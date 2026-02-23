@@ -28,3 +28,5 @@ Use o relatório de divergência RNG como verdade operacional: corrija o code pa
   - novo primeiro desvio
   - próximos passos
 
+## Recursos
+- Código em C++ do upstream: ./csmith
