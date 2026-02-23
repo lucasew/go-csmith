@@ -59,11 +59,27 @@ func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
 	}
 	raw := r.next31()
 	x := raw % n
+	if reject == nil || !reject(x) {
+		r.traceU(n, x, 0, raw)
+		return x
+	}
 	var tries uint32
-	for reject != nil && reject(x) {
+	// Safety guard: avoid pathological infinite loops when all candidates are rejected.
+	// Keep this large enough to preserve normal behavior while guaranteeing progress.
+	const maxRejectRetries uint32 = 1 << 16
+	for reject != nil && reject(x) && tries < maxRejectRetries {
 		raw = r.next31()
 		x = raw % n
 		tries++
+	}
+	if reject != nil && reject(x) {
+		// Fallback to first accepted value without consuming more RNG.
+		for cand := uint32(0); cand < n; cand++ {
+			if !reject(cand) {
+				x = cand
+				break
+			}
+		}
 	}
 	r.traceU(n, x, tries, raw)
 	return x

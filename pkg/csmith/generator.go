@@ -568,16 +568,49 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 		}
 	}
 
-	// create_and_initialize + qualifier path consume these decisions in upstream.
-	_ = er.fallback.flipcoin(50) // NewArrayVariableProb
-	_ = er.fallback.flipcoin(10) // const prob
-	_ = er.fallback.flipcoin(20) // volatile prob
-	_ = er.fallback.flipcoin(50)
-	_ = er.fallback.flipcoin(50)
-	_ = er.fallback.upto(20)
+	// Upstream GenerateNewParentLocal path:
+	// 1. CVQualifiers::random_qualifiers(t, access, cg_context, no_volatile=true):
+	//    - rnd_flipcoin(RegularVolatileProb=50) -> F 50
+	//    - rnd_flipcoin(RegularConstProb=10)    -> F 10
+	// 2. create_and_initialize:
+	//    - rnd_flipcoin(NewArrayVariableProb=20) -> F 20
+	//    - make_init_value -> Constant::make_random -> GenerateRandomConstant:
+	//      (pure_rnd = main RNG in is_random() mode)
+	//      - pure_rnd_flipcoin(50) -> F 50
+	//      - pure_rnd_flipcoin(50) -> F 50  (or pure_rnd_upto depending on branch)
+	//      - pure_rnd_upto(20)     -> U 20
+	// After this, upstream returns the local variable with NO further main RNG use.
+	_ = er.fallback.flipcoin(50) // volatile from random_qualifiers
+	_ = er.fallback.flipcoin(10) // const from random_qualifiers
+	_ = er.fallback.flipcoin(20) // create_and_initialize NewArrayVariableProb
+	_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50) in GenerateRandomConstant
+	_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50) in GenerateRandomConstant
+	_ = er.fallback.upto(20)     // pure_rnd_upto(20) in GenerateRandomConstant
 
-	// Materialize as a generated global in this simplified backend.
-	return createOnDemandGlobalFromER(er, opts, chosen, ctx)
+	// Materialize as a generated global in our simplified backend WITHOUT
+	// consuming any more main RNG. The upstream's local variable creation
+	// used pure_rnd for const/volatile (already consumed above) and
+	// pure_rnd for the init constant (also consumed above as the upto(20)).
+	return createLocalPathGlobalDirect(opts, chosen, ctx)
+}
+
+// createLocalPathGlobalDirect creates a global variable for the simplified
+// backend without consuming any main RNG (no er.pick for const/volatile,
+// no er.next for the init literal). This matches the upstream's behavior
+// after GenerateNewParentLocal returns — the local variable is returned
+// with no further main-RNG consumption.
+func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	if ctx == nil || ctx.state == nil {
+		return exprVarCandidate{}, false
+	}
+	id := ctx.state.nextGlobalID
+	ctx.state.nextGlobalID = id + 1
+	name := fmt.Sprintf("g_%d", id)
+	// Use a zero literal — no main RNG consumption.
+	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = 0;", t.Name, name))
+	g := globalInfo{name: name, ctype: t, isConst: false, isVolatile: false}
+	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+	return exprVarCandidate{expr: name, ctype: t, assignable: true}, true
 }
 
 func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
@@ -816,6 +849,20 @@ func randomLeafExprWithMode(
 		snap := takeGenSnapshot(ctx)
 		var choice termChoice
 		if er != nil && er.fallback != nil {
+			hasAllowed := false
+			for _, e := range entries {
+				if e.prob <= 0 {
+					continue
+				}
+				if !disallowed(e.term) {
+					hasAllowed = true
+					break
+				}
+			}
+			if !hasAllowed {
+				restoreGenSnapshot(ctx, snap)
+				continue
+			}
 			raw := int(er.fallback.uptoWithFilter(uint32(maxProb), func(x uint32) bool {
 				return disallowed(decode(int(x)))
 			}))
@@ -836,9 +883,8 @@ func randomLeafExprWithMode(
 					if er.fallback.flipcoin(5) {
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
-						// In upstream make_random_unary(), operand expression is
-						// generated under the current expr_depth context.
-						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, depth, ctx, false, false)
+						// Recursive child expression must advance depth.
+						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
 						return castLiteral(t, fmt.Sprintf("(~(%s))", operand))
 					}
 					ptrCmpProb := uint32(0)
@@ -850,10 +896,9 @@ func randomLeafExprWithMode(
 					_ = er.fallback.flipcoin(50)
 					_ = er.fallback.flipcoin(50)
 					_ = er.fallback.upto(4)
-					// In upstream make_random_binary(), lhs/rhs are generated
-					// from child contexts carrying current expr_depth.
-					lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth, ctx, false, false)
-					rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth, ctx, false, false)
+					// Recursive child expressions must advance depth.
+					lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+					rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
 					return castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
 				}
 			}
