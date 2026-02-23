@@ -147,7 +147,7 @@ P
     echo "- agent_log: $iter_log"
   } >> "$MEMORY_FILE"
 
-  cmd="$CLAUDE_CMD -p \"\$(cat '$iter_prompt')\""
+  cmd="$CLAUDE_CMD --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
   echo "[loop] claude cmd: $cmd"
 
   if [[ "$DRY_RUN" == "1" ]]; then
