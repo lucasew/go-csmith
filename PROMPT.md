@@ -11,6 +11,7 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 2. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
 3. Aplique patch mínimo para testar essa hipótese.
 4. Pare de editar; o loop executará a validação pós-patch.
+5. Guarde o que você aprendeu e outras informações relevantes em MEMORY.md
 
 ## Estratégia por modo
 - `mode=termination_fix`:
