@@ -73,13 +73,7 @@ func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
 		tries++
 	}
 	if reject != nil && reject(x) {
-		// Fallback to first accepted value without consuming more RNG.
-		for cand := uint32(0); cand < n; cand++ {
-			if !reject(cand) {
-				x = cand
-				break
-			}
-		}
+		panic(fmt.Sprintf("rng.uptoWithFilter: exceeded retry limit (n=%d tries=%d raw=%d)", n, tries, raw))
 	}
 	r.traceU(n, x, tries, raw)
 	return x
