@@ -103,6 +103,9 @@ if [[ ! -f "$MEMORY_FILE" ]]; then
 - rollback_on_regression: $ROLLBACK_ON_REGRESSION
 
 ## Iterations
+
+| iter | ts_utc | mode | pre_result | pre_reason | pre_score | pre_div | post_result | post_reason | post_score | post_div | improved | checkpoint |
+|---|---|---|---|---|---:|---:|---|---|---:|---:|---:|---|
 MEM
 fi
 
@@ -222,19 +225,24 @@ P
   {
     echo ""
     echo "### Iteration $iter"
-    echo "- timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    echo "- pre_result: ${pre_result}"
-    echo "- pre_reason: ${pre_reason}"
-    echo "- pre_score: ${pre_score}"
-    echo "- pre_mismatch_event: ${pre_mismatch_event:-unknown}"
-    echo "- pre_upstream_event: ${pre_up_event:-<none>}"
-    echo "- pre_go_event: ${pre_go_event:-<none>}"
-    if [[ "$pre_result" == "failure" ]]; then
-      echo "- pre_failure_tail: ${pre_fail_text:-<none>}"
-    fi
+    echo ""
+    echo "#### Context"
+    echo "- ts_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    echo "- mode: ${pre_mode}"
     echo "- pre_report_file: $pre_report"
     echo "- prompt_file: $iter_prompt"
     echo "- agent_log: $iter_log"
+    echo ""
+    echo "#### Pre"
+    echo "- result: ${pre_result}"
+    echo "- reason: ${pre_reason}"
+    echo "- score: ${pre_score}"
+    echo "- first_divergence_event: ${pre_mismatch_event:-unknown}"
+    echo "- upstream_event: ${pre_up_event:-<none>}"
+    echo "- go_event: ${pre_go_event:-<none>}"
+    if [[ "$pre_result" == "failure" ]]; then
+      echo "- failure_tail: ${pre_fail_text:-<none>}"
+    fi
   } >> "$MEMORY_FILE"
 
   cmd="$CLAUDE_CMD --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
@@ -299,21 +307,23 @@ P
     best_iter="$iter"
   fi
 
-  {
-    echo "- post_result: ${post_result}"
-    echo "- post_reason: ${post_reason}"
-    echo "- post_score: ${post_score}"
-    echo "- post_mismatch_event: ${post_mismatch_event:-unknown}"
-    echo "- post_upstream_event: ${post_up_event:-<none>}"
-    echo "- post_go_event: ${post_go_event:-<none>}"
-    if [[ "$post_result" == "failure" ]]; then
-      echo "- post_failure_tail: ${post_fail_text:-<none>}"
-    fi
-    echo "- post_report_file: $post_report"
-    echo "- improved: $improved"
-  } >> "$MEMORY_FILE"
+  checkpoint_msg="-"
 
   if [[ "$post_result" == "match" ]]; then
+    {
+      echo ""
+      echo "#### Post"
+      echo "- result: ${post_result}"
+      echo "- reason: ${post_reason}"
+      echo "- score: ${post_score}"
+      echo "- first_divergence_event: ${post_mismatch_event:-unknown}"
+      echo "- upstream_event: ${post_up_event:-<none>}"
+      echo "- go_event: ${post_go_event:-<none>}"
+      echo "- post_report_file: $post_report"
+      echo "- improved: $improved"
+      echo ""
+      echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
+    } >> "$MEMORY_FILE"
     echo "[loop] parity achieved at iteration $iter"
     exit 0
   fi
@@ -325,12 +335,32 @@ P
         if ! git diff --cached --quiet; then
           commit_msg="checkpoint: seed ${SEED} iter ${iter} score=${pre_score}->${post_score}"
           git commit -m "$commit_msg" >/dev/null
+          checkpoint_msg="$commit_msg"
           echo "[loop] checkpoint commit created: $commit_msg"
           echo "- checkpoint_commit: $commit_msg" >> "$MEMORY_FILE"
         fi
       fi
     fi
   fi
+
+  {
+    echo ""
+    echo "#### Post"
+    echo "- result: ${post_result}"
+    echo "- reason: ${post_reason}"
+    echo "- score: ${post_score}"
+    echo "- first_divergence_event: ${post_mismatch_event:-unknown}"
+    echo "- upstream_event: ${post_up_event:-<none>}"
+    echo "- go_event: ${post_go_event:-<none>}"
+    if [[ "$post_result" == "failure" ]]; then
+      echo "- failure_tail: ${post_fail_text:-<none>}"
+    fi
+    echo "- post_report_file: $post_report"
+    echo "- improved: $improved"
+    echo "- checkpoint: $checkpoint_msg"
+    echo ""
+    echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
+  } >> "$MEMORY_FILE"
 
   if (( stall_count >= STALL_LIMIT )); then
     echo "[loop] stalled for ${STALL_LIMIT} consecutive iterations; stopping early"
