@@ -998,16 +998,12 @@ func randomParamLeafExpr(t CType, er *exprRand, opts Options, env envInfo, scope
 }
 
 func maxExprDepth(opts Options) int {
-	if opts.MaxExprComplexity <= 2 {
+	// Upstream --max-expr-complexity N sets CGOptions::max_expr_depth = N directly.
+	// The filter is: expr_depth + 2 > max_expr_depth(), i.e. N=10 only filters at depth>=9.
+	if opts.MaxExprComplexity < 1 {
 		return 1
 	}
-	if opts.MaxExprComplexity <= 6 {
-		return 2
-	}
-	if opts.MaxExprComplexity <= 12 {
-		return 3
-	}
-	return 4
+	return opts.MaxExprComplexity
 }
 
 func randomTypedExprDepth(t CType, er *exprRand, opts Options, env envInfo, scope scopeInfo, depth int, ctx *genContext) string {
