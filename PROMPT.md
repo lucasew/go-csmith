@@ -1,32 +1,36 @@
 # Objetivo
 Você está trabalhando no projeto `go-csmith` para obter equivalência real com o Csmith upstream (C++).
 
-## Regra principal
-Use o relatório de divergência RNG como verdade operacional: corrija o code path em Go para empurrar o primeiro desvio para frente, sem hacks.
+## Função objetivo (obrigatória)
+- Score primário: `first_divergence_event` (quanto maior, melhor).
+- `result=match` é sucesso final.
+- Se houver crash/timeout/falha de geração, trate como problema de terminação/estabilidade.
 
-## O que fazer em cada iteração
-1. Ler o desvio atual (evento, contexto upstream/go).
-2. Identificar a função/caminho no Go responsável pelo desvio.
-3. Portar comportamento upstream de forma fiel (ordem de chamadas RNG, filtros, retries, profundidade/contexto).
-4. Evitar mudanças cosméticas e evitar alterações no algoritmo upstream.
-5. Fazer mudanças mínimas e coerentes para avançar a paridade.
+## Modo de trabalho por iteração
+1. Leia `mode` e o `pre_report_file`.
+2. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
+3. Aplique patch mínimo para testar essa hipótese.
+4. Pare de editar; o loop executará a validação pós-patch.
+
+## Estratégia por modo
+- `mode=termination_fix`:
+  - Priorize remover não-terminação (recursão sem avanço de profundidade, filtros impossíveis, loops sem bound).
+  - Não mude comportamento além do necessário para voltar a terminar.
+- `mode=rng_alignment`:
+  - Priorize alinhar ordem e semântica de consumo RNG no primeiro ponto de desvio.
+  - Foque em call path local do desvio (filtros/retries/contexto/profundidade).
 
 ## Restrições
-- Não trapacear.
-- Não mascarar resultado removendo trechos de geração.
-- Não “alinhar por sorte” com consumos artificiais sem base no upstream.
-- Priorizar fidelidade de pipeline e RNG call path.
-
-## Definição de pronto
-- O primeiro desvio de RNG deve avançar para um evento maior a cada iteração, idealmente até `result=match`.
-- A implementação Go deve continuar compilando e gerando código válido.
+- Faça patch em no máximo 2 arquivos por iteração.
+- Não faça refactor amplo nem mudanças cosméticas.
+- Não adicione hacks de consumo RNG sem base no upstream.
+- Não desative funcionalidades para “passar” no checker.
 
 ## Saída esperada da iteração
 - Resumo curto:
-  - qual era o desvio
-  - qual mudança foi aplicada
-  - novo primeiro desvio
-  - próximos passos
+  - hipótese escolhida
+  - arquivo(s) alterado(s)
+  - por que a mudança deve melhorar o score
 
 ## Recursos
-- Código em C++ do upstream: ./csmith
+- Código upstream C++: `./csmith`
