@@ -25,7 +25,7 @@ Env overrides:
 
 Examples:
   scripts/compare-upstream.sh --count 20 --seed-start 100
-  UPSTREAM_GEN_CMD='/tmp/csmith/src/csmith' scripts/compare-upstream.sh
+  UPSTREAM_GEN_CMD='./csmith/src/csmith' scripts/compare-upstream.sh
 USAGE
 }
 

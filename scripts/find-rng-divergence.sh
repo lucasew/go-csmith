@@ -4,7 +4,7 @@ set -euo pipefail
 SEED="${SEED:-2}"
 WORKDIR="${WORKDIR:-/tmp/csmith-parity}"
 CONTEXT="${CONTEXT:-8}"
-UPSTREAM_CMD="${UPSTREAM_CMD:-/tmp/csmith/build-instrumented/src/csmith}"
+UPSTREAM_CMD="${UPSTREAM_CMD:-./csmith/build-instrumented/src/csmith}"
 GO_CMD="${GO_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith-go}"
 STRICT_RAW="${STRICT_RAW:-0}"
 
@@ -19,13 +19,13 @@ Env overrides:
   SEED        (default: 2)
   WORKDIR     (default: /tmp/csmith-parity)
   CONTEXT     (default: 8)
-  UPSTREAM_CMD (default: /tmp/csmith/build-instrumented/src/csmith)
+  UPSTREAM_CMD (default: ./csmith/build-instrumented/src/csmith)
   GO_CMD      (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith-go)
   STRICT_RAW  (default: 0) compare tries/raw too (1 = enabled)
 
 Examples:
   scripts/find-rng-divergence.sh --seed 2
-  UPSTREAM_CMD='/tmp/csmith/build-instrumented/src/csmith' scripts/find-rng-divergence.sh --seed 2 --strict-raw
+  UPSTREAM_CMD='./csmith/build-instrumented/src/csmith' scripts/find-rng-divergence.sh --seed 2 --strict-raw
 USAGE
 }
 
