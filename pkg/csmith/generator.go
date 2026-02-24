@@ -944,6 +944,19 @@ func randomLeafExprWithMode(
 		case termConstant:
 			return randomConstantExprFromER(t, er, opts)
 		case termAssign:
+			// Upstream ExpressionAssign::make_random consumes 3 RNG calls before
+			// LHS variable selection:
+			// 1. CVQualifiers::random_qualifiers -> rnd_flipcoin(volatile_prob=50)
+			//    (volatile draw; result is discarded when no_volatile=true, but RNG
+			//    is still consumed)
+			// 2. AssignOpsProbability -> rnd_upto(assign_ops_total=120)
+			// 3. Expression::make_random for RHS -> ExpressionTypeProbability ->
+			//    rnd_upto(maxProb) selecting the RHS expression kind
+			if er != nil && er.fallback != nil {
+				_ = er.fallback.flipcoin(50)          // CVQualifiers volatile draw
+				_ = er.fallback.upto(120)             // AssignOpsProbability
+				_ = er.fallback.upto(uint32(maxProb)) // RHS ExpressionTypeProbability
+			}
 			scopePick := variableScopePickFromER(er, opts)
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
