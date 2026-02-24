@@ -92,3 +92,34 @@
 
 | 2 | 2026-02-24T18:22:18Z | rng_alignment | mismatch | event_diff | 92 | 92 | mismatch | event_diff | 92 | 92 | 0 | - |
 - iteration_score_final: 92
+
+### Iteration 3
+
+#### Context
+- ts_utc: 2026-02-24T18:22:20Z
+- mode: rng_alignment
+- pre_report_file: /tmp/csmith-parity/seed_2.iter_3.pre.report.txt
+- prompt_file: /tmp/csmith-parity/seed_2.iter_3.prompt.md
+- agent_log: /tmp/csmith-parity/seed_2.iter_3.agent.log
+
+#### Pre
+- result: mismatch
+- reason: event_diff
+- score: 92
+- first_divergence_event: 92
+- upstream_event: 92 U 120 60 0 311111580
+- go_event:       92 U 2 0 0 1479118506
+
+#### Post
+- result: mismatch
+- reason: event_diff
+- score: 92
+- first_divergence_event: 92
+- upstream_event: 92 U 120 60 0 311111580
+- go_event:       92 U 120 66 0 1479118506
+- post_report_file: /tmp/csmith-parity/seed_2.iter_3.post.report.txt
+- improved: 0
+- checkpoint: -
+
+| 3 | 2026-02-24T18:24:26Z | rng_alignment | mismatch | event_diff | 92 | 92 | mismatch | event_diff | 92 | 92 | 0 | - |
+- iteration_score_final: 92
