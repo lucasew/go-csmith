@@ -12,7 +12,7 @@ MEMORY_FILE="${MEMORY_FILE:-}"
 CHECKPOINT_COMMITS="${CHECKPOINT_COMMITS:-1}"
 DRY_RUN="${DRY_RUN:-0}"
 STALL_LIMIT="${STALL_LIMIT:-3}"
-ROLLBACK_ON_REGRESSION="${ROLLBACK_ON_REGRESSION:-1}"
+RESET_ON_NO_IMPROVEMENT="${RESET_ON_NO_IMPROVEMENT:-1}"
 
 usage() {
   cat <<'USAGE'
@@ -34,8 +34,8 @@ Options:
   --claude-cmd "CMD"
   --memory-file PATH
   --stall-limit N
-  --rollback-on-regression
-  --no-rollback-on-regression
+  --reset-on-no-improvement
+  --no-reset-on-no-improvement
   --no-checkpoint-commits
   --checkpoint-commits
   --dry-run
@@ -44,7 +44,7 @@ Options:
 Env overrides:
   SEED, MAX_ITERS, WORKDIR, CONTEXT, STRICT_RAW, PROMPT_FILE, CLAUDE_CMD,
   MEMORY_FILE, STALL_LIMIT, CHECKPOINT_COMMITS, DRY_RUN
-  ROLLBACK_ON_REGRESSION
+  RESET_ON_NO_IMPROVEMENT
 
 Example:
   scripts/ralph-loop.sh --seed 2 --max-iters 30 --claude-cmd "claude"
@@ -62,8 +62,8 @@ while [[ $# -gt 0 ]]; do
     --claude-cmd) CLAUDE_CMD="$2"; shift 2 ;;
     --memory-file) MEMORY_FILE="$2"; shift 2 ;;
     --stall-limit) STALL_LIMIT="$2"; shift 2 ;;
-    --rollback-on-regression) ROLLBACK_ON_REGRESSION=1; shift ;;
-    --no-rollback-on-regression) ROLLBACK_ON_REGRESSION=0; shift ;;
+    --reset-on-no-improvement) RESET_ON_NO_IMPROVEMENT=1; shift ;;
+    --no-reset-on-no-improvement) RESET_ON_NO_IMPROVEMENT=0; shift ;;
     --checkpoint-commits) CHECKPOINT_COMMITS=1; shift ;;
     --no-checkpoint-commits) CHECKPOINT_COMMITS=0; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -88,7 +88,7 @@ fi
 mkdir -p "$WORKDIR"
 
 if [[ -z "$MEMORY_FILE" ]]; then
-  MEMORY_FILE="$WORKDIR/seed_${SEED}.memory.md"
+  MEMORY_FILE="MEMORY.md"
 fi
 
 if [[ ! -f "$MEMORY_FILE" ]]; then
@@ -100,7 +100,7 @@ if [[ ! -f "$MEMORY_FILE" ]]; then
 - prompt_file: $PROMPT_FILE
 - claude_cmd: $CLAUDE_CMD
 - stall_limit: $STALL_LIMIT
-- rollback_on_regression: $ROLLBACK_ON_REGRESSION
+- reset_on_no_improvement: $RESET_ON_NO_IMPROVEMENT
 
 ## Iterations
 
@@ -171,6 +171,43 @@ parse_report() {
   eval "${out_prefix}_go_event=\"\$go_event\""
   eval "${out_prefix}_mode=\"\$mode\""
   eval "${out_prefix}_fail_text=\"\$fail_text\""
+}
+
+reset_repo_keep_memory() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+  local backup_file=""
+  if [[ -f "$MEMORY_FILE" ]]; then
+    backup_file="$(mktemp)"
+    cp "$MEMORY_FILE" "$backup_file"
+  fi
+  git reset HEAD -- . >/dev/null
+  git checkout HEAD -- . >/dev/null
+  if [[ -n "$backup_file" ]]; then
+    mkdir -p "$(dirname "$MEMORY_FILE")"
+    cp "$backup_file" "$MEMORY_FILE"
+    rm -f "$backup_file"
+  fi
+}
+
+commit_memory_only() {
+  local iter="$1"
+  local pre_score="$2"
+  local post_score="$3"
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! git add -- "$MEMORY_FILE" >/dev/null 2>&1; then
+    echo "[loop] warning: could not git add memory file '$MEMORY_FILE'"
+    return 0
+  fi
+  if git diff --cached --quiet; then
+    return 0
+  fi
+  local msg="memory: seed ${SEED} iter ${iter} score=${pre_score}->${post_score}"
+  git commit -m "$msg" >/dev/null
+  echo "[loop] memory commit created: $msg"
 }
 
 best_score="-1"
@@ -249,21 +286,6 @@ P
   cmd="$CLAUDE_CMD --model opus --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
   echo "[loop] claude cmd: $cmd"
 
-  pre_stash_ref=""
-  rollback_enabled_this_iter=0
-  if [[ "$ROLLBACK_ON_REGRESSION" == "1" && "$DRY_RUN" != "1" ]]; then
-    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      # Save pre-agent worktree/index/untracked and re-apply it to keep a rollback point.
-      git stash push -u -m "ralph-loop pre iter=${iter} score=${pre_score}" >/dev/null
-      pre_stash_ref="stash@{0}"
-      if git stash apply --index "$pre_stash_ref" >/dev/null 2>&1; then
-        rollback_enabled_this_iter=1
-      else
-        echo "[loop] warning: failed to re-apply pre-iteration stash; rollback disabled for this iteration"
-      fi
-    fi
-  fi
-
   if [[ "$DRY_RUN" == "1" ]]; then
     : > "$iter_log"
   else
@@ -285,21 +307,12 @@ P
   if (( improved == 1 )); then
     stall_count=0
     echo "[loop] improved: score ${pre_score} -> ${post_score}"
-    if [[ "$rollback_enabled_this_iter" == "1" ]]; then
-      git stash drop "$pre_stash_ref" >/dev/null || true
-      echo "[loop] dropped pre-iteration rollback stash"
-    fi
   else
     stall_count=$((stall_count + 1))
     echo "[loop] no improvement: score ${pre_score} -> ${post_score} (stall=${stall_count}/${STALL_LIMIT})"
-    if [[ "$rollback_enabled_this_iter" == "1" ]]; then
-      git stash push -u -m "ralph-loop regressed iter=${iter} score=${pre_score}->${post_score}" >/dev/null || true
-      if git stash apply --index "stash@{1}" >/dev/null 2>&1; then
-        echo "[loop] rolled back regressed iteration using stash snapshot; regressed state kept at stash@{0}"
-      else
-        echo "[loop] warning: rollback apply failed; manual recovery may be needed"
-      fi
-      git stash drop "stash@{1}" >/dev/null || true
+    if [[ "$RESET_ON_NO_IMPROVEMENT" == "1" && "$DRY_RUN" != "1" ]]; then
+      reset_repo_keep_memory
+      echo "[loop] reset applied: git checkout HEAD em tudo (memory preserved)"
     fi
   fi
 
@@ -324,12 +337,23 @@ P
       echo "- improved: $improved"
       echo ""
       echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
+      echo "- iteration_score_final: ${post_score}"
     } >> "$MEMORY_FILE"
+    if [[ "$DRY_RUN" != "1" ]]; then
+      if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git add -A
+        if ! git diff --cached --quiet; then
+          commit_msg="checkpoint: seed ${SEED} iter ${iter} score=${pre_score}->${post_score} (match)"
+          git commit -m "$commit_msg" >/dev/null
+          echo "[loop] checkpoint commit created: $commit_msg"
+        fi
+      fi
+    fi
     echo "[loop] parity achieved at iteration $iter"
     exit 0
   fi
 
-  if [[ "$CHECKPOINT_COMMITS" == "1" && "$DRY_RUN" != "1" && "$improved" == "1" ]]; then
+  if [[ "$DRY_RUN" != "1" && "$improved" == "1" ]]; then
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       if ! git diff --quiet || ! git diff --cached --quiet; then
         git add -A
@@ -361,7 +385,12 @@ P
     echo "- checkpoint: $checkpoint_msg"
     echo ""
     echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
+    echo "- iteration_score_final: ${post_score}"
   } >> "$MEMORY_FILE"
+
+  if [[ "$DRY_RUN" != "1" && "$improved" != "1" ]]; then
+    commit_memory_only "$iter" "$pre_score" "$post_score"
+  fi
 
   if (( stall_count >= STALL_LIMIT )); then
     echo "[loop] stalled for ${STALL_LIMIT} consecutive iterations; stopping early"
