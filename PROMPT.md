@@ -13,7 +13,14 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 4. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
 5. Aplique patch mínimo para testar essa hipótese.
 6. Pare de editar; o loop executará a validação pós-patch.
-7. Guarde o que você aprendeu e outras informações relevantes em MEMORY.md
+7. Guarde o que você aprendeu em `MEMORY.md` no final da iteração.
+8. Use este formato fixo em `MEMORY.md`:
+   - `## Learned (iter N)`
+   - `- hypothesis: ...`
+   - `- cpp_reference: caminho::funcao`
+   - `- go_change: arquivo::funcao`
+   - `- outcome_expected: ...`
+   - `- handoff: ...`
 
 ## Estratégia por modo
 - `mode=termination_fix`:

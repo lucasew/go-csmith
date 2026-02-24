@@ -256,6 +256,13 @@ Instrução:
 - Se mode=termination_fix: priorize remover loop/recursão não-terminante.
 - Se mode=rng_alignment: priorize ordem exata de consumo RNG no primeiro desvio.
 - Compare explicitamente com o upstream C++ em ./csmith/src e cite arquivo+função equivalentes.
+- Atualize MEMORY.md com o bloco:
+  - ## Learned (iter $iter)
+  - - hypothesis: ...
+  - - cpp_reference: caminho::funcao
+  - - go_change: arquivo::funcao
+  - - outcome_expected: ...
+  - - handoff: ...
 - Ao final, pare de editar para o loop rodar a próxima comparação.
 P
   } > "$iter_prompt"
