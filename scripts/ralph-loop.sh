@@ -218,6 +218,7 @@ Instrução:
 - Limite patch a no máximo 2 arquivos e evite refactor.
 - Se mode=termination_fix: priorize remover loop/recursão não-terminante.
 - Se mode=rng_alignment: priorize ordem exata de consumo RNG no primeiro desvio.
+- Compare explicitamente com o upstream C++ em ./csmith/src e cite arquivo+função equivalentes.
 - Ao final, pare de editar para o loop rodar a próxima comparação.
 P
   } > "$iter_prompt"

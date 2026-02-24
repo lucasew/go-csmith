@@ -8,10 +8,12 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 
 ## Modo de trabalho por iteração
 1. Leia `mode` e o `pre_report_file`.
-2. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
-3. Aplique patch mínimo para testar essa hipótese.
-4. Pare de editar; o loop executará a validação pós-patch.
-5. Guarde o que você aprendeu e outras informações relevantes em MEMORY.md
+2. Faça rastreio completo do primeiro desvio/falha (start -> call path -> decisão RNG).
+3. Localize no C++ upstream (`./csmith/src`) o caminho equivalente e confirme ordem/semântica de RNG.
+4. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
+5. Aplique patch mínimo para testar essa hipótese.
+6. Pare de editar; o loop executará a validação pós-patch.
+7. Guarde o que você aprendeu e outras informações relevantes em MEMORY.md
 
 ## Estratégia por modo
 - `mode=termination_fix`:
@@ -26,12 +28,17 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 - Não faça refactor amplo nem mudanças cosméticas.
 - Não adicione hacks de consumo RNG sem base no upstream.
 - Não desative funcionalidades para “passar” no checker.
+- Toda mudança em Go deve citar referência C++ equivalente (arquivo + função).
 
 ## Saída esperada da iteração
 - Resumo curto:
   - hipótese escolhida
   - arquivo(s) alterado(s)
   - por que a mudança deve melhorar o score
+- Inclua obrigatoriamente:
+  - `TRACE_PATH`: 3-8 passos do rastreio (início -> fim).
+  - `CPP_REFERENCE`: arquivo(s)/função(ões) do upstream usados.
+  - `HANDOFF`: próximo alvo objetivo para o agente seguinte.
 
 ## Recursos
 - Código upstream C++: `./csmith`

@@ -610,6 +610,10 @@ func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext) (exprVa
 	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = 0;", t.Name, name))
 	g := globalInfo{name: name, ctype: t, isConst: false, isVolatile: false}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
+	// selections — matches upstream's GenerateNewParentLocal adding to
+	// block->local_vars, preventing repeated on-demand creation.
+	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t})
 	return exprVarCandidate{expr: name, ctype: t, assignable: true}, true
 }
 
