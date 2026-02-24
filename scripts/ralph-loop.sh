@@ -245,7 +245,7 @@ P
     fi
   } >> "$MEMORY_FILE"
 
-  cmd="$CLAUDE_CMD --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
+  cmd="$CLAUDE_CMD --model opus --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
   echo "[loop] claude cmd: $cmd"
 
   pre_stash_ref=""
