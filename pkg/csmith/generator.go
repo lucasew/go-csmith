@@ -672,11 +672,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			sameWidth = append(sameWidth, c)
 		}
 	}
+	// Upstream choose_ok_var: len==1 returns directly without RNG,
+	// len>1 calls rnd_upto(len). (VariableSelector.cpp:332)
 	if len(exact) > 0 {
+		if len(exact) == 1 {
+			return exact[0], true
+		}
 		return exact[int(er.pick(uint32(len(exact))))], true
 	}
 	if len(sameWidth) > 0 {
+		if len(sameWidth) == 1 {
+			return sameWidth[0], true
+		}
 		return sameWidth[int(er.pick(uint32(len(sameWidth))))], true
+	}
+	if len(filtered) == 1 {
+		return filtered[0], true
 	}
 	return filtered[int(er.pick(uint32(len(filtered))))], true
 }
@@ -963,7 +974,62 @@ func randomLeafExprWithMode(
 			// Generate full RHS expression (upstream does Expression::make_random
 			// before LHS selection).
 			rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
-			// Now LHS variable selection (upstream Lhs::make_random).
+			// Upstream Lhs::make_random (Lhs.cpp:61): do-while loop that tries
+			// select_deref_pointer before falling through to VariableSelector::select.
+			// Each iteration when flipcoin(80)=true and no pointer vars exist:
+			//   F 80 (SelectDerefPointerProb) -> true
+			//   F 20 (NewArrayVariableProb in create_and_initialize)
+			//   F 20 (make_init_value for pointer: constant path if true)
+			//   F 0  (opportunistic_validate with null_pointer_deref_prob=0)
+			// When make_init_value flipcoin(20)=false: address-of path creates a
+			// global int var (F 20 inner NewArrayVar, F 50 GenerateRandomConstant,
+			// + 8 raw genrand for RandomHexDigits), then pointer is valid -> loop exits.
+			// When flipcoin(80)=false: fall through to VariableSelector::select (scope pick).
+			// Upstream Lhs::make_random (Lhs.cpp:61): do-while loop that tries
+			// select_deref_pointer before falling through to VariableSelector::select.
+			lhsFromDeref := false
+			if er != nil && er.fallback != nil {
+				for {
+					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
+					if !deref {
+						break // fall through to VariableSelector::select
+					}
+					// select_deref_pointer: no pointer vars -> GenerateNewParentLocal
+					// create_and_initialize (VariableSelector.cpp:510):
+					_ = er.fallback.flipcoin(20) // NewArrayVariableProb
+					// make_init_value for pointer (VariableSelector.cpp:834):
+					initConst := er.fallback.flipcoin(20)
+					if initConst {
+						// Constant "0" (null), no more RNG for init
+						// opportunistic_validate: null ptr -> flipcoin(0) -> fail
+						_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
+						continue
+					}
+					// Address-of path: create global int for pointer target
+					// GenerateNewGlobal -> create_and_initialize for int:
+					_ = er.fallback.flipcoin(20) // inner NewArrayVariableProb
+					// Constant::make_random(int) -> GenerateRandomConstant:
+					_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50)
+					for i := 0; i < 8; i++ {
+						_ = er.fallback.next31() // RandomHexDigits(8)
+					}
+					// Pointer to valid var -> opportunistic_validate passes -> exit
+					lhsFromDeref = true
+					break
+				}
+			}
+			if lhsFromDeref {
+				// Upstream already selected LHS in the loop; no scope pick.
+				// Pick any writable variable for the Go output.
+				candidates := buildExprCandidatesFromER(er, env, scope, ctx)
+				if len(candidates) > 0 {
+					if lv, ok := selectExprVariableFromER(t, er, candidates, true); ok {
+						return castLiteral(t, fmt.Sprintf("(%s = %s)", lv.expr, rhs))
+					}
+				}
+				return castLiteral(t, fmt.Sprintf("(%s)", rhs))
+			}
+			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
 			scopePick := variableScopePickFromER(er, opts)
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
