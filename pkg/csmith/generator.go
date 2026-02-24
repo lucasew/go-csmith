@@ -944,25 +944,27 @@ func randomLeafExprWithMode(
 		case termConstant:
 			return randomConstantExprFromER(t, er, opts)
 		case termAssign:
-			// Upstream ExpressionAssign::make_random consumes 3 RNG calls before
-			// LHS variable selection:
+			// Upstream ExpressionAssign::make_random:
 			// 1. CVQualifiers::random_qualifiers -> rnd_flipcoin(volatile_prob=50)
 			//    (volatile draw; result is discarded when no_volatile=true, but RNG
 			//    is still consumed)
-			// 2. AssignOpsProbability -> rnd_upto(assign_ops_total=120)
-			// 3. Expression::make_random for RHS -> ExpressionTypeProbability ->
-			//    rnd_upto(maxProb) selecting the RHS expression kind
+			// 2. StatementAssign::make_random:
+			//    a. AssignOpsProbability -> rnd_upto(assign_ops_total=120)
+			//    b. Full Expression::make_random for RHS (recursive)
+			//    c. Lhs::make_random for LHS variable selection
 			if er != nil && er.fallback != nil {
-				_ = er.fallback.flipcoin(50)          // CVQualifiers volatile draw
-				_ = er.fallback.upto(120)             // AssignOpsProbability
-				_ = er.fallback.upto(uint32(maxProb)) // RHS ExpressionTypeProbability
+				_ = er.fallback.flipcoin(50) // CVQualifiers volatile draw
+				_ = er.fallback.upto(120)    // AssignOpsProbability
 			}
+			// Generate full RHS expression (upstream does Expression::make_random
+			// before LHS selection).
+			rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+			// Now LHS variable selection (upstream Lhs::make_random).
 			scopePick := variableScopePickFromER(er, opts)
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
 				if scopePick == 0 || scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
-						rhs := randomConstantExprFromER(g.ctype, er, opts)
 						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
 					}
 				}
@@ -970,7 +972,6 @@ func randomLeafExprWithMode(
 			}
 			if len(candidates) > 0 {
 				if lv, ok := selectExprVariableFromER(t, er, candidates, true); ok {
-					rhs := randomConstantExprFromER(lv.ctype, er, opts)
 					return castLiteral(t, fmt.Sprintf("(%s = %s)", lv.expr, rhs))
 				}
 			}
