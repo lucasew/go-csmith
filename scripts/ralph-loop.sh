@@ -109,8 +109,8 @@ if [[ ! -f "$MEMORY_FILE" ]]; then
 
 ## Iterations
 
-| iter | ts_utc | mode | pre_result | pre_reason | pre_score | pre_div | post_result | post_reason | post_score | post_div | improved | checkpoint |
-|---|---|---|---|---|---:|---:|---|---|---:|---:|---:|---|
+| run | iter | ts_utc | mode | pre_score | post_score | improved | post_div | reason | action |
+|---:|---:|---|---|---:|---:|---:|---:|---|---|
 MEM
 fi
 
@@ -234,6 +234,8 @@ commit_memory_only() {
 best_score="-1"
 best_iter="0"
 stall_count="0"
+run_seq=0
+last_iter_seen=999999
 
 for ((iter=1; iter<=MAX_ITERS; iter++)); do
   echo ""
@@ -251,6 +253,13 @@ for ((iter=1; iter<=MAX_ITERS; iter++)); do
   iter_prompt="$WORKDIR/seed_${SEED}.iter_${iter}.prompt.md"
   iter_log="$WORKDIR/seed_${SEED}.iter_${iter}.agent.log"
   post_report="$WORKDIR/seed_${SEED}.iter_${iter}.post.report.txt"
+  memory_tail_file="$WORKDIR/seed_${SEED}.iter_${iter}.memory_tail.md"
+
+  if [[ -f "$MEMORY_FILE" ]]; then
+    tail -n 120 "$MEMORY_FILE" > "$memory_tail_file" || true
+  else
+    : > "$memory_tail_file"
+  fi
 
   {
     cat "$PROMPT_FILE"
@@ -271,6 +280,11 @@ for ((iter=1; iter<=MAX_ITERS; iter++)); do
 - pre_report_file: $pre_report
 - stall_count: $stall_count/$STALL_LIMIT
 
+## Memória Recente (obrigatório usar)
+\`\`\`md
+$(cat "$memory_tail_file")
+\`\`\`
+
 Instrução:
 - Faça apenas uma hipótese por vez.
 - Limite patch a no máximo 2 arquivos e evite refactor.
@@ -282,34 +296,12 @@ Instrução:
   - - hypothesis: ...
   - - cpp_reference: caminho::funcao
   - - go_change: arquivo::funcao
+  - - memory_reuse: qual item anterior você reutilizou
   - - outcome_expected: ...
   - - handoff: ...
 - Ao final, pare de editar para o loop rodar a próxima comparação.
 P
   } > "$iter_prompt"
-
-  {
-    echo ""
-    echo "### Iteration $iter"
-    echo ""
-    echo "#### Context"
-    echo "- ts_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    echo "- mode: ${pre_mode}"
-    echo "- pre_report_file: $pre_report"
-    echo "- prompt_file: $iter_prompt"
-    echo "- agent_log: $iter_log"
-    echo ""
-    echo "#### Pre"
-    echo "- result: ${pre_result}"
-    echo "- reason: ${pre_reason}"
-    echo "- score: ${pre_score}"
-    echo "- first_divergence_event: ${pre_mismatch_event:-unknown}"
-    echo "- upstream_event: ${pre_up_event:-<none>}"
-    echo "- go_event: ${pre_go_event:-<none>}"
-    if [[ "$pre_result" == "failure" ]]; then
-      echo "- failure_tail: ${pre_fail_text:-<none>}"
-    fi
-  } >> "$MEMORY_FILE"
 
   cmd="$CLAUDE_CMD --model opus --dangerously-skip-permissions --output-format stream-json --verbose -p \"\$(cat '$iter_prompt')\""
   echo "[loop] claude cmd: $cmd"
@@ -317,9 +309,23 @@ P
   if [[ "$DRY_RUN" == "1" ]]; then
     : > "$iter_log"
   else
-    # Direto no terminal, sem redirecionamento mágico
-    bash -lc "$cmd"
-    : > "$iter_log"
+    bash -lc "$cmd" | tee "$iter_log"
+  fi
+
+  if [[ "$DRY_RUN" != "1" ]]; then
+    if ! grep -q "^## Learned (iter $iter)" "$MEMORY_FILE"; then
+      {
+        echo ""
+        echo "## Learned (iter $iter)"
+        echo "- hypothesis: <missing_from_agent>"
+        echo "- cpp_reference: <missing_from_agent>"
+        echo "- go_change: <missing_from_agent>"
+        echo "- memory_reuse: <missing_from_agent>"
+        echo "- outcome_expected: <missing_from_agent>"
+        echo "- handoff: <missing_from_agent>"
+      } >> "$MEMORY_FILE"
+      echo "[loop] warning: agente não escreveu bloco Learned (iter $iter); bloco placeholder adicionado"
+    fi
   fi
 
   run_divergence_check "$post_report" || true
@@ -348,31 +354,20 @@ P
   checkpoint_msg="-"
 
   if [[ "$post_result" == "match" ]]; then
-    {
-      echo ""
-      echo "#### Post"
-      echo "- result: ${post_result}"
-      echo "- reason: ${post_reason}"
-      echo "- score: ${post_score}"
-      echo "- first_divergence_event: ${post_mismatch_event:-unknown}"
-      echo "- upstream_event: ${post_up_event:-<none>}"
-      echo "- go_event: ${post_go_event:-<none>}"
-      echo "- post_report_file: $post_report"
-      echo "- improved: $improved"
-      echo ""
-      echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
-      echo "- iteration_score_final: ${post_score}"
-    } >> "$MEMORY_FILE"
+    action="match"
     if [[ "$DRY_RUN" != "1" ]]; then
       if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         git add -A
         if ! git diff --cached --quiet; then
           commit_msg="checkpoint: seed ${SEED} iter ${iter} score=${pre_score}->${post_score} (match)"
           git commit -m "$commit_msg" >/dev/null
+          checkpoint_msg="$commit_msg"
+          action="checkpoint_match"
           echo "[loop] checkpoint commit created: $commit_msg"
         fi
       fi
     fi
+    echo "| ${run_seq} | ${iter} | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_score} | ${post_score} | ${improved} | ${post_mismatch_event:-0} | ${post_reason} | ${action} |" >> "$MEMORY_FILE"
     echo "[loop] parity achieved at iteration $iter"
     exit 0
   fi
@@ -386,31 +381,16 @@ P
           git commit -m "$commit_msg" >/dev/null
           checkpoint_msg="$commit_msg"
           echo "[loop] checkpoint commit created: $commit_msg"
-          echo "- checkpoint_commit: $commit_msg" >> "$MEMORY_FILE"
         fi
       fi
     fi
   fi
 
-  {
-    echo ""
-    echo "#### Post"
-    echo "- result: ${post_result}"
-    echo "- reason: ${post_reason}"
-    echo "- score: ${post_score}"
-    echo "- first_divergence_event: ${post_mismatch_event:-unknown}"
-    echo "- upstream_event: ${post_up_event:-<none>}"
-    echo "- go_event: ${post_go_event:-<none>}"
-    if [[ "$post_result" == "failure" ]]; then
-      echo "- failure_tail: ${post_fail_text:-<none>}"
-    fi
-    echo "- post_report_file: $post_report"
-    echo "- improved: $improved"
-    echo "- checkpoint: $checkpoint_msg"
-    echo ""
-    echo "| $iter | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_result} | ${pre_reason} | ${pre_score} | ${pre_mismatch_event:-0} | ${post_result} | ${post_reason} | ${post_score} | ${post_mismatch_event:-0} | $improved | $checkpoint_msg |"
-    echo "- iteration_score_final: ${post_score}"
-  } >> "$MEMORY_FILE"
+  action="memory_only"
+  if [[ "$improved" == "1" ]]; then
+    action="checkpoint"
+  fi
+  echo "| ${run_seq} | ${iter} | $(date -u +"%Y-%m-%dT%H:%M:%SZ") | ${pre_mode} | ${pre_score} | ${post_score} | ${improved} | ${post_mismatch_event:-0} | ${post_reason} | ${action} |" >> "$MEMORY_FILE"
 
   if [[ "$DRY_RUN" != "1" && "$improved" != "1" ]]; then
     commit_memory_only "$iter" "$pre_score" "$post_score"
@@ -428,3 +408,7 @@ done
 
 echo "[loop] max iterations reached without parity match"
 exit 1
+  if (( iter <= last_iter_seen )); then
+    run_seq=$((run_seq + 1))
+  fi
+  last_iter_seen="$iter"

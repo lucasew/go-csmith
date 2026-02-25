@@ -43,6 +43,7 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
   - arquivo(s) alterado(s)
   - por que a mudança deve melhorar o score
 - Inclua obrigatoriamente:
+  - `MEMORY_REUSE`: qual item de memória anterior foi usado nesta iteração.
   - `TRACE_PATH`: 3-8 passos do rastreio (início -> fim).
   - `CPP_REFERENCE`: arquivo(s)/função(ões) do upstream usados.
   - `HANDOFF`: próximo alvo objetivo para o agente seguinte.
