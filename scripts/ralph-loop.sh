@@ -76,6 +76,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  cd "$REPO_ROOT"
+fi
+
 if [[ ! -f "$PROMPT_FILE" ]]; then
   echo "prompt file not found: $PROMPT_FILE" >&2
   exit 1
@@ -173,22 +178,33 @@ parse_report() {
   eval "${out_prefix}_fail_text=\"\$fail_text\""
 }
 
-reset_repo_keep_memory() {
-  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    return 0
-  fi
+backup_memory_file() {
   local backup_file=""
   if [[ -f "$MEMORY_FILE" ]]; then
     backup_file="$(mktemp)"
     cp "$MEMORY_FILE" "$backup_file"
   fi
-  git reset HEAD -- . >/dev/null
-  git checkout HEAD -- . >/dev/null
-  if [[ -n "$backup_file" ]]; then
+  echo "$backup_file"
+}
+
+restore_memory_file() {
+  local backup_file="$1"
+  if [[ -n "$backup_file" && -f "$backup_file" ]]; then
     mkdir -p "$(dirname "$MEMORY_FILE")"
     cp "$backup_file" "$MEMORY_FILE"
     rm -f "$backup_file"
   fi
+}
+
+reset_repo_except_memory() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+  local memory_backup=""
+  memory_backup="$(backup_memory_file)"
+  git reset HEAD -- . >/dev/null
+  git checkout HEAD -- . >/dev/null
+  restore_memory_file "$memory_backup"
 }
 
 commit_memory_only() {
@@ -198,10 +214,15 @@ commit_memory_only() {
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     return 0
   fi
-  if ! git add -- "$MEMORY_FILE" >/dev/null 2>&1; then
-    echo "[loop] warning: could not git add memory file '$MEMORY_FILE'"
+  if [[ ! -f "$MEMORY_FILE" ]]; then
+    echo "[loop] warning: memory file not found '$MEMORY_FILE'"
     return 0
   fi
+  local add_err=""
+  add_err="$(git add -A -- "$MEMORY_FILE" 2>&1)" || {
+    echo "[loop] warning: could not git add memory file '$MEMORY_FILE' ($add_err)"
+    return 0
+  }
   if git diff --cached --quiet; then
     return 0
   fi
@@ -317,10 +338,6 @@ P
   else
     stall_count=$((stall_count + 1))
     echo "[loop] no improvement: score ${pre_score} -> ${post_score} (stall=${stall_count}/${STALL_LIMIT})"
-    if [[ "$RESET_ON_NO_IMPROVEMENT" == "1" && "$DRY_RUN" != "1" ]]; then
-      reset_repo_keep_memory
-      echo "[loop] reset applied: git checkout HEAD em tudo (memory preserved)"
-    fi
   fi
 
   if [[ "$post_score" =~ ^-?[0-9]+$ ]] && (( post_score > best_score )); then
@@ -397,6 +414,10 @@ P
 
   if [[ "$DRY_RUN" != "1" && "$improved" != "1" ]]; then
     commit_memory_only "$iter" "$pre_score" "$post_score"
+    if [[ "$RESET_ON_NO_IMPROVEMENT" == "1" ]]; then
+      reset_repo_except_memory
+      echo "[loop] reset applied after memory commit: git checkout HEAD em tudo"
+    fi
   fi
 
   if (( stall_count >= STALL_LIMIT )); then
