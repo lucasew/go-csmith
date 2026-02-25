@@ -15,3 +15,12 @@
 | 4 | 1 | 2026-02-25T13:21:02Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |
 | 4 | 2 | 2026-02-25T13:22:00Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |
 | 4 | 3 | 2026-02-25T13:23:09Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |
+
+## Learned (iter 1)
+- hypothesis: <missing_from_agent>
+- cpp_reference: <missing_from_agent>
+- go_change: <missing_from_agent>
+- memory_reuse: <missing_from_agent>
+- outcome_expected: <missing_from_agent>
+- handoff: <missing_from_agent>
+| 0 | 1 | 2026-02-25T13:30:36Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |
