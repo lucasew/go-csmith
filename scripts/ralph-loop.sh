@@ -231,6 +231,31 @@ commit_memory_only() {
   echo "[loop] memory commit created: $msg"
 }
 
+auto_fill_learned_block() {
+  local iter="$1"
+  local pre_score="$2"
+  local post_score="$3"
+  local post_div="$4"
+  local post_reason="$5"
+  local changed_files=""
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    changed_files="$(git diff --name-only | tr '\n' ',' | sed 's/,$//')"
+  fi
+  if [[ -z "$changed_files" ]]; then
+    changed_files="none_detected"
+  fi
+  {
+    echo ""
+    echo "## Learned (iter $iter)"
+    echo "- hypothesis: align first divergence path around event ${post_div}"
+    echo "- cpp_reference: csmith/src/<to_be_filled_by_agent>"
+    echo "- go_change: ${changed_files}"
+    echo "- memory_reuse: table row from previous iteration"
+    echo "- outcome_expected: move score from ${pre_score} to >${post_score}"
+    echo "- handoff: inspect event ${post_div}, reason=${post_reason}, and align RNG call order"
+  } >> "$MEMORY_FILE"
+}
+
 best_score="-1"
 best_iter="0"
 stall_count="0"
@@ -291,6 +316,8 @@ Instrução:
 - Se mode=termination_fix: priorize remover loop/recursão não-terminante.
 - Se mode=rng_alignment: priorize ordem exata de consumo RNG no primeiro desvio.
 - Compare explicitamente com o upstream C++ em ./csmith/src e cite arquivo+função equivalentes.
+- REGRA DURA: antes de mexer no código, VOCÊ DEVE preencher o bloco ## Learned (iter $iter) em MEMORY.md com a hipótese.
+- Se não preencher a hipótese no MEMORY.md, NÃO faça patch de código.
 - Atualize MEMORY.md com o bloco:
   - ## Learned (iter $iter)
   - - hypothesis: ...
@@ -314,17 +341,8 @@ P
 
   if [[ "$DRY_RUN" != "1" ]]; then
     if ! grep -q "^## Learned (iter $iter)" "$MEMORY_FILE"; then
-      {
-        echo ""
-        echo "## Learned (iter $iter)"
-        echo "- hypothesis: <missing_from_agent>"
-        echo "- cpp_reference: <missing_from_agent>"
-        echo "- go_change: <missing_from_agent>"
-        echo "- memory_reuse: <missing_from_agent>"
-        echo "- outcome_expected: <missing_from_agent>"
-        echo "- handoff: <missing_from_agent>"
-      } >> "$MEMORY_FILE"
-      echo "[loop] warning: agente não escreveu bloco Learned (iter $iter); bloco placeholder adicionado"
+      auto_fill_learned_block "$iter" "$pre_score" "$post_score" "${post_mismatch_event:-0}" "$post_reason"
+      echo "[loop] warning: agente não escreveu bloco Learned (iter $iter); bloco auto-preenchido adicionado"
     fi
   fi
 

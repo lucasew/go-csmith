@@ -1019,12 +1019,13 @@ func randomLeafExprWithMode(
 				}
 			}
 			if lhsFromDeref {
-				// Upstream already selected LHS in the loop; no scope pick.
-				// Pick any writable variable for the Go output.
+				// Upstream Lhs.cpp:82-86: when select_deref_pointer returns valid var,
+				// skips VariableSelector::select entirely (zero RNG consumed).
+				// Pick first assignable candidate without consuming RNG.
 				candidates := buildExprCandidatesFromER(er, env, scope, ctx)
-				if len(candidates) > 0 {
-					if lv, ok := selectExprVariableFromER(t, er, candidates, true); ok {
-						return castLiteral(t, fmt.Sprintf("(%s = %s)", lv.expr, rhs))
+				for _, c := range candidates {
+					if c.assignable {
+						return castLiteral(t, fmt.Sprintf("(%s = %s)", c.expr, rhs))
 					}
 				}
 				return castLiteral(t, fmt.Sprintf("(%s)", rhs))

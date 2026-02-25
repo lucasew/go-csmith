@@ -11,9 +11,10 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 2. Faça rastreio completo do primeiro desvio/falha (start -> call path -> decisão RNG).
 3. Localize no C++ upstream (`./csmith/src`) o caminho equivalente e confirme ordem/semântica de RNG.
 4. Forme exatamente 1 hipótese técnica para o primeiro desvio/falha atual.
-5. Aplique patch mínimo para testar essa hipótese.
-6. Pare de editar; o loop executará a validação pós-patch.
-7. Guarde o que você aprendeu em `MEMORY.md` no final da iteração.
+5. **ANTES de editar código, VOCÊ DEVE escrever a hipótese em `MEMORY.md` no bloco `## Learned (iter N)`.**
+6. Aplique patch mínimo para testar essa hipótese.
+7. Pare de editar; o loop executará a validação pós-patch.
+8. Guarde o que você aprendeu em `MEMORY.md` no final da iteração.
 8. Use este formato fixo em `MEMORY.md`:
    - `## Learned (iter N)`
    - `- hypothesis: ...`
@@ -36,6 +37,7 @@ Você está trabalhando no projeto `go-csmith` para obter equivalência real com
 - Não adicione hacks de consumo RNG sem base no upstream.
 - Não desative funcionalidades para “passar” no checker.
 - Toda mudança em Go deve citar referência C++ equivalente (arquivo + função).
+- Se não preencher hipótese no `MEMORY.md` antes do patch, NÃO edite código.
 
 ## Saída esperada da iteração
 - Resumo curto:
