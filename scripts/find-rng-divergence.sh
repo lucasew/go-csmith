@@ -70,7 +70,7 @@ if ! CSMITH_TRACE_RNG=1 timeout 60s bash -lc "$UPSTREAM_CMD --seed $SEED > '$UP_
 fi
 
 echo "[2/4] Generating go trace..."
-if ! CSMITH_TRACE_RNG=1 CSMITH_TRACE_RNG_RAW=1 CSMITH_TRACE_RNG_FILE="$GO_RNG" timeout 60s bash -lc "$GO_CMD --seed $SEED > '$GO_C'"; then
+if ! CSMITH_TRACE_RNG=1 CSMITH_TRACE_RNG_RAW=1 CSMITH_TRACE_RNG_SITE=1 CSMITH_TRACE_RNG_FILE="$GO_RNG" timeout 60s bash -lc "$GO_CMD --seed $SEED > '$GO_C'"; then
   echo "go generation/trace failed" >&2
   exit 1
 fi
@@ -190,6 +190,8 @@ up_line=$(sed -n "${mismatch_at}p" "$UP_NORM" || true)
 go_line=$(sed -n "${mismatch_at}p" "$GO_NORM" || true)
 echo "upstream_event: ${up_line:-<none>}"
 echo "go_event:       ${go_line:-<none>}"
+go_site="$(awk -v n="$mismatch_at" '$1==n { site=""; for (i=1; i<=NF; i++) if ($i ~ /^@/) site=substr($i,2); if (site!="") print site }' "$GO_RNG" | head -n1)"
+echo "go_callsite:    ${go_site:-<none>}"
 
 start=$((mismatch_at - CONTEXT))
 if (( start < 1 )); then start=1; fi
@@ -202,9 +204,21 @@ echo ""
 echo "go_context (${start}..${end}):"
 nl -ba "$GO_NORM" | sed -n "${start},${end}p"
 echo ""
+echo "go_site_context (${start}..${end}):"
+awk -v s="$start" -v e="$end" '
+  ($1+0)>=s && ($1+0)<=e {
+    site="<none>"
+    for (i=1; i<=NF; i++) {
+      if ($i ~ /^@/) {
+        site=substr($i,2)
+      }
+    }
+    printf("%6d %s\n", $1, site)
+  }
+' "$GO_RNG"
+echo ""
 echo "artifacts:"
 echo "  $UP_RNG"
 echo "  $GO_RNG"
 echo "  $UP_NORM"
 echo "  $GO_NORM"
-
