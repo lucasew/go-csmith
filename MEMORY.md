@@ -33,3 +33,4 @@
 - outcome_expected: <missing_from_agent>
 - handoff: <missing_from_agent>
 | 0 | 2 | 2026-02-25T13:31:49Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |
+| 1 | 1 | 2026-02-25T17:41:49Z | rng_alignment | 92 | 92 | 0 | 92 | event_diff | memory_only |

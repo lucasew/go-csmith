@@ -11,8 +11,6 @@ CLAUDE_CMD="${CLAUDE_CMD:-claude}"
 MEMORY_FILE="${MEMORY_FILE:-}"
 CHECKPOINT_COMMITS="${CHECKPOINT_COMMITS:-1}"
 DRY_RUN="${DRY_RUN:-0}"
-STALL_LIMIT="${STALL_LIMIT:-3}"
-RESET_ON_NO_IMPROVEMENT="${RESET_ON_NO_IMPROVEMENT:-1}"
 
 usage() {
   cat <<'USAGE'
@@ -21,8 +19,8 @@ Usage: scripts/ralph-loop.sh [options]
 Score-gated Claude loop:
   1) run RNG divergence checker (pre)
   2) call Claude with a mode-specific prompt
-  3) run checker again (post) and keep only improved iterations
-  4) repeat until match, stall limit, or max iterations
+  3) run checker again (post)
+  4) repeat until match or max iterations
 
 Options:
   --seed N
@@ -33,9 +31,6 @@ Options:
   --prompt-file PATH
   --claude-cmd "CMD"
   --memory-file PATH
-  --stall-limit N
-  --reset-on-no-improvement
-  --no-reset-on-no-improvement
   --no-checkpoint-commits
   --checkpoint-commits
   --dry-run
@@ -43,8 +38,7 @@ Options:
 
 Env overrides:
   SEED, MAX_ITERS, WORKDIR, CONTEXT, STRICT_RAW, PROMPT_FILE, CLAUDE_CMD,
-  MEMORY_FILE, STALL_LIMIT, CHECKPOINT_COMMITS, DRY_RUN
-  RESET_ON_NO_IMPROVEMENT
+  MEMORY_FILE, CHECKPOINT_COMMITS, DRY_RUN
 
 Example:
   scripts/ralph-loop.sh --seed 2 --max-iters 30 --claude-cmd "claude"
@@ -61,9 +55,6 @@ while [[ $# -gt 0 ]]; do
     --prompt-file) PROMPT_FILE="$2"; shift 2 ;;
     --claude-cmd) CLAUDE_CMD="$2"; shift 2 ;;
     --memory-file) MEMORY_FILE="$2"; shift 2 ;;
-    --stall-limit) STALL_LIMIT="$2"; shift 2 ;;
-    --reset-on-no-improvement) RESET_ON_NO_IMPROVEMENT=1; shift ;;
-    --no-reset-on-no-improvement) RESET_ON_NO_IMPROVEMENT=0; shift ;;
     --checkpoint-commits) CHECKPOINT_COMMITS=1; shift ;;
     --no-checkpoint-commits) CHECKPOINT_COMMITS=0; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -104,8 +95,6 @@ if [[ ! -f "$MEMORY_FILE" ]]; then
 - started_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 - prompt_file: $PROMPT_FILE
 - claude_cmd: $CLAUDE_CMD
-- stall_limit: $STALL_LIMIT
-- reset_on_no_improvement: $RESET_ON_NO_IMPROVEMENT
 
 ## Iterations
 
@@ -134,7 +123,6 @@ parse_report() {
   local up_event="<none>"
   local go_event="<none>"
   local mode="rng_alignment"
-  local fail_text=""
 
   if grep -q "^result=match" "$report_file"; then
     result="match"
@@ -155,7 +143,6 @@ parse_report() {
     go_event="$(awk -F': ' '/^go_event:/{print $2}' "$report_file" | tail -n1)"
     mode="rng_alignment"
   else
-    fail_text="$(tail -n 5 "$report_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')"
     if grep -q "go generation/trace failed" "$report_file"; then
       reason="go_generation_failed"
       mode="termination_fix"
@@ -168,43 +155,13 @@ parse_report() {
     fi
   fi
 
-  eval "${out_prefix}_result=\"\$result\""
-  eval "${out_prefix}_reason=\"\$reason\""
-  eval "${out_prefix}_score=\"\$score\""
-  eval "${out_prefix}_mismatch_event=\"\$mismatch_event\""
-  eval "${out_prefix}_up_event=\"\$up_event\""
-  eval "${out_prefix}_go_event=\"\$go_event\""
-  eval "${out_prefix}_mode=\"\$mode\""
-  eval "${out_prefix}_fail_text=\"\$fail_text\""
-}
-
-backup_memory_file() {
-  local backup_file=""
-  if [[ -f "$MEMORY_FILE" ]]; then
-    backup_file="$(mktemp)"
-    cp "$MEMORY_FILE" "$backup_file"
-  fi
-  echo "$backup_file"
-}
-
-restore_memory_file() {
-  local backup_file="$1"
-  if [[ -n "$backup_file" && -f "$backup_file" ]]; then
-    mkdir -p "$(dirname "$MEMORY_FILE")"
-    cp "$backup_file" "$MEMORY_FILE"
-    rm -f "$backup_file"
-  fi
-}
-
-reset_repo_except_memory() {
-  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    return 0
-  fi
-  local memory_backup=""
-  memory_backup="$(backup_memory_file)"
-  git reset HEAD -- . >/dev/null
-  git checkout HEAD -- . >/dev/null
-  restore_memory_file "$memory_backup"
+  eval "${out_prefix}_result=\"$result\""
+  eval "${out_prefix}_reason=\"$reason\""
+  eval "${out_prefix}_score=\"$score\""
+  eval "${out_prefix}_mismatch_event=\"$mismatch_event\""
+  eval "${out_prefix}_up_event=\"$up_event\""
+  eval "${out_prefix}_go_event=\"$go_event\""
+  eval "${out_prefix}_mode=\"$mode\""
 }
 
 commit_memory_only() {
@@ -258,13 +215,12 @@ auto_fill_learned_block() {
 
 best_score="-1"
 best_iter="0"
-stall_count="0"
 run_seq=0
-last_iter_seen=999999
 
 for ((iter=1; iter<=MAX_ITERS; iter++)); do
   echo ""
   echo "========== ITERATION $iter/$MAX_ITERS =========="
+  run_seq=$((run_seq + 1))
 
   pre_report="$WORKDIR/seed_${SEED}.iter_${iter}.pre.report.txt"
   run_divergence_check "$pre_report" || true
@@ -303,7 +259,6 @@ for ((iter=1; iter<=MAX_ITERS; iter++)); do
 - upstream_event: ${pre_up_event:-<none>}
 - go_event: ${pre_go_event:-<none>}
 - pre_report_file: $pre_report
-- stall_count: $stall_count/$STALL_LIMIT
 
 ## Memória Recente (obrigatório usar)
 \`\`\`md
@@ -339,15 +294,15 @@ P
     bash -lc "$cmd" | tee "$iter_log"
   fi
 
+  run_divergence_check "$post_report" || true
+  parse_report "$post_report" "post"
+
   if [[ "$DRY_RUN" != "1" ]]; then
     if ! grep -q "^## Learned (iter $iter)" "$MEMORY_FILE"; then
       auto_fill_learned_block "$iter" "$pre_score" "$post_score" "${post_mismatch_event:-0}" "$post_reason"
       echo "[loop] warning: agente não escreveu bloco Learned (iter $iter); bloco auto-preenchido adicionado"
     fi
   fi
-
-  run_divergence_check "$post_report" || true
-  parse_report "$post_report" "post"
 
   improved=0
   if [[ "$post_score" =~ ^-?[0-9]+$ && "$pre_score" =~ ^-?[0-9]+$ ]]; then
@@ -357,11 +312,9 @@ P
   fi
 
   if (( improved == 1 )); then
-    stall_count=0
     echo "[loop] improved: score ${pre_score} -> ${post_score}"
   else
-    stall_count=$((stall_count + 1))
-    echo "[loop] no improvement: score ${pre_score} -> ${post_score} (stall=${stall_count}/${STALL_LIMIT})"
+    echo "[loop] no improvement: score ${pre_score} -> ${post_score}"
   fi
 
   if [[ "$post_score" =~ ^-?[0-9]+$ ]] && (( post_score > best_score )); then
@@ -390,7 +343,7 @@ P
     exit 0
   fi
 
-  if [[ "$DRY_RUN" != "1" && "$improved" == "1" ]]; then
+  if [[ "$DRY_RUN" != "1" && "$improved" == "1" && "$CHECKPOINT_COMMITS" == "1" ]]; then
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       if ! git diff --quiet || ! git diff --cached --quiet; then
         git add -A
@@ -412,21 +365,8 @@ P
 
   if [[ "$DRY_RUN" != "1" && "$improved" != "1" ]]; then
     commit_memory_only "$iter" "$pre_score" "$post_score"
-    if [[ "$RESET_ON_NO_IMPROVEMENT" == "1" ]]; then
-      reset_repo_except_memory
-      echo "[loop] reset applied after memory commit: git checkout HEAD em tudo"
-    fi
-  fi
-
-  if (( stall_count >= STALL_LIMIT )); then
-    echo "[loop] stalled for ${STALL_LIMIT} consecutive iterations; stopping early"
-    exit 1
   fi
 done
 
 echo "[loop] max iterations reached without parity match"
 exit 1
-  if (( iter <= last_iter_seen )); then
-    run_seq=$((run_seq + 1))
-  fi
-  last_iter_seen="$iter"
