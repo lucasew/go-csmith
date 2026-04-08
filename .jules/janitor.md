@@ -1,0 +1,1 @@
+- 2026-04-08: Add missing documentation comments on exported functions and structs to satisfy golint.
