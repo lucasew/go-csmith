@@ -1,1 +1,1 @@
-- 2026-04-08: Remove unused fields/functions identified by staticcheck and add missing doc comments on exported symbols for golint.
+- 2026-04-08: Add missing documentation comments on exported functions and structs to satisfy golint.
