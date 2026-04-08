@@ -164,6 +164,8 @@ type Options struct {
 	MaxGlobals int
 }
 
+// Defaults returns an Options struct populated with the default settings.
+// These defaults align with Csmith's CGOptions::set_default_settings.
 func Defaults() Options {
 	return Options{
 		OutputPath:       "",
@@ -370,6 +372,7 @@ func (o Options) resolvePlatformInfo() (Options, error) {
 	return o, nil
 }
 
+// Validate checks the consistency and validity of the generator options.
 func (o Options) Validate() error {
 	if o.IntSize <= 0 {
 		return fmt.Errorf("int-size must be positive")
