@@ -164,6 +164,7 @@ type Options struct {
 	MaxGlobals int
 }
 
+// Defaults returns the default Options configuration.
 func Defaults() Options {
 	return Options{
 		OutputPath:       "",
@@ -370,6 +371,7 @@ func (o Options) resolvePlatformInfo() (Options, error) {
 	return o, nil
 }
 
+// Validate checks if the current Options configuration is valid.
 func (o Options) Validate() error {
 	if o.IntSize <= 0 {
 		return fmt.Errorf("int-size must be positive")
