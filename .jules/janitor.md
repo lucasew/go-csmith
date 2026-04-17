@@ -1,0 +1,1 @@
+- 2024-05-24: Added comments for exported functions and methods to fix `golint` warnings.
