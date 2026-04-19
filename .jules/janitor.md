@@ -1,0 +1,1 @@
+- 2026-04-19: Ensure all exported functions and methods have documentation comments to fix golint warnings.
