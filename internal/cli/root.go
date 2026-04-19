@@ -27,6 +27,7 @@ func addBoolPair(cmd *cobra.Command, bindings *[]negBoolBinding, target *bool, n
 	*bindings = append(*bindings, negBoolBinding{target: target, neg: neg})
 }
 
+// NewRootCmd creates and returns the root cobra.Command for the application.
 func NewRootCmd() *cobra.Command {
 	opts := csmith.Defaults()
 	seedSet := false
