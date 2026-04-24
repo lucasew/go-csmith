@@ -1,0 +1,1 @@
+- 2026-04-24: Swallowed or ignored IO errors can mask systemic failures; always report them through a centralized error handler.
