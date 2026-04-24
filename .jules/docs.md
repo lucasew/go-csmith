@@ -1,0 +1,1 @@
+- 2026-04-24: Added missing documentation comments to exported functions to resolve golint warnings and improve codebase readability for humans and LLMs.
