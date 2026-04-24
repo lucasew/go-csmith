@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+
+	"csmith/pkg/errorhandler"
 )
 
 const (
@@ -33,7 +35,10 @@ func newRNG(seed uint64) *rng {
 		if r.traceFile == "" {
 			r.traceFile = "/tmp/csmith-go-rng.trace"
 		}
-		_ = os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0644)
+		err := os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0644)
+		if err != nil {
+			errorhandler.ReportError(err, "failed to write initial RNG trace file")
+		}
 	}
 	return r
 }
@@ -84,16 +89,24 @@ func (r *rng) traceU(n uint32, x uint32, tries uint32, raw uint32) {
 		r.tracePos++
 		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err == nil {
+			var writeErr error
 			if r.traceSite && r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d @%s\n", r.tracePos, n, x, tries, raw, traceCaller())
+				_, writeErr = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d @%s\n", r.tracePos, n, x, tries, raw, traceCaller())
 			} else if r.traceSite {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d @%s\n", r.tracePos, n, x, traceCaller())
+				_, writeErr = fmt.Fprintf(f, "%d U %d -> %d @%s\n", r.tracePos, n, x, traceCaller())
 			} else if r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d\n", r.tracePos, n, x, tries, raw)
+				_, writeErr = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d\n", r.tracePos, n, x, tries, raw)
 			} else {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d\n", r.tracePos, n, x)
+				_, writeErr = fmt.Fprintf(f, "%d U %d -> %d\n", r.tracePos, n, x)
 			}
-			_ = f.Close()
+			if writeErr != nil {
+				errorhandler.ReportError(writeErr, "failed to write to RNG trace file")
+			}
+			if closeErr := f.Close(); closeErr != nil {
+				errorhandler.ReportError(closeErr, "failed to close RNG trace file")
+			}
+		} else {
+			errorhandler.ReportError(err, "failed to open RNG trace file")
 		}
 	}
 }
@@ -113,16 +126,24 @@ func (r *rng) flipcoin(p uint32) bool {
 			if ok {
 				b = 1
 			}
+			var writeErr error
 			if r.traceSite && r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d raw=%d @%s\n", r.tracePos, p, b, raw, traceCaller())
+				_, writeErr = fmt.Fprintf(f, "%d F %d -> %d raw=%d @%s\n", r.tracePos, p, b, raw, traceCaller())
 			} else if r.traceSite {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d @%s\n", r.tracePos, p, b, traceCaller())
+				_, writeErr = fmt.Fprintf(f, "%d F %d -> %d @%s\n", r.tracePos, p, b, traceCaller())
 			} else if r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d raw=%d\n", r.tracePos, p, b, raw)
+				_, writeErr = fmt.Fprintf(f, "%d F %d -> %d raw=%d\n", r.tracePos, p, b, raw)
 			} else {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d\n", r.tracePos, p, b)
+				_, writeErr = fmt.Fprintf(f, "%d F %d -> %d\n", r.tracePos, p, b)
 			}
-			_ = f.Close()
+			if writeErr != nil {
+				errorhandler.ReportError(writeErr, "failed to write to RNG trace file")
+			}
+			if closeErr := f.Close(); closeErr != nil {
+				errorhandler.ReportError(closeErr, "failed to close RNG trace file")
+			}
+		} else {
+			errorhandler.ReportError(err, "failed to open RNG trace file")
 		}
 	}
 	return ok

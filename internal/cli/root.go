@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"csmith/pkg/csmith"
+	"csmith/pkg/errorhandler"
 )
 
 const (
@@ -257,7 +258,9 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&mainFlag, "main", false, "force generating main")
 	cmd.Flags().BoolVar(&nomainFlag, "nomain", false, "disable generating main")
 
-	_ = cmd.MarkFlagFilename("output", "c")
+	if err := cmd.MarkFlagFilename("output", "c"); err != nil {
+		errorhandler.ReportError(err, "failed to mark flag filename")
+	}
 
 	cmd.PreRun = func(cmd *cobra.Command, args []string) {
 		seedSet = cmd.Flags().Changed("seed")

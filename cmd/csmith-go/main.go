@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"csmith/internal/cli"
+	"csmith/pkg/errorhandler"
 )
 
 func main() {
 	if err := cli.NewRootCmd().Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		errorhandler.ReportError(err, "command execution failed")
 		os.Exit(1)
 	}
 }
