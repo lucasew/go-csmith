@@ -164,6 +164,9 @@ type Options struct {
 	MaxGlobals int
 }
 
+// Defaults returns an Options struct initialized with the standard default values
+// for the C program generator. This establishes the baseline configuration before
+// any CLI flags or configuration files are applied.
 func Defaults() Options {
 	return Options{
 		OutputPath:       "",
@@ -370,6 +373,9 @@ func (o Options) resolvePlatformInfo() (Options, error) {
 	return o, nil
 }
 
+// Validate checks the configuration options for consistency and correctness.
+// It ensures numerical boundaries are respected and verifies that conflicting
+// features (e.g., random-based vs exhaustive generation) are not enabled simultaneously.
 func (o Options) Validate() error {
 	if o.IntSize <= 0 {
 		return fmt.Errorf("int-size must be positive")
