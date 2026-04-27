@@ -27,6 +27,9 @@ func addBoolPair(cmd *cobra.Command, bindings *[]negBoolBinding, target *bool, n
 	*bindings = append(*bindings, negBoolBinding{target: target, neg: neg})
 }
 
+// NewRootCmd initializes and configures the root Cobra command for the csmith-go CLI.
+// It sets up command-line flags, binding them to generation options, and establishes
+// the execution flow for running the C program generator.
 func NewRootCmd() *cobra.Command {
 	opts := csmith.Defaults()
 	seedSet := false
