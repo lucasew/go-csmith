@@ -2,6 +2,7 @@ package csmith
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -1010,8 +1011,13 @@ func randomLeafExprWithMode(
 					_ = er.fallback.flipcoin(20) // inner NewArrayVariableProb
 					// Constant::make_random(int) -> GenerateRandomConstant:
 					_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50)
-					for i := 0; i < 8; i++ {
-						_ = er.fallback.next31() // RandomHexDigits(8)
+					hexN := t.HexDigits
+					if hexN <= 0 {
+						hexN = 8 // fallback to int-sized
+					}
+					fmt.Fprintf(os.Stderr, "DEBUG: hexN=%d t.Name=%s t.Bits=%d t.HexDigits=%d\n", hexN, t.Name, t.Bits, t.HexDigits)
+					for i := 0; i < hexN; i++ {
+						_ = er.fallback.next31() // RandomHexDigits(N)
 					}
 					// Pointer to valid var -> opportunistic_validate passes -> exit
 					lhsFromDeref = true
