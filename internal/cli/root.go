@@ -109,7 +109,7 @@ func NewRootCmd() *cobra.Command {
 				_, err = fmt.Fprint(cmd.OutOrStdout(), program)
 				return err
 			}
-			return os.WriteFile(outputPath, []byte(program), 0o644)
+			return os.WriteFile(outputPath, []byte(program), 0o600)
 		},
 	}
 

@@ -1,0 +1,1 @@
+- 2026-06-14: Secure temporary files must use os.TempDir() and trace/output files should have restricted permissions like 0600 or 0o750 (CWE-377, CWE-276).

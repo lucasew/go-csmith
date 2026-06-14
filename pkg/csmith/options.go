@@ -442,7 +442,7 @@ func (o Options) Validate() error {
 	}
 	if o.MaxSplitFiles > 0 && o.SplitFilesDir == "" {
 		o.SplitFilesDir = "./output"
-		if err := os.MkdirAll(o.SplitFilesDir, 0o755); err != nil {
+		if err := os.MkdirAll(o.SplitFilesDir, 0o750); err != nil {
 			return fmt.Errorf("cannot create dir for split files: %w", err)
 		}
 	}

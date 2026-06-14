@@ -3,6 +3,7 @@ package csmith
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 )
 
@@ -31,9 +32,9 @@ func newRNG(seed uint64) *rng {
 		r.traceRaw = os.Getenv("CSMITH_TRACE_RNG_RAW") != ""
 		r.traceFile = os.Getenv("CSMITH_TRACE_RNG_FILE")
 		if r.traceFile == "" {
-			r.traceFile = "/tmp/csmith-go-rng.trace"
+			r.traceFile = filepath.Join(os.TempDir(), "csmith-go-rng.trace")
 		}
-		_ = os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0644)
+		_ = os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0600)
 	}
 	return r
 }
@@ -82,7 +83,7 @@ func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
 func (r *rng) traceU(n uint32, x uint32, tries uint32, raw uint32) {
 	if r.trace {
 		r.tracePos++
-		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err == nil {
 			if r.traceSite && r.traceRaw {
 				_, _ = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d @%s\n", r.tracePos, n, x, tries, raw, traceCaller())
@@ -107,7 +108,7 @@ func (r *rng) flipcoin(p uint32) bool {
 	ok := v < p
 	if r.trace {
 		r.tracePos++
-		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err == nil {
 			var b uint32
 			if ok {
