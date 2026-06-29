@@ -1,0 +1,1 @@
+- 2026-06-29: Swallowed I/O errors (e.g., from os.WriteFile, os.OpenFile, or f.Close) should be routed through a centralized error handler rather than ignored.

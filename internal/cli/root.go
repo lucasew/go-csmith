@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"csmith/pkg/csmith"
+	"csmith/pkg/errorhandler"
 )
 
 const (
@@ -54,6 +55,9 @@ func NewRootCmd() *cobra.Command {
 
 			if showVersion {
 				_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", appName, appVersion)
+				if err != nil {
+					errorhandler.ReportError(err)
+				}
 				return err
 			}
 
@@ -107,9 +111,16 @@ func NewRootCmd() *cobra.Command {
 
 			if outputPath == "" {
 				_, err = fmt.Fprint(cmd.OutOrStdout(), program)
+				if err != nil {
+					errorhandler.ReportError(err)
+				}
 				return err
 			}
-			return os.WriteFile(outputPath, []byte(program), 0o644)
+			err = os.WriteFile(outputPath, []byte(program), 0o644)
+			if err != nil {
+				errorhandler.ReportError(err)
+			}
+			return err
 		},
 	}
 
@@ -257,7 +268,9 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&mainFlag, "main", false, "force generating main")
 	cmd.Flags().BoolVar(&nomainFlag, "nomain", false, "disable generating main")
 
-	_ = cmd.MarkFlagFilename("output", "c")
+	if err := cmd.MarkFlagFilename("output", "c"); err != nil {
+		errorhandler.ReportError(err)
+	}
 
 	cmd.PreRun = func(cmd *cobra.Command, args []string) {
 		seedSet = cmd.Flags().Changed("seed")
