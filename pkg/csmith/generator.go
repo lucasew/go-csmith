@@ -1295,6 +1295,21 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 	if opts.Structs {
 		sidx := 0
 		maxStructs := min(max(opts.MaxStructFields, 1), 32)
+
+		emitBitfield := func(st *structTypeInfo, f int) {
+			name := fmt.Sprintf("f%d", f)
+			base := "unsigned"
+			if r.flipcoin(bitfieldsSignedProb) {
+				base = "signed"
+			}
+			qual := fieldQual()
+			width := bitfieldLength(opts.IntSize*8, st.fields)
+			writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
+			st.fields = append(st.fields, fieldInfo{
+				name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
+			})
+		}
+
 		for sidx < maxStructs && moreTypesProbability(typeCount) {
 			fieldCount := 1 + int(r.upto(uint32(max(1, opts.MaxStructFields))))
 			st := structTypeInfo{fields: make([]fieldInfo, 0, fieldCount)}
@@ -1309,31 +1324,11 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 						st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 						continue
 					}
-					name := fmt.Sprintf("f%d", f)
-					base := "unsigned"
-					if r.flipcoin(bitfieldsSignedProb) {
-						base = "signed"
-					}
-					qual := fieldQual()
-					width := bitfieldLength(opts.IntSize*8, st.fields)
-					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
-					st.fields = append(st.fields, fieldInfo{
-						name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
-					})
+					emitBitfield(&st, f)
 					continue
 				}
 				if opts.Bitfields && r.flipcoin(bitfieldInNormalStructProb) {
-					name := fmt.Sprintf("f%d", f)
-					base := "unsigned"
-					if r.flipcoin(bitfieldsSignedProb) {
-						base = "signed"
-					}
-					qual := fieldQual()
-					width := bitfieldLength(opts.IntSize*8, st.fields)
-					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
-					st.fields = append(st.fields, fieldInfo{
-						name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
-					})
+					emitBitfield(&st, f)
 					continue
 				}
 				name := fmt.Sprintf("f%d", f)
@@ -1954,20 +1949,6 @@ func emitStatements(
 }
 
 func emitSingleFuncDef(
-	r *rng,
-	opts Options,
-	fn funcInfo,
-	state *functionFlowState,
-	idx int,
-	maxBlock int,
-	env envInfo,
-	info compositeInfo,
-	stmtBudget *int,
-) string {
-	return emitSingleFuncDefOnce(r, opts, fn, state, idx, maxBlock, env, info, stmtBudget)
-}
-
-func emitSingleFuncDefOnce(
 	r *rng,
 	opts Options,
 	fn funcInfo,
