@@ -2,7 +2,6 @@ package csmith
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -1015,7 +1014,6 @@ func randomLeafExprWithMode(
 					if hexN <= 0 {
 						hexN = 8 // fallback to int-sized
 					}
-					fmt.Fprintf(os.Stderr, "DEBUG: hexN=%d t.Name=%s t.Bits=%d t.HexDigits=%d\n", hexN, t.Name, t.Bits, t.HexDigits)
 					for i := 0; i < hexN; i++ {
 						_ = er.fallback.next31() // RandomHexDigits(N)
 					}
