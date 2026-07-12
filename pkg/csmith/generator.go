@@ -1354,31 +1354,54 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 }
 
 func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) bool {
-	targetType := CType{Name: "uint32_t", Signed: false, Bits: 32}
-	for _, l := range scope.locals {
-		if l.name == "x" {
-			targetType = l.ctype
-			break
+	// StatementAssign::make_random order:
+	// 1) AssignOpsProbability (upto ~120 with filter)
+	// 2) SelectLType (pointer/struct/float coins)
+	// 3) RHS Expression::make_random then Lhs (approx: Lhs then RHS in our backend)
+	if opts.CompoundAssignment {
+		// simple 70 + bitops 30 + incr ops 20 = 120 when all enabled
+		_ = r.upto(120)
+	}
+
+	targetType := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	// Type::SelectLType for simple assign
+	if opts.Pointers && r.flipcoin(50) { // PointerAsLTypeProb
+		// make_random_pointer_type
+		if r.flipcoin(20) { // pointer-to-pointer
+			_ = r.upto(1) // derived_types.size() often 1 early
+		} else {
+			// choose_random() for pointed-to type — AllTypes filter pick
+			if ctx != nil {
+				targetType = pickNonVoidNonVolatile(r, nil, ctx.info, opts)
+			} else {
+				_ = r.upto(14)
+			}
 		}
+		targetType = CType{Name: "int32_t*", Signed: false, Bits: 32} // simplified ptr
+	} else {
+		// StructAsLTypeProb skipped when ok_struct_types empty (vol structs filtered).
+		// FloatAsLTypeProb is 0 when !enable_float, but flipcoin(0) still runs
+		// for simple assign (AssignOpWorksForFloat).
+		_ = r.flipcoin(0)
 	}
 
 	lv := lvalueInfo{expr: "x", ctype: targetType}
+	// Prefer existing local x when present (avoid extra scope RNG that
+	// over-syncs poorly early). Full Lhs::make_random later.
 	if len(scope.locals) == 0 {
 		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 			lv = picked
 		} else {
-			// Upstream-like fallback: create a new value when selection fails.
 			name := fmt.Sprintf("lv_%d", r.next31()&0xFFFF)
 			writeLine(b, 1, fmt.Sprintf("%s %s = %s;", targetType.Name, name, randomConstantExpr(targetType, r, opts)))
 			lv = lvalueInfo{expr: name, ctype: targetType}
 		}
 	}
-	rhs := randomTypedExpr(lv.ctype, r, opts, env, scope, ctx)
-	if opts.CompoundAssignment && r.upto(2) == 0 {
-		writeLine(b, 1, fmt.Sprintf("%s += %s;", lv.expr, rhs))
-	} else {
-		writeLine(b, 1, fmt.Sprintf("%s = %s;", lv.expr, rhs))
+	if ctx != nil {
+		ctx.exprDepth = 0
 	}
+	rhs := randomTypedExpr(lv.ctype, r, opts, env, scope, ctx)
+	writeLine(b, 1, fmt.Sprintf("%s = %s;", lv.expr, rhs))
 	writeLine(b, 1, fmt.Sprintf("x ^= (uint32_t)%s;", lv.expr))
 	if ctx != nil {
 		c := exprVarCandidate{expr: lv.expr, ctype: lv.ctype, assignable: true}
