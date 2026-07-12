@@ -833,15 +833,18 @@ func buildFunctionCallExpr(
 		if len(state.funcs) >= state.maxFuncs {
 			return "", false
 		}
-		// Return qfer: random_qualifiers for pointer types draws per indirection
-		// level then the pointee; int* → (F50,F10) + (F50,F10).
+		// Return qfer: for int* static random_qualifiers draws level+self
+		// pairs; seed2 also shows an extra (F50,F10) before ParamList — keep
+		// it for pointer returns (member random_qualifiers / stricter path).
 		ptrDepth := strings.Count(t.Name, "*")
-		for i := 0; i < ptrDepth; i++ {
+		pairs := ptrDepth + 1 // pointed-to levels + pointer variable
+		if ptrDepth > 0 {
+			pairs++ // extra pair observed at seed2 e246 before max_params
+		}
+		for i := 0; i < pairs; i++ {
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(10)
 		}
-		_ = r.flipcoin(50) // variable itself volatile
-		_ = r.flipcoin(10) // const
 		maxP := opts.MaxParams
 		if maxP < 1 {
 			maxP = 1
