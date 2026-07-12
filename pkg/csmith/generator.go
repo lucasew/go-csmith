@@ -1166,13 +1166,20 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if newArray {
 			burnCreateArrayVariable(er.fallback, opts, chosen, true)
 		} else if !initNull {
-			// Address-of residual (seed2 e1027): choose_ok_var among pointees U2
-			// then expression completes; next F80 is outer SelectDeref/term.
-			n := 2
-			if ctx.state.useSmallParentStack {
-				n = 2
+			// Address-of residual.
+			// e1027: U2 choose. e1211: multi-level under useSmallParentStack —
+			// F20 NewArray + F20 init for pointed-to, then U6 choose (UP F20×4 U6).
+			levels := strings.Count(chosen.Name, "*")
+			if ctx.state.useSmallParentStack && levels >= 2 {
+				// Nested GenerateNew for pointed-to pointer.
+				_ = er.fallback.flipcoin(20) // NewArray for pointee
+				_ = er.fallback.flipcoin(20) // init null vs address
+				n := 6
+				_ = er.fallback.upto(uint32(n))
+			} else {
+				n := 2
+				_ = er.fallback.upto(uint32(n))
 			}
-			_ = er.fallback.upto(uint32(n))
 		}
 		id := ctx.state.nextLocalID
 		ctx.state.nextLocalID = id + 1
@@ -1432,6 +1439,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		chooseN := n
 		// seed2 e865 real n=2; e892 U5; e905 U10; e1017 era keep U2 (useSmallParentStack).
 		smallStack := useSmallParentStackSink != nil && *useSmallParentStackSink
+		// seed2 e1216: late Global pointer sole-ish — UP no U after U100 (pad inflated n=2).
+		if n == 2 && smallStack && picks >= 6 {
+			itemize(exact[0], 1)
+			return exact[0], true
+		}
 		if n == 2 && picks >= 3 && mustReadLiveSink != nil && !*mustReadLiveSink && !smallStack {
 			chooseN = 5
 			if picks >= 4 && picks < 6 {
@@ -2255,9 +2267,14 @@ func randomLeafExprWithMode(
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
 					// qferMode: pointer F50+F10 (e789); simple !SE-free F10 (e872);
 					// useSmallParentStack era SE-free simple F50+F10 (e977).
+					// seed2 e1208: late pointer ParentLocal create !SE-free self F10
+					// only (levels F50+F10×2 then F10, not self F50).
 					qferMode := 1
-					if !strings.Contains(t.Name, "*") &&
-						(ctx.state == nil || !ctx.state.useSmallParentStack) {
+					wantPtr := strings.Contains(t.Name, "*")
+					if !wantPtr && (ctx.state == nil || !ctx.state.useSmallParentStack) {
+						qferMode = 2
+					} else if wantPtr && ctx.state != nil && ctx.state.useSmallParentStack &&
+						ctx.state.assignExprCount >= 3 {
 						qferMode = 2
 					}
 					// Late era: inventory falsely non-empty; force create (e977).
