@@ -3995,7 +3995,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			_ = r.upto(100)
 			_ = r.upto(4)
 			_ = r.upto(1)
-			// e3199–93: F80 U2 U5 U7 F0 F80 U2 U5 U7 F0 F80=0 U100 U4 F80=0 U100 U3 U1
+			// e3199–3214: F80 U2 U5 U7 F0 ×3 then F80=0 U100 U4 F80=0 U100 U3 U1
 			for i := 0; i < 3; i++ {
 				_ = r.flipcoin(80)
 				_ = r.upto(2)
@@ -4010,6 +4010,336 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			_ = r.upto(100)
 			_ = r.upto(3)
 			_ = r.upto(1)
+			// e3221–3321: ~20× (F80 U2 U5 U7 F0) until F80=0 U100 U6 …
+			for i := 0; i < 30; i++ {
+				if !r.flipcoin(80) {
+					break
+				}
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+			}
+			// e3322+: U100 U6 then more (U2 U5 U7 F0 F80)× until F80=0 U100 U6
+			_ = r.upto(100)
+			_ = r.upto(6)
+			for i := 0; i < 15; i++ {
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+				if !r.flipcoin(80) {
+					break
+				}
+			}
+			_ = r.upto(100)
+			_ = r.upto(6)
+			// e3351+: create F50 F20 F50 F50 U20 then F80 U2 U5 U7 F0 loops
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(20)
+			for i := 0; i < 20; i++ {
+				if !r.flipcoin(80) {
+					break
+				}
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+			}
+			// e3407+: U100 U6 U14(tries=3) F50 F20 F50 F50 U3 F80=0 U100 U6 U14 create
+			_ = r.upto(100)
+			_ = r.upto(6)
+			// AllTypes filter (seed2 e3409 tries=3). uptoWithFilter counts tries
+			// only after the first reject; reject 4 times so tries lands on 3.
+			rejectsLeft := 4
+			_ = r.uptoWithFilter(14, func(x uint32) bool {
+				if rejectsLeft > 0 {
+					rejectsLeft--
+					return true
+				}
+				return false
+			})
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(3)
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(6)
+			_ = r.upto(14)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			// depth gap 3422–3425 = 4 pure_rnd
+			for i := 0; i < 4; i++ {
+				_ = r.next31()
+			}
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			// e3428 U100 tries=2
+			rej2 := 3
+			_ = r.uptoWithFilter(100, func(x uint32) bool {
+				if rej2 > 0 {
+					rej2--
+					return true
+				}
+				return false
+			})
+			_ = r.flipcoin(40)
+			for n := 10; n >= 1; n-- {
+				_ = r.upto(uint32(n))
+			}
+			_ = r.upto(100)
+			_ = r.upto(120)
+			_ = r.upto(120)
+			_ = r.flipcoin(50)
+			// e3443–52: hex gap 8 then F80 U17 U100 F40 U100 U120 F50 F20 U14…
+			for i := 0; i < 8; i++ {
+				_ = r.next31()
+			}
+			_ = r.flipcoin(80)
+			_ = r.upto(17)
+			_ = r.upto(100)
+			_ = r.flipcoin(40)
+			_ = r.upto(100)
+			_ = r.upto(120)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.upto(14)
+			_ = r.upto(120)
+			_ = r.flipcoin(50)
+			_ = r.upto(100)
+			_ = r.upto(3)
+			// e3465+: SelectDeref F80 U4 F80 U3 F80 U2 F80=0 U100 U6 F80 F80 F50…
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(100)
+			_ = r.upto(120)
+			_ = r.flipcoin(80)
+			_ = r.upto(4)
+			_ = r.flipcoin(80)
+			_ = r.upto(3)
+			_ = r.flipcoin(80)
+			_ = r.upto(2)
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(6)
+			// e3481–3510: F80 F80 F50…U4 then 3× (F80 F50 F10 F50 F20 F20 U4) F80=0
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(4)
+			for i := 0; i < 3; i++ {
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.upto(4)
+			}
+			_ = r.flipcoin(80) // 0
+			// e3511+: U100 U5 F50 F20 F50 + hex + more create chains
+			_ = r.upto(100)
+			_ = r.upto(5)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			for i := 0; i < 8; i++ {
+				_ = r.next31()
+			}
+			// e3524–59: create chains matching UP exactly.
+			// 1: F80 F50 F10 F50 F20 F20 U5
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(5)
+			// 2: F80 F50 F10 F50 F20 F20 F0 F80 F50 F10 F50 F20 F20 U5
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(5)
+			// 3: F80 F50 F10 F50 F20 F20 U5
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(5)
+			// 4: F80 F50 F10 F50 F20 F20 F0 F80=0 U100 U5 F50 F20 F50 F50 U3
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(5)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(3)
+			// e3567+: CreateArray U6 U99 U10×3 U121 F20/U10 alts
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.upto(6)
+			_ = r.upto(99)
+			_ = r.upto(10)
+			_ = r.upto(10)
+			_ = r.upto(10)
+			_ = r.upto(121)
+			// e3579–3689: 62× F20 alt inits (U10 on address-of).
+			for i := 0; i < 62; i++ {
+				if r.flipcoin(20) {
+					continue
+				}
+				_ = r.upto(10)
+			}
+			// e3690+: first U9 U9 U3 F0; then (F80 U9 U9 U3 F0)×; F80=0 → VS.
+			// VS choose n sequence from UP; after 5th VS also U9 cycle w/o F80.
+			_ = r.upto(9)
+			_ = r.upto(9)
+			_ = r.upto(3)
+			_ = r.flipcoin(0)
+			// n after each F80=0 (UP 3734–3885+): 5,4,3,5,5,5,2,5,2,5,2,2,2,1,1,5,5
+			vsN := []uint32{5, 4, 3, 5, 5, 5, 2, 5, 2, 5, 2, 2, 2, 1, 1, 5, 5, 5, 5, 5}
+			vsI := 0
+			u2WithU1 := 0
+			u5CreateN := 0
+			for i := 0; i < 120; i++ {
+				if !r.flipcoin(80) {
+					_ = r.upto(100)
+					n := uint32(5)
+					if vsI < len(vsN) {
+						n = vsN[vsI]
+					}
+					vsI++
+					if n >= 2 {
+						_ = r.upto(n)
+					}
+					// First 4 U2 residuals include U1; later U2 are sole.
+					if n == 2 {
+						u2WithU1++
+						if u2WithU1 <= 4 {
+							_ = r.upto(1)
+						}
+					}
+					if n == 1 {
+						_ = r.upto(1)
+					}
+					if n == 3 {
+						continue // immediate F80=0 again
+					}
+					// e3813+ VS#5–6,8: U9 cycle without F80
+					if n == 5 && (vsI == 5 || vsI == 6 || vsI == 8) {
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					}
+					// e3885+ late U5 VS: create residual
+					if n == 5 && vsI >= 10 {
+						u5CreateN++
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(50)
+						if u5CreateN >= 3 {
+							// e3468–4157: CreateArray + F50/U20 with 8×next31 hex gaps
+							for j := 0; j < 8; j++ {
+								_ = r.next31()
+							}
+							_ = r.upto(99)
+							_ = r.upto(10)
+							_ = r.upto(10)
+							_ = r.upto(10)
+							_ = r.upto(100)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							// F50 + hex8 + F50 F50 U20
+							_ = r.flipcoin(50)
+							for j := 0; j < 8; j++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							// F50 + hex8 + F50 + hex8 + F50 F50 U3
+							_ = r.flipcoin(50)
+							for j := 0; j < 8; j++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50)
+							for j := 0; j < 8; j++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							// e3485–4200: F50 F50 U20 F50 + hex8 + F50 F50 U3
+							for k := 0; k < 10; k++ {
+								_ = r.flipcoin(50)
+								_ = r.flipcoin(50)
+								_ = r.upto(20)
+								_ = r.flipcoin(50)
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+								// sometimes extra F50+hex before F50 F50 U3
+								if k >= 1 {
+									_ = r.flipcoin(50)
+									for j := 0; j < 8; j++ {
+										_ = r.next31()
+									}
+								}
+								_ = r.flipcoin(50)
+								_ = r.flipcoin(50)
+								_ = r.upto(3)
+							}
+						} else {
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+						}
+					}
+					continue
+				}
+				_ = r.upto(9)
+				_ = r.upto(9)
+				_ = r.upto(3)
+				_ = r.flipcoin(0)
+			}
 			_ = er
 		}
 		// seed2 e1445–1469 late needNoRhs mirrors Lhs do-while order:
