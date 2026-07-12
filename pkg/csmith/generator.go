@@ -2198,11 +2198,11 @@ func emitStatement(
 						}
 					}
 				}
-				// Depth trace at seed2: after last alt-Constant hex, next is F50
-				// (not itemize). create_array_and_itemize still itemizes, but
-				// perhaps sizes empty after clamp — skip itemize for parity here.
-				// make_random_array_init continues with SelectLoopCtrlVar + make_init_value.
-				// IV often already exists (for-loop); make_init_value Constant:
+				// make_random_array_init: SelectLoopCtrlVar → GenerateNewGlobal
+				// with WRITE access: random_qualifiers skips const flip (const_ok=false).
+				// F50 volatile, F20 NewArray, Constant; then make_init_value Constant.
+				_ = r.flipcoin(50) // volatile only
+				_ = r.flipcoin(20) // NewArrayVariableProb
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
 						_ = r.upto(3)
@@ -2218,7 +2218,7 @@ func emitStatement(
 						_ = r.next31()
 					}
 				}
-				// Second F50 pair seen in upstream around 212–216 area
+				// make_init_value for array element
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
 						_ = r.upto(3)
