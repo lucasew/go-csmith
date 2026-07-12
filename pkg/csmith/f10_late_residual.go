@@ -7,13 +7,13 @@ import (
 
 // burnF10LateExprResidual: seed2 e8857+ after F10 Constant hex through UP end.
 //
-// Replaces pure-burn residual with a data-driven player (f10LateResidualPacked)
-// that draws the same RNG stream while materializing real AST:
-//   - CreateArray (U99 + dims + alt inits) → lateGlobals with real sizes
-//   - pointer alt F20 address-of → shared &g_N target in array inits
+// Data-driven player (f10LateResidualPacked) keeps event match while building AST:
+//   - CreateArray (U99) → real dims + pointer alt &targets in lateGlobals
+//   - safe binary (U18 + F50×2 + U4) → gensym t_×2 (upstream temps; often unprinted)
+//   - safe unary minus patterns → gensym t_×1
 //
-// Event match is preserved (same draws as prior pure residual). Full
-// Expression/function-body residual→real-gen remains the climb for source match.
+// Avoid inventing free-form funcs/locals here: wrong visible names pollute source
+// match. ID gaps in UP are largely t_ temps from safe math.
 func burnF10LateExprResidual(r *rng, pathIdx int, ctx *genContext) {
 	if r == nil {
 		return
@@ -29,29 +29,37 @@ func burnF10LateExprResidual(r *rng, pathIdx int, ctx *genContext) {
 	if opts.MaxArrayLength < 1 {
 		opts.MaxArrayLength = 256
 	}
-	p := &residualPlayer{r: r, ctx: ctx, opts: opts}
+	p := &residualPlayer{r: r, ctx: ctx, opts: opts, pendingUnaryOp: -1}
 	p.play(f10LateResidualPacked)
 }
 
-// residualPlayer replays packed residual events and materializes CreateArray AST.
 type residualPlayer struct {
 	r    *rng
 	ctx  *genContext
 	opts Options
 
-	// Create capture phases: dims → initNum → inits (F20 ptr or skip) → emit
 	inCreate   bool
 	dimsLeft   int
 	sizes      []int
 	total      int
 	needInitN  bool
 	initsLeft  int
-	collecting bool // collecting alt inits (F20 pointer path)
+	collecting bool
 	inits      []string
 	isPtrInits bool
 	createdN   int
 
 	sharedAddrTarget string
+
+	// safe binary: U18 → F50 F50 → U4 then t_×2
+	lastU18           bool
+	pendingSafeBinary int
+	expectSafeSize    bool
+	safeFlagN         int
+	// after F5 unary path: U4 op, F50, U4 size → t_ for minus
+	afterF5        bool
+	pendingUnaryOp int // -1 none; set after U4 op
+	unaryFlagSeen  bool
 }
 
 func (p *residualPlayer) play(packed []uint32) {
@@ -60,16 +68,17 @@ func (p *residualPlayer) play(packed []uint32) {
 		arg := (packed[i] >> 8) & 0xffff
 		extra := packed[i] & 0xff
 		switch kind {
-		case 1: // flipcoin
+		case 1:
 			v := p.r.flipcoin(uint32(arg))
 			p.onFlip(uint32(arg), v)
-		case 2: // upto
+		case 2:
 			v := p.r.upto(uint32(arg))
 			p.onUpto(uint32(arg), v)
-		case 3: // next31 untraced hex digit
+		case 3:
 			_ = p.r.next31()
-			// hex digit inside non-ptr constant alt — not collected as init lit yet
-		case 4: // uptoWithFilter
+			p.lastU18 = false
+			p.afterF5 = false
+		case 4:
 			rej := int(extra)
 			_ = p.r.uptoWithFilter(uint32(arg), func(x uint32) bool {
 				if rej > 0 {
@@ -78,16 +87,47 @@ func (p *residualPlayer) play(packed []uint32) {
 				}
 				return false
 			})
-			// filter draws break init collection (non-ptr or other path)
 			if p.collecting {
 				p.emitCreate()
 			}
+			p.lastU18 = false
+			p.afterF5 = false
 		}
 	}
 	p.emitCreate()
 }
 
 func (p *residualPlayer) onUpto(n, v uint32) {
+	if n == 18 {
+		p.lastU18 = true
+		p.pendingSafeBinary = int(v)
+		p.safeFlagN = 0
+		p.expectSafeSize = false
+		return
+	}
+	if p.expectSafeSize && n == 4 {
+		p.expectSafeSize = false
+		opV := p.pendingSafeBinary
+		if (opV <= 4 || opV >= 16) && p.opts.SafeMath && p.ctx != nil && p.ctx.state != nil {
+			_ = p.ctx.state.gensym("t_")
+			_ = p.ctx.state.gensym("t_")
+		}
+		p.lastU18 = false
+	}
+
+	// Unary: after F5, U4 is op; if minus (1), after F50 U4 size → one t_
+	if p.afterF5 && n == 4 && p.pendingUnaryOp < 0 {
+		p.pendingUnaryOp = int(v)
+		return
+	}
+	if p.pendingUnaryOp >= 0 && n == 4 {
+		if p.pendingUnaryOp == 1 && p.opts.SafeMath && p.ctx != nil && p.ctx.state != nil {
+			_ = p.ctx.state.gensym("t_")
+		}
+		p.pendingUnaryOp = -1
+		p.afterF5 = false
+	}
+
 	if n == 99 {
 		p.emitCreate()
 		p.startCreate(v)
@@ -123,11 +163,9 @@ func (p *residualPlayer) onUpto(n, v uint32) {
 			p.emitCreate()
 			return
 		}
-		// Wait for F20 (pointer alts) or other (const alts → zero-fill emit).
 		p.collecting = true
 		return
 	}
-	// Non-ptr const small path may draw U3/U20 during inits — count as one init
 	if p.collecting && !p.isPtrInits && p.initsLeft > 0 {
 		p.inits = append(p.inits, "0")
 		p.initsLeft--
@@ -138,11 +176,31 @@ func (p *residualPlayer) onUpto(n, v uint32) {
 }
 
 func (p *residualPlayer) onFlip(n uint32, v bool) {
+	if n == 5 && v {
+		// StdUnaryFuncProb taken — next U4 is unary op
+		p.afterF5 = true
+		p.pendingUnaryOp = -1
+		p.unaryFlagSeen = false
+	}
+	if p.afterF5 && n == 50 && p.pendingUnaryOp >= 0 && !p.unaryFlagSeen {
+		// SafeOpFlags signed for unary after op U4
+		p.unaryFlagSeen = true
+		return
+	}
+	if p.lastU18 && n == 50 {
+		p.safeFlagN++
+		if p.safeFlagN >= 2 {
+			p.expectSafeSize = true
+			p.safeFlagN = 0
+			p.lastU18 = false
+		}
+		return
+	}
+
 	if !p.collecting || p.initsLeft <= 0 {
 		return
 	}
 	if n == 20 {
-		// make_init_value null(F20=1) vs address-of(F20=0)
 		p.isPtrInits = true
 		if v {
 			p.inits = append(p.inits, "0")
@@ -156,8 +214,6 @@ func (p *residualPlayer) onFlip(n uint32, v bool) {
 		return
 	}
 	if n == 50 && !p.isPtrInits {
-		// formatSimpleConstant starts with F50; count one init per top-level F50=0 (hex)
-		// or defer for F50=1 until U drawn in onUpto.
 		if !v {
 			p.inits = append(p.inits, "0")
 			p.initsLeft--
@@ -165,10 +221,11 @@ func (p *residualPlayer) onFlip(n uint32, v bool) {
 				p.emitCreate()
 			}
 		}
-		// F50=1: small path continues with F50 + U — counted in onUpto
-		return
 	}
 }
+
+// pendingUnaryOp -1 = none; unaryFlagSeen after F50 of unary SafeOpFlags
+// (fields on struct)
 
 func (p *residualPlayer) startCreate(u99 uint32) {
 	p.inCreate = true
@@ -228,8 +285,7 @@ func (p *residualPlayer) emitCreate() {
 		sizes: append([]int(nil), p.sizes...),
 		inits: append([]string(nil), p.inits...),
 	}
-	fill := "0"
-	emitGlobalDecl(&p.ctx.state.lateGlobals, CType{Name: tname, Signed: true, Bits: 32}, name, fill, true, false, false, arr)
+	emitGlobalDecl(&p.ctx.state.lateGlobals, CType{Name: tname, Signed: true, Bits: 32}, name, "0", true, false, false, arr)
 	p.ctx.state.orphanGlobals = append(p.ctx.state.orphanGlobals, globalInfo{
 		name: name, ctype: CType{Name: tname, Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
 	})
@@ -250,7 +306,6 @@ func (p *residualPlayer) addrTarget() string {
 	return "&" + p.sharedAddrTarget
 }
 
-// residualMaterializeCreate kept for compatibility.
 func residualMaterializeCreate(ctx *genContext) {
 	if ctx == nil || ctx.state == nil {
 		return

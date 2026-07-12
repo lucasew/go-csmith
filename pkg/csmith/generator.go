@@ -592,6 +592,97 @@ func safeAddExpr(t CType, a, b string, opts Options) string {
 	return fmt.Sprintf("safe_add_func_%s%d_t_%s(%s, %s)", prefix, bits, sign, a, b)
 }
 
+// formatUnaryInvocation mirrors unary stdfunc Output.
+// uop: ePlus=0 eMinus=1 eNot=2 eBitNot=3 (U4).
+func formatUnaryInvocation(uop int, operand string, bits int, signed bool, opts Options) string {
+	if bits != 8 && bits != 16 && bits != 32 && bits != 64 {
+		bits = 32
+	}
+	typeName := fmt.Sprintf("int%d_t", bits)
+	if !signed {
+		typeName = fmt.Sprintf("uint%d_t", bits)
+	}
+	sign := "_u"
+	if signed {
+		sign = "_s"
+	}
+	switch uop {
+	case 0: // ePlus
+		return fmt.Sprintf("(+(%s))", operand)
+	case 1: // eMinus
+		if opts.SafeMath {
+			return fmt.Sprintf("safe_unary_minus_func_%s%s(%s)", typeName, sign, operand)
+		}
+		return fmt.Sprintf("(-(%s))", operand)
+	case 2: // eNot
+		return fmt.Sprintf("(!(%s))", operand)
+	default: // eBitNot
+		return fmt.Sprintf("(~(%s))", operand)
+	}
+}
+
+// formatBinaryInvocation mirrors FunctionInvocationBinary::Output for eBinaryOps.
+// opV is rnd_upto(MAX_BINARY_OP)=U18: eAdd..eLShift (0..17).
+// Safe math ops emit safe_*_func_* when opts.SafeMath (avoid_signed_overflow).
+func formatBinaryInvocation(opV int, lhs, rhs string, bits int, op1Signed, op2Signed bool, opts Options) string {
+	if bits != 8 && bits != 16 && bits != 32 && bits != 64 {
+		bits = 32
+	}
+	typeName := fmt.Sprintf("int%d_t", bits)
+	if !op1Signed {
+		typeName = fmt.Sprintf("uint%d_t", bits)
+	}
+	sign1 := "_u"
+	if op1Signed {
+		sign1 = "_s"
+	}
+	sign2 := "_u"
+	if op2Signed {
+		sign2 = "_s"
+	}
+	// Safe ops: add/sub/mul/div/mod/lshift/rshift
+	if opts.SafeMath {
+		var stem string
+		switch opV {
+		case 0:
+			stem = "safe_add_"
+		case 1:
+			stem = "safe_sub_"
+		case 2:
+			stem = "safe_mul_"
+		case 3:
+			stem = "safe_div_"
+		case 4:
+			stem = "safe_mod_"
+		case 16:
+			stem = "safe_rshift_"
+		case 17:
+			stem = "safe_lshift_"
+		}
+		if stem != "" {
+			// to_string: safe_X_func_<size><op1sign><op2sign for shifts else op1sign>
+			s2 := sign1
+			if opV == 16 || opV == 17 {
+				s2 = sign2
+			}
+			return fmt.Sprintf("%sfunc_%s%s%s(%s, %s)", stem, typeName, sign1, s2, lhs, rhs)
+		}
+	}
+	// Infix / non-safe
+	ops := []string{
+		"+", "-", "*", "/", "%", // 0-4
+		">", "<", ">=", "<=", "==", "!=", // 5-10
+		"&&", "||", // 11-12
+		"^", "&", "|", // 13-15
+		">>", "<<", // 16-17
+	}
+	sym := "^"
+	if opV >= 0 && opV < len(ops) {
+		sym = ops[opV]
+	}
+	return fmt.Sprintf("(%s %s %s)", lhs, sym, rhs)
+}
+
 func safeDivU32Expr(a, b string, opts Options) string {
 	if !opts.SafeMath {
 		return fmt.Sprintf("((%s) / (%s))", a, b)
@@ -2664,11 +2755,27 @@ func randomLeafExprWithMode(
 					if er.fallback.flipcoin(5) {
 						// make_random_unary: rnd_upto(MAX_UNARY_OP) then
 						// SafeOpFlags::make_random_unary (F50 signed + U4 size).
-						_ = er.fallback.upto(4)
-						_ = er.fallback.flipcoin(50)
-						_ = er.fallback.upto(4)
+						uop := int(er.fallback.upto(4))
+						uSigned := er.fallback.flipcoin(50)
+						usz := int(er.fallback.upto(4))
+						ubits := 32
+						switch usz {
+						case 0:
+							ubits = 8
+						case 1:
+							ubits = 16
+						case 2:
+							ubits = 32
+						default:
+							ubits = 64
+						}
+						// safe unary minus gensyms one t_ temp (CreateFunctionInvocationUnary).
+						if opts.SafeMath && uop == 0 && ctx != nil && ctx.state != nil {
+							_ = ctx.state.gensym("t_")
+						}
 						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
-						out = castLiteral(t, fmt.Sprintf("(~(%s))", operand))
+						out = formatUnaryInvocation(uop, operand, ubits, uSigned, opts)
+						out = castLiteral(t, out)
 					} else if opts.Pointers && er.fallback.flipcoin(10) {
 						// make_random_binary_ptr_comparison
 						_ = er.fallback.flipcoin(50)
@@ -2706,25 +2813,46 @@ func randomLeafExprWithMode(
 						}
 						out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 					} else {
-						_ = er.fallback.upto(18)
-						_ = er.fallback.flipcoin(50)   // SafeOpsSigned op1
-						_ = er.fallback.flipcoin(50)   // SafeOpsSigned op2
-						sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64-bit
-						// Map size to operand type for RandomHexDigits width
+						// make_random_binary: op U18, SafeOpFlags F50 F50 U4,
+						// then CreateFunctionInvocationBinary gensyms t_×2 for
+						// safe ops (add/sub/mul/div/mod/shift) even when
+						// math_notmp=false (temps may not print; IDs still advance).
+						opV := int(er.fallback.upto(18))
+						op1Signed := er.fallback.flipcoin(50)
+						op2Signed := er.fallback.flipcoin(50)
+						sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64
 						opTy := t
+						bits := 32
 						switch sz {
 						case 0:
+							bits = 8
 							opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
 						case 1:
+							bits = 16
 							opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
 						case 2:
+							bits = 32
 							opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 						default:
+							bits = 64
 							opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+						}
+						if !op1Signed {
+							opTy.Signed = false
+							opTy.Name = strings.Replace(opTy.Name, "int", "uint", 1)
+						}
+						// safe_ops: eAdd..eMod (0-4) and eRShift/eLShift (16-17)
+						safeOp := opV <= 4 || opV >= 16
+						if safeOp && opts.SafeMath && ctx != nil && ctx.state != nil {
+							// Mirror create_new_tmp_var ×2 (gensym t_ before operands).
+							_ = ctx.state.gensym("t_")
+							_ = ctx.state.gensym("t_")
 						}
 						lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
 						rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-						out = castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
+						out = formatBinaryInvocation(opV, lhs, rhs, bits, op1Signed, op2Signed, opts)
+						out = castLiteral(t, out)
+						_ = op2Signed
 					}
 					if ctx != nil {
 						ctx.skipFuncRetQfer = prevSkip
