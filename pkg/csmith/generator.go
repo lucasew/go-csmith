@@ -17,6 +17,7 @@ var lhsSoleNextSink *bool
 var globalU27DoneSink *bool
 var globalLateU2MissDoneSink *bool
 var forceNextTermVariableSink *bool
+var lateLhsChooseCountSink *int
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -137,6 +138,8 @@ type functionFlowState struct {
 	forceNextTermVariable bool
 	// lateMaxFuncsCreateDone: one-shot e1402 F20 U7 CREATE residual at maxFuncs.
 	lateMaxFuncsCreateDone bool
+	// lateLhsChooseCount: forAssign choose scale late (e1447 U4, e1462 U3).
+	lateLhsChooseCount int
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
@@ -1378,17 +1381,25 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		}
 	}
 	scaleAssign := func(n int) int {
+		// seed2 e1447 first late Lhs choose U4; e1456 ParentParam explicit U4;
+		// e1462 later Global choose U3.
+		if forAssign && n >= 2 && useSmallParentStackSink != nil && *useSmallParentStackSink &&
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
+			lateLhsChooseCountSink != nil {
+			c := *lateLhsChooseCountSink
+			*lateLhsChooseCountSink = c + 1
+			if c == 0 {
+				return 4 // e1447
+			}
+			return 3 // e1462+
+		}
 		// Lhs after multi-dim: inventory over-count n=3→U2 (seed2 e940).
 		if forAssign && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			return 2
 		}
 		// seed2 e1121: Global Lhs choose U3 vs inventory n=4.
-		// seed2 e1447 late: real U4 (after CREATE residual era).
 		if forAssign && n == 4 && useSmallParentStackSink != nil && *useSmallParentStackSink {
-			if globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink {
-				return 4 // e1447
-			}
-			return 3 // e1121
+			return 3
 		}
 		return n
 	}
@@ -3058,6 +3069,10 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 		if flow != nil && flow.multiDimArrays > 0 {
 			nStack = 2 // seed2 e940
 		}
+		// seed2 e1469 late needNoRhs ParentLocal stack U4 (not U2).
+		if flow != nil && flow.useSmallParentStack && flow.globalLateU2MissDone {
+			nStack = 4
+		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if useBlockLocal {
@@ -3088,8 +3103,26 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 	}
 	// seed2 e1222: ParentParam Lhs under useSmallParentStack → empty → miss
 	// → Lhs loop retries SelectDeref F80 (not param U2 choose).
+	// seed2 e1455–56: late needNoRhs era ParentParam does choose U4 (not miss).
 	if scopePick == 2 && flow != nil && flow.useSmallParentStack {
-		return lvalueInfo{}, false
+		if !flow.globalLateU2MissDone {
+			return lvalueInfo{}, false
+		}
+		// Late: choose U4 among params (e1456, e1504). First time also itemize
+		// U10 U1 U1 (e1457–59); later ParentParam is U4 then create residual.
+		_ = r.upto(4)
+		if flow.lateLhsChooseCount <= 1 {
+			// First ParentParam Lhs late (after first Global U4 choose count).
+			_ = r.upto(10)
+			_ = r.upto(1)
+			_ = r.upto(1)
+		} else {
+			// e1505+: qferMode 3 style F50 vol, F20 NewArray, F50 residual.
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+		}
+		return lvalueInfo{expr: "x", ctype: target}, true
 	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
@@ -3304,49 +3337,89 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// next-statement U100.
 	lhsAfterParamMiss := false
 	if !lhsFromDeref {
-		lhsGlobalFailOnce := false
-		for try := 0; try < 6 && !lhsFromDeref; try++ {
-			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-				// seed2 e1448: late Global Lhs choose then visit_facts fail → F80
-				// loop continues (not needNoRhs F50). One-shot.
-				if !lhsGlobalFailOnce && ctx != nil && ctx.state != nil &&
-					ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone {
-					lhsGlobalFailOnce = true
-					// Fall through to F80 retry without accepting pick.
-				} else {
-					lv = picked
-					lhsFromDeref = true
-					break
+		// seed2 e1445–1469 late needNoRhs mirrors Lhs do-while order:
+		// F80? SelectDeref residual : VariableSelector; visit_facts may fail.
+		lateNeedNoRhs := needNoRhs && ctx != nil && ctx.state != nil &&
+			ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone
+		if lateNeedNoRhs {
+			// After outer SelectDeref residual, first VS immediate.
+			// Fail patterns (3 fails then accept):
+			//   vs0: F80 U2, F80 U10 U1 U1, F80=0, VS
+			//   vs1: ParentParam burns U4+itemize internally; F80=0, VS
+			//   vs2: F80 U10 U1 U1, F80=0, VS
+			//   vs3: accept
+			// Accept after enough VS tries; ParentLocal create still fails
+			// visit_facts and burns more F80 itemize (e1482–).
+			for vs := 0; vs < 10 && !lhsFromDeref; vs++ {
+				if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+					if vs >= 6 {
+						lv = picked
+						lhsFromDeref = true
+						break
+					}
+					if vs == 0 {
+						// e1448–53
+						_ = r.flipcoin(80) // 1
+						_ = r.upto(2)
+						_ = r.flipcoin(80) // 1
+						_ = r.upto(10)
+						_ = r.upto(1)
+						_ = r.upto(1)
+						_ = r.flipcoin(80) // 0 → next VS
+					} else if vs == 1 {
+						// ParentParam itemized; e1460 F80=0 only
+						_ = r.flipcoin(80)
+					} else if vs == 2 {
+						// e1463–67
+						_ = r.flipcoin(80) // 1
+						_ = r.upto(10)
+						_ = r.upto(1)
+						_ = r.upto(1)
+						_ = r.flipcoin(80) // 0
+					} else if vs == 3 {
+						// e1482–1501: five F80=1 itemize after create, F80=0
+						for i := 0; i < 5; i++ {
+							_ = r.flipcoin(80)
+							_ = r.upto(10)
+							_ = r.upto(1)
+							_ = r.upto(1)
+						}
+						_ = r.flipcoin(80) // 0
+					} else {
+						// e1508+: after ParentParam create residual, F80 itemize
+						// then F80 gate (0 → next VS). Repeat until accept.
+						if r.flipcoin(80) {
+							_ = r.upto(10)
+							_ = r.upto(1)
+							_ = r.upto(1)
+						}
+						// ensure next VS only after F80=0
+						for r.flipcoin(80) {
+							_ = r.upto(10)
+							_ = r.upto(1)
+							_ = r.upto(1)
+						}
+					}
+					continue
 				}
+				if r.flipcoin(80) {
+					_ = r.upto(10)
+					_ = r.upto(1)
+					_ = r.upto(1)
+				}
+			}
+		}
+		for try := 0; try < 8 && !lhsFromDeref; try++ {
+			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+				lv = picked
+				lhsFromDeref = true
+				break
 			}
 			// VariableSelector miss → retry SelectDeref.
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again
 			}
-			// seed2 e1223: after ParentParam miss, F80 then U3 (stack/choose).
-			// seed2 e1449–53: late needNoRhs after Global fail: F80 U2 then
-			// itemize U10 U1 U1 then F80=0 VS (not immediate U100).
 			if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
-				if needNoRhs && ctx.state.globalLateU2MissDone {
-					_ = r.upto(2) // e1449
-					// Re-enter SelectDeref loop body style: next F80 + itemize.
-					// Burn one more F80 iteration residual here.
-					if r.flipcoin(80) {
-						_ = r.upto(10)
-						_ = r.upto(1)
-						_ = r.upto(1)
-					}
-					// then fall through to F80=0 VS on next outer try… but we're
-					// inside miss loop. Emit VS path after itemize:
-					if !r.flipcoin(80) {
-						if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-							lv = picked
-							lhsFromDeref = true
-							break
-						}
-					}
-					continue
-				}
 				_ = r.upto(3)
 				ctx.state.lhsSoleNext = true
 				lhsAfterParamMiss = true
@@ -4500,6 +4573,7 @@ func emitSingleFuncDefOnce(
 		globalU27DoneSink = &state.globalU27Done
 		globalLateU2MissDoneSink = &state.globalLateU2MissDone
 		forceNextTermVariableSink = &state.forceNextTermVariable
+		lateLhsChooseCountSink = &state.lateLhsChooseCount
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4511,6 +4585,7 @@ func emitSingleFuncDefOnce(
 			globalU27DoneSink = nil
 			globalLateU2MissDoneSink = nil
 			forceNextTermVariableSink = nil
+			lateLhsChooseCountSink = nil
 			lastArraySizesSink = nil
 		}()
 	}

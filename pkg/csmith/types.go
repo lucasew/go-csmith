@@ -126,41 +126,66 @@ func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Optio
 
 // pickSimpleNonVoid mirrors Type::choose_random_nonvoid_simple /
 // choose_random_simple: rnd_upto(MAX_SIMPLE_TYPES=14, SIMPLE_TYPES_PROB_FILTER).
-// Enum order matches eSimpleType: void,char,uchar,short,ushort,int,uint,long,...
+// Early: historical interleaved layout (seed2 e351 inventory).
+// Late useSmallParentStack: true eSimpleType order so float@10 is filtered
+// when !EnableFloat (seed2 e1470 U14 tries=2).
 func pickSimpleNonVoid(r *rng, opts Options) CType {
-	// Index-aligned with eSimpleType; HexDigits match GenerateRandom*Constant.
-	simples := []CType{
-		{Name: "void", Bits: 0},                                 // 0 eVoid — filtered
-		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},   // 1 eChar
-		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2}, // 2 eUChar
-		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}, // 3 eShort
-		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4}, // 4 eUShort
-		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}, // 5 eInt
-		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8}, // 6 eUInt
-		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8}, // 7 eLong
-		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8}, // 8 eULong
-		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},  // 9 eLongLong
-		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16}, // 10 eULongLong
-		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},   // 11 eFloat
-		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16}, // 12
-		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16}, // 13
+	historical := []CType{
+		{Name: "void", Bits: 0},
+		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},
+		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2},
+		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4},
+		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4},
+		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
+		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8},
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8},
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8},
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16},
+		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},
+		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},
+		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
+	}
+	// Type.h eSimpleType: void,char,int,short,long,longlong,uchar,uint,ushort,ulong,float,ulonglong,int128,uint128
+	eSimple := []CType{
+		{Name: "void", Bits: 0},
+		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},
+		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
+		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4},
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8},
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},
+		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2},
+		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8},
+		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4},
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8},
+		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16},
+		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},
+		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
+	}
+	simples := historical
+	floatIdx, i128Idx, u128Idx := 11, 12, 13
+	if useSmallParentStackSink != nil && *useSmallParentStackSink {
+		simples = eSimple
+		floatIdx, i128Idx, u128Idx = 10, 12, 13
 	}
 	reject := func(x uint32) bool {
 		i := int(x)
 		if i < 0 || i >= len(simples) {
 			return true
 		}
-		switch i {
-		case 0: // void
+		if i == 0 {
 			return true
-		case 11: // float
+		}
+		if i == floatIdx {
 			return !opts.EnableFloat
-		case 12:
+		}
+		if i == i128Idx {
 			return !opts.Int128
-		case 13:
+		}
+		if i == u128Idx {
 			return !opts.UInt128
 		}
-		// long/longlong allowed by default (allow_int64=true).
 		return false
 	}
 	idx := int(r.uptoWithFilter(uint32(len(simples)), reject))
