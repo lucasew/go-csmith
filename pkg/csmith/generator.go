@@ -2610,17 +2610,17 @@ func emitStatement(
 		// len==1 → no RNG; len>1 → rnd_upto(len).
 		// After array-loop: first nested for sees n=2 + array_control (e370);
 		// later fors often n=1 + make_random_loop_control (e503).
+		// loopIVPool: 2+ after array-loop (e370 multi-IV + array_control);
+		// 1 after first nested for (e503 reuse IV + loop_control);
+		// 0 after that (e521 must create IV: F50 vol + F20 NewArray + const).
 		postArrayFor := state != nil && state.loopIVPool > 1
-		ivN := 1
+		reuseIV := state != nil && state.loopIVPool == 1
+		createIV := state != nil && state.deepStack && state.loopIVPool == 0
 		if postArrayFor {
-			ivN = state.loopIVPool
-		}
-		if ivN > 1 {
-			_ = r.upto(uint32(ivN))
-		} else if ivN == 0 && opts.GlobalVariables {
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(10)
-			_ = r.flipcoin(20)
+			_ = r.upto(uint32(state.loopIVPool))
+		} else if createIV && opts.GlobalVariables {
+			_ = r.flipcoin(50) // WRITE random_qualifiers volatile
+			_ = r.flipcoin(20) // NewArrayVariableProb (false → Constant)
 			if r.flipcoin(50) {
 				if r.flipcoin(50) {
 					_ = r.upto(3)
@@ -2633,6 +2633,7 @@ func emitStatement(
 				}
 			}
 		}
+		_ = reuseIV
 		if postArrayFor {
 			// make_random_array_control-like pure_rnd stream after array-loop.
 			_ = r.upto(1)
@@ -2645,8 +2646,7 @@ func emitStatement(
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
-			// Subsequent fors: single IV, plain loop_control (seed2 e503).
-			state.loopIVPool = 1
+			state.loopIVPool = 1 // next for reuses IV (e503)
 		} else {
 			// make_random_loop_control
 			if !r.flipcoin(50) {
@@ -2667,6 +2667,9 @@ func emitStatement(
 			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
+			if state != nil && state.loopIVPool == 1 {
+				state.loopIVPool = 0 // later fors recreate IV (e521)
+			}
 		}
 		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
 		writeLine(b, 2, "x += (uint32_t)i;")
@@ -2690,6 +2693,9 @@ func emitStatement(
 	case stmtBreak:
 		writeLine(b, 1, "break;")
 	case stmtGoto:
+		// StatementGoto::make_random starts with rnd_flipcoin(40) for back-edge,
+		// then often returns null → Statement::make_random retries (seed2 e518).
+		_ = r.flipcoin(40)
 		return false
 	case stmtArrayOp:
 		// StatementArrayOp::make_random
