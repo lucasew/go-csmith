@@ -1283,21 +1283,28 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// simple table), not AllTypes. Wrong hex width desynced LCG at e944–947.
 		chosen = pickSimpleNonVoid(er.fallback, opts)
 	}
+	isConst, isVolatile := false, false
 	if qferMode > 0 {
 		// GenerateNewParentLocal → random_qualifiers(..., no_volatile often true).
 		levels := strings.Count(chosen.Name, "*")
 		for i := 0; i < levels; i++ {
-			_ = er.fallback.flipcoin(50)
-			_ = er.fallback.flipcoin(10)
+			_ = er.fallback.flipcoin(50) // ptr-level vol
+			_ = er.fallback.flipcoin(10) // ptr-level const
 		}
 		// Self: F50 only when SE-free (qferMode 1); F10 const if READ (not WRITE).
 		// qferMode 2 = !SE-free READ (e872 F10 only).
 		// qferMode 3 = WRITE (e943 F50 vol no const, then NewArray F20).
+		// Parent-local often no_volatile=true for self → still burn F50 when mode 1/3
+		// but force non-vol (seed2 comments); mode 1 SE-free may keep vol.
 		if qferMode == 1 || qferMode == 3 {
-			_ = er.fallback.flipcoin(50)
+			volDraw := er.fallback.flipcoin(50)
+			// Parent-local path: vol discarded for non-pointer self (no_volatile).
+			if qferMode == 1 && isPtr {
+				isVolatile = volDraw && opts.Volatiles
+			}
 		}
 		if qferMode != 3 {
-			_ = opts.Consts && er.fallback.flipcoin(10)
+			isConst = opts.Consts && er.fallback.flipcoin(10)
 		}
 	}
 	// create_and_initialize
@@ -1418,17 +1425,17 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	}
 
 	// Materialize as a generated global without further main RNG.
-	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray)
+	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile)
 }
 
 // createLocalPathGlobalDirect creates a global with zero init (no main RNG).
 func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext, blockDepth int) (exprVarCandidate, bool) {
-	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false)
+	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false, false, false)
 }
 
 // createLocalPathGlobalDirectInit materializes a global with a precomputed init
 // literal (init RNG already consumed by the caller).
-func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool) (exprVarCandidate, bool) {
+func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool, isConst bool, isVolatile bool) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1436,12 +1443,19 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	if initLit == "" {
 		initLit = "0"
 	}
-	if isArray {
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s[4] = {%s};", t.Name, name, initLit))
-	} else {
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = %s;", t.Name, name, initLit))
+	qual := ""
+	if isConst {
+		qual += "const "
 	}
-	g := globalInfo{name: name, ctype: t, isConst: false, isVolatile: false, isArray: isArray, arrayLen: 4}
+	if isVolatile {
+		qual += "volatile "
+	}
+	if isArray {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s[4] = {%s};", qual, t.Name, name, initLit))
+	} else {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
+	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: 4}
 	if !isArray {
 		g.arrayLen = 0
 	}
