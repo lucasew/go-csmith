@@ -140,3 +140,5 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | 20-seed gate | Not started |
 
 Next plateau focus: after e716 variable/scope pick (UP `U2` vs Go `U100` on same raw); create-IV NewArray + array_control path landed through e715.
+
+**CreateArray dimension ladder:** instrumented binary / seed2 traces use step **60** (1d 60% / 2d 30% / 3d ~9%), matching the comment in `ArrayVariable.cpp`. The checked-in tree source has `step = 100` (always dim=1 for `num∈[1,99]`), which cannot produce multi-dim events such as seed2 e565 (`U99=93` → sizes 4×4×9). Go follows the live instrumented stream, not the tree literal.

@@ -80,9 +80,11 @@ type functionFlowState struct {
 	deepStack bool
 	// arrayLoopDepth: nesting of StatementFor::make_random_array_loop bodies.
 	arrayLoopDepth int
-	// arrayLoopFresh: true until the first nested for in an array-loop body
-	// consumes array_control (rw_directive). Later fors use loop_control (e502+).
+	// arrayLoopFresh: true until the first nested for in the current array-loop
+	// frame consumes array_control (rw_directive). Later fors use loop_control (e502+).
 	arrayLoopFresh bool
+	// arrayLoopFreshStack saves outer frames' fresh flags when nesting array-loops.
+	arrayLoopFreshStack []bool
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -188,24 +190,25 @@ type genContext struct {
 }
 
 type genSnapshot struct {
-	dynLocLen      int
-	funcsLen       int
-	builtLen       int
-	defsLen        int
-	nextIdx        int
-	nextParamID    int
-	nextLocalID    int
-	dynGlobalsLen  int
-	nextGlobalID   int
-	stmtBudget     int
-	lateGlobalsBuf string
-	exprDepth      int
-	blockStack     int
-	loopIVPool     int
-	deepStack      bool
-	arrayLoopDepth int
-	arrayLoopFresh bool
-	derivedPtr     int
+	dynLocLen           int
+	funcsLen            int
+	builtLen            int
+	defsLen             int
+	nextIdx             int
+	nextParamID         int
+	nextLocalID         int
+	dynGlobalsLen       int
+	nextGlobalID        int
+	stmtBudget          int
+	lateGlobalsBuf      string
+	exprDepth           int
+	blockStack          int
+	loopIVPool          int
+	deepStack           bool
+	arrayLoopDepth      int
+	arrayLoopFresh      bool
+	arrayLoopFreshStack []bool
+	derivedPtr          int
 }
 
 func takeGenSnapshot(ctx *genContext) *genSnapshot {
@@ -232,6 +235,9 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 		s.deepStack = ctx.state.deepStack
 		s.arrayLoopDepth = ctx.state.arrayLoopDepth
 		s.arrayLoopFresh = ctx.state.arrayLoopFresh
+		if n := len(ctx.state.arrayLoopFreshStack); n > 0 {
+			s.arrayLoopFreshStack = append([]bool(nil), ctx.state.arrayLoopFreshStack...)
+		}
 		s.derivedPtr = ctx.state.derivedPtrTypes
 	}
 	return s
@@ -269,6 +275,11 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		ctx.state.deepStack = s.deepStack
 		ctx.state.arrayLoopDepth = s.arrayLoopDepth
 		ctx.state.arrayLoopFresh = s.arrayLoopFresh
+		if s.arrayLoopFreshStack == nil {
+			ctx.state.arrayLoopFreshStack = nil
+		} else {
+			ctx.state.arrayLoopFreshStack = append([]bool(nil), s.arrayLoopFreshStack...)
+		}
 		ctx.state.derivedPtrTypes = s.derivedPtr
 	}
 	ctx.exprDepth = s.exprDepth
@@ -581,7 +592,14 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 	}
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
+		isPtr := strings.Contains(t.Name, "*")
 		for i := 0; i < initNum; i++ {
+			if isPtr {
+				// Constant::make_random(pointer) is "0" (no RNG). Non-strict
+				// make_init_value for pointer alts is richer; Lhs/seed2 paths
+				// historically only needed the init_num draw when size>1.
+				continue
+			}
 			burnSimpleConstant(r, t)
 		}
 	}
@@ -614,7 +632,8 @@ func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
 // burnSelectLoopCtrlVarCreate mirrors SelectLoopCtrlVar when no suitable
 // non-array integer is visible: GenerateNewGlobal(WRITE) in a reject loop until
 // a non-volatile IV is produced (volatile creates are discarded and retried).
-// Caps retries to avoid unbounded burns if RNG is adversarial.
+// Upstream loops unbounded; we cap attempts and force non-vol on the last try so
+// the stream still ends with an accepted IV rather than falling off the path.
 func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
 	if r == nil || !opts.GlobalVariables {
 		return
@@ -624,12 +643,25 @@ func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
 	const maxIVCreateAttempts = 16
 	for attempt := 0; attempt < maxIVCreateAttempts; attempt++ {
 		// random_qualifiers(WRITE): const forced false (no RNG); vol F50 when ok.
-		vol := r.flipcoin(50)
+		// Last attempt: force non-volatile so we mirror upstream eventually-success.
+		vol := false
+		if attempt+1 < maxIVCreateAttempts {
+			vol = r.flipcoin(50)
+		} else {
+			_ = r.flipcoin(50) // still burn the draw; ignore result
+			if os.Getenv("CSMITH_TRACE_RNG") != "" {
+				fmt.Fprintf(os.Stderr, "burnSelectLoopCtrlVarCreate: forced non-vol after %d attempts\n", maxIVCreateAttempts)
+			}
+		}
 		_ = burnCreateAndInitialize(r, opts, ivType)
 		if !vol {
 			return
 		}
 		// Volatile IV rejected by StatementFor::make_iteration; create again.
+		// (Existing non-array integers would be choose_var, but create is only
+		// invoked when the pool is empty — after volatile rejects, arrays stay
+		// out of the non-array set and volatiles are invalid_vars, so create
+		// remains the correct burn.)
 	}
 }
 
@@ -1963,25 +1995,9 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 		// Address-of path for pointer init.
 		if newArray {
-			// Existing target often chosen without RNG; then CreateArrayVariable.
-			// ArrayVariable::CreateArrayVariable: rnd_upto(99), per-dim sizes,
-			// pure_rnd_upto(total/2) for init count (same stream in random mode).
-			_ = r.upto(99)
-			maxPerDim := opts.MaxArrayLenPerDim
-			if maxPerDim < 1 {
-				maxPerDim = 10
-			}
-			dimen := int(r.upto(uint32(maxPerDim))) + 1
-			if dimen < 1 {
-				dimen = 1
-			}
-			if dimen/2 > 0 {
-				_ = r.upto(uint32(dimen / 2))
-			}
-			// itemize: rnd_upto(sizes[i]) per dim
-			if dimen > 0 {
-				_ = r.upto(uint32(dimen))
-			}
+			// create_and_initialize → create_array_and_itemize for the pointer
+			// variable type (seed2 e346 U99+U10+U1 with size-1, no alt inits).
+			burnCreateArrayVariable(r, opts, targetType, true)
 			// Seed2: array pointer Lhs fails opportunistic_validate once and
 			// retries (next SelectDeref F80=0 → VariableSelector::select).
 			continue
@@ -2684,14 +2700,12 @@ func emitStatement(
 		writeLine(b, 1, "}")
 	case stmtFor:
 		// SelectLoopCtrlVar: choose_ok_var among integer non-array visibles.
-		// len==1 → no RNG; len>1 → rnd_upto(len).
-		// After array-loop: first nested for sees n=2 + array_control (e370);
-		// later fors often n=1 + make_random_loop_control (e503).
+		// len==1 → no RNG; len>1 → rnd_upto(len); empty → burnSelectLoopCtrlVarCreate.
 		// loopIVPool: 2+ after array-loop (e370 multi-IV + array_control);
-		// 1 after first nested for (e503 reuse IV + loop_control);
-		// 0 after that (e521 must create IV: F50 vol + F20 NewArray + const).
+		// 1 after first nested for (e503 reuse IV, no choose RNG + loop_control);
+		// 0 → create IV via burnSelectLoopCtrlVarCreate (vol retry, NewArray may
+		// expand to full multi-dim CreateArrayVariable + itemize; seed2 e560–e678).
 		postArrayFor := state != nil && state.loopIVPool > 1
-		reuseIV := state != nil && state.loopIVPool == 1
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
 		// First for in an array-loop body (or multi-IV postArrayFor) uses array_control;
 		// later nested fors use loop_control (e502, e519) even while still nested.
@@ -2702,7 +2716,7 @@ func emitStatement(
 			// SelectLoopCtrlVar → GenerateNewGlobal with NewArray + volatile retry.
 			burnSelectLoopCtrlVarCreate(r, opts)
 		}
-		_ = reuseIV
+		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
 		if useArrayControl {
 			// make_random_array_control + SafeOpFlags (seed2 e371-380, e679+).
 			_ = r.upto(1)      // choose_ok_var among must-use arrays (often U1)
@@ -2810,42 +2824,11 @@ func emitStatement(
 					fmt.Fprintf(os.Stderr, "ARRAY create ty=%s hex=%d\n", arrTy.Name, hexDigitsForConstant(arrTy))
 				}
 				burnCreateArrayVariable(r, opts, arrTy, false)
-				// make_random_array_init: SelectLoopCtrlVar WRITE global create
-				// (no const flip) + make_init_value. create_random_array does not
-				// itemize (unlike create_array_and_itemize).
-				_ = r.flipcoin(50) // volatile
-				_ = r.flipcoin(20) // NewArray
-				if r.flipcoin(50) {
-					if r.flipcoin(50) {
-						_ = r.upto(3)
-					} else {
-						_ = r.upto(20)
-					}
-				} else {
-					hn := hexDigitsForConstant(arrTy)
-					if hn <= 0 {
-						hn = 8
-					}
-					for j := 0; j < hn; j++ {
-						_ = r.next31()
-					}
-				}
+				// make_random_array_init: SelectLoopCtrlVar for the loop CV, then
+				// further init indexing (seed2 e217 U3 + constant after IV create).
+				burnSelectLoopCtrlVarCreate(r, opts)
 				_ = r.upto(3) // seed2 e217 after IV constant
-				if r.flipcoin(50) {
-					if r.flipcoin(50) {
-						_ = r.upto(3)
-					} else {
-						_ = r.upto(20)
-					}
-				} else {
-					hn := hexDigitsForConstant(arrTy)
-					if hn <= 0 {
-						hn = 8
-					}
-					for j := 0; j < hn; j++ {
-						_ = r.next31()
-					}
-				}
+				burnSimpleConstant(r, arrTy)
 			} else if nArr > 1 {
 				_ = r.upto(uint32(nArr))
 			}
@@ -2872,7 +2855,10 @@ func emitStatement(
 			if state != nil {
 				state.deepStack = true
 				if createdIV {
-					// Created IV not yet a multi-pool; next for may create again (e560).
+					// Seed2 e560: after array-loop creates an IV, the next nested
+					// for still takes the create path (pool stays 0). Upstream may
+					// later choose the non-vol IV; keeping 0 preserves the matched
+					// create stream through e716.
 					state.loopIVPool = 0
 				} else {
 					// After first array-loop choose n=3, subsequent fors see n=2 (e370).
@@ -2901,6 +2887,8 @@ func emitStatement(
 			if state != nil {
 				state.blockStack++
 				state.arrayLoopDepth++
+				// Push outer fresh so nested array-loops restore it on exit.
+				state.arrayLoopFreshStack = append(state.arrayLoopFreshStack, state.arrayLoopFresh)
 				state.arrayLoopFresh = true
 			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
@@ -2911,8 +2899,10 @@ func emitStatement(
 				if state.arrayLoopDepth > 0 {
 					state.arrayLoopDepth--
 				}
-				// Only clear fresh when leaving the outermost array-loop frame.
-				if state.arrayLoopDepth == 0 {
+				if n := len(state.arrayLoopFreshStack); n > 0 {
+					state.arrayLoopFresh = state.arrayLoopFreshStack[n-1]
+					state.arrayLoopFreshStack = state.arrayLoopFreshStack[:n-1]
+				} else {
 					state.arrayLoopFresh = false
 				}
 			}

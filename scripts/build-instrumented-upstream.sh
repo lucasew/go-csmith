@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Build RNG-instrumented upstream csmith from pkgs.csmith.src + in-repo patch.
 # Output: .build/csmith-instrumented/src/csmith (gitignored)
+#
+# Note: ArrayVariable::CreateArrayVariable in the source tree uses step=100
+# (always 1-d for num in 1..99), but seed2 RNG traces from this binary show
+# multi-dim arrays consistent with step=60 (see SPEC.md §9 and burnCreateArrayVariable).
+# Prefer live traces when aligning Go; do not "fix" Go back to step=100 without re-measuring.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
