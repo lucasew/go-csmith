@@ -69,6 +69,8 @@ type functionFlowState struct {
 	lateGlobals  strings.Builder
 	nextGlobalID int
 	stmtBudget   int
+	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
+	loopIVPool int
 }
 
 type stmtKind int
@@ -2247,9 +2249,12 @@ func emitStatement(
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
 		writeLine(b, 1, "}")
 	case stmtFor:
-		// SelectLoopCtrlVar / choose_var: 0→create, 1→no RNG, n>1→upto(n).
-		// seed2 first for: exactly one viable IV (no choose RNG) then loop control.
-		ivN := 1 // match observed seed2: one integer IV already visible
+		// SelectLoopCtrlVar choose_var among integer IVs.
+		// Default n=1 (no RNG). state.loopIVPool raised by array-loop path.
+		ivN := 1
+		if state != nil && state.loopIVPool > 1 {
+			ivN = state.loopIVPool
+		}
 		if ivN > 1 {
 			_ = r.upto(uint32(ivN))
 		} else if ivN == 0 && opts.GlobalVariables {
@@ -2268,25 +2273,40 @@ func emitStatement(
 				}
 			}
 		}
-		// make_random_loop_control
-		if !r.flipcoin(50) {
-			_ = r.upto(60)
-		}
-		_ = r.upto(60)
-		_ = r.upto(6)
-		if r.flipcoin(50) {
-			_ = r.upto(10)
-		} else {
+		// Seed2 e371+: nested for after array-loop uses array_control-like
+		// pure_rnd stream (U1, F0 oob, F50s) then SafeOpFlags.
+		if state != nil && state.loopIVPool > 1 {
+			_ = r.upto(1)
+			_ = r.flipcoin(0) // array_oob_prob
 			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+		} else {
+			// make_random_loop_control (top-level for)
+			if !r.flipcoin(50) {
+				_ = r.upto(60)
+			}
+			_ = r.upto(60)
+			_ = r.upto(6)
+			if r.flipcoin(50) {
+				_ = r.upto(10)
+			} else {
+				_ = r.flipcoin(50)
+			}
+			// make_iteration SafeOpFlags
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
 		}
-		// make_iteration: SafeOpFlags for init (sOpAssign), test (sOpBinary), incr (sOpAssign).
-		_ = r.flipcoin(50) // init assign signed
-		_ = r.upto(4)
-		_ = r.flipcoin(50) // test binary op1
-		_ = r.flipcoin(50) // test binary op2
-		_ = r.upto(4)
-		_ = r.flipcoin(50) // incr assign signed
-		_ = r.upto(4)
 		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
 		writeLine(b, 2, "x += (uint32_t)i;")
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
@@ -2450,6 +2470,10 @@ func emitStatement(
 			}
 			// SelectLoopCtrlVar choose_var among integer visibles (seed2 n=3).
 			_ = r.upto(3)
+			if state != nil {
+				// After array-loop IV choose (n=3), subsequent fors see n=2 at e370.
+				state.loopIVPool = 2
+			}
 			// make_random_array_control for must-use array (size 1 → bound 0):
 			// choose_ok_var among arrays may be U1 if multiple; seed2 U1 then
 			// pure_rnd_flipcoin(array_oob_prob=0), then control pure_rnds.
@@ -2461,12 +2485,11 @@ func emitStatement(
 			// pure_rnd_flipcoin(50) for incr 1 vs upto.
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
-			// SafeOpFlags for init/test/incr assigns (make_iteration)
+			// After array_control F50s (matched e360-363), SafeOpFlags:
+			// init F50+U4, test F50+F50+U4 — seed2 e364-367; body stmt count U4 next.
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
 			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
-			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
 			writeLine(b, 1, "/* array loop */ {")
