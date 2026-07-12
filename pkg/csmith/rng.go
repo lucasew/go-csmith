@@ -31,7 +31,7 @@ func newRNG(seed uint64) *rng {
 		r.traceRaw = os.Getenv("CSMITH_TRACE_RNG_RAW") != ""
 		r.traceFile = os.Getenv("CSMITH_TRACE_RNG_FILE")
 		if r.traceFile == "" {
-			r.traceFile = "/tmp/csmith-go-rng.trace"
+			r.traceFile = "/tmp/csmith-rng.trace"
 		}
 		_ = os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0644)
 	}

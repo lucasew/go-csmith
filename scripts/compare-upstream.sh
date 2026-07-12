@@ -6,7 +6,7 @@ SEED_START="${SEED_START:-1}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-5}"
 WORKDIR="${WORKDIR:-/tmp/csmith-parity}"
 UPSTREAM_GEN_CMD="${UPSTREAM_GEN_CMD:-csmith}"
-GO_GEN_CMD="${GO_GEN_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith-go}"
+GO_GEN_CMD="${GO_GEN_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith}"
 UPSTREAM_INCLUDE="${UPSTREAM_INCLUDE:-/nix/store/hrf9nixgjz33q1563l9bxx155py477qv-csmith-2.3.0/include/csmith-2.3.0}"
 GO_INCLUDE="${GO_INCLUDE:-$UPSTREAM_INCLUDE}"
 CC_BIN="${CC_BIN:-cc}"
@@ -18,7 +18,7 @@ Usage: scripts/compare-upstream.sh [--count N] [--seed-start N] [--timeout N] [-
 Env overrides:
   COUNT, SEED_START, TIMEOUT_SECS, WORKDIR
   UPSTREAM_GEN_CMD (default: csmith)
-  GO_GEN_CMD (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith-go)
+  GO_GEN_CMD (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith)
   UPSTREAM_INCLUDE
   GO_INCLUDE (default: UPSTREAM_INCLUDE)
   CC_BIN

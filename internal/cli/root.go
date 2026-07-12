@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	appName    = "csmith-go"
+	appName    = "csmith"
 	appVersion = "0.1.0"
 )
 
@@ -44,7 +44,7 @@ func NewRootCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           appName,
-		Short:         "Random C program generator (Csmith port in progress)",
+		Short:         "Random C program generator (Csmith-compatible, port in progress)",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

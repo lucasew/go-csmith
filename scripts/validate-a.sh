@@ -9,9 +9,9 @@ set -euo pipefail
 COUNT="${COUNT:-20}"
 SEED_START="${SEED_START:-1}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-3}"
-WORKDIR="${WORKDIR:-/tmp/csmith-go-validate}"
+WORKDIR="${WORKDIR:-/tmp/csmith-validate}"
 RUNTIME_INCLUDE="${RUNTIME_INCLUDE:-/nix/store/hrf9nixgjz33q1563l9bxx155py477qv-csmith-2.3.0/include/csmith-2.3.0}"
-CANDIDATE_CMD="${CANDIDATE_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith-go}"
+CANDIDATE_CMD="${CANDIDATE_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith}"
 STRICT_SAN="${STRICT_SAN:-0}"
 SAN_FLAGS="${SAN_FLAGS:--fsanitize=undefined -fno-sanitize-recover=all}"
 
@@ -26,7 +26,7 @@ Env overrides:
 
 Examples:
   scripts/validate-a.sh --count 50 --seed-start 1000
-  CANDIDATE_CMD='./bin/csmith-go' scripts/validate-a.sh
+  CANDIDATE_CMD='./bin/csmith' scripts/validate-a.sh
 USAGE
 }
 

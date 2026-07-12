@@ -5,14 +5,14 @@ SEED="${SEED:-2}"
 WORKDIR="${WORKDIR:-/tmp/csmith-parity}"
 CONTEXT="${CONTEXT:-8}"
 UPSTREAM_CMD="${UPSTREAM_CMD:-./csmith/build-instrumented/src/csmith}"
-GO_CMD="${GO_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith-go}"
+GO_CMD="${GO_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith}"
 STRICT_RAW="${STRICT_RAW:-0}"
 
 usage() {
   cat <<'USAGE'
 Usage: scripts/find-rng-divergence.sh [--seed N] [--workdir DIR] [--context N] [--strict-raw]
 
-Runs upstream Csmith and csmith-go with the same seed, captures RNG traces,
+Runs upstream Csmith and this Go csmith with the same seed, captures RNG traces,
 normalizes them, and reports the first divergence event.
 
 Env overrides:
@@ -20,7 +20,7 @@ Env overrides:
   WORKDIR     (default: /tmp/csmith-parity)
   CONTEXT     (default: 8)
   UPSTREAM_CMD (default: ./csmith/build-instrumented/src/csmith)
-  GO_CMD      (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith-go)
+  GO_CMD      (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith)
   STRICT_RAW  (default: 0) compare tries/raw too (1 = enabled)
 
 Examples:
