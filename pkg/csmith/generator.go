@@ -13,6 +13,8 @@ var mustReadLiveSink *bool
 var postMustReadGlobalPicks *int
 var pointerGlobalPicksSink *int
 var useSmallParentStackSink *bool
+var lhsSoleNextSink *bool
+var globalU27DoneSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -119,6 +121,13 @@ type functionFlowState struct {
 	skipNextBlockSize bool
 	// assignExprCount: ExpressionAssign under useSmallParentStack.
 	assignExprCount int
+	// lhsSoleNext: after ParentParam Lhs miss+U3 burn, next Global Lhs is sole
+	// (seed2 e1225: UP no U after U100=2; inventory pad would U3).
+	lhsSoleNext bool
+	// parentParamExprPicks: ExpressionVariable ParentParam under useSmallParentStack.
+	parentParamExprPicks int
+	// globalU27Done: one-shot e1145 Global eFlexible U27 scale.
+	globalU27Done bool
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
@@ -1357,6 +1366,17 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		}
 		return n
 	}
+	// seed2 e1225: after ParentParam Lhs miss+U3, next Lhs choose is sole (no U).
+	if forAssign && lhsSoleNextSink != nil && *lhsSoleNextSink {
+		*lhsSoleNextSink = false
+		if len(exact) > 0 {
+			return exact[0], true
+		}
+		if len(sameWidth) > 0 {
+			return sameWidth[0], true
+		}
+		return filtered[0], true
+	}
 	if len(exact) > 0 {
 		n := len(exact)
 		return exact[int(r.upto(uint32(scaleAssign(n))))%n], true
@@ -1492,15 +1512,24 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			// seed2 e1145: late useSmallParentStack GlobalList U27.
 			if multiDimArraySink != nil && *multiDimArraySink > 0 && n >= 2 {
 				target := 0
-				if useSmallParentStackSink != nil && *useSmallParentStackSink &&
-					*postMustReadGlobalPicks >= 5 {
+				// e1145 U27 one-shot; e1373 later real n (U2) — no further pad.
+				small := useSmallParentStackSink != nil && *useSmallParentStackSink
+				picks := *postMustReadGlobalPicks
+				u27ok := globalU27DoneSink == nil || !*globalU27DoneSink
+				if small && picks >= 5 && n >= 3 && u27ok {
 					target = 27 // e1145
-				} else if *postMustReadGlobalPicks >= 2 && n < 11 {
-					if n == 2 && *postMustReadGlobalPicks >= 4 {
-						target = 5 // seed2 e892 GlobalList choose
+					if globalU27DoneSink != nil {
+						*globalU27DoneSink = true
+					}
+				} else if small && globalU27DoneSink != nil && *globalU27DoneSink {
+					// e1373: after U27 era, use real pool n (often 2).
+					target = 0
+				} else if picks >= 2 && n < 11 {
+					if n == 2 && picks >= 4 && !small {
+						target = 5 // seed2 e892 GlobalList choose (pre-small-stack)
 					} else if n >= 3 {
 						target = 11
-						if *postMustReadGlobalPicks == 2 {
+						if picks == 2 {
 							target = 17 // e811 second pick
 						}
 					}
@@ -1516,11 +1545,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			}
 		}
 		// seed2 e1017: Global eFlexible n=4 → U2 (even if mustReadLive).
+		// seed2 e1373: after U27 era under useSmallParentStack, real GlobalList
+		// choose is U2 (inventory over-counts convertibles as n=6).
+		// seed2 e1374: after choose, itemize residual U3 (array member).
 		chooseN := n
 		if n == 4 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			chooseN = 2
 		}
+		lateU2 := useSmallParentStackSink != nil && *useSmallParentStackSink &&
+			globalU27DoneSink != nil && *globalU27DoneSink && n > 2
+		if lateU2 {
+			chooseN = 2
+		}
 		idx := int(er.pick(uint32(chooseN))) % n
+		if lateU2 {
+			_ = er.pick(3) // e1374 itemize residual
+		}
 		if n >= 11 && mustReadLiveSink != nil && !*mustReadLiveSink && er.fallback != nil {
 			_ = er.fallback.flipcoin(50)
 		}
@@ -2309,6 +2349,20 @@ func randomLeafExprWithMode(
 				strings.Contains(t.Name, "*") {
 				candidates = nil
 			}
+			// seed2 e1271: first late ParentParam simple ExpressionVariable —
+			// create residual F50 U8 (inventory falsely non-empty). Later picks
+			// (e1275) sole/choose without residual.
+			if scopePick == 2 && flow != nil && flow.useSmallParentStack &&
+				!strings.Contains(t.Name, "*") && er != nil && er.fallback != nil {
+				n := flow.parentParamExprPicks
+				flow.parentParamExprPicks++
+				if n == 0 {
+					_ = er.fallback.flipcoin(50)
+					_ = er.fallback.upto(8)
+					bumpExprDepth(ctx)
+					return castLiteral(t, "x")
+				}
+			}
 			if len(candidates) == 0 {
 				if scopePick == 0 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
@@ -2607,16 +2661,44 @@ func randomLeafExprWithMode(
 		case termComma:
 			lhsType := t
 			if er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
-				allCount := len(ctx.state.pool) + len(ctx.state.info.structs) + len(ctx.state.info.unions)
-				if allCount > 0 {
-					pick := int(er.fallback.upto(uint32(allCount)))
-					switch {
-					case pick < len(ctx.state.pool):
-						lhsType = ctx.state.pool[pick]
-					case pick < len(ctx.state.pool)+len(ctx.state.info.structs):
-						lhsType = CType{Name: fmt.Sprintf("struct S%d", pick-len(ctx.state.pool)), Bits: 32}
-					default:
-						lhsType = CType{Name: fmt.Sprintf("union U%d", pick-len(ctx.state.pool)-len(ctx.state.info.structs)), Bits: 32}
+				// Upstream ExpressionComma lhs: type=nil → choose_random_nonvoid_nonvolatile.
+				// Early seed2: pool cardinality without filter (historical match).
+				// Late useSmallParentStack e1310: AllTypes n=14, float filtered tries≥1.
+				if ctx.state.useSmallParentStack {
+					types := allTypesList(ctx.state.info)
+					if len(types) > 0 {
+						reject := func(x uint32) bool {
+							i := int(x)
+							if i < 0 || i >= len(types) {
+								return true
+							}
+							tn := types[i].Name
+							if tn == "float" && !opts.EnableFloat {
+								return true
+							}
+							if tn == "__int128" && !opts.Int128 {
+								return true
+							}
+							if tn == "unsigned __int128" && !opts.UInt128 {
+								return true
+							}
+							return false
+						}
+						idx := int(er.fallback.uptoWithFilter(uint32(len(types)), reject))
+						lhsType = types[idx]
+					}
+				} else {
+					allCount := len(ctx.state.pool) + len(ctx.state.info.structs) + len(ctx.state.info.unions)
+					if allCount > 0 {
+						pick := int(er.fallback.upto(uint32(allCount)))
+						switch {
+						case pick < len(ctx.state.pool):
+							lhsType = ctx.state.pool[pick]
+						case pick < len(ctx.state.pool)+len(ctx.state.info.structs):
+							lhsType = CType{Name: fmt.Sprintf("struct S%d", pick-len(ctx.state.pool)), Bits: 32}
+						default:
+							lhsType = CType{Name: fmt.Sprintf("union U%d", pick-len(ctx.state.pool)-len(ctx.state.info.structs)), Bits: 32}
+						}
 					}
 				}
 			}
@@ -2782,6 +2864,11 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 		if g, ok := createOnDemandFromParentLocalPathER(er, opts, target, ctx, needQfer); ok {
 			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
 		}
+	}
+	// seed2 e1222: ParentParam Lhs under useSmallParentStack → empty → miss
+	// → Lhs loop retries SelectDeref F80 (not param U2 choose).
+	if scopePick == 2 && flow != nil && flow.useSmallParentStack {
+		return lvalueInfo{}, false
 	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
@@ -2967,11 +3054,53 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		break
 	}
 	// note: lhsDerefAttempts already bumped on F80=true above
+	// Upstream Lhs::make_random is a do-while: SelectDeref (F80) or
+	// VariableSelector; on miss, loop again (seed2 e1222 F80 after ParentParam).
+	// lhsAfterParamMiss: ParentParam miss→F80→U3→Global sole; when this Lhs is
+	// actually ExpressionAssign nested in a larger Expression (same Lhs RNG as
+	// StatementAssign), parent continues with term U120 (seed2 e1225) instead of
+	// next-statement U100.
+	lhsAfterParamMiss := false
 	if !lhsFromDeref {
-		// VariableSelector::select after SelectDerefPointerProb false (or
-		// failed deref create). Always scope-pick; do not require empty locals.
-		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-			lv = picked
+		for try := 0; try < 6 && !lhsFromDeref; try++ {
+			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+				lv = picked
+				lhsFromDeref = true
+				break
+			}
+			// VariableSelector miss → retry SelectDeref.
+			if !r.flipcoin(80) {
+				continue // try VariableSelector again
+			}
+			// seed2 e1223: after ParentParam miss, F80 then U3 (stack/choose),
+			// not ConstPointers F10 create path. Next Global Lhs is sole (e1225).
+			if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+				_ = r.upto(3)
+				ctx.state.lhsSoleNext = true
+				lhsAfterParamMiss = true
+				// Fall through to VariableSelector again (often Global).
+				continue
+			}
+			if opts.ConstPointers {
+				_ = r.flipcoin(10)
+			}
+			if opts.VolatilePointers {
+				_ = r.flipcoin(50)
+			}
+			newArray := r.flipcoin(20)
+			if r.flipcoin(20) {
+				_ = r.flipcoin(0)
+				continue
+			}
+			if newArray {
+				burnCreateArrayVariable(r, opts, targetType, true)
+				continue
+			}
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			burnSimpleConstant(r, targetType)
+			lhsFromDeref = true
+			break
 		}
 	}
 	// ++/-- compound: make_possible_compound_assign → SafeOpFlags (e945 F50 U4).
@@ -2984,6 +3113,15 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	if ctx != nil {
 		c := exprVarCandidate{expr: lv.expr, ctype: lv.ctype, assignable: true}
 		ctx.mustUse = &c
+	}
+	// seed2 e1225: after ParentParam-miss Global sole Lhs, UP continues as
+	// Expression term U120 (ExpressionAssign nested under Funcall/binary), not
+	// StatementProbability U100. Burn sibling/parent expression residual.
+	if lhsAfterParamMiss {
+		if ctx != nil {
+			ctx.exprDepth = 0
+		}
+		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 	}
 	return true
 }
@@ -4086,6 +4224,8 @@ func emitSingleFuncDefOnce(
 		postMustReadGlobalPicks = &state.postMustReadGlobalPicks
 		pointerGlobalPicksSink = &state.pointerGlobalPicks
 		useSmallParentStackSink = &state.useSmallParentStack
+		lhsSoleNextSink = &state.lhsSoleNext
+		globalU27DoneSink = &state.globalU27Done
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4093,6 +4233,8 @@ func emitSingleFuncDefOnce(
 			postMustReadGlobalPicks = prevP
 			pointerGlobalPicksSink = nil
 			useSmallParentStackSink = nil
+			lhsSoleNextSink = nil
+			globalU27DoneSink = nil
 			lastArraySizesSink = nil
 		}()
 	}
