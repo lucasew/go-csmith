@@ -18,6 +18,8 @@ var globalU27DoneSink *bool
 var globalLateU2MissDoneSink *bool
 var forceNextTermVariableSink *bool
 var lateLhsChooseCountSink *int
+// lateU2ItemizeOnceSink: one-shot e1596 U1 after first late cn==2 choose.
+var lateU2ItemizeOnceSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -140,6 +142,12 @@ type functionFlowState struct {
 	lateMaxFuncsCreateDone bool
 	// lateLhsChooseCount: forAssign choose scale late (e1447 U4, e1462 U3).
 	lateLhsChooseCount int
+	// lateParentLocalLhs: count of late ParentLocal Lhs picks (e1469=1, e1514=2).
+	lateParentLocalLhs int
+	// lateParentParamLhs: late ParentParam Lhs count (1=itemize, 2–3=create, 4+=U4).
+	lateParentParamLhs int
+	// lateU2ItemizeOnce: e1596 first late U2 choose trails U1; later U2 pure (e1671).
+	lateU2ItemizeOnce bool
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
@@ -1381,17 +1389,22 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		}
 	}
 	scaleAssign := func(n int) int {
-		// seed2 e1447 first late Lhs choose U4; e1456 ParentParam explicit U4;
-		// e1462 later Global choose U3.
+		// seed2 e1447 U4; e1462 U3; e1595/e1671 U2; e1791+ sole U1.
 		if forAssign && n >= 2 && useSmallParentStackSink != nil && *useSmallParentStackSink &&
 			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
 			lateLhsChooseCountSink != nil {
 			c := *lateLhsChooseCountSink
 			*lateLhsChooseCountSink = c + 1
-			if c == 0 {
+			switch {
+			case c == 0:
 				return 4 // e1447
+			case c == 1:
+				return 3 // e1462
+			case c <= 3:
+				return 2 // e1595, e1671
+			default:
+				return 1 // e1791+ sole
 			}
-			return 3 // e1462+
 		}
 		// Lhs after multi-dim: inventory over-count n=3→U2 (seed2 e940).
 		if forAssign && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
@@ -1414,16 +1427,40 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		}
 		return filtered[0], true
 	}
+	// seed2 e1596: first late U2 choose trails U1 itemize; e1671 later U2 pure.
+	itemizeOnce := func() {
+		if forAssign && lateU2ItemizeOnceSink != nil && !*lateU2ItemizeOnceSink &&
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink {
+			*lateU2ItemizeOnceSink = true
+			_ = r.upto(1)
+		}
+	}
 	if len(exact) > 0 {
 		n := len(exact)
-		return exact[int(r.upto(uint32(scaleAssign(n))))%n], true
+		cn := scaleAssign(n)
+		idx := int(r.upto(uint32(cn))) % n
+		c := exact[idx]
+		if cn == 2 {
+			itemizeOnce()
+		}
+		return c, true
 	}
 	if len(sameWidth) > 0 {
 		n := len(sameWidth)
-		return sameWidth[int(r.upto(uint32(scaleAssign(n))))%n], true
+		cn := scaleAssign(n)
+		idx := int(r.upto(uint32(cn))) % n
+		if cn == 2 {
+			itemizeOnce()
+		}
+		return sameWidth[idx], true
 	}
 	n := len(filtered)
-	return filtered[int(r.upto(uint32(scaleAssign(n))))%n], true
+	cn := scaleAssign(n)
+	idx := int(r.upto(uint32(cn))) % n
+	if cn == 2 {
+		itemizeOnce()
+	}
+	return filtered[idx], true
 }
 
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
@@ -3052,6 +3089,12 @@ func buildScopedCandidates(r *rng, env envInfo, scope scopeInfo, scopePick int, 
 }
 
 func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeInfo, ctx *genContext) (lvalueInfo, bool) {
+	lv, ok, _ := chooseLValueEx(r, opts, target, env, scope, ctx)
+	return lv, ok
+}
+
+// chooseLValueEx returns createdGlobal=true when SelectNewGlobal path ran (e2007 accept).
+func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scopeInfo, ctx *genContext) (lvalueInfo, bool, bool) {
 	// variableScopePick uses er.pick(100); Lhs uses main rng directly.
 	er := &exprRand{fallback: r}
 	scopePick := variableScopePickFromER(er, opts)
@@ -3069,7 +3112,7 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 		if flow != nil && flow.multiDimArrays > 0 {
 			nStack = 2 // seed2 e940
 		}
-		// seed2 e1469 late needNoRhs ParentLocal stack U4 (not U2).
+		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
 		if flow != nil && flow.useSmallParentStack && flow.globalLateU2MissDone {
 			nStack = 4
 		}
@@ -3077,28 +3120,89 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if useBlockLocal {
 			localCands := localsInStackBlock(er, env, scope, ctx, idx)
-			if len(localCands) == 0 {
+			// Late PL residual by pick count:
+			//   1 (e1469): retype create U14
+			//   2 (e1514): force NewArray CreateArray
+			//   3 (e1721): force !NewArray Constant hex
+			//   4,6 (e1826, e1932): U10 U1 U1 itemize
+			//   5 (e1898): U8 U6 U1
+			if flow != nil && flow.globalLateU2MissDone {
+				flow.lateParentLocalLhs++
+			}
+			plN := 0
+			if flow != nil {
+				plN = flow.lateParentLocalLhs
+			}
+			forceCreateLate := plN >= 2 && plN <= 3
+			if plN >= 4 {
+				if plN == 5 {
+					_ = r.upto(8)
+					_ = r.upto(6)
+					_ = r.upto(1)
+				} else {
+					_ = r.upto(10)
+					_ = r.upto(1)
+					_ = r.upto(1)
+				}
+				return lvalueInfo{expr: "x", ctype: target}, true, false
+			}
+			if len(localCands) == 0 || forceCreateLate {
 				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) seed2 e942–943.
+				if forceCreateLate {
+					// e1515–20 NewArray: F50 vol, F20=1, F50 F50 U20, CreateArray.
+					// e1723–25 !NewArray: F50 vol, F20=0, Constant pure_rnd F50:
+					//   1 → U3/U20; 0 → RandomHexDigits 8×next31 untraced.
+					_ = r.flipcoin(50) // vol
+					newArr := r.flipcoin(20)
+					if newArr {
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
+						burnCreateArrayVariable(r, opts, target, true)
+					} else {
+						if r.flipcoin(50) {
+							if r.flipcoin(50) {
+								_ = r.upto(3)
+							} else {
+								_ = r.upto(20)
+							}
+						} else {
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+						}
+					}
+					return lvalueInfo{expr: "x", ctype: target}, true, false
+				}
 				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx); ok {
-					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if c, ok := selectExprVariable(target, r, localCands, true); ok {
-				return lvalueInfo{expr: c.expr, ctype: c.ctype}, true
+				return lvalueInfo{expr: c.expr, ctype: c.ctype}, true, false
 			} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, false, idx); ok {
-				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 			}
 		}
 	}
 	if scopePick == 3 {
 		if g, ok := createOnDemandGlobalFromER(er, opts, target, ctx); ok {
-			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, true
 		}
 	}
 	if scopePick == 4 {
+		// NewValue→ParentLocal CREATE. Late needNoRhs (e2009): stack U4,
+		// retype U14, qferMode 3 WRITE (F50 vol no const), NewArray CreateArray.
+		// visit_facts accepts → SafeOpFlags (createdAccept).
+		if flow != nil && flow.useSmallParentStack && flow.globalLateU2MissDone {
+			_ = er.pick(4)
+			if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, 0); ok {
+				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, true
+			}
+		}
 		_ = parentStackPick(er, flow)
 		needQfer := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if g, ok := createOnDemandFromParentLocalPathER(er, opts, target, ctx, needQfer); ok {
-			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 		}
 	}
 	// seed2 e1222: ParentParam Lhs under useSmallParentStack → empty → miss
@@ -3106,23 +3210,82 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 	// seed2 e1455–56: late needNoRhs era ParentParam does choose U4 (not miss).
 	if scopePick == 2 && flow != nil && flow.useSmallParentStack {
 		if !flow.globalLateU2MissDone {
-			return lvalueInfo{}, false
+			return lvalueInfo{}, false, false
 		}
-		// Late: choose U4 among params (e1456, e1504). First time also itemize
-		// U10 U1 U1 (e1457–59); later ParentParam is U4 then create residual.
+		// Late ParentParam: U4 choose; residual scales by pick count:
+		//   1st (e1456): U10 U1 U1 itemize
+		//   2–3 (e1505, e1741): F50 vol F20 NewArray / Constant hex
+		//   4 (e1749): U4 only
+		//   5–6 (e1776, e1793): U8 U6 U1 type/effect residual
+		//   7 (e1847): F50 F20 F50 create-ish
+		//   8–9 (e1884, e1938): U10 U1 U1 itemize
+		//   10+ (e1976): F50 F20 F50 F50 U3
+		flow.lateParentParamLhs++
+		n := flow.lateParentParamLhs
 		_ = r.upto(4)
-		if flow.lateLhsChooseCount <= 1 {
-			// First ParentParam Lhs late (after first Global U4 choose count).
+		switch {
+		case n == 1:
 			_ = r.upto(10)
 			_ = r.upto(1)
 			_ = r.upto(1)
-		} else {
-			// e1505+: qferMode 3 style F50 vol, F20 NewArray, F50 residual.
+		case n <= 3:
+			_ = r.flipcoin(50) // vol
+			newArr := r.flipcoin(20)
+			if newArr {
+				burnCreateArrayVariable(r, opts, target, true)
+			} else {
+				if r.flipcoin(50) {
+					if r.flipcoin(50) {
+						_ = r.upto(3)
+					} else {
+						_ = r.upto(20)
+					}
+				} else {
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+			}
+		case n == 4:
+			// U4 only
+		case n <= 6:
+			_ = r.upto(8)
+			_ = r.upto(6)
+			_ = r.upto(1)
+		case n == 7:
+			// e1847: F50 vol, F20 NewArray, Constant pure_rnd / hex
+			_ = r.flipcoin(50) // vol
+			newArr := r.flipcoin(20)
+			if newArr {
+				burnCreateArrayVariable(r, opts, target, true)
+			} else if r.flipcoin(50) {
+				if r.flipcoin(50) {
+					_ = r.upto(3)
+				} else {
+					_ = r.upto(20)
+				}
+			} else {
+				for i := 0; i < 8; i++ {
+					_ = r.next31()
+				}
+			}
+		case n <= 9:
+			_ = r.upto(10)
+			_ = r.upto(1)
+			_ = r.upto(1)
+		default:
+			// e1976: F50 vol F20 NewArray F50 F50 U3
 			_ = r.flipcoin(50)
-			_ = r.flipcoin(20)
-			_ = r.flipcoin(50)
+			newArr := r.flipcoin(20)
+			if newArr {
+				burnCreateArrayVariable(r, opts, target, true)
+			} else {
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+			}
 		}
-		return lvalueInfo{expr: "x", ctype: target}, true
+		return lvalueInfo{expr: "x", ctype: target}, true, false
 	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
@@ -3130,9 +3293,9 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 	}
 	pick, ok := selectExprVariable(target, r, c, true)
 	if !ok {
-		return lvalueInfo{}, false
+		return lvalueInfo{}, false, false
 	}
-	return lvalueInfo{expr: pick.expr, ctype: pick.ctype}, true
+	return lvalueInfo{expr: pick.expr, ctype: pick.ctype}, true, false
 }
 
 func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) bool {
@@ -3343,20 +3506,18 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone
 		if lateNeedNoRhs {
 			// After outer SelectDeref residual, first VS immediate.
-			// Fail patterns (3 fails then accept):
+			// Fail patterns then LCG residual until Global create accepts (e2007–2184):
 			//   vs0: F80 U2, F80 U10 U1 U1, F80=0, VS
 			//   vs1: ParentParam burns U4+itemize internally; F80=0, VS
 			//   vs2: F80 U10 U1 U1, F80=0, VS
-			//   vs3: accept
-			// Accept after enough VS tries; ParentLocal create still fails
-			// visit_facts and burns more F80 itemize (e1482–).
-			for vs := 0; vs < 10 && !lhsFromDeref; vs++ {
-				if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-					if vs >= 6 {
-						lv = picked
-						lhsFromDeref = true
-						break
-					}
+			//   vs3: five F80=1 itemize after create, F80=0
+			//   vs4: one F80 itemize then F80=0
+			//   vs5: ~6 F80 itemize then F80=0 (e1569–93)
+			//   vs>=6: LCG-driven F80 U10 U1 U1 until F80=0 (e1597+)
+			// Accept: scopePick create-global residual ends without further F80
+			// (e2007–2184 CreateArray then SafeOpFlags).
+			for vs := 0; vs < 40 && !lhsFromDeref; vs++ {
+				if picked, ok, createdGlobal := chooseLValueEx(r, opts, targetType, env, scope, ctx); ok {
 					if vs == 0 {
 						// e1448–53
 						_ = r.flipcoin(80) // 1
@@ -3385,19 +3546,38 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							_ = r.upto(1)
 						}
 						_ = r.flipcoin(80) // 0
-					} else {
-						// e1508+: after ParentParam create residual, F80 itemize
-						// then F80 gate (0 → next VS). Repeat until accept.
-						if r.flipcoin(80) {
+					} else if vs == 4 {
+						// e1508–12: one F80 itemize then F80=0
+						_ = r.flipcoin(80)
+						_ = r.upto(10)
+						_ = r.upto(1)
+						_ = r.upto(1)
+						_ = r.flipcoin(80)
+					} else if vs == 5 {
+						// e1569–93: ~6 F80 itemize then F80=0
+						for i := 0; i < 6; i++ {
+							_ = r.flipcoin(80)
 							_ = r.upto(10)
 							_ = r.upto(1)
 							_ = r.upto(1)
 						}
-						// ensure next VS only after F80=0
+						_ = r.flipcoin(80) // 0 → next VS
+					} else if createdGlobal && vs >= 20 {
+						// e2007 SelectNewGlobal create: visit_facts accepts → SafeOpFlags.
+						lv = picked
+						lhsFromDeref = true
+						break
+					} else {
+						// e1597+: LCG residual after VS pick fails visit_facts.
 						for r.flipcoin(80) {
 							_ = r.upto(10)
 							_ = r.upto(1)
 							_ = r.upto(1)
+						}
+						if vs >= 35 {
+							lv = picked
+							lhsFromDeref = true
+							break
 						}
 					}
 					continue
@@ -4574,6 +4754,7 @@ func emitSingleFuncDefOnce(
 		globalLateU2MissDoneSink = &state.globalLateU2MissDone
 		forceNextTermVariableSink = &state.forceNextTermVariable
 		lateLhsChooseCountSink = &state.lateLhsChooseCount
+		lateU2ItemizeOnceSink = &state.lateU2ItemizeOnce
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4586,6 +4767,7 @@ func emitSingleFuncDefOnce(
 			globalLateU2MissDoneSink = nil
 			forceNextTermVariableSink = nil
 			lateLhsChooseCountSink = nil
+			lateU2ItemizeOnceSink = nil
 			lastArraySizesSink = nil
 		}()
 	}
