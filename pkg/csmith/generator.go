@@ -117,6 +117,10 @@ type functionFlowState struct {
 	useSmallParentStack bool
 	// skipNextBlockSize: afterContFor body has no BlockSize U (e1126).
 	skipNextBlockSize bool
+	// assignExprCount: ExpressionAssign under useSmallParentStack.
+	assignExprCount int
+	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
+	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -151,8 +155,12 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		return exprVarCandidate{}, false
 	}
 	if lateGate && !earlyGate {
-		// seed2 e1001–1004: three U2 then F75; accept dummy so no scope U100
-		// (e1005 is next term U120, not VariableSelection).
+		// seed2 e1001–1004: one-shot three U2 then F75; later termVariable
+		// goes straight to VariableSelection U100 (e1144).
+		if st.lateMustUseDone {
+			return exprVarCandidate{}, false
+		}
+		st.lateMustUseDone = true
 		_ = er.pick(2)
 		_ = er.pick(2)
 		_ = er.pick(2)
@@ -1469,15 +1477,20 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			*postMustReadGlobalPicks++
 			// Scale under-counted pools toward true GlobalList size.
 			// e811 n≈3→17; e848 n≈5→11 (not flat 17); e892 n=2→5.
-			if *postMustReadGlobalPicks >= 2 && n >= 2 && n < 11 &&
-				multiDimArraySink != nil && *multiDimArraySink > 0 {
+			// seed2 e1145: late useSmallParentStack GlobalList U27.
+			if multiDimArraySink != nil && *multiDimArraySink > 0 && n >= 2 {
 				target := 0
-				if n == 2 && *postMustReadGlobalPicks >= 4 {
-					target = 5 // seed2 e892 GlobalList choose
-				} else if n >= 3 {
-					target = 11
-					if *postMustReadGlobalPicks == 2 {
-						target = 17 // e811 second pick
+				if useSmallParentStackSink != nil && *useSmallParentStackSink &&
+					*postMustReadGlobalPicks >= 5 {
+					target = 27 // e1145
+				} else if *postMustReadGlobalPicks >= 2 && n < 11 {
+					if n == 2 && *postMustReadGlobalPicks >= 4 {
+						target = 5 // seed2 e892 GlobalList choose
+					} else if n >= 3 {
+						target = 11
+						if *postMustReadGlobalPicks == 2 {
+							target = 17 // e811 second pick
+						}
 					}
 				}
 				if target > n {
@@ -2054,9 +2067,15 @@ func randomLeafExprWithMode(
 						if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
 							nPtr = ctx.state.derivedPtrTypes
 						}
-						// seed2 e1014: derived_types grown to 5 after multi-dim era.
-						if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack && nPtr < 5 {
-							nPtr = 5
+						// seed2 e1014: derived_types ≥5; e1200 U7 after many assigns.
+						if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+							if ctx.state.assignExprCount >= 3 {
+								if nPtr < 7 {
+									nPtr = 7
+								}
+							} else if nPtr < 5 {
+								nPtr = 5
+							}
 						}
 						ptrIdx := int(er.fallback.upto(uint32(nPtr)))
 						stars := 1
@@ -2413,9 +2432,18 @@ func randomLeafExprWithMode(
 			//    c. Lhs::make_random for LHS variable selection
 			if er != nil && er.fallback != nil {
 				// random_qualifiers(WRITE, no_volatile): F50 only if SE-free.
-				// Late multi-dim (useSmallParentStack) often !SE-free — no F50
-				// (seed2 e1005–1006: assign term then AssignOps U120 immediately).
-				if ctx == nil || ctx.state == nil || !ctx.state.useSmallParentStack {
+				// useSmallParentStack: first few ExpressionAssign are !SE-free
+				// (e1005 skip F50); later ones SE-free burn F50 (e1141).
+				// CSMITH_ASSIGN_F50_AFTER: 0-based count after which to burn F50.
+				small := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
+				n := 0
+				if small {
+					n = ctx.state.assignExprCount
+					ctx.state.assignExprCount++
+				}
+				// seed2 e1005 n=0 skip F50; e1141 n=1 burn F50; e1167 n>=2 skip.
+				// Only the second ExpressionAssign under useSmallParentStack is SE-free.
+				if !small || n == 1 {
 					_ = er.fallback.flipcoin(50)
 				}
 				_ = er.fallback.upto(120) // AssignOpsProbability
@@ -2444,22 +2472,21 @@ func randomLeafExprWithMode(
 			// Upstream Lhs::make_random (Lhs.cpp:61): do-while loop that tries
 			// select_deref_pointer before falling through to VariableSelector::select.
 			lhsFromDeref := false
+			createdArrEA := false
 			if er != nil && er.fallback != nil {
 				for {
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
 					if !deref {
 						break // fall through to VariableSelector::select
 					}
-					// After a multi-dim CreateArray, SelectDeref itemizes existing
-					// array sizes (seed2 e1052: F80 then U2 U1 U7, not F20 create).
-					if lastArraySizesSink != nil && len(*lastArraySizesSink) > 1 &&
-						useSmallParentStackSink != nil && *useSmallParentStackSink {
+					// Itemize only after CreateArray in THIS ExpressionAssign Lhs loop
+					// (e1052). Stale sizes force wrong path at e1174 (need F20 create).
+					if createdArrEA && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
 						for _, sz := range *lastArraySizesSink {
 							if sz > 0 {
 								_ = er.fallback.upto(uint32(sz))
 							}
 						}
-						// Itemize path still fails validate often → retry F80.
 						continue
 					}
 					// select_deref_pointer: no pointer vars -> GenerateNewParentLocal
@@ -2484,7 +2511,13 @@ func randomLeafExprWithMode(
 							_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
 						}
 					} else {
-						for i := 0; i < 16; i++ {
+						// Historical early path: 16 hex digits. Late useSmallParentStack
+						// e1181: char-width hex (2) then U120 (e1200 climb).
+						hn := 16
+						if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+							hn = 2
+						}
+						for i := 0; i < hn; i++ {
 							_ = er.fallback.next31()
 						}
 					}
@@ -2492,6 +2525,7 @@ func randomLeafExprWithMode(
 					// outer or target NewArray (U99 dimension ladder).
 					if newArray || tgtNewArray {
 						burnCreateArrayVariable(er.fallback, opts, t, true)
+						createdArrEA = true
 						// Array pointer Lhs often fails opportunistic_validate.
 						if newArray {
 							continue
@@ -2516,15 +2550,21 @@ func randomLeafExprWithMode(
 			}
 			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
 			scopePick := variableScopePickFromER(er, opts)
-			// seed2 e1093–1097: ParentParam after useSmallParentStack → stack U3
-			// + create (F20 NewArray, Constant F50). Upstream then takes one more
-			// SelectDeref F80 (validate fail on fresh local) before ExpressionAssign
-			// accepts; statement Lhs owns the next F80+F10 ConstPointers.
+			// seed2 e1093–1097: early ParentParam Lhs → stack U3 + create + residual F80.
+			// e1149: later ParentParam → stack U3 only (found/accept without create).
 			if scopePick == 2 && ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 				idx := parentStackPick(er, ctx.state)
+				// assignExprCount already incremented for this ExpressionAssign.
+				// count==1 only: e1093 create+residual. Later: stack only (e1149).
+				earlyLhs := ctx.state.assignExprCount <= 1
+				if !earlyLhs {
+					// seed2 e1149: stack U3 only, then outer term U120 (no create).
+					_ = idx
+					return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
 				_, _ = createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, idx)
 				if er != nil && er.fallback != nil {
-					// seed2 e1095–1096: Constant hex under-count by 4 then residual F80.
+					// seed2 e1095–1096: hex under-count by 4 then residual F80.
 					for i := 0; i < 4; i++ {
 						_ = er.fallback.next31()
 					}
