@@ -597,17 +597,45 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 		}
 	}
 	if newArray {
-		// ArrayVariable::CreateArrayVariable (simplified dimension/init burns)
-		_ = er.fallback.upto(99) // dimension seed
-		// At least one dimension length: rnd_upto(max_array_length_per_dimension)+1
+		// ArrayVariable::CreateArrayVariable + itemize()
+		num := int(er.fallback.upto(99)) + 1
+		dimension := 0
+		step := 100
+		for num > 0 {
+			dimension++
+			num -= step
+			step /= 2
+			if step == 0 {
+				step = 1
+			}
+		}
+		maxDim := opts.MaxArrayDim
+		if maxDim < 1 {
+			maxDim = 3
+		}
+		if dimension > maxDim {
+			dimension = maxDim
+		}
 		maxPerDim := opts.MaxArrayLenPerDim
 		if maxPerDim < 1 {
 			maxPerDim = 10
 		}
-		// Conservative: one dimension draw (seed2 early arrays are often 1d)
-		dim0 := int(er.fallback.upto(uint32(maxPerDim))) + 1
-		total := dim0
-		// pure_rnd_upto(total_size/2) alternative inits
+		maxTotal := opts.MaxArrayLength
+		if maxTotal < 1 {
+			maxTotal = 256
+		}
+		sizes := make([]int, 0, dimension)
+		total := 1
+		for i := 0; i < dimension; i++ {
+			dimen := int(er.fallback.upto(uint32(maxPerDim))) + 1
+			if total*dimen > maxTotal {
+				dimen = maxTotal / total
+			}
+			if dimen > 0 {
+				total *= dimen
+				sizes = append(sizes, dimen)
+			}
+		}
 		if total/2 > 0 {
 			initNum := int(er.fallback.upto(uint32(total / 2)))
 			for i := 0; i < initNum; i++ {
@@ -626,6 +654,12 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 						_ = er.fallback.next31()
 					}
 				}
+			}
+		}
+		// itemize(): rnd_upto(sizes[i]) per dimension
+		for _, sz := range sizes {
+			if sz > 0 {
+				_ = er.fallback.upto(uint32(sz))
 			}
 		}
 	}
