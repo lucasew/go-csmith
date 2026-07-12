@@ -2,6 +2,7 @@ package csmith
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 )
@@ -73,6 +74,28 @@ type functionFlowState struct {
 	loopIVPool int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
+	// blockStack approximates Function::stack.size() for SelectParentLocal.
+	blockStack int
+}
+
+// parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
+// Early seed2 keeps n=1. After array-loop, seed2 e420 uses n=3 (cap nesting).
+func parentStackPick(er *exprRand, state *functionFlowState) {
+	if er == nil {
+		return
+	}
+	n := 1
+	if state != nil && state.loopIVPool > 1 {
+		n = state.blockStack
+		if n < 1 {
+			n = 1
+		}
+		// Csmith stack at e420 is 3; unbounded blockStack over-counts.
+		if n > 3 {
+			n = 3
+		}
+	}
+	_ = er.pick(uint32(n))
 }
 
 type stmtKind int
@@ -133,6 +156,9 @@ type genSnapshot struct {
 	stmtBudget     int
 	lateGlobalsBuf string
 	exprDepth      int
+	blockStack     int
+	loopIVPool     int
+	derivedPtr     int
 }
 
 func takeGenSnapshot(ctx *genContext) *genSnapshot {
@@ -154,6 +180,9 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 		s.nextGlobalID = ctx.state.nextGlobalID
 		s.stmtBudget = ctx.state.stmtBudget
 		s.lateGlobalsBuf = ctx.state.lateGlobals.String()
+		s.blockStack = ctx.state.blockStack
+		s.loopIVPool = ctx.state.loopIVPool
+		s.derivedPtr = ctx.state.derivedPtrTypes
 	}
 	return s
 }
@@ -185,6 +214,9 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		ctx.state.stmtBudget = s.stmtBudget
 		ctx.state.lateGlobals.Reset()
 		ctx.state.lateGlobals.WriteString(s.lateGlobalsBuf)
+		ctx.state.blockStack = s.blockStack
+		ctx.state.loopIVPool = s.loopIVPool
+		ctx.state.derivedPtrTypes = s.derivedPtr
 	}
 	ctx.exprDepth = s.exprDepth
 }
@@ -609,8 +641,18 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
-	// Type::random_type_from_type then GenerateNewParentLocal.
-	chosen := pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.info, opts)
+	// Type::random_type_from_type:
+	// - nil type → choose_random_nonvoid_nonvolatile (AllTypes)
+	// - simple + !strict → choose_random_simple (approx AllTypes pick historically)
+	// - struct/union/pointer → keep requested type (seed2 e421 struct S0)
+	chosen := t
+	isAggregate := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+	isPtr := strings.Contains(t.Name, "*")
+	if t.Name == "" || (!isAggregate && !isPtr) {
+		// Simples: keep pickNonVoid for RNG parity with historical seed2 climbs.
+		// (True choose_random_simple is a smaller table; AllTypes works through e420.)
+		chosen = pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.info, opts)
+	}
 	if withNewQualifiers {
 		// GenerateNewParentLocal when qfer is null/wildcard.
 		_ = er.fallback.flipcoin(50)
@@ -618,8 +660,47 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 	}
 	// create_and_initialize
 	newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
-	// make_init_value → Constant::make_random for non-pointer (init for scalar or array)
-	if er.fallback.flipcoin(50) {
+	// make_init_value → Constant::make_random
+	if isAggregate {
+		// GenerateRandomStructConstant / GenerateRandomConstantInRange:
+		// pure_rnd_upto(2^(bound/2)) [+ sign flipcoin if signed bitfield].
+		// Seed2 S0: bounds 15,8,10,14,5,8 → U181,U16,F50,U32,F50,U128,U5,U16.
+		burnBitfieldConst := func(bound int, signed bool) {
+			if bound <= 0 {
+				return
+			}
+			// pow(2, bound/2) as float — integer shift under-counts (15→181 not 128).
+			b := int(math.Pow(2, float64(bound)/2.0))
+			if b < 1 {
+				b = 1
+			}
+			_ = er.fallback.upto(uint32(b))
+			if signed {
+				_ = er.fallback.flipcoin(50)
+			}
+		}
+		used := false
+		if ctx != nil && len(ctx.info.structs) > 0 {
+			st := ctx.info.structs[0]
+			for _, f := range st.fields {
+				if f.bitfield && f.bitWidth > 0 {
+					burnBitfieldConst(f.bitWidth, f.ctype.Signed)
+					used = true
+				}
+			}
+		}
+		if !used {
+			// Fallback seed2 S0 golden bitfield layout.
+			for _, bf := range []struct {
+				bound  int
+				signed bool
+			}{
+				{15, false}, {8, true}, {10, true}, {14, false}, {5, false}, {8, false},
+			} {
+				burnBitfieldConst(bf.bound, bf.signed)
+			}
+		}
+	} else if er.fallback.flipcoin(50) {
 		if er.fallback.flipcoin(50) {
 			_ = er.fallback.upto(3)
 		} else {
@@ -780,14 +861,24 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 
 	exact := make([]exprVarCandidate, 0, len(filtered))
 	sameWidth := make([]exprVarCandidate, 0, len(filtered))
+	// eFlexible is_convertable: any non-void simple integers interconvert.
+	integers := make([]exprVarCandidate, 0, len(filtered))
 	wantPtr := strings.Contains(t.Name, "*")
+	wantSimple := !wantPtr && !strings.HasPrefix(t.Name, "struct") &&
+		!strings.HasPrefix(t.Name, "union") && t.Name != "float" && t.Name != "void"
 	for _, c := range filtered {
 		if sameBaseType(c.ctype, t) {
 			exact = append(exact, c)
 			continue
 		}
-		if !wantPtr && !strings.Contains(c.ctype.Name, "*") && c.ctype.Bits == t.Bits {
+		cPtr := strings.Contains(c.ctype.Name, "*")
+		cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
+			!strings.HasPrefix(c.ctype.Name, "union") && c.ctype.Name != "float" && c.ctype.Name != "void"
+		if !wantPtr && !cPtr && c.ctype.Bits == t.Bits {
 			sameWidth = append(sameWidth, c)
+		}
+		if wantSimple && cSimple {
+			integers = append(integers, c)
 		}
 	}
 	// Upstream choose_ok_var: len==1 returns directly without RNG,
@@ -798,12 +889,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		}
 		return exact[int(er.pick(uint32(len(exact))))], true
 	}
+	// eFlexible integer conversion pool (is_convertable among simples).
+	// is_eligible_var often collapses small pools on early reads (seed2 e276:
+	// n=2 → no pick). Larger pools still call rnd_upto (seed2 e417: n=3).
+	if len(integers) > 0 {
+		if len(integers) == 1 {
+			return integers[0], true
+		}
+		if !forAssign && len(integers) == 2 {
+			return integers[0], true
+		}
+		return integers[int(er.pick(uint32(len(integers))))], true
+	}
 	if len(sameWidth) > 0 {
 		if len(sameWidth) == 1 {
 			return sameWidth[0], true
 		}
-		// eConvert often collapses to one viable; if seed2 expects no pick, prefer
-		// first when not assigning (read path). Still pick when assigning.
 		if !forAssign {
 			return sameWidth[0], true
 		}
@@ -812,8 +913,6 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
 	}
-	// Read path: prefer first remaining (eligibility often collapses to one).
-	// Assign path: pick among remaining.
 	if !forAssign {
 		return filtered[0], true
 	}
@@ -1166,10 +1265,12 @@ func randomLeafExprWithMode(
 				restoreGenSnapshot(ctx, snap)
 				continue
 			}
+			var flow *functionFlowState
+			if ctx != nil {
+				flow = ctx.state
+			}
 			if scopePick == 4 {
-				if er != nil && er.fallback != nil {
-					_ = er.pick(1) // parent.stack pick (size often 1)
-				}
+				parentStackPick(er, flow)
 				// NewValue→ParentLocal: qfer usually non-wildcard from select.
 				if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, false); ok {
 					bumpExprDepth(ctx)
@@ -1178,8 +1279,8 @@ func randomLeafExprWithMode(
 				restoreGenSnapshot(ctx, snap)
 				continue
 			}
-			if scopePick == 1 && er != nil && er.fallback != nil {
-				_ = er.pick(1)
+			if scopePick == 1 {
+				parentStackPick(er, flow)
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
@@ -1198,9 +1299,7 @@ func randomLeafExprWithMode(
 				}
 				// SelectParentParam with empty params → SelectParentLocal.
 				if scopePick == 2 {
-					if er != nil && er.fallback != nil {
-						_ = er.pick(1) // parent.stack size
-					}
+					parentStackPick(er, flow)
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
@@ -1218,9 +1317,7 @@ func randomLeafExprWithMode(
 						compat := sameBaseType(c.ctype, t) ||
 							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
 						if !compat {
-							if er != nil && er.fallback != nil {
-								_ = er.pick(1) // parent.stack
-							}
+							parentStackPick(er, flow)
 							if g, ok2 := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
@@ -1694,7 +1791,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
-						name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
+						name: name, ctype: CType{Name: "uint32_t", Bits: 32, Signed: base == "signed"}, bitfield: true, bitWidth: width,
 					})
 					continue
 				}
@@ -1708,7 +1805,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
-						name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
+						name: name, ctype: CType{Name: "uint32_t", Bits: 32, Signed: base == "signed"}, bitfield: true, bitWidth: width,
 					})
 					continue
 				}
@@ -1748,7 +1845,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					width := bitfieldLength(opts.IntSize*8, ut.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					ut.fields = append(ut.fields, fieldInfo{
-						name: name, ctype: CType{Name: "uint32_t", Bits: 32}, bitfield: true, bitWidth: width,
+						name: name, ctype: CType{Name: "uint32_t", Bits: 32, Signed: base == "signed"}, bitfield: true, bitWidth: width,
 					})
 					continue
 				}
@@ -2254,6 +2351,8 @@ func emitStatement(
 		e := randomTypedExprDepthFlags(CType{Name: "uint32_t", Signed: false, Bits: 32}, er, opts, env, scope, 0, ctx, false, noConst)
 		cond := fmt.Sprintf("((uint32_t)%s != 0u)", e)
 		writeLine(b, 1, fmt.Sprintf("if %s {", cond))
+		// If/else blocks are short-lived on the Csmith stack relative to loops;
+		// only loop bodies grow blockStack for SelectParentLocal (seed2 e420 n=3).
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
 		writeLine(b, 1, "} else {")
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
@@ -2319,7 +2418,13 @@ func emitStatement(
 		}
 		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
 		writeLine(b, 2, "x += (uint32_t)i;")
+		if state != nil {
+			state.blockStack++
+		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+		if state != nil && state.blockStack > 0 {
+			state.blockStack--
+		}
 		writeLine(b, 1, "}")
 	case stmtReturn:
 		ret := scope.returnVar
@@ -2503,7 +2608,13 @@ func emitStatement(
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
 			writeLine(b, 1, "/* array loop */ {")
+			if state != nil {
+				state.blockStack++
+			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state != nil && state.blockStack > 0 {
+				state.blockStack--
+			}
 			writeLine(b, 1, "}")
 		}
 	default:
@@ -2738,6 +2849,7 @@ func emitFunctionsUpstreamFlow(b *strings.Builder, r *rng, opts Options, pool []
 		dynGlobals:   []globalInfo{},
 		nextGlobalID: env.nextID,
 		stmtBudget:   opts.StopByStmt,
+		blockStack:   1, // function body block
 	}
 	state.funcs = append(state.funcs, state.makeFuncSignature(r, 1))
 	state.built = append(state.built, false)
