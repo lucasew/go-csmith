@@ -648,18 +648,33 @@ func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
 }
 
 // burnSelectLoopCtrlVarCreate mirrors SelectLoopCtrlVar when no suitable
-// non-array integer is visible: GenerateNewGlobal (or GenerateNewParentLocal when
-// globals are off). WRITE random_qualifiers + create_and_initialize RNG is the
-// same either way; only storage placement differs. Retries while the IV is
-// volatile (StatementFor::make_iteration reject loop). Upstream is unbounded;
-// we cap attempts and force non-vol on the last try so the stream still ends
-// with an accepted IV rather than falling off the path.
+// non-array integer is visible.
+//
+// Global path (opts.GlobalVariables): GenerateNewGlobal → random_qualifiers
+// with no_volatile=false, so F50 can yield a volatile IV; make_iteration rejects
+// and retries create (bounded here; last attempt forces accept).
+//
+// Parent-local path (!opts.GlobalVariables): GenerateNewParentLocal →
+// random_qualifiers(..., no_volatile=true). Still burns volatile F50 for a
+// simple int, then forces non-vol; make_iteration always accepts — single
+// create, no reject loop.
 func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
 	if r == nil {
 		return
 	}
 	// Loop control type is get_int_type() → int (hex width 8).
 	ivType := CType{Name: "int32_t", Signed: true, Bits: 32}
+
+	if !opts.GlobalVariables {
+		// Parent-local: burn vol F50 then force non-vol (no_volatile=true).
+		_ = r.flipcoin(50)
+		_ = burnCreateAndInitialize(r, opts, ivType)
+		if os.Getenv("CSMITH_TRACE_RNG") != "" {
+			fmt.Fprintf(os.Stderr, "burnSelectLoopCtrlVarCreate: parent-local create (no_volatile)\n")
+		}
+		return
+	}
+
 	const maxIVCreateAttempts = 16
 	for attempt := 0; attempt < maxIVCreateAttempts; attempt++ {
 		// random_qualifiers(WRITE): const forced false (no RNG); vol F50 when ok.
