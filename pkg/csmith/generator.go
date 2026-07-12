@@ -2843,6 +2843,7 @@ func emitStatement(
 			}
 			// SelectLoopCtrlVar among integer visibles.
 			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create.
+			createdIV := false
 			if state != nil && state.deepStack && state.loopIVPool == 0 && opts.GlobalVariables {
 				_ = r.flipcoin(50) // WRITE qfer volatile
 				_ = r.flipcoin(20) // NewArray
@@ -2857,13 +2858,19 @@ func emitStatement(
 						_ = r.next31()
 					}
 				}
+				createdIV = true
 			} else {
 				_ = r.upto(3)
 			}
 			if state != nil {
-				// After array-loop IV choose, subsequent fors see n=2 at e370.
-				state.loopIVPool = 2
 				state.deepStack = true
+				if createdIV {
+					// Created IV not yet a multi-pool; next for may create again (e560).
+					state.loopIVPool = 0
+				} else {
+					// After first array-loop choose n=3, subsequent fors see n=2 (e370).
+					state.loopIVPool = 2
+				}
 			}
 			// make_random_array_control for must-use array (size 1 → bound 0):
 			// choose_ok_var among arrays may be U1 if multiple; seed2 U1 then
