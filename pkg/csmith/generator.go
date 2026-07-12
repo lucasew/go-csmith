@@ -825,20 +825,23 @@ func buildFunctionCallExpr(
 	}
 
 	if calleeIdx < 0 {
-		if !useExisting && len(candidates) == 0 {
-			// Matched seed2 events 43–45: F50=0, F0, then leaf retries.
-			if r != nil {
-				_ = r.flipcoin(0)
-			}
-			return "", false
-		}
 		// CREATE: FunctionInvocationUser::build_invocation_and_function
-		// → make_random_signature RNG, then body (emitSingleFuncDef).
+		// → make_random_signature RNG, then body.
 		if r == nil {
 			return "", false
 		}
-		_ = r.flipcoin(50) // RegularVolatileProb (even with no_volatile force)
-		_ = r.flipcoin(10) // RegularConstProb
+		if len(state.funcs) >= state.maxFuncs {
+			return "", false
+		}
+		// Return qfer: random_qualifiers for pointer types draws per indirection
+		// level then the pointee; int* → (F50,F10) + (F50,F10).
+		ptrDepth := strings.Count(t.Name, "*")
+		for i := 0; i < ptrDepth; i++ {
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+		}
+		_ = r.flipcoin(50) // variable itself volatile
+		_ = r.flipcoin(10) // const
 		maxP := opts.MaxParams
 		if maxP < 1 {
 			maxP = 1
@@ -851,6 +854,11 @@ func buildFunctionCallExpr(
 			_ = r.flipcoin(40)
 			// Type::choose_random_nonvoid_nonvolatile → rnd_upto(AllTypes.size(), filter)
 			pt := pickNonVoidNonVolatile(r, state.pool, state.info, opts)
+			pd := strings.Count(pt.Name, "*")
+			for j := 0; j < pd; j++ {
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+			}
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(10)
 			params = append(params, paramInfo{
@@ -1017,11 +1025,16 @@ func randomLeafExprWithMode(
 		}
 		switch choice {
 		case termFunction:
-			if depth > 0 && er != nil && er.fallback != nil {
-				// ExpressionFuncall::ExpressionFunctionProbability + stdfunc path.
-				if er.fallback.flipcoin(80) {
+			// ExpressionFuncall always draws ExpressionFunctionProbability (F80).
+			// Pointer/struct/union types force user-function path after the coin
+			// (stdfunc only for simple non-void).
+			if er != nil && er.fallback != nil {
+				stdFunc := er.fallback.flipcoin(80)
+				isSimple := !strings.Contains(t.Name, "*") &&
+					!strings.HasPrefix(t.Name, "struct ") &&
+					!strings.HasPrefix(t.Name, "union ")
+				if stdFunc && isSimple {
 					// Binary/unary stdfunc: do not bump ctx.exprDepth (upstream).
-					// Advance nest depth only (arg) so hard cap can fire.
 					nest := depth + 1
 					if er.fallback.flipcoin(5) {
 						_ = er.fallback.flipcoin(50)
