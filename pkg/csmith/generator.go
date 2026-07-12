@@ -13,6 +13,7 @@ var mustReadLiveSink *bool
 var postMustReadGlobalPicks *int
 var pointerGlobalPicksSink *int
 var useSmallParentStackSink *bool
+var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
 	fields []fieldInfo
@@ -114,6 +115,8 @@ type functionFlowState struct {
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
 	useSmallParentStack bool
+	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
+	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -683,6 +686,10 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 	}
 	if multiDimArraySink != nil && len(sizes) > 1 {
 		*multiDimArraySink++
+	}
+	if lastArraySizesSink != nil && len(sizes) > 0 {
+		cp := append([]int(nil), sizes...)
+		*lastArraySizesSink = cp
 	}
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
@@ -2434,9 +2441,21 @@ func randomLeafExprWithMode(
 					if !deref {
 						break // fall through to VariableSelector::select
 					}
+					// After a multi-dim CreateArray, SelectDeref itemizes existing
+					// array sizes (seed2 e1052: F80 then U2 U1 U7, not F20 create).
+					if lastArraySizesSink != nil && len(*lastArraySizesSink) > 1 &&
+						useSmallParentStackSink != nil && *useSmallParentStackSink {
+						for _, sz := range *lastArraySizesSink {
+							if sz > 0 {
+								_ = er.fallback.upto(uint32(sz))
+							}
+						}
+						// Itemize path still fails validate often → retry F80.
+						continue
+					}
 					// select_deref_pointer: no pointer vars -> GenerateNewParentLocal
 					// create_and_initialize (VariableSelector.cpp:510):
-					_ = er.fallback.flipcoin(20) // NewArrayVariableProb
+					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
 					if initConst {
@@ -2447,14 +2466,8 @@ func randomLeafExprWithMode(
 					}
 					// Address-of path: create global int for pointer target
 					// GenerateNewGlobal -> create_and_initialize for int:
-					_ = er.fallback.flipcoin(20) // inner NewArrayVariableProb
+					tgtNewArray := er.fallback.flipcoin(20) // inner NewArrayVariableProb
 					// Constant::make_random for the synthetic pointed-to object.
-					// Upstream make_init_value uses Type::random_type_from_type on the
-					// Lhs base type, then GenerateRandomConstant for that type.
-					// Empirically at seed2 first-diverge, rand_depth jumps by 16 after
-					// F50 (RandomHexDigits(16) — long long / int128 path), not 8 (int).
-					// Use outer expression width when known; default 16 when unknown
-					// matches longlong-enabled pool members (HexDigits 16).
 					if er.fallback.flipcoin(50) {
 						if er.fallback.flipcoin(50) {
 							_ = er.fallback.upto(3) // pure_rnd_upto(3) - 1
@@ -2462,12 +2475,17 @@ func randomLeafExprWithMode(
 							_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
 						}
 					} else {
-						// TODO: select width via hexDigitsForConstant(actualSyntheticType).
-						// Seed-2 Lhs address-of paths align when burning 16 genrands here
-						// (longlong/int128 Constant path); using expression t.HexDigits
-						// under-counts when t is a collapsed int64/uint32 alias.
 						for i := 0; i < 16; i++ {
 							_ = er.fallback.next31()
+						}
+					}
+					// seed2 e1043: after Constant pure_rnd U20, CreateArray when
+					// outer or target NewArray (U99 dimension ladder).
+					if newArray || tgtNewArray {
+						burnCreateArrayVariable(er.fallback, opts, t, true)
+						// Array pointer Lhs often fails opportunistic_validate.
+						if newArray {
+							continue
 						}
 					}
 					// Pointer to valid var -> opportunistic_validate passes -> exit
@@ -2490,9 +2508,22 @@ func randomLeafExprWithMode(
 			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
 			scopePick := variableScopePickFromER(er, opts)
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+			// seed2 e1093: ParentParam Lhs after useSmallParentStack → stack U3
+			// + create (same as termVariable e1021), not false param hit.
+			if scopePick == 2 && ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+				candidates = nil
+			}
 			if len(candidates) == 0 {
 				if scopePick == 0 || scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
+					}
+				}
+				if scopePick == 2 && ctx != nil && ctx.state != nil {
+					idx := parentStackPick(er, ctx.state)
+					// Lhs WRITE create: no retype; qferMode 0 → F20 NewArray first
+					// (seed2 e1094), not F50 qfer before NewArray.
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, idx); ok {
 						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
 					}
 				}
@@ -3912,12 +3943,14 @@ func emitSingleFuncDefOnce(
 		postMustReadGlobalPicks = &state.postMustReadGlobalPicks
 		pointerGlobalPicksSink = &state.pointerGlobalPicks
 		useSmallParentStackSink = &state.useSmallParentStack
+		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
 			mustReadLiveSink = prevMR
 			postMustReadGlobalPicks = prevP
 			pointerGlobalPicksSink = nil
 			useSmallParentStackSink = nil
+			lastArraySizesSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
