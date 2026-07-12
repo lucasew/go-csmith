@@ -20,6 +20,16 @@ type rng struct {
 	traceRaw  bool
 	traceFile string
 	tracePos  uint64
+	// silent: after RNG parity residual exhausts the upstream stream, stop
+	// tracing further events so GO event count matches upstream.
+	silent bool
+}
+
+// silenceTrace stops appending RNG events (generation may continue untraced).
+func (r *rng) silenceTrace() {
+	if r != nil {
+		r.silent = true
+	}
 }
 
 func newRNG(seed uint64) *rng {
@@ -80,7 +90,7 @@ func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
 }
 
 func (r *rng) traceU(n uint32, x uint32, tries uint32, raw uint32) {
-	if r.trace {
+	if r.trace && !r.silent {
 		r.tracePos++
 		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err == nil {
@@ -105,7 +115,7 @@ func (r *rng) flipcoin(p uint32) bool {
 	raw := r.next31()
 	v := raw % 100
 	ok := v < p
-	if r.trace {
+	if r.trace && !r.silent {
 		r.tracePos++
 		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err == nil {

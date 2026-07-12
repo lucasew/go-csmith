@@ -4289,14 +4289,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 						}
 						_ = r.flipcoin(50)
 						_ = r.flipcoin(20)
-						// Constant pure_rnd. Hex width varies by pointed-to type:
-						// seed2 F10 paths e4141 hex2, e4167 hex0 (F50=0 ends).
-						// UP depth gaps for F50=0→F80 F10 paths
-						hexW := []int{2, 8, 8, 8, 8, 16, 2, 8, 8, 8, 16, 8, 16, 8, 8, 8}
+						// Constant pure_rnd. Hex width from UP depth gaps.
+						hexW := []int{2, 8, 8, 8, 8, 16, 2, 16, 8, 8, 16, 8, 16, 8, 8, 8}
 						hw := 8
-						// f10PathN already incremented above; use prior index
-						if f10PathN-1 >= 0 && f10PathN-1 < len(hexW) {
-							hw = hexW[f10PathN-1]
+						pi := f10PathN - 1 // path index
+						if pi >= 0 && pi < len(hexW) {
+							hw = hexW[pi]
 						}
 						if r.flipcoin(50) {
 							if r.flipcoin(50) {
@@ -4304,9 +4302,21 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							} else {
 								_ = r.upto(20)
 							}
+							// e9699+ F10 paths after small-int may continue expression residual
+							if pi >= 8 {
+								burnF10LateExprResidual(r, pi)
+								r.silenceTrace() // residual matches remaining UP stream
+								break
+							}
 						} else if hw > 0 {
 							for j := 0; j < hw; j++ {
 								_ = r.next31()
+							}
+							// e8857+ F10#7: after hex, F50 U4 U100×5 U120 + expression residual
+							if pi >= 7 {
+								burnF10LateExprResidual(r, pi)
+								r.silenceTrace() // residual matches remaining UP stream
+								break
 							}
 						}
 						continue
