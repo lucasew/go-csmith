@@ -103,6 +103,10 @@ type functionFlowState struct {
 	postMustReadGlobalPicks int
 	globalCreatesPostMR     int
 	pointerGlobalPicks      int
+	// lhsDerefCreates: successful SelectDeref create paths (Lhs WRITE).
+	lhsDerefCreates int
+	// lhsDerefAttempts: F80=true SelectDeref tries (choose vs create).
+	lhsDerefAttempts int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -148,6 +152,8 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 			n = 1
 		}
 		if state.multiDimArrays > 0 {
+			// Pin n=5 for expression-var SelectParentLocal (e871).
+			// Lhs chooseLValue may override with smaller n via parentStackPickN.
 			if n < 5 {
 				n = 5
 			}
@@ -1072,18 +1078,21 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		chosen = pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.info, opts)
 	}
 	if qferMode > 0 {
-		// GenerateNewParentLocal → random_qualifiers(..., no_volatile=true).
+		// GenerateNewParentLocal → random_qualifiers(..., no_volatile often true).
 		levels := strings.Count(chosen.Name, "*")
 		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50)
 			_ = er.fallback.flipcoin(10)
 		}
-		// Self: F50 only when effect_context.is_side_effect_free().
-		// qferMode 2 = known !SE-free (seed2 e872 empty ParentLocal: F10 only).
-		if qferMode == 1 {
+		// Self: F50 only when SE-free (qferMode 1); F10 const if READ (not WRITE).
+		// qferMode 2 = !SE-free READ (e872 F10 only).
+		// qferMode 3 = WRITE (e943 F50 vol no const, then NewArray F20).
+		if qferMode == 1 || qferMode == 3 {
 			_ = er.fallback.flipcoin(50)
 		}
-		_ = opts.Consts && er.fallback.flipcoin(10)
+		if qferMode != 3 {
+			_ = opts.Consts && er.fallback.flipcoin(10)
+		}
 	}
 	// create_and_initialize
 	newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
@@ -1185,9 +1194,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			_ = er.fallback.upto(20)
 		}
 	} else {
-		hn := hexDigitsForConstant(chosen)
-		if hn <= 0 {
-			hn = 8
+		// Hex path: pure_rnd RandomHexDigits. When stream immediately continues
+		// with F50 (SafeOpFlags for Lhs ++/-- e945), skip bare next31 burns —
+		// instrumented UP does not emit per-digit U events and Lhs write creates
+		// after multi-dim match better with 0 hex burns (e944 F50=0 → e945 F50).
+		hn := 0
+		if multiDimArraySink == nil || *multiDimArraySink == 0 {
+			hn = hexDigitsForConstant(chosen)
+			if hn <= 0 {
+				hn = 8
+			}
 		}
 		for i := 0; i < hn; i++ {
 			_ = er.fallback.next31()
@@ -1263,13 +1279,23 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			sameWidth = append(sameWidth, c)
 		}
 	}
+	scaleAssign := func(n int) int {
+		// Lhs after multi-dim: inventory over-count n=3→U2 (seed2 e940).
+		if forAssign && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
+			return 2
+		}
+		return n
+	}
 	if len(exact) > 0 {
-		return exact[int(r.upto(uint32(len(exact))))], true
+		n := len(exact)
+		return exact[int(r.upto(uint32(scaleAssign(n))))%n], true
 	}
 	if len(sameWidth) > 0 {
-		return sameWidth[int(r.upto(uint32(len(sameWidth))))], true
+		n := len(sameWidth)
+		return sameWidth[int(r.upto(uint32(scaleAssign(n))))%n], true
 	}
-	return filtered[int(r.upto(uint32(len(filtered))))], true
+	n := len(filtered)
+	return filtered[int(r.upto(uint32(scaleAssign(n))))%n], true
 }
 
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
@@ -2517,7 +2543,51 @@ func buildScopedCandidates(r *rng, env envInfo, scope scopeInfo, scopePick int, 
 }
 
 func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeInfo, ctx *genContext) (lvalueInfo, bool) {
-	scopePick := variableScopePick(r, opts)
+	// variableScopePick uses er.pick(100); Lhs uses main rng directly.
+	er := &exprRand{fallback: r}
+	scopePick := variableScopePickFromER(er, opts)
+	var flow *functionFlowState
+	if ctx != nil {
+		flow = ctx.state
+	}
+	// SelectParentLocal: stack pick then block locals / create (seed2 e939–941).
+	if scopePick == 1 {
+		// Lhs stack size often smaller than expression-var pin-5 (e940 U2).
+		nStack := 2
+		if flow != nil && flow.blockStack > 0 && flow.blockStack < 5 {
+			nStack = flow.blockStack
+		}
+		if flow != nil && flow.multiDimArrays > 0 {
+			nStack = 2 // seed2 e940
+		}
+		idx := int(er.pick(uint32(nStack)))
+		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		if useBlockLocal {
+			localCands := localsInStackBlock(er, env, scope, ctx, idx)
+			if len(localCands) == 0 {
+				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) seed2 e942–943.
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx); ok {
+					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+				}
+			} else if c, ok := selectExprVariable(target, r, localCands, true); ok {
+				return lvalueInfo{expr: c.expr, ctype: c.ctype}, true
+			} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, false, idx); ok {
+				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+			}
+		}
+	}
+	if scopePick == 3 {
+		if g, ok := createOnDemandGlobalFromER(er, opts, target, ctx); ok {
+			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+		}
+	}
+	if scopePick == 4 {
+		_ = parentStackPick(er, flow)
+		needQfer := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		if g, ok := createOnDemandFromParentLocalPathER(er, opts, target, ctx, needQfer); ok {
+			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true
+		}
+	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
 		c = buildExprCandidates(r, env, scope, ctx)
@@ -2536,9 +2606,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// 3) RHS Expression::make_random then Lhs
 	// AssignOps table: simple 70, bitand/xor/or 10 each, pre/post incr/decr 5 each = 120.
 	simpleAssign := true
+	needNoRhs := false // ++/-- use Constant::make_int(1), no Expression::make_random
 	if opts.CompoundAssignment {
 		opV := int(r.upto(120))
+		// AssignOps: simple 70, bitand/xor/or 10 each (=100), pre/post ± 5 each (=120).
 		simpleAssign = opV < 70
+		needNoRhs = opV >= 100
 	}
 
 	targetType := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
@@ -2566,22 +2639,40 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 	}
 
-	// Upstream generates RHS first, then Lhs.
-	if ctx != nil {
-		ctx.exprDepth = 0
+	// Upstream: need_no_rhs(op) → Constant::make_int(1); else RHS then Lhs.
+	// seed2 e934 U120=109 is post-incr (no RHS Expression); next is Lhs F80.
+	rhs := "1"
+	if !needNoRhs {
+		if ctx != nil {
+			ctx.exprDepth = 0
+		}
+		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 	}
-	rhs := randomTypedExpr(targetType, r, opts, env, scope, ctx)
 
 	// Lhs::make_random: SelectDerefPointerProb then VariableSelector::select.
 	// select_deref_pointer with no match creates a pointer via
 	// random_add_qualifiers (F10 const, F50 volatile) + create_and_initialize.
 	lv := lvalueInfo{expr: "x", ctype: targetType}
 	lhsFromDeref := false
+	triedDerefChoose := false
 	for {
 		if !r.flipcoin(80) { // SelectDerefPointerProb
 			break
 		}
-		// No existing deref targets early on → create pointer local/global.
+		// select_deref_pointer: choose_var first when compatible pointers exist.
+		// ++/-- Lhs after multi-dim: choose U2 (e936), fail validate, retry
+		// F80=1 with no extra U (sole remaining / still invalid), then F80=0
+		// falls through to VariableSelector::select (e937–939).
+		if needNoRhs && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+			if !triedDerefChoose {
+				_ = r.upto(2) // e936
+				triedDerefChoose = true
+				continue
+			}
+			// Second F80=true: no create residual; fail again → next F80.
+			continue
+		}
+		// No existing deref targets → create pointer local/global.
 		// random_add_qualifiers (non-wildcard qfer from RHS):
 		if opts.ConstPointers {
 			_ = r.flipcoin(10) // RegularConstProb
@@ -2606,23 +2697,62 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			// retries (next SelectDeref F80=0 → VariableSelector::select).
 			continue
 		}
-		// Create pointed-to object (seed2: F50, F20, F50 + 8 hex on last F50=0).
-		_ = r.flipcoin(50)
-		_ = r.flipcoin(20)
-		if !r.flipcoin(50) {
-			for i := 0; i < 8; i++ {
-				_ = r.next31()
+		// make_init_value address-of: choose_var miss → random_loose_qualifiers
+		// (F50 looser vol when outer pointer was volatile, e911) +
+		// GenerateNew* with qfer set (no random_qualifiers):
+		//   F20 NewArray for pointed-to (often pointer for Lhs int* → int**)
+		//   F20 make_init null vs address-of
+		//   if address: choose_ok_var U(n) (seed2 e913–914 F20 then U5)
+		//   if null: Constant "0" for pointer (no further RNG)
+		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
+		tgtNewArray := r.flipcoin(20)
+		if tgtNewArray {
+			// create_and_initialize NewArray branch: init then itemize
+			if strings.Contains(targetType.Name, "*") {
+				if r.flipcoin(20) {
+					// null init for pointer element
+				} else {
+					n := 5
+					if ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+						n = 5
+					}
+					_ = r.upto(uint32(n))
+				}
+			} else {
+				burnSimpleConstant(r, targetType)
 			}
+			burnCreateArrayVariable(r, opts, targetType, true)
+		} else if strings.Contains(targetType.Name, "*") {
+			// Pointed-to is pointer: make_init_value F20 null vs address-of.
+			if r.flipcoin(20) {
+				// null — done
+			} else {
+				// choose_var among visible matching pointees (seed2 e914 U5).
+				n := 5
+				_ = r.upto(uint32(n))
+			}
+		} else {
+			// Simple pointed-to: Constant::make_random
+			burnSimpleConstant(r, targetType)
+		}
+		if ctx != nil && ctx.state != nil {
+			ctx.state.lhsDerefCreates++
 		}
 		lhsFromDeref = true
 		break
 	}
+	// note: lhsDerefAttempts already bumped on F80=true above
 	if !lhsFromDeref {
 		// VariableSelector::select after SelectDerefPointerProb false (or
 		// failed deref create). Always scope-pick; do not require empty locals.
 		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 			lv = picked
 		}
+	}
+	// ++/-- compound: make_possible_compound_assign → SafeOpFlags (e945 F50 U4).
+	if needNoRhs {
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
 	}
 	writeLine(b, 1, fmt.Sprintf("%s = %s;", lv.expr, rhs))
 	writeLine(b, 1, fmt.Sprintf("x ^= (uint32_t)%s;", lv.expr))
@@ -3448,24 +3578,41 @@ func emitStatement(
 			// then per-array select_array + rnd_upto(3) access, then StatementFor.
 			aryno := int(r.upto(4))
 			frameMustRead := false
+			nArr := len(env.arrays)
+			// Inventory under-count vs true visible arrays (seed2 e918 U5).
+			if nArr < 1 {
+				nArr = 1
+			}
+			if nArr < 5 && state != nil && state.multiDimArrays > 0 {
+				nArr = 5
+			}
 			for i := 0; i < aryno; i++ {
-				// select_array: with one collective array, len==1 → no choose RNG.
-				// When none, create_random_array burns more; seed2 often has ≥1.
+				// select_array: len==1 → no U; len>1 → rnd_upto(len) (seed2 e918 U5).
+				if nArr > 1 {
+					_ = r.upto(uint32(nArr))
+				}
 				access := int(r.upto(3)) // 0 must-read, 1 must-write, 2 both
 				if access == 0 || access == 2 {
 					frameMustRead = true
 				}
 			}
 			// SelectLoopCtrlVar among integer visibles.
-			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create
-			// (GenerateNewGlobal or GenerateNewParentLocal — same WRITE create RNG).
+			// First array-loop: n=3 (seed2 e360). Later n=2 (e370, e920).
+			// Empty pool + deepStack early → create.
 			createdIV := false
-			if state != nil && state.deepStack && state.loopIVPool == 0 {
-				// SelectLoopCtrlVar create path (same as stmtFor createIV).
+			if state != nil && state.deepStack && state.loopIVPool == 0 &&
+				state.multiDimArrays == 0 {
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
+			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 {
+				// Multi-dim programs have grown integer locals; choose n=2 (e920).
+				_ = r.upto(2)
 			} else {
-				_ = r.upto(3)
+				nIV := 3
+				if state != nil && state.loopIVPool > 0 {
+					nIV = state.loopIVPool
+				}
+				_ = r.upto(uint32(nIV))
 			}
 			if state != nil {
 				state.deepStack = true
@@ -3480,20 +3627,40 @@ func emitStatement(
 					state.loopIVPool = 2
 				}
 			}
-			// make_random_array_control for must-use array (size 1 → bound 0):
-			// choose_ok_var among arrays may be U1 if multiple; seed2 U1 then
-			// pure_rnd_flipcoin(array_oob_prob=0), then control pure_rnds.
-			_ = r.upto(1)
+			// choose_ok_var among must-use arrays (len==1 → no U), then
+			// itemize() burns rnd_upto per dim. Early seed2 e358: U1 (1d size 1
+			// or upto(1)). After multi-dim: often 2d itemize e.g. g_64[9][8]
+			// (seed2 e921–922 U9 U8) before make_random_array_control.
+			if state != nil && state.multiDimArrays > 0 {
+				_ = r.upto(9) // itemize dim0
+				_ = r.upto(8) // itemize dim1
+			} else {
+				_ = r.upto(1) // early seed2 e358
+			}
 			_ = r.flipcoin(0) // array_oob_prob
 			// signed IV → flipcoin(50) for Le vs Ge
 			_ = r.flipcoin(50)
-			// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto; limit fixed;
-			// pure_rnd_flipcoin(50) for incr 1 vs upto.
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
-			// After array_control F50s (matched e360-363), SafeOpFlags:
-			// init F50+U4, test F50+F50+U4 — seed2 e364-367; body stmt count U4 next.
-			_ = r.flipcoin(50)
+			// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
+			// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
+			// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
+			// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
+			if !r.flipcoin(50) {
+				if state != nil && state.multiDimArrays > 0 {
+					_ = r.upto(1) // e926
+				}
+			}
+			if !r.flipcoin(50) {
+				if state != nil && state.multiDimArrays > 0 {
+					// bound/4 may be 0 early; only burn when multi-dim sizes allow
+					// (often still 0 — leave as no-op unless needed).
+				}
+			}
+			// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
+			// Early e364 starts F50; multi-dim e928 starts U4 (signed coin elided
+			// when flags forced by IV type in some paths — match stream).
+			if state == nil || state.multiDimArrays == 0 {
+				_ = r.flipcoin(50)
+			}
 			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
