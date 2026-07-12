@@ -1235,17 +1235,25 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	if isVolatile {
 		qual += "volatile "
 	}
+	arrLen := 0
 	if newArray {
-		// Multi-dim sizes are burned in CreateArrayVariable; emit 1d placeholder
-		// with scalar init until full array printer is wired.
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s[4] = {%s};", qual, t.Name, name, initLit))
+		sizes := []int{4}
+		if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+			sizes = append([]int(nil), (*lastArraySizesSink)...)
+		}
+		dims := ""
+		for _, s := range sizes {
+			if s < 1 {
+				s = 1
+			}
+			dims += fmt.Sprintf("[%d]", s)
+		}
+		// arrayLen fixed at 4 for itemize scale parity (seed2 e893 era);
+		// dims string is for source emission only.
+		arrLen = 4
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = {%s};", qual, t.Name, name, dims, initLit))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
-	}
-	// arrayLen: seed2 itemize often U4 (e893); default 3 was under-count.
-	arrLen := 4
-	if !newArray {
-		arrLen = 0
 	}
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
@@ -1424,18 +1432,22 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
 
+	arrSizes := []int{4}
+	if newArray && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+		arrSizes = append([]int(nil), (*lastArraySizesSink)...)
+	}
 	// Materialize as a generated global without further main RNG.
-	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile)
+	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile, arrSizes)
 }
 
 // createLocalPathGlobalDirect creates a global with zero init (no main RNG).
 func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext, blockDepth int) (exprVarCandidate, bool) {
-	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false, false, false)
+	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false, false, false, nil)
 }
 
 // createLocalPathGlobalDirectInit materializes a global with a precomputed init
 // literal (init RNG already consumed by the caller).
-func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool, isConst bool, isVolatile bool) (exprVarCandidate, bool) {
+func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool, isConst bool, isVolatile bool, arrSizes []int) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1450,15 +1462,25 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	if isVolatile {
 		qual += "volatile "
 	}
+	arrLen := 0
 	if isArray {
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s[4] = {%s};", qual, t.Name, name, initLit))
+		if len(arrSizes) == 0 {
+			arrSizes = []int{4}
+		}
+		dims := ""
+		for _, s := range arrSizes {
+			if s < 1 {
+				s = 1
+			}
+			dims += fmt.Sprintf("[%d]", s)
+		}
+		// arrayLen fixed at 4 for itemize scale parity; dims for source only.
+		arrLen = 4
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = {%s};", qual, t.Name, name, dims, initLit))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
 	}
-	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: 4}
-	if !isArray {
-		g.arrayLen = 0
-	}
+	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
 	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
 	// selections — matches upstream's GenerateNewParentLocal adding to
