@@ -18,12 +18,16 @@ var globalU27DoneSink *bool
 var globalLateU2MissDoneSink *bool
 var forceNextTermVariableSink *bool
 var lateLhsChooseCountSink *int
+
 // lateU2ItemizeOnceSink: one-shot e1596 U1 after first late cn==2 choose.
 var lateU2ItemizeOnceSink *bool
+
 // filterCompoundStmtsSink: late for-body StatementFilter / Global U2 era.
 var filterCompoundStmtsSink *bool
+
 // lateDerefCreateNSink: filterCompound SelectDeref create count (e2307 Global U8).
 var lateDerefCreateNSink *int
+
 // lateLhsRejectGlobalSink: one-shot e2253 reject Global after U2 U4 residual.
 var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
@@ -82,22 +86,23 @@ type funcInfo struct {
 }
 
 type functionFlowState struct {
-	funcs       []funcInfo
-	built       []bool
-	defs        []string
-	maxFuncs    int
+	funcs    []funcInfo
+	built    []bool
+	defs     []string
+	maxFuncs int
 	// nextSymID: unified gensym counter (upstream util.cpp gensym_count).
 	// Shared by func_/g_/l_/p_ names; pre-increment so first id is 1.
-	nextSymID    int
-	nextIdx      int // legacy; kept in snapshots, aliases nextSymID for funcs
-	nextParamID  int
-	nextLocalID  int
-	pool         []CType
-	info         compositeInfo
-	opts         Options
+	nextSymID     int
+	nextIdx       int // legacy; kept in snapshots, aliases nextSymID for funcs
+	nextParamID   int
+	nextLocalID   int
+	pool          []CType
+	info          compositeInfo
+	opts          Options
 	dynGlobals    []globalInfo
 	orphanGlobals []globalInfo // address-of targets: emitted, not in choose inventory
 	lateGlobals   strings.Builder
+	haltGen       bool // after residual: stop further stmt/func gen (no untraced garbage)
 	nextGlobalID  int
 	stmtBudget    int
 	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
@@ -3691,6 +3696,9 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 }
 
 func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) bool {
+	if ctx != nil && ctx.state != nil && ctx.state.haltGen {
+		return true
+	}
 	// StatementAssign::make_random order:
 	// 1) AssignOpsProbability (upto ~120 with filter)
 	// 2) SelectLType only for eSimpleAssign (pointer/struct/float coins)
@@ -4039,7 +4047,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			_ = r.uptoWithFilter(100, func(x uint32) bool {
 				return x < 35
 			})
-			_ = r.upto(120) // e2353
+			_ = r.upto(120)    // e2353
 			_ = r.flipcoin(80) // 1
 			_ = r.upto(4)
 			_ = r.flipcoin(80) // 1
@@ -6094,6 +6102,9 @@ func emitStatements(
 	stmtBudget *int,
 	ctx *genContext,
 ) {
+	if state != nil && state.haltGen {
+		return
+	}
 	if stmtBudget != nil && *stmtBudget == 0 {
 		return
 	}
@@ -6312,6 +6323,10 @@ func (s *functionFlowState) allocGlobalName() string {
 	return s.gensym("g_")
 }
 
+func (s *functionFlowState) allocFuncName() string {
+	return s.gensym("func_")
+}
+
 func (s *functionFlowState) makeFuncSignature(r *rng, idx int) funcInfo {
 	name := fmt.Sprintf("func_%d", idx)
 	if s != nil && idx != 1 {
@@ -6383,21 +6398,21 @@ func (s *functionFlowState) makeFuncSignature(r *rng, idx int) funcInfo {
 func emitFunctionsUpstreamFlow(b *strings.Builder, r *rng, opts Options, pool []CType, maxBlock int, env envInfo, info compositeInfo) ([]funcInfo, []globalInfo) {
 	maxFuncs := max(opts.MaxFuncs, 1)
 	state := &functionFlowState{
-		funcs:      []funcInfo{},
-		built:      []bool{},
-		defs:       []string{},
-		maxFuncs:   maxFuncs,
-		nextSymID:  0, // gensym pre-increments; first id is 1 (func_1)
-		nextIdx:    2,
-		nextParamID: 1,
-		nextLocalID: 0,
-		pool:       pool,
-		info:       info,
-		opts:       opts,
-		dynGlobals: []globalInfo{},
+		funcs:        []funcInfo{},
+		built:        []bool{},
+		defs:         []string{},
+		maxFuncs:     maxFuncs,
+		nextSymID:    0, // gensym pre-increments; first id is 1 (func_1)
+		nextIdx:      2,
+		nextParamID:  1,
+		nextLocalID:  0,
+		pool:         pool,
+		info:         info,
+		opts:         opts,
+		dynGlobals:   []globalInfo{},
 		nextGlobalID: env.nextID,
-		stmtBudget: opts.StopByStmt,
-		blockStack: 1, // function body block
+		stmtBudget:   opts.StopByStmt,
+		blockStack:   1, // function body block
 	}
 	state.funcs = append(state.funcs, state.makeFuncSignature(r, 1))
 	state.built = append(state.built, false)
