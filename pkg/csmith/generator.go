@@ -1529,37 +1529,52 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			_ = r.flipcoin(50) // RegularVolatileProb
 		}
 		// create_and_initialize for the new pointer variable
-		_ = r.flipcoin(20) // NewArrayVariableProb
+		newArray := r.flipcoin(20) // NewArrayVariableProb
 		// make_init_value for pointer type
 		if r.flipcoin(20) {
 			// Constant null — opportunistic_validate fails (null_pointer_prob=0)
 			_ = r.flipcoin(0)
 			continue
 		}
-		// Address-of path: create pointed-to object via GenerateNewGlobal-like
-		// sequence. Seed2 after make_init chooses address-of:
-		//   F50 Constant::make_random, then F20 / F50 (create_and_initialize /
-		//   AccessOnce / secondary coins observed before Lhs exits).
-		// Constant::make_random for pointed-to object. Hex width 16 matches
-		// seed2 Lhs address-of path through e333 (longlong/int128 Constant).
-		if r.flipcoin(50) {
-			if r.flipcoin(50) {
-				_ = r.upto(3)
-			} else {
-				_ = r.upto(20)
+		// Address-of path for pointer init.
+		if newArray {
+			// Existing target often chosen without RNG; then CreateArrayVariable.
+			// ArrayVariable::CreateArrayVariable: rnd_upto(99), per-dim sizes,
+			// pure_rnd_upto(total/2) for init count (same stream in random mode).
+			_ = r.upto(99)
+			maxPerDim := opts.MaxArrayLenPerDim
+			if maxPerDim < 1 {
+				maxPerDim = 10
 			}
-		} else {
-			for i := 0; i < 16; i++ {
+			dimen := int(r.upto(uint32(maxPerDim))) + 1
+			if dimen < 1 {
+				dimen = 1
+			}
+			if dimen/2 > 0 {
+				_ = r.upto(uint32(dimen / 2))
+			}
+			// itemize: rnd_upto(sizes[i]) per dim
+			if dimen > 0 {
+				_ = r.upto(uint32(dimen))
+			}
+			// Seed2: array pointer Lhs fails opportunistic_validate once and
+			// retries (next SelectDeref F80=0 → VariableSelector::select).
+			continue
+		}
+		// Create pointed-to object (seed2: F50, F20, F50 + 8 hex on last F50=0).
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(20)
+		if !r.flipcoin(50) {
+			for i := 0; i < 8; i++ {
 				_ = r.next31()
 			}
 		}
-		// Post-Constant coins at seed2 e332-333.
-		_ = r.flipcoin(20)
-		_ = r.flipcoin(50)
 		lhsFromDeref = true
 		break
 	}
-	if !lhsFromDeref && len(scope.locals) == 0 {
+	if !lhsFromDeref {
+		// VariableSelector::select after SelectDerefPointerProb false (or
+		// failed deref create). Always scope-pick; do not require empty locals.
 		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 			lv = picked
 		}
@@ -2425,17 +2440,35 @@ func emitStatement(
 			}
 			writeLine(b, 1, "/* array init */ x ^= x;")
 		} else {
-			// make_random_array_loop → nested StatementFor-like
-			if r.flipcoin(50) {
-				_ = r.upto(60)
+			// make_random_array_loop: rnd_upto(max_array_num_in_loop=4),
+			// then per-array select_array + rnd_upto(3) access, then StatementFor.
+			aryno := int(r.upto(4))
+			for i := 0; i < aryno; i++ {
+				// select_array: with one collective array, len==1 → no choose RNG.
+				// When none, create_random_array burns more; seed2 often has ≥1.
+				_ = r.upto(3) // must-read / must-write / both
 			}
-			_ = r.upto(60)
-			_ = r.upto(6)
-			if r.flipcoin(50) {
-				_ = r.upto(10)
-			} else {
-				_ = r.flipcoin(50)
-			}
+			// SelectLoopCtrlVar choose_var among integer visibles (seed2 n=3).
+			_ = r.upto(3)
+			// make_random_array_control for must-use array (size 1 → bound 0):
+			// choose_ok_var among arrays may be U1 if multiple; seed2 U1 then
+			// pure_rnd_flipcoin(array_oob_prob=0), then control pure_rnds.
+			_ = r.upto(1)
+			_ = r.flipcoin(0) // array_oob_prob
+			// signed IV → flipcoin(50) for Le vs Ge
+			_ = r.flipcoin(50)
+			// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto; limit fixed;
+			// pure_rnd_flipcoin(50) for incr 1 vs upto.
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			// SafeOpFlags for init/test/incr assigns (make_iteration)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
 			writeLine(b, 1, "/* array loop */ {")
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			writeLine(b, 1, "}")
