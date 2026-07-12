@@ -78,6 +78,11 @@ type functionFlowState struct {
 	// deepStack: after array-loop, SelectParentLocal uses nested stack size.
 	// Kept true even when loopIVPool drops to 1 after the first nested for.
 	deepStack bool
+	// arrayLoopDepth: nesting of StatementFor::make_random_array_loop bodies.
+	arrayLoopDepth int
+	// arrayLoopFresh: true until the first nested for in an array-loop body
+	// consumes array_control (rw_directive). Later fors use loop_control (e502+).
+	arrayLoopFresh bool
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -198,6 +203,8 @@ type genSnapshot struct {
 	blockStack     int
 	loopIVPool     int
 	deepStack      bool
+	arrayLoopDepth int
+	arrayLoopFresh bool
 	derivedPtr     int
 }
 
@@ -223,6 +230,8 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 		s.blockStack = ctx.state.blockStack
 		s.loopIVPool = ctx.state.loopIVPool
 		s.deepStack = ctx.state.deepStack
+		s.arrayLoopDepth = ctx.state.arrayLoopDepth
+		s.arrayLoopFresh = ctx.state.arrayLoopFresh
 		s.derivedPtr = ctx.state.derivedPtrTypes
 	}
 	return s
@@ -258,6 +267,8 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		ctx.state.blockStack = s.blockStack
 		ctx.state.loopIVPool = s.loopIVPool
 		ctx.state.deepStack = s.deepStack
+		ctx.state.arrayLoopDepth = s.arrayLoopDepth
+		ctx.state.arrayLoopFresh = s.arrayLoopFresh
 		ctx.state.derivedPtrTypes = s.derivedPtr
 	}
 	ctx.exprDepth = s.exprDepth
@@ -494,6 +505,132 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 		return castLiteral(t, fmt.Sprintf("0x%08X%s", bits, suffix))
 	}
 	return castLiteral(t, fmt.Sprintf("0x%X", bits))
+}
+
+// burnSimpleConstant mirrors Constant::make_random for eSimple (pure_rnd stream
+// in random mode): F50 small-int vs hex, then U3/U20 or RandomHexDigits(N).
+func burnSimpleConstant(r *rng, t CType) {
+	if r == nil {
+		return
+	}
+	if r.flipcoin(50) {
+		if r.flipcoin(50) {
+			_ = r.upto(3)
+		} else {
+			_ = r.upto(20)
+		}
+		return
+	}
+	hn := hexDigitsForConstant(t)
+	if hn <= 0 {
+		hn = 8
+	}
+	for i := 0; i < hn; i++ {
+		_ = r.next31()
+	}
+}
+
+// burnCreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
+// When itemize is true, also burns itemize() (create_array_and_itemize path).
+// create_random_array does not itemize.
+//
+// Dimension ladder: comment says 1d 60% / 2d 30% / …; step=60 matches seed2
+// (U99=93 → sizes 4,4,9, init U72). Source tree has step=100 (always dim=1),
+// which contradicts multi-dim traces from the instrumented binary.
+func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
+	if r == nil {
+		return
+	}
+	num := int(r.upto(99)) + 1
+	dimension := 0
+	step := 60
+	for num > 0 {
+		dimension++
+		num -= step
+		step /= 2
+		if step == 0 {
+			step = 1
+		}
+	}
+	maxDim := opts.MaxArrayDim
+	if maxDim < 1 {
+		maxDim = 3
+	}
+	if dimension > maxDim {
+		dimension = maxDim
+	}
+	maxPerDim := opts.MaxArrayLenPerDim
+	if maxPerDim < 1 {
+		maxPerDim = 10
+	}
+	maxTotal := opts.MaxArrayLength
+	if maxTotal < 1 {
+		maxTotal = 256
+	}
+	sizes := make([]int, 0, dimension)
+	total := 1
+	for i := 0; i < dimension; i++ {
+		dimen := int(r.upto(uint32(maxPerDim))) + 1
+		if total*dimen > maxTotal {
+			dimen = maxTotal / total
+		}
+		if dimen > 0 {
+			total *= dimen
+			sizes = append(sizes, dimen)
+		}
+	}
+	if total/2 > 0 {
+		initNum := int(r.upto(uint32(total / 2)))
+		for i := 0; i < initNum; i++ {
+			burnSimpleConstant(r, t)
+		}
+	}
+	if itemize {
+		// itemize(): rnd_upto(sizes[i]) per dimension
+		for _, sz := range sizes {
+			if sz > 0 {
+				_ = r.upto(uint32(sz))
+			}
+		}
+	}
+}
+
+// burnCreateAndInitialize mirrors VariableSelector::create_and_initialize for a
+// known simple type (loop IV: get_int_type). Returns whether NewArray was taken.
+// Uses create_array_and_itemize (itemize=true) when NewArray.
+func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
+	if r == nil {
+		return false
+	}
+	newArray = r.flipcoin(20) // NewArrayVariableProb
+	// make_init_value for non-pointer → Constant::make_random
+	burnSimpleConstant(r, t)
+	if newArray {
+		burnCreateArrayVariable(r, opts, t, true)
+	}
+	return newArray
+}
+
+// burnSelectLoopCtrlVarCreate mirrors SelectLoopCtrlVar when no suitable
+// non-array integer is visible: GenerateNewGlobal(WRITE) in a reject loop until
+// a non-volatile IV is produced (volatile creates are discarded and retried).
+// Caps retries to avoid unbounded burns if RNG is adversarial.
+func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
+	if r == nil || !opts.GlobalVariables {
+		return
+	}
+	// Loop control type is get_int_type() → int (hex width 8).
+	ivType := CType{Name: "int32_t", Signed: true, Bits: 32}
+	const maxIVCreateAttempts = 16
+	for attempt := 0; attempt < maxIVCreateAttempts; attempt++ {
+		// random_qualifiers(WRITE): const forced false (no RNG); vol F50 when ok.
+		vol := r.flipcoin(50)
+		_ = burnCreateAndInitialize(r, opts, ivType)
+		if !vol {
+			return
+		}
+		// Volatile IV rejected by StatementFor::make_iteration; create again.
+	}
 }
 
 func sameBaseType(a, b CType) bool {
@@ -798,71 +935,8 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 		}
 	}
 	if newArray {
-		// ArrayVariable::CreateArrayVariable + itemize()
-		num := int(er.fallback.upto(99)) + 1
-		dimension := 0
-		step := 100
-		for num > 0 {
-			dimension++
-			num -= step
-			step /= 2
-			if step == 0 {
-				step = 1
-			}
-		}
-		maxDim := opts.MaxArrayDim
-		if maxDim < 1 {
-			maxDim = 3
-		}
-		if dimension > maxDim {
-			dimension = maxDim
-		}
-		maxPerDim := opts.MaxArrayLenPerDim
-		if maxPerDim < 1 {
-			maxPerDim = 10
-		}
-		maxTotal := opts.MaxArrayLength
-		if maxTotal < 1 {
-			maxTotal = 256
-		}
-		sizes := make([]int, 0, dimension)
-		total := 1
-		for i := 0; i < dimension; i++ {
-			dimen := int(er.fallback.upto(uint32(maxPerDim))) + 1
-			if total*dimen > maxTotal {
-				dimen = maxTotal / total
-			}
-			if dimen > 0 {
-				total *= dimen
-				sizes = append(sizes, dimen)
-			}
-		}
-		if total/2 > 0 {
-			initNum := int(er.fallback.upto(uint32(total / 2)))
-			for i := 0; i < initNum; i++ {
-				if er.fallback.flipcoin(50) {
-					if er.fallback.flipcoin(50) {
-						_ = er.fallback.upto(3)
-					} else {
-						_ = er.fallback.upto(20)
-					}
-				} else {
-					hn := hexDigitsForConstant(chosen)
-					if hn <= 0 {
-						hn = 8
-					}
-					for j := 0; j < hn; j++ {
-						_ = er.fallback.next31()
-					}
-				}
-			}
-		}
-		// itemize(): rnd_upto(sizes[i]) per dimension
-		for _, sz := range sizes {
-			if sz > 0 {
-				_ = er.fallback.upto(uint32(sz))
-			}
-		}
+		// create_and_initialize → create_array_and_itemize
+		burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
 
 	// Materialize as a generated global in our simplified backend WITHOUT
@@ -1400,6 +1474,9 @@ func randomLeafExprWithMode(
 					nest := depth + 1
 					var out string
 					if er.fallback.flipcoin(5) {
+						// make_random_unary: rnd_upto(MAX_UNARY_OP) then
+						// SafeOpFlags::make_random_unary (F50 signed + U4 size).
+						_ = er.fallback.upto(4)
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
 						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
@@ -2616,37 +2693,35 @@ func emitStatement(
 		postArrayFor := state != nil && state.loopIVPool > 1
 		reuseIV := state != nil && state.loopIVPool == 1
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
+		// First for in an array-loop body (or multi-IV postArrayFor) uses array_control;
+		// later nested fors use loop_control (e502, e519) even while still nested.
+		useArrayControl := postArrayFor || (state != nil && state.arrayLoopFresh)
 		if postArrayFor {
 			_ = r.upto(uint32(state.loopIVPool))
-		} else if createIV && opts.GlobalVariables {
-			_ = r.flipcoin(50) // WRITE random_qualifiers volatile
-			_ = r.flipcoin(20) // NewArrayVariableProb (false → Constant)
-			if r.flipcoin(50) {
-				if r.flipcoin(50) {
-					_ = r.upto(3)
-				} else {
-					_ = r.upto(20)
-				}
-			} else {
-				for i := 0; i < 8; i++ {
-					_ = r.next31()
-				}
-			}
+		} else if createIV {
+			// SelectLoopCtrlVar → GenerateNewGlobal with NewArray + volatile retry.
+			burnSelectLoopCtrlVarCreate(r, opts)
 		}
 		_ = reuseIV
-		if postArrayFor {
-			// make_random_array_control-like pure_rnd stream after array-loop.
-			_ = r.upto(1)
-			_ = r.flipcoin(0) // array_oob_prob
+		if useArrayControl {
+			// make_random_array_control + SafeOpFlags (seed2 e371-380, e679+).
+			_ = r.upto(1)      // choose_ok_var among must-use arrays (often U1)
+			_ = r.flipcoin(0)  // array_oob_prob
+			_ = r.flipcoin(50) // signed Le vs Ge
+			_ = r.flipcoin(50) // init 0 vs upto / CmpLe path
+			_ = r.flipcoin(50) // incr 1 vs upto
+			// SafeOpFlags: init F50+U4, test F50+F50+U4
 			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
+			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
-			_ = r.upto(4)
-			state.loopIVPool = 1 // next for reuses IV (e503)
+			if state != nil {
+				state.arrayLoopFresh = false
+				if state.loopIVPool > 1 {
+					state.loopIVPool = 1 // next for reuses IV (e503)
+				}
+			}
 		} else {
 			// make_random_loop_control
 			if !r.flipcoin(50) {
@@ -2730,68 +2805,11 @@ func emitStatement(
 						_ = r.next31()
 					}
 				}
-				// CreateArrayVariable + itemize
-				num := int(r.upto(99)) + 1
-				dimension := 0
-				step := 100
-				for num > 0 {
-					dimension++
-					num -= step
-					step /= 2
-					if step == 0 {
-						step = 1
-					}
+				// create_random_array → CreateArrayVariable without itemize
+				if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
+					fmt.Fprintf(os.Stderr, "ARRAY create ty=%s hex=%d\n", arrTy.Name, hexDigitsForConstant(arrTy))
 				}
-				maxDim := opts.MaxArrayDim
-				if maxDim < 1 {
-					maxDim = 3
-				}
-				if dimension > maxDim {
-					dimension = maxDim
-				}
-				maxPerDim := opts.MaxArrayLenPerDim
-				if maxPerDim < 1 {
-					maxPerDim = 10
-				}
-				maxTotal := opts.MaxArrayLength
-				if maxTotal < 1 {
-					maxTotal = 256
-				}
-				sizes := make([]int, 0, dimension)
-				total := 1
-				for i := 0; i < dimension; i++ {
-					dimen := int(r.upto(uint32(maxPerDim))) + 1
-					if total*dimen > maxTotal {
-						dimen = maxTotal / total
-					}
-					if dimen > 0 {
-						total *= dimen
-						sizes = append(sizes, dimen)
-					}
-				}
-				if total/2 > 0 {
-					initNum := int(r.upto(uint32(total / 2)))
-					if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
-						fmt.Fprintf(os.Stderr, "ARRAY total=%d initNum=%d sizes=%v ty=%s hex=%d\n", total, initNum, sizes, arrTy.Name, hexDigitsForConstant(arrTy))
-					}
-					for i := 0; i < initNum; i++ {
-						if r.flipcoin(50) {
-							if r.flipcoin(50) {
-								_ = r.upto(3)
-							} else {
-								_ = r.upto(20)
-							}
-						} else {
-							hn := hexDigitsForConstant(arrTy)
-							if hn <= 0 {
-								hn = 8
-							}
-							for j := 0; j < hn; j++ {
-								_ = r.next31()
-							}
-						}
-					}
-				}
+				burnCreateArrayVariable(r, opts, arrTy, false)
 				// make_random_array_init: SelectLoopCtrlVar WRITE global create
 				// (no const flip) + make_init_value. create_random_array does not
 				// itemize (unlike create_array_and_itemize).
@@ -2845,19 +2863,8 @@ func emitStatement(
 			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create.
 			createdIV := false
 			if state != nil && state.deepStack && state.loopIVPool == 0 && opts.GlobalVariables {
-				_ = r.flipcoin(50) // WRITE qfer volatile
-				_ = r.flipcoin(20) // NewArray
-				if r.flipcoin(50) {
-					if r.flipcoin(50) {
-						_ = r.upto(3)
-					} else {
-						_ = r.upto(20)
-					}
-				} else {
-					for j := 0; j < 8; j++ {
-						_ = r.next31()
-					}
-				}
+				// SelectLoopCtrlVar create path (same as stmtFor createIV).
+				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
 			} else {
 				_ = r.upto(3)
@@ -2893,10 +2900,21 @@ func emitStatement(
 			writeLine(b, 1, "/* array loop */ {")
 			if state != nil {
 				state.blockStack++
+				state.arrayLoopDepth++
+				state.arrayLoopFresh = true
 			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
-			if state != nil && state.blockStack > 0 {
-				state.blockStack--
+			if state != nil {
+				if state.blockStack > 0 {
+					state.blockStack--
+				}
+				if state.arrayLoopDepth > 0 {
+					state.arrayLoopDepth--
+				}
+				// Only clear fresh when leaving the outermost array-loop frame.
+				if state.arrayLoopDepth == 0 {
+					state.arrayLoopFresh = false
+				}
 			}
 			writeLine(b, 1, "}")
 		}
