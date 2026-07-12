@@ -136,10 +136,10 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
-| Seed 2 source match | **Not yet** — residual path burns RNG without full AST emit (GO body shorter) |
+| Seed 2 source match | **In progress** — real inits + unified gensym; still short body / residual debt |
 | 20-seed gate | Blocked on source match |
 
-Next plateau focus: replace late F10 monolithic residual with real generation so source bodies match.
+Next plateau focus: multi-dim arrays, volatile/const globals, pointer address-of targets; shrink F10 residual as real create paths absorb events.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

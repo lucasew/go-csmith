@@ -82,11 +82,14 @@ type funcInfo struct {
 }
 
 type functionFlowState struct {
-	funcs        []funcInfo
-	built        []bool
-	defs         []string
-	maxFuncs     int
-	nextIdx      int
+	funcs       []funcInfo
+	built       []bool
+	defs        []string
+	maxFuncs    int
+	// nextSymID: unified gensym counter (upstream util.cpp gensym_count).
+	// Shared by func_/g_/l_/p_ names; pre-increment so first id is 1.
+	nextSymID    int
+	nextIdx      int // legacy; kept in snapshots, aliases nextSymID for funcs
 	nextParamID  int
 	nextLocalID  int
 	pool         []CType
@@ -356,6 +359,7 @@ type genSnapshot struct {
 	funcsLen            int
 	builtLen            int
 	defsLen             int
+	nextSymID           int
 	nextIdx             int
 	nextParamID         int
 	nextLocalID         int
@@ -385,6 +389,7 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 		s.funcsLen = len(ctx.state.funcs)
 		s.builtLen = len(ctx.state.built)
 		s.defsLen = len(ctx.state.defs)
+		s.nextSymID = ctx.state.nextSymID
 		s.nextIdx = ctx.state.nextIdx
 		s.nextParamID = ctx.state.nextParamID
 		s.nextLocalID = ctx.state.nextLocalID
@@ -425,6 +430,7 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		if len(ctx.state.dynGlobals) >= s.dynGlobalsLen {
 			ctx.state.dynGlobals = ctx.state.dynGlobals[:s.dynGlobalsLen]
 		}
+		ctx.state.nextSymID = s.nextSymID
 		ctx.state.nextIdx = s.nextIdx
 		ctx.state.nextParamID = s.nextParamID
 		ctx.state.nextLocalID = s.nextLocalID
@@ -696,24 +702,80 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 // burnSimpleConstant mirrors Constant::make_random for eSimple (pure_rnd stream
 // in random mode): F50 small-int vs hex, then U3/U20 or RandomHexDigits(N).
 func burnSimpleConstant(r *rng, t CType) {
+	_ = formatSimpleConstant(r, t)
+}
+
+// formatSimpleConstant mirrors Constant::GenerateRandomConstant for eSimple.
+// Consumes the same pure_rnd stream as burnSimpleConstant and returns a C literal.
+func formatSimpleConstant(r *rng, t CType) string {
 	if r == nil {
-		return
+		return "0"
+	}
+	// Pointers: only null constant.
+	if strings.Contains(t.Name, "*") {
+		return "0"
 	}
 	if r.flipcoin(50) {
+		// Small decimal path: pure_rnd_upto(3)-1 or pure_rnd_upto(20)-10.
+		var num int32
 		if r.flipcoin(50) {
-			_ = r.upto(3)
+			num = int32(r.upto(3)) - 1
 		} else {
-			_ = r.upto(20)
+			num = int32(r.upto(20)) - 10
 		}
-		return
+		unsigned := !t.Signed || strings.Contains(t.Name, "uint") || strings.HasPrefix(t.Name, "unsigned")
+		if unsigned && num < 0 {
+			// Upstream still emits the bit pattern via cast; keep decimal for small.
+			num = int32(uint32(num))
+		}
+		suf := "L"
+		if unsigned {
+			suf = "UL"
+		}
+		// Prefer compact forms for common small values.
+		if t.Bits > 0 && t.Bits <= 32 && !strings.Contains(t.Name, "long") {
+			if unsigned {
+				return fmt.Sprintf("%dU", uint32(num))
+			}
+			return fmt.Sprintf("%d", num)
+		}
+		if unsigned {
+			return fmt.Sprintf("%d%s", uint64(uint32(num)), suf)
+		}
+		return fmt.Sprintf("%d%s", num, suf)
 	}
+	// Hex path: RandomHexDigits(N) — N from type width; untraced next31 per digit.
 	hn := hexDigitsForConstant(t)
 	if hn <= 0 {
 		hn = 8
 	}
+	var hex strings.Builder
+	hex.WriteString("0x")
 	for i := 0; i < hn; i++ {
-		_ = r.next31()
+		d := r.next31() % 16
+		if d < 10 {
+			hex.WriteByte(byte('0' + d))
+		} else {
+			hex.WriteByte(byte('A' + d - 10))
+		}
 	}
+	unsigned := !t.Signed || strings.Contains(t.Name, "uint") || strings.HasPrefix(t.Name, "unsigned")
+	if strings.Contains(t.Name, "int128") {
+		if unsigned {
+			return hex.String() // no standard suffix
+		}
+		return hex.String()
+	}
+	if strings.Contains(t.Name, "long long") || t.Bits == 64 {
+		if unsigned {
+			return hex.String() + "ULL"
+		}
+		return hex.String() + "LL"
+	}
+	if unsigned {
+		return hex.String() + "UL"
+	}
+	return hex.String() + "L"
 }
 
 // burnCreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
@@ -1120,9 +1182,7 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
 		return exprVarCandidate{}, false
 	}
-	id := ctx.state.nextGlobalID
-	ctx.state.nextGlobalID = id + 1
-	name := fmt.Sprintf("g_%d", id)
+	name := ctx.state.allocGlobalName()
 	// GenerateNewGlobal → random_qualifiers(t, access, no_volatile=false):
 	// Per pointer level: F50 vol + F10 const.
 	// Self: F50 vol only if side_effect_free (often false → skip); F10 const if READ.
@@ -1139,6 +1199,7 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	// create_and_initialize
 	newArray := er.fallback.flipcoin(20)
 	isPtr := levels > 0
+	initLit := "0"
 	if isPtr {
 		initConst := er.fallback.flipcoin(20) // make_init_value null vs address-of
 		if !initConst {
@@ -1148,41 +1209,21 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 			// F20 NewArray + F50 F50 constant path for pointed-to simple.
 			base := CType{Name: strings.ReplaceAll(t.Name, "*", ""), Signed: true, Bits: 32}
 			tgtNewArray := er.fallback.flipcoin(20)
-			if er.fallback.flipcoin(50) {
-				if er.fallback.flipcoin(50) {
-					_ = er.fallback.upto(3)
-				} else {
-					_ = er.fallback.upto(20)
-				}
-			} else {
-				for i := 0; i < 8; i++ {
-					_ = er.fallback.next31()
-				}
-			}
+			_ = formatSimpleConstant(er.fallback, base) // burn + discard pointed-to init for now
 			if tgtNewArray {
 				burnCreateArrayVariable(er.fallback, opts, base, true)
 			}
+			// Pointer still emits null until address-of target is materialized.
+			initLit = "0"
+		} else {
+			initLit = "0"
 		}
 		if newArray {
 			burnCreateArrayVariable(er.fallback, opts, t, true)
 		}
 	} else {
-		// Constant::make_random
-		if er.fallback.flipcoin(50) {
-			if er.fallback.flipcoin(50) {
-				_ = er.fallback.upto(3)
-			} else {
-				_ = er.fallback.upto(20)
-			}
-		} else {
-			hn := hexDigitsForConstant(t)
-			if hn <= 0 {
-				hn = 8
-			}
-			for i := 0; i < hn; i++ {
-				_ = er.fallback.next31()
-			}
-		}
+		// Constant::make_random — capture literal for emission
+		initLit = formatSimpleConstant(er.fallback, t)
 		if newArray {
 			burnCreateArrayVariable(er.fallback, opts, t, true)
 		}
@@ -1194,7 +1235,13 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	if isVolatile {
 		qual += "volatile "
 	}
-	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = 0;", qual, t.Name, name))
+	if newArray {
+		// Multi-dim sizes are burned in CreateArrayVariable; emit 1d placeholder
+		// with scalar init until full array printer is wired.
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s[4] = {%s};", qual, t.Name, name, initLit))
+	} else {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
 	// arrayLen: seed2 itemize often U4 (e893); default 3 was under-count.
 	arrLen := 4
 	if !newArray {
@@ -1295,131 +1342,109 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 				_ = er.fallback.upto(uint32(n))
 			}
 		}
-		id := ctx.state.nextLocalID
-		ctx.state.nextLocalID = id + 1
-		name := fmt.Sprintf("l_%d", id)
+		name := ctx.state.allocLocalName()
 		ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: chosen, blockDepth: depth})
 		return exprVarCandidate{expr: name, ctype: chosen, assignable: true}, true
 	}
-	// make_init_value → Constant::make_random
+	// make_init_value → Constant::make_random (capture literal for emission)
+	initLit := "0"
 	if isAggregate {
-		// GenerateRandomStructConstant / GenerateRandomConstantInRange:
-		// pure_rnd_upto(2^(bound/2)) [+ sign flipcoin if signed bitfield].
-		// Seed2 S0: bounds 15,8,10,14,5,8 → U181,U16,F50,U32,F50,U128,U5,U16.
-		burnBitfieldConst := func(bound int, signed bool) {
+		// GenerateRandomStructConstant: bitfield InRange then per-field make_random.
+		// Emit {f0,f1,...} from field constants.
+		fieldLits := []string{}
+		burnBitfieldConst := func(bound int, signed bool) string {
 			if bound <= 0 {
-				return
+				return "0"
 			}
-			// pow(2, bound/2) as float — integer shift under-counts (15→181 not 128).
 			b := int(math.Pow(2, float64(bound)/2.0))
 			if b < 1 {
 				b = 1
 			}
-			_ = er.fallback.upto(uint32(b))
+			v := int(er.fallback.upto(uint32(b)))
 			if signed {
-				_ = er.fallback.flipcoin(50)
+				// GenerateRandomConstantInRange: flipcoin true → positive, false → negative
+				if !er.fallback.flipcoin(50) {
+					return fmt.Sprintf("-%d", v)
+				}
 			}
+			return fmt.Sprintf("%d", v)
 		}
-		used := false
+		// First pass: bitfield InRange draws (seed2 S0 layout).
+		bfBounds := []struct {
+			bound  int
+			signed bool
+		}{
+			{15, false}, {8, true}, {10, true}, {14, false}, {5, false}, {8, false},
+		}
 		if ctx != nil && len(ctx.info.structs) > 0 {
 			st := ctx.info.structs[0]
+			bfBounds = bfBounds[:0]
 			for _, f := range st.fields {
 				if f.bitfield && f.bitWidth > 0 {
-					burnBitfieldConst(f.bitWidth, f.ctype.Signed)
-					used = true
+					bfBounds = append(bfBounds, struct {
+						bound  int
+						signed bool
+					}{f.bitWidth, f.ctype.Signed})
+				}
+			}
+			if len(bfBounds) == 0 {
+				bfBounds = []struct {
+					bound  int
+					signed bool
+				}{
+					{15, false}, {8, true}, {10, true}, {14, false}, {5, false}, {8, false},
 				}
 			}
 		}
-		if !used {
-			// Fallback seed2 S0 golden bitfield layout.
-			for _, bf := range []struct {
-				bound  int
-				signed bool
-			}{
-				{15, false}, {8, true}, {10, true}, {14, false}, {5, false}, {8, false},
-			} {
-				burnBitfieldConst(bf.bound, bf.signed)
-			}
+		// InRange draws supply the struct initializer values (seed2 S0 style).
+		for _, bf := range bfBounds {
+			fieldLits = append(fieldLits, burnBitfieldConst(bf.bound, bf.signed))
 		}
-		// create_field_vars → CreateVariable per field sets
-		// init = Constant::make_random(field_type) for non-union parents.
-		// Bitfield fields still use eSimple Constant path (not InRange):
-		// pure_rnd_flipcoin(50) then small ints or RandomHexDigits(8).
-		burnSimpleFieldConst := func() {
-			if er.fallback.flipcoin(50) {
-				if er.fallback.flipcoin(50) {
-					_ = er.fallback.upto(3)
-				} else {
-					_ = er.fallback.upto(20)
-				}
-			} else {
-				for i := 0; i < 8; i++ {
-					_ = er.fallback.next31()
-				}
-			}
+		// create_field_vars → Constant::make_random per field (RNG only; values unused).
+		nFields := len(fieldLits)
+		if nFields == 0 {
+			nFields = 6
 		}
-		fieldCount := 0
-		if ctx != nil && len(ctx.info.structs) > 0 {
-			for _, f := range ctx.info.structs[0].fields {
-				if f.bitfield && f.bitWidth == 0 {
-					continue // unnamed padding
-				}
-				burnSimpleFieldConst()
-				fieldCount++
-			}
+		for i := 0; i < nFields; i++ {
+			_ = formatSimpleConstant(er.fallback, CType{Name: "int", Signed: true, Bits: 32})
 		}
-		if fieldCount == 0 {
-			// Fallback: 6 fields as in seed2 S0.
-			for i := 0; i < 6; i++ {
-				burnSimpleFieldConst()
-			}
-		}
-	} else if er.fallback.flipcoin(50) {
-		if er.fallback.flipcoin(50) {
-			_ = er.fallback.upto(3)
-		} else {
-			_ = er.fallback.upto(20)
-		}
+		initLit = "{" + strings.Join(fieldLits, ",") + "}"
 	} else {
-		// RandomHexDigits: genrand%16 per digit, advances LCG without U/F events.
-		hn := hexDigitsForConstant(chosen)
-		if hn <= 0 {
-			hn = 8
-		}
-		for i := 0; i < hn; i++ {
-			_ = er.fallback.next31()
-		}
+		initLit = formatSimpleConstant(er.fallback, chosen)
 	}
 	if newArray {
 		// create_and_initialize → create_array_and_itemize
 		burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
 
-	// Materialize as a generated global in our simplified backend WITHOUT
-	// consuming any more main RNG. The upstream's local variable creation
-	// used pure_rnd for const/volatile (already consumed above) and
-	// pure_rnd for the init constant (also consumed above as the upto(20)).
-	// Pass selected stack block depth so SelectParentLocal sees this local
-	// (seed2 e872 create → e889 non-empty choose, not second create).
-	return createLocalPathGlobalDirect(opts, chosen, ctx, depth)
+	// Materialize as a generated global without further main RNG.
+	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray)
 }
 
-// createLocalPathGlobalDirect creates a global variable for the simplified
-// backend without consuming any main RNG (no er.pick for const/volatile,
-// no er.next for the init literal). This matches the upstream's behavior
-// after GenerateNewParentLocal returns — the local variable is returned
-// with no further main-RNG consumption.
-// blockDepth: Function::stack index+1 of the parent block (0 → use blockStack).
+// createLocalPathGlobalDirect creates a global with zero init (no main RNG).
 func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext, blockDepth int) (exprVarCandidate, bool) {
+	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false)
+}
+
+// createLocalPathGlobalDirectInit materializes a global with a precomputed init
+// literal (init RNG already consumed by the caller).
+func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
-	id := ctx.state.nextGlobalID
-	ctx.state.nextGlobalID = id + 1
-	name := fmt.Sprintf("g_%d", id)
-	// Use a zero literal — no main RNG consumption.
-	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = 0;", t.Name, name))
-	g := globalInfo{name: name, ctype: t, isConst: false, isVolatile: false}
+	name := ctx.state.allocGlobalName()
+	if initLit == "" {
+		initLit = "0"
+	}
+	if isArray {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s[4] = {%s};", t.Name, name, initLit))
+	} else {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = %s;", t.Name, name, initLit))
+	}
+	g := globalInfo{name: name, ctype: t, isConst: false, isVolatile: false, isArray: isArray, arrayLen: 4}
+	if !isArray {
+		g.arrayLen = 0
+	}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
 	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
 	// selections — matches upstream's GenerateNewParentLocal adding to
@@ -5324,11 +5349,12 @@ func (s *functionFlowState) appendNewFunction(r *rng, forceRet *CType) (funcInfo
 	if len(s.funcs) >= s.maxFuncs {
 		return funcInfo{}, -1, false
 	}
-	fn := funcInfo{
-		name: fmt.Sprintf("func_%d", s.nextIdx),
-	}
+	var fn funcInfo
 	if forceRet != nil {
-		fn.ret = *forceRet
+		fn = funcInfo{
+			name: s.gensym("func_"),
+			ret:  *forceRet,
+		}
 		maxParams := s.opts.MaxParams
 		if maxParams < 0 {
 			maxParams = 0
@@ -5345,9 +5371,9 @@ func (s *functionFlowState) appendNewFunction(r *rng, forceRet *CType) (funcInfo
 			})
 		}
 	} else {
-		fn = s.makeFuncSignature(r, s.nextIdx)
+		// makeFuncSignature gensyms a new func_ name (idx!=1 path).
+		fn = s.makeFuncSignature(r, s.nextSymID+1)
 	}
-	s.nextIdx++
 	s.funcs = append(s.funcs, fn)
 	s.built = append(s.built, false)
 	s.defs = append(s.defs, "")
@@ -5362,11 +5388,10 @@ func (s *functionFlowState) appendNewFunctionWithSignature(r *rng, ret CType, pa
 		return funcInfo{}, -1, false
 	}
 	fn := funcInfo{
-		name:   fmt.Sprintf("func_%d", s.nextIdx),
+		name:   s.gensym("func_"),
 		ret:    ret,
 		params: params,
 	}
-	s.nextIdx++
 	s.funcs = append(s.funcs, fn)
 	s.built = append(s.built, false)
 	s.defs = append(s.defs, "")
@@ -6101,21 +6126,43 @@ func emitSingleFuncDefOnce(
 	return b.String()
 }
 
+// gensym mirrors upstream util.cpp gensym: shared counter for func_/g_/l_/p_.
+func (s *functionFlowState) gensym(prefix string) string {
+	if s == nil {
+		return prefix + "0"
+	}
+	s.nextSymID++
+	// Keep legacy counters in sync for snapshots / residual paths that still read them.
+	s.nextIdx = s.nextSymID + 1
+	s.nextParamID = s.nextSymID + 1
+	s.nextLocalID = s.nextSymID
+	s.nextGlobalID = s.nextSymID
+	return fmt.Sprintf("%s%d", prefix, s.nextSymID)
+}
+
 func (s *functionFlowState) allocParamName() string {
-	name := fmt.Sprintf("p_%d", s.nextParamID)
-	s.nextParamID++
-	return name
+	return s.gensym("p_")
 }
 
 func (s *functionFlowState) allocLocalName() string {
-	name := fmt.Sprintf("l_%d", s.nextLocalID)
-	s.nextLocalID++
-	return name
+	return s.gensym("l_")
+}
+
+func (s *functionFlowState) allocGlobalName() string {
+	return s.gensym("g_")
 }
 
 func (s *functionFlowState) makeFuncSignature(r *rng, idx int) funcInfo {
+	name := fmt.Sprintf("func_%d", idx)
+	if s != nil && idx != 1 {
+		name = s.gensym("func_")
+	} else if s != nil && idx == 1 {
+		// make_first: first gensym is func_1
+		s.nextSymID = 0
+		name = s.gensym("func_")
+	}
 	fn := funcInfo{
-		name: fmt.Sprintf("func_%d", idx),
+		name: name,
 	}
 	// Function::make_first uses RandomReturnType() over AllTypes (simple + aggregates),
 	// while later signatures are chosen from random types as they are created.
@@ -6176,20 +6223,21 @@ func (s *functionFlowState) makeFuncSignature(r *rng, idx int) funcInfo {
 func emitFunctionsUpstreamFlow(b *strings.Builder, r *rng, opts Options, pool []CType, maxBlock int, env envInfo, info compositeInfo) ([]funcInfo, []globalInfo) {
 	maxFuncs := max(opts.MaxFuncs, 1)
 	state := &functionFlowState{
-		funcs:        []funcInfo{},
-		built:        []bool{},
-		defs:         []string{},
-		maxFuncs:     maxFuncs,
-		nextIdx:      2,
-		nextParamID:  1,
-		nextLocalID:  0,
-		pool:         pool,
-		info:         info,
-		opts:         opts,
-		dynGlobals:   []globalInfo{},
+		funcs:      []funcInfo{},
+		built:      []bool{},
+		defs:       []string{},
+		maxFuncs:   maxFuncs,
+		nextSymID:  0, // gensym pre-increments; first id is 1 (func_1)
+		nextIdx:    2,
+		nextParamID: 1,
+		nextLocalID: 0,
+		pool:       pool,
+		info:       info,
+		opts:       opts,
+		dynGlobals: []globalInfo{},
 		nextGlobalID: env.nextID,
-		stmtBudget:   opts.StopByStmt,
-		blockStack:   1, // function body block
+		stmtBudget: opts.StopByStmt,
+		blockStack: 1, // function body block
 	}
 	state.funcs = append(state.funcs, state.makeFuncSignature(r, 1))
 	state.built = append(state.built, false)
