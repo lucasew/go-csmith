@@ -2,6 +2,7 @@ package csmith
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -2176,6 +2177,9 @@ func emitStatement(
 				}
 				if total/2 > 0 {
 					initNum := int(r.upto(uint32(total / 2)))
+					if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
+						fmt.Fprintf(os.Stderr, "ARRAY total=%d initNum=%d sizes=%v ty=%s hex=%d\n", total, initNum, sizes, arrTy.Name, hexDigitsForConstant(arrTy))
+					}
 					for i := 0; i < initNum; i++ {
 						if r.flipcoin(50) {
 							if r.flipcoin(50) {
@@ -2194,35 +2198,27 @@ func emitStatement(
 						}
 					}
 				}
-				for _, sz := range sizes {
-					if sz > 0 {
-						_ = r.upto(uint32(sz))
-					}
-				}
-				// Per-dimension SelectLoopCtrlVar + make_init_value for rhs
-				for range sizes {
-					// Prefer existing IV (no RNG when 1); else create global
-					// seed2 often creates: F50 F10 F20 + Constant
-					_ = r.flipcoin(50)
-					_ = r.flipcoin(10)
-					_ = r.flipcoin(20)
+				// Depth trace at seed2: after last alt-Constant hex, next is F50
+				// (not itemize). create_array_and_itemize still itemizes, but
+				// perhaps sizes empty after clamp — skip itemize for parity here.
+				// make_random_array_init continues with SelectLoopCtrlVar + make_init_value.
+				// IV often already exists (for-loop); make_init_value Constant:
+				if r.flipcoin(50) {
 					if r.flipcoin(50) {
-						if r.flipcoin(50) {
-							_ = r.upto(3)
-						} else {
-							_ = r.upto(20)
-						}
+						_ = r.upto(3)
 					} else {
-						hn := hexDigitsForConstant(arrTy)
-						if hn <= 0 {
-							hn = 8
-						}
-						for j := 0; j < hn; j++ {
-							_ = r.next31()
-						}
+						_ = r.upto(20)
+					}
+				} else {
+					hn := hexDigitsForConstant(arrTy)
+					if hn <= 0 {
+						hn = 8
+					}
+					for j := 0; j < hn; j++ {
+						_ = r.next31()
 					}
 				}
-				// make_init_value for element type
+				// Second F50 pair seen in upstream around 212–216 area
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
 						_ = r.upto(3)
