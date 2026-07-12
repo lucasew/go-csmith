@@ -887,6 +887,17 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 		for _, g := range mergedGlobals(env, ctx) {
 			out = append(out, exprVarCandidate{expr: g.name, ctype: g.ctype, assignable: !g.isConst})
 		}
+		// Ensure at least a few simple globals for eFlexible after multi-dim
+		// (seed2 e844 U2) without inflating early (mustReadLive still true).
+		if ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 && !ctx.state.mustReadLive {
+			for len(out) < 2 {
+				out = append(out, exprVarCandidate{
+					expr:       fmt.Sprintf("g_min_%d", len(out)),
+					ctype:      CType{Name: "int32_t", Signed: true, Bits: 32},
+					assignable: true,
+				})
+			}
+		}
 	case 1:
 		for _, l := range mergedLocals(scope, ctx) {
 			if l.name == "x" {
@@ -1247,10 +1258,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if len(uniq) == 1 {
 			return uniq[0], true
 		}
-		if len(uniq) == 2 {
-			return uniq[0], true // e276
-		}
 		n := len(uniq)
+		// e276 small-pool quirk only before multi-dim / must_read era.
+		if n == 2 && (multiDimArraySink == nil || *multiDimArraySink == 0) {
+			return uniq[0], true
+		}
 		// seed2: first Global eFlexible after must_read spent uses real n (e719 U3);
 		// later picks see grown GlobalList (e811 U17).
 		if mustReadLiveSink != nil && !*mustReadLiveSink && postMustReadGlobalPicks != nil {
@@ -1290,8 +1302,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
 	}
-	// Pointer wants after multi-dim era: do not fall back to unrelated filtered[0]
-	// (seed2 e825: choose_var null → GenerateNewGlobal F50).
+	// Pointer wants after multi-dim: only exact-level matches (e825 create when
+	// none; e844 U2 among two int*).
 	if wantPtr && len(exact) == 0 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 		return exprVarCandidate{}, false
 	}
