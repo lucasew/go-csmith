@@ -95,10 +95,11 @@ type functionFlowState struct {
 	pool         []CType
 	info         compositeInfo
 	opts         Options
-	dynGlobals   []globalInfo
-	lateGlobals  strings.Builder
-	nextGlobalID int
-	stmtBudget   int
+	dynGlobals    []globalInfo
+	orphanGlobals []globalInfo // address-of targets: emitted, not in choose inventory
+	lateGlobals   strings.Builder
+	nextGlobalID  int
+	stmtBudget    int
 	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
 	loopIVPool int
 	// deepStack: after array-loop, SelectParentLocal uses nested stack size.
@@ -778,6 +779,12 @@ func formatSimpleConstant(r *rng, t CType) string {
 	return hex.String() + "L"
 }
 
+// arrayCreateResult holds dimensions + element init literals from CreateArrayVariable.
+type arrayCreateResult struct {
+	sizes []int
+	inits []string // length may be < total elements (sparse init)
+}
+
 // burnCreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
 // When itemize is true, also burns itemize() (create_array_and_itemize path).
 // create_random_array does not itemize.
@@ -785,9 +792,9 @@ func formatSimpleConstant(r *rng, t CType) string {
 // Dimension ladder: comment says 1d 60% / 2d 30% / …; step=60 matches seed2
 // (U99=93 → sizes 4,4,9, init U72). Source tree has step=100 (always dim=1),
 // which contradicts multi-dim traces from the instrumented binary.
-func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
+func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayCreateResult {
 	if r == nil {
-		return
+		return arrayCreateResult{}
 	}
 	num := int(r.upto(99)) + 1
 	dimension := 0
@@ -836,6 +843,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 		cp := append([]int(nil), sizes...)
 		*lastArraySizesSink = cp
 	}
+	inits := []string{}
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
 		isPtr := strings.Contains(t.Name, "*")
@@ -851,11 +859,13 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 				// (e346: total/2==0, no alts) or int-element NewArray IVs.
 				// KNOWN DEBT: non-strict pointer alts with initNum>0 are incomplete.
 				if opts.StrictConstArrays {
+					inits = append(inits, "0")
 					continue // Constant "0"
 				}
 				// make_init_value: F20 null vs address-of. Address-of: choose_ok_var
 				// among pointees (seed2 e1108–1111 F20 U6 F20 U6).
 				if r.flipcoin(20) {
+					inits = append(inits, "0")
 					continue // Constant null pointer
 				}
 				n := 6
@@ -863,9 +873,11 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 					n = 6
 				}
 				_ = r.upto(uint32(n))
+				// Without a real choose_var inventory, materialize null for now.
+				inits = append(inits, "0")
 				continue
 			}
-			burnSimpleConstant(r, t)
+			inits = append(inits, formatSimpleConstant(r, t))
 		}
 	}
 	if itemize {
@@ -876,6 +888,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 			}
 		}
 	}
+	return arrayCreateResult{sizes: sizes, inits: inits}
 }
 
 // burnCreateAndInitialize mirrors VariableSelector::create_and_initialize for a
@@ -1200,32 +1213,53 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	newArray := er.fallback.flipcoin(20)
 	isPtr := levels > 0
 	initLit := "0"
+	var arrRes arrayCreateResult
 	if isPtr {
 		initConst := er.fallback.flipcoin(20) // make_init_value null vs address-of
 		if !initConst {
-			// Address-of: choose_var miss → random_loose_qualifiers (often 0 coins
-			// when looser keeps existing) + GenerateNewGlobal with qfer set
-			// (no random_qualifiers) → create_and_initialize. seed2 e830+:
-			// F20 NewArray + F50 F50 constant path for pointed-to simple.
-			base := CType{Name: strings.ReplaceAll(t.Name, "*", ""), Signed: true, Bits: 32}
-			tgtNewArray := er.fallback.flipcoin(20)
-			_ = formatSimpleConstant(er.fallback, base) // burn + discard pointed-to init for now
-			if tgtNewArray {
-				burnCreateArrayVariable(er.fallback, opts, base, true)
+			// Address-of: create pointed-to global then &target (seed2 e830+).
+			// Name pointer first (gensym), then nested target (higher id).
+			baseName := strings.ReplaceAll(t.Name, "*", "")
+			base := CType{Name: baseName, Signed: true, Bits: 32}
+			if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
+				base.Signed = false
 			}
-			// Pointer still emits null until address-of target is materialized.
-			initLit = "0"
+			tgtName := ctx.state.allocGlobalName()
+			tgtNewArray := er.fallback.flipcoin(20)
+			tgtInit := formatSimpleConstant(er.fallback, base)
+			var tgtArr arrayCreateResult
+			if tgtNewArray {
+				tgtArr = burnCreateArrayVariable(er.fallback, opts, base, true)
+			}
+			// Emit target before pointer (nested create order).
+			// Do NOT add to dynGlobals yet — inventory/choose_n must stay aligned
+			// with residual-era path; targets still appear in lateGlobals output
+			// and are folded into env after function gen for hash.
+			emitGlobalDecl(&ctx.state.lateGlobals, base, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
+			ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+				name: tgtName, ctype: base, isArray: tgtNewArray, arrayLen: 4,
+			})
+			if tgtNewArray && len(tgtArr.sizes) > 0 {
+				// Common pattern: &g_N[i] for array target — use [0] as materialization.
+				initLit = fmt.Sprintf("&%s[0]", tgtName)
+			} else {
+				initLit = "&" + tgtName
+			}
 		} else {
 			initLit = "0"
 		}
 		if newArray {
-			burnCreateArrayVariable(er.fallback, opts, t, true)
+			arrRes = burnCreateArrayVariable(er.fallback, opts, t, true)
+			// Pointer array: fill alts with same address-of / null pattern.
+			if initLit != "0" && len(arrRes.inits) == 0 {
+				// no alt inits drawn; still use single-element brace of &target
+			}
 		}
 	} else {
 		// Constant::make_random — capture literal for emission
 		initLit = formatSimpleConstant(er.fallback, t)
 		if newArray {
-			burnCreateArrayVariable(er.fallback, opts, t, true)
+			arrRes = burnCreateArrayVariable(er.fallback, opts, t, true)
 		}
 	}
 	qual := ""
@@ -1237,10 +1271,12 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	}
 	arrLen := 0
 	if newArray {
-		sizes := []int{4}
-		if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
-			sizes = append([]int(nil), (*lastArraySizesSink)...)
+		sizes := arrRes.sizes
+		if len(sizes) == 0 {
+			sizes = []int{4}
 		}
+		// Prefer captured element inits; else single initLit (scalar/address-of).
+		initBody := formatArrayInitBrace(sizes, arrRes.inits, initLit)
 		dims := ""
 		for _, s := range sizes {
 			if s < 1 {
@@ -1248,10 +1284,9 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 			}
 			dims += fmt.Sprintf("[%d]", s)
 		}
-		// arrayLen fixed at 4 for itemize scale parity (seed2 e893 era);
-		// dims string is for source emission only.
+		// arrayLen fixed at 4 for itemize scale parity (seed2 e893 era).
 		arrLen = 4
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = {%s};", qual, t.Name, name, dims, initLit))
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, initBody))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
 	}
@@ -1261,6 +1296,97 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 		ctx.state.globalCreatesPostMR++
 	}
 	return exprVarCandidate{expr: name, ctype: t, assignable: !isConst}, true
+}
+
+// emitGlobalDecl writes a static global declaration (helper for nested target creates).
+func emitGlobalDecl(b *strings.Builder, t CType, name, initLit string, isArray, isConst, isVolatile bool, arr arrayCreateResult) {
+	qual := ""
+	if isConst {
+		qual += "const "
+	}
+	if isVolatile {
+		qual += "volatile "
+	}
+	if isArray {
+		sizes := arr.sizes
+		if len(sizes) == 0 {
+			sizes = []int{4}
+		}
+		dims := ""
+		for _, s := range sizes {
+			if s < 1 {
+				s = 1
+			}
+			dims += fmt.Sprintf("[%d]", s)
+		}
+		body := formatArrayInitBrace(sizes, arr.inits, initLit)
+		writeLine(b, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, body))
+	} else {
+		if initLit == "" {
+			initLit = "0"
+		}
+		writeLine(b, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
+}
+
+// formatArrayInitBrace builds a C array initializer from element lits.
+// If inits is empty, uses fill for all elements (or a single-element brace).
+// Multi-dim nesting is best-effort row grouping by the last dimension.
+func formatArrayInitBrace(sizes []int, inits []string, fill string) string {
+	if fill == "" {
+		fill = "0"
+	}
+	total := 1
+	for _, s := range sizes {
+		if s > 0 {
+			total *= s
+		}
+	}
+	if total < 1 {
+		total = 1
+	}
+	elems := make([]string, total)
+	for i := range elems {
+		if i < len(inits) && inits[i] != "" {
+			elems[i] = inits[i]
+		} else {
+			elems[i] = fill
+		}
+	}
+	// Nest by last dimension when multi-dim and full/partial list is large enough.
+	if len(sizes) >= 2 {
+		last := sizes[len(sizes)-1]
+		if last < 1 {
+			last = 1
+		}
+		var rows []string
+		for i := 0; i < total; i += last {
+			end := i + last
+			if end > total {
+				end = total
+			}
+			rows = append(rows, "{"+strings.Join(elems[i:end], ",")+"}")
+		}
+		// One more nesting level if 3D.
+		if len(sizes) >= 3 {
+			mid := sizes[len(sizes)-2]
+			if mid < 1 {
+				mid = 1
+			}
+			var planes []string
+			rowPerPlane := mid
+			for i := 0; i < len(rows); i += rowPerPlane {
+				end := i + rowPerPlane
+				if end > len(rows) {
+					end = len(rows)
+				}
+				planes = append(planes, "{"+strings.Join(rows[i:end], ",")+"}")
+			}
+			return "{" + strings.Join(planes, ",") + "}"
+		}
+		return "{" + strings.Join(rows, ",") + "}"
+	}
+	return "{" + strings.Join(elems, ",") + "}"
 }
 
 func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ctx *genContext, withNewQualifiers bool) (exprVarCandidate, bool) {
@@ -1427,27 +1553,23 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	} else {
 		initLit = formatSimpleConstant(er.fallback, chosen)
 	}
+	var arrRes arrayCreateResult
 	if newArray {
 		// create_and_initialize → create_array_and_itemize
-		burnCreateArrayVariable(er.fallback, opts, chosen, true)
-	}
-
-	arrSizes := []int{4}
-	if newArray && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
-		arrSizes = append([]int(nil), (*lastArraySizesSink)...)
+		arrRes = burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
 	// Materialize as a generated global without further main RNG.
-	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile, arrSizes)
+	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile, arrRes)
 }
 
 // createLocalPathGlobalDirect creates a global with zero init (no main RNG).
 func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext, blockDepth int) (exprVarCandidate, bool) {
-	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false, false, false, nil)
+	return createLocalPathGlobalDirectInit(opts, t, ctx, blockDepth, "0", false, false, false, arrayCreateResult{})
 }
 
 // createLocalPathGlobalDirectInit materializes a global with a precomputed init
 // literal (init RNG already consumed by the caller).
-func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool, isConst bool, isVolatile bool, arrSizes []int) (exprVarCandidate, bool) {
+func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blockDepth int, initLit string, isArray bool, isConst bool, isVolatile bool, arr arrayCreateResult) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1464,11 +1586,12 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	}
 	arrLen := 0
 	if isArray {
-		if len(arrSizes) == 0 {
-			arrSizes = []int{4}
+		sizes := arr.sizes
+		if len(sizes) == 0 {
+			sizes = []int{4}
 		}
 		dims := ""
-		for _, s := range arrSizes {
+		for _, s := range sizes {
 			if s < 1 {
 				s = 1
 			}
@@ -1476,7 +1599,8 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 		}
 		// arrayLen fixed at 4 for itemize scale parity; dims for source only.
 		arrLen = 4
-		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = {%s};", qual, t.Name, name, dims, initLit))
+		body := formatArrayInitBrace(sizes, arr.inits, initLit)
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, body))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
 	}
@@ -6300,7 +6424,10 @@ func emitFunctionsUpstreamFlow(b *strings.Builder, r *rng, opts Options, pool []
 	for i := 0; i < len(state.defs); i++ {
 		b.WriteString(state.defs[i])
 	}
-	return state.funcs, state.dynGlobals
+	// Merge orphan address-of targets into dynGlobals for hash/env (not used mid-gen).
+	outGlobals := append([]globalInfo{}, state.dynGlobals...)
+	outGlobals = append(outGlobals, state.orphanGlobals...)
+	return state.funcs, outGlobals
 }
 
 func emitComputeHashFunc(b *strings.Builder, env envInfo, info compositeInfo) {
