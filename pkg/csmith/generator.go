@@ -2077,9 +2077,13 @@ func emitStatement(
 		} else {
 			_ = r.flipcoin(50)
 		}
-		// SafeOpFlags for init StatementAssign
-		_ = r.flipcoin(50)
-		_ = r.flipcoin(50)
+		// make_iteration: SafeOpFlags for init (sOpAssign), test (sOpBinary), incr (sOpAssign).
+		_ = r.flipcoin(50) // init assign signed
+		_ = r.upto(4)
+		_ = r.flipcoin(50) // test binary op1
+		_ = r.flipcoin(50) // test binary op2
+		_ = r.upto(4)
+		_ = r.flipcoin(50) // incr assign signed
 		_ = r.upto(4)
 		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
 		writeLine(b, 2, "x += (uint32_t)i;")
