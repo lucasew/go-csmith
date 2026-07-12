@@ -2841,10 +2841,27 @@ func emitStatement(
 				// When none, create_random_array burns more; seed2 often has ≥1.
 				_ = r.upto(3) // must-read / must-write / both
 			}
-			// SelectLoopCtrlVar choose_var among integer visibles (seed2 n=3).
-			_ = r.upto(3)
+			// SelectLoopCtrlVar among integer visibles.
+			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create.
+			if state != nil && state.deepStack && state.loopIVPool == 0 && opts.GlobalVariables {
+				_ = r.flipcoin(50) // WRITE qfer volatile
+				_ = r.flipcoin(20) // NewArray
+				if r.flipcoin(50) {
+					if r.flipcoin(50) {
+						_ = r.upto(3)
+					} else {
+						_ = r.upto(20)
+					}
+				} else {
+					for j := 0; j < 8; j++ {
+						_ = r.next31()
+					}
+				}
+			} else {
+				_ = r.upto(3)
+			}
 			if state != nil {
-				// After array-loop IV choose (n=3), subsequent fors see n=2 at e370.
+				// After array-loop IV choose, subsequent fors see n=2 at e370.
 				state.loopIVPool = 2
 				state.deepStack = true
 			}
