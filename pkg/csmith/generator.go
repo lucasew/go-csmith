@@ -47,6 +47,9 @@ type pointerInfo struct {
 type paramInfo struct {
 	name  string
 	ctype CType
+	// constLevels mirrors CVQualifiers::is_consts (pointer levels then self)
+	// from GenerateParameterVariable random_qualifiers draws.
+	constLevels []bool
 }
 
 type funcInfo struct {
@@ -80,9 +83,10 @@ type functionFlowState struct {
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
 // Early seed2 keeps n=1. After array-loop, seed2 e420 uses n=3 (cap nesting).
-func parentStackPick(er *exprRand, state *functionFlowState) {
+// Returns the chosen stack index (0-based).
+func parentStackPick(er *exprRand, state *functionFlowState) int {
 	if er == nil {
-		return
+		return 0
 	}
 	n := 1
 	if state != nil && state.loopIVPool > 1 {
@@ -95,7 +99,26 @@ func parentStackPick(er *exprRand, state *functionFlowState) {
 			n = 3
 		}
 	}
-	_ = er.pick(uint32(n))
+	return int(er.pick(uint32(n)))
+}
+
+// localsInStackBlock returns parent-local candidates belonging to stack[index].
+// blockDepth is 1-based (body=1); stack index 0 → depth 1.
+// Includes "x" — selectExprVariableFromER only accepts type-compatible picks.
+func localsInStackBlock(er *exprRand, env envInfo, scope scopeInfo, ctx *genContext, stackIndex int) []exprVarCandidate {
+	wantDepth := stackIndex + 1
+	out := make([]exprVarCandidate, 0, 8)
+	for _, l := range mergedLocals(scope, ctx) {
+		d := l.blockDepth
+		if d == 0 {
+			d = 1 // static scope locals → function body
+		}
+		if d != wantDepth {
+			continue
+		}
+		out = append(out, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+	}
+	return out
 }
 
 type stmtKind int
@@ -114,6 +137,9 @@ const (
 type localInfo struct {
 	name  string
 	ctype CType
+	// blockDepth: Function::stack index+1 when created (1=function body).
+	// SelectParentLocal only sees locals of the chosen stack block.
+	blockDepth int
 }
 
 type scopeInfo struct {
@@ -141,6 +167,14 @@ type genContext struct {
 	info    compositeInfo
 	// exprDepth mirrors CGContext::expr_depth (filter only; not always bumped).
 	exprDepth int
+	// skipFuncRetQfer: ExpressionAssign/WRITE qfer path — return random_qualifiers
+	// burns no coins when all-const-false + no_volatile (seed2 e447).
+	skipFuncRetQfer bool
+	// incomingQferConsts: when non-nil, make_random_signature uses
+	// qfer->random_qualifiers → random_looser_consts (F50 per eligible const level).
+	// nil means qfer==0 static random_qualifiers path.
+	// Set from param formal qfer when generating make_random_param args.
+	incomingQferConsts []bool
 }
 
 type genSnapshot struct {
@@ -455,14 +489,21 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 }
 
 func sameBaseType(a, b CType) bool {
-	// Pointer vs scalar are never "same base" for choose_var tiers.
+	// Exact-tier match for choose_var:
+	// - pointers / aggregates: name identity (struct S0 ≠ uint32_t)
+	// - simple integers: bits + signedness (int32 ≈ eInt width/sign)
 	aPtr := strings.Contains(a.Name, "*")
 	bPtr := strings.Contains(b.Name, "*")
-	if aPtr != bPtr {
-		return false
+	if aPtr || bPtr {
+		return aPtr && bPtr && normTypeName(a.Name) == normTypeName(b.Name)
 	}
-	if aPtr {
+	aAgg := strings.HasPrefix(a.Name, "struct") || strings.HasPrefix(a.Name, "union")
+	bAgg := strings.HasPrefix(b.Name, "struct") || strings.HasPrefix(b.Name, "union")
+	if aAgg || bAgg {
 		return normTypeName(a.Name) == normTypeName(b.Name)
+	}
+	if a.Name == "float" || b.Name == "float" {
+		return a.Name == b.Name
 	}
 	return a.Bits == b.Bits && a.Signed == b.Signed
 }
@@ -700,6 +741,39 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 				burnBitfieldConst(bf.bound, bf.signed)
 			}
 		}
+		// create_field_vars → CreateVariable per field sets
+		// init = Constant::make_random(field_type) for non-union parents.
+		// Bitfield fields still use eSimple Constant path (not InRange):
+		// pure_rnd_flipcoin(50) then small ints or RandomHexDigits(8).
+		burnSimpleFieldConst := func() {
+			if er.fallback.flipcoin(50) {
+				if er.fallback.flipcoin(50) {
+					_ = er.fallback.upto(3)
+				} else {
+					_ = er.fallback.upto(20)
+				}
+			} else {
+				for i := 0; i < 8; i++ {
+					_ = er.fallback.next31()
+				}
+			}
+		}
+		fieldCount := 0
+		if ctx != nil && len(ctx.info.structs) > 0 {
+			for _, f := range ctx.info.structs[0].fields {
+				if f.bitfield && f.bitWidth == 0 {
+					continue // unnamed padding
+				}
+				burnSimpleFieldConst()
+				fieldCount++
+			}
+		}
+		if fieldCount == 0 {
+			// Fallback: 6 fields as in seed2 S0.
+			for i := 0; i < 6; i++ {
+				burnSimpleFieldConst()
+			}
+		}
 	} else if er.fallback.flipcoin(50) {
 		if er.fallback.flipcoin(50) {
 			_ = er.fallback.upto(3)
@@ -809,7 +883,11 @@ func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext) (exprVa
 	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
 	// selections — matches upstream's GenerateNewParentLocal adding to
 	// block->local_vars, preventing repeated on-demand creation.
-	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t})
+	depth := 1
+	if ctx.state.blockStack > 0 {
+		depth = ctx.state.blockStack
+	}
+	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t, blockDepth: depth})
 	return exprVarCandidate{expr: name, ctype: t, assignable: true}, true
 }
 
@@ -984,17 +1062,38 @@ func buildFunctionCallExpr(
 		if len(state.funcs) >= state.maxFuncs {
 			return "", false
 		}
-		// Return qfer: for int* static random_qualifiers draws level+self
-		// pairs; seed2 also shows an extra (F50,F10) before ParamList — keep
-		// it for pointer returns (member random_qualifiers / stricter path).
+		// Return qfer before ParamList (Function::make_random_signature).
+		// qfer==0: CVQualifiers::random_qualifiers(type, READ, no_volatile) —
+		//   per pointer level + self: F50 (vol) + F10 (const); vol discarded.
+		// qfer!=0: qfer->random_qualifiers → random_looser_consts (F50 per
+		//   eligible true-const level). WRITE all-false / wildcard → 0 coins.
+		// Param-arg nested CREATE passes formal constLevels as incoming qfer.
 		ptrDepth := strings.Count(t.Name, "*")
-		pairs := ptrDepth + 1 // pointed-to levels + pointer variable
-		if ptrDepth > 0 {
-			pairs++ // extra pair observed at seed2 e246 before max_params
-		}
-		for i := 0; i < pairs; i++ {
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(10)
+		isAgg := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+		skipRetQfer := ctx != nil && ctx.skipFuncRetQfer
+		if skipRetQfer || isAgg {
+			// 0 coins
+		} else if ctx != nil && ctx.incomingQferConsts != nil {
+			// Instance path: no_volatile skips vol draws; looser_consts only.
+			depthN := len(ctx.incomingQferConsts)
+			for i, c := range ctx.incomingQferConsts {
+				// random_looser_consts: coin only when is_const && (depth-i)<=2
+				if c && (depthN-i) <= 2 {
+					_ = r.flipcoin(50) // LooserConstProb
+				}
+			}
+		} else {
+			// Null qfer static path: ptr levels + self each F50+F10.
+			// Pointer returns also burn one extra pair before ParamList
+			// (seed2 e246 — member/stricter path or double indirection quirk).
+			pairs := ptrDepth + 1
+			if ptrDepth > 0 {
+				pairs++
+			}
+			for i := 0; i < pairs; i++ {
+				_ = r.flipcoin(50) // RegularVolatileProb (discarded: no_volatile)
+				_ = r.flipcoin(10) // RegularConstProb
+			}
 		}
 		maxP := opts.MaxParams
 		if maxP < 1 {
@@ -1029,16 +1128,19 @@ func buildFunctionCallExpr(
 			} else {
 				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
 			}
+			// Param qfer: random_qualifiers per ptr level + self (F50 vol, F10 const).
 			pd := strings.Count(pt.Name, "*")
+			constLevels := make([]bool, 0, pd+1)
 			for j := 0; j < pd; j++ {
 				_ = r.flipcoin(50)
-				_ = r.flipcoin(10)
+				constLevels = append(constLevels, r.flipcoin(10))
 			}
 			_ = r.flipcoin(50)
-			_ = r.flipcoin(10)
+			constLevels = append(constLevels, r.flipcoin(10))
 			params = append(params, paramInfo{
-				name:  state.allocParamName(),
-				ctype: pt,
+				name:        state.allocParamName(),
+				ctype:       pt,
+				constLevels: constLevels,
 			})
 		}
 		created, newIdx, ok := state.appendNewFunctionWithSignature(r, t, params)
@@ -1051,11 +1153,24 @@ func buildFunctionCallExpr(
 
 	// Param expressions for the call site (make_random_param per formal).
 	// Upstream generates args before the callee body for new functions.
+	// Nested CREATE uses formal's qfer (constLevels), not the caller's WRITE skip.
 	args := "void"
 	if len(callee.params) > 0 {
 		argExprs := make([]string, 0, len(callee.params))
 		for _, p := range callee.params {
+			var prevSkip bool
+			var prevQfer []bool
+			if ctx != nil {
+				prevSkip = ctx.skipFuncRetQfer
+				prevQfer = ctx.incomingQferConsts
+				ctx.skipFuncRetQfer = false
+				ctx.incomingQferConsts = p.constLevels
+			}
 			argExprs = append(argExprs, randomParamExprDepth(p.ctype, er, opts, env, scope, depth+1, ctx))
+			if ctx != nil {
+				ctx.skipFuncRetQfer = prevSkip
+				ctx.incomingQferConsts = prevQfer
+			}
 		}
 		args = strings.Join(argExprs, ", ")
 	}
@@ -1209,15 +1324,26 @@ func randomLeafExprWithMode(
 					!strings.HasPrefix(t.Name, "struct ") &&
 					!strings.HasPrefix(t.Name, "union ")
 				if stdFunc && isSimple {
+					// Binary/unary stdfunc: Expression::make_random(type) with
+					// null qfer — nested CREATE uses static return qfer (F50+F10).
+					// Clear incoming/WRITE qfer flags for operand subtrees.
+					var prevSkip bool
+					var prevQfer []bool
+					if ctx != nil {
+						prevSkip = ctx.skipFuncRetQfer
+						prevQfer = ctx.incomingQferConsts
+						ctx.skipFuncRetQfer = false
+						ctx.incomingQferConsts = nil
+					}
 					// Binary/unary stdfunc: do not bump ctx.exprDepth (upstream).
 					nest := depth + 1
+					var out string
 					if er.fallback.flipcoin(5) {
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
 						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
-						return castLiteral(t, fmt.Sprintf("(~(%s))", operand))
-					}
-					if opts.Pointers && er.fallback.flipcoin(10) {
+						out = castLiteral(t, fmt.Sprintf("(~(%s))", operand))
+					} else if opts.Pointers && er.fallback.flipcoin(10) {
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.flipcoin(50)
@@ -1225,27 +1351,33 @@ func randomLeafExprWithMode(
 						_ = er.fallback.upto(1)
 						lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
 						rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
-						return castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
+						out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
+					} else {
+						_ = er.fallback.upto(18)
+						_ = er.fallback.flipcoin(50)   // SafeOpsSigned op1
+						_ = er.fallback.flipcoin(50)   // SafeOpsSigned op2
+						sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64-bit
+						// Map size to operand type for RandomHexDigits width
+						opTy := t
+						switch sz {
+						case 0:
+							opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+						case 1:
+							opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
+						case 2:
+							opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						default:
+							opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+						}
+						lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+						rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+						out = castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
 					}
-					_ = er.fallback.upto(18)
-					_ = er.fallback.flipcoin(50)   // SafeOpsSigned op1
-					_ = er.fallback.flipcoin(50)   // SafeOpsSigned op2
-					sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64-bit
-					// Map size to operand type for RandomHexDigits width
-					opTy := t
-					switch sz {
-					case 0:
-						opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
-					case 1:
-						opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
-					case 2:
-						opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-					default:
-						opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+					if ctx != nil {
+						ctx.skipFuncRetQfer = prevSkip
+						ctx.incomingQferConsts = prevQfer
 					}
-					lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-					rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-					return castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
+					return out
 				}
 			}
 			// User-function path runs whenever stdfunc was not taken. Nest depth
@@ -1270,8 +1402,9 @@ func randomLeafExprWithMode(
 				flow = ctx.state
 			}
 			if scopePick == 4 {
-				parentStackPick(er, flow)
-				// NewValue→ParentLocal: qfer usually non-wildcard from select.
+				_ = parentStackPick(er, flow)
+				// NewValue→ParentLocal: GenerateNewVariable always creates
+				// (never choose_var). qfer usually non-wildcard from select.
 				if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, false); ok {
 					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
@@ -1280,7 +1413,7 @@ func randomLeafExprWithMode(
 				continue
 			}
 			if scopePick == 1 {
-				parentStackPick(er, flow)
+				_ = parentStackPick(er, flow)
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
@@ -1297,9 +1430,11 @@ func randomLeafExprWithMode(
 						return castLiteral(t, g.expr)
 					}
 				}
-				// SelectParentParam with empty params → SelectParentLocal.
+				// SelectParentParam empty → SelectParentLocal (create path).
+				// choose_var on block locals is approximated as create when our
+				// block-local inventory is incomplete (seed2 e490 still open).
 				if scopePick == 2 {
-					parentStackPick(er, flow)
+					_ = parentStackPick(er, flow)
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
@@ -1317,7 +1452,7 @@ func randomLeafExprWithMode(
 						compat := sameBaseType(c.ctype, t) ||
 							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
 						if !compat {
-							parentStackPick(er, flow)
+							_ = parentStackPick(er, flow)
 							if g, ok2 := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
@@ -1347,9 +1482,16 @@ func randomLeafExprWithMode(
 				_ = er.fallback.flipcoin(50) // CVQualifiers volatile draw
 				_ = er.fallback.upto(120)    // AssignOpsProbability
 			}
-			// Generate full RHS expression (upstream does Expression::make_random
-			// before LHS selection).
+			// RHS sees WRITE qfer (often all-const-false) → skip function ret qfer.
+			prevSkip := false
+			if ctx != nil {
+				prevSkip = ctx.skipFuncRetQfer
+				ctx.skipFuncRetQfer = true
+			}
 			rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+			if ctx != nil {
+				ctx.skipFuncRetQfer = prevSkip
+			}
 			// Upstream Lhs::make_random (Lhs.cpp:61): do-while loop that tries
 			// select_deref_pointer before falling through to VariableSelector::select.
 			// Each iteration when flipcoin(80)=true and no pointer vars exist:
@@ -2261,7 +2403,19 @@ func emitFunctionCallMutation(
 		argExprs := make([]string, 0, len(callee.params))
 		er := newExprRand(r, exprDecisionBudget(opts))
 		for _, p := range callee.params {
+			var prevSkip bool
+			var prevQfer []bool
+			if ctx != nil {
+				prevSkip = ctx.skipFuncRetQfer
+				prevQfer = ctx.incomingQferConsts
+				ctx.skipFuncRetQfer = false
+				ctx.incomingQferConsts = p.constLevels
+			}
 			argExprs = append(argExprs, randomParamExprDepth(p.ctype, er, opts, env, scope, 0, ctx))
+			if ctx != nil {
+				ctx.skipFuncRetQfer = prevSkip
+				ctx.incomingQferConsts = prevQfer
+			}
 		}
 		args = strings.Join(argExprs, ", ")
 	}
