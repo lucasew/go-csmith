@@ -115,6 +115,8 @@ type functionFlowState struct {
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
 	useSmallParentStack bool
+	// skipNextBlockSize: afterContFor body has no BlockSize U (e1126).
+	skipNextBlockSize bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -3586,10 +3588,12 @@ func emitStatement(
 	if state != nil {
 		state.lastStmtWasContinue = false
 	}
+	remappedAssignToFor := false
 	if st == stmtAssign && afterCont && state != nil &&
 		state.loopIVPool > 1 && state.multiDimArrays > 0 {
 		st = stmtFor
 		state.useSmallParentStack = true
+		remappedAssignToFor = true
 	}
 	switch st {
 	case stmtAssign:
@@ -3621,15 +3625,23 @@ func emitStatement(
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
 		// First for in an array-loop body (or multi-IV postArrayFor) uses array_control;
 		// later nested fors use loop_control (e502, e519) even while still nested.
-		useArrayControl := postArrayFor || (state != nil && state.arrayLoopFresh)
+		// seed2 e1123–1125: natural For after continue → select_array U5+U1, no SafeOpFlags.
+		afterContFor := afterCont && !remappedAssignToFor && state != nil && state.multiDimArrays > 0
+		useArrayControl := postArrayFor || (state != nil && state.arrayLoopFresh) || afterContFor
 		if postArrayFor {
 			_ = r.upto(uint32(state.loopIVPool))
+		} else if afterContFor {
+			_ = r.upto(5)
+			_ = r.upto(1)
+			if state != nil {
+				state.skipNextBlockSize = true
+			}
 		} else if createIV {
 			// SelectLoopCtrlVar → GenerateNewGlobal with NewArray + volatile retry.
 			burnSelectLoopCtrlVarCreate(r, opts)
 		}
 		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
-		if useArrayControl {
+		if useArrayControl && !afterContFor {
 			// make_random_array_control + SafeOpFlags.
 			// postArrayFor multi-dim (e949): itemize U9 U8. Early e679: U1.
 			if postArrayFor && state != nil && state.multiDimArrays > 0 {
@@ -3660,7 +3672,7 @@ func emitStatement(
 					state.loopIVPool = 1
 				}
 			}
-		} else {
+		} else if !afterContFor {
 			// make_random_loop_control
 			if !r.flipcoin(50) {
 				_ = r.upto(60)
@@ -3723,6 +3735,33 @@ func emitStatement(
 		// StatementArrayOp::make_random
 		if !opts.Arrays {
 			return false
+		}
+		// seed2 e1127: late ArrayOp in afterContFor body: U3 U2 then continue
+		// (skip F5 init-vs-loop and U4 aryno).
+		lateArrayOp := state != nil && state.useSmallParentStack && state.multiDimArrays > 0
+		if lateArrayOp {
+			// seed2 e1127–1129: U3 U2 then body U100 (no itemize U9 U8).
+			_ = r.upto(3)
+			_ = r.upto(2)
+			if state != nil {
+				state.skipNextBlockSize = true
+			}
+			writeLine(b, 1, "/* array loop late */ {")
+			if state != nil {
+				state.blockStack++
+				state.arrayLoopDepth++
+			}
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state != nil {
+				if state.blockStack > 0 {
+					state.blockStack--
+				}
+				if state.arrayLoopDepth > 0 {
+					state.arrayLoopDepth--
+				}
+			}
+			writeLine(b, 1, "}")
+			return true
 		}
 		if r.flipcoin(5) {
 			// make_random_array_init → select_array
@@ -3914,7 +3953,14 @@ func emitStatements(
 	if depth > 0 {
 		base = 1
 	}
-	stmtCount := base + int(r.upto(uint32(stmtLimit)))
+	// seed2 e1126: afterContFor body skips BlockSize U.
+	stmtCount := 1
+	if state != nil && state.skipNextBlockSize {
+		state.skipNextBlockSize = false
+		stmtCount = 1
+	} else {
+		stmtCount = base + int(r.upto(uint32(stmtLimit)))
+	}
 	for s := 0; s < stmtCount; s++ {
 		if stmtBudget != nil && *stmtBudget == 0 {
 			break
