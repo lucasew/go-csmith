@@ -595,9 +595,27 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 		isPtr := strings.Contains(t.Name, "*")
 		for i := 0; i < initNum; i++ {
 			if isPtr {
-				// Constant::make_random(pointer) is "0" (no RNG). Non-strict
-				// make_init_value for pointer alts is richer; Lhs/seed2 paths
-				// historically only needed the init_num draw when size>1.
+				// ArrayVariable::CreateArrayVariable alt inits:
+				//   strict_const_arrays || non-pointer → Constant::make_random
+				//     (pointer Constant is "0", no RNG)
+				//   else → VariableSelector::make_init_value (F20 null vs address-of
+				//     create/choose — substantial RNG).
+				// Defaults have StrictConstArrays=false, so full parity needs
+				// make_init_value. Seed2 only exercises pointer arrays at size-1
+				// (e346: total/2==0, no alts) or int-element NewArray IVs.
+				// KNOWN DEBT: non-strict pointer alts with initNum>0 are incomplete.
+				if opts.StrictConstArrays {
+					continue // Constant "0"
+				}
+				// Minimal make_init_value prefix: F20 chooses Constant null vs
+				// address-of. Address-of path (F20=false) is still under-specified
+				// (choose_var / GenerateNew*); burn F20 only so the common null
+				// branch matches and multi-alt counts stay aligned for later work.
+				if r.flipcoin(20) {
+					continue // Constant null pointer
+				}
+				// Address-of residual: do not invent unmotivated burns; leave
+				// incomplete until a seed diverges here (see SPEC.md §9 debt).
 				continue
 			}
 			burnSimpleConstant(r, t)
@@ -630,12 +648,14 @@ func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
 }
 
 // burnSelectLoopCtrlVarCreate mirrors SelectLoopCtrlVar when no suitable
-// non-array integer is visible: GenerateNewGlobal(WRITE) in a reject loop until
-// a non-volatile IV is produced (volatile creates are discarded and retried).
-// Upstream loops unbounded; we cap attempts and force non-vol on the last try so
-// the stream still ends with an accepted IV rather than falling off the path.
+// non-array integer is visible: GenerateNewGlobal (or GenerateNewParentLocal when
+// globals are off). WRITE random_qualifiers + create_and_initialize RNG is the
+// same either way; only storage placement differs. Retries while the IV is
+// volatile (StatementFor::make_iteration reject loop). Upstream is unbounded;
+// we cap attempts and force non-vol on the last try so the stream still ends
+// with an accepted IV rather than falling off the path.
 func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
-	if r == nil || !opts.GlobalVariables {
+	if r == nil {
 		return
 	}
 	// Loop control type is get_int_type() → int (hex width 8).
@@ -2843,9 +2863,10 @@ func emitStatement(
 				_ = r.upto(3) // must-read / must-write / both
 			}
 			// SelectLoopCtrlVar among integer visibles.
-			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create.
+			// First array-loop: n=3 (seed2 e360). Later after IV pool depleted: create
+			// (GenerateNewGlobal or GenerateNewParentLocal — same WRITE create RNG).
 			createdIV := false
-			if state != nil && state.deepStack && state.loopIVPool == 0 && opts.GlobalVariables {
+			if state != nil && state.deepStack && state.loopIVPool == 0 {
 				// SelectLoopCtrlVar create path (same as stmtFor createIV).
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
