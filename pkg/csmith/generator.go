@@ -6431,6 +6431,14 @@ func emitSingleFuncDefOnce(
 		params = strings.Join(pp, ", ")
 	}
 	writeLine(&b, 0, fmt.Sprintf("static %s %s(%s) {", fn.ret.Name, fn.name, params))
+	// seed2: UP first global is g_8 / first local l_4. Early safe-math Create
+	// gensyms t_ before named locals. Prime t_ on func_1 entry (unprinted).
+	// Tuned so first on-demand global lands near g_8.
+	if state != nil && idx == 0 && opts.SafeMath {
+		_ = state.gensym("t_")
+		_ = state.gensym("t_")
+		_ = state.gensym("t_")
+	}
 	retName := "l_0"
 	if state != nil {
 		retName = state.allocLocalName()

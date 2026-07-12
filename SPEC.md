@@ -136,7 +136,7 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
-| Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym (max id ~1229 vs UP 1356); residual CreateArray + residual `t_`; still wrong early IDs (`g_5` vs `g_8`) and locals (43 vs 287) |
+| Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym (max id ~1229 vs UP 1356); residual CreateArray + residual `t_`; first global **g_8** aligned; locals still sparse (l_5 vs l_4…; 43 vs 287) |
 | 20-seed gate | Blocked on source match |
 
 Next plateau: early local/create materialization (ID align to `g_8`/`l_4`); residual Expression/Statement real gen (not just `t_`/CreateArray); source body match; COUNT=20.
