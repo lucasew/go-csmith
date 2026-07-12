@@ -75,6 +75,9 @@ type functionFlowState struct {
 	stmtBudget   int
 	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
 	loopIVPool int
+	// deepStack: after array-loop, SelectParentLocal uses nested stack size.
+	// Kept true even when loopIVPool drops to 1 after the first nested for.
+	deepStack bool
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -82,19 +85,18 @@ type functionFlowState struct {
 }
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
-// Early seed2 keeps n=1. After array-loop, seed2 e420 uses n=3 (cap nesting).
+// Early seed2 keeps n=1. After array-loop (deepStack), use blockStack cap 3.
 // Returns the chosen stack index (0-based).
 func parentStackPick(er *exprRand, state *functionFlowState) int {
 	if er == nil {
 		return 0
 	}
 	n := 1
-	if state != nil && state.loopIVPool > 1 {
+	if state != nil && state.deepStack {
 		n = state.blockStack
 		if n < 1 {
 			n = 1
 		}
-		// Csmith stack at e420 is 3; unbounded blockStack over-counts.
 		if n > 3 {
 			n = 3
 		}
@@ -195,6 +197,7 @@ type genSnapshot struct {
 	exprDepth      int
 	blockStack     int
 	loopIVPool     int
+	deepStack      bool
 	derivedPtr     int
 }
 
@@ -219,6 +222,7 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 		s.lateGlobalsBuf = ctx.state.lateGlobals.String()
 		s.blockStack = ctx.state.blockStack
 		s.loopIVPool = ctx.state.loopIVPool
+		s.deepStack = ctx.state.deepStack
 		s.derivedPtr = ctx.state.derivedPtrTypes
 	}
 	return s
@@ -253,6 +257,7 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		ctx.state.lateGlobals.WriteString(s.lateGlobalsBuf)
 		ctx.state.blockStack = s.blockStack
 		ctx.state.loopIVPool = s.loopIVPool
+		ctx.state.deepStack = s.deepStack
 		ctx.state.derivedPtrTypes = s.derivedPtr
 	}
 	ctx.exprDepth = s.exprDepth
@@ -2601,10 +2606,13 @@ func emitStatement(
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
 		writeLine(b, 1, "}")
 	case stmtFor:
-		// SelectLoopCtrlVar choose_var among integer IVs.
-		// Default n=1 (no RNG). state.loopIVPool raised by array-loop path.
+		// SelectLoopCtrlVar: choose_ok_var among integer non-array visibles.
+		// len==1 → no RNG; len>1 → rnd_upto(len).
+		// After array-loop: first nested for sees n=2 + array_control (e370);
+		// later fors often n=1 + make_random_loop_control (e503).
+		postArrayFor := state != nil && state.loopIVPool > 1
 		ivN := 1
-		if state != nil && state.loopIVPool > 1 {
+		if postArrayFor {
 			ivN = state.loopIVPool
 		}
 		if ivN > 1 {
@@ -2625,9 +2633,8 @@ func emitStatement(
 				}
 			}
 		}
-		// Seed2 e371+: nested for after array-loop uses array_control-like
-		// pure_rnd stream (U1, F0 oob, F50s) then SafeOpFlags.
-		if state != nil && state.loopIVPool > 1 {
+		if postArrayFor {
+			// make_random_array_control-like pure_rnd stream after array-loop.
 			_ = r.upto(1)
 			_ = r.flipcoin(0) // array_oob_prob
 			_ = r.flipcoin(50)
@@ -2638,8 +2645,10 @@ func emitStatement(
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
+			// Subsequent fors: single IV, plain loop_control (seed2 e503).
+			state.loopIVPool = 1
 		} else {
-			// make_random_loop_control (top-level for)
+			// make_random_loop_control
 			if !r.flipcoin(50) {
 				_ = r.upto(60)
 			}
@@ -2831,6 +2840,7 @@ func emitStatement(
 			if state != nil {
 				// After array-loop IV choose (n=3), subsequent fors see n=2 at e370.
 				state.loopIVPool = 2
+				state.deepStack = true
 			}
 			// make_random_array_control for must-use array (size 1 → bound 0):
 			// choose_ok_var among arrays may be U1 if multiple; seed2 U1 then
