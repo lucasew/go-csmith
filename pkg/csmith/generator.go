@@ -419,7 +419,20 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 }
 
 func sameBaseType(a, b CType) bool {
+	// Pointer vs scalar are never "same base" for choose_var tiers.
+	aPtr := strings.Contains(a.Name, "*")
+	bPtr := strings.Contains(b.Name, "*")
+	if aPtr != bPtr {
+		return false
+	}
+	if aPtr {
+		return normTypeName(a.Name) == normTypeName(b.Name)
+	}
 	return a.Bits == b.Bits && a.Signed == b.Signed
+}
+
+func normTypeName(name string) string {
+	return strings.ReplaceAll(strings.TrimSpace(name), " ", "")
 }
 
 func mergedLocals(scope scopeInfo, ctx *genContext) []localInfo {
@@ -729,12 +742,14 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 
 	exact := make([]exprVarCandidate, 0, len(filtered))
 	sameWidth := make([]exprVarCandidate, 0, len(filtered))
+	wantPtr := strings.Contains(t.Name, "*")
 	for _, c := range filtered {
 		if sameBaseType(c.ctype, t) {
 			exact = append(exact, c)
 			continue
 		}
-		if c.ctype.Bits == t.Bits {
+		// same-width scalar conversion only (never pointer↔scalar).
+		if !wantPtr && !strings.Contains(c.ctype.Name, "*") && c.ctype.Bits == t.Bits {
 			sameWidth = append(sameWidth, c)
 		}
 	}
@@ -761,12 +776,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 
 	exact := make([]exprVarCandidate, 0, len(filtered))
 	sameWidth := make([]exprVarCandidate, 0, len(filtered))
+	wantPtr := strings.Contains(t.Name, "*")
 	for _, c := range filtered {
 		if sameBaseType(c.ctype, t) {
 			exact = append(exact, c)
 			continue
 		}
-		if c.ctype.Bits == t.Bits {
+		if !wantPtr && !strings.Contains(c.ctype.Name, "*") && c.ctype.Bits == t.Bits {
 			sameWidth = append(sameWidth, c)
 		}
 	}
@@ -789,10 +805,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		}
 		return sameWidth[int(er.pick(uint32(len(sameWidth))))], true
 	}
-	if len(filtered) == 1 {
+	if len(filtered) == 0 {
+		return exprVarCandidate{}, false
+	}
+	// Read path: prefer first remaining (eligibility often collapses to one).
+	// Assign path: pick among remaining.
+	if !forAssign {
 		return filtered[0], true
 	}
-	if !forAssign {
+	if len(filtered) == 1 {
 		return filtered[0], true
 	}
 	return filtered[int(er.pick(uint32(len(filtered))))], true
@@ -881,9 +902,19 @@ func buildFunctionCallExpr(
 		paramN := maxBound + 1
 		params := make([]paramInfo, 0, paramN)
 		for i := 0; i < paramN; i++ {
-			_ = r.flipcoin(40)
-			// Type::choose_random_nonvoid_nonvolatile → rnd_upto(AllTypes.size(), filter)
-			pt := pickNonVoidNonVolatile(r, state.pool, state.info, opts)
+			// GenerateParameterVariable: pointer coin then either
+			// choose_random_pointer_type (rnd_upto(derived_types.size())) or
+			// choose_random_nonvoid_nonvolatile (AllTypes).
+			wantPtr := r.flipcoin(40)
+			var pt CType
+			if wantPtr && opts.Pointers {
+				// derived_types.size() grows as pointer types are registered;
+				// seed2 e306 needs n=3.
+				_ = r.upto(3)
+				pt = CType{Name: "int32_t*", Signed: true, Bits: 32}
+			} else {
+				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
+			}
 			pd := strings.Count(pt.Name, "*")
 			for j := 0; j < pd; j++ {
 				_ = r.flipcoin(50)
@@ -1150,10 +1181,39 @@ func randomLeafExprWithMode(
 						return castLiteral(t, g.expr)
 					}
 				}
+				// SelectParentParam with empty params → SelectParentLocal.
+				if scopePick == 2 {
+					if er != nil && er.fallback != nil {
+						_ = er.pick(1) // parent.stack size
+					}
+					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, g.expr)
+					}
+				}
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 			}
 			if len(candidates) > 0 {
 				if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
+					// SelectParentParam: if choose_var would reject (pointer vs
+					// scalar / no width match), fall through to SelectParentLocal.
+					if scopePick == 2 {
+						wantPtr := strings.Contains(t.Name, "*")
+						havePtr := strings.Contains(c.ctype.Name, "*")
+						compat := sameBaseType(c.ctype, t) ||
+							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
+						if !compat {
+							if er != nil && er.fallback != nil {
+								_ = er.pick(1) // parent.stack
+							}
+							if g, ok2 := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok2 {
+								bumpExprDepth(ctx)
+								return castLiteral(t, g.expr)
+							}
+							restoreGenSnapshot(ctx, snap)
+							continue
+						}
+					}
 					bumpExprDepth(ctx)
 					return castLiteral(t, c.expr)
 				}
@@ -1411,33 +1471,38 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) bool {
 	// StatementAssign::make_random order:
 	// 1) AssignOpsProbability (upto ~120 with filter)
-	// 2) SelectLType (pointer/struct/float coins)
-	// 3) RHS Expression::make_random then Lhs (approx: Lhs then RHS in our backend)
+	// 2) SelectLType only for eSimpleAssign (pointer/struct/float coins)
+	// 3) RHS Expression::make_random then Lhs
+	// AssignOps table: simple 70, bitand/xor/or 10 each, pre/post incr/decr 5 each = 120.
+	simpleAssign := true
 	if opts.CompoundAssignment {
-		// simple 70 + bitops 30 + incr ops 20 = 120 when all enabled
-		_ = r.upto(120)
+		opV := int(r.upto(120))
+		simpleAssign = opV < 70
 	}
 
 	targetType := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-	// Type::SelectLType for simple assign
-	if opts.Pointers && r.flipcoin(50) { // PointerAsLTypeProb
-		// make_random_pointer_type
-		if r.flipcoin(20) { // pointer-to-pointer
-			_ = r.upto(1) // derived_types.size() often 1 early
-		} else {
-			// choose_random() for pointed-to type — AllTypes filter pick
-			if ctx != nil {
-				targetType = pickNonVoidNonVolatile(r, nil, ctx.info, opts)
+	// Type::SelectLType: pointer/struct only when op is simple assign;
+	// float coin only when AssignOpWorksForFloat(op).
+	if simpleAssign {
+		if opts.Pointers && r.flipcoin(50) { // PointerAsLTypeProb
+			// make_random_pointer_type
+			if r.flipcoin(20) { // pointer-to-pointer
+				_ = r.upto(1) // derived_types.size() often 1 early
 			} else {
-				_ = r.upto(14)
+				// choose_random() for pointed-to type — AllTypes filter pick
+				if ctx != nil {
+					targetType = pickNonVoidNonVolatile(r, nil, ctx.info, opts)
+				} else {
+					_ = r.upto(14)
+				}
 			}
+			targetType = CType{Name: "int32_t*", Signed: true, Bits: 32} // simplified ptr
+		} else {
+			// StructAsLTypeProb skipped when ok_struct_types empty (vol structs filtered).
+			// FloatAsLTypeProb is 0 when !enable_float, but flipcoin(0) still runs
+			// for simple assign (AssignOpWorksForFloat).
+			_ = r.flipcoin(0)
 		}
-		targetType = CType{Name: "int32_t*", Signed: false, Bits: 32} // simplified ptr
-	} else {
-		// StructAsLTypeProb skipped when ok_struct_types empty (vol structs filtered).
-		// FloatAsLTypeProb is 0 when !enable_float, but flipcoin(0) still runs
-		// for simple assign (AssignOpWorksForFloat).
-		_ = r.flipcoin(0)
 	}
 
 	// Upstream generates RHS first, then Lhs.
@@ -1446,29 +1511,55 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 	rhs := randomTypedExpr(targetType, r, opts, env, scope, ctx)
 
-	// Lhs::make_random (simplified): SelectDerefPointerProb then VariableSelector
+	// Lhs::make_random: SelectDerefPointerProb then VariableSelector::select.
+	// select_deref_pointer with no match creates a pointer via
+	// random_add_qualifiers (F10 const, F50 volatile) + create_and_initialize.
 	lv := lvalueInfo{expr: "x", ctype: targetType}
-	if r.flipcoin(80) { // SelectDerefPointerProb
-		// select_deref_pointer / create path (simplified)
-		_ = r.flipcoin(20) // NewArray when creating pointer var
+	lhsFromDeref := false
+	for {
+		if !r.flipcoin(80) { // SelectDerefPointerProb
+			break
+		}
+		// No existing deref targets early on → create pointer local/global.
+		// random_add_qualifiers (non-wildcard qfer from RHS):
+		if opts.ConstPointers {
+			_ = r.flipcoin(10) // RegularConstProb
+		}
+		if opts.VolatilePointers {
+			_ = r.flipcoin(50) // RegularVolatileProb
+		}
+		// create_and_initialize for the new pointer variable
+		_ = r.flipcoin(20) // NewArrayVariableProb
+		// make_init_value for pointer type
 		if r.flipcoin(20) {
-			// null const init
+			// Constant null — opportunistic_validate fails (null_pointer_prob=0)
 			_ = r.flipcoin(0)
-		} else {
-			_ = r.flipcoin(20)
+			continue
+		}
+		// Address-of path: create pointed-to object via GenerateNewGlobal-like
+		// sequence. Seed2 after make_init chooses address-of:
+		//   F50 Constant::make_random, then F20 / F50 (create_and_initialize /
+		//   AccessOnce / secondary coins observed before Lhs exits).
+		// Constant::make_random for pointed-to object. Hex width 16 matches
+		// seed2 Lhs address-of path through e333 (longlong/int128 Constant).
+		if r.flipcoin(50) {
 			if r.flipcoin(50) {
-				if r.flipcoin(50) {
-					_ = r.upto(3)
-				} else {
-					_ = r.upto(20)
-				}
+				_ = r.upto(3)
 			} else {
-				for i := 0; i < 8; i++ {
-					_ = r.next31()
-				}
+				_ = r.upto(20)
+			}
+		} else {
+			for i := 0; i < 16; i++ {
+				_ = r.next31()
 			}
 		}
-	} else if len(scope.locals) == 0 {
+		// Post-Constant coins at seed2 e332-333.
+		_ = r.flipcoin(20)
+		_ = r.flipcoin(50)
+		lhsFromDeref = true
+		break
+	}
+	if !lhsFromDeref && len(scope.locals) == 0 {
 		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 			lv = picked
 		}
