@@ -71,6 +71,8 @@ type functionFlowState struct {
 	stmtBudget   int
 	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
 	loopIVPool int
+	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
+	derivedPtrTypes int
 }
 
 type stmtKind int
@@ -910,10 +912,21 @@ func buildFunctionCallExpr(
 			wantPtr := r.flipcoin(40)
 			var pt CType
 			if wantPtr && opts.Pointers {
-				// derived_types.size() grows as pointer types are registered;
-				// seed2 e306 needs n=3.
-				_ = r.upto(3)
+				// choose_random_pointer_type → rnd_upto(derived_types.size()).
+				// Seed2: n=3 at e306, n=4 by e390–404 (grows slowly).
+				nPtr := state.derivedPtrTypes
+				if nPtr < 3 {
+					nPtr = 3
+				}
+				_ = r.upto(uint32(nPtr))
 				pt = CType{Name: "int32_t*", Signed: true, Bits: 32}
+				// Grow after use: 3→4 once, then hold (seed2 stays at 4 for a while).
+				if state.derivedPtrTypes < 3 {
+					state.derivedPtrTypes = 3
+				}
+				if state.derivedPtrTypes == 3 {
+					state.derivedPtrTypes = 4
+				}
 			} else {
 				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
 			}
@@ -2234,15 +2247,12 @@ func emitStatement(
 			return false
 		}
 	case stmtIfElse:
-		cond := fmt.Sprintf("((x & %du) != 0u)", 1+dec.pick(1, 7))
-		if opts.ConstAsCondition && dec.pick(2, 5) == 0 {
-			cond = fmt.Sprintf("(%s != 0u)", randomConstantExpr(CType{Name: "uint32_t", Signed: false, Bits: 32}, r, opts))
-		} else if dec.pick(3, 3) == 0 {
-			er := newExprRand(r, exprDecisionBudget(opts))
-			noConst := !opts.ConstAsCondition
-			e := randomTypedExprDepthFlags(CType{Name: "uint32_t", Signed: false, Bits: 32}, er, opts, env, scope, 0, ctx, false, noConst)
-			cond = fmt.Sprintf("((uint32_t)%s != 0u)", e)
-		}
+		// StatementIf::make_random uses Expression::make_random for the condition
+		// (term table total 120 when assigns/commas enabled), not a fixed mask.
+		er := newExprRand(r, exprDecisionBudget(opts))
+		noConst := !opts.ConstAsCondition
+		e := randomTypedExprDepthFlags(CType{Name: "uint32_t", Signed: false, Bits: 32}, er, opts, env, scope, 0, ctx, false, noConst)
+		cond := fmt.Sprintf("((uint32_t)%s != 0u)", e)
 		writeLine(b, 1, fmt.Sprintf("if %s {", cond))
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
 		writeLine(b, 1, "} else {")
