@@ -1316,11 +1316,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				}
 				if n < target {
 					v := int(er.pick(uint32(target)))
+					// e849 F50 after U11-scale Global choose (not after e811 U17).
+					if target == 11 && er.fallback != nil {
+						_ = er.fallback.flipcoin(50)
+					}
 					return uniq[v%n], true
 				}
 			}
 		}
-		return uniq[int(er.pick(uint32(n)))], true
+		idx := int(er.pick(uint32(n)))
+		if n >= 11 && mustReadLiveSink != nil && !*mustReadLiveSink && er.fallback != nil {
+			_ = er.fallback.flipcoin(50)
+		}
+		return uniq[idx], true
 	}
 	if len(exact) > 0 {
 		if len(exact) == 1 {
