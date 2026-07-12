@@ -2135,18 +2135,108 @@ func emitStatement(
 						_ = r.next31()
 					}
 				}
-				// CreateArrayVariable + itemize (1d common)
-				_ = r.upto(99)
+				// CreateArrayVariable + itemize
+				num := int(r.upto(99)) + 1
+				dimension := 0
+				step := 100
+				for num > 0 {
+					dimension++
+					num -= step
+					step /= 2
+					if step == 0 {
+						step = 1
+					}
+				}
+				maxDim := opts.MaxArrayDim
+				if maxDim < 1 {
+					maxDim = 3
+				}
+				if dimension > maxDim {
+					dimension = maxDim
+				}
 				maxPerDim := opts.MaxArrayLenPerDim
 				if maxPerDim < 1 {
 					maxPerDim = 10
 				}
-				sz := int(r.upto(uint32(maxPerDim))) + 1
-				if sz/2 > 0 {
-					_ = r.upto(uint32(sz / 2))
+				maxTotal := opts.MaxArrayLength
+				if maxTotal < 1 {
+					maxTotal = 256
 				}
-				if sz > 0 {
-					_ = r.upto(uint32(sz)) // itemize
+				sizes := make([]int, 0, dimension)
+				total := 1
+				for i := 0; i < dimension; i++ {
+					dimen := int(r.upto(uint32(maxPerDim))) + 1
+					if total*dimen > maxTotal {
+						dimen = maxTotal / total
+					}
+					if dimen > 0 {
+						total *= dimen
+						sizes = append(sizes, dimen)
+					}
+				}
+				if total/2 > 0 {
+					initNum := int(r.upto(uint32(total / 2)))
+					for i := 0; i < initNum; i++ {
+						if r.flipcoin(50) {
+							if r.flipcoin(50) {
+								_ = r.upto(3)
+							} else {
+								_ = r.upto(20)
+							}
+						} else {
+							hn := hexDigitsForConstant(arrTy)
+							if hn <= 0 {
+								hn = 8
+							}
+							for j := 0; j < hn; j++ {
+								_ = r.next31()
+							}
+						}
+					}
+				}
+				for _, sz := range sizes {
+					if sz > 0 {
+						_ = r.upto(uint32(sz))
+					}
+				}
+				// Per-dimension SelectLoopCtrlVar + make_init_value for rhs
+				for range sizes {
+					// Prefer existing IV (no RNG when 1); else create global
+					// seed2 often creates: F50 F10 F20 + Constant
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(20)
+					if r.flipcoin(50) {
+						if r.flipcoin(50) {
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(20)
+						}
+					} else {
+						hn := hexDigitsForConstant(arrTy)
+						if hn <= 0 {
+							hn = 8
+						}
+						for j := 0; j < hn; j++ {
+							_ = r.next31()
+						}
+					}
+				}
+				// make_init_value for element type
+				if r.flipcoin(50) {
+					if r.flipcoin(50) {
+						_ = r.upto(3)
+					} else {
+						_ = r.upto(20)
+					}
+				} else {
+					hn := hexDigitsForConstant(arrTy)
+					if hn <= 0 {
+						hn = 8
+					}
+					for j := 0; j < hn; j++ {
+						_ = r.next31()
+					}
 				}
 			} else if nArr > 1 {
 				_ = r.upto(uint32(nArr))
