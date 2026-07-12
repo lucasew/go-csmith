@@ -135,11 +135,11 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 3505** (defaults) |
+| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 8864** (defaults) |
 | Seed 2 source match | Blocked on event match |
 | 20-seed gate | Not started |
 
-Next plateau focus: e3505 after extended Lhs/CreateArray residual — still climbing residual.
+Next plateau focus: e8864 F10 path residual (F50×2 U4 after F20) — still climbing residual.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

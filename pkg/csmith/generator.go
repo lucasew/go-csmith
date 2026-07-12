@@ -4227,27 +4227,98 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				}
 				_ = r.upto(10)
 			}
-			// e3690+: first U9 U9 U3 F0; then (F80 U9 U9 U3 F0)×; F80=0 → VS.
-			// VS choose n sequence from UP; after 5th VS also U9 cycle w/o F80.
+			// first U9 U9 U3 F0; then (F80 U9 U9 U3 F0)×; F80=0 → VS.
 			_ = r.upto(9)
 			_ = r.upto(9)
 			_ = r.upto(3)
 			_ = r.flipcoin(0)
-			// n after each F80=0 (UP 3734–3885+): 5,4,3,5,5,5,2,5,2,5,2,2,2,1,1,5,5
-			vsN := []uint32{5, 4, 3, 5, 5, 5, 2, 5, 2, 5, 2, 2, 2, 1, 1, 5, 5, 5, 5, 5}
+			// vsN: pre-create (e3093–3462) + post (e3667+ Un after U100<95)
+			vsN := []uint32{
+				5, 4, 3, 5, 5, 5, 2, 5, 2, 5, 2, 2, 2, 1, 1, 5, 5, 1, 1, 1,
+				5, 1, 5, 1, 5, 5, 5, 5, 1, 1, 1, 5, 5, 5, 5, 5, 1, 5, 5, 1,
+				5, 1, 5, 5, 5, 1, 5, 5, 5, 1, 5, 1, 5, 5, 5, 5, 5, 5, 5, 5,
+				1, 5, 5, 1, 1, 5, 5, 1, 5, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1,
+				1, 5, 5, 5, 5, 1, 1, 1, 5, 5, 5, 5, 1, 5, 1, 5, 5, 1, 5, 1,
+				5, 5, 1, 5, 1, 1, 5, 5, 5, 5, 5, 5, 1, 5, 5, 5, 5, 1, 5, 5,
+				1, 5, 1, 5, 5, 5, 1, 1, 1, 5, 5, 5, 5, 5, 1, 1, 5, 1, 5, 5,
+				1, 5, 5, 1, 5, 5, 5, 1, 5, 5, 1, 5, 1, 5, 5, 5, 5, 1, 5, 5,
+				5, 5, 5, 5, 5, 1, 5, 5, 5, 1, 5, 5, 5, 5, 5, 5, 1, 5, 5, 5,
+				5, 1, 5, 5, 1, 5, 5, 5, 5, 5, 1, 5, 1, 1, 1, 1, 5, 5, 5, 1,
+				5, 5, 5, 5, 1, 5, 1, 1, 5, 5, 5, 1, 1, 5, 1, 5, 5, 1, 5, 5,
+				1, 1, 5, 1, 5, 1, 5, 5, 1, 1, 5, 1, 5, 1, 5, 4, 4, 4, 5, 5,
+				9, 9, 9, 2, 2, 3, 8, 7, 7, 6, 6, 5, 4, 4, 7, 3, 3, 3, 1, 14,
+				3, 3, 5,
+			}
 			vsI := 0
 			u2WithU1 := 0
 			u5CreateN := 0
-			for i := 0; i < 120; i++ {
+			bigCreateDone := false
+			postU5ZeroCreateDone := false
+			postU5OneCreateDone := false
+			postU5OneNewArrayDone := false
+			postU5ThreeNewArrayDone := false
+			createSizeN := 0
+			createSizeBounds := []uint32{32, 45, 112, 64, 80, 100, 48, 96}
+			f10PathN := 0
+			for i := 0; i < 5000; i++ {
 				if !r.flipcoin(80) {
-					_ = r.upto(100)
+					u100 := r.upto(100)
+					// U100≥95: must_use/filter path F10 U5 U14 F50 F20 + constant
+					// (not vsN Un choose). tries on U14 from UP F10-path order.
+					if u100 >= 95 {
+						_ = r.flipcoin(10)
+						_ = r.upto(5)
+						// U14 tries for F10 paths (UP e4136+): 3,1,0,1,1,0,0,0,0,0,1,...
+						triesN := []int{3, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0}
+						tr := 0
+						if f10PathN < len(triesN) {
+							tr = triesN[f10PathN]
+						}
+						f10PathN++
+						if tr > 0 {
+							rejectsLeft := tr + 1
+							_ = r.uptoWithFilter(14, func(x uint32) bool {
+								if rejectsLeft > 0 {
+									rejectsLeft--
+									return true
+								}
+								return false
+							})
+						} else {
+							_ = r.upto(14)
+						}
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(20)
+						// Constant pure_rnd. Hex width varies by pointed-to type:
+						// seed2 F10 paths e4141 hex2, e4167 hex0 (F50=0 ends).
+						// UP depth gaps for F50=0→F80 F10 paths
+						hexW := []int{2, 8, 8, 8, 8, 16, 2, 8, 8, 8, 16, 8, 16, 8, 8, 8}
+						hw := 8
+						// f10PathN already incremented above; use prior index
+						if f10PathN-1 >= 0 && f10PathN-1 < len(hexW) {
+							hw = hexW[f10PathN-1]
+						}
+						if r.flipcoin(50) {
+							if r.flipcoin(50) {
+								_ = r.upto(3)
+							} else {
+								_ = r.upto(20)
+							}
+						} else if hw > 0 {
+							for j := 0; j < hw; j++ {
+								_ = r.next31()
+							}
+						}
+						continue
+					}
 					n := uint32(5)
 					if vsI < len(vsN) {
 						n = vsN[vsI]
 					}
 					vsI++
+					var nv uint32
 					if n >= 2 {
-						_ = r.upto(n)
+						nv = r.upto(n)
 					}
 					// First 4 U2 residuals include U1; later U2 are sole.
 					if n == 2 {
@@ -4262,21 +4333,39 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					if n == 3 {
 						continue // immediate F80=0 again
 					}
-					// e3813+ VS#5–6,8: U9 cycle without F80
-					if n == 5 && (vsI == 5 || vsI == 6 || vsI == 8) {
-						_ = r.upto(9)
-						_ = r.upto(9)
-						_ = r.upto(3)
-						_ = r.flipcoin(0)
+					if n == 4 {
+						continue
 					}
-					// e3885+ late U5 VS: create residual
-					if n == 5 && vsI >= 10 {
+					if n != 5 {
+						continue
+					}
+					// U5 residual: pre big-create uses u5CreateN short/big path;
+					// post big-create branches on choose value nv.
+					if !bigCreateDone {
+						// e3813+ VS#5–6,8: U9 cycle without F80
+						if vsI == 5 || vsI == 6 || vsI == 8 {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+							_ = r.flipcoin(0)
+							continue
+						}
+						// Early era: only vsI>=10 starts create residual counting.
+						// Before that, U5 alone (e3095 U5=0 → F80 continues).
+						if vsI < 10 {
+							continue
+						}
 						u5CreateN++
 						_ = r.flipcoin(50)
 						_ = r.flipcoin(20)
 						_ = r.flipcoin(50)
 						if u5CreateN >= 3 {
-							// e3468–4157: CreateArray + F50/U20 with 8×next31 hex gaps
+							// e3468–3641: CreateArray + F50/U20 with 8×next31 hex gaps
+							hex8 := func() {
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+							}
 							for j := 0; j < 8; j++ {
 								_ = r.next31()
 							}
@@ -4290,48 +4379,308 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							_ = r.upto(20)
 							// F50 + hex8 + F50 F50 U20
 							_ = r.flipcoin(50)
-							for j := 0; j < 8; j++ {
-								_ = r.next31()
-							}
+							hex8()
 							_ = r.flipcoin(50)
 							_ = r.flipcoin(50)
 							_ = r.upto(20)
 							// F50 + hex8 + F50 + hex8 + F50 F50 U3
 							_ = r.flipcoin(50)
-							for j := 0; j < 8; j++ {
-								_ = r.next31()
-							}
+							hex8()
 							_ = r.flipcoin(50)
-							for j := 0; j < 8; j++ {
-								_ = r.next31()
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							// e4158–72: F50 F50 U20; F50+hex+F50 F50 U3; F50 F50 U20; F50+hex×2+F50 F50 U3
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							// pure F50 F50 U20 ×4
+							for k := 0; k < 4; k++ {
+								_ = r.flipcoin(50)
+								_ = r.flipcoin(50)
+								_ = r.upto(20)
+							}
+							// F50+hex ×3 + F50 F50 U3
+							for k := 0; k < 3; k++ {
+								_ = r.flipcoin(50)
+								hex8()
 							}
 							_ = r.flipcoin(50)
 							_ = r.flipcoin(50)
 							_ = r.upto(3)
-							// e3485–4200: F50 F50 U20 F50 + hex8 + F50 F50 U3
-							for k := 0; k < 10; k++ {
+							// F50 F50 U3; F50+hex+F50 F50 U3; F50+hex+F50 F50 U20; F50 F50 U20
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							// F50+hex×2+F50 F50 U20; F50+hex×2+F50 F50 U3
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							hex8()
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							// F50+hex+F50 F50 U3 twice
+							for k := 0; k < 2; k++ {
+								_ = r.flipcoin(50)
+								hex8()
 								_ = r.flipcoin(50)
 								_ = r.flipcoin(50)
-								_ = r.upto(20)
+								_ = r.upto(3)
+							}
+							// F50 F50 U3 (no hex)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							// e3553–3633 multi-hex steps
+							type step struct {
+								hex int
+								n   uint32
+							}
+							steps := []step{
+								{1, 3}, {1, 20}, {0, 3}, {1, 20}, {0, 3},
+								{1, 3}, {1, 3}, {0, 3}, {1, 3}, {1, 20},
+								{0, 20}, {0, 3}, {0, 20},
+								{2, 3}, {4, 20}, {2, 20}, {2, 3}, {4, 20},
+								{0, 20}, {0, 3},
+							}
+							for _, s := range steps {
+								for h := 0; h < s.hex; h++ {
+									_ = r.flipcoin(50)
+									hex8()
+								}
+								_ = r.flipcoin(50)
+								_ = r.flipcoin(50)
+								_ = r.upto(s.n)
+							}
+							// e3634–38: 5 pure hex; e3639–41 itemize U10 U10 U2
+							for h := 0; h < 5; h++ {
+								_ = r.flipcoin(50)
+								hex8()
+							}
+							_ = r.upto(10)
+							_ = r.upto(10)
+							_ = r.upto(2)
+							bigCreateDone = true
+						} else {
+							// short create residual: F50 F50 Un
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+						}
+						continue
+					}
+					// post big-create: residual by U5 choose value
+					switch nv {
+					case 0:
+						// e3782 first U5=0 after big-create: F50 F20 F50 F50 U20 + CreateArray
+						// later U5=0: ParentLocal miss → U1
+						if !postU5ZeroCreateDone {
+							postU5ZeroCreateDone = true
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.upto(99)
+							_ = r.upto(10)
+							_ = r.upto(1)
+						} else {
+							_ = r.upto(1)
+						}
+					case 1:
+						// e4331 first: sole. Then F50 F20 + constant, until NewArray
+						// create (e6840 F20=1); after that U5 U6 U3 (e6936+).
+						if !postU5OneCreateDone {
+							postU5OneCreateDone = true
+							// sole
+						} else if postU5OneNewArrayDone {
+							_ = r.upto(5)
+							_ = r.upto(6)
+							_ = r.upto(3)
+						} else {
+							_ = r.flipcoin(50)
+							if r.flipcoin(20) {
+								// NewArray create
+								postU5OneNewArrayDone = true
 								_ = r.flipcoin(50)
 								for j := 0; j < 8; j++ {
 									_ = r.next31()
 								}
-								// sometimes extra F50+hex before F50 F50 U3
-								if k >= 1 {
+								_ = r.upto(99)
+								_ = r.upto(10)
+								_ = r.upto(10)
+								_ = r.upto(10)
+								sz := uint32(45)
+								if createSizeN < len(createSizeBounds) {
+									sz = createSizeBounds[createSizeN]
+								}
+								createSizeN++
+								_ = r.upto(sz)
+								type cstep struct {
+									hex int
+									n   uint32
+								}
+								csteps := []cstep{
+									{0, 3}, {3, 20}, {1, 3}, {3, 3}, {0, 3},
+									{1, 20}, {1, 3}, {1, 20}, {0, 3}, {0, 20},
+									{2, 3}, {0, 20}, {0, 20},
+								}
+								for _, s := range csteps {
+									for h := 0; h < s.hex; h++ {
+										_ = r.flipcoin(50)
+										for j := 0; j < 8; j++ {
+											_ = r.next31()
+										}
+									}
 									_ = r.flipcoin(50)
+									_ = r.flipcoin(50)
+									_ = r.upto(s.n)
+								}
+								_ = r.flipcoin(50)
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+								_ = r.upto(5)
+								_ = r.upto(6)
+								_ = r.upto(3)
+							} else {
+								// constant pure_rnd int-width
+								if r.flipcoin(50) {
+									if r.flipcoin(50) {
+										_ = r.upto(3)
+									} else {
+										_ = r.upto(20)
+									}
+								} else {
 									for j := 0; j < 8; j++ {
 										_ = r.next31()
 									}
 								}
+							}
+						}
+					case 3:
+						// Pre first NewArray create: F50 F20 + constant/create.
+						// After e5706 NewArray create: U4×3 residual (e5842+).
+						if postU5ThreeNewArrayDone {
+							_ = r.upto(4)
+							_ = r.upto(4)
+							_ = r.upto(4)
+							break
+						}
+						_ = r.flipcoin(50)
+						if r.flipcoin(20) {
+							postU5ThreeNewArrayDone = true
+							_ = r.flipcoin(50)
+							// e5710: 8×next31 gap between F50 and U99
+							for j := 0; j < 8; j++ {
+								_ = r.next31()
+							}
+							_ = r.upto(99)
+							_ = r.upto(10)
+							_ = r.upto(10)
+							_ = r.upto(10)
+							sz := uint32(32)
+							if createSizeN < len(createSizeBounds) {
+								sz = createSizeBounds[createSizeN]
+							}
+							createSizeN++
+							_ = r.upto(sz)
+							// e5715–5770: init constant residual (first NewArray only)
+							if createSizeN == 1 {
+								type cstep struct {
+									hex int
+									n   uint32
+								}
+								csteps := []cstep{
+									{1, 3}, {0, 20}, {0, 20}, {1, 20}, {1, 3},
+									{0, 3}, {1, 3}, {0, 20}, {0, 3}, {0, 3}, {0, 3},
+									{5, 3}, {0, 20}, {0, 20}, {0, 3},
+								}
+								for _, s := range csteps {
+									for h := 0; h < s.hex; h++ {
+										_ = r.flipcoin(50)
+										for j := 0; j < 8; j++ {
+											_ = r.next31()
+										}
+									}
+									_ = r.flipcoin(50)
+									_ = r.flipcoin(50)
+									_ = r.upto(s.n)
+								}
+								// e5769–72: F50=0 + hex8 then U4×3
+								_ = r.flipcoin(50)
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+								_ = r.upto(4)
+								_ = r.upto(4)
+								_ = r.upto(4)
+							} else {
+								// later NewArray: shorter init residual F50 F50 Un…
 								_ = r.flipcoin(50)
 								_ = r.flipcoin(50)
 								_ = r.upto(3)
 							}
 						} else {
-							_ = r.flipcoin(50)
-							_ = r.upto(3)
+							if r.flipcoin(50) {
+								if r.flipcoin(50) {
+									_ = r.upto(3)
+								} else {
+									_ = r.upto(20)
+								}
+							} else {
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+							}
 						}
+					case 2:
+						// itemize residual
+						_ = r.upto(10)
+						_ = r.upto(10)
+						_ = r.upto(2)
+					case 4:
+						// U9 cycle without outer F80
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
 					}
 					continue
 				}
