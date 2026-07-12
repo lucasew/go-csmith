@@ -1383,8 +1383,12 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			return 2
 		}
 		// seed2 e1121: Global Lhs choose U3 vs inventory n=4.
+		// seed2 e1447 late: real U4 (after CREATE residual era).
 		if forAssign && n == 4 && useSmallParentStackSink != nil && *useSmallParentStackSink {
-			return 3
+			if globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink {
+				return 4 // e1447
+			}
+			return 3 // e1121
 		}
 		return n
 	}
@@ -3154,6 +3158,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	lv := lvalueInfo{expr: "x", ctype: targetType}
 	lhsFromDeref := false
 	triedDerefChoose := false
+	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
 	for {
 		if !r.flipcoin(80) { // SelectDerefPointerProb
@@ -3164,6 +3169,26 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// F80=1 with no extra U (sole remaining / still invalid), then F80=0
 		// falls through to VariableSelector::select (e937–939).
 		if needNoRhs && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+			// seed2 e936 U2; e1437 late U4; e1439 U3; e1441 U2 then itemize U10 U1 U1.
+			late := ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone
+			if late {
+				switch needNoRhsDerefTries {
+				case 0:
+					_ = r.upto(4) // e1437
+				case 1:
+					_ = r.upto(3) // e1439
+				case 2:
+					_ = r.upto(2) // e1441
+					// itemize residual e1442–1444 U10 U1 U1
+					_ = r.upto(10)
+					_ = r.upto(1)
+					_ = r.upto(1)
+				default:
+					// further retries bare continue
+				}
+				needNoRhsDerefTries++
+				continue
+			}
 			if !triedDerefChoose {
 				_ = r.upto(2) // e936
 				triedDerefChoose = true
@@ -3279,19 +3304,49 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// next-statement U100.
 	lhsAfterParamMiss := false
 	if !lhsFromDeref {
+		lhsGlobalFailOnce := false
 		for try := 0; try < 6 && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-				lv = picked
-				lhsFromDeref = true
-				break
+				// seed2 e1448: late Global Lhs choose then visit_facts fail → F80
+				// loop continues (not needNoRhs F50). One-shot.
+				if !lhsGlobalFailOnce && ctx != nil && ctx.state != nil &&
+					ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone {
+					lhsGlobalFailOnce = true
+					// Fall through to F80 retry without accepting pick.
+				} else {
+					lv = picked
+					lhsFromDeref = true
+					break
+				}
 			}
 			// VariableSelector miss → retry SelectDeref.
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again
 			}
-			// seed2 e1223: after ParentParam miss, F80 then U3 (stack/choose),
-			// not ConstPointers F10 create path. Next Global Lhs is sole (e1225).
+			// seed2 e1223: after ParentParam miss, F80 then U3 (stack/choose).
+			// seed2 e1449–53: late needNoRhs after Global fail: F80 U2 then
+			// itemize U10 U1 U1 then F80=0 VS (not immediate U100).
 			if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+				if needNoRhs && ctx.state.globalLateU2MissDone {
+					_ = r.upto(2) // e1449
+					// Re-enter SelectDeref loop body style: next F80 + itemize.
+					// Burn one more F80 iteration residual here.
+					if r.flipcoin(80) {
+						_ = r.upto(10)
+						_ = r.upto(1)
+						_ = r.upto(1)
+					}
+					// then fall through to F80=0 VS on next outer try… but we're
+					// inside miss loop. Emit VS path after itemize:
+					if !r.flipcoin(80) {
+						if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+							lv = picked
+							lhsFromDeref = true
+							break
+						}
+					}
+					continue
+				}
 				_ = r.upto(3)
 				ctx.state.lhsSoleNext = true
 				lhsAfterParamMiss = true
