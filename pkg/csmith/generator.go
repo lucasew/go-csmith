@@ -15,6 +15,7 @@ var pointerGlobalPicksSink *int
 var useSmallParentStackSink *bool
 var lhsSoleNextSink *bool
 var globalU27DoneSink *bool
+var globalLateU2MissDoneSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -128,6 +129,8 @@ type functionFlowState struct {
 	parentParamExprPicks int
 	// globalU27Done: one-shot e1145 Global eFlexible U27 scale.
 	globalU27Done bool
+	// globalLateU2MissDone: one-shot e1373–75 Global U2+U3 then visit_facts miss.
+	globalLateU2MissDone bool
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
@@ -1547,19 +1550,27 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// seed2 e1017: Global eFlexible n=4 → U2 (even if mustReadLive).
 		// seed2 e1373: after U27 era under useSmallParentStack, real GlobalList
 		// choose is U2 (inventory over-counts convertibles as n=6).
-		// seed2 e1374: after choose, itemize residual U3 (array member).
+		// seed2 e1374–1377: Global U2+U3 then visit_facts fail → ExpressionVariable
+		// do-while retries VariableSelector (U100 ParentLocal U3 U2).
 		chooseN := n
 		if n == 4 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			chooseN = 2
 		}
 		lateU2 := useSmallParentStackSink != nil && *useSmallParentStackSink &&
-			globalU27DoneSink != nil && *globalU27DoneSink && n > 2
+			globalU27DoneSink != nil && *globalU27DoneSink && n > 2 &&
+			(globalLateU2MissDoneSink == nil || !*globalLateU2MissDoneSink)
 		if lateU2 {
 			chooseN = 2
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		if lateU2 {
 			_ = er.pick(3) // e1374 itemize residual
+			if globalLateU2MissDoneSink != nil {
+				*globalLateU2MissDoneSink = true
+			}
+			// ExpressionVariable do-while: visit_facts fail → retry select.
+			// Signal via empty expr name for termVariable retry (e1375 U100).
+			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 		}
 		if n >= 11 && mustReadLiveSink != nil && !*mustReadLiveSink && er.fallback != nil {
 			_ = er.fallback.flipcoin(50)
@@ -2457,6 +2468,35 @@ func randomLeafExprWithMode(
 							restoreGenSnapshot(ctx, snap)
 							continue
 						}
+					}
+					// seed2 e1375: empty expr = visit_facts miss after Global U2+U3;
+					// ExpressionVariable do-while retries VariableSelector (new U100).
+					if c.expr == "" && ctx != nil && ctx.state != nil &&
+						ctx.state.useSmallParentStack && er != nil {
+						scopePick = variableScopePickFromER(er, opts)
+						// ParentLocal: stack U3 then choose/create (e1376 U3 U2).
+						if scopePick == 1 {
+							idx := parentStackPick(er, flow)
+							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							if c2, ok2 := selectExprVariableFromER(t, er, localCands, false); ok2 && c2.expr != "" {
+								bumpExprDepth(ctx)
+								return castLiteral(t, c2.expr)
+							}
+							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
+								bumpExprDepth(ctx)
+								return castLiteral(t, g.expr)
+							}
+						}
+						candidates = buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+						if len(candidates) == 0 {
+							candidates = buildExprCandidatesFromER(er, env, scope, ctx)
+						}
+						if c2, ok2 := selectExprVariableFromER(t, er, candidates, false); ok2 && c2.expr != "" {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c2.expr)
+						}
+						bumpExprDepth(ctx)
+						return castLiteral(t, "x")
 					}
 					bumpExprDepth(ctx)
 					return castLiteral(t, c.expr)
@@ -4226,6 +4266,7 @@ func emitSingleFuncDefOnce(
 		useSmallParentStackSink = &state.useSmallParentStack
 		lhsSoleNextSink = &state.lhsSoleNext
 		globalU27DoneSink = &state.globalU27Done
+		globalLateU2MissDoneSink = &state.globalLateU2MissDone
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4235,6 +4276,7 @@ func emitSingleFuncDefOnce(
 			useSmallParentStackSink = nil
 			lhsSoleNextSink = nil
 			globalU27DoneSink = nil
+			globalLateU2MissDoneSink = nil
 			lastArraySizesSink = nil
 		}()
 	}
