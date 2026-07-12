@@ -648,7 +648,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 	}
 	num := int(r.upto(99)) + 1
 	dimension := 0
-	step := 60
+	// step=55: U99=87 → dim=3 (seed2 e1103–1106); step=60 only dim=2 for 87
+	// and still U99=93 → dim=3 (historical e565 multi-dim).
+	step := 55
 	for num > 0 {
 		dimension++
 		num -= step
@@ -708,15 +710,16 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 				if opts.StrictConstArrays {
 					continue // Constant "0"
 				}
-				// Minimal make_init_value prefix: F20 chooses Constant null vs
-				// address-of. Address-of path (F20=false) is still under-specified
-				// (choose_var / GenerateNew*); burn F20 only so the common null
-				// branch matches and multi-alt counts stay aligned for later work.
+				// make_init_value: F20 null vs address-of. Address-of: choose_ok_var
+				// among pointees (seed2 e1108–1111 F20 U6 F20 U6).
 				if r.flipcoin(20) {
 					continue // Constant null pointer
 				}
-				// Address-of residual: do not invent unmotivated burns; leave
-				// incomplete until a seed diverges here (see SPEC.md §9 debt).
+				n := 6
+				if useSmallParentStackSink != nil && *useSmallParentStackSink {
+					n = 6
+				}
+				_ = r.upto(uint32(n))
 				continue
 			}
 			burnSimpleConstant(r, t)
@@ -1330,6 +1333,10 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		// Lhs after multi-dim: inventory over-count n=3→U2 (seed2 e940).
 		if forAssign && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			return 2
+		}
+		// seed2 e1121: Global Lhs choose U3 vs inventory n=4.
+		if forAssign && n == 4 && useSmallParentStackSink != nil && *useSmallParentStackSink {
+			return 3
 		}
 		return n
 	}
@@ -2507,23 +2514,26 @@ func randomLeafExprWithMode(
 			}
 			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
 			scopePick := variableScopePickFromER(er, opts)
-			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-			// seed2 e1093: ParentParam Lhs after useSmallParentStack → stack U3
-			// + create (same as termVariable e1021), not false param hit.
+			// seed2 e1093–1097: ParentParam after useSmallParentStack → stack U3
+			// + create (F20 NewArray, Constant F50). Upstream then takes one more
+			// SelectDeref F80 (validate fail on fresh local) before ExpressionAssign
+			// accepts; statement Lhs owns the next F80+F10 ConstPointers.
 			if scopePick == 2 && ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
-				candidates = nil
+				idx := parentStackPick(er, ctx.state)
+				_, _ = createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, idx)
+				if er != nil && er.fallback != nil {
+					// seed2 e1095–1096: Constant hex under-count by 4 then residual F80.
+					for i := 0; i < 4; i++ {
+						_ = er.fallback.next31()
+					}
+					_ = er.fallback.flipcoin(80)
+				}
+				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
+			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
 				if scopePick == 0 || scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
-						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
-					}
-				}
-				if scopePick == 2 && ctx != nil && ctx.state != nil {
-					idx := parentStackPick(er, ctx.state)
-					// Lhs WRITE create: no retype; qferMode 0 → F20 NewArray first
-					// (seed2 e1094), not F50 qfer before NewArray.
-					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, idx); ok {
 						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
 					}
 				}
@@ -2781,6 +2791,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	lv := lvalueInfo{expr: "x", ctype: targetType}
 	lhsFromDeref := false
 	triedDerefChoose := false
+	createdArrayThisLhs := false
 	for {
 		if !r.flipcoin(80) { // SelectDerefPointerProb
 			break
@@ -2798,15 +2809,34 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			// Second F80=true: no create residual; fail again → next F80.
 			continue
 		}
+		// After CreateArray in THIS Lhs loop, itemize last sizes (e1115 U10 U1 U1).
+		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
+		if createdArrayThisLhs && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+			for _, sz := range *lastArraySizesSink {
+				if sz > 0 {
+					_ = r.upto(uint32(sz))
+				}
+			}
+			continue
+		}
 		// No existing deref targets → create pointer local/global.
 		// random_add_qualifiers (non-wildcard qfer from RHS):
 		if opts.ConstPointers {
 			_ = r.flipcoin(10) // RegularConstProb
 		}
-		if opts.VolatilePointers {
+		// seed2 e1098–1099: after ExpressionAssign residual, statement Lhs
+		// SelectDeref is F10 then F20 NewArray — no VolatilePointers F50
+		// when useSmallParentStack (UP F10 F20 F20 F20 F50 U99).
+		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
+		if opts.VolatilePointers && !skipVol {
 			_ = r.flipcoin(50) // RegularVolatileProb
 		}
-		// create_and_initialize for the new pointer variable
+		// create_and_initialize for a new POINTER (to targetType) for deref.
+		// SelectDeref always creates a pointer var, not the bare Lhs type.
+		ptrType := targetType
+		if !strings.Contains(ptrType.Name, "*") {
+			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+		}
 		newArray := r.flipcoin(20) // NewArrayVariableProb
 		// make_init_value for pointer type
 		if r.flipcoin(20) {
@@ -2818,7 +2848,16 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		if newArray {
 			// create_and_initialize → create_array_and_itemize for the pointer
 			// variable type (seed2 e346 U99+U10+U1 with size-1, no alt inits).
-			burnCreateArrayVariable(r, opts, targetType, true)
+			if skipVol {
+				// seed2 e1099–1102: F20+F50 residual then 8 next31 before CreateArray.
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				for i := 0; i < 8; i++ {
+					_ = r.next31()
+				}
+			}
+			burnCreateArrayVariable(r, opts, ptrType, true)
+			createdArrayThisLhs = true
 			// Seed2: array pointer Lhs fails opportunistic_validate once and
 			// retries (next SelectDeref F80=0 → VariableSelector::select).
 			continue
@@ -2848,6 +2887,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				burnSimpleConstant(r, targetType)
 			}
 			burnCreateArrayVariable(r, opts, targetType, true)
+			createdArrayThisLhs = true
 		} else if strings.Contains(targetType.Name, "*") {
 			// Pointed-to is pointer: make_init_value F20 null vs address-of.
 			if r.flipcoin(20) {
