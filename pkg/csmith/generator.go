@@ -118,6 +118,8 @@ type functionFlowState struct {
 	lhsDerefAttempts int
 	// lastStmtWasContinue: for seed2 e948 assign→For remap after continue.
 	lastStmtWasContinue bool
+	// lastStmtWasReturn: Block must_return — stop more stmts in this block.
+	lastStmtWasReturn bool
 	// parentLocalStackPicks: count of parentStackPick calls.
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
@@ -4359,6 +4361,16 @@ func emitStatement(
 		} else if createIV {
 			// SelectLoopCtrlVar → GenerateNewGlobal with NewArray + volatile retry.
 			burnSelectLoopCtrlVarCreate(r, opts)
+		} else if state != nil && state.multiDimArrays > 0 && state.useSmallParentStack {
+			// seed2 e2187: SelectLoopCtrlVar among many integer visibles (U28).
+			// e2188: body BlockSize next — loop_control pure + init/incr SafeOp
+			// residual absent from UP stream after this choose (depth/pure path).
+			_ = r.upto(28)
+			// Skip array/loop control residual; fall through to body.
+			useArrayControl = false
+			afterContFor = true // reuse skip residual flag below
+		} else if state != nil && state.loopIVPool == 1 {
+			// sole IV early — no choose RNG
 		}
 		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
 		if useArrayControl && !afterContFor {
@@ -4433,6 +4445,9 @@ func emitStatement(
 		}
 		writeLine(b, 1, fmt.Sprintf("%s ^= (uint32_t)x;", ret))
 		writeLine(b, 1, fmt.Sprintf("return %s;", ret))
+		if state != nil {
+			state.lastStmtWasReturn = true
+		}
 	case stmtContinue:
 		writeLine(b, 1, "continue;")
 		if state != nil {
@@ -4681,9 +4696,16 @@ func emitStatements(
 	} else {
 		stmtCount = base + int(r.upto(uint32(stmtLimit)))
 	}
-	for s := 0; s < stmtCount; s++ {
+	// seed2 e2186: depth-0 function body with multi-dim still has another
+	// StatementProbability after GO's base+U count (UP continues U100=24 For;
+	// GO was ending the function and opening if-then BlockSize). Extra slot
+	// only when multiDimArrays (late functions created mid-expression).
+	if depth == 0 && state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
+		stmtCount++
+	}
+	emitOne := func() bool {
 		if stmtBudget != nil && *stmtBudget == 0 {
-			break
+			return false
 		}
 		const maxStmtAttempts = 8
 		ok := false
@@ -4702,15 +4724,23 @@ func emitStatements(
 				break
 			}
 
-			// Reject path: rollback to keep statement-local retries side-effect free.
 			if stmtBudget != nil && snapStmtBudget >= 0 {
 				*stmtBudget = snapStmtBudget
 			}
 			restoreGenSnapshot(ctx, snap)
 		}
 		if !ok {
-			// Last-resort deterministic no-op-like mutation when all attempts fail.
 			writeLine(b, 1, "x ^= 0u;")
+		}
+		return ok
+	}
+	for s := 0; s < stmtCount; s++ {
+		if !emitOne() {
+			break
+		}
+		if state != nil && state.lastStmtWasReturn {
+			state.lastStmtWasReturn = false
+			break
 		}
 	}
 }
