@@ -813,20 +813,19 @@ func buildFunctionCallExpr(
 	state := ctx.state
 	from := ctx.from
 
+	// Only functions with known effect (body already built) are choosable —
+	// mirrors Function::choose_func skipping is_effect_known()==false.
 	candidates := make([]int, 0, len(state.funcs))
 	for i := 0; i < len(state.funcs); i++ {
 		if i <= from {
 			continue
 		}
-		candidates = append(candidates, i)
+		if i < len(state.built) && state.built[i] {
+			candidates = append(candidates, i)
+		}
 	}
 
 	// FunctionInvocation::make_random(is_std_func=false).
-	// Upstream (seed2 SITE logs): pure_rnd_flipcoin(50) then either choose or
-	// CREATE+make_random_signature. Some early call sites that go routes here
-	// are not real FunctionInvocation on C++ (event 43 has F50 without SITE);
-	// when useExisting=false and no later-func candidates, emit flipcoin(0)
-	// and fail like the matched seed2 prefix (events 43–45).
 	var r *rng
 	if er != nil {
 		r = er.fallback
