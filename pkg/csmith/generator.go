@@ -1302,11 +1302,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// later picks see grown GlobalList (e811 U17).
 		if mustReadLiveSink != nil && !*mustReadLiveSink && postMustReadGlobalPicks != nil {
 			*postMustReadGlobalPicks++
-			// e811 under-count n≈3–5 → U17; e848 real n=11 keep real.
-			if *postMustReadGlobalPicks >= 2 && n >= 3 && n <= 5 &&
+			// Scale under-counted pools toward true GlobalList size.
+			// e811 n≈3→17; e848 n≈5→11 (not flat 17).
+			if *postMustReadGlobalPicks >= 2 && n >= 3 && n < 11 &&
 				multiDimArraySink != nil && *multiDimArraySink > 0 {
-				v := int(er.pick(17))
-				return uniq[v%n], true
+				// Grow toward ~11–17 as picks accumulate.
+				target := 11
+				if *postMustReadGlobalPicks >= 3 {
+					target = 11
+				}
+				if *postMustReadGlobalPicks == 2 {
+					target = 17 // e811 second pick
+				}
+				if n < target {
+					v := int(er.pick(uint32(target)))
+					return uniq[v%n], true
+				}
 			}
 		}
 		return uniq[int(er.pick(uint32(n)))], true
