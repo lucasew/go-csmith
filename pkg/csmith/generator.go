@@ -104,11 +104,14 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 
 // localsInStackBlock returns parent-local candidates belonging to stack[index].
 // blockDepth is 1-based (body=1); stack index 0 → depth 1.
-// Includes "x" — selectExprVariableFromER only accepts type-compatible picks.
+// Skips synthetic "x" (not a real block local in upstream).
 func localsInStackBlock(er *exprRand, env envInfo, scope scopeInfo, ctx *genContext, stackIndex int) []exprVarCandidate {
 	wantDepth := stackIndex + 1
 	out := make([]exprVarCandidate, 0, 8)
 	for _, l := range mergedLocals(scope, ctx) {
+		if l.name == "x" {
+			continue
+		}
 		d := l.blockDepth
 		if d == 0 {
 			d = 1 // static scope locals → function body
@@ -1000,6 +1003,59 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	return filtered[int(er.pick(uint32(len(filtered))))], true
 }
 
+// selectExprVariableStrict is choose_var with eFlexible/eExact only — no
+// arbitrary filtered[0] fallback. Used for SelectParentLocal after
+// ParentParam miss so struct wants don't match int "x" (seed2 e319 vs e490).
+func selectExprVariableStrict(t CType, er *exprRand, candidates []exprVarCandidate) (exprVarCandidate, bool) {
+	if er == nil || len(candidates) == 0 {
+		return exprVarCandidate{}, false
+	}
+	exact := make([]exprVarCandidate, 0, len(candidates))
+	integers := make([]exprVarCandidate, 0, len(candidates))
+	sameWidth := make([]exprVarCandidate, 0, len(candidates))
+	wantPtr := strings.Contains(t.Name, "*")
+	wantSimple := !wantPtr && !strings.HasPrefix(t.Name, "struct") &&
+		!strings.HasPrefix(t.Name, "union") && t.Name != "float" && t.Name != "void"
+	for _, c := range candidates {
+		if sameBaseType(c.ctype, t) {
+			exact = append(exact, c)
+			continue
+		}
+		cPtr := strings.Contains(c.ctype.Name, "*")
+		cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
+			!strings.HasPrefix(c.ctype.Name, "union") && c.ctype.Name != "float" && c.ctype.Name != "void"
+		if !wantPtr && !cPtr && c.ctype.Bits == t.Bits {
+			sameWidth = append(sameWidth, c)
+		}
+		if wantSimple && cSimple {
+			integers = append(integers, c)
+		}
+	}
+	pick := func(pool []exprVarCandidate) (exprVarCandidate, bool) {
+		if len(pool) == 0 {
+			return exprVarCandidate{}, false
+		}
+		if len(pool) == 1 {
+			return pool[0], true
+		}
+		// eFlexible small-pool quirk: n==2 no pick (seed2 e276).
+		if len(pool) == 2 {
+			return pool[0], true
+		}
+		return pool[int(er.pick(uint32(len(pool))))], true
+	}
+	if c, ok := pick(exact); ok {
+		return c, true
+	}
+	if c, ok := pick(integers); ok {
+		return c, true
+	}
+	if c, ok := pick(sameWidth); ok {
+		return c, true
+	}
+	return exprVarCandidate{}, false
+}
+
 func buildFunctionCallExpr(
 	t CType,
 	er *exprRand,
@@ -1430,11 +1486,28 @@ func randomLeafExprWithMode(
 						return castLiteral(t, g.expr)
 					}
 				}
-				// SelectParentParam empty → SelectParentLocal (create path).
-				// choose_var on block locals is approximated as create when our
-				// block-local inventory is incomplete (seed2 e490 still open).
+				// SelectParentParam empty → SelectParentLocal:
+				// stack pick, strict choose_var on that block, else any-depth
+				// dynLocs (inventory approx), else create.
 				if scopePick == 2 {
-					_ = parentStackPick(er, flow)
+					idx := parentStackPick(er, flow)
+					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					if c, ok := selectExprVariableStrict(t, er, localCands); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, c.expr)
+					}
+					// Fall back: all non-x dynLocs (block inventory incomplete).
+					allLocs := make([]exprVarCandidate, 0, 8)
+					for _, l := range mergedLocals(scope, ctx) {
+						if l.name == "x" {
+							continue
+						}
+						allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+					}
+					if c, ok := selectExprVariableStrict(t, er, allLocs); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, c.expr)
+					}
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
@@ -1452,7 +1525,23 @@ func randomLeafExprWithMode(
 						compat := sameBaseType(c.ctype, t) ||
 							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
 						if !compat {
-							_ = parentStackPick(er, flow)
+							idx := parentStackPick(er, flow)
+							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
+								bumpExprDepth(ctx)
+								return castLiteral(t, c2.expr)
+							}
+							allLocs := make([]exprVarCandidate, 0, 8)
+							for _, l := range mergedLocals(scope, ctx) {
+								if l.name == "x" {
+									continue
+								}
+								allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+							}
+							if c2, ok2 := selectExprVariableStrict(t, er, allLocs); ok2 {
+								bumpExprDepth(ctx)
+								return castLiteral(t, c2.expr)
+							}
 							if g, ok2 := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
