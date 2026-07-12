@@ -2103,10 +2103,71 @@ func emitStatement(
 	case stmtGoto:
 		return false
 	case stmtArrayOp:
-		if !opts.Arrays || len(env.arrays) == 0 {
+		// StatementArrayOp::make_random
+		if !opts.Arrays {
 			return false
 		}
-		emitArrayMutation(b, r, opts, env, scope, ctx)
+		if r.flipcoin(5) {
+			// make_random_array_init → select_array
+			nArr := len(env.arrays)
+			if nArr == 0 {
+				// create_random_array
+				asGlobal := opts.GlobalVariables && r.flipcoin(25)
+				if !asGlobal {
+					// func->stack.size() — nested blocks may be >1
+					_ = r.upto(2)
+				}
+				// type choose + filter retries; burn one AllTypes pick
+				arrTy := pickNonVoidNonVolatile(r, nil, info, opts)
+				// Constant::make_random for init
+				if r.flipcoin(50) {
+					if r.flipcoin(50) {
+						_ = r.upto(3)
+					} else {
+						_ = r.upto(20)
+					}
+				} else {
+					hn := hexDigitsForConstant(arrTy)
+					if hn <= 0 {
+						hn = 8
+					}
+					for i := 0; i < hn; i++ {
+						_ = r.next31()
+					}
+				}
+				// CreateArrayVariable + itemize (1d common)
+				_ = r.upto(99)
+				maxPerDim := opts.MaxArrayLenPerDim
+				if maxPerDim < 1 {
+					maxPerDim = 10
+				}
+				sz := int(r.upto(uint32(maxPerDim))) + 1
+				if sz/2 > 0 {
+					_ = r.upto(uint32(sz / 2))
+				}
+				if sz > 0 {
+					_ = r.upto(uint32(sz)) // itemize
+				}
+			} else if nArr > 1 {
+				_ = r.upto(uint32(nArr))
+			}
+			writeLine(b, 1, "/* array init */ x ^= x;")
+		} else {
+			// make_random_array_loop → nested StatementFor-like
+			if r.flipcoin(50) {
+				_ = r.upto(60)
+			}
+			_ = r.upto(60)
+			_ = r.upto(6)
+			if r.flipcoin(50) {
+				_ = r.upto(10)
+			} else {
+				_ = r.flipcoin(50)
+			}
+			writeLine(b, 1, "/* array loop */ {")
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			writeLine(b, 1, "}")
+		}
 	default:
 		return false
 	}
