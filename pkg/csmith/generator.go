@@ -896,6 +896,22 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	return arrayCreateResult{sizes: sizes, inits: inits}
 }
 
+// emitOrphanArrayGlobal materializes a CreateArray result as lateGlobals orphan
+// without touching choose inventory (source shape only).
+func emitOrphanArrayGlobal(ctx *genContext, t CType, arr arrayCreateResult) {
+	if ctx == nil || ctx.state == nil {
+		return
+	}
+	name := ctx.state.allocGlobalName()
+	if len(arr.sizes) == 0 {
+		arr.sizes = []int{4}
+	}
+	emitGlobalDecl(&ctx.state.lateGlobals, t, name, "0", true, false, false, arr)
+	ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+		name: name, ctype: t, isArray: true, arrayLen: 4,
+	})
+}
+
 // burnCreateAndInitialize mirrors VariableSelector::create_and_initialize for a
 // known simple type (loop IV: get_int_type). Returns whether NewArray was taken.
 // Uses create_array_and_itemize (itemize=true) when NewArray.
@@ -907,7 +923,8 @@ func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
 	// make_init_value for non-pointer → Constant::make_random
 	burnSimpleConstant(r, t)
 	if newArray {
-		burnCreateArrayVariable(r, opts, t, true)
+		// No ctx here (loop-IV helper); caller materializes when needed.
+		_ = burnCreateArrayVariable(r, opts, t, true)
 	}
 	return newArray
 }
@@ -1458,7 +1475,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// make_init_value: F20 null vs address-of
 		initNull := er.fallback.flipcoin(20)
 		if newArray {
-			burnCreateArrayVariable(er.fallback, opts, chosen, true)
+			{
+				_arr := burnCreateArrayVariable(er.fallback, opts, chosen, true)
+				emitOrphanArrayGlobal(ctx, chosen, _arr)
+			}
 		} else if !initNull {
 			// Address-of residual (make_init_value → choose_var → choose_ok_var).
 			// e1027: U2 choose. e1211: multi-level under useSmallParentStack —
@@ -2184,7 +2204,10 @@ func buildFunctionCallExpr(
 				_ = r.flipcoin(20)
 				_ = r.flipcoin(20)
 				_ = r.flipcoin(20)
-				burnCreateArrayVariable(r, opts, t, true)
+				{
+					_arr := burnCreateArrayVariable(r, opts, t, true)
+					emitOrphanArrayGlobal(ctx, t, _arr)
+				}
 				// Lhs::make_random do-while after failed array validate:
 				// F80=0 U100 U4 (e1422–24), then F20 F20 F80 create path (e1425–33).
 				if !r.flipcoin(80) {
@@ -3251,7 +3274,10 @@ func randomLeafExprWithMode(
 					// seed2 e1043: after Constant pure_rnd U20, CreateArray when
 					// outer or target NewArray (U99 dimension ladder).
 					if newArray || tgtNewArray {
-						burnCreateArrayVariable(er.fallback, opts, t, true)
+						{
+							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
+							emitOrphanArrayGlobal(ctx, t, _arr)
+						}
 						createdArrEA = true
 						// Array pointer Lhs often fails opportunistic_validate.
 						if newArray {
@@ -3549,7 +3575,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 						_ = r.flipcoin(50)
 						_ = r.flipcoin(50)
 						_ = r.upto(20)
-						burnCreateArrayVariable(r, opts, target, true)
+						{
+							_arr := burnCreateArrayVariable(r, opts, target, true)
+							emitOrphanArrayGlobal(ctx, target, _arr)
+						}
 					} else {
 						if r.flipcoin(50) {
 							if r.flipcoin(50) {
@@ -3629,7 +3658,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			_ = r.flipcoin(50) // vol
 			newArr := r.flipcoin(20)
 			if newArr {
-				burnCreateArrayVariable(r, opts, target, true)
+				{
+					_arr := burnCreateArrayVariable(r, opts, target, true)
+					emitOrphanArrayGlobal(ctx, target, _arr)
+				}
 			} else {
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
@@ -3654,7 +3686,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			_ = r.flipcoin(50) // vol
 			newArr := r.flipcoin(20)
 			if newArr {
-				burnCreateArrayVariable(r, opts, target, true)
+				{
+					_arr := burnCreateArrayVariable(r, opts, target, true)
+					emitOrphanArrayGlobal(ctx, target, _arr)
+				}
 			} else if r.flipcoin(50) {
 				if r.flipcoin(50) {
 					_ = r.upto(3)
@@ -3675,7 +3710,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			_ = r.flipcoin(50)
 			newArr := r.flipcoin(20)
 			if newArr {
-				burnCreateArrayVariable(r, opts, target, true)
+				{
+					_arr := burnCreateArrayVariable(r, opts, target, true)
+					emitOrphanArrayGlobal(ctx, target, _arr)
+				}
 			} else {
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
@@ -3907,7 +3945,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					_ = r.next31()
 				}
 			}
-			burnCreateArrayVariable(r, opts, ptrType, true)
+			{
+				_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+				emitOrphanArrayGlobal(ctx, ptrType, _arr)
+			}
 			createdArrayThisLhs = true
 			// Seed2: array pointer Lhs fails opportunistic_validate once and
 			// retries (next SelectDeref F80=0 → VariableSelector::select).
@@ -3959,7 +4000,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			} else {
 				burnSimpleConstant(r, targetType)
 			}
-			burnCreateArrayVariable(r, opts, targetType, true)
+			{
+				_arr := burnCreateArrayVariable(r, opts, targetType, true)
+				emitOrphanArrayGlobal(ctx, targetType, _arr)
+			}
 			createdArrayThisLhs = true
 		} else if strings.Contains(targetType.Name, "*") {
 			// Pointed-to is pointer: make_init_value F20 null vs address-of.
@@ -5018,7 +5062,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				continue
 			}
 			if newArray {
-				burnCreateArrayVariable(r, opts, targetType, true)
+				{
+					_arr := burnCreateArrayVariable(r, opts, targetType, true)
+					emitOrphanArrayGlobal(ctx, targetType, _arr)
+				}
 				continue
 			}
 			_ = r.flipcoin(50)
@@ -5952,7 +5999,10 @@ func emitStatement(
 				if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
 					fmt.Fprintf(os.Stderr, "ARRAY create ty=%s hex=%d\n", arrTy.Name, hexDigitsForConstant(arrTy))
 				}
-				burnCreateArrayVariable(r, opts, arrTy, false)
+				{
+					_arr := burnCreateArrayVariable(r, opts, arrTy, false)
+					emitOrphanArrayGlobal(ctx, arrTy, _arr)
+				}
 				// make_random_array_init: SelectLoopCtrlVar for the loop CV, then
 				// further init indexing (seed2 e217 U3 + constant after IV create).
 				burnSelectLoopCtrlVarCreate(r, opts)
