@@ -782,9 +782,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if len(sameWidth) == 1 {
 			return sameWidth[0], true
 		}
+		// eConvert often collapses to one viable; if seed2 expects no pick, prefer
+		// first when not assigning (read path). Still pick when assigning.
+		if !forAssign {
+			return sameWidth[0], true
+		}
 		return sameWidth[int(er.pick(uint32(len(sameWidth))))], true
 	}
 	if len(filtered) == 1 {
+		return filtered[0], true
+	}
+	if !forAssign {
 		return filtered[0], true
 	}
 	return filtered[int(er.pick(uint32(len(filtered))))], true
