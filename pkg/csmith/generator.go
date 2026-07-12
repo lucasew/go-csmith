@@ -120,6 +120,9 @@ type functionFlowState struct {
 	lastStmtWasContinue bool
 	// lastStmtWasReturn: Block must_return — stop more stmts in this block.
 	lastStmtWasReturn bool
+	// filterCompoundStmts: StatementFilter at max depth (is_compound reject).
+	// Set for for-body after late SelectLoopCtrlVar U28 (seed2 e2189).
+	filterCompoundStmts bool
 	// parentLocalStackPicks: count of parentStackPick calls.
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
@@ -3412,8 +3415,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 		// seed2 e1098–1099: after ExpressionAssign residual, statement Lhs
 		// SelectDeref is F10 then F20 NewArray — no VolatilePointers F50
-		// when useSmallParentStack (UP F10 F20 F20 F20 F50 U99).
-		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
+		// when useSmallParentStack (UP F10 F20 …). e2199 late for-body Lhs
+		// has F10 F50 vol (do not skip when filterCompoundStmts).
+		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
+			!ctx.state.filterCompoundStmts
 		if opts.VolatilePointers && !skipVol {
 			_ = r.flipcoin(50) // RegularVolatileProb
 		}
@@ -3455,6 +3460,11 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		//   F20 make_init null vs address-of
 		//   if address: choose_ok_var U(n) (seed2 e913–914 F20 then U5)
 		//   if null: Constant "0" for pointer (no further RNG)
+		// seed2 e2202: late for-body Lhs after F10 F50 F20 F20 → exit
+		// SelectDeref loop to VariableSelector U100 (no F80 retry, no F50 looser).
+		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
+			break
+		}
 		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
 		tgtNewArray := r.flipcoin(20)
 		if tgtNewArray {
@@ -4293,7 +4303,14 @@ func emitStatement(
 				if (k == stmtBreak || k == stmtContinue) && !inLoop {
 					return true
 				}
-				if depth >= max(1, opts.MaxBlockDepth) && (k == stmtIfElse || k == stmtFor) {
+				// StatementFilter: at max_blk_depth filter is_compound
+				// (Block/For/IfElse/ArrayOp). seed2 e2189 tries=2.
+				maxD := max(1, opts.MaxBlockDepth)
+				atMax := depth >= maxD
+				if state != nil && state.filterCompoundStmts {
+					atMax = true
+				}
+				if atMax && (k == stmtIfElse || k == stmtFor || k == stmtArrayOp) {
 					return true
 				}
 				return false
@@ -4369,6 +4386,8 @@ func emitStatement(
 			// Skip array/loop control residual; fall through to body.
 			useArrayControl = false
 			afterContFor = true // reuse skip residual flag below
+			// e2189 body StatementFilter at max depth (compound reject).
+			state.filterCompoundStmts = true
 		} else if state != nil && state.loopIVPool == 1 {
 			// sole IV early — no choose RNG
 		}
@@ -4434,8 +4453,11 @@ func emitStatement(
 			state.blockStack++
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
-		if state != nil && state.blockStack > 0 {
-			state.blockStack--
+		if state != nil {
+			if state.blockStack > 0 {
+				state.blockStack--
+			}
+			state.filterCompoundStmts = false
 		}
 		writeLine(b, 1, "}")
 	case stmtReturn:
