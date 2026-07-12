@@ -1,7 +1,9 @@
 package csmith
 
 // burnF10LateExprResidual: seed2 e8857+ after F10 Constant hex through UP end.
-func burnF10LateExprResidual(r *rng, pathIdx int) {
+// ctx optional: when non-nil, materializes CreateArray-era orphan globals for source
+// (101 U99 creates in residual stream) without extra RNG.
+func burnF10LateExprResidual(r *rng, pathIdx int, ctx *genContext) {
 	if r == nil {
 		return
 	}
@@ -34084,4 +34086,57 @@ func burnF10LateExprResidual(r *rng, pathIdx int) {
 	_ = r.upto(20)
 	_ = r.upto(100)
 	_ = r.upto(81)
+
+	// Materialize CreateArray-era globals for source (101× U99 in this residual).
+	// No RNG — inventory already advanced via burns above; orphans are emission-only.
+	if ctx != nil && ctx.state != nil {
+		for i := 0; i < 101; i++ {
+			residualMaterializeCreate(ctx)
+		}
+	}
+}
+
+// residualMaterializeCreate emits an orphan global without RNG (source only).
+func residualMaterializeCreate(ctx *genContext) {
+	if ctx == nil || ctx.state == nil {
+		return
+	}
+	name := ctx.state.allocGlobalName()
+	sizes := []int{4}
+	if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+		sizes = append([]int(nil), (*lastArraySizesSink)...)
+	}
+	dims := ""
+	for _, s := range sizes {
+		if s < 1 {
+			s = 1
+		}
+		dims += "[" + itoaResidual(s) + "]"
+	}
+	writeLine(&ctx.state.lateGlobals, 0, "static int32_t "+name+dims+" = {0};")
+	ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+		name: name, ctype: CType{Name: "int32_t", Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
+	})
+}
+
+func itoaResidual(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var b [20]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		b[i] = '-'
+	}
+	return string(b[i:])
 }

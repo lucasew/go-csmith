@@ -4489,7 +4489,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							}
 							// e9699+ F10 paths after small-int may continue expression residual
 							if pi >= 8 {
-								burnF10LateExprResidual(r, pi)
+								burnF10LateExprResidual(r, pi, ctx)
 								r.silenceTrace() // residual matches remaining UP stream
 								break
 							}
@@ -4499,7 +4499,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							}
 							// e8857+ F10#7: after hex, F50 U4 U100×5 U120 + expression residual
 							if pi >= 7 {
-								burnF10LateExprResidual(r, pi)
+								burnF10LateExprResidual(r, pi, ctx)
 								r.silenceTrace() // residual matches remaining UP stream
 								break
 							}
