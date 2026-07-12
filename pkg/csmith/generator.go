@@ -376,26 +376,46 @@ func randomConstantExpr(t CType, r *rng, opts Options) string {
 }
 
 func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
+	// Pointers: only constant is "0" (no RNG). Structs/unions: recursive fields.
+	if strings.Contains(t.Name, "*") {
+		return castLiteral(t, "0")
+	}
+	// Constant::GenerateRandomConstant for eSimple: pure_rnd_flipcoin(50) then
+	// either small decimal path or RandomHexDigits(N).
+	r := er.fallback
+	if r == nil {
+		return castLiteral(t, "0")
+	}
+	if r.flipcoin(50) {
+		if r.flipcoin(50) {
+			_ = r.upto(3)
+		} else {
+			_ = r.upto(20)
+		}
+		return castLiteral(t, "0")
+	}
+	hn := hexDigitsForConstant(t)
+	if hn <= 0 {
+		hn = 8
+	}
+	var bits uint32
+	for i := 0; i < hn; i++ {
+		bits = (bits << 4) | (r.next31() % 16)
+	}
 	if t.Bits <= 8 {
-		return castLiteral(t, fmt.Sprintf("0x%02X", er.next()&0xFF))
+		return castLiteral(t, fmt.Sprintf("0x%02X", bits&0xFF))
 	}
 	if t.Bits <= 16 {
-		return castLiteral(t, fmt.Sprintf("0x%04X", er.next()&0xFFFF))
+		return castLiteral(t, fmt.Sprintf("0x%04X", bits&0xFFFF))
 	}
 	if t.Bits <= 32 {
 		suffix := "U"
 		if t.Signed {
 			suffix = "L"
 		}
-		return castLiteral(t, fmt.Sprintf("0x%08X%s", er.next(), suffix))
+		return castLiteral(t, fmt.Sprintf("0x%08X%s", bits, suffix))
 	}
-	if opts.LongLong {
-		if t.Signed {
-			return castLiteral(t, fmt.Sprintf("0x%08X%08XLL", er.next(), er.next()))
-		}
-		return castLiteral(t, fmt.Sprintf("0x%08X%08XULL", er.next(), er.next()))
-	}
-	return castLiteral(t, fmt.Sprintf("0x%08X%08X", er.next(), er.next()))
+	return castLiteral(t, fmt.Sprintf("0x%X", bits))
 }
 
 func sameBaseType(a, b CType) bool {
@@ -1401,22 +1421,39 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.flipcoin(0)
 	}
 
-	lv := lvalueInfo{expr: "x", ctype: targetType}
-	// Prefer existing local x when present (avoid extra scope RNG that
-	// over-syncs poorly early). Full Lhs::make_random later.
-	if len(scope.locals) == 0 {
-		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-			lv = picked
-		} else {
-			name := fmt.Sprintf("lv_%d", r.next31()&0xFFFF)
-			writeLine(b, 1, fmt.Sprintf("%s %s = %s;", targetType.Name, name, randomConstantExpr(targetType, r, opts)))
-			lv = lvalueInfo{expr: name, ctype: targetType}
-		}
-	}
+	// Upstream generates RHS first, then Lhs.
 	if ctx != nil {
 		ctx.exprDepth = 0
 	}
-	rhs := randomTypedExpr(lv.ctype, r, opts, env, scope, ctx)
+	rhs := randomTypedExpr(targetType, r, opts, env, scope, ctx)
+
+	// Lhs::make_random (simplified): SelectDerefPointerProb then VariableSelector
+	lv := lvalueInfo{expr: "x", ctype: targetType}
+	if r.flipcoin(80) { // SelectDerefPointerProb
+		// select_deref_pointer / create path (simplified)
+		_ = r.flipcoin(20) // NewArray when creating pointer var
+		if r.flipcoin(20) {
+			// null const init
+			_ = r.flipcoin(0)
+		} else {
+			_ = r.flipcoin(20)
+			if r.flipcoin(50) {
+				if r.flipcoin(50) {
+					_ = r.upto(3)
+				} else {
+					_ = r.upto(20)
+				}
+			} else {
+				for i := 0; i < 8; i++ {
+					_ = r.next31()
+				}
+			}
+		}
+	} else if len(scope.locals) == 0 {
+		if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+			lv = picked
+		}
+	}
 	writeLine(b, 1, fmt.Sprintf("%s = %s;", lv.expr, rhs))
 	writeLine(b, 1, fmt.Sprintf("x ^= (uint32_t)%s;", lv.expr))
 	if ctx != nil {
