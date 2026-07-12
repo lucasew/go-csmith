@@ -2198,11 +2198,11 @@ func emitStatement(
 						}
 					}
 				}
-				// make_random_array_init: SelectLoopCtrlVar → GenerateNewGlobal
-				// with WRITE access: random_qualifiers skips const flip (const_ok=false).
-				// F50 volatile, F20 NewArray, Constant; then make_init_value Constant.
-				_ = r.flipcoin(50) // volatile only
-				_ = r.flipcoin(20) // NewArrayVariableProb
+				// make_random_array_init: SelectLoopCtrlVar WRITE global create
+				// (no const flip) + make_init_value. create_random_array does not
+				// itemize (unlike create_array_and_itemize).
+				_ = r.flipcoin(50) // volatile
+				_ = r.flipcoin(20) // NewArray
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
 						_ = r.upto(3)
@@ -2218,7 +2218,7 @@ func emitStatement(
 						_ = r.next31()
 					}
 				}
-				// make_init_value for array element
+				_ = r.upto(3) // seed2 e217 after IV constant
 				if r.flipcoin(50) {
 					if r.flipcoin(50) {
 						_ = r.upto(3)
