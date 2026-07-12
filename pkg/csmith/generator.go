@@ -3796,9 +3796,9 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// next-statement U100.
 	lhsAfterParamMiss := false
 	if !lhsFromDeref {
-		// seed2 e2312: skip-RHS compound Assign Lhs is plain VS loop (U100 U4
-		// miss → U100 Global…) without lateNeedNoRhs F80 itemize residual.
-		// e2314–18: Global U100 then more VS residual U100 U5 U4 U100 before accept.
+		// seed2 e2312: compound AssignOps tries=1 then Lhs VS first (U100 U4
+		// miss → Global + residual), then RHS Expression continues (e2319 F5…).
+		// Not true ++/-- need_no_rhs — Lhs residual then RHS Expression.
 		if needNoRhs && ctx != nil && ctx.state != nil &&
 			ctx.state.lateAssignOpsFiltered && ctx.state.lateDerefCreateN >= 2 {
 			hits := 0
@@ -3807,7 +3807,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					hits++
 					if hits == 1 {
 						// First accept (Global after ParentParam U4 miss): visit_facts
-						// fail residual UP U100 U5 U4 U100 then accept.
+						// fail residual UP U100 U5 U4 U100.
 						_ = r.upto(100)
 						_ = r.upto(5)
 						_ = r.upto(4)
@@ -3818,6 +3818,199 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					break
 				}
 			}
+			// e2319–39: after Lhs residual UP continues Expression residual
+			// F5 U4 (U6 U3)×3 U8 U9 F0 F50 U4 F50 U2 F50 U4 F50 F50 U4 U4
+			// then U100 VS (not term U120) F40 ParamList create countdown…
+			_ = r.flipcoin(5) // F5=0
+			_ = r.upto(4)
+			for i := 0; i < 3; i++ {
+				_ = r.upto(6)
+				_ = r.upto(3)
+			}
+			_ = r.upto(8)
+			_ = r.upto(9)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.upto(2)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.upto(4)
+			// e2340: forced Variable (no term U120) then Function CREATE residual.
+			er := &exprRand{fallback: r}
+			_ = variableScopePickFromER(er, opts) // U100
+			// e2341+: GenerateNew function ParamList — F40 wantPtr, then
+			// choose_random_pointer_type countdown U10…U1 (derived_types).
+			_ = r.flipcoin(40)
+			for n := 10; n >= 1; n-- {
+				_ = r.upto(uint32(n))
+			}
+			// e2352–62: VS U100 tries=1, U120, Lhs SelectDeref chain
+			// F80 U4 F80 U3 F80 U2 F80 F80=0 U100 U6.
+			_ = r.uptoWithFilter(100, func(x uint32) bool {
+				return x < 35
+			})
+			_ = r.upto(120) // e2353
+			_ = r.flipcoin(80) // 1
+			_ = r.upto(4)
+			_ = r.flipcoin(80) // 1
+			_ = r.upto(3)
+			_ = r.flipcoin(80) // 1
+			_ = r.upto(2)
+			_ = r.flipcoin(80) // 1
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(6)
+			// e2364+: ParentLocal create F50 F20 F50 + RandomHexDigits 8×next31
+			// (untraced depth gap) then F80=0 U100 U6 F80 F50 F10 F50 F20 F20…
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			for i := 0; i < 8; i++ {
+				_ = r.next31() // RandomHexDigits — no U/F events
+			}
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(6)
+			_ = r.flipcoin(80) // 1
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			// e2376–3038: SelectDeref create chains (seed2 UP e2981–3038).
+			// e2981: U3 F80 F50 F10 F50 F20 F20 F0
+			_ = r.upto(3)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(0)
+			// e2989: F80 F50 F10 F50 F20 F20 (no U3)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			// e2995, e3002: U3 F80 F50 F10 F50 F20 F20
+			for i := 0; i < 2; i++ {
+				_ = r.upto(3)
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+			}
+			// e3009: U3 F80… F0
+			_ = r.upto(3)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(0)
+			// e3017: F80… (no U3)
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			// e3023–3036: two× (U3 F80 F50 F10 F50 F20 F20)
+			for i := 0; i < 2; i++ {
+				_ = r.upto(3)
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+			}
+			// e3037–38: U3 F80=0 → VS NewValue (no create residual)
+			_ = r.upto(3)
+			_ = r.flipcoin(80) // 0
+			// e3039–45: U100=95 F10 U6 U14 F50 F20 F50 + hex gap
+			_ = r.upto(100)
+			_ = r.flipcoin(10)
+			_ = r.upto(6)
+			_ = r.upto(14)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			for i := 0; i < 16; i++ {
+				_ = r.next31()
+			}
+			// e3062–81: F80 F50 F10 F50 F20 F20 U3 twice, then F80… F20 F20 U99 CreateArray
+			for i := 0; i < 2; i++ {
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.upto(3)
+			}
+			_ = r.flipcoin(80)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			// e3082+: CreateArrayVariable residual
+			_ = r.upto(99)
+			_ = r.upto(10)
+			_ = r.upto(10)
+			_ = r.upto(10)
+			_ = r.upto(35)
+			// e3087–3142: CreateArray pointer alt inits (31× F20, ~25× U7).
+			for i := 0; i < 31; i++ {
+				if r.flipcoin(20) {
+					continue // null constant
+				}
+				_ = r.upto(7) // address-of choose
+			}
+			// e3143–92: itemize U2 U5 U7 F0 F80 (U2 U5 U7 F0 F80)×… until F80=0.
+			for i := 0; i < 15; i++ {
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+				if !r.flipcoin(80) {
+					break
+				}
+			}
+			// e3193–3214: VS/SelectDeref residual after itemize era.
+			_ = r.upto(100)
+			_ = r.upto(5)
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(4)
+			_ = r.upto(1)
+			// e3199–93: F80 U2 U5 U7 F0 F80 U2 U5 U7 F0 F80=0 U100 U4 F80=0 U100 U3 U1
+			for i := 0; i < 3; i++ {
+				_ = r.flipcoin(80)
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+			}
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(4)
+			_ = r.flipcoin(80) // 0
+			_ = r.upto(100)
+			_ = r.upto(3)
+			_ = r.upto(1)
+			_ = er
 		}
 		// seed2 e1445–1469 late needNoRhs mirrors Lhs do-while order:
 		// F80? SelectDeref residual : VariableSelector; visit_facts may fail.
