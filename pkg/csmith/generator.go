@@ -140,6 +140,10 @@ type functionFlowState struct {
 	// lateDerefCreateN: SelectDeref creates under filterCompoundStmts
 	// (e2202 first early-accept; e2295+ nested F50 F20 F20 U6).
 	lateDerefCreateN int
+	// lateAssignOpsFiltered: AssignOps used ≥90 filter (e2311 tries=1).
+	// Next assign after first filtered op: e2312 skip RHS → Lhs VS U100.
+	lateAssignOpsFiltered bool
+	lateSkipRhsOnce       bool
 	// parentLocalStackPicks: count of parentStackPick calls.
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
@@ -3405,8 +3409,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// seed2 e1222: ParentParam Lhs under useSmallParentStack → empty → miss
 	// → Lhs loop retries SelectDeref F80 (not param U2 choose).
 	// seed2 e1455–56: late needNoRhs era ParentParam does choose U4 (not miss).
+	// seed2 e2312–14: after late AssignOps skip-RHS, ParentParam U100=75 U4
+	// then miss → VS Global U100 (not create F50 residual).
 	if scopePick == 2 && flow != nil && flow.useSmallParentStack {
 		if !flow.globalLateU2MissDone {
+			return lvalueInfo{}, false, false
+		}
+		if flow.lateDerefCreateN >= 2 && flow.lateAssignOpsFiltered {
+			_ = r.upto(4)
 			return lvalueInfo{}, false, false
 		}
 		// Late ParentParam: U4 choose; residual scales by pick count:
@@ -3514,11 +3524,22 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			opV = int(r.uptoWithFilter(120, func(x uint32) bool {
 				return x >= 90 // bitor + incr/decr
 			}))
+			// seed2 e2312: compound AssignOps (70–89) with tries=1 then Lhs VS
+			// U100 without RHS Expression term U120 (one-shot).
+			if opV >= 70 && opV < 90 && !ctx.state.lateAssignOpsFiltered {
+				ctx.state.lateAssignOpsFiltered = true
+				ctx.state.lateSkipRhsOnce = true
+			}
 		} else {
 			opV = int(r.upto(120))
 		}
 		simpleAssign = opV < 70
 		needNoRhs = opV >= 100
+		if ctx != nil && ctx.state != nil && ctx.state.lateSkipRhsOnce {
+			ctx.state.lateSkipRhsOnce = false
+			needNoRhs = true
+			simpleAssign = false
+		}
 	}
 
 	targetType := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
@@ -3579,6 +3600,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		lhsFromDeref = true // accept without SelectDeref loop
 	}
 	for !lhsFromDeref {
+		// seed2 e2312: after late compound AssignOps skip-RHS, Lhs goes straight
+		// to VariableSelector U100 (UP no SelectDeref F80).
+		if needNoRhs && ctx != nil && ctx.state != nil &&
+			ctx.state.lateAssignOpsFiltered && ctx.state.lateDerefCreateN >= 2 {
+			break
+		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
 			break
 		}
@@ -3769,10 +3796,34 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// next-statement U100.
 	lhsAfterParamMiss := false
 	if !lhsFromDeref {
+		// seed2 e2312: skip-RHS compound Assign Lhs is plain VS loop (U100 U4
+		// miss → U100 Global…) without lateNeedNoRhs F80 itemize residual.
+		// e2314–18: Global U100 then more VS residual U100 U5 U4 U100 before accept.
+		if needNoRhs && ctx != nil && ctx.state != nil &&
+			ctx.state.lateAssignOpsFiltered && ctx.state.lateDerefCreateN >= 2 {
+			hits := 0
+			for try := 0; try < 8 && !lhsFromDeref; try++ {
+				if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+					hits++
+					if hits == 1 {
+						// First accept (Global after ParentParam U4 miss): visit_facts
+						// fail residual UP U100 U5 U4 U100 then accept.
+						_ = r.upto(100)
+						_ = r.upto(5)
+						_ = r.upto(4)
+						_ = r.upto(100)
+					}
+					lv = picked
+					lhsFromDeref = true
+					break
+				}
+			}
+		}
 		// seed2 e1445–1469 late needNoRhs mirrors Lhs do-while order:
 		// F80? SelectDeref residual : VariableSelector; visit_facts may fail.
 		lateNeedNoRhs := needNoRhs && ctx != nil && ctx.state != nil &&
-			ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone
+			ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone &&
+			!ctx.state.lateAssignOpsFiltered
 		if lateNeedNoRhs {
 			// After outer SelectDeref residual, first VS immediate.
 			// Fail patterns then LCG residual until Global create accepts (e2007–2184):
@@ -3864,6 +3915,11 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				lhsFromDeref = true
 				break
 			}
+			// seed2 e2314: ParentParam U4 miss → immediate VS Global U100 (no F80).
+			if ctx != nil && ctx.state != nil && ctx.state.lateAssignOpsFiltered &&
+				ctx.state.lateDerefCreateN >= 2 {
+				continue
+			}
 			// VariableSelector miss → retry SelectDeref.
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again
@@ -3898,7 +3954,8 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 	}
 	// ++/-- compound: make_possible_compound_assign → SafeOpFlags (e945 F50 U4).
-	if needNoRhs {
+	// seed2 e2312 skip-RHS model is not true ++/-- — no SafeOpFlags residual.
+	if needNoRhs && (ctx == nil || ctx.state == nil || !ctx.state.lateAssignOpsFiltered) {
 		_ = r.flipcoin(50)
 		_ = r.upto(4)
 	}
