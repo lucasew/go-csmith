@@ -135,11 +135,11 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 864** (defaults) |
+| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 913** (defaults) |
 | Seed 2 source match | Blocked on event match |
 | 20-seed gate | Not started |
 
-Next plateau focus: e864 SelectGlobal U11 vs inflated U17 (two matching pointer globals) vs GO create F50 — GlobalList inventory under-count for pointer types after e825 create.
+Next plateau focus: e913 Lhs SelectDeref pointer create — UP `F20` vs GO `F50` in pointed-to `make_init_value` / `create_and_initialize` after address-of (events 906–912 match: F80 F10 F50 F20 F20 F50 F20).
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
