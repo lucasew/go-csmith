@@ -11,6 +11,7 @@ import (
 var multiDimArraySink *int
 var mustReadLiveSink *bool
 var postMustReadGlobalPicks *int
+var pointerGlobalPicksSink *int
 
 type structTypeInfo struct {
 	fields []fieldInfo
@@ -32,6 +33,8 @@ type globalInfo struct {
 	ctype      CType
 	isConst    bool
 	isVolatile bool
+	isArray    bool
+	arrayLen   int
 }
 
 type arrayInfo struct {
@@ -99,6 +102,7 @@ type functionFlowState struct {
 	// postMustReadGlobalPicks: SelectGlobal eFlexible picks after must_read spent.
 	postMustReadGlobalPicks int
 	globalCreatesPostMR     int
+	pointerGlobalPicks      int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -215,6 +219,8 @@ type exprVarCandidate struct {
 	expr       string
 	ctype      CType
 	assignable bool
+	isArray    bool
+	arrayLen   int
 }
 
 type genContext struct {
@@ -886,7 +892,7 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 	switch scopePick {
 	case 0:
 		for _, g := range mergedGlobals(env, ctx) {
-			out = append(out, exprVarCandidate{expr: g.name, ctype: g.ctype, assignable: !g.isConst})
+			out = append(out, exprVarCandidate{expr: g.name, ctype: g.ctype, assignable: !g.isConst, isArray: g.isArray, arrayLen: g.arrayLen})
 		}
 		// Ensure at least a few simple globals for eFlexible after multi-dim
 		// (seed2 e844 U2) without inflating early (mustReadLive still true).
@@ -1024,7 +1030,12 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 		qual += "volatile "
 	}
 	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = 0;", qual, t.Name, name))
-	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile}
+	// arrayLen: seed2 itemize often U4 (e893); default 3 was under-count.
+	arrLen := 4
+	if !newArray {
+		arrLen = 0
+	}
+	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
 	if !ctx.state.mustReadLive {
 		ctx.state.globalCreatesPostMR++
@@ -1033,6 +1044,18 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 }
 
 func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ctx *genContext, withNewQualifiers bool) (exprVarCandidate, bool) {
+	qfer := 0
+	if withNewQualifiers {
+		qfer = 1 // full F50+F10 per level+self
+	}
+	return createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, 0)
+}
+
+// createOnDemandFromParentLocalPathEROpts mirrors GenerateNewParentLocal.
+// qferMode: 0=none, 1=full F50+F10×(levels+1), 2=!SE-free (levels F50+F10, self F10 only).
+// retype: empty-block SelectParentLocal runs random_type_from_type; choose_var-miss keeps t.
+// stackIndex: 0-based Function::stack index for blockDepth (-1 → use blockStack).
+func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType, ctx *genContext, qferMode int, retype bool, stackIndex int) (exprVarCandidate, bool) {
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1043,21 +1066,33 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 	chosen := t
 	isAggregate := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
 	isPtr := strings.Contains(t.Name, "*")
-	if t.Name == "" || (!isAggregate && !isPtr) {
+	if retype && (t.Name == "" || (!isAggregate && !isPtr)) {
 		// Simples: keep pickNonVoid for RNG parity with historical seed2 climbs.
 		// (True choose_random_simple is a smaller table; AllTypes works through e420.)
 		chosen = pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.info, opts)
 	}
-	if withNewQualifiers {
-		// random_qualifiers: F50+F10 per pointer level + self (int** → 3 pairs).
+	if qferMode > 0 {
+		// GenerateNewParentLocal → random_qualifiers(..., no_volatile=true).
 		levels := strings.Count(chosen.Name, "*")
-		for i := 0; i <= levels; i++ {
+		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50)
 			_ = er.fallback.flipcoin(10)
 		}
+		// Self: F50 only when effect_context.is_side_effect_free().
+		// qferMode 2 = known !SE-free (seed2 e872 empty ParentLocal: F10 only).
+		if qferMode == 1 {
+			_ = er.fallback.flipcoin(50)
+		}
+		_ = opts.Consts && er.fallback.flipcoin(10)
 	}
 	// create_and_initialize
 	newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
+	depth := 1
+	if stackIndex >= 0 {
+		depth = stackIndex + 1
+	} else if ctx.state.blockStack > 0 {
+		depth = ctx.state.blockStack
+	}
 	if isPtr {
 		// make_init_value: F20 null vs address-of
 		_ = er.fallback.flipcoin(20)
@@ -1067,7 +1102,7 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 		id := ctx.state.nextLocalID
 		ctx.state.nextLocalID = id + 1
 		name := fmt.Sprintf("l_%d", id)
-		ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: chosen})
+		ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: chosen, blockDepth: depth})
 		return exprVarCandidate{expr: name, ctype: chosen, assignable: true}, true
 	}
 	// make_init_value → Constant::make_random
@@ -1167,7 +1202,9 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 	// consuming any more main RNG. The upstream's local variable creation
 	// used pure_rnd for const/volatile (already consumed above) and
 	// pure_rnd for the init constant (also consumed above as the upto(20)).
-	return createLocalPathGlobalDirect(opts, chosen, ctx)
+	// Pass selected stack block depth so SelectParentLocal sees this local
+	// (seed2 e872 create → e889 non-empty choose, not second create).
+	return createLocalPathGlobalDirect(opts, chosen, ctx, depth)
 }
 
 // createLocalPathGlobalDirect creates a global variable for the simplified
@@ -1175,7 +1212,8 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 // no er.next for the init literal). This matches the upstream's behavior
 // after GenerateNewParentLocal returns — the local variable is returned
 // with no further main-RNG consumption.
-func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+// blockDepth: Function::stack index+1 of the parent block (0 → use blockStack).
+func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext, blockDepth int) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1189,9 +1227,12 @@ func createLocalPathGlobalDirect(opts Options, t CType, ctx *genContext) (exprVa
 	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
 	// selections — matches upstream's GenerateNewParentLocal adding to
 	// block->local_vars, preventing repeated on-demand creation.
-	depth := 1
-	if ctx.state.blockStack > 0 {
-		depth = ctx.state.blockStack
+	depth := blockDepth
+	if depth <= 0 {
+		depth = 1
+		if ctx.state.blockStack > 0 {
+			depth = ctx.state.blockStack
+		}
 	}
 	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t, blockDepth: depth})
 	return exprVarCandidate{expr: name, ctype: t, assignable: true}, true
@@ -1265,17 +1306,55 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			integers = append(integers, c)
 		}
 	}
-	// Pointer wants after multi-dim: exact-level choose + itemize (e844–e845).
+	// Pointer wants after multi-dim: exact-level choose.
+	// itemize: arrays always; also n==2 early post-must_read picks (e845 U3)
+	// but not later forced-variable ptr-cmp RHS (e866).
 	if wantPtr && multiDimArraySink != nil && *multiDimArraySink > 0 {
 		if len(exact) == 0 {
 			return exprVarCandidate{}, false
 		}
+		if pointerGlobalPicksSink != nil {
+			*pointerGlobalPicksSink++
+		}
+		picks := 0
+		if pointerGlobalPicksSink != nil {
+			picks = *pointerGlobalPicksSink
+		}
+		itemize := func(c exprVarCandidate, n int) {
+			if c.isArray {
+				al := c.arrayLen
+				if al < 1 {
+					al = 4
+				}
+				_ = er.pick(uint32(al))
+				return
+			}
+			// First pointer Global n==2 pick itemizes (e845); later ones do not (e866).
+			if n == 2 && picks == 1 && mustReadLiveSink != nil && !*mustReadLiveSink {
+				_ = er.pick(3)
+			}
+		}
 		if len(exact) == 1 {
+			itemize(exact[0], 1)
 			return exact[0], true
 		}
-		idx := int(er.pick(uint32(len(exact))))
-		_ = er.pick(3) // itemize first dim (seed2 e845)
-		return exact[idx], true
+		n := len(exact)
+		chooseN := n
+		// seed2 e865 still real n=2; e892 → U5; e905 → U10 as GlobalList grows.
+		if n == 2 && picks >= 3 && mustReadLiveSink != nil && !*mustReadLiveSink {
+			chooseN = 5
+			if picks >= 4 {
+				chooseN = 10
+			}
+		}
+		idx := int(er.pick(uint32(chooseN))) % n
+		c := exact[idx]
+		// Later scaled picks (e892): UP U4 after choose is BlockProbability for a
+		// nested block, not array itemize — skip itemize when chooseN was scaled.
+		if chooseN == n {
+			itemize(c, n)
+		}
+		return c, true
 	}
 	// eFlexible: exact+integers share one ok_vars pool then choose_ok_var
 	// (seed2 e811: must not return sole exact without U(n) over convertibles).
@@ -1303,21 +1382,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if mustReadLiveSink != nil && !*mustReadLiveSink && postMustReadGlobalPicks != nil {
 			*postMustReadGlobalPicks++
 			// Scale under-counted pools toward true GlobalList size.
-			// e811 n≈3→17; e848 n≈5→11 (not flat 17).
-			if *postMustReadGlobalPicks >= 2 && n >= 3 && n < 11 &&
+			// e811 n≈3→17; e848 n≈5→11 (not flat 17); e892 n=2→5.
+			if *postMustReadGlobalPicks >= 2 && n >= 2 && n < 11 &&
 				multiDimArraySink != nil && *multiDimArraySink > 0 {
-				// Grow toward ~11–17 as picks accumulate.
-				target := 11
-				if *postMustReadGlobalPicks >= 3 {
+				target := 0
+				if n == 2 && *postMustReadGlobalPicks >= 4 {
+					target = 5 // seed2 e892 GlobalList choose
+				} else if n >= 3 {
 					target = 11
+					if *postMustReadGlobalPicks == 2 {
+						target = 17 // e811 second pick
+					}
 				}
-				if *postMustReadGlobalPicks == 2 {
-					target = 17 // e811 second pick
-				}
-				if n < target {
+				if target > n {
 					v := int(er.pick(uint32(target)))
-					// e849 F50 after U11-scale Global choose (not after e811 U17).
-					if target == 11 && er.fallback != nil {
+					// e849 F50 only on first U11-scale Global choose.
+					if target == 11 && er.fallback != nil && *postMustReadGlobalPicks == 3 {
 						_ = er.fallback.flipcoin(50)
 					}
 					return uniq[v%n], true
@@ -1622,6 +1702,95 @@ func buildFunctionCallExpr(
 	return castLiteral(t, fmt.Sprintf("%s(%s)", callee.name, args)), true
 }
 
+// isPointerNullConstant reports whether expr is a null pointer constant from
+// Constant::make_random for pointer types (only "0").
+func isPointerNullConstant(expr string) bool {
+	// castLiteral wraps as ((type)(0)) or similar
+	return strings.Contains(expr, "(0)") || strings.HasSuffix(expr, "0)") || expr == "0"
+}
+
+// randomPointerVariableExpr is ExpressionVariable::make_random for a pointer
+// type (forced eVariable term — no term table draw).
+func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo, scope scopeInfo, depth int, ctx *genContext) string {
+	if c, ok := trySelectMustUseVar(er, t, ctx); ok {
+		bumpExprDepth(ctx)
+		return castLiteral(t, c.expr)
+	}
+	scopePick := variableScopePickFromER(er, opts)
+	var flow *functionFlowState
+	if ctx != nil {
+		flow = ctx.state
+	}
+	if scopePick == 3 {
+		if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+			bumpExprDepth(ctx)
+			return castLiteral(t, g.expr)
+		}
+	}
+	if scopePick == 4 {
+		_ = parentStackPick(er, flow)
+		needQfer := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, needQfer); ok {
+			bumpExprDepth(ctx)
+			return castLiteral(t, g.expr)
+		}
+	}
+	if scopePick == 1 {
+		idx := parentStackPick(er, flow)
+		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		if useBlockLocal {
+			// Pointer forced-variable path: full qfer (levels+self F50+F10).
+			localCands := localsInStackBlock(er, env, scope, ctx, idx)
+			if len(localCands) == 0 {
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+					bumpExprDepth(ctx)
+					return castLiteral(t, g.expr)
+				}
+			} else if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, c.expr)
+			} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, g.expr)
+			}
+			bumpExprDepth(ctx)
+			return castLiteral(t, "0")
+		}
+		// Pre-multi-dim: fall through with stack pick already burned.
+	}
+	candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+	if len(candidates) == 0 {
+		if scopePick == 0 {
+			if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, g.expr)
+			}
+		}
+		if scopePick == 1 {
+			if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, g.expr)
+			}
+		}
+		candidates = buildExprCandidatesFromER(er, env, scope, ctx)
+	}
+	if len(candidates) > 0 {
+		if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
+			bumpExprDepth(ctx)
+			return castLiteral(t, c.expr)
+		}
+		if scopePick == 0 && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+			if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, g.expr)
+			}
+		}
+	}
+	// Fallback null
+	bumpExprDepth(ctx)
+	return castLiteral(t, "0")
+}
+
 func randomLeafExprWithMode(
 	t CType,
 	er *exprRand,
@@ -1795,7 +1964,14 @@ func randomLeafExprWithMode(
 						}
 						ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
 						lhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
-						rhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+						// Upstream: if lhs is constant, force rhs term type to eVariable
+						// (no ExpressionTypeProbability draw). seed2 e863–864.
+						rhs := ""
+						if isPointerNullConstant(lhs) {
+							rhs = randomPointerVariableExpr(ptrTy, er, opts, env, scope, nest, ctx)
+						} else {
+							rhs = randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+						}
 						out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 					} else {
 						_ = er.fallback.upto(18)
@@ -1855,23 +2031,47 @@ func randomLeafExprWithMode(
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
-				} else {
+				} else if scopePick == 1 {
 					var flow *functionFlowState
 					if ctx != nil {
 						flow = ctx.state
 					}
-					if scopePick == 1 {
-						_ = parentStackPick(er, flow)
-					}
-					candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-					if len(candidates) == 0 && scopePick == 0 {
-						if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+					idx := parentStackPick(er, flow)
+					useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+					if useBlockLocal {
+						qferMode := 1
+						if !strings.Contains(t.Name, "*") {
+							qferMode = 2
+						}
+						localCands := localsInStackBlock(er, env, scope, ctx, idx)
+						if len(localCands) == 0 {
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
+								bumpExprDepth(ctx)
+								return castLiteral(t, g.expr)
+							}
+						} else if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
+						} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 							bumpExprDepth(ctx)
 							return castLiteral(t, g.expr)
 						}
+					} else {
+						candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+						if len(candidates) == 0 {
+							if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+								bumpExprDepth(ctx)
+								return castLiteral(t, g.expr)
+							}
+						} else if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
+						}
 					}
-					if len(candidates) == 0 && scopePick == 1 {
-						if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+				} else {
+					candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+					if len(candidates) == 0 && scopePick == 0 {
+						if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 							bumpExprDepth(ctx)
 							return castLiteral(t, g.expr)
 						}
@@ -1922,8 +2122,47 @@ func randomLeafExprWithMode(
 				restoreGenSnapshot(ctx, snap)
 				continue
 			}
+			// SelectParentLocal: rnd_upto(stack.size) then that block's local_vars.
+			// After multi-dim, blockDepth inventory is reliable enough to honor
+			// empty-block → create (seed2 e871–872). Earlier, inventory is sparse
+			// (often only synthetic "x") so fall through to all-locals path.
 			if scopePick == 1 {
-				_ = parentStackPick(er, flow)
+				idx := parentStackPick(er, flow)
+				useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+				if useBlockLocal {
+					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					// qferMode: pointer creates keep full F50+F10 (seed2 e789 SE-free
+					// int**); simple empty-block creates after multi-dim are !SE-free
+					// (seed2 e872: self F10 only).
+					qferMode := 1
+					if !strings.Contains(t.Name, "*") {
+						qferMode = 2
+					}
+					if len(localCands) == 0 {
+						// Empty block: random_type_from_type + GenerateNewParentLocal.
+						// (seed2 e872). Do not fall back to all-locals here — that
+						// skips create RNG (broke e872). e889+ may need visit_facts.
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, g.expr)
+						}
+					} else {
+						// Non-empty: simple types use get_int_type (no retype U);
+						// choose_var then create on miss without retype.
+						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
+						}
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, g.expr)
+						}
+					}
+					restoreGenSnapshot(ctx, snap)
+					continue
+				}
+				// Pre-multi-dim: keep historical all-locals candidate build below
+				// (stack pick already burned).
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
@@ -1934,7 +2173,7 @@ func randomLeafExprWithMode(
 					}
 				}
 				if scopePick == 1 {
-					// Empty parent locals often use wildcard qfer → random_qualifiers.
+					// Pre-multi-dim empty parent locals → create with qfer.
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
@@ -1962,7 +2201,8 @@ func randomLeafExprWithMode(
 						bumpExprDepth(ctx)
 						return castLiteral(t, c.expr)
 					}
-					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+					// Param→ParentLocal create: full qfer (SE-free more common early).
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
@@ -1971,13 +2211,24 @@ func randomLeafExprWithMode(
 			}
 			if len(candidates) > 0 {
 				if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
-					// SelectParentParam: if choose_var would reject (pointer vs
-					// scalar / no width match), fall through to SelectParentLocal.
+					// SelectParentParam: if choose_var would reject type, fall through
+					// to SelectParentLocal. Early: sameBase/same-bits. After multi-dim:
+					// eFlexible int↔int (seed2 e887 width convert).
 					if scopePick == 2 {
 						wantPtr := strings.Contains(t.Name, "*")
 						havePtr := strings.Contains(c.ctype.Name, "*")
 						compat := sameBaseType(c.ctype, t) ||
 							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
+						if !compat && !wantPtr && !havePtr &&
+							ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+							cSimple := !strings.HasPrefix(c.ctype.Name, "struct") &&
+								!strings.HasPrefix(c.ctype.Name, "union") &&
+								c.ctype.Name != "float" && c.ctype.Name != "void"
+							tSimple := !strings.HasPrefix(t.Name, "struct") &&
+								!strings.HasPrefix(t.Name, "union") &&
+								t.Name != "float" && t.Name != "void"
+							compat = cSimple && tSimple
+						}
 						if !compat {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
@@ -1996,7 +2247,7 @@ func randomLeafExprWithMode(
 								bumpExprDepth(ctx)
 								return castLiteral(t, c2.expr)
 							}
-							if g, ok2 := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok2 {
+							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
 							}
@@ -3135,9 +3386,15 @@ func emitStatement(
 	case stmtBreak:
 		writeLine(b, 1, "break;")
 	case stmtGoto:
-		// StatementGoto::make_random starts with rnd_flipcoin(40) for back-edge,
-		// then often returns null → Statement::make_random retries (seed2 e518).
-		_ = r.flipcoin(40)
+		// StatementGoto::make_random: F40 back-edge, then find_good_jump_block
+		// rnd_upto(blocks.size()) [+ retries], or early null without U.
+		// seed2 e518 F40=0 → null, Statement retry U100 (no block U).
+		// seed2 e895 F40=1 → U1 block pick then null/retry (e896–897).
+		backEdge := r.flipcoin(40)
+		if backEdge {
+			// find_good_jump_block U(func->blocks.size()); seed2 e896 U1.
+			_ = r.upto(1)
+		}
 		return false
 	case stmtArrayOp:
 		// StatementArrayOp::make_random
@@ -3364,10 +3621,12 @@ func emitSingleFuncDefOnce(
 		mustReadLiveSink = &state.mustReadLive
 		prevP := postMustReadGlobalPicks
 		postMustReadGlobalPicks = &state.postMustReadGlobalPicks
+		pointerGlobalPicksSink = &state.pointerGlobalPicks
 		defer func() {
 			multiDimArraySink = prevSink
 			mustReadLiveSink = prevMR
 			postMustReadGlobalPicks = prevP
+			pointerGlobalPicksSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
