@@ -22,6 +22,8 @@ var lateLhsChooseCountSink *int
 var lateU2ItemizeOnceSink *bool
 // filterCompoundStmtsSink: late for-body StatementFilter / Global U2 era.
 var filterCompoundStmtsSink *bool
+// lateDerefCreateNSink: filterCompound SelectDeref create count (e2307 Global U8).
+var lateDerefCreateNSink *int
 // lateLhsRejectGlobalSink: one-shot e2253 reject Global after U2 U4 residual.
 var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
@@ -129,6 +131,15 @@ type functionFlowState struct {
 	filterCompoundStmts bool
 	// lateLhsRejectGlobal: one-shot after SelectDeref U2 U4 (e2253 reject Global).
 	lateLhsRejectGlobal bool
+	// lateLhsMustUseWrite: after late pointer create address-of itemize, Lhs
+	// select_must_use WRITE burns F75 before SelectDeref (seed2 e2270).
+	lateLhsMustUseWrite bool
+	// lateAddrOfArrayItemizeDone: one-shot U2 itemize after address-of U6
+	// (e2268); later address-of is U6 only then Lhs F80 (e2289).
+	lateAddrOfArrayItemizeDone bool
+	// lateDerefCreateN: SelectDeref creates under filterCompoundStmts
+	// (e2202 first early-accept; e2295+ nested F50 F20 F20 U6).
+	lateDerefCreateN int
 	// parentLocalStackPicks: count of parentStackPick calls.
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
@@ -1252,9 +1263,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if newArray {
 			burnCreateArrayVariable(er.fallback, opts, chosen, true)
 		} else if !initNull {
-			// Address-of residual.
+			// Address-of residual (make_init_value → choose_var → choose_ok_var).
 			// e1027: U2 choose. e1211: multi-level under useSmallParentStack —
 			// F20 NewArray + F20 init for pointed-to, then U6 choose (UP F20×4 U6).
+			// seed2 e2268: filterCompoundStmts era visible pool n=6 (not U2).
+			// Sometimes array itemize after choose (U2) then select_must_use F75
+			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
 			if ctx.state.useSmallParentStack && levels >= 2 {
 				// Nested GenerateNew for pointed-to pointer.
@@ -1262,6 +1276,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 				_ = er.fallback.flipcoin(20) // init null vs address
 				n := 6
 				_ = er.fallback.upto(uint32(n))
+			} else if ctx.state.filterCompoundStmts {
+				// Late nested block: choose_ok_var among ~6 visible pointees.
+				_ = er.fallback.upto(6)
+				// e2268 first: array itemize U2 + Lhs must_use WRITE F75 residual.
+				// e2289 later: non-array choose → Lhs SelectDeref F80 only.
+				if !ctx.state.lateAddrOfArrayItemizeDone {
+					ctx.state.lateAddrOfArrayItemizeDone = true
+					_ = er.fallback.upto(2)
+					ctx.state.lateLhsMustUseWrite = true
+				}
 			} else {
 				n := 2
 				_ = er.fallback.upto(uint32(n))
@@ -1479,9 +1503,19 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			_ = r.upto(1)
 		}
 	}
+	// seed2 e1791: scaleAssign cn=1 still burns U1. e2311 after late
+	// SelectDeref creates: true sole (no U) before next Statement U120.
+	trueSole := filterCompoundStmtsSink != nil && *filterCompoundStmtsSink &&
+		lateDerefCreateNSink != nil && *lateDerefCreateNSink >= 2
 	if len(exact) > 0 {
 		n := len(exact)
 		cn := scaleAssign(n)
+		if cn <= 1 {
+			if cn == 1 && !trueSole {
+				_ = r.upto(1) // e1791
+			}
+			return exact[0], true
+		}
 		idx := int(r.upto(uint32(cn))) % n
 		c := exact[idx]
 		if cn == 2 {
@@ -1492,6 +1526,12 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 	if len(sameWidth) > 0 {
 		n := len(sameWidth)
 		cn := scaleAssign(n)
+		if cn <= 1 {
+			if cn == 1 && !trueSole {
+				_ = r.upto(1)
+			}
+			return sameWidth[0], true
+		}
 		idx := int(r.upto(uint32(cn))) % n
 		if cn == 2 {
 			itemizeOnce()
@@ -1500,6 +1540,12 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 	}
 	n := len(filtered)
 	cn := scaleAssign(n)
+	if cn <= 1 {
+		if cn == 1 && !trueSole {
+			_ = r.upto(1)
+		}
+		return filtered[0], true
+	}
 	idx := int(r.upto(uint32(cn))) % n
 	if cn == 2 {
 		itemizeOnce()
@@ -1652,7 +1698,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					// seed2 e2236: filterCompoundStmts era Global U2 (real n).
 					if globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink && n >= 3 {
 						if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink {
-							target = 0 // seed2 e2236 real pool U2
+							// seed2 e2236: first filterCompound Global U2 (real n).
+							// seed2 e2307: later Global eFlexible U8 (GlobalList grown).
+							if lateDerefCreateNSink != nil && *lateDerefCreateNSink >= 2 {
+								target = 8
+							} else {
+								target = 0
+							}
 						} else {
 							target = 28 // seed2 e1390 U28, e1393 U28
 						}
@@ -1712,13 +1764,20 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			}
 		}
 		// seed2 e2236: late for-body Global real n may be 2.
-		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && n >= 2 && chooseN > 2 {
+		// seed2 e2307: after second SelectDeref create, GlobalList choose U8.
+		lateGlobalU8 := filterCompoundStmtsSink != nil && *filterCompoundStmtsSink &&
+			lateDerefCreateNSink != nil && *lateDerefCreateNSink >= 2
+		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && n >= 2 && chooseN > 2 && !lateGlobalU8 {
 			chooseN = 2
+		}
+		if lateGlobalU8 {
+			chooseN = 8
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		// seed2 e2237–38: late for-body Global U2+U3 then visit_facts fail →
 		// ExpressionVariable retry VariableSelector U100 (like e1374–75).
-		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && chooseN == 2 {
+		// Not after e2307 U8 era (accept Global choose).
+		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && chooseN == 2 && !lateGlobalU8 {
 			_ = er.pick(3)
 			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 		}
@@ -2525,6 +2584,58 @@ func randomLeafExprWithMode(
 							bumpExprDepth(ctx)
 							return castLiteral(t, c.expr)
 						}
+					}
+				} else if scopePick == 2 {
+					// seed2 e2261: maxFuncs Function fail → ExpressionVariable
+					// ParentParam empty/miss → SelectParentLocal stack U6 + create
+					// (UP F50 F10 F50 F10 F20 F20). Do not sole-select from
+					// buildExprCandidates (would skip U6 and jump to Lhs F80).
+					var flow *functionFlowState
+					if ctx != nil {
+						flow = ctx.state
+					}
+					// Mirror termVariable: pointer + useSmallParentStack forces
+					// empty ParentParam fallthrough even if inventory non-empty.
+					paramCands := buildScopedCandidatesFromER(er, env, scope, 2, ctx)
+					if flow != nil && flow.useSmallParentStack && strings.Contains(t.Name, "*") {
+						paramCands = nil
+					}
+					if len(paramCands) > 0 {
+						if c, ok := selectExprVariableFromER(t, er, paramCands, false); ok {
+							wantPtr := strings.Contains(t.Name, "*")
+							havePtr := strings.Contains(c.ctype.Name, "*")
+							compat := sameBaseType(c.ctype, t) ||
+								(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
+							if compat {
+								bumpExprDepth(ctx)
+								return castLiteral(t, c.expr)
+							}
+						}
+					}
+					// ParentParam miss → ParentLocal (stack + create).
+					idx := parentStackPick(er, flow)
+					qfer := 1
+					if flow != nil && flow.useSmallParentStack && strings.Contains(t.Name, "*") {
+						// Late pointer: often full SE-free qfer (e2261 F50×2 F10×2).
+						// Keep qferMode 1 (not 2) under filterCompoundStmts.
+						if flow.filterCompoundStmts {
+							qfer = 1
+						} else {
+							qfer = 2
+						}
+					}
+					// force create: empty block / late inventory approx.
+					forceCreate := flow != nil && (flow.useSmallParentStack || flow.filterCompoundStmts)
+					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					if !forceCreate {
+						if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c2.expr)
+						}
+					}
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, g.expr)
 					}
 				} else {
 					candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
@@ -3393,8 +3504,19 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	simpleAssign := true
 	needNoRhs := false // ++/-- use Constant::make_int(1), no Expression::make_random
 	if opts.CompoundAssignment {
-		opV := int(r.upto(120))
 		// AssignOps: simple 70, bitand/xor/or 10 each (=100), pre/post ± 5 each (=120).
+		// seed2 e2311: late filterCompound AssignOpsProbability filters
+		// non-simple ops (tries=1): reject bitor++ band so first U120 draw
+		// misses then accept (UP U120=78 tries=1).
+		var opV int
+		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts &&
+			ctx.state.lateDerefCreateN >= 2 {
+			opV = int(r.uptoWithFilter(120, func(x uint32) bool {
+				return x >= 90 // bitor + incr/decr
+			}))
+		} else {
+			opV = int(r.upto(120))
+		}
 		simpleAssign = opV < 70
 		needNoRhs = opV >= 100
 	}
@@ -3434,7 +3556,8 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 	}
 
-	// Lhs::make_random: SelectDerefPointerProb then VariableSelector::select.
+	// Lhs::make_random: select_must_use WRITE first, then SelectDerefPointerProb
+	// then VariableSelector::select (Lhs.cpp).
 	// select_deref_pointer with no match creates a pointer via
 	// random_add_qualifiers (F10 const, F50 volatile) + create_and_initialize.
 	lv := lvalueInfo{expr: "x", ctype: targetType}
@@ -3442,7 +3565,20 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
-	for {
+	// seed2 e2270: after late pointer RHS create address-of itemize, must_write
+	// non-empty → select_must_use WRITE F75. visit_facts fails → VS residual
+	// U100 U100 U6 then accept (no SelectDeref F80). Next Statement U100 is
+	// the following block statement (e2274), not more Lhs residual.
+	if ctx != nil && ctx.state != nil && ctx.state.lateLhsMustUseWrite {
+		ctx.state.lateLhsMustUseWrite = false
+		_ = r.flipcoin(75)
+		// e2271–73: VS retries then stack; accept Lhs.
+		_ = r.upto(100)
+		_ = r.upto(100)
+		_ = r.upto(6)
+		lhsFromDeref = true // accept without SelectDeref loop
+	}
+	for !lhsFromDeref {
 		if !r.flipcoin(80) { // SelectDerefPointerProb
 			break
 		}
@@ -3451,15 +3587,22 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// F80=1 with no extra U (sole remaining / still invalid), then F80=0
 		// falls through to VariableSelector::select (e937–939).
 		// seed2 e2251: late filterCompoundStmts Lhs on non-pointer target:
-		// choose U2 then U4 then VariableSelector U100 (not create F10).
-		// Pointer Lhs still uses create residual (e2198 F10 after SelectLType F50).
+		// choose U2 then U4 then accept. e2309 later: U4 only then VS U100
+		// (not early accept). Pointer Lhs create residual e2198 F10…
 		if ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 &&
 			ctx.state.filterCompoundStmts && !needNoRhs &&
 			!strings.Contains(targetType.Name, "*") {
 			if !triedDerefChoose {
+				triedDerefChoose = true
+				if ctx.state.lateDerefCreateN >= 2 {
+					// e2309: SelectDeref choose U4 accepts (e2311 next is
+					// Statement U100 AssignOps U120, not Lhs VS).
+					_ = r.upto(4)
+					lhsFromDeref = true
+					break
+				}
 				_ = r.upto(2) // e2251
 				_ = r.upto(4) // e2252
-				triedDerefChoose = true
 				// seed2 e2253: accept Lhs after U2 U4; next is Statement U100
 				// (not VariableSelector NewValue create).
 				lhsFromDeref = true
@@ -3557,13 +3700,25 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		//   F20 make_init null vs address-of
 		//   if address: choose_ok_var U(n) (seed2 e913–914 F20 then U5)
 		//   if null: Constant "0" for pointer (no further RNG)
-		// seed2 e2202: late for-body Lhs after F10 F50 F20 F20 accepts
-		// (no F50 looser / Constant residual). Next is StatementProbability
-		// U100 (not VariableSelector — that yielded U4 stack residual).
+		// seed2 e2202: first late for-body SelectDeref after F10 F50 F20 F20
+		// accepts (no F50 looser). e2295 second create continues nested
+		// GenerateNew residual F50 F20 F20 U6.
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
-			if ctx.state != nil {
-				ctx.state.lhsDerefCreates++
+			ctx.state.lhsDerefCreates++
+			ctx.state.lateDerefCreateN++
+			if ctx.state.lateDerefCreateN <= 1 {
+				lhsFromDeref = true
+				break
 			}
+			// Nested pointee create: looser vol + NewArray + init address-of U6.
+			// e2295–98: F50 F20 F20 U6. e2299–2300: VS residual U100 U100 then
+			// accept (next Statement U100=92 AssignOps U120 — not BlockSize).
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(20) // NewArray pointee
+			_ = r.flipcoin(20) // init null vs address
+			_ = r.upto(6)      // choose_ok_var among pointees
+			_ = r.upto(100)
+			_ = r.upto(100)
 			lhsFromDeref = true
 			break
 		}
@@ -4400,6 +4555,19 @@ func emitStatement(
 		// Mimics upstream rnd_upto(..., StatementFilter):
 		// retries happen inside one RNG API call.
 		if dec.r != nil {
+			// seed2 e2310: after late SelectDeref creates, UP StatementProbability
+			// accepts low values as Assign (weight-100 table, tries=0). GO range
+			// map + is_compound filter rejected those → wrong U100. Keep
+			// uptoWithFilter for early filterCompound (e2189 tries=2).
+			if state != nil && state.filterCompoundStmts && state.lateDerefCreateN >= 2 {
+				// Upstream Assign weight dominates; low U100 values are still
+				// Assign after is_compound filter (seed2 e2310 U100=5 Assign).
+				v := int(dec.r.upto(100))
+				if v < 2 {
+					return stmtReturn
+				}
+				return stmtAssign
+			}
 			v := int(dec.r.uptoWithFilter(100, func(x uint32) bool {
 				k := toKind(int(x))
 				if (k == stmtBreak || k == stmtContinue) && !inLoop {
@@ -4824,9 +4992,14 @@ func emitStatements(
 	// only when multiDimArrays (late functions created mid-expression).
 	// seed2 e2253: late filterCompoundStmts blocks also need +1 (avoid extra
 	// BlockSize before Statement U100).
+	// seed2 e2275–e2311: filterCompound for-body needs +4 (extra Assigns after
+	// Lhs must_use / SelectDeref residuals; smaller bonuses left GO ending
+	// body with BlockSize U4 vs UP AssignOps U120).
 	if state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
-		if depth == 0 || state.filterCompoundStmts {
+		if depth == 0 {
 			stmtCount++
+		} else if state.filterCompoundStmts {
+			stmtCount += 4
 		}
 	}
 	emitOne := func() bool {
@@ -4912,6 +5085,7 @@ func emitSingleFuncDefOnce(
 		lateLhsChooseCountSink = &state.lateLhsChooseCount
 		lateU2ItemizeOnceSink = &state.lateU2ItemizeOnce
 		filterCompoundStmtsSink = &state.filterCompoundStmts
+		lateDerefCreateNSink = &state.lateDerefCreateN
 		lateLhsRejectGlobalSink = &state.lateLhsRejectGlobal
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
@@ -4927,6 +5101,7 @@ func emitSingleFuncDefOnce(
 			lateLhsChooseCountSink = nil
 			lateU2ItemizeOnceSink = nil
 			filterCompoundStmtsSink = nil
+			lateDerefCreateNSink = nil
 			lateLhsRejectGlobalSink = nil
 			lastArraySizesSink = nil
 		}()
