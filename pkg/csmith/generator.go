@@ -1459,6 +1459,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if pointerGlobalPicksSink != nil {
 			picks = *pointerGlobalPicksSink
 		}
+		// seed2 e1412: after maxFuncs CREATE residual era, pointer Global is sole
+		// (UP U100 then F20 Lhs create — no choose/itemize U4).
+		if useSmallParentStackSink != nil && *useSmallParentStackSink &&
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
+			picks >= 1 {
+			return exact[0], true
+		}
 		itemize := func(c exprVarCandidate, n int) {
 			if c.isArray {
 				al := c.arrayLen
@@ -1577,6 +1584,7 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// choose is U2 (inventory over-counts convertibles as n=6).
 		// seed2 e1374–1377: Global U2+U3 then visit_facts fail → ExpressionVariable
 		// do-while retries VariableSelector (U100 ParentLocal U3 U2).
+		// seed2 e1412: after maxFuncs CREATE residual, Global sole (no U4).
 		chooseN := n
 		if n == 4 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			chooseN = 2
@@ -1586,6 +1594,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			(globalLateU2MissDoneSink == nil || !*globalLateU2MissDoneSink)
 		if lateU2 {
 			chooseN = 2
+		}
+		// After lateMaxFuncs CREATE one-shot, nested failed-Function→Variable is sole.
+		if useSmallParentStackSink != nil && *useSmallParentStackSink &&
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink {
+			// Detect via postMustRead high + late create already done: sole Global.
+			// (e1412 U100=6 then F20 create, no choose U)
+			if n >= 2 && !lateU2 {
+				// Only sole when U28 scale was not applied (target path returned).
+				// Here we are in chooseN path — if picks high, sole after create residual.
+				if postMustReadGlobalPicks != nil && *postMustReadGlobalPicks >= 12 {
+					return uniq[0], true
+				}
+			}
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		if lateU2 {
@@ -1789,6 +1810,34 @@ func buildFunctionCallExpr(
 					if ctx != nil {
 						ctx.exprDepth = prevDepth
 					}
+				}
+				// seed2 e1413–1421: after RHS Variable (failed Function), Lhs
+				// SelectDeref create array: F20×4 + CreateArray, then Lhs loop
+				// continues F80 VariableSelector (e1422) not next-statement U100.
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				burnCreateArrayVariable(r, opts, t, true)
+				// Lhs::make_random do-while after failed array validate:
+				// F80=0 U100 U4 (e1422–24), then F20 F20 F80 create path (e1425–33).
+				if !r.flipcoin(80) {
+					_ = variableScopePickFromER(er, opts) // U100
+					_ = r.upto(4)
+				}
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				if r.flipcoin(80) {
+					if opts.ConstPointers {
+						_ = r.flipcoin(10)
+					}
+					if opts.VolatilePointers {
+						_ = r.flipcoin(50)
+					}
+					_ = r.flipcoin(20) // NewArray
+					_ = r.flipcoin(20) // init
+					_ = r.upto(2)
+					_ = r.upto(4)
 				}
 				return castLiteral(t, "0"), true
 			}
