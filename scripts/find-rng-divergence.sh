@@ -4,7 +4,7 @@ set -euo pipefail
 SEED="${SEED:-2}"
 WORKDIR="${WORKDIR:-/tmp/csmith-parity}"
 CONTEXT="${CONTEXT:-8}"
-UPSTREAM_CMD="${UPSTREAM_CMD:-./csmith/build-instrumented/src/csmith}"
+UPSTREAM_CMD="${UPSTREAM_CMD:-./.build/csmith-instrumented/src/csmith}"
 GO_CMD="${GO_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith}"
 STRICT_RAW="${STRICT_RAW:-0}"
 
@@ -19,13 +19,13 @@ Env overrides:
   SEED        (default: 2)
   WORKDIR     (default: /tmp/csmith-parity)
   CONTEXT     (default: 8)
-  UPSTREAM_CMD (default: ./csmith/build-instrumented/src/csmith)
+  UPSTREAM_CMD (default: ./.build/csmith-instrumented/src/csmith)
   GO_CMD      (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith)
   STRICT_RAW  (default: 0) compare tries/raw too (1 = enabled)
 
 Examples:
   scripts/find-rng-divergence.sh --seed 2
-  UPSTREAM_CMD='./csmith/build-instrumented/src/csmith' scripts/find-rng-divergence.sh --seed 2 --strict-raw
+  scripts/build-instrumented-upstream.sh && scripts/find-rng-divergence.sh --seed 2
 USAGE
 }
 
@@ -60,6 +60,12 @@ CMP_OUT="${BASE}.cmp.txt"
 
 if [[ ! -x "$(command -v timeout || true)" ]]; then
   echo "timeout command not found" >&2
+  exit 1
+fi
+
+if [[ ! -x "$UPSTREAM_CMD" ]]; then
+  echo "instrumented upstream not found: $UPSTREAM_CMD" >&2
+  echo "run: scripts/build-instrumented-upstream.sh" >&2
   exit 1
 fi
 

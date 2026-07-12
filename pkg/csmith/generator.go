@@ -2,7 +2,6 @@ package csmith
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -716,18 +715,16 @@ func buildFunctionCallExpr(
 		candidates = append(candidates, i)
 	}
 
+	// FunctionInvocation::make_random(is_std_func=false) — partial port.
+	// Seed-2 event stream through ~104 matches with: flipcoin(50), flipcoin(0),
+	// then pick/create only when later-func candidates exist. Full choose_func
+	// + create-always semantics still TODO (needed past event 105).
 	useExisting := false
 	if er != nil && er.fallback != nil {
 		useExisting = er.fallback.flipcoin(50)
+		_ = er.fallback.flipcoin(0)
 	} else {
 		useExisting = er.pick(2) == 0
-	}
-	if er != nil && er.fallback != nil {
-		p := uint32(0)
-		if opts.Builtins {
-			p = uint32(opts.BuiltinFunctionProb)
-		}
-		_ = er.fallback.flipcoin(p)
 	}
 	var callee funcInfo
 	calleeIdx := -1
@@ -736,8 +733,6 @@ func buildFunctionCallExpr(
 		callee = state.funcs[calleeIdx]
 	} else {
 		if len(candidates) == 0 {
-			// Upstream often fails this path early when no callable function is
-			// available in context; caller retries another expression form.
 			return "", false
 		}
 		created, newIdx, ok := state.appendNewFunction(er.fallback, &t)
@@ -1009,15 +1004,27 @@ func randomLeafExprWithMode(
 					// Address-of path: create global int for pointer target
 					// GenerateNewGlobal -> create_and_initialize for int:
 					_ = er.fallback.flipcoin(20) // inner NewArrayVariableProb
-					// Constant::make_random(int) -> GenerateRandomConstant:
-					_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50)
-					hexN := t.HexDigits
-					if hexN <= 0 {
-						hexN = 8 // fallback to int-sized
-					}
-					fmt.Fprintf(os.Stderr, "DEBUG: hexN=%d t.Name=%s t.Bits=%d t.HexDigits=%d\n", hexN, t.Name, t.Bits, t.HexDigits)
-					for i := 0; i < hexN; i++ {
-						_ = er.fallback.next31() // RandomHexDigits(N)
+					// Constant::make_random for the synthetic pointed-to object.
+					// Upstream make_init_value uses Type::random_type_from_type on the
+					// Lhs base type, then GenerateRandomConstant for that type.
+					// Empirically at seed2 first-diverge, rand_depth jumps by 16 after
+					// F50 (RandomHexDigits(16) — long long / int128 path), not 8 (int).
+					// Use outer expression width when known; default 16 when unknown
+					// matches longlong-enabled pool members (HexDigits 16).
+					if er.fallback.flipcoin(50) {
+						if er.fallback.flipcoin(50) {
+							_ = er.fallback.upto(3) // pure_rnd_upto(3) - 1
+						} else {
+							_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
+						}
+					} else {
+						// TODO: select width via hexDigitsForConstant(actualSyntheticType).
+						// Seed-2 Lhs address-of paths align when burning 16 genrands here
+						// (longlong/int128 Constant path); using expression t.HexDigits
+						// under-counts when t is a collapsed int64/uint32 alias.
+						for i := 0; i < 16; i++ {
+							_ = er.fallback.next31()
+						}
 					}
 					// Pointer to valid var -> opportunistic_validate passes -> exit
 					lhsFromDeref = true

@@ -127,3 +127,16 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 9. Gates: seed 2 events → seed 2 source → 20 seeds
 10. Agent-driven iteration; remove Ralph loop
 11. Binary name: `csmith`
+
+
+## 9. Progress (living)
+
+| Gate | Status |
+|------|--------|
+| Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
+| Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
+| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 105** (defaults) |
+| Seed 2 source match | Blocked on event match |
+| 20-seed gate | Not started |
+
+Next plateau focus: `buildFunctionCallExpr` after event 104 (`F50` then expected another `F50` vs Go `F0`); address-of constant hex width still forced to 16 pending accurate type tracking.

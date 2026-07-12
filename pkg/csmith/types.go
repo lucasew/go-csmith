@@ -1,6 +1,9 @@
 package csmith
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // CType is a lightweight C scalar type descriptor used by the current generator.
 type CType struct {
@@ -63,6 +66,31 @@ func typePool(opts Options) []CType {
 
 func pickType(r *rng, pool []CType) CType {
 	return pool[int(r.upto(uint32(len(pool))))]
+}
+
+// hexDigitsForConstant mirrors Constant.cpp GenerateRandom*Constant widths:
+// char=2, short=4, int/long=8, longlong/int128=16.
+func hexDigitsForConstant(t CType) int {
+	if t.HexDigits > 0 {
+		return t.HexDigits
+	}
+	switch {
+	case t.Bits <= 8:
+		return 2
+	case t.Bits <= 16:
+		return 4
+	case t.Bits <= 32:
+		return 8
+	case t.Bits <= 64:
+		// Ambiguous long vs longlong when HexDigits unset; prefer longlong
+		// width only when the name suggests it, else classic long (8).
+		if strings.Contains(t.Name, "int128") {
+			return 16
+		}
+		return 8
+	default:
+		return 16
+	}
 }
 
 func castLiteral(t CType, expr string) string {
