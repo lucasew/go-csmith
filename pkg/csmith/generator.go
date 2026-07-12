@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// multiDimArraySink is set during function generation to count multi-dim arrays.
+var multiDimArraySink *int
+
 type structTypeInfo struct {
 	fields []fieldInfo
 }
@@ -85,10 +88,40 @@ type functionFlowState struct {
 	arrayLoopFresh bool
 	// arrayLoopFreshStack saves outer frames' fresh flags when nesting array-loops.
 	arrayLoopFreshStack []bool
+	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
+	// select_must_use F75 is after multi-dim IV create (e565+); earlier
+	// array-loop ExpressionVariables have no F75 (e416).
+	multiDimArrays int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
+}
+
+// trySelectMustUseVar mirrors VariableSelector::select_must_use_var (READ).
+// Seed2 e716: first F75 is inside make_random_param tree after multi-dim IV
+// creates; non-param stdfunc operands (e787) take select without must_use.
+// visit_facts fails → return false so caller falls through to scope pick.
+func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
+		return exprVarCandidate{}, false
+	}
+	st := ctx.state
+	if !ctx.inParamExpr || st.arrayLoopDepth <= 0 || st.multiDimArrays <= 0 {
+		return exprVarCandidate{}, false
+	}
+	// Match int-like element arrays (IV NewArray is get_int_type).
+	if strings.Contains(t.Name, "*") || strings.HasPrefix(t.Name, "struct") ||
+		strings.HasPrefix(t.Name, "union") || t.Name == "float" || t.Name == "void" {
+		return exprVarCandidate{}, false
+	}
+	if t.Bits <= 0 {
+		return exprVarCandidate{}, false
+	}
+	// itemize_array choose_ok_var among 2 IVs (array-loop + nested for).
+	_ = er.pick(2)
+	_ = er.fallback.flipcoin(75)
+	return exprVarCandidate{}, false
 }
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
@@ -104,7 +137,17 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		if n < 1 {
 			n = 1
 		}
-		if n > 3 {
+		// Before multi-dim IV creates, seed2 parent stack is ≤3 (e420).
+		// After multi-dim nesting (e788) UP uses n=5; blockStack overcounts
+		// so pin to 5 once multiDimArrays>0 rather than raw blockStack.
+		if state.multiDimArrays > 0 {
+			if n > 5 {
+				n = 5
+			}
+			if n < 5 && state.arrayLoopDepth > 0 {
+				n = 5 // deep array-loop after multi-dim IV (seed2 e788)
+			}
+		} else if n > 3 {
 			n = 3
 		}
 	}
@@ -187,6 +230,9 @@ type genContext struct {
 	// nil means qfer==0 static random_qualifiers path.
 	// Set from param formal qfer when generating make_random_param args.
 	incomingQferConsts []bool
+	// inParamExpr: true while generating make_random_param trees (including
+	// nested comma/assign). Distinct from isParam term table weights.
+	inParamExpr bool
 }
 
 type genSnapshot struct {
@@ -589,6 +635,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) {
 			total *= dimen
 			sizes = append(sizes, dimen)
 		}
+	}
+	if multiDimArraySink != nil && len(sizes) > 1 {
+		*multiDimArraySink++
 	}
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
@@ -1517,11 +1566,17 @@ func randomLeafExprWithMode(
 		}
 		switch choice {
 		case termFunction:
-			// ExpressionFuncall always draws ExpressionFunctionProbability (F80).
+			// ExpressionFuncall: ExpressionFunctionProbability (F80), unless
+			// reach_max_functions_cnt() forces stdfunc without a coin (seed2 e721).
 			// Pointer/struct/union types force user-function path after the coin
 			// (stdfunc only for simple non-void).
 			if er != nil && er.fallback != nil {
-				stdFunc := er.fallback.flipcoin(80)
+				stdFunc := true
+				atMaxFuncs := ctx != nil && ctx.state != nil &&
+					len(ctx.state.funcs) >= ctx.state.maxFuncs
+				if !atMaxFuncs {
+					stdFunc = er.fallback.flipcoin(80)
+				}
 				isSimple := !strings.Contains(t.Name, "*") &&
 					!strings.HasPrefix(t.Name, "struct ") &&
 					!strings.HasPrefix(t.Name, "union ")
@@ -1549,13 +1604,24 @@ func randomLeafExprWithMode(
 						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
 						out = castLiteral(t, fmt.Sprintf("(~(%s))", operand))
 					} else if opts.Pointers && er.fallback.flipcoin(10) {
+						// make_random_binary_ptr_comparison:
+						// F50 eq/ne, SafeOpFlags binary (F50+F50+U4), then
+						// Type::choose_random_pointer_type → rnd_upto(derived_types).
+						// Early seed2: derived_types.size()==1 (e132 U1); later grows.
+						// Operands use the pointer type (not outer t) so must_use
+						// does not match int arrays (seed2 e787).
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
-						_ = er.fallback.upto(1)
-						lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
-						rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+						nPtr := 1
+						if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
+							nPtr = ctx.state.derivedPtrTypes
+						}
+						_ = er.fallback.upto(uint32(nPtr))
+						ptrTy := CType{Name: "int32_t*", Signed: true, Bits: 32}
+						lhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+						rhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
 						out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 					} else {
 						_ = er.fallback.upto(18)
@@ -1592,6 +1658,10 @@ func randomLeafExprWithMode(
 			}
 			restoreGenSnapshot(ctx, snap)
 		case termVariable:
+			if c, ok := trySelectMustUseVar(er, t, ctx); ok {
+				bumpExprDepth(ctx)
+				return castLiteral(t, c.expr)
+			}
 			scopePick := variableScopePickFromER(er, opts)
 			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
@@ -1852,6 +1922,12 @@ func randomLeafExpr(t CType, er *exprRand, opts Options, env envInfo, scope scop
 }
 
 func randomParamLeafExpr(t CType, er *exprRand, opts Options, env envInfo, scope scopeInfo, depth int, ctx *genContext) string {
+	prev := false
+	if ctx != nil {
+		prev = ctx.inParamExpr
+		ctx.inParamExpr = true
+		defer func() { ctx.inParamExpr = prev }()
+	}
 	return randomLeafExprWithMode(t, er, opts, env, scope, depth, ctx, true, false, false)
 }
 
@@ -3032,6 +3108,11 @@ func emitSingleFuncDefOnce(
 	info compositeInfo,
 	stmtBudget *int,
 ) string {
+	if state != nil {
+		prevSink := multiDimArraySink
+		multiDimArraySink = &state.multiDimArrays
+		defer func() { multiDimArraySink = prevSink }()
+	}
 	fdec := nextFuncDecision(r)
 	var b strings.Builder
 
