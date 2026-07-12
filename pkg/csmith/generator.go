@@ -20,6 +20,10 @@ var forceNextTermVariableSink *bool
 var lateLhsChooseCountSink *int
 // lateU2ItemizeOnceSink: one-shot e1596 U1 after first late cn==2 choose.
 var lateU2ItemizeOnceSink *bool
+// filterCompoundStmtsSink: late for-body StatementFilter / Global U2 era.
+var filterCompoundStmtsSink *bool
+// lateLhsRejectGlobalSink: one-shot e2253 reject Global after U2 U4 residual.
+var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -121,8 +125,10 @@ type functionFlowState struct {
 	// lastStmtWasReturn: Block must_return — stop more stmts in this block.
 	lastStmtWasReturn bool
 	// filterCompoundStmts: StatementFilter at max depth (is_compound reject).
-	// Set for for-body after late SelectLoopCtrlVar U28 (seed2 e2189).
+	// Set after late SelectLoopCtrlVar U28 (seed2 e2189); sticky for late era.
 	filterCompoundStmts bool
+	// lateLhsRejectGlobal: one-shot after SelectDeref U2 U4 (e2253 reject Global).
+	lateLhsRejectGlobal bool
 	// parentLocalStackPicks: count of parentStackPick calls.
 	parentLocalStackPicks int
 	// useSmallParentStack: after e948 For remap, ParentLocal uses n=3 (e976).
@@ -226,7 +232,10 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		}
 		if state.multiDimArrays > 0 {
 			// e871 n=5; e976 n=3 after continue→For era or many stack picks.
-			if state.useSmallParentStack || state.parentLocalStackPicks >= 12 {
+			// seed2 e2226: late filterCompoundStmts era stack U6 (deeper nest).
+			if state.filterCompoundStmts {
+				n = 6
+			} else if state.useSmallParentStack || state.parentLocalStackPicks >= 12 {
 				n = 3
 			} else {
 				if n < 5 {
@@ -962,9 +971,39 @@ func buildExprCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, ctx *
 
 // scope codes: 0=global, 1=parent local, 2=param, 3=new-global, 4=new-parent-local
 func variableScopePickFromER(er *exprRand, opts Options) int {
+	return variableScopePickFromEROpts(er, opts, nil)
+}
+
+// variableScopePickFromEROpts applies VariableSelectFilter when scope provided:
+// reject ParentParam if params empty (VariableSelector.cpp VariableSelectFilter).
+func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) int {
 	// InitScopeTable: Global 0-34, ParentLocal 35-64, ParentParam 65-94, NewValue 95-99.
 	// NewValue → VariableCreationProbability: flipcoin(10) Global else ParentLocal CREATE.
-	v := int(er.pick(100))
+	reject := func(x uint32) bool {
+		if opts.GlobalVariables {
+			// ParentParam 65–94 when no params (VariableSelectFilter).
+			if scope != nil && len(scope.params) == 0 && x >= 65 && x < 95 {
+				return true
+			}
+			// seed2 e2253: after SelectDeref U2 U4, reject Global once → NewValue.
+			if lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink && x < 35 {
+				return true
+			}
+		}
+		return false
+	}
+	var v int
+	useFilter := er != nil && er.fallback != nil &&
+		((scope != nil && len(scope.params) == 0) ||
+			(lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink))
+	if useFilter {
+		v = int(er.fallback.uptoWithFilter(100, reject))
+		if lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink {
+			*lateLhsRejectGlobalSink = false // one-shot
+		}
+	} else {
+		v = int(er.pick(100))
+	}
 	if opts.GlobalVariables {
 		switch {
 		case v < 35:
@@ -1610,8 +1649,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				} else if small && globalU27DoneSink != nil && *globalU27DoneSink {
 					// e1373 lateU2 / ParentLocal pad: n≤2 real choose (not Global pad).
 					// e1390+: Global eFlexible inventory n≥3 → scale to GlobalList ~28.
+					// seed2 e2236: filterCompoundStmts era Global U2 (real n).
 					if globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink && n >= 3 {
-						target = 28 // seed2 e1390 U28, e1393 U28
+						if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink {
+							target = 0 // seed2 e2236 real pool U2
+						} else {
+							target = 28 // seed2 e1390 U28, e1393 U28
+						}
 					} else {
 						// e1373 window / ParentLocal U2: real pool n.
 						target = 0
@@ -1653,8 +1697,10 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			chooseN = 2
 		}
 		// After lateMaxFuncs CREATE one-shot, nested failed-Function→Variable is sole.
+		// seed2 e2236 filterCompoundStmts: still U2 choose (not sole).
 		if useSmallParentStackSink != nil && *useSmallParentStackSink &&
-			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink {
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
+			(filterCompoundStmtsSink == nil || !*filterCompoundStmtsSink) {
 			// Detect via postMustRead high + late create already done: sole Global.
 			// (e1412 U100=6 then F20 create, no choose U)
 			if n >= 2 && !lateU2 {
@@ -1665,7 +1711,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				}
 			}
 		}
+		// seed2 e2236: late for-body Global real n may be 2.
+		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && n >= 2 && chooseN > 2 {
+			chooseN = 2
+		}
 		idx := int(er.pick(uint32(chooseN))) % n
+		// seed2 e2237–38: late for-body Global U2+U3 then visit_facts fail →
+		// ExpressionVariable retry VariableSelector U100 (like e1374–75).
+		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && chooseN == 2 {
+			_ = er.pick(3)
+			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+		}
 		if lateU2 {
 			_ = er.pick(3) // e1374 itemize residual
 			if globalLateU2MissDoneSink != nil {
@@ -2515,8 +2571,13 @@ func randomLeafExprWithMode(
 				// qfer null → random_qualifiers. Early seed2 non-pointer creates
 				// matched with withNewQualifiers=false (const/vol already burned
 				// elsewhere); pointer creates after multi-dim need true (e817).
+				// seed2 e2228: late filterCompoundStmts simple create needs full
+				// qferMode 1 F50 F10 F20 (not bare NewArray F20).
 				needQfer := strings.Contains(t.Name, "*") &&
 					ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+				if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
+					needQfer = true
+				}
 				if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, needQfer); ok {
 					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
@@ -2773,8 +2834,10 @@ func randomLeafExprWithMode(
 			//    is still consumed)
 			// 2. StatementAssign::make_random:
 			//    a. AssignOpsProbability -> rnd_upto(assign_ops_total=120)
-			//    b. Full Expression::make_random for RHS (recursive)
-			//    c. Lhs::make_random for LHS variable selection
+			//    b. if !need_no_rhs: Expression::make_random RHS
+			//    c. Lhs::make_random
+			//    d. if need_no_rhs: SafeOpFlags F50 U4 (e2214)
+			needNoRhsExpr := false
 			if er != nil && er.fallback != nil {
 				// random_qualifiers(WRITE, no_volatile): F50 only if SE-free.
 				// useSmallParentStack: first few ExpressionAssign are !SE-free
@@ -2787,21 +2850,35 @@ func randomLeafExprWithMode(
 					ctx.state.assignExprCount++
 				}
 				// seed2 e1005 n=0 skip F50; e1141 n=1 burn F50; e1167 n>=2 skip.
-				// Only the second ExpressionAssign under useSmallParentStack is SE-free.
-				if !small || n == 1 {
+				// seed2 e2214 late for-body (filterCompoundStmts): burn F50 again.
+				lateQfer := ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts
+				if !small || n == 1 || lateQfer {
 					_ = er.fallback.flipcoin(50)
 				}
-				_ = er.fallback.upto(120) // AssignOpsProbability
+				opV := int(er.fallback.upto(120)) // AssignOpsProbability
+				// AssignOps: simple 70, bitand/xor/or 10 each (=100), pre/post ± 5 each.
+				needNoRhsExpr = opts.CompoundAssignment && opV >= 100
 			}
-			// RHS sees WRITE qfer (often all-const-false) → skip function ret qfer.
-			prevSkip := false
-			if ctx != nil {
-				prevSkip = ctx.skipFuncRetQfer
-				ctx.skipFuncRetQfer = true
+			rhs := "1"
+			if !needNoRhsExpr {
+				// RHS sees WRITE qfer (often all-const-false) → skip function ret qfer.
+				prevSkip := false
+				if ctx != nil {
+					prevSkip = ctx.skipFuncRetQfer
+					ctx.skipFuncRetQfer = true
+				}
+				rhs = randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+				if ctx != nil {
+					ctx.skipFuncRetQfer = prevSkip
+				}
 			}
-			rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
-			if ctx != nil {
-				ctx.skipFuncRetQfer = prevSkip
+			// seed2 e2214: need_no_rhs ExpressionAssign → SafeOpFlags after Lhs.
+			finishAssignExpr := func(s string) string {
+				if needNoRhsExpr && er != nil && er.fallback != nil {
+					_ = er.fallback.flipcoin(50)
+					_ = er.fallback.upto(4)
+				}
+				return castLiteral(t, s)
 			}
 			// Upstream Lhs::make_random (Lhs.cpp:61): do-while loop that tries
 			// select_deref_pointer before falling through to VariableSelector::select.
@@ -2888,10 +2965,10 @@ func randomLeafExprWithMode(
 				candidates := buildExprCandidatesFromER(er, env, scope, ctx)
 				for _, c := range candidates {
 					if c.assignable {
-						return castLiteral(t, fmt.Sprintf("(%s = %s)", c.expr, rhs))
+						return finishAssignExpr(fmt.Sprintf("(%s = %s)", c.expr, rhs))
 					}
 				}
-				return castLiteral(t, fmt.Sprintf("(%s)", rhs))
+				return finishAssignExpr(fmt.Sprintf("(%s)", rhs))
 			}
 			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
 			scopePick := variableScopePickFromER(er, opts)
@@ -2905,7 +2982,7 @@ func randomLeafExprWithMode(
 				if !earlyLhs {
 					// seed2 e1149: stack U3 only, then outer term U120 (no create).
 					_ = idx
-					return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 				}
 				_, _ = createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, idx)
 				if er != nil && er.fallback != nil {
@@ -2915,20 +2992,20 @@ func randomLeafExprWithMode(
 					}
 					_ = er.fallback.flipcoin(80)
 				}
-				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
 				if scopePick == 0 || scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
-						return castLiteral(t, fmt.Sprintf("(%s = %s)", g.expr, rhs))
+						return finishAssignExpr(fmt.Sprintf("(%s = %s)", g.expr, rhs))
 					}
 				}
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 			}
 			if len(candidates) > 0 {
 				if lv, ok := selectExprVariableFromER(t, er, candidates, true); ok {
-					return castLiteral(t, fmt.Sprintf("(%s = %s)", lv.expr, rhs))
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", lv.expr, rhs))
 				}
 			}
 			restoreGenSnapshot(ctx, snap)
@@ -3102,7 +3179,7 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scopeInfo, ctx *genContext) (lvalueInfo, bool, bool) {
 	// variableScopePick uses er.pick(100); Lhs uses main rng directly.
 	er := &exprRand{fallback: r}
-	scopePick := variableScopePickFromER(er, opts)
+	scopePick := variableScopePickFromEROpts(er, opts, &scope)
 	var flow *functionFlowState
 	if ctx != nil {
 		flow = ctx.state
@@ -3118,8 +3195,12 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			nStack = 2 // seed2 e940
 		}
 		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
+		// seed2 e2261: filterCompoundStmts era ParentLocal stack U6.
 		if flow != nil && flow.useSmallParentStack && flow.globalLateU2MissDone {
 			nStack = 4
+			if flow.filterCompoundStmts {
+				nStack = 6
+			}
 		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
@@ -3369,6 +3450,22 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// ++/-- Lhs after multi-dim: choose U2 (e936), fail validate, retry
 		// F80=1 with no extra U (sole remaining / still invalid), then F80=0
 		// falls through to VariableSelector::select (e937–939).
+		// seed2 e2251: late filterCompoundStmts Lhs on non-pointer target:
+		// choose U2 then U4 then VariableSelector U100 (not create F10).
+		// Pointer Lhs still uses create residual (e2198 F10 after SelectLType F50).
+		if ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 &&
+			ctx.state.filterCompoundStmts && !needNoRhs &&
+			!strings.Contains(targetType.Name, "*") {
+			if !triedDerefChoose {
+				_ = r.upto(2) // e2251
+				_ = r.upto(4) // e2252
+				triedDerefChoose = true
+				// seed2 e2253: accept Lhs after U2 U4; next is Statement U100
+				// (not VariableSelector NewValue create).
+				lhsFromDeref = true
+				break
+			}
+		}
 		if needNoRhs && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
 			// seed2 e936 U2; e1437 late U4; e1439 U3; e1441 U2 then itemize U10 U1 U1.
 			late := ctx.state.useSmallParentStack && ctx.state.globalLateU2MissDone
@@ -3460,9 +3557,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		//   F20 make_init null vs address-of
 		//   if address: choose_ok_var U(n) (seed2 e913–914 F20 then U5)
 		//   if null: Constant "0" for pointer (no further RNG)
-		// seed2 e2202: late for-body Lhs after F10 F50 F20 F20 → exit
-		// SelectDeref loop to VariableSelector U100 (no F80 retry, no F50 looser).
+		// seed2 e2202: late for-body Lhs after F10 F50 F20 F20 accepts
+		// (no F50 looser / Constant residual). Next is StatementProbability
+		// U100 (not VariableSelector — that yielded U4 stack residual).
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
+			if ctx.state != nil {
+				ctx.state.lhsDerefCreates++
+			}
+			lhsFromDeref = true
 			break
 		}
 		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
@@ -4453,12 +4555,10 @@ func emitStatement(
 			state.blockStack++
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
-		if state != nil {
-			if state.blockStack > 0 {
-				state.blockStack--
-			}
-			state.filterCompoundStmts = false
+		if state != nil && state.blockStack > 0 {
+			state.blockStack--
 		}
+		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")
 	case stmtReturn:
 		ret := scope.returnVar
@@ -4722,8 +4822,12 @@ func emitStatements(
 	// StatementProbability after GO's base+U count (UP continues U100=24 For;
 	// GO was ending the function and opening if-then BlockSize). Extra slot
 	// only when multiDimArrays (late functions created mid-expression).
-	if depth == 0 && state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
-		stmtCount++
+	// seed2 e2253: late filterCompoundStmts blocks also need +1 (avoid extra
+	// BlockSize before Statement U100).
+	if state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
+		if depth == 0 || state.filterCompoundStmts {
+			stmtCount++
+		}
 	}
 	emitOne := func() bool {
 		if stmtBudget != nil && *stmtBudget == 0 {
@@ -4807,6 +4911,8 @@ func emitSingleFuncDefOnce(
 		forceNextTermVariableSink = &state.forceNextTermVariable
 		lateLhsChooseCountSink = &state.lateLhsChooseCount
 		lateU2ItemizeOnceSink = &state.lateU2ItemizeOnce
+		filterCompoundStmtsSink = &state.filterCompoundStmts
+		lateLhsRejectGlobalSink = &state.lateLhsRejectGlobal
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4820,6 +4926,8 @@ func emitSingleFuncDefOnce(
 			forceNextTermVariableSink = nil
 			lateLhsChooseCountSink = nil
 			lateU2ItemizeOnceSink = nil
+			filterCompoundStmtsSink = nil
+			lateLhsRejectGlobalSink = nil
 			lastArraySizesSink = nil
 		}()
 	}
