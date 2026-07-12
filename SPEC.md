@@ -135,11 +135,11 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 1222** (defaults) |
+| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 1375** (defaults) |
 | Seed 2 source match | Blocked on event match |
 | 20-seed gate | Not started |
 
-Next plateau focus: e1222 F80 vs U2 after ParentParam U100=82 (Lhs SelectDeref residual).
+Next plateau focus: e1375 U100=41 ParentLocal vs GO U120 after Global eFlexible U2+U3 itemize.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
