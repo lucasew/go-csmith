@@ -124,6 +124,49 @@ func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Optio
 	return types[idx]
 }
 
+// pickSimpleNonVoid mirrors Type::choose_random_nonvoid_simple /
+// choose_random_simple: rnd_upto(MAX_SIMPLE_TYPES=14, SIMPLE_TYPES_PROB_FILTER).
+// Enum order matches eSimpleType: void,char,uchar,short,ushort,int,uint,long,...
+func pickSimpleNonVoid(r *rng, opts Options) CType {
+	// Index-aligned with eSimpleType; HexDigits match GenerateRandom*Constant.
+	simples := []CType{
+		{Name: "void", Bits: 0},                                 // 0 eVoid — filtered
+		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},   // 1 eChar
+		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2}, // 2 eUChar
+		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}, // 3 eShort
+		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4}, // 4 eUShort
+		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}, // 5 eInt
+		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8}, // 6 eUInt
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8}, // 7 eLong
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8}, // 8 eULong
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},  // 9 eLongLong
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16}, // 10 eULongLong
+		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},   // 11 eFloat
+		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16}, // 12
+		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16}, // 13
+	}
+	reject := func(x uint32) bool {
+		i := int(x)
+		if i < 0 || i >= len(simples) {
+			return true
+		}
+		switch i {
+		case 0: // void
+			return true
+		case 11: // float
+			return !opts.EnableFloat
+		case 12:
+			return !opts.Int128
+		case 13:
+			return !opts.UInt128
+		}
+		// long/longlong allowed by default (allow_int64=true).
+		return false
+	}
+	idx := int(r.uptoWithFilter(uint32(len(simples)), reject))
+	return simples[idx]
+}
+
 // hexDigitsForConstant mirrors Constant.cpp GenerateRandom*Constant widths:
 // char=2, short=4, int/long=8, longlong/int128=16.
 func hexDigitsForConstant(t CType) int {
