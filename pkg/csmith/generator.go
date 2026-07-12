@@ -2329,8 +2329,20 @@ func randomLeafExprWithMode(
 						qferMode = 2
 					}
 					// Late era: inventory falsely non-empty; force create (e977).
+					// seed2 e1387: after Global late-U2 miss era, prefer choose on
+					// block locals (U2) over retype create U14.
 					forceCreate := ctx.state != nil &&
-						(ctx.state.useSmallParentStack || ctx.state.parentLocalStackPicks >= 12)
+						(ctx.state.parentLocalStackPicks >= 12 ||
+							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
+					// e1387: UP choose U2 among block locals; pad empty inventory.
+					if ctx.state != nil && ctx.state.globalLateU2MissDone {
+						for len(localCands) < 2 {
+							localCands = append(localCands, exprVarCandidate{
+								expr: "x", ctype: t, assignable: true,
+							})
+						}
+						forceCreate = false
+					}
 					if len(localCands) == 0 || forceCreate {
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
 							bumpExprDepth(ctx)
@@ -2474,15 +2486,20 @@ func randomLeafExprWithMode(
 					if c.expr == "" && ctx != nil && ctx.state != nil &&
 						ctx.state.useSmallParentStack && er != nil {
 						scopePick = variableScopePickFromER(er, opts)
-						// ParentLocal: stack U3 then choose/create (e1376 U3 U2).
+						// ParentLocal: stack U3 then choose U2 (e1376–1387), not retype create.
 						if scopePick == 1 {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							for len(localCands) < 2 {
+								localCands = append(localCands, exprVarCandidate{
+									expr: "x", ctype: t, assignable: true,
+								})
+							}
 							if c2, ok2 := selectExprVariableFromER(t, er, localCands, false); ok2 && c2.expr != "" {
 								bumpExprDepth(ctx)
 								return castLiteral(t, c2.expr)
 							}
-							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
+							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
 							}
