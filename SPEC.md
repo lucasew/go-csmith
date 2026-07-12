@@ -135,12 +135,17 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 716** (defaults) |
+| Seed 2 event match | **In progress** — `first_divergence_event` advanced **92 → 791** (defaults) |
 | Seed 2 source match | Blocked on event match |
 | 20-seed gate | Not started |
 
-Next plateau focus: after e716 variable/scope pick (UP `U2` vs Go `U100` on same raw); create-IV NewArray + array_control path landed through e715.
+Next plateau focus: e791 parent-local create path for pointer type (UP extra F50/F10 qfer levels before NewArray F20; GO only one F50+F10 pair then F20).
+
+**e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
 **CreateArray dimension ladder:** instrumented binary / seed2 traces use step **60** (1d 60% / 2d 30% / 3d ~9%), matching the comment in `ArrayVariable.cpp`. The checked-in tree source has `step = 100` (always dim=1 for `num∈[1,99]`), which cannot produce multi-dim events such as seed2 e565 (`U99=93` → sizes 4×4×9). Go follows the live instrumented stream, not the tree literal.
 
-**Known RNG debt (not on seed2 path to e716):** pointer-element `CreateArrayVariable` alt inits under non-strict arrays should burn `make_init_value` (F20 null vs address-of create/choose). Go burns F20 for the null branch only; address-of residual is incomplete until a seed diverges there.
+**Known RNG debt:**
+- Pointer-element `CreateArrayVariable` alt inits under non-strict arrays should burn full `make_init_value` address-of residual (F20 null prefix only today).
+- `parentStackPick` / `blockStack` still approximate (cap 3 pre-multi-dim; pin 5 post); true `Function::stack.size()` would remove the pin.
+- Full `select_must_use_var` (itemize multi-dim, must_read membership, visit_facts accept) only partially modeled; gated on `multiDimArrays` + `inParamExpr`.
