@@ -98,6 +98,7 @@ type functionFlowState struct {
 	mustReadLive bool
 	// postMustReadGlobalPicks: SelectGlobal eFlexible picks after must_read spent.
 	postMustReadGlobalPicks int
+	globalCreatesPostMR     int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
 	derivedPtrTypes int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
@@ -897,6 +898,25 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 					assignable: true,
 				})
 			}
+			if ctx.state.globalCreatesPostMR > 0 {
+				for _, stars := range []int{1, 2} {
+					n := 0
+					suf := strings.Repeat("*", stars)
+					for _, c := range out {
+						if strings.Count(c.ctype.Name, "*") == stars {
+							n++
+						}
+					}
+					for n < 2 {
+						out = append(out, exprVarCandidate{
+							expr:       fmt.Sprintf("g_p%d_%d", stars, n),
+							ctype:      CType{Name: "int32_t" + suf, Signed: true, Bits: 32},
+							assignable: true,
+						})
+						n++
+					}
+				}
+			}
 		}
 	case 1:
 		for _, l := range mergedLocals(scope, ctx) {
@@ -1006,6 +1026,9 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = 0;", qual, t.Name, name))
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+	if !ctx.state.mustReadLive {
+		ctx.state.globalCreatesPostMR++
+	}
 	return exprVarCandidate{expr: name, ctype: t, assignable: !isConst}, true
 }
 
@@ -1242,6 +1265,18 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			integers = append(integers, c)
 		}
 	}
+	// Pointer wants after multi-dim: exact-level choose + itemize (e844–e845).
+	if wantPtr && multiDimArraySink != nil && *multiDimArraySink > 0 {
+		if len(exact) == 0 {
+			return exprVarCandidate{}, false
+		}
+		if len(exact) == 1 {
+			return exact[0], true
+		}
+		idx := int(er.pick(uint32(len(exact))))
+		_ = er.pick(3) // itemize first dim (seed2 e845)
+		return exact[idx], true
+	}
 	// eFlexible: exact+integers share one ok_vars pool then choose_ok_var
 	// (seed2 e811: must not return sole exact without U(n) over convertibles).
 	if !forAssign && wantSimple && (len(exact)+len(integers) > 0) {
@@ -1267,7 +1302,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// later picks see grown GlobalList (e811 U17).
 		if mustReadLiveSink != nil && !*mustReadLiveSink && postMustReadGlobalPicks != nil {
 			*postMustReadGlobalPicks++
-			if *postMustReadGlobalPicks >= 2 && n < 17 &&
+			// e811 under-count n≈3–5 → U17; e848 real n=11 keep real.
+			if *postMustReadGlobalPicks >= 2 && n >= 3 && n <= 5 &&
 				multiDimArraySink != nil && *multiDimArraySink > 0 {
 				v := int(er.pick(17))
 				return uniq[v%n], true
