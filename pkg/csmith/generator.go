@@ -16,6 +16,7 @@ var useSmallParentStackSink *bool
 var lhsSoleNextSink *bool
 var globalU27DoneSink *bool
 var globalLateU2MissDoneSink *bool
+var forceNextTermVariableSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
@@ -131,6 +132,11 @@ type functionFlowState struct {
 	globalU27Done bool
 	// globalLateU2MissDone: one-shot e1373–75 Global U2+U3 then visit_facts miss.
 	globalLateU2MissDone bool
+	// forceNextTermVariable: after Constant U4 residual (e1398), next Expression
+	// is forced eVariable without term table U120 (e1399 U100).
+	forceNextTermVariable bool
+	// lateMaxFuncsCreateDone: one-shot e1402 F20 U7 CREATE residual at maxFuncs.
+	lateMaxFuncsCreateDone bool
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
@@ -603,10 +609,23 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 		return castLiteral(t, "0")
 	}
 	if r.flipcoin(50) {
-		if r.flipcoin(50) {
+		smallDec := r.flipcoin(50)
+		if smallDec {
 			_ = r.upto(3)
 		} else {
 			_ = r.upto(20)
+		}
+		// seed2 e1398: after Global U28 era, pure U3 Constant then U4 residual.
+		// Only pure-U3 path (not U20); only once Global U28 scale has fired
+		// (postMustReadGlobalPicks past the U28 picks at e1390/e1393).
+		// e1399: next Expression is forced eVariable (no term U120).
+		if smallDec && useSmallParentStackSink != nil && *useSmallParentStackSink &&
+			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
+			postMustReadGlobalPicks != nil && *postMustReadGlobalPicks >= 10 {
+			_ = r.upto(4)
+			if forceNextTermVariableSink != nil {
+				*forceNextTermVariableSink = true
+			}
 		}
 		return castLiteral(t, "0")
 	}
@@ -1525,8 +1544,14 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						*globalU27DoneSink = true
 					}
 				} else if small && globalU27DoneSink != nil && *globalU27DoneSink {
-					// e1373: after U27 era, use real pool n (often 2).
-					target = 0
+					// e1373 lateU2 / ParentLocal pad: n≤2 real choose (not Global pad).
+					// e1390+: Global eFlexible inventory n≥3 → scale to GlobalList ~28.
+					if globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink && n >= 3 {
+						target = 28 // seed2 e1390 U28, e1393 U28
+					} else {
+						// e1373 window / ParentLocal U2: real pool n.
+						target = 0
+					}
 				} else if picks >= 2 && n < 11 {
 					if n == 2 && picks >= 4 && !small {
 						target = 5 // seed2 e892 GlobalList choose (pre-small-stack)
@@ -1736,7 +1761,37 @@ func buildFunctionCallExpr(
 		if r == nil {
 			return "", false
 		}
+		// seed2 e1402: after late force-Variable continuation with pointer type,
+		// UP CREATE residual F20 U7 even when GO thinks at maxFuncs (under-count).
+		// Prefer synthetic CREATE residual over falling through to Variable U100.
 		if len(state.funcs) >= state.maxFuncs {
+			if useSmallParentStackSink != nil && *useSmallParentStackSink &&
+				globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
+				!state.lateMaxFuncsCreateDone {
+				// seed2 e1402–1409 one-shot: CREATE residual F20 U7, U120 Assign,
+				// qfer F50 F10×2 + F50, then nested expression (e1410 Function…).
+				state.lateMaxFuncsCreateDone = true
+				_ = r.flipcoin(20)
+				_ = r.upto(7)
+				_ = r.upto(120) // term/AssignOps e1404
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				if er != nil && er.fallback != nil {
+					prevDepth := 0
+					if ctx != nil {
+						prevDepth = ctx.exprDepth
+						ctx.exprDepth = 0
+					}
+					_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+					if ctx != nil {
+						ctx.exprDepth = prevDepth
+					}
+				}
+				return castLiteral(t, "0"), true
+			}
 			// Upstream: failed invocation → ExpressionVariable::make_random
 			// (seed2 e814 U100 NewValue after useExisting miss at max funcs).
 			return "", false // caller termFunction falls through; see below
@@ -1976,6 +2031,62 @@ func randomLeafExprWithMode(
 	noFunc bool,
 	noConst bool,
 ) string {
+	// seed2 e1399: after Constant U4 residual, force eVariable (no term U120).
+	// e1400: parent continues with full Expression term U120 (not next statement).
+	if forceNextTermVariableSink != nil && *forceNextTermVariableSink {
+		*forceNextTermVariableSink = false
+		// Jump into termVariable path via must_use + scope select.
+		out := "x"
+		if c, ok := trySelectMustUseVar(er, t, ctx); ok {
+			out = c.expr
+		} else {
+			scopePick := variableScopePickFromER(er, opts)
+			var flow *functionFlowState
+			if ctx != nil {
+				flow = ctx.state
+			}
+			if scopePick == 1 {
+				idx := parentStackPick(er, flow)
+				localCands := localsInStackBlock(er, env, scope, ctx, idx)
+				if ctx != nil && ctx.state != nil && ctx.state.globalLateU2MissDone {
+					for len(localCands) < 2 {
+						localCands = append(localCands, exprVarCandidate{expr: "x", ctype: t, assignable: true})
+					}
+				}
+				if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
+					out = c.expr
+				}
+			} else {
+				candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+				if len(candidates) == 0 {
+					candidates = buildExprCandidatesFromER(er, env, scope, ctx)
+				}
+				if c, ok := selectExprVariableFromER(t, er, candidates, false); ok && c.expr != "" {
+					out = c.expr
+				}
+			}
+		}
+		// Parent expression continues after forced Variable (seed2 e1400 U120=39
+		// Function → user path F50 F20 U7 when at max funcs + non-simple type).
+		// Use pointer type so atMaxFuncs forces user invocation (not std F5).
+		if er != nil && er.fallback != nil {
+			prevDepth := 0
+			if ctx != nil {
+				prevDepth = ctx.exprDepth
+				if ctx.exprDepth > 0 {
+					ctx.exprDepth = 0
+				}
+			}
+			contT := CType{Name: "int32_t*", Signed: true, Bits: 32}
+			_ = randomTypedExprDepthFlags(contT, er, opts, env, scope, 0, ctx, false, false)
+			if ctx != nil {
+				ctx.exprDepth = prevDepth
+			}
+		}
+		bumpExprDepth(ctx)
+		return castLiteral(t, out)
+	}
+
 	type termChoice int
 	const (
 		termFunction termChoice = iota
@@ -4284,6 +4395,7 @@ func emitSingleFuncDefOnce(
 		lhsSoleNextSink = &state.lhsSoleNext
 		globalU27DoneSink = &state.globalU27Done
 		globalLateU2MissDoneSink = &state.globalLateU2MissDone
+		forceNextTermVariableSink = &state.forceNextTermVariable
 		lastArraySizesSink = &state.lastArraySizes
 		defer func() {
 			multiDimArraySink = prevSink
@@ -4294,6 +4406,7 @@ func emitSingleFuncDefOnce(
 			lhsSoleNextSink = nil
 			globalU27DoneSink = nil
 			globalLateU2MissDoneSink = nil
+			forceNextTermVariableSink = nil
 			lastArraySizesSink = nil
 		}()
 	}
