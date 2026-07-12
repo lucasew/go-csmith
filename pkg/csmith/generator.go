@@ -2045,9 +2045,44 @@ func emitStatement(
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, false, stmtBudget, ctx)
 		writeLine(b, 1, "}")
 	case stmtFor:
-		bound := 1 + int(dec.pick(3, 5))
-		writeLine(b, 1, fmt.Sprintf("for (uint32_t i = 0; i < %du; ++i) {", bound))
-		writeLine(b, 2, fmt.Sprintf("x += (i ^ 0x%08Xu);", dec.vals[4]))
+		// SelectLoopCtrlVar / choose_var: 0→create, 1→no RNG, n>1→upto(n).
+		// seed2 first for: exactly one viable IV (no choose RNG) then loop control.
+		ivN := 1 // match observed seed2: one integer IV already visible
+		if ivN > 1 {
+			_ = r.upto(uint32(ivN))
+		} else if ivN == 0 && opts.GlobalVariables {
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			_ = r.flipcoin(20)
+			if r.flipcoin(50) {
+				if r.flipcoin(50) {
+					_ = r.upto(3)
+				} else {
+					_ = r.upto(20)
+				}
+			} else {
+				for i := 0; i < 8; i++ {
+					_ = r.next31()
+				}
+			}
+		}
+		// make_random_loop_control
+		if !r.flipcoin(50) {
+			_ = r.upto(60)
+		}
+		_ = r.upto(60)
+		_ = r.upto(6)
+		if r.flipcoin(50) {
+			_ = r.upto(10)
+		} else {
+			_ = r.flipcoin(50)
+		}
+		// SafeOpFlags for init StatementAssign
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
+		writeLine(b, 2, "x += (uint32_t)i;")
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 		writeLine(b, 1, "}")
 	case stmtReturn:
