@@ -111,6 +111,8 @@ type genContext struct {
 	from    int
 	dynLocs []localInfo
 	info    compositeInfo
+	// exprDepth mirrors CGContext::expr_depth (filter only; not always bumped).
+	exprDepth int
 }
 
 type genSnapshot struct {
@@ -125,6 +127,7 @@ type genSnapshot struct {
 	nextGlobalID   int
 	stmtBudget     int
 	lateGlobalsBuf string
+	exprDepth      int
 }
 
 func takeGenSnapshot(ctx *genContext) *genSnapshot {
@@ -133,6 +136,7 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 	}
 	s := &genSnapshot{
 		dynLocLen: len(ctx.dynLocs),
+		exprDepth: ctx.exprDepth,
 	}
 	if ctx.state != nil {
 		s.funcsLen = len(ctx.state.funcs)
@@ -176,6 +180,13 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		ctx.state.stmtBudget = s.stmtBudget
 		ctx.state.lateGlobals.Reset()
 		ctx.state.lateGlobals.WriteString(s.lateGlobalsBuf)
+	}
+	ctx.exprDepth = s.exprDepth
+}
+
+func bumpExprDepth(ctx *genContext) {
+	if ctx != nil {
+		ctx.exprDepth++
 	}
 }
 
@@ -465,9 +476,10 @@ func buildExprCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, ctx *
 	return candidates
 }
 
+// scope codes: 0=global, 1=parent local, 2=param, 3=new-global, 4=new-parent-local
 func variableScopePickFromER(er *exprRand, opts Options) int {
-	// Upstream VariableSelector::InitScopeTable probabilities.
-	// 0=global, 1=parent local, 2=parent param, 3=new value.
+	// InitScopeTable: Global 0-34, ParentLocal 35-64, ParentParam 65-94, NewValue 95-99.
+	// NewValue → VariableCreationProbability: flipcoin(10) Global else ParentLocal CREATE.
 	v := int(er.pick(100))
 	if opts.GlobalVariables {
 		switch {
@@ -478,7 +490,10 @@ func variableScopePickFromER(er *exprRand, opts Options) int {
 		case v < 95:
 			return 2
 		default:
-			return 3
+			if er != nil && er.fallback != nil && er.fallback.flipcoin(10) {
+				return 3 // create global
+			}
+			return 4 // create parent local
 		}
 	}
 	switch {
@@ -487,7 +502,7 @@ func variableScopePickFromER(er *exprRand, opts Options) int {
 	case v < 95:
 		return 2
 	default:
-		return 3
+		return 4
 	}
 }
 
@@ -552,40 +567,68 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	return exprVarCandidate{expr: name, ctype: t, assignable: !isConst}, true
 }
 
-func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ctx *genContext, withNewQualifiers bool) (exprVarCandidate, bool) {
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
-	// Type::random_type_from_type(type, true, false) for simple types maps to
-	// choose_random_simple() and consumes rnd_upto(MAX_SIMPLE_TYPES=14).
-	chosen := t
-	if t.Bits > 0 && len(ctx.state.pool) > 0 {
-		i := int(er.fallback.upto(14))
-		if i >= 0 && i < len(ctx.state.pool) {
-			chosen = ctx.state.pool[i]
+	// Type::random_type_from_type then GenerateNewParentLocal.
+	chosen := pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.info, opts)
+	if withNewQualifiers {
+		// GenerateNewParentLocal when qfer is null/wildcard.
+		_ = er.fallback.flipcoin(50)
+		_ = er.fallback.flipcoin(10)
+	}
+	// create_and_initialize
+	newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
+	// make_init_value → Constant::make_random for non-pointer (init for scalar or array)
+	if er.fallback.flipcoin(50) {
+		if er.fallback.flipcoin(50) {
+			_ = er.fallback.upto(3)
 		} else {
-			chosen = ctx.state.pool[i%len(ctx.state.pool)]
+			_ = er.fallback.upto(20)
+		}
+	} else {
+		hn := hexDigitsForConstant(chosen)
+		if hn <= 0 {
+			hn = 8
+		}
+		for i := 0; i < hn; i++ {
+			_ = er.fallback.next31()
 		}
 	}
-
-	// Upstream GenerateNewParentLocal path:
-	// 1. CVQualifiers::random_qualifiers(t, access, cg_context, no_volatile=true):
-	//    - rnd_flipcoin(RegularVolatileProb=50) -> F 50
-	//    - rnd_flipcoin(RegularConstProb=10)    -> F 10
-	// 2. create_and_initialize:
-	//    - rnd_flipcoin(NewArrayVariableProb=20) -> F 20
-	//    - make_init_value -> Constant::make_random -> GenerateRandomConstant:
-	//      (pure_rnd = main RNG in is_random() mode)
-	//      - pure_rnd_flipcoin(50) -> F 50
-	//      - pure_rnd_flipcoin(50) -> F 50  (or pure_rnd_upto depending on branch)
-	//      - pure_rnd_upto(20)     -> U 20
-	// After this, upstream returns the local variable with NO further main RNG use.
-	_ = er.fallback.flipcoin(50) // volatile from random_qualifiers
-	_ = er.fallback.flipcoin(10) // const from random_qualifiers
-	_ = er.fallback.flipcoin(20) // create_and_initialize NewArrayVariableProb
-	_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50) in GenerateRandomConstant
-	_ = er.fallback.flipcoin(50) // pure_rnd_flipcoin(50) in GenerateRandomConstant
-	_ = er.fallback.upto(20)     // pure_rnd_upto(20) in GenerateRandomConstant
+	if newArray {
+		// ArrayVariable::CreateArrayVariable (simplified dimension/init burns)
+		_ = er.fallback.upto(99) // dimension seed
+		// At least one dimension length: rnd_upto(max_array_length_per_dimension)+1
+		maxPerDim := opts.MaxArrayLenPerDim
+		if maxPerDim < 1 {
+			maxPerDim = 10
+		}
+		// Conservative: one dimension draw (seed2 early arrays are often 1d)
+		dim0 := int(er.fallback.upto(uint32(maxPerDim))) + 1
+		total := dim0
+		// pure_rnd_upto(total_size/2) alternative inits
+		if total/2 > 0 {
+			initNum := int(er.fallback.upto(uint32(total / 2)))
+			for i := 0; i < initNum; i++ {
+				if er.fallback.flipcoin(50) {
+					if er.fallback.flipcoin(50) {
+						_ = er.fallback.upto(3)
+					} else {
+						_ = er.fallback.upto(20)
+					}
+				} else {
+					hn := hexDigitsForConstant(chosen)
+					if hn <= 0 {
+						hn = 8
+					}
+					for j := 0; j < hn; j++ {
+						_ = er.fallback.next31()
+					}
+				}
+			}
+		}
+	}
 
 	// Materialize as a generated global in our simplified backend WITHOUT
 	// consuming any more main RNG. The upstream's local variable creation
@@ -715,52 +758,81 @@ func buildFunctionCallExpr(
 		candidates = append(candidates, i)
 	}
 
-	// FunctionInvocation::make_random(is_std_func=false) — partial port.
-	// Seed-2 event stream through ~104 matches with: flipcoin(50), flipcoin(0),
-	// then pick/create only when later-func candidates exist. Full choose_func
-	// + create-always semantics still TODO (needed past event 105).
+	// FunctionInvocation::make_random(is_std_func=false).
+	// Upstream (seed2 SITE logs): pure_rnd_flipcoin(50) then either choose or
+	// CREATE+make_random_signature. Some early call sites that go routes here
+	// are not real FunctionInvocation on C++ (event 43 has F50 without SITE);
+	// when useExisting=false and no later-func candidates, emit flipcoin(0)
+	// and fail like the matched seed2 prefix (events 43–45).
+	var r *rng
+	if er != nil {
+		r = er.fallback
+	}
 	useExisting := false
-	if er != nil && er.fallback != nil {
-		useExisting = er.fallback.flipcoin(50)
-		_ = er.fallback.flipcoin(0)
+	if r != nil {
+		useExisting = r.flipcoin(50)
 	} else {
 		useExisting = er.pick(2) == 0
 	}
+
 	var callee funcInfo
 	calleeIdx := -1
 	if useExisting && len(candidates) > 0 {
-		calleeIdx = candidates[int(er.pick(uint32(len(candidates))))]
-		callee = state.funcs[calleeIdx]
-	} else {
-		if len(candidates) == 0 {
-			return "", false
+		if opts.Builtins && r != nil {
+			_ = r.flipcoin(uint32(opts.BuiltinFunctionProb))
 		}
-		created, newIdx, ok := state.appendNewFunction(er.fallback, &t)
-		if ok {
-			calleeIdx = newIdx
-			callee = created
-			if !state.built[calleeIdx] {
-				state.defs[calleeIdx] = emitSingleFuncDef(
-					er.fallback,
-					opts,
-					callee,
-					state,
-					calleeIdx,
-					opts.MaxBlockSize,
-					env,
-					ctx.info,
-					&state.stmtBudget,
-				)
-				state.built[calleeIdx] = true
-			}
-		} else if len(candidates) > 0 {
-			calleeIdx = candidates[int(er.pick(uint32(len(candidates))))]
-			callee = state.funcs[calleeIdx]
+		if len(candidates) == 1 {
+			calleeIdx = candidates[0]
 		} else {
-			return "", false
+			calleeIdx = candidates[int(er.pick(uint32(len(candidates))))]
 		}
+		callee = state.funcs[calleeIdx]
 	}
 
+	if calleeIdx < 0 {
+		if !useExisting && len(candidates) == 0 {
+			// Matched seed2 events 43–45: F50=0, F0, then leaf retries.
+			if r != nil {
+				_ = r.flipcoin(0)
+			}
+			return "", false
+		}
+		// CREATE: FunctionInvocationUser::build_invocation_and_function
+		// → make_random_signature RNG, then body (emitSingleFuncDef).
+		if r == nil {
+			return "", false
+		}
+		_ = r.flipcoin(50) // RegularVolatileProb (even with no_volatile force)
+		_ = r.flipcoin(10) // RegularConstProb
+		maxP := opts.MaxParams
+		if maxP < 1 {
+			maxP = 1
+		}
+		// ParamListProbability = rnd_upto(max_params); for i=0; i<=max; i++
+		maxBound := int(r.upto(uint32(maxP)))
+		paramN := maxBound + 1
+		params := make([]paramInfo, 0, paramN)
+		for i := 0; i < paramN; i++ {
+			_ = r.flipcoin(40)
+			// Type::choose_random_nonvoid_nonvolatile → rnd_upto(AllTypes.size(), filter)
+			pt := pickNonVoidNonVolatile(r, state.pool, state.info, opts)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(10)
+			params = append(params, paramInfo{
+				name:  state.allocParamName(),
+				ctype: pt,
+			})
+		}
+		created, newIdx, ok := state.appendNewFunctionWithSignature(r, t, params)
+		if !ok {
+			return "", false
+		}
+		calleeIdx = newIdx
+		callee = created
+	}
+
+	// Param expressions for the call site (make_random_param per formal).
+	// Upstream generates args before the callee body for new functions.
 	args := "void"
 	if len(callee.params) > 0 {
 		argExprs := make([]string, 0, len(callee.params))
@@ -769,9 +841,25 @@ func buildFunctionCallExpr(
 		}
 		args = strings.Join(argExprs, ", ")
 	}
+	if calleeIdx >= 0 && !state.built[calleeIdx] {
+		state.defs[calleeIdx] = emitSingleFuncDef(
+			r,
+			opts,
+			callee,
+			state,
+			calleeIdx,
+			opts.MaxBlockSize,
+			env,
+			ctx.info,
+			&state.stmtBudget,
+		)
+		state.built[calleeIdx] = true
+	}
 	if args == "void" {
+		bumpExprDepth(ctx)
 		return castLiteral(t, fmt.Sprintf("%s()", callee.name)), true
 	}
+	bumpExprDepth(ctx)
 	return castLiteral(t, fmt.Sprintf("%s(%s)", callee.name, args)), true
 }
 
@@ -847,10 +935,16 @@ func randomLeafExprWithMode(
 		}
 		return termVariable
 	}
+	filterDepth := depth
+	if ctx != nil {
+		filterDepth = ctx.exprDepth
+	}
+	// Hard nest cap (go-only) so stdfunc non-bumping depth cannot recurse forever.
+	nestNoFunc := depth > maxExprDepth(opts)*4
 	disallowed := func(tc termChoice) bool {
-		if (tc == termFunction && (noFunc || depth+2 > maxExprDepth(opts))) ||
+		if (tc == termFunction && (noFunc || nestNoFunc || filterDepth+2 > maxExprDepth(opts))) ||
 			(tc == termConstant && noConst) ||
-			((tc == termAssign || tc == termComma) && depth+2 > maxExprDepth(opts)) {
+			((tc == termAssign || tc == termComma) && (nestNoFunc || filterDepth+2 > maxExprDepth(opts))) {
 			return true
 		}
 		return false
@@ -891,56 +985,78 @@ func randomLeafExprWithMode(
 			if depth > 0 && er != nil && er.fallback != nil {
 				// ExpressionFuncall::ExpressionFunctionProbability + stdfunc path.
 				if er.fallback.flipcoin(80) {
+					// Binary/unary stdfunc: do not bump ctx.exprDepth (upstream).
+					// Advance nest depth only (arg) so hard cap can fire.
+					nest := depth + 1
 					if er.fallback.flipcoin(5) {
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
-						// Recursive child expression must advance depth.
-						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
 						return castLiteral(t, fmt.Sprintf("(~(%s))", operand))
 					}
-					ptrCmpProb := uint32(0)
-					if opts.Pointers {
-						ptrCmpProb = 10
+					if opts.Pointers && er.fallback.flipcoin(10) {
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.upto(4)
+						_ = er.fallback.upto(1)
+						lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+						rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+						return castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 					}
-					_ = er.fallback.flipcoin(ptrCmpProb)
 					_ = er.fallback.upto(18)
 					_ = er.fallback.flipcoin(50)
 					_ = er.fallback.flipcoin(50)
 					_ = er.fallback.upto(4)
-					// Recursive child expressions must advance depth.
-					lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
-					rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+					lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+					rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
 					return castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
 				}
 			}
-			if depth < maxExprDepth(opts) {
-				if call, ok := buildFunctionCallExpr(t, er, opts, env, scope, depth, ctx); ok {
-					return call
-				}
+			// User-function path runs whenever stdfunc was not taken. Nest depth
+			// must not gate this (upstream already chose eFunction term).
+			if call, ok := buildFunctionCallExpr(t, er, opts, env, scope, depth, ctx); ok {
+				return call
 			}
 			restoreGenSnapshot(ctx, snap)
 		case termVariable:
 			scopePick := variableScopePickFromER(er, opts)
+			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
 				if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+					bumpExprDepth(ctx)
+					return castLiteral(t, g.expr)
+				}
+				restoreGenSnapshot(ctx, snap)
+				continue
+			}
+			if scopePick == 4 {
+				if er != nil && er.fallback != nil {
+					_ = er.pick(1) // parent.stack pick (size often 1)
+				}
+				// NewValue→ParentLocal: qfer usually non-wildcard from select.
+				if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, false); ok {
+					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
 				}
 				restoreGenSnapshot(ctx, snap)
 				continue
 			}
 			if scopePick == 1 && er != nil && er.fallback != nil {
-				// Parent-local selection starts by choosing a parent stack block.
 				_ = er.pick(1)
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			if len(candidates) == 0 {
 				if scopePick == 0 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
 				}
 				if scopePick == 1 {
-					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx); ok {
+					// Empty parent locals often use wildcard qfer → random_qualifiers.
+					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
 				}
@@ -948,11 +1064,13 @@ func randomLeafExprWithMode(
 			}
 			if len(candidates) > 0 {
 				if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
+					bumpExprDepth(ctx)
 					return castLiteral(t, c.expr)
 				}
 			}
 			restoreGenSnapshot(ctx, snap)
 		case termConstant:
+			bumpExprDepth(ctx)
 			return randomConstantExprFromER(t, er, opts)
 		case termAssign:
 			// Upstream ExpressionAssign::make_random:
@@ -1721,6 +1839,25 @@ func (s *functionFlowState) appendNewFunction(r *rng, forceRet *CType) (funcInfo
 		}
 	} else {
 		fn = s.makeFuncSignature(r, s.nextIdx)
+	}
+	s.nextIdx++
+	s.funcs = append(s.funcs, fn)
+	s.built = append(s.built, false)
+	s.defs = append(s.defs, "")
+	return fn, len(s.funcs) - 1, true
+}
+
+// appendNewFunctionWithSignature registers a function whose signature RNG was
+// already consumed by the caller (make_random_signature mirror).
+func (s *functionFlowState) appendNewFunctionWithSignature(r *rng, ret CType, params []paramInfo) (funcInfo, int, bool) {
+	_ = r
+	if len(s.funcs) >= s.maxFuncs {
+		return funcInfo{}, -1, false
+	}
+	fn := funcInfo{
+		name:   fmt.Sprintf("func_%d", s.nextIdx),
+		ret:    ret,
+		params: params,
 	}
 	s.nextIdx++
 	s.funcs = append(s.funcs, fn)
