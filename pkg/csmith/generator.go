@@ -1076,11 +1076,23 @@ func randomLeafExprWithMode(
 						return castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 					}
 					_ = er.fallback.upto(18)
-					_ = er.fallback.flipcoin(50)
-					_ = er.fallback.flipcoin(50)
-					_ = er.fallback.upto(4)
-					lhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
-					rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+					_ = er.fallback.flipcoin(50)   // SafeOpsSigned op1
+					_ = er.fallback.flipcoin(50)   // SafeOpsSigned op2
+					sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64-bit
+					// Map size to operand type for RandomHexDigits width
+					opTy := t
+					switch sz {
+					case 0:
+						opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+					case 1:
+						opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
+					case 2:
+						opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					default:
+						opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+					}
+					lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+					rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
 					return castLiteral(t, fmt.Sprintf("((%s) ^ (%s))", lhs, rhs))
 				}
 			}
