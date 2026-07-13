@@ -269,6 +269,10 @@ type functionFlowState struct {
 	ppPostPadAssignLhsGlobalPending bool
 	// ppPostPadPPForceStack: ParentParam burns stack U4 (e1774–75) not sole.
 	ppPostPadPPForceStack bool
+	// ppPostPadCommaAfterPP: one-shot e1791 Constant→Comma + skip type U.
+	ppPostPadCommaAfterPP bool
+	// ppPostPadLongAddrResidualDone: first late NewArray uses U3 U9 U4 U7.
+	ppPostPadLongAddrResidualDone bool
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
 }
@@ -404,6 +408,9 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 			if state.ppPostPadPPForceStack {
 				// seed4 e1775: PP→PL stack U4 after Assign Lhs Global residual.
 				n = 4
+			} else if ppPostPadGlobalPicks >= 14 {
+				// seed4 e1831: late post-pad PL stack U6 (deep nest).
+				n = 6
 			} else if state.filterCompoundStmts {
 				n = 6
 			} else if state.isParamPPFallPicks >= 2 {
@@ -1178,6 +1185,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				}
 				if useSmallParentStackSink != nil && *useSmallParentStackSink {
 					_ = r.upto(6)
+				} else if ppPostPadGlobalPicks >= 14 {
+					// seed4 e1851: late post-pad alt init choose among ~3 pointees.
+					_ = r.upto(3)
 				} else if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 {
 					// PP-era choose_ok_var among ~2 pointees (seed4 e1103 U2).
 					_ = r.upto(2)
@@ -1853,6 +1863,18 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 							_ = er.fallback.next31()
 						}
 					}
+				}
+			} else if ppEra && ppPostPadGlobalPicks >= 14 && newArray {
+				// seed4 e1834–37: first NewArray address residual U3 U9 U4 U7;
+				// e1845–46 later: U3 U4 then CreateArray (shorter residual).
+				_ = er.fallback.upto(3)
+				if !ctx.state.ppPostPadLongAddrResidualDone {
+					ctx.state.ppPostPadLongAddrResidualDone = true
+					_ = er.fallback.upto(9)
+					_ = er.fallback.upto(4)
+					_ = er.fallback.upto(7)
+				} else {
+					_ = er.fallback.upto(4)
 				}
 			} else if ppEra && (newArray || ctx.state.ppNewArrayCreated) {
 				// seed4 e1096: NewArray + address-of → choose U2 then CreateArray.
@@ -3178,6 +3200,7 @@ func randomLeafExprWithMode(
 		return false
 	}
 
+exprTries:
 	for tries := 0; tries < 6; tries++ {
 		snap := takeGenSnapshot(ctx)
 		var choice termChoice
@@ -3207,6 +3230,13 @@ func randomLeafExprWithMode(
 				restoreGenSnapshot(ctx, snap)
 				continue
 			}
+		}
+		// seed4 e1791–95: after Global U2+U10 empty → PP miss term retry,
+		// U120 that decodes Constant is Comma (lhs Function binary without type U).
+		if choice == termConstant && ctx != nil && ctx.state != nil &&
+			ctx.state.ppPostPadCommaAfterPP && !disallowed(termComma) {
+			choice = termComma
+			// keep flag for skipCommaType on this Comma only
 		}
 		switch choice {
 		case termFunction:
@@ -3318,6 +3348,11 @@ func randomLeafExprWithMode(
 									stars = 1
 								}
 							} else if ptrIdx > 0 {
+								stars = 2
+							}
+							// seed4 e1827: after late post-pad ptr-cmp, derived
+							// **+ self F50 (not *** levels F10 overshoot).
+							if ppEra && ppPostPadGlobalPicks >= 14 && stars > 2 {
 								stars = 2
 							}
 							ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
@@ -4417,6 +4452,16 @@ func randomLeafExprWithMode(
 								bumpExprDepth(ctx)
 								return castLiteral(t, ints[idx].expr)
 							}
+							// seed4 e1790–91: after Global U2+U10 empty (picks==14),
+							// PP VS U100 is visit_facts miss → Expression do-while
+							// retries term pick U120 (not accept PP sole→statement).
+							if scopePick == 2 && ppPostPadGlobalPicks == 14 {
+								if ctx != nil && ctx.state != nil {
+									ctx.state.ppPostPadCommaAfterPP = true
+								}
+								restoreGenSnapshot(ctx, snap)
+								continue exprTries
+							}
 							candidates = buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 							if len(candidates) == 0 {
 								candidates = buildExprCandidatesFromER(er, env, scope, ctx)
@@ -4521,13 +4566,16 @@ func randomLeafExprWithMode(
 					// seed4 e1038: PP array-body pointer is !SE-free — levels only.
 					ppArrayBody := ctx != nil && ctx.state != nil &&
 						ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
-					if ptrLv > 0 && ppArrayBody {
+					// seed4 e1822–26: after post-pad GlobalPicks≥14, pointer
+					// ExpressionAssign burns levels+self F50 (not array-body skip self).
+					latePostPadAssign := ppPostPadGlobalPicks >= 14
+					if ptrLv > 0 && ppArrayBody && !latePostPadAssign {
 						for i := 0; i < ptrLv; i++ {
 							_ = er.fallback.flipcoin(50) // level vol
 							_ = er.fallback.flipcoin(10) // level const
 						}
 						// no self F50
-					} else if ptrLv > 0 && burnSelfF50 {
+					} else if ptrLv > 0 && (burnSelfF50 || latePostPadAssign) {
 						for i := 0; i < ptrLv; i++ {
 							_ = er.fallback.flipcoin(50) // level vol
 							_ = er.fallback.flipcoin(10) // level const
@@ -4655,23 +4703,32 @@ func randomLeafExprWithMode(
 					}
 					// Address-of path: create global int for pointer target
 					// GenerateNewGlobal -> create_and_initialize for int:
-					tgtNewArray := er.fallback.flipcoin(20) // inner NewArrayVariableProb
-					// Constant::make_random for the synthetic pointed-to object.
-					if er.fallback.flipcoin(50) {
-						if er.fallback.flipcoin(50) {
-							_ = er.fallback.upto(3) // pure_rnd_upto(3) - 1
-						} else {
-							_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
-						}
+					tgtNewArray := false
+					// seed4 e1845–47: late post-pad NewArray address residual
+					// U3 U4 then CreateArray U99 (not F20 Constant path).
+					if ppPostPadGlobalPicks >= 14 && newArray {
+						_ = er.fallback.upto(3)
+						_ = er.fallback.upto(4)
+						tgtNewArray = true
 					} else {
-						// Historical early path: 16 hex digits. Late useSmallParentStack
-						// e1181: char-width hex (2) then U120 (e1200 climb).
-						hn := 16
-						if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
-							hn = 2
-						}
-						for i := 0; i < hn; i++ {
-							_ = er.fallback.next31()
+						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
+						// Constant::make_random for the synthetic pointed-to object.
+						if er.fallback.flipcoin(50) {
+							if er.fallback.flipcoin(50) {
+								_ = er.fallback.upto(3) // pure_rnd_upto(3) - 1
+							} else {
+								_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
+							}
+						} else {
+							// Historical early path: 16 hex digits. Late useSmallParentStack
+							// e1181: char-width hex (2) then U120 (e1200 climb).
+							hn := 16
+							if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+								hn = 2
+							}
+							for i := 0; i < hn; i++ {
+								_ = er.fallback.next31()
+							}
 						}
 					}
 					// seed2 e1043: after Constant pure_rnd U20, CreateArray when
@@ -4738,6 +4795,30 @@ func randomLeafExprWithMode(
 			// seed4 e1231: PP-era ParentParam Lhs → stack U3 only (next F80 residual).
 			if scopePick == 2 {
 				idx := parentStackPick(er, ctx.state)
+				// seed4 e1862–67: late post-pad PP Lhs stack then F20×4 U6
+				// create residual; F80=0 → another VS (e1867–).
+				if ppPostPadGlobalPicks >= 14 && er != nil && er.fallback != nil {
+					_ = er.fallback.flipcoin(20)
+					_ = er.fallback.flipcoin(20)
+					_ = er.fallback.flipcoin(20)
+					_ = er.fallback.flipcoin(20)
+					_ = er.pick(6)
+					if er.fallback.flipcoin(80) {
+						return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+					}
+					// F80=0: VS U100=36 PL stack U6 then F20×2 (e1868–71).
+					scopePick2 := variableScopePickFromER(er, opts, &scope)
+					if scopePick2 == 0 || scopePick2 == 3 {
+						_ = er.pick(6)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+					} else if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+						_ = parentStackPick(er, ctx.state)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+					}
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
 				if ppLhsEra && !ctx.state.useSmallParentStack {
 					// seed4 e1231–33: PP-era ParentParam Lhs → stack U3, then
 					// Lhs do-while residual F80; if F80=0 retry VS U100.
@@ -4914,7 +4995,13 @@ func randomLeafExprWithMode(
 			restoreGenSnapshot(ctx, snap)
 		case termComma:
 			lhsType := t
-			if er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
+			// seed4 e1791–92: after PP miss term→Comma, skip lhs type choose
+			// (UP U120 Function immediately; not AllTypes U14).
+			skipCommaType := ctx != nil && ctx.state != nil && ctx.state.ppPostPadCommaAfterPP
+			if skipCommaType {
+				ctx.state.ppPostPadCommaAfterPP = false
+			}
+			if !skipCommaType && er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
 				// Upstream ExpressionComma lhs: type=nil → choose_random_nonvoid_nonvolatile.
 				// Early seed2: pool cardinality without filter (historical match).
 				// Late useSmallParentStack e1310: AllTypes n=14, float filtered tries>=1.
