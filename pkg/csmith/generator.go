@@ -3546,12 +3546,16 @@ func randomLeafExprWithMode(
 					forceCreate := ctx.state != nil &&
 						(ctx.state.parentLocalStackPicks >= 12 ||
 							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
-					// seed4 e1199: PP array-body ParentLocal pointer after
-					// NewArray era — inventory miss/visit_facts → force create
-					// (UP F50 F10 F10, not sole-select next U120).
-					if wantPtr && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+					// seed4 e1267: PP-era after NewArray — parentLocalStackPicks
+					// force is too aggressive (always create). Prefer pad-choose
+					// when inventory non-empty; empty pointer block still creates.
+					if ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
 						ctx.state.arrayLoopDepth > 0 && ctx.state.ppNewArrayCreated {
-						forceCreate = true
+						if len(localCands) == 0 && wantPtr {
+							forceCreate = true // e1199 empty pointer block
+						} else {
+							forceCreate = false // e1267 pad-choose over stack-count force
+						}
 					}
 					// seed4 e332: isParam ParentLocal after stack in nested CREATE
 					// body — UP empty-block create F20; GO may see caller locals.
@@ -3576,6 +3580,29 @@ func randomLeafExprWithMode(
 							})
 						}
 						forceCreate = false
+					}
+					// seed4 e1267: PP-era multiDim ParentLocal after visit-fail
+					// era — pad-to-3 choose U3 + U2 F75 residual (not retype U14).
+					// Gate: ppPLVisitFailOnce already fired (e1217), inventory pad.
+					if !forceCreate && flow != nil && flow.isParamPPFallPicks >= 2 &&
+						flow.arrayLoopDepth > 0 && flow.multiDimArrays > 0 &&
+						flow.ppNewArrayCreated && flow.ppPLVisitFailOnce {
+						for len(localCands) < 3 {
+							localCands = append(localCands, exprVarCandidate{
+								expr: fmt.Sprintf("l_p%d", len(localCands)), ctype: t, assignable: true,
+								isArray: true, arrayLen: 2,
+							})
+						}
+						_ = er.pick(3)
+						// itemize + must_use residual (UP e1268–1271 U2 F75 ×2)
+						if er != nil && er.fallback != nil {
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(75)
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(75)
+						}
+						bumpExprDepth(ctx)
+						return castLiteral(t, localCands[0].expr)
 					}
 					if len(localCands) == 0 || forceCreate {
 						// Empty-block SelectParentLocal retypes; isParam formal
@@ -4229,11 +4256,12 @@ func randomLeafExprWithMode(
 						_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
 						continue
 					}
-					// seed4 e1047: PP array-body ExpressionAssign Lhs SelectDeref
-					// address-of accepts without full tgt create (next term U120).
-					// seed4 e1195: after PP NewArray CreateArray, choose U2.
+					// seed4 e1047/e1195: PP array-body Lhs address-of early accept
+					// with U2 choose before visit-fail era. After ppPLVisitFailOnce
+					// (e1275) UP does full tgt create residual (F20 F50 F50 U3).
 					if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
-						ctx.state.arrayLoopDepth > 0 && !newArray {
+						ctx.state.arrayLoopDepth > 0 && !newArray &&
+						!ctx.state.ppPLVisitFailOnce {
 						if ctx.state.ppNewArrayCreated {
 							_ = er.fallback.upto(2)
 						}
