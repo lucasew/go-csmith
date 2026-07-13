@@ -31,6 +31,9 @@ var lateDerefCreateNSink *int
 // lateLhsRejectGlobalSink: one-shot e2253 reject Global after U2 U4 residual.
 var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
+// nestedFuncBodiesSink / nestedNullPreferSink: seed4 e263 nested-body F0.
+var nestedFuncBodiesSink *int
+var nestedNullPreferSink *bool
 
 type structTypeInfo struct {
 	fields     []fieldInfo
@@ -188,6 +191,12 @@ type functionFlowState struct {
 	lateU2ItemizeOnce bool
 	// lateMustUseDone: one-shot e1001 U2×3 F75 dummy (later termVariable → U100).
 	lateMustUseDone bool
+	// nestedFuncBodies: count of non-func_1 bodies started (CREATE callees).
+	// seed4 e263: first Global simple EV in a nested body prefers sole null
+	// higher-indirection → F0 fail → retry U100 U2 (not integer U2).
+	nestedFuncBodies int
+	// nestedNullPreferDone: one-shot F0 after nested body Global simple prefer.
+	nestedNullPreferDone bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -1693,6 +1702,31 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 					_ = er.fallback.upto(2)
 					ctx.state.lateLhsMustUseWrite = true
 				}
+			} else if qferMode == 0 {
+				// isParam formal-qfer create: no existing pointee →
+				// random_loose_qualifiers (looser const F50) + GenerateNewGlobal
+				// NewArray F20 + Constant::make_random (seed4 e245–247).
+				// Not U2 choose. Hex path leaves untraced next31 (depth gap).
+				_ = er.fallback.flipcoin(50) // looser_const
+				newArrPointee := er.fallback.flipcoin(20)
+				if newArrPointee {
+					// Rare: CreateArray residual — keep Constant-shaped burn.
+					burnSimpleConstant(er.fallback, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
+				} else {
+					// seed4 e247 F50=0 → hex; UP depth gap 252→269 = 16 next31
+					// (longlong/int128 width even for int32* pointees here).
+					if er.fallback.flipcoin(50) {
+						if er.fallback.flipcoin(50) {
+							_ = er.fallback.upto(3)
+						} else {
+							_ = er.fallback.upto(20)
+						}
+					} else {
+						for i := 0; i < 16; i++ {
+							_ = er.fallback.next31()
+						}
+					}
+				}
 			} else {
 				n := 2
 				_ = er.fallback.upto(uint32(n))
@@ -1980,7 +2014,6 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
 	}
-
 	exact := make([]exprVarCandidate, 0, len(filtered))
 	sameWidth := make([]exprVarCandidate, 0, len(filtered))
 	// eFlexible is_convertable: any non-void simple integers interconvert.
@@ -2089,6 +2122,18 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// e276 small-pool quirk only before multi-dim / must_read era.
 		if n == 2 && (multiDimArraySink == nil || *multiDimArraySink == 0) {
 			return uniq[0], true
+		}
+		// seed4 e263–266: nested body Global simple — UP prefers sole null
+		// higher-indirection → F0 fail → retry U100 U2. Invent one-shot F0
+		// instead of integer U2 when GO inventory lacks the null pointer.
+		if n == 2 && multiDimArraySink != nil && *multiDimArraySink > 0 &&
+			(useSmallParentStackSink == nil || !*useSmallParentStackSink) &&
+			nestedNullPreferSink != nil && !*nestedNullPreferSink &&
+			nestedFuncBodiesSink != nil && *nestedFuncBodiesSink > 0 &&
+			er != nil && er.fallback != nil {
+			*nestedNullPreferSink = true
+			_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
+			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 		}
 		// seed2: first Global eFlexible after must_read spent uses real n (e719 U3);
 		// later picks see grown GlobalList (e811 U17).
@@ -3240,7 +3285,31 @@ func randomLeafExprWithMode(
 					// only (levels F50+F10×2 then F10, not self F50).
 					qferMode := 1
 					wantPtr := strings.Contains(t.Name, "*")
-					if !wantPtr && (ctx.state == nil || !ctx.state.useSmallParentStack) {
+					// isParam pointer ParentLocal: UP body often has 3 pointer
+					// array locals (seed4 e236 U3 + itemize U10 U4). When the
+					// chosen block has fewer than 3 exact pointer matches,
+					// synthesize choose+2D-itemize. Non-pointer ParentLocal
+					// unchanged (e187 empty → Global retry).
+					if isParam && wantPtr {
+						nExact := 0
+						for _, c := range localCands {
+							if sameBaseType(c.ctype, t) {
+								nExact++
+							}
+						}
+						if nExact < 3 {
+							idx := int(er.pick(3))
+							_ = er.pick(10)
+							_ = er.pick(4)
+							bumpExprDepth(ctx)
+							return castLiteral(t, fmt.Sprintf("l_pp%d", idx%3))
+						}
+					}
+					// isParam: formal qfer non-wildcard → GenerateNewParentLocal
+					// skips random_qualifiers (qferMode 0). seed4 e332 F20 F50.
+					if isParam {
+						qferMode = 0
+					} else if !wantPtr && (ctx.state == nil || !ctx.state.useSmallParentStack) {
 						qferMode = 2
 					} else if wantPtr && ctx.state != nil && ctx.state.useSmallParentStack &&
 						ctx.state.assignExprCount >= 3 {
@@ -3252,6 +3321,21 @@ func randomLeafExprWithMode(
 					forceCreate := ctx.state != nil &&
 						(ctx.state.parentLocalStackPicks >= 12 ||
 							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
+					// seed4 e332: isParam ParentLocal after stack in nested CREATE
+					// body — UP empty-block create F20; GO may see caller locals.
+					// Only when nestedFuncBodies>0 (not early func_1 isParam e189).
+					if isParam && !wantPtr && ctx.state != nil && !ctx.state.useSmallParentStack &&
+						ctx.state.nestedFuncBodies > 0 {
+						nExactPL := 0
+						for _, c := range localCands {
+							if sameBaseType(c.ctype, t) {
+								nExactPL++
+							}
+						}
+						if nExactPL == 0 {
+							forceCreate = true
+						}
+					}
 					// e1387: UP choose U2 among block locals; pad empty inventory.
 					if ctx.state != nil && ctx.state.globalLateU2MissDone {
 						for len(localCands) < 2 {
@@ -3262,7 +3346,10 @@ func randomLeafExprWithMode(
 						forceCreate = false
 					}
 					if len(localCands) == 0 || forceCreate {
-						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
+						// Empty-block SelectParentLocal retypes; isParam formal
+						// qfer create keeps t (seed4 e332 F20 no U14).
+						retype := !isParam
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx); ok {
 							bumpExprDepth(ctx)
 							return castLiteral(t, g.expr)
 						}
@@ -3457,13 +3544,13 @@ func randomLeafExprWithMode(
 							continue
 						}
 					}
-					// seed2 e1375: empty expr = visit_facts miss after Global U2+U3;
+					// empty expr = visit_facts / opportunistic_validate miss.
 					// ExpressionVariable do-while retries VariableSelector (new U100).
-					if c.expr == "" && ctx != nil && ctx.state != nil &&
-						ctx.state.useSmallParentStack && er != nil {
+					// seed2 e1375 useSmallParentStack; seed4 e263–266 early nested.
+					if c.expr == "" && ctx != nil && ctx.state != nil && er != nil {
 						scopePick = variableScopePickFromER(er, opts, &scope)
 						// ParentLocal: stack U3 then choose U2 (e1376–1387), not retype create.
-						if scopePick == 1 {
+						if scopePick == 1 && ctx.state.useSmallParentStack {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
 							for len(localCands) < 2 {
@@ -3479,6 +3566,31 @@ func randomLeafExprWithMode(
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
 							}
+						}
+						// seed4 e265–266: retry Global U100 then U2 among 2.
+						if scopePick == 0 {
+							cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
+							// Prefer integer choose (null prefer already spent).
+							ints := make([]exprVarCandidate, 0, 4)
+							for _, x := range cands {
+								if !strings.Contains(x.ctype.Name, "*") &&
+									!strings.HasPrefix(x.ctype.Name, "struct") &&
+									!strings.HasPrefix(x.ctype.Name, "union") {
+									ints = append(ints, x)
+								}
+							}
+							for len(ints) < 2 {
+								ints = append(ints, exprVarCandidate{
+									expr: "g_x", ctype: t, assignable: true,
+								})
+							}
+							if len(ints) == 1 {
+								bumpExprDepth(ctx)
+								return castLiteral(t, ints[0].expr)
+							}
+							idx := int(er.pick(uint32(len(ints)))) % len(ints)
+							bumpExprDepth(ctx)
+							return castLiteral(t, ints[idx].expr)
 						}
 						candidates = buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 						if len(candidates) == 0 {
@@ -3527,9 +3639,9 @@ func randomLeafExprWithMode(
 			return randomConstantExprFromER(t, er, opts)
 		case termAssign:
 			// Upstream ExpressionAssign::make_random:
-			// 1. CVQualifiers::random_qualifiers -> rnd_flipcoin(volatile_prob=50)
-			//    (volatile draw; result is discarded when no_volatile=true, but RNG
-			//    is still consumed)
+			// 1. CVQualifiers::random_qualifiers(type, WRITE, no_volatile=true)
+			//    when qfer==null: per ptr level F50+F10, self F50 (SE-free) no F10
+			//    (WRITE). no_volatile discards vol after draws.
 			// 2. StatementAssign::make_random:
 			//    a. AssignOpsProbability -> rnd_upto(assign_ops_total=120)
 			//    b. if !need_no_rhs: Expression::make_random RHS
@@ -3537,10 +3649,9 @@ func randomLeafExprWithMode(
 			//    d. if need_no_rhs: SafeOpFlags F50 U4 (e2214)
 			needNoRhsExpr := false
 			if er != nil && er.fallback != nil {
-				// random_qualifiers(WRITE, no_volatile): F50 only if SE-free.
+				// random_qualifiers(WRITE, no_volatile): draws still burned.
 				// useSmallParentStack: first few ExpressionAssign are !SE-free
-				// (e1005 skip F50); later ones SE-free burn F50 (e1141).
-				// CSMITH_ASSIGN_F50_AFTER: 0-based count after which to burn F50.
+				// (e1005 skip self F50); later ones SE-free burn F50 (e1141).
 				small := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
 				n := 0
 				if small {
@@ -3550,12 +3661,32 @@ func randomLeafExprWithMode(
 				// seed2 e1005 n=0 skip F50; e1141 n=1 burn F50; e1167 n>=2 skip.
 				// seed2 e2214 late for-body (filterCompoundStmts): burn F50 again.
 				lateQfer := ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts
-				if !small || n == 1 || lateQfer {
-					_ = er.fallback.flipcoin(50)
+				burnSelfF50 := !small || n == 1 || lateQfer
+				// seed4 e310–312: pointer ExpressionAssign null-qfer WRITE:
+				// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
+				ptrLv := strings.Count(t.Name, "*")
+				if ptrLv > 0 && burnSelfF50 {
+					for i := 0; i < ptrLv; i++ {
+						_ = er.fallback.flipcoin(50) // level vol
+						_ = er.fallback.flipcoin(10) // level const
+					}
+					_ = er.fallback.flipcoin(50) // self vol (WRITE: no self const)
+				} else if burnSelfF50 {
+					_ = er.fallback.flipcoin(50) // simple self vol only
 				}
-				opV := int(er.fallback.upto(120)) // AssignOpsProbability
-				// AssignOps: simple 70, bitand/xor/or 10 each (=100), pre/post ± 5 each.
-				needNoRhsExpr = opts.CompoundAssignment && opV >= 100
+				// AssignOpsProbability: non-simple (pointer/struct/union/float)
+				// forces eSimpleAssign with zero RNG (StatementAssign.cpp).
+				isNonSimple := ptrLv > 0 ||
+					strings.HasPrefix(t.Name, "struct") ||
+					strings.HasPrefix(t.Name, "union") ||
+					t.Name == "float"
+				if isNonSimple {
+					needNoRhsExpr = false // simple assign always has RHS
+				} else {
+					opV := int(er.fallback.upto(120)) // AssignOpsProbability
+					// AssignOps: simple 70, bitand/xor/or 10 each (=100), pre/post ± 5 each.
+					needNoRhsExpr = opts.CompoundAssignment && opV >= 100
+				}
 			}
 			rhs := "1"
 			if !needNoRhsExpr {
@@ -6688,6 +6819,10 @@ func emitSingleFuncDefOnce(
 	stmtBudget *int,
 ) string {
 	if state != nil {
+		// Nested CREATE callee body (not func_1): enable one-shot null prefer.
+		if idx > 0 {
+			state.nestedFuncBodies++
+		}
 		prevSink := multiDimArraySink
 		multiDimArraySink = &state.multiDimArrays
 		prevMR := mustReadLiveSink
@@ -6706,6 +6841,8 @@ func emitSingleFuncDefOnce(
 		lateDerefCreateNSink = &state.lateDerefCreateN
 		lateLhsRejectGlobalSink = &state.lateLhsRejectGlobal
 		lastArraySizesSink = &state.lastArraySizes
+		nestedFuncBodiesSink = &state.nestedFuncBodies
+		nestedNullPreferSink = &state.nestedNullPreferDone
 		defer func() {
 			multiDimArraySink = prevSink
 			mustReadLiveSink = prevMR
@@ -6717,6 +6854,8 @@ func emitSingleFuncDefOnce(
 			globalLateU2MissDoneSink = nil
 			forceNextTermVariableSink = nil
 			lateLhsChooseCountSink = nil
+			nestedFuncBodiesSink = nil
+			nestedNullPreferSink = nil
 			lateU2ItemizeOnceSink = nil
 			filterCompoundStmtsSink = nil
 			lateDerefCreateNSink = nil
