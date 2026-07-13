@@ -4692,7 +4692,11 @@ exprTries:
 							// Floor only once postAggLhsDerefFailOnce (e2498 still U7).
 							// e3175: after Lhs Global U15 + loop-control residual,
 							// UP derived_types U10 (ptr-cmp); GO under-counts at 9.
-							if ctx != nil && ctx.state != nil && ctx.state.postAggLhsGlobalU15Done &&
+							// e4081: post-ptr Lhs era UP derived_types U12 (GO was 10).
+							if ctx != nil && ctx.state != nil &&
+								ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 && nPtr < 12 {
+								nPtr = 12
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggLhsGlobalU15Done &&
 								nPtr < 10 {
 								nPtr = 10
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggLhsDerefFailOnce &&
@@ -5519,6 +5523,8 @@ exprTries:
 									// stack already burned; sole accept → Lhs F80.
 									// e4035+: later PL stack + choose_ok_var U5 + F0
 									// (not sole → parent U120).
+									// e4085: ptr-cmp LHS pointer want → empty PL create
+									// (F50 F10 F10 F20…) not U2 inventory choose.
 									// Earlier e3793–97: U4 + multi-dim itemize [9][9][3].
 									if flow.postAggU15StackU6PostPPPtrSelDerefN >= 2 {
 										if flow.postAggU15StackU6PLNAfterPostPtr == 0 {
