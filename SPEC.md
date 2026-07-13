@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4237) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4250) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4237** (3876→4237; NO_DANGLING PL create + S0* residual; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4250** (3876→4250; empty PL→NewValue→Lhs Global U2; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -315,8 +315,13 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
    (not int32_t**); address residual nested Global + create_field_vars (U181 bitfield).
 3. e4204: post-create PL choose itemizes multi-dim [9][9][3] before F0.
 
-Next plateau: seed4 e4237 UP F50 (after PL stack U5) vs GO U5 choose residual;
-then parent U120 NewValue create. Seeds 5–21; source; COUNT=20.
+**e4237–e4250 climbed:**
+1. e4237: second PL after ptr-cmp create — F50 + nested Expression (not U5 itemize).
+2. Nested Variable → NewValue F10 → PL U5 retype U14 F10 F20 F50 (allow retype under StackU6).
+3. NeedLhs → Lhs F80=0 → Global U100 U2 F50 accept (not sole-fail F80 loop).
+
+Next plateau: seed4 e4250 UP U120 Function vs GO F50 after Lhs Global accept.
+Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
