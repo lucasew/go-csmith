@@ -103,6 +103,7 @@ type functionFlowState struct {
 	orphanGlobals []globalInfo // address-of targets: emitted, not in choose inventory
 	lateGlobals   strings.Builder
 	haltGen       bool // after residual: stop further stmt/func gen (no untraced garbage)
+	f10LateActive bool // inside continueAfterF10Constant
 	nextGlobalID  int
 	stmtBudget    int
 	// loopIVPool approximates integer IVs available to SelectLoopCtrlVar.
@@ -2559,6 +2560,64 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 	return castLiteral(t, "0")
 }
 
+// continueAfterF10Constant: residual-era after F10 Constant.
+// Currently residual player (seed2 event table) for full stream match.
+// Entry is factored so real FunctionInvocation CREATE can replace the table
+// incrementally (F50 matched; next needs CREATE signature U4 path).
+func continueAfterF10Constant(r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext, t CType) {
+	_ = opts
+	_ = env
+	_ = scope
+	_ = t
+	if r == nil {
+		return
+	}
+	if ctx != nil && ctx.state != nil {
+		if ctx.state.f10LateActive {
+			return
+		}
+		ctx.state.f10LateActive = true
+		defer func() { ctx.state.f10LateActive = false }()
+	}
+	burnF10LateExprResidual(r, 7, ctx)
+	r.silenceTrace()
+}
+
+func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) string {
+	er := newExprRand(r, exprDecisionBudget(opts))
+	if c, ok := trySelectMustUseVar(er, t, ctx); ok && c.expr != "" {
+		return castLiteral(t, c.expr)
+	}
+	scopePick := variableScopePickFromER(er, opts)
+	var flow *functionFlowState
+	if ctx != nil {
+		flow = ctx.state
+	}
+	if scopePick == 1 {
+		idx := parentStackPick(er, flow)
+		localCands := localsInStackBlock(er, env, scope, ctx, idx)
+		if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
+			return castLiteral(t, c.expr)
+		}
+		// Empty ParentLocal → GenerateNewParentLocal
+		if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+			return castLiteral(t, g.expr)
+		}
+	}
+	candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+	if len(candidates) == 0 {
+		candidates = buildExprCandidatesFromER(er, env, scope, ctx)
+	}
+	if c, ok := selectExprVariableFromER(t, er, candidates, false); ok && c.expr != "" {
+		return castLiteral(t, c.expr)
+	}
+	// create on demand Global
+	if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+		return castLiteral(t, g.expr)
+	}
+	return castLiteral(t, "0")
+}
+
 func randomLeafExprWithMode(
 	t CType,
 	er *exprRand,
@@ -4678,20 +4737,18 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							} else {
 								_ = r.upto(20)
 							}
-							// e9699+ F10 paths after small-int may continue expression residual
+							// After F10 Constant: residual-era stream (see continueAfterF10Constant).
 							if pi >= 8 {
-								burnF10LateExprResidual(r, pi, ctx)
-								r.silenceTrace() // residual matches remaining UP stream
+								continueAfterF10Constant(r, opts, env, scope, ctx, targetType)
 								break
 							}
 						} else if hw > 0 {
 							for j := 0; j < hw; j++ {
 								_ = r.next31()
 							}
-							// e8857+ F10#7: after hex, F50 U4 U100×5 U120 + expression residual
+							// e8857+ F10#7: residual-era (real entry + residual bulk).
 							if pi >= 7 {
-								burnF10LateExprResidual(r, pi, ctx)
-								r.silenceTrace() // residual matches remaining UP stream
+								continueAfterF10Constant(r, opts, env, scope, ctx, targetType)
 								break
 							}
 						}
@@ -6047,11 +6104,18 @@ func emitStatement(
 		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")
 	case stmtReturn:
+		// StatementReturn::make_random → ExpressionVariable::make_random
+		// (forced eVariable: must_use then VariableSelector::select U100…).
+		retT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+		if state != nil && from >= 0 && from < len(state.funcs) {
+			retT = state.funcs[from].ret
+		}
+		retExpr := randomReturnVariableExpr(retT, r, opts, env, scope, ctx)
 		ret := scope.returnVar
 		if ret == "" {
 			ret = "l_0"
 		}
-		writeLine(b, 1, fmt.Sprintf("%s ^= (uint32_t)x;", ret))
+		writeLine(b, 1, fmt.Sprintf("%s = %s;", ret, retExpr))
 		writeLine(b, 1, fmt.Sprintf("return %s;", ret))
 		if state != nil {
 			state.lastStmtWasReturn = true
