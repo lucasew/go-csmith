@@ -36,6 +36,8 @@ var nestedFuncBodiesSink *int
 // useESimpleRetypeSink: pickSimpleNonVoid uses eSimpleType order (seed4 e585
 // NewValue→PL after PP pads: U14=2→int32 HexDigits=8).
 var useESimpleRetypeSink *bool
+// isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
+var isParamPPFallPicksSink *int
 var nestedNullPreferSink *bool
 
 type structTypeInfo struct {
@@ -322,9 +324,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		if state.multiDimArrays > 0 {
 			// e871 n=5; e976 n=3 after continue→For era or many stack picks.
 			// seed2 e2226: late filterCompoundStmts era stack U6 (deeper nest).
+			// seed4 e688: after PP pads ParentLocal stack U3 (not forced U5).
 			if state.filterCompoundStmts {
 				n = 6
-			} else if state.useSmallParentStack || state.parentLocalStackPicks >= 12 {
+			} else if state.useSmallParentStack || state.parentLocalStackPicks >= 12 ||
+				state.isParamPPFallPicks >= 2 {
 				n = 3
 			} else {
 				if n < 5 {
@@ -1734,6 +1738,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 						}
 					}
 				}
+			} else if ctx.state.isParamPPFallPicks >= 2 {
+				// seed4 e695: choose_var empty → random_loose_qualifiers F50 +
+				// GenerateNew (nested Expression U120), not pad U2 choose.
+				_ = er.fallback.flipcoin(50) // looser_const
+				// Nested GenerateNew init: Expression::make_random (term U120…).
+				base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+				_ = randomTypedExprDepthFlags(base, er, opts, envInfo{}, scopeInfo{}, 0, ctx, false, false)
 			} else {
 				n := 2
 				_ = er.fallback.upto(uint32(n))
@@ -2240,6 +2251,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		}
 		if lateGlobalU8 {
 			chooseN = 8
+		}
+		// seed4 e645/e754: after PP pad era Global eFlexible UP U4
+		// (overrides multiDim n==4→U2 and inventory n>4).
+		if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 &&
+			(filterCompoundStmtsSink == nil || !*filterCompoundStmtsSink) &&
+			n >= 2 {
+			chooseN = 4
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		// seed2 e2237–38: late for-body Global U2+U3 then visit_facts fail →
@@ -3072,7 +3090,25 @@ func randomLeafExprWithMode(
 								_ = ctx.state.gensym("t_")
 							}
 							lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-							rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+							// Shift: after LHS, ShiftByNonConstantProb F50 (seed4 e668).
+							// Gate on isParamPPFallPicks>=2 so seed2 residual-era
+							// alignment stays intact (seed2 has no PP-pad era).
+							var rhs string
+							ppEra := isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2
+							if (opV == 16 || opV == 17) && ppEra {
+								notConstant := er.fallback.flipcoin(50)
+								if !notConstant {
+									lim := bits
+									if lim <= 0 {
+										lim = 32
+									}
+									rhs = fmt.Sprintf("%d", er.fallback.upto(uint32(lim)))
+								} else {
+									rhs = randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, true)
+								}
+							} else {
+								rhs = randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+							}
 							out = formatBinaryInvocation(opV, lhs, rhs, bits, op1Signed, op2Signed, opts)
 							out = castLiteral(t, out)
 							_ = op2Signed
@@ -3484,7 +3520,12 @@ func randomLeafExprWithMode(
 							}
 						}
 						if len(flex) >= 2 {
-							_ = er.pick(2) // force U2 (FromER sole-skips n==2)
+							// seed4 e340: U2; e754 after PP pads: U4 GlobalList scale.
+							cn := uint32(2)
+							if flow.isParamPPFallPicks >= 2 {
+								cn = 4
+							}
+							_ = er.pick(cn)
 							flow.isParamGlobalFlexPicks++
 							bumpExprDepth(ctx)
 							return castLiteral(t, flex[0].expr)
@@ -6857,15 +6898,52 @@ func emitStatement(
 			frameMustRead := false
 			nArr := len(env.arrays)
 			// Inventory under-count vs true visible arrays (seed2 e918 U5).
-			if nArr < 1 {
-				nArr = 1
-			}
-			if nArr < 5 && state != nil && state.multiDimArrays > 0 {
-				nArr = 5
+			// seed4 e759: after PP pads visible arrays empty → create_random_array
+			// F25 (not pad nArr=5 U5 choose).
+			ppEraEmpty := state != nil && state.isParamPPFallPicks >= 2 && nArr == 0
+			if !ppEraEmpty {
+				if nArr < 1 {
+					nArr = 1
+				}
+				if nArr < 5 && state != nil && state.multiDimArrays > 0 {
+					nArr = 5
+				}
 			}
 			for i := 0; i < aryno; i++ {
-				// select_array: len==1 → no U; len>1 → rnd_upto(len) (seed2 e918 U5).
-				if nArr > 1 {
+				if ppEraEmpty || nArr == 0 {
+					// select_array empty → create_random_array: F25 as_global.
+					asGlobal := opts.GlobalVariables && r.flipcoin(25)
+					if !asGlobal {
+						// stack pick: seed4 e760 U1 (function body only at
+						// array-loop create after PP pads; blockStack may be
+						// inflated from synthetic nest).
+						_ = r.upto(1)
+					}
+					arrTy := pickNonVoidNonVolatile(r, nil, info, opts)
+					// Constant::make_random for init
+					if r.flipcoin(50) {
+						if r.flipcoin(50) {
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(20)
+						}
+					} else {
+						hn := hexDigitsForConstant(arrTy)
+						if hn <= 0 {
+							hn = 8
+						}
+						for j := 0; j < hn; j++ {
+							_ = r.next31()
+						}
+					}
+					{
+						_arr := burnCreateArrayVariable(r, opts, arrTy, false)
+						emitOrphanArrayGlobal(ctx, arrTy, _arr)
+					}
+					nArr = 1 // subsequent selects may see the new array
+					ppEraEmpty = false
+				} else if nArr > 1 {
+					// select_array: len==1 → no U; len>1 → rnd_upto(len) (seed2 e918 U5).
 					_ = r.upto(uint32(nArr))
 				}
 				access := int(r.upto(3)) // 0 must-read, 1 must-write, 2 both
@@ -6884,6 +6962,10 @@ func emitStatement(
 			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 &&
 				state.isParamPPFallPicks < 2 {
 				// seed2 e920: multi-dim first array-loop U2 (before PP pad era).
+				_ = r.upto(2)
+			} else if state != nil && state.isParamPPFallPicks >= 2 &&
+				state.multiDimArrays > 0 && state.loopIVPool > 0 {
+				// seed4 e771: after PP pads + prior IV pool, SelectLoopCtrlVar U2.
 				_ = r.upto(2)
 			} else {
 				// First array-loop: n=3 (seed2 e360 early, seed4 e613 after PP pads).
@@ -6911,11 +6993,12 @@ func emitStatement(
 			// itemize() burns rnd_upto per dim. Early seed2 e358: U1 (1d size 1
 			// or upto(1)). After multi-dim: often 2d itemize e.g. g_64[9][8]
 			// (seed2 e921–922 U9 U8) before make_random_array_control.
-			// seed4 e614: aryno=0 multi-dim → U2 itemize + loop_control residual
-			// (not U9 U8 array_control). Gate aryno==0 after PP pad era.
-			ary0Multi := state != nil && state.multiDimArrays > 0 && aryno == 0 &&
+			// seed4 e614/e772: after PP pads itemize U2 + loop_control (not U9 U8).
+			// Also aryno=0 multi-dim residual. seed2 multi-dim keeps U9 U8.
+			ppItemize := state != nil && state.multiDimArrays > 0 &&
 				state.isParamPPFallPicks >= 2
-			if ary0Multi {
+			ary0Multi := ppItemize && aryno == 0
+			if ppItemize {
 				_ = r.upto(2)
 			} else if state != nil && state.multiDimArrays > 0 {
 				_ = r.upto(9) // itemize dim0
@@ -6923,8 +7006,9 @@ func emitStatement(
 			} else {
 				_ = r.upto(1) // early seed2 e358
 			}
+			// array_oob_prob F0 (seed4 e773 after PP itemize U2 also burns F0).
 			if !ary0Multi {
-				_ = r.flipcoin(0) // array_oob_prob
+				_ = r.flipcoin(0)
 			}
 			// signed IV → flipcoin(50) for Le vs Ge
 			_ = r.flipcoin(50)
@@ -6937,7 +7021,7 @@ func emitStatement(
 				} else {
 					_ = r.flipcoin(50)
 				}
-			} else if !r.flipcoin(50) {
+			} else if !ppItemize && !r.flipcoin(50) {
 				// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
 				// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
 				// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
@@ -6946,7 +7030,7 @@ func emitStatement(
 					_ = r.upto(1) // e926
 				}
 			}
-			if !ary0Multi {
+			if !ppItemize {
 				if !r.flipcoin(50) {
 					if state != nil && state.multiDimArrays > 0 {
 						// bound/4 may be 0 early; only burn when multi-dim sizes allow
@@ -6957,16 +7041,26 @@ func emitStatement(
 			// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
 			// seed4 ary0: also incr SafeOp F50+U4 (three pairs).
 			// Early e364 / seed4 ary0: F50; multi-dim e928 starts U4.
-			if state == nil || state.multiDimArrays == 0 || ary0Multi {
+			// seed4 e775 ppItemize aryno>0: F50 F50 U4 F50 F50 U4 (two binary-ish pairs).
+			if ppItemize && !ary0Multi {
 				_ = r.flipcoin(50)
-			}
-			_ = r.upto(4)
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
-			_ = r.upto(4)
-			if ary0Multi {
 				_ = r.flipcoin(50)
 				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+			} else {
+				if state == nil || state.multiDimArrays == 0 || ary0Multi {
+					_ = r.flipcoin(50)
+				}
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				if ary0Multi {
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+				}
 			}
 			writeLine(b, 1, "/* array loop */ {")
 			if state != nil {
@@ -7044,11 +7138,15 @@ func emitStatements(
 	// seed2 e2275–e2311: filterCompound for-body needs +4 (extra Assigns after
 	// Lhs must_use / SelectDeref residuals; smaller bonuses left GO ending
 	// body with BlockSize U4 vs UP AssignOps U120).
+	// seed4 e628–630: ary0 array-loop body after PP pads needs +2 so U100×3
+	// (continue, continue, assign) with BlockSize U4=0 (base=1).
 	if state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
 		if depth == 0 {
 			stmtCount++
 		} else if state.filterCompoundStmts {
 			stmtCount += 4
+		} else if state.isParamPPFallPicks >= 2 && inLoop {
+			stmtCount += 2
 		}
 	}
 	emitOne := func() bool {
@@ -7143,6 +7241,7 @@ func emitSingleFuncDefOnce(
 		lastArraySizesSink = &state.lastArraySizes
 		nestedFuncBodiesSink = &state.nestedFuncBodies
 		nestedNullPreferSink = &state.nestedNullPreferDone
+		isParamPPFallPicksSink = &state.isParamPPFallPicks
 		defer func() {
 			multiDimArraySink = prevSink
 			mustReadLiveSink = prevMR
@@ -7161,6 +7260,7 @@ func emitSingleFuncDefOnce(
 			lateDerefCreateNSink = nil
 			lateLhsRejectGlobalSink = nil
 			lastArraySizesSink = nil
+			isParamPPFallPicksSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
