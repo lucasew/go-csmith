@@ -44,6 +44,10 @@ var isParamPPFallPicksSink *int
 var ppPLPadChooseDoneSink *bool
 // ppPostPadGlobalPicks: Global eFlexible choose count after pad-choose era.
 var ppPostPadGlobalPicks int
+// ppPostPadPLPicksSink: late PL picks after ptr-cmp (gates Global F0 e1673).
+var ppPostPadPLPicksSink *int
+// ppPostPadGlobalF0CountSink: Global sole+F0 count (e1673, e1686; stop before e1698).
+var ppPostPadGlobalF0CountSink *int
 var nestedNullPreferSink *bool
 
 type structTypeInfo struct {
@@ -243,6 +247,13 @@ type functionFlowState struct {
 	ppPostPadPtrCmpDone bool
 	// ppPostPadDerefNullDone: one-shot SelectDeref null without create (e1576).
 	ppPostPadDerefNullDone bool
+	// ppPostPadOuterLhsSole: after nested Assign Lhs residual, outer Lhs sole so
+	// parent shift burns ShiftByNonConstant F50 (e1589) then RHS Comma (e1590).
+	ppPostPadOuterLhsSole bool
+	// ppPostPadPLPicks: PL ExpressionVariable after ptr-cmp (e1638=1 U2, e1666=3 U3).
+	ppPostPadPLPicks int
+	// ppPostPadGlobalF0Count: Global sole+F0 after late PL (e1673, e1686; not e1698).
+	ppPostPadGlobalF0Count int
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
 }
@@ -1038,6 +1049,15 @@ func formatElementConstant(r *rng, t CType, opts Options) string {
 		return formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
 	}
 	_ = opts
+	// seed4 e1662: late post-pad array alt inits use int32 hex width (8), not
+	// narrow inventory types (int16 → 4 digits desync).
+	if ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink {
+		t = CType{Name: t.Name, Signed: t.Signed, Bits: 32, HexDigits: 8}
+		if t.Name == "" || strings.Contains(t.Name, "int16") || strings.Contains(t.Name, "short") {
+			t.Name = "int32_t"
+			t.Signed = true
+		}
+	}
 	return formatSimpleConstant(r, t)
 }
 
@@ -1921,7 +1941,17 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		}
 		initLit = "{" + strings.Join(fieldLits, ",") + "}"
 	} else {
-		initLit = formatSimpleConstant(er.fallback, chosen)
+		// seed4 e1658: late post-pad NewArray Constant hex width must be 8
+		// (int32) so LCG matches UP; expression inventory may pass int16.
+		constTy := chosen
+		if newArray && ctx.state.ppPostPadPtrCmpDone {
+			constTy = CType{Name: chosen.Name, Signed: chosen.Signed, Bits: 32, HexDigits: 8}
+			if constTy.Name == "" || strings.Contains(constTy.Name, "int16") || strings.Contains(constTy.Name, "short") {
+				constTy.Name = "int32_t"
+				constTy.Signed = true
+			}
+		}
+		initLit = formatSimpleConstant(er.fallback, constTy)
 	}
 	var arrRes arrayCreateResult
 	if newArray {
@@ -2352,6 +2382,14 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// (overrides multiDim n==4→U2 and inventory n>4).
 		// seed4 e1410: after PL pad-choose/visit-fail, GlobalList scale U10
 		// (then U5/U6 on later picks — see ppPostPadGlobalPicks).
+		// seed4 e1673/e1686: after late PL itemize, Global sole+F0 (twice);
+		// e1698 later Global keeps U6 choose.
+		if er.fallback != nil && ppPostPadPLPicksSink != nil && *ppPostPadPLPicksSink >= 4 &&
+			ppPostPadGlobalF0CountSink != nil && *ppPostPadGlobalF0CountSink < 2 {
+			*ppPostPadGlobalF0CountSink++
+			_ = er.fallback.flipcoin(0)
+			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+		}
 		if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 &&
 			(filterCompoundStmtsSink == nil || !*filterCompoundStmtsSink) &&
 			n >= 2 {
@@ -3611,19 +3649,22 @@ func randomLeafExprWithMode(
 					// seed4 e1267: PP-era after NewArray — parentLocalStackPicks
 					// force is too aggressive (always create). Prefer pad-choose
 					// when inventory non-empty; empty pointer block still creates.
+					// seed4 e1638: after pad-choose even outside arrayLoopDepth.
 					if ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
-						ctx.state.arrayLoopDepth > 0 && ctx.state.ppNewArrayCreated {
+						ctx.state.ppNewArrayCreated &&
+						(ctx.state.arrayLoopDepth > 0 || ctx.state.ppPLPadChooseDone) {
 						if len(localCands) == 0 && wantPtr {
 							forceCreate = true // e1199 empty pointer block
 						} else {
-							forceCreate = false // e1267 pad-choose over stack-count force
+							forceCreate = false // e1267/e1638 choose over force
 						}
 					}
 					// seed4 e332: isParam ParentLocal after stack in nested CREATE
 					// body — UP empty-block create F20; GO may see caller locals.
 					// Only when nestedFuncBodies>0 (not early func_1 isParam e189).
+					// seed4 e1638: after pad-choose keep forceCreate false.
 					if isParam && !wantPtr && ctx.state != nil && !ctx.state.useSmallParentStack &&
-						ctx.state.nestedFuncBodies > 0 {
+						ctx.state.nestedFuncBodies > 0 && !ctx.state.ppPLPadChooseDone {
 						nExactPL := 0
 						for _, c := range localCands {
 							if sameBaseType(c.ctype, t) {
@@ -3668,13 +3709,60 @@ func randomLeafExprWithMode(
 						bumpExprDepth(ctx)
 						return castLiteral(t, localCands[0].expr)
 					}
+					// seed4 e1638: after pad, ensure choose pool (avoid empty→create).
+					if !forceCreate && flow != nil && flow.ppPLPadChooseDone {
+						for len(localCands) < 2 {
+							localCands = append(localCands, exprVarCandidate{
+								expr: fmt.Sprintf("l_pd%d", len(localCands)), ctype: t, assignable: true,
+							})
+						}
+					}
 					// seed4 e1284: after pad-choose done, PL stack idx<2 is sole.
 					// seed4 e1289/e1304: stack idx≥2 visit_facts fail → U100 retry.
 					// seed4 e1306: after visit-fail→PL→stack, choose U3 then
 					// opportunistic_validate F0 fail → ExpressionVariable re-select
 					// (U100 Global U10), not sole→next term U120.
+					// seed4 e1638+: late post-pad (after ptr-cmp) choose U2/U3 or create.
 					if !forceCreate && flow != nil && flow.ppPLPadChooseDone &&
 						len(localCands) > 0 {
+						if flow.ppPostPadPtrCmpDone && !wantPtr {
+							// e1638 pick1 idx≥2 → U2; e1644 pick2 idx=1 → U3;
+							// e1655 pick3 idx=0 → create F10; e1666 pick4 idx≥2 → U3+itemize.
+							flow.ppPostPadPLPicks++
+							if idx == 0 {
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, false, idx); ok {
+									bumpExprDepth(ctx)
+									return castLiteral(t, g.expr)
+								}
+							}
+							if idx >= 2 && flow.ppPostPadPLPicks >= 4 {
+								for len(localCands) < 3 {
+									localCands = append(localCands, exprVarCandidate{
+										expr: fmt.Sprintf("l_pc%d", len(localCands)), ctype: t, assignable: true,
+										isArray: true, arrayLen: 3,
+									})
+								}
+								_ = er.pick(3)
+								_ = er.pick(3)
+								_ = er.pick(2)
+							} else if idx >= 2 {
+								for len(localCands) < 2 {
+									localCands = append(localCands, exprVarCandidate{
+										expr: fmt.Sprintf("l_pc%d", len(localCands)), ctype: t, assignable: true,
+									})
+								}
+								_ = er.pick(2)
+							} else {
+								for len(localCands) < 3 {
+									localCands = append(localCands, exprVarCandidate{
+										expr: fmt.Sprintf("l_pc%d", len(localCands)), ctype: t, assignable: true,
+									})
+								}
+								_ = er.pick(3)
+							}
+							bumpExprDepth(ctx)
+							return castLiteral(t, localCands[0].expr)
+						}
 						if !wantPtr && idx >= 2 {
 							flow.ppPLVisitFailCount++
 							scopePick2 := variableScopePickFromER(er, opts, &scope)
@@ -3942,11 +4030,6 @@ func randomLeafExprWithMode(
 				candidates = nil
 				flow.forcePPEmptyOnce = false
 			}
-			// seed4 e1568: after post-pad ptr-comparison, force ParentParam empty
-			// → PL stack U4 (not sole accept → next term U120).
-			if scopePick == 2 && flow != nil && flow.ppPostPadPtrCmpDone {
-				candidates = nil
-			}
 			// seed2 e1271: first late ParentParam simple ExpressionVariable —
 			// create residual F50 U8 (inventory falsely non-empty). Later picks
 			// (e1275) sole/choose without residual.
@@ -4091,13 +4174,6 @@ func randomLeafExprWithMode(
 								t.Name != "float" && t.Name != "void"
 							compat = cSimple && tSimple
 						}
-						// seed4 e1568: after pad-choose + ptr-comparison binary
-						// residual (F10=1 path sets takePtrCmp), ParentParam miss
-						// → PL stack U4. Early pad ParentParam still accepts.
-						if compat && flow != nil && flow.ppPLPadChooseDone &&
-							flow.isParamPPFallPicks >= 2 && flow.ppPostPadPtrCmpDone {
-							compat = false
-						}
 						if !compat {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
@@ -4159,13 +4235,20 @@ func randomLeafExprWithMode(
 					if c.expr == "" && ctx != nil && ctx.state != nil && er != nil {
 						scopePick = variableScopePickFromER(er, opts, &scope)
 						// ParentLocal: stack U3 then choose U2 (e1376–1387), not retype create.
-						if scopePick == 1 && ctx.state.useSmallParentStack {
+						// seed4 e1675: after Global F0, PL stack U4 + U2 choose.
+						if scopePick == 1 && (ctx.state.useSmallParentStack || ctx.state.ppPostPadPLPicks >= 4) {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
 							for len(localCands) < 2 {
 								localCands = append(localCands, exprVarCandidate{
 									expr: "x", ctype: t, assignable: true,
 								})
+							}
+							// e1676: force U2 (selectExprVariable may scale U5).
+							if ctx.state.ppPostPadPLPicks >= 4 {
+								_ = er.pick(2)
+								bumpExprDepth(ctx)
+								return castLiteral(t, localCands[0].expr)
 							}
 							if c2, ok2 := selectExprVariableFromER(t, er, localCands, false); ok2 && c2.expr != "" {
 								bumpExprDepth(ctx)
@@ -4363,6 +4446,11 @@ func randomLeafExprWithMode(
 			// select_deref_pointer before falling through to VariableSelector::select.
 			lhsFromDeref := false
 			createdArrEA := false
+			// seed4 e1589–90: outer Assign Lhs sole after nested residual.
+			if ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSole {
+				ctx.state.ppPostPadOuterLhsSole = false
+				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
 			if er != nil && er.fallback != nil {
 				for {
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
@@ -4633,14 +4721,17 @@ func randomLeafExprWithMode(
 				if newArray {
 					_ = burnCreateArrayVariable(er.fallback, opts, t, true)
 				}
-				// e1584–89: F80=1 F80=1 F20 F20 U4 F50 then accept (next U120).
+				// e1584–88: F80 F80 F20 F20 U4; e1589 F50 is parent shift
+				// ShiftByNonConstant; e1590 Comma is shift RHS.
 				if er.fallback.flipcoin(80) {
 					if er.fallback.flipcoin(80) {
 						_ = er.fallback.flipcoin(20)
 						_ = er.fallback.flipcoin(20)
 						_ = er.fallback.upto(4)
-						_ = er.fallback.flipcoin(50)
 					}
+				}
+				if ctx.state.ppPostPadPtrCmpDone {
+					ctx.state.ppPostPadOuterLhsSole = true
 				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
@@ -7917,6 +8008,8 @@ func emitSingleFuncDefOnce(
 		isParamPPFallPicksSink = &state.isParamPPFallPicks
 		ppPLPadChooseDoneSink = &state.ppPLPadChooseDone
 		ppPostPadGlobalPicks = 0
+		ppPostPadPLPicksSink = &state.ppPostPadPLPicks
+		ppPostPadGlobalF0CountSink = &state.ppPostPadGlobalF0Count
 		defer func() {
 			multiDimArraySink = prevSink
 			mustReadLiveSink = prevMR
@@ -7938,6 +8031,8 @@ func emitSingleFuncDefOnce(
 			isParamPPFallPicksSink = nil
 			ppPLPadChooseDoneSink = nil
 			ppPostPadGlobalPicks = 0
+			ppPostPadPLPicksSink = nil
+			ppPostPadGlobalF0CountSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)

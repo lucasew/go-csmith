@@ -137,7 +137,7 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** (restored; c76d7b5+ isParam Global flexInt/PP synthetic pad regressed to e887/e892) |
 | Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym; residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **1590** (1284→1306→1410→1450→1536→1568→1590; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **1701** (1590→1638→1655→1673→1701; seed2 full held). |
 
 Next plateau: seed4 e1590 U120 vs F80 after Lhs PL create residual; seeds 5–21; source; COUNT=20.
 
