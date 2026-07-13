@@ -101,6 +101,41 @@ func allTypesList(info compositeInfo) []CType {
 	return out
 }
 
+// pickChooseRandom mirrors Type::choose_random (ChooseRandomTypeFilter):
+// SIMPLE_TYPES_PROB_FILTER for simples; reject struct if !ReturnStructs.
+// Does NOT reject volatile aggregates (unlike NonVoidNonVolatile).
+// Used by make_random_pointer_type pointed-to base (Type.cpp:1133).
+func pickChooseRandom(r *rng, info compositeInfo, opts Options) CType {
+	types := allTypesList(info)
+	if len(types) == 0 {
+		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	reject := func(x uint32) bool {
+		i := int(x)
+		if i < 0 || i >= len(types) {
+			return true
+		}
+		t := types[i]
+		// SIMPLE_TYPES_PROB_FILTER: disabled float / int128 / uint128
+		if t.Name == "float" && !opts.EnableFloat {
+			return true
+		}
+		if t.Name == "__int128" && !opts.Int128 {
+			return true
+		}
+		if t.Name == "unsigned __int128" && !opts.UInt128 {
+			return true
+		}
+		// ChooseRandomTypeFilter: struct rejected when !return_structs()
+		if strings.HasPrefix(t.Name, "struct") && !opts.ReturnStructs {
+			return true
+		}
+		return false
+	}
+	idx := int(r.uptoWithFilter(uint32(len(types)), reject))
+	return types[idx]
+}
+
 // pickNonVoidNonVolatile mirrors Type::choose_random_nonvoid_nonvolatile
 // (NonVoidNonVolatileTypeFilter + SIMPLE_TYPES_PROB_FILTER).
 func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Options) CType {
@@ -142,6 +177,13 @@ func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Optio
 					return true
 				}
 			}
+		}
+		// arg_structs / arg_unions (Type.cpp:171–177)
+		if strings.HasPrefix(t.Name, "struct") && !opts.ArgStructs {
+			return true
+		}
+		if strings.HasPrefix(t.Name, "union") && !opts.ArgUnions {
+			return true
 		}
 		return false
 	}

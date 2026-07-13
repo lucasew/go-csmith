@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb 2157→2317) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4036) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **2317** (2157→2317; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4036** (3876→4036; SelectDeref accept vs NewValue misread; pointer Lhs U7; ArrayOp residual; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -177,7 +177,138 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 3. ExpressionComma LHS type=null → U14 AllTypes (struct) then Function-fail create; RHS continues int32.
 4. Empty SelectParentLocal after postAggGlobalCreate → retype U14 + GenerateNewParentLocal (e2188–2196).
 
-Next plateau: seed4 e2317 U9 vs U16 Global choose `choose_random_pointer_type` (derived_types undercount by 1). Seeds 5–21; source; COUNT=20.
+**e2317–e2370 climbed:**
+1. Live GlobalList after one-shot U23 (e2317 U9).
+2. PL idx=0 F0 fail → VS reselect ParentLocal + `choose_ok_var` + array itemize (e2337–42); local `isArray`/`arrayLen` metadata.
+3. SelectDeref live pointer choose U13 (e2351); inventory pad when under-count.
+4. postAgg if-then body `StatementFilter` atMax (e2356 tries=2).
+
+**e2371–e2394 climbed:**
+1. Multi-dim array itemize after PL choose (U9 U4 U7 / g_86; U9 U9 U3 / g_126) + F0.
+2. SelectDeref live U13; fail-once then U12+itemize under postAgg if-body filter.
+3. Lhs PL stack n=6; Lhs PL choose U5 + multi-dim itemize F0.
+4. `arraySizes` on globals/locals for multi-dim itemize; StatementFilter if-body atMax.
+
+**e2395–e2420 climbed:**
+1. Lhs VS-miss → inner SelectDeref chain (U13 itemize F0; U13 F0; U12 accept).
+2. if-body inherits `inLoop` (Continue U100=36 legal) + clear skipNextBlockSize.
+3. After Continue: skip AssignOps/SelectLType; PL stack residual + create address U2 U4.
+
+**e2421–e2581 climbed:**
+1. postAgg PL idx=0: first U5+F0 reselect (e2337); later accept without F0 → parent U120 (e2530–31).
+2. ExpressionAssign self-vol F50: pure `effectSEFree` + late GlobalPicks force; skip force when Comma follows Variable select (e2534 AssignOps without F50).
+3. SelectDeref NewArray address: one-shot U3 U4 then CreateArray U99; later straight U99 (e2540).
+4. postAgg CreateArray pointer alt inits: F20-only (sole/empty pointees, no U2).
+5. Lhs PL after F80=0: choose U4 + multi-dim itemize U9 U4 U7 F0; reselect PP→stack U6 + retype U14 + create.
+
+**e2582–e2674 climbed:**
+1. Retype U14 type drives Constant hex width (eUShort hex4 vs Lhs t hex8).
+2. postAgg Global live: U9 then U24 pad once; later exact non-array U2 (not inflate 17/24).
+3. Assign self-F50 force only when !varSelectSticky (postAgg Variable select); pre-postAgg keeps force (e2084).
+4. Address-of Expression residual one-shot (e2092); later pointees U6 U3 U7 U1 F80=0→VS.
+5. postAgg PP→PL Lhs: choose U5 F0 F80 chain → VS Global (not F20×4 create).
+
+**e2675–e2690 climbed:**
+1. Nested ExpressionAssign RHS finish → arm `ppPostPadOuterLhsSole` so outer Lhs skips SelectDeref F80 (parent term U120).
+2. postAgg Global eFlexible: exact n==2 (e2627); else U9 pool with array at index 6 for itemize U10 (e2687).
+
+**e2691–e2760 climbed:**
+1. e2691 empty PL create residual matched (F10 F20 F50 F50 path).
+2. postAggLhsDerefFailOnce (e2707) empty SelectDeref; later first U13 accepts (e2732+).
+3. postAgg if-then stmtCount +3 (e2355 U4=0 body) so long Assign does not open else early (e2733/e2751 Statement U100).
+4. ptr-cmp derived_types floor U9 after fail-once (e2744).
+5. StatementReturn ParentParam: pad choose U5 + visit_facts fail → VS retry U100 (e2758–60).
+
+**e2761–e2852 climbed:**
+1. Return ParentParam U5 accept (not EV retry); postAgg if-then continues after Return.
+2. ArrayOp allowed late postAgg (`postAggLhsDerefFailOnce` + depth&lt;max); F5=0 aryno=0 path: U15 IV + loop_control + SafeOp×3 + body.
+3. postAgg stmtCount +4; PL stack n=5 after ArrayOp; PL ladder (U4 / Global U24 / multi-dim itemize→NewValue create).
+4. PL SelectDeref residual F80 U8 U4 → VS U100.
+
+**e2853–e2934 climbed:**
+1. After PL F80 U8 U4 U100: ExpressionAssign residual (AssignOps U120, RHS Variable, Lhs F80 chain) + sibling Expressions (sole Variable term + Function stdfunc on int32).
+2. Global live after ArrayOp: U24 non-array pool (e2920); SelectDeref F20 F20 → Expression residual×2 then Lhs accept (e2924–34).
+
+**e2935–e3005 climbed:**
+1. Address Expression residual one-shot with exprDepth=0 + allowFuncOnce (Function tries=0).
+2. Global U24 one-shot then U9; skip array itemize post-residual.
+3. Stack n=4 after residual; empty PL create F10 F20 F50 F50 once; locals U5.
+4. ExpressionAssign allow + skip self/GlobalPicks F50 force.
+5. Second SelectDeref F20×2 → CreateArray residual F20 F50 F50 U20.
+
+**e3006–e3129 climbed:**
+1. Assign+Lhs via `postAggNeedLhsAfterRhs` + `lhsMakeRandomWrite` (e3023–66); Statement boundary e3067.
+2. PL one-shot U5+itemize (e3104–09); later PL stack→VS reselect without U5 (e3115).
+3. SelectDeref after Lhs-write: one-shot U7 (e3076); then U12 F0 / U11→VS (e3122–26).
+4. Lhs Global choose U15 + residual U14 U13 (e3127–29).
+
+**e3130–e3276 climbed:**
+1. After Lhs Global U15: `make_random_loop_control` + SafeOpFlags×3 + body U4 (e3130–43).
+2. Next Statement unfiltered tries=0 → IfElse U100=5 (e3144); condition Expression U120… (not force Assign).
+3. ptr-cmp derived_types floor U10 after U15 era (e3175).
+4. PL stack n=5 sole after U15 (e3178); 3rd PL → VS reselect PP sole (e3218); 4th → create U14 F20 F50 F50 U20 (e3269); ExpressionAssign self F50 restored (e3264).
+5. ExpressionAssign Lhs SelectDeref choose U7→F80 U6 after U15 (e3190–92).
+
+**e3277–e3392 climbed:**
+1. ExpressionAssign Lhs PP→PL: stack sole U5 + F0 + F80 F20 F20 (not double U5) after U15 (e3275–80).
+2. Global sole F0 (no U9) → PL U5 F0 → PP sole (e3314–20 empty-reselect path).
+3. Later PL stack U5 + locals U4 (e3321–23); Continue no longer arms skip-AssignOps after U15 (e3340 AssignOps U120).
+4. After Continue: PL stack n=6; create qferMode 1 F50 F10 F20; struct Constant field-order when U15 StackU6 (e3372–92).
+
+**e3393–e3531 climbed:**
+1. PL struct create: `burnCreateFieldVarsConstants` after init (e3393+ double field Constant residual).
+2. ExpressionAssign signed AssignOps: VectorFilter exclude incr/decr (e3440 tries=1).
+3. After StackU6 create: disable OuterLhsSole skip; Lhs F80 F20 F20 U2 accept (e3445–48).
+4. Post-StackU6 PL stack sole (no U4 locals) → Expression U120 (e3521).
+
+**e3532–e3587 climbed:**
+1. Comma AllTypes after StackU6: NonVoid-style filter (accept volatile struct; e3532 tries=0).
+2. StackU6 PL create always qferMode 1 (e3537 F50 F10 F20).
+3. StackU6 PL n=0 sole (e3521); n≥1: U5 then VS reselect Global U43 (e3584–86).
+4. `pickChooseRandom` for SelectLType pointer base (Type::choose_random).
+
+**e3588–e3645 climbed:**
+1. Comma !SE-free after StackU6: two-shot NonVoid (e3464+e3532) then NonVoidNonVolatile (e3588 tries=4).
+2. StackU6 PL ladder: n=0 sole; n=1 U5→Global U43; n=2 sole+F0→PL U6 U5→PP; n≥3 U5+F0→Global U2.
+3. StackU6-era Global eFlexible scale U14 (e3637; was sticky U9).
+
+**e3646–e3734 climbed:**
+1. `isPointerNullConstant`: pure `((type)(0))` only — not `Contains("(0)")` (nested exprs false-triggered forced Variable RHS on ptr-cmp; e3646).
+2. StackU6 pointer Global empty exact → choose U2 pad (e3648).
+3. StackU6 PL n≥4: choose_ok_var U4 accept (e3656; not n≥3 F0 residual).
+4. StackU6 Lhs PP→PL: NewArray F20 + CreateArray simple-element alts before U15 F0 residual (e3660–68).
+
+**e3735–e3772 climbed:**
+1. StackU6 PL n==5: U4 + itemize [9][4][7] F0 → Global U43 (e3733–40).
+2. n==6: VS reselect + stack + itemize [6][3][7][1] (e3743–49).
+3. n≥7: sole accept (e3756–58).
+4. Global eFlexible U14 idx=5: size-10 array itemize U10 + U18 residual (e3752–54).
+5. StatementAssign Lhs SelectDeref: U13 fail (no F0) → F80 U12 → VS (e3769–72).
+
+**e3773–e3830 climbed:**
+1. After Lhs VS PP following U12: visit_facts fail residual Expression stream
+   (Function useExisting F50 F0, nested Function binary/ptr-cmp, Constant tries,
+   PL itemize, more SelectDeref) before Assign ends — was closing to Statement U100 too early.
+
+**e3831–e3875 climbed:**
+1. e3831: bare 4×upto(14) → real `pickChooseRandom` (AllTypes filter tries=3 v=13).
+2. SelectLType pointer base → `Expression::make_random` on pointer type (create
+   qfer F50×2 F10×2 + NewArray CreateArray via real createOnDemand).
+3. StackU6 NewArray skip wrong U6 address residual; post-residual Lhs F80 continue;
+   Global U2 after PP residual (drop sticky U14); SelectDeref U13→U12 countdown;
+   ParentParam miss → PL U6+itemize[9][4][7] F0.
+
+**e3876–e4035 climbed:**
+1. e3876 root cause: after SelectDeref U12, UP **accepts Lhs** → Statement U100 Assign
+   (U120 AssignOps / PointerAsLType); GO wrongly VS NewValue F10. Fixed accept.
+2. Pointer Lhs SelectDeref U7 + itemize [9][9][3] F0×2 (e3883–95); stack n=5 after.
+3. PL sole after stack U5; post-ptr SelectDeref U13…U9 F0 countdown; Global U2 (e3919).
+4. ExpressionAssign Lhs U7 F0 U6 U7 F80=0 → VS PL/NewValue create residual (e3934–54).
+5. ArrayOp U100=56 F5=0 aryno=0 → For residual header (e3955–74).
+6. haltGen after f10 late residual exhaust (avoid silent hang on longer seed4 stream).
+
+Next plateau: seed4 e4036 UP U5 (PL choose/validate) vs GO U120 term after PL U100=48 U5=0.
+Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

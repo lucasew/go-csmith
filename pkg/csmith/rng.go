@@ -26,6 +26,7 @@ type rng struct {
 }
 
 // silenceTrace stops appending RNG events (generation may continue untraced).
+func (r *rng) eventPos() uint64 { if r==nil { return 0 }; return r.tracePos }
 func (r *rng) silenceTrace() {
 	if r != nil {
 		r.silent = true
