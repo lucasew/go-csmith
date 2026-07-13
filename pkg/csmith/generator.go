@@ -3282,52 +3282,62 @@ func randomLeafExprWithMode(
 				// Pre-multi-dim: keep historical all-locals candidate build below
 				// (stack pick already burned).
 			}
-			// make_random_param + SelectGlobal for non-pointer formals only:
-			// type-strict match on real globals (no g_p* pads). Miss →
-			// choose_random_simple U14 + GenerateNewGlobal with formal qfer
-			// (seed4 e172–175). Pointer formals keep flexible choose (seed2 e312).
-			if isParam && scopePick == 0 && !strings.Contains(t.Name, "*") &&
-				flow != nil && !flow.useSmallParentStack &&
+			// make_random_param + SelectGlobal:
+			// Non-pointer: real globals, bit-exact; miss → U14 retype + create
+			// (seed4 e172–175). Pointer + multiDim: real only (no g_p* pads);
+			// miss → create F20 F20 (seed4 e177–179). Pointer + multiDim==0:
+			// fall through to flexible (seed2 e312 returns filtered[0] sole).
+			if isParam && scopePick == 0 && flow != nil && !flow.useSmallParentStack &&
 				er != nil && er.fallback != nil {
-				real := make([]exprVarCandidate, 0, 16)
-				for _, g := range env.globals {
-					if strings.Contains(g.ctype.Name, "*") {
-						continue
-					}
-					real = append(real, exprVarCandidate{
-						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
-						isArray: g.isArray, arrayLen: g.arrayLen,
-					})
-				}
-				if ctx != nil && ctx.state != nil {
-					for _, g := range ctx.state.dynGlobals {
-						if strings.Contains(g.ctype.Name, "*") {
-							continue
+				wantPtr := strings.Contains(t.Name, "*")
+				if !wantPtr || flow.multiDimArrays > 0 {
+					real := make([]exprVarCandidate, 0, 16)
+					addG := func(name string, ct CType, assignable, isArr bool, alen int) {
+						if wantPtr != strings.Contains(ct.Name, "*") {
+							return
+						}
+						if wantPtr {
+							if strings.Count(ct.Name, "*") != strings.Count(t.Name, "*") {
+								return
+							}
+							if ct.Bits != 0 && t.Bits != 0 && ct.Bits != t.Bits {
+								return
+							}
+						} else if ct.Bits != t.Bits || ct.Signed != t.Signed {
+							return
 						}
 						real = append(real, exprVarCandidate{
-							expr: g.name, ctype: g.ctype, assignable: !g.isConst,
-							isArray: g.isArray, arrayLen: g.arrayLen,
+							expr: name, ctype: ct, assignable: assignable,
+							isArray: isArr, arrayLen: alen,
 						})
 					}
-				}
-				exact := make([]exprVarCandidate, 0, len(real))
-				for _, c := range real {
-					if c.ctype.Bits == t.Bits && c.ctype.Signed == t.Signed {
-						exact = append(exact, c)
+					for _, g := range env.globals {
+						addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
 					}
-				}
-				if len(exact) == 0 {
-					retype := pickSimpleNonVoid(er.fallback, opts)
-					if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
+					if ctx != nil && ctx.state != nil {
+						for _, g := range ctx.state.dynGlobals {
+							addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+						}
+						for _, g := range ctx.state.orphanGlobals {
+							addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+						}
+					}
+					if len(real) == 0 {
+						retype := t
+						if !wantPtr {
+							retype = pickSimpleNonVoid(er.fallback, opts)
+						}
+						if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, g.expr)
+						}
+					} else if len(real) == 1 {
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return castLiteral(t, real[0].expr)
+					} else if c, ok := selectExprVariableFromER(t, er, real, false); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, c.expr)
 					}
-				} else if len(exact) == 1 {
-					bumpExprDepth(ctx)
-					return castLiteral(t, exact[0].expr)
-				} else if c, ok := selectExprVariableFromER(t, er, exact, false); ok {
-					bumpExprDepth(ctx)
-					return castLiteral(t, c.expr)
 				}
 			}
 						candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)

@@ -137,9 +137,9 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
 | Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym; residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **178** (was 62→173→178; e173 non-ptr param Global retype+create fixed); seed5 first_div **155**. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **236** (62→173→178→236; isParam Global retype/create, pointer+multiDim no g_p* pads); seed5 first_div **155**. |
 
-Next plateau: seed4 e178 pointer param Global (pad inventory vs create); seed5 e155; multi-seed; residual→real; source; COUNT=20.
+Next plateau: seed4 e236 ParentLocal choose U3 vs retry; seed5 e155; multi-seed; residual→real; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
