@@ -4101,8 +4101,11 @@ func randomLeafExprWithMode(
 			if er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
 				// Upstream ExpressionComma lhs: type=nil → choose_random_nonvoid_nonvolatile.
 				// Early seed2: pool cardinality without filter (historical match).
-				// Late useSmallParentStack e1310: AllTypes n=14, float filtered tries≥1.
-				if ctx.state.useSmallParentStack {
+				// Late useSmallParentStack e1310: AllTypes n=14, float filtered tries>=1.
+				// seed4 e993: PP-era array body also AllTypes U14 with filter (tries=1).
+				useAllTypesFilter := ctx.state.useSmallParentStack ||
+					(ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0)
+				if useAllTypesFilter {
 					types := allTypesList(ctx.state.info)
 					if len(types) > 0 {
 						reject := func(x uint32) bool {
