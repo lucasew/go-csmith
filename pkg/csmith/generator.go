@@ -900,6 +900,9 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				_ = er.fallback.flipcoin(0)
 			}
 			flow.postAggLhsWriteDone = true
+			// Lhs complete — do not re-enter NeedLhs on subsequent Expressions.
+			flow.postAggNeedLhsAfterRhs = false
+			flow.ppPostPadSkipStmtLhs = true
 			return "x"
 		}
 		ptrs := collectLhsDerefPointers(env, scope, ctx, t)
