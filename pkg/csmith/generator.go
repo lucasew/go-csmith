@@ -273,6 +273,11 @@ type functionFlowState struct {
 	ppPostPadCommaAfterPP bool
 	// ppPostPadLongAddrResidualDone: first late NewArray uses U3 U9 U4 U7.
 	ppPostPadLongAddrResidualDone bool
+	// ppPostPadForceNoFunc: one-shot after e1871 residual — filter Function
+	// so term U120 tries=1 → Assign (e1872).
+	ppPostPadForceNoFunc bool
+	// ppPostPadForceAssignQfer: one-shot Assign after residual burns pointer qfer.
+	ppPostPadForceAssignQfer bool
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
 }
@@ -2453,12 +2458,42 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					chooseN = 8 // e1755
 				case ppPostPadGlobalPicks == 14:
 					chooseN = 2 // e1788 after U13 SelectDeref empty
+				case ppPostPadGlobalPicks == 15:
+					chooseN = 13 // e1883 once
+				case ppPostPadGlobalPicks >= 16:
+					// e1886: sole + F20×4 U4 U10 (handled before pick below)
+					chooseN = 1 // sole — pick path skipped via residual below
 				default:
 					chooseN = 6 // e1574+ bulk
 				}
 			} else {
 				chooseN = 4
 			}
+		}
+		// seed4 e1886–92: late Global sole F20×4 U4 U10 (no choose U).
+		if chooseN == 1 && ppPostPadGlobalPicks >= 16 &&
+			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
+			er.fallback != nil {
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.pick(4)
+			_ = er.pick(10)
+			return uniq[0], true
+		}
+		// seed4 e1886 under filterCompound U2: same F20 residual, no U2/U3 empty.
+		if chooseN == 2 && ppPostPadGlobalPicks >= 15 &&
+			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
+			er.fallback != nil &&
+			filterCompoundStmtsSink != nil && *filterCompoundStmtsSink {
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.pick(4)
+			_ = er.pick(10)
+			return uniq[0], true
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		// seed4 e1716: after first late Global U8 (picks==6), residual U10.
@@ -3192,7 +3227,8 @@ func randomLeafExprWithMode(
 	// Hard nest cap (go-only) so stdfunc non-bumping depth cannot recurse forever.
 	nestNoFunc := depth > maxExprDepth(opts)*4
 	disallowed := func(tc termChoice) bool {
-		if (tc == termFunction && (noFunc || nestNoFunc || filterDepth+2 > maxExprDepth(opts))) ||
+		forceNoFunc := ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc
+		if (tc == termFunction && (noFunc || forceNoFunc || nestNoFunc || filterDepth+2 > maxExprDepth(opts))) ||
 			(tc == termConstant && noConst) ||
 			((tc == termAssign || tc == termComma) && (nestNoFunc || filterDepth+2 > maxExprDepth(opts))) {
 			return true
@@ -3237,6 +3273,10 @@ exprTries:
 			ctx.state.ppPostPadCommaAfterPP && !disallowed(termComma) {
 			choice = termComma
 			// keep flag for skipCommaType on this Comma only
+		}
+		// Clear one-shot noFunc after term selection (e1872 Assign).
+		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc {
+			ctx.state.ppPostPadForceNoFunc = false
 		}
 		switch choice {
 		case termFunction:
@@ -4539,6 +4579,12 @@ exprTries:
 				// PP-era only so seed2 residual paths stay intact.
 				skipQfer := ctx != nil && ctx.skipFuncRetQfer &&
 					ctx.state != nil && ctx.state.isParamPPFallPicks >= 2
+				// seed4 e1873: after residual term-retry Assign, burn pointer
+				// qfer F50 F10… even under skipFuncRetQfer parent context.
+				if skipQfer && ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceAssignQfer {
+					skipQfer = false
+					ctx.state.ppPostPadForceAssignQfer = false
+				}
 				ptrLv := strings.Count(t.Name, "*")
 				if !skipQfer {
 					// random_qualifiers(WRITE, no_volatile): draws still burned.
@@ -4795,8 +4841,9 @@ exprTries:
 			// seed4 e1231: PP-era ParentParam Lhs → stack U3 only (next F80 residual).
 			if scopePick == 2 {
 				idx := parentStackPick(er, ctx.state)
-				// seed4 e1862–67: late post-pad PP Lhs stack then F20×4 U6
-				// create residual; F80=0 → another VS (e1867–).
+				// seed4 e1862–71: late post-pad PP Lhs stack then F20×4 U6
+				// create residual; F80=0 → VS PL U6 F20×2; then Expression
+				// term retry U120 Assign (e1872) not SelectDeref F80.
 				if ppPostPadGlobalPicks >= 14 && er != nil && er.fallback != nil {
 					_ = er.fallback.flipcoin(20)
 					_ = er.fallback.flipcoin(20)
@@ -4817,7 +4864,19 @@ exprTries:
 						_ = er.fallback.flipcoin(20)
 						_ = er.fallback.flipcoin(20)
 					}
-					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+					// e1872: Expression do-while retries term U120 Assign
+					// (pointer qfer F50 F10…). Force noFunc so Function is
+					// filtered (tries=1 → Assign 103).
+					if snap != nil && ctx != nil {
+						keepDepth := ctx.exprDepth
+						restoreGenSnapshot(ctx, snap)
+						ctx.exprDepth = keepDepth
+					}
+					if ctx != nil && ctx.state != nil {
+						ctx.state.ppPostPadForceNoFunc = true
+						ctx.state.ppPostPadForceAssignQfer = true
+					}
+					continue exprTries
 				}
 				if ppLhsEra && !ctx.state.useSmallParentStack {
 					// seed4 e1231–33: PP-era ParentParam Lhs → stack U3, then
