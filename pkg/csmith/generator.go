@@ -391,6 +391,9 @@ type functionFlowState struct {
 	// postAggPtrCmpPLCreateDone: after e4085+ NO_DANGLING PL create; later PL
 	// choose residual itemizes multi-dim [9][9][3] before F0 (e4204).
 	postAggPtrCmpPLCreateDone bool
+	// postAggSkipShiftByOnce: after NeedLhs Lhs, parent shift may still run
+	// ShiftBy F50 U32 (NeedLhs cleared); UP next is Expression U120 (e4250).
+	postAggSkipShiftByOnce bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -820,8 +823,10 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					_ = er.pick(2)
 					_ = er.fallback.flipcoin(50)
 					flow.postAggLhsWriteDone = true
-					// After Lhs accept, next is Expression U120 (e4250), not
-					// another ExpressionAssign self-F50 / SelectDeref F80.
+					// e4250: nested ExpressionAssign Lhs done; StatementAssign outer
+					// Lhs must sole-accept (UP next Expression Function U120), not
+					// another SelectDeref F80 / Assign residual F50 U32.
+					flow.ppPostPadSkipStmtLhs = true
 					flow.ppPostPadOuterLhsSole = true
 					flow.ppPostPadSkipParentExprN = 0
 					return "x"
@@ -4880,6 +4885,14 @@ exprTries:
 							if ctx != nil && ctx.state != nil && ctx.state.postAggNeedLhsAfterRhs {
 								out = castLiteral(t, lhs)
 								_ = op2Signed
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggSkipShiftByOnce &&
+								(opV == 16 || opV == 17) {
+								// e4250: NeedLhs Lhs already ran (cleared NeedLhs); outer
+								// shift resumes ShiftBy — UP already finished Assign and
+								// next is Expression U120 Function. Skip ShiftBy once.
+								ctx.state.postAggSkipShiftByOnce = false
+								out = castLiteral(t, lhs)
+								_ = op2Signed
 							} else {
 								// Shift: after LHS, ShiftByNonConstantProb F50 (seed4 e668).
 								var rhs string
@@ -5668,8 +5681,14 @@ exprTries:
 												nest = 1
 											}
 											_ = randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+											// Arm NeedLhs so ExpressionAssign/StatementAssign run
+											// Lhs after RHS (skips open shift ShiftBy via binary
+											// NeedLhs short-circuit). e4250: after Lhs, swallow
+											// residual ShiftBy once (NeedLhs cleared before outer
+											// shift resumes after ExpressionAssign returns).
 											if flow != nil {
 												flow.postAggNeedLhsAfterRhs = true
+												flow.postAggSkipShiftByOnce = true
 											}
 											bumpExprDepth(ctx)
 											if len(localCands) > 0 {
@@ -7203,7 +7222,13 @@ exprTries:
 				_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
 				// Assign complete — unwind to Statement U100 (e3067).
 				// Do not arm stmtFilterCompound (e3083 tries=0 U100=4, not tries=1).
-				if ctx.state.ppPostPadSkipParentExprN < 6 {
+				// e4250: after ptr-cmp-create era nested ExpressionAssign Lhs,
+				// StatementAssign outer Lhs must sole (next Expression U120 Function).
+				// Do not set SkipParentExprN=6 (would swallow next Expression U120).
+				if ctx.state.postAggPtrCmpPLCreateDone {
+					ctx.state.ppPostPadSkipStmtLhs = true
+					ctx.state.ppPostPadSkipParentExprN = 0
+				} else if ctx.state.ppPostPadSkipParentExprN < 6 {
 					ctx.state.ppPostPadSkipParentExprN = 6
 				}
 				ctx.state.skipNextBlockSize = true
