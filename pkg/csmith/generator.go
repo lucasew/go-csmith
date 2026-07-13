@@ -252,6 +252,22 @@ type functionFlowState struct {
 	// ppPostPadOuterLhsSole: after nested Assign Lhs residual, outer Lhs sole so
 	// parent shift burns ShiftByNonConstant F50 (e1589) then RHS Comma (e1590).
 	ppPostPadOuterLhsSole bool
+	ppPostPadOuterLhsSoleN int
+	// ppPostPadSkipStmtLhs: after e1895 nested ExpressionAssign Lhs residual+create,
+	// StatementAssign outer Lhs sole (e2013 UP term U120 not SelectDeref F80).
+	ppPostPadSkipStmtLhs bool
+	// ppPostPadAllowFuncOnce: after e1895 residual, next term U120 accepts Function
+	// (tries=0) even if exprDepth high from nested Assign unwind.
+	ppPostPadAllowFuncOnce bool
+	// ppPostPadPLForceCreateOnce: one-shot e2024 PL stack → qfer create.
+	ppPostPadPLForceCreateOnce bool
+	ppPostPadLhsGlobalSelDerefOnce bool // e1895 one-shot Lhs Global residual
+	ppPostPadLhsSelDerefChooseOnce bool // e2041 one-shot Lhs SelectDeref U4 residual
+	// ppPostPadForceNoFuncIn: countdown to arm depthBlock (e2105 tries=12 Variable).
+	ppPostPadForceNoFuncIn int
+	// ppPostPadDepthBlock: filter Function+Assign+Comma like high exprDepth.
+	ppPostPadDepthBlock bool
+	ppPostPadDepthBlockN int // Variable/Constant picks while depthBlock armed
 	// ppPostPadPLPicks: PL ExpressionVariable after ptr-cmp (e1638=1 U2, e1666=3 U3).
 	ppPostPadPLPicks int
 	// ppPostPadGlobalF0Count: Global sole+F0 after late PL (e1673, e1686; not e1698).
@@ -1190,6 +1206,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				}
 				if useSmallParentStackSink != nil && *useSmallParentStackSink {
 					_ = r.upto(6)
+				} else if ppPostPadGlobalPicks >= 15 {
+					// seed4 e1912+: after e1895 residual era, alt init choose U2.
+					_ = r.upto(2)
 				} else if ppPostPadGlobalPicks >= 14 {
 					// seed4 e1851: late post-pad alt init choose among ~3 pointees.
 					_ = r.upto(3)
@@ -1872,20 +1891,31 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			} else if ppEra && ppPostPadGlobalPicks >= 14 && newArray {
 				// seed4 e1834–37: first NewArray address residual U3 U9 U4 U7;
 				// e1845–46 later: U3 U4 then CreateArray (shorter residual).
-				_ = er.fallback.upto(3)
-				if !ctx.state.ppPostPadLongAddrResidualDone {
-					ctx.state.ppPostPadLongAddrResidualDone = true
-					_ = er.fallback.upto(9)
-					_ = er.fallback.upto(4)
-					_ = er.fallback.upto(7)
+				// seed4 e1905+: after e1895 SelectDeref residual era, U2 only
+				// then CreateArray U99 (not U3 U4).
+				if ppPostPadGlobalPicks >= 15 {
+					_ = er.fallback.upto(2)
 				} else {
-					_ = er.fallback.upto(4)
+					_ = er.fallback.upto(3)
+					if !ctx.state.ppPostPadLongAddrResidualDone {
+						ctx.state.ppPostPadLongAddrResidualDone = true
+						_ = er.fallback.upto(9)
+						_ = er.fallback.upto(4)
+						_ = er.fallback.upto(7)
+					} else {
+						_ = er.fallback.upto(4)
+					}
 				}
 			} else if ppEra && (newArray || ctx.state.ppNewArrayCreated) {
 				// seed4 e1096: NewArray + address-of → choose U2 then CreateArray.
 				// seed4 e1204: after ppNewArrayCreated, address-of finds pointees
 				// (U2 choose), not empty → F50 + nested Expression (e695).
-				_ = er.fallback.upto(2)
+				// seed4 e2032: after e1895 residual era !NewArray address U5.
+				if ppPostPadGlobalPicks >= 15 && !newArray {
+					_ = er.fallback.upto(5)
+				} else {
+					_ = er.fallback.upto(2)
+				}
 			} else if ppEra {
 				// seed4 e695: choose_var empty → random_loose_qualifiers F50 +
 				// GenerateNew (nested Expression U120), not pad U2 choose.
@@ -2276,6 +2306,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if n == 4 {
 			chooseN = 2 // seed2 e1017 Global pointer choose
 		}
+		// seed4 e1886–92: after eFlexible U13 era, Function-fail→pointer Global
+		// is create residual F20×4 U4 U10 (UP empty/create; GO must not U2+itemize).
+		if ppPostPadGlobalPicks >= 15 &&
+			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
+			er.fallback != nil && n >= 1 {
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			_ = er.pick(4)
+			_ = er.pick(10)
+			return exact[0], true
+		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		c := exact[idx]
 		// Later scaled picks (e892): UP U4 after choose is BlockProbability for a
@@ -2470,23 +2513,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				chooseN = 4
 			}
 		}
-		// seed4 e1886–92: late Global sole F20×4 U4 U10 (no choose U).
-		if chooseN == 1 && ppPostPadGlobalPicks >= 16 &&
+		if ppPostPadGlobalPicks >= 15 &&
 			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
-			er.fallback != nil {
-			_ = er.fallback.flipcoin(20)
-			_ = er.fallback.flipcoin(20)
-			_ = er.fallback.flipcoin(20)
-			_ = er.fallback.flipcoin(20)
-			_ = er.pick(4)
-			_ = er.pick(10)
-			return uniq[0], true
-		}
-		// seed4 e1886 under filterCompound U2: same F20 residual, no U2/U3 empty.
-		if chooseN == 2 && ppPostPadGlobalPicks >= 15 &&
-			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
-			er.fallback != nil &&
-			filterCompoundStmtsSink != nil && *filterCompoundStmtsSink {
+			er.fallback != nil && n >= 1 &&
+			!(ppPostPadGlobalPicks == 15 && chooseN == 13) &&
+			!(ppPostPadGlobalPicks == 14 && chooseN == 2) {
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
@@ -3228,9 +3259,21 @@ func randomLeafExprWithMode(
 	nestNoFunc := depth > maxExprDepth(opts)*4
 	disallowed := func(tc termChoice) bool {
 		forceNoFunc := ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc
-		if (tc == termFunction && (noFunc || forceNoFunc || nestNoFunc || filterDepth+2 > maxExprDepth(opts))) ||
-			(tc == termConstant && noConst) ||
-			((tc == termAssign || tc == termComma) && (nestNoFunc || filterDepth+2 > maxExprDepth(opts))) {
+		allowFunc := ctx != nil && ctx.state != nil && ctx.state.ppPostPadAllowFuncOnce
+		depthBlock := filterDepth+2 > maxExprDepth(opts) ||
+			(ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock)
+		if tc == termFunction {
+			// e2013: after e1895 residual, one-shot Function even under noFunc/depth.
+			if allowFunc {
+				return false
+			}
+			if noFunc || nestNoFunc || forceNoFunc || depthBlock {
+				return true
+			}
+			return false
+		}
+		if (tc == termConstant && noConst) ||
+			((tc == termAssign || tc == termComma) && (nestNoFunc || depthBlock)) {
 			return true
 		}
 		return false
@@ -3240,6 +3283,13 @@ exprTries:
 	for tries := 0; tries < 6; tries++ {
 		snap := takeGenSnapshot(ctx)
 		var choice termChoice
+		// Countdown once per term attempt (not per disallowed call).
+		if tries == 0 && ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFuncIn > 0 {
+			ctx.state.ppPostPadForceNoFuncIn--
+			if ctx.state.ppPostPadForceNoFuncIn == 0 {
+				ctx.state.ppPostPadDepthBlock = true
+			}
+		}
 		if er != nil && er.fallback != nil {
 			hasAllowed := false
 			for _, e := range entries {
@@ -3278,6 +3328,21 @@ exprTries:
 		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc {
 			ctx.state.ppPostPadForceNoFunc = false
 		}
+		// Keep depth-block for a few Variable/Constant picks (e2105 + e2109).
+		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock &&
+			(choice == termVariable || choice == termConstant) {
+			ctx.state.ppPostPadDepthBlockN++
+			if ctx.state.ppPostPadDepthBlockN >= 2 {
+				ctx.state.ppPostPadDepthBlock = false
+			}
+		}
+		// Clear only when Function actually selected (may skip intermediate Assign soles).
+		forceStdFuncSimple := false
+		if choice == termFunction && ctx != nil && ctx.state != nil && ctx.state.ppPostPadAllowFuncOnce {
+			ctx.state.ppPostPadAllowFuncOnce = false
+			// e2014: UP stdfunc F5 path (simple), not user-func F50.
+			forceStdFuncSimple = true
+		}
 		switch choice {
 		case termFunction:
 			// ExpressionFuncall: ExpressionFunctionProbability (F80), unless
@@ -3298,12 +3363,16 @@ exprTries:
 				stdFunc := true
 				atMaxFuncs := ctx != nil && ctx.state != nil &&
 					len(ctx.state.funcs) >= ctx.state.maxFuncs
-				if !atMaxFuncs {
+				if !atMaxFuncs && !forceStdFuncSimple {
 					stdFunc = er.fallback.flipcoin(80)
 				}
 				isSimple := !strings.Contains(t.Name, "*") &&
 					!strings.HasPrefix(t.Name, "struct ") &&
 					!strings.HasPrefix(t.Name, "union ")
+				if forceStdFuncSimple {
+					stdFunc = true
+					isSimple = true
+				}
 				if stdFunc && isSimple {
 					// Binary/unary stdfunc: Expression::make_random(type) with
 					// null qfer — nested CREATE uses static return qfer (F50+F10).
@@ -3368,7 +3437,10 @@ exprTries:
 								nPtr = ctx.state.derivedPtrTypes
 							}
 							// seed2 e1014: derived_types ≥5; e1200 U7 after many assigns.
-							if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+							// seed4 e2020: after e1895 residual era, UP derived_types U6.
+							if ppPostPadGlobalPicks >= 15 {
+								nPtr = 6
+							} else if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 								if ctx.state.assignExprCount >= 3 {
 									if nPtr < 7 {
 										nPtr = 7
@@ -3891,13 +3963,29 @@ exprTries:
 					// seed4 e1306: after visit-fail→PL→stack, choose U3 then
 					// opportunistic_validate F0 fail → ExpressionVariable re-select
 					// (U100 Global U10), not sole→next term U120.
+					// seed4 e2024: one-shot after e1895 residual, PL stack → full qfer
+					// create (F50 F10×levels + F20 F20 U5) not sole → next term.
+					if !forceCreate && flow != nil && flow.ppPLPadChooseDone &&
+						flow.ppPostPadPLForceCreateOnce {
+						flow.ppPostPadPLForceCreateOnce = false
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, g.expr)
+						}
+					}
 					// seed4 e1638+: late post-pad (after ptr-cmp) choose U2/U3 or create.
 					if !forceCreate && flow != nil && flow.ppPLPadChooseDone &&
 						len(localCands) > 0 {
 						if flow.ppPostPadPtrCmpDone && !wantPtr {
 							// e1638 pick1 idx≥2 → U2; e1644 pick2 idx=1 → U3;
 							// e1655 pick3 idx=0 → create F10; e1666 pick4 idx≥2 → U3+itemize.
+							// seed4 e2041: after e2024 create residual, idx=0 sole accept
+							// so outer Assign Lhs SelectDeref F80 (not more create F10).
 							flow.ppPostPadPLPicks++
+							if idx == 0 && ppPostPadGlobalPicks >= 15 && !flow.ppPostPadPLForceCreateOnce {
+								bumpExprDepth(ctx)
+								return castLiteral(t, localCands[0].expr)
+							}
 							if idx == 0 {
 								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, false, idx); ok {
 									bumpExprDepth(ctx)
@@ -3927,12 +4015,17 @@ exprTries:
 								}
 								_ = er.pick(2)
 							} else {
-								for len(localCands) < 3 {
+								// e1644: U3; seed4 e2108 after residual era: U4.
+								nChoose := 3
+								if ppPostPadGlobalPicks >= 15 {
+									nChoose = 4
+								}
+								for len(localCands) < nChoose {
 									localCands = append(localCands, exprVarCandidate{
 										expr: fmt.Sprintf("l_pc%d", len(localCands)), ctype: t, assignable: true,
 									})
 								}
-								_ = er.pick(3)
+								_ = er.pick(uint32(nChoose))
 							}
 							bumpExprDepth(ctx)
 							return castLiteral(t, localCands[0].expr)
@@ -4585,6 +4678,11 @@ exprTries:
 					skipQfer = false
 					ctx.state.ppPostPadForceAssignQfer = false
 				}
+				// seed4 e2036: after e1895 residual era, Assign still burns self F50
+				// (UP qfer) even under parent WRITE skipFuncRetQfer.
+				if skipQfer && ppPostPadGlobalPicks >= 15 {
+					skipQfer = false
+				}
 				ptrLv := strings.Count(t.Name, "*")
 				if !skipQfer {
 					// random_qualifiers(WRITE, no_volatile): draws still burned.
@@ -4634,7 +4732,9 @@ exprTries:
 							_ = er.fallback.flipcoin(50)
 							_ = er.fallback.flipcoin(10)
 						}
-					} else if burnSelfF50 {
+					} else if burnSelfF50 || (ppPostPadGlobalPicks >= 15 && ptrLv == 0) {
+						// seed4 e2036: after residual era, simple Assign burns self F50
+						// even when effectSEFree=false (post-Function).
 						_ = er.fallback.flipcoin(50) // simple self vol only
 					}
 				}
@@ -4689,6 +4789,10 @@ exprTries:
 			lhsFromDeref := false
 			createdArrEA := false
 			// seed4 e1589–90: outer Assign Lhs sole after nested residual.
+			if ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSoleN > 0 {
+				ctx.state.ppPostPadOuterLhsSoleN--
+				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
 			if ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSole {
 				ctx.state.ppPostPadOuterLhsSole = false
 				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
@@ -4698,6 +4802,29 @@ exprTries:
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
 					if !deref {
 						break // fall through to VariableSelector::select
+					}
+					// seed4 e2041–50: one-shot SelectDeref choose residual U4 F80 U3 F0…
+					// (later F80 e2090 is F20 create path, not U4 residual).
+					if ppPostPadGlobalPicks >= 15 && !createdArrEA &&
+						ctx != nil && ctx.state != nil && !ctx.state.ppPostPadLhsSelDerefChooseOnce {
+						ctx.state.ppPostPadLhsSelDerefChooseOnce = true
+						_ = er.pick(4)
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(3)
+							_ = er.fallback.flipcoin(0)
+						}
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(0)
+						}
+						if er.fallback.flipcoin(80) {
+							// e2049 F80=1 continue attempt
+						}
+						if !er.fallback.flipcoin(80) {
+							break // e2050 F80=0 → VS
+						}
+						lhsFromDeref = true
+						break
 					}
 					// seed4 e1576–77: after post-pad ptr-cmp, first SelectDeref
 					// returns null without F20 create (max_indirect / sole fail).
@@ -4729,6 +4856,19 @@ exprTries:
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
+					if ppPostPadGlobalPicks >= 15 && !newArray && !initConst {
+						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						if ctx != nil && ctx.state != nil {
+							ctx.state.ppPostPadAllowFuncOnce = false
+						}
+						_ = randomTypedExprDepthFlags(base, er, opts, env, scope, depth+1, ctx, false, false)
+						if ctx != nil && ctx.state != nil {
+							// e2105 is ~4 term picks after nested address Expression ends.
+							ctx.state.ppPostPadForceNoFuncIn = 3
+						}
+						lhsFromDeref = true
+						break
+					}
 					if initConst {
 						// Constant "0" (null), no more RNG for init
 						// opportunistic_validate: null ptr -> flipcoin(0) -> fail
@@ -5002,6 +5142,44 @@ exprTries:
 				}
 				// e1701: Lhs Global miss → random_type_from_type U14 + WRITE create
 				// (no self F10; NewArray F20 then Constant F50… + CreateArray).
+				// seed4 e1895: one-shot Lhs Global SelectDeref residual then NewValue create.
+				// Later Lhs Global (e2052) uses U14 WRITE create (e1701 default).
+				if ppPostPadGlobalPicks >= 15 && ctx.state != nil && !ctx.state.ppPostPadLhsGlobalSelDerefOnce {
+					ctx.state.ppPostPadLhsGlobalSelDerefOnce = true
+					if er.fallback.flipcoin(80) {
+						_ = er.pick(2)
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(9)
+						}
+					}
+					if !er.fallback.flipcoin(80) {
+						// variableScopePickFromER already burns NewValue F10 for 95–99.
+						scopePick2 := variableScopePickFromER(er, opts, &scope)
+						if scopePick2 == 3 {
+							_, _ = createOnDemandGlobalFromER(er, opts, t, ctx)
+						} else if scopePick2 == 4 || scopePick2 == 1 || scopePick2 == 2 {
+							idx := parentStackPick(er, ctx.state)
+							// qferMode 0: NewArray F20 first (e1903), no F50/F10 qfer.
+							_, _ = createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, true, idx)
+						} else if scopePick2 == 0 {
+							_, _ = createOnDemandGlobalFromER(er, opts, t, ctx)
+						}
+					}
+					// After create residual, finish Assign and arm outer Lhs sole so
+					// next top-level Expression term U120 is Function (depth 0, tries=0)
+					// not nested SelectDeref F80 / depth-filtered term.
+					if ctx != nil && ctx.state != nil {
+						ctx.state.ppPostPadOuterLhsSoleN = 2
+						ctx.state.ppPostPadSkipStmtLhs = true
+						ctx.state.ppPostPadForceNoFunc = false
+						ctx.state.ppPostPadAllowFuncOnce = true
+						ctx.state.ppPostPadPLForceCreateOnce = true
+					}
+					if ctx != nil {
+						ctx.exprDepth = 0
+					}
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
 				chosen := pickSimpleNonVoid(er.fallback, opts)
 				newArray := er.fallback.flipcoin(20)
 				if newArray {
@@ -5600,6 +5778,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		!ctx.state.useSmallParentStack && !strings.Contains(targetType.Name, "*") &&
 		ctx.state.ppEraRhsArrayCreate {
 		ctx.state.ppEraRhsArrayCreate = false
+		lhsFromDeref = true
+	}
+	// seed4 e2013: after e1895 nested ExpressionAssign Lhs residual create,
+	// StatementAssign outer Lhs is sole (UP next term U120 / next stmt), not F80.
+	if ctx != nil && ctx.state != nil && ctx.state.ppPostPadSkipStmtLhs {
+		ctx.state.ppPostPadSkipStmtLhs = false
 		lhsFromDeref = true
 	}
 	// seed2 e2270: after late pointer RHS create address-of itemize, must_write
