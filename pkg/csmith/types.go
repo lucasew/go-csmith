@@ -220,3 +220,141 @@ func hexDigitsForConstant(t CType) int {
 func castLiteral(t CType, expr string) string {
 	return fmt.Sprintf("((%s)(%s))", t.Name, expr)
 }
+
+// simpleTypesGenerateOrder is AllTypes after Type::GenerateSimpleTypes
+// (eChar..eUInt128, void excluded). Index 0..12 for U13 draws.
+func simpleTypesGenerateOrder(opts Options) []CType {
+	return []CType{
+		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},                // eChar
+		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},              // eInt (host)
+		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4},              // eShort
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8},              // eLong
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},             // eLongLong
+		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2},              // eUChar
+		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8},            // eUInt
+		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4},            // eUShort
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8},            // eULong
+		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},                // eFloat
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16},           // eULongLong
+		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},           // eInt128
+		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16}, // eUInt128
+	}
+}
+
+// simpleTypeEnumFiltered mirrors SIMPLE_TYPES_PROB_FILTER for AllTypes index
+// after GenerateSimpleTypes (0=eChar … 12=eUInt128).
+func simpleTypeEnumFiltered(idx int, opts Options) bool {
+	// Map idx → eSimpleType value used by ProbabilityFilter.
+	// eChar=1 … eFloat=10, eULongLong=11, eInt128=12, eUInt128=13
+	switch idx {
+	case 9: // eFloat
+		return !opts.EnableFloat
+	case 11: // eInt128
+		return !opts.Int128
+	case 12: // eUInt128
+		return !opts.UInt128
+	case 3, 8: // eLong, eULong — ccomp disables; default !ccomp
+		return false
+	case 4, 10: // eLongLong, eULongLong — allow_int64 default true via LongLong
+		return !opts.LongLong
+	default:
+		return false
+	}
+}
+
+// pickFieldType mirrors make_one_struct_field: rnd_upto(AllTypes.size(), filter)
+// with tries on one event (not separate upto per reject).
+// For union fields with prior structs, make_one_union_field uses pure_rnd_flipcoin(15)
+// then pure_rnd_upto(ok_nonstruct) with manual retry — use pickUnionFieldType there.
+// nStructs: when >0 and forUnion, 15% struct field chance first.
+func pickFieldType(r *rng, opts Options, nStructs int) CType {
+	return pickFieldTypeEx(r, opts, nStructs, false)
+}
+
+// pickUnionFieldType mirrors make_one_union_field (manual retry loop = multi U events).
+func pickUnionFieldType(r *rng, opts Options, nStructs int) CType {
+	return pickFieldTypeEx(r, opts, nStructs, true)
+}
+
+func pickFieldTypeEx(r *rng, opts Options, nStructs int, forUnion bool) CType {
+	if r == nil {
+		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	simples := simpleTypesGenerateOrder(opts)
+	if opts.IntSize == 4 {
+		simples[1] = hostIntType(opts)
+		simples[6] = unsignedOf(hostIntType(opts).Bits)
+	}
+	// AllTypes size during early field gen ≈ simples only (+ prior structs for struct fields).
+	// Struct fields: ChooseRandomTypeFilter on full AllTypes including prior structs.
+	// For simplicity when nStructs==0: U13 with filter in one event.
+	if forUnion {
+		// pure_rnd_flipcoin(15) only if structs exist; pure_rnd_upto + manual retry.
+		for tries := 0; tries < 1<<16; tries++ {
+			if nStructs > 0 && r.flipcoin(15) {
+				return CType{Name: fmt.Sprintf("struct S%d", int(r.upto(uint32(nStructs)))), Bits: 32}
+			}
+			idx := int(r.upto(uint32(len(simples))))
+			if simpleTypeEnumFiltered(idx, opts) {
+				continue
+			}
+			return simples[idx]
+		}
+		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	// Struct field: rnd_upto(AllTypes, filter) — one event with tries.
+	// AllTypes = simples + prior structs (nStructs).
+	nAll := len(simples) + nStructs
+	reject := func(x uint32) bool {
+		i := int(x)
+		if i < 0 || i >= nAll {
+			return true
+		}
+		if i < len(simples) {
+			return simpleTypeEnumFiltered(i, opts)
+		}
+		return false // struct types ok for fields when assign_ops allow (default ok)
+	}
+	idx := int(r.uptoWithFilter(uint32(nAll), reject))
+	if idx < len(simples) {
+		return simples[idx]
+	}
+	return CType{Name: fmt.Sprintf("struct S%d", idx-len(simples)), Bits: 32}
+}
+
+// pickReturnType mirrors Type::choose_random / RandomReturnType:
+// rnd_upto(AllTypes.size(), ChooseRandomTypeFilter).
+func pickReturnType(r *rng, opts Options, info compositeInfo) CType {
+	if r == nil {
+		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	simples := simpleTypesGenerateOrder(opts)
+	if opts.IntSize == 4 {
+		simples[1] = hostIntType(opts)
+		simples[6] = unsignedOf(hostIntType(opts).Bits)
+	}
+	nAll := len(simples) + len(info.structs) + len(info.unions)
+	if nAll <= 0 {
+		return CType{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8}
+	}
+	reject := func(x uint32) bool {
+		i := int(x)
+		if i < 0 || i >= nAll {
+			return true
+		}
+		if i < len(simples) {
+			return simpleTypeEnumFiltered(i, opts)
+		}
+		return false
+	}
+	idx := int(r.uptoWithFilter(uint32(nAll), reject))
+	if idx < len(simples) {
+		return simples[idx]
+	}
+	idx -= len(simples)
+	if idx < len(info.structs) {
+		return CType{Name: fmt.Sprintf("struct S%d", idx), Bits: 32}
+	}
+	idx -= len(info.structs)
+	return CType{Name: fmt.Sprintf("union U%d", idx), Bits: 32}
+}

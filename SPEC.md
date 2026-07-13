@@ -137,7 +137,7 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
 | Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym (max id ~1229 vs UP 1356); residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 via residual invent |
-| 20-seed gate | Blocked on source match |
+| 20-seed gate | **In progress** — type-gen despecialize: seed3 first_div 12→53 (GO ends early); seed4 e5→62; seed5 e27→94; seed2 still full match |
 
 Next plateau: early local/create materialization (ID align to `g_8`/`l_4`); residual Expression/Statement real gen (not just `t_`/CreateArray); source body match; COUNT=20.
 

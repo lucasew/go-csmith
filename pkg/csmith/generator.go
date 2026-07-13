@@ -5315,7 +5315,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 				if fullBitfields {
 					if r.flipcoin(scalarFieldInFullBitfieldProb) {
 						name := fmt.Sprintf("f%d", f)
-						t := pickType(r, pool)
+						t := pickFieldType(r, opts, sidx)
 						writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
 						st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 						continue
@@ -5348,7 +5348,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					continue
 				}
 				name := fmt.Sprintf("f%d", f)
-				t := pickType(r, pool)
+				t := pickFieldType(r, opts, sidx)
 				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
 				st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 			}
@@ -5387,7 +5387,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					})
 					continue
 				}
-				t := pickType(r, pool)
+				t := pickUnionFieldType(r, opts, len(info.structs))
 				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
 				ut.fields = append(ut.fields, fieldInfo{name: name, ctype: t})
 			}
@@ -6580,23 +6580,10 @@ func (s *functionFlowState) makeFuncSignature(r *rng, idx int) funcInfo {
 	fn := funcInfo{
 		name: name,
 	}
-	// Function::make_first uses RandomReturnType() over AllTypes (simple + aggregates),
-	// while later signatures are chosen from random types as they are created.
+	// Function::make_first uses RandomReturnType → Type::choose_random:
+	// rnd_upto(AllTypes.size(), ChooseRandomTypeFilter) with SIMPLE_TYPES filter.
 	if idx == 1 {
-		allCount := len(s.pool) + len(s.info.structs) + len(s.info.unions)
-		if allCount <= 0 {
-			fn.ret = CType{Name: "uint32_t", Signed: false, Bits: 32}
-		} else {
-			pick := int(r.upto(uint32(allCount)))
-			switch {
-			case pick < len(s.pool):
-				fn.ret = s.pool[pick]
-			case pick < len(s.pool)+len(s.info.structs):
-				fn.ret = CType{Name: fmt.Sprintf("struct S%d", pick-len(s.pool)), Bits: 32}
-			default:
-				fn.ret = CType{Name: fmt.Sprintf("union U%d", pick-len(s.pool)-len(s.info.structs)), Bits: 32}
-			}
-		}
+		fn.ret = pickReturnType(r, s.opts, s.info)
 	} else {
 		fn.ret = pickType(r, s.pool)
 	}
