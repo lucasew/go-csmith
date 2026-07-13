@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb 2157→2230) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb 2157→2317) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **2230** (2157→2230; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **2317** (2157→2317; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -177,7 +177,7 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 3. ExpressionComma LHS type=null → U14 AllTypes (struct) then Function-fail create; RHS continues int32.
 4. Empty SelectParentLocal after postAggGlobalCreate → retype U14 + GenerateNewParentLocal (e2188–2196).
 
-Next plateau: seed4 e2230 U7 vs U6 `choose_random_pointer_type` (derived_types undercount by 1). Seeds 5–21; source; COUNT=20.
+Next plateau: seed4 e2317 U9 vs U16 Global choose `choose_random_pointer_type` (derived_types undercount by 1). Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

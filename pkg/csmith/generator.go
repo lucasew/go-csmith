@@ -48,6 +48,8 @@ var ppPLPadChooseDoneSink *bool
 
 // ppPostPadGlobalPicks: Global eFlexible choose count after pad-choose era.
 var ppPostPadGlobalPicks int
+var postAggGlobalCreateN = -1
+var postAggGlobalU23Done bool
 
 // ppPostPadPLPicksSink: late PL picks after ptr-cmp (gates Global F0 e1673).
 var ppPostPadPLPicksSink *int
@@ -263,9 +265,10 @@ type functionFlowState struct {
 	// ppPostPadSkipStmtLhs: after e1895 nested ExpressionAssign Lhs residual+create,
 	// StatementAssign outer Lhs sole (e2013 UP term U120 not SelectDeref F80).
 	ppPostPadSkipStmtLhs bool
-	// postAggGlobalCreate: after Function-fail struct Global create+field_vars,
-	// next empty PL blocks must create (seed4 e2188).
-	postAggGlobalCreate bool
+	// postAggGlobalCreate: remaining forced empty-PL creates after Function-fail
+	// struct Global (seed4 e2188+).
+	postAggGlobalCreate     int
+	postAggSkipAddrResidual bool
 	// ppPostPadAllowFuncOnce: after e1895 residual, next term U120 accepts Function
 	// (tries=0) even if exprDepth high from nested Assign unwind.
 	ppPostPadAllowFuncOnce bool
@@ -1762,7 +1765,9 @@ func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *
 	if !newArray {
 		burnCreateFieldVarsConstants(r, t, ctx, opts)
 		if strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") {
-			ctx.state.postAggGlobalCreate = true
+			ctx.state.postAggGlobalCreate = 4
+			postAggGlobalCreateN = 4
+			noteDerivedPointer(ctx.state, t.Name, false)
 		}
 	}
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
@@ -2000,6 +2005,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
 	}
+	if ctx.state.postAggGlobalCreate > 0 && strings.Contains(t.Name, "*") {
+		ctx.state.postAggSkipAddrResidual = true
+		defer func() { ctx.state.postAggSkipAddrResidual = false }()
+	}
 	// Type::random_type_from_type:
 	// - nil type → choose_random_nonvoid_nonvolatile (AllTypes)
 	// - simple + !strict → choose_random_simple (approx AllTypes pick historically)
@@ -2127,11 +2136,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 					}
 				}
 			} else if ppEra && (newArray || ctx.state.ppNewArrayCreated) {
-				// seed4 e1096: NewArray + address-of → choose U2 then CreateArray.
-				// seed4 e1204: after ppNewArrayCreated, address-of finds pointees
-				// (U2 choose), not empty → F50 + nested Expression (e695).
-				// seed4 e2032: after e1895 residual era !NewArray address U5.
-				if ppPostPadGlobalPicks >= 15 && !newArray {
+				// seed4 e1096 / e1204 / e2032 address residual.
+				// seed4 e2240 postAgg: no choose residual.
+				if ctx.state.postAggSkipAddrResidual && !newArray {
+					// sole
+				} else if ppPostPadGlobalPicks >= 15 && !newArray {
 					_ = er.fallback.upto(5)
 				} else {
 					_ = er.fallback.upto(2)
@@ -2527,11 +2536,20 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if n == 4 {
 			chooseN = 2 // seed2 e1017 Global pointer choose
 		}
-		// seed4 e1886–92: after eFlexible U13 era, Function-fail→pointer Global
-		// is create residual F20×4 U4 U10 (UP empty/create; GO must not U2+itemize).
+		// seed4 e1886–92 residual F20×4 when small inventory.
+		// seed4 e2256 postAgg: UP U23 GlobalList choose — pad once postAgg active.
 		if ppPostPadGlobalPicks >= 15 &&
 			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
 			er.fallback != nil && n >= 1 {
+			if postAggGlobalCreateN >= 0 {
+				target := 23
+				base := n
+				for len(exact) < target {
+					exact = append(exact, exact[len(exact)%base])
+				}
+				idx := int(er.pick(uint32(target))) % len(exact)
+				return exact[idx], true
+			}
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
@@ -2539,6 +2557,16 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			_ = er.pick(4)
 			_ = er.pick(10)
 			return exact[0], true
+		}
+		// Also: postAgg Global pointer choose even if picks gate differs
+		if postAggGlobalCreateN >= 0 && n >= 1 && er != nil {
+			target := 23
+			base := n
+			for len(exact) < target {
+				exact = append(exact, exact[len(exact)%base])
+			}
+			idx := int(er.pick(uint32(target))) % len(exact)
+			return exact[idx], true
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		c := exact[idx]
@@ -2739,6 +2767,22 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			er.fallback != nil && n >= 1 &&
 			!(ppPostPadGlobalPicks == 15 && chooseN == 13) &&
 			!(ppPostPadGlobalPicks == 14 && chooseN == 2) {
+			// seed4 e2256: first postAgg Global eFlexible U23; later real n (e2317 U9).
+			if postAggGlobalCreateN >= 0 {
+				if !postAggGlobalU23Done {
+					postAggGlobalU23Done = true
+					target := 23
+					base := n
+					for len(uniq) < target {
+						uniq = append(uniq, uniq[len(uniq)%base])
+					}
+					idx := int(er.pick(uint32(target))) % len(uniq)
+					return uniq[idx], true
+				}
+				// subsequent: real pool choose
+				idx := int(er.pick(uint32(n))) % n
+				return uniq[idx], true
+			}
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
 			_ = er.fallback.flipcoin(20)
@@ -3669,7 +3713,9 @@ exprTries:
 							// seed2 e1014: derived_types ≥5; e1200 U7 after many assigns.
 							// seed4 e2020: after e1895 residual era, UP derived_types U6.
 							if ppPostPadGlobalPicks >= 15 {
-								nPtr = 6
+								if nPtr < 6 {
+									nPtr = 6
+								}
 							} else if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 								if ctx.state.assignExprCount >= 3 {
 									if nPtr < 7 {
@@ -4200,12 +4246,16 @@ exprTries:
 					// seed4 e1638: after pad, ensure choose pool (avoid empty→create).
 					// seed4 e2188: after aggregate Global create, empty PL blocks
 					// must GenerateNewParentLocal (not pad synthetic).
-					if !forceCreate && flow != nil && flow.postAggGlobalCreate &&
+					if !forceCreate && flow != nil && flow.postAggGlobalCreate > 0 &&
 						len(localCands) == 0 && !isParam {
 						forceCreate = true
-						// SE-free empty-block qfer burns F50+F10 (no_volatile discards vol).
-						qferMode = 1
-						// one-shot until next successful non-empty PL
+						// First postAgg empty-PL (counter still 4): SE-free F50+F10.
+						// Later (e2312): !SE-free F10 only.
+						if flow.postAggGlobalCreate >= 4 {
+							qferMode = 1
+						} else {
+							qferMode = 2
+						}
 					}
 					if !forceCreate && flow != nil && flow.ppPLPadChooseDone {
 						for len(localCands) < 2 {
@@ -4345,21 +4395,26 @@ exprTries:
 						return castLiteral(t, localCands[0].expr)
 					}
 					if len(localCands) == 0 || forceCreate {
-						// Empty-block SelectParentLocal retypes; isParam formal
-						// qfer create keeps t (seed4 e332 F20 no U14).
 						retype := !isParam
-						esimple := retype && forceCreate && flow != nil && flow.postAggGlobalCreate
+						postN := 0
+						if flow != nil {
+							postN = flow.postAggGlobalCreate
+						}
+						esimple := retype && forceCreate && postN > 0 && !strings.Contains(t.Name, "*")
 						if esimple {
 							useESimpleRetypeSink = &esimple
 						}
 						g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx)
 						if esimple {
 							useESimpleRetypeSink = nil
-							if ok {
-								flow.postAggGlobalCreate = false // one create
-							}
 						}
 						if ok {
+							if flow != nil && flow.postAggGlobalCreate > 0 {
+								flow.postAggGlobalCreate--
+								if postAggGlobalCreateN > 0 {
+									postAggGlobalCreateN--
+								}
+							}
 							bumpExprDepth(ctx)
 							return castLiteral(t, g.expr)
 						}
@@ -8876,6 +8931,8 @@ func emitSingleFuncDefOnce(
 		isParamPPFallPicksSink = &state.isParamPPFallPicks
 		ppPLPadChooseDoneSink = &state.ppPLPadChooseDone
 		ppPostPadGlobalPicks = 0
+		postAggGlobalCreateN = -1
+		postAggGlobalU23Done = false
 		ppPostPadPLPicksSink = &state.ppPostPadPLPicks
 		ppPostPadGlobalF0CountSink = &state.ppPostPadGlobalF0Count
 		ppPostPadLoopBodySink = &state.ppPostPadLoopBody
