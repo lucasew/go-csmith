@@ -3889,10 +3889,19 @@ func randomLeafExprWithMode(
 				// seed2 e2214 late for-body (filterCompoundStmts): burn F50 again.
 				lateQfer := ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts
 				burnSelfF50 := !small || n == 1 || lateQfer
-				// seed4 e310–312: pointer ExpressionAssign null-qfer WRITE:
+				// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
 				// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
+				// seed4 e1038: PP array-body pointer is !SE-free — levels only.
 				ptrLv := strings.Count(t.Name, "*")
-				if ptrLv > 0 && burnSelfF50 {
+				ppArrayBody := ctx != nil && ctx.state != nil &&
+					ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
+				if ptrLv > 0 && ppArrayBody {
+					for i := 0; i < ptrLv; i++ {
+						_ = er.fallback.flipcoin(50) // level vol
+						_ = er.fallback.flipcoin(10) // level const
+					}
+					// no self F50
+				} else if ptrLv > 0 && burnSelfF50 {
 					for i := 0; i < ptrLv; i++ {
 						_ = er.fallback.flipcoin(50) // level vol
 						_ = er.fallback.flipcoin(10) // level const
