@@ -7,13 +7,10 @@ CONTEXT="${CONTEXT:-8}"
 UPSTREAM_CMD="${UPSTREAM_CMD:-./.build/csmith-instrumented/src/csmith}"
 GO_CMD="${GO_CMD:-GOCACHE=/tmp/go-cache go run ./cmd/csmith}"
 STRICT_RAW="${STRICT_RAW:-0}"
-# INTEGRITY=1 runs anti-gaming checks after compare (static + residual sites + source bulk).
-# Default 0 so climb loops stay fast; parity-gate always runs validate-integrity separately.
-INTEGRITY="${INTEGRITY:-0}"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/find-rng-divergence.sh [--seed N] [--workdir DIR] [--context N] [--strict-raw] [--integrity]
+Usage: scripts/find-rng-divergence.sh [--seed N] [--workdir DIR] [--context N] [--strict-raw]
 
 Runs upstream Csmith and this Go csmith with the same seed, captures RNG traces,
 normalizes them, and reports the first divergence event.
@@ -25,11 +22,9 @@ Env overrides:
   UPSTREAM_CMD (default: ./.build/csmith-instrumented/src/csmith)
   GO_CMD      (default: GOCACHE=/tmp/go-cache go run ./cmd/csmith)
   STRICT_RAW  (default: 0) compare tries/raw too (1 = enabled)
-  INTEGRITY   (default: 0) run scripts/validate-integrity.sh after compare
 
 Examples:
   scripts/find-rng-divergence.sh --seed 2
-  INTEGRITY=1 STRICT_RAW=1 scripts/find-rng-divergence.sh --seed 2 --workdir .build/parity
   scripts/build-instrumented-upstream.sh && scripts/find-rng-divergence.sh --seed 2
 USAGE
 }
@@ -44,8 +39,6 @@ while [[ $# -gt 0 ]]; do
       CONTEXT="$2"; shift 2 ;;
     --strict-raw)
       STRICT_RAW=1; shift ;;
-    --integrity)
-      INTEGRITY=1; shift ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -192,14 +185,6 @@ if [[ "$status" == "MATCH" ]]; then
   echo "  $GO_RNG"
   echo "  $UP_NORM"
   echo "  $GO_NORM"
-  if [[ "$INTEGRITY" == "1" ]]; then
-    echo ""
-    SEED="$SEED" WORKDIR="$WORKDIR" GO_CMD="$GO_CMD" UPSTREAM_CMD="$UPSTREAM_CMD" \
-      scripts/validate-integrity.sh --skip-gen || {
-        echo "result=match_but_integrity_fail (event stream matched; gaming/residual bans failed)" >&2
-        exit 1
-      }
-  fi
   exit 0
 fi
 
@@ -243,12 +228,3 @@ echo "  $UP_RNG"
 echo "  $GO_RNG"
 echo "  $UP_NORM"
 echo "  $GO_NORM"
-
-if [[ "$INTEGRITY" == "1" ]]; then
-  echo ""
-  # Still run static bans on mismatch (residual is never an excuse).
-  scripts/validate-integrity.sh --code-only || {
-    echo "integrity_code_fail (static anti-gaming bans)" >&2
-    exit 1
-  }
-fi

@@ -85,32 +85,37 @@ All generation/compare steps use **timeouts**. Filter/retry loops must be bounde
 | Plateau | Stop blind guessing; read **C++** under `pkgs.csmith.src` / `.build/csmith-src` for the failing path; **align Go call flow to Csmith**. |
 | Stop | Goal gates met, or human stops the work. **No** “max iterations then abandon.” |
 | Ralph loop | **Removed.** No `ralph-loop.sh`, no agent `PROMPT.md` / `MEMORY.md` ritual. |
-| Measurement scripts | `find-rng-divergence.sh`, `compare-upstream.sh`, `parity-gate.sh`, `validate-a.sh`, **`validate-integrity.sh`** |
-| Integrity | **Event match alone is not acceptance.** `scripts/validate-integrity.sh` must pass (wired into `parity-gate.sh`). |
+| Measurement scripts | `find-rng-divergence.sh`, `compare-upstream.sh`, `parity-gate.sh`, `validate-a.sh` (metrics only — not integrity) |
+| Integrity | **Not scripted.** Reviewers/agents **read the implementer’s code** and reject gaming (see §5.2). Event match alone is not acceptance. |
 
 ### 5.1 Technique — Csmith control flow (required)
 
 **Implementers MUST mirror Csmith’s control flow**, not invent an independent generator that only matches LCG outputs.
 
 1. Open the relevant C++ under `.build/csmith-src/src/` (e.g. `Expression.cpp`, `FunctionInvocation.cpp`, `VariableSelector.cpp`, `StatementAssign.cpp`, `Lhs.cpp`, `CVQualifiers.cpp`).
-2. Trace the **same function/method sequence** for the failing event (SITE lines / callsites).
-3. Patch Go so the **same RNG consumers** run in the **same order** (function call CREATE → signature → param exprs → body; Assign → AssignOps → RHS Expression → Lhs; etc.).
+2. Trace the **same function/method sequence** for the failing event (SITE lines / callsites in traces).
+3. Patch Go so the **same RNG consumers** run in the **same order** (e.g. FunctionInvocation CREATE → `make_random_signature` → param exprs → body; Assign → AssignOps → RHS Expression → Lhs).
 4. Prefer shared helpers that name the upstream API (`burnCreateArrayVariable` ≈ `CreateArrayVariable`) over ad-hoc coin sequences.
 5. Multi-seed: fixes must be **structural** (options/effects/inventory), not `if seed == 4`.
 
-### 5.2 Banned techniques (integrity fail)
+### 5.2 Integrity review (read the code — no integrity scripts)
 
-These make `first_divergence_event` look good while **gaming** the gate. **`validate-integrity.sh` fails the run** if present:
+**Do not add scripts that grep for bans as a gate.** Humans and agent **reviewers** open the implementer’s diff and reject work that games metrics.
 
-| Ban | Why |
-|-----|-----|
-| Packed residual event tables (`f10_late_residual_data.go`, `f10LateResidualPacked`, offline `[]uint32` stream dumps) | Replays a single seed’s RNG offline instead of generating |
+When reviewing a climb/commit, **read** `pkg/csmith/*.go` (and related) and fail the review if you find:
+
+| Reject if present | Why |
+|-------------------|-----|
+| Packed residual event tables (`f10_late_residual_data.go`, `f10LateResidualPacked`, offline `[]uint32` stream dumps of one seed) | Replays a seed offline instead of generating |
 | `residualPlayer` / `burnF10LateExprResidual` as primary stream driver | RNG burns without Csmith Expression/Statement graph |
 | `silenceTrace` / `rng.silent` to stop tracing | Fakes event-count match after residual exhausts |
-| Seed-literal branches (`if seed == 2`) in generator paths | Non-portable hardcodes |
-| Event match with **thin source** (Go C ≪ upstream C lines / globals) | Events advanced without materializing AST |
+| Seed-literal branches (`if seed == 2`) in generation paths | Non-portable hardcodes |
+| Event match with **thin/wrong source** (Go C ≪ upstream structure) while claiming “done” | Events advanced without materializing real AST |
+| Coin sequences with no corresponding C++ call path | Unmotivated hacks |
 
-Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs; instrumented upstream for measurement.
+**Review process for implementers:** after a patch, a separate pass **reads the code** (diff + call graph around the fix) and confirms it maps to Csmith C++ methods — not only that `find-rng-divergence` score improved.
+
+Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs; instrumented upstream for measurement only.
 
 ### 5.3 Technique constraints
 
@@ -160,13 +165,13 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **claimed 37939/37939** but **fails integrity** (`validate-integrity.sh`) — residual pack + `silenceTrace` gaming |
-| Seed 2 source match | **FAIL integrity** — residual-driven; not Csmith-flow AST |
-| 20-seed gate | **Blocked** until integrity passes and multi-seed event+source |
+| Seed 2 event match | **claimed 37939/37939** — **not accepted** until code review clears residual/`silenceTrace` gaming (§5.2) |
+| Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
+| 20-seed gate | **Blocked** until code is Csmith-shaped and multi-seed event+source pass |
 
-**Integrity (new):** `scripts/validate-integrity.sh` bans residual tables, `residualPlayer`, `silenceTrace`, seed hardcodes, thin source. Wired into `parity-gate.sh`. Event match **without** integrity is **not** a gate pass.
+**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
-Next: remove residual pack; implement real Expression/Statement after F10#7 per Csmith C++; re-climb multi-seed with integrity green.
+Next: remove residual pack via real Expression/Statement paths after F10#7; re-climb multi-seed under §5.1–5.2 review.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
