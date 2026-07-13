@@ -70,21 +70,26 @@ func pickType(r *rng, pool []CType) CType {
 
 // allTypesList mirrors Type::AllTypes after GenerateSimpleTypes + aggregates:
 // eChar..eUInt128 (13 entries, always includes float slot) then structs then unions.
+// allTypesList mirrors Type::AllTypes after GenerateSimpleTypes (eChar..eUInt128,
+// void is separate and NOT in AllTypes) + GenerateAllTypes structs/unions.
+// Indices must match rnd_upto(AllTypes.size()) for NonVoidNonVolatile filter.
 func allTypesList(info compositeInfo) []CType {
+	// GenerateSimpleTypes starts at eChar (skips eVoid):
+	// char,int,short,long,longlong,uchar,uint,ushort,ulong,float,ulonglong,int128,uint128
 	simples := []CType{
-		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},
-		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
-		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4},
-		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8},
-		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},
-		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2},
-		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8},
-		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4},
-		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8},
-		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},
-		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16},
-		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},
-		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
+		{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2},                  // eChar
+		{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},                 // eInt
+		{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4},                 // eShort
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 8},                 // eLong
+		{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16},                // eLongLong
+		{Name: "uint8_t", Signed: false, Bits: 8, HexDigits: 2},                 // eUChar
+		{Name: "uint32_t", Signed: false, Bits: 32, HexDigits: 8},               // eUInt
+		{Name: "uint16_t", Signed: false, Bits: 16, HexDigits: 4},               // eUShort
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 8},               // eULong
+		{Name: "float", Signed: true, Bits: 32, HexDigits: 0},                   // eFloat
+		{Name: "uint64_t", Signed: false, Bits: 64, HexDigits: 16},              // eULongLong
+		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},              // eInt128
+		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},    // eUInt128
 	}
 	out := append([]CType{}, simples...)
 	for i := range info.structs {
@@ -96,7 +101,8 @@ func allTypesList(info compositeInfo) []CType {
 	return out
 }
 
-// pickNonVoidNonVolatile mirrors Type::choose_random_nonvoid_nonvolatile.
+// pickNonVoidNonVolatile mirrors Type::choose_random_nonvoid_nonvolatile
+// (NonVoidNonVolatileTypeFilter + SIMPLE_TYPES_PROB_FILTER).
 func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Options) CType {
 	_ = pool
 	types := allTypesList(info)
@@ -109,13 +115,32 @@ func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Optio
 			return true
 		}
 		t := types[i]
+		// SIMPLE_TYPES_PROB_FILTER: disabled float / int128 / uint128
 		if t.Name == "float" && !opts.EnableFloat {
 			return true
 		}
-		// NonVoidNonVolatileTypeFilter rejects volatile aggregates.
-		if strings.HasPrefix(t.Name, "struct ") || strings.HasPrefix(t.Name, "union ") {
-			if opts.VolStructUnionFields {
-				return true
+		if t.Name == "__int128" && !opts.Int128 {
+			return true
+		}
+		if t.Name == "unsigned __int128" && !opts.UInt128 {
+			return true
+		}
+		// NonVoidNonVolatileTypeFilter rejects only volatile aggregates
+		// (is_volatile_struct_union), not all structs when the option is on.
+		if strings.HasPrefix(t.Name, "struct S") {
+			var si int
+			if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil {
+				if si >= 0 && si < len(info.structs) && info.structs[si].isVolatile {
+					return true
+				}
+			}
+		}
+		if strings.HasPrefix(t.Name, "union U") {
+			var ui int
+			if _, err := fmt.Sscanf(t.Name, "union U%d", &ui); err == nil {
+				if ui >= 0 && ui < len(info.unions) && info.unions[ui].isVolatile {
+					return true
+				}
 			}
 		}
 		return false

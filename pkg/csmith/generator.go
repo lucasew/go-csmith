@@ -33,11 +33,13 @@ var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
 
 type structTypeInfo struct {
-	fields []fieldInfo
+	fields     []fieldInfo
+	isVolatile bool // true if any field is volatile (is_volatile_struct_union)
 }
 
 type unionTypeInfo struct {
-	fields []fieldInfo
+	fields     []fieldInfo
+	isVolatile bool
 }
 
 type fieldInfo struct {
@@ -189,9 +191,55 @@ type functionFlowState struct {
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
+	// Grown by find_pointer_type(add): SelectDeref uses exact Lhs type (so
+	// int16_t* vs int32_t* are distinct); SelectLType consolidates simples to
+	// int* but ptr-to-ptr adds deeper entries (int**, …).
 	derivedPtrTypes int
+	// derivedPtrBases tracks pointed-to type keys already in derived_types.
+	derivedPtrBases map[string]bool
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
+}
+
+// noteDerivedPointer mirrors Type::find_pointer_type(t, add=true).
+// baseKey identifies the pointed-to type; deeper=true is pointer-to-pointer
+// (always a new derived entry when base already exists).
+func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
+	if st == nil {
+		return
+	}
+	if st.derivedPtrBases == nil {
+		st.derivedPtrBases = make(map[string]bool)
+	}
+	if deeper {
+		// find_pointer_type(existing_ptr, true) → new deeper pointer type.
+		key := baseKey + "*"
+		for st.derivedPtrBases[key] {
+			key += "*"
+		}
+		st.derivedPtrBases[key] = true
+		st.derivedPtrTypes++
+		return
+	}
+	if baseKey == "" {
+		baseKey = "int32_t"
+	}
+	if !st.derivedPtrBases[baseKey] {
+		st.derivedPtrBases[baseKey] = true
+		st.derivedPtrTypes++
+	}
+}
+
+func pointerBaseKey(t CType) string {
+	name := t.Name
+	if name == "" {
+		if t.Signed {
+			name = fmt.Sprintf("int%d_t", t.Bits)
+		} else {
+			name = fmt.Sprintf("uint%d_t", t.Bits)
+		}
+	}
+	return strings.ReplaceAll(name, "*", "")
 }
 
 // trySelectMustUseVar mirrors VariableSelector::select_must_use_var (READ).
@@ -910,6 +958,10 @@ func formatElementConstant(r *rng, t CType, opts Options) string {
 type arrayCreateResult struct {
 	sizes []int
 	inits []string // length may be < total elements (sparse init)
+	// hadNullPtrAlt: pointer array alt inits included Constant null (F20=1).
+	// select_deref opportunistic_validate then burns null_pointer F0 (seed4 e104);
+	// non-null alts skip F0 and re-itemize on SelectDeref retry (seed2 e1051).
+	hadNullPtrAlt bool
 }
 
 // burnCreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
@@ -971,6 +1023,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 		*lastArraySizesSink = cp
 	}
 	inits := []string{}
+	hadNullPtrAlt := false
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
 		isPtr := strings.Contains(t.Name, "*")
@@ -984,22 +1037,22 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// Defaults have StrictConstArrays=false, so full parity needs
 				// make_init_value. Seed2 only exercises pointer arrays at size-1
 				// (e346: total/2==0, no alts) or int-element NewArray IVs.
-				// KNOWN DEBT: non-strict pointer alts with initNum>0 are incomplete.
 				if opts.StrictConstArrays {
 					inits = append(inits, "0")
+					hadNullPtrAlt = true
 					continue // Constant "0"
 				}
-				// make_init_value: F20 null vs address-of. Address-of: choose_ok_var
-				// among pointees (seed2 e1108–1111 F20 U6 F20 U6).
+				// make_init_value: F20 null vs address-of. Address-of: choose_var
+				// among pointees — sole/empty early (seed4 e101 F20=0 → itemize,
+				// no choose U); multi-candidate later burns U n (seed2 e1108 U6).
 				if r.flipcoin(20) {
 					inits = append(inits, "0")
+					hadNullPtrAlt = true
 					continue // Constant null pointer
 				}
-				n := 6
 				if useSmallParentStackSink != nil && *useSmallParentStackSink {
-					n = 6
+					_ = r.upto(6)
 				}
-				_ = r.upto(uint32(n))
 				// Without a real choose_var inventory, materialize null for now.
 				inits = append(inits, "0")
 				continue
@@ -1016,7 +1069,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 			}
 		}
 	}
-	return arrayCreateResult{sizes: sizes, inits: inits}
+	return arrayCreateResult{sizes: sizes, inits: inits, hadNullPtrAlt: hadNullPtrAlt}
 }
 
 // emitOrphanArrayGlobal materializes a CreateArray result as lateGlobals orphan
@@ -1205,8 +1258,10 @@ func buildExprCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, ctx *
 }
 
 // scope codes: 0=global, 1=parent local, 2=param, 3=new-global, 4=new-parent-local
-func variableScopePickFromER(er *exprRand, opts Options) int {
-	return variableScopePickFromEROpts(er, opts, nil)
+// scope must be non-nil whenever params emptiness is known so VariableSelectFilter
+// rejects ParentParam (65–94) when param list is empty — seed4 e67 tries=1.
+func variableScopePickFromER(er *exprRand, opts Options, scope *scopeInfo) int {
+	return variableScopePickFromEROpts(er, opts, scope)
 }
 
 // variableScopePickFromEROpts applies VariableSelectFilter when scope provided:
@@ -1214,10 +1269,13 @@ func variableScopePickFromER(er *exprRand, opts Options) int {
 func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) int {
 	// InitScopeTable: Global 0-34, ParentLocal 35-64, ParentParam 65-94, NewValue 95-99.
 	// NewValue → VariableCreationProbability: flipcoin(10) Global else ParentLocal CREATE.
+	// nil scope treated as empty params: ExpressionVariable always has a current
+	// Function; early func_1 has no params so ParentParam must be filtered.
+	paramsEmpty := scope == nil || len(scope.params) == 0
 	reject := func(x uint32) bool {
 		if opts.GlobalVariables {
 			// ParentParam 65–94 when no params (VariableSelectFilter).
-			if scope != nil && len(scope.params) == 0 && x >= 65 && x < 95 {
+			if paramsEmpty && x >= 65 && x < 95 {
 				return true
 			}
 			// seed2 e2253: after SelectDeref U2 U4, reject Global once → NewValue.
@@ -1229,8 +1287,7 @@ func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) i
 	}
 	var v int
 	useFilter := er != nil && er.fallback != nil &&
-		((scope != nil && len(scope.params) == 0) ||
-			(lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink))
+		(paramsEmpty || (lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink))
 	if useFilter {
 		v = int(er.fallback.uptoWithFilter(100, reject))
 		if lateLhsRejectGlobalSink != nil && *lateLhsRejectGlobalSink {
@@ -2346,7 +2403,7 @@ func buildFunctionCallExpr(
 				// Lhs::make_random do-while after failed array validate:
 				// F80=0 U100 U4 (e1422–24), then F20 F20 F80 create path (e1425–33).
 				if !r.flipcoin(80) {
-					_ = variableScopePickFromER(er, opts) // U100
+					_ = variableScopePickFromER(er, opts, &scope) // U100
 					_ = r.upto(4)
 				}
 				_ = r.flipcoin(20)
@@ -2411,27 +2468,16 @@ func buildFunctionCallExpr(
 		paramN := maxBound + 1
 		params := make([]paramInfo, 0, paramN)
 		for i := 0; i < paramN; i++ {
-			// GenerateParameterVariable: pointer coin then either
-			// choose_random_pointer_type (rnd_upto(derived_types.size())) or
-			// choose_random_nonvoid_nonvolatile (AllTypes).
+			// GenerateParameterVariable (VariableSelector.cpp):
+			// F40 always; pointer only when has_pointer_type() && F40,
+			// else choose_random_nonvoid_nonvolatile. Does NOT create
+			// derived types — only chooses among existing ones.
 			wantPtr := r.flipcoin(40)
 			var pt CType
-			if wantPtr && opts.Pointers {
+			if wantPtr && opts.Pointers && state.derivedPtrTypes > 0 {
 				// choose_random_pointer_type → rnd_upto(derived_types.size()).
-				// Seed2: n=3 at e306, n=4 by e390–404 (grows slowly).
-				nPtr := state.derivedPtrTypes
-				if nPtr < 3 {
-					nPtr = 3
-				}
-				_ = r.upto(uint32(nPtr))
+				_ = r.upto(uint32(state.derivedPtrTypes))
 				pt = CType{Name: "int32_t*", Signed: true, Bits: 32}
-				// Grow after use: 3→4 once, then hold (seed2 stays at 4 for a while).
-				if state.derivedPtrTypes < 3 {
-					state.derivedPtrTypes = 3
-				}
-				if state.derivedPtrTypes == 3 {
-					state.derivedPtrTypes = 4
-				}
 			} else {
 				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
 			}
@@ -2517,7 +2563,7 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 		bumpExprDepth(ctx)
 		return castLiteral(t, c.expr)
 	}
-	scopePick := variableScopePickFromER(er, opts)
+	scopePick := variableScopePickFromER(er, opts, &scope)
 	var flow *functionFlowState
 	if ctx != nil {
 		flow = ctx.state
@@ -2621,7 +2667,7 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 	if c, ok := trySelectMustUseVar(er, t, ctx); ok && c.expr != "" {
 		return castLiteral(t, c.expr)
 	}
-	scopePick := variableScopePickFromER(er, opts)
+	scopePick := variableScopePickFromER(er, opts, &scope)
 	var flow *functionFlowState
 	if ctx != nil {
 		flow = ctx.state
@@ -2673,7 +2719,7 @@ func randomLeafExprWithMode(
 		if c, ok := trySelectMustUseVar(er, t, ctx); ok {
 			out = c.expr
 		} else {
-			scopePick := variableScopePickFromER(er, opts)
+			scopePick := variableScopePickFromER(er, opts, &scope)
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
@@ -2880,84 +2926,96 @@ func randomLeafExprWithMode(
 						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
 						out = formatUnaryInvocation(uop, operand, ubits, uSigned, opts)
 						out = castLiteral(t, out)
-					} else if opts.Pointers && er.fallback.flipcoin(10) {
-						// make_random_binary_ptr_comparison
-						_ = er.fallback.flipcoin(50)
-						_ = er.fallback.flipcoin(50)
-						_ = er.fallback.flipcoin(50)
-						_ = er.fallback.upto(4)
-						nPtr := 1
-						if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
-							nPtr = ctx.state.derivedPtrTypes
-						}
-						// seed2 e1014: derived_types ≥5; e1200 U7 after many assigns.
-						if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
-							if ctx.state.assignExprCount >= 3 {
-								if nPtr < 7 {
-									nPtr = 7
-								}
-							} else if nPtr < 5 {
-								nPtr = 5
+					} else {
+						// make_random_binary: F10 && has_pointer_type() → ptr comparison;
+						// else U18 binary. has_pointer_type ≡ derived_types.size()>0.
+						// Always burn F10 when Pointers; only take ptr path if derived.
+						takePtrCmp := false
+						if opts.Pointers {
+							takePtrCmp = er.fallback.flipcoin(10)
+							if takePtrCmp && (ctx == nil || ctx.state == nil || ctx.state.derivedPtrTypes == 0) {
+								takePtrCmp = false
 							}
 						}
-						ptrIdx := int(er.fallback.upto(uint32(nPtr)))
-						stars := 1
-						if ptrIdx > 0 {
-							stars = 2
-						}
-						ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
-						lhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
-						// Upstream: if lhs is constant, force rhs term type to eVariable
-						// (no ExpressionTypeProbability draw). seed2 e863–864.
-						rhs := ""
-						if isPointerNullConstant(lhs) {
-							rhs = randomPointerVariableExpr(ptrTy, er, opts, env, scope, nest, ctx)
+						if takePtrCmp {
+							// make_random_binary_ptr_comparison
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(4)
+							nPtr := 1
+							if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
+								nPtr = ctx.state.derivedPtrTypes
+							}
+							// seed2 e1014: derived_types ≥5; e1200 U7 after many assigns.
+							if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+								if ctx.state.assignExprCount >= 3 {
+									if nPtr < 7 {
+										nPtr = 7
+									}
+								} else if nPtr < 5 {
+									nPtr = 5
+								}
+							}
+							ptrIdx := int(er.fallback.upto(uint32(nPtr)))
+							stars := 1
+							if ptrIdx > 0 {
+								stars = 2
+							}
+							ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
+							lhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+							// Upstream: if lhs is constant, force rhs term type to eVariable
+							// (no ExpressionTypeProbability draw). seed2 e863–864.
+							rhs := ""
+							if isPointerNullConstant(lhs) {
+								rhs = randomPointerVariableExpr(ptrTy, er, opts, env, scope, nest, ctx)
+							} else {
+								rhs = randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+							}
+							out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 						} else {
-							rhs = randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
-						}
-						out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
-					} else {
-						// make_random_binary: op U18, SafeOpFlags F50 F50 U4,
-						// then CreateFunctionInvocationBinary gensyms t_×2 for
-						// safe ops (add/sub/mul/div/mod/shift) even when
-						// math_notmp=false (temps may not print; IDs still advance).
-						opV := int(er.fallback.upto(18))
-						op1Signed := er.fallback.flipcoin(50)
-						op2Signed := er.fallback.flipcoin(50)
-						sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64
-						opTy := t
-						bits := 32
-						switch sz {
-						case 0:
-							bits = 8
-							opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
-						case 1:
-							bits = 16
-							opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
-						case 2:
-							bits = 32
-							opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-						default:
-							bits = 64
-							opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
-						}
-						if !op1Signed {
-							opTy.Signed = false
-							opTy.Name = strings.Replace(opTy.Name, "int", "uint", 1)
-						}
-						// safe_ops: eAdd..eMod (0-4) and eRShift/eLShift (16-17)
-						safeOp := opV <= 4 || opV >= 16
-						if safeOp && opts.SafeMath && ctx != nil && ctx.state != nil {
-							// Mirror create_new_tmp_var ×2 (gensym t_ before operands).
-							_ = ctx.state.gensym("t_")
-							_ = ctx.state.gensym("t_")
-						}
-						lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-						rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
-						out = formatBinaryInvocation(opV, lhs, rhs, bits, op1Signed, op2Signed, opts)
-						out = castLiteral(t, out)
-						_ = op2Signed
-					}
+							// make_random_binary: op U18, SafeOpFlags F50 F50 U4,
+							// then CreateFunctionInvocationBinary gensyms t_×2 for
+							// safe ops (add/sub/mul/div/mod/shift) even when
+							// math_notmp=false (temps may not print; IDs still advance).
+							opV := int(er.fallback.upto(18))
+							op1Signed := er.fallback.flipcoin(50)
+							op2Signed := er.fallback.flipcoin(50)
+							sz := int(er.fallback.upto(4)) // SafeOpSize 0..3 → 8,16,32,64
+							opTy := t
+							bits := 32
+							switch sz {
+							case 0:
+								bits = 8
+								opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+							case 1:
+								bits = 16
+								opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
+							case 2:
+								bits = 32
+								opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+							default:
+								bits = 64
+								opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+							}
+							if !op1Signed {
+								opTy.Signed = false
+								opTy.Name = strings.Replace(opTy.Name, "int", "uint", 1)
+							}
+							// safe_ops: eAdd..eMod (0-4) and eRShift/eLShift (16-17)
+							safeOp := opV <= 4 || opV >= 16
+							if safeOp && opts.SafeMath && ctx != nil && ctx.state != nil {
+								// Mirror create_new_tmp_var ×2 (gensym t_ before operands).
+								_ = ctx.state.gensym("t_")
+								_ = ctx.state.gensym("t_")
+							}
+							lhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+							rhs := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
+							out = formatBinaryInvocation(opV, lhs, rhs, bits, op1Signed, op2Signed, opts)
+							out = castLiteral(t, out)
+							_ = op2Signed
+						} // !takePtrCmp binary
+					} // !unary
 					if ctx != nil {
 						ctx.skipFuncRetQfer = prevSkip
 						ctx.incomingQferConsts = prevQfer
@@ -2978,7 +3036,7 @@ func randomLeafExprWithMode(
 					bumpExprDepth(ctx)
 					return castLiteral(t, c.expr)
 				}
-				scopePick := variableScopePickFromER(er, opts)
+				scopePick := variableScopePickFromER(er, opts, &scope)
 				if scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 						bumpExprDepth(ctx)
@@ -3111,7 +3169,7 @@ func randomLeafExprWithMode(
 				bumpExprDepth(ctx)
 				return castLiteral(t, c.expr)
 			}
-			scopePick := variableScopePickFromER(er, opts)
+			scopePick := variableScopePickFromER(er, opts, &scope)
 			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
 				if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
@@ -3323,7 +3381,7 @@ func randomLeafExprWithMode(
 					// ExpressionVariable do-while retries VariableSelector (new U100).
 					if c.expr == "" && ctx != nil && ctx.state != nil &&
 						ctx.state.useSmallParentStack && er != nil {
-						scopePick = variableScopePickFromER(er, opts)
+						scopePick = variableScopePickFromER(er, opts, &scope)
 						// ParentLocal: stack U3 then choose U2 (e1376–1387), not retype create.
 						if scopePick == 1 {
 							idx := parentStackPick(er, flow)
@@ -3471,7 +3529,14 @@ func randomLeafExprWithMode(
 						}
 						continue
 					}
-					// select_deref_pointer: no pointer vars -> GenerateNewParentLocal
+					// select_deref_pointer: no pointer vars → find_pointer_type(add=true)
+					// then GenerateNewParentLocal/create_and_initialize.
+					// find_pointer_type grows derived_types even if create later fails
+					// (seed2 e79–86 null-init retries still leave has_pointer_type).
+					// Exact Lhs type (not consolidated int*) — int16 vs int32 are distinct.
+					if ctx != nil && ctx.state != nil {
+						noteDerivedPointer(ctx.state, pointerBaseKey(t), strings.Contains(t.Name, "*"))
+					}
 					// create_and_initialize (VariableSelector.cpp:510):
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
@@ -3505,16 +3570,31 @@ func randomLeafExprWithMode(
 					}
 					// seed2 e1043: after Constant pure_rnd U20, CreateArray when
 					// outer or target NewArray (U99 dimension ladder).
+					// CreateArray type is the POINTER type (select_deref creates
+					// pointer vars), not the bare Lhs value type — seed4 e99+
+					// pointer alt inits are make_init_value F20, not int Constant.
 					if newArray || tgtNewArray {
-						{
-							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
-							emitOrphanArrayGlobal(ctx, t, _arr)
+						arrTy := t
+						if !strings.Contains(arrTy.Name, "*") {
+							arrTy = CType{
+								Name: arrTy.Name + "*", Signed: arrTy.Signed,
+								Bits: arrTy.Bits, HexDigits: arrTy.HexDigits,
+							}
 						}
-						createdArrEA = true
-						// Array pointer Lhs often fails opportunistic_validate.
+						_arr := burnCreateArrayVariable(er.fallback, opts, arrTy, true)
+						emitOrphanArrayGlobal(ctx, arrTy, _arr)
+						// Null pointer alts → opportunistic_validate F0 (seed4 e104)
+						// then F80 exit. Non-null alts → re-itemize on retry (seed2 e1051).
 						if newArray {
+							if _arr.hadNullPtrAlt {
+								_ = er.fallback.flipcoin(0)
+								createdArrEA = false
+							} else {
+								createdArrEA = true
+							}
 							continue
 						}
+						createdArrEA = true
 					}
 					// Pointer to valid var -> opportunistic_validate passes -> exit
 					lhsFromDeref = true
@@ -3534,7 +3614,13 @@ func randomLeafExprWithMode(
 				return finishAssignExpr(fmt.Sprintf("(%s)", rhs))
 			}
 			// VariableSelector::select (VariableSelector.cpp:1187): scope pick.
-			scopePick := variableScopePickFromER(er, opts)
+			scopePick := variableScopePickFromER(er, opts, &scope)
+			// Early (pre-useSmallParentStack) ExpressionAssign Lhs: inventory is
+			// sparse/wrong vs UP. After VS U100 accept without choose U so parent
+			// term stream stays aligned (seed4 e106 Global U100 → e107 U120).
+			if ctx == nil || ctx.state == nil || !ctx.state.useSmallParentStack {
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
 			// seed2 e1093–1097: early ParentParam Lhs → stack U3 + create + residual F80.
 			// e1149: later ParentParam → stack U3 only (found/accept without create).
 			if scopePick == 2 && ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
@@ -4010,15 +4096,36 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// float coin only when AssignOpWorksForFloat(op).
 	if simpleAssign {
 		if opts.Pointers && r.flipcoin(50) { // PointerAsLTypeProb
-			// make_random_pointer_type
-			if r.flipcoin(20) { // pointer-to-pointer
-				_ = r.upto(1) // derived_types.size() often 1 early
+			// make_random_pointer_type → find_pointer_type(t, add=true)
+			// F20: occasionally pointer-to-pointer from existing derived_types
+			// (grows derived: int* → int**, etc.). Else choose_random base +
+			// find_pointer_type (simple types consolidate to int*).
+			ptrToPtr := r.flipcoin(20)
+			if ptrToPtr {
+				n := 1
+				if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
+					n = ctx.state.derivedPtrTypes
+				}
+				_ = r.upto(uint32(n))
+				// find_pointer_type(existing_ptr, true) adds a deeper pointer.
+				if ctx != nil && ctx.state != nil {
+					noteDerivedPointer(ctx.state, "int32_t", ctx.state.derivedPtrTypes > 0)
+				}
 			} else {
-				// choose_random() for pointed-to type — AllTypes filter pick
+				// choose_random() for pointed-to type — AllTypes filter pick.
+				// Simple types consolidate to int* (Type.cpp make_random_pointer_type).
 				if ctx != nil {
 					targetType = pickNonVoidNonVolatile(r, nil, ctx.info, opts)
 				} else {
 					_ = r.upto(14)
+				}
+				if ctx != nil && ctx.state != nil {
+					// Struct/union bases add distinct derived entries; simples → int*.
+					base := "int32_t"
+					if strings.HasPrefix(targetType.Name, "struct") || strings.HasPrefix(targetType.Name, "union") {
+						base = targetType.Name
+					}
+					noteDerivedPointer(ctx.state, base, false)
 				}
 			}
 			targetType = CType{Name: "int32_t*", Signed: true, Bits: 32} // simplified ptr
@@ -4157,6 +4264,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+		}
+		// find_pointer_type(add) — has_pointer_type becomes true; exact type.
+		if ctx != nil && ctx.state != nil {
+			noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
 		}
 		newArray := r.flipcoin(20) // NewArrayVariableProb
 		// make_init_value for pointer type
@@ -4311,7 +4422,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			_ = r.upto(4)
 			// e2340: forced Variable (no term U120) then Function CREATE residual.
 			er := &exprRand{fallback: r}
-			_ = variableScopePickFromER(er, opts) // U100
+			_ = variableScopePickFromER(er, opts, &scope) // U100
 			// e2341+: GenerateNew function ParamList — F40 wantPtr, then
 			// choose_random_pointer_type countdown U10…U1 (derived_types).
 			_ = r.flipcoin(40)
@@ -5361,7 +5472,9 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 	// Upstream Type::GenerateSimpleTypes pushes eChar..eUInt128, i.e. 13
 	// simple types before aggregate generation starts.
 	typeCount := 13
-	fieldQual := func() string {
+	// fieldQual draws vol/const; sets *volOut when volatile is taken so the
+	// enclosing aggregate can mark is_volatile_struct_union.
+	fieldQual := func(volOut *bool) string {
 		// Mirrors CVQualifiers::random_qualifiers(..., FieldConstProb, FieldVolatileProb):
 		// volatile draw first, then const draw.
 		isVolatile := opts.VolStructUnionFields && r.flipcoin(fieldVolatileProb)
@@ -5375,6 +5488,9 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 		}
 		if isVolatile {
 			q += "volatile "
+			if volOut != nil {
+				*volOut = true
+			}
 		}
 		return q
 	}
@@ -5407,7 +5523,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(scalarFieldInFullBitfieldProb) {
 						name := fmt.Sprintf("f%d", f)
 						t := pickFieldType(r, opts, sidx)
-						writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
+						writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile), t.Name, name))
 						st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 						continue
 					}
@@ -5416,7 +5532,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual()
+					qual := fieldQual(&st.isVolatile)
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
@@ -5430,7 +5546,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual()
+					qual := fieldQual(&st.isVolatile)
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
@@ -5440,7 +5556,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 				}
 				name := fmt.Sprintf("f%d", f)
 				t := pickFieldType(r, opts, sidx)
-				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
+				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile), t.Name, name))
 				st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 			}
 			if opts.PackedStruct {
@@ -5470,7 +5586,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual()
+					qual := fieldQual(&ut.isVolatile)
 					width := bitfieldLength(opts.IntSize*8, ut.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					ut.fields = append(ut.fields, fieldInfo{
@@ -5479,7 +5595,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					continue
 				}
 				t := pickUnionFieldType(r, opts, len(info.structs))
-				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(), t.Name, name))
+				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&ut.isVolatile), t.Name, name))
 				ut.fields = append(ut.fields, fieldInfo{name: name, ctype: t})
 			}
 			writeLine(b, 0, "};")

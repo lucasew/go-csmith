@@ -136,10 +136,10 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
 | Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
-| Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym (max id ~1229 vs UP 1356); residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 via residual invent |
-| 20-seed gate | **In progress** — type-gen despecialize: seed3 first_div 12→53 (GO ends early); seed4 e5→62; seed5 e27→94; seed2 still full match |
+| Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym; residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **173** (was 62 F10 ptr-cmp); seed5 first_div **155** (was 94). `has_pointer_type` / `derived_types` / ParentParam filter / CreateArray ptr alts / NonVoid volatile-struct filter |
 
-Next plateau: early local/create materialization (ID align to `g_8`/`l_4`); residual Expression/Statement real gen (not just `t_`/CreateArray); source body match; COUNT=20.
+Next plateau: seed4 e173 Global create vs choose; seed5 e155 param qfer after struct; multi-seed climb; residual→real gen; source body; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
