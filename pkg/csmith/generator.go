@@ -263,6 +263,9 @@ type functionFlowState struct {
 	// ppPostPadSkipStmtLhs: after e1895 nested ExpressionAssign Lhs residual+create,
 	// StatementAssign outer Lhs sole (e2013 UP term U120 not SelectDeref F80).
 	ppPostPadSkipStmtLhs bool
+	// postAggGlobalCreate: after Function-fail struct Global create+field_vars,
+	// next empty PL blocks must create (seed4 e2188).
+	postAggGlobalCreate bool
 	// ppPostPadAllowFuncOnce: after e1895 residual, next term U120 accepts Function
 	// (tries=0) even if exprDepth high from nested Assign unwind.
 	ppPostPadAllowFuncOnce bool
@@ -1642,6 +1645,36 @@ func formatAggregateOrSimpleConstant(r *rng, t CType, ctx *genContext, opts Opti
 	return formatSimpleConstant(r, t)
 }
 
+// burnCreateFieldVarsConstants mirrors Variable::create_field_vars after
+// CreateVariable(name, type, init, qfer): each non-padding field runs
+// Constant::make_random(field_type). seed4 e2157+ after struct Global Constant.
+func burnCreateFieldVarsConstants(r *rng, t CType, ctx *genContext, opts Options) {
+	if r == nil || ctx == nil {
+		return
+	}
+	var fields []fieldInfo
+	if strings.HasPrefix(t.Name, "struct") {
+		var si int
+		if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil &&
+			si >= 0 && si < len(ctx.info.structs) {
+			fields = ctx.info.structs[si].fields
+		}
+	} else if strings.HasPrefix(t.Name, "union") {
+		return
+	} else {
+		return
+	}
+	for _, f := range fields {
+		if f.bitfield && f.bitWidth <= 0 {
+			continue
+		}
+		_ = formatAggregateOrSimpleConstant(r, f.ctype, ctx, opts)
+		if strings.HasPrefix(f.ctype.Name, "struct") {
+			burnCreateFieldVarsConstants(r, f.ctype, ctx, opts)
+		}
+	}
+}
+
 // createOnDemandGlobalFromERSEFree mirrors GenerateNewGlobal when effect context
 // is side-effect-free: self F50 RegularVolatileProb + F10 const, then NewArray
 // and Constant::make_random (seed4 e2133 maxFuncs Function-fail → struct Global).
@@ -1725,6 +1758,12 @@ func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, initBody))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
+	if !newArray {
+		burnCreateFieldVarsConstants(r, t, ctx, opts)
+		if strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") {
+			ctx.state.postAggGlobalCreate = true
+		}
 	}
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
@@ -1842,6 +1881,9 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, initBody))
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
+	if !newArray && (strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")) {
+		burnCreateFieldVarsConstants(er.fallback, t, ctx, opts)
 	}
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
@@ -4156,6 +4198,15 @@ exprTries:
 						return castLiteral(t, localCands[0].expr)
 					}
 					// seed4 e1638: after pad, ensure choose pool (avoid empty→create).
+					// seed4 e2188: after aggregate Global create, empty PL blocks
+					// must GenerateNewParentLocal (not pad synthetic).
+					if !forceCreate && flow != nil && flow.postAggGlobalCreate &&
+						len(localCands) == 0 && !isParam {
+						forceCreate = true
+						// SE-free empty-block qfer burns F50+F10 (no_volatile discards vol).
+						qferMode = 1
+						// one-shot until next successful non-empty PL
+					}
 					if !forceCreate && flow != nil && flow.ppPLPadChooseDone {
 						for len(localCands) < 2 {
 							localCands = append(localCands, exprVarCandidate{
@@ -4297,7 +4348,18 @@ exprTries:
 						// Empty-block SelectParentLocal retypes; isParam formal
 						// qfer create keeps t (seed4 e332 F20 no U14).
 						retype := !isParam
-						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx); ok {
+						esimple := retype && forceCreate && flow != nil && flow.postAggGlobalCreate
+						if esimple {
+							useESimpleRetypeSink = &esimple
+						}
+						g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx)
+						if esimple {
+							useESimpleRetypeSink = nil
+							if ok {
+								flow.postAggGlobalCreate = false // one create
+							}
+						}
+						if ok {
 							bumpExprDepth(ctx)
 							return castLiteral(t, g.expr)
 						}
