@@ -72,6 +72,8 @@ var postAggLhsWriteDoneSink *bool
 var postAggGlobalU2AfterLhsWriteSink *bool
 // postAggLhsGlobalU15Sink: one-shot Lhs Global choose U15 (e3127).
 var postAggLhsGlobalU15Sink *bool
+// postAggExprContGlobalU15Sink: one-shot Expression Global U15 after e4386 create (e4389).
+var postAggExprContGlobalU15Sink *bool
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
 // U15 path, next StatementProbability is tries=0 Assign-friendly (e3144 U100=5).
 var postAggAfterLhsLoopCtrlSink *bool
@@ -422,6 +424,22 @@ type functionFlowState struct {
 	// postAggUnwindBinaryAfterExprVar: after ExprVarSole, nested binaries return
 	// LHS only (no ShiftBy F50/RHS) until decremented to 0 (e4332).
 	postAggUnwindBinaryAfterExprVar int
+	// postAggStmtLhsAfterExprUnwind: Statement Lhs after e4332 Expression unwind;
+	// ParentParam miss → PL stack U5 + choose U5 fail → F80 (not multi-dim
+	// itemize U4 U9 U4 U7 F0) (e4335). SelectDeref countdown U11… (e4338).
+	postAggStmtLhsAfterExprUnwind bool
+	// postAggStmtLhsSelDerefFails: choose fail count under StmtLhsAfterExprUnwind
+	// (pool 11,10,9…; F0 on fails 1,4,…).
+	postAggStmtLhsSelDerefFails int
+	// postAggLhsExprContinue: after Global create Lhs accept (e4386), parent
+	// Expression continues U120 (not next Statement U100).
+	postAggLhsExprContinue bool
+	// postAggExprContGlobalU15: one-shot Global choose U15 after that Expression
+	// continue Variable (e4389 UP U15; not post-ptr U44 inventory).
+	postAggExprContGlobalU15 bool
+	// postAggExprNestContinue: after Global-create Lhs Expression continue, keep
+	// emitting parent Expression U120 (e4390–4406 chain) instead of Statement.
+	postAggExprNestContinue int
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -3508,6 +3526,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					*postAggU15StackU6PostPPPtrSelDerefNSink >= 2 {
 					target = 44
 				}
+				// e4389: after Global-create Expression continue Variable, UP U15.
+				if postAggExprContGlobalU15Sink != nil && *postAggExprContGlobalU15Sink {
+					*postAggExprContGlobalU15Sink = false
+					v := int(er.pick(15))
+					if n < 1 {
+						return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
+					}
+					return uniq[v%n], true
+				}
 				if target > n {
 					v := int(er.pick(uint32(target)))
 					// e849 F50 only on first U11-scale Global choose.
@@ -3758,6 +3785,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 									pool = liveNoArr
 								}
 								targetN = 44
+								// e4389: Expression continue after Global create → U15 not U44.
+								if postAggExprContGlobalU15Sink != nil && *postAggExprContGlobalU15Sink {
+									*postAggExprContGlobalU15Sink = false
+									targetN = 15
+								}
 							} else if len(exactNoArr) >= 2 {
 								// e3862: exact-ish small pool U2 after residual Expression.
 								pool = exactNoArr
@@ -5335,6 +5367,8 @@ exprTries:
 				if flow.ppPostPadSkipParentExprN < 6 {
 					flow.ppPostPadSkipParentExprN = 6
 				}
+				// e4335: Statement Lhs ParentParam→PL is U5 U5 fail not itemize.
+				flow.postAggStmtLhsAfterExprUnwind = true
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "x"))
@@ -5409,6 +5443,17 @@ exprTries:
 			// (often only synthetic "x") so fall through to all-locals path.
 			if scopePick == 1 {
 				idx := parentStackPick(er, flow)
+				// e4398: after Global-create Expression nest PL stack, UP F50
+				// (ShiftBy/parent) then Expression U120 tries=1 — not local choose U4.
+				if flow != nil && flow.postAggExprNestContinue > 0 &&
+					!strings.Contains(t.Name, "*") && er != nil && er.fallback != nil {
+					flow.postAggExprNestContinue = 0
+					_ = er.fallback.flipcoin(50)
+					// Next Expression filters Function once (UP U120 tries=1 v=71).
+					flow.ppPostPadForceNoFunc = true
+					bumpExprDepth(ctx)
+					return finishVar(castLiteral(t, "x"))
+				}
 				// e4085+: Expression Variable under ptr-cmp NO_DANGLING_PTR —
 				// dangling locals → GenerateNewParentLocal (F50 F10 F10…).
 				// randomPointerVariableExpr has the null-LHS forced-Variable twin.
@@ -8361,6 +8406,18 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	}
 	// SelectParentLocal: stack pick then block locals / create (seed2 e939–941).
 	if scopePick == 1 {
+		// e4371–75: after SelectDeref countdown VS, PL stack U5 + multi-dim
+		// itemize [9][9][3] F0 (no intermediate U5 choose) → F80 continue.
+		if flow != nil && flow.postAggStmtLhsAfterExprUnwind {
+			_ = er.pick(5)
+			_ = er.pick(9)
+			_ = er.pick(9)
+			_ = er.pick(3)
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(0)
+			}
+			return lvalueInfo{}, false, false
+		}
 		// Lhs stack size often smaller than expression-var pin-5 (e940 U2).
 		// seed4 e449: nested callee body stack size 1 → U1 (not force multiDim U2).
 		nStack := 2
@@ -8455,10 +8512,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if postAggGlobalCreateN >= 0 {
-				// seed4 e2389–93: Lhs PL choose U5 + multi-dim itemize U9 U9 U3
-				// (g_126 int32_t**[9][9][3]) + F0 fail → Lhs F80 retry.
-				nChoose := 5
-				_ = er.pick(uint32(nChoose))
+				// e4372: after SelectDeref countdown VS, PL stack already burned
+				// (U5); multi-dim itemize [9][9][3] F0 without extra U5 choose
+				// when postAggStmtLhsAfterExprUnwind (UP e4371–75).
+				// seed4 e2389–93: earlier Lhs PL choose U5 + itemize U9 U9 U3.
+				if flow == nil || !flow.postAggStmtLhsAfterExprUnwind {
+					nChoose := 5
+					_ = er.pick(uint32(nChoose))
+				}
 				// Find live multi-dim pointer sizes; default g_126 shape.
 				sizes := []int{9, 9, 3}
 				if ctx != nil {
@@ -8509,6 +8570,26 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if g, ok := createOnDemandFromParentLocalPathER(er, opts, target, ctx, needQfer); ok {
 			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 		}
+	}
+	// e4335: Statement Lhs ParentParam miss → PL stack U5 + choose U5 fail
+	// → F80 SelectDeref U11… (first VS after Expression unwind).
+	// e4372: later VS ParentParam miss → PL stack U5 + itemize [9][9][3] F0
+	// (no intermediate U5 choose).
+	if scopePick == 2 && flow != nil && flow.postAggStmtLhsAfterExprUnwind {
+		_ = er.pick(5) // SelectParentLocal stack
+		if flow.postAggStmtLhsSelDerefFails == 0 {
+			// First VS (before SelectDeref countdown): stack U5 + choose U5.
+			_ = er.pick(5)
+		} else {
+			// After countdown: stack U5 + multi-dim itemize [9][9][3] F0.
+			_ = er.pick(9)
+			_ = er.pick(9)
+			_ = er.pick(3)
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(0)
+			}
+		}
+		return lvalueInfo{}, false, false
 	}
 	// e3866–72: StackU6 after Lhs PP residual Expression: ParentParam miss →
 	// SelectParentLocal stack U6 + U4 choose + multi-dim itemize [9][4][7] +
@@ -8621,6 +8702,36 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			}
 		}
 		return lvalueInfo{expr: "x", ctype: target}, true, false
+	}
+	// e4383–87: after SelectDeref countdown + VS itemize, Global create
+	// U14 retype + F20 NewArray + F50 Constant hex (UP), not choose U2.
+	// Accept Lhs; caller must continue Expression (e4387 U120), not Statement.
+	if scopePick == 0 && flow != nil && flow.postAggStmtLhsAfterExprUnwind &&
+		flow.postAggStmtLhsSelDerefFails >= 11 {
+		// Type::random_type_from_type → choose_random (U14 pool).
+		_ = er.pick(14)
+		_ = er.fallback.flipcoin(20) // NewArray
+		// Constant::GenerateRandomConstant: F50 small vs hex; hex digits untraced.
+		if er.fallback.flipcoin(50) {
+			if er.fallback.flipcoin(50) {
+				_ = er.fallback.upto(3)
+			} else {
+				_ = er.fallback.upto(20)
+			}
+		} else {
+			// eLong (U14=4 eSimple) → RandomHexDigits(8).
+			for i := 0; i < 8; i++ {
+				_ = er.fallback.next31()
+			}
+		}
+		// ExpressionAssign-style continue after Lhs: parent Expression U120.
+		// Must clear SkipParentExprN (set during e4332 unwind) or randomTypedExpr
+		// returns "0" with zero RNG and next Statement U100 desyncs (e4387).
+		flow.postAggLhsExprContinue = true
+		flow.postAggExprContGlobalU15 = true
+		flow.postAggExprNestContinue = 8
+		flow.ppPostPadSkipParentExprN = 0
+		return lvalueInfo{expr: "g_new", ctype: target}, true, true
 	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
@@ -8864,6 +8975,17 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			break
 		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
+			// e4335+: Statement Lhs after Expression unwind — Lhs is do-while
+			// (Lhs.cpp): F80=0 → VS; on miss, loop again SelectDeref (UP U5 U5
+			// fail → F80 U11…). Not break-to-one-shot-VS outside the loop.
+			if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind {
+				if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+					lv = picked
+					lhsFromDeref = true
+					break
+				}
+				continue
+			}
 			break
 		}
 		// select_deref_pointer: choose_var first when compatible pointers exist.
@@ -9035,6 +9157,46 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				}
 				if nChoose < len(ptrs) {
 					nChoose = len(ptrs)
+				}
+				// e4336–70: after ParentParam→PL U5 U5, SelectDeref countdown:
+				// U11, U10+F0, U9, U8, U7+[9][4][7]F0, U7+F0, U6+[9][9][3]F0,
+				// U6+F0, U5… until F80=0 → VS (UP e4336–4369).
+				if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind {
+					fails := ctx.state.postAggStmtLhsSelDerefFails
+					// Round1: 11,10+F0,9,8,7+[9][4][7]F0,7+F0,6+[9][9][3]F0,6+F0,5,4,3 → VS
+					// Round2 after VS: U2+[9][9][3]F0 → F80=0 VS create (e4376–82).
+					if fails >= 11 {
+						_ = r.upto(2)
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+						ctx.state.postAggStmtLhsSelDerefFails++
+						continue
+					}
+					pool := []int{11, 10, 9, 8, 7, 7, 6, 6, 5, 4, 3}
+					nChoose = pool[fails]
+					_ = r.upto(uint32(nChoose))
+					ctx.state.postAggStmtLhsSelDerefFails++
+					switch fails {
+					case 1: // U10 + F0
+						_ = r.flipcoin(0)
+					case 4: // U7 + [9][4][7] F0
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					case 5: // U7 + F0
+						_ = r.flipcoin(0)
+					case 6: // U6 + [9][9][3] F0
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					case 7: // U6 + F0
+						_ = r.flipcoin(0)
+					}
+					continue
 				}
 				// Early postAgg: pad ~13 (e2351/e2377). One-shot after Lhs write
 				// create: U7 accept (e3076). Later e3122+ : 12,11,10… + F0 fail.
@@ -10800,6 +10962,44 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 	}
+	// e4387+: after Global create Lhs accept under StmtLhsAfterExprUnwind, UP
+	// continues a nest of Expressions (not Statement U100). Pattern from UP:
+	//   1) depth-block Variable (tries=3)
+	//   2) low-depth Variable ParentParam
+	//   3) F50 + depth-block noConst Variable (tries=16)
+	//   4+) more parent Expressions (NewValue/PL/Global…) until nest ends.
+	if ctx != nil && ctx.state != nil && ctx.state.postAggLhsExprContinue {
+		ctx.state.postAggLhsExprContinue = false
+		ctx.state.ppPostPadSkipParentExprN = 0
+		maxD := maxExprDepth(opts)
+		if maxD < 1 {
+			maxD = 1
+		}
+		// (1) depth-blocked Variable
+		ctx.exprDepth = maxD
+		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		// (2) low-depth parent Expression
+		ctx.state.ppPostPadSkipParentExprN = 0
+		ctx.exprDepth = 0
+		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		// (3) F50 + depth-block noConst Variable
+		_ = r.flipcoin(50)
+		ctx.state.ppPostPadSkipParentExprN = 0
+		ctx.state.ppPostPadAllowFuncOnce = false
+		ctx.state.ppPostPadForceNoFunc = true
+		ctx.state.ppPostPadDepthBlock = true
+		ctx.exprDepth = maxD * 2
+		er := newExprRand(r, exprDecisionBudget(opts))
+		_ = randomTypedExprDepthFlags(targetType, er, opts, env, scope, 0, ctx, false, true)
+		ctx.state.ppPostPadForceNoFunc = false
+		ctx.state.ppPostPadDepthBlock = false
+		// (4+) parent nest: low-depth Expressions (UP e4395–4410 chain).
+		for i := 0; i < 8; i++ {
+			ctx.state.ppPostPadSkipParentExprN = 0
+			ctx.exprDepth = 0
+			_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		}
+	}
 	return true
 }
 
@@ -12350,6 +12550,7 @@ func emitSingleFuncDefOnce(
 		postAggLhsWriteDoneSink = &state.postAggLhsWriteDone
 		postAggGlobalU2AfterLhsWriteSink = &state.postAggGlobalU2AfterLhsWrite
 		postAggLhsGlobalU15Sink = &state.postAggLhsGlobalU15Done
+		postAggExprContGlobalU15Sink = &state.postAggExprContGlobalU15
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
 		postAggU15PLAfterGlobalF0Sink = &state.postAggU15PLAfterGlobalF0
@@ -12394,6 +12595,7 @@ func emitSingleFuncDefOnce(
 			postAggLhsWriteDoneSink = nil
 			postAggGlobalU2AfterLhsWriteSink = nil
 			postAggLhsGlobalU15Sink = nil
+		postAggExprContGlobalU15Sink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
