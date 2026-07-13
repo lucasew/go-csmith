@@ -318,6 +318,13 @@ type localInfo struct {
 	// blockDepth: Function::stack index+1 when created (1=function body).
 	// SelectParentLocal only sees locals of the chosen stack block.
 	blockDepth int
+	// Emission (GenerateNewParentLocal materialization):
+	initLit  string // C initializer expression; empty → "0"
+	isArray  bool
+	arr      arrayCreateResult
+	isConst  bool
+	isVol    bool
+	emitDecl bool // true → write declaration into function body
 }
 
 type scopeInfo struct {
@@ -345,6 +352,8 @@ type genContext struct {
 	from    int
 	dynLocs []localInfo
 	info    compositeInfo
+	// residualBody: optional sink for residual-era Statement-like lines
+	residualBody *strings.Builder
 	// exprDepth mirrors CGContext::expr_depth (filter only; not always bumped).
 	exprDepth int
 	// skipFuncRetQfer: ExpressionAssign/WRITE qfer path — return random_qualifiers
@@ -1600,7 +1609,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			}
 		}
 		name := ctx.state.allocLocalName()
-		ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: chosen, blockDepth: depth})
+		ctx.dynLocs = append(ctx.dynLocs, localInfo{
+			name: name, ctype: chosen, blockDepth: depth,
+			initLit: "0", emitDecl: true,
+		})
 		return exprVarCandidate{expr: name, ctype: chosen, assignable: true}, true
 	}
 	// make_init_value → Constant::make_random (capture literal for emission)
@@ -1674,7 +1686,9 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// create_and_initialize → create_array_and_itemize
 		arrRes = burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
-	// Materialize as a generated global without further main RNG.
+	// Materialize parent-local creates as globals for choose-inventory parity with
+	// the residual-era path (full local inventory re-climb is residual work).
+	// Also register emitDecl local aliases when we can without extra RNG.
 	return createLocalPathGlobalDirectInit(opts, chosen, ctx, depth, initLit, newArray, isConst, isVolatile, arrRes)
 }
 
@@ -1713,7 +1727,6 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 			}
 			dims += fmt.Sprintf("[%d]", s)
 		}
-		// arrayLen fixed at 4 for itemize scale parity; dims for source only.
 		arrLen = 4
 		body := formatArrayInitBrace(sizes, arr.inits, initLit)
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, body))
@@ -1722,9 +1735,6 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	}
 	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: arrLen}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
-	// Also add to dynLocs so mergedLocals() finds this variable on subsequent
-	// selections — matches upstream's GenerateNewParentLocal adding to
-	// block->local_vars, preventing repeated on-demand creation.
 	depth := blockDepth
 	if depth <= 0 {
 		depth = 1
@@ -1732,8 +1742,9 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 			depth = ctx.state.blockStack
 		}
 	}
-	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t, blockDepth: depth})
-	return exprVarCandidate{expr: name, ctype: t, assignable: true}, true
+	// Inventory for ParentLocal re-select (upstream block->local_vars).
+	ctx.dynLocs = append(ctx.dynLocs, localInfo{name: name, ctype: t, blockDepth: depth, emitDecl: false})
+	return exprVarCandidate{expr: name, ctype: t, assignable: !isConst}, true
 }
 
 func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
@@ -6453,16 +6464,21 @@ func emitSingleFuncDefOnce(
 	locals := make([]localInfo, 0, 1)
 	locals = append(locals, localInfo{name: "x", ctype: CType{Name: "uint32_t", Signed: false, Bits: 32}})
 	scope := scopeInfo{params: fn.params, locals: locals, returnVar: retName}
+	var residualBody strings.Builder
 	ctx := &genContext{
-		state: state,
-		from:  idx,
-		info:  info,
+		state:        state,
+		from:         idx,
+		info:         info,
+		residualBody: &residualBody,
 	}
 
 	for _, p := range fn.params {
 		writeLine(&b, 1, fmt.Sprintf("x ^= (uint32_t)%s;", p.name))
 	}
-	emitStatements(&b, r, opts, env, scope, state, info, idx, 0, false, stmtBudget, ctx)
+	// Body statements first (populate ctx.dynLocs via GenerateNewParentLocal /
+	// residual inventLocal). Residual may also write Statement lines into residualBody.
+	var body strings.Builder
+	emitStatements(&body, r, opts, env, scope, state, info, idx, 0, false, stmtBudget, ctx)
 	if len(env.globals) > 0 {
 		writable := make([]globalInfo, 0, len(env.globals))
 		for _, g := range env.globals {
@@ -6473,11 +6489,50 @@ func emitSingleFuncDefOnce(
 		}
 		if len(writable) > 0 {
 			g := writable[int(fdec.pick(2, uint32(len(writable))))]
-			writeLine(&b, 1, fmt.Sprintf("%s ^= %s;", g.name, randomTypedExpr(g.ctype, r, opts, env, scope, ctx)))
+			writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", g.name, randomTypedExpr(g.ctype, r, opts, env, scope, ctx)))
 		}
 	}
-	writeLine(&b, 1, fmt.Sprintf("%s ^= %s;", retName, castLiteral(fn.ret, "x")))
-	writeLine(&b, 1, fmt.Sprintf("return %s;", retName))
+	// Residual-era Statement materialization before return.
+	if residualBody.Len() > 0 {
+		body.WriteString(residualBody.String())
+	}
+	writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", retName, castLiteral(fn.ret, "x")))
+	writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
+	// Upstream Block::OutputVariableList: declare locals before stmts.
+	for _, loc := range ctx.dynLocs {
+		if !loc.emitDecl || !strings.HasPrefix(loc.name, "l_") {
+			continue
+		}
+		qual := ""
+		if loc.isConst {
+			qual += "const "
+		}
+		if loc.isVol {
+			qual += "volatile "
+		}
+		init := loc.initLit
+		if init == "" {
+			init = "0"
+		}
+		if loc.isArray {
+			sizes := loc.arr.sizes
+			if len(sizes) == 0 {
+				sizes = []int{4}
+			}
+			dims := ""
+			for _, s := range sizes {
+				if s < 1 {
+					s = 1
+				}
+				dims += fmt.Sprintf("[%d]", s)
+			}
+			bodyInit := formatArrayInitBrace(sizes, loc.arr.inits, init)
+			writeLine(&b, 1, fmt.Sprintf("%s%s %s%s = %s;", qual, loc.ctype.Name, loc.name, dims, bodyInit))
+		} else {
+			writeLine(&b, 1, fmt.Sprintf("%s%s %s = %s;", qual, loc.ctype.Name, loc.name, init))
+		}
+	}
+	b.WriteString(body.String())
 	writeLine(&b, 0, "}")
 	writeLine(&b, 0, "")
 	return b.String()

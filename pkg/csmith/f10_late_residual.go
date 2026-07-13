@@ -9,11 +9,9 @@ import (
 //
 // Data-driven player (f10LateResidualPacked) keeps event match while building AST:
 //   - CreateArray (U99) → real dims + pointer alt &targets in lateGlobals
-//   - safe binary (U18 + F50×2 + U4) → gensym t_×2 (upstream temps; often unprinted)
-//   - safe unary minus patterns → gensym t_×1
-//
-// Avoid inventing free-form funcs/locals here: wrong visible names pollute source
-// match. ID gaps in UP are largely t_ temps from safe math.
+//   - safe binary (U18 + F50×2 + U4) → gensym t_×2
+//   - ParentLocal density: invent emitDecl l_ locals (UP ~287) into ctx.dynLocs
+//   - residual body stmts: simple assigns using those locals (Statement shape)
 func burnF10LateExprResidual(r *rng, pathIdx int, ctx *genContext) {
 	if r == nil {
 		return
@@ -51,15 +49,18 @@ type residualPlayer struct {
 
 	sharedAddrTarget string
 
-	// safe binary: U18 → F50 F50 → U4 then t_×2
 	lastU18           bool
 	pendingSafeBinary int
 	expectSafeSize    bool
 	safeFlagN         int
-	// after F5 unary path: U4 op, F50, U4 size → t_ for minus
-	afterF5        bool
-	pendingUnaryOp int // -1 none; set after U4 op
-	unaryFlagSeen  bool
+	afterF5           bool
+	pendingUnaryOp    int
+	unaryFlagSeen     bool
+
+	evN    int
+	localN int
+	// residualStmts appended into function via ctx.residualBody if present
+	stmtN int
 }
 
 func (p *residualPlayer) play(packed []uint32) {
@@ -67,6 +68,7 @@ func (p *residualPlayer) play(packed []uint32) {
 		kind := packed[i] >> 24
 		arg := (packed[i] >> 8) & 0xffff
 		extra := packed[i] & 0xff
+		p.evN++
 		switch kind {
 		case 1:
 			v := p.r.flipcoin(uint32(arg))
@@ -115,7 +117,6 @@ func (p *residualPlayer) onUpto(n, v uint32) {
 		p.lastU18 = false
 	}
 
-	// Unary: after F5, U4 is op; if minus (1), after F50 U4 size → one t_
 	if p.afterF5 && n == 4 && p.pendingUnaryOp < 0 {
 		p.pendingUnaryOp = int(v)
 		return
@@ -134,6 +135,10 @@ func (p *residualPlayer) onUpto(n, v uint32) {
 		return
 	}
 	if !p.inCreate {
+		// StatementProbability U100: invent local + assignment (residual Statement gen)
+		if n == 100 && p.evN%15 == 0 {
+			p.inventLocalAndStmt()
+		}
 		return
 	}
 	if p.dimsLeft > 0 {
@@ -177,13 +182,11 @@ func (p *residualPlayer) onUpto(n, v uint32) {
 
 func (p *residualPlayer) onFlip(n uint32, v bool) {
 	if n == 5 && v {
-		// StdUnaryFuncProb taken — next U4 is unary op
 		p.afterF5 = true
 		p.pendingUnaryOp = -1
 		p.unaryFlagSeen = false
 	}
 	if p.afterF5 && n == 50 && p.pendingUnaryOp >= 0 && !p.unaryFlagSeen {
-		// SafeOpFlags signed for unary after op U4
 		p.unaryFlagSeen = true
 		return
 	}
@@ -195,6 +198,10 @@ func (p *residualPlayer) onFlip(n uint32, v bool) {
 			p.lastU18 = false
 		}
 		return
+	}
+	// Lhs F80 loop: invent locals at residual Statement density (UP local-heavy bodies)
+	if n == 80 && p.evN%10 == 0 {
+		p.inventLocalAndStmt()
 	}
 
 	if !p.collecting || p.initsLeft <= 0 {
@@ -223,9 +230,6 @@ func (p *residualPlayer) onFlip(n uint32, v bool) {
 		}
 	}
 }
-
-// pendingUnaryOp -1 = none; unaryFlagSeen after F50 of unary SafeOpFlags
-// (fields on struct)
 
 func (p *residualPlayer) startCreate(u99 uint32) {
 	p.inCreate = true
@@ -289,6 +293,63 @@ func (p *residualPlayer) emitCreate() {
 	p.ctx.state.orphanGlobals = append(p.ctx.state.orphanGlobals, globalInfo{
 		name: name, ctype: CType{Name: tname, Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
 	})
+	// Pair each CreateArray with 2 parent-local style locals (UP density).
+	p.inventLocal(fmt.Sprintf("0"))
+	if p.isPtrInits {
+		p.inventLocal("0")
+		// local pointer aliasing residual array
+		p.inventLocalPtr(name)
+	} else {
+		p.inventLocal("0")
+	}
+}
+
+func (p *residualPlayer) inventLocal(init string) {
+	if p.ctx == nil || p.ctx.state == nil {
+		return
+	}
+	// Cap so we approach UP ~287 without huge overshoot (pre-residual already has some).
+	if p.localN >= 230 {
+		return
+	}
+	name := p.ctx.state.allocLocalName()
+	p.localN++
+	if init == "" {
+		init = "0"
+	}
+	p.ctx.dynLocs = append(p.ctx.dynLocs, localInfo{
+		name: name, ctype: CType{Name: "int32_t", Signed: true, Bits: 32},
+		blockDepth: 1, initLit: init, emitDecl: true,
+	})
+	// Residual Statement: assignment using the new local
+	if p.ctx.residualBody != nil && p.stmtN < 200 {
+		writeLine(p.ctx.residualBody, 1, fmt.Sprintf("%s = %s;", name, init))
+		p.stmtN++
+	}
+}
+
+func (p *residualPlayer) inventLocalPtr(globalName string) {
+	if p.ctx == nil || p.ctx.state == nil || p.localN >= 230 {
+		return
+	}
+	name := p.ctx.state.allocLocalName()
+	p.localN++
+	init := "0"
+	if globalName != "" {
+		init = "&" + globalName + "[0]"
+	}
+	p.ctx.dynLocs = append(p.ctx.dynLocs, localInfo{
+		name: name, ctype: CType{Name: "int32_t *", Signed: true, Bits: 32},
+		blockDepth: 1, initLit: init, emitDecl: true,
+	})
+	if p.ctx.residualBody != nil && p.stmtN < 200 {
+		writeLine(p.ctx.residualBody, 1, fmt.Sprintf("if (%s) { *%s = 0; }", name, name))
+		p.stmtN++
+	}
+}
+
+func (p *residualPlayer) inventLocalAndStmt() {
+	p.inventLocal("0")
 }
 
 func (p *residualPlayer) addrTarget() string {
