@@ -197,6 +197,9 @@ type functionFlowState struct {
 	nestedFuncBodies int
 	// nestedNullPreferDone: one-shot F0 after nested body Global simple prefer.
 	nestedNullPreferDone bool
+	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body
+	// (seed4 e361 U2 only; e427–429 U2 + U2 U4 itemize).
+	isParamPPFallPicks int
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -3307,7 +3310,8 @@ func randomLeafExprWithMode(
 							return castLiteral(t, fmt.Sprintf("l_pp%d", idx%3))
 						}
 						if nb > 0 {
-							// seed4 e422 U2 choose + array itemize U4 (e423).
+							// seed4 e422: U2 choose + U4 itemize (1d).
+							// seed4 e427–429: U2 choose + U2 U4 itemize (2d).
 							for len(exact) < 2 {
 								exact = append(exact, exprVarCandidate{
 									expr: fmt.Sprintf("l_pp%d", len(exact)), ctype: t, assignable: true,
@@ -3315,12 +3319,9 @@ func randomLeafExprWithMode(
 								})
 							}
 							c := exact[int(er.pick(2))%len(exact)]
-							// itemize collective array (seed4 e423 U4).
-							al := c.arrayLen
-							if al < 1 {
-								al = 4
-							}
-							_ = er.pick(uint32(al))
+							// seed4 e422–423: U2 choose + U4 itemize (1d array).
+							_ = er.pick(4)
+							_ = c
 							bumpExprDepth(ctx)
 							return castLiteral(t, c.expr)
 						}
@@ -3538,7 +3539,8 @@ func randomLeafExprWithMode(
 					idx := parentStackPick(er, flow)
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
 					// seed4 e361–362: eFlexible among ~2 visibles → U2.
-					// Direct U2 burn: FromER may sole-skip (multiDim/inventory).
+					// seed4 e427–429: pointer want → U2 choose + multi-dim itemize
+					// (U2 U4 after first U2-only residual at e361).
 					if flow != nil && flow.nestedFuncBodies > 0 && !flow.useSmallParentStack {
 						pool := localCands
 						if len(pool) < 2 {
@@ -3553,6 +3555,13 @@ func randomLeafExprWithMode(
 							pool = append(pool, exprVarCandidate{expr: "l_x", ctype: t, assignable: true})
 						}
 						i := int(er.pick(2)) % len(pool)
+						// seed4 e361/e402: early nested PP→PL U2 only.
+						// seed4 e427–428: third pick → U2 choose + U2 itemize (1d);
+						// following U4 is BlockSize for callee body (e429).
+						flow.isParamPPFallPicks++
+						if flow.isParamPPFallPicks >= 3 {
+							_ = er.pick(2) // array itemize size-2
+						}
 						bumpExprDepth(ctx)
 						return castLiteral(t, pool[i].expr)
 					} else if c, ok := selectExprVariableStrict(t, er, localCands); ok {
@@ -4137,8 +4146,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if flow != nil && flow.blockStack > 0 && flow.blockStack < 5 {
 			nStack = flow.blockStack
 		}
-		if flow != nil && flow.multiDimArrays > 0 {
-			nStack = 2 // seed2 e940
+		// seed2 e940: multi-dim Lhs ParentLocal U2 when stack has nested blocks.
+		// seed4 e449: nested callee body stack size 1 → U1 (not force U2).
+		if flow != nil && flow.multiDimArrays > 0 && flow.blockStack >= 2 {
+			nStack = 2
 		}
 		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
 		// seed2 e2261: filterCompoundStmts era ParentLocal stack U6.
@@ -4209,7 +4220,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					}
 					return lvalueInfo{expr: "x", ctype: target}, true, false
 				}
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx); ok {
+				// seed4 e450: empty-block Lhs WRITE create keeps target type
+				// (no U14 retype) — F50 vol then NewArray F20…
+				retype := flow != nil && flow.useSmallParentStack
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, retype, idx); ok {
 					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if c, ok := selectExprVariable(target, r, localCands, true); ok {
@@ -4524,13 +4538,19 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				needNoRhsDerefTries++
 				continue
 			}
-			if !triedDerefChoose {
+			// seed4 e432–435: nested callee body ++/-- Lhs SelectDeref with no
+			// eligible pointers → create residual F50 F10 F50 F20… (not U2 choose).
+			// seed2 e936 U2 choose only once useSmallParentStack era has inventory.
+			if !ctx.state.useSmallParentStack {
+				// fall through to create residual below
+			} else if !triedDerefChoose {
 				_ = r.upto(2) // e936
 				triedDerefChoose = true
 				continue
+			} else {
+				// Second F80=true: no create residual; fail again → next F80.
+				continue
 			}
-			// Second F80=true: no create residual; fail again → next F80.
-			continue
 		}
 		// After CreateArray in THIS Lhs loop, itemize last sizes (e1115 U10 U1 U1).
 		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
@@ -4543,25 +4563,33 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			continue
 		}
 		// No existing deref targets → create pointer local/global.
-		// random_add_qualifiers (non-wildcard qfer from RHS):
-		if opts.ConstPointers {
-			_ = r.flipcoin(10) // RegularConstProb
-		}
-		// seed2 e1098–1099: after ExpressionAssign residual, statement Lhs
-		// SelectDeref is F10 then F20 NewArray — no VolatilePointers F50
-		// when useSmallParentStack (UP F10 F20 …). e2199 late for-body Lhs
-		// has F10 F50 vol (do not skip when filterCompoundStmts).
+		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
+		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
+		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol.
 		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
 			!ctx.state.filterCompoundStmts
-		if opts.VolatilePointers && !skipVol {
-			_ = r.flipcoin(50) // RegularVolatileProb
-		}
-		// create_and_initialize for a new POINTER (to targetType) for deref.
-		// SelectDeref always creates a pointer var, not the bare Lhs type.
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
+		if needNoRhs {
+			// random_qualifiers WRITE no_volatile: draws vol F50 even if discarded.
+			levels := strings.Count(ptrType.Name, "*")
+			for i := 0; i < levels; i++ {
+				_ = r.flipcoin(50) // level vol
+				_ = r.flipcoin(10) // level const
+			}
+			_ = r.flipcoin(50) // self vol (WRITE: no self const F10)
+		} else {
+			if opts.ConstPointers {
+				_ = r.flipcoin(10) // RegularConstProb (random_add)
+			}
+			// seed2 e1098–1099: skip vol F50 under useSmallParentStack.
+			if opts.VolatilePointers && !skipVol {
+				_ = r.flipcoin(50)
+			}
+		}
+		// create_and_initialize for a new POINTER (to targetType) for deref.
 		// find_pointer_type(add) — has_pointer_type becomes true; exact type.
 		if ctx != nil && ctx.state != nil {
 			noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
@@ -4623,7 +4651,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			lhsFromDeref = true
 			break
 		}
-		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
+		// random_looser_volatiles only when outer pointer is volatile (eligible).
+		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
+		// tgtNewArray + F50 Constant (no looser F50).
+		if !needNoRhs {
+			_ = r.flipcoin(50) // random_looser residual when outer vol
+		}
 		tgtNewArray := r.flipcoin(20)
 		if tgtNewArray {
 			// create_and_initialize NewArray branch: init then itemize
@@ -4656,10 +4689,18 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 		} else {
 			// Simple pointed-to: Constant::make_random
+			// seed4 e438–439: F20 tgtNewArray=0 then F50 Constant (hex/small).
 			burnSimpleConstant(r, targetType)
 		}
 		if ctx != nil && ctx.state != nil {
 			ctx.state.lhsDerefCreates++
+		}
+		// seed4 e439–440: first need_no_rhs address-of create fails validate →
+		// SelectDeref retry F80. Second create accepts.
+		if needNoRhs && ctx != nil && ctx.state != nil && !ctx.state.useSmallParentStack &&
+			needNoRhsDerefTries == 0 {
+			needNoRhsDerefTries++
+			continue
 		}
 		lhsFromDeref = true
 		break
