@@ -415,6 +415,13 @@ type functionFlowState struct {
 	// postAggU2EraPLFails: ParentLocal miss count under U2-after-create era
 	// (e4305 U5 only; e4325+ U5 U5 F0). Independent of Param plFails.
 	postAggU2EraPLFails int
+	// postAggExprVarSoleAfterLhs: after Expression-level Lhs Global sole (e4329),
+	// next Expression Variable VS sole-accepts (no create F50) so Statement Lhs
+	// F80 runs (e4332).
+	postAggExprVarSoleAfterLhs bool
+	// postAggUnwindBinaryAfterExprVar: after ExprVarSole, nested binaries return
+	// LHS only (no ShiftBy F50/RHS) until decremented to 0 (e4332).
+	postAggUnwindBinaryAfterExprVar int
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -840,9 +847,14 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				// e4330: after empty CreateArray U2-era, Global Lhs sole-accept
 				// (UP next Expression U120), not U2+F50 residual (that was e4248).
 				// Do not SkipStmtLhs/OuterLhsSole — parent Expression continues.
+				// e4332: next Expression Variable VS sole so Statement Lhs F80.
 				if flow != nil && flow.postAggDerefChooseU2AfterCreate {
 					flow.postAggLhsWriteDone = true
 					flow.postAggDerefChooseU2AfterCreate = false
+					flow.postAggExprVarSoleAfterLhs = true
+					// e4332: Statement Lhs needs real SelectDeref F80 after
+					// Expression continue Variable; clear sticky SkipStmtLhs.
+					flow.ppPostPadSkipStmtLhs = false
 					return "x"
 				}
 				// e4248: after ptr-cmp PL create + NewValue residual, Lhs F80=0
@@ -5000,6 +5012,12 @@ exprTries:
 							if ctx != nil && ctx.state != nil && ctx.state.postAggNeedLhsAfterRhs {
 								out = castLiteral(t, lhs)
 								_ = op2Signed
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggUnwindBinaryAfterExprVar > 0 {
+								// e4332: after ExprVarSole, unwind nested binaries without
+								// ShiftBy F50/RHS so Statement Lhs F80 runs.
+								ctx.state.postAggUnwindBinaryAfterExprVar--
+								out = castLiteral(t, lhs)
+								_ = op2Signed
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggSkipShiftByOnce &&
 								(opV == 16 || opV == 17) {
 								// e4250: NeedLhs Lhs already ran (cleared NeedLhs); outer
@@ -5275,32 +5293,60 @@ exprTries:
 				}
 			}
 			// e4271: after ForceDeref OuterLhsSoleBurn Constant, next Variable is
-			// Assign RHS — arm NeedLhs so SelectDeref create runs (UP F80 F20 U99…).
+			// free Expression then Lhs create (run Lhs in-Expression so parent
+			// continues e4330 U120). Do NOT set NeedLhs for StatementAssign.
+			runLhsAfterVar := false
 			if postAggArmNeedLhsAfterNextVar && ctx != nil && ctx.state != nil {
 				postAggArmNeedLhsAfterNextVar = false
-				ctx.state.postAggNeedLhsAfterRhs = true
+				runLhsAfterVar = true
 				ctx.state.postAggEmptyDerefCreateOnce = true
 				ctx.state.ppPostPadOuterLhsSole = false
 				ctx.state.ppPostPadOuterLhsSoleN = 0
 			}
+			finishVar := func(s string) string {
+				if !runLhsAfterVar || ctx == nil || ctx.state == nil || er == nil {
+					return s
+				}
+				runLhsAfterVar = false
+				base := t
+				if strings.Contains(base.Name, "*") {
+					base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+				}
+				_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
+				return s
+			}
 			if c, ok := trySelectMustUseVar(er, t, ctx); ok {
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
-				return castLiteral(t, c.expr)
+				return finishVar(castLiteral(t, c.expr))
 			}
 			scopePick := variableScopePickFromER(er, opts, &scope)
+			var flow *functionFlowState
+			if ctx != nil {
+				flow = ctx.state
+			}
+			// e4332: after Expression-level Lhs Global sole, next Expression
+			// Variable VS sole-accepts (UP Statement Lhs F80 next, not PL create F50).
+			if flow != nil && flow.postAggExprVarSoleAfterLhs {
+				flow.postAggExprVarSoleAfterLhs = false
+				// e4332: unwind nested binaries + parent Expressions so Statement
+				// Lhs F80 runs immediately (UP F80, not ShiftBy F50 or more U120).
+				flow.postAggUnwindBinaryAfterExprVar = 6
+				if flow.ppPostPadSkipParentExprN < 6 {
+					flow.ppPostPadSkipParentExprN = 6
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
+			}
 			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
 				if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 					bumpExprDepth(ctx)
-					return castLiteral(t, g.expr)
+					return finishVar(castLiteral(t, g.expr))
 				}
 				restoreGenSnapshot(ctx, snap)
 				continue
-			}
-			var flow *functionFlowState
-			if ctx != nil {
-				flow = ctx.state
 			}
 			if scopePick == 4 {
 				idx := parentStackPick(er, flow)
@@ -5352,7 +5398,7 @@ exprTries:
 				}
 				if ok {
 					bumpExprDepth(ctx)
-					return castLiteral(t, g.expr)
+					return finishVar(castLiteral(t, g.expr))
 				}
 				restoreGenSnapshot(ctx, snap)
 				continue
@@ -5375,10 +5421,10 @@ exprTries:
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 						flow.postAggPtrCmpPLCreateDone = true
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 					bumpExprDepth(ctx)
-					return castLiteral(t, "p")
+					return finishVar(castLiteral(t, "p"))
 				}
 				// seed4 after ArrayOp PL ladder (stack already burned above):
 				// n=0 e2812 U4 locals; n=1 e2816–18 stack→VS Global U24;
@@ -5392,22 +5438,22 @@ exprTries:
 					case n == 0:
 						_ = er.pick(4) // e2812 U4
 						bumpExprDepth(ctx)
-						return castLiteral(t, "x")
+						return finishVar(castLiteral(t, "x"))
 					case n == 1:
 						scopePick = variableScopePickFromER(er, opts, &scope) // e2817
 						if scopePick == 0 {
 							_ = er.pick(24) // e2818
 							bumpExprDepth(ctx)
-							return castLiteral(t, "g_0")
+							return finishVar(castLiteral(t, "g_0"))
 						}
 						// fall through other scopes
 						localCands := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
 							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
+							return finishVar(castLiteral(t, c.expr))
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, "0")
+						return finishVar(castLiteral(t, "0"))
 					case n == 2:
 						// multi-dim itemize residual (e2829–33 U4 U9 U4 U7 F0)
 						// then visit_facts fail → VS NewValue create (e2834 U100=98 F10…).
@@ -5422,16 +5468,16 @@ exprTries:
 						if scopePick == 3 {
 							if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 								bumpExprDepth(ctx)
-								return castLiteral(t, g.expr)
+								return finishVar(castLiteral(t, g.expr))
 							}
 						}
 						idx2 := parentStackPick(er, flow) // e2836 U5
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx2); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, g.expr)
+							return finishVar(castLiteral(t, g.expr))
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, "x")
+						return finishVar(castLiteral(t, "x"))
 					default:
 						// e2849–68: F80 U8 U4 U100; AssignOps U120; RHS Variable
 						// U120 U100; Lhs F80 U12 F80 U11 U100; then sibling
@@ -5463,7 +5509,7 @@ exprTries:
 							_ = randomTypedExprDepthFlags(base, er, opts, env, scope, nest, ctx, false, false)
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, "x")
+						return finishVar(castLiteral(t, "x"))
 					}
 				}
 				// e2966: one-shot empty PL create F10 F20 F50 F50 after residual.
@@ -5478,7 +5524,7 @@ exprTries:
 							ctx.state.ppPostPadAllowFuncOnce = true
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 				useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
@@ -5497,9 +5543,9 @@ exprTries:
 							flow.postAggNeedLhsAfterRhs = true
 							bumpExprDepth(ctx)
 							if len(localCands) > 0 {
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							}
-							return castLiteral(t, "x")
+							return finishVar(castLiteral(t, "x"))
 						}
 						if postAggGlobalF50AfterF0U9Done && flow.postAggLhsWriteDone &&
 							!flow.postAggPLItemizeAfterLhsWrite {
@@ -5522,9 +5568,9 @@ exprTries:
 							}
 							bumpExprDepth(ctx)
 							if len(localCands) > 0 {
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							}
-							return castLiteral(t, "x")
+							return finishVar(castLiteral(t, "x"))
 						}
 						if postAggGlobalF50AfterF0U9Done && flow.postAggLhsWriteDone &&
 							flow.postAggPLItemizeAfterLhsWrite &&
@@ -5553,9 +5599,9 @@ exprTries:
 							}
 							bumpExprDepth(ctx)
 							if len(localCands) > 0 {
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							}
-							return castLiteral(t, "x")
+							return finishVar(castLiteral(t, "x"))
 						}
 						// e3178/e3210/e3213: after U15+loop residual, stack U5 sole
 						// locals (no U(n) choose) → next Expression U120.
@@ -5577,9 +5623,9 @@ exprTries:
 								}
 								bumpExprDepth(ctx)
 								if len(localCands) > 0 {
-									return castLiteral(t, localCands[0].expr)
+									return finishVar(castLiteral(t, localCands[0].expr))
 								}
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							if flow.postAggU15PLAccepts == 3 && er != nil {
 								// e3218: 3rd PL fails → VS reselect U100=67 PP sole.
@@ -5591,9 +5637,9 @@ exprTries:
 								}
 								bumpExprDepth(ctx)
 								if len(localCands) > 0 {
-									return castLiteral(t, localCands[0].expr)
+									return finishVar(castLiteral(t, localCands[0].expr))
 								}
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							if flow.postAggU15PLAccepts >= 4 && !flow.postAggU15PLCreateDone &&
 								er != nil && er.fallback != nil {
@@ -5606,7 +5652,7 @@ exprTries:
 								_ = er.fallback.flipcoin(50)
 								_ = er.fallback.upto(20)
 								bumpExprDepth(ctx)
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							// e3373+: after Continue → stack U6 PL create qferMode 1
 							// when empty. e3521 first non-empty sole; e3584 n=1 U5+Global
@@ -5616,7 +5662,7 @@ exprTries:
 								if len(localCands) == 0 {
 									if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								}
 								n := flow.postAggU15StackU6PLN
@@ -5625,9 +5671,9 @@ exprTries:
 									// e3521 sole accept (choose_ok_var len==1 → no U).
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 1 && er != nil {
 									// e3584: choose_ok_var U5 then reselect Global U100 U43
@@ -5641,9 +5687,9 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 2 && er != nil && er.fallback != nil {
 									// e3629–34: sole ok_var (no U) → opportunistic_validate
@@ -5672,9 +5718,9 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 3 && er != nil && er.fallback != nil {
 									// e3640–44: choose_ok_var U5 → F0 validate fail →
@@ -5689,9 +5735,9 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 4 && er != nil {
 									// e3655–56: choose_ok_var U4 accept — outer Assign Lhs F80 (e3657).
@@ -5704,9 +5750,9 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 5 && er != nil && er.fallback != nil {
 									// e3733–40: choose_ok_var U4 → array itemize [9][4][7]
@@ -5730,9 +5776,9 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 6 && er != nil && er.fallback != nil {
 									// e3743–49: stack already burned; empty/miss → VS reselect
@@ -5753,18 +5799,18 @@ exprTries:
 									}
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 7 && er != nil {
 									// e3756–58: stack already burned; sole accept → parent
 									// Expression U120 next (not VS reselect U100).
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								if n >= 8 && er != nil {
 									// e3903: first PL after post-PP pointer Lhs era —
@@ -5779,9 +5825,9 @@ exprTries:
 											flow.postAggU15StackU6PLNAfterPostPtr = 1
 											bumpExprDepth(ctx)
 											if len(localCands) > 0 {
-												return castLiteral(t, localCands[0].expr)
+												return finishVar(castLiteral(t, localCands[0].expr))
 											}
-											return castLiteral(t, "x")
+											return finishVar(castLiteral(t, "x"))
 										}
 										// e4035–39: choose_ok_var U5 + opportunistic F0
 										// fail → VS Global U100 + GlobalList U44.
@@ -5817,9 +5863,9 @@ exprTries:
 											}
 											bumpExprDepth(ctx)
 											if len(localCands) > 0 {
-												return castLiteral(t, localCands[0].expr)
+												return finishVar(castLiteral(t, localCands[0].expr))
 											}
-											return castLiteral(t, "x")
+											return finishVar(castLiteral(t, "x"))
 										}
 										// e4035/e4204: U5 choose; e4261+: U4 after one-shot create residual.
 										nLoc := uint32(5)
@@ -5847,9 +5893,9 @@ exprTries:
 											flow.ppPostPadOuterLhsSoleN = 0
 											bumpExprDepth(ctx)
 											if len(localCands) > 0 {
-												return castLiteral(t, localCands[0].expr)
+												return finishVar(castLiteral(t, localCands[0].expr))
 											}
-											return castLiteral(t, "x")
+											return finishVar(castLiteral(t, "x"))
 										}
 										if er.fallback != nil {
 											_ = er.fallback.flipcoin(0)
@@ -5863,9 +5909,9 @@ exprTries:
 										}
 										bumpExprDepth(ctx)
 										if len(localCands) > 0 {
-											return castLiteral(t, localCands[0].expr)
+											return finishVar(castLiteral(t, localCands[0].expr))
 										}
-										return castLiteral(t, "x")
+										return finishVar(castLiteral(t, "x"))
 									}
 									// e3793–97: U4 choose + multi-dim itemize [9][9][3]
 									// accept (no F0) → parent U120.
@@ -5881,15 +5927,15 @@ exprTries:
 									_ = er.pick(3)
 									bumpExprDepth(ctx)
 									if len(localCands) > 0 {
-										return castLiteral(t, localCands[0].expr)
+										return finishVar(castLiteral(t, localCands[0].expr))
 									}
-									return castLiteral(t, "x")
+									return finishVar(castLiteral(t, "x"))
 								}
 								bumpExprDepth(ctx)
 								if len(localCands) > 0 {
-									return castLiteral(t, localCands[0].expr)
+									return finishVar(castLiteral(t, localCands[0].expr))
 								}
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							// e3275–80 F0+F80 was ExpressionAssign Lhs PP→PL (not
 							// termVariable). e3311 sole; e3321–33 after Global F0:
@@ -5898,26 +5944,26 @@ exprTries:
 								_ = er.pick(4) // e3323 / e3333 locals choose
 								bumpExprDepth(ctx)
 								if len(localCands) > 0 {
-									return castLiteral(t, localCands[0].expr)
+									return finishVar(castLiteral(t, localCands[0].expr))
 								}
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							// e3178/e3210/e3213: first two sole accept; e3311 sole
 							bumpExprDepth(ctx)
 							if len(localCands) > 0 {
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							}
-							return castLiteral(t, "x")
+							return finishVar(castLiteral(t, "x"))
 						}
 						nLoc := 5
 						if len(localCands) > 0 {
 							_ = er.pick(uint32(nLoc))
 							bumpExprDepth(ctx)
-							return castLiteral(t, localCands[0].expr)
+							return finishVar(castLiteral(t, localCands[0].expr))
 						}
 						_ = er.pick(uint32(nLoc))
 						bumpExprDepth(ctx)
-						return castLiteral(t, "x")
+						return finishVar(castLiteral(t, "x"))
 					}
 					// qferMode: pointer F50+F10 (e789); simple !SE-free F10 (e872);
 					// useSmallParentStack era SE-free simple F50+F10 (e977).
@@ -5955,14 +6001,14 @@ exprTries:
 							}
 							_ = er.pick(uint32(al))
 							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
+							return finishVar(castLiteral(t, c.expr))
 						}
 						if len(exact) < 3 {
 							idx := int(er.pick(3))
 							_ = er.pick(10)
 							_ = er.pick(4)
 							bumpExprDepth(ctx)
-							return castLiteral(t, fmt.Sprintf("l_pp%d", idx%3))
+							return finishVar(castLiteral(t, fmt.Sprintf("l_pp%d", idx%3)))
 						}
 					}
 					// isParam: formal qfer non-wildcard → GenerateNewParentLocal
@@ -6042,7 +6088,7 @@ exprTries:
 							_ = er.fallback.flipcoin(75)
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, localCands[0].expr)
+						return finishVar(castLiteral(t, localCands[0].expr))
 					}
 					// seed4 e1638: after pad, ensure choose pool (avoid empty→create).
 					// seed4 e2188: after aggregate Global create, empty PL blocks
@@ -6082,7 +6128,7 @@ exprTries:
 						flow.ppPostPadPLForceCreateOnce = false
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, g.expr)
+							return finishVar(castLiteral(t, g.expr))
 						}
 					}
 					// seed4 e1638+: late post-pad (after ptr-cmp) choose U2/U3 or create.
@@ -6134,7 +6180,7 @@ exprTries:
 											gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
 											if c, ok := selectExprVariableFromER(t, er, gCands, false); ok && c.expr != "" {
 												bumpExprDepth(ctx)
-												return castLiteral(t, c.expr)
+												return finishVar(castLiteral(t, c.expr))
 											}
 										case 1: // SelectParentLocal
 											idx2 := parentStackPick(er, flow)
@@ -6151,12 +6197,12 @@ exprTries:
 											}
 											if c, ok := chooseOKVarFromER(er, ok2); ok {
 												bumpExprDepth(ctx)
-												return castLiteral(t, c.expr)
+												return finishVar(castLiteral(t, c.expr))
 											}
 											// empty block → GenerateNewParentLocal
 											if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, true, idx2); ok {
 												bumpExprDepth(ctx)
-												return castLiteral(t, g.expr)
+												return finishVar(castLiteral(t, g.expr))
 											}
 										default:
 											// ParentParam miss often → PL; try stack choose
@@ -6172,28 +6218,28 @@ exprTries:
 											}
 											if c, ok := chooseOKVarFromER(er, ok2); ok {
 												bumpExprDepth(ctx)
-												return castLiteral(t, c.expr)
+												return finishVar(castLiteral(t, c.expr))
 											}
 										}
 										bumpExprDepth(ctx)
-										return castLiteral(t, real[0].expr)
+										return finishVar(castLiteral(t, real[0].expr))
 									}
 									// Accept chosen local — parent Expression continues.
 									bumpExprDepth(ctx)
 									markVarSelectEffect()
-									return castLiteral(t, picked.expr)
+									return finishVar(castLiteral(t, picked.expr))
 								}
 							}
 							if idx == 0 && ppPostPadGlobalPicks >= 15 && !flow.ppPostPadPLForceCreateOnce &&
 								postAggGlobalCreateN < 0 {
 								bumpExprDepth(ctx)
 								markVarSelectEffect()
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							}
 							if idx == 0 {
 								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, false, idx); ok {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 							}
 							// e1666 pick4: U3+itemize; e1741 later: sole after stack (no U).
@@ -6239,25 +6285,25 @@ exprTries:
 									if idx == 3 && len(flex) <= 1 {
 										if len(flex) == 1 && hasTrueLocal {
 											bumpExprDepth(ctx)
-											return castLiteral(t, flex[0].expr)
+											return finishVar(castLiteral(t, flex[0].expr))
 										}
 										if len(raw) >= 1 {
 											bumpExprDepth(ctx)
-											return castLiteral(t, raw[0].expr)
+											return finishVar(castLiteral(t, raw[0].expr))
 										}
 										if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, true, idx); ok {
 											bumpExprDepth(ctx)
-											return castLiteral(t, g.expr)
+											return finishVar(castLiteral(t, g.expr))
 										}
 									}
 									if len(raw) >= 2 {
 										idx2 := int(er.pick(uint32(len(raw)))) % len(raw)
 										bumpExprDepth(ctx)
-										return castLiteral(t, raw[idx2].expr)
+										return finishVar(castLiteral(t, raw[idx2].expr))
 									}
 									if len(raw) == 1 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, raw[0].expr)
+										return finishVar(castLiteral(t, raw[0].expr))
 									}
 									// e2704 idx=2 empty: visit_facts fail → VS reselect
 									// Global U100 (not create F10). e2691 idx≥5 create.
@@ -6268,27 +6314,27 @@ exprTries:
 											gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
 											if c, ok := selectExprVariableFromER(t, er, gCands, false); ok && c.expr != "" {
 												bumpExprDepth(ctx)
-												return castLiteral(t, c.expr)
+												return finishVar(castLiteral(t, c.expr))
 											}
 										} else if scopePick2 == 2 {
 											// e2718 ParentParam sole — no stack (e2719 UP U120)
 											bumpExprDepth(ctx)
-											return castLiteral(t, "x")
+											return finishVar(castLiteral(t, "x"))
 										} else if scopePick2 == 1 || scopePick2 == 4 {
 											_ = parentStackPick(er, flow)
 										}
 										bumpExprDepth(ctx)
-										return castLiteral(t, "x")
+										return finishVar(castLiteral(t, "x"))
 									}
 									// e2691 empty true locals idx≥3: GenerateNewParentLocal
 									// keeps want type (no retype U14) → F10 F20 F50×2.
 									if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, false, idx); ok {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								}
 								bumpExprDepth(ctx)
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							} else if idx >= 2 {
 								for len(localCands) < 2 {
 									localCands = append(localCands, exprVarCandidate{
@@ -6417,7 +6463,7 @@ exprTries:
 												gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
 												if c2, ok2 := selectExprVariableFromER(t, er, gCands, false); ok2 && c2.expr != "" {
 													bumpExprDepth(ctx)
-													return castLiteral(t, c2.expr)
+													return finishVar(castLiteral(t, c2.expr))
 												}
 											} else if scopePick2 == 1 {
 												idx2 := parentStackPick(er, flow)
@@ -6432,13 +6478,13 @@ exprTries:
 												}
 												if c2, ok2 := chooseOKVarFromER(er, ok2); ok2 {
 													bumpExprDepth(ctx)
-													return castLiteral(t, c2.expr)
+													return finishVar(castLiteral(t, c2.expr))
 												}
 											}
 											// ParentParam/NewValue: scope pick only → accept
 										}
 										bumpExprDepth(ctx)
-										return castLiteral(t, c.expr)
+										return finishVar(castLiteral(t, c.expr))
 									}
 								}
 								nChoose := 3
@@ -6453,7 +6499,7 @@ exprTries:
 								_ = er.pick(uint32(nChoose))
 							}
 							bumpExprDepth(ctx)
-							return castLiteral(t, localCands[0].expr)
+							return finishVar(castLiteral(t, localCands[0].expr))
 						}
 						if !wantPtr && idx >= 2 {
 							flow.ppPLVisitFailCount++
@@ -6482,36 +6528,36 @@ exprTries:
 								} else if scopePick3 == 3 {
 									if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								} else if scopePick3 == 4 {
 									idx3 := parentStackPick(er, flow)
 									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx3); ok2 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								}
 								bumpExprDepth(ctx)
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							} else if scopePick2 == 2 {
 								// ParentParam sole (e1289 U100=76 no further stack)
 								bumpExprDepth(ctx)
-								return castLiteral(t, localCands[0].expr)
+								return finishVar(castLiteral(t, localCands[0].expr))
 							} else if scopePick2 == 0 || scopePick2 == 3 {
 								if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 							} else if scopePick2 == 4 {
 								idx2 := parentStackPick(er, flow)
 								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx2); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 							}
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, localCands[0].expr)
+						return finishVar(castLiteral(t, localCands[0].expr))
 					}
 					if len(localCands) == 0 || forceCreate {
 						retype := !isParam
@@ -6535,7 +6581,7 @@ exprTries:
 								}
 							}
 							bumpExprDepth(ctx)
-							return castLiteral(t, g.expr)
+							return finishVar(castLiteral(t, g.expr))
 						}
 					} else {
 						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
@@ -6568,36 +6614,36 @@ exprTries:
 										_ = er.fallback.upto(18)
 									}
 									bumpExprDepth(ctx)
-									return castLiteral(t, localCands2[0].expr)
+									return finishVar(castLiteral(t, localCands2[0].expr))
 								} else if scopePick2 == 2 {
 									// ParentParam retry → PL stack + create/select
 									idx2 := parentStackPick(er, flow)
 									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx2); ok2 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								} else if scopePick2 == 0 || scopePick2 == 3 {
 									if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								} else if scopePick2 == 4 {
 									idx2 := parentStackPick(er, flow)
 									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx2); ok2 {
 										bumpExprDepth(ctx)
-										return castLiteral(t, g.expr)
+										return finishVar(castLiteral(t, g.expr))
 									}
 								}
 								// If retry paths miss, fall through accept original.
 							}
 							if c.expr != "" {
 								bumpExprDepth(ctx)
-								return castLiteral(t, c.expr)
+								return finishVar(castLiteral(t, c.expr))
 							}
 						}
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, g.expr)
+							return finishVar(castLiteral(t, g.expr))
 						}
 					}
 					restoreGenSnapshot(ctx, snap)
@@ -6685,12 +6731,12 @@ exprTries:
 							_ = er.pick(cn)
 							flow.isParamGlobalFlexPicks++
 							bumpExprDepth(ctx)
-							return castLiteral(t, flex[0].expr)
+							return finishVar(castLiteral(t, flex[0].expr))
 						}
 						if len(flex) == 1 {
 							flow.isParamGlobalFlexPicks++
 							bumpExprDepth(ctx)
-							return castLiteral(t, flex[0].expr)
+							return finishVar(castLiteral(t, flex[0].expr))
 						}
 					}
 					if len(real) == 0 {
@@ -6700,20 +6746,20 @@ exprTries:
 						}
 						if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, g.expr)
+							return finishVar(castLiteral(t, g.expr))
 						}
 					} else if len(real) == 1 {
 						bumpExprDepth(ctx)
-						return castLiteral(t, real[0].expr)
+						return finishVar(castLiteral(t, real[0].expr))
 					} else if wantPtr && flow.isParamGlobalFlexPicks > 0 {
 						// seed4 e405: after flex Global era, pointer isParam
 						// inventory over-counts; UP sole. seed2 rarely has
 						// flex picks>0 before this shape (flex capped at 3).
 						bumpExprDepth(ctx)
-						return castLiteral(t, real[0].expr)
+						return finishVar(castLiteral(t, real[0].expr))
 					} else if c, ok := selectExprVariableFromER(t, er, real, false); ok {
 						bumpExprDepth(ctx)
-						return castLiteral(t, c.expr)
+						return finishVar(castLiteral(t, c.expr))
 					}
 				}
 			}
@@ -6753,7 +6799,7 @@ exprTries:
 					_ = er.fallback.flipcoin(50)
 					_ = er.fallback.upto(8)
 					bumpExprDepth(ctx)
-					return castLiteral(t, "x")
+					return finishVar(castLiteral(t, "x"))
 				}
 			}
 			// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
@@ -6768,18 +6814,18 @@ exprTries:
 						flow.postAggU15StackU6CreateDone && er != nil {
 						_ = er.pick(2)
 						bumpExprDepth(ctx)
-						return castLiteral(t, "g_0")
+						return finishVar(castLiteral(t, "g_0"))
 					}
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 				if scopePick == 1 {
 					// Pre-multi-dim empty parent locals → create with qfer.
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 				// SelectParentParam empty → SelectParentLocal:
@@ -6815,7 +6861,7 @@ exprTries:
 							_ = er.pick(2) // seed4 e428 itemize
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, pool[0].expr)
+						return finishVar(castLiteral(t, pool[0].expr))
 					}
 					// seed4 e1199: PP array-body PP→PL pointer after NewArray —
 					// inventory sole-select skips create; UP visit_facts miss →
@@ -6834,11 +6880,11 @@ exprTries:
 								expr = localCands[0].expr
 							}
 							bumpExprDepth(ctx)
-							return castLiteral(t, expr)
+							return finishVar(castLiteral(t, expr))
 						}
 						if c, ok := selectExprVariableStrict(t, er, localCands); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
+							return finishVar(castLiteral(t, c.expr))
 						}
 						// Fall back: all non-x dynLocs (block inventory incomplete).
 						allLocs := make([]exprVarCandidate, 0, 8)
@@ -6850,7 +6896,7 @@ exprTries:
 						}
 						if c, ok := selectExprVariableStrict(t, er, allLocs); ok {
 							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
+							return finishVar(castLiteral(t, c.expr))
 						}
 					}
 					// Param→ParentLocal create: early SE-free qferMode 1; late
@@ -6886,7 +6932,7 @@ exprTries:
 							flow.ppEraRhsArrayCreate = true
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
@@ -6931,7 +6977,7 @@ exprTries:
 									_ = er.pick(2)
 								}
 								bumpExprDepth(ctx)
-								return castLiteral(t, pool[0].expr)
+								return finishVar(castLiteral(t, pool[0].expr))
 							}
 							// seed4 e1199: PP→PL pointer after NewArray force create
 							// qferMode 2 (not sole-select then next term U120).
@@ -6948,11 +6994,11 @@ exprTries:
 										expr = localCands[0].expr
 									}
 									bumpExprDepth(ctx)
-									return castLiteral(t, expr)
+									return finishVar(castLiteral(t, expr))
 								}
 								if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, c2.expr)
+									return finishVar(castLiteral(t, c2.expr))
 								}
 								allLocs := make([]exprVarCandidate, 0, 8)
 								for _, l := range mergedLocals(scope, ctx) {
@@ -6963,7 +7009,7 @@ exprTries:
 								}
 								if c2, ok2 := selectExprVariableStrict(t, er, allLocs); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, c2.expr)
+									return finishVar(castLiteral(t, c2.expr))
 								}
 							}
 							qferMiss := 1
@@ -6972,7 +7018,7 @@ exprTries:
 							}
 							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
 								bumpExprDepth(ctx)
-								return castLiteral(t, g.expr)
+								return finishVar(castLiteral(t, g.expr))
 							}
 							restoreGenSnapshot(ctx, snap)
 							continue
@@ -7001,7 +7047,7 @@ exprTries:
 								}
 								// PP sole (e3319 U100=71) → e3320 U120
 								bumpExprDepth(ctx)
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							// e3013–15: after CreateArray residual Global F0, PL stack U4
 							// + locals U5 (not skip-PL continue → second U100).
@@ -7009,7 +7055,7 @@ exprTries:
 								_ = parentStackPick(er, flow) // e3014 U4 (n=4)
 								_ = er.pick(5)                // e3015 U5 locals
 								bumpExprDepth(ctx)
-								return castLiteral(t, "x")
+								return finishVar(castLiteral(t, "x"))
 							}
 							// After U13 residual empty: PL miss without stack residual
 							// (e1753 U100=36 → e1754 U100=16 Global).
@@ -7031,15 +7077,15 @@ exprTries:
 								if ctx.state.ppPostPadPLPicks >= 4 {
 									_ = er.pick(2)
 									bumpExprDepth(ctx)
-									return castLiteral(t, localCands[0].expr)
+									return finishVar(castLiteral(t, localCands[0].expr))
 								}
 								if c2, ok2 := selectExprVariableFromER(t, er, localCands, false); ok2 && c2.expr != "" {
 									bumpExprDepth(ctx)
-									return castLiteral(t, c2.expr)
+									return finishVar(castLiteral(t, c2.expr))
 								}
 								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 								continue
 							}
@@ -7053,7 +7099,7 @@ exprTries:
 									cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
 									if c2, ok2 := selectExprVariableFromER(t, er, cands, false); ok2 && c2.expr != "" {
 										bumpExprDepth(ctx)
-										return castLiteral(t, c2.expr)
+										return finishVar(castLiteral(t, c2.expr))
 									}
 									continue
 								}
@@ -7074,7 +7120,7 @@ exprTries:
 								}
 								if len(ints) == 1 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, ints[0].expr)
+									return finishVar(castLiteral(t, ints[0].expr))
 								}
 								cn := len(ints)
 								if ctx.state.ppPostPadPLPicks >= 4 {
@@ -7082,7 +7128,7 @@ exprTries:
 								}
 								idx := int(er.pick(uint32(cn))) % len(ints)
 								bumpExprDepth(ctx)
-								return castLiteral(t, ints[idx].expr)
+								return finishVar(castLiteral(t, ints[idx].expr))
 							}
 							// seed4 e1790–91: after Global U2+U10 empty (picks==14),
 							// PP VS U100 is visit_facts miss → Expression do-while
@@ -7100,28 +7146,28 @@ exprTries:
 							}
 							if c2, ok2 := selectExprVariableFromER(t, er, candidates, false); ok2 && c2.expr != "" {
 								bumpExprDepth(ctx)
-								return castLiteral(t, c2.expr)
+								return finishVar(castLiteral(t, c2.expr))
 							}
 							// NewValue / empty scopes: accept create or retry.
 							if scopePick == 3 {
 								if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 							}
 							if scopePick == 4 {
 								idx := parentStackPick(er, flow)
 								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
 									bumpExprDepth(ctx)
-									return castLiteral(t, g.expr)
+									return finishVar(castLiteral(t, g.expr))
 								}
 							}
 						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, "x")
+						return finishVar(castLiteral(t, "x"))
 					}
 					bumpExprDepth(ctx)
-					return castLiteral(t, c.expr)
+					return finishVar(castLiteral(t, c.expr))
 				}
 				// choose_var returned null (e.g. pointer want, no exact match).
 				if scopePick == 0 && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
@@ -7130,11 +7176,11 @@ exprTries:
 					if strings.Contains(t.Name, "*") && ctx.state.postAggU15StackU6CreateDone && er != nil {
 						_ = er.pick(2)
 						bumpExprDepth(ctx)
-						return castLiteral(t, "g_0")
+						return finishVar(castLiteral(t, "g_0"))
 					}
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 				// ParentParam miss → SelectParentLocal (stack pick + create).
@@ -7145,7 +7191,7 @@ exprTries:
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
 					if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
 						bumpExprDepth(ctx)
-						return castLiteral(t, c2.expr)
+						return finishVar(castLiteral(t, c2.expr))
 					}
 					qfer := 1
 					if ctx.state.useSmallParentStack && strings.Contains(t.Name, "*") {
@@ -7153,7 +7199,7 @@ exprTries:
 					}
 					if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok2 {
 						bumpExprDepth(ctx)
-						return castLiteral(t, g.expr)
+						return finishVar(castLiteral(t, g.expr))
 					}
 				}
 			}

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4330) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4335) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4330** (4268→4330; int32 hex + NeedLhs SelectDeref create U2-era; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4335** (4330→4335; Expression-level Lhs + binary unwind → Statement Lhs; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -331,7 +331,13 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 3. Empty SelectDeref create F20 F20 U99… (no inventory U5); then choose U2 fail-loop;
    PL U5 / U5 U5 F0; Param U5 U4; Global sole-accept (not U2+F50).
 
-Next plateau: seed4 e4330 UP U120 Expression after Global Lhs vs GO Statement U100.
+**e4330–e4335 climbed:**
+1. Run Lhs after Variable in-Expression (`finishVar`) so parent Expression continues
+   (not StatementAssign NeedLhs ending statement).
+2. After Global Lhs sole: next Expression Variable VS sole-accept; unwind nested
+   binaries (`postAggUnwindBinaryAfterExprVar`) + SkipParentExpr → Statement Lhs F80.
+
+Next plateau: seed4 e4335 UP U5 after NewValue vs GO U4 (Lhs VS residual).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
