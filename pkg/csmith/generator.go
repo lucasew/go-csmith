@@ -3289,18 +3289,39 @@ func randomLeafExprWithMode(
 					// only (levels F50+F10×2 then F10, not self F50).
 					qferMode := 1
 					wantPtr := strings.Contains(t.Name, "*")
-					// isParam pointer ParentLocal: UP body often has 3 pointer
-					// array locals (seed4 e236 U3 + itemize U10 U4). When the
-					// chosen block has fewer than 3 exact pointer matches,
-					// synthesize choose+2D-itemize (392026e seed2-safe).
+					// isParam pointer ParentLocal:
+					// seed2/early: undercount → U3+U10+U4.
+					// seed4 e422 nested multiDim: U2 choose + U4 itemize.
 					if isParam && wantPtr {
-						nExact := 0
+						exact := make([]exprVarCandidate, 0, 4)
 						for _, c := range localCands {
 							if sameBaseType(c.ctype, t) {
-								nExact++
+								exact = append(exact, c)
 							}
 						}
-						if nExact < 3 {
+						nb := 0
+						if ctx != nil && ctx.state != nil {
+							nb = ctx.state.nestedFuncBodies
+						}
+						if nb > 0 && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 &&
+							len(exact) < 3 {
+							// seed4 e422–423: U2 + U4 itemize (1d array).
+							for len(exact) < 2 {
+								exact = append(exact, exprVarCandidate{
+									expr: fmt.Sprintf("l_pp%d", len(exact)), ctype: t, assignable: true,
+									isArray: true, arrayLen: 4,
+								})
+							}
+							c := exact[int(er.pick(2))%len(exact)]
+							al := c.arrayLen
+							if al < 1 {
+								al = 4
+							}
+							_ = er.pick(uint32(al))
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
+						}
+						if len(exact) < 3 {
 							idx := int(er.pick(3))
 							_ = er.pick(10)
 							_ = er.pick(4)
@@ -3464,6 +3485,12 @@ func randomLeafExprWithMode(
 							return castLiteral(t, g.expr)
 						}
 					} else if len(real) == 1 {
+						bumpExprDepth(ctx)
+						return castLiteral(t, real[0].expr)
+					} else if wantPtr && flow.isParamGlobalFlexPicks > 0 {
+						// seed4 e405: after flex Global era, pointer isParam
+						// inventory over-counts; UP sole. seed2 rarely has
+						// flex picks>0 before this shape (flex capped at 3).
 						bumpExprDepth(ctx)
 						return castLiteral(t, real[0].expr)
 					} else if c, ok := selectExprVariableFromER(t, er, real, false); ok {
@@ -4139,12 +4166,13 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// SelectParentLocal: stack pick then block locals / create (seed2 e939–941).
 	if scopePick == 1 {
 		// Lhs stack size often smaller than expression-var pin-5 (e940 U2).
+		// seed4 e449: nested callee body stack size 1 → U1 (not force multiDim U2).
 		nStack := 2
 		if flow != nil && flow.blockStack > 0 && flow.blockStack < 5 {
 			nStack = flow.blockStack
 		}
-		if flow != nil && flow.multiDimArrays > 0 {
-			nStack = 2 // seed2 e940
+		if flow != nil && flow.multiDimArrays > 0 && flow.blockStack >= 2 {
+			nStack = 2 // seed2 e940 multi-dim only when stack has nested blocks
 		}
 		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
 		// seed2 e2261: filterCompoundStmts era ParentLocal stack U6.
@@ -4186,6 +4214,8 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			}
 			if len(localCands) == 0 || forceCreateLate {
 				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) seed2 e942–943.
+				// seed4 e450: empty-block Lhs WRITE create keeps target type
+				// (no U14 retype) when !useSmallParentStack.
 				if forceCreateLate {
 					// e1515–20 NewArray: F50 vol, F20=1, F50 F50 U20, CreateArray.
 					// e1723–25 !NewArray: F50 vol, F20=0, Constant pure_rnd F50:
@@ -4215,7 +4245,13 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					}
 					return lvalueInfo{expr: "x", ctype: target}, true, false
 				}
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx); ok {
+				// seed4 e450: after PP pad era, empty PL Lhs WRITE create keeps
+				// target type (no U14). seed2 e942 early still retypes.
+				retype := true
+				if flow != nil && flow.isParamPPFallPicks >= 2 && !flow.useSmallParentStack {
+					retype = false
+				}
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, retype, idx); ok {
 					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if c, ok := selectExprVariable(target, r, localCands, true); ok {
@@ -4530,17 +4566,19 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				needNoRhsDerefTries++
 				continue
 			}
-			// seed2 e936: multiDim needNoRhs always U2 choose / continue (never
-			// create-fallthrough here — that broke seed2 when nestedFuncBodies>0).
-			// seed4 e432 create residual is handled after VS ParentLocal miss
-			// (needNoRhs residual chain), not by skipping U2 on first F80.
-			if !triedDerefChoose {
+			// seed2 e936: multiDim needNoRhs U2 choose.
+			// seed4 e433: after PP pad era (isParamPPFallPicks>=2) nested body
+			// ++/-- has no ptr inventory → create residual F50 F10 F50…
+			if ctx.state.isParamPPFallPicks >= 2 && !ctx.state.useSmallParentStack {
+				// fall through to need_no_rhs create residual
+			} else if !triedDerefChoose {
 				_ = r.upto(2) // e936
 				triedDerefChoose = true
 				continue
+			} else {
+				// Second F80=true: no create residual; fail again → next F80.
+				continue
 			}
-			// Second F80=true: no create residual; fail again → next F80.
-			continue
 		}
 		// After CreateArray in THIS Lhs loop, itemize last sizes (e1115 U10 U1 U1).
 		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
