@@ -1394,6 +1394,14 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 }
 
 func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	return createOnDemandGlobalFromEROpts(er, opts, t, ctx, false)
+}
+
+// createOnDemandGlobalFromEROpts mirrors GenerateNewGlobal.
+// skipRandomQfer: when the caller passes a non-wildcard qfer (e.g. formal
+// param qfer from make_random_param), GenerateNewGlobal copies it and skips
+// random_qualifiers (seed4 e173–175: U14 F20 F50 only, no F10 after retype).
+func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *genContext, skipRandomQfer bool) (exprVarCandidate, bool) {
 	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
 		return exprVarCandidate{}, false
 	}
@@ -1404,13 +1412,15 @@ func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genCon
 	// seed2 e825–827: F50 F10 F10 then NewArray F20.
 	levels := strings.Count(t.Name, "*")
 	isConst, isVolatile := false, false
-	for i := 0; i < levels; i++ {
-		_ = opts.Volatiles && er.fallback.flipcoin(50)
-		_ = opts.Consts && er.fallback.flipcoin(10)
+	if !skipRandomQfer {
+		for i := 0; i < levels; i++ {
+			_ = opts.Volatiles && er.fallback.flipcoin(50)
+			_ = opts.Consts && er.fallback.flipcoin(10)
+		}
+		// Self: assume non-side-effect-free expression context (no vol draw).
+		isConst = opts.Consts && er.fallback.flipcoin(10)
+		isVolatile = false
 	}
-	// Self: assume non-side-effect-free expression context (no vol draw).
-	isConst = opts.Consts && er.fallback.flipcoin(10)
-	isVolatile = false
 	// create_and_initialize
 	newArray := er.fallback.flipcoin(20)
 	isPtr := levels > 0
@@ -3184,19 +3194,31 @@ func randomLeafExprWithMode(
 				flow = ctx.state
 			}
 			if scopePick == 4 {
-				_ = parentStackPick(er, flow)
+				idx := parentStackPick(er, flow)
 				// NewValue→ParentLocal: GenerateNewVariable always creates.
-				// qfer null → random_qualifiers. Early seed2 non-pointer creates
-				// matched with withNewQualifiers=false (const/vol already burned
-				// elsewhere); pointer creates after multi-dim need true (e817).
-				// seed2 e2228: late filterCompoundStmts simple create needs full
-				// qferMode 1 F50 F10 F20 (not bare NewArray F20).
-				needQfer := strings.Contains(t.Name, "*") &&
-					ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
-				if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
-					needQfer = true
+				// make_random_param passes formal qfer → no random_qualifiers
+				// (seed4 e181–185: after F10 creation coin + stack U, F20 NewArray
+				// + F20 init only). Non-param: qfer null → random_qualifiers.
+				qferMode := 0
+				if !isParam {
+					// Early seed2 non-pointer: withNewQualifiers=false.
+					// Pointer after multi-dim need full qfer (e817).
+					// seed2 e2228: filterCompoundStmts simple create qferMode 1.
+					needQfer := strings.Contains(t.Name, "*") &&
+						ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+					if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
+						needQfer = true
+					}
+					if needQfer {
+						qferMode = 1
+					}
 				}
-				if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, needQfer); ok {
+				// Pointer formals keep t; simple may retype via random_type_from_type.
+				retype := !strings.Contains(t.Name, "*") && !isParam
+				if isParam && !strings.Contains(t.Name, "*") {
+					retype = true // GenerateNewVariable ParentLocal retypes simple
+				}
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx); ok {
 					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
 				}
@@ -3260,7 +3282,55 @@ func randomLeafExprWithMode(
 				// Pre-multi-dim: keep historical all-locals candidate build below
 				// (stack pick already burned).
 			}
-			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+			// make_random_param + SelectGlobal for non-pointer formals only:
+			// type-strict match on real globals (no g_p* pads). Miss →
+			// choose_random_simple U14 + GenerateNewGlobal with formal qfer
+			// (seed4 e172–175). Pointer formals keep flexible choose (seed2 e312).
+			if isParam && scopePick == 0 && !strings.Contains(t.Name, "*") &&
+				flow != nil && !flow.useSmallParentStack &&
+				er != nil && er.fallback != nil {
+				real := make([]exprVarCandidate, 0, 16)
+				for _, g := range env.globals {
+					if strings.Contains(g.ctype.Name, "*") {
+						continue
+					}
+					real = append(real, exprVarCandidate{
+						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+						isArray: g.isArray, arrayLen: g.arrayLen,
+					})
+				}
+				if ctx != nil && ctx.state != nil {
+					for _, g := range ctx.state.dynGlobals {
+						if strings.Contains(g.ctype.Name, "*") {
+							continue
+						}
+						real = append(real, exprVarCandidate{
+							expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+							isArray: g.isArray, arrayLen: g.arrayLen,
+						})
+					}
+				}
+				exact := make([]exprVarCandidate, 0, len(real))
+				for _, c := range real {
+					if c.ctype.Bits == t.Bits && c.ctype.Signed == t.Signed {
+						exact = append(exact, c)
+					}
+				}
+				if len(exact) == 0 {
+					retype := pickSimpleNonVoid(er.fallback, opts)
+					if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
+						bumpExprDepth(ctx)
+						return castLiteral(t, g.expr)
+					}
+				} else if len(exact) == 1 {
+					bumpExprDepth(ctx)
+					return castLiteral(t, exact[0].expr)
+				} else if c, ok := selectExprVariableFromER(t, er, exact, false); ok {
+					bumpExprDepth(ctx)
+					return castLiteral(t, c.expr)
+				}
+			}
+						candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			// seed2 e1021: ParentParam + pointer want after useSmallParentStack —
 			// UP falls through to SelectParentLocal (U3 stack + create) even when
 			// GO param inventory is non-empty. Keep non-pointer param selects (e962).
