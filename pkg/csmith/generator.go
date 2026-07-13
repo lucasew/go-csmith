@@ -394,6 +394,9 @@ type functionFlowState struct {
 	// postAggSkipShiftByOnce: after NeedLhs Lhs, parent shift may still run
 	// ShiftBy F50 U32 (NeedLhs cleared); UP next is Expression U120 (e4250).
 	postAggSkipShiftByOnce bool
+	// postAggForceDerefCreate: next SelectDeref uses empty create F20 F20 U5
+	// (e4262 after PL U4 NeedLhs), not inventory choose/itemize.
+	postAggForceDerefCreate bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -824,10 +827,13 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					_ = er.fallback.flipcoin(50)
 					flow.postAggLhsWriteDone = true
 					// e4250: nested ExpressionAssign Lhs done; StatementAssign outer
-					// Lhs must sole-accept (UP next Expression Function U120), not
-					// another SelectDeref F80 / Assign residual F50 U32.
+					// Lhs must sole-accept (UP next Expression U120). e4258: several
+					// free Variable Expressions follow; sole outer ExpressionAssign
+					// Lhs so GO does not F80 SelectDeref mid-stream (UP U120 Variable).
 					flow.ppPostPadSkipStmtLhs = true
 					flow.ppPostPadOuterLhsSole = true
+					// One-shot sole sticky; e4262 ExpressionAssign needs real F80 Lhs
+					// so do not arm OuterLhsSoleN (would sticky-sole that Lhs too).
 					flow.ppPostPadSkipParentExprN = 0
 					return "x"
 				}
@@ -880,6 +886,21 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 		fails := 0
 		if flow != nil {
 			fails = flow.postAggLhsDerefChooseFails
+		}
+		// e4262–65: after ptr-cmp-create era PL U4 accept + NeedLhs, SelectDeref
+		// empty → create F20 F20 U5 (address residual), not choose U5 itemize.
+		// Use postAggLhsWriteDone as arm: set when U4 PL NeedLhs fires.
+		if flow != nil && flow.postAggPtrCmpPLCreateDone && flow.postAggForceDerefCreate {
+			flow.postAggForceDerefCreate = false
+			newArray := er.fallback.flipcoin(20)
+			initConst := er.fallback.flipcoin(20)
+			if !newArray && !initConst {
+				_ = er.pick(5) // address-of choose residual
+			} else if initConst {
+				_ = er.fallback.flipcoin(0)
+			}
+			flow.postAggLhsWriteDone = true
+			return "x"
 		}
 		ptrs := collectLhsDerefPointers(env, scope, ctx, t)
 		// UP pool: 12,10,8,7,7,6 then after Global VS fail: 5…
@@ -5666,13 +5687,14 @@ exprTries:
 										// e4237: second PL after create — empty/miss path:
 										// no U5 choose; F50 (loose/create-prefix) then nested
 										// Expression (UP U120→NewValue create e4238–45).
+										// e4237 one-shot: PLN==2 after itemize → F50 + nested
+										// Expression. Later PLs (e4261) use normal U5/U4 choose.
 										if flow.postAggPtrCmpPLCreateDone &&
-											flow.postAggU15StackU6PLNAfterPostPtr >= 2 {
+											flow.postAggU15StackU6PLNAfterPostPtr == 2 {
+											flow.postAggU15StackU6PLNAfterPostPtr = 3
 											// Stack already burned; mirror make_init address
 											// residual shape: F50 then Expression::make_random
 											// (UP e4238 Variable → NewValue create e4239–45).
-											// Arm NeedLhs so after nested create parent Assign
-											// runs Lhs F80 next (e4246), not more Expression F50.
 											if er.fallback != nil {
 												_ = er.fallback.flipcoin(50)
 											}
@@ -5696,7 +5718,13 @@ exprTries:
 											}
 											return castLiteral(t, "x")
 										}
-										_ = er.pick(5)
+										// e4035/e4204: U5 choose; e4261+: U4 after one-shot create residual.
+										nLoc := uint32(5)
+										if flow.postAggPtrCmpPLCreateDone &&
+											flow.postAggU15StackU6PLNAfterPostPtr >= 3 {
+											nLoc = 4
+										}
+										_ = er.pick(nLoc)
 										if flow.postAggPtrCmpPLCreateDone &&
 											flow.postAggU15StackU6PLNAfterPostPtr == 1 {
 											// One-shot e4204 itemize after first post-create PL.
@@ -5704,6 +5732,21 @@ exprTries:
 											_ = er.pick(9)
 											_ = er.pick(9)
 											_ = er.pick(3)
+										}
+										// e4261 U4 accept → parent ExpressionAssign Lhs F80
+										// (not F0 reselect, not free next Expression F50 U120).
+										if flow.postAggPtrCmpPLCreateDone &&
+											flow.postAggU15StackU6PLNAfterPostPtr >= 3 {
+											flow.postAggNeedLhsAfterRhs = true
+											flow.postAggForceDerefCreate = true
+											// Allow real Lhs F80 (clear sticky OuterLhsSole).
+											flow.ppPostPadOuterLhsSole = false
+											flow.ppPostPadOuterLhsSoleN = 0
+											bumpExprDepth(ctx)
+											if len(localCands) > 0 {
+												return castLiteral(t, localCands[0].expr)
+											}
+											return castLiteral(t, "x")
 										}
 										if er.fallback != nil {
 											_ = er.fallback.flipcoin(0)
@@ -7198,8 +7241,11 @@ exprTries:
 			// seed4 e1589–90: outer Assign Lhs sole after nested residual.
 			// e3445: after U15 StackU6 create era, Lhs runs SelectDeref F80
 			// (not sticky OuterLhsSole skip → parent U120).
+			// e4258: after ptr-cmp-create NeedLhs Lhs, free Variable Expressions
+			// follow; keep OuterLhsSoleN even under StackU6CreateDone.
 			skipOuterLhsSole := ctx != nil && ctx.state != nil &&
-				ctx.state.postAggU15StackU6CreateDone
+				ctx.state.postAggU15StackU6CreateDone &&
+				!ctx.state.postAggPtrCmpPLCreateDone
 			if !skipOuterLhsSole && ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSoleN > 0 {
 				ctx.state.ppPostPadOuterLhsSoleN--
 				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
