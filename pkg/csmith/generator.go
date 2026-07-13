@@ -382,6 +382,9 @@ type functionFlowState struct {
 	// postAggForceArrayOpResidual: one-shot e3955 ArrayOp (U100=56 tries=0) with
 	// F5=0 array_loop aryno=0 → StatementFor residual (not filterCompound reject).
 	postAggForceArrayOpResidual bool
+	// postAggU15StackU6PLNAfterPostPtr: PL picks after post-ptr era (0: e3903 sole;
+	// later e4035+ U5 choose + F0).
+	postAggU15StackU6PLNAfterPostPtr int
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -3318,6 +3321,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					target > 9 {
 					target = 9
 				}
+				// e4039: post-ptr era GlobalList U44 (overrides seed2 U28 pad).
+				if postAggU15StackU6PostPPPtrSelDerefNSink != nil &&
+					*postAggU15StackU6PostPPPtrSelDerefNSink >= 2 {
+					target = 44
+				}
 				if target > n {
 					v := int(er.pick(uint32(target)))
 					// e849 F50 only on first U11-scale Global choose.
@@ -3556,8 +3564,20 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						stackU6U14 := postAggU15StackU6CreateDoneSink != nil && *postAggU15StackU6CreateDoneSink &&
 							!afterPPVisit
 						if afterPPVisit {
-							// e3862: exact-ish small pool U2 after residual Expression.
-							if len(exactNoArr) >= 2 {
+							// e4039: after post-ptr PL F0 reselect Global, UP GlobalList
+							// choose U44 (full list grown). e3862 was U2 after residual.
+							postPtrN := 0
+							if postAggU15StackU6PostPPPtrSelDerefNSink != nil {
+								postPtrN = *postAggU15StackU6PostPPPtrSelDerefNSink
+							}
+							if postPtrN >= 2 {
+								pool = live
+								if len(pool) == 0 {
+									pool = liveNoArr
+								}
+								targetN = 44
+							} else if len(exactNoArr) >= 2 {
+								// e3862: exact-ish small pool U2 after residual Expression.
 								pool = exactNoArr
 								if len(pool) > 2 {
 									pool = pool[:2]
@@ -5495,10 +5515,33 @@ exprTries:
 									return castLiteral(t, "x")
 								}
 								if n >= 8 && er != nil {
-									// e3903+: after post-PP pointer Lhs era, stack U5
-									// sole accept (choose_ok_var len==1 → no U) → Lhs F80.
+									// e3903: first PL after post-PP pointer Lhs era —
+									// stack already burned; sole accept → Lhs F80.
+									// e4035+: later PL stack + choose_ok_var U5 + F0
+									// (not sole → parent U120).
 									// Earlier e3793–97: U4 + multi-dim itemize [9][9][3].
 									if flow.postAggU15StackU6PostPPPtrSelDerefN >= 2 {
+										if flow.postAggU15StackU6PLNAfterPostPtr == 0 {
+											flow.postAggU15StackU6PLNAfterPostPtr = 1
+											bumpExprDepth(ctx)
+											if len(localCands) > 0 {
+												return castLiteral(t, localCands[0].expr)
+											}
+											return castLiteral(t, "x")
+										}
+										// e4035–39: choose_ok_var U5 + opportunistic F0
+										// fail → VS Global U100 + GlobalList U44.
+										_ = er.pick(5)
+										if er.fallback != nil {
+											_ = er.fallback.flipcoin(0)
+										}
+										scopePick2 := variableScopePickFromER(er, opts, &scope)
+										if scopePick2 == 0 {
+											// e4039: UP GlobalList size 44 (inventory lags).
+											_ = er.pick(44)
+										} else if scopePick2 == 1 || scopePick2 == 4 {
+											_ = parentStackPick(er, flow)
+										}
 										bumpExprDepth(ctx)
 										if len(localCands) > 0 {
 											return castLiteral(t, localCands[0].expr)
@@ -6855,12 +6898,18 @@ exprTries:
 					// (UP U120 AssignOps next, not F50 qfer).
 					// e3264: after Lhs Global U15 era, SE-free Assign burns self F50
 					// again (UP F50 then AssignOps U120=85).
+					// e4040–41: post-ptr era ExpressionAssign term → AssignOps U120
+					// without self F50 (UP U120=100 then U120=53).
 					if postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink &&
 						postAggGlobalU24AfterArrayOpDone {
 						seFree = false
 						if ctx != nil && ctx.state != nil && ctx.state.postAggLhsGlobalU15Done {
 							seFree = true
 						}
+					}
+					if ctx != nil && ctx.state != nil &&
+						ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 {
+						seFree = false
 					}
 					burnSelfF50 := (!small || n == 1 || lateQfer) && seFree
 					if ppEraAssign {

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4036) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4081) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4036** (3876→4036; SelectDeref accept vs NewValue misread; pointer Lhs U7; ArrayOp residual; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4081** (3876→4081; SelectDeref accept through ExpressionAssign/ArrayOp; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -307,7 +307,7 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 5. ArrayOp U100=56 F5=0 aryno=0 → For residual header (e3955–74).
 6. haltGen after f10 late residual exhaust (avoid silent hang on longer seed4 stream).
 
-Next plateau: seed4 e4036 UP U5 (PL choose/validate) vs GO U120 term after PL U100=48 U5=0.
+Next plateau: seed4 e4081 UP U12 vs GO U10 (GlobalList/choose scale after Function binary).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
