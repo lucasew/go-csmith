@@ -188,15 +188,9 @@ func pickSimpleNonVoid(r *rng, opts Options) CType {
 		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},
 		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
 	}
-	// eSimple matches Type::choose_random_simple (eChar,eInt,eShort,…) used by
-	// random_type_from_type retype. historical left-shifted uchar/int for early
-	// Global paths; use eSimple once nested callees exist (seed4 e585 U14=2→int).
 	simples := historical
 	floatIdx, i128Idx, u128Idx := 11, 12, 13
 	if useSmallParentStackSink != nil && *useSmallParentStackSink {
-		simples = eSimple
-		floatIdx, i128Idx, u128Idx = 10, 12, 13
-	} else if nestedFuncBodiesSink != nil && *nestedFuncBodiesSink > 0 {
 		simples = eSimple
 		floatIdx, i128Idx, u128Idx = 10, 12, 13
 	}

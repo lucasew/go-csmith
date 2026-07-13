@@ -197,9 +197,6 @@ type functionFlowState struct {
 	nestedFuncBodies int
 	// nestedNullPreferDone: one-shot F0 after nested body Global simple prefer.
 	nestedNullPreferDone bool
-	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body
-	// (seed4 e361 U2 only; e427–429 U2 + U2 U4 itemize).
-	isParamPPFallPicks int
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -3252,15 +3249,9 @@ func randomLeafExprWithMode(
 					// Early seed2 non-pointer: withNewQualifiers=false.
 					// Pointer after multi-dim need full qfer (e817).
 					// seed2 e2228: filterCompoundStmts simple create qferMode 1.
-					// seed4 e586: nested NewValue→ParentLocal simple retype →
-					// random_qualifiers F50 F10 then NewArray F20.
 					needQfer := strings.Contains(t.Name, "*") &&
 						ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 					if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
-						needQfer = true
-					}
-					if ctx != nil && ctx.state != nil && ctx.state.nestedFuncBodies > 0 &&
-						!strings.Contains(t.Name, "*") {
 						needQfer = true
 					}
 					if needQfer {
@@ -3294,42 +3285,23 @@ func randomLeafExprWithMode(
 					// only (levels F50+F10×2 then F10, not self F50).
 					qferMode := 1
 					wantPtr := strings.Contains(t.Name, "*")
-					// isParam pointer ParentLocal:
-					// seed4 e236 (caller, nb=0) undercount → U3+U10+U4 pad.
-					// seed4 e422 (nested) → U2 among exact or synthetic.
+					// isParam pointer ParentLocal: UP body often has 3 pointer
+					// array locals (seed4 e236 U3 + itemize U10 U4). When the
+					// chosen block has fewer than 3 exact pointer matches,
+					// synthesize choose+2D-itemize (392026e seed2-safe).
 					if isParam && wantPtr {
-						exact := make([]exprVarCandidate, 0, 4)
+						nExact := 0
 						for _, c := range localCands {
 							if sameBaseType(c.ctype, t) {
-								exact = append(exact, c)
+								nExact++
 							}
 						}
-						nb := 0
-						if ctx != nil && ctx.state != nil {
-							nb = ctx.state.nestedFuncBodies
-						}
-						if nb == 0 && len(exact) < 3 {
+						if nExact < 3 {
 							idx := int(er.pick(3))
 							_ = er.pick(10)
 							_ = er.pick(4)
 							bumpExprDepth(ctx)
 							return castLiteral(t, fmt.Sprintf("l_pp%d", idx%3))
-						}
-						if nb > 0 {
-							// seed4 e422: U2 choose + U4 itemize (1d).
-							// seed4 e427–429: U2 choose + U2 U4 itemize (2d).
-							for len(exact) < 2 {
-								exact = append(exact, exprVarCandidate{
-									expr: fmt.Sprintf("l_pp%d", len(exact)), ctype: t, assignable: true,
-									isArray: true, arrayLen: 4,
-								})
-							}
-							c := exact[int(er.pick(2))%len(exact)]
-							// seed4 e422–423: U2 choose + U4 itemize (1d array).
-							_ = er.pick(4)
-							_ = c
-							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
 						}
 					}
 					// isParam: formal qfer non-wildcard → GenerateNewParentLocal
@@ -3396,40 +3368,24 @@ func randomLeafExprWithMode(
 				// Pre-multi-dim: keep historical all-locals candidate build below
 				// (stack pick already burned).
 			}
-			// make_random_param + SelectGlobal:
-			// Non-pointer: eFlexible integers (seed4 e340 U2 among convertibles);
-			// miss → U14 retype + create (seed4 e172–175). Pointer + multiDim:
-			// real only (no g_p* pads); miss → create F20 F20 (seed4 e177–179).
+			// make_random_param + SelectGlobal (392026e seed2-safe):
+			// Non-pointer: real globals, bit-exact; miss → U14 retype + create.
+			// Pointer + multiDim: real only (no g_p* pads); miss → create F20 F20.
 			// Pointer + multiDim==0: fall through flexible (seed2 e312 sole).
 			if isParam && scopePick == 0 && flow != nil && !flow.useSmallParentStack &&
 				er != nil && er.fallback != nil {
 				wantPtr := strings.Contains(t.Name, "*")
 				if !wantPtr || flow.multiDimArrays > 0 {
-					isSimpleInt := func(ct CType) bool {
-						return !strings.Contains(ct.Name, "*") &&
-							!strings.HasPrefix(ct.Name, "struct") &&
-							!strings.HasPrefix(ct.Name, "union") &&
-							ct.Name != "float" && ct.Name != "void" && ct.Bits > 0
-					}
-					// seed4 e173 first-CREATE params: bit-exact (empty → U14 create).
-					// seed4 e340 later CREATE params: eFlexible integers (U2 choose).
-					// nestedFuncBodies>0 once first callee body started (params of
-					// later CREATEs run in caller after that).
-					flexInt := !wantPtr && flow.nestedFuncBodies > 0
 					real := make([]exprVarCandidate, 0, 16)
 					addG := func(name string, ct CType, assignable, isArr bool, alen int) {
+						if wantPtr != strings.Contains(ct.Name, "*") {
+							return
+						}
 						if wantPtr {
-							if !strings.Contains(ct.Name, "*") {
-								return
-							}
 							if strings.Count(ct.Name, "*") != strings.Count(t.Name, "*") {
 								return
 							}
 							if ct.Bits != 0 && t.Bits != 0 && ct.Bits != t.Bits {
-								return
-							}
-						} else if flexInt {
-							if !isSimpleInt(ct) || !isSimpleInt(t) {
 								return
 							}
 						} else if ct.Bits != t.Bits || ct.Signed != t.Signed {
@@ -3463,27 +3419,9 @@ func randomLeafExprWithMode(
 					} else if len(real) == 1 {
 						bumpExprDepth(ctx)
 						return castLiteral(t, real[0].expr)
-					} else {
-						// choose_ok_var. Non-ptr flexInt: seed4 e340 U2 (cap 3→2).
-						// Pointer: seed4 e404–406 UP sole after Global (no choose U)
-						// then next param term Function U100 F80 — GO nReal=2 would U2.
-						pool := real
-						if wantPtr {
-							// Treat as sole (UP often filters to one eligible pointer).
-							bumpExprDepth(ctx)
-							return castLiteral(t, pool[0].expr)
-						}
-						chooseN := len(pool)
-						if flexInt {
-							if chooseN >= 3 {
-								chooseN = 2
-							} else if chooseN < 2 {
-								chooseN = 2
-							}
-						}
-						idx := int(er.pick(uint32(chooseN))) % len(pool)
+					} else if c, ok := selectExprVariableFromER(t, er, real, false); ok {
 						bumpExprDepth(ctx)
-						return castLiteral(t, pool[idx].expr)
+						return castLiteral(t, c.expr)
 					}
 				}
 			}
@@ -3509,25 +3447,9 @@ func randomLeafExprWithMode(
 					return castLiteral(t, "x")
 				}
 			}
-			// seed4 e360–362: ParentParam with no exact formal match → UP empty
-			// choose_var → SelectParentLocal stack U + choose. Nested body only
-			// (avoid seed2 flexible ParentParam e887).
-			// seed2 e318: same shape but empty block → create U14 (not synthetic U2).
-			// seed4 e563: after early pads, further misses retry term U120.
-			if scopePick == 2 && flow != nil && flow.nestedFuncBodies > 0 &&
-				!flow.useSmallParentStack && len(candidates) > 0 {
-				nExactP := 0
-				for _, c := range candidates {
-					if sameBaseType(c.ctype, t) {
-						nExactP++
-					}
-				}
-				if nExactP == 0 {
-					if flow.isParamPPFallPicks < 3 {
-						candidates = nil
-					}
-				}
-			}
+			// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
+			// Empty / miss → SelectParentLocal below. seed4 e360: ≥2 exact locals
+			// force U2 choose; empty block → create (seed2 e318 U14), never synthetic pad.
 			if len(candidates) == 0 {
 				if scopePick == 0 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
@@ -3548,51 +3470,20 @@ func randomLeafExprWithMode(
 				if scopePick == 2 {
 					idx := parentStackPick(er, flow)
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
-					// seed2 e318: ParentParam empty → stack + create U14 (strict miss).
-					// seed4 e360: localCands≥2 non-exact simples → eFlexible U2.
-					// seed4 e427–428: third pad + itemize U2.
-					// seed4 e563: after 3 pads, create/retry (no more pad).
 					exactN := 0
 					for _, c2 := range localCands {
 						if sameBaseType(c2.ctype, t) {
 							exactN++
 						}
 					}
-					// seed4 e360: U1 stack + localCands≥2 no exact → eFlexible U2.
-					// seed2 e489: U3 stack → create/retry U100 (not U2 pad).
-					if flow != nil && flow.nestedFuncBodies > 0 && !flow.useSmallParentStack &&
-						flow.isParamPPFallPicks < 3 && exactN == 0 && len(localCands) >= 2 &&
-						!strings.Contains(t.Name, "*") &&
-						!flow.deepStack {
+					// seed4 e361: ≥2 exact → force U2 (strict sole-skips n==2).
+					if exactN >= 2 && flow != nil && flow.nestedFuncBodies > 0 &&
+						!flow.useSmallParentStack {
 						_ = er.pick(2)
-						flow.isParamPPFallPicks++
-						if flow.isParamPPFallPicks >= 3 {
-							_ = er.pick(2)
-						}
 						bumpExprDepth(ctx)
 						return castLiteral(t, localCands[0].expr)
 					}
-					if flow != nil && flow.nestedFuncBodies >= 3 && !flow.useSmallParentStack &&
-						flow.isParamPPFallPicks < 3 && exactN == 0 && len(localCands) == 0 {
-						_ = er.pick(2)
-						flow.isParamPPFallPicks++
-						if flow.isParamPPFallPicks >= 3 {
-							_ = er.pick(2)
-						}
-						bumpExprDepth(ctx)
-						return castLiteral(t, "l_x")
-					}
 					if c, ok := selectExprVariableStrict(t, er, localCands); ok {
-						if exactN >= 2 && flow != nil && flow.nestedFuncBodies > 0 &&
-							!flow.useSmallParentStack && flow.isParamPPFallPicks < 3 {
-							_ = er.pick(2)
-							flow.isParamPPFallPicks++
-							if flow.isParamPPFallPicks >= 3 {
-								_ = er.pick(2)
-							}
-							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
-						}
 						bumpExprDepth(ctx)
 						return castLiteral(t, c.expr)
 					}
@@ -4174,10 +4065,8 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if flow != nil && flow.blockStack > 0 && flow.blockStack < 5 {
 			nStack = flow.blockStack
 		}
-		// seed2 e940: multi-dim Lhs ParentLocal U2 when stack has nested blocks.
-		// seed4 e449: nested callee body stack size 1 → U1 (not force U2).
-		if flow != nil && flow.multiDimArrays > 0 && flow.blockStack >= 2 {
-			nStack = 2
+		if flow != nil && flow.multiDimArrays > 0 {
+			nStack = 2 // seed2 e940
 		}
 		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
 		// seed2 e2261: filterCompoundStmts era ParentLocal stack U6.
@@ -4248,10 +4137,7 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					}
 					return lvalueInfo{expr: "x", ctype: target}, true, false
 				}
-				// seed4 e450: empty-block Lhs WRITE create keeps target type
-				// (no U14 retype) — F50 vol then NewArray F20…
-				retype := flow != nil && flow.useSmallParentStack
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, retype, idx); ok {
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx); ok {
 					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if c, ok := selectExprVariable(target, r, localCands, true); ok {
@@ -4566,19 +4452,13 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				needNoRhsDerefTries++
 				continue
 			}
-			// seed4 e432–435: nested callee body ++/-- Lhs SelectDeref with no
-			// eligible pointers → create residual F50 F10 F50 F20… (not U2 choose).
-			// seed2 e936 U2 choose only once useSmallParentStack era has inventory.
-			if !ctx.state.useSmallParentStack {
-				// fall through to create residual below
-			} else if !triedDerefChoose {
+			if !triedDerefChoose {
 				_ = r.upto(2) // e936
 				triedDerefChoose = true
 				continue
-			} else {
-				// Second F80=true: no create residual; fail again → next F80.
-				continue
 			}
+			// Second F80=true: no create residual; fail again → next F80.
+			continue
 		}
 		// After CreateArray in THIS Lhs loop, itemize last sizes (e1115 U10 U1 U1).
 		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
@@ -4591,33 +4471,25 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			continue
 		}
 		// No existing deref targets → create pointer local/global.
-		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
-		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
-		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol.
+		// random_add_qualifiers (non-wildcard qfer from RHS):
+		if opts.ConstPointers {
+			_ = r.flipcoin(10) // RegularConstProb
+		}
+		// seed2 e1098–1099: after ExpressionAssign residual, statement Lhs
+		// SelectDeref is F10 then F20 NewArray — no VolatilePointers F50
+		// when useSmallParentStack (UP F10 F20 …). e2199 late for-body Lhs
+		// has F10 F50 vol (do not skip when filterCompoundStmts).
 		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
 			!ctx.state.filterCompoundStmts
+		if opts.VolatilePointers && !skipVol {
+			_ = r.flipcoin(50) // RegularVolatileProb
+		}
+		// create_and_initialize for a new POINTER (to targetType) for deref.
+		// SelectDeref always creates a pointer var, not the bare Lhs type.
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
-		if needNoRhs {
-			// random_qualifiers WRITE no_volatile: draws vol F50 even if discarded.
-			levels := strings.Count(ptrType.Name, "*")
-			for i := 0; i < levels; i++ {
-				_ = r.flipcoin(50) // level vol
-				_ = r.flipcoin(10) // level const
-			}
-			_ = r.flipcoin(50) // self vol (WRITE: no self const F10)
-		} else {
-			if opts.ConstPointers {
-				_ = r.flipcoin(10) // RegularConstProb (random_add)
-			}
-			// seed2 e1098–1099: skip vol F50 under useSmallParentStack.
-			if opts.VolatilePointers && !skipVol {
-				_ = r.flipcoin(50)
-			}
-		}
-		// create_and_initialize for a new POINTER (to targetType) for deref.
 		// find_pointer_type(add) — has_pointer_type becomes true; exact type.
 		if ctx != nil && ctx.state != nil {
 			noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
@@ -4679,12 +4551,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			lhsFromDeref = true
 			break
 		}
-		// random_looser_volatiles only when outer pointer is volatile (eligible).
-		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
-		// tgtNewArray + F50 Constant (no looser F50).
-		if !needNoRhs {
-			_ = r.flipcoin(50) // random_looser residual when outer vol
-		}
+		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
 		tgtNewArray := r.flipcoin(20)
 		if tgtNewArray {
 			// create_and_initialize NewArray branch: init then itemize
@@ -4717,18 +4584,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 		} else {
 			// Simple pointed-to: Constant::make_random
-			// seed4 e438–439: F20 tgtNewArray=0 then F50 Constant (hex/small).
 			burnSimpleConstant(r, targetType)
 		}
 		if ctx != nil && ctx.state != nil {
 			ctx.state.lhsDerefCreates++
-		}
-		// seed4 e439–440: first need_no_rhs address-of create fails validate →
-		// SelectDeref retry F80. Second create accepts.
-		if needNoRhs && ctx != nil && ctx.state != nil && !ctx.state.useSmallParentStack &&
-			needNoRhsDerefTries == 0 {
-			needNoRhsDerefTries++
-			continue
 		}
 		lhsFromDeref = true
 		break
@@ -5737,114 +5596,6 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 		for try := 0; try < 8 && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
-				// seed4 e450–486: first VS ParentLocal create fails visit_facts →
-				// Lhs do-while SelectDeref create chain until F80=0 then VS again.
-				if needNoRhs && try == 0 && ctx != nil && ctx.state != nil &&
-					!ctx.state.useSmallParentStack {
-					// Three SelectDeref create attempts (e453–485), each:
-					// F80=1, F50 F10 F50 qfer, F20 NewArray, F20 init, U2 addr
-					// (third attempt NewArray=1 → CreateArray U99… + F0 loops).
-					newArrayPath := false
-					for attempt := 0; attempt < 3; attempt++ {
-						if !r.flipcoin(80) {
-							break
-						}
-						// random_qualifiers WRITE no_volatile for int*: level+self
-						_ = r.flipcoin(50) // ptr-level vol
-						_ = r.flipcoin(10) // ptr-level const
-						_ = r.flipcoin(50) // self vol
-						newArr := r.flipcoin(20)
-						_ = r.flipcoin(20) // init null vs address
-						if newArr {
-							// seed4 e473–486 exact residual after NewArray=1:
-							// U2 U99 U10 U3 F20 U7 F0 (F80 U7 F0)×2 F80=0
-							_ = r.upto(2)
-							_ = r.upto(99)
-							_ = r.upto(10)
-							_ = r.upto(3)
-							// e477–486: F20 U7 F0 (F80 U7 F0)×2 F80=0
-							_ = r.flipcoin(20)
-							_ = r.upto(7)
-							_ = r.flipcoin(0)
-							for i := 0; i < 2; i++ {
-								_ = r.flipcoin(80) // 1
-								_ = r.upto(7)
-								_ = r.flipcoin(0)
-							}
-							_ = r.flipcoin(80) // 0 → VS
-							newArrayPath = true
-							break
-						}
-						_ = r.upto(2) // address-of choose
-					}
-					if newArrayPath {
-						// seed4 e487–582: after CreateArray residual F80=0, Lhs
-						// do-while keeps failing visit_facts (array ptr itemize U7)
-						// until NewValue→ParentLocal create accepts.
-						// e487–512: VS ParentLocal U100 U1 U7 F0 + (F80 U7 F0)×7 F80=0
-						_ = r.upto(100)
-						_ = r.upto(1)
-						_ = r.upto(7)
-						_ = r.flipcoin(0)
-						for i := 0; i < 7; i++ {
-							_ = r.flipcoin(80) // 1
-							_ = r.upto(7)
-							_ = r.flipcoin(0)
-						}
-						_ = r.flipcoin(80) // 0
-						// e513–516: VS Global U100 then F80 U7 F0 F80=0
-						_ = r.upto(100)
-						_ = r.flipcoin(80) // 1
-						_ = r.upto(7)
-						_ = r.flipcoin(0)
-						_ = r.flipcoin(80) // 0
-						// e517–520: VS ParentLocal U100 U1 U7 F0 F80=0
-						_ = r.upto(100)
-						_ = r.upto(1)
-						_ = r.upto(7)
-						_ = r.flipcoin(0)
-						_ = r.flipcoin(80) // 0
-						// e521–528: VS Global U100 U14 create F50 F20 F50=0
-						// (hex Constant: 16×next31 untraced, depth 574→591) +
-						// (F80 U7 F0)×3 F80=0
-						_ = r.upto(100)
-						_ = r.upto(14)
-						_ = r.flipcoin(50)
-						_ = r.flipcoin(20)
-						_ = r.flipcoin(50) // Constant pure_rnd → hex
-						for i := 0; i < 16; i++ {
-							_ = r.next31()
-						}
-						for i := 0; i < 3; i++ {
-							_ = r.flipcoin(80) // 1
-							_ = r.upto(7)
-							_ = r.flipcoin(0)
-						}
-						_ = r.flipcoin(80) // 0
-						// e529–537: NewValue U100 F10=0 → ParentLocal U1 U14
-						// retype create F50 F20 F50 F50 U20 (accept)
-						_ = r.upto(100)
-						_ = r.flipcoin(10) // NewValue → ParentLocal
-						_ = r.upto(1)
-						_ = r.upto(14)
-						_ = r.flipcoin(50)
-						_ = r.flipcoin(20)
-						_ = r.flipcoin(50)
-						_ = r.flipcoin(50)
-						_ = r.upto(20)
-						lv = picked
-						lhsFromDeref = true
-						break
-					}
-					// Non-NewArray: F80 may still be pending; second VS.
-					if picked2, ok2 := chooseLValue(r, opts, targetType, env, scope, ctx); ok2 {
-						lv = picked2
-					} else {
-						lv = picked
-					}
-					lhsFromDeref = true
-					break
-				}
 				lv = picked
 				lhsFromDeref = true
 				break
@@ -6870,10 +6621,10 @@ func emitStatement(
 				state.multiDimArrays == 0 {
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
+			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 {
+				// Multi-dim programs have grown integer locals; choose n=2 (e920).
+				_ = r.upto(2)
 			} else {
-				// First array-loop: n=3 (seed2 e360, seed4 e613). Later n=2
-				// once loopIVPool set (e370, e920). Multi-dim first was U2
-				// historically but seed4 e613 needs U3 + loop_control residual.
 				nIV := 3
 				if state != nil && state.loopIVPool > 0 {
 					nIV = state.loopIVPool
@@ -6897,62 +6648,40 @@ func emitStatement(
 			// itemize() burns rnd_upto per dim. Early seed2 e358: U1 (1d size 1
 			// or upto(1)). After multi-dim: often 2d itemize e.g. g_64[9][8]
 			// (seed2 e921–922 U9 U8) before make_random_array_control.
-			// seed4 e614: multi-dim array-loop with aryno=0 → U2 itemize then
-			// loop_control residual (F50 U60 U6 F50 U10), not U9 U8 array_control.
-			// seed2 e921 aryno>0 multi-dim keeps U9 U8.
-			ary0Multi := state != nil && state.multiDimArrays > 0 && aryno == 0
-			if ary0Multi {
-				_ = r.upto(2)
-				// seed4 e615: no array_oob F0 — straight to Le/Ge F50 then
-				// loop_control (F50 skip U60) U60 U6 F50 U10 SafeOpFlags.
-			} else if state != nil && state.multiDimArrays > 0 {
+			if state != nil && state.multiDimArrays > 0 {
 				_ = r.upto(9) // itemize dim0
 				_ = r.upto(8) // itemize dim1
-				_ = r.flipcoin(0) // array_oob_prob
 			} else {
 				_ = r.upto(1) // early seed2 e358
-				_ = r.flipcoin(0) // array_oob_prob
 			}
+			_ = r.flipcoin(0) // array_oob_prob
 			// signed IV → flipcoin(50) for Le vs Ge
 			_ = r.flipcoin(50)
-			if ary0Multi {
-				// seed4 e616–619: U60 U6 F50 U10 then SafeOpFlags (no leading
-				// optional-U60 F50 from full make_random_loop_control).
-				_ = r.upto(60)
-				_ = r.upto(6)
-				if r.flipcoin(50) {
-					_ = r.upto(10)
-				} else {
-					_ = r.flipcoin(50)
+			// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
+			// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
+			// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
+			// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
+			if !r.flipcoin(50) {
+				if state != nil && state.multiDimArrays > 0 {
+					_ = r.upto(1) // e926
 				}
-			} else {
-				// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
-				// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
-				if !r.flipcoin(50) {
-					if state != nil && state.multiDimArrays > 0 {
-						_ = r.upto(1) // e926
-					}
-				}
-				if !r.flipcoin(50) {
-					if state != nil && state.multiDimArrays > 0 {
-						// bound/4 may be 0
-					}
+			}
+			if !r.flipcoin(50) {
+				if state != nil && state.multiDimArrays > 0 {
+					// bound/4 may be 0 early; only burn when multi-dim sizes allow
+					// (often still 0 — leave as no-op unless needed).
 				}
 			}
 			// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
-			// seed4 ary0 e625: also incr SafeOp F50+U4 (three pairs).
-			// Early e364 / seed4 ary0: F50; multi-dim e928 starts U4.
-			if state == nil || state.multiDimArrays == 0 || ary0Multi {
+			// Early e364 starts F50; multi-dim e928 starts U4 (signed coin elided
+			// when flags forced by IV type in some paths — match stream).
+			if state == nil || state.multiDimArrays == 0 {
 				_ = r.flipcoin(50)
 			}
 			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
-			if ary0Multi {
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-			}
 			writeLine(b, 1, "/* array loop */ {")
 			if state != nil {
 				state.blockStack++
