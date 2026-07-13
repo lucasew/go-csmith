@@ -95,6 +95,12 @@ var postAggU15PLAfterGlobalF0Sink *bool
 // opportunistic_validate F0+reselect (seed4 e2337); later accepts without F0
 // (e2530 U5 → parent Expression U120, not F0).
 var postAggPLIdx0ValidateF0Done bool
+// postAggForceInt32ConstOnce: one-shot after ForceDerefCreate — next Constant
+// uses int32 RandomHexDigits(8) to match UP (e4268), not parent uint8 hex=2.
+var postAggForceInt32ConstOnce bool
+// postAggArmNeedLhsAfterNextVar: after ForceDeref OuterLhsSoleBurn era, next
+// termVariable arms NeedLhs so parent Assign runs SelectDeref create (e4271).
+var postAggArmNeedLhsAfterNextVar bool
 
 // effectSEFreeSink: current Expression SE-free for is_eligible.
 var effectSEFreeSink *bool
@@ -397,6 +403,18 @@ type functionFlowState struct {
 	// postAggForceDerefCreate: next SelectDeref uses empty create F20 F20 U5
 	// (e4262 after PL U4 NeedLhs), not inventory choose/itemize.
 	postAggForceDerefCreate bool
+	// postAggOuterLhsSoleBurnF50: OuterLhsSole burns F50 (parent ShiftBy) once
+	// after ForceDerefCreate Constant (e4268); earlier OuterLhsSole is silent (e4258).
+	postAggOuterLhsSoleBurnF50 bool
+	// postAggEmptyDerefCreateOnce: next SelectDeref empty → create F20 F20 U99
+	// without inventory choose U5 (e4272 after NeedLhs Variable).
+	postAggEmptyDerefCreateOnce bool
+	// postAggDerefChooseU2AfterCreate: after e4272 empty create fail, SelectDeref
+	// choose uses U2 (UP pool) not inventory U5 (e4279).
+	postAggDerefChooseU2AfterCreate bool
+	// postAggU2EraPLFails: ParentLocal miss count under U2-after-create era
+	// (e4305 U5 only; e4325+ U5 U5 F0). Independent of Param plFails.
+	postAggU2EraPLFails int
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -819,6 +837,14 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			sp := variableScopePickFromER(er, opts, &scope)
 			switch {
 			case sp == 0: // Global
+				// e4330: after empty CreateArray U2-era, Global Lhs sole-accept
+				// (UP next Expression U120), not U2+F50 residual (that was e4248).
+				// Do not SkipStmtLhs/OuterLhsSole — parent Expression continues.
+				if flow != nil && flow.postAggDerefChooseU2AfterCreate {
+					flow.postAggLhsWriteDone = true
+					flow.postAggDerefChooseU2AfterCreate = false
+					return "x"
+				}
 				// e4248: after ptr-cmp PL create + NewValue residual, Lhs F80=0
 				// → VS Global U100=8 chooses among 2 (UP U2). e4249 F50 residual
 				// then parent Expression U120 (not more SelectDeref F80).
@@ -826,14 +852,11 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					_ = er.pick(2)
 					_ = er.fallback.flipcoin(50)
 					flow.postAggLhsWriteDone = true
-					// e4250: nested ExpressionAssign Lhs done; StatementAssign outer
-					// Lhs must sole-accept (UP next Expression U120). e4258: several
-					// free Variable Expressions follow; sole outer ExpressionAssign
-					// Lhs so GO does not F80 SelectDeref mid-stream (UP U120 Variable).
+					// e4250: StatementAssign outer Lhs sole; OuterLhsSole for free
+					// ExpressionAssigns e4250–57 (silent sole, no F50).
 					flow.ppPostPadSkipStmtLhs = true
 					flow.ppPostPadOuterLhsSole = true
-					// One-shot sole sticky; e4262 ExpressionAssign needs real F80 Lhs
-					// so do not arm OuterLhsSoleN (would sticky-sole that Lhs too).
+					flow.postAggOuterLhsSoleBurnF50 = false
 					flow.ppPostPadSkipParentExprN = 0
 					return "x"
 				}
@@ -856,6 +879,25 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				globalFails++
 				continue
 			case sp == 1 || sp == 2 || sp == 4:
+				// e4305: after empty CreateArray U2-era, ParentLocal first miss is
+				// U5 only then F80. Later PL: U5 U5 F0 (e4325–27). Param: U5+U4.
+				if flow != nil && flow.postAggDerefChooseU2AfterCreate && sp == 1 {
+					_ = er.pick(5)
+					if flow.postAggU2EraPLFails >= 1 {
+						_ = er.pick(5)
+						_ = er.fallback.flipcoin(0)
+					}
+					flow.postAggU2EraPLFails++
+					plFails++
+					continue
+				}
+				if flow != nil && flow.postAggDerefChooseU2AfterCreate && sp == 2 {
+					// Param: U5 choose + U4 residual (e4286–87) then F80.
+					_ = er.pick(5)
+					_ = er.pick(4)
+					plFails++
+					continue
+				}
 				_ = parentStackPick(er, flow)
 				nLoc := uint32(4)
 				if plFails >= 1 {
@@ -902,20 +944,63 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			flow.postAggLhsWriteDone = true
 			// Lhs complete — do not re-enter NeedLhs on subsequent Expressions.
 			flow.postAggNeedLhsAfterRhs = false
-			flow.ppPostPadSkipStmtLhs = true
+			// e4268: free Constant after create uses int32 hex=8 (UP); next
+			// ExpressionAssign soles Lhs + burns parent ShiftBy F50.
+			// Do NOT set SkipStmtLhs: e4271 StatementAssign needs real SelectDeref
+			// create (F80 F20 F20 U99…); sticky skip soles that Lhs → U120 Constant.
+			postAggForceInt32ConstOnce = true
+			postAggArmNeedLhsAfterNextVar = true
+			flow.ppPostPadOuterLhsSole = true
+			flow.postAggOuterLhsSoleBurnF50 = true
 			return "x"
 		}
 		ptrs := collectLhsDerefPointers(env, scope, ctx, t)
+		// e4272: after NeedLhs Variable, SelectDeref create without inventory
+		// choose (UP F80 F20=1 NewArray F20 U99…, not U5). Prior ForceDeref
+		// may have left ptrs in inventory that still fail type/visit_facts.
+		// Create may fail visit_facts → continue Lhs loop (F80 U2… e4278+).
+		if flow != nil && flow.postAggEmptyDerefCreateOnce {
+			flow.postAggEmptyDerefCreateOnce = false
+			newArray := er.fallback.flipcoin(20)
+			initConst := er.fallback.flipcoin(20)
+			if newArray {
+				// CreateArray: U99 dim + per-dim sizes (ArrayVariable.cpp).
+				_ = er.fallback.upto(99)
+				_ = er.fallback.upto(10)
+				_ = er.fallback.upto(1)
+				_ = er.fallback.upto(2)
+			} else if initConst {
+				_ = er.fallback.flipcoin(0)
+			} else {
+				_ = er.pick(5)
+			}
+			flow.postAggDerefChooseU2AfterCreate = true
+			if flow != nil {
+				flow.postAggLhsDerefChooseFails++
+			}
+			continue
+		}
 		// UP pool: 12,10,8,7,7,6 then after Global VS fail: 5…
+		// e4279+: after empty CreateArray fail, choose pool is U2 (not U5).
 		poolNs := []int{12, 10, 8, 7, 7, 6, 5, 5, 5}
 		nChoose := 5
-		if fails < len(poolNs) {
+		if flow != nil && flow.postAggDerefChooseU2AfterCreate {
+			nChoose = 2
+		} else if fails < len(poolNs) {
 			nChoose = poolNs[fails]
 		}
 		// After first Global VS sole-fail, next SelectDeref is choose+itemize+F0
 		// (e3055–59 U5 U9 U9 U3 F0) not choose-only half of a pair.
 		afterGlobalVS := globalFails >= 1
 		_ = int(er.pick(uint32(nChoose)))
+		// e4279–84: after empty CreateArray, choose U2 fails pure (no F0/itemize);
+		// loop SelectDeref F80 until F80=0 → VS U100.
+		if flow != nil && flow.postAggDerefChooseU2AfterCreate {
+			if flow != nil {
+				flow.postAggLhsDerefChooseFails++
+			}
+			continue
+		}
 		if len(ptrs) > 0 || fails < 8 {
 			if fails == 0 {
 				_ = er.fallback.flipcoin(0)
@@ -1505,6 +1590,12 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 	r := er.fallback
 	if r == nil {
 		return castLiteral(t, "0")
+	}
+	// e4268: after ForceDerefCreate Lhs, free Constant is int-width hex (UP
+	// RandomHexDigits(8)); expr type may still be uint8_t from parent.
+	if postAggForceInt32ConstOnce {
+		postAggForceInt32ConstOnce = false
+		t = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 	}
 	if r.flipcoin(50) {
 		smallDec := r.flipcoin(50)
@@ -5183,6 +5274,15 @@ exprTries:
 					}
 				}
 			}
+			// e4271: after ForceDeref OuterLhsSoleBurn Constant, next Variable is
+			// Assign RHS — arm NeedLhs so SelectDeref create runs (UP F80 F20 U99…).
+			if postAggArmNeedLhsAfterNextVar && ctx != nil && ctx.state != nil {
+				postAggArmNeedLhsAfterNextVar = false
+				ctx.state.postAggNeedLhsAfterRhs = true
+				ctx.state.postAggEmptyDerefCreateOnce = true
+				ctx.state.ppPostPadOuterLhsSole = false
+				ctx.state.ppPostPadOuterLhsSoleN = 0
+			}
 			if c, ok := trySelectMustUseVar(er, t, ctx); ok {
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
@@ -7255,6 +7355,12 @@ exprTries:
 			}
 			if !skipOuterLhsSole && ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSole {
 				ctx.state.ppPostPadOuterLhsSole = false
+				// e4268: sole Lhs after int32 Constant RHS; burn F50 only when
+				// armed after ForceDerefCreate (parent ShiftBy). e4258 silent.
+				if ctx.state.postAggOuterLhsSoleBurnF50 && er != nil && er.fallback != nil {
+					ctx.state.postAggOuterLhsSoleBurnF50 = false
+					_ = er.fallback.flipcoin(50)
+				}
 				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			if skipOuterLhsSole && ctx != nil && ctx.state != nil {
@@ -12188,6 +12294,8 @@ func emitSingleFuncDefOnce(
 		postAggGlobalU23Done = false
 		postAggGlobalLivePicks = 0
 		postAggPLIdx0ValidateF0Done = false
+		postAggForceInt32ConstOnce = false
+		postAggArmNeedLhsAfterNextVar = false
 		postAggArrayOpDoneSink = nil
 		postAggGlobalU24AfterArrayOpDone = false
 		postAggGlobalF0AfterCreateResidual = false
