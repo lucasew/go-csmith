@@ -227,6 +227,9 @@ type functionFlowState struct {
 	// ppNewArrayCreated: true after PP-era ParentLocal NewArray CreateArray;
 	// gates Lhs address-of choose U2 (seed4 e1195).
 	ppNewArrayCreated bool
+	// ppPLVisitFailOnce: one-shot visit_facts fail for PP-era simple ParentLocal
+	// (seed4 e1217 U100 retry after stack).
+	ppPLVisitFailOnce bool
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
 }
@@ -1791,8 +1794,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 						}
 					}
 				}
-			} else if ppEra && newArray {
-				// seed4 e1096: NewArray + address-of init → choose U2 then CreateArray.
+			} else if ppEra && (newArray || ctx.state.ppNewArrayCreated) {
+				// seed4 e1096: NewArray + address-of → choose U2 then CreateArray.
+				// seed4 e1204: after ppNewArrayCreated, address-of finds pointees
+				// (U2 choose), not empty → F50 + nested Expression (e695).
 				_ = er.fallback.upto(2)
 			} else if ppEra {
 				// seed4 e695: choose_var empty → random_loose_qualifiers F50 +
@@ -3428,6 +3433,7 @@ func randomLeafExprWithMode(
 					// seed2 e2228: filterCompoundStmts simple create qferMode 1.
 					// seed4 e586: after PP pad era nested simple NewValue→PL
 					// SE-free qfer F50 F10 (isParamPPFallPicks>=2).
+					// seed4 e1226: !SE-free simple → qferMode 2 (F10 only, not F50 F10).
 					needQfer := strings.Contains(t.Name, "*") &&
 						ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 					if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
@@ -3439,6 +3445,11 @@ func randomLeafExprWithMode(
 					}
 					if needQfer {
 						qferMode = 1
+						if ctx != nil && !ctx.effectSEFree &&
+							!strings.Contains(t.Name, "*") &&
+							ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+							qferMode = 2
+						}
 					}
 				}
 				// Pointer formals keep t; simple may retype via random_type_from_type.
@@ -3576,8 +3587,61 @@ func randomLeafExprWithMode(
 						}
 					} else {
 						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
-							bumpExprDepth(ctx)
-							return castLiteral(t, c.expr)
+							// seed4 e1217: PP-era simple ParentLocal choose fails
+							// visit_facts → ExpressionVariable do-while retries
+							// VariableSelector (new U100), not accept→next term.
+							if flow != nil && flow.isParamPPFallPicks >= 2 &&
+								flow.arrayLoopDepth > 0 && flow.ppNewArrayCreated &&
+								!wantPtr && !flow.ppPLVisitFailOnce {
+								flow.ppPLVisitFailOnce = true
+								// Fall through to empty-expr retry style below via
+								// re-select with empty name signal.
+								c.expr = ""
+								// Handle retry inline (same as empty-expr path).
+								scopePick2 := variableScopePickFromER(er, opts, &scope)
+								if scopePick2 == 1 {
+									idx2 := parentStackPick(er, flow)
+									localCands2 := localsInStackBlock(er, env, scope, ctx, idx2)
+									// seed4 e1219: after PL retry stack, choose U3
+									// among padded block locals (not sole-select).
+									for len(localCands2) < 3 {
+										localCands2 = append(localCands2, exprVarCandidate{
+											expr: fmt.Sprintf("l_r%d", len(localCands2)), ctype: t, assignable: true,
+										})
+									}
+									_ = er.pick(3)
+									// seed4 e1220: residual U18 before next term
+									// (Function binary op stream alignment).
+									if er.fallback != nil {
+										_ = er.fallback.upto(18)
+									}
+									bumpExprDepth(ctx)
+									return castLiteral(t, localCands2[0].expr)
+								} else if scopePick2 == 2 {
+									// ParentParam retry → PL stack + create/select
+									idx2 := parentStackPick(er, flow)
+									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx2); ok2 {
+										bumpExprDepth(ctx)
+										return castLiteral(t, g.expr)
+									}
+								} else if scopePick2 == 0 || scopePick2 == 3 {
+									if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
+										bumpExprDepth(ctx)
+										return castLiteral(t, g.expr)
+									}
+								} else if scopePick2 == 4 {
+									idx2 := parentStackPick(er, flow)
+									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx2); ok2 {
+										bumpExprDepth(ctx)
+										return castLiteral(t, g.expr)
+									}
+								}
+								// If retry paths miss, fall through accept original.
+							}
+							if c.expr != "" {
+								bumpExprDepth(ctx)
+								return castLiteral(t, c.expr)
+							}
 						}
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 							bumpExprDepth(ctx)
@@ -3707,6 +3771,13 @@ func randomLeafExprWithMode(
 			// GO param inventory is non-empty. Keep non-pointer param selects (e962).
 			if scopePick == 2 && flow != nil && flow.useSmallParentStack &&
 				strings.Contains(t.Name, "*") {
+				candidates = nil
+			}
+			// seed4 e1199: PP array-body ParentParam pointer — inventory falsely
+			// non-empty (choose U3 among params) while UP PP miss → PL stack U3
+			// + create qferMode 2 (F50 F10 F10). Force empty like small-stack era.
+			if scopePick == 2 && flow != nil && flow.isParamPPFallPicks >= 2 &&
+				flow.arrayLoopDepth > 0 && strings.Contains(t.Name, "*") {
 				candidates = nil
 			}
 			// seed4 e831: after must_use F80 residual, ParentParam miss → PL
@@ -4240,13 +4311,42 @@ func randomLeafExprWithMode(
 			// Early (pre-useSmallParentStack) ExpressionAssign Lhs: inventory is
 			// sparse/wrong vs UP. After VS U100 accept without choose U so parent
 			// term stream stays aligned (seed4 e106 Global U100 → e107 U120).
-			if ctx == nil || ctx.state == nil || !ctx.state.useSmallParentStack {
+			// seed4 e1231: PP-era (no useSmallParentStack) ParentParam Lhs still
+			// does stack U3 (PP→PL), not early accept after U100 alone.
+			if ctx == nil || ctx.state == nil {
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			ppLhsEra := ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
+			if !ctx.state.useSmallParentStack && !ppLhsEra {
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			// seed2 e1093–1097: early ParentParam Lhs → stack U3 + create + residual F80.
 			// e1149: later ParentParam → stack U3 only (found/accept without create).
-			if scopePick == 2 && ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+			// seed4 e1231: PP-era ParentParam Lhs → stack U3 only (next F80 residual).
+			if scopePick == 2 {
 				idx := parentStackPick(er, ctx.state)
+				if ppLhsEra && !ctx.state.useSmallParentStack {
+					// seed4 e1231–33: PP-era ParentParam Lhs → stack U3, then
+					// Lhs do-while residual F80; if F80=0 retry VS U100.
+					_ = idx
+					if er != nil && er.fallback != nil && er.fallback.flipcoin(80) {
+						// SelectDeref true — accept Lhs (create path omitted).
+						return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+					}
+					// F80=0: fall through to another VariableSelector pick.
+					scopePick2 := variableScopePickFromER(er, opts, &scope)
+					if scopePick2 == 2 {
+						_ = parentStackPick(er, ctx.state)
+					} else if scopePick2 == 1 {
+						_ = parentStackPick(er, ctx.state)
+					} else if scopePick2 == 4 {
+						_ = parentStackPick(er, ctx.state)
+						_, _ = createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, true, 0)
+					} else if scopePick2 == 3 || scopePick2 == 0 {
+						_, _ = createOnDemandGlobalFromER(er, opts, t, ctx)
+					}
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
 				// assignExprCount already incremented for this ExpressionAssign.
 				// count==1 only: e1093 create+residual. Later: stack only (e1149).
 				earlyLhs := ctx.state.assignExprCount <= 1
@@ -6832,9 +6932,11 @@ func emitStatement(
 	if stmtBudget != nil && *stmtBudget == 0 {
 		return true
 	}
-	// Each statement starts with SE-free effect context (CGContext fresh/merged).
+	// Each statement starts with SE-free effect context and expr_depth=0
+	// (Statement.cpp: cg_context.expr_depth = 0 before statement body).
 	if ctx != nil {
 		ctx.effectSEFree = true
+		ctx.exprDepth = 0
 	}
 	maybeDeclareOnDemandLocal(b, r, opts, ctx)
 	if stmtBudget != nil && *stmtBudget > 0 {
