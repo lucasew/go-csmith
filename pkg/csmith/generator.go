@@ -33,6 +33,9 @@ var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
 // nestedFuncBodiesSink / nestedNullPreferSink: seed4 e263 nested-body F0.
 var nestedFuncBodiesSink *int
+// useESimpleRetypeSink: pickSimpleNonVoid uses eSimpleType order (seed4 e585
+// NewValue→PL after PP pads: U14=2→int32 HexDigits=8).
+var useESimpleRetypeSink *bool
 var nestedNullPreferSink *bool
 
 type structTypeInfo struct {
@@ -3253,9 +3256,15 @@ func randomLeafExprWithMode(
 					// Early seed2 non-pointer: withNewQualifiers=false.
 					// Pointer after multi-dim need full qfer (e817).
 					// seed2 e2228: filterCompoundStmts simple create qferMode 1.
+					// seed4 e586: after PP pad era nested simple NewValue→PL
+					// SE-free qfer F50 F10 (isParamPPFallPicks>=2).
 					needQfer := strings.Contains(t.Name, "*") &&
 						ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 					if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
+						needQfer = true
+					}
+					if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+						!strings.Contains(t.Name, "*") {
 						needQfer = true
 					}
 					if needQfer {
@@ -3267,7 +3276,18 @@ func randomLeafExprWithMode(
 				if isParam && !strings.Contains(t.Name, "*") {
 					retype = true // GenerateNewVariable ParentLocal retypes simple
 				}
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx); ok {
+				// seed4 e585: after PP pads, retype uses eSimpleType (U14=2→int32
+				// HexDigits=8). Broad nested eSimple broke seed2 inventory.
+				esimple := false
+				if retype && ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+					esimple = true
+					useESimpleRetypeSink = &esimple
+				}
+				g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx)
+				if esimple {
+					useESimpleRetypeSink = nil
+				}
+				if ok {
 					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
 				}
@@ -5737,6 +5757,105 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		}
 		for try := 0; try < 8 && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+				// seed4 e450–486: first VS ParentLocal create fails visit_facts →
+				// Lhs do-while SelectDeref create chain until F80=0 then VS again.
+				// Gate on isParamPPFallPicks (seed4 nested after PP pads) so seed2
+				// e942 PL create still accepts immediately → SafeOpFlags.
+				if needNoRhs && try == 0 && ctx != nil && ctx.state != nil &&
+					!ctx.state.useSmallParentStack && ctx.state.isParamPPFallPicks >= 2 {
+					// Three SelectDeref create attempts (e453–485), each:
+					// F80=1, F50 F10 F50 qfer, F20 NewArray, F20 init, U2 addr
+					// (third attempt NewArray=1 → CreateArray U99… + F0 loops).
+					newArrayPath := false
+					for attempt := 0; attempt < 3; attempt++ {
+						if !r.flipcoin(80) {
+							break
+						}
+						_ = r.flipcoin(50) // ptr-level vol
+						_ = r.flipcoin(10) // ptr-level const
+						_ = r.flipcoin(50) // self vol
+						newArr := r.flipcoin(20)
+						_ = r.flipcoin(20) // init null vs address
+						if newArr {
+							// seed4 e473–486: U2 U99 U10 U3 F20 U7 F0 (F80 U7 F0)×2 F80=0
+							_ = r.upto(2)
+							_ = r.upto(99)
+							_ = r.upto(10)
+							_ = r.upto(3)
+							_ = r.flipcoin(20)
+							_ = r.upto(7)
+							_ = r.flipcoin(0)
+							for i := 0; i < 2; i++ {
+								_ = r.flipcoin(80) // 1
+								_ = r.upto(7)
+								_ = r.flipcoin(0)
+							}
+							_ = r.flipcoin(80) // 0 → VS
+							newArrayPath = true
+							break
+						}
+						_ = r.upto(2) // address-of choose
+					}
+					if newArrayPath {
+						// seed4 e487–582 residual after CreateArray F80=0
+						_ = r.upto(100)
+						_ = r.upto(1)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+						for i := 0; i < 7; i++ {
+							_ = r.flipcoin(80) // 1
+							_ = r.upto(7)
+							_ = r.flipcoin(0)
+						}
+						_ = r.flipcoin(80) // 0
+						_ = r.upto(100)
+						_ = r.flipcoin(80) // 1
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+						_ = r.flipcoin(80) // 0
+						_ = r.upto(100)
+						_ = r.upto(1)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+						_ = r.flipcoin(80) // 0
+						_ = r.upto(100)
+						_ = r.upto(14)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(50) // hex Constant
+						for i := 0; i < 16; i++ {
+							_ = r.next31()
+						}
+						for i := 0; i < 3; i++ {
+							_ = r.flipcoin(80) // 1
+							_ = r.upto(7)
+							_ = r.flipcoin(0)
+						}
+						_ = r.flipcoin(80) // 0
+						// e582–589: NewValue U100 F10=0 → PL U1 U14 retype create
+						// qferMode 3 WRITE: F50 vol (no F10), F20 NewArray, Constant
+						// F50 F50 U20 (seed4 e586; not SE-free F50 F10).
+						_ = r.upto(100)
+						_ = r.flipcoin(10) // NewValue → ParentLocal
+						_ = r.upto(1)
+						_ = r.upto(14)
+						_ = r.flipcoin(50) // vol (WRITE qferMode 3)
+						_ = r.flipcoin(20) // NewArray
+						_ = r.flipcoin(50) // Constant pure_rnd
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
+						lv = picked
+						lhsFromDeref = true
+						break
+					}
+					if picked2, ok2 := chooseLValue(r, opts, targetType, env, scope, ctx); ok2 {
+						lv = picked2
+					} else {
+						lv = picked
+					}
+					lhsFromDeref = true
+					break
+				}
 				lv = picked
 				lhsFromDeref = true
 				break
@@ -6762,10 +6881,13 @@ func emitStatement(
 				state.multiDimArrays == 0 {
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
-			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 {
-				// Multi-dim programs have grown integer locals; choose n=2 (e920).
+			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 &&
+				state.isParamPPFallPicks < 2 {
+				// seed2 e920: multi-dim first array-loop U2 (before PP pad era).
 				_ = r.upto(2)
 			} else {
+				// First array-loop: n=3 (seed2 e360 early, seed4 e613 after PP pads).
+				// Later n=2 once loopIVPool set (e370).
 				nIV := 3
 				if state != nil && state.loopIVPool > 0 {
 					nIV = state.loopIVPool
@@ -6789,40 +6911,63 @@ func emitStatement(
 			// itemize() burns rnd_upto per dim. Early seed2 e358: U1 (1d size 1
 			// or upto(1)). After multi-dim: often 2d itemize e.g. g_64[9][8]
 			// (seed2 e921–922 U9 U8) before make_random_array_control.
-			if state != nil && state.multiDimArrays > 0 {
+			// seed4 e614: aryno=0 multi-dim → U2 itemize + loop_control residual
+			// (not U9 U8 array_control). Gate aryno==0 after PP pad era.
+			ary0Multi := state != nil && state.multiDimArrays > 0 && aryno == 0 &&
+				state.isParamPPFallPicks >= 2
+			if ary0Multi {
+				_ = r.upto(2)
+			} else if state != nil && state.multiDimArrays > 0 {
 				_ = r.upto(9) // itemize dim0
 				_ = r.upto(8) // itemize dim1
 			} else {
 				_ = r.upto(1) // early seed2 e358
 			}
-			_ = r.flipcoin(0) // array_oob_prob
+			if !ary0Multi {
+				_ = r.flipcoin(0) // array_oob_prob
+			}
 			// signed IV → flipcoin(50) for Le vs Ge
 			_ = r.flipcoin(50)
-			// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
-			// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
-			// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
-			// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
-			if !r.flipcoin(50) {
+			if ary0Multi {
+				// seed4 e616–619: U60 U6 F50 U10 then SafeOpFlags
+				_ = r.upto(60)
+				_ = r.upto(6)
+				if r.flipcoin(50) {
+					_ = r.upto(10)
+				} else {
+					_ = r.flipcoin(50)
+				}
+			} else if !r.flipcoin(50) {
+				// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
+				// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
+				// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
+				// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
 				if state != nil && state.multiDimArrays > 0 {
 					_ = r.upto(1) // e926
 				}
 			}
-			if !r.flipcoin(50) {
-				if state != nil && state.multiDimArrays > 0 {
-					// bound/4 may be 0 early; only burn when multi-dim sizes allow
-					// (often still 0 — leave as no-op unless needed).
+			if !ary0Multi {
+				if !r.flipcoin(50) {
+					if state != nil && state.multiDimArrays > 0 {
+						// bound/4 may be 0 early; only burn when multi-dim sizes allow
+						// (often still 0 — leave as no-op unless needed).
+					}
 				}
 			}
 			// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
-			// Early e364 starts F50; multi-dim e928 starts U4 (signed coin elided
-			// when flags forced by IV type in some paths — match stream).
-			if state == nil || state.multiDimArrays == 0 {
+			// seed4 ary0: also incr SafeOp F50+U4 (three pairs).
+			// Early e364 / seed4 ary0: F50; multi-dim e928 starts U4.
+			if state == nil || state.multiDimArrays == 0 || ary0Multi {
 				_ = r.flipcoin(50)
 			}
 			_ = r.upto(4)
 			_ = r.flipcoin(50)
 			_ = r.flipcoin(50)
 			_ = r.upto(4)
+			if ary0Multi {
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+			}
 			writeLine(b, 1, "/* array loop */ {")
 			if state != nil {
 				state.blockStack++

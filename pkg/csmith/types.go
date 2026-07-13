@@ -188,9 +188,14 @@ func pickSimpleNonVoid(r *rng, opts Options) CType {
 		{Name: "__int128", Signed: true, Bits: 128, HexDigits: 16},
 		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
 	}
+	// eSimple: true choose_random_simple order. historical left-shifts for early
+	// seed2. useESimpleRetypeSink: seed4 e585 after PP pads only.
 	simples := historical
 	floatIdx, i128Idx, u128Idx := 11, 12, 13
 	if useSmallParentStackSink != nil && *useSmallParentStackSink {
+		simples = eSimple
+		floatIdx, i128Idx, u128Idx = 10, 12, 13
+	} else if useESimpleRetypeSink != nil && *useESimpleRetypeSink {
 		simples = eSimple
 		floatIdx, i128Idx, u128Idx = 10, 12, 13
 	}
