@@ -4452,6 +4452,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				needNoRhsDerefTries++
 				continue
 			}
+			// seed2 e936: multiDim needNoRhs always U2 choose / continue (never
+			// create-fallthrough here — that broke seed2 when nestedFuncBodies>0).
+			// seed4 e432 create residual is handled after VS ParentLocal miss
+			// (needNoRhs residual chain), not by skipping U2 on first F80.
 			if !triedDerefChoose {
 				_ = r.upto(2) // e936
 				triedDerefChoose = true
@@ -4471,25 +4475,33 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			continue
 		}
 		// No existing deref targets → create pointer local/global.
-		// random_add_qualifiers (non-wildcard qfer from RHS):
-		if opts.ConstPointers {
-			_ = r.flipcoin(10) // RegularConstProb
-		}
-		// seed2 e1098–1099: after ExpressionAssign residual, statement Lhs
-		// SelectDeref is F10 then F20 NewArray — no VolatilePointers F50
-		// when useSmallParentStack (UP F10 F20 …). e2199 late for-body Lhs
-		// has F10 F50 vol (do not skip when filterCompoundStmts).
+		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
+		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
+		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol.
 		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
 			!ctx.state.filterCompoundStmts
-		if opts.VolatilePointers && !skipVol {
-			_ = r.flipcoin(50) // RegularVolatileProb
-		}
-		// create_and_initialize for a new POINTER (to targetType) for deref.
-		// SelectDeref always creates a pointer var, not the bare Lhs type.
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
+		if needNoRhs {
+			// random_qualifiers WRITE no_volatile: draws vol F50 even if discarded.
+			levels := strings.Count(ptrType.Name, "*")
+			for i := 0; i < levels; i++ {
+				_ = r.flipcoin(50) // level vol
+				_ = r.flipcoin(10) // level const
+			}
+			_ = r.flipcoin(50) // self vol (WRITE: no self const F10)
+		} else {
+			if opts.ConstPointers {
+				_ = r.flipcoin(10) // RegularConstProb (random_add)
+			}
+			// seed2 e1098–1099: skip vol F50 under useSmallParentStack.
+			if opts.VolatilePointers && !skipVol {
+				_ = r.flipcoin(50)
+			}
+		}
+		// create_and_initialize for a new POINTER (to targetType) for deref.
 		// find_pointer_type(add) — has_pointer_type becomes true; exact type.
 		if ctx != nil && ctx.state != nil {
 			noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
@@ -4551,7 +4563,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			lhsFromDeref = true
 			break
 		}
-		_ = r.flipcoin(50) // random_looser_volatiles residual when outer vol
+		// random_looser_volatiles only when outer pointer is volatile (eligible).
+		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
+		// tgtNewArray + F50 Constant (no looser F50).
+		if !needNoRhs {
+			_ = r.flipcoin(50) // random_looser residual when outer vol
+		}
 		tgtNewArray := r.flipcoin(20)
 		if tgtNewArray {
 			// create_and_initialize NewArray branch: init then itemize
@@ -4584,10 +4601,18 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 		} else {
 			// Simple pointed-to: Constant::make_random
+			// seed4 e438–439: F20 tgtNewArray=0 then F50 Constant (hex/small).
 			burnSimpleConstant(r, targetType)
 		}
 		if ctx != nil && ctx.state != nil {
 			ctx.state.lhsDerefCreates++
+		}
+		// seed4 e439–440: first need_no_rhs address-of create fails validate →
+		// SelectDeref retry F80. Second create accepts.
+		if needNoRhs && ctx != nil && ctx.state != nil && !ctx.state.useSmallParentStack &&
+			needNoRhsDerefTries == 0 {
+			needNoRhsDerefTries++
+			continue
 		}
 		lhsFromDeref = true
 		break
