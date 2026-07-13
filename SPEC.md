@@ -135,11 +135,11 @@ Order of preference in practice: fix local RNG/call-path alignment first; struct
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** event+raw match vs instrumented upstream |
+| Seed 2 event match | **Was PASS** 37939/37939 (through 392026e); PP→PL pad era regressed — working **first_div≈887**. Restore full seed2 before DONE. |
 | Seed 2 source match | **In progress** — safe_* binary emission + `t_` gensym; residual CreateArray + residual `t_`; first global **g_8** aligned; locals ~281 vs UP 287 |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **453** (62→…→428→449→453). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **629** (62→…→453→487→563→613→629). |
 
-Next plateau: seed4 e453 Lhs SelectDeref chain; seed5 e155; multi-seed; source; COUNT=20.
+Next plateau: restore seed2 full; seed4 e629 Statement U100; seed5+; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
