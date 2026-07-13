@@ -813,6 +813,19 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			sp := variableScopePickFromER(er, opts, &scope)
 			switch {
 			case sp == 0: // Global
+				// e4248: after ptr-cmp PL create + NewValue residual, Lhs F80=0
+				// → VS Global U100=8 chooses among 2 (UP U2). e4249 F50 residual
+				// then parent Expression U120 (not more SelectDeref F80).
+				if flow != nil && flow.postAggPtrCmpPLCreateDone && globalFails == 0 {
+					_ = er.pick(2)
+					_ = er.fallback.flipcoin(50)
+					flow.postAggLhsWriteDone = true
+					// After Lhs accept, next is Expression U120 (e4250), not
+					// another ExpressionAssign self-F50 / SelectDeref F80.
+					flow.ppPostPadOuterLhsSole = true
+					flow.ppPostPadSkipParentExprN = 0
+					return "x"
+				}
 				// First Lhs VS Global sole (e3053 U100=0 → F80, no U(n)).
 				// Second+: create U14 + F20 F50 F50 U20 (e3061–66).
 				if globalFails >= 1 {
@@ -2548,8 +2561,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if qferMode == 0 {
 			qferMode = 1
 		}
-		// Keep caller's type (may be struct → field-by-field Constant).
-		retype = false
+		// Keep caller's type (may be struct → field-by-field Constant), except
+		// e4242 NewValue→PL after ptr-cmp create: GenerateNewVariable always
+		// random_type_from_type (U14) before qfer (UP U14 F10 F20 F50…).
+		if !ctx.state.postAggPtrCmpPLCreateDone {
+			retype = false
+		}
 		ctx.state.postAggU15StackU6CreateDone = true
 	}
 	if ctx.state.postAggGlobalCreate > 0 && strings.Contains(t.Name, "*") {
@@ -5631,10 +5648,40 @@ exprTries:
 										}
 										// e4035–39: choose_ok_var U5 + opportunistic F0
 										// fail → VS Global U100 + GlobalList U44.
-										// e4204+: after ptr-cmp PL create, array choose
-										// itemizes multi-dim [9][9][3] then F0.
+										// e4204: first PL after ptr-cmp create — U5 choose +
+										// multi-dim itemize [9][9][3] + F0 reselect.
+										// e4237: second PL after create — empty/miss path:
+										// no U5 choose; F50 (loose/create-prefix) then nested
+										// Expression (UP U120→NewValue create e4238–45).
+										if flow.postAggPtrCmpPLCreateDone &&
+											flow.postAggU15StackU6PLNAfterPostPtr >= 2 {
+											// Stack already burned; mirror make_init address
+											// residual shape: F50 then Expression::make_random
+											// (UP e4238 Variable → NewValue create e4239–45).
+											// Arm NeedLhs so after nested create parent Assign
+											// runs Lhs F80 next (e4246), not more Expression F50.
+											if er.fallback != nil {
+												_ = er.fallback.flipcoin(50)
+											}
+											nest := depth + 1
+											if nest < 1 {
+												nest = 1
+											}
+											_ = randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+											if flow != nil {
+												flow.postAggNeedLhsAfterRhs = true
+											}
+											bumpExprDepth(ctx)
+											if len(localCands) > 0 {
+												return castLiteral(t, localCands[0].expr)
+											}
+											return castLiteral(t, "x")
+										}
 										_ = er.pick(5)
-										if flow.postAggPtrCmpPLCreateDone {
+										if flow.postAggPtrCmpPLCreateDone &&
+											flow.postAggU15StackU6PLNAfterPostPtr == 1 {
+											// One-shot e4204 itemize after first post-create PL.
+											flow.postAggU15StackU6PLNAfterPostPtr = 2
 											_ = er.pick(9)
 											_ = er.pick(9)
 											_ = er.pick(3)
