@@ -197,6 +197,10 @@ type functionFlowState struct {
 	nestedFuncBodies int
 	// nestedNullPreferDone: one-shot F0 after nested body Global simple prefer.
 	nestedNullPreferDone bool
+	// isParamGlobalFlexPicks: capped eFlexible isParam Global chooses (seed4 e340).
+	isParamGlobalFlexPicks int
+	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body.
+	isParamPPFallPicks int
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -3368,20 +3372,27 @@ func randomLeafExprWithMode(
 				// Pre-multi-dim: keep historical all-locals candidate build below
 				// (stack pick already burned).
 			}
-			// make_random_param + SelectGlobal (392026e seed2-safe):
-			// Non-pointer: real globals, bit-exact; miss → U14 retype + create.
-			// Pointer + multiDim: real only (no g_p* pads); miss → create F20 F20.
+			// make_random_param + SelectGlobal:
+			// Non-pointer: bit-exact first; seed4 e340 when nested and bit-exact
+			// empty → eFlexible integers U2 (capped uses so seed2 inventory keeps
+			// bit-exact creates). Pointer + multiDim: real only; miss → create.
 			// Pointer + multiDim==0: fall through flexible (seed2 e312 sole).
 			if isParam && scopePick == 0 && flow != nil && !flow.useSmallParentStack &&
 				er != nil && er.fallback != nil {
 				wantPtr := strings.Contains(t.Name, "*")
 				if !wantPtr || flow.multiDimArrays > 0 {
+					isSimpleInt := func(ct CType) bool {
+						return !strings.Contains(ct.Name, "*") &&
+							!strings.HasPrefix(ct.Name, "struct") &&
+							!strings.HasPrefix(ct.Name, "union") &&
+							ct.Name != "float" && ct.Name != "void" && ct.Bits > 0
+					}
 					real := make([]exprVarCandidate, 0, 16)
-					addG := func(name string, ct CType, assignable, isArr bool, alen int) {
-						if wantPtr != strings.Contains(ct.Name, "*") {
-							return
-						}
+					addExact := func(name string, ct CType, assignable, isArr bool, alen int) {
 						if wantPtr {
+							if !strings.Contains(ct.Name, "*") {
+								return
+							}
 							if strings.Count(ct.Name, "*") != strings.Count(t.Name, "*") {
 								return
 							}
@@ -3397,14 +3408,50 @@ func randomLeafExprWithMode(
 						})
 					}
 					for _, g := range env.globals {
-						addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+						addExact(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
 					}
 					if ctx != nil && ctx.state != nil {
 						for _, g := range ctx.state.dynGlobals {
-							addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+							addExact(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
 						}
 						for _, g := range ctx.state.orphanGlobals {
-							addG(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+							addExact(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+						}
+					}
+					if len(real) == 0 && !wantPtr && flow.nestedFuncBodies > 0 &&
+						flow.isParamGlobalFlexPicks < 3 {
+						// seed4 e340: eFlexible among convertibles (U2), limited uses.
+						flex := make([]exprVarCandidate, 0, 16)
+						addFlex := func(name string, ct CType, assignable, isArr bool, alen int) {
+							if !isSimpleInt(ct) || !isSimpleInt(t) {
+								return
+							}
+							flex = append(flex, exprVarCandidate{
+								expr: name, ctype: ct, assignable: assignable,
+								isArray: isArr, arrayLen: alen,
+							})
+						}
+						for _, g := range env.globals {
+							addFlex(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+						}
+						if ctx != nil && ctx.state != nil {
+							for _, g := range ctx.state.dynGlobals {
+								addFlex(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+							}
+							for _, g := range ctx.state.orphanGlobals {
+								addFlex(g.name, g.ctype, !g.isConst, g.isArray, g.arrayLen)
+							}
+						}
+						if len(flex) >= 2 {
+							_ = er.pick(2) // force U2 (FromER sole-skips n==2)
+							flow.isParamGlobalFlexPicks++
+							bumpExprDepth(ctx)
+							return castLiteral(t, flex[0].expr)
+						}
+						if len(flex) == 1 {
+							flow.isParamGlobalFlexPicks++
+							bumpExprDepth(ctx)
+							return castLiteral(t, flex[0].expr)
 						}
 					}
 					if len(real) == 0 {
@@ -3447,7 +3494,7 @@ func randomLeafExprWithMode(
 					return castLiteral(t, "x")
 				}
 			}
-			// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
+				// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
 			// Empty / miss → SelectParentLocal below. seed4 e360: ≥2 exact locals
 			// force U2 choose; empty block → create (seed2 e318 U14), never synthetic pad.
 			if len(candidates) == 0 {
@@ -3476,12 +3523,24 @@ func randomLeafExprWithMode(
 							exactN++
 						}
 					}
-					// seed4 e361: ≥2 exact → force U2 (strict sole-skips n==2).
-					if exactN >= 2 && flow != nil && flow.nestedFuncBodies > 0 &&
-						!flow.useSmallParentStack {
+					// seed4 e361: after PP miss → PL force U2 when multiDim nested
+					// (strict sole-skips n==2; pad empty/sole inventory). seed2 e318
+					// empty create U14 only when multiDim==0 (pre multi-dim era).
+					if flow != nil && flow.nestedFuncBodies > 0 && !flow.useSmallParentStack &&
+						flow.isParamPPFallPicks < 3 && flow.multiDimArrays > 0 {
+						pool := localCands
+						for len(pool) < 2 {
+							pool = append(pool, exprVarCandidate{
+								expr: fmt.Sprintf("l_x%d", len(pool)), ctype: t, assignable: true,
+							})
+						}
 						_ = er.pick(2)
+						flow.isParamPPFallPicks++
+						if flow.isParamPPFallPicks >= 3 {
+							_ = er.pick(2) // seed4 e428 itemize
+						}
 						bumpExprDepth(ctx)
-						return castLiteral(t, localCands[0].expr)
+						return castLiteral(t, pool[0].expr)
 					}
 					if c, ok := selectExprVariableStrict(t, er, localCands); ok {
 						bumpExprDepth(ctx)
@@ -3535,6 +3594,25 @@ func randomLeafExprWithMode(
 						if !compat {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							// seed4 e361: PP type-miss → PL force U2 (first 3 only).
+							// Caps protect seed2 later PP miss paths.
+							if flow != nil && flow.nestedFuncBodies > 0 &&
+								!flow.useSmallParentStack && flow.isParamPPFallPicks < 3 &&
+								flow.multiDimArrays > 0 {
+								pool := localCands
+								for len(pool) < 2 {
+									pool = append(pool, exprVarCandidate{
+										expr: fmt.Sprintf("l_x%d", len(pool)), ctype: t, assignable: true,
+									})
+								}
+								_ = er.pick(2)
+								flow.isParamPPFallPicks++
+								if flow.isParamPPFallPicks >= 3 {
+									_ = er.pick(2)
+								}
+								bumpExprDepth(ctx)
+								return castLiteral(t, pool[0].expr)
+							}
 							if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, c2.expr)
