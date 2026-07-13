@@ -1573,6 +1573,167 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 	return out
 }
 
+// formatAggregateOrSimpleConstant mirrors Constant::make_random for global inits.
+func formatAggregateOrSimpleConstant(r *rng, t CType, ctx *genContext, opts Options) string {
+	if r == nil {
+		return "0"
+	}
+	if strings.Contains(t.Name, "*") {
+		return "0"
+	}
+	if strings.HasPrefix(t.Name, "union") {
+		field0 := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+		if ctx != nil {
+			var si int
+			if _, err := fmt.Sscanf(t.Name, "union U%d", &si); err == nil &&
+				si >= 0 && si < len(ctx.info.unions) && len(ctx.info.unions[si].fields) > 0 {
+				field0 = ctx.info.unions[si].fields[0].ctype
+			}
+		}
+		return "{" + formatSimpleConstant(r, field0) + "}"
+	}
+	if strings.HasPrefix(t.Name, "struct") {
+		var fields []fieldInfo
+		if ctx != nil {
+			var si int
+			if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil &&
+				si >= 0 && si < len(ctx.info.structs) {
+				fields = ctx.info.structs[si].fields
+			}
+		}
+		if len(fields) == 0 {
+			return "{" + formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}) + "}"
+		}
+		lits := make([]string, 0, len(fields))
+		for _, f := range fields {
+			if f.bitfield {
+				if f.bitWidth <= 0 {
+					continue
+				}
+				// GenerateRandomConstantInRange: b = (int)pow(2, bound/2.0)
+				// (floating half-width; bound=15 → ~181, not 1<<(15/2)=128).
+				b := int(math.Pow(2, float64(f.bitWidth)/2.0))
+				if b < 1 {
+					b = 1
+				}
+				v := int(r.upto(uint32(b)))
+				// eInt signed: pure_rnd_flipcoin(50) for optional minus.
+				// eUInt: always non-negative (no coin).
+				if f.ctype.Signed {
+					if !r.flipcoin(50) {
+						lits = append(lits, fmt.Sprintf("-%d", v))
+					} else {
+						lits = append(lits, fmt.Sprintf("%d", v))
+					}
+				} else {
+					lits = append(lits, fmt.Sprintf("%d", v))
+				}
+				continue
+			}
+			if strings.HasPrefix(f.ctype.Name, "struct") || strings.HasPrefix(f.ctype.Name, "union") {
+				lits = append(lits, formatAggregateOrSimpleConstant(r, f.ctype, ctx, opts))
+			} else {
+				lits = append(lits, formatSimpleConstant(r, f.ctype))
+			}
+		}
+		return "{" + strings.Join(lits, ",") + "}"
+	}
+	_ = opts
+	return formatSimpleConstant(r, t)
+}
+
+// createOnDemandGlobalFromERSEFree mirrors GenerateNewGlobal when effect context
+// is side-effect-free: self F50 RegularVolatileProb + F10 const, then NewArray
+// and Constant::make_random (seed4 e2133 maxFuncs Function-fail → struct Global).
+func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
+		return exprVarCandidate{}, false
+	}
+	r := er.fallback
+	name := ctx.state.allocGlobalName()
+	levels := strings.Count(t.Name, "*")
+	isConst, isVolatile := false, false
+	// Ptr levels: F50 vol + F10 const each.
+	for i := 0; i < levels; i++ {
+		_ = opts.Volatiles && r.flipcoin(50)
+		_ = opts.Consts && r.flipcoin(10)
+	}
+	// Self: SE-free → F50 vol; READ → F10 const.
+	isVolatile = opts.Volatiles && r.flipcoin(50)
+	isConst = opts.Consts && r.flipcoin(10)
+	newArray := r.flipcoin(20)
+	initLit := "0"
+	var arrRes arrayCreateResult
+	if levels > 0 {
+		// make_init_value: F20 null vs address-of
+		if r.flipcoin(20) {
+			initLit = "0"
+		} else {
+			baseName := strings.ReplaceAll(t.Name, "*", "")
+			base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+			if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
+				base.Signed = false
+			}
+			tgtName := ctx.state.allocGlobalName()
+			tgtNewArray := r.flipcoin(20)
+			tgtInit := formatAggregateOrSimpleConstant(r, base, ctx, opts)
+			var tgtArr arrayCreateResult
+			if tgtNewArray {
+				tgtArr = burnCreateArrayVariable(r, opts, base, true)
+			}
+			emitGlobalDecl(&ctx.state.lateGlobals, base, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
+			ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+				name: tgtName, ctype: base, isArray: tgtNewArray, arrayLen: 4,
+			})
+			if tgtNewArray {
+				initLit = fmt.Sprintf("&%s[0]", tgtName)
+			} else {
+				initLit = "&" + tgtName
+			}
+		}
+		if newArray {
+			arrRes = burnCreateArrayVariable(r, opts, t, true)
+		}
+	} else {
+		initLit = formatAggregateOrSimpleConstant(r, t, ctx, opts)
+		if newArray {
+			arrRes = burnCreateArrayVariable(r, opts, t, true)
+		}
+	}
+	qual := ""
+	if isConst {
+		qual += "const "
+	}
+	if isVolatile {
+		qual += "volatile "
+	}
+	arrLen := 0
+	if newArray {
+		sizes := arrRes.sizes
+		if len(sizes) == 0 {
+			sizes = []int{4}
+		}
+		initBody := formatArrayInitBrace(sizes, arrRes.inits, initLit)
+		dims := ""
+		for _, s := range sizes {
+			if s < 1 {
+				s = 1
+			}
+			dims += fmt.Sprintf("[%d]", s)
+		}
+		arrLen = 4
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s%s = %s;", qual, t.Name, name, dims, initBody))
+	} else {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
+	}
+	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: newArray, arrayLen: arrLen}
+	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+	if !ctx.state.mustReadLive {
+		ctx.state.globalCreatesPostMR++
+	}
+	return exprVarCandidate{expr: name, ctype: t, assignable: !isConst}, true
+}
+
 func createOnDemandGlobalFromER(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
 	return createOnDemandGlobalFromEROpts(er, opts, t, ctx, false)
 }
@@ -2259,7 +2420,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		cPtr := strings.Contains(c.ctype.Name, "*")
 		cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
 			!strings.HasPrefix(c.ctype.Name, "union") && c.ctype.Name != "float" && c.ctype.Name != "void"
-		if !wantPtr && !cPtr && c.ctype.Bits == t.Bits {
+		// sameWidth only among simple integers (not struct Bits=32 vs int32).
+		if wantSimple && cSimple && c.ctype.Bits == t.Bits {
 			sameWidth = append(sameWidth, c)
 		}
 		if wantSimple && cSimple {
@@ -2699,7 +2861,9 @@ func selectExprVariableStrict(t CType, er *exprRand, candidates []exprVarCandida
 		cPtr := strings.Contains(c.ctype.Name, "*")
 		cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
 			!strings.HasPrefix(c.ctype.Name, "union") && c.ctype.Name != "float" && c.ctype.Name != "void"
-		if !wantPtr && !cPtr && c.ctype.Bits == t.Bits {
+		// sameWidth / integers only for simple integers (Type::is_convertable).
+		// Struct Bits=32 must not match int32_t (seed4 e2133).
+		if wantSimple && cSimple && c.ctype.Bits == t.Bits {
 			sameWidth = append(sameWidth, c)
 		}
 		if wantSimple && cSimple {
@@ -3746,6 +3910,23 @@ exprTries:
 					}
 				} else {
 					candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+					// seed4 e2133: maxFuncs Function-fail → ExpressionVariable
+					// Global for struct S0. Upstream SelectGlobal has no
+					// is_derivable match → GenerateNewGlobal (F50 F10 F20…).
+					// Loose selectExprVariableFromER returns filtered[0] int.
+					wantAgg := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+					if scopePick == 0 && wantAgg {
+						if c, ok := selectExprVariableStrict(t, er, candidates); ok && c.expr != "" {
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, c.expr)
+						}
+						if g, ok := createOnDemandGlobalFromERSEFree(er, opts, t, ctx); ok {
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, g.expr)
+						}
+					}
 					if len(candidates) == 0 && scopePick == 0 {
 						if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 							bumpExprDepth(ctx)

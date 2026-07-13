@@ -165,15 +165,17 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb a4d74b9) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb 2133→2157) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **2133** (2113→2133; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **2157** (2133→2157; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
-**e2113–e2132 climbed (a4d74b9):** address residual modeled as 3 Expression burns + visit_facts fail → Lhs SelectDeref choose residual; parent RHS skip + skipNextBlockSize + StatementFilter atMax. Still residual-shaped — refactor toward real Lhs/CREATE paths when possible.
+**e2133–e2156 climbed:** maxFuncs FunctionInvocation useExisting miss for `struct S0` → ExpressionVariable Global. Root causes fixed with Csmith-shaped paths:
+1. `selectExprVariableStrict`/`FromER` sameWidth matched int32 to struct (Bits=32) — only simple integers now (Type::is_convertable).
+2. Function-fail Global aggregate empty → `GenerateNewGlobal` SE-free (F50 vol+F10 const) + `Constant::make_random` struct fields (bitfield `pow(2,bound/2.0)` → U181 not U128).
 
-Next plateau: seed4 e2133 F50 vs U120 after user-func useExisting U100 (likely CREATE/signature residual); seeds 5–21; source; COUNT=20.
+Next plateau: seed4 e2157 F50 vs U120 after first struct global Constant (UP continues ~21 more Constant-shaped events then U120 Function std binary; GO exits to term U120). Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
