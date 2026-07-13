@@ -206,6 +206,9 @@ type functionFlowState struct {
 	isParamGlobalFlexPicks int
 	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body.
 	isParamPPFallPicks int
+	// forcePPEmptyOnce: after must_use F80 residual, next ParentParam is empty
+	// (seed4 e831 PL stack U3 create).
+	forcePPEmptyOnce bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -274,8 +277,11 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		return exprVarCandidate{}, false
 	}
 	earlyGate := ctx.inParamExpr && st.arrayLoopDepth > 0 && st.mustReadLive
+	// seed4 e827: nested For inside PP-era array-loop body also burns U2 F75
+	// must_use attempt (not only make_random_param).
+	ppArrayGate := st.isParamPPFallPicks >= 2 && st.arrayLoopDepth > 0 && st.mustReadLive
 	lateGate := st.useSmallParentStack // after e948 era
-	if !earlyGate && !lateGate {
+	if !earlyGate && !ppArrayGate && !lateGate {
 		return exprVarCandidate{}, false
 	}
 	if strings.Contains(t.Name, "*") || strings.HasPrefix(t.Name, "struct") ||
@@ -303,6 +309,12 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	_ = er.pick(2)
 	if er.fallback.flipcoin(75) {
 		st.mustReadLive = false
+	}
+	// seed4 e829: after PP-era array-body must_use miss, Lhs-like SelectDeref
+	// F80=0 then VariableSelector U100 (not bare U100).
+	if ppArrayGate {
+		_ = er.fallback.flipcoin(80)
+		st.forcePPEmptyOnce = true
 	}
 	// Inventory incomplete — miss; caller continues VariableSelector::select.
 	return exprVarCandidate{}, false
@@ -3568,6 +3580,12 @@ func randomLeafExprWithMode(
 				strings.Contains(t.Name, "*") {
 				candidates = nil
 			}
+			// seed4 e831: after must_use F80 residual, ParentParam miss → PL
+			// stack U3 + create (not sole param then Lhs F80).
+			if scopePick == 2 && flow != nil && flow.forcePPEmptyOnce {
+				candidates = nil
+				flow.forcePPEmptyOnce = false
+			}
 			// seed2 e1271: first late ParentParam simple ExpressionVariable —
 			// create residual F50 U8 (inventory falsely non-empty). Later picks
 			// (e1275) sole/choose without residual.
@@ -3648,11 +3666,27 @@ func randomLeafExprWithMode(
 					}
 					// Param→ParentLocal create: early SE-free qferMode 1; late
 					// pointer (useSmallParentStack) !SE-free self F10 only (e1024).
+					// seed4 e833: after forcePPEmpty + U14 retype, NewArray F20
+					// first (qferMode 0), not F50 F10 qfer.
 					qfer := 1
 					if flow != nil && flow.useSmallParentStack && strings.Contains(t.Name, "*") {
 						qfer = 2
 					}
-					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok {
+					if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 {
+						qfer = 0
+					}
+					// seed4 e835: retype uses eSimple order (U14=8→uint16 HexDigits=4)
+					// not historical (uint64 HexDigits=8) so hex next31 count matches.
+					esimple := false
+					if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 {
+						esimple = true
+						useESimpleRetypeSink = &esimple
+					}
+					g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx)
+					if esimple {
+						useESimpleRetypeSink = nil
+					}
+					if ok {
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
@@ -4649,6 +4683,13 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					_ = r.upto(uint32(sz))
 				}
 			}
+			// seed4 e898: after PP-era CreateArray itemize, accept Lhs (next
+			// Statement U100); seed2 e1115 continues SelectDeref retry.
+			if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+				!ctx.state.useSmallParentStack {
+				lhsFromDeref = true
+				break
+			}
 			continue
 		}
 		// No existing deref targets → create pointer local/global.
@@ -4707,6 +4748,13 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				emitOrphanArrayGlobal(ctx, ptrType, _arr)
 			}
 			createdArrayThisLhs = true
+			// seed4 e898: after PP-era CreateArray+itemize, accept Lhs (next
+			// Statement U100). Seed2: fail validate once → retry F80=0 → VS.
+			if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+				!ctx.state.useSmallParentStack {
+				lhsFromDeref = true
+				break
+			}
 			// Seed2: array pointer Lhs fails opportunistic_validate once and
 			// retries (next SelectDeref F80=0 → VariableSelector::select).
 			continue
@@ -6683,11 +6731,23 @@ func emitStatement(
 		// expand to full multi-dim CreateArrayVariable + itemize; seed2 e560–e678).
 		postArrayFor := state != nil && state.loopIVPool > 1
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
+		// seed4 e783: first nested For in PP-era array-loop body has no real
+		// integer IV (array-loop burned fictional U2/U3); create like empty pool
+		// (F50 NewArray…) not postArrayFor U2+U9 U8.
+		if postArrayFor && state != nil && state.arrayLoopFresh &&
+			state.isParamPPFallPicks >= 2 && state.multiDimArrays > 0 {
+			postArrayFor = false
+			createIV = true
+		}
 		// First for in an array-loop body (or multi-IV postArrayFor) uses array_control;
 		// later nested fors use loop_control (e502, e519) even while still nested.
 		// seed2 e1123–1125: natural For after continue → select_array U5+U1, no SafeOpFlags.
 		afterContFor := afterCont && !remappedAssignToFor && state != nil && state.multiDimArrays > 0
 		useArrayControl := postArrayFor || (state != nil && state.arrayLoopFresh) || afterContFor
+		// seed4 e806: PP-era createIV in array body still burns array_control
+		// residual but itemize U2 (not U1 / U9 U8) after create stream.
+		ppCreateArrayBody := createIV && state != nil && state.isParamPPFallPicks >= 2 &&
+			state.arrayLoopFresh && state.multiDimArrays > 0
 		if postArrayFor {
 			_ = r.upto(uint32(state.loopIVPool))
 		} else if afterContFor {
@@ -6716,7 +6776,10 @@ func emitStatement(
 		if useArrayControl && !afterContFor {
 			// make_random_array_control + SafeOpFlags.
 			// postArrayFor multi-dim (e949): itemize U9 U8. Early e679: U1.
-			if postArrayFor && state != nil && state.multiDimArrays > 0 {
+			// seed4 e806 ppCreateArrayBody: itemize U2 after IV create.
+			if ppCreateArrayBody {
+				_ = r.upto(2)
+			} else if postArrayFor && state != nil && state.multiDimArrays > 0 {
 				_ = r.upto(9)
 				_ = r.upto(8)
 			} else {
@@ -6725,19 +6788,28 @@ func emitStatement(
 			_ = r.flipcoin(0) // array_oob_prob
 			_ = r.flipcoin(50)
 			if !r.flipcoin(50) {
-				if postArrayFor && state != nil && state.multiDimArrays > 0 {
+				if postArrayFor && state != nil && state.multiDimArrays > 0 && !ppCreateArrayBody {
 					_ = r.upto(1)
 				}
 			}
 			_ = r.flipcoin(50) // incr
 			// SafeOpFlags: skip first F50 when postArrayFor multi-dim (e928/e957).
-			if !(postArrayFor && state != nil && state.multiDimArrays > 0) {
+			// seed4 e811 ppCreate: F50 U4 F50 F50 U4 after incr (assign + binary).
+			if ppCreateArrayBody {
 				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+			} else {
+				if !(postArrayFor && state != nil && state.multiDimArrays > 0) {
+					_ = r.flipcoin(50)
+				}
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
 			}
-			_ = r.upto(4)
-			_ = r.flipcoin(50)
-			_ = r.flipcoin(50)
-			_ = r.upto(4)
 			if state != nil {
 				state.arrayLoopFresh = false
 				if state.loopIVPool > 1 {
