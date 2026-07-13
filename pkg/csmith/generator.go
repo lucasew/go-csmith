@@ -22,7 +22,6 @@ var lateLhsChooseCountSink *int
 // lateU2ItemizeOnceSink: one-shot e1596 U1 after first late cn==2 choose.
 var lateU2ItemizeOnceSink *bool
 
-
 // filterCompoundStmtsSink: late for-body StatementFilter / Global U2 era.
 var filterCompoundStmtsSink *bool
 
@@ -32,22 +31,30 @@ var lateDerefCreateNSink *int
 // lateLhsRejectGlobalSink: one-shot e2253 reject Global after U2 U4 residual.
 var lateLhsRejectGlobalSink *bool
 var lastArraySizesSink *[]int
+
 // nestedFuncBodiesSink / nestedNullPreferSink: seed4 e263 nested-body F0.
 var nestedFuncBodiesSink *int
+
 // useESimpleRetypeSink: pickSimpleNonVoid uses eSimpleType order (seed4 e585
 // NewValue→PL after PP pads: U14=2→int32 HexDigits=8).
 var useESimpleRetypeSink *bool
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
+
 // ppPLPadChooseDoneSink: after seed4 e1267 pad-choose, Global eFlexible scales
 // up (e1410 U10) instead of early PP U4 (e645/e754).
 var ppPLPadChooseDoneSink *bool
+
 // ppPostPadGlobalPicks: Global eFlexible choose count after pad-choose era.
 var ppPostPadGlobalPicks int
+
 // ppPostPadPLPicksSink: late PL picks after ptr-cmp (gates Global F0 e1673).
 var ppPostPadPLPicksSink *int
+
 // ppPostPadGlobalF0CountSink: Global sole+F0 count (e1673, e1686; stop before e1698).
 var ppPostPadGlobalF0CountSink *int
+
 // ppPostPadLoopBodySink: after e1756–68 loop-control residual → for-body filter.
 var ppPostPadLoopBodySink *bool
 var nestedNullPreferSink *bool
@@ -251,7 +258,7 @@ type functionFlowState struct {
 	ppPostPadDerefNullDone bool
 	// ppPostPadOuterLhsSole: after nested Assign Lhs residual, outer Lhs sole so
 	// parent shift burns ShiftByNonConstant F50 (e1589) then RHS Comma (e1590).
-	ppPostPadOuterLhsSole bool
+	ppPostPadOuterLhsSole  bool
 	ppPostPadOuterLhsSoleN int
 	// ppPostPadSkipStmtLhs: after e1895 nested ExpressionAssign Lhs residual+create,
 	// StatementAssign outer Lhs sole (e2013 UP term U120 not SelectDeref F80).
@@ -260,14 +267,24 @@ type functionFlowState struct {
 	// (tries=0) even if exprDepth high from nested Assign unwind.
 	ppPostPadAllowFuncOnce bool
 	// ppPostPadPLForceCreateOnce: one-shot e2024 PL stack → qfer create.
-	ppPostPadPLForceCreateOnce bool
+	ppPostPadPLForceCreateOnce     bool
 	ppPostPadLhsGlobalSelDerefOnce bool // e1895 one-shot Lhs Global residual
 	ppPostPadLhsSelDerefChooseOnce bool // e2041 one-shot Lhs SelectDeref U4 residual
 	// ppPostPadForceNoFuncIn: countdown to arm depthBlock (e2105 tries=12 Variable).
 	ppPostPadForceNoFuncIn int
 	// ppPostPadDepthBlock: filter Function+Assign+Comma like high exprDepth.
-	ppPostPadDepthBlock bool
+	ppPostPadDepthBlock  bool
 	ppPostPadDepthBlockN int // Variable/Constant picks while depthBlock armed
+	// ppPostPadAddrResidualVisitFail: after e2092 3-expr address residual continue,
+	// next F80=0→PP stack uses SelectDeref choose residual (e2116+) not F20×4 create.
+	ppPostPadAddrResidualVisitFail bool
+	// ppPostPadSkipParentExprN: after that Lhs accepts, parent binaries still want
+	// RHS operands that were absorbed into residual — return dummy without RNG
+	// so the Expression stack unwinds to Statement U100 (e2126 tries=1).
+	ppPostPadSkipParentExprN int
+	// ppPostPadStmtFilterCompound: one-shot StatementFilter atMax (reject For/If)
+	// so e2126 U100 tries=1 accepts Assign 83 (not For 15).
+	ppPostPadStmtFilterCompound bool
 	// ppPostPadPLPicks: PL ExpressionVariable after ptr-cmp (e1638=1 U2, e1666=3 U3).
 	ppPostPadPLPicks int
 	// ppPostPadGlobalF0Count: Global sole+F0 after late PL (e1673, e1686; not e1698).
@@ -2568,8 +2585,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			ppPLPadChooseDoneSink != nil && *ppPLPadChooseDoneSink &&
 			er.fallback != nil {
 			_ = er.fallback.flipcoin(50) // e1756 init
-			_ = er.pick(60)             // e1757 limit
-			_ = er.pick(6)              // e1758 test_op
+			_ = er.pick(60)              // e1757 limit
+			_ = er.pick(6)               // e1758 test_op
 			if er.fallback.flipcoin(50) {
 				_ = er.pick(10) // e1759–60 incr
 			} else {
@@ -3135,6 +3152,12 @@ func randomLeafExprWithMode(
 	noFunc bool,
 	noConst bool,
 ) string {
+	// seed4 e2126: after e2092 address Lhs residual absorb parent RHS operands,
+	// return dummy without RNG so Expression stack unwinds to Statement U100.
+	if ctx != nil && ctx.state != nil && ctx.state.ppPostPadSkipParentExprN > 0 {
+		ctx.state.ppPostPadSkipParentExprN--
+		return castLiteral(t, "0")
+	}
 	// seed2 e1399: after Constant U4 residual, force eVariable (no term U120).
 	// e1400: parent continues with full Expression term U120 (not next statement).
 	if forceNextTermVariableSink != nil && *forceNextTermVariableSink {
@@ -3288,6 +3311,7 @@ exprTries:
 			ctx.state.ppPostPadForceNoFuncIn--
 			if ctx.state.ppPostPadForceNoFuncIn == 0 {
 				ctx.state.ppPostPadDepthBlock = true
+				ctx.state.ppPostPadDepthBlockN = 0
 			}
 		}
 		if er != nil && er.fallback != nil {
@@ -3332,7 +3356,7 @@ exprTries:
 		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock &&
 			(choice == termVariable || choice == termConstant) {
 			ctx.state.ppPostPadDepthBlockN++
-			if ctx.state.ppPostPadDepthBlockN >= 2 {
+			if ctx.state.ppPostPadDepthBlockN >= 3 {
 				ctx.state.ppPostPadDepthBlock = false
 			}
 		}
@@ -4276,7 +4300,7 @@ exprTries:
 					}
 				}
 			}
-						candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
 			// seed2 e1021: ParentParam + pointer want after useSmallParentStack —
 			// UP falls through to SelectParentLocal (U3 stack + create) even when
 			// GO param inventory is non-empty. Keep non-pointer param selects (e962).
@@ -4315,7 +4339,7 @@ exprTries:
 					return castLiteral(t, "x")
 				}
 			}
-				// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
+			// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
 			// Empty / miss → SelectParentLocal below. seed4 e360: ≥2 exact locals
 			// force U2 choose; empty block → create (seed2 e318 U14), never synthetic pad.
 			if len(candidates) == 0 {
@@ -4801,7 +4825,44 @@ exprTries:
 				for {
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
 					if !deref {
+						// seed4 e2113–15: after e2092 address residual, F80=0 → VS
+						// ParentParam stack U6, visit_facts fails → loop continues
+						// with SelectDeref choose residual (e2116+), not accept VS.
+						if ppPostPadGlobalPicks >= 15 && ctx != nil && ctx.state != nil &&
+							ctx.state.ppPostPadAddrResidualVisitFail {
+							_ = variableScopePickFromER(er, opts, &scope) // U100
+							_ = parentStackPick(er, ctx.state)            // U6
+							// visit fail → continue Lhs loop (next F80 choose residual)
+							continue
+						}
 						break // fall through to VariableSelector::select
+					}
+					// seed4 e2116–25: SelectDeref choose residual after VS visit-fail
+					// (U11..U8 F0); then accept Lhs. Next U100 is Statement filter.
+					if ppPostPadGlobalPicks >= 15 && ctx != nil && ctx.state != nil &&
+						ctx.state.ppPostPadAddrResidualVisitFail {
+						ctx.state.ppPostPadAddrResidualVisitFail = false
+						// F80 already true this iteration; choose U11 then more F80.
+						_ = er.pick(11)
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(10)
+						}
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(9)
+							_ = er.fallback.flipcoin(0)
+						}
+						if er.fallback.flipcoin(80) {
+							_ = er.pick(8)
+							_ = er.pick(4)
+						}
+						// Parent binaries still expect RHS that residual absorbed.
+						// N=5 unwinds to block boundary; skipNextBlockSize so next
+						// emitStatements is Statement U100 (e2126) not BlockSize U4.
+						ctx.state.ppPostPadSkipParentExprN = 5
+						ctx.state.skipNextBlockSize = true
+						ctx.state.ppPostPadStmtFilterCompound = true
+						lhsFromDeref = true
+						break
 					}
 					// seed4 e2041–50: one-shot SelectDeref choose residual U4 F80 U3 F0…
 					// (later F80 e2090 is F20 create path, not U4 residual).
@@ -4857,17 +4918,21 @@ exprTries:
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
 					if ppPostPadGlobalPicks >= 15 && !newArray && !initConst {
+						// seed4 e2092–2112: address-of residual is Expression Constant,
+						// then Function binary (+operands), then Constant. visit_facts
+						// fails → Lhs loop continues at e2113 F80 (not accept after
+						// first Constant; that left Assign closed and next U120).
 						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 						if ctx != nil && ctx.state != nil {
 							ctx.state.ppPostPadAllowFuncOnce = false
-						}
-						_ = randomTypedExprDepthFlags(base, er, opts, env, scope, depth+1, ctx, false, false)
-						if ctx != nil && ctx.state != nil {
-							// e2105 is ~4 term picks after nested address Expression ends.
+							// e2105 Variable tries=12 under subsequent Expression depthBlock.
 							ctx.state.ppPostPadForceNoFuncIn = 3
+							ctx.state.ppPostPadAddrResidualVisitFail = true
 						}
-						lhsFromDeref = true
-						break
+						for i := 0; i < 3; i++ {
+							_ = randomTypedExprDepthFlags(base, er, opts, env, scope, depth+1, ctx, false, false)
+						}
+						continue
 					}
 					if initConst {
 						// Constant "0" (null), no more RNG for init
@@ -7869,6 +7934,11 @@ func emitStatement(
 				}
 				return stmtAssign
 			}
+			forceAtMax := false
+			if state != nil && state.ppPostPadStmtFilterCompound {
+				state.ppPostPadStmtFilterCompound = false
+				forceAtMax = true
+			}
 			v := int(dec.r.uptoWithFilter(100, func(x uint32) bool {
 				k := toKind(int(x))
 				if (k == stmtBreak || k == stmtContinue) && !inLoop {
@@ -7877,7 +7947,7 @@ func emitStatement(
 				// StatementFilter: at max_blk_depth filter is_compound
 				// (Block/For/IfElse/ArrayOp). seed2 e2189 tries=2.
 				maxD := max(1, opts.MaxBlockDepth)
-				atMax := depth >= maxD
+				atMax := depth >= maxD || forceAtMax
 				if state != nil && state.filterCompoundStmts {
 					atMax = true
 				}
@@ -8628,11 +8698,11 @@ func emitSingleFuncDefOnce(
 	scope := scopeInfo{params: fn.params, locals: locals, returnVar: retName}
 	var residualBody strings.Builder
 	ctx := &genContext{
-		state:         state,
-		from:          idx,
-		info:          info,
-		residualBody:  &residualBody,
-		effectSEFree:  true,
+		state:        state,
+		from:         idx,
+		info:         info,
+		residualBody: &residualBody,
+		effectSEFree: true,
 	}
 
 	for _, p := range fn.params {
