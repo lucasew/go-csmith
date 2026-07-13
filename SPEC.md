@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4085) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4237) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4085** (3876→4085; SelectDeref accept through ExpressionAssign/ArrayOp; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4237** (3876→4237; NO_DANGLING PL create + S0* residual; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -307,8 +307,16 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 5. ArrayOp U100=56 F5=0 aryno=0 → For residual header (e3955–74).
 6. haltGen after f10 late residual exhaust (avoid silent hang on longer seed4 stream).
 
-Next plateau: seed4 e4085 UP F50 create (pointer PL) vs GO U2 choose after ptr-cmp U12; nPtr floor 12 fixed e4081.
-Seeds 5–21; source; COUNT=20.
+**e4085–e4237 climbed:**
+1. e4085 root: ptr-cmp null-LHS → `randomPointerVariableExpr` (forced Variable), not
+   main `termVariable`. NO_DANGLING empties choose → GenerateNewParentLocal qferMode 2
+   (F50 F10 F10). Gate on post-ptr era (avoid e2236 regression).
+2. Out-of-range derived_types idx (nPtr floor 12, list under-count) → `struct S0*`
+   (not int32_t**); address residual nested Global + create_field_vars (U181 bitfield).
+3. e4204: post-create PL choose itemizes multi-dim [9][9][3] before F0.
+
+Next plateau: seed4 e4237 UP F50 (after PL stack U5) vs GO U5 choose residual;
+then parent U120 NewValue create. Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
