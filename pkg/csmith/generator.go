@@ -22,6 +22,7 @@ var lateLhsChooseCountSink *int
 // lateU2ItemizeOnceSink: one-shot e1596 U1 after first late cn==2 choose.
 var lateU2ItemizeOnceSink *bool
 
+
 // filterCompoundStmtsSink: late for-body StatementFilter / Global U2 era.
 var filterCompoundStmtsSink *bool
 
@@ -221,6 +222,11 @@ type functionFlowState struct {
 	derivedPtrTypes int
 	// derivedPtrBases tracks pointed-to type keys already in derived_types.
 	derivedPtrBases map[string]bool
+	// derivedPtrList: ordered Type::derived_types pointer star-counts (1=*, 2=**, …).
+	derivedPtrList []int
+	// ppNewArrayCreated: true after PP-era ParentLocal NewArray CreateArray;
+	// gates Lhs address-of choose U2 (seed4 e1195).
+	ppNewArrayCreated bool
 	// blockStack approximates Function::stack.size() for SelectParentLocal.
 	blockStack int
 }
@@ -237,12 +243,23 @@ func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
 	}
 	if deeper {
 		// find_pointer_type(existing_ptr, true) → new deeper pointer type.
-		key := baseKey + "*"
-		for st.derivedPtrBases[key] {
+		// Cap depth at 3 (* / ** / ***) to match practical derived_types growth.
+		base := strings.ReplaceAll(baseKey, "*", "")
+		if base == "" {
+			base = "int32_t"
+		}
+		stars := 2
+		key := base + "*"
+		for st.derivedPtrBases[key] && stars < 3 {
 			key += "*"
+			stars++
+		}
+		if st.derivedPtrBases[key] {
+			return // already have max depth for this base
 		}
 		st.derivedPtrBases[key] = true
 		st.derivedPtrTypes++
+		st.derivedPtrList = append(st.derivedPtrList, stars)
 		return
 	}
 	if baseKey == "" {
@@ -251,6 +268,8 @@ func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
 	if !st.derivedPtrBases[baseKey] {
 		st.derivedPtrBases[baseKey] = true
 		st.derivedPtrTypes++
+		// find_pointer_type(simple, true) → one-star pointer.
+		st.derivedPtrList = append(st.derivedPtrList, 1)
 	}
 }
 
@@ -442,7 +461,11 @@ type genContext struct {
 	exprDepth int
 	// skipFuncRetQfer: ExpressionAssign/WRITE qfer path — return random_qualifiers
 	// burns no coins when all-const-false + no_volatile (seed2 e447).
+	// Also: non-null qfer on ExpressionAssign skips WRITE random_qualifiers entirely.
 	skipFuncRetQfer bool
+	// effectSEFree mirrors Effect::is_side_effect_free for WRITE self-vol coin.
+	// Cleared after Function terms; reset at each statement.
+	effectSEFree bool
 	// incomingQferConsts: when non-nil, make_random_signature uses
 	// qfer->random_qualifiers → random_looser_consts (F50 per eligible const level).
 	// nil means qfer==0 static random_qualifiers path.
@@ -505,6 +528,7 @@ func takeGenSnapshot(ctx *genContext) *genSnapshot {
 			s.arrayLoopFreshStack = append([]bool(nil), ctx.state.arrayLoopFreshStack...)
 		}
 		s.derivedPtr = ctx.state.derivedPtrTypes
+		// derivedPtrList length matches derivedPtrTypes when tracking is consistent.
 	}
 	return s
 }
@@ -548,6 +572,9 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 			ctx.state.arrayLoopFreshStack = append([]bool(nil), s.arrayLoopFreshStack...)
 		}
 		ctx.state.derivedPtrTypes = s.derivedPtr
+		if len(ctx.state.derivedPtrList) > s.derivedPtr {
+			ctx.state.derivedPtrList = ctx.state.derivedPtrList[:s.derivedPtr]
+		}
 	}
 	ctx.exprDepth = s.exprDepth
 }
@@ -1080,6 +1107,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// make_init_value: F20 null vs address-of. Address-of: choose_var
 				// among pointees — sole/empty early (seed4 e101 F20=0 → itemize,
 				// no choose U); multi-candidate later burns U n (seed2 e1108 U6).
+				// seed4 e1103: PP-era address-of alt burns choose U2 (not skip).
 				if r.flipcoin(20) {
 					inits = append(inits, "0")
 					hadNullPtrAlt = true
@@ -1087,6 +1115,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				}
 				if useSmallParentStackSink != nil && *useSmallParentStackSink {
 					_ = r.upto(6)
+				} else if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 {
+					// PP-era choose_ok_var among ~2 pointees (seed4 e1103 U2).
+					_ = r.upto(2)
 				}
 				// Without a real choose_var inventory, materialize null for now.
 				inits = append(inits, "0")
@@ -1697,14 +1728,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		depth = ctx.state.blockStack
 	}
 	if isPtr {
-		// make_init_value: F20 null vs address-of
+		// create_and_initialize: NewArray F20, then make_init_value, then if
+		// NewArray create_array_and_itemize. seed4 e1096: address residual U2
+		// before CreateArray when NewArray+address-of (PP era). seed2 keeps
+		// historical NewArray→CreateArray without pre-residual.
 		initNull := er.fallback.flipcoin(20)
-		if newArray {
-			{
-				_arr := burnCreateArrayVariable(er.fallback, opts, chosen, true)
-				emitOrphanArrayGlobal(ctx, chosen, _arr)
-			}
-		} else if !initNull {
+		ppEra := ctx.state.isParamPPFallPicks >= 2
+		// Address residual: always when !NewArray && !initNull; PP-era also when
+		// NewArray && !initNull (make_init_value before CreateArray).
+		doAddrResidual := !initNull && (!newArray || ppEra)
+		if doAddrResidual {
 			// Address-of residual (make_init_value → choose_var → choose_ok_var).
 			// e1027: U2 choose. e1211: multi-level under useSmallParentStack —
 			// F20 NewArray + F20 init for pointed-to, then U6 choose (UP F20×4 U6).
@@ -1712,7 +1745,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// Sometimes array itemize after choose (U2) then select_must_use F75
 			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
-			if ctx.state.useSmallParentStack && levels >= 2 {
+			// seed4 e1044: PP array-body Function-fail→PL create address-of
+			// accepts sole/empty without residual (next is ExpressionAssign Lhs F80).
+			// Only when NOT NewArray — NewArray needs choose residual (e1096).
+			if ppEra && ctx.state.arrayLoopDepth > 0 && qferMode == 0 && !newArray {
+				// no residual RNG
+			} else if ctx.state.useSmallParentStack && levels >= 2 {
 				// Nested GenerateNew for pointed-to pointer.
 				_ = er.fallback.flipcoin(20) // NewArray for pointee
 				_ = er.fallback.flipcoin(20) // init null vs address
@@ -1728,7 +1766,7 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 					_ = er.fallback.upto(2)
 					ctx.state.lateLhsMustUseWrite = true
 				}
-			} else if qferMode == 0 {
+			} else if qferMode == 0 && !newArray {
 				// isParam formal-qfer create: no existing pointee →
 				// random_loose_qualifiers (looser const F50) + GenerateNewGlobal
 				// NewArray F20 + Constant::make_random (seed4 e245–247).
@@ -1753,7 +1791,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 						}
 					}
 				}
-			} else if ctx.state.isParamPPFallPicks >= 2 {
+			} else if ppEra && newArray {
+				// seed4 e1096: NewArray + address-of init → choose U2 then CreateArray.
+				_ = er.fallback.upto(2)
+			} else if ppEra {
 				// seed4 e695: choose_var empty → random_loose_qualifiers F50 +
 				// GenerateNew (nested Expression U120), not pad U2 choose.
 				_ = er.fallback.flipcoin(50) // looser_const
@@ -1763,6 +1804,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			} else {
 				n := 2
 				_ = er.fallback.upto(uint32(n))
+			}
+		}
+		if newArray {
+			_arr := burnCreateArrayVariable(er.fallback, opts, chosen, true)
+			emitOrphanArrayGlobal(ctx, chosen, _arr)
+			if ppEra {
+				ctx.state.ppNewArrayCreated = true
 			}
 		}
 		name := ctx.state.allocLocalName()
@@ -2978,6 +3026,16 @@ func randomLeafExprWithMode(
 			// reach_max_functions_cnt() forces stdfunc without a coin (seed2 e721).
 			// Pointer/struct/union types force user-function path after the coin
 			// (stdfunc only for simple non-void).
+			// After the whole Function term (std/user/fail→Variable), mark
+			// effect context !SE-free for subsequent sibling subexpressions
+			// (binary RHS after Comma/Function). seed4 e1064.
+			markFuncEffect := func() {
+				// Only track for PP-era (seed4+); seed2 residual era must keep
+				// historical always-SE-free Assign self F50 behavior.
+				if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+					ctx.effectSEFree = false
+				}
+			}
 			if er != nil && er.fallback != nil {
 				stdFunc := true
 				atMaxFuncs := ctx != nil && ctx.state != nil &&
@@ -3059,8 +3117,16 @@ func randomLeafExprWithMode(
 								}
 							}
 							ptrIdx := int(er.fallback.upto(uint32(nPtr)))
+							// choose_random_pointer_type → derived_types[index].
+							// PP-era: use tracked star depths. seed2: idx>0 → **.
 							stars := 1
-							if ptrIdx > 0 {
+							ppEra := ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2
+							if ppEra && ptrIdx >= 0 && ptrIdx < len(ctx.state.derivedPtrList) {
+								stars = ctx.state.derivedPtrList[ptrIdx]
+								if stars < 1 {
+									stars = 1
+								}
+							} else if ptrIdx > 0 {
 								stars = 2
 							}
 							ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
@@ -3139,12 +3205,14 @@ func randomLeafExprWithMode(
 						ctx.skipFuncRetQfer = prevSkip
 						ctx.incomingQferConsts = prevQfer
 					}
+					markFuncEffect()
 					return out
 				}
 			}
 			// User-function path runs whenever stdfunc was not taken. Nest depth
 			// must not gate this (upstream already chose eFunction term).
 			if call, ok := buildFunctionCallExpr(t, er, opts, env, scope, depth, ctx); ok {
+				markFuncEffect()
 				return call
 			}
 			// Failed invocation (max funcs + no existing match): upstream replaces
@@ -3153,12 +3221,14 @@ func randomLeafExprWithMode(
 			if ctx != nil && ctx.state != nil && len(ctx.state.funcs) >= ctx.state.maxFuncs {
 				if c, ok := trySelectMustUseVar(er, t, ctx); ok {
 					bumpExprDepth(ctx)
+					markFuncEffect()
 					return castLiteral(t, c.expr)
 				}
 				scopePick := variableScopePickFromER(er, opts, &scope)
 				if scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 						bumpExprDepth(ctx)
+						markFuncEffect()
 						return castLiteral(t, g.expr)
 					}
 				} else if scopePick == 4 {
@@ -3170,6 +3240,7 @@ func randomLeafExprWithMode(
 					needQfer := strings.Contains(t.Name, "*") && ctx.state.multiDimArrays > 0
 					if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, needQfer); ok {
 						bumpExprDepth(ctx)
+						markFuncEffect()
 						return castLiteral(t, g.expr)
 					}
 				} else if scopePick == 1 {
@@ -3185,18 +3256,32 @@ func randomLeafExprWithMode(
 							(ctx.state == nil || !ctx.state.useSmallParentStack) {
 							qferMode = 2
 						}
+						// seed4 e1042: Function-fail→PL create in PP array body
+						// skips random_qualifiers (F20 NewArray first, not F50 F10).
+						if flow != nil && flow.isParamPPFallPicks >= 2 &&
+							flow.arrayLoopDepth > 0 {
+							qferMode = 0
+						}
 						localCands := localsInStackBlock(er, env, scope, ctx, idx)
 						forceCreate := ctx.state != nil && ctx.state.useSmallParentStack
+						// seed4 e1042: empty/miss force create (no sole local).
+						if flow != nil && flow.isParamPPFallPicks >= 2 &&
+							flow.arrayLoopDepth > 0 {
+							forceCreate = true
+						}
 						if len(localCands) == 0 || forceCreate {
 							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
 								bumpExprDepth(ctx)
+								markFuncEffect()
 								return castLiteral(t, g.expr)
 							}
 						} else if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, c.expr)
 						} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, g.expr)
 						}
 					} else {
@@ -3204,10 +3289,12 @@ func randomLeafExprWithMode(
 						if len(candidates) == 0 {
 							if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
 								bumpExprDepth(ctx)
+								markFuncEffect()
 								return castLiteral(t, g.expr)
 							}
 						} else if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, c.expr)
 						}
 					}
@@ -3234,6 +3321,7 @@ func randomLeafExprWithMode(
 								(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
 							if compat {
 								bumpExprDepth(ctx)
+								markFuncEffect()
 								return castLiteral(t, c.expr)
 							}
 						}
@@ -3253,14 +3341,37 @@ func randomLeafExprWithMode(
 					// force create: empty block / late inventory approx.
 					forceCreate := flow != nil && (flow.useSmallParentStack || flow.filterCompoundStmts)
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					// seed4 e1055: Function-fail→PP→PL first stack fails visit_facts
+					// → retry VariableSelector U100 (ParentLocal) then stack+create.
+					if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 {
+						scopePick2 := variableScopePickFromER(er, opts, &scope)
+						if scopePick2 == 1 {
+							idx2 := parentStackPick(er, flow)
+							// qferMode 2: levels F50+F10, self F10 only (UP F50 F10 F10).
+							qfer2 := 2
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer2, true, idx2); ok {
+								bumpExprDepth(ctx)
+								markFuncEffect()
+								return castLiteral(t, g.expr)
+							}
+						}
+						// fall through other scopes if needed
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok {
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, g.expr)
+						}
+					}
 					if !forceCreate {
 						if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, c2.expr)
 						}
 					}
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok {
 						bumpExprDepth(ctx)
+						markFuncEffect()
 						return castLiteral(t, g.expr)
 					}
 				} else {
@@ -3268,6 +3379,7 @@ func randomLeafExprWithMode(
 					if len(candidates) == 0 && scopePick == 0 {
 						if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, g.expr)
 						}
 					}
@@ -3277,6 +3389,7 @@ func randomLeafExprWithMode(
 					if len(candidates) > 0 {
 						if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
 							bumpExprDepth(ctx)
+							markFuncEffect()
 							return castLiteral(t, c.expr)
 						}
 					}
@@ -3422,6 +3535,13 @@ func randomLeafExprWithMode(
 					forceCreate := ctx.state != nil &&
 						(ctx.state.parentLocalStackPicks >= 12 ||
 							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
+					// seed4 e1199: PP array-body ParentLocal pointer after
+					// NewArray era — inventory miss/visit_facts → force create
+					// (UP F50 F10 F10, not sole-select next U120).
+					if wantPtr && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+						ctx.state.arrayLoopDepth > 0 && ctx.state.ppNewArrayCreated {
+						forceCreate = true
+					}
 					// seed4 e332: isParam ParentLocal after stack in nested CREATE
 					// body — UP empty-block create F20; GO may see caller locals.
 					// Only when nestedFuncBodies>0 (not early func_1 isParam e189).
@@ -3657,21 +3777,29 @@ func randomLeafExprWithMode(
 						bumpExprDepth(ctx)
 						return castLiteral(t, pool[0].expr)
 					}
-					if c, ok := selectExprVariableStrict(t, er, localCands); ok {
-						bumpExprDepth(ctx)
-						return castLiteral(t, c.expr)
-					}
-					// Fall back: all non-x dynLocs (block inventory incomplete).
-					allLocs := make([]exprVarCandidate, 0, 8)
-					for _, l := range mergedLocals(scope, ctx) {
-						if l.name == "x" {
-							continue
+					// seed4 e1199: PP array-body PP→PL pointer after NewArray —
+					// inventory sole-select skips create; UP visit_facts miss →
+					// create qferMode 2 (F50 F10 F10).
+					forcePPPLCreate := flow != nil && flow.isParamPPFallPicks >= 2 &&
+						flow.arrayLoopDepth > 0 && flow.ppNewArrayCreated &&
+						strings.Contains(t.Name, "*")
+					if !forcePPPLCreate {
+						if c, ok := selectExprVariableStrict(t, er, localCands); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
 						}
-						allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
-					}
-					if c, ok := selectExprVariableStrict(t, er, allLocs); ok {
-						bumpExprDepth(ctx)
-						return castLiteral(t, c.expr)
+						// Fall back: all non-x dynLocs (block inventory incomplete).
+						allLocs := make([]exprVarCandidate, 0, 8)
+						for _, l := range mergedLocals(scope, ctx) {
+							if l.name == "x" {
+								continue
+							}
+							allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+						}
+						if c, ok := selectExprVariableStrict(t, er, allLocs); ok {
+							bumpExprDepth(ctx)
+							return castLiteral(t, c.expr)
+						}
 					}
 					// Param→ParentLocal create: early SE-free qferMode 1; late
 					// pointer (useSmallParentStack) !SE-free self F10 only (e1024).
@@ -3683,6 +3811,11 @@ func randomLeafExprWithMode(
 					}
 					if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 {
 						qfer = 0
+					}
+					// seed4 e1199: pointer PP→PL create after NewArray is !SE-free
+					// READ qferMode 2 (levels F50+F10, self F10), not qferMode 0.
+					if forcePPPLCreate {
+						qfer = 2
 					}
 					// seed4 e835: retype uses eSimple order (U14=8→uint16 HexDigits=4)
 					// not historical (uint64 HexDigits=8) so hex next31 count matches.
@@ -3748,22 +3881,32 @@ func randomLeafExprWithMode(
 								bumpExprDepth(ctx)
 								return castLiteral(t, pool[0].expr)
 							}
-							if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
-								bumpExprDepth(ctx)
-								return castLiteral(t, c2.expr)
-							}
-							allLocs := make([]exprVarCandidate, 0, 8)
-							for _, l := range mergedLocals(scope, ctx) {
-								if l.name == "x" {
-									continue
+							// seed4 e1199: PP→PL pointer after NewArray force create
+							// qferMode 2 (not sole-select then next term U120).
+							forcePPPL := flow != nil && flow.isParamPPFallPicks >= 2 &&
+								flow.arrayLoopDepth > 0 && flow.ppNewArrayCreated && wantPtr
+							if !forcePPPL {
+								if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
+									bumpExprDepth(ctx)
+									return castLiteral(t, c2.expr)
 								}
-								allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+								allLocs := make([]exprVarCandidate, 0, 8)
+								for _, l := range mergedLocals(scope, ctx) {
+									if l.name == "x" {
+										continue
+									}
+									allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+								}
+								if c2, ok2 := selectExprVariableStrict(t, er, allLocs); ok2 {
+									bumpExprDepth(ctx)
+									return castLiteral(t, c2.expr)
+								}
 							}
-							if c2, ok2 := selectExprVariableStrict(t, er, allLocs); ok2 {
-								bumpExprDepth(ctx)
-								return castLiteral(t, c2.expr)
+							qferMiss := 1
+							if forcePPPL {
+								qferMiss = 2
 							}
-							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
+							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
 								bumpExprDepth(ctx)
 								return castLiteral(t, g.expr)
 							}
@@ -3876,39 +4019,60 @@ func randomLeafExprWithMode(
 			//    d. if need_no_rhs: SafeOpFlags F50 U4 (e2214)
 			needNoRhsExpr := false
 			if er != nil && er.fallback != nil {
-				// random_qualifiers(WRITE, no_volatile): draws still burned.
-				// useSmallParentStack: first few ExpressionAssign are !SE-free
-				// (e1005 skip self F50); later ones SE-free burn F50 (e1141).
-				small := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
-				n := 0
-				if small {
-					n = ctx.state.assignExprCount
-					ctx.state.assignExprCount++
-				}
-				// seed2 e1005 n=0 skip F50; e1141 n=1 burn F50; e1167 n>=2 skip.
-				// seed2 e2214 late for-body (filterCompoundStmts): burn F50 again.
-				lateQfer := ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts
-				burnSelfF50 := !small || n == 1 || lateQfer
-				// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
-				// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
-				// seed4 e1038: PP array-body pointer is !SE-free — levels only.
+				// ExpressionAssign.cpp: when qfer!=null, skip random_qualifiers.
+				// GO maps non-null parent qfer via skipFuncRetQfer (Assign RHS).
+				// PP-era only so seed2 residual paths stay intact.
+				skipQfer := ctx != nil && ctx.skipFuncRetQfer &&
+					ctx.state != nil && ctx.state.isParamPPFallPicks >= 2
 				ptrLv := strings.Count(t.Name, "*")
-				ppArrayBody := ctx != nil && ctx.state != nil &&
-					ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
-				if ptrLv > 0 && ppArrayBody {
-					for i := 0; i < ptrLv; i++ {
-						_ = er.fallback.flipcoin(50) // level vol
-						_ = er.fallback.flipcoin(10) // level const
+				if !skipQfer {
+					// random_qualifiers(WRITE, no_volatile): draws still burned.
+					// useSmallParentStack: first few ExpressionAssign are !SE-free
+					// (e1005 skip self F50); later ones SE-free burn F50 (e1141).
+					small := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack
+					n := 0
+					if small {
+						n = ctx.state.assignExprCount
+						ctx.state.assignExprCount++
 					}
-					// no self F50
-				} else if ptrLv > 0 && burnSelfF50 {
-					for i := 0; i < ptrLv; i++ {
-						_ = er.fallback.flipcoin(50) // level vol
-						_ = er.fallback.flipcoin(10) // level const
+					// seed2 e1005 n=0 skip F50; e1141 n=1 burn F50; e1167 n>=2 skip.
+					// seed2 e2214 late for-body (filterCompoundStmts): burn F50 again.
+					lateQfer := ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts
+					// Self vol only when effect context is SE-free
+					// (CVQualifiers::random_qualifiers volatile_ok).
+					// PP-era only: seed2 keeps assignExprCount/lateQfer model.
+					seFree := true
+					if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+						seFree = ctx.effectSEFree
 					}
-					_ = er.fallback.flipcoin(50) // self vol (WRITE: no self const)
-				} else if burnSelfF50 {
-					_ = er.fallback.flipcoin(50) // simple self vol only
+					burnSelfF50 := (!small || n == 1 || lateQfer) && seFree
+					// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
+					// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
+					// seed4 e1038: PP array-body pointer is !SE-free — levels only.
+					ppArrayBody := ctx != nil && ctx.state != nil &&
+						ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
+					if ptrLv > 0 && ppArrayBody {
+						for i := 0; i < ptrLv; i++ {
+							_ = er.fallback.flipcoin(50) // level vol
+							_ = er.fallback.flipcoin(10) // level const
+						}
+						// no self F50
+					} else if ptrLv > 0 && burnSelfF50 {
+						for i := 0; i < ptrLv; i++ {
+							_ = er.fallback.flipcoin(50) // level vol
+							_ = er.fallback.flipcoin(10) // level const
+						}
+						_ = er.fallback.flipcoin(50) // self vol (WRITE: no self const)
+					} else if ptrLv > 0 && !burnSelfF50 &&
+						ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+						// PP-era !SE-free pointer: levels still drawn, no self F50.
+						for i := 0; i < ptrLv; i++ {
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(10)
+						}
+					} else if burnSelfF50 {
+						_ = er.fallback.flipcoin(50) // simple self vol only
+					}
 				}
 				// AssignOpsProbability: non-simple (pointer/struct/union/float)
 				// forces eSimpleAssign with zero RNG (StatementAssign.cpp).
@@ -3993,6 +4157,17 @@ func randomLeafExprWithMode(
 						// opportunistic_validate: null ptr -> flipcoin(0) -> fail
 						_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
 						continue
+					}
+					// seed4 e1047: PP array-body ExpressionAssign Lhs SelectDeref
+					// address-of accepts without full tgt create (next term U120).
+					// seed4 e1195: after PP NewArray CreateArray, choose U2.
+					if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+						ctx.state.arrayLoopDepth > 0 && !newArray {
+						if ctx.state.ppNewArrayCreated {
+							_ = er.fallback.upto(2)
+						}
+						lhsFromDeref = true
+						break
 					}
 					// Address-of path: create global int for pointer target
 					// GenerateNewGlobal -> create_and_initialize for int:
@@ -6657,6 +6832,10 @@ func emitStatement(
 	if stmtBudget != nil && *stmtBudget == 0 {
 		return true
 	}
+	// Each statement starts with SE-free effect context (CGContext fresh/merged).
+	if ctx != nil {
+		ctx.effectSEFree = true
+	}
 	maybeDeclareOnDemandLocal(b, r, opts, ctx)
 	if stmtBudget != nil && *stmtBudget > 0 {
 		*stmtBudget = *stmtBudget - 1
@@ -7406,10 +7585,11 @@ func emitSingleFuncDefOnce(
 	scope := scopeInfo{params: fn.params, locals: locals, returnVar: retName}
 	var residualBody strings.Builder
 	ctx := &genContext{
-		state:        state,
-		from:         idx,
-		info:         info,
-		residualBody: &residualBody,
+		state:         state,
+		from:          idx,
+		info:          info,
+		residualBody:  &residualBody,
+		effectSEFree:  true,
 	}
 
 	for _, p := range fn.params {
