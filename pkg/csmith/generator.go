@@ -385,6 +385,12 @@ type functionFlowState struct {
 	// postAggU15StackU6PLNAfterPostPtr: PL picks after post-ptr era (0: e3903 sole;
 	// later e4035+ U5 choose + F0).
 	postAggU15StackU6PLNAfterPostPtr int
+	// inPtrCmpExpr: inside make_random_binary_ptr_comparison operand Expression
+	// (NO_DANGLING_PTR). SelectParentLocal often empty → GenerateNewParentLocal.
+	inPtrCmpExpr bool
+	// postAggPtrCmpPLCreateDone: after e4085+ NO_DANGLING PL create; later PL
+	// choose residual itemizes multi-dim [9][9][3] before F0 (e4204).
+	postAggPtrCmpPLCreateDone bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -2617,10 +2623,37 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// Sometimes array itemize after choose (U2) then select_must_use F75
 			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
-			// seed4 e1044: PP array-body Function-fail→PL create address-of
-			// accepts sole/empty without residual (next is ExpressionAssign Lhs F80).
-			// Only when NOT NewArray — NewArray needs choose residual (e1096).
-			if ppEra && ctx.state.arrayLoopDepth > 0 && qferMode == 0 && !newArray {
+			// e4089+: post-ptr ptr-cmp create address-of, choose_var empty
+			// (NO_DANGLING / no exact pointee) → GenerateNewGlobal for pointee
+			// (use_local false when globals on). Non-wildcard qfer skips
+			// random_qualifiers; NewArray F20 + Constant (+ create_field_vars
+			// for struct S0 — e4090–4128 bitfield U181).
+			if ctx.state.inPtrCmpExpr &&
+				ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 && !newArray {
+				// Peel one * for pointee type (struct S0* → struct S0).
+				baseName := strings.TrimSuffix(chosen.Name, "*")
+				if baseName == "" {
+					baseName = "int32_t"
+				}
+				base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				if strings.HasPrefix(baseName, "struct") {
+					base = CType{Name: baseName, Bits: 32}
+				}
+				newArrPointee := er.fallback.flipcoin(20)
+				if newArrPointee {
+					_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+					emitOrphanArrayGlobal(ctx, base, _arr)
+				} else if strings.Contains(base.Name, "*") {
+					if !er.fallback.flipcoin(20) {
+						_ = er.fallback.upto(2)
+					}
+				} else if strings.HasPrefix(base.Name, "struct") {
+					_ = formatAggregateOrSimpleConstant(er.fallback, base, ctx, opts)
+					burnCreateFieldVarsConstants(er.fallback, base, ctx, opts)
+				} else {
+					burnSimpleConstant(er.fallback, base)
+				}
+			} else if ppEra && ctx.state.arrayLoopDepth > 0 && qferMode == 0 && !newArray {
 				// e3082: post Lhs-write era still needs U2 address choose residual.
 				if ctx.state.postAggLhsWriteDone {
 					_ = er.fallback.upto(2)
@@ -4191,6 +4224,24 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 	}
 	if scopePick == 1 {
 		idx := parentStackPick(er, flow)
+		// e4085: ptr-cmp RHS forced Variable (null LHS → eVariable only) under
+		// NO_DANGLING_PTR in post-ptr era. Block locals exist but are dangling
+		// → UP choose_var empty → GenerateNewParentLocal. qferMode 2: F50 F10
+		// F10 for * when !SE-free. Do not force before post-ptr (e2236 regression).
+		if flow != nil && flow.inPtrCmpExpr && strings.Contains(t.Name, "*") &&
+			flow.postAggU15StackU6PostPPPtrSelDerefN >= 2 {
+			qferMode := 2
+			if ctx != nil && ctx.effectSEFree {
+				qferMode = 1
+			}
+			if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
+				flow.postAggPtrCmpPLCreateDone = true
+				bumpExprDepth(ctx)
+				return castLiteral(t, g.expr)
+			}
+			bumpExprDepth(ctx)
+			return castLiteral(t, "p")
+		}
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if useBlockLocal {
 			// Pointer forced-variable path: full qfer (levels+self F50+F10).
@@ -4663,6 +4714,12 @@ exprTries:
 							if ctx != nil && ctx.state != nil && ctx.state.ppPLPadChooseDone {
 								ctx.state.ppPostPadPtrCmpDone = true
 							}
+							// make_random_binary_ptr_comparison — operands use
+							// NO_DANGLING_PTR (FunctionInvocation.cpp). Arm flag so
+							// SelectParentLocal creates when inventory is stale.
+							if ctx != nil && ctx.state != nil {
+								ctx.state.inPtrCmpExpr = true
+							}
 							// make_random_binary_ptr_comparison
 							_ = er.fallback.flipcoin(50)
 							_ = er.fallback.flipcoin(50)
@@ -4708,20 +4765,37 @@ exprTries:
 							// PP-era: use tracked star depths. seed2: idx>0 → **.
 							stars := 1
 							ppEra := ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2
-							if ppEra && ptrIdx >= 0 && ptrIdx < len(ctx.state.derivedPtrList) {
-								stars = ctx.state.derivedPtrList[ptrIdx]
-								if stars < 1 {
-									stars = 1
+							listLen := 0
+							if ctx != nil && ctx.state != nil {
+								listLen = len(ctx.state.derivedPtrList)
+							}
+							// e4081: nPtr floored to 12 while list under-counts;
+							// out-of-range high indices are often struct S0* (UP
+							// address residual creates S0 with bitfield U181).
+							outOfRangeS0 := ctx != nil && ctx.state != nil &&
+								ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 &&
+								ptrIdx >= listLen
+							if !outOfRangeS0 {
+								if ppEra && ptrIdx >= 0 && ptrIdx < listLen {
+									stars = ctx.state.derivedPtrList[ptrIdx]
+									if stars < 1 {
+										stars = 1
+									}
+								} else if ptrIdx > 0 {
+									stars = 2
 								}
-							} else if ptrIdx > 0 {
-								stars = 2
 							}
 							// seed4 e1827: after late post-pad ptr-cmp, derived
 							// **+ self F50 (not *** levels F10 overshoot).
 							if ppEra && ppPostPadGlobalPicks >= 14 && stars > 2 {
 								stars = 2
 							}
-							ptrTy := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
+							var ptrTy CType
+							if outOfRangeS0 {
+								ptrTy = CType{Name: "struct S0*", Signed: true, Bits: 32}
+							} else {
+								ptrTy = CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32}
+							}
 							lhs := randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
 							// Upstream: if lhs->term_type == eConstant, force rhs eVariable
 							// (no ExpressionTypeProbability). isPointerNullConstant must match
@@ -4731,6 +4805,9 @@ exprTries:
 								rhs = randomPointerVariableExpr(ptrTy, er, opts, env, scope, nest, ctx)
 							} else {
 								rhs = randomTypedExprDepthFlags(ptrTy, er, opts, env, scope, nest, ctx, true, false)
+							}
+							if ctx != nil && ctx.state != nil {
+								ctx.state.inPtrCmpExpr = false
 							}
 							out = castLiteral(t, fmt.Sprintf("((%s) == (%s))", lhs, rhs))
 						} else {
@@ -5132,6 +5209,23 @@ exprTries:
 			// (often only synthetic "x") so fall through to all-locals path.
 			if scopePick == 1 {
 				idx := parentStackPick(er, flow)
+				// e4085+: Expression Variable under ptr-cmp NO_DANGLING_PTR —
+				// dangling locals → GenerateNewParentLocal (F50 F10 F10…).
+				// randomPointerVariableExpr has the null-LHS forced-Variable twin.
+				if flow != nil && strings.Contains(t.Name, "*") &&
+					flow.postAggU15StackU6PostPPPtrSelDerefN >= 2 && flow.inPtrCmpExpr {
+					qferMode := 2
+					if ctx != nil && ctx.effectSEFree {
+						qferMode = 1
+					}
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
+						flow.postAggPtrCmpPLCreateDone = true
+						bumpExprDepth(ctx)
+						return castLiteral(t, g.expr)
+					}
+					bumpExprDepth(ctx)
+					return castLiteral(t, "p")
+				}
 				// seed4 after ArrayOp PL ladder (stack already burned above):
 				// n=0 e2812 U4 locals; n=1 e2816–18 stack→VS Global U24;
 				// n>=2 e2829+ multi-dim itemize U4 U9 U4 U7 F0.
@@ -5537,7 +5631,14 @@ exprTries:
 										}
 										// e4035–39: choose_ok_var U5 + opportunistic F0
 										// fail → VS Global U100 + GlobalList U44.
+										// e4204+: after ptr-cmp PL create, array choose
+										// itemizes multi-dim [9][9][3] then F0.
 										_ = er.pick(5)
+										if flow.postAggPtrCmpPLCreateDone {
+											_ = er.pick(9)
+											_ = er.pick(9)
+											_ = er.pick(3)
+										}
 										if er.fallback != nil {
 											_ = er.fallback.flipcoin(0)
 										}
