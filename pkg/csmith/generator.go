@@ -209,6 +209,9 @@ type functionFlowState struct {
 	// forcePPEmptyOnce: after must_use F80 residual, next ParentParam is empty
 	// (seed4 e831 PL stack U3 create).
 	forcePPEmptyOnce bool
+	// ppEraRhsArrayCreate: RHS Expression just did PL NewArray create (seed4 e898
+	// skip Lhs SelectDeref after itemize).
+	ppEraRhsArrayCreate bool
 	// lastArraySizes: most recent CreateArrayVariable dimensions (for itemize).
 	lastArraySizes []int
 	// derivedPtrTypes approximates Type::derived_types.size() for pointer picks.
@@ -2213,6 +2216,12 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						}
 					}
 				}
+				// seed4 e991: after PP-era array creates, GlobalList scale U9
+				// (not seed2 e811 U17).
+				if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 &&
+					target > 9 {
+					target = 9
+				}
 				if target > n {
 					v := int(er.pick(uint32(target)))
 					// e849 F50 only on first U11-scale Global choose.
@@ -3687,6 +3696,10 @@ func randomLeafExprWithMode(
 						useESimpleRetypeSink = nil
 					}
 					if ok {
+						// seed4 e898: signal Statement Assign Lhs to skip SelectDeref.
+						if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 {
+							flow.ppEraRhsArrayCreate = true
+						}
 						bumpExprDepth(ctx)
 						return castLiteral(t, g.expr)
 					}
@@ -4590,6 +4603,16 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
+	// seed4 e898: after PP-era array-body RHS with PL CreateArray itemize,
+	// UP finishes Assign with zero Lhs RNG (next Statement U100); GO must not
+	// enter SelectDeref F80 create. Sole-accept Lhs for non-pointer targets.
+	if !needNoRhs && ctx != nil && ctx.state != nil &&
+		ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0 &&
+		!ctx.state.useSmallParentStack && !strings.Contains(targetType.Name, "*") &&
+		ctx.state.ppEraRhsArrayCreate {
+		ctx.state.ppEraRhsArrayCreate = false
+		lhsFromDeref = true
+	}
 	// seed2 e2270: after late pointer RHS create address-of itemize, must_write
 	// non-empty → select_must_use WRITE F75. visit_facts fails → VS residual
 	// U100 U100 U6 then accept (no SelectDeref F80). Next Statement U100 is
