@@ -885,6 +885,27 @@ func formatSimpleConstant(r *rng, t CType) string {
 	return hex.String() + "L"
 }
 
+// formatElementConstant mirrors Constant::make_random for array element types.
+// Unions: GenerateRandomUnionConstant = first field only (simple constant).
+// Structs: full struct constant (caller should prefer format path with fields).
+// Simple: formatSimpleConstant.
+func formatElementConstant(r *rng, t CType, opts Options) string {
+	if r == nil {
+		return "0"
+	}
+	if strings.HasPrefix(t.Name, "union") {
+		// Prefer int8_t first field (common); Bits=8 → 2 hex digits.
+		field0 := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+		return formatSimpleConstant(r, field0)
+	}
+	if strings.HasPrefix(t.Name, "struct") {
+		// Fallback: simple int constant (full struct path is elsewhere).
+		return formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
+	}
+	_ = opts
+	return formatSimpleConstant(r, t)
+}
+
 // arrayCreateResult holds dimensions + element init literals from CreateArrayVariable.
 type arrayCreateResult struct {
 	sizes []int
@@ -983,7 +1004,8 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				inits = append(inits, "0")
 				continue
 			}
-			inits = append(inits, formatSimpleConstant(r, t))
+			// Constant::make_random for array elements: unions use first field only.
+			inits = append(inits, formatElementConstant(r, t, opts))
 		}
 	}
 	if itemize {
@@ -1618,9 +1640,23 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	}
 	// make_init_value → Constant::make_random (capture literal for emission)
 	initLit := "0"
-	if isAggregate {
+	isUnion := strings.HasPrefix(chosen.Name, "union")
+	isStruct := strings.HasPrefix(chosen.Name, "struct")
+	if isUnion {
+		// GenerateRandomUnionConstant: only first field Constant::make_random.
+		field0 := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+		if ctx != nil && len(ctx.info.unions) > 0 {
+			// Use first field type from matching union if available.
+			for _, u := range ctx.info.unions {
+				if len(u.fields) > 0 {
+					field0 = u.fields[0].ctype
+					break
+				}
+			}
+		}
+		initLit = "{" + formatSimpleConstant(er.fallback, field0) + "}"
+	} else if isStruct {
 		// GenerateRandomStructConstant: bitfield InRange then per-field make_random.
-		// Emit {f0,f1,...} from field constants.
 		fieldLits := []string{}
 		burnBitfieldConst := func(bound int, signed bool) string {
 			if bound <= 0 {
@@ -1632,14 +1668,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			}
 			v := int(er.fallback.upto(uint32(b)))
 			if signed {
-				// GenerateRandomConstantInRange: flipcoin true → positive, false → negative
 				if !er.fallback.flipcoin(50) {
 					return fmt.Sprintf("-%d", v)
 				}
 			}
 			return fmt.Sprintf("%d", v)
 		}
-		// First pass: bitfield InRange draws (seed2 S0 layout).
 		bfBounds := []struct {
 			bound  int
 			signed bool
@@ -1666,11 +1700,9 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 				}
 			}
 		}
-		// InRange draws supply the struct initializer values (seed2 S0 style).
 		for _, bf := range bfBounds {
 			fieldLits = append(fieldLits, burnBitfieldConst(bf.bound, bf.signed))
 		}
-		// create_field_vars → Constant::make_random per field (RNG only; values unused).
 		nFields := len(fieldLits)
 		if nFields == 0 {
 			nFields = 6
@@ -2560,10 +2592,11 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 	return castLiteral(t, "0")
 }
 
-// continueAfterF10Constant: residual-era after F10 Constant.
-// Currently residual player (seed2 event table) for full stream match.
-// Entry is factored so real FunctionInvocation CREATE can replace the table
-// incrementally (F50 matched; next needs CREATE signature U4 path).
+// continueAfterF10Constant: after F10 Constant, residual-era stream.
+// Real FunctionInvocation CREATE matched F50 but next UP is U4 (not qfer F50);
+// residual player remains load-bearing until CREATE signature is aligned.
+// Probe: at maxFuncs ExpressionFunctionProbability forces stdfunc without F80;
+// residual F50 U4 may be SafeOpFlags unary or stack pick — TBD.
 func continueAfterF10Constant(r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext, t CType) {
 	_ = opts
 	_ = env
@@ -2599,8 +2632,9 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 		if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
 			return castLiteral(t, c.expr)
 		}
-		// Empty ParentLocal → GenerateNewParentLocal
-		if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+		// Empty ParentLocal → GenerateNewParentLocal with rv qfer copy (qferMode 0:
+		// no random_qualifiers — StatementReturn passes &rv->qfer non-wildcard).
+		if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, true, idx); ok {
 			return castLiteral(t, g.expr)
 		}
 	}
@@ -2611,8 +2645,8 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 	if c, ok := selectExprVariableFromER(t, er, candidates, false); ok && c.expr != "" {
 		return castLiteral(t, c.expr)
 	}
-	// create on demand Global
-	if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+	// NewValue with return qfer copy (no random_qualifiers F50/F10).
+	if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 0, false, -1); ok {
 		return castLiteral(t, g.expr)
 	}
 	return castLiteral(t, "0")
