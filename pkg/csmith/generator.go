@@ -107,6 +107,9 @@ var postAggNestArrayOpResidualDoneSink *bool
 var postAggNestArrayOpGlobalPtrSoleNSink *int
 // postAggNestArrayOpGlobalChooseNSink: multi-cand Global pad count after nest ArrayOp.
 var postAggNestArrayOpGlobalChooseNSink *int
+// postAggNestArrayOpF0PPKeepExprSink: set true on gn==11 F0 (e7439) so Statement
+// Assign RHS forces one more Expression after tree returns (e7443).
+var postAggNestArrayOpF0PPKeepExprSink *bool
 // postAggSkipNestArrayAltU2: Function-arg Global CreateArray alts skip nest U2
 // choose (e7315 UP F20 F20 then itemize; Lhs CreateArray still burns U2 per alt).
 var postAggSkipNestArrayAltU2 bool
@@ -560,8 +563,18 @@ type functionFlowState struct {
 	// PL stack is U4 not sticky U6 (e7342).
 	postAggNestArrayOpPLStackU4 bool
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
-	// (e7421 U4 first; e7431+ U5).
+	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
+	// postAggNestArrayOpF0PPKeepExpr: after residual-era Global F0 → PP sole
+	// (e7439–40), keep Statement RHS Expression open for one more Variable
+	// (e7443 PL U5 → Lhs F80) instead of ending Statement after Constant.
+	postAggNestArrayOpF0PPKeepExpr bool
+	// postAggNestArrayOpKeepExprSelN: SelectDeref residual rounds after keepExpr
+	// Lhs F80 (e7455+ U12+993/947/F0 then U11…).
+	postAggNestArrayOpKeepExprSelN int
+	// postAggNestArrayOpKeepExprSelActive: arm SelectDeref residual after PL
+	// itemize fail on keepExpr Lhs (e7448+).
+	postAggNestArrayOpKeepExprSelActive bool
 	// postAggNestArrayOpGlobalChooseN: multi-cand Global pad after nest ArrayOp
 	// residual (0: U55 e6878; 1: U2 e6972; 2: U54 e6979; 3+: U19 e6986).
 	postAggNestArrayOpGlobalChooseN int
@@ -811,14 +824,19 @@ func burnNestArrayOpPLAfterStack(er *exprRand, opts Options, env envInfo, scope 
 			_ = er.pick(5)
 			return
 		}
-		// e7435: stack already burned; visit miss → VS reselect (no local choose).
-		// e7435–36: Global U100 then U19 pad.
-		scopePick2 := variableScopePickFromER(er, opts, &scope)
-		if scopePick2 == 0 {
-			_ = er.pick(19)
-		} else if scopePick2 == 1 || scopePick2 == 4 {
-			_ = parentStackPick(er, flow)
+		if n == 2 {
+			// e7435: stack already burned; visit miss → VS reselect (no local choose).
+			// e7435–36: Global U100 then U19 pad.
+			scopePick2 := variableScopePickFromER(er, opts, &scope)
+			if scopePick2 == 0 {
+				_ = er.pick(19)
+			} else if scopePick2 == 1 || scopePick2 == 4 {
+				_ = parentStackPick(er, flow)
+			}
+			return
 		}
+		// e7445+: later inventory PL U5 after reselect era
+		_ = er.pick(5)
 		return
 	}
 	if flow.postAggNestArrayOpPLItemizeOnce {
@@ -1251,11 +1269,38 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				// e7111–7199: repeating stdfunc/Function residual stream.
 				// Prefer real Expression with Function allowed over packing each
 				// U120 F5 F10 U18 F50 F50 U4 by hand.
+				// e7443: stream continues through residual-era F0→PP+Constant; keep
+				// one more free Expression Variable (PL U5 → Lhs F80) before
+				// Statement ends (not emitStatements BlockSize U4 early).
 				if ctx != nil && ctx.state != nil {
 					ctx.state.ppPostPadAllowFuncOnce = true
 					ctx.exprDepth = 0
 				}
 				_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 1, ctx, false, false)
+				if flow != nil && flow.postAggNestArrayOpF0PPKeepExpr {
+					flow.postAggNestArrayOpF0PPKeepExpr = false
+					if ctx != nil && ctx.state != nil {
+						ctx.state.ppPostPadSkipStmtLhs = false
+						ctx.state.ppPostPadSkipParentExprN = 0
+						// e7443: UP U120 tries=5 Variable (depth-block filters
+						// Function/Assign/Comma); not free Function at depth 0.
+						maxD := maxExprDepth(opts)
+						if maxD < 1 {
+							maxD = 1
+						}
+						ctx.exprDepth = maxD * 2
+						ctx.state.ppPostPadDepthBlock = true
+						ctx.state.ppPostPadForceNoFunc = true
+					}
+					_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 1, ctx, false, false)
+					if ctx != nil && ctx.state != nil {
+						ctx.state.ppPostPadDepthBlock = false
+						ctx.state.ppPostPadForceNoFunc = false
+						ctx.exprDepth = 0
+					}
+					// e7447: after Variable PL, Lhs SelectDeref F80 (parent Assign).
+					_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, flow)
+				}
 			}
 		}
 	}()
@@ -1371,12 +1416,60 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					flow.postAggNestStmtUnfilteredOnce = true
 					return "x"
 				}
-				// e7342–43: after nest ArrayOp Lhs CreateArray residual era, PL
-				// stack U4 sole-accepts (UP F20 next; not U4 choose miss → F80).
+				// e7342–43: ExpressionAssign Lhs residual era used PL stack U4
+				// sole (F20 F20) on a different path. e7448–54: lhsMakeRandomWrite
+				// after residual-era keepExpr Expression: F80=0 → VS PL stack U4
+				// + choose U4 + multi-dim itemize U9 U4 U7 F0 → more SelectDeref
+				// (not sticky sole → Statement early).
+				// e7479–85: after SelectDeref U11 round, F80=0 → VS PL U4 U3 +
+				// 993 F0 → more SelectDeref U10…
 				if flow != nil && flow.postAggNestArrayOpPLStackU4 {
-					_ = parentStackPick(er, flow) // e7342 U4
-					flow.postAggLhsWriteDone = true
-					return "x"
+					selN := flow.postAggNestArrayOpKeepExprSelN
+					if !flow.postAggNestArrayOpKeepExprSelActive {
+						_ = parentStackPick(er, flow) // e7449 U4
+						_ = er.pick(4)                // e7450
+						_ = er.pick(9)                // e7451
+						_ = er.pick(4)                // e7452
+						_ = er.pick(7)                // e7453
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(0) // e7454 F0
+						}
+						flow.postAggNestArrayOpKeepExprSelActive = true
+						flow.postAggNestArrayOpKeepExprSelN = 0
+						plFails++
+						continue // e7455 more SelectDeref F80
+					}
+					if selN == 5 {
+						// e7479–85: second VS PL after U11 era → 993 F0 → U10 round
+						_ = parentStackPick(er, flow) // e7480 U4
+						_ = er.pick(3)                // e7481 U3
+						_ = er.pick(9)                // e7482 993
+						_ = er.pick(9)
+						_ = er.pick(3)
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(0) // e7485 F0
+						}
+						// Next SelectDeref case 5 is wrong (already used); use case 6 arm
+						flow.postAggNestArrayOpKeepExprSelN = 6
+						plFails++
+						continue // e7486 F80 U10
+					}
+					if selN == 7 {
+						// e7488–91: after U10, VS PL U4 U3 sole → F80 U8
+						_ = parentStackPick(er, flow) // e7490 U4
+						_ = er.pick(3)                // e7491 U3
+						flow.postAggNestArrayOpKeepExprSelN = 8
+						plFails++
+						continue // e7492 F80 U8
+					}
+					if selN >= 9 {
+						// e7494–97: after U8, VS PL U4 U4 accept Lhs
+						_ = parentStackPick(er, flow) // e7496 U4
+						_ = er.pick(4)                // e7497 U4
+						flow.postAggNestArrayOpKeepExprSelActive = false
+						flow.postAggLhsWriteDone = true
+						return "x"
+					}
 				}
 				_ = parentStackPick(er, flow)
 				nLoc := uint32(4)
@@ -1408,6 +1501,59 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 		fails := 0
 		if flow != nil {
 			fails = flow.postAggLhsDerefChooseFails
+		}
+		// e7455–77: after keepExpr Lhs PL itemize fail, SelectDeref residual
+		// U12+993×2, U12+947, U12+F0, U11 then F80=0 → VS (not empty create F20).
+		// e7486+: after second VS PL 993, U10 then F80=0 → VS.
+		if flow != nil && flow.postAggNestArrayOpKeepExprSelActive {
+			n := flow.postAggNestArrayOpKeepExprSelN
+			flow.postAggNestArrayOpKeepExprSelN++
+			switch n {
+			case 0, 1:
+				// e7455/e7461: U12 + [9][9][3] F0
+				_ = er.pick(12)
+				_ = er.pick(9)
+				_ = er.pick(9)
+				_ = er.pick(3)
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0)
+				}
+				continue
+			case 2:
+				// e7467: U12 + [9][4][7] F0
+				_ = er.pick(12)
+				_ = er.pick(9)
+				_ = er.pick(4)
+				_ = er.pick(7)
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0)
+				}
+				continue
+			case 3:
+				// e7473: U12 + F0
+				_ = er.pick(12)
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0)
+				}
+				continue
+			case 4:
+				// e7476: U11 then F80=0 → VS (n→5)
+				_ = er.pick(11)
+				continue
+			case 6:
+				// e7486: after second VS PL 993, U10 then F80=0 → VS (n→7)
+				_ = er.pick(10)
+				continue
+			case 8:
+				// e7492: after VS PL U4 U3, U8 then F80=0 → VS accept (n→9)
+				_ = er.pick(8)
+				continue
+			default:
+				// unexpected — accept Lhs
+				flow.postAggNestArrayOpKeepExprSelActive = false
+				flow.postAggLhsWriteDone = true
+				return "x"
+			}
 		}
 		// e7018–25: after nest ArrayOp Global F0 PL residual, SelectDeref
 		// U12+F0 fail then U11 + VS + residual Expression (not F20 create).
@@ -4421,7 +4567,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 							if er.fallback != nil {
 								_ = er.fallback.flipcoin(0)
 							}
+							// e7443: after F0→PP sole + Constant, keep Statement RHS
+							// Expression open (force one more Expression when RHS returns).
+							if postAggNestArrayOpF0PPKeepExprSink != nil {
+								*postAggNestArrayOpF0PPKeepExprSink = true
+							}
 							return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+						case gn == 12:
+							// e7510: free Expression Global after keepExpr Lhs residual U55
+							target = 55
 						default:
 							target = 2
 						}
@@ -10466,6 +10620,17 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.exprDepth = 0
 		}
 		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		// e7443: after residual-era Global F0 → PP sole + Constant, UP keeps
+		// free Expression Variable (PL U4 U5) then Lhs F80. GO ended Statement
+		// one Expression short — force one more Expression before Statement Lhs.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpF0PPKeepExpr {
+			ctx.state.postAggNestArrayOpF0PPKeepExpr = false
+			ctx.state.ppPostPadSkipStmtLhs = false
+			ctx.state.ppPostPadSkipParentExprN = 0
+			ctx.exprDepth = 0
+			erKeep := newExprRand(r, exprDecisionBudget(opts))
+			_ = randomTypedExprDepthFlags(targetType, erKeep, opts, env, scope, 0, ctx, false, false)
+		}
 	}
 
 	// Lhs::make_random: select_must_use WRITE first, then SelectDerefPointerProb
@@ -10488,6 +10653,19 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		keepExpr := ctx.state.postAggNestArrayOpLhsKeepExpr
 		_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
 		// residual burned in lhsMakeRandomWrite defer (e7047–53).
+		// e7498: after keepExpr Lhs residual era completes, UP continues with
+		// another Statement in the same block (U100=8 then Expression U120 F5…),
+		// not new BlockSize U4. Force Statement + RHS Expression only
+		// (U100 then U120 F5 — no AssignOps/SelectLType between).
+		if ctx.state.postAggNestArrayOpPLStackU4 && ctx.state.postAggLhsWriteDone &&
+			!ctx.state.postAggNestArrayOpKeepExprSelActive {
+			ctx.state.skipNextBlockSize = false
+			_ = r.upto(100) // e7498 StatementProbability
+			ctx.exprDepth = 0
+			_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+			writeLine(b, 1, "x = x;")
+			return true
+		}
 		if keepExpr {
 			ctx.state.skipNextBlockSize = false
 		} else {
@@ -15079,6 +15257,7 @@ func emitSingleFuncDefOnce(
 		postAggNestArrayOpResidualDoneSink = &state.postAggNestArrayOpResidualDone
 		postAggNestArrayOpGlobalPtrSoleNSink = &state.postAggNestArrayOpGlobalPtrSoleN
 		postAggNestArrayOpGlobalChooseNSink = &state.postAggNestArrayOpGlobalChooseN
+		postAggNestArrayOpF0PPKeepExprSink = &state.postAggNestArrayOpF0PPKeepExpr
 		postAggNestNoConstOnceSink = &state.postAggNestNoConstOnce
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
@@ -15135,6 +15314,7 @@ func emitSingleFuncDefOnce(
 			postAggNestArrayOpResidualDoneSink = nil
 			postAggNestArrayOpGlobalPtrSoleNSink = nil
 			postAggNestArrayOpGlobalChooseNSink = nil
+			postAggNestArrayOpF0PPKeepExprSink = nil
 			postAggNestNoConstOnceSink = nil
 		}()
 	}
