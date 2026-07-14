@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8719) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8809) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8719** (8682→8719; Statement Assign Lhs SelectDeref residual; seed2 full held). Toward 9000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8809** (8719→8809; For residual + ExpressionAssign qfer + Lhs U5 residuals; seed2 full held). Toward 9000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -527,8 +527,17 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
    (clear sticky SkipStmtLhs after long post-CD3 RHS).
 2. e8702: second Statement Assign Lhs residual U6→VS Global/PP→PL create.
 
-Next plateau: seed4 e8719 after Lhs residual, UP F5 For/array residual vs GO
-Statement U100. Seeds 5–21; COUNT=20.
+**e8719–e8809 climbed:**
+1. e8719–40: after StmtLhs2 residual, For/array residual (F5 aryno U4 +
+   select_array U10 U3×3 + U32 U3 U2 F0 + SafeOpFlags).
+2. e8747: post-CD3 pointer ExpressionAssign levels F50 F10 + self F50
+   (e8294 first free Assign was non-pointer AssignOps only).
+3. e8753: post-CD3 n==1 pointer Global multiphase (e8701 sole; e8753 pad U2).
+4. e8765–88: third Statement Lhs SelectDeref residual U5/U4/U3 F0/U2 F0 + VS create.
+5. e8796: fourth Statement Lhs F80 U5 accept; clear sticky e4332 ExprUnwind residual.
+
+Next plateau: seed4 e8809 UP F75 select_must_use vs GO U100 VS after nested
+Function (U120=77). Toward 9000+. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

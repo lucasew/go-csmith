@@ -105,6 +105,12 @@ var postAggNestGlobalU17F0DoneSink *bool
 var postAggNestArrayOpResidualDoneSink *bool
 // postAggNestArrayOpPostCD3Sink: after CD3 leave, free Expression Global natural choose.
 var postAggNestArrayOpPostCD3Sink *bool
+// postAggPostCD3PtrGlobalNSink: post-CD3 multi-cand pointer Global choose count
+// (e8483 n=0 sole; e8605+ n≥1 natural U2).
+var postAggPostCD3PtrGlobalNSink *int
+// postAggPostCD3PtrGlobalSoleNSink: post-CD3 n==1 pointer Global count
+// (e8701 first sole; e8753+ pad U2).
+var postAggPostCD3PtrGlobalSoleNSink *int
 // postAggPostCD3DepthBlockOnceSink: one-shot depthBlock after post-CD3 Constant
 // (e8381 UP U120 tries=3 Variable).
 var postAggPostCD3DepthBlockOnceSink *bool
@@ -662,6 +668,24 @@ type functionFlowState struct {
 	postAggPostCD3StmtLhs2 bool
 	// postAggPostCD3StmtLhs2Active: burn U6+VS create residual at Lhs entry.
 	postAggPostCD3StmtLhs2Active bool
+	// postAggPostCD3StmtLhs3: arm third Statement Assign Lhs SelectDeref residual
+	// after ExpressionAssign qfer era (e8765 U5 U4 U3 F0 U2 F0 then VS).
+	postAggPostCD3StmtLhs3 bool
+	// postAggPostCD3StmtLhs3Active: burn U5 countdown residual at Lhs entry.
+	postAggPostCD3StmtLhs3Active bool
+	// postAggPostCD3StmtLhs4: arm fourth Statement Assign Lhs residual (e8796 U5).
+	postAggPostCD3StmtLhs4 bool
+	// postAggPostCD3StmtLhs4Active: burn U5 accept residual at Lhs entry.
+	postAggPostCD3StmtLhs4Active bool
+	// postAggPostCD3ExprAssignN: count of post-CD3 pointer ExpressionAssign
+	// qfer burns (e8747+ levels F50 F10 + self F50 each).
+	postAggPostCD3ExprAssignN int
+	// postAggPostCD3PtrGlobalN: post-CD3 multi-cand pointer Global choose count
+	// (e8483 first sole; later e8605+ natural U2).
+	postAggPostCD3PtrGlobalN int
+	// postAggPostCD3PtrGlobalSoleN: post-CD3 n==1 pointer Global count
+	// (e8701 first sole; e8753+ pad U2).
+	postAggPostCD3PtrGlobalSoleN int
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -4718,11 +4742,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// e7259/e7286: free Expression Global after nest ArrayOp residual —
 		// sole without array itemize U(n) (UP free Expression U120 next).
 		// e8276 post-CD3: eFlexible multi-cand uses pad table (U56/U19); pointer
-		// exact multi soles again (e8483 U100 Global sole → U120, not U2).
+		// exact multi: first sole (e8483), later natural U2 (e8605/e8753).
 		nestArrayOpExprGlobal := !forAssign && postAggNestArrayOpResidualDoneSink != nil &&
 			*postAggNestArrayOpResidualDoneSink &&
 			(postAggNestArrayOpPostCD3Sink == nil || !*postAggNestArrayOpPostCD3Sink)
-		postCD3PtrSole := !forAssign && wantPtr &&
+		postCD3Ptr := !forAssign && wantPtr &&
 			postAggNestArrayOpPostCD3Sink != nil && *postAggNestArrayOpPostCD3Sink
 		if len(exact) == 1 {
 			// e6947: 2nd pointer Global sole pads U2 (e6875 first / e7259 3rd+ no U2).
@@ -4733,8 +4757,18 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					_ = er.pick(2)
 				}
 			}
+			// e8701 post-CD3: first n==1 pointer Global soles (→ Lhs F80).
+			// e8753: second+ n==1 under-count pad U2 (UP choose among 2).
+			if postCD3Ptr && er != nil && postAggPostCD3PtrGlobalSoleNSink != nil {
+				pn := *postAggPostCD3PtrGlobalSoleNSink
+				*postAggPostCD3PtrGlobalSoleNSink++
+				if pn >= 1 {
+					_ = er.pick(2)
+				}
+				return exact[0], true
+			}
 			// e7286: skip array itemize on free Expression Global sole after residual.
-			if !nestArrayOpExprGlobal && !postCD3PtrSole {
+			if !nestArrayOpExprGlobal && !postCD3Ptr {
 				itemize(exact[0], 1)
 			}
 			return exact[0], true
@@ -4751,9 +4785,21 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// e7259/e7286: after nest ArrayOp residual, free Expression Global multi
 		// sole-accepts without choose (n=2 U2 or n=4→U2 e1017 scale desyncs;
 		// UP free Expression U120 next).
-		// e8483 post-CD3: pointer Global multi also soles (not U2 choose).
-		if (nestArrayOpExprGlobal || postCD3PtrSole) && n >= 2 {
+		// e8483 post-CD3: first pointer Global multi soles; e8605+ natural U2.
+		if nestArrayOpExprGlobal && n >= 2 {
 			return exact[0], true
+		}
+		if postCD3Ptr && n >= 2 {
+			pn := 0
+			if postAggPostCD3PtrGlobalNSink != nil {
+				pn = *postAggPostCD3PtrGlobalNSink
+				*postAggPostCD3PtrGlobalNSink++
+			}
+			if pn == 0 {
+				// e8483: first multi sole → next Expression U120
+				return exact[0], true
+			}
+			// e8605+: natural choose U(n) — fall through
 		}
 		if n == 2 && nestArrayOpExprGlobal {
 			itemize(exact[0], 1)
@@ -9444,11 +9490,23 @@ exprTries:
 					// under-counts and skips self).
 					// e7645–48: after keepExpr residual PL stack U3 era, ** levels
 					// F50 F10×2 only (no self F50) then parent Expression U120.
-					// e8294 post-CD3: free ExpressionAssign → AssignOps U120, no qfer.
+					// e8294 post-CD3: first free ExpressionAssign is non-pointer
+					// (AssignOps U120, no qfer). e8747+: first pointer ExpressionAssign
+					// burns levels F50 F10 + self F50 (null qfer WRITE).
 					nestArrayOpPtrQfer := ctx != nil && ctx.state != nil &&
 						ctx.state.postAggNestArrayOpResidualDone && ptrLv > 0 &&
 						!ctx.state.postAggNestArrayOpPostCD3
-					if nestArrayOpPtrQfer {
+					// post-CD3 pointer ExpressionAssign: exclusive levels+self qfer.
+					if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 &&
+						ptrLv > 0 {
+						ctx.state.postAggPostCD3ExprAssignN++
+						// e8747+: levels F50 F10 ×ptrLv + self F50 then AssignOps/RHS
+						for i := 0; i < ptrLv; i++ {
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(10)
+						}
+						_ = er.fallback.flipcoin(50)
+					} else if nestArrayOpPtrQfer {
 						lv := ptrLv
 						if lv < 2 {
 							lv = 2
@@ -11420,6 +11478,20 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.state.ppPostPadSkipStmtLhs = false
 			ctx.state.postAggNeedLhsAfterRhs = false
 			ctx.state.postAggPostCD3StmtLhs2Active = true
+		} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs3 {
+			// e8765: third Statement Assign Lhs SelectDeref U5… residual.
+			ctx.state.postAggPostCD3StmtLhs3 = false
+			ctx.state.postAggPostCD3StmtLhsSel = false
+			ctx.state.ppPostPadSkipStmtLhs = false
+			ctx.state.postAggNeedLhsAfterRhs = false
+			ctx.state.postAggPostCD3StmtLhs3Active = true
+		} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs4 {
+			// e8796: fourth Statement Assign Lhs SelectDeref U5 accept.
+			ctx.state.postAggPostCD3StmtLhs4 = false
+			ctx.state.postAggPostCD3StmtLhsSel = false
+			ctx.state.ppPostPadSkipStmtLhs = false
+			ctx.state.postAggNeedLhsAfterRhs = false
+			ctx.state.postAggPostCD3StmtLhs4Active = true
 		}
 	}
 
@@ -11475,10 +11547,89 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.flipcoin(20) // e8713
 		_ = r.upto(2)      // e8714
 		_ = r.upto(3)      // e8715
-		// e8716–18: VS residual U100×3 before next Statement
+		// e8716–18: VS residual U100×3 then For/array residual (e8719+).
 		_ = r.upto(100)
 		_ = r.upto(100)
 		_ = r.upto(100)
+		// e8719–40: F5 array_loop aryno U4 + select_array/access residual
+		// U10 U3 ×3 + loop/create residual U32 U3 U2 F0 + SafeOpFlags-like.
+		_ = r.flipcoin(5) // e8719 F5=0 → array_loop
+		_ = r.upto(4)     // e8720 aryno
+		// select_array + access residual (UP U10 U3 ×3)
+		_ = r.upto(10)
+		_ = r.upto(3)
+		_ = r.upto(10)
+		_ = r.upto(3)
+		_ = r.upto(10)
+		_ = r.upto(3)
+		// e8727–30: U32 U3 U2 F0
+		_ = r.upto(32)
+		_ = r.upto(3)
+		_ = r.upto(2)
+		_ = r.flipcoin(0)
+		// e8731–40: SafeOpFlags-like F50×5 U4 F50 F50 U4 U4
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.upto(4)
+		lhsFromDeref = true
+		ctx.state.skipNextBlockSize = true // next Statement U100 after residual
+		// e8765: next Statement Assign Lhs needs U5 countdown residual.
+		ctx.state.postAggPostCD3StmtLhs3 = true
+	}
+	// e8765–88 post-CD3: Statement Lhs SelectDeref countdown
+	// F80 U5, F80 U4, F80 U3 F0, F80 U2 F0, F80=0 Global U2 U5,
+	// F80 F0, F80 F10 F50 F20×4 U2 then accept / continue.
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs3Active {
+		ctx.state.postAggPostCD3StmtLhs3Active = false
+		// e8765–74: F80 U5 / U4 / U3 F0 / U2 F0 then F80=0
+		_ = r.flipcoin(80) // e8765 F80=1
+		_ = r.upto(5)      // e8766
+		_ = r.flipcoin(80) // e8767
+		_ = r.upto(4)      // e8768
+		_ = r.flipcoin(80) // e8769
+		_ = r.upto(3)      // e8770
+		_ = r.flipcoin(0)  // e8771
+		_ = r.flipcoin(80) // e8772
+		_ = r.upto(2)      // e8773
+		_ = r.flipcoin(0)  // e8774
+		_ = r.flipcoin(80) // e8775 F80=0
+		// e8776–78: VS Global U100 U2 U5
+		_ = r.upto(100)
+		_ = r.upto(2)
+		_ = r.upto(5)
+		// e8779–80: F80 F0
+		_ = r.flipcoin(80)
+		_ = r.flipcoin(0)
+		// e8781–88: F80 create residual F10 F50 F20×4 U2
+		_ = r.flipcoin(80)
+		if opts.ConstPointers {
+			_ = r.flipcoin(10)
+		}
+		if opts.VolatilePointers {
+			_ = r.flipcoin(50)
+		}
+		_ = r.flipcoin(20) // NewArray
+		_ = r.flipcoin(20) // init
+		_ = r.flipcoin(20)
+		_ = r.flipcoin(20)
+		_ = r.upto(2)
+		lhsFromDeref = true
+		ctx.state.skipNextBlockSize = false
+		// e8796: next Statement Assign Lhs U5 accept residual.
+		ctx.state.postAggPostCD3StmtLhs4 = true
+	}
+	// e8795–96 post-CD3: Statement Lhs SelectDeref F80 U5 accept (UP next U100).
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs4Active {
+		ctx.state.postAggPostCD3StmtLhs4Active = false
+		_ = r.flipcoin(80) // e8795
+		_ = r.upto(5)      // e8796
 		lhsFromDeref = true
 		ctx.state.skipNextBlockSize = false
 	}
@@ -11777,6 +11928,10 @@ lhsDerefLoop:
 							// e8276+: free Expression Global multiphase U56 then U19.
 							ctx.state.postAggNestArrayOpPLStackU2Once = true
 							ctx.state.postAggNestArrayOpPostCD3 = true
+							// e8796: sticky e4332 Expression-unwind SelectDeref residual
+							// would force U2+[9][9][3]; clear for post-CD3 live U5.
+							ctx.state.postAggStmtLhsAfterExprUnwind = false
+							ctx.state.postAggStmtLhsSelDerefFails = 0
 							ctx.state.postAggNestArrayOpGlobalChooseN = 0
 							ctx.state.postAggNestArrayOpPostCD3PLN = 0
 							ctx.state.postAggNestArrayOpPostCD3StackN = 0
@@ -12866,6 +13021,10 @@ lhsDerefLoop:
 					if nChoose+extra > nChoose {
 						nChoose = len(ptrs) + (extra+1)/2
 					}
+					// e8796 post-CD3: Statement Lhs SelectDeref pool U5 (GO often U2).
+					if ctx.state.postAggNestArrayOpPostCD3 && nChoose < 5 {
+						nChoose = 5
+					}
 				}
 				if nChoose < len(ptrs) {
 					nChoose = len(ptrs)
@@ -12989,7 +13148,10 @@ lhsDerefLoop:
 					}
 					continue
 				}
-				if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind {
+				// e8796 post-CD3: sticky e4332 Expression-unwind residual must
+				// not force U2+[9][9][3] (UP live choose U5). Clear under postCD3.
+				if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind &&
+					!ctx.state.postAggNestArrayOpPostCD3 {
 					fails := ctx.state.postAggStmtLhsSelDerefFails
 					// Round1: 11,10+F0,9,8,7+[9][4][7]F0,7+F0,6+[9][9][3]F0,6+F0,5,4,3 → VS
 					// Round2 after VS: U2+[9][9][3]F0 → F80=0 VS create (e4376–82).
@@ -13025,6 +13187,11 @@ lhsDerefLoop:
 						_ = r.flipcoin(0)
 					}
 					continue
+				}
+				if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 &&
+					ctx.state.postAggStmtLhsAfterExprUnwind {
+					ctx.state.postAggStmtLhsAfterExprUnwind = false
+					ctx.state.postAggStmtLhsSelDerefFails = 0
 				}
 				// Early postAgg: pad ~13 (e2351/e2377). One-shot after Lhs write
 				// create: U7 accept (e3076). Later e3122+ : 12,11,10… + F0 fail.
@@ -16570,6 +16737,8 @@ func emitSingleFuncDefOnce(
 		postAggNestGlobalU17F0DoneSink = &state.postAggNestGlobalU17F0Done
 		postAggNestArrayOpResidualDoneSink = &state.postAggNestArrayOpResidualDone
 		postAggNestArrayOpPostCD3Sink = &state.postAggNestArrayOpPostCD3
+		postAggPostCD3PtrGlobalNSink = &state.postAggPostCD3PtrGlobalN
+		postAggPostCD3PtrGlobalSoleNSink = &state.postAggPostCD3PtrGlobalSoleN
 		postAggPostCD3DepthBlockOnceSink = &state.postAggPostCD3DepthBlockOnce
 		postAggNestArrayOpPLStackU3Sink = &state.postAggNestArrayOpPLStackU3
 		postAggNestArrayOpGlobalPtrSoleNSink = &state.postAggNestArrayOpGlobalPtrSoleN
@@ -16630,6 +16799,8 @@ func emitSingleFuncDefOnce(
 			postAggNestGlobalU17F0DoneSink = nil
 			postAggNestArrayOpResidualDoneSink = nil
 			postAggNestArrayOpPostCD3Sink = nil
+			postAggPostCD3PtrGlobalNSink = nil
+			postAggPostCD3PtrGlobalSoleNSink = nil
 			postAggPostCD3DepthBlockOnceSink = nil
 			postAggNestArrayOpPLStackU3Sink = nil
 			postAggNestArrayOpGlobalPtrSoleNSink = nil
