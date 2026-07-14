@@ -14367,6 +14367,8 @@ lhsDerefLoop:
 																		// after post-array done (e16732 U2 F0;
 																		// e16866 CreateArray).
 																		postCreatePostArrayGlobalN := 0
+																		// postCreatePostArrayAsgN: Assign hits after GlobalN>=7
+																		postCreatePostArrayAsgN := 0
 																		// postCreateLateCommaUseExDone: one-shot
 																		// e16555 Comma → Function useEx.
 																		postCreateLateCommaUseExDone := false
@@ -15154,13 +15156,30 @@ lhsDerefLoop:
 																								postCreateConstOnlyOnce = true
 																								postCreateConstBareOnce = true
 																							} else {
-																								// n>=8: F50 + afterAsg bare Func
-																								// e16807–09: F50=0 → no Assign
-																								// next (Function tries=1).
-																								asgF50 := rf.flipcoin(50)
-																								afterAsg = true
-																								if !asgF50 && postCreatePostArrayDone {
-																									postCreateNoAssignOnce = true
+																								// n>=8: F50 + afterAsg bare Func.
+																								// e16807-09: F50=0 → no Assign next.
+																								// e17346+: after GlobalN>=7, 2nd Assign is *type WRITE
+																								// qfer F50 F10 F50 then RHS (not afterAsg).
+																								if postCreatePostArrayGlobalN >= 7 {
+																									postCreatePostArrayAsgN++
+																									if postCreatePostArrayAsgN >= 2 {
+																										_ = rf.flipcoin(50) // level vol
+																										_ = rf.flipcoin(10) // level const
+																										_ = rf.flipcoin(50) // self vol
+																										afterAsg = false
+																									} else {
+																										asgF50 := rf.flipcoin(50)
+																										afterAsg = true
+																										if !asgF50 {
+																											postCreateNoAssignOnce = true
+																										}
+																									}
+																								} else {
+																									asgF50 := rf.flipcoin(50)
+																									afterAsg = true
+																									if !asgF50 && postCreatePostArrayDone {
+																										postCreateNoAssignOnce = true
+																									}
 																								}
 																							}
 																						}
@@ -15768,9 +15787,8 @@ lhsDerefLoop:
 																											_ = rf.flipcoin(50)
 																											_ = rf.upto(16)
 																											postCreateVarOnlyOnce = true
-																										} else {
-																											// e16956–68: Global U2 F0 → NewValue
-																											// F10=0 U2 U14 F50 F10 F20 F50×2 U3.
+																										} else if postCreatePostArrayGlobalN == 5 {
+																											// e16956-68: Global U2 F0 → NewValue F10=0 U2 U14 F50 F10 F20 F50x2 U3.
 																											_ = rf.upto(2)
 																											_ = rf.flipcoin(0)
 																											_ = rf.upto(100) // NewValue
@@ -15784,6 +15802,64 @@ lhsDerefLoop:
 																												_ = rf.flipcoin(50)
 																												_ = rf.upto(3)
 																											}
+																											postCreateVarOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN == 6 {
+																											// e17221-32: Global U6 F0 → PP U2 F50 F10x2 F10 F20 F20.
+																											_ = rf.upto(6)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100) // PP
+																											_ = rf.upto(2)
+																											for qi := 0; qi < 2; qi++ {
+																												_ = rf.flipcoin(50)
+																												_ = rf.flipcoin(10)
+																											}
+																											_ = rf.flipcoin(10)
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(20)
+																											postCreateVarOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN == 7 {
+																											// e17269-85: Global U9 F0 → PP F0 → Global U8 F0 → PL U3
+																											// + choose_random_simple + GenerateNewParentLocal.
+																											_ = rf.upto(9)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100)
+																											_ = rf.upto(8)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100)
+																											_ = rf.upto(3) // parent.stack
+																											es := true
+																											prevES := useESimpleRetypeSink
+																											useESimpleRetypeSink = &es
+																											ty := pickSimpleNonVoid(rf, opts)
+																											useESimpleRetypeSink = prevES
+																											_ = rf.flipcoin(50) // vol (no_volatile forces false after draw)
+																											isConst := opts.Consts && rf.flipcoin(10)
+																											_ = rf.flipcoin(20) // NewArray
+																											init := formatSimpleConstant(rf, ty)
+																											if ctx != nil && ctx.state != nil {
+																												name := ctx.state.allocLocalName()
+																												ctx.dynLocs = append(ctx.dynLocs, localInfo{
+																													name: name, ctype: ty, blockDepth: 1, initLit: init, isConst: isConst, emitDecl: true,
+																												})
+																											}
+																											postCreateVarOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN == 8 {
+																											// e17287-88: Global ok_vars U140.
+																											_ = rf.upto(140)
+																											postCreateVarOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN == 9 {
+																											// e17290-95: U2 → PP U3 U4 → Global.
+																											_ = rf.upto(2)
+																											_ = rf.upto(100)
+																											_ = rf.upto(3)
+																											_ = rf.upto(4)
+																											_ = rf.upto(100)
+																										} else {
+																											// later Global residual
+																											_ = rf.upto(2)
+																											_ = rf.flipcoin(0)
 																											postCreateVarOnlyOnce = true
 																										}
 																									} else {
@@ -16158,8 +16234,54 @@ lhsDerefLoop:
 																									// e16773+: late PL U2 sole;
 																									// e16925: one-shot ConstOnly;
 																									// e16970+: F80 CreateArray residual.
-																									_ = rf.upto(2)
-																									if postCreatePostArrayGlobalN >= 5 {
+																									if postCreatePostArrayAsgN >= 2 {
+																										// e17351-55: Assign RHS PL stack U4 + create
+																										_ = rf.upto(4)
+																										_ = rf.flipcoin(20)
+																										_ = rf.flipcoin(20)
+																										_ = rf.upto(3)
+																										if ctx != nil && ctx.state != nil {
+																											name := ctx.state.allocLocalName()
+																											ctx.dynLocs = append(ctx.dynLocs, localInfo{
+																												name: name, ctype: CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
+																												blockDepth: 4, initLit: "0", emitDecl: true,
+																											})
+																										}
+																										// e17356+: Lhs SelectDeref F80=0 → NewValue Global CreateArray
+																										_ = rf.flipcoin(80)
+																										_ = rf.upto(100) // NewValue
+																										if rf.flipcoin(10) {
+																											// Global create residual e17358-74
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(50)
+																											_ = rf.upto(99)
+																											_ = rf.upto(10)
+																											_ = rf.upto(10)
+																											_ = rf.upto(10)
+																											_ = rf.upto(75)
+																											for hi := 0; hi < 4; hi++ {
+																												_ = rf.flipcoin(20)
+																											}
+																											_ = rf.upto(10)
+																											_ = rf.upto(3)
+																											_ = rf.upto(5)
+																											if ctx != nil && ctx.state != nil {
+																												gname := ctx.state.allocGlobalName()
+																												writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[4] = {0};", gname))
+																												ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																													name: gname, ctype: CType{Name: "int32_t", Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
+																												})
+																											}
+																										} else {
+																											_ = rf.upto(4)
+																											_ = rf.flipcoin(20)
+																										}
+																									} else {
+																										_ = rf.upto(2)
+																										if postCreatePostArrayGlobalN >= 5 {
+
 																										// e16972–80: F80=1 F0 F80
 																										// F20 F20 U99 U10×3 F20×…
 																										if rf.flipcoin(80) {
@@ -16179,36 +16301,56 @@ lhsDerefLoop:
 																										_ = rf.upto(5)
 																										_ = rf.upto(4)
 																										_ = rf.flipcoin(0)
-																										// e16987+: F80 U5 U4 F0 ladder
-																										// until F80=0 → VS then more.
-																										for ri := 0; ri < 8; ri++ {
-																											if !rf.flipcoin(80) {
-																												_ = rf.upto(100)
-																												// e16997+: after first F80=0
-																												// continue U2 F80 ladder /
-																												// Global U3× F0 residual.
-																												_ = rf.upto(2)
-																												if !rf.flipcoin(80) {
-																													_ = rf.upto(100)
-																													_ = rf.upto(3)
-																													_ = rf.upto(3)
-																													_ = rf.flipcoin(0)
-																													// more F80 U5 U4 F0
-																													for rj := 0; rj < 6; rj++ {
-																														if !rf.flipcoin(80) {
-																															_ = rf.upto(100)
-																															break
-																														}
-																														_ = rf.upto(5)
-																														_ = rf.upto(4)
-																														_ = rf.flipcoin(0)
-																													}
-																												}
-																												break
+																										// e16987-17206: multiphase VS ladder (Lhs SelectDeref fail path).
+																										// F80=1 -> U5 U4 F0 continue; F80=0 -> VS U100:
+																										// Global U3 U3 F0 continue; PL U2 early continue / late CreateArray;
+																										// PP/NV sole continue. e17013 must not exit on Global U3 U3 F0.
+																										plVSHits := 0
+																										for ri := 0; ri < 50; ri++ {
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(5)
+																												_ = rf.upto(4)
+																												_ = rf.flipcoin(0)
+																												continue
 																											}
-																											_ = rf.upto(5)
-																											_ = rf.upto(4)
-																											_ = rf.flipcoin(0)
+																											sp := rf.upto(100)
+																											if sp < 35 {
+																												_ = rf.upto(3)
+																												_ = rf.upto(3)
+																												_ = rf.flipcoin(0)
+																												continue
+																											}
+																											if sp >= 65 {
+																												continue
+																											}
+																											_ = rf.upto(2)
+																											plVSHits++
+																											if plVSHits == 1 || ri < 15 {
+																												continue
+																											}
+																											// CreateArray + field Constants (digits into strings)
+																											_ = rf.flipcoin(20)
+																											constTy := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+																											_ = formatSimpleConstant(rf, constTy)
+																											_ = rf.upto(99)
+																											_ = rf.upto(10)
+																											_ = rf.upto(10)
+																											_ = rf.upto(10)
+																											_ = rf.upto(81)
+																											for fi := 0; fi < 58; fi++ {
+																												_ = formatSimpleConstant(rf, constTy)
+																											}
+																											_ = rf.upto(3)
+																											_ = rf.upto(6)
+																											_ = rf.upto(9)
+																											if ctx != nil && ctx.state != nil {
+																												arrName := ctx.state.allocGlobalName()
+																												writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[4] = {0};", arrName))
+																												ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																													name: arrName, ctype: constTy, isArray: true, arrayLen: 4,
+																												})
+																											}
+																											break
 																										}
 																										postCreateVarOnlyOnce = true
 																									} else if postCreatePostArrayGlobalN >= 2 && !postCreateLatePLConstDone {
@@ -16218,7 +16360,8 @@ lhsDerefLoop:
 																										// e16935+: next Variable tries
 																										postCreateVarOnlyOnce = true
 																									}
-																								}
+																								}																									}
+
 																							} else {
 																								// e15815: stack U6 U5 + itemize
 																								// + VS U100. e15898+: U6 U5 sole.
@@ -16508,15 +16651,42 @@ lhsDerefLoop:
 																								if postCreatePostArrayDone {
 																									postCreateLateFreePPN++
 																									if postCreateLateFreePPN >= 2 {
-																										// e16541/e16929: U2 sole;
-																										// e16835: U2 F50 U16 once.
+																										// e16541: U2 sole; e16835: U2 F50 U16;
+																										// e16929: U2 + VarOnly; e17206+: U2 CreateArray.
 																										_ = rf.upto(2)
-																										if postCreateLateFreePPN == 3 {
+																										switch {
+																										case postCreateLateFreePPN == 2:
+																											// U2 sole only
+																										case postCreateLateFreePPN == 3:
 																											_ = rf.flipcoin(50)
 																											_ = rf.upto(16)
-																										} else if postCreateLateFreePPN >= 4 {
-																											// e16932+: next Variable tries
+																										case postCreateLateFreePPN == 4:
 																											postCreateVarOnlyOnce = true
+																										case postCreateLateFreePPN == 5:
+																											// e17209-19: *** qfer F50 F10 x3 + NewArray F20 F20 CreateArray
+																											for qi := 0; qi < 3; qi++ {
+																												_ = rf.flipcoin(50)
+																												_ = rf.flipcoin(10)
+																											}
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(20)
+																											_ = rf.upto(99)
+																											_ = rf.upto(10)
+																											_ = rf.upto(1)
+																											if ctx != nil && ctx.state != nil {
+																												arrName := ctx.state.allocGlobalName()
+																												writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[1] = {0};", arrName))
+																												ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																													name: arrName, ctype: CType{Name: "int32_t", Signed: true, Bits: 32}, isArray: true, arrayLen: 1,
+																												})
+																											}
+																											postCreateVarOnlyOnce = true
+																										case postCreateLateFreePPN == 6, postCreateLateFreePPN == 7:
+																											postCreateVarOnlyOnce = true
+																										default:
+																											// e17250+: U2 U4 + VS Global
+																											_ = rf.upto(4)
+																											_ = rf.upto(100)
 																										}
 																									}
 																								}
@@ -16563,11 +16733,11 @@ lhsDerefLoop:
 																					// Constant trails F50 (e13055).
 																					// e16129+: late era F10=0 → stack U1
 																					// U14 F10 F20 F50×2 U3 F80 ladder.
-																					if !rf.flipcoin(10) {
-																						if postCreatePostArrayDone {
-																							// e16885–903: NewValue stack U2
-																							// + F50 F10×2 F10 F20×2 CreateArray
-																							// U99 U10×3 F20×4 U10 U2.
+																					if postCreatePostArrayDone {
+																						// e16885+: NewValue VariableCreationProbability F10
+																						// 0→PL CreateArray; 1→Global create U14 + qfer + Constant.
+																						if !rf.flipcoin(10) {
+																							// e16885-903: PL stack U2 + qfer CreateArray
 																							_ = rf.upto(2)
 																							for qi := 0; qi < 2; qi++ {
 																								_ = rf.flipcoin(50)
@@ -16585,7 +16755,28 @@ lhsDerefLoop:
 																							}
 																							_ = rf.upto(10)
 																							_ = rf.upto(2)
-																						} else if !postCreateLateCommaF80 {
+																						} else {
+																							// e17239-45: Global create choose_random_simple U14 +
+																							// qfer F50 F10 + NewArray F20 + Constant.
+																							es := true
+																							prevES := useESimpleRetypeSink
+																							useESimpleRetypeSink = &es
+																							ty := pickSimpleNonVoid(rf, opts)
+																							useESimpleRetypeSink = prevES
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20)
+																							init := formatSimpleConstant(rf, ty)
+																							if ctx != nil && ctx.state != nil {
+																								gname := ctx.state.allocGlobalName()
+																								writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = %s;", ty.Name, gname, init))
+																								ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{name: gname, ctype: ty})
+																							}
+																							postCreateVarOnlyOnce = true
+																						}
+																						} else if !rf.flipcoin(10) {
+																						if !postCreateLateCommaF80 {
+
 																							// e16129–42: PL stack U1 +
 																							// full U14 + F10 F20 F50 F50
 																							// U3 F80 F80 F20 F20 U3 F50 U8.

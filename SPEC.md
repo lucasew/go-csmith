@@ -189,9 +189,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →17013) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →17363) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **17013** (16417→17013; post-itemize Variable multiphase, useEx field catalog, late PL/Global/PP residuals; seed2 full held). Toward 20000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **17363** (17013→17363; multiphase VS Global U3 continue, freePP CreateArray, GlobalN 5–9 PL create with choose_random_simple, NewValue F10 Global, Assign *qfer + Lhs CreateArray; seed2 full held). Toward 20000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
 
