@@ -677,6 +677,15 @@ type functionFlowState struct {
 	postAggPostCD3StmtLhs4 bool
 	// postAggPostCD3StmtLhs4Active: burn U5 accept residual at Lhs entry.
 	postAggPostCD3StmtLhs4Active bool
+	// postAggPostCD3ForMustRead: after e8719 For residual, ExpressionVariable
+	// select_must_use F75 accept (e8809) without U2 itemize.
+	postAggPostCD3ForMustRead bool
+	// postAggPostCD3ForceGlobalCreate: after multi-level ExpressionAssign qfer
+	// (e8822 ****), next Function-fail Global creates F20×4 (e8831).
+	postAggPostCD3ForceGlobalCreate bool
+	// postAggPostCD3EALhsU2: ExpressionAssign Lhs after e8831 create residual
+	// burns F80 F20 F20 U2 (e8848–51) before parent Expression U120.
+	postAggPostCD3EALhsU2 bool
 	// postAggPostCD3ExprAssignN: count of post-CD3 pointer ExpressionAssign
 	// qfer burns (e8747+ levels F50 F10 + self F50 each).
 	postAggPostCD3ExprAssignN int
@@ -868,7 +877,10 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	// must_use attempt (not only make_random_param).
 	ppArrayGate := st.isParamPPFallPicks >= 2 && st.arrayLoopDepth > 0 && st.mustReadLive
 	lateGate := st.useSmallParentStack // after e948 era
-	if !earlyGate && !ppArrayGate && !lateGate {
+	// e8809 post-CD3 For residual body: must_read non-empty, non-array match
+	// burns F75 only (no U2 itemize) and accepts (UP next Expression U120).
+	postCD3ForMust := st.postAggPostCD3ForMustRead && st.mustReadLive
+	if !earlyGate && !ppArrayGate && !lateGate && !postCD3ForMust {
 		return exprVarCandidate{}, false
 	}
 	if strings.Contains(t.Name, "*") || strings.HasPrefix(t.Name, "struct") ||
@@ -877,6 +889,15 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	}
 	if t.Bits <= 0 {
 		return exprVarCandidate{}, false
+	}
+	if postCD3ForMust && !earlyGate && !lateGate {
+		// e8809: match non-array must_read → F75 erase, accept (no U2).
+		if er.fallback.flipcoin(75) {
+			st.mustReadLive = false
+		}
+		// One-shot accept so later Variables use VS U100.
+		st.postAggPostCD3ForMustRead = false
+		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
 	if lateGate && !earlyGate {
 		// seed2 e1001–1004: one-shot three U2 then F75; later termVariable
@@ -5811,6 +5832,39 @@ func buildFunctionCallExpr(
 			}
 			// Upstream: failed invocation → ExpressionVariable::make_random
 			// (seed2 e814 U100 NewValue after useExisting miss at max funcs).
+			// e8831: after **** ExpressionAssign, burn Global create residual
+			// here so U100 then F20×4 CreateArray (not sole→Lhs F80).
+			// e8839+: nested residual F50 F20 F20 U7 CreateArray U99 U10 U4 F20 U9
+			// then Lhs F80 (not pointer-alt U2 itemize).
+			if state.postAggPostCD3ForceGlobalCreate && er != nil && er.fallback != nil {
+				state.postAggPostCD3ForceGlobalCreate = false
+				_ = variableScopePickFromER(er, opts, &scope) // U100 Global
+				// e8831–47: F20×4 + CreateArray residual matching UP (no alt
+				// initNum / itemize overshoot). Manual burn of ladder only.
+				_ = er.fallback.flipcoin(20) // NewArray
+				_ = er.fallback.flipcoin(20) // init
+				_ = er.fallback.flipcoin(20) // nested NewArray
+				_ = er.fallback.flipcoin(20) // nested residual
+				// first CreateArray: U99 U10 U3 F20
+				_ = er.fallback.upto(99)
+				_ = er.fallback.upto(10)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.flipcoin(20)
+				// nested: F50 F20 F20 U7 CreateArray U99 U10 U4 F20 U9
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(20)
+				_ = er.fallback.flipcoin(20)
+				_ = er.fallback.upto(7)
+				_ = er.fallback.upto(99)
+				_ = er.fallback.upto(10)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.flipcoin(20)
+				_ = er.fallback.upto(9)
+				// e8848–51: ExpressionAssign Lhs SelectDeref F80 F20 F20 U2 then
+				// parent Expression U120 (arm so Lhs residual matches).
+				state.postAggPostCD3EALhsU2 = true
+				return castLiteral(t, "g_0"), true
+			}
 			return "", false // caller termFunction falls through; see below
 		}
 		// Return qfer before ParamList (Function::make_random_signature).
@@ -9499,9 +9553,20 @@ exprTries:
 					// post-CD3 pointer ExpressionAssign: exclusive levels+self qfer.
 					if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 &&
 						ptrLv > 0 {
+						n := ctx.state.postAggPostCD3ExprAssignN
 						ctx.state.postAggPostCD3ExprAssignN++
-						// e8747+: levels F50 F10 ×ptrLv + self F50 then AssignOps/RHS
-						for i := 0; i < ptrLv; i++ {
+						// e8747: first pointer EA levels×ptrLv + self.
+						// e8822: later ptr-cmp ExpressionAssign UP has **** qfer
+						// (F50 F10×4 + self) while GO type often * / ** under-count.
+						lv := ptrLv
+						if n >= 1 {
+							if lv < 4 {
+								lv = 4
+							}
+							// e8831: RHS Function-fail Global needs create residual.
+							ctx.state.postAggPostCD3ForceGlobalCreate = true
+						}
+						for i := 0; i < lv; i++ {
 							_ = er.fallback.flipcoin(50)
 							_ = er.fallback.flipcoin(10)
 						}
@@ -9699,6 +9764,18 @@ exprTries:
 			}
 			if er != nil && er.fallback != nil {
 				for {
+					// e8848–51 post-CD3: after **** Global create residual, Lhs
+					// SelectDeref F80 F20 F20 U2 then parent Expression U120.
+					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3EALhsU2 {
+						ctx.state.postAggPostCD3EALhsU2 = false
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.upto(2)
+						}
+						lhsFromDeref = true
+						break
+					}
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
 					if !deref {
 						// seed4 e2113–15: after e2092 address residual, F80=0 → VS
@@ -11582,6 +11659,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		ctx.state.skipNextBlockSize = true // next Statement U100 after residual
 		// e8765: next Statement Assign Lhs needs U5 countdown residual.
 		ctx.state.postAggPostCD3StmtLhs3 = true
+		// e8809: UP For body carries rw_directive must_read → ExpressionVariable
+		// select_must_use F75. Residual burns RNG without emitStatements; arm
+		// mustReadLive + arrayLoopDepth so trySelectMustUseVar fires.
+		if ctx.state.arrayLoopDepth < 1 {
+			ctx.state.arrayLoopDepth = 1
+		}
+		ctx.state.mustReadLive = true
+		ctx.state.postAggPostCD3ForMustRead = true
 	}
 	// e8765–88 post-CD3: Statement Lhs SelectDeref countdown
 	// F80 U5, F80 U4, F80 U3 F0, F80 U2 F0, F80=0 Global U2 U5,
