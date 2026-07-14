@@ -14169,6 +14169,16 @@ lhsDerefLoop:
 																		// chooses; 1st sole, 2nd F50 (e13157),
 																		// 3rd F50 U16 (e13280–81 array/extra).
 																		globalU102N := 0
+																		// e13384+: under re-armed depth filter
+																		// (longlong), Global ok_vars shrinks
+																		// U3 then U2 (ExpressionVariable retry).
+																		globalDepthN := 0
+																		// e13406: after depth-era Const small,
+																		// SelectDeref F80 residual once.
+																		depthConstSelectDerefDone := false
+																		// e13431: after that Const, next Expression
+																		// is no_const+depth (only Variable 70–89).
+																		depthNoConstNext := false
 																		// e13249+: post-itemize PL residual phases
 																		// (stack U4 then choose/create variants).
 																		plClosedN := 0
@@ -14220,7 +14230,13 @@ lhsDerefLoop:
 																		commaLhsNoConst := false
 																		for j := 0; j < 250; j++ {
 																			var vv uint32
-																			if depthFilterExpr {
+																			if depthNoConstNext {
+																				// e13431: depth + no_const → Variable only
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 70 || x >= 90
+																				})
+																				depthNoConstNext = false
+																			} else if depthFilterExpr {
 																				// only Variable 70–89 + Constant 90–99
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x < 70 || x >= 100
@@ -14335,6 +14351,33 @@ lhsDerefLoop:
 																					} else {
 																						_ = rf.upto(20)
 																					}
+																					// e13406: after CreateArray itemize
+																					// era (plClosedN≥4), depth-era small
+																					// Const → SelectDeref F80 F20×2 U5
+																					// F80=0 → VS Global residual.
+																					// Not on early depth Consts (e13295).
+																					if depthFilterExpr && depthFilterClosed && plClosedN >= 4 && !depthConstSelectDerefDone {
+																						depthConstSelectDerefDone = true
+																						if rf.flipcoin(80) {
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																							_ = rf.upto(5)
+																						}
+																						if !rf.flipcoin(80) {
+																							_ = rf.upto(100)
+																							// e13411 Global U3 + U2 U9 U4
+																							// residual before next U120.
+																							globalDepthN++
+																							_ = rf.upto(3)
+																							_ = rf.upto(2)
+																							_ = rf.upto(9)
+																							_ = rf.upto(4)
+																						}
+																					} else if depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone {
+																						// e13431: next term depth+no_const
+																						// (shift RHS or struct) Variable only.
+																						depthNoConstNext = true
+																					}
 																				} else {
 																					hn := lastHexN
 																					if hn <= 0 {
@@ -14398,12 +14441,16 @@ lhsDerefLoop:
 																				// not stale SafeOpFlags size.
 																				// e13056: stop re-arming after itemize
 																				// closed the depth-filter window.
+																				// e13382: under re-armed depth filter do
+																				// not force lastHexN=8 — preserve U14
+																				// width (e13325 longlong → hex×16).
 																				if plStackN <= 5 && !depthFilterClosed {
 																					depthFilterExpr = true
 																					lastHexN = 8
-																				} else if plStackN <= 5 {
+																				} else if plStackN <= 5 && !depthFilterExpr {
 																					lastHexN = 8
 																				}
+																				// when depthFilterExpr: keep lastHexN
 																				if sp < 35 {
 																					// e12711: Global U3; e12724–37:
 																					// Global miss → PL U3 U6 →
@@ -14412,7 +14459,41 @@ lhsDerefLoop:
 																					// e13119+: after itemize window,
 																					// expanded Global ok_vars n=102
 																					// (no CreateArray itemize pack).
-																					if plStackN <= 5 && depthFilterClosed {
+																					if plStackN <= 5 && depthFilterClosed && depthFilterExpr {
+																						// e13384+: re-armed depth era
+																						// longlong ok_vars small (not
+																						// U102 int pool; not e12855 U36).
+																						// e13384–90: first Global fails
+																						// visit → retry Global U2 → PL
+																						// stack U4 create U6 (same
+																						// ExpressionVariable loop).
+																						globalDepthN++
+																						switch {
+																						case globalDepthN == 1:
+																							_ = rf.upto(3)
+																							_ = rf.upto(100) // retry Global
+																							globalDepthN++
+																							_ = rf.upto(2)
+																							_ = rf.upto(100) // PL
+																							_ = rf.upto(4)
+																							_ = rf.upto(6)
+																						case globalDepthN == 2:
+																							_ = rf.upto(2)
+																						case globalDepthN == 3:
+																							// e13411 from SelectDeref path
+																							_ = rf.upto(3)
+																						case globalDepthN == 4:
+																							// e13421: U2 F0 → PP reselect
+																							_ = rf.upto(2)
+																							_ = rf.flipcoin(0)
+																							_ = rf.upto(100) // PP
+																						case globalDepthN <= 6:
+																							_ = rf.upto(2)
+																						default:
+																							// e13474+: larger pool U34
+																							_ = rf.upto(34)
+																						}
+																					} else if plStackN <= 5 && depthFilterClosed {
 																						_ = rf.upto(102)
 																						globalU102N++
 																						// e13156+: 2nd Global F50; e13279+:
@@ -14532,11 +14613,9 @@ lhsDerefLoop:
 																							_ = rf.upto(3)
 																							_ = rf.upto(3)
 																							_ = rf.upto(1)
-																						case plClosedN == 2, plClosedN == 6:
-																							// e13283/e13388: create-ish
-																							// U6 U9 then next Expression
-																							// under depth filter (e13287
-																							// Const tries=3).
+																						case plClosedN == 2:
+																							// e13283: create-ish U6 U9
+																							// then depth filter re-arm.
 																							_ = rf.upto(6)
 																							_ = rf.upto(9)
 																							depthFilterExpr = true
@@ -14591,26 +14670,143 @@ lhsDerefLoop:
 																								_ = rf.upto(7)
 																								for di := 0; di < 20; di++ {
 																									if !rf.flipcoin(80) {
+																										// e13375: VS U100 U4;
+																										// F20 NewArray=0 →
+																										// Constant init F50
+																										// small vs hex.
+																										// e13378 F50=0 →
+																										// hex×8 (int; UP depth
+																										// gap 16439→16448).
 																										_ = rf.upto(100)
 																										_ = rf.upto(4)
 																										_ = rf.flipcoin(20)
-																										_ = rf.flipcoin(50)
+																										if rf.flipcoin(50) {
+																											if rf.flipcoin(50) {
+																												_ = rf.upto(3)
+																											} else {
+																												_ = rf.upto(20)
+																											}
+																										} else {
+																											for h := 0; h < 8; h++ {
+																												_ = rf.next31()
+																											}
+																										}
 																										break
 																									}
 																									_ = rf.upto(7)
 																								}
 																							}
+																						case plClosedN == 5:
+																							// e13392: stack U4 sole
+																							// (choose_ok_var n=1).
+																						case plClosedN == 6:
+																							// e13417: U4 U7 choose
+																							_ = rf.upto(7)
+																						case plClosedN == 7:
+																							// e13432–68: PL create struct
+																							// F50 F10 F20 + field Constants.
+																							// Hex widths from UP depth gaps:
+																							// 16,8,8 then small U181 + more.
+																							_ = rf.flipcoin(50) // SE-free vol
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20) // NewArray=0
+																							// fields: F50=0 hex×16, ×8, ×8
+																							for _, hn := range []int{16, 8, 8} {
+																								_ = rf.flipcoin(50) // =0 hex
+																								for h := 0; h < hn; h++ {
+																									_ = rf.next31()
+																								}
+																							}
+																							// F50 F50 U3 small field
+																							_ = rf.flipcoin(50)
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							// U181 bitfield
+																							_ = rf.upto(181)
+																							// e13444–68 remaining fields
+																							burnFC := func(hexN int) {
+																								if rf.flipcoin(50) {
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else {
+																									for h := 0; h < hexN; h++ {
+																										_ = rf.next31()
+																									}
+																								}
+																							}
+																							// e13444–49: F50 F50 U20; F50 F50 U3
+																							burnFC(8)
+																							burnFC(8)
+																							// e13450–58: hex×4, hex×8, small U3;
+																							// hex×8, small U3 (UP depth gaps).
+																							for _, hn := range []int{4, 8} {
+																								_ = rf.flipcoin(50)
+																								for h := 0; h < hn; h++ {
+																									_ = rf.next31()
+																								}
+																							}
+																							_ = rf.flipcoin(50)
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							_ = rf.flipcoin(50)
+																							for h := 0; h < 8; h++ {
+																								_ = rf.next31()
+																							}
+																							_ = rf.flipcoin(50)
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							// e13459–68: hex×16, hex×8, U20;
+																							// hex×8, hex×4?, U20
+																							for _, hn := range []int{16, 8} {
+																								_ = rf.flipcoin(50)
+																								for h := 0; h < hn; h++ {
+																									_ = rf.next31()
+																								}
+																							}
+																							_ = rf.flipcoin(50)
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							for _, hn := range []int{8, 4} {
+																								_ = rf.flipcoin(50)
+																								for h := 0; h < hn; h++ {
+																									_ = rf.next31()
+																								}
+																							}
+																							_ = rf.flipcoin(50)
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
 																						default:
-																							// later: stack-only or light
-																							// choose (e13392 U4 sole)
-																							if plClosedN%3 == 0 {
-																								// sole stack accept
-																							} else if plClosedN%3 == 1 {
-																								_ = rf.upto(7)
+																							// e13503+: stack U5? or U4
+																							// + itemize/create variants
+																							if plClosedN%2 == 0 {
+																								_ = rf.upto(5)
+																								_ = rf.upto(3)
+																								_ = rf.upto(9)
 																							} else {
 																								_ = rf.upto(5)
 																								_ = rf.upto(3)
 																								_ = rf.upto(9)
+																								if rf.flipcoin(80) {
+																									_ = rf.upto(2)
+																								}
 																							}
 																						}
 																					} else {

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13379) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13471) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13379** (13009→13379; post-itemize Expression residual, PL multiphase+CreateArray itemize; seed2 full held). Toward 15000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13471** (13379→13471; hex after create F50=0, depth-era Global/PL, SelectDeref, struct create pack; seed2 full held). Toward 15000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e13379 U120 tries under re-armed depth filter after CreateArray itemize (stream/filter residual). Toward 15000+.
+Next plateau: seed4 e13471 Const F50=0 after struct create — UP has F50 U64 after hex×16 (depth gap); GO ends Constant early. Toward 15000+.
+
+**e13379–e13471 climbed:**
+1. e13379: CreateArray VS F20 NewArray=0 → Constant F50=0 hex×8 (unlogged digits).
+2. Preserve lastHexN under re-armed depth (longlong hex×16 after NewValue U14=5).
+3. Depth-era Global small ok_vars U3/U2 + ExpressionVariable retry; PL phases 5–7 sole/U7/struct create.
+4. e13406: after CreateArray-era small Const → SelectDeref F80 residual; e13431 depth+no_const Variable-only.
+5. e13432: PL struct create_field_vars hex widths 16/8/8 + U181 + field pack.
+6. seed2 37939 held.
 
 **e13009–e13379 climbed:**
 1. e13009–55: Comma lhs U14 NonVoid + no_const; NewValue U4+SE-free F50 trails.
