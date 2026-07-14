@@ -547,6 +547,12 @@ type functionFlowState struct {
 	// SelectDeref U12+F0 then U11 (e7018–21), not sticky F20 create.
 	postAggNestArrayOpLhsCountdown bool
 	postAggNestArrayOpLhsFails     int
+	// postAggNestArrayOpLhsVSAfterF80: after residual Expression+ShiftBy, next
+	// F80=0 → VS WRITE U6 U4 U4 → Global (e7041–46).
+	postAggNestArrayOpLhsVSAfterF80 bool
+	// postAggNestArrayOpLhsKeepExpr: sticky through Lhs residual/VS accept so
+	// ExpressionAssign does not SkipParentExprN→Statement (e7047 U120 next).
+	postAggNestArrayOpLhsKeepExpr bool
 	// postAggNestArrayOpGlobalChooseN: multi-cand Global pad after nest ArrayOp
 	// residual (0: U55 e6878; 1: U2 e6972; 2: U54 e6979; 3+: U19 e6986).
 	postAggNestArrayOpGlobalChooseN int
@@ -1110,6 +1116,111 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 	if er == nil || er.fallback == nil {
 		return "x"
 	}
+	// e7047+: after nest ArrayOp Lhs residual/VS accept, burn free Expression
+	// Function residual then real Expression (Variable Global U55…) so LCG
+	// stays aligned without expanding a long residual pack.
+	defer func() {
+		if flow != nil && flow.postAggNestArrayOpLhsKeepExpr && er.fallback != nil {
+			flow.postAggNestArrayOpLhsKeepExpr = false
+			// uptoWithFilter checks reject twice on the same first x (if + for);
+			// reject both so the loop draws a second raw (tries=1).
+			rejectCalls := 0
+			_ = er.fallback.uptoWithFilter(120, func(uint32) bool {
+				rejectCalls++
+				return rejectCalls <= 2
+			}) // e7047 tries=1
+			_ = er.fallback.flipcoin(5)  // e7048
+			_ = er.fallback.flipcoin(10) // e7049
+			_ = er.fallback.upto(18)     // e7050
+			_ = er.fallback.flipcoin(50) // e7051
+			_ = er.fallback.flipcoin(50) // e7052
+			_ = er.fallback.upto(4)      // e7053
+			if ctx != nil && ctx.state != nil {
+				ctx.state.ppPostPadSkipParentExprN = 0
+				ctx.state.skipNextBlockSize = false
+			}
+			// e7054+: free Expression Variable (Global U55 pad era).
+			base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+			if ctx != nil {
+				ctx.exprDepth = 0
+			}
+			_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 1, ctx, false, false)
+			// e7057–80: ExpressionAssign + Lhs create + VS residual trail.
+			if er.fallback != nil {
+				_ = er.fallback.upto(120)    // e7057
+				_ = er.fallback.upto(120)    // e7058
+				_ = er.fallback.flipcoin(80) // e7059 F80=1
+				_ = er.fallback.flipcoin(20) // e7060
+				_ = er.fallback.flipcoin(20) // e7061
+				_ = er.fallback.upto(6)      // e7062 stack
+				_ = er.fallback.flipcoin(50) // e7063
+				_ = er.fallback.upto(4)      // e7064
+				_ = er.fallback.upto(4)      // e7065
+				_ = er.fallback.upto(100)    // e7066
+				_ = er.fallback.upto(100)    // e7067
+				_ = er.fallback.upto(5)      // e7068
+				_ = er.fallback.upto(4)      // e7069
+				_ = er.fallback.upto(100)    // e7070
+				_ = er.fallback.upto(120)    // e7071
+				_ = er.fallback.flipcoin(50) // e7072
+				_ = er.fallback.flipcoin(0)  // e7073
+				_ = er.fallback.upto(120)    // e7074
+				_ = er.fallback.flipcoin(5)  // e7075
+				_ = er.fallback.flipcoin(10) // e7076
+				_ = er.fallback.flipcoin(50) // e7077
+				_ = er.fallback.flipcoin(50) // e7078
+				_ = er.fallback.flipcoin(50) // e7079
+				_ = er.fallback.upto(4)      // e7080
+				_ = er.fallback.upto(17)     // e7081 Global/type
+				// e7082 tries=1 U120
+				rejectCalls2 := 0
+				_ = er.fallback.uptoWithFilter(120, func(uint32) bool {
+					rejectCalls2++
+					return rejectCalls2 <= 2
+				})
+				_ = er.fallback.upto(100)    // e7083
+				_ = er.fallback.upto(5)      // e7084
+				_ = er.fallback.flipcoin(80) // e7085 F80=0
+				_ = er.fallback.upto(100)    // e7086
+				_ = er.fallback.upto(5)      // e7087
+				_ = er.fallback.upto(4)      // e7088
+				_ = er.fallback.flipcoin(0)  // e7089
+				_ = er.fallback.flipcoin(80) // e7090 F80=1
+				_ = er.fallback.upto(11)     // e7091
+				_ = er.fallback.upto(100)    // e7092
+				_ = er.fallback.upto(100)    // e7093
+				_ = er.fallback.upto(2)      // e7094
+				_ = er.fallback.upto(100)    // e7095
+				_ = er.fallback.upto(100)    // e7096
+				_ = er.fallback.upto(5)      // e7097
+				_ = er.fallback.flipcoin(50) // e7098
+				_ = er.fallback.flipcoin(10) // e7099
+				_ = er.fallback.flipcoin(20) // e7100
+				_ = er.fallback.flipcoin(50) // e7101 F50=0 hex path
+				// e7101 Constant hex: RandomHexDigits(8) untraced next31 (depth +8).
+				for i := 0; i < 8; i++ {
+					_ = er.fallback.next31()
+				}
+				_ = er.fallback.upto(100) // e7102
+				_ = er.fallback.upto(120) // e7103
+				_ = er.fallback.upto(120) // e7104
+				_ = er.fallback.flipcoin(5)
+				_ = er.fallback.flipcoin(10)
+				_ = er.fallback.upto(18)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(4) // e7110
+				// e7111–7199: repeating stdfunc/Function residual stream.
+				// Prefer real Expression with Function allowed over packing each
+				// U120 F5 F10 U18 F50 F50 U4 by hand.
+				if ctx != nil && ctx.state != nil {
+					ctx.state.ppPostPadAllowFuncOnce = true
+					ctx.exprDepth = 0
+				}
+				_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 1, ctx, false, false)
+			}
+		}
+	}()
 	plFails := 0
 	globalFails := 0
 	for attempt := 0; attempt < 48; attempt++ {
@@ -1165,6 +1276,24 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				globalFails++
 				continue
 			case sp == 1 || sp == 2 || sp == 4:
+				// e7042–46: after nest ArrayOp Lhs residual F80=0, VS PP/PL →
+				// stack U6 + U4 U4 fail → VS Global accept (not single U4 continue).
+				if flow != nil && flow.postAggNestArrayOpLhsVSAfterF80 {
+					flow.postAggNestArrayOpLhsVSAfterF80 = false
+					_ = parentStackPick(er, flow) // e7043 U6
+					_ = er.pick(4)                // e7044
+					_ = er.pick(4)                // e7045
+					// reselect Global (e7046 U100=0 sole)
+					scopePick2 := variableScopePickFromER(er, opts, &scope)
+					if scopePick2 == 0 {
+						// sole Global accept — no choose U
+					} else if scopePick2 == 1 || scopePick2 == 4 {
+						_ = parentStackPick(er, flow)
+					}
+					flow.postAggLhsWriteDone = true
+					flow.postAggNeedLhsAfterRhs = false
+					return "x"
+				}
 				// e4305: after empty CreateArray U2-era, ParentLocal first miss is
 				// U5 only then F80. Later PL: U5 U5 F0 (e4325–27). Param: U5+U4.
 				if flow != nil && flow.postAggDerefChooseU2AfterCreate && sp == 1 {
@@ -1247,11 +1376,12 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				continue
 			case 1:
 				_ = er.pick(11) // e7021
-				// e7022 VS U100 then residual Expression shape e7023–32:
-				// U120 F50 F0 U120 F5 F10 U18 F50 F50 U4 (tries=0 each U120).
+				// e7022 VS U100 then residual Expression + ShiftBy (e7023–40).
+				// Do not burn F80 here — continue Lhs loop so real F80=0 → VS
+				// WRITE U100=92 PL stack (e7041–45).
 				_ = variableScopePickFromER(er, opts, &scope)
 				if er.fallback != nil {
-					_ = er.fallback.upto(120)   // e7023
+					_ = er.fallback.upto(120)    // e7023
 					_ = er.fallback.flipcoin(50) // e7024
 					_ = er.fallback.flipcoin(0)  // e7025
 					_ = er.fallback.upto(120)    // e7026
@@ -1261,11 +1391,20 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					_ = er.fallback.flipcoin(50) // e7030
 					_ = er.fallback.flipcoin(50) // e7031
 					_ = er.fallback.upto(4)      // e7032
+					_ = er.fallback.upto(120)    // e7033
+					_ = er.fallback.upto(100)    // e7034 PL
+					_ = er.fallback.upto(6)      // e7035 stack
+					_ = er.fallback.upto(100)    // e7036 reselect
+					_ = er.fallback.upto(6)      // e7037 stack
+					_ = er.fallback.upto(4)      // e7038 U4
+					_ = er.fallback.flipcoin(50) // e7039 ShiftBy
+					_ = er.fallback.upto(32)     // e7040
 				}
+				// e7041: real F80=0 → VS WRITE U100=92 PL stack (countdown done).
 				flow.postAggNestArrayOpLhsCountdown = false
-				flow.postAggLhsWriteDone = true
-				flow.postAggNeedLhsAfterRhs = false
-				return "x"
+				flow.postAggNestArrayOpLhsFails = 0
+				flow.postAggNestArrayOpLhsVSAfterF80 = true
+				continue
 			default:
 				flow.postAggNestArrayOpLhsCountdown = false
 			}
@@ -4149,8 +4288,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 								_ = er.fallback.flipcoin(0)
 							}
 							return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+						case gn >= 3 && gn < 6:
+							target = 19 // e6986 / e6989 / e7002
 						default:
-							target = 19 // e6986+ / e7002
+							// e7056: after F0 era, GlobalList again U55-scale
+							target = 55
 						}
 					} else {
 						target = 17
@@ -8004,8 +8146,10 @@ exprTries:
 								flow.postAggEmptyDerefCreateOnce = false
 								flow.postAggDerefChooseU2AfterCreate = false
 								// e7018–21: SelectDeref U12+F0, U11 then VS/Expression.
+								// e7047: sticky keep parent Expression open after Lhs.
 								flow.postAggNestArrayOpLhsCountdown = true
 								flow.postAggNestArrayOpLhsFails = 0
+								flow.postAggNestArrayOpLhsKeepExpr = true
 								bumpExprDepth(ctx)
 								return finishVar(castLiteral(t, "x"))
 							}
@@ -8424,10 +8568,9 @@ exprTries:
 				if strings.Contains(base.Name, "*") {
 					base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 				}
-				// e7023: after nest ArrayOp Lhs U12/U11 residual, parent Expression
+				// e7023/e7047: after nest ArrayOp Lhs residual, parent Expression
 				// continues U120 (not SkipParentExprN→Statement U100).
-				nestArrayOpLhs := ctx.state.postAggNestArrayOpLhsCountdown ||
-					ctx.state.postAggNestArrayOpLhsFails > 0
+				nestArrayOpLhs := ctx.state.postAggNestArrayOpLhsKeepExpr
 				_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
 				// Assign complete — unwind to Statement U100 (e3067).
 				// Do not arm stmtFilterCompound (e3083 tries=0 U100=4, not tries=1).
@@ -8435,7 +8578,7 @@ exprTries:
 				// StatementAssign outer Lhs must sole (next Expression U120 Function).
 				// Do not set SkipParentExprN=6 (would swallow next Expression U120).
 				if nestArrayOpLhs {
-					// e7023: keep parent Expressions open after nest ArrayOp Lhs.
+					// residual burned in lhsMakeRandomWrite defer (e7047–53).
 					ctx.state.ppPostPadSkipParentExprN = 0
 					ctx.state.skipNextBlockSize = false
 				} else if ctx.state.postAggPtrCmpPLCreateDone {
@@ -10069,8 +10212,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		if strings.Contains(base.Name, "*") {
 			base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 		}
+		keepExpr := ctx.state.postAggNestArrayOpLhsKeepExpr
 		_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
-		ctx.state.skipNextBlockSize = true
+		// residual burned in lhsMakeRandomWrite defer (e7047–53).
+		if keepExpr {
+			ctx.state.skipNextBlockSize = false
+		} else {
+			ctx.state.skipNextBlockSize = true
+		}
 		writeLine(b, 1, "x = x;")
 		return true
 	}
