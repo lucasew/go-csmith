@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7857) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8029) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7857** (7776→7857; keep Expression Global create + For loop_ctrl; seed2 full held). Toward 8500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8029** (7857→8029 past 8000; SelectDeref U6 + multiphase countdown; seed2 full held). Toward 8500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -493,7 +493,13 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e7823–40: unfiltered For SelectLoopCtrlVar U33…U30 + loop_control residual.
 4. e7848–55: re-arm PLStackU4; PP→PL create without e7372 U2 + address U8.
 
-Next plateau: seed4 e7857 SelectDeref F80 U6 choose vs GO F80 retry.
+**e7857–e8029 climbed (past 8000):**
+1. e7857: Statement Assign Lhs SelectDeref live choose U6 (clear nest countdown).
+2. e7861–75: short nest CD U12 / U11+[9][4][7]F0 → VS PL U3 U4 U9 U4 U7 F0.
+3. e7876–906: multiphase SelectDeref ladder (CD2 U11…U6, CD3 U4/U3/U2 itemize,
+   Global/PP create residuals) through 8000+.
+
+Next plateau: seed4 e8029 SelectDeref itemize 947/993 pattern residual.
 Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
