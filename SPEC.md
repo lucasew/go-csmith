@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7776) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7857) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7776** (7736→7776; Lhs CreateArray residual under PLStackU3; seed2 full held). Toward 8500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7857** (7776→7857; keep Expression Global create + For loop_ctrl; seed2 full held). Toward 8500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -486,8 +486,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e7762: Global multi-cand gn=14 visit_facts F0 → PL U3+U4 accept (not sticky
    e7008 U5 F0 under PLStackU3).
 
-Next plateau: seed4 e7776 after Expression U120, GO Statement Assign Lhs F80 vs
-UP Global/create F50 F10 qfer ladder → CreateArray. Seeds 5–21; COUNT=20.
+**e7776–e7857 climbed:**
+1. e7776: free Expression Global pointer empty create (SE-free **** qfer + nested
+   make_init peel residual) — not residual sole → Statement Assign F80 early.
+2. e7809: Statement Assign Lhs SelectDeref empty create F10 F50 + CreateArray.
+3. e7823–40: unfiltered For SelectLoopCtrlVar U33…U30 + loop_control residual.
+4. e7848–55: re-arm PLStackU4; PP→PL create without e7372 U2 + address U8.
+
+Next plateau: seed4 e7857 SelectDeref F80 U6 choose vs GO F80 retry.
+Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
