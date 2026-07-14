@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6595) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6608) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6595** (6479→6595; nest ptr-cmp derived U16 + Lhs create residual; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6608** (6595→6608; nest depthBlock + Global U17 + PL reselect; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -385,8 +385,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e6549–89: nest Lhs empty create F20…; Global pointer CreateArray residual chain.
 6. e6590–93: outer Lhs skip + PP→PL sole-accept + depth filter after residual Variable.
 
-Next plateau: seed4 e6595 UP U120=73 tries=1 vs GO U120=45 after nest Constant F50
-(hex width / depth filter for next Expression). Seeds 5–21; source; COUNT=20.
+**e6595–e6608 climbed:**
+1. e6595: sticky `ppPostPadDepthBlock` after nest Lhs Global residual (Statement resets exprDepth).
+2. Nest Function/Assign/Comma must not bypass natural or sticky depthBlock.
+3. e6597: GlobalList choose U17 (not sticky nest U54).
+4. e6598: skip needNoRhs SafeOpFlags after nest Global Variable Expression.
+5. e6605: PL stack U5 visit-fail → VS U100 reselect only (no U4 choose).
+
+Next plateau: seed4 e6608 UP U120=82 tries=9 vs GO U120=89 tries=1 after Constant F50=0
+(hex digit count / deeper depth filter). Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
