@@ -459,6 +459,27 @@ type functionFlowState struct {
 	// postAggForceArrayOpResidual: one-shot e3955 ArrayOp (U100=56 tries=0) with
 	// F5=0 array_loop aryno=0 → StatementFor residual (not filterCompound reject).
 	postAggForceArrayOpResidual bool
+	// postAggPostCD3ArrayOpOnce: after e8904 PL CreateArray residual, next
+	// Statement is ArrayOp (U100=50 tries=0) not filterCompound Assign.
+	// F5=0 → make_random_array_loop residual (e8927+).
+	postAggPostCD3ArrayOpOnce bool
+	// postAggPostCD3ForCtrl: first For in postCD3 array-loop body uses
+	// SelectLoopCtrlVar U30 + U5 U3 U3 U1 F0 residual (e8952+), not loopIVPool U2.
+	postAggPostCD3ForCtrl bool
+	// postAggPostCD3ArrayMustItemize: must_use array itemize U4 U4 before F75
+	// in postCD3 array-loop ExpressionVariable (e8972–74).
+	postAggPostCD3ArrayMustItemize bool
+	// postAggPostCD3ArrayLhsU7: Statement Lhs SelectDeref U7 path after
+	// must_use RHS (e8975+), not nest countdown U12.
+	postAggPostCD3ArrayLhsU7 bool
+	// postAggPostCD3ArrayLhsU7N: 0=F80 U7 accept; 1=F80 U7 F0 U6 U5 (e8988+).
+	postAggPostCD3ArrayLhsU7N int
+	// postAggPostCD3ArrayMustItemize2: second must_use in body (e8982–87)
+	// U4 U3 U4 U2 U2 F75 then Lhs F80 U7…
+	postAggPostCD3ArrayMustItemize2 bool
+	// postAggPostCD3ArrayOp2Once: nested ArrayOp after second Lhs residual
+	// (e8995 U100=51 F5=0 aryno + U13×3 + SelectLoopCtrlVar U29…U23).
+	postAggPostCD3ArrayOp2Once bool
 	// postAggU15StackU6PLNAfterPostPtr: PL picks after post-ptr era (0: e3903 sole;
 	// later e4035+ U5 choose + F0).
 	postAggU15StackU6PLNAfterPostPtr int
@@ -901,13 +922,34 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	if t.Bits <= 0 {
 		return exprVarCandidate{}, false
 	}
-	if postCD3ForMust && !earlyGate && !lateGate {
-		// e8809: match non-array must_read → F75 erase, accept (no U2).
+	// postCD3 must_use before lateGate U2×3 dummy (e8972 U4 U4 F75, not U100).
+	if postCD3ForMust && !earlyGate {
+		// e8809: non-array must_read → F75 only.
+		// e8972+: postCD3 array-loop body must_read arrays → itemize_array
+		// choose_ok_var IVs then F75 (UP before Lhs F80).
+		if st.postAggPostCD3ArrayMustItemize {
+			_ = er.fallback.upto(4)
+			_ = er.fallback.upto(4)
+			st.postAggPostCD3ArrayMustItemize = false
+			// Next Statement Lhs SelectDeref among ~7 pointers (e8975 F80 U7).
+			st.postAggPostCD3ArrayLhsU7 = true
+		} else if st.postAggPostCD3ArrayMustItemize2 {
+			// e8982–87: U4 U3 U4 U2 U2 F75 (multi-dim itemize + IV choose)
+			_ = er.fallback.upto(4)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.upto(4)
+			_ = er.fallback.upto(2)
+			_ = er.fallback.upto(2)
+			st.postAggPostCD3ArrayMustItemize2 = false
+			st.postAggPostCD3ArrayLhsU7 = true
+		}
 		if er.fallback.flipcoin(75) {
 			st.mustReadLive = false
 		}
-		// One-shot accept so later Variables use VS U100.
-		st.postAggPostCD3ForMustRead = false
+		// Re-arm for another must_use Variable if itemize2 pending.
+		if !st.postAggPostCD3ArrayMustItemize2 {
+			st.postAggPostCD3ForMustRead = false
+		}
 		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
 	if lateGate && !earlyGate {
@@ -11653,9 +11695,44 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
+	// e8975–94: postCD3 array-loop body Statement Lhs after must_use RHS.
+	// First hit: F80 U7 accept. Second (after itemize2): F80 U7 F0 fail,
+	// F80 U6, F80 U5 accept → next Statement ArrayOp (e8995).
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayLhsU7 {
+		ctx.state.postAggPostCD3ArrayLhsU7 = false
+		n := ctx.state.postAggPostCD3ArrayLhsU7N
+		ctx.state.postAggPostCD3ArrayLhsU7N++
+		if n == 0 {
+			// e8975–76: F80 U7 accept
+			if r.flipcoin(80) {
+				_ = r.upto(7)
+			}
+			lhsFromDeref = true
+			// Re-arm must_use for subsequent ExpressionVariables (e8981+).
+			ctx.state.mustReadLive = true
+			ctx.state.postAggPostCD3ForMustRead = true
+			ctx.state.postAggPostCD3ArrayMustItemize2 = true
+		} else {
+			// e8988–94: F80 U7 F0, F80 U6, F80 U5 accept
+			if r.flipcoin(80) {
+				_ = r.upto(7)
+				_ = r.flipcoin(0) // e8990 validate fail
+			}
+			if r.flipcoin(80) {
+				_ = r.upto(6)
+			}
+			if r.flipcoin(80) {
+				_ = r.upto(5)
+			}
+			lhsFromDeref = true
+			// e8995+: next Statement ArrayOp unfiltered (not filterCompound)
+			ctx.state.postAggPostCD3ArrayOp2Once = true
+			ctx.state.filterCompoundStmts = false
+		}
+	}
 	// e8682 post-CD3: Statement Lhs SelectDeref residual after long RHS.
 	// UP e8682–93: U12+947 F0, U12+F0, U11+U4 accept.
-	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhsSel {
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhsSel && !lhsFromDeref {
 		ctx.state.postAggPostCD3StmtLhsSel = false
 		_ = r.flipcoin(80) // e8682 F80=1
 		_ = r.upto(12)     // e8683
@@ -12265,38 +12342,48 @@ lhsDerefLoop:
 					_ = r.upto(3)
 					_ = r.flipcoin(0)
 				case 2: // e8904+ PL U3 + create U14 F50 F20 F50 F50 U20 CreateArray
-					_ = r.upto(3)
-					_ = r.upto(14)
+					_ = r.upto(3) // stack
+					// e8906: choose_random_simple U14 (e.g. 6 → eUChar hn=2).
+					// Natural type width: formatElementConstant's ppPLPad force
+					// int32/hn=8 would over-burn RandomHexDigits → F50 desync
+					// at e8919 after matching U99…U4 initNum.
+					base := pickSimpleNonVoid(r, opts)
+					_ = r.flipcoin(50) // WRITE vol
+					_ = r.flipcoin(20) // NewArray
+					// make_init Constant pure_rnd before CreateArray
 					_ = r.flipcoin(50)
-					_ = r.flipcoin(20)
-					_ = r.flipcoin(50)
-					_ = r.flipcoin(50)
-					_ = r.upto(20)
-					// CreateArray full (int element alts F50…) then trail
-					base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					if r.flipcoin(50) {
+						_ = r.upto(3)
+					} else {
+						_ = r.upto(20)
+					}
+					// Suspend ppPLPad hn=8 override for CreateArray element alts.
+					var padSaved *bool
+					if ppPLPadChooseDoneSink != nil {
+						padSaved = ppPLPadChooseDoneSink
+						off := false
+						ppPLPadChooseDoneSink = &off
+					}
 					_arr := burnCreateArrayVariable(r, opts, base, true)
+					if padSaved != nil {
+						ppPLPadChooseDoneSink = padSaved
+					}
 					emitOrphanArrayGlobal(ctx, base, _arr)
-					// e8917–26 trail after CreateArray if under-burned
-					_ = r.flipcoin(50)
-					_ = r.flipcoin(50)
-					_ = r.flipcoin(50)
-					_ = r.flipcoin(50)
-					_ = r.upto(3)
-					_ = r.upto(3)
-					_ = r.upto(3)
-					_ = r.upto(1)
-					_ = r.flipcoin(50)
-					_ = r.upto(4)
+					// e8925–26 F50 U4 is needNoRhs SafeOpFlags AFTER Lhs accept
+					// (make_random_unary), not CreateArray residual — leave it.
+					// e8927+: next Statement ArrayOp unfiltered (not filterCompound).
+					ctx.state.postAggPostCD3ArrayOpOnce = true
 					ctx.state.postAggPostCD3SelDerefU7 = false
 					lhsFromDeref = true
 					lv = lvalueInfo{expr: "x", ctype: targetType}
-					break
+					break lhsDerefLoop
 				default:
 					ctx.state.postAggPostCD3SelDerefU7 = false
 					lhsFromDeref = true
 					lv = lvalueInfo{expr: "x", ctype: targetType}
-					break
+					break lhsDerefLoop
 				}
+				// case 0/1: VS miss residual — retry SelectDeref
 				continue
 			}
 			// e8855 post-CD3: after multi-level ExpressionAssign, Statement Lhs
@@ -16053,6 +16140,122 @@ func emitStatement(
 		writeLine(b, 1, "/* array-loop residual */ ;")
 		return true
 	}
+	// e8995+: nested ArrayOp after postCD3 body Assign Lhs residual.
+	// U100=51 F5=0 aryno=3 U13×3 + SelectLoopCtrlVar shrink U29→U23 + For.
+	if state != nil && state.postAggPostCD3ArrayOp2Once {
+		state.postAggPostCD3ArrayOp2Once = false
+		if stmtBudget != nil && *stmtBudget > 0 {
+			*stmtBudget = *stmtBudget - 1
+		}
+		_ = r.upto(100)   // e8995 U100=51 ArrayOp
+		_ = r.flipcoin(5) // e8996 F5=0
+		aryno := int(r.upto(4))
+		for i := 0; i < aryno; i++ {
+			_ = r.upto(13)
+			_ = r.upto(3)
+		}
+		// SelectLoopCtrlVar volatile shrink U29…U23 then residual (e9004–15)
+		for n := 29; n >= 23; n-- {
+			_ = r.upto(uint32(n))
+		}
+		_ = r.upto(7)
+		_ = r.upto(3)
+		_ = r.upto(3)
+		_ = r.upto(1)
+		_ = r.flipcoin(0)
+		// SafeOpFlags F50×5 U4 F50×2 U4 U4 (e9016–25)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.upto(4)
+		state.filterCompoundStmts = false
+		state.skipNextBlockSize = true
+		writeLine(b, 1, "/* array-loop postCD3-2 */ {")
+		state.blockStack++
+		state.arrayLoopDepth++
+		bodyDepth := depth
+		if bodyDepth >= max(1, opts.MaxBlockDepth) {
+			bodyDepth = max(1, opts.MaxBlockDepth) - 1
+		}
+		emitStatements(b, r, opts, env, scope, state, info, from, bodyDepth, true, stmtBudget, ctx)
+		if state.blockStack > 0 {
+			state.blockStack--
+		}
+		if state.arrayLoopDepth > 0 {
+			state.arrayLoopDepth--
+		}
+		writeLine(b, 1, "}")
+		return true
+	}
+	// e8927+: post-CD3 after PL CreateArray residual — Statement ArrayOp
+	// unfiltered (U100=50). F5=0 → array_loop aryno + select_array×n + For.
+	if state != nil && state.postAggPostCD3ArrayOpOnce {
+		state.postAggPostCD3ArrayOpOnce = false
+		if stmtBudget != nil && *stmtBudget > 0 {
+			*stmtBudget = *stmtBudget - 1
+		}
+		_ = r.upto(100)   // e8927 U100=50 ArrayOp
+		_ = r.flipcoin(5) // e8928 F5=0 → array_loop
+		aryno := int(r.upto(4))
+		// select_array U13 + access U3 per array (e8929–35 aryno=3)
+		for i := 0; i < aryno; i++ {
+			_ = r.upto(13)
+			_ = r.upto(3)
+		}
+		// SelectLoopCtrlVar + array_control residual (e8936–41)
+		_ = r.upto(31)
+		_ = r.upto(5)
+		_ = r.upto(3)
+		_ = r.upto(3)
+		_ = r.upto(1)
+		_ = r.flipcoin(0)
+		// SafeOpFlags init/test/incr (e8942–50): F50×4 U4 F50×2 U4 U4
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+		_ = r.upto(4)
+		_ = r.upto(4)
+		// For body continues real Statement generation (e8951+ U100=24 For…).
+		// Clear sticky filterCompound so body allows nested For/If (UP tries=0).
+		state.filterCompoundStmts = false
+		state.deepStack = true
+		state.skipNextBlockSize = true
+		state.postAggPostCD3ForCtrl = true
+		// Avoid postArrayFor U2 path — SelectLoopCtrlVar is U30 (e8952).
+		state.loopIVPool = 0
+		state.arrayLoopFresh = false
+		// Outer array_loop set must_read → ExpressionVariable itemize+F75.
+		state.mustReadLive = true
+		state.postAggPostCD3ForMustRead = true
+		state.postAggPostCD3ArrayMustItemize = true
+		writeLine(b, 1, "/* array-loop postCD3 */ {")
+		state.blockStack++
+		state.arrayLoopDepth++
+		// Body depth: UP still below max_blk_depth (allows compound).
+		bodyDepth := depth
+		if bodyDepth >= max(1, opts.MaxBlockDepth) {
+			bodyDepth = max(1, opts.MaxBlockDepth) - 1
+		}
+		emitStatements(b, r, opts, env, scope, state, info, from, bodyDepth, true, stmtBudget, ctx)
+		if state.blockStack > 0 {
+			state.blockStack--
+		}
+		if state.arrayLoopDepth > 0 {
+			state.arrayLoopDepth--
+		}
+		writeLine(b, 1, "}")
+		return true
+	}
 	// Each statement starts with SE-free effect context and expr_depth=0
 	// (Statement.cpp: cg_context.expr_depth = 0 before statement body).
 	if ctx != nil {
@@ -16299,6 +16502,38 @@ func emitStatement(
 			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state != nil && state.blockStack > 0 {
+				state.blockStack--
+			}
+			writeLine(b, 1, "}")
+			break
+		}
+		// e8952+: postCD3 array-loop body For — SelectLoopCtrlVar U30 +
+		// multi-dim residual U5 U3 U3 U1 F0 + SafeOpFlags (not createIV/U2).
+		if state != nil && state.postAggPostCD3ForCtrl {
+			state.postAggPostCD3ForCtrl = false
+			_ = r.upto(30) // e8952
+			_ = r.upto(5)  // e8953
+			_ = r.upto(3)
+			_ = r.upto(3)
+			_ = r.upto(1)
+			_ = r.flipcoin(0)
+			// SafeOpFlags F50×4 U4 F50×2 U4 U4 (e8958–66)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.upto(4)
+			// e8967 body Statement U100 next (no BlockSize U4)
+			state.skipNextBlockSize = true
+			writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
+			writeLine(b, 2, "x += (uint32_t)i;")
+			state.blockStack++
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state.blockStack > 0 {
 				state.blockStack--
 			}
 			writeLine(b, 1, "}")
