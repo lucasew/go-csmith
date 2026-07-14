@@ -117,6 +117,9 @@ var burnCreateArrayCtxSink *genContext
 var burnCreateArrayFieldVarsDone bool
 // burnCreateArrayPLU2Done: one-shot e10988 U2 U2 F0 chain; later PL sole.
 var burnCreateArrayPLU2Done bool
+// burnCreateArrayLhsF80Fail: 0 off; 1 arm after first F20×4 empty create;
+// 2 done after e11066 fail-loop consumed.
+var burnCreateArrayLhsF80Fail int
 // postAggPostCD3ArrayOp2AfterGlobalU56: next free Expression Variable after
 // e9274 Global U56 must_use U5 U5 U2 F75 (e9276).
 var postAggPostCD3ArrayOp2AfterGlobalU56 bool
@@ -551,6 +554,8 @@ type functionFlowState struct {
 	// postAggPostCD3ArrayOp2StmtLhsU9: after e9838 PL accept, next Statement
 	// Assign Lhs SelectDeref F80 U9 accept (e9847–48; GO pool U8 under-count).
 	postAggPostCD3ArrayOp2StmtLhsU9 bool
+	// postAggPostCD3ArrayOp2StmtLhsU9Burned: e11118 field-vars era Stmt Lhs U9.
+	postAggPostCD3ArrayOp2StmtLhsU9Burned bool
 	// postAggPostCD3ArrayOp2PPFallDone: one-shot e9888 PP miss → PL U6 **** create.
 	postAggPostCD3ArrayOp2PPFallDone bool
 	// postAggPostCD3ArrayOp2FuncArgMustDone: one-shot e9940 Function-arg U5 U7 F75.
@@ -11189,6 +11194,12 @@ exprTries:
 						}
 						break // fall through to VariableSelector::select
 					}
+					// e11066–67: after first F20×4 empty create, next SelectDeref
+					// fails once (no create RNG) and loops; second F80 creates.
+					if burnCreateArrayLhsF80Fail == 1 {
+						burnCreateArrayLhsF80Fail = 2
+						continue
+					}
 					// e8308–36 post-CD3: ExpressionAssign Lhs SelectDeref residual
 					// U11+993, U11+947, U11×2, U10+F0, F80=0→VS, U8+993, U8 accept
 					// (not empty create F20 F20).
@@ -11471,16 +11482,28 @@ exprTries:
 							return finishAssignExpr(fmt.Sprintf("(%s++)", "x"))
 						} else {
 							// e9813–18: F20×4 address residual then parent Variable U120
-							// (not Constant make_init F50).
-							// e10010: after Function-arg must residual, NewArray+init
-							// F20 F20 already burned → address choose U2 then U120.
-							if ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone {
+							// (not Constant make_init F50). NewArray+init F20 F20 already
+							// burned above; two more F20 then choose.
+							// e10010: after Function-arg must residual, only U2
+							// (F20 F20 already burned → address choose U2 then U120).
+							// e11052: after create_field_vars era, UP still F20×2 U2
+							// (**** multi-level address; not sticky e10010 U2-only).
+							if ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone &&
+								!burnCreateArrayFieldVarsDone {
 								_ = er.pick(2) // e10010
 								lhsFromDeref = true
 								break
 							}
 							_ = er.fallback.flipcoin(20)
 							_ = er.fallback.flipcoin(20)
+							if burnCreateArrayFieldVarsDone {
+								_ = er.pick(2) // e11054 address choose U2
+								// e11066: next Lhs SelectDeref fails once before
+								// another F20×4 create.
+								if burnCreateArrayLhsF80Fail == 0 {
+									burnCreateArrayLhsF80Fail = 1
+								}
+							}
 							lhsFromDeref = true
 							break
 						}
@@ -13433,6 +13456,20 @@ lhsDerefLoop:
 				break // VS select
 			}
 			_ = r.upto(9) // e9848
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
+		// e11118: after create_field_vars EmptyCreate era, Statement Lhs
+		// F80 U9 (GO live pool under-counts U8). Accept like e9848.
+		if ctx != nil && ctx.state != nil && burnCreateArrayFieldVarsDone &&
+			burnCreateArrayLhsF80Fail >= 1 &&
+			!ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Burned {
+			ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Burned = true
+			if !r.flipcoin(80) {
+				break // VS select
+			}
+			_ = r.upto(9) // e11118
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
@@ -17689,6 +17726,7 @@ func emitStatement(
 		postAggPostCD3ArrayOp2GlobalSoleN = 0
 		burnCreateArrayFieldVarsDone = false
 		burnCreateArrayPLU2Done = false
+		burnCreateArrayLhsF80Fail = 0
 		// Outer array_loop must_read still live for ExpressionVariable itemize.
 		state.mustReadLive = true
 		writeLine(b, 1, "/* array-loop postCD3-2 */ {")
