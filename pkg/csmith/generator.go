@@ -14425,6 +14425,20 @@ lhsDerefLoop:
 																		// postCreateLateFreeConstN: free invent Constants
 																		// after late free F0 (hex size multiphase).
 																		postCreateLateFreeConstN := 0
+																		// postCreateLateFreePPF0Once: after Global F80
+																		// create residual (e19128), next free PP is
+																		// F0 reselect (e19134), not U5 U5.
+																		postCreateLateFreePPF0Once := false
+																		// postCreateLateFreePPU5N: count non-F0 PP U5
+																		// residuals (first 2: U5 U5; later U5 sole).
+																		postCreateLateFreePPU5N := 0
+																		// postCreateLateFreeConstF80Once: after late
+																		// free PL U5 U5 Constant small, F80 F20 F20 U5
+																		// create residual (e19148–51).
+																		postCreateLateFreeConstF80Once := false
+																		// postCreateLateFreeConstThenVar: after 2nd
+																		// late free Const F50 residual, next Variable.
+																		postCreateLateFreeConstThenVar := false
 																		// postCreateAsgSelDerefOnce: Assign residual is
 																		// Lhs SelectDeref F80 ladder (e18475), not F50.
 																		postCreateAsgSelDerefOnce := false
@@ -14528,6 +14542,11 @@ lhsDerefLoop:
 																				vv = rf.upto(120)
 																			}
 																			if vv >= 110 {
+																				// Comma as ptr-cmp LHS root: clear flag so nested
+																				// Assign/Variable do not burn pointer qfer residual.
+																				if ptrCmpLhsDone {
+																					ptrCmpLhsDone = false
+																				}
 																				if postCreateAsgNeedLhs {
 																					// e17446–63: Assign RHS Comma bare; Lhs SelectDeref
 																					// F80=0 → VS PL U4 create F20 F50 F50 U20; then
@@ -15445,6 +15464,28 @@ lhsDerefLoop:
 																				// later (e12721) nest directly.
 																				// e13067+: post-itemize SE-free F50
 																				// unless skipNextAssignF50 (e13070).
+																				// e19034–43: late free invent ptr-cmp LHS
+																				// ExpressionAssign null qfer → WRITE
+																				// random_qualifiers **** (4× F50 F10) +
+																				// self F50. Nested Lhs/RHS invent continues.
+																				// Gate lateFreeUseExN so earlier ptr-cmp
+																				// Assign (e17346 1-level F50 F10 F50) stays.
+																				if postCreatePostArrayDone && ptrCmpLhsDone && postCreateLateFreeUseExN >= 3 {
+																					ptrCmpLhsDone = false
+																					for qi := 0; qi < 4; qi++ {
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(10)
+																					}
+																					_ = rf.flipcoin(50) // self
+																					// e19044: first ptr-cmp Assign qfer → nested
+																					// Function useEx. e19063+ second Assign
+																					// (ForceAssign) nested Function is stdfunc.
+																					if postCreateLateFreeUseExN < 4 {
+																						postCreateForceStdfunc = false
+																						postCreateUseExAgain = true
+																					}
+																					continue
+																				}
 																				if postCreateAsgSelDerefOnce {
 																					// e18475–542: Assign Lhs SelectDeref F80
 																					// ladder after freePL n=11 residual.
@@ -15830,14 +15871,49 @@ lhsDerefLoop:
 																						ptrCmpLhsDone = false
 																					} else {
 																						ptrCmpLhsDone = false
-																						// bare null; Variable RHS residual U100 scope sole
+																						// bare null; RHS forced eVariable (no term U120).
+																						// ExpressionVariable::select multiphase.
 																						// Consume sticky Assign Constant arms so they do not
 																						// fire residual after bare null.
 																						postCreateConstBareOnce = false
 																						postCreateConstHex16Once = false
 																						postCreateConstHex8Once = false
 																						postCreateAsgLhsF80Once = false
-																						_ = rf.upto(100)
+																						// e17495: Global U100 sole (no ok_vars U).
+																						// e18926–37: PL U5 + **** qfer F50 F10×4
+																						// + NewArray F20 + make_init F20
+																						// (GenerateNewParentLocal pointer type).
+																						sp := rf.upto(100)
+																						if sp < 35 {
+																							// Global sole accept — no extra residual
+																						} else if sp < 65 {
+																							// ParentLocal stack + create
+																							_ = rf.upto(5)
+																							for qi := 0; qi < 4; qi++ {
+																								_ = rf.flipcoin(50)
+																								_ = rf.flipcoin(10)
+																							}
+																							_ = rf.flipcoin(20) // NewArray
+																							_ = rf.flipcoin(20) // make_init null/addr
+																						} else if sp < 95 {
+																							// ParentParam → empty/miss → PL create
+																							_ = rf.upto(5)
+																							for qi := 0; qi < 4; qi++ {
+																								_ = rf.flipcoin(50)
+																								_ = rf.flipcoin(10)
+																							}
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																						} else if !rf.flipcoin(10) {
+																							// NewValue → PL create
+																							_ = rf.upto(5)
+																							for qi := 0; qi < 4; qi++ {
+																								_ = rf.flipcoin(50)
+																								_ = rf.flipcoin(10)
+																							}
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																						}
 																						continue
 																					}
 																				}
@@ -15918,14 +15994,48 @@ lhsDerefLoop:
 																									// e17542: F50 small residual only.
 																									// e18322 (noVarOnly): next free Function.
 																									// e17545 (default): re-arm VarOnly below.
+																									// e19145–51: late free PL Const small + F80 create.
 																									noVar := postCreateConstSmallNoVarOnly
 																									postCreateConstSmallOnce = false
 																									postCreateConstSmallNoVarOnly = false
+																									if postCreateLateFreeConstF80Once {
+																										postCreateLateFreeConstF80Once = false
+																										// F50 F50 U3/U20 small
+																										if rf.flipcoin(50) {
+																											if rf.flipcoin(50) {
+																												_ = rf.upto(3)
+																											} else {
+																												_ = rf.upto(20)
+																											}
+																										} else {
+																											for h := 0; h < 8; h++ {
+																												_ = rf.next31()
+																											}
+																										}
+																										// e19148–51: F80 F20 F20 U5
+																										if rf.flipcoin(80) {
+																											_ = rf.flipcoin(20)
+																											_ = rf.flipcoin(20)
+																											_ = rf.upto(5)
+																										}
+																										// e19152: next Constant F50 residual then Variable
+																										postCreateConstOnlyOnce = true
+																										postCreateLateFreeConstThenVar = true
+																										afterAsg = false
+																										continue
+																									}
 																									_ = formatSimpleConstant(rf, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
 																									if noVar {
 																										afterAsg = false
 																										postCreateUseExAgain = false
 																										postCreateForceStdfunc = false
+																										continue
+																									}
+																									if postCreateLateFreeConstThenVar {
+																										// e19165: after even-PL Const small → Variable
+																										postCreateLateFreeConstThenVar = false
+																										postCreateVarOnlyOnce = true
+																										afterAsg = false
 																										continue
 																									}
 																								} else if postCreateConstHex8Once {
@@ -15938,6 +16048,24 @@ lhsDerefLoop:
 																									// (UP depth gap 21680→21697 = 16 untraced next31).
 																									postCreateConstHex16Once = false
 																									_ = formatSimpleConstant(rf, CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16})
+																								} else if postCreateLateFreeConstThenVar {
+																									// e19153: second late free Const F50=0 → hex×2;
+																									// e19154: next Variable-only.
+																									postCreateLateFreeConstThenVar = false
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 2; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																									postCreateVarOnlyOnce = true
+																									afterAsg = false
+																									continue
 																								} else if postCreateLateFreeUseExN >= 3 {
 																									// e18842: late free invent Constant after F0 nest
 																									// F50=0 → hex multiphase (n=1 hex×4; n≥2 hex×16).
@@ -16810,64 +16938,104 @@ lhsDerefLoop:
 																												}
 																												postCreateVarOnlyOnce = true
 																											} else {
-																												// later free Global
-																												// e18845: ok_vars U150 (was U140 e17436-era).
-																												// e18846: SelectDeref F80=0 → VS reselect
-																												// NewValue create residual (e18847–).
-																												_ = rf.upto(150)
-																												if !rf.flipcoin(80) {
-																													sp := rf.upto(100)
-																													if sp >= 95 {
-																														// NewValue F10=0 → PP U6 U14 create
-																														if !rf.flipcoin(10) {
-																															_ = rf.upto(6)
-																															// e18850: U14 tries=1 (1 untraced reject)
-																															_ = rf.next31()
-																															_ = rf.upto(14)
-																															_ = rf.flipcoin(20)
-																															_ = rf.flipcoin(50)
-																															// e18852 F50=0 → hex×8 (depth 23927→23936)
-																															// then SelectDeref F80 ladder
-																															for h := 0; h < 8; h++ {
-																																_ = rf.next31()
-																															}
-																															// e18853–60: F80 U6 until F80=0 → VS PP
-																															// U6 U3 U1 → reselect U100 → free Expression.
-																															for ri := 0; ri < 20; ri++ {
-																																if !rf.flipcoin(80) {
-																																	sp2 := rf.upto(100)
-																																	if sp2 >= 65 && sp2 < 95 {
-																																		// e18856–59: PP U6 U3 U1
-																																		_ = rf.upto(6)
-																																		_ = rf.upto(3)
-																																		_ = rf.upto(1)
-																																		// e18860: VS reselect then free invent
-																																		_ = rf.upto(100)
-																																	} else if sp2 < 35 {
-																																		_ = rf.upto(9)
-																																	} else if sp2 < 65 {
-																																		_ = rf.upto(6)
-																																		_ = rf.upto(5)
-																																	} else if !rf.flipcoin(10) {
-																																		_ = rf.upto(5)
-																																	}
-																																	break
-																																}
+																												// later free Global multiphase:
+																												// e18845 (n=6): U150 + F80 reselect create
+																												// e18954 (n=7): U150 sole
+																												// e19095 (n≥8): U2 sole (small ok_vars)
+																												switch {
+																												case postCreateLateFreeGlobalN == 6:
+																													_ = rf.upto(150)
+																													// e18846: F80=0 → VS reselect NewValue create
+																													if !rf.flipcoin(80) {
+																														sp := rf.upto(100)
+																														if sp >= 95 {
+																															if !rf.flipcoin(10) {
 																																_ = rf.upto(6)
+																																_ = rf.next31()
+																																_ = rf.upto(14)
+																																_ = rf.flipcoin(20)
+																																_ = rf.flipcoin(50)
+																																for h := 0; h < 8; h++ {
+																																	_ = rf.next31()
+																																}
+																																for ri := 0; ri < 20; ri++ {
+																																	if !rf.flipcoin(80) {
+																																		sp2 := rf.upto(100)
+																																		if sp2 >= 65 && sp2 < 95 {
+																																			_ = rf.upto(6)
+																																			_ = rf.upto(3)
+																																			_ = rf.upto(1)
+																																			_ = rf.upto(100)
+																																		} else if sp2 < 35 {
+																																			_ = rf.upto(9)
+																																		} else if sp2 < 65 {
+																																			_ = rf.upto(6)
+																																			_ = rf.upto(5)
+																																		} else if !rf.flipcoin(10) {
+																																			_ = rf.upto(5)
+																																		}
+																																		break
+																																	}
+																																	_ = rf.upto(6)
+																																}
+																																postCreateForceStdfunc = false
+																																postCreateUseExAgain = true
+																																postCreateLateFreeUseExF0Once = true
 																															}
-																															// e18861+: next Function useEx F50; miss → F0
-																															postCreateForceStdfunc = false
-																															postCreateUseExAgain = true
-																															postCreateLateFreeUseExF0Once = true
+																														} else if sp < 35 {
+																															_ = rf.upto(9)
+																														} else if sp < 65 {
+																															_ = rf.upto(6)
+																															_ = rf.upto(5)
+																														} else {
+																															_ = rf.upto(6)
 																														}
-																													} else if sp < 35 {
-																														_ = rf.upto(9)
-																													} else if sp < 65 {
-																														_ = rf.upto(6)
-																														_ = rf.upto(5)
-																													} else {
-																														_ = rf.upto(6)
 																													}
+																												case postCreateLateFreeGlobalN == 7:
+																													// e18954: U150 sole
+																													_ = rf.upto(150)
+																												case postCreateLateFreeGlobalN == 8, postCreateLateFreeGlobalN == 9:
+																													// e19095/e19098: small ok_vars U2 sole
+																													_ = rf.upto(2)
+																												case postCreateLateFreeGlobalN == 10:
+																													// e19105–23: U5 F0 + Global reselect multiphase
+																													// → free Variable tries=7.
+																													_ = rf.upto(5)
+																													_ = rf.flipcoin(0)
+																													// iter0: U100 U4 U10 U3 U5 F0
+																													_ = rf.upto(100)
+																													_ = rf.upto(4)
+																													_ = rf.upto(10)
+																													_ = rf.upto(3)
+																													_ = rf.upto(5)
+																													_ = rf.flipcoin(0)
+																													// iter1: U100 U4 U100 U3 U10 U3 U5 F0
+																													_ = rf.upto(100)
+																													_ = rf.upto(4)
+																													_ = rf.upto(100)
+																													_ = rf.upto(3)
+																													_ = rf.upto(10)
+																													_ = rf.upto(3)
+																													_ = rf.upto(5)
+																													_ = rf.flipcoin(0)
+																													// iter2: U100 U3 → free Variable
+																													_ = rf.upto(100)
+																													_ = rf.upto(3)
+																													postCreateVarOnlyOnce = true
+																												case postCreateLateFreeGlobalN == 11:
+																													// e19125: Global U5 sole only
+																													_ = rf.upto(5)
+																												default:
+																													// e19128+: F80 SelectDeref/create F20×4;
+																													// e19133: next Expression Variable-only;
+																													// e19134: next free PP is F0 reselect.
+																													if rf.flipcoin(80) {
+																														for hi := 0; hi < 4; hi++ {
+																															_ = rf.flipcoin(20)
+																														}
+																													}
+																													postCreateVarOnlyOnce = true
+																													postCreateLateFreePPF0Once = true
 																												}
 																											}
 																										} else {
@@ -17444,6 +17612,28 @@ lhsDerefLoop:
 																											// e18474: next Assign + Lhs SelectDeref F80 ladder
 																											postCreateForceAssignOnce = true
 																											postCreateAsgSelDerefOnce = true
+																										} else if postCreateLateFreePLN == 12 {
+																											// e19142–44: PL U5 U5 sole; next Constant
+																											// small + F80 create residual.
+																											_ = rf.upto(5)
+																											_ = rf.upto(5)
+																											postCreateConstOnlyOnce = true
+																											postCreateConstSmallOnce = true
+																											postCreateLateFreeConstF80Once = true
+																										} else if postCreateLateFreePLN >= 13 {
+																											// e19156 odd: U5 sole + VarOnly;
+																											// e19159 even: U5 U5 + Const small (no F80).
+																											if postCreateLateFreePLN%2 == 1 {
+																												_ = rf.upto(5)
+																												postCreateVarOnlyOnce = true
+																											} else {
+																												_ = rf.upto(5)
+																												_ = rf.upto(5)
+																												postCreateConstOnlyOnce = true
+																												postCreateConstSmallOnce = true
+																												// VarOnly after Const small (no F80 create)
+																												postCreateLateFreeConstThenVar = true
+																											}
 																										} else {
 																											// e18454+: multiphase U4 U5
 																											_ = rf.upto(4)
@@ -17828,7 +18018,7 @@ lhsDerefLoop:
 																										// e17520 (n=10): F0 reselect; e17530 (n=11): U4 F50 U16…
 																										// e17637 (n=12): U6 + ** qfer F50 F10×2 F20 F20
 																										switch {
-																										case postCreateLateFreePPN >= 15:
+																										case postCreateLateFreePPN == 15:
 																											// e18412: PP U4 U2 F0 reselect multiphase;
 																											// e18420: next Expression Variable-only (tries=2).
 																											_ = rf.upto(4)
@@ -17850,6 +18040,41 @@ lhsDerefLoop:
 																												}
 																											}
 																											postCreateVarOnlyOnce = true
+																										case postCreateLateFreePPN >= 16:
+																											// e18999–900: PP empty → PL U5 U5 sole.
+																											// e19134–39: after F80-create era, F0 →
+																											// VS reselect PL U5 U5 U1 + VarOnly.
+																											// e19167: PP ok_vars U5 sole + VarOnly.
+																											if postCreateLateFreePPF0Once {
+																												postCreateLateFreePPF0Once = false
+																												_ = rf.flipcoin(0)
+																												sp := rf.upto(100)
+																												if sp >= 35 && sp < 65 {
+																													_ = rf.upto(5)
+																													_ = rf.upto(5)
+																													_ = rf.upto(1)
+																												} else if sp < 35 {
+																													_ = rf.upto(5)
+																												} else if sp < 95 {
+																													_ = rf.upto(5)
+																													_ = rf.upto(5)
+																												} else if !rf.flipcoin(10) {
+																													_ = rf.upto(5)
+																												}
+																												postCreateVarOnlyOnce = true
+																											} else {
+																												// e18999 first hits: U5 U5; later e19167: U5 sole+VarOnly
+																												postCreateLateFreePPU5N++
+																												if postCreateLateFreePPU5N == 1 {
+																													// e18999: U5 U5 sole
+																													_ = rf.upto(5)
+																													_ = rf.upto(5)
+																												} else {
+																													// e19167+: U5 sole + VarOnly
+																													_ = rf.upto(5)
+																													postCreateVarOnlyOnce = true
+																												}
+																											}
 																										case postCreateLateFreePPN == 14:
 																											// e18346: PP U4 + **** qfer F50 F10×4 + NewArray
 																											// CreateArray sizes; next Expression Constant
@@ -18016,7 +18241,27 @@ lhsDerefLoop:
 																						// e18423+: late free NewValue F10=0 → PL U4 U14 create
 																						// + SelectDeref residual (not U2 CreateArray).
 																						if !rf.flipcoin(10) {
-																							if postCreateLateFreePPN >= 15 {
+																							if postCreateLateFreePPN >= 16 {
+																								// e19016–23: PL stack U5 + U14 type +
+																								// F50 F10 qfer + NewArray F20 + Constant
+																								// F50 F50 U3 small.
+																								_ = rf.upto(5)
+																								_ = rf.upto(14)
+																								_ = rf.flipcoin(50)
+																								_ = rf.flipcoin(10)
+																								_ = rf.flipcoin(20)
+																								if rf.flipcoin(50) {
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else {
+																									for h := 0; h < 8; h++ {
+																										_ = rf.next31()
+																									}
+																								}
+																							} else if postCreateLateFreePPN >= 15 {
 																								_ = rf.upto(4)
 																								_ = rf.upto(14)
 																								_ = rf.flipcoin(10)
@@ -18411,10 +18656,12 @@ lhsDerefLoop:
 																						// Count late free-asg useEx hits for multiphase.
 																						postCreateLateFreeUseExN++
 																						// e18810+: after field catalog Assign residual,
-																						// useEx hit → CREATE head F20 U14 (not VS).
+																						// useEx hit n==3 → CREATE head F20 U14 (not VS).
 																						// Keep useExAgain for nested param Function;
 																						// e18814 useEx=0 (max-funcs) → ExprVar residual.
-																						if postCreateLateFreeUseExN >= 3 {
+																						// e19045+: later hits (n≥4) → VS residual
+																						// (U100 PP U5 F20 F20…), not another CREATE.
+																						if postCreateLateFreeUseExN == 3 {
 																							_ = rf.flipcoin(20)
 																							_ = rf.upto(14)
 																							postCreateLateFreeCreateMissVar = true
@@ -18454,6 +18701,31 @@ lhsDerefLoop:
 																							postCreateUseExAgain = false
 																							continue
 																						} else if sp < 95 {
+																							if postCreateLateFreeUseExN >= 4 {
+																								// e19046–52: PP→PL U5 + NewArray F20×2
+																								// + F80=0 → PP U5 sole; next Assign
+																								// with **** qfer residual (e19054–).
+																								_ = rf.upto(5)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								if !rf.flipcoin(80) {
+																									sp2 := rf.upto(100)
+																									if sp2 >= 65 && sp2 < 95 {
+																										_ = rf.upto(5)
+																									} else if sp2 < 35 {
+																										_ = rf.upto(9)
+																									} else if sp2 < 65 {
+																										_ = rf.upto(5)
+																									} else if !rf.flipcoin(10) {
+																										_ = rf.upto(5)
+																									}
+																								}
+																								postCreateForceAssignOnce = true
+																								// Re-arm ptr-cmp Assign qfer for forced Assign.
+																								ptrCmpLhsDone = true
+																								postCreateUseExAgain = false
+																								continue
+																							}
 																							_ = rf.upto(6)
 																							_ = rf.upto(2)
 																							postCreateUseExAgain = false
