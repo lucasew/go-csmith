@@ -644,6 +644,15 @@ type functionFlowState struct {
 	// postAggPostCD3PLAddrN: PL create address residual choose under post-CD3
 	// (e8445 U2; e8495 U5).
 	postAggPostCD3PLAddrN int
+	// postAggPostCD3PPFallThroughDone: first post-CD3 free Expression PP→PL
+	// stack create done (e8485); later PP soles (e8570+/e8603).
+	postAggPostCD3PPFallThroughDone bool
+	// postAggPostCD3U3PLN: inventory PL after U3-stack under post-CD3
+	// (e8610 U5; e8614 sole; e8617 U5+F0).
+	postAggPostCD3U3PLN int
+	// postAggPostCD3NVPLN: simple NewValue→PL create count under post-CD3
+	// (e8597 mode1 F50 F10; e8669 mode2 F10).
+	postAggPostCD3NVPLN int
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -921,7 +930,45 @@ func burnNestArrayOpPLAfterStack(er *exprRand, opts Options, env envInfo, scope 
 			}
 			return
 		default:
-			// e8376+: inventory PL U5 sole (UP free Expression U120 next).
+			// e8376+: inventory PL U5. Under U3-stack era (StackN>4):
+			// e8610 U5; e8614 sole; e8617 U5+F0; e8643 U4; e8648 U5+993 F0; else U5.
+			if flow.postAggNestArrayOpPostCD3StackN > 4 {
+				un := flow.postAggPostCD3U3PLN
+				flow.postAggPostCD3U3PLN++
+				switch un {
+				case 0:
+					_ = er.pick(5) // e8610
+					return
+				case 1:
+					// e8614: sole after stack (UP U120 next)
+					return
+				case 2:
+					// e8617: U5 + F0 → VS
+					_ = er.pick(5)
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(0)
+					}
+					_ = variableScopePickFromER(er, opts, &scope)
+					return
+				case 3:
+					_ = er.pick(4) // e8643
+					return
+				case 4:
+					// e8648: U5 + [9][9][3] F0 → VS
+					_ = er.pick(5)
+					_ = er.pick(9)
+					_ = er.pick(9)
+					_ = er.pick(3)
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(0)
+					}
+					_ = variableScopePickFromER(er, opts, &scope)
+					return
+				default:
+					_ = er.pick(5) // e8677+
+					return
+				}
+			}
 			_ = er.pick(5)
 			return
 		}
@@ -3898,10 +3945,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	// e7413: after Lhs CreateArray residual era (PL stack U4), simple create
 	// keeps mode 2 F10 only (not sticky SE-free F50 F10).
 	// e7634: PL stack U3 ptr-cmp create also keeps mode 2 (levels+self F10).
+	// e8669 post-CD3: NewValue→PL simple is !SE-free F10 only (UP F10 F20 F50).
 	if ctx.state.postAggNestArrayOpResidualDone &&
 		!ctx.state.postAggNestArrayOpPLStackU4 &&
 		!ctx.state.postAggNestArrayOpPLStackU3 {
-		if qferMode == 2 {
+		if qferMode == 2 && !ctx.state.postAggNestArrayOpPostCD3 {
 			qferMode = 1
 		}
 	}
@@ -3920,6 +3968,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// random_type_from_type(simple, !strict) → choose_random_simple (U14
 		// simple table), not AllTypes. Wrong hex width desynced LCG at e944–947.
 		chosen = pickSimpleNonVoid(er.fallback, opts)
+	}
+	// e8597 post-CD3 first simple NewValue→PL: mode 1 F50 F10; e8669 later mode 2 F10.
+	if ctx.state.postAggNestArrayOpPostCD3 && !isPtr && !isAggregate && qferMode >= 1 {
+		n := ctx.state.postAggPostCD3NVPLN
+		ctx.state.postAggPostCD3NVPLN++
+		if n == 0 {
+			qferMode = 1
+		} else {
+			qferMode = 2
+		}
 	}
 	isConst, isVolatile := false, false
 	if qferMode > 0 {
@@ -4854,9 +4912,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 								target = 56 // e8276
 							case gn == 1:
 								target = 19 // e8339
+							case gn == 2:
+								target = 56 // e8516
 							default:
-								// e8516+: GlobalList U56 again (not sticky U19).
-								target = 56
+								// e8606+: real inventory / U2 scale (not sticky U56).
+								target = 2
 							}
 						} else {
 							gn := 0
@@ -8614,6 +8674,22 @@ exprTries:
 					return finishVar(castLiteral(t, "x"))
 				}
 			}
+			// e8485 post-CD3: first free Expression PP→PL stack U3 + create.
+			// e8570+/e8603: later PP soles (UP free Expression U120 next), not
+			// sticky stack multiphase create.
+			if scopePick == 2 && flow != nil && flow.postAggNestArrayOpPostCD3 &&
+				flow.postAggPostCD3PPFallThroughDone {
+				noteNestPPSoleShiftSkip(flow)
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				expr := "x"
+				if len(candidates) > 0 {
+					expr = candidates[0].expr
+				} else if len(scope.params) > 0 {
+					expr = scope.params[0].name
+				}
+				return finishVar(castLiteral(t, expr))
+			}
 			// ParentParam: keep candidates for eFlexible (seed2 e887 sole after U100).
 			// Empty / miss → SelectParentLocal below. seed4 e360: ≥2 exact locals
 			// force U2 choose; empty block → create (seed2 e318 U14), never synthetic pad.
@@ -8656,6 +8732,10 @@ exprTries:
 				// stack pick, choose_var on that block, else any-depth
 				// dynLocs (inventory approx), else create.
 				if scopePick == 2 {
+					// e8485: first post-CD3 PP→PL fallthrough; later PP soles.
+					if flow != nil && flow.postAggNestArrayOpPostCD3 {
+						flow.postAggPostCD3PPFallThroughDone = true
+					}
 					idx := parentStackPick(er, flow)
 					// One-shot: e1775 U4 done; later VS not forced empty PP.
 					if flow != nil && flow.ppPostPadPPForceStack {

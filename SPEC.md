@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8603) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8682) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8603** (8390→8603 past 8500; Statement Assign RHS Function + post-CD3 free Expression; seed2 full held). Toward 9000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8682** (8603→8682; NewValue PP sole + post-CD3 PL/Global multiphase; seed2 full held). Toward 9000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -516,8 +516,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e8483: empty Global sole after first U2 pad.
 6. e8516: GlobalList pad U56 again after U19.
 
-Next plateau: seed4 e8603 NewValue PP → Expression U120 (not stack U3).
-Seeds 5–21; COUNT=20.
+**e8603–e8682 climbed:**
+1. e8603: post-CD3 PP sole after first fallthrough (e8485 U3 create).
+2. e8606: Global pad multiphase U56/U19/U56/U2.
+3. e8610–77: U3-stack PL inventory table (U5/sole/U5+F0/U4/U5+993/U5).
+4. e8669: NewValue→PL simple qfer mode1 then mode2.
+
+Next plateau: seed4 e8682 after free Expression Constant, UP Lhs SelectDeref F80
+(U12+947…) vs GO next Statement U100. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
