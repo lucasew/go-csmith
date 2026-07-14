@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6716) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6823) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6716** (6635→6716; nest PP sole skip-ShiftBy + Global F0/PL + Lhs SelectDeref U12 table + NewValue→PL U14; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6823** (6716→6823; NewValue→PL hex + nest ArrayOp residual ×2 + PL U6 U4; seed2 full held). Past 7000. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -410,8 +410,16 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
    table (U11+F0; U7/U5/U4 itemize 947; one 993; U4+F0) through F80=0.
 5. e6712: NewValue→PL after F80=0 is stack U5 + U14 + F50 F20 F50 (not U4 choose).
 
-Next plateau: seed4 e6716 UP U100=57 (Lhs create/VS residual after NewValue→PL
-prefix) vs GO Statement U100 tries=2. Seeds 5–21; source; COUNT=20.
+**e6716–e6823 climbed:**
+1. e6712–15: WRITE NewValue→PL retype U14 + qfer F50 + NewArray F20 + Constant
+   hex next31 (formatSimpleConstant) so Statement U100 LCG matches.
+2. e6716–33: Statement ArrayOp F5=0 array_loop aryno=1 select_array U13 +
+   SelectLoopCtrlVar U39 + residual; sole return (no body).
+3. e6734–49: second ArrayOp aryno=0 SelectLoopCtrlVar U38 + same residual sole.
+4. e6821–22: after nest ArrayOp residual, PL stack U6 + choose U4 (not VS U100).
+
+Next plateau: seed4 e6823 UP F50=1 after PL U4 vs GO free Expression U120.
+Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

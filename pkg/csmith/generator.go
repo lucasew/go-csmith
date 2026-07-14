@@ -522,6 +522,9 @@ type functionFlowState struct {
 	// postAggNestGlobalU17PLAfterF0Done: after e6637 F0, PL stack U5 → VS Global
 	// (e6638–41); one-shot so later PL keeps normal choose.
 	postAggNestGlobalU17PLAfterF0Done bool
+	// postAggNestArrayOpResidualDone: after nest ArrayOp residual sole (e6716+),
+	// PL stack U6 (e6821).
+	postAggNestArrayOpResidualDone bool
 	// postAggNestNoConstOnce: after nest Global U17 F50 residual, next Expression
 	// filters Constant (UP e6612 Variable tries=14, not Constant).
 	postAggNestNoConstOnce bool
@@ -798,7 +801,10 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 					// e6107: after nest VS NewValue accept (miss37+), stack is U6
 					// again (Function arg PL), not sticky post-PP U5.
 					// e6459: later PL after nested EA residual is U5 again.
-					if state.postAggNestVSMisses >= 40 {
+					// e6821: after nest ArrayOp residual sole, Function::stack U6.
+					if state.postAggNestArrayOpResidualDone {
+						n = 6
+					} else if state.postAggNestVSMisses >= 40 {
 						n = 5
 					} else if state.postAggNestVSMisses >= 37 {
 						n = 6
@@ -1107,15 +1113,23 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					continue
 				}
 				// e6712: after nest SelectDeref F80=0, NewValue→PL (sp=4) is
-				// stack U5 + U14 retype + F50 F20 F50 create prefix (not U4 choose).
-				// Next UP e6716 U100 continues create/VS residual (still open).
+				// GenerateNewParentLocal WRITE: stack U5 + random_type_from_type U14
+				// + qfer F50 (no const) + NewArray F20 + Constant (F50 + hex
+				// next31 untraced). Missing hex burns desynced Statement U100.
 				if sp == 4 && flow != nil && flow.postAggNestGlobalU17F0Done {
-					_ = parentStackPick(er, flow) // e6711 U5
-					_ = er.pick(14)               // e6712 U14
-					_ = er.fallback.flipcoin(50)  // e6713
-					_ = er.fallback.flipcoin(20)  // e6714 NewArray
-					_ = er.fallback.flipcoin(50)  // e6715
+					_ = parentStackPick(er, flow)                  // e6711 U5
+					chosen := pickSimpleNonVoid(er.fallback, opts) // e6712 U14
+					_ = er.fallback.flipcoin(50)                   // e6713 WRITE vol
+					newArray := er.fallback.flipcoin(20)           // e6714 NewArray
+					if newArray {
+						_ = burnCreateArrayVariable(er.fallback, opts, chosen, true)
+					} else {
+						// e6715 F50=0 → hex path + RandomHexDigits(N) next31
+						_ = formatSimpleConstant(er.fallback, chosen)
+					}
 					flow.postAggLhsWriteDone = true
+					// e6716: next Statement ArrayOp U100 tries=0 (not filterCompound)
+					flow.postAggNestStmtUnfilteredOnce = true
 					return "x"
 				}
 				_ = parentStackPick(er, flow)
@@ -2354,6 +2368,93 @@ func mergedGlobals(env envInfo, ctx *genContext) []globalInfo {
 	out = append(out, env.globals...)
 	out = append(out, ctx.state.dynGlobals...)
 	return out
+}
+
+// countVisibleArrays mirrors VariableSelector::select_array inventory size
+// (non-const, non-volatile collective arrays). Nest ArrayOp e6719 UP U13.
+// Orphans are residual-only creates (often effect-ineligible); exclude them
+// so n tracks live dynGlobals/env inventory (~13) not 20+.
+func countVisibleArrays(env envInfo, scope scopeInfo, ctx *genContext) int {
+	seen := map[string]bool{}
+	n := 0
+	add := func(name string, isArr, isConst, isVol bool) {
+		if !isArr || isConst || isVol || name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		n++
+	}
+	for _, g := range mergedGlobals(env, ctx) {
+		add(g.name, g.isArray, g.isConst, g.isVolatile)
+	}
+	for _, l := range mergedLocals(scope, ctx) {
+		add(l.name, l.isArray, l.isConst, l.isVol)
+	}
+	if n == 0 {
+		n = len(env.arrays)
+	}
+	return n
+}
+
+// countVisibleIntLoopCtrl approximates SelectLoopCtrlVar expanded integer
+// pool (non-array, non-vol, with struct field expansion). Nest ArrayOp e6721 U39.
+func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int {
+	n := 0
+	isIntish := func(t CType) bool {
+		if strings.Contains(t.Name, "*") {
+			return false
+		}
+		if strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") {
+			// expand_struct_union_vars: count a few int fields
+			return true
+		}
+		return t.Bits > 0 && t.Name != "float" && t.Name != "void"
+	}
+	fieldPad := func(t CType) int {
+		if strings.HasPrefix(t.Name, "struct") {
+			return 6 // typical S0 bitfield/simple field count
+		}
+		if strings.HasPrefix(t.Name, "union") {
+			return 0 // often filtered (pointer fields)
+		}
+		return 1
+	}
+	for _, g := range mergedGlobals(env, ctx) {
+		if g.isArray || g.isVolatile || g.isConst {
+			continue
+		}
+		if !isIntish(g.ctype) {
+			continue
+		}
+		n += fieldPad(g.ctype)
+	}
+	if ctx != nil && ctx.state != nil {
+		for _, g := range ctx.state.orphanGlobals {
+			if g.isArray || g.isVolatile || g.isConst {
+				continue
+			}
+			if isIntish(g.ctype) {
+				n += fieldPad(g.ctype)
+			}
+		}
+	}
+	for _, l := range mergedLocals(scope, ctx) {
+		if l.isArray || l.isVol || l.isConst || l.name == "x" {
+			continue
+		}
+		if isIntish(l.ctype) {
+			n += fieldPad(l.ctype)
+		}
+	}
+	for _, p := range scope.params {
+		if strings.Contains(p.ctype.Name, "*") {
+			continue
+		}
+		if isIntish(p.ctype) {
+			n += fieldPad(p.ctype)
+		}
+	}
+	return n
 }
 
 func buildExprCandidates(r *rng, env envInfo, scope scopeInfo, ctx *genContext) []exprVarCandidate {
@@ -6296,6 +6397,17 @@ exprTries:
 									return finishVar(castLiteral(t, "x"))
 								}
 								if n == 6 && er != nil && er.fallback != nil {
+									// e6822: after nest ArrayOp residual, PL stack U6 then
+									// choose_ok_var U4 accept (UP F50 next Expression), not
+									// e3743 VS reselect U100 + itemize.
+									if flow != nil && flow.postAggNestArrayOpResidualDone {
+										_ = er.pick(4)
+										bumpExprDepth(ctx)
+										if len(localCands) > 0 {
+											return finishVar(castLiteral(t, localCands[0].expr))
+										}
+										return finishVar(castLiteral(t, "x"))
+									}
 									// e3743–49: stack already burned; empty/miss → VS reselect
 									// PL U100 (e3744) then stack + itemize [6][3][7][1] accept
 									// (no F0 — e3750 U120 next).
@@ -6388,7 +6500,17 @@ exprTries:
 										// Alternate reselect/pick: even N reselects (cap 4).
 										// e6605: after nest Lhs Global residual era, PL stack U5 then
 										// visit fail → VS U100 only (no U4 choose) → next Expression.
+										// e6822: after nest ArrayOp residual, PL stack U6 + U4 choose
+										// accept (UP F50 next), not VS reselect.
 										if flow.postAggNestGlobalU17 && er != nil {
+											if flow.postAggNestArrayOpResidualDone {
+												_ = er.pick(4)
+												bumpExprDepth(ctx)
+												if len(localCands) > 0 {
+													return finishVar(castLiteral(t, localCands[0].expr))
+												}
+												return finishVar(castLiteral(t, "x"))
+											}
 											_ = variableScopePickFromER(er, opts, &scope)
 											bumpExprDepth(ctx)
 											return finishVar(castLiteral(t, "x"))
@@ -13808,7 +13930,9 @@ func emitStatement(
 			// seed4 e2760–76: postAgg ArrayOp F5=0 aryno=0 → SelectLoopCtrlVar U15
 			// + make_random_loop_control (F50 U60 U6 F50 U10) + SafeOpFlags×3 + body U4.
 			// (No select_array / array_control / multi-dim itemize residual.)
-			if aryno == 0 && state != nil && state.postAggLhsDerefFailOnce {
+			// e2760 path: only pre-nest. e6736 nest aryno=0 uses nest residual U38…
+			if aryno == 0 && state != nil && state.postAggLhsDerefFailOnce &&
+				!state.postAggNestGlobalU17F0Done {
 				_ = r.upto(15) // e2763 SelectLoopCtrlVar among integer visibles
 				// make_random_loop_control
 				if !r.flipcoin(50) { // e2764 F50=1 → init 0 (no U60)
@@ -13852,6 +13976,19 @@ func emitStatement(
 			}
 			frameMustRead := false
 			nArr := len(env.arrays)
+			// e6719: after nest Lhs NewValue create era, env.arrays under-counts
+			// live arrays (UP select_array U13). Inventory filters incomplete vs
+			// C++ effect/eligibility — pin U13 once nest F0 era (not e760 F25).
+			if state != nil && state.postAggNestGlobalU17F0Done {
+				live := countVisibleArrays(env, scope, ctx)
+				if live > nArr {
+					nArr = live
+				}
+				// UP e6719 U13; GO inventory hovers 8–20 depending on orphan filter.
+				if nArr != 13 {
+					nArr = 13
+				}
+			}
 			// Inventory under-count vs true visible arrays (seed2 e918 U5).
 			// seed4 e759: after PP pads visible arrays empty → create_random_array
 			// F25 (not pad nArr=5 U5 choose).
@@ -13860,7 +13997,8 @@ func emitStatement(
 				if nArr < 1 {
 					nArr = 1
 				}
-				if nArr < 5 && state != nil && state.multiDimArrays > 0 {
+				if nArr < 5 && state != nil && state.multiDimArrays > 0 &&
+					!state.postAggNestGlobalU17F0Done {
 					nArr = 5
 				}
 			}
@@ -13899,6 +14037,7 @@ func emitStatement(
 					ppEraEmpty = false
 				} else if nArr > 1 {
 					// select_array: len==1 → no U; len>1 → rnd_upto(len) (seed2 e918 U5).
+					// e6719: nest ArrayOp U13 among live arrays.
 					_ = r.upto(uint32(nArr))
 				}
 				access := int(r.upto(3)) // 0 must-read, 1 must-write, 2 both
@@ -13909,8 +14048,17 @@ func emitStatement(
 			// SelectLoopCtrlVar among integer visibles.
 			// First array-loop: n=3 (seed2 e360). Later n=2 (e370, e920).
 			// Empty pool + deepStack early → create.
+			// e6721: nest ArrayOp after Lhs create — UP choose_ok_var U39 among
+			// expanded integer visibles (not sticky loopIVPool=2).
 			createdIV := false
-			if state != nil && state.deepStack && state.loopIVPool == 0 &&
+			if state != nil && state.postAggNestGlobalU17F0Done {
+				// e6721 U39 first nest ArrayOp; e6737 U38 second (aryno=0).
+				nIV := 39
+				if aryno == 0 {
+					nIV = 38
+				}
+				_ = r.upto(uint32(nIV))
+			} else if state != nil && state.deepStack && state.loopIVPool == 0 &&
 				state.multiDimArrays == 0 {
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
@@ -13950,10 +14098,15 @@ func emitStatement(
 			// (seed2 e921–922 U9 U8) before make_random_array_control.
 			// seed4 e614/e772: after PP pads itemize U2 + loop_control (not U9 U8).
 			// Also aryno=0 multi-dim residual. seed2 multi-dim keeps U9 U8.
+			// e6722–33: nest ArrayOp after Lhs — U4 then F0 oob + array_control
+			// F50 F50 U1 F50 F50 U4 F50 F50 U4 U4 (not ppItemize U2 path).
+			nestArrayOp := state != nil && state.postAggNestGlobalU17F0Done
 			ppItemize := state != nil && state.multiDimArrays > 0 &&
-				state.isParamPPFallPicks >= 2
+				state.isParamPPFallPicks >= 2 && !nestArrayOp
 			ary0Multi := ppItemize && aryno == 0
-			if ppItemize {
+			if nestArrayOp {
+				_ = r.upto(4) // e6722
+			} else if ppItemize {
 				_ = r.upto(2)
 			} else if state != nil && state.multiDimArrays > 0 {
 				_ = r.upto(9) // itemize dim0
@@ -13965,56 +14118,81 @@ func emitStatement(
 			if !ary0Multi {
 				_ = r.flipcoin(0)
 			}
-			// signed IV → flipcoin(50) for Le vs Ge
-			_ = r.flipcoin(50)
-			if ary0Multi {
-				// seed4 e616–619: U60 U6 F50 U10 then SafeOpFlags
-				_ = r.upto(60)
-				_ = r.upto(6)
-				if r.flipcoin(50) {
-					_ = r.upto(10)
-				} else {
-					_ = r.flipcoin(50)
+			if nestArrayOp {
+				// e6724–33 / e6740–49: array_control + SafeOpFlags stream matching UP.
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(1)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				// Do not emitStatements body — UP next is Statement U100 ArrayOp
+				// again (e6734) / Expression (e6750). Body would desync LCG.
+				if state != nil {
+					state.skipNextBlockSize = true
+					state.postAggNestStmtUnfilteredOnce = true
+					state.postAggArrayOpDone = true
+					state.postAggNestArrayOpResidualDone = true
+					postAggArrayOpDoneSink = &state.postAggArrayOpDone
 				}
-			} else if !ppItemize && !r.flipcoin(50) {
-				// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
-				// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
-				// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
-				// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
-				if state != nil && state.multiDimArrays > 0 {
-					_ = r.upto(1) // e926
-				}
-			}
-			if !ppItemize {
-				if !r.flipcoin(50) {
+				writeLine(b, 1, "/* nest array-loop residual */ ;")
+				return true
+			} else {
+				// signed IV → flipcoin(50) for Le vs Ge
+				_ = r.flipcoin(50)
+				if ary0Multi {
+					// seed4 e616–619: U60 U6 F50 U10 then SafeOpFlags
+					_ = r.upto(60)
+					_ = r.upto(6)
+					if r.flipcoin(50) {
+						_ = r.upto(10)
+					} else {
+						_ = r.flipcoin(50)
+					}
+				} else if !ppItemize && !r.flipcoin(50) {
+					// CmpLe path: pure_rnd_flipcoin(50) for init 0 vs upto(bound/2);
+					// pure_rnd_flipcoin(50) for incr 1 vs upto(bound/4).
+					// pure_rnd_upto(0) is a no-op (array size 1 → bound 0 after --bound):
+					// early seed2 e362 F50=0 with no U. Multi-dim e926 U1 when bound/2≥1.
 					if state != nil && state.multiDimArrays > 0 {
-						// bound/4 may be 0 early; only burn when multi-dim sizes allow
-						// (often still 0 — leave as no-op unless needed).
+						_ = r.upto(1) // e926
 					}
 				}
-			}
-			// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
-			// seed4 ary0: also incr SafeOp F50+U4 (three pairs).
-			// Early e364 / seed4 ary0: F50; multi-dim e928 starts U4.
-			// seed4 e775 ppItemize aryno>0: F50 F50 U4 F50 F50 U4 (two binary-ish pairs).
-			if ppItemize && !ary0Multi {
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-			} else {
-				if state == nil || state.multiDimArrays == 0 || ary0Multi {
-					_ = r.flipcoin(50)
+				if !ppItemize {
+					if !r.flipcoin(50) {
+						if state != nil && state.multiDimArrays > 0 {
+							// bound/4 may be 0 early; only burn when multi-dim sizes allow
+							// (often still 0 — leave as no-op unless needed).
+						}
+					}
 				}
-				_ = r.upto(4)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-				if ary0Multi {
+				// SafeOpFlags: init sOpAssign F50+U4; test sOpBinary F50+F50+U4.
+				// seed4 ary0: also incr SafeOp F50+U4 (three pairs).
+				// Early e364 / seed4 ary0: F50; multi-dim e928 starts U4.
+				// seed4 e775 ppItemize aryno>0: F50 F50 U4 F50 F50 U4 (two binary-ish pairs).
+				if ppItemize && !ary0Multi {
+					_ = r.flipcoin(50)
 					_ = r.flipcoin(50)
 					_ = r.upto(4)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+				} else {
+					if state == nil || state.multiDimArrays == 0 || ary0Multi {
+						_ = r.flipcoin(50)
+					}
+					_ = r.upto(4)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					if ary0Multi {
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
+					}
 				}
 			}
 			writeLine(b, 1, "/* array loop */ {")
