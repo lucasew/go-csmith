@@ -14300,6 +14300,9 @@ lhsDerefLoop:
 																		postCreateNoAssignOnce := false
 																		postCreateForceAssignOnce := false // e17398 Assign tries=4
 																		postCreateAsgLhsF80Once := false // e17407 Lhs SelectDeref after *** Assign
+																		postCreateAsgLhsF80N := 0
+																		postCreateAsgNeedLhs := false // after Assign RHS term, Lhs F80
+																		postCreateConstHex16Once := false // e17425 RandomHexDigits(16)
 																		// postCreateFuncOnlyOnce: after late Comma
 																		// (e15868), next Expression Function-only
 																		// (e15869 U120=49 tries=1).
@@ -14480,6 +14483,47 @@ lhsDerefLoop:
 																				vv = rf.upto(120)
 																			}
 																			if vv >= 110 {
+																				if postCreateAsgNeedLhs {
+																					// e17446–63: Assign RHS Comma bare; Lhs SelectDeref
+																					// F80=0 → VS PL U4 create F20 F50 F50 U20; then
+																					// SelectDeref countdown F80 U4 F0 / U3 F0 / U2 / F0 / F80=0.
+																					postCreateAsgNeedLhs = false
+																					_ = rf.flipcoin(80) // F80=0
+																					_ = rf.upto(100)    // PL
+																					_ = rf.upto(4)      // stack
+																					_ = rf.flipcoin(20) // NewArray
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(20)
+																					// SelectDeref F80 countdown residual
+																					if rf.flipcoin(80) { // e17454 F80=1
+																						_ = rf.upto(4)
+																					}
+																					if rf.flipcoin(80) { // e17456
+																						_ = rf.upto(3)
+																						_ = rf.flipcoin(0) // e17458
+																					}
+																					if rf.flipcoin(80) { // e17459
+																						_ = rf.upto(2)
+																					}
+																					if rf.flipcoin(80) { // e17461
+																						_ = rf.flipcoin(0) // e17462
+																					}
+																					_ = rf.flipcoin(80) // e17463 F80=0 → VS
+																					// e17464–71: NewValue PL create residual
+																					_ = rf.upto(100) // NewValue 90
+																					_ = rf.upto(4)   // stack
+																					if rf.flipcoin(80) { // e17466
+																						_ = rf.flipcoin(20)
+																						_ = rf.flipcoin(20)
+																						_ = rf.upto(2)
+																						_ = rf.upto(3)
+																						_ = rf.upto(3)
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(4) // e17473 itemize/size residual
+																					}
+																					continue
+																				}
 																				// e13009: ExpressionComma lhs type=nil →
 																				// AllTypes U14 NonVoid; lhs no_const.
 																				// e13484: after LShift ends (depth
@@ -15196,6 +15240,10 @@ lhsDerefLoop:
 																										// e17421+: simple Assign self F50, nested RHS
 																										_ = rf.flipcoin(50)
 																										afterAsg = true
+																										postCreateConstHex16Once = true
+																										postCreateAsgLhsF80Once = true
+																										postCreateAsgLhsF80N = 1
+																										postCreateAsgNeedLhs = true
 																									} else {
 																										asgF50 := rf.flipcoin(50)
 																										afterAsg = true
@@ -15261,20 +15309,14 @@ lhsDerefLoop:
 																								// AssignThenConst; else burnConst.
 																								constBare := postCreateConstBareOnce
 																								if constBare {
-																																																		postCreateConstBareOnce = false
-																									if postCreateAsgLhsF80Once {
-																										postCreateAsgLhsF80Once = false
-																										// e17407–13: Lhs SelectDeref F80=1 empty create
-																										// F20×4 + U4 + F50 (SafeOpFlags/vol) then next Expression.
-																										_ = rf.flipcoin(80)
-																										for hi := 0; hi < 4; hi++ {
-																											_ = rf.flipcoin(20)
-																										}
-																										_ = rf.upto(4)
-																										_ = rf.flipcoin(50)
-																									}
+																									postCreateConstBareOnce = false
+																								} else if postCreateConstHex16Once {
+																									// e17425: F50=0 → RandomHexDigits(16) for eLongLong
+																									// (UP depth gap 21680→21697 = 16 untraced next31).
+																									postCreateConstHex16Once = false
+																									_ = formatSimpleConstant(rf, CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16})
 																								} else if rf.flipcoin(50) {
-																									// e16181+/e16445: burnConst
+																									// e16181+/e16445: burnConst small
 																									if rf.flipcoin(50) {
 																										_ = rf.upto(3)
 																									} else {
@@ -15285,13 +15327,31 @@ lhsDerefLoop:
 																										_ = rf.next31()
 																									}
 																								}
+																								// e17407/e17426: after Assign RHS Constant, Lhs SelectDeref residual
+																								didAsgLhs := false
+																								if postCreateAsgLhsF80Once {
+																									postCreateAsgLhsF80Once = false
+																									didAsgLhs = true
+																									n := postCreateAsgLhsF80N
+																									postCreateAsgLhsF80N++
+																									// Lhs::make_random SelectDerefPointerProb F80
+																									_ = rf.flipcoin(80)
+																									if n == 0 {
+																										// e17407: empty create residual F20×4 U4 F50
+																										for hi := 0; hi < 4; hi++ {
+																											_ = rf.flipcoin(20)
+																										}
+																										_ = rf.upto(4)
+																										_ = rf.flipcoin(50)
+																									}
+																									// e17426 n>=1: F80=1 select_deref finds existing — no more RNG
+																								}
 																								afterAsg = false
 																								postCreateUseExAgain = false
-																								if !postCreatePostArrayVar && !constBare {
+																								// After Assign Lhs residual, free next Expression (Function e17427).
+																								// Do not re-arm VarOnly (would force U120 tries).
+																								if !didAsgLhs && !postCreatePostArrayVar && !constBare {
 																									postCreateForceStdfunc = true
-																									// e16922+: after post-array
-																									// Global CreateArray residual
-																									// (n≥2), Constant → VarOnly.
 																									if postCreatePostArrayGlobalN >= 2 {
 																										postCreateVarOnlyOnce = true
 																									}
@@ -15897,25 +15957,15 @@ lhsDerefLoop:
 																											_ = rf.upto(4)
 																											_ = rf.upto(100)
 																										} else if postCreatePostArrayAsgN >= 2 {
-																											// e17385+: after Assign*qfer Lhs create, Global
-																											// ok_vars U4 + **** WRITE/READ qfer F50 F10×4
-																											// + NewArray F20 + make_init F20 + nested expr.
-																											_ = rf.upto(4)
-																											for li := 0; li < 4; li++ {
-																												_ = rf.flipcoin(50)
-																												_ = rf.flipcoin(10)
-																											}
-																											_ = rf.flipcoin(20) // NewArray
-																											_ = rf.flipcoin(20) // make_init null/const
-																											// e17397: residual U5 then parent Expression
-																											_ = rf.upto(5)
-																											// live U120 terms follow
-																											} else {
+																											// e17436+: Global ok_vars large U140 accept
+																											// (GlobalList grown; sole → next Expression Function).
+																											_ = rf.upto(140)
+																										} else {
 																											// later Global residual
 																											_ = rf.upto(2)
 																											_ = rf.flipcoin(0)
 																											postCreateVarOnlyOnce = true
-																											}
+																										}
 																									} else {
 																										// e16165+: F0 reselect VS.
 																										_ = rf.flipcoin(0)
@@ -16962,6 +17012,7 @@ lhsDerefLoop:
 																			// wins over forceStdfunc.
 																			if afterAsg {
 																				afterAsg = false
+																				postCreateAsgNeedLhs = false // RHS was Function bare, not Comma
 																				postCreateForceStdfunc = false
 																				if depthFilterNoConst {
 																					depthFilterNoConst = false
