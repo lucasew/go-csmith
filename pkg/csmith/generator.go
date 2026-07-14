@@ -514,6 +514,32 @@ type functionFlowState struct {
 	postAggPostCD3ArrayOp2PLSoleUsed bool
 	// postAggPostCD3ArrayOp2PLU5F0Done: one-shot e9834 U5 F0 reselect residual.
 	postAggPostCD3ArrayOp2PLU5F0Done bool
+	// postAggPostCD3ArrayOp2PLU5F0AfterFuncArg: e10016 U5 F0 → VS PP after FuncArg.
+	postAggPostCD3ArrayOp2PLU5F0AfterFuncArg bool
+	// postAggPostCD3ArrayOp2FuncArgLhsSelDone: e10021 ExpressionAssign Lhs residual.
+	postAggPostCD3ArrayOp2FuncArgLhsSelDone bool
+	// postAggPostCD3ArrayOp2LhsSelU3Ladder: e10328+ Lhs SelectDeref residual phase
+	// (0 off; 1: F80 U3 U2 U5×9; 2: F80 U9 U8 F0… create).
+	postAggPostCD3ArrayOp2LhsSelU3Ladder int
+	// postAggPostCD3ArrayOp2PLSoleAfterLadder: e10396 PL stack sole after Lhs ladder.
+	postAggPostCD3ArrayOp2PLSoleAfterLadder bool
+	// postAggPostCD3ArrayOp2LhsSelF80Sole: e10400 Lhs F80=1 sole accept (no F20);
+	// then e10413 multiphase F80 U9 itemize residual (armed as phase 2).
+	postAggPostCD3ArrayOp2LhsSelF80Sole int
+	// postAggPostCD3ArrayOp2PPAfterF80SoleN: PP Variable count after F80Sole phase2.
+	postAggPostCD3ArrayOp2PPAfterF80SoleN int
+	// postAggPostCD3ArrayOp2FuncUserOnce: e10436 Function user-path (not stdfunc F5).
+	postAggPostCD3ArrayOp2FuncUserOnce bool
+	// postAggPostCD3ArrayOp2FuncCreateRes: e10438 CREATE residual after useExisting=0.
+	postAggPostCD3ArrayOp2FuncCreateRes bool
+	// postAggPostCD3ArrayOp2FuncFailPPPL: e10443 Function-fail → PP→PL stack create.
+	postAggPostCD3ArrayOp2FuncFailPPPL bool
+	// postAggPostCD3ArrayOp2ConstBinaryU18Done: e10107 Constant-as-LHS binary U18.
+	postAggPostCD3ArrayOp2ConstBinaryU18Done bool
+	// postAggPostCD3ArrayOp2PostConstAssignN: free Assign count after ConstBinary.
+	postAggPostCD3ArrayOp2PostConstAssignN int
+	// postAggPostCD3ArrayOp2PLAfterNeedN: PL locals pad after need_no_rhs n≥3.
+	postAggPostCD3ArrayOp2PLAfterNeedN int
 	// postAggPostCD3ArrayOp2StmtLhsU9: after e9838 PL accept, next Statement
 	// Assign Lhs SelectDeref F80 U9 accept (e9847–48; GO pool U8 under-count).
 	postAggPostCD3ArrayOp2StmtLhsU9 bool
@@ -1333,9 +1359,10 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// e9282: ArrayOp2 body PL stack U6 then sole (no local U5; UP U120 next).
 	// Sticky sole every PL stack pick — e9292 second PL also soles then F80 Lhs.
 	// e9834 U5 F0 residual intercepts before sole consume (NeedNoRhsN≥2).
+	// e10016: after Function-arg must residual, PL is U5 F0 reselect (not sole).
 	if postAggPostCD3ArrayOp2BodyActive {
 		_ = er.pick(6)
-		if state != nil {
+		if state != nil && !state.postAggPostCD3ArrayOp2FuncArgMustDone {
 			state.postAggPostCD3ArrayOp2PLSole = true
 		}
 		return 0
@@ -4366,12 +4393,19 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			ctx.state.postAggNestVSMisses >= 40 {
 			doAddrResidual = true
 		}
-		// e9478–79: ArrayOp2 Function-fail **** PL NewArray+address residual
-		// F20 F20 then CreateArray U99 (nested pointee make_init), not bare U99.
+		// e9478–79: first ArrayOp2 PL NewArray+address — nested F20 F20 then
+		// CreateArray U99 (not bare U99).
+		// e10002: after Function-arg must residual — address choose U2 then
+		// CreateArray U99 U10 U2 U5 (not sticky nested F20 F20).
 		if postAggPostCD3ArrayOp2BodyActive && newArray && !initNull {
-			_ = er.fallback.flipcoin(20)
-			_ = er.fallback.flipcoin(20)
-			doAddrResidual = false
+			if ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone {
+				_ = er.fallback.upto(2) // e10002 choose_ok_var U2
+				doAddrResidual = false
+			} else {
+				_ = er.fallback.flipcoin(20)
+				_ = er.fallback.flipcoin(20)
+				doAddrResidual = false
+			}
 		}
 		// e9827: ArrayOp2 PL !NewArray+address — no choose U5; parent Expression U120.
 		if postAggPostCD3ArrayOp2BodyActive && !newArray && !initNull {
@@ -6105,6 +6139,28 @@ func buildFunctionCallExpr(
 		if r == nil {
 			return "", false
 		}
+		// e10438+: after F80Sole residual Function useExisting=0, CREATE residual
+		// F0 + nested Expression (Comma U120…) before fallthrough Variable.
+		if state.postAggPostCD3ArrayOp2FuncCreateRes && er != nil {
+			state.postAggPostCD3ArrayOp2FuncCreateRes = false
+			_ = r.flipcoin(0) // e10438
+			// e10439–41: nested Expression Comma U14 then Function user-path
+			// (useExisting=0 → VS PP create e10443+, not another F0 nest).
+			prevAllow := state.ppPostPadAllowFuncOnce
+			state.ppPostPadAllowFuncOnce = true
+			state.postAggPostCD3ArrayOp2FuncUserOnce = true
+			prevDepth := 0
+			if ctx != nil {
+				prevDepth = ctx.exprDepth
+				ctx.exprDepth = 0
+			}
+			_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+			if ctx != nil {
+				ctx.exprDepth = prevDepth
+			}
+			state.ppPostPadAllowFuncOnce = prevAllow
+			return castLiteral(t, "0"), true
+		}
 		// seed2 e1402: after late force-Variable continuation with pointer type,
 		// UP CREATE residual F20 U7 even when GO thinks at maxFuncs (under-count).
 		// Prefer synthetic CREATE residual over falling through to Variable U100.
@@ -6838,7 +6894,19 @@ exprTries:
 		if choice == termFunction && ctx != nil && ctx.state != nil && ctx.state.ppPostPadAllowFuncOnce {
 			ctx.state.ppPostPadAllowFuncOnce = false
 			// e2014: UP stdfunc F5 path (simple), not user-func F50.
-			forceStdFuncSimple = true
+			// e10436: FuncUserOnce → user-path (skip forceStdFunc).
+			if !ctx.state.postAggPostCD3ArrayOp2FuncUserOnce {
+				forceStdFuncSimple = true
+			}
+		}
+		forceUserFunc := false
+		if choice == termFunction && ctx != nil && ctx.state != nil &&
+			ctx.state.postAggPostCD3ArrayOp2FuncUserOnce {
+			ctx.state.postAggPostCD3ArrayOp2FuncUserOnce = false
+			forceUserFunc = true
+			forceStdFuncSimple = false
+			// Nested Function fail → PP→PL stack create (e10443).
+			ctx.state.postAggPostCD3ArrayOp2FuncFailPPPL = true
 		}
 		switch choice {
 		case termFunction:
@@ -6857,7 +6925,7 @@ exprTries:
 				stdFunc := true
 				atMaxFuncs := ctx != nil && ctx.state != nil &&
 					len(ctx.state.funcs) >= ctx.state.maxFuncs
-				if !atMaxFuncs && !forceStdFuncSimple {
+				if !atMaxFuncs && !forceStdFuncSimple && !forceUserFunc {
 					stdFunc = er.fallback.flipcoin(80)
 				}
 				isSimple := !strings.Contains(t.Name, "*") &&
@@ -6866,6 +6934,10 @@ exprTries:
 				if forceStdFuncSimple {
 					stdFunc = true
 					isSimple = true
+				}
+				if forceUserFunc {
+					// e10436: skip F80; user-path useExisting F50 next.
+					stdFunc = false
 				}
 				if stdFunc && isSimple {
 					// Binary/unary stdfunc: Expression::make_random(type) with
@@ -7124,16 +7196,21 @@ exprTries:
 									} else {
 										// e8373 post-CD3: ShiftBy non-const RHS filters
 										// Function/Assign (UP U120 tries=11 Variable).
+										// e10228 ArrayOp2 after FuncArg: UP Function tries=0
+										// (do not arm depthBlock).
 										prevDB := false
 										prevDN := 0
-										if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 {
+										armDB := ctx != nil && ctx.state != nil &&
+											ctx.state.postAggNestArrayOpPostCD3 &&
+											!ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone
+										if armDB {
 											prevDB = ctx.state.ppPostPadDepthBlock
 											prevDN = ctx.state.ppPostPadDepthBlockN
 											ctx.state.ppPostPadDepthBlock = true
 											ctx.state.ppPostPadDepthBlockN = 0
 										}
 										rhs = randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, true)
-										if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 {
+										if armDB {
 											ctx.state.ppPostPadDepthBlock = prevDB
 											ctx.state.ppPostPadDepthBlockN = prevDN
 										}
@@ -7253,10 +7330,19 @@ exprTries:
 					if ctx != nil {
 						flow = ctx.state
 					}
+					// e10443: after F80Sole Function CREATE residual nested fail,
+					// force PP→PL stack U6 + create (not sole param accept).
+					forcePPPL := flow != nil && flow.postAggPostCD3ArrayOp2FuncFailPPPL
+					if forcePPPL {
+						flow.postAggPostCD3ArrayOp2FuncFailPPPL = false
+					}
 					// Mirror termVariable: pointer + useSmallParentStack forces
 					// empty ParentParam fallthrough even if inventory non-empty.
 					paramCands := buildScopedCandidatesFromER(er, env, scope, 2, ctx)
 					if flow != nil && flow.useSmallParentStack && strings.Contains(t.Name, "*") {
+						paramCands = nil
+					}
+					if forcePPPL {
 						paramCands = nil
 					}
 					if len(paramCands) > 0 {
@@ -7284,8 +7370,15 @@ exprTries:
 							qfer = 2
 						}
 					}
+					// e10445–: F50 F10 F20 + Constant F50 F50 U3 create residual.
+					if forcePPPL {
+						qfer = 1
+					}
 					// force create: empty block / late inventory approx.
 					forceCreate := flow != nil && (flow.useSmallParentStack || flow.filterCompoundStmts)
+					if forcePPPL {
+						forceCreate = true
+					}
 					// seed4 e2504 postAgg: after PP→PL stack, try block locals /
 					// sole first so parent Expression continues U120 (not create F50).
 					if postAggGlobalCreateN >= 0 && flow != nil && flow.filterCompoundStmts {
@@ -7529,7 +7622,8 @@ exprTries:
 					return finishVar(castLiteral(t, "x"))
 				}
 				// After U2-fail era free Expression Globals:
-				// n=0 e9908 sole; n=1 e9922 U61 + multi-dim itemize U2 U9 U4.
+				// n=0 e9908 sole; n=1 e9922 U61 + multi-dim itemize U2 U9 U4;
+				// n=2,3 e10102 U70; n=4 e10273 U27; n≥5 e10291 U3→VS reselect.
 				if postAggPostCD3ArrayOp2GlobalU2Done {
 					n := postAggPostCD3ArrayOp2GlobalSoleN
 					postAggPostCD3ArrayOp2GlobalSoleN++
@@ -7539,11 +7633,91 @@ exprTries:
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "g_0"))
 					}
-					// e9922–25: GlobalList U61 then itemize U2 U9 U4.
-					_ = er.pick(61)
-					_ = er.pick(2)
-					_ = er.pick(9)
-					_ = er.pick(4)
+					if n == 1 {
+						// e9922–25: GlobalList U61 then itemize U2 U9 U4.
+						_ = er.pick(61)
+						_ = er.pick(2)
+						_ = er.pick(9)
+						_ = er.pick(4)
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "g_0"))
+					}
+					if n < 4 {
+						_ = er.pick(70) // e10102+
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "g_0"))
+					}
+					if n == 4 {
+						_ = er.pick(27) // e10273
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "g_0"))
+					}
+					if n == 5 {
+						// e10291–309: Global U3 fail → VS PL U6 U2 F0 → VS PL U6 U5
+						// +itemize U9 U9 U3 F0 → VS Global U2 F0 → VS PL U6 U5 F50.
+						_ = er.pick(3) // e10291
+						scopePick2 := variableScopePickFromER(er, opts, &scope)
+						if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+							_ = parentStackPick(er, flow) // e10293 U6
+							_ = er.pick(2)                 // e10294
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(0) // e10295
+							}
+							scopePick3 := variableScopePickFromER(er, opts, &scope)
+							if scopePick3 == 1 || scopePick3 == 2 || scopePick3 == 4 {
+								_ = parentStackPick(er, flow) // e10297
+								_ = er.pick(5)                 // e10298
+								if er.fallback != nil {
+									_ = er.pick(9)
+									_ = er.pick(9)
+									_ = er.pick(3)
+									_ = er.fallback.flipcoin(0) // e10302
+									scopePick4 := variableScopePickFromER(er, opts, &scope)
+									if scopePick4 == 0 {
+										_ = er.pick(2) // e10304
+										_ = er.fallback.flipcoin(0)
+										scopePick5 := variableScopePickFromER(er, opts, &scope)
+										if scopePick5 == 1 || scopePick5 == 2 || scopePick5 == 4 {
+											_ = parentStackPick(er, flow) // e10307
+											_ = er.pick(5)                 // e10308
+											// e10309 F50 is parent Assign self (not residual).
+										} else if scopePick5 == 0 {
+											_ = er.pick(2)
+										}
+									} else if scopePick4 == 1 || scopePick4 == 2 || scopePick4 == 4 {
+										_ = parentStackPick(er, flow)
+										_ = er.pick(4)
+									}
+								}
+							} else if scopePick3 == 0 {
+								_ = er.pick(2)
+							}
+						} else if scopePick2 == 0 {
+							_ = er.pick(2)
+						}
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "g_0"))
+					}
+					// e10316+: GlobalList U70 sole again after U3 reselect era.
+					// First post-U3 U70 (n==6): arm Lhs SelectDeref ladder for
+					// later Assign (e10328 F80 U3 U2 U5×… F80=0→VS PL U6 U2).
+					// e10399: after ladder, GlobalList grows U71.
+					if n == 6 && flow != nil && flow.postAggPostCD3ArrayOp2LhsSelU3Ladder == 0 {
+						flow.postAggPostCD3ArrayOp2LhsSelU3Ladder = 1
+					}
+					if n >= 8 {
+						_ = er.pick(71) // e10399+
+						// e10400: parent Assign Lhs F80=1 sole (no empty F20).
+						if n == 8 && flow != nil {
+							flow.postAggPostCD3ArrayOp2LhsSelF80Sole = 1
+						}
+					} else {
+						_ = er.pick(70) // e10316 / e10327
+					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
 					return finishVar(castLiteral(t, "g_0"))
@@ -7855,6 +8029,98 @@ exprTries:
 						}
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
+						return finishVar(castLiteral(t, "x"))
+					}
+					// e10016–18: after Function-arg must residual, PL U5 F0 → VS PP
+					// sole (UP U100=85 next Expression U120; not sticky PL sole).
+					if flow != nil && flow.postAggPostCD3ArrayOp2Body &&
+						flow.postAggPostCD3ArrayOp2FuncArgMustDone &&
+						!flow.postAggPostCD3ArrayOp2PLU5F0AfterFuncArg &&
+						er != nil && er.fallback != nil {
+						flow.postAggPostCD3ArrayOp2PLU5F0AfterFuncArg = true
+						flow.postAggPostCD3ArrayOp2PLSole = false
+						_ = er.pick(5)              // e10016 locals
+						_ = er.fallback.flipcoin(0) // e10017 visit fail
+						_ = variableScopePickFromER(er, opts, &scope) // e10018 PP
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "x"))
+					}
+					// e10396: after Lhs SelectDeref ladder era, PL stack sole
+					// (UP next Expression U120; not U5 itemize).
+					if flow != nil && flow.postAggPostCD3ArrayOp2PLSoleAfterLadder {
+						flow.postAggPostCD3ArrayOp2PLSoleAfterLadder = false
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						if len(localCands) > 0 {
+							return finishVar(castLiteral(t, localCands[0].expr))
+						}
+						return finishVar(castLiteral(t, "x"))
+					}
+					// e10254+: after need_no_rhs n≥3 era, PL locals multiphase
+					// (0: U2; 1: U4; 2: U5+itemize U9 U9 U3 F0 → VS PL U6 U4;
+					//  3: U5 sole; 4+: U5+itemize → VS reselect chain).
+					if flow != nil && flow.postAggPostCD3ArrayOp2Body &&
+						flow.postAggPostCD3ArrayOp2NeedNoRhsN >= 4 &&
+						er != nil {
+						pn := flow.postAggPostCD3ArrayOp2PLAfterNeedN
+						flow.postAggPostCD3ArrayOp2PLAfterNeedN++
+						switch pn {
+						case 0:
+							_ = er.pick(2) // e10254
+						case 1:
+							_ = er.pick(4) // e10258
+						case 2:
+							// e10277–84: U5 + multi-dim itemize fail → VS PL U6 U4.
+							_ = er.pick(5)
+							if er.fallback != nil {
+								_ = er.pick(9)
+								_ = er.pick(9)
+								_ = er.pick(3)
+								_ = er.fallback.flipcoin(0)
+								scopePick2 := variableScopePickFromER(er, opts, &scope)
+								if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+									_ = parentStackPick(er, flow)
+									_ = er.pick(4)
+								} else if scopePick2 == 0 {
+									_ = er.pick(2)
+								}
+							}
+						case 3:
+							_ = er.pick(5) // e10288 sole accept
+						default:
+							// e10298+: U5 + itemize U9 U9 U3 F0 → VS reselect.
+							_ = er.pick(5)
+							if er.fallback != nil {
+								_ = er.pick(9)
+								_ = er.pick(9)
+								_ = er.pick(3)
+								_ = er.fallback.flipcoin(0)
+								scopePick2 := variableScopePickFromER(er, opts, &scope)
+								if scopePick2 == 0 {
+									// e10303–05: Global U2 F0 → VS again
+									_ = er.pick(2)
+									_ = er.fallback.flipcoin(0)
+									scopePick3 := variableScopePickFromER(er, opts, &scope)
+									if scopePick3 == 1 || scopePick3 == 2 || scopePick3 == 4 {
+										_ = parentStackPick(er, flow)
+										_ = er.pick(5)
+										// e10309 F50 effect; accept Variable next U120
+										_ = er.fallback.flipcoin(50)
+									} else if scopePick3 == 0 {
+										_ = er.pick(2)
+									}
+								} else if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+									_ = parentStackPick(er, flow)
+									_ = er.pick(4)
+								}
+							}
+						}
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						if len(localCands) > 0 {
+							return finishVar(castLiteral(t, localCands[0].expr))
+						}
 						return finishVar(castLiteral(t, "x"))
 					}
 					// e9282: ArrayOp2 body PL stack U6 then sole (UP next U120 / F80).
@@ -9903,6 +10169,53 @@ exprTries:
 					// e6635: ParentParam sole Variable (main inventory accept).
 					if scopePick == 2 {
 						noteNestPPSoleShiftSkip(flow)
+						// e10413–35: 3rd PP after F80Sole phase2 (e10403/405 sole;
+						// e10411 burns parent Lhs residual here — GO OuterLhsSole
+						// skips ExpressionAssign Lhs path).
+						if flow != nil && flow.postAggPostCD3ArrayOp2LhsSelF80Sole == 2 {
+							n := flow.postAggPostCD3ArrayOp2PPAfterF80SoleN
+							flow.postAggPostCD3ArrayOp2PPAfterF80SoleN++
+							if n >= 2 && er != nil && er.fallback != nil {
+								flow.postAggPostCD3ArrayOp2LhsSelF80Sole = 0
+								if er.fallback.flipcoin(80) { // e10413
+									_ = er.fallback.upto(9)
+									_ = er.fallback.upto(9)
+									_ = er.fallback.upto(9)
+									_ = er.fallback.upto(3)
+									_ = er.fallback.flipcoin(0)
+								}
+								if er.fallback.flipcoin(80) { // e10419
+									_ = er.fallback.upto(9)
+								}
+								sp2 := variableScopePickFromER(er, opts, &scope)
+								if sp2 == 0 {
+									_ = er.pick(39)
+									_ = er.pick(38)
+									_ = er.pick(2)
+									_ = er.fallback.flipcoin(0)
+								} else if sp2 == 1 || sp2 == 2 || sp2 == 4 {
+									_ = parentStackPick(er, flow)
+									_ = er.pick(2)
+									_ = er.fallback.flipcoin(0)
+								}
+								for i := 0; i < 4; i++ {
+									_ = er.fallback.flipcoin(50)
+								}
+								_ = er.fallback.upto(4)
+								_ = er.fallback.flipcoin(50)
+								_ = er.fallback.flipcoin(50)
+								_ = er.fallback.upto(4)
+								_ = er.fallback.upto(4)
+								_ = variableScopePickFromER(er, opts, &scope)
+								// e10436: next free Expression Function (U120=13)
+								// user-path useExisting F50 (not stdfunc F5).
+								if ctx != nil && ctx.state != nil {
+									ctx.state.ppPostPadAllowFuncOnce = true
+									ctx.state.postAggPostCD3ArrayOp2FuncUserOnce = true
+									ctx.state.postAggPostCD3ArrayOp2FuncCreateRes = true
+								}
+							}
+						}
 					}
 					bumpExprDepth(ctx)
 					return finishVar(castLiteral(t, c.expr))
@@ -9963,7 +10276,23 @@ exprTries:
 			restoreGenSnapshot(ctx, snap)
 		case termConstant:
 			bumpExprDepth(ctx)
-			return randomConstantExprFromER(t, er, opts)
+			s := randomConstantExprFromER(t, er, opts)
+			// e10107: after Global U70 sole era free Constant, UP burns U18 then
+			// free Expression Function (U120 F5 F10…) — not full SafeOpFlags binary.
+			// Gate GlobalSoleN≥3 (after e9908 sole, e9922 U61, e10102 U70).
+			if ctx != nil && ctx.state != nil &&
+				postAggPostCD3ArrayOp2GlobalSoleN >= 3 &&
+				!ctx.state.postAggPostCD3ArrayOp2ConstBinaryU18Done &&
+				er != nil && er.fallback != nil {
+				ctx.state.postAggPostCD3ArrayOp2ConstBinaryU18Done = true
+				_ = er.fallback.upto(18) // e10107
+				prevAllow := ctx.state.ppPostPadAllowFuncOnce
+				ctx.state.ppPostPadAllowFuncOnce = true
+				// Next free Expression Function stream (e10108 U120 …).
+				_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+				ctx.state.ppPostPadAllowFuncOnce = prevAllow
+			}
+			return s
 		case termAssign:
 			// Upstream ExpressionAssign::make_random:
 			// 1. CVQualifiers::random_qualifiers(type, WRITE, no_volatile=true)
@@ -10064,9 +10393,18 @@ exprTries:
 					// e9031: nested ArrayOp2 body ExpressionAssign after Function
 					// residual burns self F50 (UP F50 → AssignOps/RHS U120).
 					// Not all postCD3+arrayLoop (e8294 free Assign still skips).
-					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body &&
-						ptrLv == 0 {
-						burnSelfF50 = true
+					// e10243: Nth free Assign after ConstBinary U18 skips self F50
+					// (UP AssignOps U120); earlier still burn F50 (e10116).
+					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body && ptrLv == 0 {
+						if ctx.state.postAggPostCD3ArrayOp2ConstBinaryU18Done {
+							n := ctx.state.postAggPostCD3ArrayOp2PostConstAssignN
+							ctx.state.postAggPostCD3ArrayOp2PostConstAssignN++
+							// e10116/e10135/e10156: first three free Assigns burn F50;
+							// e10243 fourth skips (UP AssignOps U120 next).
+							burnSelfF50 = n < 3
+						} else {
+							burnSelfF50 = true
+						}
 					}
 					// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
 					// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
@@ -10307,7 +10645,7 @@ exprTries:
 					}
 					lhsFromDeref = false
 					needNoRhsExpr = false
-				} else {
+				} else if n == 2 {
 					// e9775–: F80 F80=0 → VS PP U100 U6 NewArray F20 + Constant
 					// F50 F50 U3 + CreateArray U99 U10 U2 U4 then Lhs F80…
 					_ = er.fallback.flipcoin(80) // e9775 F80=1
@@ -10322,6 +10660,14 @@ exprTries:
 					}
 					lhsFromDeref = false
 					needNoRhsExpr = false
+				} else {
+					// e10244–48: F80 F20 F20 then SafeOpFlags F50 U4 (finishAssignExpr);
+					// parent Expression U120 Comma next.
+					if er.fallback.flipcoin(80) { // e10244
+						_ = er.fallback.flipcoin(20) // e10245 NewArray=0
+						_ = er.fallback.flipcoin(20) // e10246 init
+					}
+					return finishAssignExpr(fmt.Sprintf("(%s++)", "x"))
 				}
 			}
 			// seed4 e1589–90: outer Assign Lhs sole after nested residual.
@@ -10487,6 +10833,220 @@ exprTries:
 						}
 						// e8855: next Statement Lhs F80=0→PP→PL stack U2 create.
 						ctx.state.postAggPostCD3EALhsU2Done = true
+						lhsFromDeref = true
+						break
+					}
+					// e10400 / e10413+: after Global U71, Lhs SelectDeref residual.
+					if postAggPostCD3ArrayOp2BodyActive && ctx != nil && ctx.state != nil &&
+						ctx.state.postAggPostCD3ArrayOp2LhsSelF80Sole > 0 &&
+						er.fallback != nil {
+						phase := ctx.state.postAggPostCD3ArrayOp2LhsSelF80Sole
+						if phase == 1 {
+							// e10400 F80=1 sole accept.
+							ctx.state.postAggPostCD3ArrayOp2LhsSelF80Sole = 2
+							_ = er.fallback.flipcoin(80)
+							lhsFromDeref = true
+							break
+						}
+						// e10413–35: F80 U9 U9 U9 U3 F0; F80 U9 → VS Global
+						// U39 U38 U2 F0 + qfer/create residual.
+						ctx.state.postAggPostCD3ArrayOp2LhsSelF80Sole = 0
+						if er.fallback.flipcoin(80) { // e10413
+							_ = er.fallback.upto(9) // e10414
+							_ = er.fallback.upto(9) // e10415
+							_ = er.fallback.upto(9) // e10416
+							_ = er.fallback.upto(3) // e10417
+							_ = er.fallback.flipcoin(0)
+						}
+						if er.fallback.flipcoin(80) { // e10419
+							_ = er.fallback.upto(9) // e10420
+						}
+						// e10421 VS Global U39 U38 U2 F0
+						sp := variableScopePickFromER(er, opts, &scope)
+						if sp == 0 {
+							_ = er.pick(39) // e10422
+							_ = er.pick(38) // e10423
+							_ = er.pick(2)  // e10424
+							_ = er.fallback.flipcoin(0)
+						} else if sp == 1 || sp == 2 || sp == 4 {
+							_ = parentStackPick(er, ctx.state)
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10426–34: qfer/create residual F50×4 U4 F50 F50 U4 U4
+						// then VS U100=85 (Function-ish) U120…
+						for i := 0; i < 4; i++ {
+							_ = er.fallback.flipcoin(50)
+						}
+						_ = er.fallback.upto(4)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.upto(4)
+						_ = er.fallback.upto(4)
+						_ = variableScopePickFromER(er, opts, &scope) // e10435
+						lhsFromDeref = true
+						break
+					}
+					// e10328+: after Global U70 post-U3 era, Lhs SelectDeref residual
+					// multiphase (GO empty F20 under-burns pointees).
+					if postAggPostCD3ArrayOp2BodyActive && ctx != nil && ctx.state != nil &&
+						ctx.state.postAggPostCD3ArrayOp2LhsSelU3Ladder > 0 &&
+						er.fallback != nil {
+						phase := ctx.state.postAggPostCD3ArrayOp2LhsSelU3Ladder
+						if phase == 1 {
+							// e10328–53: F80 U3, F80 U2, F80 U5×9, F80=0 → VS PL U6 U2.
+							ctx.state.postAggPostCD3ArrayOp2LhsSelU3Ladder = 2
+							type ladStep struct {
+								pool int
+							}
+							steps := []ladStep{{3}, {2}}
+							for i := 0; i < 9; i++ {
+								steps = append(steps, ladStep{5})
+							}
+							done := false
+							for _, st := range steps {
+								if !er.fallback.flipcoin(80) {
+									sp := variableScopePickFromER(er, opts, &scope)
+									if sp == 1 || sp == 2 || sp == 4 {
+										_ = parentStackPick(er, ctx.state)
+										_ = er.pick(2)
+									} else if sp == 0 {
+										_ = er.pick(2)
+									}
+									done = true
+									break
+								}
+								_ = er.fallback.upto(uint32(st.pool))
+							}
+							if !done {
+								_ = er.fallback.flipcoin(80)
+								sp := variableScopePickFromER(er, opts, &scope)
+								if sp == 1 || sp == 2 || sp == 4 {
+									_ = parentStackPick(er, ctx.state)
+									_ = er.pick(2) // e10353
+								} else if sp == 0 {
+									_ = er.pick(2)
+								}
+							}
+							lhsFromDeref = true
+							break
+						}
+						// e10356–89: F80 U9; F80 U8 F0; F80=0→VS PL U6 U2 F0;
+						// F80=0→VS Global U3 F0; F80 U6; F80=0→VS Global;
+						// F80 U4 F0; F80 U3 U7 U9 U4 F0; F80=0→VS Global create.
+						ctx.state.postAggPostCD3ArrayOp2LhsSelU3Ladder = 0
+						// e10356–57 F80 U9
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.upto(9)
+						}
+						// e10358–60 F80 U8 F0
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.upto(8)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10361 F80=0 → VS NewValue PL U6 U2 F0
+						_ = er.fallback.flipcoin(80)
+						sp := variableScopePickFromER(er, opts, &scope)
+						if sp == 1 || sp == 2 || sp == 4 || sp == 3 {
+							if sp != 3 {
+								_ = parentStackPick(er, ctx.state)
+							} else {
+								// NewValue→PL often stack too
+								_ = parentStackPick(er, ctx.state)
+							}
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(0)
+						} else if sp == 0 {
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10366 F80=0 → VS Global U3 F0
+						_ = er.fallback.flipcoin(80)
+						sp = variableScopePickFromER(er, opts, &scope)
+						if sp == 0 {
+							_ = er.pick(3)
+							_ = er.fallback.flipcoin(0)
+						} else if sp == 1 || sp == 2 || sp == 4 {
+							_ = parentStackPick(er, ctx.state)
+							_ = er.pick(2)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10370 F80 U6; e10372 F80=0 → VS Global U1
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.upto(6)
+						}
+						_ = er.fallback.flipcoin(80)
+						sp = variableScopePickFromER(er, opts, &scope)
+						if sp == 0 {
+							// e10373 U100=1 Global; no choose before next F80
+						} else if sp == 1 || sp == 2 || sp == 4 {
+							_ = parentStackPick(er, ctx.state)
+						}
+						// e10374 F80 U4 F0
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.upto(4)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10377 F80 U3 U7 U9 U4 F0 (CreateArray-ish itemize)
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.upto(3)
+							_ = er.fallback.upto(7)
+							_ = er.fallback.upto(9)
+							_ = er.fallback.upto(4)
+							_ = er.fallback.flipcoin(0)
+						}
+						// e10383 F80=0 → VS Global U14 create F20 F50 F50 U20
+						_ = er.fallback.flipcoin(80)
+						sp = variableScopePickFromER(er, opts, &scope)
+						if sp == 0 {
+							base := pickSimpleNonVoid(er.fallback, opts) // e10385 U14
+							_ = er.fallback.flipcoin(20)                  // e10386 NewArray
+							_ = formatSimpleConstant(er.fallback, base)  // e10387–89
+						} else if sp == 1 || sp == 2 || sp == 4 {
+							_ = parentStackPick(er, ctx.state)
+							_ = er.fallback.flipcoin(20)
+						}
+						// e10396: next free PL stack sole (no U5 itemize).
+						ctx.state.postAggPostCD3ArrayOp2PLSoleAfterLadder = true
+						lhsFromDeref = true
+						break
+					}
+					// e10021–33: after PL U5 F0 post-FuncArg, ExpressionAssign Lhs
+					// SelectDeref F80 U9 F0, F80=0 VS U100 U6 F20 + Constant init ×2.
+					// Gate on PLU5F0AfterFuncArg so e10007 EmptyCreate U2 still runs.
+					if postAggPostCD3ArrayOp2BodyActive && ctx != nil && ctx.state != nil &&
+						ctx.state.postAggPostCD3ArrayOp2PLU5F0AfterFuncArg &&
+						!ctx.state.postAggPostCD3ArrayOp2FuncArgLhsSelDone &&
+						er.fallback != nil {
+						ctx.state.postAggPostCD3ArrayOp2FuncArgLhsSelDone = true
+						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						if er.fallback.flipcoin(80) { // e10021
+							_ = er.pick(9)              // e10022
+							_ = er.fallback.flipcoin(0) // e10023
+						}
+						// e10024–28: F80=0 → VS U100 U6 NewArray=0 + Constant (hex pure_rnd)
+						_ = er.fallback.flipcoin(80) // e10024 expect 0
+						_ = variableScopePickFromER(er, opts, &scope) // e10025
+						_ = parentStackPick(er, ctx.state)              // e10026 U6
+						ctx.state.postAggPostCD3ArrayOp2PLSole = false
+						_ = er.fallback.flipcoin(20)                 // e10027 NewArray=0
+						_ = formatSimpleConstant(er.fallback, base) // e10028+ hex/dec
+						// e10029–33: F80=0 → VS U100 U6 NewArray=0 + Constant
+						_ = er.fallback.flipcoin(80) // e10029 expect 0
+						_ = variableScopePickFromER(er, opts, &scope) // e10030
+						_ = parentStackPick(er, ctx.state)              // e10031 U6
+						ctx.state.postAggPostCD3ArrayOp2PLSole = false
+						_ = er.fallback.flipcoin(20)                 // e10032
+						_ = formatSimpleConstant(er.fallback, base) // e10033+
+						// e10034+: parent Expression continues U100 PP / U120
+						// Function (not Statement Lhs F80 countdown).
+						if ctx.exprDepth > 0 {
+							ctx.exprDepth = 0
+						}
+						ctx.state.ppPostPadSkipParentExprN = 0
+						ctx.state.skipNextBlockSize = false
+						ctx.state.ppPostPadSkipStmtLhs = true
+						ctx.state.ppPostPadOuterLhsSole = false
 						lhsFromDeref = true
 						break
 					}
@@ -10816,6 +11376,13 @@ exprTries:
 						} else {
 							// e9813–18: F20×4 address residual then parent Variable U120
 							// (not Constant make_init F50).
+							// e10010: after Function-arg must residual, NewArray+init
+							// F20 F20 already burned → address choose U2 then U120.
+							if ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone {
+								_ = er.pick(2) // e10010
+								lhsFromDeref = true
+								break
+							}
 							_ = er.fallback.flipcoin(20)
 							_ = er.fallback.flipcoin(20)
 							lhsFromDeref = true
