@@ -14169,6 +14169,9 @@ lhsDerefLoop:
 																		// chooses; 1st sole, 2nd F50 (e13157),
 																		// 3rd F50 U16 (e13280–81 array/extra).
 																		globalU102N := 0
+																		// e13249+: post-itemize PL residual phases
+																		// (stack U4 then choose/create variants).
+																		plClosedN := 0
 																		plF0Done := false
 																		// e12873: first late PP Variable F50 U64.
 																		latePPN := 0
@@ -14187,12 +14190,16 @@ lhsDerefLoop:
 																		// after U14=4 uint16.
 																		lastHexN := 8
 																		hexFromU14 := func(u uint32) int {
-																			// historical pickSimpleNonVoid HexDigits
+																			// historical residual widths + e13325
+																			// U14=5 eLongLong → 16 hex digits
+																			// (UP depth gap after F50=0 hex path).
 																			switch u {
 																			case 1, 2:
 																				return 2
 																			case 3, 4:
 																				return 4
+																			case 5: // eLongLong
+																				return 16
 																			case 9, 10, 12, 13:
 																				return 16
 																			case 11:
@@ -14514,14 +14521,98 @@ lhsDerefLoop:
 																				} else if sp < 65 {
 																					// e12711–13: PL U3 U6; e12853 U3 U5
 																					// e13249+: post-itemize stack n=4
-																					// then locals choose U5 + U3 U3 U1
-																					// (SelectParentLocal residual).
+																					// then multiphase PL residual.
 																					if depthFilterClosed {
-																						_ = rf.upto(4)
-																						_ = rf.upto(5)
-																						_ = rf.upto(3)
-																						_ = rf.upto(3)
-																						_ = rf.upto(1)
+																						plClosedN++
+																						_ = rf.upto(4) // parent.stack
+																						switch {
+																						case plClosedN == 1:
+																							// e13249: choose U5 + U3 U3 U1
+																							_ = rf.upto(5)
+																							_ = rf.upto(3)
+																							_ = rf.upto(3)
+																							_ = rf.upto(1)
+																						case plClosedN == 2, plClosedN == 6:
+																							// e13283/e13388: create-ish
+																							// U6 U9 then next Expression
+																							// under depth filter (e13287
+																							// Const tries=3).
+																							_ = rf.upto(6)
+																							_ = rf.upto(9)
+																							depthFilterExpr = true
+																						case plClosedN == 3:
+																							// e13304: U5 + SelectDeref
+																							// F80 chain
+																							_ = rf.upto(5)
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(7)
+																								_ = rf.flipcoin(0)
+																							}
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(6)
+																								_ = rf.flipcoin(0)
+																							}
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(5)
+																							}
+																						case plClosedN == 4:
+																							// e13331: U5 U9 U9 U3 F0
+																							// → VS reselect U100 U4 U5
+																							// U3 U3 U1 then SelectDeref
+																							// F80 F20×2 F0 F80 F20×2
+																							// U4 U99 (e13338–52).
+																							_ = rf.upto(5)
+																							_ = rf.upto(9)
+																							_ = rf.upto(9)
+																							_ = rf.upto(3)
+																							_ = rf.flipcoin(0)
+																							_ = rf.upto(100)
+																							_ = rf.upto(4)
+																							_ = rf.upto(5)
+																							_ = rf.upto(3)
+																							_ = rf.upto(3)
+																							_ = rf.upto(1)
+																							if rf.flipcoin(80) {
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(0)
+																							}
+																							if rf.flipcoin(80) {
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.upto(4)
+																								_ = rf.upto(99)
+																								// e13353+: CreateArray
+																								// sizes U10 U3 U7 + itemize
+																								// F80 U7 chain until F80=0
+																								// → VS U100 U4 F20 F50.
+																								_ = rf.upto(10)
+																								_ = rf.upto(3)
+																								_ = rf.upto(7)
+																								for di := 0; di < 20; di++ {
+																									if !rf.flipcoin(80) {
+																										_ = rf.upto(100)
+																										_ = rf.upto(4)
+																										_ = rf.flipcoin(20)
+																										_ = rf.flipcoin(50)
+																										break
+																									}
+																									_ = rf.upto(7)
+																								}
+																							}
+																						default:
+																							// later: stack-only or light
+																							// choose (e13392 U4 sole)
+																							if plClosedN%3 == 0 {
+																								// sole stack accept
+																							} else if plClosedN%3 == 1 {
+																								_ = rf.upto(7)
+																							} else {
+																								_ = rf.upto(5)
+																								_ = rf.upto(3)
+																								_ = rf.upto(9)
+																							}
+																						}
 																					} else {
 																						_ = rf.upto(3)
 																						_ = rf.upto(plStackN)
@@ -14572,7 +14663,19 @@ lhsDerefLoop:
 																						} else {
 																							_ = rf.upto(3)
 																						}
-																						u14 := rf.upto(14)
+																						// e13325: NewValue type U14
+																						// NonVoid under re-armed depth
+																						// era (reject float 9,
+																						// int128 11, uint128 12).
+																						// e13048 accepts float (9).
+																						var u14 uint32
+																						if depthFilterExpr {
+																							u14 = rf.uptoWithFilter(14, func(x uint32) bool {
+																								return x == 9 || x == 11 || x == 12
+																							})
+																						} else {
+																							u14 = rf.upto(14)
+																						}
 																						lastHexN = hexFromU14(u14)
 																						if plStackN <= 5 {
 																							_ = rf.flipcoin(50) // vol SE-free
