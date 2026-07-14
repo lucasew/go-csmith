@@ -455,6 +455,14 @@ type functionFlowState struct {
 	postAggNestPLChooseU2 bool
 	postAggNestStackU6 bool
 	postAggNestPLSoleAfterF0 bool
+	// postAggNestLhsSelDerefU7: Expression Lhs SelectDeref U7+U4 accept (e4481).
+	postAggNestLhsSelDerefU7 bool
+	// postAggNestSelDerefCountdown: Statement Lhs U12… after nest U7 Lhs (e4489).
+	postAggNestSelDerefCountdown bool
+	postAggNestSelDerefFails int
+	postAggNestSelDerefRound2 bool
+	postAggNestSelDerefRoundN int
+	postAggNestVSMisses int
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -670,7 +678,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 			}
 		}
 		// Signal PL path: sole-accept after residual (skip create).
+		// e4481: next Expression Lhs SelectDeref U7+U4 (not empty create F20).
 		state.postAggNestPLSoleAfterF0 = true
+		state.postAggNestLhsSelDerefU7 = true
+		state.postAggEmptyDerefCreateOnce = false
+		state.postAggForceDerefCreate = false
 		return 0
 	}
 	if state != nil && state.deepStack {
@@ -989,6 +1001,23 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 		fails := 0
 		if flow != nil {
 			fails = flow.postAggLhsDerefChooseFails
+		}
+		// e4481–82: after nest PL F0→VS sole Variable, Expression Lhs SelectDeref
+		// choose U7 + 1d itemize U4 accept (UP), not empty create F20.
+		if flow != nil && flow.postAggNestLhsSelDerefU7 {
+			flow.postAggNestLhsSelDerefU7 = false
+			_ = er.pick(7)
+			_ = er.pick(4)
+			flow.postAggLhsWriteDone = true
+			flow.postAggNeedLhsAfterRhs = false
+			// Parent Expression continues (e4484 U120), not Statement skip.
+			flow.ppPostPadSkipParentExprN = 0
+			// e4489+: Statement Lhs SelectDeref countdown U12+F0,U11,U10+F0,U9 → VS.
+			flow.postAggNestSelDerefCountdown = true
+			flow.postAggNestSelDerefFails = 0
+			flow.postAggDerefChooseU2AfterCreate = false
+			flow.postAggEmptyDerefCreateOnce = false
+			return "x"
 		}
 		// e4262–65: after ptr-cmp-create era PL U4 accept + NeedLhs, SelectDeref
 		// empty → create F20 F20 U5 (address residual), not choose U5 itemize.
@@ -2761,6 +2790,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	// e4479: after U6+U4+F0+VS residual, do not create (UP F80 Lhs next).
 	if ctx.state.postAggNestPLSoleAfterF0 {
 		ctx.state.postAggNestPLSoleAfterF0 = false
+		ctx.state.postAggNestLhsSelDerefU7 = true
+		ctx.state.postAggEmptyDerefCreateOnce = false
+		ctx.state.postAggForceDerefCreate = false
+		ctx.state.postAggNeedLhsAfterRhs = true
 		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
 	// e3373+: after U15 Continue stack U6, PL create needs SE-free qfer
@@ -5525,8 +5558,14 @@ exprTries:
 					return finishVar(castLiteral(t, "x"))
 				}
 				// e4479: after U6 stack U4+F0+VS residual, sole-accept (no create F50).
+				// e4480–82: parent ExpressionAssign Lhs SelectDeref U7+U4 accept
+				// (not empty create F20 from sticky EmptyDerefCreateOnce).
 				if flow != nil && flow.postAggNestPLSoleAfterF0 {
 					flow.postAggNestPLSoleAfterF0 = false
+					flow.postAggNestLhsSelDerefU7 = true
+					flow.postAggEmptyDerefCreateOnce = false
+					flow.postAggForceDerefCreate = false
+					flow.postAggNeedLhsAfterRhs = true
 					bumpExprDepth(ctx)
 					return finishVar(castLiteral(t, "x"))
 				}
@@ -9058,6 +9097,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.upto(6)
 		lhsFromDeref = true // accept without SelectDeref loop
 	}
+	lhsDerefLoop:
 	for !lhsFromDeref {
 		// seed2 e2312: after late compound AssignOps skip-RHS, Lhs goes straight
 		// to VariableSelector U100 (UP no SelectDeref F80).
@@ -9069,6 +9109,20 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			// e4335+: Statement Lhs after Expression unwind — Lhs is do-while
 			// (Lhs.cpp): F80=0 → VS; on miss, loop again SelectDeref (UP U5 U5
 			// fail → F80 U11…). Not break-to-one-shot-VS outside the loop.
+			// e4523–24: after nest round1 SelectDeref pool, F80=0 VS Global U100=4
+			// visit_facts fails → F80 U7+[9][4][7]F0 continue (not create U14).
+			// e4523: after nest SelectDeref pool exhaust, one F80=0 VS miss then
+			// continue U7… countdown (not Global create). Cap VS misses.
+			if ctx != nil && ctx.state != nil && ctx.state.postAggNestSelDerefRoundN >= 1 &&
+				ctx.state.postAggNestVSMisses < 3 {
+				_ = r.upto(100) // VS empty miss
+				ctx.state.postAggNestVSMisses++
+				ctx.state.postAggNestSelDerefCountdown = true
+				if ctx.state.postAggNestSelDerefFails < 6 {
+					ctx.state.postAggNestSelDerefFails = 6 // next U7
+				}
+				continue
+			}
 			if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind {
 				if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 					lv = picked
@@ -9164,7 +9218,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// select_deref_pointer: choose_var(eDereference) among visible pointers
 		// when inventory non-empty (VariableSelector.cpp:1220–1239):
 		// GlobalNonvolatiles + parent-block locals + params. postAgg e2351 U13.
-		if postAggGlobalCreateN >= 0 && !needNoRhs {
+		// e4501+: nest SelectDeref countdown also for needNoRhs ++/-- Lhs (U120=111).
+		nestSel := ctx != nil && ctx.state != nil && (ctx.state.postAggNestSelDerefCountdown ||
+			ctx.state.postAggNestSelDerefRound2)
+		if postAggGlobalCreateN >= 0 && (!needNoRhs || nestSel) {
 			seen := map[string]bool{}
 			ptrs := make([]exprVarCandidate, 0, 32)
 			addPtr := func(c exprVarCandidate) {
@@ -9228,6 +9285,80 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					})
 				}
 			}
+			// e4489+/e4501+: nest-era SelectDeref countdown (even if ptr inventory < 2).
+			if ctx != nil && ctx.state != nil && (ctx.state.postAggNestSelDerefCountdown ||
+				ctx.state.postAggNestSelDerefRound2) {
+				if ctx.state.postAggNestSelDerefRound2 && !ctx.state.postAggNestSelDerefCountdown {
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 0
+					ctx.state.postAggNestSelDerefRound2 = false
+					ctx.state.postAggNestSelDerefRoundN++
+				}
+				fails := ctx.state.postAggNestSelDerefFails
+				roundN := ctx.state.postAggNestSelDerefRoundN
+				pool := []int{12, 11, 10, 9}
+				if roundN >= 1 {
+					pool = []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 5, 5}
+				}
+				if fails >= len(pool) {
+					ctx.state.postAggNestSelDerefCountdown = false
+					continue
+				}
+				n := pool[fails]
+				_ = r.upto(uint32(n))
+				ctx.state.postAggNestSelDerefFails++
+				if roundN == 0 {
+					if fails == 0 || fails == 2 {
+						_ = r.flipcoin(0)
+						continue
+					}
+					if fails == 1 {
+						continue
+					}
+					ctx.state.postAggNestSelDerefCountdown = false
+					ctx.state.postAggNestSelDerefFails = 0
+					ctx.state.postAggNestSelDerefRound2 = true
+					lhsFromDeref = true
+					break lhsDerefLoop
+				}
+				switch fails {
+				case 0, 1, 3:
+				case 2:
+					_ = r.flipcoin(0)
+				case 4:
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 5:
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+				case 6: // U7+[9][4][7]F0 after VS (e4524)
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+				case 7:
+				case 8:
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+				case 9:
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 10, 11:
+				default:
+					if fails >= 12 {
+						ctx.state.postAggNestSelDerefCountdown = false
+					}
+				}
+				continue
+			}
 			if len(ptrs) >= 2 {
 				// Live choose_ok_var size. GO under-counts vs UP visible pool
 				// (e2351 U13 / e2377–79 U13 then U12). Pad toward ~13.
@@ -9252,6 +9383,86 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				// e4336–70: after ParentParam→PL U5 U5, SelectDeref countdown:
 				// U11, U10+F0, U9, U8, U7+[9][4][7]F0, U7+F0, U6+[9][9][3]F0,
 				// U6+F0, U5… until F80=0 → VS (UP e4336–4369).
+				// e4489+: nest-era Statement SelectDeref countdown.
+				// Round0: 12+F0,11,10+F0,9 accept → Statement U100 (e4499).
+				// Round1+: 12,11,10+F0,9,8+[9][9][3]F0,8+[9][4][7]F0 → F80=0 VS.
+				if ctx != nil && ctx.state != nil && (ctx.state.postAggNestSelDerefCountdown ||
+					ctx.state.postAggNestSelDerefRound2) {
+					if ctx.state.postAggNestSelDerefRound2 && !ctx.state.postAggNestSelDerefCountdown {
+						ctx.state.postAggNestSelDerefCountdown = true
+						ctx.state.postAggNestSelDerefFails = 0
+						ctx.state.postAggNestSelDerefRound2 = false
+						ctx.state.postAggNestSelDerefRoundN++
+					}
+					fails := ctx.state.postAggNestSelDerefFails
+					roundN := ctx.state.postAggNestSelDerefRoundN
+					pool := []int{12, 11, 10, 9}
+					if roundN >= 1 {
+						// After U8×2 F0: U7+[9][4][7]F0, U7, U6+[9][4][7]F0, U6+[9][9][3]F0…
+						pool = []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 5, 5}
+					}
+					if fails >= len(pool) {
+						// End of round1 pool: stop choose; next F80=0 → VS.
+						ctx.state.postAggNestSelDerefCountdown = false
+						continue
+					}
+					nChoose = pool[fails]
+					_ = r.upto(uint32(nChoose))
+					ctx.state.postAggNestSelDerefFails++
+					if roundN == 0 {
+						if fails == 0 || fails == 2 {
+							_ = r.flipcoin(0)
+							continue
+						}
+						if fails == 1 {
+							continue
+						}
+						// U9 accept → Statement U100; arm round2 for next Assign Lhs.
+						ctx.state.postAggNestSelDerefCountdown = false
+						ctx.state.postAggNestSelDerefFails = 0
+						ctx.state.postAggNestSelDerefRound2 = true
+						lhsFromDeref = true
+						break lhsDerefLoop
+					}
+					// Round1+ residual after choose
+					switch fails {
+					case 0, 1, 3: // U12,U11,U9 pure fail
+					case 2: // U10+F0
+						_ = r.flipcoin(0)
+					case 4: // U8 + [9][9][3] F0
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					case 5: // U8 + [9][4][7] F0
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					case 6: // U7 + [9][4][7] F0
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					case 7: // U7 pure
+					case 8: // U6 + [9][4][7] F0
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					case 9: // U6 + [9][9][3] F0
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					case 10, 11:
+					default:
+						if fails >= 12 {
+							ctx.state.postAggNestSelDerefCountdown = false
+						}
+					}
+					continue
+				}
 				if ctx != nil && ctx.state != nil && ctx.state.postAggStmtLhsAfterExprUnwind {
 					fails := ctx.state.postAggStmtLhsSelDerefFails
 					// Round1: 11,10+F0,9,8,7+[9][4][7]F0,7+F0,6+[9][9][3]F0,6+F0,5,4,3 → VS

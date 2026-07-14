@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4481) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4545) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4481** (4408→4481; Global create Lhs Expression nest continue; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4545** (4481→4545; Global create Lhs Expression nest continue; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -346,7 +346,12 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. Unfiltered Statement U100=8 IfElse; clear binary unwind so RHS continues.
 4. Nest PL U2 choose; stack U6 + U4+F0 + VS U100; block create → F80 Lhs era.
 
-Next plateau: seed4 e4481 UP SelectDeref U7 vs GO lhsMakeRandomWrite F20.
+**e4481–e4545 climbed:**
+1. After nest PL F0→VS sole: Expression Lhs SelectDeref U7+U4 (not empty F20 create).
+2. Statement SelectDeref countdown U12+F0…U9 accept; round2 U12…U8 itemize + post-VS U7….
+3. needNoRhs ++/-- Lhs also uses nest countdown (was gated out).
+
+Next plateau: seed4 e4545 UP U6 vs GO U5 (SelectDeref pool index).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
