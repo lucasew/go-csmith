@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →16417) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →17013) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **16417** (15887→16417; late PP F50 U32 threshold, Assign afterAsg/**/****, late Global/Constant/PP, residual j 500, CreateArray itemize; seed2 full held). Toward 17000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **17013** (16417→17013; post-itemize Variable multiphase, useEx field catalog, late PL/Global/PP residuals; seed2 full held). Toward 20000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e16417 after CreateArray itemize F80=0 Global → Variable residual. Toward 17000+.
+Next plateau: seed4 e17013 after PL F80 ladder F80=0 U100 → U3 U3 F0 residual (vs GO free U120). Toward 20000+.
+
+**e16417–e17013 climbed:**
+1. e16417: post-CreateArray Variable multiphase (PP U1 U2 F0; PL itemize NewValue).
+2. e16558: late Comma → useEx PP create field catalog (hex widths from UP depth).
+3. e16732+: post-array Global multiphase (U2 F0 create; CreateArray; U39; U3; NewValue).
+4. e16773+: late PL U2 / F80 CreateArray; free PP U2 F50 U16; Assign afterAsg vs forceStdfunc.
+5. seed2 37939 held.
 
 **e15887–e16417 climbed:**
 1. e15887: late PP F50 U32 threshold latePPN≥4 (was 6); Assign n≥8 F50+afterAsg.
