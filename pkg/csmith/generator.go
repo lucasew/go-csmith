@@ -115,6 +115,8 @@ var burnCreateArrayCtxSink *genContext
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
 var burnCreateArrayFieldVarsDone bool
+// burnCreateArrayAltEmpty: pointer alts F20 only (Lhs CreateArray e17368+).
+var burnCreateArrayAltEmpty bool
 // burnCreateArrayPLU2Done: one-shot e10988 U2 U2 F0 chain; later PL sole.
 var burnCreateArrayPLU2Done bool
 // burnCreateArrayLhsF80Fail: 0 off; 1 arm after first F20×4 empty create;
@@ -3212,7 +3214,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// then itemize; Lhs CreateArray keeps U2 via skip flag false).
 				// e7748: PLStackU3 era alts burn U2 U3 U3 (same as ** create
 				// address residual e7641–43), not bare U2.
-				if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink {
+				if burnCreateArrayAltEmpty {
+					// e17368+: empty pointees — F20 only
+				} else if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink {
 					// e9166–71: ArrayOp2 body pointer CreateArray alts F20 only
 					// (empty pointees; no U2/U6 choose).
 					// e11322+: after create_field_vars era, alts burn U5 choose
@@ -3265,6 +3269,7 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	// e7754: PLStackU3 CreateArray skips post-alt U2 U5 — itemize sizes next
 	// (alts already burned U2 U3 U3 per address).
 	if itemize && strings.Contains(t.Name, "*") &&
+		!burnCreateArrayAltEmpty &&
 		postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 &&
 		len(inits) > 0 && !postAggSkipNestArrayAltU2 {
 		// e9172: ArrayOp2 body CreateArray skips post-alt U2 U5 — itemize next.
@@ -14293,6 +14298,8 @@ lhsDerefLoop:
 																		// residual (e15405), next Expression rejects
 																		// Assign (e15406 U120=75 tries=1 Variable).
 																		postCreateNoAssignOnce := false
+																		postCreateForceAssignOnce := false // e17398 Assign tries=4
+																		postCreateAsgLhsF80Once := false // e17407 Lhs SelectDeref after *** Assign
 																		// postCreateFuncOnlyOnce: after late Comma
 																		// (e15868), next Expression Function-only
 																		// (e15869 U120=49 tries=1).
@@ -14369,6 +14376,7 @@ lhsDerefLoop:
 																		postCreatePostArrayGlobalN := 0
 																		// postCreatePostArrayAsgN: Assign hits after GlobalN>=7
 																		postCreatePostArrayAsgN := 0
+																		postCreatePostArrayAsgLhsDone := false
 																		// postCreateLateCommaUseExDone: one-shot
 																		// e16555 Comma → Function useEx.
 																		postCreateLateCommaUseExDone := false
@@ -14420,6 +14428,12 @@ lhsDerefLoop:
 																				// Function 0–69 only
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x >= 70
+																				})
+																																						} else if postCreateForceAssignOnce {
+																				postCreateForceAssignOnce = false
+																				// e17398: only Assign 100-109 (tries=4)
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 100 || x >= 110
 																				})
 																			} else if postCreateNoAssignOnce {
 																				postCreateNoAssignOnce = false
@@ -15162,11 +15176,26 @@ lhsDerefLoop:
 																								// qfer F50 F10 F50 then RHS (not afterAsg).
 																								if postCreatePostArrayGlobalN >= 7 {
 																									postCreatePostArrayAsgN++
-																									if postCreatePostArrayAsgN >= 2 {
-																										_ = rf.flipcoin(50) // level vol
-																										_ = rf.flipcoin(10) // level const
-																										_ = rf.flipcoin(50) // self vol
+																									if postCreatePostArrayAsgN == 2 {
+																										// e17346: *type WRITE qfer F50 F10 + self F50
+																										_ = rf.flipcoin(50)
+																										_ = rf.flipcoin(10)
+																										_ = rf.flipcoin(50)
 																										afterAsg = false
+																									} else if postCreatePostArrayAsgN == 3 {
+																										// e17398: *** WRITE qfer 3×(F50 F10) + self F50
+																										for li := 0; li < 3; li++ {
+																											_ = rf.flipcoin(50)
+																											_ = rf.flipcoin(10)
+																										}
+																										_ = rf.flipcoin(50)
+																										afterAsg = false
+																										postCreateConstBareOnce = true
+																										postCreateAsgLhsF80Once = true
+																									} else if postCreatePostArrayAsgN >= 4 {
+																										// e17421+: simple Assign self F50, nested RHS
+																										_ = rf.flipcoin(50)
+																										afterAsg = true
 																									} else {
 																										asgF50 := rf.flipcoin(50)
 																										afterAsg = true
@@ -15232,7 +15261,18 @@ lhsDerefLoop:
 																								// AssignThenConst; else burnConst.
 																								constBare := postCreateConstBareOnce
 																								if constBare {
-																									postCreateConstBareOnce = false
+																																																		postCreateConstBareOnce = false
+																									if postCreateAsgLhsF80Once {
+																										postCreateAsgLhsF80Once = false
+																										// e17407–13: Lhs SelectDeref F80=1 empty create
+																										// F20×4 + U4 + F50 (SafeOpFlags/vol) then next Expression.
+																										_ = rf.flipcoin(80)
+																										for hi := 0; hi < 4; hi++ {
+																											_ = rf.flipcoin(20)
+																										}
+																										_ = rf.upto(4)
+																										_ = rf.flipcoin(50)
+																									}
 																								} else if rf.flipcoin(50) {
 																									// e16181+/e16445: burnConst
 																									if rf.flipcoin(50) {
@@ -15856,12 +15896,26 @@ lhsDerefLoop:
 																											_ = rf.upto(3)
 																											_ = rf.upto(4)
 																											_ = rf.upto(100)
-																										} else {
+																										} else if postCreatePostArrayAsgN >= 2 {
+																											// e17385+: after Assign*qfer Lhs create, Global
+																											// ok_vars U4 + **** WRITE/READ qfer F50 F10×4
+																											// + NewArray F20 + make_init F20 + nested expr.
+																											_ = rf.upto(4)
+																											for li := 0; li < 4; li++ {
+																												_ = rf.flipcoin(50)
+																												_ = rf.flipcoin(10)
+																											}
+																											_ = rf.flipcoin(20) // NewArray
+																											_ = rf.flipcoin(20) // make_init null/const
+																											// e17397: residual U5 then parent Expression
+																											_ = rf.upto(5)
+																											// live U120 terms follow
+																											} else {
 																											// later Global residual
 																											_ = rf.upto(2)
 																											_ = rf.flipcoin(0)
 																											postCreateVarOnlyOnce = true
-																										}
+																											}
 																									} else {
 																										// e16165+: F0 reselect VS.
 																										_ = rf.flipcoin(0)
@@ -16234,7 +16288,8 @@ lhsDerefLoop:
 																									// e16773+: late PL U2 sole;
 																									// e16925: one-shot ConstOnly;
 																									// e16970+: F80 CreateArray residual.
-																									if postCreatePostArrayAsgN >= 2 {
+																																																		if postCreatePostArrayAsgN >= 2 && !postCreatePostArrayAsgLhsDone {
+																										postCreatePostArrayAsgLhsDone = true
 																										// e17351-55: Assign RHS PL stack U4 + create
 																										_ = rf.upto(4)
 																										_ = rf.flipcoin(20)
@@ -16247,38 +16302,85 @@ lhsDerefLoop:
 																												blockDepth: 4, initLit: "0", emitDecl: true,
 																											})
 																										}
-																										// e17356+: Lhs SelectDeref F80=0 → NewValue Global CreateArray
-																										_ = rf.flipcoin(80)
-																										_ = rf.upto(100) // NewValue
+																										// e17356+: Lhs SelectDeref F80=0 → VS NewValue F10=1
+																										// Global create: NewArray F20=1 → make_init_value for pointer
+																										// F20=0 address → nested pointee create NewArray F20=0 →
+																										// Constant::make_random (F50=0 → RandomHexDigits; eChar hn=2
+																										// untraced depth gap 21615→21618) → CreateArrayVariable U99
+																										// sizes U10×3 init_num U75 + alt F20×4 + itemize.
+																										_ = rf.flipcoin(80) // F80=0
+																										_ = rf.upto(100)    // NewValue
 																										if rf.flipcoin(10) {
-																											// Global create residual e17358-74
-																											_ = rf.flipcoin(20)
-																											_ = rf.flipcoin(20)
-																											_ = rf.flipcoin(20)
-																											_ = rf.flipcoin(50)
-																											_ = rf.upto(99)
-																											_ = rf.upto(10)
-																											_ = rf.upto(10)
-																											_ = rf.upto(10)
-																											_ = rf.upto(75)
-																											for hi := 0; hi < 4; hi++ {
-																												_ = rf.flipcoin(20)
-																											}
-																											_ = rf.upto(10)
-																											_ = rf.upto(3)
-																											_ = rf.upto(5)
-																											if ctx != nil && ctx.state != nil {
-																												gname := ctx.state.allocGlobalName()
-																												writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[4] = {0};", gname))
-																												ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-																													name: gname, ctype: CType{Name: "int32_t", Signed: true, Bits: 32}, isArray: true, arrayLen: 4,
-																												})
+																											// Global scope
+																											newArr := rf.flipcoin(20) // NewArrayVariableProb
+																											if newArr {
+																												// make_init_value for pointer: F20 null vs address
+																												if !rf.flipcoin(20) {
+																													// address-of: empty → GenerateNewGlobal pointee
+																													// nested NewArray F20 (simple pointee often 0)
+																													nestedNA := rf.flipcoin(20)
+																													if !nestedNA {
+																														// Constant for pointee — eChar RandomHexDigits(2)
+																														// when F50=0 (UP depth gap +2 before U99).
+																														pointee := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+																														initLit := formatSimpleConstant(rf, pointee)
+																														if ctx != nil && ctx.state != nil {
+																															pname := ctx.state.allocGlobalName()
+																															writeLine(&ctx.state.lateGlobals, 0,
+																																fmt.Sprintf("static int8_t %s = %s;", pname, initLit))
+																															ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																																name: pname, ctype: pointee,
+																															})
+																														}
+																													} else {
+																														// nested NewArray for pointee — burnCreateArray
+																														_ = burnCreateArrayVariable(rf, opts, CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}, false)
+																													}
+																												} else {
+																													// null Constant for pointer — no RNG
+																												}
+																												// CreateArrayVariable for outer pointer array + itemize
+																												burnCreateArrayAltEmpty = true
+																												arr := burnCreateArrayVariable(rf, opts, CType{Name: "int8_t *", Signed: true, Bits: 32}, true)
+																												burnCreateArrayAltEmpty = false
+																												if ctx != nil && ctx.state != nil {
+																													gname := ctx.state.allocGlobalName()
+																													sz := 1
+																													for _, d := range arr.sizes {
+																														sz *= d
+																													}
+																													if sz < 1 {
+																														sz = 1
+																													}
+																													writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int8_t *%s[%d] = {0};", gname, sz))
+																													ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																														name: gname, ctype: CType{Name: "int8_t *", Signed: true, Bits: 32}, isArray: true, arrayLen: sz,
+																													})
+																												}
+																												postCreateConstBareOnce = true // e17375 pointer Constant bare
+																											} else {
+																												// !NewArray simple Global create + Constant
+																												_ = formatSimpleConstant(rf, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
 																											}
 																										} else {
+																											// PL create residual (F10=0)
 																											_ = rf.upto(4)
 																											_ = rf.flipcoin(20)
 																										}
-																									} else {
+																									} else if postCreatePostArrayAsgLhsDone {
+																										// e17385+: later PL after Assign Lhs create —
+																										// stack U4 + multi-level pointer qfer F50 F10×4
+																										// + NewArray F20 + make_init F20.
+																										_ = rf.upto(4)
+																										for li := 0; li < 4; li++ {
+																											_ = rf.flipcoin(50)
+																											_ = rf.flipcoin(10)
+																										}
+																										_ = rf.flipcoin(20)
+																										_ = rf.flipcoin(20)
+																										_ = rf.upto(5)
+																										postCreateForceAssignOnce = true
+																										} else {
 																										_ = rf.upto(2)
 																										if postCreatePostArrayGlobalN >= 5 {
 
