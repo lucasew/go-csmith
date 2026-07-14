@@ -2,8 +2,8 @@ package csmith
 
 import (
 	"fmt"
-	"os"
 	"math"
+	"os"
 	"strings"
 )
 
@@ -103,56 +103,77 @@ var postAggNestGlobalU17F0DoneSink *bool
 
 // postAggNestArrayOpResidualDoneSink: after nest ArrayOp residual (e6716+ U55 Global).
 var postAggNestArrayOpResidualDoneSink *bool
+
 // postAggNestArrayOpPostCD3Sink: after CD3 leave, free Expression Global natural choose.
 var postAggNestArrayOpPostCD3Sink *bool
+
 // postAggPostCD3ArrayOp2BodySink: inside e8995 ArrayOp body (Constant hn=16 e9073).
 var postAggPostCD3ArrayOp2BodySink *bool
+
 // postAggPostCD3ArrayOp2BodyActive: sticky even if nested generate rebinds sinks.
 var postAggPostCD3ArrayOp2BodyActive bool
+
 // burnCreateArrayCtxSink: genContext for CreateArray create_field_vars + aggregate
 // alt Constant::make_random (e10466 after U99 dims, before init_num).
 var burnCreateArrayCtxSink *genContext
+
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
 var burnCreateArrayFieldVarsDone bool
+
 // burnCreateArrayAltEmpty: pointer alts F20 only (Lhs CreateArray e17368+).
 var burnCreateArrayAltEmpty bool
+
 // burnCreateArrayPLU2Done: one-shot e10988 U2 U2 F0 chain; later PL sole.
 var burnCreateArrayPLU2Done bool
+
 // burnCreateArrayLhsF80Fail: 0 off; 1 arm after first F20×4 empty create;
 // 2 done after e11066 fail-loop consumed.
 var burnCreateArrayLhsF80Fail int
+
 // postAggPostCD3ArrayOp2AfterGlobalU56: next free Expression Variable after
 // e9274 Global U56 must_use U5 U5 U2 F75 (e9276).
 var postAggPostCD3ArrayOp2AfterGlobalU56 bool
+
 // postAggPostCD3ArrayOp2GlobalU56Done: one-shot e9274 GlobalList U56; later U2.
 var postAggPostCD3ArrayOp2GlobalU56Done bool
+
 // postAggPostCD3ArrayOp2GlobalU2Done: one-shot e9740 U2 fail→PL; later Global.
 var postAggPostCD3ArrayOp2GlobalU2Done bool
+
 // postAggPostCD3ArrayOp2GlobalSoleN: free Expression Global after U2 era
 // (0: e9908 sole; 1+: e9922 U61 + itemize U2 U9 U4).
 var postAggPostCD3ArrayOp2GlobalSoleN int
+
 // postAggPostCD3ArrayOp2Hex16Once: next Constant hex after unary size-3 (e9073).
 var postAggPostCD3ArrayOp2Hex16Once bool
+
 // postAggPostCD3PtrGlobalNSink: post-CD3 multi-cand pointer Global choose count
 // (e8483 n=0 sole; e8605+ n≥1 natural U2).
 var postAggPostCD3PtrGlobalNSink *int
+
 // postAggPostCD3PtrGlobalSoleNSink: post-CD3 n==1 pointer Global count
 // (e8701 first sole; e8753+ pad U2).
 var postAggPostCD3PtrGlobalSoleNSink *int
+
 // postAggPostCD3DepthBlockOnceSink: one-shot depthBlock after post-CD3 Constant
 // (e8381 UP U120 tries=3 Variable).
 var postAggPostCD3DepthBlockOnceSink *bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
+
 // postAggNestArrayOpGlobalPtrSoleNSink: pointer Global sole count after nest ArrayOp.
 var postAggNestArrayOpGlobalPtrSoleNSink *int
+
 // postAggNestArrayOpGlobalChooseNSink: multi-cand Global pad count after nest ArrayOp.
 var postAggNestArrayOpGlobalChooseNSink *int
+
 // postAggNestArrayOpF0PPKeepExprSink: set true on gn==11 F0 (e7439) so Statement
 // Assign RHS forces one more Expression after tree returns (e7443).
 var postAggNestArrayOpF0PPKeepExprSink *bool
+
 // postAggSkipNestArrayAltU2: Function-arg Global CreateArray alts skip nest U2
 // choose (e7315 UP F20 F20 then itemize; Lhs CreateArray still burns U2 per alt).
 var postAggSkipNestArrayAltU2 bool
@@ -750,11 +771,11 @@ type functionFlowState struct {
 	postAggNestArrayOpPLStackU4ShortCDDone bool
 	// postAggNestArrayOpPLStackU4CD2: after that VS residual, SelectDeref continues
 	// U11,U10,U9,U8,U7 pure then U6+F0 (e7876–88; not full round1 residual table).
-	postAggNestArrayOpPLStackU4CD2 bool
+	postAggNestArrayOpPLStackU4CD2  bool
 	postAggNestArrayOpPLStackU4CD2N int
 	// postAggNestArrayOpPLStackU4CD3: after CD2 F80=0 VS Global, more SelectDeref
 	// U4+F0, U3+[9][4][7]F0 ×2, F80=0 (e7891–906).
-	postAggNestArrayOpPLStackU4CD3 bool
+	postAggNestArrayOpPLStackU4CD3  bool
 	postAggNestArrayOpPLStackU4CD3N int
 	// postAggNestArrayOpPLStackU4CD3F0N: F80=0 hit count under CD3 n≥400
 	// (e7989 Param residual, e8032 Global U6, e8065 NewValue…).
@@ -1080,10 +1101,10 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		!st.postAggPostCD3ArrayOp2FuncArgMustDone {
 		st.postAggPostCD3ArrayOp2FuncArgMustDone = true
 		st.postAggPostCD3ArrayOp2FuncArgPPCreateDone = true
-		_ = er.fallback.upto(5)       // e9940
-		_ = er.fallback.upto(7)       // e9941
-		_ = er.fallback.flipcoin(75)  // e9942
-		_ = er.fallback.flipcoin(0)   // e9943
+		_ = er.fallback.upto(5)      // e9940
+		_ = er.fallback.upto(7)      // e9941
+		_ = er.fallback.flipcoin(75) // e9942
+		_ = er.fallback.flipcoin(0)  // e9943
 		_ = er.fallback.upto(100)    // e9944 VS U100 PP
 		_ = parentStackPick(er, st)  // e9945 U6
 		st.postAggPostCD3ArrayOp2PLSole = false
@@ -1243,12 +1264,12 @@ func noteNestPPSoleShiftSkip(flow *functionFlowState) {
 
 // burnNestArrayOpPLAfterStack: inventory PL residual after parentStackPick under
 // postAggNestArrayOpResidualDone (stack already burned).
-// - one-shot e6963: U5 + multi-dim itemize [9][9][3] F0 → VS
-// - after itemize: phase 0 U4 (e6995); phase 1 stack-only VS reselect (e6998);
-//   else U4 sole. (e7011 U5 F0 is empty-Global F0 retry — see termVariable loop.)
-// - pre-itemize: U4 sole (e6822, e6900)
-// - PLStackU4 era (e7421+): first U4; later U5
-// - post-CD3 (e8346–50): U4 + [9][4][7] F0 → VS reselect
+//   - one-shot e6963: U5 + multi-dim itemize [9][9][3] F0 → VS
+//   - after itemize: phase 0 U4 (e6995); phase 1 stack-only VS reselect (e6998);
+//     else U4 sole. (e7011 U5 F0 is empty-Global F0 retry — see termVariable loop.)
+//   - pre-itemize: U4 sole (e6822, e6900)
+//   - PLStackU4 era (e7421+): first U4; later U5
+//   - post-CD3 (e8346–50): U4 + [9][4][7] F0 → VS reselect
 func burnNestArrayOpPLAfterStack(er *exprRand, opts Options, env envInfo, scope scopeInfo, flow *functionFlowState, ctx *genContext) {
 	if er == nil || flow == nil {
 		return
@@ -3415,7 +3436,6 @@ func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
 		_ = r.flipcoin(50)
 		_ = burnCreateAndInitialize(r, opts, ivType)
 		if os.Getenv("CSMITH_TRACE_RNG") != "" {
-			fmt.Fprintf(os.Stderr, "burnSelectLoopCtrlVarCreate: parent-local create (no_volatile)\n")
 		}
 		return
 	}
@@ -3430,7 +3450,6 @@ func burnSelectLoopCtrlVarCreate(r *rng, opts Options) {
 		} else {
 			_ = r.flipcoin(50) // still burn the draw; ignore result
 			if os.Getenv("CSMITH_TRACE_RNG") != "" {
-				fmt.Fprintf(os.Stderr, "burnSelectLoopCtrlVarCreate: forced non-vol after %d attempts\n", maxIVCreateAttempts)
 			}
 		}
 		_ = burnCreateAndInitialize(r, opts, ivType)
@@ -5854,16 +5873,16 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 								}
 								targetN = 44
 								// e9274: ArrayOp2 body GlobalList U56 once; e9740 one-shot U2; later natural.
-							if postAggPostCD3ArrayOp2BodyActive {
-								if !postAggPostCD3ArrayOp2GlobalU56Done {
-									postAggPostCD3ArrayOp2GlobalU56Done = true
-									targetN = 56
-									postAggPostCD3ArrayOp2AfterGlobalU56 = true
-								} else if !postAggPostCD3ArrayOp2GlobalU2Done {
-									postAggPostCD3ArrayOp2GlobalU2Done = true
-									targetN = 2
+								if postAggPostCD3ArrayOp2BodyActive {
+									if !postAggPostCD3ArrayOp2GlobalU56Done {
+										postAggPostCD3ArrayOp2GlobalU56Done = true
+										targetN = 56
+										postAggPostCD3ArrayOp2AfterGlobalU56 = true
+									} else if !postAggPostCD3ArrayOp2GlobalU2Done {
+										postAggPostCD3ArrayOp2GlobalU2Done = true
+										targetN = 2
+									}
 								}
-							}
 								// e4389: Expression continue after Global create → U15 not U44.
 								if postAggExprContGlobalU15Sink != nil && *postAggExprContGlobalU15Sink {
 									*postAggExprContGlobalU15Sink = false
@@ -7728,7 +7747,7 @@ exprTries:
 				// e9740–48: one-shot after U56, Global U2→PL create.
 				if postAggPostCD3ArrayOp2GlobalU56Done && !postAggPostCD3ArrayOp2GlobalU2Done {
 					postAggPostCD3ArrayOp2GlobalU2Done = true
-					_ = er.pick(2) // e9740
+					_ = er.pick(2)                                          // e9740
 					scopePick2 := variableScopePickFromER(er, opts, &scope) // e9741
 					if scopePick2 == 1 || scopePick2 == 4 {
 						_ = parentStackPick(er, flow) // e9742 U6
@@ -7785,14 +7804,14 @@ exprTries:
 						scopePick2 := variableScopePickFromER(er, opts, &scope)
 						if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
 							_ = parentStackPick(er, flow) // e10293 U6
-							_ = er.pick(2)                 // e10294
+							_ = er.pick(2)                // e10294
 							if er.fallback != nil {
 								_ = er.fallback.flipcoin(0) // e10295
 							}
 							scopePick3 := variableScopePickFromER(er, opts, &scope)
 							if scopePick3 == 1 || scopePick3 == 2 || scopePick3 == 4 {
 								_ = parentStackPick(er, flow) // e10297
-								_ = er.pick(5)                 // e10298
+								_ = er.pick(5)                // e10298
 								if er.fallback != nil {
 									_ = er.pick(9)
 									_ = er.pick(9)
@@ -7805,7 +7824,7 @@ exprTries:
 										scopePick5 := variableScopePickFromER(er, opts, &scope)
 										if scopePick5 == 1 || scopePick5 == 2 || scopePick5 == 4 {
 											_ = parentStackPick(er, flow) // e10307
-											_ = er.pick(5)                 // e10308
+											_ = er.pick(5)                // e10308
 											// e10309 F50 is parent Assign self (not residual).
 										} else if scopePick5 == 0 {
 											_ = er.pick(2)
@@ -8142,8 +8161,8 @@ exprTries:
 						flow.postAggPostCD3ArrayOp2PLU5F0Done = true
 						flow.postAggPostCD3ArrayOp2StmtLhsU9 = true
 						flow.postAggPostCD3ArrayOp2PLSole = false
-						_ = er.pick(5)              // e9834 locals
-						_ = er.fallback.flipcoin(0) // e9835 visit fail
+						_ = er.pick(5)                                          // e9834 locals
+						_ = er.fallback.flipcoin(0)                             // e9835 visit fail
 						scopePick2 := variableScopePickFromER(er, opts, &scope) // e9836
 						if scopePick2 == 1 || scopePick2 == 4 {
 							_ = parentStackPick(er, flow) // e9837 U6
@@ -8162,8 +8181,8 @@ exprTries:
 						er != nil && er.fallback != nil {
 						flow.postAggPostCD3ArrayOp2PLU5F0AfterFuncArg = true
 						flow.postAggPostCD3ArrayOp2PLSole = false
-						_ = er.pick(5)              // e10016 locals
-						_ = er.fallback.flipcoin(0) // e10017 visit fail
+						_ = er.pick(5)                                // e10016 locals
+						_ = er.fallback.flipcoin(0)                   // e10017 visit fail
 						_ = variableScopePickFromER(er, opts, &scope) // e10018 PP
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
@@ -10202,9 +10221,9 @@ exprTries:
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, "x"))
 								}
-								_ = parentStackPick(er, flow) // e7011 U6
-								_ = er.pick(5)                // e7012
-								_ = er.fallback.flipcoin(0)   // e7013 F0
+								_ = parentStackPick(er, flow)                           // e7011 U6
+								_ = er.pick(5)                                          // e7012
+								_ = er.fallback.flipcoin(0)                             // e7013 F0
 								scopePick2 := variableScopePickFromER(er, opts, &scope) // e7014
 								if scopePick2 == 1 || scopePick2 == 4 {
 									_ = parentStackPick(er, flow) // e7015 U6
@@ -10839,8 +10858,8 @@ exprTries:
 					_ = er.fallback.flipcoin(80) // e9775 F80=1
 					if !er.fallback.flipcoin(80) {
 						_ = variableScopePickFromER(er, opts, &scope) // e9777 U100
-						_ = er.pick(6)                                 // e9778 U6
-						_ = er.fallback.flipcoin(20)                   // e9779 NewArray=1
+						_ = er.pick(6)                                // e9778 U6
+						_ = er.fallback.flipcoin(20)                  // e9779 NewArray=1
 						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 						_ = formatSimpleConstant(er.fallback, base) // e9780–82 F50 F50 U3
 						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
@@ -10972,9 +10991,9 @@ exprTries:
 								f0      bool
 							}
 							steps := []selStep{
-								{4, true, true},  // e9305–10
+								{4, true, true},   // e9305–10
 								{4, false, false}, // e9311–12
-								{3, true, true},  // e9313–18
+								{3, true, true},   // e9313–18
 								{3, false, false}, // e9319–20
 							}
 							for _, st := range steps {
@@ -11188,7 +11207,7 @@ exprTries:
 						sp = variableScopePickFromER(er, opts, &scope)
 						if sp == 0 {
 							base := pickSimpleNonVoid(er.fallback, opts) // e10385 U14
-							_ = er.fallback.flipcoin(20)                  // e10386 NewArray
+							_ = er.fallback.flipcoin(20)                 // e10386 NewArray
 							_ = formatSimpleConstant(er.fallback, base)  // e10387–89
 						} else if sp == 1 || sp == 2 || sp == 4 {
 							_ = parentStackPick(er, ctx.state)
@@ -11213,18 +11232,18 @@ exprTries:
 							_ = er.fallback.flipcoin(0) // e10023
 						}
 						// e10024–28: F80=0 → VS U100 U6 NewArray=0 + Constant (hex pure_rnd)
-						_ = er.fallback.flipcoin(80) // e10024 expect 0
+						_ = er.fallback.flipcoin(80)                  // e10024 expect 0
 						_ = variableScopePickFromER(er, opts, &scope) // e10025
-						_ = parentStackPick(er, ctx.state)              // e10026 U6
+						_ = parentStackPick(er, ctx.state)            // e10026 U6
 						ctx.state.postAggPostCD3ArrayOp2PLSole = false
-						_ = er.fallback.flipcoin(20)                 // e10027 NewArray=0
+						_ = er.fallback.flipcoin(20)                // e10027 NewArray=0
 						_ = formatSimpleConstant(er.fallback, base) // e10028+ hex/dec
 						// e10029–33: F80=0 → VS U100 U6 NewArray=0 + Constant
-						_ = er.fallback.flipcoin(80) // e10029 expect 0
+						_ = er.fallback.flipcoin(80)                  // e10029 expect 0
 						_ = variableScopePickFromER(er, opts, &scope) // e10030
-						_ = parentStackPick(er, ctx.state)              // e10031 U6
+						_ = parentStackPick(er, ctx.state)            // e10031 U6
 						ctx.state.postAggPostCD3ArrayOp2PLSole = false
-						_ = er.fallback.flipcoin(20)                 // e10032
+						_ = er.fallback.flipcoin(20)                // e10032
 						_ = formatSimpleConstant(er.fallback, base) // e10033+
 						// e10034+: parent Expression continues U100 PP / U120
 						// Function (not Statement Lhs F80 countdown).
@@ -13321,7 +13340,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.upto(9)      // e8684 947
 		_ = r.upto(4)
 		_ = r.upto(7)
-		_ = r.flipcoin(0) // e8687
+		_ = r.flipcoin(0)   // e8687
 		if r.flipcoin(80) { // e8688
 			_ = r.upto(12)
 			_ = r.flipcoin(0) // e8690
@@ -13706,7 +13725,7 @@ lhsDerefLoop:
 									_ = rf.upto(4)
 									// Adaptive rest until residual ends
 									afterA := true
-									globalChooseN := 0 // multiphase Global list size
+									globalChooseN := 0     // multiphase Global list size
 									funcAfterSkip := false // Function after afterA-skip → binary
 									for k := 0; k < 40; k++ {
 										v2 := rf.upto(120)
@@ -13725,7 +13744,7 @@ lhsDerefLoop:
 												if rf.flipcoin(80) {
 													_ = rf.upto(2) // e11950
 												}
-												_ = rf.flipcoin(80) // e11951
+												_ = rf.flipcoin(80)  // e11951
 												if rf.flipcoin(80) { // e11952
 													_ = rf.flipcoin(20)
 													_ = rf.flipcoin(20)
@@ -14343,9 +14362,9 @@ lhsDerefLoop:
 																		// Assign (e15406 U120=75 tries=1 Variable).
 																		postCreateNoAssignOnce := false
 																		postCreateForceAssignOnce := false // e17398 Assign tries=4
-																		postCreateAsgLhsF80Once := false // e17407 Lhs SelectDeref after *** Assign
+																		postCreateAsgLhsF80Once := false   // e17407 Lhs SelectDeref after *** Assign
 																		postCreateAsgLhsF80N := 0
-																		postCreateAsgNeedLhs := false // after Assign RHS term, Lhs F80
+																		postCreateAsgNeedLhs := false     // after Assign RHS term, Lhs F80
 																		postCreateConstHex16Once := false // e17425 RandomHexDigits(16)
 																		postCreateConstHex8Once := false  // e17517 RandomHexDigits(8)
 																		postCreateConstSmallOnce := false // e17542 F50 small residual
@@ -14591,6 +14610,9 @@ lhsDerefLoop:
 																		// postCreateLateFreeAfterNVUseExBareF0Once: bare F0
 																		// only (e20524–25) without arming more residuals.
 																		postCreateLateFreeAfterNVUseExBareF0Once := false
+																		// postCreateLateFreeAfterNVUseEx0PLU6NVOnce: useEx=0
+																		// after CREATE head → PL U6 → NV create (e21335–54).
+																		postCreateLateFreeAfterNVUseEx0PLU6NVOnce := false
 																		// postCreateLateFreeAfterNVAsgNoAssignOnce: after
 																		// that F0 era's Assign F50 residual, next U120
 																		// rejects Assign/Comma (e20273 tries=2 → Function).
@@ -14634,12 +14656,46 @@ lhsDerefLoop:
 																		// postCreateLateFreeAfterNVAsgThenBareOnce: after
 																		// Assign F50 residual, next Assign is bare (e20824).
 																		postCreateLateFreeAfterNVAsgThenBareOnce := false
+																		// postCreateLateFreeAfterNVAsgThenBareGlobalU159: with
+																		// AsgThenBare, arm Global U159 not PL multiphase
+																		// (e21368–91).
+																		postCreateLateFreeAfterNVAsgThenBareGlobalU159 := false
+																		// postCreateLateFreeAfterNVAsgBareThenConstBare: after
+																		// bare Assign residual, next Constant is bare
+																		// (e21372 no F50 residual).
+																		postCreateLateFreeAfterNVAsgBareThenConstBare := false
 																		// postCreateLateFreeAfterNVPLMultiOnce: free PL U5
 																		// multiphase reselect residual (e20849–71).
 																		postCreateLateFreeAfterNVPLMultiOnce := false
 																		// postCreateLateFreeAfterNVGlobalU159Once: free Global
 																		// U159 sole (e20883) after Comma Variable.
 																		postCreateLateFreeAfterNVGlobalU159Once := false
+																		// postCreateLateFreeAfterNVGlobalU159NoPL: with U159,
+																		// skip PLU5F50 arm (e21391 sole only).
+																		postCreateLateFreeAfterNVGlobalU159NoPL := false
+																		// postCreateLateFreeAfterNVPPU6F80Once: free PP U6 F80=0
+																		// → Global U4 (e21395–99).
+																		postCreateLateFreeAfterNVPPU6F80Once := false
+																		// postCreateLateFreeAfterNVCommaF80U4Once: free Comma
+																		// F80 U4 F50 U4 residual (e21417–20).
+																		postCreateLateFreeAfterNVCommaF80U4Once := false
+																		// postCreateLateFreeAfterNVAsgF50ThenCommaF80Once: free
+																		// invent Assign F50 residual arms Comma F80 (e21414–16).
+																		postCreateLateFreeAfterNVAsgF50ThenCommaF80Once := false
+																		// postCreateLateFreeAfterNVPLMulti3Once: free PL U6 U5
+																		// U8 U5 U6 F0 → Global U158 (e21422–30).
+																		postCreateLateFreeAfterNVPLMulti3Once := false
+																		// postCreateLateFreeAfterNVConstThenPPU6F50: after Const
+																		// hex8, next free invent Constant ptr-cmp
+																		// RHS Variable PP U6 F50 (e21498–500).
+																		postCreateLateFreeAfterNVConstThenPPU6F50 := false
+																		// postCreateLateFreeAfterNVPPU6F50Once: ptr-cmp Constant RHS
+																		// Variable PP U6 F50 sole (e21499–500).
+																		postCreateLateFreeAfterNVPPU6F50Once := false
+																		// postCreateLateFreeAfterNVAfterPtrCmpConstOnly: after
+																		// ptr-cmp PP create residual, free invent Constant
+																		// residual then ConstOnly (e21549 tries=8).
+																		postCreateLateFreeAfterNVAfterPtrCmpConstOnly := false
 																		// postCreateLateFreeAfterNVPLU5F50Once: free PL U5 F50
 																		// sole (e20893–94).
 																		postCreateLateFreeAfterNVPLU5F50Once := false
@@ -14682,6 +14738,11 @@ lhsDerefLoop:
 																		// postCreateLateFreeAfterNVGlobalU3F0BOnce: free Global
 																		// U3 F0 → PP U5 U2 U7 (e21070–75).
 																		postCreateLateFreeAfterNVGlobalU3F0BOnce := false
+																		// postCreateLateFreeAfterNVGlobalU3F0G2Once: free Global
+																		// U3 F0 → Global U2 U18 (e21552–57).
+																		postCreateLateFreeAfterNVGlobalU3F0G2Once := false
+																		// postCreateLateFreeAfterNVNVCreateU6Once: NV F10=0 PL U6 create (e21561).
+																		postCreateLateFreeAfterNVNVCreateU6Once := false
 																		// postCreateLateFreeAfterNVGlobalU159F80Once: free Global
 																		// U159 + F80 SelectDeref ladder (e21078–97).
 																		postCreateLateFreeAfterNVGlobalU159F80Once := false
@@ -14870,7 +14931,7 @@ lhsDerefLoop:
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x >= 70
 																				})
-																																						} else if postCreateForceAssignOnce {
+																			} else if postCreateForceAssignOnce {
 																				postCreateForceAssignOnce = false
 																				// e17398: only Assign 100-109 (tries=4)
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
@@ -14930,6 +14991,21 @@ lhsDerefLoop:
 																				if ptrCmpLhsDone {
 																					ptrCmpLhsDone = false
 																				}
+																				if postCreateLateFreeAfterNVCommaF80U4Once {
+																					// e21417–20: Comma F80 U4 F50 U4 residual
+																					// (not NonVoid U14 type burn).
+																					// e21421+: free invent Variable PL multiphase.
+																					// Clear afterAsg so next Variable is not sole.
+																					postCreateLateFreeAfterNVCommaF80U4Once = false
+																					afterAsg = false
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(4)
+																					}
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(4)
+																					postCreateLateFreeAfterNVPLMulti3Once = true
+																					continue
+																				}
 																				if postCreateAsgNeedLhs {
 																					// e17446–63: Assign RHS Comma bare; Lhs SelectDeref
 																					// F80=0 → VS PL U4 create F20 F50 F50 U20; then
@@ -14958,8 +15034,8 @@ lhsDerefLoop:
 																					}
 																					_ = rf.flipcoin(80) // e17463 F80=0 → VS
 																					// e17464–71: NewValue PL create residual
-																					_ = rf.upto(100) // NewValue 90
-																					_ = rf.upto(4)   // stack
+																					_ = rf.upto(100)     // NewValue 90
+																					_ = rf.upto(4)       // stack
 																					if rf.flipcoin(80) { // e17466
 																						_ = rf.flipcoin(20)
 																						_ = rf.flipcoin(20)
@@ -15169,52 +15245,52 @@ lhsDerefLoop:
 																										postCreateUseExAgain = false
 																									}
 																								} else {
-																								_ = rf.upto(5)
-																								switch {
-																								case plVS <= 2:
-																									// e13502/e13525: U5 U3 U9
-																									_ = rf.upto(3)
-																									_ = rf.upto(9)
-																								case plVS <= 4:
-																									// e13540/e13602: itemize
-																									_ = rf.upto(9)
-																									_ = rf.upto(9)
-																									_ = rf.upto(3)
-																									_ = rf.flipcoin(0)
-																								case plVS == 5:
-																									// e13804: U5 sole
-																								case plVS == 12, plVS == 17:
-																									// e14187/e14669: itemize
-																									_ = rf.upto(9)
-																									_ = rf.upto(9)
-																									_ = rf.upto(3)
-																									_ = rf.flipcoin(0)
-																								case plVS == 14:
-																									// e14512: U3 sole
-																									_ = rf.upto(3)
-																								case plVS == 15:
-																									// e14568: U2 U9
-																									_ = rf.upto(2)
-																									_ = rf.upto(9)
-																								case plVS == 19, plVS == 20:
-																									// e14804/e14954: U3 U4 U8
-																									_ = rf.upto(3)
-																									_ = rf.upto(4)
-																									_ = rf.upto(8)
-																								case plVS == 21:
-																									// e14995: U2 U5
-																									_ = rf.upto(2)
 																									_ = rf.upto(5)
-																								case plVS == 22:
-																									// e15000: U9
-																									_ = rf.upto(9)
-																								default:
-																									// e13909+ create (L6–11,
-																									// L13, L16, L18…):
-																									// U5 F50 F20 Const
-																									// [+CreateArray if NewArray]
-																									burnLhsResidualScopeCreate(rf, opts)
-																								}
+																									switch {
+																									case plVS <= 2:
+																										// e13502/e13525: U5 U3 U9
+																										_ = rf.upto(3)
+																										_ = rf.upto(9)
+																									case plVS <= 4:
+																										// e13540/e13602: itemize
+																										_ = rf.upto(9)
+																										_ = rf.upto(9)
+																										_ = rf.upto(3)
+																										_ = rf.flipcoin(0)
+																									case plVS == 5:
+																										// e13804: U5 sole
+																									case plVS == 12, plVS == 17:
+																										// e14187/e14669: itemize
+																										_ = rf.upto(9)
+																										_ = rf.upto(9)
+																										_ = rf.upto(3)
+																										_ = rf.flipcoin(0)
+																									case plVS == 14:
+																										// e14512: U3 sole
+																										_ = rf.upto(3)
+																									case plVS == 15:
+																										// e14568: U2 U9
+																										_ = rf.upto(2)
+																										_ = rf.upto(9)
+																									case plVS == 19, plVS == 20:
+																										// e14804/e14954: U3 U4 U8
+																										_ = rf.upto(3)
+																										_ = rf.upto(4)
+																										_ = rf.upto(8)
+																									case plVS == 21:
+																										// e14995: U2 U5
+																										_ = rf.upto(2)
+																										_ = rf.upto(5)
+																									case plVS == 22:
+																										// e15000: U9
+																										_ = rf.upto(9)
+																									default:
+																										// e13909+ create (L6–11,
+																										// L13, L16, L18…):
+																										// U5 F50 F20 Const
+																										// [+CreateArray if NewArray]
+																										burnLhsResidualScopeCreate(rf, opts)
+																									}
 																								} // end !postCreateUseExHitN>=4 PL
 																							} else if sp < 95 {
 																								// PP multiphase catalog
@@ -15239,79 +15315,79 @@ lhsDerefLoop:
 																										_ = rf.upto(4)
 																									}
 																								} else {
-																								_ = rf.upto(5)
-																								switch {
-																								case ppVS == 1:
-																									// e13495: U5 U14 F50 F20 F50+hex
-																									u14 := rf.upto(14)
-																									_ = rf.flipcoin(50)
-																									_ = rf.flipcoin(20)
-																									if rf.flipcoin(50) {
-																										if rf.flipcoin(50) {
-																											_ = rf.upto(3)
-																										} else {
-																											_ = rf.upto(20)
-																										}
-																									} else {
-																										hn := 8
-																										switch u14 {
-																										case 1, 2, 6:
-																											hn = 2
-																										case 3, 4, 8:
-																											hn = 4
-																										case 5, 11:
-																											hn = 16
-																										}
-																										for h := 0; h < hn; h++ {
-																											_ = rf.next31()
-																										}
-																									}
-																								case ppVS == 2:
-																									// e13532: U2 F0
-																									_ = rf.upto(2)
-																									_ = rf.flipcoin(0)
-																								case ppVS == 3:
-																									// e13728: U2
-																									_ = rf.upto(2)
-																								case ppVS == 4:
-																									// e13840: U5 sole
-																								case ppVS == 5:
-																									// e13888: U5 F50 F20 Const create
-																									burnLhsResidualScopeCreate(rf, opts)
-																								case ppVS == 6, ppVS == 9, ppVS == 14:
-																									// e14021/e14556/e14937:
-																									// U5 + itemize U9 U9 U3 F0
-																									_ = rf.upto(9)
-																									_ = rf.upto(9)
-																									_ = rf.upto(3)
-																									_ = rf.flipcoin(0)
-																								case ppVS == 7, ppVS == 8:
-																									// e14315/e14434: create
-																									// (+CreateArray when NewArray)
-																									burnLhsResidualScopeCreate(rf, opts)
-																								case ppVS == 10, ppVS == 13:
-																									// e14633/e14931: U3 U4 U8
-																									_ = rf.upto(3)
-																									_ = rf.upto(4)
-																									_ = rf.upto(8)
-																								case ppVS == 11:
-																									// e14849: U2
-																									_ = rf.upto(2)
-																								case ppVS == 12:
-																									// e14873: U2 U5
-																									_ = rf.upto(2)
 																									_ = rf.upto(5)
-																								default:
-																									// later: alternate itemize / U2
-																									if ppVS%2 == 0 {
+																									switch {
+																									case ppVS == 1:
+																										// e13495: U5 U14 F50 F20 F50+hex
+																										u14 := rf.upto(14)
+																										_ = rf.flipcoin(50)
+																										_ = rf.flipcoin(20)
+																										if rf.flipcoin(50) {
+																											if rf.flipcoin(50) {
+																												_ = rf.upto(3)
+																											} else {
+																												_ = rf.upto(20)
+																											}
+																										} else {
+																											hn := 8
+																											switch u14 {
+																											case 1, 2, 6:
+																												hn = 2
+																											case 3, 4, 8:
+																												hn = 4
+																											case 5, 11:
+																												hn = 16
+																											}
+																											for h := 0; h < hn; h++ {
+																												_ = rf.next31()
+																											}
+																										}
+																									case ppVS == 2:
+																										// e13532: U2 F0
+																										_ = rf.upto(2)
+																										_ = rf.flipcoin(0)
+																									case ppVS == 3:
+																										// e13728: U2
+																										_ = rf.upto(2)
+																									case ppVS == 4:
+																										// e13840: U5 sole
+																									case ppVS == 5:
+																										// e13888: U5 F50 F20 Const create
+																										burnLhsResidualScopeCreate(rf, opts)
+																									case ppVS == 6, ppVS == 9, ppVS == 14:
+																										// e14021/e14556/e14937:
+																										// U5 + itemize U9 U9 U3 F0
 																										_ = rf.upto(9)
 																										_ = rf.upto(9)
 																										_ = rf.upto(3)
 																										_ = rf.flipcoin(0)
-																									} else {
+																									case ppVS == 7, ppVS == 8:
+																										// e14315/e14434: create
+																										// (+CreateArray when NewArray)
+																										burnLhsResidualScopeCreate(rf, opts)
+																									case ppVS == 10, ppVS == 13:
+																										// e14633/e14931: U3 U4 U8
+																										_ = rf.upto(3)
+																										_ = rf.upto(4)
+																										_ = rf.upto(8)
+																									case ppVS == 11:
+																										// e14849: U2
 																										_ = rf.upto(2)
+																									case ppVS == 12:
+																										// e14873: U2 U5
+																										_ = rf.upto(2)
+																										_ = rf.upto(5)
+																									default:
+																										// later: alternate itemize / U2
+																										if ppVS%2 == 0 {
+																											_ = rf.upto(9)
+																											_ = rf.upto(9)
+																											_ = rf.upto(3)
+																											_ = rf.flipcoin(0)
+																										} else {
+																											_ = rf.upto(2)
+																										}
 																									}
-																								}
 																								} // end !postCreateUseExHitN>=4 PP
 																							} else {
 																								// NewValue: F10 scope
@@ -15992,7 +16068,93 @@ lhsDerefLoop:
 																													_ = rf.upto(4)
 																													for rl := 0; rl < 12; rl++ {
 																														if !rf.flipcoin(80) {
-																															_ = rf.upto(100)
+																															// e21285–311: F80=0 → PP U6 U3 +
+																															// F80 itemize (U2 U2 U10 / U2 U8
+																															// U5 U6 F0) until F80=0 → PL create.
+																															sp2 := rf.upto(100)
+																															if sp2 >= 65 && sp2 < 95 {
+																																_ = rf.upto(6)
+																																_ = rf.upto(3)
+																																for rm := 0; rm < 16; rm++ {
+																																	if !rf.flipcoin(80) {
+																																		// e21311+: PL U6 F50 F20 F50 F80
+																																		// → NV create residual
+																																		_ = rf.upto(100) // PL
+																																		_ = rf.upto(6)
+																																		_ = rf.flipcoin(50)
+																																		_ = rf.flipcoin(20)
+																																		if !rf.flipcoin(50) {
+																																			_ = formatHexConstantDigits(rf, 8, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
+																																		} else if rf.flipcoin(50) {
+																																			_ = rf.upto(3)
+																																		} else {
+																																			_ = rf.upto(20)
+																																		}
+																																		if !rf.flipcoin(80) {
+																																			// e21318+: NewValue F10 PL U6 U14 create
+																																			_ = rf.upto(100) // NewValue
+																																			if !rf.flipcoin(10) {
+																																				_ = rf.upto(6)
+																																				_ = rf.upto(14)
+																																				_ = rf.flipcoin(50)
+																																				_ = rf.flipcoin(20)
+																																				if rf.flipcoin(50) {
+																																					if rf.flipcoin(50) {
+																																						_ = rf.upto(3)
+																																					} else {
+																																						_ = rf.upto(20)
+																																					}
+																																				} else {
+																																					for h := 0; h < 8; h++ {
+																																						_ = rf.next31()
+																																					}
+																																				}
+																																				// e21327–29: F50 U4 + VS reselect PP
+																																				// e21330+: free invent Function useEx CREATE
+																																				// head F50 F20 U14 (not stdfunc F5).
+																																				_ = rf.flipcoin(50)
+																																				_ = rf.upto(4)
+																																				_ = rf.uptoWithFilter(100, func(x uint32) bool {
+																																					return x < 65 || x >= 95
+																																				})
+																																				// e21330–33: Function useEx CREATE head;
+																																				// e21334–54: nested useEx=0 → PL U6 → NV
+																																				// create multiphase (not PP aggregate).
+																																				postCreateForceStdfunc = false
+																																				postCreateUseExAgain = true
+																																				postCreateFunc = true
+																																				postCreateUseExN = 1
+																																				postCreateLateFreeAfterNVUseEx0PLU6NVOnce = true
+																																			}
+																																		}
+																																		break
+																																	}
+																																	if rm == 0 {
+																																		_ = rf.upto(2)
+																																		_ = rf.upto(2)
+																																		_ = rf.upto(10)
+																																	} else if rm == 3 {
+																																		// e21303–06: U2 U8 U5 U6 F0 once
+																																		_ = rf.upto(2)
+																																		_ = rf.upto(8)
+																																		_ = rf.upto(5)
+																																		_ = rf.upto(6)
+																																		_ = rf.flipcoin(0)
+																																	} else {
+																																		_ = rf.upto(2)
+																																		_ = rf.upto(2)
+																																		_ = rf.upto(10)
+																																	}
+																																}
+																															} else if sp2 < 35 {
+																																_ = rf.upto(8)
+																																_ = rf.upto(4)
+																															} else if sp2 < 65 {
+																																_ = rf.upto(6)
+																																_ = rf.upto(3)
+																															} else if !rf.flipcoin(10) {
+																																_ = rf.upto(5)
+																															}
 																															break
 																														}
 																														_ = rf.upto(2)
@@ -16367,6 +16529,13 @@ lhsDerefLoop:
 																														postCreateConstOnlyOnce = true
 																														postCreateLateFreeAfterNVConstBareOnce = true
 																													}
+																													if postCreateLateFreeAfterNVAsgBareThenConstBare {
+																														// e21372: free invent bare Constant after
+																														// bare Assign (no F50 residual).
+																														postCreateLateFreeAfterNVAsgBareThenConstBare = false
+																														postCreateConstOnlyOnce = true
+																														postCreateConstBareOnce = true
+																													}
 																												} else {
 																													asgF50 := rf.flipcoin(50)
 																													afterAsg = true
@@ -16377,8 +16546,23 @@ lhsDerefLoop:
 																													if postCreateLateFreeAfterNVAsgThenBareOnce {
 																														postCreateLateFreeAfterNVAsgThenBareOnce = false
 																														postCreateLateFreeAsgBareOnce = true
-																														// e20847+: free invent Variable PL multiphase
-																														postCreateLateFreeAfterNVPLMultiOnce = true
+																														if postCreateLateFreeAfterNVAsgThenBareGlobalU159 {
+																															// e21389+: free invent Variable Global U159
+																															// (not PL multiphase from e20847).
+																															// e21372: bare Constant after second Assign bare.
+																															postCreateLateFreeAfterNVAsgThenBareGlobalU159 = false
+																															postCreateLateFreeAfterNVGlobalU159Once = true
+																															postCreateLateFreeAfterNVGlobalU159NoPL = true
+																															postCreateLateFreeAfterNVAsgBareThenConstBare = true
+																														} else {
+																															// e20847+: free invent Variable PL multiphase
+																															postCreateLateFreeAfterNVPLMultiOnce = true
+																														}
+																													}
+																													// e21414–16: Assign F50 residual arms next Comma F80
+																													if postCreateLateFreeAfterNVAsgF50ThenCommaF80Once {
+																														postCreateLateFreeAfterNVAsgF50ThenCommaF80Once = false
+																														postCreateLateFreeAfterNVCommaF80U4Once = true
 																													}
 																													// e20273: AfterNV F80-ladder CREATE era
 																													// Assign F50 → next Expression no Assign/Comma.
@@ -16450,7 +16634,7 @@ lhsDerefLoop:
 																				continue
 																			}
 																			if vv >= 90 {
-																																								afterAsg = false
+																				afterAsg = false
 																				// e19545: AfterNV Assign nested RHS bare Constant
 																				if postCreateLateFreeAfterNVConstBareOnce {
 																					postCreateLateFreeAfterNVConstBareOnce = false
@@ -16494,14 +16678,23 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(20) // NewArray
 																							_ = rf.flipcoin(20) // make_init null/addr
 																						} else if sp < 95 {
-																							// ParentParam → empty/miss → PL create
-																							_ = rf.upto(5)
-																							for qi := 0; qi < 4; qi++ {
+																							// ParentParam: e21499 free invent Constant ptr-cmp RHS
+																							// Variable select — UP PP U6 F50 sole (not empty→PL create).
+																							if postCreateLateFreeAfterNVPPU6F50Once {
+																								postCreateLateFreeAfterNVPPU6F50Once = false
+																								_ = rf.upto(6)
 																								_ = rf.flipcoin(50)
-																								_ = rf.flipcoin(10)
+																							} else {
+																								// e21520+: PP ok_vars U6 + **** qfer create (was U5)
+																								_ = rf.upto(6)
+																								for qi := 0; qi < 4; qi++ {
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																								}
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								postCreateLateFreeAfterNVAfterPtrCmpConstOnly = true
 																							}
-																							_ = rf.flipcoin(20)
-																							_ = rf.flipcoin(20)
 																						} else if !rf.flipcoin(10) {
 																							// NewValue → PL create
 																							_ = rf.upto(5)
@@ -16795,11 +16988,21 @@ lhsDerefLoop:
 																									// e17517: F50=0 → RandomHexDigits(8)
 																									// (UP depth gap 21788→21797 = 8 untraced next31).
 																									// e19740–41 AfterNV: sole F50 hex, then Variable.
+																									// e21497–500: next free invent Constant ptr-cmp RHS
+																									// Variable PP U6 F50 (not Variable term).
 																									postCreateConstHex8Once = false
 																									_ = formatSimpleConstant(rf, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
 																									if postCreateLateFreeAfterNVConstVarOnce {
 																										postCreateLateFreeAfterNVConstVarOnce = false
 																										postCreateVarOnlyOnce = true
+																										afterAsg = false
+																										continue
+																									}
+																									if postCreateLateFreeAfterNVConstThenPPU6F50 {
+																										// e21497–500: later free invent Variable is PP U6 F50
+																										// (do not VarOnly — Function stream first).
+																										postCreateLateFreeAfterNVConstThenPPU6F50 = false
+																										postCreateLateFreeAfterNVPPU6F50Once = true
 																										afterAsg = false
 																										continue
 																									}
@@ -16892,7 +17095,17 @@ lhsDerefLoop:
 																								// e18842+: late free invent Constant (after F0 nest)
 																								// next Variable is free (no VarOnly tries).
 																								if !didAsgLhs && !postCreatePostArrayVar && !constBare {
-																									if postCreateLateFreeUseExN < 3 {
+																									if postCreateLateFreeAfterNVAfterPtrCmpConstOnly {
+																										// e21549: after ptr-cmp PP create + free Const
+																										// residual, next Expression Constant-only.
+																										postCreateLateFreeAfterNVAfterPtrCmpConstOnly = false
+																										postCreateConstOnlyOnce = true
+																										postCreateConstHex8Once = true
+																										postCreateConstHex16Once = false
+																										postCreateConstSmallOnce = false
+																										postCreateLateFreeAfterNVConstVarOnce = true
+																										postCreateLateFreeAfterNVGlobalU3F0G2Once = true
+																									} else if postCreateLateFreeUseExN < 3 {
 																										postCreateForceStdfunc = true
 																										if postCreatePostArrayGlobalN >= 2 {
 																											postCreateVarOnlyOnce = true
@@ -17277,45 +17490,53 @@ lhsDerefLoop:
 																					_ = rf.upto(4)
 																					_ = rf.upto(100) // PL 54 create
 																					_ = rf.flipcoin(5)
-																						_ = rf.upto(4)
-																						_ = rf.upto(20)
-																						_ = rf.upto(3)
-																						_ = rf.upto(20)
-																						_ = rf.upto(3)
-																						_ = rf.upto(20)
-																						_ = rf.upto(3)
-																						_ = rf.upto(70)
-																						_ = rf.upto(69)
-																						_ = rf.upto(4)
-																						_ = rf.upto(9)
-																						_ = rf.flipcoin(0)
-																						// For residual
-																						_ = rf.flipcoin(50)
-																						_ = rf.flipcoin(50)
-																						_ = rf.flipcoin(50)
-																						_ = rf.upto(4)
-																						_ = rf.flipcoin(50)
-																						_ = rf.upto(2)
-																						_ = rf.flipcoin(50)
-																						_ = rf.upto(4)
-																						_ = rf.flipcoin(50)
-																						_ = rf.flipcoin(50)
-																						_ = rf.upto(4)
-																						_ = rf.upto(4)
-																						_ = rf.upto(100) // PP
+																					_ = rf.upto(4)
+																					_ = rf.upto(20)
+																					_ = rf.upto(3)
+																					_ = rf.upto(20)
+																					_ = rf.upto(3)
+																					_ = rf.upto(20)
+																					_ = rf.upto(3)
+																					_ = rf.upto(70)
+																					_ = rf.upto(69)
+																					_ = rf.upto(4)
+																					_ = rf.upto(9)
+																					_ = rf.flipcoin(0)
+																					// For residual
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(4)
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(2)
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(4)
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(4)
+																					_ = rf.upto(4)
+																					_ = rf.upto(100) // PP
 																					// e16023+: next Function useExisting
 																					// CREATE head F50 F20 U14.
 																					postCreateUseExAgain = true
 																					continue
 																				}
 																				sp := rf.upto(100)
+																				if postCreateAssignN >= 40 {
+																				}
 																				if (postCreateLateFreeAfterNVNVCreateOnce || postCreateLateFreeAfterNVNVCreate2Once) && sp >= 95 {
 																					// e21056–63 / e21108–16: NewValue F10=0 PL U5 U14 create
 																					nv2 := postCreateLateFreeAfterNVNVCreate2Once
 																					postCreateLateFreeAfterNVNVCreateOnce = false
 																					postCreateLateFreeAfterNVNVCreate2Once = false
 																					if !rf.flipcoin(10) {
-																						_ = rf.upto(5)
+																						if postCreateLateFreeAfterNVNVCreateU6Once {
+																							// e21561: PL stack U6 (not U5)
+																							postCreateLateFreeAfterNVNVCreateU6Once = false
+																							_ = rf.upto(6)
+																						} else {
+																							_ = rf.upto(5)
+																						}
 																						if ctx != nil {
 																							// e21111: plain U14 (tries=0) vs NonVoidNV
 																							if nv2 {
@@ -17855,9 +18076,18 @@ lhsDerefLoop:
 																											} else if postCreateLateFreeAfterNVGlobalU159Once {
 																												// e20883: Global ok_vars U159 sole
 																												// e20891–94: next free Variable PL U5 F50 sole
+																												// e21391: sole only (no PLU5F50 when BareGlobalU159).
 																												postCreateLateFreeAfterNVGlobalU159Once = false
 																												_ = rf.upto(159)
-																												postCreateLateFreeAfterNVPLU5F50Once = true
+																												if postCreateLateFreeAfterNVGlobalU159NoPL {
+																													postCreateLateFreeAfterNVGlobalU159NoPL = false
+																													// e21392+: free invent Assign bare → Function bare →
+																													// Variable PP U6 F80=0 → Global U4.
+																													postCreateLateFreeAsgBareOnce = true
+																													postCreateLateFreeAfterNVPPU6F80Once = true
+																												} else {
+																													postCreateLateFreeAfterNVPLU5F50Once = true
+																												}
 																											} else if postCreateLateFreeAfterNVGlobalU3F0BOnce {
 																												// e21070–75: Global U3 F0 → PP U5 U2 U7
 																												// e21076+: free Variable Global U159 F80 ladder
@@ -17870,6 +18100,17 @@ lhsDerefLoop:
 																												_ = rf.upto(7)
 																												postCreateVarOnlyOnce = true
 																												postCreateLateFreeAfterNVGlobalU159F80Once = true
+																											} else if postCreateLateFreeAfterNVGlobalU3F0G2Once {
+																												// e21552–57: Global U3 F0 → reselect Global U2 U18
+																												postCreateLateFreeAfterNVGlobalU3F0G2Once = false
+																												_ = rf.upto(3)
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // Global
+																												_ = rf.upto(2)
+																												_ = rf.upto(18)
+																												// e21558+: free invent Variable tries=8 PP/NV multiphase
+																												postCreateVarOnlyOnce = true
+																												postCreateLateFreeAfterNVNVCreateU6Once = true
 																											} else if postCreateLateFreeAfterNVGlobalU159F80Once {
 																												// e21078–97: Global U159 + F80 SelectDeref ladder
 																												// → PL U5 U2 → free invent Variable Global U3…
@@ -19104,7 +19345,7 @@ lhsDerefLoop:
 																									// e16773+: late PL U2 sole;
 																									// e16925: one-shot ConstOnly;
 																									// e16970+: F80 CreateArray residual.
-																																																		if postCreatePostArrayAsgN >= 2 && !postCreatePostArrayAsgLhsDone {
+																									if postCreatePostArrayAsgN >= 2 && !postCreatePostArrayAsgLhsDone {
 																										postCreatePostArrayAsgLhsDone = true
 																										// e17351-55: Assign RHS PL stack U4 + create
 																										_ = rf.upto(4)
@@ -19196,6 +19437,27 @@ lhsDerefLoop:
 																											_ = rf.upto(5)
 																											_ = rf.flipcoin(50)
 																											postCreateLateFreeAfterNVGlobalU9Once = true
+																										} else if postCreateLateFreeAfterNVPLMulti3Once {
+																											// e21422–30: PL U6 U5 U8 U5 U6 F0 → Global U158
+																											postCreateLateFreeAfterNVPLMulti3Once = false
+																											_ = rf.upto(6)
+																											_ = rf.upto(5)
+																											_ = rf.upto(8)
+																											_ = rf.upto(5)
+																											_ = rf.upto(6)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100) // Global
+																											_ = rf.upto(158)
+																											// e21466–67: free invent Constant F50 hex×8
+																											// (sticky; not late free UseExN hex×4).
+																											// Do not ConstOnly — Function stream first.
+																											// e21497+: after Constant, next Constant ptr-cmp
+																											// RHS Variable PP U6 F50.
+																											postCreateConstHex8Once = true
+																											postCreateConstHex16Once = false
+																											postCreateConstSmallOnce = false
+																											postCreateAsgLhsF80Once = false
+																											postCreateLateFreeAfterNVConstThenPPU6F50 = true
 																										} else if postCreateLateFreeAfterNVPLU5SoleOnce {
 																											// e21046: PL U5 sole; e21047+ Variable-only multiphase
 																											// PP U5 U2 F0 → PP U5 U5 → NV create…
@@ -19780,85 +20042,86 @@ lhsDerefLoop:
 																										_ = rf.upto(2)
 																										if postCreatePostArrayGlobalN >= 5 {
 
-																										// e16972–80: F80=1 F0 F80
-																										// F20 F20 U99 U10×3 F20×…
-																										if rf.flipcoin(80) {
-																											_ = rf.flipcoin(0)
-																										}
-																										if rf.flipcoin(80) {
-																											_ = rf.flipcoin(20)
-																											_ = rf.flipcoin(20)
-																										}
-																										_ = rf.upto(99)
-																										_ = rf.upto(10)
-																										_ = rf.upto(10)
-																										_ = rf.upto(10)
-																										for hi := 0; hi < 3; hi++ {
-																											_ = rf.flipcoin(20)
-																										}
-																										_ = rf.upto(5)
-																										_ = rf.upto(4)
-																										_ = rf.flipcoin(0)
-																										// e16987-17206: multiphase VS ladder (Lhs SelectDeref fail path).
-																										// F80=1 -> U5 U4 F0 continue; F80=0 -> VS U100:
-																										// Global U3 U3 F0 continue; PL U2 early continue / late CreateArray;
-																										// PP/NV sole continue. e17013 must not exit on Global U3 U3 F0.
-																										plVSHits := 0
-																										for ri := 0; ri < 50; ri++ {
+																											// e16972–80: F80=1 F0 F80
+																											// F20 F20 U99 U10×3 F20×…
 																											if rf.flipcoin(80) {
-																												_ = rf.upto(5)
-																												_ = rf.upto(4)
 																												_ = rf.flipcoin(0)
-																												continue
 																											}
-																											sp := rf.upto(100)
-																											if sp < 35 {
-																												_ = rf.upto(3)
-																												_ = rf.upto(3)
-																												_ = rf.flipcoin(0)
-																												continue
+																											if rf.flipcoin(80) {
+																												_ = rf.flipcoin(20)
+																												_ = rf.flipcoin(20)
 																											}
-																											if sp >= 65 {
-																												continue
-																											}
-																											_ = rf.upto(2)
-																											plVSHits++
-																											if plVSHits == 1 || ri < 15 {
-																												continue
-																											}
-																											// CreateArray + field Constants (digits into strings)
-																											_ = rf.flipcoin(20)
-																											constTy := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-																											_ = formatSimpleConstant(rf, constTy)
 																											_ = rf.upto(99)
 																											_ = rf.upto(10)
 																											_ = rf.upto(10)
 																											_ = rf.upto(10)
-																											_ = rf.upto(81)
-																											for fi := 0; fi < 58; fi++ {
+																											for hi := 0; hi < 3; hi++ {
+																												_ = rf.flipcoin(20)
+																											}
+																											_ = rf.upto(5)
+																											_ = rf.upto(4)
+																											_ = rf.flipcoin(0)
+																											// e16987-17206: multiphase VS ladder (Lhs SelectDeref fail path).
+																											// F80=1 -> U5 U4 F0 continue; F80=0 -> VS U100:
+																											// Global U3 U3 F0 continue; PL U2 early continue / late CreateArray;
+																											// PP/NV sole continue. e17013 must not exit on Global U3 U3 F0.
+																											plVSHits := 0
+																											for ri := 0; ri < 50; ri++ {
+																												if rf.flipcoin(80) {
+																													_ = rf.upto(5)
+																													_ = rf.upto(4)
+																													_ = rf.flipcoin(0)
+																													continue
+																												}
+																												sp := rf.upto(100)
+																												if sp < 35 {
+																													_ = rf.upto(3)
+																													_ = rf.upto(3)
+																													_ = rf.flipcoin(0)
+																													continue
+																												}
+																												if sp >= 65 {
+																													continue
+																												}
+																												_ = rf.upto(2)
+																												plVSHits++
+																												if plVSHits == 1 || ri < 15 {
+																													continue
+																												}
+																												// CreateArray + field Constants (digits into strings)
+																												_ = rf.flipcoin(20)
+																												constTy := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 																												_ = formatSimpleConstant(rf, constTy)
+																												_ = rf.upto(99)
+																												_ = rf.upto(10)
+																												_ = rf.upto(10)
+																												_ = rf.upto(10)
+																												_ = rf.upto(81)
+																												for fi := 0; fi < 58; fi++ {
+																													_ = formatSimpleConstant(rf, constTy)
+																												}
+																												_ = rf.upto(3)
+																												_ = rf.upto(6)
+																												_ = rf.upto(9)
+																												if ctx != nil && ctx.state != nil {
+																													arrName := ctx.state.allocGlobalName()
+																													writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[4] = {0};", arrName))
+																													ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+																														name: arrName, ctype: constTy, isArray: true, arrayLen: 4,
+																													})
+																												}
+																												break
 																											}
-																											_ = rf.upto(3)
-																											_ = rf.upto(6)
-																											_ = rf.upto(9)
-																											if ctx != nil && ctx.state != nil {
-																												arrName := ctx.state.allocGlobalName()
-																												writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static int32_t %s[4] = {0};", arrName))
-																												ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-																													name: arrName, ctype: constTy, isArray: true, arrayLen: 4,
-																												})
-																											}
-																											break
+																											postCreateVarOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN >= 2 && !postCreateLatePLConstDone {
+																											postCreateLatePLConstDone = true
+																											postCreateConstOnlyOnce = true
+																										} else if postCreatePostArrayGlobalN >= 2 {
+																											// e16935+: next Variable tries
+																											postCreateVarOnlyOnce = true
 																										}
-																										postCreateVarOnlyOnce = true
-																									} else if postCreatePostArrayGlobalN >= 2 && !postCreateLatePLConstDone {
-																										postCreateLatePLConstDone = true
-																										postCreateConstOnlyOnce = true
-																									} else if postCreatePostArrayGlobalN >= 2 {
-																										// e16935+: next Variable tries
-																										postCreateVarOnlyOnce = true
 																									}
-																								}																									}
+																								}
 
 																							} else {
 																								// e15815: stack U6 U5 + itemize
@@ -20259,6 +20522,22 @@ lhsDerefLoop:
 																										_ = rf.upto(5)
 																										postCreateVarOnlyOnce = true
 																										postCreateLateFreeAfterNVNVCreateOnce = true
+																									} else if postCreateLateFreeAfterNVPPU6F80Once {
+																										// e21395–99: PP U6 F80=0 → Global U4 sole
+																										postCreateLateFreeAfterNVPPU6F80Once = false
+																										_ = rf.upto(6)
+																										if !rf.flipcoin(80) {
+																											_ = rf.upto(100) // Global
+																											_ = rf.upto(4)
+																										}
+																										// e21414+: free invent Assign F50=0 then Comma F80
+																										postCreateLateFreeAfterNVAsgF50ThenCommaF80Once = true
+																									} else if postCreateLateFreeAfterNVPPU6F50Once {
+																										// e21499–500: free invent Variable PP U6 F50 (backup;
+																										// primary is ptr-cmp Constant path).
+																										postCreateLateFreeAfterNVPPU6F50Once = false
+																										_ = rf.upto(6)
+																										_ = rf.flipcoin(50)
 																									} else if postCreateLateFreeAfterNVPPU6U2Once {
 																										// e21132–36: PP U6 U2 F80 U10 U2
 																										postCreateLateFreeAfterNVPPU6U2Once = false
@@ -20772,8 +21051,19 @@ lhsDerefLoop:
 																								// e19016–23: PL stack U5 + U14 type +
 																								// F50 F10 qfer + NewArray F20 + Constant
 																								// F50 F50 U3 small.
-																								_ = rf.upto(5)
-																								_ = rf.upto(14)
+																								if postCreateLateFreeAfterNVNVCreateU6Once {
+																									// e21561–62: PL stack U6 + NonVoid U14 (tries=1)
+																									postCreateLateFreeAfterNVNVCreateU6Once = false
+																									_ = rf.upto(6)
+																									if ctx != nil {
+																										burnAllTypesNonVoidNonVolatile(rf, ctx.info, opts)
+																									} else {
+																										_ = rf.upto(14)
+																									}
+																								} else {
+																									_ = rf.upto(5)
+																									_ = rf.upto(14)
+																								}
 																								_ = rf.flipcoin(50)
 																								_ = rf.flipcoin(10)
 																								_ = rf.flipcoin(20)
@@ -20856,7 +21146,7 @@ lhsDerefLoop:
 																							}
 																							postCreateVarOnlyOnce = true
 																						}
-																						} else if !rf.flipcoin(10) {
+																					} else if !rf.flipcoin(10) {
 																						if !postCreateLateCommaF80 {
 
 																							// e16129–42: PL stack U1 +
@@ -21020,6 +21310,47 @@ lhsDerefLoop:
 																			if postCreateFunc || lhsSelectDerefResidualRan {
 																				useEx := rf.flipcoin(50)
 																				if !useEx && postCreateFunc {
+																					if postCreateLateFreeAfterNVUseEx0PLU6NVOnce {
+																						// e21335–54: useEx=0 → PL U6 → NV F10
+																						// PL U6 + qfer create multiphase residual.
+																						postCreateLateFreeAfterNVUseEx0PLU6NVOnce = false
+																						postCreateFunc = false
+																						postCreateUseExAgain = false
+																						_ = rf.upto(100) // PL
+																						_ = rf.upto(6)
+																						_ = rf.upto(100) // NewValue
+																						if !rf.flipcoin(10) {
+																							_ = rf.upto(6)
+																							// qfer F50 F10 F50 F10 F20 F20
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																							// CreateArray U6 U99 U10 U1 U3 F80 U9
+																							_ = rf.upto(6)
+																							_ = rf.upto(99)
+																							_ = rf.upto(10)
+																							_ = rf.upto(1)
+																							_ = rf.upto(3)
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(9)
+																							}
+																							// e21354: VS PP reselect tries=2
+																							_ = rf.uptoWithFilter(100, func(x uint32) bool {
+																								return x < 65 || x >= 95
+																							})
+																						}
+																						// e21355: free invent Variable sole (no residual);
+																						// e21356+: free invent Function stdfunc.
+																						// e21368–71: Assign F50 afterAsg → Function bare →
+																						// Assign bare → Constant; e21389+: Global U159.
+																						postCreateLateFreeAfterNVVarBareOnce = true
+																						postCreateLateFreeAfterNVAsgThenBareOnce = true
+																						postCreateLateFreeAfterNVAsgThenBareGlobalU159 = true
+																						continue
+																					}
 																					if postCreateLateFreeAfterNVUseExPLU5F0Once {
 																						// e20269–70: after nested useEx PL U5
 																						// residual, useEx=0 → bare F0 then
@@ -22522,9 +22853,9 @@ lhsDerefLoop:
 												// F80 U5; F80 U4 F0; F80 U3 U7 U9 U4 F0;
 												// F80=0 → VS Global U2.
 												steps := []struct {
-													pool    int
-													extra   []int
-													f0      bool
+													pool  int
+													extra []int
+													f0    bool
 												}{
 													{8, nil, true},
 													{7, nil, true},
@@ -22600,7 +22931,7 @@ lhsDerefLoop:
 												continue
 											}
 											_ = rf.flipcoin(0)
-											_ = rf.upto(120) // nested Function binary
+											_ = rf.upto(120)     // nested Function binary
 											funcAfterSkip = true // nested binary next style
 											// fall through to binary burn for nested
 										}
@@ -23336,7 +23667,7 @@ lhsDerefLoop:
 				pool := []int{11, 10, 9, 8, 7, 6}
 				_ = r.upto(uint32(pool[n]))
 				if n == 5 {
-					_ = r.flipcoin(0) // e7888
+					_ = r.flipcoin(0)                             // e7888
 					ctx.state.postAggNestArrayOpPLStackU4CD2N = 6 // wait F80=0
 				}
 				continue
@@ -23528,9 +23859,9 @@ lhsDerefLoop:
 					// Final F80=0 → VS PP U3 + create residual (e7929–34),
 					// then more SelectDeref U2+[9][9][3]F0… (e7935+).
 					if !r.flipcoin(80) {
-						_ = r.upto(100) // e7930 PP
-						_ = r.upto(3)   // e7931 stack
-						_ = r.flipcoin(50) // e7932 WRITE vol
+						_ = r.upto(100)          // e7930 PP
+						_ = r.upto(3)            // e7931 stack
+						_ = r.flipcoin(50)       // e7932 WRITE vol
 						newArr := r.flipcoin(20) // e7933 NewArray
 						if newArr {
 							_ = r.flipcoin(50)
@@ -23744,12 +24075,12 @@ lhsDerefLoop:
 			// then F80 U11… (not nestVSMisses sticky U5 residual).
 			if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU4ShortCDDone {
 				ctx.state.postAggNestArrayOpPLStackU4ShortCDDone = false
-				_ = r.upto(100) // e7869 PL
-				_ = r.upto(3)   // e7870 stack
-				_ = r.upto(4)   // e7871 locals
-				_ = r.upto(9)   // e7872
-				_ = r.upto(4)   // e7873
-				_ = r.upto(7)   // e7874
+				_ = r.upto(100)   // e7869 PL
+				_ = r.upto(3)     // e7870 stack
+				_ = r.upto(4)     // e7871 locals
+				_ = r.upto(9)     // e7872
+				_ = r.upto(4)     // e7873
+				_ = r.upto(7)     // e7874
 				_ = r.flipcoin(0) // e7875
 				// Resume: F80 U11…U7 pure, U6+F0 (e7876–88).
 				ctx.state.postAggNestArrayOpPLStackU4CD2 = true
@@ -28111,7 +28442,6 @@ func emitStatement(
 				}
 				// create_random_array → CreateArrayVariable without itemize
 				if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
-					fmt.Fprintf(os.Stderr, "ARRAY create ty=%s hex=%d\n", arrTy.Name, hexDigitsForConstant(arrTy))
 				}
 				{
 					_arr := burnCreateArrayVariable(r, opts, arrTy, false)
