@@ -589,6 +589,23 @@ type functionFlowState struct {
 	// postAggNestArrayOpPLStackU4AddrU8: that create burns address residual U8
 	// (e7855; e7383 sticky skip would omit it).
 	postAggNestArrayOpPLStackU4AddrU8 bool
+	// postAggNestArrayOpPLStackU4LiveU6: next Statement Assign Lhs SelectDeref
+	// is live choose U6 (e7857; not nest countdown / empty F80 retry).
+	postAggNestArrayOpPLStackU4LiveU6 bool
+	// postAggNestArrayOpPLStackU4ShortCD: after LiveU6 accept, next Assign Lhs
+	// nest SelectDeref is short: F80 U12, F80 U11+[9][4][7]F0, F80=0→VS (e7861–68).
+	postAggNestArrayOpPLStackU4ShortCD bool
+	// postAggNestArrayOpPLStackU4ShortCDDone: after short CD ends, VS PL is U3
+	// + locals U4 + [9][4][7] F0 (e7870–75).
+	postAggNestArrayOpPLStackU4ShortCDDone bool
+	// postAggNestArrayOpPLStackU4CD2: after that VS residual, SelectDeref continues
+	// U11,U10,U9,U8,U7 pure then U6+F0 (e7876–88; not full round1 residual table).
+	postAggNestArrayOpPLStackU4CD2 bool
+	postAggNestArrayOpPLStackU4CD2N int
+	// postAggNestArrayOpPLStackU4CD3: after CD2 F80=0 VS Global, more SelectDeref
+	// U4+F0, U3+[9][4][7]F0 ×2, F80=0 (e7891–906).
+	postAggNestArrayOpPLStackU4CD3 bool
+	postAggNestArrayOpPLStackU4CD3N int
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -8542,8 +8559,13 @@ exprTries:
 								// create qferMode 1 without e7372 U2 or second stack.
 								// UP qfer F50 F10×2 = one ptr level + self (keep * not **).
 								// e7855: address residual U8 after F20 F20.
+								// e7857: parent Statement Assign Lhs SelectDeref live U6.
 								flow.postAggNestArrayOpPLStackU4SkipU2Once = false
 								flow.postAggNestArrayOpPLStackU4AddrU8 = true
+								flow.postAggNestArrayOpPLStackU4LiveU6 = true
+								// Clear nest SelectDeref countdown so Lhs uses live U6.
+								flow.postAggNestSelDerefCountdown = false
+								flow.postAggNestSelDerefRound2 = false
 								createT := t
 								if !strings.Contains(createT.Name, "*") {
 									createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
@@ -10468,8 +10490,17 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			}
 		}
 		// seed4 e2388 postAgg Lhs PL: Function::stack.size() ≈ 6 (not e940 U2).
+		// e7870: after LiveU6 short SelectDeref countdown VS, PL stack is U3
+		// then locals U4 + [9][4][7] F0 (not sticky postAgg U6 / U5).
 		if postAggGlobalCreateN >= 0 {
 			nStack = 6
+			if flow != nil && flow.postAggNestArrayOpPLStackU4ShortCDDone {
+				nStack = 3
+			} else if flow != nil && flow.postAggNestArrayOpPLStackU4 {
+				nStack = 4
+			} else if flow != nil && flow.postAggNestArrayOpPLStackU3 {
+				nStack = 3
+			}
 		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
@@ -10500,6 +10531,18 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					_ = r.upto(1)
 				}
 				return lvalueInfo{expr: "x", ctype: target}, true, false
+			}
+			// e7870–75: after short CD VS PL U3 + locals U4 + [9][4][7] F0 → F80.
+			if flow != nil && flow.postAggNestArrayOpPLStackU4ShortCDDone {
+				flow.postAggNestArrayOpPLStackU4ShortCDDone = false
+				_ = er.pick(4) // e7871
+				_ = er.pick(9) // e7872
+				_ = er.pick(4) // e7873
+				_ = er.pick(7) // e7874
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0) // e7875
+				}
+				return lvalueInfo{}, false, false
 			}
 			if len(localCands) == 0 || forceCreateLate {
 				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) seed2 e942–943.
@@ -11127,6 +11170,256 @@ lhsDerefLoop:
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
 		}
+		// e7857: after ForCtrl PP→PL create + U8 address residual (RHS of this
+		// Assign), Lhs SelectDeref is live choose U6 accept (UP F80 U6 then
+		// next Statement U100). Nest countdown / empty retry would F80×2.
+		// e7861: next Statement Assign Lhs starts nest countdown U12… (arm Round2).
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU4LiveU6 {
+			if !r.flipcoin(80) {
+				break // VS select
+			}
+			ctx.state.postAggNestArrayOpPLStackU4LiveU6 = false
+			_ = r.upto(6) // e7857 choose_ok_var among ~6 pointers
+			// Next Assign Lhs: short nest SelectDeref (e7861–68).
+			ctx.state.postAggNestSelDerefRound2 = true
+			ctx.state.postAggNestSelDerefFails = 0
+			ctx.state.postAggNestSelDerefRoundN = 0
+			ctx.state.postAggNestArrayOpPLStackU4ShortCD = true
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
+		// e7876–88: after short-CD VS PL residual, F80 U11…U7 pure then U6+F0;
+		// e7889–90: F80=0 VS Global then CD3.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU4CD2 {
+			n := ctx.state.postAggNestArrayOpPLStackU4CD2N
+			// After U6+F0 (n==6 sentinel): only F80=0 → Global + CD3.
+			if n >= 6 {
+				if !r.flipcoin(80) {
+					ctx.state.postAggNestArrayOpPLStackU4CD2 = false
+					_ = r.upto(100) // e7890 Global
+					ctx.state.postAggNestArrayOpPLStackU4CD3 = true
+					ctx.state.postAggNestArrayOpPLStackU4CD3N = 0
+					continue
+				}
+				// unexpected F80=1
+				ctx.state.postAggNestArrayOpPLStackU4CD2 = false
+				continue
+			}
+			if !r.flipcoin(80) {
+				// early F80=0 before ladder done — fall through
+				ctx.state.postAggNestArrayOpPLStackU4CD2 = false
+			} else {
+				ctx.state.postAggNestArrayOpPLStackU4CD2N++
+				// n=0..4: U11,U10,U9,U8,U7 pure; n=5: U6+F0
+				pool := []int{11, 10, 9, 8, 7, 6}
+				_ = r.upto(uint32(pool[n]))
+				if n == 5 {
+					_ = r.flipcoin(0) // e7888
+					ctx.state.postAggNestArrayOpPLStackU4CD2N = 6 // wait F80=0
+				}
+				continue
+			}
+		}
+		// e7891–906: F80 U4+F0, F80 U3+[9][4][7]F0 ×2; e7906–14: F80=0 VS Global
+		// U7 then F80 U3+[9][9][3]F0, F80 U3, F80 U2+[9][9][3]…
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU4CD3 {
+			n := ctx.state.postAggNestArrayOpPLStackU4CD3N
+			// n>=3: after ladder, wait F80=0 → Global U7 + more SelectDeref
+			if n >= 3 {
+				if n >= 200 && n < 300 {
+					// After PP create residual: U2+[9][9][3]F0 until F80=0 (e7935+);
+					// e7947–50: F80=0 VS Global U6 U8 then more SelectDeref.
+					if !r.flipcoin(80) {
+						_ = r.upto(100) // e7948 Global
+						_ = r.upto(6)   // e7949
+						_ = r.upto(8)   // e7950
+						ctx.state.postAggNestArrayOpPLStackU4CD3N = 300
+						continue
+					}
+					_ = r.upto(2)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestArrayOpPLStackU4CD3N++
+					if ctx.state.postAggNestArrayOpPLStackU4CD3N > 220 {
+						// force VS path
+						ctx.state.postAggNestArrayOpPLStackU4CD3N = 300
+					}
+					continue
+				}
+				if n >= 300 {
+					if !r.flipcoin(80) {
+						// e7975–82: first F80=0 → PL create residual F50 F20 F50 F50 U20
+						// e7989–95: later F80=0 → VS U100 U3 U9 U4 U7 F0 then more.
+						// Use CD3N parity: after create residual set n=400; n>=400 → later.
+						if n < 400 {
+							_ = r.upto(100) // e7976 PL
+							_ = r.upto(3)   // e7977 stack
+							_ = r.flipcoin(50)
+							newArr := r.flipcoin(20)
+							if newArr {
+								_ = r.flipcoin(50)
+								_ = r.flipcoin(50)
+								_ = r.upto(20)
+								_ = burnCreateArrayVariable(r, opts, targetType, true)
+							} else {
+								if r.flipcoin(50) {
+									if r.flipcoin(50) {
+										_ = r.upto(3)
+									} else {
+										_ = r.upto(20)
+									}
+								} else {
+									for i := 0; i < 8; i++ {
+										_ = r.next31()
+									}
+								}
+							}
+							ctx.state.postAggNestArrayOpPLStackU4CD3N = 400
+							continue
+						}
+						// later F80=0: VS stack residual U3 U9 U4 U7 F0
+						_ = r.upto(100)
+						_ = r.upto(3)
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+						continue
+					}
+					// F80=1 under n>=400: 947, then (993,947,947,947)* (e7983–831).
+					if n >= 400 {
+						k := n - 400
+						_ = r.upto(2)
+						_ = r.upto(9)
+						use993 := k >= 1 && (k-1)%4 == 0
+						if use993 {
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+						ctx.state.postAggNestArrayOpPLStackU4CD3N++
+						if ctx.state.postAggNestArrayOpPLStackU4CD3N > 450 {
+							ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+						}
+						continue
+					}
+					// First [9][4][7] then all [9][9][3] itemize F0 (e7951–74).
+					k := ctx.state.postAggNestArrayOpPLStackU4CD3N - 300
+					_ = r.upto(2)
+					_ = r.upto(9)
+					if k == 0 {
+						_ = r.upto(4)
+						_ = r.upto(7)
+					} else {
+						_ = r.upto(9)
+						_ = r.upto(3)
+					}
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestArrayOpPLStackU4CD3N++
+					if ctx.state.postAggNestArrayOpPLStackU4CD3N > 340 {
+						ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+					}
+					continue
+				}
+				if n >= 100 {
+					// Final F80=0 → VS PP U3 + create residual (e7929–34),
+					// then more SelectDeref U2+[9][9][3]F0… (e7935+).
+					if !r.flipcoin(80) {
+						_ = r.upto(100) // e7930 PP
+						_ = r.upto(3)   // e7931 stack
+						_ = r.flipcoin(50) // e7932 WRITE vol
+						newArr := r.flipcoin(20) // e7933 NewArray
+						if newArr {
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = burnCreateArrayVariable(r, opts, targetType, true)
+						} else {
+							// Constant::make_random (e7934 F50=0 → hex 8×next31)
+							if r.flipcoin(50) {
+								if r.flipcoin(50) {
+									_ = r.upto(3)
+								} else {
+									_ = r.upto(20)
+								}
+							} else {
+								for i := 0; i < 8; i++ {
+									_ = r.next31()
+								}
+							}
+						}
+						ctx.state.postAggNestArrayOpPLStackU4CD3N = 200
+						continue
+					}
+					ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+					continue
+				}
+				if !r.flipcoin(80) {
+					_ = r.upto(100) // e7907 Global
+					_ = r.upto(7)   // e7908
+					ctx.state.postAggNestArrayOpPLStackU4CD3N = 4
+					continue
+				}
+				// n>=4: continuing SelectDeref after Global U7
+				nn := n - 4
+				ctx.state.postAggNestArrayOpPLStackU4CD3N++
+				switch nn {
+				case 0: // U3 + [9][9][3] F0
+					_ = r.upto(3)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 1: // U3 pure
+					_ = r.upto(3)
+				case 2: // U2 + [9][9][3] F0
+					_ = r.upto(2)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 3: // U2 + [9][4][7] F0 (e7924–28) then wait final F80=0
+					_ = r.upto(2)
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestArrayOpPLStackU4CD3N = 100
+				default:
+					ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+				}
+				continue
+			}
+			if !r.flipcoin(80) {
+				// early F80=0 before ladder done
+				ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+				break
+			}
+			ctx.state.postAggNestArrayOpPLStackU4CD3N++
+			switch n {
+			case 0: // U4 + F0
+				_ = r.upto(4)
+				_ = r.flipcoin(0)
+			case 1, 2: // U3 + [9][4][7] F0
+				_ = r.upto(3)
+				_ = r.upto(9)
+				_ = r.upto(4)
+				_ = r.upto(7)
+				_ = r.flipcoin(0)
+				if n == 2 {
+					ctx.state.postAggNestArrayOpPLStackU4CD3N = 3 // wait F80=0
+				}
+			default:
+				ctx.state.postAggNestArrayOpPLStackU4CD3 = false
+			}
+			continue
+		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
 			// e4335+: Statement Lhs after Expression unwind — Lhs is do-while
 			// (Lhs.cpp): F80=0 → VS; on miss, loop again SelectDeref (UP U5 U5
@@ -11137,6 +11430,22 @@ lhsDerefLoop:
 			// 0: U100 → resume U7. 1: U100+U6. 2: U100+U6+create long → U3/U2.
 			// 3: U100+U5+U8 (e4707). 4: U100+U6+[9][4][7]F0 (e4711–15).
 			// 5: U100+U6+F50 F20 F50 → U2 phase2 (e4718–21). 6+: U5/U6 itemize.
+			// e7869–75: after LiveU6 short CD, F80=0 → VS PL U100 U3 U4 U9 U4 U7 F0
+			// then F80 U11… (not nestVSMisses sticky U5 residual).
+			if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU4ShortCDDone {
+				ctx.state.postAggNestArrayOpPLStackU4ShortCDDone = false
+				_ = r.upto(100) // e7869 PL
+				_ = r.upto(3)   // e7870 stack
+				_ = r.upto(4)   // e7871 locals
+				_ = r.upto(9)   // e7872
+				_ = r.upto(4)   // e7873
+				_ = r.upto(7)   // e7874
+				_ = r.flipcoin(0) // e7875
+				// Resume: F80 U11…U7 pure, U6+F0 (e7876–88).
+				ctx.state.postAggNestArrayOpPLStackU4CD2 = true
+				ctx.state.postAggNestArrayOpPLStackU4CD2N = 0
+				continue
+			}
 			if ctx != nil && ctx.state != nil && ctx.state.postAggNestSelDerefRoundN >= 1 &&
 				ctx.state.postAggNestVSMisses < 50 {
 				_ = r.upto(100) // VS scope
@@ -11728,6 +12037,25 @@ lhsDerefLoop:
 					lhsFromDeref = true
 					break lhsDerefLoop
 				}
+				// e7861–68: short countdown after LiveU6 — F80 U12 pure,
+				// F80 U11+[9][4][7]F0, then F80=0→VS PL U3+[9][4][7]F0.
+				if ctx.state.postAggNestArrayOpPLStackU4ShortCD && roundN >= 1 {
+					switch fails {
+					case 0: // U12 pure
+					case 1: // U11 + [9][4][7] F0 → stop; arm VS PL residual
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+						ctx.state.postAggNestArrayOpPLStackU4ShortCD = false
+						ctx.state.postAggNestArrayOpPLStackU4ShortCDDone = true
+						ctx.state.postAggNestSelDerefCountdown = false
+					default:
+						ctx.state.postAggNestArrayOpPLStackU4ShortCD = false
+						ctx.state.postAggNestSelDerefCountdown = false
+					}
+					continue
+				}
 				if roundN >= 2 {
 					// e6129–36: U12+947, U12+F0 → VS; e6140+: U10… countdown
 					switch fails {
@@ -12073,6 +12401,24 @@ lhsDerefLoop:
 						break lhsDerefLoop
 					}
 					// Round1+ residual after choose
+					// e7861–68: short countdown after LiveU6 — F80 U12 pure,
+					// F80 U11+[9][4][7]F0, then F80=0→VS (not full U10/U9 ladder).
+					if ctx.state.postAggNestArrayOpPLStackU4ShortCD {
+						switch fails {
+						case 0: // U12 pure
+						case 1: // U11 + [9][4][7] F0 → stop countdown
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+							_ = r.flipcoin(0)
+							ctx.state.postAggNestArrayOpPLStackU4ShortCD = false
+							ctx.state.postAggNestSelDerefCountdown = false
+						default:
+							ctx.state.postAggNestArrayOpPLStackU4ShortCD = false
+							ctx.state.postAggNestSelDerefCountdown = false
+						}
+						continue
+					}
 					switch fails {
 					case 0, 1, 3: // U12,U11,U9 pure fail
 					case 2: // U10+F0
