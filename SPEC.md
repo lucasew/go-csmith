@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8682) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8719) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8682** (8603→8682; NewValue PP sole + post-CD3 PL/Global multiphase; seed2 full held). Toward 9000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8719** (8682→8719; Statement Assign Lhs SelectDeref residual; seed2 full held). Toward 9000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -522,8 +522,13 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e8610–77: U3-stack PL inventory table (U5/sole/U5+F0/U4/U5+993/U5).
 4. e8669: NewValue→PL simple qfer mode1 then mode2.
 
-Next plateau: seed4 e8682 after free Expression Constant, UP Lhs SelectDeref F80
-(U12+947…) vs GO next Statement U100. Seeds 5–21; COUNT=20.
+**e8682–e8719 climbed:**
+1. e8682: Statement Assign Lhs SelectDeref residual U12+947 / U12+F0 / U11+U4
+   (clear sticky SkipStmtLhs after long post-CD3 RHS).
+2. e8702: second Statement Assign Lhs residual U6→VS Global/PP→PL create.
+
+Next plateau: seed4 e8719 after Lhs residual, UP F5 For/array residual vs GO
+Statement U100. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

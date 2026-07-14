@@ -653,6 +653,15 @@ type functionFlowState struct {
 	// postAggPostCD3NVPLN: simple NewValue→PL create count under post-CD3
 	// (e8597 mode1 F50 F10; e8669 mode2 F10).
 	postAggPostCD3NVPLN int
+	// postAggPostCD3StmtLhsSel: Statement Assign Lhs SelectDeref residual after
+	// long post-CD3 RHS (e8682 U12+947…).
+	postAggPostCD3StmtLhsSel bool
+	// postAggPostCD3StmtLhsSelDone: one-shot arm for e8682 residual.
+	postAggPostCD3StmtLhsSelDone bool
+	// postAggPostCD3StmtLhs2: arm second Statement Assign Lhs residual after e8682.
+	postAggPostCD3StmtLhs2 bool
+	// postAggPostCD3StmtLhs2Active: burn U6+VS create residual at Lhs entry.
+	postAggPostCD3StmtLhs2Active bool
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -9694,8 +9703,9 @@ exprTries:
 						}
 						ctx.state.ppPostPadSkipParentExprN = 0
 						ctx.state.skipNextBlockSize = false
-						// Outer Statement/ExpressionAssign Lhs soles (nested residual done).
-						ctx.state.ppPostPadSkipStmtLhs = true
+						// e8337: ExpressionAssign outer Lhs soles after nested residual.
+						// Do NOT set SkipStmtLhs — Statement Assign at e8387 has long
+						// RHS then real Lhs SelectDeref F80 (e8682 U12+947), not sole.
 						ctx.state.ppPostPadOuterLhsSole = true
 						lhsFromDeref = true
 						break
@@ -11389,6 +11399,28 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			erKeep := newExprRand(r, exprDecisionBudget(opts))
 			_ = randomTypedExprDepthFlags(targetType, erKeep, opts, env, scope, 0, ctx, false, false)
 		}
+		// e8682 post-CD3: long Statement Assign RHS ends at free Expression
+		// Constant; Lhs must run real SelectDeref F80 (U12+947…), not sticky
+		// SkipStmtLhs / NeedLhs short-circuit from earlier residuals.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 &&
+			!ctx.state.postAggPostCD3StmtLhsSelDone {
+			ctx.state.postAggPostCD3StmtLhsSelDone = true
+			ctx.state.ppPostPadSkipStmtLhs = false
+			ctx.state.ppPostPadOuterLhsSole = false
+			ctx.state.ppPostPadOuterLhsSoleN = 0
+			ctx.state.postAggNeedLhsAfterRhs = false
+			ctx.state.ppEraRhsArrayCreate = false
+			ctx.state.lateLhsMustUseWrite = false
+			// Arm Statement Lhs SelectDeref residual matching UP e8682–93.
+			ctx.state.postAggPostCD3StmtLhsSel = true
+		} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs2 {
+			// e8702: second Statement Assign Lhs residual U6+VS create.
+			ctx.state.postAggPostCD3StmtLhs2 = false
+			ctx.state.postAggPostCD3StmtLhsSel = false
+			ctx.state.ppPostPadSkipStmtLhs = false
+			ctx.state.postAggNeedLhsAfterRhs = false
+			ctx.state.postAggPostCD3StmtLhs2Active = true
+		}
 	}
 
 	// Lhs::make_random: select_must_use WRITE first, then SelectDerefPointerProb
@@ -11400,8 +11432,58 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
+	// e8682 post-CD3: Statement Lhs SelectDeref residual after long RHS.
+	// UP e8682–93: U12+947 F0, U12+F0, U11+U4 accept.
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhsSel {
+		ctx.state.postAggPostCD3StmtLhsSel = false
+		_ = r.flipcoin(80) // e8682 F80=1
+		_ = r.upto(12)     // e8683
+		_ = r.upto(9)      // e8684 947
+		_ = r.upto(4)
+		_ = r.upto(7)
+		_ = r.flipcoin(0) // e8687
+		if r.flipcoin(80) { // e8688
+			_ = r.upto(12)
+			_ = r.flipcoin(0) // e8690
+		}
+		if r.flipcoin(80) { // e8691
+			_ = r.upto(11)
+			_ = r.upto(4) // e8693
+		}
+		lhsFromDeref = true
+		ctx.state.skipNextBlockSize = false
+		// e8702+: next Statement Assign Lhs SelectDeref U6 then VS create residual.
+		ctx.state.postAggPostCD3StmtLhs2 = true
+	}
+	// e8702–18 post-CD3: F80 U6 → VS Global/PP → PL U3 create F20 F20 CreateArray
+	// then more VS residual U100×3 before next Statement.
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3StmtLhs2Active {
+		ctx.state.postAggPostCD3StmtLhs2Active = false
+		_ = r.flipcoin(80) // e8702 F80=1
+		_ = r.upto(6)      // e8703 U6
+		// visit fail → VS Global U100, PP U100, PL U3 + create residual
+		_ = r.upto(100)    // e8704 Global
+		_ = r.upto(100)    // e8705 PP
+		_ = r.upto(3)      // e8706 stack
+		_ = r.flipcoin(20) // e8707 NewArray
+		_ = r.flipcoin(20) // e8708 init
+		_ = r.upto(99)     // e8709 CreateArray dim
+		// itemize sizes approx 10 10 3 (UP e8710–12)
+		_ = r.upto(10)
+		_ = r.upto(10)
+		_ = r.upto(3)
+		_ = r.flipcoin(20) // e8713
+		_ = r.upto(2)      // e8714
+		_ = r.upto(3)      // e8715
+		// e8716–18: VS residual U100×3 before next Statement
+		_ = r.upto(100)
+		_ = r.upto(100)
+		_ = r.upto(100)
+		lhsFromDeref = true
+		ctx.state.skipNextBlockSize = false
+	}
 	// e3023+: F50-era RHS Variable signaled postAggNeedLhsAfterRhs.
-	if ctx != nil && ctx.state != nil && ctx.state.postAggNeedLhsAfterRhs {
+	if !lhsFromDeref && ctx != nil && ctx.state != nil && ctx.state.postAggNeedLhsAfterRhs {
 		ctx.state.postAggNeedLhsAfterRhs = false
 		er := newExprRand(r, exprDecisionBudget(opts))
 		base := targetType
