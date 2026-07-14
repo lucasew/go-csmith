@@ -101,6 +101,9 @@ var postAggNestGlobalU17ChoosesSink *int
 // postAggNestGlobalU17F0DoneSink: one-shot F0 before 3rd nest U17 (e6637).
 var postAggNestGlobalU17F0DoneSink *bool
 
+// postAggNestArrayOpResidualDoneSink: after nest ArrayOp residual (e6716+ U55 Global).
+var postAggNestArrayOpResidualDoneSink *bool
+
 // postAggNestNoConstOnceSink: next Expression noConst after nest Global F50 residual.
 var postAggNestNoConstOnceSink *bool
 
@@ -737,7 +740,9 @@ func noteNestPPSoleShiftSkip(flow *functionFlowState) {
 		return
 	}
 	flow.postAggNestPPSoleN++
-	if flow.postAggNestPPSoleN >= 3 {
+	// Arm only on the 3rd sole (e6635); re-arming on 4th+ sticky-skips later
+	// legitimate ShiftBy (e6823 UP F50 after nest ArrayOp PL Variable).
+	if flow.postAggNestPPSoleN == 3 {
 		flow.postAggSkipShiftByOnce = true
 		if flow.postAggUnwindBinaryAfterExprVar < 2 {
 			flow.postAggUnwindBinaryAfterExprVar = 2
@@ -1962,7 +1967,11 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 	// e6608: nest residual Constant hex under-width (int8 hn=2) while UP
 	// burns wider RandomHexDigits after F50=0 — floor so LCG aligns for
 	// next Expression U120 tries=9 Variable.
+	// e6895: after nest ArrayOp residual, free Constant still needs hn≥16.
 	if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && hn < 16 {
+		hn = 16
+	}
+	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink && hn < 16 {
 		hn = 16
 	}
 	var bits uint32
@@ -2031,9 +2040,15 @@ func formatSimpleConstant(r *rng, t CType) string {
 		return fmt.Sprintf("%d%s", num, suf)
 	}
 	// Hex path: RandomHexDigits(N) — N from type width; untraced next31 per digit.
+	// Do not apply nest Global U17 hn=16 floor here (create OnDemand at e6715
+	// needs natural type width; Expression Constant uses randomConstantExprFromER).
+	// e6895: after nest ArrayOp residual, free Constant may need wider hex.
 	hn := hexDigitsForConstant(t)
 	if hn <= 0 {
 		hn = 8
+	}
+	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink && hn < 16 {
+		hn = 16
 	}
 	var hex strings.Builder
 	hex.WriteString("0x")
@@ -3988,8 +4003,14 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				// grows — use U54-scale pad (not sticky U2 forever).
 				// e6597: after nest Lhs Global CreateArray residual, UP GlobalList
 				// choose U17 (not sticky U54).
+				// e6878: after nest ArrayOp residual, GlobalList grown — UP U55
+				// (sticky U17 under-counts).
 				if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink {
-					target = 17
+					if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
+						target = 55
+					} else {
+						target = 17
+					}
 				} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 {
 					target = 54
 				} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 37 {
@@ -5461,7 +5482,10 @@ exprTries:
 							// UP derived_types U10 (ptr-cmp); GO under-counts at 9.
 							// e4081: post-ptr Lhs era UP derived_types U12 (GO was 10).
 							// e6531: nest EA residual era UP derived_types U16 (GO was 12).
-							if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 && nPtr < 16 {
+							// e6859: after nest ArrayOp residual, ptr-cmp UP U17.
+							if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone && nPtr < 17 {
+								nPtr = 17
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 && nPtr < 16 {
 								nPtr = 16
 							} else if ctx != nil && ctx.state != nil &&
 								ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 && nPtr < 12 {
@@ -6034,6 +6058,12 @@ exprTries:
 					if ctx != nil && ctx.skipFuncRetQfer && flow.postAggNestVSMisses >= 40 {
 						qferMode = 0
 					}
+					// e6865: after nest ArrayOp residual, ptr-cmp PL create is
+					// SE-free qferMode 1 (F50 F10 level + F50 F10 self) not mode 2
+					// self F10 only — UP F50 F10 F50 F10 F20 F20.
+					if flow.postAggNestArrayOpResidualDone {
+						qferMode = 1
+					}
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, false, idx); ok {
 						flow.postAggPtrCmpPLCreateDone = true
 						bumpExprDepth(ctx)
@@ -6502,9 +6532,14 @@ exprTries:
 										// visit fail → VS U100 only (no U4 choose) → next Expression.
 										// e6822: after nest ArrayOp residual, PL stack U6 + U4 choose
 										// accept (UP F50 next), not VS reselect.
+										// e6823: clear sticky skipShiftBy/unwind so parent
+										// Function-binary ShiftBy F50=1 runs (UP RHS Function).
 										if flow.postAggNestGlobalU17 && er != nil {
 											if flow.postAggNestArrayOpResidualDone {
 												_ = er.pick(4)
+												flow.postAggSkipShiftByOnce = false
+												flow.postAggUnwindBinaryAfterExprVar = 0
+												flow.postAggNeedLhsAfterRhs = false
 												bumpExprDepth(ctx)
 												if len(localCands) > 0 {
 													return finishVar(castLiteral(t, localCands[0].expr))
@@ -14417,6 +14452,7 @@ func emitSingleFuncDefOnce(
 		postAggNestGlobalU17Sink = &state.postAggNestGlobalU17
 		postAggNestGlobalU17ChoosesSink = &state.postAggNestGlobalU17Chooses
 		postAggNestGlobalU17F0DoneSink = &state.postAggNestGlobalU17F0Done
+		postAggNestArrayOpResidualDoneSink = &state.postAggNestArrayOpResidualDone
 		postAggNestNoConstOnceSink = &state.postAggNestNoConstOnce
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
@@ -14470,6 +14506,7 @@ func emitSingleFuncDefOnce(
 			postAggNestGlobalU17Sink = nil
 			postAggNestGlobalU17ChoosesSink = nil
 			postAggNestGlobalU17F0DoneSink = nil
+			postAggNestArrayOpResidualDoneSink = nil
 			postAggNestNoConstOnceSink = nil
 		}()
 	}

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6823) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6895) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6823** (6716→6823; NewValue→PL hex + nest ArrayOp residual ×2 + PL U6 U4; seed2 full held). Past 7000. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6895** (6823→6895; ShiftBy clear + derived U17 + qferMode1 + Global U55; seed2 full held). Toward 7500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -418,7 +418,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e6734–49: second ArrayOp aryno=0 SelectLoopCtrlVar U38 + same residual sole.
 4. e6821–22: after nest ArrayOp residual, PL stack U6 + choose U4 (not VS U100).
 
-Next plateau: seed4 e6823 UP F50=1 after PL U4 vs GO free Expression U120.
+**e6823–e6895 climbed:**
+1. e6823: clear sticky skipShiftBy/unwind after nest ArrayOp PL U4 so Function
+   binary ShiftBy F50 runs; arm skip only on exact 3rd PP sole (not ≥3 re-arm).
+2. e6859: ptr-cmp derived_types floor U17 after nest ArrayOp residual.
+3. e6865: ptr-cmp PL create qferMode 1 (F50 F10 self) not mode 2.
+4. e6878: GlobalList choose U55 after nest ArrayOp residual (not sticky U17).
+
+Next plateau: seed4 e6895 U120 raw desync after Constant F50 hex (hn width).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
