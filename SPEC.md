@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8855) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8918) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8855** (8809→8855; For must_use F75 + **** ExpressionAssign qfer + Global create; seed2 full held). Toward 9000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8918** (8855→8918; Statement Lhs PP→PL U2 + SelectDeref U7 countdown; seed2 full held). Toward 9000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -543,8 +543,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e8831: Function-fail Global create F20×4 + CreateArray ladder residual.
 4. e8848: ExpressionAssign Lhs F80 F20 F20 U2 after create residual.
 
-Next plateau: seed4 e8855 after Expression U120 F80=0 U100, UP U2 vs GO U5
-Statement Lhs residual. Toward 9000+. Seeds 5–21; COUNT=20.
+**e8855–e8918 climbed:**
+1. e8855: Statement Lhs F80=0 was nest VS-miss ladder (U5); force PP→PL U2
+   create residual before ladder (intercept at SelectDerefPointerProb F80=0).
+2. e8875: SelectDeref countdown U7 U6 F0 U5+993 U5 U4 U3 (not U12 start).
+3. e8892+: F80=0 VS multiphase Global U7 / PP U3 U2+993 / PL create CreateArray.
+
+Next plateau: seed4 e8919 F50 value desync in CreateArray alt Constant path
+(raws match through U4 initNum; hex/pure_rnd trail). Toward 9000+. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

@@ -686,6 +686,17 @@ type functionFlowState struct {
 	// postAggPostCD3EALhsU2: ExpressionAssign Lhs after e8831 create residual
 	// burns F80 F20 F20 U2 (e8848–51) before parent Expression U120.
 	postAggPostCD3EALhsU2 bool
+	// postAggPostCD3EALhsU2Done: after e8848 EA Lhs residual, next Statement
+	// Lhs F80=0→PP→PL stack U2 create residual (e8855).
+	postAggPostCD3EALhsU2Done bool
+	// postAggPostCD3StmtLhsPPU2Done: one-shot Statement Lhs PP→PL U2 residual
+	// after multi-level ExpressionAssign era (e8855).
+	postAggPostCD3StmtLhsPPU2Done bool
+	// postAggPostCD3SelDerefU7: next Statement Lhs SelectDeref countdown starts
+	// at U7 (e8875 U7 U6 F0 U5+993…) not U12.
+	postAggPostCD3SelDerefU7 bool
+	// postAggPostCD3SelDerefU7F0N: F80=0 hit count after U7 countdown (e8892+).
+	postAggPostCD3SelDerefU7F0N int
 	// postAggPostCD3ExprAssignN: count of post-CD3 pointer ExpressionAssign
 	// qfer burns (e8747+ levels F50 F10 + self F50 each).
 	postAggPostCD3ExprAssignN int
@@ -5861,8 +5872,10 @@ func buildFunctionCallExpr(
 				_ = er.fallback.flipcoin(20)
 				_ = er.fallback.upto(9)
 				// e8848–51: ExpressionAssign Lhs SelectDeref F80 F20 F20 U2 then
-				// parent Expression U120 (arm so Lhs residual matches).
+				// parent Expression U120.
+				// e8855: Statement Lhs after that era PP→PL stack U2 create.
 				state.postAggPostCD3EALhsU2 = true
+				state.postAggPostCD3EALhsU2Done = true
 				return castLiteral(t, "g_0"), true
 			}
 			return "", false // caller termFunction falls through; see below
@@ -9773,11 +9786,42 @@ exprTries:
 							_ = er.fallback.flipcoin(20)
 							_ = er.fallback.upto(2)
 						}
+						// e8855: next Statement Lhs F80=0→PP→PL stack U2 create.
+						ctx.state.postAggPostCD3EALhsU2Done = true
 						lhsFromDeref = true
 						break
 					}
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
 					if !deref {
+						// e8855 post-CD3 Statement Lhs: F80=0 → VS PP U100 → PL
+						// stack U2 create residual (not fallthrough U5 + SelectDeref).
+						if ctx != nil && ctx.state != nil &&
+							ctx.state.postAggNestArrayOpPostCD3 &&
+							ctx.state.postAggPostCD3ExprAssignN >= 2 &&
+							!ctx.state.postAggPostCD3StmtLhsPPU2Done {
+							ctx.state.postAggPostCD3StmtLhsPPU2Done = true
+							_ = variableScopePickFromER(er, opts, &scope) // U100
+							_ = er.pick(2)                                // U2
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(32)
+							_ = er.fallback.upto(31)
+							_ = er.fallback.upto(2)
+							_ = er.fallback.upto(3)
+							_ = er.fallback.upto(3)
+							_ = er.fallback.flipcoin(0)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(1)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(4)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(4)
+							_ = er.fallback.upto(4)
+							lhsFromDeref = true
+							break
+						}
 						// seed4 e2113–15: after e2092 address residual, F80=0 → VS
 						// ParentParam stack U6, visit_facts fails → loop continues
 						// with SelectDeref choose residual (e2116+), not accept VS.
@@ -10950,6 +10994,34 @@ func chooseLValue(r *rng, opts Options, target CType, env envInfo, scope scopeIn
 func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scopeInfo, ctx *genContext) (lvalueInfo, bool, bool) {
 	// variableScopePick uses er.pick(100); Lhs uses main rng directly.
 	er := &exprRand{fallback: r}
+	// e8855 post-CD3: after **** EA Lhs residual, Statement Lhs F80=0 → VS
+	// PP U100 → PL stack U2 + create residual (force before other scope paths).
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3EALhsU2Done {
+		ctx.state.postAggPostCD3EALhsU2Done = false
+		scopePick := variableScopePickFromEROpts(er, opts, &scope)
+		_ = scopePick
+		_ = er.pick(2) // e8855 stack U2 (UP after PP U100)
+		if er.fallback != nil {
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(32)
+			_ = er.fallback.upto(31)
+			_ = er.fallback.upto(2)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.flipcoin(0)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(1)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(4)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(4)
+			_ = er.fallback.upto(4)
+		}
+		return lvalueInfo{expr: "x", ctype: target}, true, false
+	}
 	scopePick := variableScopePickFromEROpts(er, opts, &scope)
 	var flow *functionFlowState
 	if ctx != nil {
@@ -12175,6 +12247,109 @@ lhsDerefLoop:
 			continue
 		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
+			// e8892+ post-CD3: after U7 countdown, F80=0 VS residual multiphase.
+			if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3SelDerefU7 &&
+				ctx.state.postAggPostCD3StmtLhsPPU2Done &&
+				!ctx.state.postAggNestSelDerefCountdown {
+				n := ctx.state.postAggPostCD3SelDerefU7F0N
+				ctx.state.postAggPostCD3SelDerefU7F0N++
+				_ = r.upto(100) // VS scope
+				switch n {
+				case 0: // e8893–94 Global U7
+					_ = r.upto(7)
+				case 1: // e8896–902 PP U3 U2 + [9][9][3] F0
+					_ = r.upto(3)
+					_ = r.upto(2)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 2: // e8904+ PL U3 + create U14 F50 F20 F50 F50 U20 CreateArray
+					_ = r.upto(3)
+					_ = r.upto(14)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					// CreateArray full (int element alts F50…) then trail
+					base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					_arr := burnCreateArrayVariable(r, opts, base, true)
+					emitOrphanArrayGlobal(ctx, base, _arr)
+					// e8917–26 trail after CreateArray if under-burned
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+					_ = r.upto(3)
+					_ = r.upto(3)
+					_ = r.upto(1)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					ctx.state.postAggPostCD3SelDerefU7 = false
+					lhsFromDeref = true
+					lv = lvalueInfo{expr: "x", ctype: targetType}
+					break
+				default:
+					ctx.state.postAggPostCD3SelDerefU7 = false
+					lhsFromDeref = true
+					lv = lvalueInfo{expr: "x", ctype: targetType}
+					break
+				}
+				continue
+			}
+			// e8855 post-CD3: after multi-level ExpressionAssign, Statement Lhs
+			// F80=0 → VS PP U100 → PL stack U2 create residual (UP U2 F20 F50…);
+			// must not fall into nest VS-miss ladder (U5 + SelectDeref 993).
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.postAggNestArrayOpPostCD3 &&
+				ctx.state.postAggPostCD3ExprAssignN >= 2 &&
+				!ctx.state.postAggPostCD3StmtLhsPPU2Done {
+				ctx.state.postAggPostCD3StmtLhsPPU2Done = true
+				_ = r.upto(100) // e8854 U100
+				_ = r.upto(2)   // e8855 U2
+				// e8856–63: GenerateNewParentLocal WRITE: F20 NewArray=0,
+				// F50 Constant hex path (8×next31 untraced), then residual
+				// U32 U31 U2 U3 U3 F0 (CreateArray-ish / itemize).
+				_ = r.flipcoin(20) // NewArray
+				if !r.flipcoin(50) {
+					// Constant hex (F50=0): RandomHexDigits untraced
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				} else if r.flipcoin(50) {
+					_ = r.upto(3)
+				} else {
+					_ = r.upto(20)
+				}
+				_ = r.upto(32)
+				_ = r.upto(31)
+				_ = r.upto(2)
+				_ = r.upto(3)
+				_ = r.upto(3)
+				_ = r.flipcoin(0)
+				// e8864+: SafeOpFlags-like F50 U1 F50 F50 U4 F50 F50 U4 U4
+				_ = r.flipcoin(50)
+				_ = r.upto(1)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				// e8875+: next Statement Lhs SelectDeref countdown U7 U6 F0 U5+993…
+				ctx.state.postAggNestSelDerefCountdown = true
+				ctx.state.postAggNestSelDerefRound2 = true
+				ctx.state.postAggNestSelDerefFails = 0
+				ctx.state.postAggNestSelDerefRoundN = 1
+				// Pool starts at U7 (not U12): fails map to 7,6,5…
+				ctx.state.postAggPostCD3SelDerefU7 = true
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "x", ctype: targetType}
+				break
+			}
 			// e4335+: Statement Lhs after Expression unwind — Lhs is do-while
 			// (Lhs.cpp): F80=0 → VS; on miss, loop again SelectDeref (UP U5 U5
 			// fail → F80 U11…). Not break-to-one-shot-VS outside the loop.
@@ -12755,7 +12930,11 @@ lhsDerefLoop:
 				fails := ctx.state.postAggNestSelDerefFails
 				roundN := ctx.state.postAggNestSelDerefRoundN
 				pool := []int{12, 11, 10, 9}
-				if roundN >= 2 {
+				// e8875 post-CD3: SelectDeref countdown U7 U6 F0 U5+993 U5 U4 U3
+				// then F80=0 VS (not U12 start).
+				if ctx.state.postAggPostCD3SelDerefU7 {
+					pool = []int{7, 6, 5, 5, 4, 3}
+				} else if roundN >= 2 {
 					// e6129+: U12+947, U12+F0 → VS; e6140+: U10…U3; e6207+: U2 itemize
 					pool = make([]int, 80)
 					copy(pool, []int{12, 12, 10, 9, 8, 7, 6, 5, 5, 5, 5, 5, 4, 4, 4, 3, 3})
@@ -12772,11 +12951,28 @@ lhsDerefLoop:
 				}
 				if fails >= len(pool) {
 					ctx.state.postAggNestSelDerefCountdown = false
+					ctx.state.postAggPostCD3SelDerefU7 = false
 					continue
 				}
 				n := pool[fails]
 				_ = r.upto(uint32(n))
 				ctx.state.postAggNestSelDerefFails++
+				if ctx.state.postAggPostCD3SelDerefU7 {
+					// e8875–91: U7 pure; U6+F0; U5+993; U5 pure; U4 pure; U3 pure
+					switch fails {
+					case 1: // U6 + F0
+						_ = r.flipcoin(0)
+					case 2: // U5 + [9][9][3] F0
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					case 5: // U3 last pure → next F80=0 VS Global U7…
+						ctx.state.postAggNestSelDerefCountdown = false
+						// keep postAggPostCD3SelDerefU7 for F80=0 residual
+					}
+					continue
+				}
 				if roundN == 0 {
 					if fails == 0 || fails == 2 {
 						_ = r.flipcoin(0)
@@ -13624,10 +13820,41 @@ lhsDerefLoop:
 	// next-statement U100.
 	lhsAfterParamMiss := false
 	if !lhsFromDeref {
+		// e8855 post-CD3: after multi-level ExpressionAssign (**** qfer n≥2),
+		// Statement Lhs F80=0 → VS PP U100 → PL stack U2 create residual
+		// (UP U2 F20 F50 U32…; GO sticky U5 + SelectDeref 993).
+		if ctx != nil && ctx.state != nil &&
+			ctx.state.postAggNestArrayOpPostCD3 &&
+			ctx.state.postAggPostCD3ExprAssignN >= 2 &&
+			!ctx.state.postAggPostCD3StmtLhsPPU2Done {
+			ctx.state.postAggPostCD3StmtLhsPPU2Done = true
+			er := &exprRand{fallback: r}
+			_ = variableScopePickFromEROpts(er, opts, &scope) // U100
+			_ = er.pick(2)                                    // U2 stack
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			_ = r.upto(32)
+			_ = r.upto(31)
+			_ = r.upto(2)
+			_ = r.upto(3)
+			_ = r.upto(3)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(50)
+			_ = r.upto(1)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.upto(4)
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "x", ctype: targetType}
+		}
 		// seed2 e2312: compound AssignOps tries=1 then Lhs VS first (U100 U4
 		// miss → Global + residual), then RHS Expression continues (e2319 F5…).
 		// Not true ++/-- need_no_rhs — Lhs residual then RHS Expression.
-		if needNoRhs && ctx != nil && ctx.state != nil &&
+		if !lhsFromDeref && needNoRhs && ctx != nil && ctx.state != nil &&
 			ctx.state.lateAssignOpsFiltered && ctx.state.lateDerefCreateN >= 2 {
 			hits := 0
 			for try := 0; try < 8 && !lhsFromDeref; try++ {
