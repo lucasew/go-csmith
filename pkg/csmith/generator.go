@@ -562,6 +562,11 @@ type functionFlowState struct {
 	// postAggNestArrayOpPLStackU4: after Lhs CreateArray residual era (e7336+),
 	// PL stack is U4 not sticky U6 (e7342).
 	postAggNestArrayOpPLStackU4 bool
+	// postAggNestArrayOpPLStackU3: after keepExpr Lhs residual completes (e7497+),
+	// PL stack drops to U3 (e7579 empty create).
+	postAggNestArrayOpPLStackU3 bool
+	// postAggNestArrayOpPLStackU3N: PL hits under PLStackU3 (0–2 create; 3+ U5).
+	postAggNestArrayOpPLStackU3N int
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -575,6 +580,9 @@ type functionFlowState struct {
 	// postAggNestArrayOpKeepExprSelActive: arm SelectDeref residual after PL
 	// itemize fail on keepExpr Lhs (e7448+).
 	postAggNestArrayOpKeepExprSelActive bool
+	// postAggNestArrayOpKeepExprStmtForce: after keepExpr Lhs accept (e7497),
+	// force next Statement U100 + Expression (e7498) then arm PL stack U3.
+	postAggNestArrayOpKeepExprStmtForce bool
 	// postAggNestArrayOpGlobalChooseN: multi-cand Global pad after nest ArrayOp
 	// residual (0: U55 e6878; 1: U2 e6972; 2: U54 e6979; 3+: U19 e6986).
 	postAggNestArrayOpGlobalChooseN int
@@ -932,8 +940,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 					// e6459: later PL after nested EA residual is U5 again.
 					// e6821: after nest ArrayOp residual sole, Function::stack U6.
 					// e7342: later PL after Lhs CreateArray residual era is U4.
+					// e7579: after keepExpr Lhs residual completes (e7497+), stack
+					// drops to U3 (empty PL → create U14…, not sticky U4 inventory).
 					if state.postAggNestArrayOpResidualDone {
-						if state.postAggNestArrayOpPLStackU4 {
+						if state.postAggNestArrayOpPLStackU3 {
+							n = 3
+						} else if state.postAggNestArrayOpPLStackU4 {
 							n = 4
 						} else {
 							n = 6
@@ -1468,6 +1480,8 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 						_ = er.pick(4)                // e7497 U4
 						flow.postAggNestArrayOpKeepExprSelActive = false
 						flow.postAggLhsWriteDone = true
+						// e7498: force next Statement; e7579: later PL stack U3.
+						flow.postAggNestArrayOpKeepExprStmtForce = true
 						return "x"
 					}
 				}
@@ -3626,7 +3640,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	// (UP F50 F10 F20 F50 then Expression U120 tries=5).
 	// e7413: after Lhs CreateArray residual era (PL stack U4), simple create
 	// keeps mode 2 F10 only (not sticky SE-free F50 F10).
-	if ctx.state.postAggNestArrayOpResidualDone && !ctx.state.postAggNestArrayOpPLStackU4 {
+	// e7634: PL stack U3 ptr-cmp create also keeps mode 2 (levels+self F10).
+	if ctx.state.postAggNestArrayOpResidualDone &&
+		!ctx.state.postAggNestArrayOpPLStackU4 &&
+		!ctx.state.postAggNestArrayOpPLStackU3 {
 		if qferMode == 2 {
 			qferMode = 1
 		}
@@ -3724,6 +3741,19 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// CreateArray U99 (not filterCompound U6 / multi-level U6).
 			if newArray && ctx.skipFuncRetQfer && ctx.state.postAggNestVSMisses >= 40 {
 				_ = er.fallback.upto(2)
+				goto afterAddrResidual
+			}
+			// e7641–43: after keepExpr residual PL stack U3 ** create, address
+			// residual is U2 choose + U3 U3 (not ptr-cmp pointee F20 CreateArray).
+			// e7695: * create address residual is U4 only (not U2 U3 U3).
+			if ctx.state.postAggNestArrayOpPLStackU3 && !newArray {
+				if levels >= 2 {
+					_ = er.fallback.upto(2)
+					_ = er.fallback.upto(3)
+					_ = er.fallback.upto(3)
+				} else {
+					_ = er.fallback.upto(4)
+				}
 				goto afterAddrResidual
 			}
 			// e4089+: post-ptr ptr-cmp create address-of, choose_var empty
@@ -4575,6 +4605,9 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 							return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 						case gn == 12:
 							// e7510: free Expression Global after keepExpr Lhs residual U55
+							target = 55
+						case gn == 13:
+							// e7601: after PL stack U3 create era, GlobalList U55
 							target = 55
 						default:
 							target = 2
@@ -6067,7 +6100,10 @@ exprTries:
 							// e4081: post-ptr Lhs era UP derived_types U12 (GO was 10).
 							// e6531: nest EA residual era UP derived_types U16 (GO was 12).
 							// e6859: after nest ArrayOp residual, ptr-cmp UP U17.
-							if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone && nPtr < 17 {
+							// e7630: after keepExpr residual + PL stack U3 era, UP U19.
+							if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU3 && nPtr < 19 {
+								nPtr = 19
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone && nPtr < 17 {
 								nPtr = 17
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 && nPtr < 16 {
 								nPtr = 16
@@ -6093,9 +6129,12 @@ exprTries:
 							// e4081: nPtr floored to 12 while list under-counts;
 							// out-of-range high indices are often struct S0* (UP
 							// address residual creates S0 with bitfield U181).
+							// e7630: after keepExpr residual PL stack U3, high indices
+							// are multi-level ** (not S0* / list * under-count).
+							plStackU3 := ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU3
 							outOfRangeS0 := ctx != nil && ctx.state != nil &&
 								ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 &&
-								ptrIdx >= listLen
+								ptrIdx >= listLen && !plStackU3
 							if !outOfRangeS0 {
 								if ppEra && ptrIdx >= 0 && ptrIdx < listLen {
 									stars = ctx.state.derivedPtrList[ptrIdx]
@@ -6105,6 +6144,9 @@ exprTries:
 								} else if ptrIdx > 0 {
 									stars = 2
 								}
+							}
+							if plStackU3 && ptrIdx >= 10 && stars < 2 {
+								stars = 2
 							}
 							// seed4 e1827: after late post-pad ptr-cmp, derived
 							// **+ self F50 (not *** levels F10 overshoot).
@@ -6612,6 +6654,34 @@ exprTries:
 			// (often only synthetic "x") so fall through to all-locals path.
 			if scopePick == 1 {
 				idx := parentStackPick(er, flow)
+				// e7579–86: after keepExpr Lhs residual era, PL stack U3 empty →
+				// GenerateNewParentLocal (first hits). Simple: retype U14 + qfer 1.
+				// Pointer: keep type, qferMode 2. e7714+: later hits inventory U5.
+				if flow != nil && flow.postAggNestArrayOpPLStackU3 {
+					n := flow.postAggNestArrayOpPLStackU3N
+					flow.postAggNestArrayOpPLStackU3N++
+					if n >= 3 {
+						// e7714 U5; e7720 U4; e7724 sole (no choose → parent U120)
+						if n == 3 {
+							_ = er.pick(5)
+						} else if n == 4 {
+							_ = er.pick(4)
+						}
+						// n >= 5: sole after stack
+						bumpExprDepth(ctx)
+						return finishVar(castLiteral(t, "x"))
+					}
+					qfer := 1
+					retype := true
+					if flow.inPtrCmpExpr || strings.Contains(t.Name, "*") {
+						qfer = 2
+						retype = false
+					}
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, retype, idx); ok {
+						bumpExprDepth(ctx)
+						return finishVar(castLiteral(t, g.expr))
+					}
+				}
 				// e4398: after Global-create Expression nest PL stack, UP F50
 				// (ShiftBy/parent) then Expression U120 tries=1 — not local choose U4.
 				if flow != nil && flow.postAggExprNestContinue > 0 &&
@@ -8208,6 +8278,32 @@ exprTries:
 					if flow != nil && flow.ppPostPadPPForceStack {
 						flow.ppPostPadPPForceStack = false
 					}
+					// e7690: after keepExpr residual PL stack U3, PP→PL empty create
+					// is qferMode 2 (levels F50 F10 + self F10) keep type — not mode 1.
+					// Shares PLStackU3N counter with ParentLocal path.
+					if flow != nil && flow.postAggNestArrayOpPLStackU3 {
+						n := flow.postAggNestArrayOpPLStackU3N
+						flow.postAggNestArrayOpPLStackU3N++
+						if n >= 3 {
+							if n == 3 {
+								_ = er.pick(5)
+							} else if n == 4 {
+								_ = er.pick(4)
+							}
+							bumpExprDepth(ctx)
+							return finishVar(castLiteral(t, "x"))
+						}
+						qfer := 1
+						retype := true
+						if flow.inPtrCmpExpr || strings.Contains(t.Name, "*") {
+							qfer = 2
+							retype = false
+						}
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, retype, idx); ok {
+							bumpExprDepth(ctx)
+							return finishVar(castLiteral(t, g.expr))
+						}
+					}
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
 					exactN := 0
 					for _, c2 := range localCands {
@@ -8820,6 +8916,8 @@ exprTries:
 					// e7299: after nest ArrayOp residual, pointer ExpressionAssign
 					// burns ≥2 levels F50 F10 + self F50 (UP; GO ptrLv=1 levels-only
 					// under-counts and skips self).
+					// e7645–48: after keepExpr residual PL stack U3 era, ** levels
+					// F50 F10×2 only (no self F50) then parent Expression U120.
 					nestArrayOpPtrQfer := ctx != nil && ctx.state != nil &&
 						ctx.state.postAggNestArrayOpResidualDone && ptrLv > 0
 					if nestArrayOpPtrQfer {
@@ -8831,7 +8929,11 @@ exprTries:
 							_ = er.fallback.flipcoin(50)
 							_ = er.fallback.flipcoin(10)
 						}
-						_ = er.fallback.flipcoin(50) // self
+						if ctx.state.postAggNestArrayOpPLStackU3 {
+							// levels only — no self F50
+						} else {
+							_ = er.fallback.flipcoin(50) // self
+						}
 					} else if ptrLv > 0 && ppArrayBody && !latePostPadAssign {
 						for i := 0; i < ptrLv; i++ {
 							_ = er.fallback.flipcoin(50) // level vol
@@ -9251,9 +9353,12 @@ exprTries:
 						// (parent Expression U120) — not multi-dim itemize U2 U7 U3 U9.
 						// e6905: after nest ArrayOp residual, F20 F20 ends without U2
 						// (parent Expression U120 next).
+						// e7605: after keepExpr residual + PL stack U3 era, F20 F20
+						// address residual U2 again (UP U2 then parent Expression).
 						if ctx != nil && ctx.state != nil && ctx.state.postAggU15StackU6CreateDone {
-							if !ctx.state.postAggNestArrayOpResidualDone {
-								_ = er.pick(2) // e3448
+							if !ctx.state.postAggNestArrayOpResidualDone ||
+								ctx.state.postAggNestArrayOpPLStackU3 {
+								_ = er.pick(2) // e3448 / e7605
 							}
 							lhsFromDeref = true
 							break
@@ -10514,7 +10619,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				// e6103: after nest VS NewValue accept (miss37), UP derived_types
 				// U13 for choose_random_pointer_type; GO inventory under-counts.
 				// e6531: nest residual era ptr-cmp U16 (SelectLType may grow further).
-				if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 && n < 16 {
+				// e7516: after keepExpr Lhs residual era, UP derived_types U18.
+				if ctx != nil && ctx.state != nil &&
+					(ctx.state.postAggNestArrayOpPLStackU4 || ctx.state.postAggNestArrayOpPLStackU3) &&
+					n < 18 {
+					n = 18
+				} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 && n < 16 {
 					n = 16
 				} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 && n < 13 {
 					n = 13
@@ -10657,12 +10767,15 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// another Statement in the same block (U100=8 then Expression U120 F5…),
 		// not new BlockSize U4. Force Statement + RHS Expression only
 		// (U100 then U120 F5 — no AssignOps/SelectLType between).
-		if ctx.state.postAggNestArrayOpPLStackU4 && ctx.state.postAggLhsWriteDone &&
-			!ctx.state.postAggNestArrayOpKeepExprSelActive {
+		// e7579: after that Statement, PL stack drops to U3.
+		if ctx.state.postAggNestArrayOpKeepExprStmtForce {
+			ctx.state.postAggNestArrayOpKeepExprStmtForce = false
 			ctx.state.skipNextBlockSize = false
 			_ = r.upto(100) // e7498 StatementProbability
 			ctx.exprDepth = 0
 			_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+			ctx.state.postAggNestArrayOpPLStackU4 = false
+			ctx.state.postAggNestArrayOpPLStackU3 = true
 			writeLine(b, 1, "x = x;")
 			return true
 		}
