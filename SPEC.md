@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →15102) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →15387) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **15102** (13968→15102; Lhs SelectDeref multiphase Global/PL/PP + NewArray CreateArray; seed2 full held). Toward 17000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **15387** (15185→15387; post-CREATE Function useExisting / Assign ****/** qfer / CreateArray + field hex / PL residual; seed2 full held). Toward 17000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e15102 post-Lhs Function CREATE body (useExisting F50 → make_random_signature + param/body Expression; Comma lhs U120 tries=2 Function vs GO Assign). Toward 17000+.
+Next plateau: seed4 e15387 Variable Global ok_vars U129 vs GO U102 (inventory under-count after post-CREATE residual). Toward 17000+.
+
+**e15185–e15387 climbed:**
+1. e15185: post-CREATE Function useExisting residual — PL stack U6 multiphase (was U5 sole).
+2. e15191: StatementFilter max blk_depth rejects compound (IfElse/For) tries=1 → Continue.
+3. e15199–200: useExisting=0 after CREATE body → F0 marker (not stdfunc F5); end special Function era.
+4. e15204/11 stdfunc F5; e15219 **** WRITE qfer; e15230 useExisting CreateArray F80 F20×; e15248 Comma no_func tries=1 + U14.
+5. e15280 ** qfer; useEx=0 VS Global/PL; field Constant hex gaps; e15364 Constant tries=3 + F80; stdfunc resume.
+6. seed2 37939 held.
 
 **e13968–e15102 climbed:**
 1. e13968: Global ok_vars multiphase U5 U8…U3 U8/U10/U4 catalog (G8–G23).

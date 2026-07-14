@@ -14241,15 +14241,68 @@ lhsDerefLoop:
 																		// NonVoid filter (float/int128 reject);
 																		// lhs Expression no_const until non-Comma.
 																		commaLhsNoConst := false
+																		// commaLhsNoAssign: CREATE-era Comma lhs type
+																		// is const_struct_union (e15101 U14=13) →
+																		// reject Assign as well as Constant.
+																		// e15102 UP U120=5 tries=2 Function;
+																		// GO with Constant-only accepted Assign.
+																		commaLhsNoAssign := false
 																		// e15083+: Lhs SelectDeref residual accept
 																		// (NewValue N2); next Function may CREATE.
 																		// lhsSelectDerefResidualRan: one-shot long
 																		// residual (do not re-enter on later Comma).
 																		lhsSelectDerefResidualRan := false
 																		lhsResidualDone := false
+																		// postCreateFunc: after CREATE head, next
+																		// Function terms use useExisting residual.
+																		postCreateFunc := false
+																		// postCreateUseExN: count of useExisting=1
+																		// Function hits after residual (e15146 first
+																		// chooses existing; e15179 CREATE again).
+																		postCreateUseExN := 0
+																		// postCreateAssignN: Assign hits after
+																		// post-CREATE Function era ends (e15201
+																		// F50 only; e15219 **** qfer WRITE).
+																		postCreateAssignN := 0
+																		// postCreateEra: armed after F0 end of
+																		// Function special residual (e15200+).
+																		postCreateEra := false
+																		// postCreateUseExAgain: after **** qfer
+																		// Assign (e15219), next Function is
+																		// useExisting residual (e15230 F50) not
+																		// stdfunc F5 (e15204/e15211).
+																		postCreateUseExAgain := false
+																		// postCreateUseExHitN: count of useExisting
+																		// residual hits in postCreate era (shapes
+																		// differ: e15231 CreateArray vs e15296 U9).
+																		postCreateUseExHitN := 0
+																		// postCreateNoFuncOnce: after CreateArray
+																		// residual (e15247), next Expression
+																		// rejects Function (e15248 U120 tries=1
+																		// Comma).
+																		postCreateNoFuncOnce := false
+																		// postCreateConstOnlyOnce: after PL
+																		// useEx=0 residual (e15363), next
+																		// Expression only Constant (e15364
+																		// U120=91 tries=3).
+																		postCreateConstOnlyOnce := false
+																		// postCreateConstF80: after const-only
+																		// Constant term, burn F80 trail (e15365).
+																		postCreateConstF80 := false
 																		for j := 0; j < 250; j++ {
 																			var vv uint32
-																			if depthNoConstNext {
+																			if postCreateNoFuncOnce {
+																				postCreateNoFuncOnce = false
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 70
+																				})
+																			} else if postCreateConstOnlyOnce {
+																				postCreateConstOnlyOnce = false
+																				postCreateConstF80 = true
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 90 || x >= 100
+																				})
+																			} else if depthNoConstNext {
 																				// e13431: depth + no_const → Variable only
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x < 70 || x >= 90
@@ -14259,6 +14312,12 @@ lhsDerefLoop:
 																				// only Variable 70–89 + Constant 90–99
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x < 70 || x >= 100
+																				})
+																			} else if commaLhsNoAssign {
+																				// e15102: no_const + no Assign
+																				// (const_struct_union type).
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x >= 90 && x < 110
 																				})
 																			} else if depthFilterNoConst || commaLhsNoConst {
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
@@ -14290,7 +14349,9 @@ lhsDerefLoop:
 																				// StatementAssign Lhs after expr.
 																				// One-shot: later Comma (e15100 CREATE
 																				// body) uses normal U14 type burn.
-																				if !depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone && !lhsSelectDerefResidualRan {
+																				// e15248+: postCreateEra Comma also
+																				// uses U14 (not re-enter Lhs residual).
+																				if !postCreateEra && !depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone && !lhsSelectDerefResidualRan {
 																					lhsSelectDerefResidualRan = true
 																					// e13484–15095: long Statement Lhs
 																					// SelectDeref residual after deep
@@ -14616,31 +14677,85 @@ lhsDerefLoop:
 																				// NonVoid U14 (reject float/int128).
 																				// e15100 CREATE body Comma: full U14
 																				// (UP U14=13).
+																				// e15249: postCreateEra Comma full U14.
 																				if lhsSelectDerefResidualRan {
 																					// e15100 CREATE body Comma: full
-																					// U14; lhs still no_const (Comma
-																					// make_random lhs no_const=true).
+																					// U14; lhs no_const; type may be
+																					// const_struct → also no Assign.
+																					_ = rf.upto(14)
+																					commaLhsNoAssign = true
+																				} else if postCreateEra {
+																					// e15249: full U14 after CreateArray
+																					// Comma (not NonVoid filter).
 																					_ = rf.upto(14)
 																				} else {
 																					_ = rf.uptoWithFilter(14, func(x uint32) bool {
 																						return x == 9 || x == 11 || x == 12
 																					})
+																					// lhs no_const until a non-Comma term
+																					commaLhsNoConst = true
 																				}
-																				// lhs no_const until a non-Comma term
-																				commaLhsNoConst = true
 																				afterAsg = false
 																				continue
 																			}
-																			// non-Comma term ends Comma lhs no_const
+																			// non-Comma term ends Comma lhs filters
 																			if commaLhsNoConst {
 																				commaLhsNoConst = false
+																			}
+																			if commaLhsNoAssign {
+																				commaLhsNoAssign = false
 																			}
 																			if vv >= 100 {
 																				// Assign: first may F50 (e12594);
 																				// later (e12721) nest directly.
 																				// e13067+: post-itemize SE-free F50
 																				// unless skipNextAssignF50 (e13070).
-																				if !assignF50Done {
+																				if postCreateEra {
+																					postCreateAssignN++
+																					if postCreateAssignN == 1 {
+																						// e15201: Assign self F50 only
+																						// (qfer provided / simple).
+																						// afterAsg → bare next Function.
+																						_ = rf.flipcoin(50)
+																						afterAsg = true
+																						continue
+																					} else if postCreateAssignN == 2 {
+																						// e15219–28: ExpressionAssign
+																						// WRITE random_qualifiers for
+																						// **** type: 4 levels F50 F10
+																						// + self F50 (const_ok=false).
+																						for qi := 0; qi < 4; qi++ {
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(10)
+																						}
+																						_ = rf.flipcoin(50)
+																						// RHS/Lhs nested U120 terms
+																						// follow — do not afterAsg-skip
+																						// next Function (e15230 F50).
+																						afterAsg = false
+																						postCreateUseExAgain = true
+																						continue
+																					}
+																					// e15229 (n=3): bare Assign.
+																					// e15259 (n=4): F50 then nested RHS.
+																					// e15280 (n=5): ** WRITE qfer
+																					// (2×F50 F10 + self F50).
+																					switch {
+																					case postCreateAssignN == 4:
+																						_ = rf.flipcoin(50)
+																					case postCreateAssignN >= 5:
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(10)
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(10)
+																						_ = rf.flipcoin(50)
+																						// e15287+: next Function may
+																						// useExisting residual again.
+																						postCreateUseExAgain = true
+																					}
+																					afterAsg = false
+																					continue
+																				} else if !assignF50Done {
 																					_ = rf.flipcoin(50)
 																					assignF50Done = true
 																				} else if depthFilterClosed {
@@ -14657,6 +14772,21 @@ lhsDerefLoop:
 																			}
 																			if vv >= 90 {
 																				afterAsg = false
+																				// e15261: postCreateEra Constant bare
+																				// (no small/hex residual; next U120).
+																				// e15365: const-only Constant burns
+																				// F80 SelectDeref trail then next
+																				// Function stdfunc.
+																				if postCreateEra {
+																					if postCreateConstF80 {
+																						postCreateConstF80 = false
+																						_ = rf.flipcoin(80)
+																						// e15366+: next Function is
+																						// stdfunc F5 (not useExisting).
+																						postCreateUseExAgain = false
+																					}
+																					continue
+																				}
 																				// e13238: ptr-cmp pointer Constant is
 																				// null "0" (no residual); RHS forced
 																				// ExpressionVariable (no U120 term).
@@ -15318,10 +15448,426 @@ lhsDerefLoop:
 																					// e15098–99: CREATE signature head
 																					_ = rf.flipcoin(20)
 																					_ = rf.upto(14)
+																					postCreateFunc = true
 																					// e15100+: live U120 body/params
 																					continue
 																				}
 																				// useExisting=0 → stdfunc below
+																			}
+																			// e15103+/e15146+: post-CREATE Function
+																			// always useExisting F50 (not stdfunc F5).
+																			// First hit (postCreateFuncN==0): CREATE
+																			// body aggregate. Later: build_invocation
+																			// choose/params residual.
+																			if postCreateFunc || lhsSelectDerefResidualRan {
+																				useEx := rf.flipcoin(50)
+																				if !useEx && postCreateFunc {
+																					// e15104–15144: PP create aggregate.
+																					// Depth-gap catalog (unlogged hex):
+																					//   hex×16, small×2, hex×16, U181,
+																					//   hex×16, small, hex×4, hex×8,
+																					//   small×2, hex×8, small×3, hex×8,
+																					//   small, hex×8 → U120.
+																					_ = rf.upto(100)
+																					_ = rf.upto(5)
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(10)
+																					_ = rf.flipcoin(20)
+																					burnHex := func(n int) {
+																						for h := 0; h < n; h++ {
+																							_ = rf.next31()
+																						}
+																					}
+																					burnField := func(hexN int) {
+																						if rf.flipcoin(50) {
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																						} else {
+																							burnHex(hexN)
+																						}
+																					}
+																					// 1 longlong hex×16
+																					if !rf.flipcoin(50) {
+																						burnHex(16)
+																					} else if rf.flipcoin(50) {
+																						_ = rf.upto(3)
+																					} else {
+																						_ = rf.upto(20)
+																					}
+																					burnField(8)
+																					burnField(8)
+																					// 4 longlong hex×16
+																					if !rf.flipcoin(50) {
+																						burnHex(16)
+																					} else if rf.flipcoin(50) {
+																						_ = rf.upto(3)
+																					} else {
+																						_ = rf.upto(20)
+																					}
+																					_ = rf.upto(181) // uint bitfield
+																					// 6 longlong hex×16
+																					if !rf.flipcoin(50) {
+																						burnHex(16)
+																					} else if rf.flipcoin(50) {
+																						_ = rf.upto(3)
+																					} else {
+																						_ = rf.upto(20)
+																					}
+																					burnField(8)
+																					// short hex×4
+																					if !rf.flipcoin(50) {
+																						burnHex(4)
+																					} else if rf.flipcoin(50) {
+																						_ = rf.upto(3)
+																					} else {
+																						_ = rf.upto(20)
+																					}
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					burnField(8)
+																					postCreateFunc = false
+																					continue
+																				}
+																				if useEx {
+																					postCreateUseExN++
+																					if postCreateUseExN%2 == 0 {
+																						// e15179+: even useExisting hits
+																						// miss compatible callee → CREATE
+																						// head F20 U14 then nested U120.
+																						_ = rf.flipcoin(20)
+																						_ = rf.upto(14)
+																						continue
+																					}
+																					// e15146–77 / e15183+: odd hits →
+																					// build_invocation / VS residual.
+																					sp := rf.upto(100)
+																					if sp >= 65 && sp < 95 {
+																						_ = rf.upto(5)
+																						_ = rf.upto(5)
+																						if rf.flipcoin(80) {
+																							_ = rf.upto(5)
+																							_ = rf.flipcoin(0)
+																						}
+																						if !rf.flipcoin(80) {
+																							_ = rf.upto(100)
+																							_ = rf.upto(100)
+																							_ = rf.upto(100)
+																							if !rf.flipcoin(10) {
+																								_ = rf.upto(5)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.upto(2)
+																								_ = rf.upto(4)
+																							}
+																							// e15163–76: Statement/For residual
+																							_ = rf.upto(100)
+																							_ = rf.upto(100)
+																							_ = rf.upto(72)
+																							_ = rf.upto(2)
+																							_ = rf.flipcoin(0)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(4)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(4)
+																							_ = rf.upto(4)
+																							_ = rf.upto(100)
+																						}
+																					} else if sp < 35 {
+																						_ = rf.upto(3)
+																					} else if sp < 65 {
+																						// e15185+: ParentLocal stack U6
+																						// + choose multiphase residual
+																						// (was U5 sole — UP U6).
+																						// Sequence: U6 U5 U2 U5 F80 U5
+																						// → VS reselect U100 tries=1
+																						// → U100 U2 U100 U100 F40 U100
+																						// then outer U120 continues.
+																						_ = rf.upto(6)
+																						_ = rf.upto(5)
+																						_ = rf.upto(2)
+																						_ = rf.upto(5)
+																						if rf.flipcoin(80) {
+																							_ = rf.upto(5)
+																						}
+																						// e15191: StatementFilter at max
+																						// blk_depth rejects compound
+																						// (IfElse 0-14, For 15-29)
+																						// → Continue v=38 tries=1.
+																						// Reject is stateless: uptoWithFilter
+																						// re-invokes reject on the same x
+																						// before drawing the next raw.
+																						_ = rf.uptoWithFilter(100, func(x uint32) bool {
+																							return x < 30
+																						})
+																						_ = rf.upto(100)
+																						_ = rf.upto(2)
+																						_ = rf.upto(100)
+																						_ = rf.upto(100)
+																						_ = rf.flipcoin(40)
+																						_ = rf.upto(100)
+																					} else {
+																						if !rf.flipcoin(10) {
+																							_ = rf.upto(5)
+																						}
+																					}
+																					continue
+																				}
+																				// e15199–200: useExisting=0 after
+																				// CREATE body done — not stdfunc F5.
+																				// UP F0 (null/dead ptr probe or
+																				// failed-invocation marker) then next
+																				// Expression term U120. Ends the
+																				// post-CREATE Function special era
+																				// (e15204+ falls to stdfunc F5).
+																				if !postCreateFunc {
+																					_ = rf.flipcoin(0)
+																					lhsSelectDerefResidualRan = false
+																					postCreateEra = true
+																					continue
+																				}
+																				// useExisting=0 while postCreateFunc
+																				// still set but not taken above:
+																				// fall through to stdfunc F5
+																			}
+																			// e15230+: after **** qfer Assign, Function
+																			// useExisting residual (not stdfunc F5
+																			// like e15204/e15211).
+																			if postCreateUseExAgain {
+																				useEx := rf.flipcoin(50)
+																				if useEx {
+																					postCreateUseExHitN++
+																					// e15231–47 / e15296+: VS residual.
+																					sp := rf.upto(100)
+																					if sp < 35 {
+																						if postCreateUseExHitN == 1 {
+																							// Global: F80 → F20×4 → F80 F80
+																							// → F20×4 → CreateArray
+																							// U99 U10 U1 U3 (e15233–47).
+																							if rf.flipcoin(80) {
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																							}
+																							if rf.flipcoin(80) {
+																								_ = rf.flipcoin(80)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																							}
+																							_ = rf.upto(99)
+																							_ = rf.upto(10)
+																							_ = rf.upto(1)
+																							_ = rf.upto(3)
+																							// e15248: next Expression no_func
+																							// (Comma after CreateArray).
+																							postCreateNoFuncOnce = true
+																						} else if postCreateUseExHitN >= 3 {
+																							// e15356–57: Global sole U3
+																							// (small ok_vars).
+																							_ = rf.upto(3)
+																						} else {
+																							// e15297–353: Global ok_vars U9 U9
+																							// → VS reselect U100 U5 + create
+																							// F50 F10 F20 + field Constants
+																							// with hex gaps (depth 18756→73).
+																							_ = rf.upto(9)
+																							_ = rf.upto(9)
+																							_ = rf.upto(100)
+																							_ = rf.upto(5)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20)
+																							// Constant: F50=0 → hex×N;
+																							// F50=1 → F50 small U3/U20.
+																							burnHex := func(n int) {
+																								for h := 0; h < n; h++ {
+																									_ = rf.next31()
+																								}
+																							}
+																							burnConst := func(hexN int) {
+																								if rf.flipcoin(50) {
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else {
+																									burnHex(hexN)
+																								}
+																							}
+																							// e15305: F50=0 hex×16 (depth+17)
+																							burnConst(16)
+																							// e15307–09: F50=1 F50=1 U3
+																							// (small path after hex gap ~9)
+																							// Actually e15306 is F50=0 with
+																							// depth gap 9 — another hex.
+																							// Sequence from UP:
+																							// F50=0 hex16; F50=0 hex8;
+																							// F50=1 F50=1 U3; F50=1 F50=0
+																							// U20; U181; then 3×(F50 F50 U20);
+																							// F50=0 hex8; U99 U10; ...
+																							// Re-do with precise catalog:
+																							// (burnConst already took e15305)
+																							// Continue:
+																							// e15306 F50=0 hex×8 (gap 9≈8+overhead)
+																							if !rf.flipcoin(50) {
+																								burnHex(8)
+																							} else if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							// e15307–09 small U3
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(3)
+																							// e15310–12 F50 F50 U20
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(20)
+																							// e15313 U181 bitfield
+																							_ = rf.upto(181)
+																							// e15314–22: 3×(F50 F50 U20)
+																							for fi := 0; fi < 3; fi++ {
+																								_ = rf.flipcoin(50)
+																								_ = rf.flipcoin(50)
+																								_ = rf.upto(20)
+																							}
+																							// e15323 F50=0 hex×8 → U99 U10
+																							if !rf.flipcoin(50) {
+																								burnHex(8)
+																							} else if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							_ = rf.upto(99)
+																							_ = rf.upto(10)
+																							// e15326–28: F50=1 F50=1 U3
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(3)
+																							// e15329–34: F50=0 ×6 with hex
+																							// gaps 8/8/16/8/16 (depth).
+																							for _, hn := range []int{8, 8, 16, 8, 16, 8} {
+																								if !rf.flipcoin(50) {
+																									burnHex(hn)
+																								} else if rf.flipcoin(50) {
+																									_ = rf.upto(3)
+																								} else {
+																									_ = rf.upto(20)
+																								}
+																							}
+																							// e15335–37: F50=1 F50=1 U3
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(3)
+																							// e15338–40: F50=0 hex8; U1 U3
+																							if !rf.flipcoin(50) {
+																								burnHex(8)
+																							} else if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																							_ = rf.upto(1)
+																							_ = rf.upto(3)
+																							// e15341–46: F50=0 hex16; F50=0
+																							// hex8; F50=0 hex8; F50=1 F50=1 U3
+																							for _, hn := range []int{16, 8, 8} {
+																								if !rf.flipcoin(50) {
+																									burnHex(hn)
+																								} else if rf.flipcoin(50) {
+																									_ = rf.upto(3)
+																								} else {
+																									_ = rf.upto(20)
+																								}
+																							}
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(3)
+																							// e15347–53: F50=0 hex8; F50=0
+																							// hex16; F50=0 hex8; F50=0 hex4;
+																							// F50=1 F50=1 U3 → U120
+																							for _, hn := range []int{8, 16, 8, 4} {
+																								if !rf.flipcoin(50) {
+																									burnHex(hn)
+																								} else if rf.flipcoin(50) {
+																									_ = rf.upto(3)
+																								} else {
+																									_ = rf.upto(20)
+																								}
+																							}
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(3)
+																							// e15354+: next Function is
+																							// useExisting residual again.
+																							postCreateUseExAgain = true
+																						}
+																					} else if sp < 65 {
+																						_ = rf.upto(6)
+																						_ = rf.upto(5)
+																					} else if sp < 95 {
+																						_ = rf.upto(5)
+																					} else {
+																						if !rf.flipcoin(10) {
+																							_ = rf.upto(5)
+																						}
+																					}
+																					// Leave postCreateUseExAgain as set
+																					// by residual body (re-arm after
+																					// create catalog; clear on one-shot
+																					// paths). Default clear for hitN=1.
+																					if postCreateUseExHitN == 1 {
+																						postCreateUseExAgain = false
+																					}
+																					continue
+																				}
+																				// e15287–92 / e15359+: useExisting=0
+																				// → VS residual (not stdfunc F5).
+																				sp0 := rf.upto(100)
+																				if sp0 < 35 {
+																					// e15288–92: Global U2 F80 F20×2
+																					_ = rf.upto(2)
+																					if rf.flipcoin(80) {
+																						_ = rf.flipcoin(20)
+																						_ = rf.flipcoin(20)
+																					}
+																					postCreateNoFuncOnce = true
+																				} else if sp0 < 65 {
+																					// e15360–63: PL stack multiphase
+																					// U5 U2 U5 (choose residual).
+																					_ = rf.upto(5)
+																					_ = rf.upto(2)
+																					_ = rf.upto(5)
+																					// e15364: next Expression Constant-only
+																					// (tries=3).
+																					postCreateConstOnlyOnce = true
+																				} else if sp0 < 95 {
+																					_ = rf.upto(5)
+																				} else {
+																					if !rf.flipcoin(10) {
+																						_ = rf.upto(5)
+																					}
+																				}
+																				continue
 																			}
 																			if j >= 8 && !useExistingPackDone {
 																				if rf.flipcoin(50) {
