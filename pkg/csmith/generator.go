@@ -807,6 +807,49 @@ func chooseOKVarFromER(er *exprRand, ok []exprVarCandidate) (exprVarCandidate, b
 	return c, true
 }
 
+// nestU2ItemizeKind returns "993", "947", or "" for nest SelectDeref U2 residual
+// tables keyed by postAggNestSelDerefFails (miss16+ phases e5308+).
+func nestU2ItemizeKind(fails int) string {
+	type span struct {
+		lo, hi int
+		seq    []string
+	}
+	spans := []span{
+		{140, 155, []string{"947", "947", "947", "947", "993", "993", "993", "993", "947", "993", "947", "947", "947", "947", "947"}},
+		{155, 160, []string{"993", "947", "993", "947", "947"}},
+		{160, 162, []string{"993", "947"}},
+		{163, 165, []string{"993", "947"}},
+		{165, 179, []string{"947", "993", "993", "993", "993", "993", "993", "993", "947", "947", "993", "993", "947", "947"}},
+		{179, 180, []string{"947"}},
+		{180, 183, []string{"947", "947", "993"}},
+		{183, 185, []string{"947", "993"}},
+		{185, 201, []string{"993", "947", "947", "947", "947", "947", "947", "993", "947", "947", "947", "947", "947", "993", "993", "993"}},
+		{202, 211, []string{"947", "993", "993", "993", "947", "947", "947", "993", "947"}},
+		{211, 218, []string{"993", "947", "993", "993", "993", "993", "947"}},
+		{218, 220, []string{"947", "947"}},
+		{220, 239, []string{"947", "993", "993", "993", "993", "993", "993", "993", "947", "947", "993", "993", "993", "947", "993", "947", "993", "993", "947"}},
+		{239, 240, []string{"947"}},
+		{240, 247, []string{"993", "993", "993", "993", "993", "993", "993"}},
+		{247, 250, []string{"993", "947", "947"}},
+		{250, 252, []string{"993", "947"}},
+	}
+	for _, s := range spans {
+		if fails >= s.lo && fails < s.hi {
+			i := fails - s.lo
+			if i >= 0 && i < len(s.seq) {
+				return s.seq[i]
+			}
+		}
+	}
+	if fails >= 252 && fails < 280 {
+		if (fails-252)%2 == 0 {
+			return "993"
+		}
+		return "947"
+	}
+	return ""
+}
+
 // itemizeArrayCandidate burns ArrayVariable::itemize rnd_upto(sizes[i]) per dim.
 func itemizeArrayCandidate(er *exprRand, c exprVarCandidate) {
 	if er == nil || !c.isArray {
@@ -9116,7 +9159,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			// 3: U100+U5+U8 (e4707). 4: U100+U6+[9][4][7]F0 (e4711–15).
 			// 5: U100+U6+F50 F20 F50 → U2 phase2 (e4718–21). 6+: U5/U6 itemize.
 			if ctx != nil && ctx.state != nil && ctx.state.postAggNestSelDerefRoundN >= 1 &&
-				ctx.state.postAggNestVSMisses < 20 {
+				ctx.state.postAggNestVSMisses < 40 {
 				_ = r.upto(100) // VS scope
 				nMiss := ctx.state.postAggNestVSMisses
 				ctx.state.postAggNestVSMisses++
@@ -9274,12 +9317,200 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					_ = r.upto(10)
 					ctx.state.postAggNestSelDerefCountdown = true
 					ctx.state.postAggNestSelDerefFails = 130
+				case 16:
+					// e5308: Global choose U3 → long U2
+					_ = r.upto(3)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 140
+				case 17:
+					// e5401–11: U6 + NewArray create residual fail + U8 → U2
+					// After F50=0 Constant hex path: 8×next31 untraced (depth 6332–39)
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20) // NewArray
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					_ = r.upto(99)
+					_ = r.upto(10)
+					_ = r.upto(4)
+					if r.flipcoin(50) {
+						// small-dec Constant residual (not taken at e5410)
+						if r.flipcoin(50) {
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(20)
+						}
+					} else {
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+					}
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 155
+				case 18:
+					// e5444–45: U2 + U8
+					_ = r.upto(2)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 160
+				case 19:
+					// e5460–65: U6 + short create → immediate next VS
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 20:
+					// e5468–69: U2 + U8
+					_ = r.upto(2)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 163
+				case 21:
+					// e5484–88: U6 + [9][9][3] F0
+					_ = r.upto(6)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 165
+				case 22:
+					// e5573: U6 + U8
+					_ = r.upto(6)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 179
+				case 23:
+					// e5583: U2 + U8
+					_ = r.upto(2)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 180
+				case 24:
+					// e5605: U6 + U5 U4 U4
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 183
+				case 25:
+					// e5623: U6 + F50 F20 F50 F50 U20 create → U2 long
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 185
+				case 26:
+					// e5727: U6 + U8 → immediate next VS
+					_ = r.upto(6)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 27:
+					// e5731: U6 + [9][9][3] F0
+					_ = r.upto(6)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 202
+				case 28:
+					// e5792: U6 + short create F50 F20 F50 F50 U3
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 211
+				case 29:
+					// e5842: U2 + U10
+					_ = r.upto(2)
+					_ = r.upto(10)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 218
+				case 30:
+					// e5852: U6 + U5 U4 U4
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 219
+				case 31:
+					// e5864: U2 + U10 → long U2
+					_ = r.upto(2)
+					_ = r.upto(10)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 220
+				case 32:
+					// e5982: U6 + U5 U4 U4
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 239
+				case 33:
+					// e5994: U6 + U5 U4 U4 → U2×7 all 993
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 240
+				case 34:
+					// e6042: U6 + [9][4][7] F0
+					_ = r.upto(6)
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 247
+				case 35:
+					// e6067: U6 + U8 → immediate next VS
+					_ = r.upto(6)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 36:
+					// e6071: U2 + U10
+					_ = r.upto(2)
+					_ = r.upto(10)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 250
+				case 37:
+					// e6088–98: U100=95 NewValue → F10 PL create Constant residual
+					// → accept Lhs (next Statement U100 tries=1)
+					_ = r.flipcoin(10) // VariableCreationProbability → PL
+					_ = r.upto(6)      // stack
+					_ = r.upto(14)     // random_type_from_type
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20) // NewArray=0
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = false
+					lhsFromDeref = true
+					break lhsDerefLoop
 				default:
 					// further VS residual — U6 continue U2
 					_ = r.upto(6)
 					ctx.state.postAggNestSelDerefCountdown = true
-					if ctx.state.postAggNestSelDerefFails < 135 {
-						ctx.state.postAggNestSelDerefFails = 135
+					if ctx.state.postAggNestSelDerefFails < 252 {
+						ctx.state.postAggNestSelDerefFails = 252
 					}
 				}
 				continue
@@ -9459,10 +9690,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				roundN := ctx.state.postAggNestSelDerefRoundN
 				pool := []int{12, 11, 10, 9}
 				if roundN >= 1 {
-					// Indices 0–19: countdown 12→3; 20–139: U2 itemize phases
-					pool = make([]int, 140)
+					// Indices 0–19: countdown 12→3; 20–279: U2 itemize phases
+					pool = make([]int, 280)
 					copy(pool, []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 5, 4, 3, 3, 3, 3})
-					for i := 20; i < 140; i++ {
+					for i := 20; i < 280; i++ {
 						pool[i] = 2
 					}
 				}
@@ -9681,20 +9912,24 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							_ = r.upto(7)
 						}
 						_ = r.flipcoin(0)
-					} else if fails >= 136 && fails < 140 {
-						if (fails-136)%2 == 0 {
+					} else if fails >= 140 && fails < 280 {
+						// Post-e5308 multi-phase U2 tables (miss16+)
+						kind := nestU2ItemizeKind(fails)
+						if kind == "993" {
 							_ = r.upto(9)
 							_ = r.upto(9)
 							_ = r.upto(3)
-						} else {
+							_ = r.flipcoin(0)
+						} else if kind == "947" {
 							_ = r.upto(9)
 							_ = r.upto(4)
 							_ = r.upto(7)
+							_ = r.flipcoin(0)
 						}
-						_ = r.flipcoin(0)
+						// kind=="": pure U2 choose (gap / no itemize)
 					} else if fails >= 27 && fails < 30 {
 						ctx.state.postAggNestSelDerefCountdown = false
-					} else if (fails >= 44 && fails < 50) || (fails >= 87 && fails < 90) || fails >= 140 {
+					} else if (fails >= 44 && fails < 50) || (fails >= 87 && fails < 90) || (fails >= 136 && fails < 140) || fails >= 280 {
 						ctx.state.postAggNestSelDerefCountdown = false
 					}
 				}

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →5308) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6099) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **5308** (4545→5308; nest VS miss ladder + U2 itemize phases; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6099** (5308→6099; nest VS miss16–37 + U2 phases; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -359,7 +359,13 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. Multi-phase U2 itemize residual tables (993 vs 947) after each VS miss create/fail.
 4. Cap VS misses / pool indices extended so countdown does not drop early.
 
-Next plateau: seed4 e5308 UP U3 vs GO U6 (post–miss15 VS residual).
+**e5308–e6099 climbed:**
+1. miss16: Global choose U3 (not sticky U6) → long U2 947-heavy phase.
+2. miss17–36: create residuals (hex 8×next31 after F50=0), U2+U8/U10, U6+U5 U4 U4,
+   U6+itemize 993/947, short create → multi-phase U2 via `nestU2ItemizeKind`.
+3. miss37: NewValue U100=95 → F10 PL create Constant residual (partial accept).
+
+Next plateau: seed4 e6099 GO extra F50 after NewValue residual vs UP Statement U100 tries=1.
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
