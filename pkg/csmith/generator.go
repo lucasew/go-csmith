@@ -556,6 +556,16 @@ type functionFlowState struct {
 	postAggPostCD3ArrayOp2StmtLhsU9 bool
 	// postAggPostCD3ArrayOp2StmtLhsU9Burned: e11118 field-vars era Stmt Lhs U9.
 	postAggPostCD3ArrayOp2StmtLhsU9Burned bool
+	// postAggPostCD3ArrayOp2StmtLhsU9ArrayOp: after e11118 residual accepts Lhs,
+	// next ArrayOp select_array is U18 (e11654; inventory under-counts as U13).
+	// 1=select_array, 2=SelectLoopCtrlVar U44 era.
+	postAggPostCD3ArrayOp2StmtLhsU9ArrayOp int
+	// postAggPostCD3ArrayOp2StmtLhsU9Must: first Variable in e11671 For body
+	// must_use U5 U3 F75 (e11677–79), not VS U100.
+	postAggPostCD3ArrayOp2StmtLhsU9Must bool
+	// postAggPostCD3ArrayOp2StmtLhsU9Lhs: after must_use RHS, Statement Lhs
+	// F80=0 → VS Global sole → PL U100 → F40 → PP → Expression (e11680–).
+	postAggPostCD3ArrayOp2StmtLhsU9Lhs bool
 	// postAggPostCD3ArrayOp2PPFallDone: one-shot e9888 PP miss → PL U6 **** create.
 	postAggPostCD3ArrayOp2PPFallDone bool
 	// postAggPostCD3ArrayOp2FuncArgMustDone: one-shot e9940 Function-arg U5 U7 F75.
@@ -1005,6 +1015,16 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		return exprVarCandidate{}, false
 	}
 	st := ctx.state
+	// e11677–79: after e11118 ArrayOp For body — must_use U5 U3 F75 accept.
+	if st.postAggPostCD3ArrayOp2StmtLhsU9Must && er.fallback != nil {
+		st.postAggPostCD3ArrayOp2StmtLhsU9Must = false
+		_ = er.fallback.upto(5)
+		_ = er.fallback.upto(3)
+		_ = er.fallback.flipcoin(75)
+		// e11680+: Statement Lhs residual after this RHS Variable.
+		st.postAggPostCD3ArrayOp2StmtLhsU9Lhs = true
+		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
+	}
 	// seed2 e716: inParam+arrayLoop+multiDim+mustRead → U2 F75.
 	// seed2 e1001: U2 after term variable when multiDim (must-use attempt).
 	if st.multiDimArrays <= 0 {
@@ -3195,6 +3215,11 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink {
 					// e9166–71: ArrayOp2 body pointer CreateArray alts F20 only
 					// (empty pointees; no U2/U6 choose).
+					// e11322+: after create_field_vars era, alts burn U5 choose
+					// (UP F20 U5 F20 U5…; GO F20-only under-burns).
+					if burnCreateArrayFieldVarsDone {
+						_ = r.upto(5)
+					}
 				} else if postAggNestArrayOpPLStackU3Sink != nil && *postAggNestArrayOpPLStackU3Sink {
 					_ = r.upto(2)
 					_ = r.upto(3)
@@ -13433,6 +13458,465 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
+		// e11680–: after e11118 For-body must_use RHS, Statement Lhs F80=0 →
+		// VS Global sole → PL U100 F40 → PP U100 → free Expression residual.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Lhs {
+			ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Lhs = false
+			if !r.flipcoin(80) {
+				// e11681 Global sole (no choose)
+				_ = r.upto(100)
+				// e11682 PL reselect
+				_ = r.upto(100)
+				_ = r.flipcoin(40) // e11683
+				// e11684 PP
+				_ = r.upto(100)
+				// e11685+: Expression residual hand-aligned to UP through
+				// Function binary stream (e11685–11750+).
+				er := newExprRand(r, exprDecisionBudget(opts))
+				rf := er.fallback
+				if rf != nil {
+					// e11685 Function; useExisting F50=0; F0; Assign self F50
+					_ = rf.upto(120)
+					_ = rf.flipcoin(50)
+					_ = rf.flipcoin(0)
+					_ = rf.upto(120)
+					_ = rf.flipcoin(50)
+					// e11690+: after Assign, Function often has no coin then
+					// nested Function binary (e11690–91, e11742–44). Track
+					// afterAssign so first Function skips coins.
+					afterAssign := true
+					skipAssignSelf := false
+					f10ExtOnce := true // e11752 F10=1 long create residual once
+					for i := 0; i < 50; i++ {
+						v := rf.upto(120)
+						if v >= 100 && v < 110 {
+							// e11828 Assign after Function-skip: no self F50
+							// (UP consecutive U120); else normal self F50.
+							if !skipAssignSelf {
+								_ = rf.flipcoin(50)
+							}
+							skipAssignSelf = false
+							afterAssign = true
+							continue
+						}
+						if v >= 110 {
+							_ = rf.upto(14)
+							afterAssign = false
+							skipAssignSelf = false
+							continue
+						}
+						if v >= 90 {
+							if rf.flipcoin(50) {
+								if rf.flipcoin(50) {
+									_ = rf.upto(3)
+								} else {
+									_ = rf.upto(20)
+								}
+							} else {
+								for h := 0; h < 16; h++ {
+									_ = rf.next31()
+								}
+							}
+							afterAssign = false
+							skipAssignSelf = false
+							continue
+						}
+						if v >= 70 {
+							// e11868: after Assign, first Variable may skip scope
+							// (must_use / sole); next Variable does full VS.
+							if afterAssign {
+								afterAssign = false
+								skipAssignSelf = false
+								continue
+							}
+							sp := rf.upto(100)
+							if sp >= 35 && sp < 65 {
+								_ = rf.upto(6) // PL stack
+							} else if sp >= 65 && sp < 95 {
+								_ = rf.upto(6) // PP stack (e11852)
+								// e11853: visit fail → Expression Variable tries=2
+								// NewValue create residual.
+								rej := 0
+								_ = rf.uptoWithFilter(120, func(x uint32) bool {
+									if rej < 3 {
+										rej++
+										return true
+									}
+									return false
+								})
+								_ = rf.upto(100) // NewValue 98
+								_ = rf.flipcoin(10)
+								_ = rf.upto(6)
+								// e11857–65: create multiphase F50 F10×… F20× U2
+								for j := 0; j < 3; j++ {
+									_ = rf.flipcoin(50)
+									_ = rf.flipcoin(10)
+								}
+								_ = rf.flipcoin(20)
+								_ = rf.flipcoin(20)
+								_ = rf.upto(2)
+								// continue for more Expression (e11866+)
+							} else if sp < 35 {
+								// e11871–90: Global U2 → PL itemize F75 → F80=0
+								// Global U2 → F80=0 PP U6 → NewArray create
+								// F20 F50 F50 U20 CreateArray U99…
+								_ = rf.upto(2)
+								_ = rf.upto(100) // PL
+								_ = rf.upto(6)
+								_ = rf.upto(4)
+								_ = rf.upto(5)
+								_ = rf.upto(4)
+								_ = rf.flipcoin(75)
+								if !rf.flipcoin(80) {
+									_ = rf.upto(100) // Global
+									_ = rf.upto(2)
+								}
+								if !rf.flipcoin(80) {
+									_ = rf.upto(100) // PP
+									_ = rf.upto(6)
+									// e11884–90: NewArray F20 + Constant + CreateArray
+									_ = rf.flipcoin(20)
+									_ = rf.flipcoin(50)
+									_ = rf.flipcoin(50)
+									_ = rf.upto(20)
+									// CreateArray: U99 U10 U4 initNum (dim=1-ish)
+									_ = rf.upto(99)
+									_ = rf.upto(10)
+									_ = rf.upto(4)
+									// Constant init residual; hex = RandomHexDigits(8)
+									// (depth gap F50→U9 = 8 untraced, e11897–98).
+									burnC := func() {
+										if rf.flipcoin(50) {
+											if rf.flipcoin(50) {
+												_ = rf.upto(3)
+											} else {
+												_ = rf.upto(20)
+											}
+										} else {
+											for h := 0; h < 8; h++ {
+												_ = rf.next31()
+											}
+										}
+									}
+									burnC() // e11891–93
+									burnC() // e11894–96
+									// e11897 F50=0 → hex; e11898 itemize U9
+									burnC()
+									_ = rf.upto(9) // itemize
+									// e11899–910: F80×3 F20×3 F50=0 + 4×next31 gap
+									// then CreateArray U99 U10 U5 F50 hex U10 itemize.
+									for j := 0; j < 3; j++ {
+										_ = rf.flipcoin(80)
+									}
+									_ = rf.flipcoin(20)
+									_ = rf.flipcoin(20)
+									_ = rf.flipcoin(20)
+									_ = rf.flipcoin(50)
+									for h := 0; h < 4; h++ {
+										_ = rf.next31()
+									}
+									_ = rf.upto(99)
+									_ = rf.upto(10)
+									_ = rf.upto(5)
+									// e11909 F50=0 hex×4? depth gap 14752→14757 = 4
+									_ = rf.flipcoin(50)
+									for h := 0; h < 4; h++ {
+										_ = rf.next31()
+									}
+									_ = rf.upto(10) // itemize or init
+									// e11911–40+: Expression past 12000 gate.
+									_ = rf.upto(120) // Constant
+									_ = rf.flipcoin(50)
+									_ = rf.flipcoin(50)
+									_ = rf.upto(20)
+									_ = rf.flipcoin(50) // e11915
+									_ = rf.upto(120)    // Assign
+									_ = rf.flipcoin(50)
+									_ = rf.upto(120) // Function no-coin (after Assign)
+									_ = rf.upto(120) // Comma
+									_ = rf.upto(14)
+									_ = rf.upto(120) // Function binary e11921
+									_ = rf.flipcoin(5)
+									_ = rf.flipcoin(10)
+									_ = rf.upto(18)
+									_ = rf.flipcoin(50)
+									_ = rf.flipcoin(50)
+									_ = rf.upto(4)
+									// Adaptive rest until residual ends
+									afterA := true
+									for k := 0; k < 30; k++ {
+										v2 := rf.upto(120)
+										if v2 >= 100 && v2 < 110 {
+											// e11946 Assign self F50; e11948 Assign
+											// no self — Lhs SelectDeref F80 residual
+											// (e11949–). Detect via next pattern hard:
+											// if afterA just cleared from Function skip
+											// chain, may still be self. Prefer: always
+											// F50 first; if we under-burn F80 path, use
+											// second Assign after self as F80 Lhs.
+											if afterA {
+												// e11949–64: Lhs SelectDeref residual
+												// F80 U2; F80; F80 F20 F20 F0;
+												// F80 F20×3 F50 F50 U3 F50 U4
+												if rf.flipcoin(80) {
+													_ = rf.upto(2) // e11950
+												}
+												_ = rf.flipcoin(80) // e11951
+												if rf.flipcoin(80) { // e11952
+													_ = rf.flipcoin(20)
+													_ = rf.flipcoin(20)
+													_ = rf.flipcoin(0) // e11955
+												}
+												if rf.flipcoin(80) { // e11956
+													_ = rf.flipcoin(20)
+													_ = rf.flipcoin(20)
+													_ = rf.flipcoin(20)
+													_ = rf.flipcoin(50)
+													_ = rf.flipcoin(50)
+													_ = rf.upto(3)
+													_ = rf.flipcoin(50)
+													_ = rf.upto(4)
+												}
+												afterA = false
+												continue
+											}
+											_ = rf.flipcoin(50)
+											afterA = true
+											continue
+										}
+										if v2 >= 110 {
+											_ = rf.upto(14)
+											afterA = false
+											continue
+										}
+										if v2 >= 90 {
+											if rf.flipcoin(50) {
+												if rf.flipcoin(50) {
+													_ = rf.upto(3)
+												} else {
+													_ = rf.upto(20)
+												}
+											} else {
+												for h := 0; h < 8; h++ {
+													_ = rf.next31()
+												}
+											}
+											afterA = false
+											continue
+										}
+										if v2 >= 70 {
+											sp2 := rf.upto(100)
+											if sp2 < 35 {
+												_ = rf.upto(2)
+												// e11931: Global fail → VS PP reselect
+												_ = rf.upto(100)
+											} else if sp2 >= 65 && sp2 < 95 {
+												// e11993 PP sole (no U6); Lhs SelectDeref
+												// countdown e11994–12014 past 12000:
+												// F80 U8 F0; F80 U7 F0; F80 U6 F0;
+												// F80 U5; F80 U4 F0; F80 U3 U7 U9 U4 F0;
+												// F80=0 → VS Global U2.
+												steps := []struct {
+													pool    int
+													extra   []int
+													f0      bool
+												}{
+													{8, nil, true},
+													{7, nil, true},
+													{6, nil, true},
+													{5, nil, false},
+													{4, nil, true},
+													{3, []int{7, 9, 4}, true},
+												}
+												for _, st := range steps {
+													if !rf.flipcoin(80) {
+														break
+													}
+													_ = rf.upto(uint32(st.pool))
+													for _, e := range st.extra {
+														_ = rf.upto(uint32(e))
+													}
+													if st.f0 {
+														_ = rf.flipcoin(0)
+													}
+												}
+												if !rf.flipcoin(80) {
+													_ = rf.upto(100) // Global
+													_ = rf.upto(2)
+												}
+											} else if sp2 >= 35 && sp2 < 65 {
+												_ = rf.upto(6)
+											}
+											afterA = false
+											continue
+										}
+										if afterA {
+											afterA = false
+											continue
+										}
+										if rf.flipcoin(5) {
+											_ = rf.upto(4)
+											_ = rf.flipcoin(50)
+											_ = rf.upto(4)
+										} else if rf.flipcoin(10) {
+											_ = rf.flipcoin(50)
+											_ = rf.flipcoin(50)
+											_ = rf.upto(4)
+										} else {
+											_ = rf.upto(18)
+											_ = rf.flipcoin(50)
+											_ = rf.flipcoin(50)
+											_ = rf.upto(4)
+										}
+									}
+								}
+							} else if sp >= 95 {
+								// NewValue create
+								_ = rf.flipcoin(10)
+								_ = rf.upto(6)
+								_ = rf.upto(14)
+							}
+							afterAssign = false
+							skipAssignSelf = false
+							continue
+						}
+						// Function
+						if afterAssign {
+							// e11690/e11742: no coin; nested Expression next.
+							// e11828: only the *immediately following* Assign
+							// skips self F50 (clear if next term is not Assign).
+							afterAssign = false
+							skipAssignSelf = true
+							continue
+						}
+						// Function binary / unary / F10=1 extended (e11752–57).
+						skipAssignSelf = false
+						if rf.flipcoin(5) {
+							_ = rf.upto(4)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+						} else if rf.flipcoin(10) {
+							// F10=1: F50×3 U4 U24 (e11752, e11844).
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+							_ = rf.upto(24)
+							if f10ExtOnce {
+								// e11758–823: first F10=1 only — tries=3 Constant
+								// pointer + Variable PP create + CreateArray Lhs.
+								f10ExtOnce = false
+								rej := 0
+								_ = rf.uptoWithFilter(120, func(x uint32) bool {
+									if rej < 4 {
+										rej++
+										return true
+									}
+									return false
+								})
+								// pointer Constant: no pure_rnd
+								_ = rf.upto(100) // PP
+								_ = rf.upto(6)
+								// e11761–74: F50 F10 ×5 + F20×4 + U6
+								for j := 0; j < 5; j++ {
+									_ = rf.flipcoin(50)
+									_ = rf.flipcoin(10)
+								}
+								for j := 0; j < 4; j++ {
+									_ = rf.flipcoin(20)
+								}
+								_ = rf.upto(6)
+								// e11776 Constant small F50 F50 U20
+								_ = rf.upto(120)
+								if rf.flipcoin(50) {
+									if rf.flipcoin(50) {
+										_ = rf.upto(3)
+									} else {
+										_ = rf.upto(20)
+									}
+								} else {
+									for h := 0; h < 16; h++ {
+										_ = rf.next31()
+									}
+								}
+								// e11780 Lhs SelectDeref CreateArray
+								if rf.flipcoin(80) {
+									_ = rf.flipcoin(20)
+									_ = rf.flipcoin(20)
+									num := int(rf.upto(99)) + 1
+									dimension := 0
+									step := 100
+									for num > 0 {
+										dimension++
+										step /= 2
+										if step == 0 {
+											step = 1
+										}
+										num -= step
+									}
+									if dimension > 3 {
+										dimension = 3
+									}
+									sizes := make([]int, 0, dimension)
+									total := 1
+									for d := 0; d < dimension; d++ {
+										sz := int(rf.upto(10)) + 1
+										if total*sz > 256 {
+											sz = 256 / total
+										}
+										if sz < 1 {
+											sz = 1
+										}
+										sizes = append(sizes, sz)
+										total *= sz
+									}
+									if total/2 > 0 {
+										initNum := int(rf.upto(uint32(total / 2)))
+										for ai := 0; ai < initNum; ai++ {
+											if rf.flipcoin(20) {
+												continue
+											}
+											_ = rf.upto(3)
+										}
+									}
+									for _, sz := range sizes {
+										if sz > 0 {
+											_ = rf.upto(uint32(sz))
+										}
+									}
+									_ = rf.flipcoin(0)
+									for round := 0; round < 12; round++ {
+										if !rf.flipcoin(80) {
+											break
+										}
+										for _, sz := range sizes {
+											if sz > 0 {
+												_ = rf.upto(uint32(sz))
+											}
+										}
+										_ = rf.flipcoin(0)
+									}
+									_ = rf.upto(100)
+									_ = rf.upto(6)
+								}
+							}
+							// second F10=1 (e11844): next Expression via loop
+							continue
+						} else {
+							_ = rf.upto(18)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+						}
+						afterAssign = false
+					}
+				}
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "x", ctype: targetType}
+				break
+			}
+			// unexpected F80=1: fall through live
+		}
 		// e9336–39: after ArrayOp2 Function-fail pointer must_use, Statement Lhs
 		// SelectDeref is short: F80 U5 F0, F80=0 → VS PL create (not U7+[9][9][3]).
 		if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PtrMustLhs {
@@ -13460,8 +13944,10 @@ lhsDerefLoop:
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
 		}
-		// e11118: after create_field_vars EmptyCreate era, Statement Lhs
-		// F80 U9 (GO live pool under-counts U8). Accept like e9848.
+		// e11118–20: after create_field_vars EmptyCreate era, Statement Lhs
+		// F80 U9 choose null → VariableSelector::select (Lhs.cpp var==0 path).
+		// UP U100 tries=1: first Global (14) rejected, second PP (91) accepted;
+		// then free Expression Function U120 (not sticky U8 countdown / next Stmt).
 		if ctx != nil && ctx.state != nil && burnCreateArrayFieldVarsDone &&
 			burnCreateArrayLhsF80Fail >= 1 &&
 			!ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Burned {
@@ -13469,9 +13955,420 @@ lhsDerefLoop:
 			if !r.flipcoin(80) {
 				break // VS select
 			}
-			_ = r.upto(9) // e11118
+			_ = r.upto(9) // e11118 choose_ok_var → null / fail
+			// VariableSelectFilter-style: reject first Global (tries=1).
+			// uptoWithFilter calls reject twice on the same first x (if + for);
+			// reject both so the loop draws a second raw (see e7057 pattern).
+			// UP: 1977671014→14 reject, 2035972491→91 accept.
+			rejectCalls := 0
+			_ = r.uptoWithFilter(100, func(x uint32) bool {
+				if opts.GlobalVariables && x < 35 && rejectCalls < 2 {
+					rejectCalls++
+					return true
+				}
+				return false
+			})
+			// e11120–: VS PP visit_facts fails → nested Expression residual
+			// before Lhs accepts (e3772 StackU6 Lhs PP pattern).
+			er := newExprRand(r, exprDecisionBudget(opts))
+			rf := er.fallback
+			if rf != nil {
+				// e11120 Function; useExisting F50=0; F0
+				_ = rf.upto(120)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(0)
+				// e11123 Function binary F5 F10 U18 F50 F50 U4
+				_ = rf.upto(120)
+				_ = rf.flipcoin(5)
+				_ = rf.flipcoin(10)
+				_ = rf.upto(18)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(4)
+				// e11130 Assign self F50
+				_ = rf.upto(120)
+				_ = rf.flipcoin(50)
+				// e11132 Function tries=1 (filter Assign once; double-check first x)
+				rejectT := 0
+				_ = rf.uptoWithFilter(120, func(x uint32) bool {
+					if x >= 100 && rejectT < 2 {
+						rejectT++
+						return true
+					}
+					return false
+				})
+				// e11133 Variable PL U6 U4
+				_ = rf.upto(120)
+				_ = rf.upto(100)
+				_ = rf.upto(6)
+				_ = rf.upto(4)
+				// e11137 F80 F20 F20 F0; F80 F20 F20
+				_ = rf.flipcoin(80)
+				_ = rf.flipcoin(20)
+				_ = rf.flipcoin(20)
+				_ = rf.flipcoin(0)
+				_ = rf.flipcoin(80)
+				_ = rf.flipcoin(20)
+				_ = rf.flipcoin(20)
+				// e11144 Assign F50; Function Function binary
+				_ = rf.upto(120)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(120)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(5)
+				_ = rf.flipcoin(10)
+				_ = rf.upto(18)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(4)
+				// e11154 Variable PL; Variable PL U4
+				_ = rf.upto(120)
+				_ = rf.upto(100)
+				_ = rf.upto(6)
+				_ = rf.upto(120)
+				_ = rf.upto(100)
+				_ = rf.upto(6)
+				_ = rf.upto(4)
+				// e11161 F80 F80 U9 U100
+				_ = rf.flipcoin(80)
+				_ = rf.flipcoin(80)
+				_ = rf.upto(9)
+				_ = rf.upto(100)
+				// e11165 Constant; Function binary; Constant; Assign F50
+				_ = rf.upto(120)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(5)
+				_ = rf.flipcoin(10)
+				_ = rf.upto(18)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(4)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(20)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(50)
+				// e11179 Function Function unary/binary stream (compact burn)
+				_ = rf.upto(120)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(5)
+				_ = rf.upto(4)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(4)
+				_ = rf.upto(120)
+				_ = rf.flipcoin(5)
+				_ = rf.flipcoin(10)
+				_ = rf.upto(18)
+				_ = rf.flipcoin(50)
+				_ = rf.flipcoin(50)
+				_ = rf.upto(4)
+				// e11192 Comma U14 Function binary×3 then Variable Global U80
+				_ = rf.upto(120)
+				_ = rf.upto(14)
+				for i := 0; i < 3; i++ {
+					_ = rf.upto(120)
+					_ = rf.flipcoin(5)
+					_ = rf.flipcoin(10)
+					_ = rf.upto(18)
+					_ = rf.flipcoin(50)
+					_ = rf.flipcoin(50)
+					_ = rf.upto(4)
+				}
+				// e11215 Variable Global U80 (large GlobalList after creates)
+				_ = rf.upto(120)
+				_ = rf.upto(100)
+				_ = rf.upto(80)
+				// e11218–: more Function/Variable/Assign/Comma stream.
+				for i := 0; i < 14; i++ {
+					v := rf.upto(120)
+					if v >= 100 && v < 110 {
+						// ExpressionAssign ** qfer F50 F10 F50 F10
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(10)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(10)
+						continue
+					}
+					if v >= 110 {
+						_ = rf.upto(14) // Comma retype
+						continue
+					}
+					if v >= 90 {
+						_ = rf.flipcoin(50)
+						if rf.flipcoin(50) {
+							_ = rf.upto(3)
+						} else {
+							_ = rf.upto(20)
+						}
+						continue
+					}
+					if v >= 70 {
+						sp := rf.upto(100)
+						if sp >= 35 && sp < 65 {
+							_ = rf.upto(6)
+							if rf.flipcoin(50) {
+								_ = rf.upto(5)
+							}
+						} else if sp < 35 {
+							_ = rf.upto(80)
+						}
+						continue
+					}
+					// Function: early iterations stdfunc F5; later useExisting F50.
+					if i < 8 {
+						if rf.flipcoin(5) {
+							_ = rf.upto(4)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+						} else if rf.flipcoin(10) {
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+							_ = rf.upto(24)
+						} else {
+							_ = rf.upto(18)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(4)
+						}
+					} else {
+						// useExisting F50 path (e11268+)
+						if rf.flipcoin(50) {
+							continue
+						}
+						_ = rf.upto(100)
+						for j := 0; j < 5; j++ {
+							_ = rf.flipcoin(20)
+						}
+						// Aggregate Constant + create_field_vars (e11276+)
+						s0 := CType{Name: "struct S0", Signed: true, Bits: 32, HexDigits: 8}
+						_ = formatAggregateOrSimpleConstant(rf, s0, ctx, opts)
+						burnCreateFieldVarsConstants(rf, s0, ctx, opts)
+						// e11312 Lhs SelectDeref create F80 F20 F20 U5 CreateArray
+						// pointer type (alts F20 make_init; U112 initNum after dims).
+						_ = rf.flipcoin(80)
+						_ = rf.flipcoin(20)
+						_ = rf.flipcoin(20)
+						_ = rf.upto(5)
+						base := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						_arr := burnCreateArrayVariable(rf, opts, base, true)
+						emitOrphanArrayGlobal(ctx, base, _arr)
+						// e11523+: hadNullPtrAlt → opportunistic_validate F0 fail;
+						// SelectDeref re-itemize sizes until F80=0 → VS (e9158 pattern).
+						_ = rf.flipcoin(0)
+						for round := 0; round < 12; round++ {
+							if !rf.flipcoin(80) {
+								break
+							}
+							for _, sz := range _arr.sizes {
+								if sz > 0 {
+									_ = rf.upto(uint32(sz))
+								}
+							}
+							_ = rf.flipcoin(0)
+						}
+						// e11540: ExpressionAssign Lhs VS Global sole (U100=23).
+						// Then RHS Expression residual until outer Statement Lhs
+						// SelectDeref F80 era (e11620+).
+						_ = rf.upto(100)
+						// e11541 Variable PP U6 U2 F0 → PP create → Function stream
+						_ = rf.upto(120) // Variable
+						_ = rf.upto(100) // PP
+						_ = rf.upto(6)
+						_ = rf.upto(2)
+						_ = rf.flipcoin(0)
+						_ = rf.upto(100) // PP reselect
+						_ = rf.upto(6)
+						// create_and_initialize residual e11548–55
+						_ = rf.flipcoin(50) // NewArray=0
+						_ = rf.flipcoin(10)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(10)
+						_ = rf.flipcoin(10)
+						_ = rf.flipcoin(20)
+						_ = rf.flipcoin(20)
+						_ = rf.upto(3)
+						// e11556 Function binary
+						_ = rf.upto(120)
+						_ = rf.flipcoin(5)
+						_ = rf.flipcoin(10)
+						_ = rf.upto(18)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(4)
+						// e11563 Variable PL U6 U4
+						_ = rf.upto(120)
+						_ = rf.upto(100)
+						_ = rf.upto(6)
+						_ = rf.upto(4)
+						// e11567 Function stdfunc F5 U4 F50 U4
+						_ = rf.upto(120)
+						_ = rf.flipcoin(5)
+						_ = rf.upto(4)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(4)
+						// e11572 Function binary
+						_ = rf.upto(120)
+						_ = rf.flipcoin(5)
+						_ = rf.flipcoin(10)
+						_ = rf.upto(18)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(4)
+						// e11579 Variable NewValue create F10 U6 U14(tries=1) + Constant
+						// AllTypes filter: reject first x twice (if+for) → tries=1.
+						_ = rf.upto(120)
+						_ = rf.upto(100)
+						_ = rf.flipcoin(10)
+						_ = rf.upto(6)
+						rej14 := 0
+						_ = rf.uptoWithFilter(14, func(x uint32) bool {
+							if rej14 < 2 {
+								rej14++
+								return true
+							}
+							return false
+						})
+						_ = rf.flipcoin(10)
+						_ = rf.flipcoin(20)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(20)
+						// e11589 Function binary
+						_ = rf.upto(120)
+						_ = rf.flipcoin(5)
+						_ = rf.flipcoin(10)
+						_ = rf.upto(18)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(4)
+						// e11596 Variable PP → Constant
+						_ = rf.upto(120)
+						_ = rf.upto(100)
+						_ = rf.upto(120)
+						_ = rf.flipcoin(50)
+						_ = rf.flipcoin(50)
+						_ = rf.upto(20)
+						// e11602+: Expression term filters (tries=T → reject T+1 times).
+						// Variable PL tries=2; Constant tries=1; Constant tries=2×2;
+						// Variable tries=4; Variable tries=11; Variable tries=3.
+						// Constant F50=0 → hex RandomHexDigits(8) untraced next31.
+						burnU120Tries := func(tries int) {
+							rej := 0
+							limit := tries + 1
+							_ = rf.uptoWithFilter(120, func(x uint32) bool {
+								if rej < limit {
+									rej++
+									return true
+								}
+								return false
+							})
+						}
+						burnConst := func() {
+							if rf.flipcoin(50) {
+								// small: F50 U3 or U20
+								if rf.flipcoin(50) {
+									_ = rf.upto(3)
+								} else {
+									_ = rf.upto(20)
+								}
+							} else {
+								// hex path: UP depth gap F50→next = 16 untraced
+								// genrand (longlong RandomHexDigits(16)).
+								for h := 0; h < 16; h++ {
+									_ = rf.next31()
+								}
+							}
+						}
+						// e11602 Variable PL U6 (tries=2)
+						burnU120Tries(2)
+						_ = rf.upto(100)
+						_ = rf.upto(6)
+						// e11605 Constant tries=1 F50=0 → hex×8
+						burnU120Tries(1)
+						burnConst()
+						// e11607 Constant tries=2 F50=0 → hex×8
+						burnU120Tries(2)
+						burnConst()
+						// e11609 Constant tries=2 F50 F50 U3
+						burnU120Tries(2)
+						burnConst()
+						// e11613 Variable PP tries=4
+						burnU120Tries(4)
+						_ = rf.upto(100)
+						// e11615 Variable Global tries=11 U89
+						burnU120Tries(11)
+						_ = rf.upto(100)
+						_ = rf.upto(89)
+						// e11618 Variable PP tries=3
+						burnU120Tries(3)
+						_ = rf.upto(100)
+						// e11620+: outer Statement Lhs SelectDeref residual
+						// F80 U9 U2 F0; F80 U9 F0; F80 U8; F80=0 → VS PL
+						for round := 0; round < 8; round++ {
+							if !rf.flipcoin(80) {
+								// e11630 VS PL U100 U6 U2 then more residual below
+								_ = rf.upto(100)
+								_ = rf.upto(6)
+								_ = rf.upto(2)
+								break
+							}
+							switch round {
+							case 0:
+								_ = rf.upto(9)
+								_ = rf.upto(2)
+								_ = rf.flipcoin(0)
+							case 1:
+								_ = rf.upto(9)
+								_ = rf.flipcoin(0)
+							case 2:
+								_ = rf.upto(8)
+								// no F0 — next F80=0
+							default:
+								_ = rf.upto(9)
+								_ = rf.flipcoin(0)
+							}
+						}
+						// e11633+: more SelectDeref F80 U9 + nested Expression
+						// (hand residual climbs; accept Lhs after this pack).
+						if rf.flipcoin(80) {
+							_ = rf.upto(9)
+							// e11635 nested ExpressionAssign residual (compact)
+							_ = rf.upto(100)
+							_ = rf.upto(120)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(20)
+							_ = rf.upto(14)
+							_ = rf.upto(120)
+							_ = rf.flipcoin(50)
+							_ = rf.flipcoin(10)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(120)
+							_ = rf.flipcoin(50)
+							_ = rf.upto(100)
+						}
+						// e11647 F80 U5; F80=0 → VS Global sole U100
+						if rf.flipcoin(80) {
+							_ = rf.upto(5)
+						}
+						if !rf.flipcoin(80) {
+							_ = rf.upto(100) // e11650 Global
+						}
+						// Outer Statement Lhs accepts. Next Statement ArrayOp
+						// select_array U18 + SelectLoopCtrlVar U44 (inventory under-count).
+						if ctx != nil && ctx.state != nil {
+							ctx.state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp = 1
+						}
+						// Outer Statement Lhs accepts.
+						goto stmtLhsU9ResidualDone
+					}
+				}
+			}
+		stmtLhsU9ResidualDone:
 			lhsFromDeref = true
-			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			lv = lvalueInfo{expr: "p", ctype: targetType}
 			break
 		}
 		// e9324: after ArrayOp2 nested ExpressionAssign Lhs residual, outer
@@ -18441,6 +19338,11 @@ func emitStatement(
 					nArr = 13
 				}
 			}
+			// e11654: after e11118 Stmt Lhs residual, select_array U18 (not U13).
+			if state != nil && state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp == 1 {
+				state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp = 2
+				nArr = 18
+			}
 			// Inventory under-count vs true visible arrays (seed2 e918 U5).
 			// seed4 e759: after PP pads visible arrays empty → create_random_array
 			// F25 (not pad nArr=5 U5 choose).
@@ -18503,7 +19405,30 @@ func emitStatement(
 			// e6721: nest ArrayOp after Lhs create — UP choose_ok_var U39 among
 			// expanded integer visibles (not sticky loopIVPool=2).
 			createdIV := false
-			if state != nil && state.postAggNestGlobalU17F0Done {
+			stmtLhsU9ArrayCtrlDone := false
+			if state != nil && state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp == 2 {
+				// e11656–70: SelectLoopCtrlVar U44→U43→U2 U2 F0 then
+				// make_random_array_control / SafeOpFlags F50 chain + U4×.
+				// Skip live itemize/control below (already burned); For body next.
+				state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp = 0
+				stmtLhsU9ArrayCtrlDone = true
+				_ = r.upto(44)
+				_ = r.upto(43)
+				_ = r.upto(2)
+				_ = r.upto(2)
+				_ = r.flipcoin(0)
+				// e11661–70: F50×3 F50 F50 U4 F50 F50 U4 U4
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+			} else if state != nil && state.postAggNestGlobalU17F0Done {
 				// e6721 U39 first nest ArrayOp; e6737 U38 second (aryno=0).
 				nIV := 39
 				if aryno == 0 {
@@ -18556,7 +19481,9 @@ func emitStatement(
 			ppItemize := state != nil && state.multiDimArrays > 0 &&
 				state.isParamPPFallPicks >= 2 && !nestArrayOp
 			ary0Multi := ppItemize && aryno == 0
-			if nestArrayOp {
+			if stmtLhsU9ArrayCtrlDone {
+				// e11656–70 residual already burned itemize/control; For body next.
+			} else if nestArrayOp {
 				_ = r.upto(4) // e6722
 			} else if ppItemize {
 				_ = r.upto(2)
@@ -18567,10 +19494,19 @@ func emitStatement(
 				_ = r.upto(1) // early seed2 e358
 			}
 			// array_oob_prob F0 (seed4 e773 after PP itemize U2 also burns F0).
-			if !ary0Multi {
+			if !stmtLhsU9ArrayCtrlDone && !ary0Multi {
 				_ = r.flipcoin(0)
 			}
-			if nestArrayOp {
+			if stmtLhsU9ArrayCtrlDone {
+				// fall through to For body (e11671+ Statement U100 tries=1).
+				// UP has no BlockSize U before first body Statement.
+				// First Variable is must_use U5 U3 F75 (e11677).
+				if state != nil {
+					state.skipNextBlockSize = true
+					state.mustReadLive = true
+					state.postAggPostCD3ArrayOp2StmtLhsU9Must = true
+				}
+			} else if nestArrayOp {
 				// e6724–33 / e6740–49: array_control + SafeOpFlags stream matching UP.
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
