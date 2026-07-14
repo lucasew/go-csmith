@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6608) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6635) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6608** (6595→6608; nest depthBlock + Global U17 + PL reselect; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6635** (6608→6635; nest Constant hex16 + Global F50/noConst + create residual; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -392,8 +392,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 4. e6598: skip needNoRhs SafeOpFlags after nest Global Variable Expression.
 5. e6605: PL stack U5 visit-fail → VS U100 reselect only (no U4 choose).
 
-Next plateau: seed4 e6608 UP U120=82 tries=9 vs GO U120=89 tries=1 after Constant F50=0
-(hex digit count / deeper depth filter). Seeds 5–21; source; COUNT=20.
+**e6608–e6635 climbed:**
+1. e6608: nest Constant hex floor hn=16 (int8 under-width desynced LCG after F50=0).
+2. depthBlock Assign must not re-open via allowAssignPad (e6612).
+3. e6611: 2nd nest Global U17 F50 residual + next Expression noConst (Variable tries=14).
+4. e6622: nest NewValue→PL create F50 U8 residual after Constant U20.
+
+Next plateau: seed4 e6635 UP U120=73 tries=2 vs GO ShiftBy F50=0 U32 after nest PP
+Variable sole chain. Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
