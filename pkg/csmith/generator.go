@@ -14263,10 +14263,222 @@ lhsDerefLoop:
 																				vv = rf.upto(120)
 																			}
 																			if vv >= 110 {
-																				// ExpressionComma lhs: type=nil →
-																				// choose_random_nonvoid(_nonvolatile)
-																				// AllTypes n=14: reject float(9),
-																				// int128(11), uint128(12). e13009 tries=1.
+																				// e13009: ExpressionComma lhs type=nil →
+																				// AllTypes U14 NonVoid; lhs no_const.
+																				// e13484: after LShift ends (depth
+																				// cleared), residual is Lhs
+																				// SelectDeref F80 ladder (not U14) —
+																				// StatementAssign Lhs after expr.
+																				if !depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone {
+																					// e13484–15095: long Statement Lhs
+																					// SelectDeref residual after deep
+																					// Expression (LShift) ends.
+																					// Dominant F80=1 body: multi-dim
+																					// itemize U9 U9 U3 F0 fail (×229).
+																					// F80=0 → VS U100 + scope residual.
+																					lhsDerefN := 0
+																					itemizeN := 0
+																					plVS := 0
+																					globalVS := 0
+																					ppVS := 0
+																					for lhsDerefN < 400 {
+																						lhsDerefN++
+																						if !rf.flipcoin(80) {
+																							// VS U100
+																							sp := rf.upto(100)
+																							if sp < 35 {
+																								// Global ok_vars multiphase.
+																								globalVS++
+																								if lhsDerefN < 5 {
+																									_ = rf.upto(5)
+																									_ = rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																								} else {
+																									switch {
+																									case globalVS == 1:
+																										// e13700: U9 sole
+																										_ = rf.upto(9)
+																									case globalVS == 2:
+																										// e13708: U8 U8
+																										_ = rf.upto(8)
+																										_ = rf.upto(8)
+																									case globalVS == 3:
+																										// e13752: U8 U10
+																										_ = rf.upto(8)
+																										_ = rf.upto(10)
+																									case globalVS == 4:
+																										// e13766: U8 sole
+																										_ = rf.upto(8)
+																									case globalVS == 5:
+																										// e13852: U7 sole
+																										_ = rf.upto(7)
+																									default:
+																										// e13880+: U6 [U8];
+																										// e13968 U5 U8 later.
+																										_ = rf.upto(6)
+																										if globalVS%2 == 0 {
+																											_ = rf.upto(8)
+																										}
+																									}
+																								}
+																							} else if sp < 65 {
+																								// PL multiphase from residual
+																								// catalog e13502–15000.
+																								plVS++
+																								_ = rf.upto(5)
+																								switch {
+																								case plVS <= 2:
+																									// U5 U3 U9
+																									_ = rf.upto(3)
+																									_ = rf.upto(9)
+																								case plVS <= 4:
+																									// U5 + itemize U9 U9 U3 F0
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																								case plVS == 5:
+																									// e13804: U5 sole
+																								default:
+																									// e13909+: U5 F50 F20 F50
+																									// create small/hex
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								}
+																							} else if sp < 95 {
+																								// PP: first create U5 U14
+																								// F50 F20 F50+hex (e13495);
+																								// later U5 U2 F0 fail
+																								// (e13532–34).
+																								ppVS++
+																								_ = rf.upto(5)
+																								if ppVS == 1 {
+																									u14 := rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										hn := 8
+																										switch u14 {
+																										case 1, 2, 6:
+																											hn = 2
+																										case 3, 4, 8:
+																											hn = 4
+																										case 5, 11:
+																											hn = 16
+																										}
+																										for h := 0; h < hn; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								} else if sp >= 85 {
+																									// e13888: high PP U5 F50
+																									// F20 F50 create; F50=0
+																									// hex×8 (e13891 gap).
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								} else if ppVS == 2 {
+																									// e13532 U2 F0
+																									_ = rf.upto(2)
+																									_ = rf.flipcoin(0)
+																								} else if ppVS == 4 {
+																									// e13840 U5 sole
+																								} else {
+																									// e13728 U2
+																									_ = rf.upto(2)
+																								}
+																							} else {
+																								// NewValue create F10=0 PL
+																								// e13816: U5 U14 F50 F20 F50
+																								// hex×16 when U14=5.
+																								if !rf.flipcoin(10) {
+																									_ = rf.upto(5)
+																									u14 := rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										hn := 8
+																										switch u14 {
+																										case 1, 2, 6:
+																											hn = 2
+																										case 3, 4, 8:
+																											hn = 4
+																										case 5, 11:
+																											hn = 16
+																										}
+																										for h := 0; h < hn; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								}
+																							}
+																							// often more F80 after VS
+																							continue
+																						}
+																						// F80=1: early pool U7…U3; then
+																						// multi-dim itemize U9 U9 U3 F0
+																						// (dominant ×229 in residual).
+																						if lhsDerefN <= 4 {
+																							_ = rf.upto(uint32(8 - lhsDerefN))
+																							if lhsDerefN == 1 {
+																								_ = rf.flipcoin(0)
+																							}
+																						} else if lhsDerefN <= 6 {
+																							// e13501: short U3 after first
+																							// VS create (lhsDerefN=6)
+																							_ = rf.upto(3)
+																						} else {
+																							// e13508–24: U2 + itemize after
+																							// first PL; e13536+: pure
+																							// U9 U9 U3 F0 (×229).
+																							itemizeN++
+																							if itemizeN <= 3 {
+																								_ = rf.upto(2)
+																							}
+																							_ = rf.upto(9)
+																							_ = rf.upto(9)
+																							_ = rf.upto(3)
+																							_ = rf.flipcoin(0)
+																						}
+																					}
+																					afterAsg = false
+																					continue
+																				}
 																				_ = rf.uptoWithFilter(14, func(x uint32) bool {
 																					return x == 9 || x == 11 || x == 12
 																				})
@@ -14386,6 +14598,19 @@ lhsDerefLoop:
 																					for h := 0; h < hn; h++ {
 																						_ = rf.next31()
 																					}
+																					// e13471: after longlong Const hex
+																					// under SelectDeref era: F50 + U64
+																					// residual (ShiftByNonConstant /
+																					// make_random_upto or PP-era shape).
+																					// Depth filter continues after
+																					// (e13473 Var tries=5).
+																					if depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone && hn >= 16 {
+																						if !rf.flipcoin(50) {
+																							_ = rf.upto(64)
+																						} else {
+																							depthNoConstNext = true
+																						}
+																					}
 																				}
 																				// e12678: one F50 after first post-pack
 																				// Constant before Function binary.
@@ -14487,11 +14712,25 @@ lhsDerefLoop:
 																							_ = rf.upto(2)
 																							_ = rf.flipcoin(0)
 																							_ = rf.upto(100) // PP
-																						case globalDepthN <= 6:
-																							_ = rf.upto(2)
 																						default:
-																							// e13474+: larger pool U34
+																							// e13474+: larger ok_vars U34
+																							// + U4; first only F50
+																							// (e13476–77); later may
+																							// reselect NewValue U100
+																							// (e13482).
 																							_ = rf.upto(34)
+																							_ = rf.upto(4)
+																							if globalDepthN == 5 {
+																								_ = rf.flipcoin(50)
+																							} else {
+																								// e13482: visit-fail →
+																								// NewValue U100; LShift
+																								// Function ends → depth=0
+																								// (e13483 Comma tries=0).
+																								_ = rf.upto(100)
+																								depthFilterExpr = false
+																								depthNoConstNext = false
+																							}
 																						}
 																					} else if plStackN <= 5 && depthFilterClosed {
 																						_ = rf.upto(102)

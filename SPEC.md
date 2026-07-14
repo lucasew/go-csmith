@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13471) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13968) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13471** (13379→13471; hex after create F50=0, depth-era Global/PL, SelectDeref, struct create pack; seed2 full held). Toward 15000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13968** (13471→13968; LShift RHS U64, long Lhs SelectDeref residual; seed2 full held). Toward 15000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,13 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e13471 Const F50=0 after struct create — UP has F50 U64 after hex×16 (depth gap); GO ends Constant early. Toward 15000+.
+Next plateau: seed4 e13968 Lhs SelectDeref Global ok_vars U5 U8 (vs GO U6). Long residual continues to ~15096 U120. Toward 15000+.
+
+**e13471–e13968 climbed:**
+1. e13471: after longlong Const hex, ShiftByNonConstant F50=0 → make_random_upto(64) for 8-byte shift RHS.
+2. e13483: clear depth after NewValue; Comma → Statement Lhs SelectDeref F80 ladder (not U14).
+3. e13484–13968: long Lhs SelectDeref loop — F80 itemize U9 U9 U3 F0 (×229), VS U100 multiphase Global/PL/PP/NewValue with create hex.
+4. seed2 37939 held.
 
 **e13379–e13471 climbed:**
 1. e13379: CreateArray VS F20 NewArray=0 → Constant F50=0 hex×8 (unlogged digits).
