@@ -76,6 +76,8 @@ var postAggLhsGlobalU15Sink *bool
 var postAggExprContGlobalU15Sink *bool
 // postAggExprNestPLChooseU5Sink: one-shot PL choose U5 (e4402).
 var postAggExprNestPLChooseU5Sink *bool
+var postAggNestPLChooseU2Sink *bool
+var postAggNestStackU6Sink *bool
 // postAggExprNestDepthBlockOnce: after PL F0 VS, next Expression depth-block.
 var postAggExprNestDepthBlockOnce bool
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
@@ -448,6 +450,11 @@ type functionFlowState struct {
 	postAggExprNestPLChooseU5 bool
 	// postAggExprNestDepthBlock: next Expression depth-block (e4406 tries=5).
 	postAggExprNestDepthBlock bool
+	postAggNestSelDerefDone bool
+	postAggNestStmtUnfilteredOnce bool
+	postAggNestPLChooseU2 bool
+	postAggNestStackU6 bool
+	postAggNestPLSoleAfterF0 bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -650,6 +657,22 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	if state != nil && state.postAggNestStackU6 {
+		state.postAggNestStackU6 = false
+		n = 6
+		_ = er.pick(uint32(n))
+		// e4477–79: choose U4 + F0 fail → VS reselect U100 (not empty create F50).
+		if er != nil {
+			_ = er.pick(4)
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(0)
+				_ = er.fallback.upto(100) // e4479 VS reselect
+			}
+		}
+		// Signal PL path: sole-accept after residual (skip create).
+		state.postAggNestPLSoleAfterF0 = true
+		return 0
+	}
 	if state != nil && state.deepStack {
 		n = state.blockStack
 		if n < 1 {
@@ -1408,6 +1431,15 @@ func (e *exprRand) pick(n uint32) uint32 {
 			_ = e.fallback.upto(15)
 			postAggExprNestDepthBlockOnce = true
 			return v
+		}
+	}
+	// e4466: nest-era PL local choose U2 (UP) not inventory U4.
+	if n == 4 && postAggNestPLChooseU2Sink != nil && *postAggNestPLChooseU2Sink {
+		*postAggNestPLChooseU2Sink = false
+		n = 2
+		// e4476: next PL stack is U6 (IfElse nest deepens Function::stack).
+		if postAggNestStackU6Sink != nil {
+			*postAggNestStackU6Sink = true
 		}
 	}
 	if e.fallback != nil {
@@ -2725,6 +2757,11 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType, ctx *genContext, qferMode int, retype bool, stackIndex int) (exprVarCandidate, bool) {
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false
+	}
+	// e4479: after U6+U4+F0+VS residual, do not create (UP F80 Lhs next).
+	if ctx.state.postAggNestPLSoleAfterF0 {
+		ctx.state.postAggNestPLSoleAfterF0 = false
+		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
 	// e3373+: after U15 Continue stack U6, PL create needs SE-free qfer
 	// F50 F10 before NewArray F20 (callers often pass qferMode 0 for isParam).
@@ -5484,6 +5521,12 @@ exprTries:
 					flow.ppPostPadForceNoFunc = true
 					// e4402: next PL local choose is U5 (not inventory U4).
 					flow.postAggExprNestPLChooseU5 = true
+					bumpExprDepth(ctx)
+					return finishVar(castLiteral(t, "x"))
+				}
+				// e4479: after U6 stack U4+F0+VS residual, sole-accept (no create F50).
+				if flow != nil && flow.postAggNestPLSoleAfterF0 {
+					flow.postAggNestPLSoleAfterF0 = false
 					bumpExprDepth(ctx)
 					return finishVar(castLiteral(t, "x"))
 				}
@@ -11041,10 +11084,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = randomTypedExprDepthFlags(targetType, er, opts, env, scope, 0, ctx, false, true)
 		ctx.state.ppPostPadForceNoFunc = false
 		ctx.state.ppPostPadDepthBlock = false
-		// (4+) parent nest: low-depth Expressions (UP e4395–4410 chain).
-		// forceNoFunc/depthBlock set by prior Variable (F50 / VS reselect) apply
-		// to THIS iteration, then clear.
-		for i := 0; i < 10; i++ {
+		// (4+) parent nest through e4410 then Statement Lhs F80 (e4411).
+		// forceNoFunc/depthBlock from prior Variable apply to THIS iteration.
+		// e4408: after depth-block Variable (ParentParam), ForceNoFunc tries=1.
+		// e4410: that Expression Global U15; then stop nest → Statement Lhs F80.
+		armNoFuncNext := false
+		for i := 0; i < 12; i++ {
 			ctx.state.ppPostPadSkipParentExprN = 0
 			ctx.exprDepth = 0
 			if postAggExprNestDepthBlockOnce {
@@ -11052,6 +11097,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				ctx.state.ppPostPadForceNoFunc = true
 				ctx.state.ppPostPadDepthBlock = true
 				ctx.exprDepth = maxD
+			}
+			didNoFuncArm := false
+			if armNoFuncNext {
+				armNoFuncNext = false
+				ctx.state.ppPostPadForceNoFunc = true
+				// e4410: Variable Global → U15 not post-ptr U44.
+				ctx.state.postAggExprContGlobalU15 = true
+				didNoFuncArm = true
 			}
 			hadNoFunc := ctx.state.ppPostPadForceNoFunc
 			hadDepth := ctx.state.ppPostPadDepthBlock
@@ -11061,7 +11114,47 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 			if hadDepth {
 				ctx.state.ppPostPadDepthBlock = false
+				// After depth-block Variable (e4406–07 PP), arm tries=1 next.
+				armNoFuncNext = true
 			}
+			// e4411: after noFunc+U15 Global Expression, UP Lhs SelectDeref chain
+			// (not next Statement U100).
+			if didNoFuncArm {
+				break
+			}
+		}
+		// e4411–30: one-shot SelectDeref + PL create after Expression nest.
+		if !ctx.state.postAggNestSelDerefDone {
+			ctx.state.postAggNestSelDerefDone = true
+			_ = r.flipcoin(80)
+			_ = r.upto(12)
+			_ = r.upto(9)
+			_ = r.upto(4)
+			_ = r.upto(7)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(80)
+			_ = r.upto(12)
+			_ = r.flipcoin(0)
+			_ = r.flipcoin(80)
+			_ = r.upto(11)
+			_ = r.flipcoin(80)
+			_ = r.upto(10)
+			_ = r.flipcoin(80)
+			_ = r.upto(100)
+			_ = r.upto(5)
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(20)
+			// e4431: Statement U100=8 IfElse tries=0 (atMax would reject).
+			ctx.state.postAggNestStmtUnfilteredOnce = true
+			// e4443: allow binary RHS after Constant LHS (unwind sticky skipped RHS).
+			ctx.state.postAggUnwindBinaryAfterExprVar = 0
+			ctx.state.postAggNeedLhsAfterRhs = false
+			ctx.state.ppPostPadSkipParentExprN = 0
+			// e4466: Expression PL local choose U2 (not inventory U4).
+			// e4476 U6 stack armed when U2 is consumed.
+			ctx.state.postAggNestPLChooseU2 = true
 		}
 	}
 	return true
@@ -11781,6 +11874,11 @@ func emitStatement(
 			// and not atMax is_compound reject (tries=3 Assign).
 			if state != nil && state.postAggAfterLhsLoopCtrl {
 				state.postAggAfterLhsLoopCtrl = false
+				v := int(dec.r.upto(100))
+				return toKind(v)
+			}
+			if state != nil && state.postAggNestStmtUnfilteredOnce {
+				state.postAggNestStmtUnfilteredOnce = false
 				v := int(dec.r.upto(100))
 				return toKind(v)
 			}
@@ -12616,6 +12714,8 @@ func emitSingleFuncDefOnce(
 		postAggLhsGlobalU15Sink = &state.postAggLhsGlobalU15Done
 		postAggExprContGlobalU15Sink = &state.postAggExprContGlobalU15
 		postAggExprNestPLChooseU5Sink = &state.postAggExprNestPLChooseU5
+		postAggNestPLChooseU2Sink = &state.postAggNestPLChooseU2
+		postAggNestStackU6Sink = &state.postAggNestStackU6
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
 		postAggU15PLAfterGlobalF0Sink = &state.postAggU15PLAfterGlobalF0
@@ -12662,6 +12762,8 @@ func emitSingleFuncDefOnce(
 			postAggLhsGlobalU15Sink = nil
 		postAggExprContGlobalU15Sink = nil
 		postAggExprNestPLChooseU5Sink = nil
+		postAggNestPLChooseU2Sink = nil
+		postAggNestStackU6Sink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)

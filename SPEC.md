@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4408) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4481) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4408** (4335→4408; Global create Lhs Expression nest continue; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4481** (4408→4481; Global create Lhs Expression nest continue; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -337,17 +337,16 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 2. After Global Lhs sole: next Expression Variable VS sole-accept; unwind nested
    binaries (`postAggUnwindBinaryAfterExprVar`) + SkipParentExpr → Statement Lhs F80.
 
-**e4335–e4408 climbed:**
-1. Statement Lhs do-while after Expression unwind: F80=0 → VS; ParentParam U5 U5;
-   SelectDeref countdown U11…; later PL/PP itemize; Global create U14 F20 F50 hex.
-2. After Global create Lhs: clear `SkipParentExprN` and continue Expression nest
-   (depth-block Variable tries=3 → parent U120 → F50+noConst tries=16 → …).
-3. Expression Global choose U15 (not post-ptr U44); PL stack then F50 parent
-   (not local choose U4); nest continues through e4401.
-4. PL choose U5+F0 → VS Global U15; nest Expression depth-block tries=5
-   (through e4407).
+**e4335–e4408 climbed:** (prior)
+Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 
-Next plateau: seed4 e4408 UP U120 tries=1 vs GO tries=0 (after ParentParam U100=71).
+**e4408–e4481 climbed:**
+1. After depth-block Variable (ParentParam): ForceNoFunc tries=1 → Variable U120=86.
+2. Global U15; stop nest; SelectDeref F80 U12+[9][4][7]F0… F80=0 → PL create residual.
+3. Unfiltered Statement U100=8 IfElse; clear binary unwind so RHS continues.
+4. Nest PL U2 choose; stack U6 + U4+F0 + VS U100; block create → F80 Lhs era.
+
+Next plateau: seed4 e4481 UP SelectDeref U7 vs GO lhsMakeRandomWrite F20.
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
