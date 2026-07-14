@@ -14394,6 +14394,13 @@ lhsDerefLoop:
 																		// postCreateLateCommaUseExDone: one-shot
 																		// e16555 Comma → Function useEx.
 																		postCreateLateCommaUseExDone := false
+																		// postCreateLateCommaSelDerefOnce: free Comma
+																		// after late useEx PP → Lhs SelectDeref F80
+																		// (e17733), not sole U14.
+																		postCreateLateCommaSelDerefOnce := false
+																		// postCreateLateFreeAsgN: Assign hits after
+																		// freeGlobalN≥4 (e18298 * WRITE; e18333 F50).
+																		postCreateLateFreeAsgN := 0
 																		// postCreateLatePLConstDone: one-shot
 																		// e16925 ConstOnly after PL U2.
 																		postCreateLatePLConstDone := false
@@ -15042,6 +15049,267 @@ lhsDerefLoop:
 																				// e15100 CREATE body Comma: full U14
 																				// (UP U14=13).
 																				// e15249: postCreateEra Comma full U14.
+																				if postCreateLateCommaSelDerefOnce {
+																					// e17733–18168: free Comma after late
+																					// useEx PP → Statement Lhs SelectDeref
+																					// F80 residual (not U14 type burn).
+																					postCreateLateCommaSelDerefOnce = false
+																					// Head: F80 U3 F0; F80 U2; F80 empty;
+																					// F80 create×2 U8; F80 CreateArray.
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(3)
+																						_ = rf.flipcoin(0)
+																					}
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(2)
+																					}
+																					_ = rf.flipcoin(80) // empty choose
+																					// two empty-create attempts F50 F10 F50 F20 F20 U8
+																					for ci := 0; ci < 2; ci++ {
+																						if !rf.flipcoin(80) {
+																							break
+																						}
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(10)
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(20)
+																						_ = rf.flipcoin(20)
+																						_ = rf.upto(8)
+																					}
+																					// CreateArray path F50 F10 F50 F20 F20 U99…
+																					if rf.flipcoin(80) {
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(10)
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(20)
+																						_ = rf.flipcoin(20)
+																						_ = rf.upto(99)
+																						_ = rf.upto(10)
+																						_ = rf.upto(2)
+																						_ = rf.upto(5)
+																						_ = rf.flipcoin(0)
+																					}
+																					// Main F80 ladder: U5 F0 until F80=0 → VS
+																					// Scope multiphase from UP cycles 10–117.
+																					gVS, plVS, ppVS, nvVS := 0, 0, 0, 0
+																					for ri := 0; ri < 200; ri++ {
+																						if !rf.flipcoin(80) {
+																							sp := rf.upto(100)
+																							if sp < 35 {
+																								gVS++
+																								// Global ok_vars: e17774 U9 U4;
+																								// e17815 U9 U8; e17832 U9; e17838 U8;
+																								// e17921 U7 U8; e18007 U6+create.
+																								switch gVS {
+																								case 1:
+																									_ = rf.upto(9)
+																									_ = rf.upto(4)
+																								case 2:
+																									_ = rf.upto(9)
+																									_ = rf.upto(8)
+																								case 3:
+																									_ = rf.upto(9)
+																								case 4:
+																									_ = rf.upto(8)
+																								case 5:
+																									_ = rf.upto(7)
+																									_ = rf.upto(8)
+																								default:
+																									_ = rf.upto(6)
+																									if rf.flipcoin(50) {
+																										_ = rf.flipcoin(20)
+																										if rf.flipcoin(50) {
+																											if rf.flipcoin(50) {
+																												_ = rf.upto(3)
+																											} else {
+																												_ = rf.upto(20)
+																											}
+																										} else {
+																											for h := 0; h < 8; h++ {
+																												_ = rf.next31()
+																											}
+																										}
+																									}
+																								}
+																							} else if sp < 65 {
+																								plVS++
+																								_ = rf.upto(6)
+																								// e17785: U6 sole; e18104: U6 F50 F20 F50 F50 U3;
+																								// e18132: U6 U14 CreateArray end residual.
+																								if plVS == 2 {
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else if plVS >= 3 {
+																									// e18132+: U14 create + trailing VS ends residual
+																									_ = rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(10)
+																									_ = rf.upto(12)
+																									// e18142: F50=0 hex×4; F50 F50 U3; U3 U8; F50=0 U4
+																									if !rf.flipcoin(50) {
+																										for h := 0; h < 4; h++ {
+																											_ = rf.next31()
+																										}
+																									} else if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																									_ = rf.upto(3)
+																									_ = rf.upto(8)
+																									if !rf.flipcoin(50) {
+																										_ = rf.upto(4)
+																									}
+																									// e18150+: trailing VS multiphase (tries untraced)
+																									for ti := 0; ti < 1; ti++ {
+																										_ = rf.next31()
+																									}
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(2)
+																									_ = rf.upto(3)
+																									_ = rf.upto(6)
+																									_ = rf.upto(9)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(40)
+																									_ = rf.upto(9)
+																									_ = rf.upto(8)
+																									_ = rf.upto(1)
+																									_ = rf.upto(11)
+																									_ = rf.upto(100)
+																									break
+																								}
+																							} else if sp < 95 {
+																								ppVS++
+																								_ = rf.upto(6)
+																								// e17819 U6 U2; e17883 U6 F50 F20 F50;
+																								// e17929 U6 CreateArray; e18009 U6 F50 F20 F50 F50 U20;
+																								// e18038 U6 F50 F20 F50; e18043 U6 U5 F0.
+																								switch ppVS {
+																								case 1:
+																									_ = rf.upto(2)
+																								case 2:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								case 3:
+																									// CreateArray F50 F20 F50 F50 U3 U99 U10 U1
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(1)
+																								case 4:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								case 5:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								default:
+																									// e18043: U5 F0 (itemize continue in VS)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																								}
+																							} else {
+																								nvVS++
+																								// e17847: NewValue F10=0 U6 U14 F50 F20 F50
+																								if !rf.flipcoin(10) {
+																									_ = rf.upto(6)
+																									_ = rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									if rf.flipcoin(50) {
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
+																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																								}
+																							}
+																							continue
+																						}
+																						// F80=1: dominant U5 F0 itemize fail
+																						_ = rf.upto(5)
+																						_ = rf.flipcoin(0)
+																					}
+																					afterAsg = false
+																					continue
+																				}
 																				if lhsSelectDerefResidualRan {
 																					// e15100 CREATE body Comma: full
 																					// U14; lhs no_const; type may be
@@ -15118,6 +15386,11 @@ lhsDerefLoop:
 																								postCreateLateCommaUseExDone = true
 																								postCreateUseExAgain = true
 																								postCreateForceStdfunc = false
+																							}
+																							// e18240: nested/next Expression
+																							// no_const (tries=1 reject Constant → Comma)
+																							if postCreatePostArrayDone {
+																								commaLhsNoConst = true
 																							}
 																						}
 																					} else {
@@ -15248,13 +15521,31 @@ lhsDerefLoop:
 																										postCreateConstBareOnce = true
 																										postCreateAsgLhsF80Once = true
 																									} else if postCreatePostArrayAsgN >= 4 {
-																										// e17421+: simple Assign self F50, nested RHS
-																										_ = rf.flipcoin(50)
-																										afterAsg = true
-																										postCreateConstHex16Once = true
-																										postCreateAsgLhsF80Once = true
-																										postCreateAsgLhsF80N = 1
-																										postCreateAsgNeedLhs = true
+																										if postCreateLateFreeGlobalN >= 4 {
+																											postCreateLateFreeAsgN++
+																											if postCreateLateFreeAsgN <= 2 {
+																												// e18298/e18307: *type WRITE qfer F50 F10 + self F50;
+																												// next Function useExisting F50 (not stdfunc).
+																												_ = rf.flipcoin(50)
+																												_ = rf.flipcoin(10)
+																												_ = rf.flipcoin(50)
+																												afterAsg = false
+																												postCreateForceStdfunc = false
+																												postCreateUseExAgain = true
+																											} else {
+																												// e18333+: simple Assign F50 afterAsg
+																												_ = rf.flipcoin(50)
+																												afterAsg = true
+																											}
+																										} else {
+																											// e17421+: simple Assign self F50, nested RHS
+																											_ = rf.flipcoin(50)
+																											afterAsg = true
+																											postCreateConstHex16Once = true
+																											postCreateAsgLhsF80Once = true
+																											postCreateAsgLhsF80N = 1
+																											postCreateAsgNeedLhs = true
+																										}
 																									} else {
 																										asgF50 := rf.flipcoin(50)
 																										afterAsg = true
@@ -15649,6 +15940,9 @@ lhsDerefLoop:
 																				// sole (no scope U100) → next Function.
 																				if afterAsg {
 																					afterAsg = false
+																					// Assign RHS was Variable, not Comma —
+																					// do not keep Lhs SelectDeref arm.
+																					postCreateAsgNeedLhs = false
 																					// e13070: next Assign under non-SE-free
 																					// / nested qfer skips F50.
 																					if depthFilterClosed {
@@ -16171,6 +16465,22 @@ lhsDerefLoop:
 																												// e17693: next Function useExisting F50 (not stdfunc)
 																												postCreateForceStdfunc = false
 																												postCreateUseExAgain = true
+																											} else if postCreateLateFreeGlobalN == 4 {
+																												// e18244: Global ok_vars U4 sole;
+																												// e18245: next Constant F50 + hex×16
+																												// (clear sticky asgLhs/Hex16).
+																												_ = rf.upto(4)
+																												postCreateConstOnlyOnce = true
+																												postCreateConstHex16Once = true
+																												postCreateAsgLhsF80Once = false
+																												postCreateConstHex8Once = false
+																												postCreateConstSmallOnce = false
+																											} else if postCreateLateFreeGlobalN == 5 {
+																												// e18445: U2 F80 U5 residual
+																												_ = rf.upto(2)
+																												if rf.flipcoin(80) {
+																													_ = rf.upto(5)
+																												}
 																											} else {
 																												// later free Global
 																												_ = rf.upto(140)
@@ -16669,9 +16979,26 @@ lhsDerefLoop:
 																												postCreateAsgLhsF80Once = false
 																												postCreateConstSmallOnce = true
 																											}
-																										} else {
-																											// e17624+: U6 U2 residual
+																										} else if postCreateLateFreePLN == 4 {
+																											// e17624: U6 U2 residual
 																											_ = rf.upto(6)
+																											_ = rf.upto(2)
+																										} else if postCreateLateFreePLN == 5 {
+																											// e18203: U4 U2 residual
+																											_ = rf.upto(4)
+																											_ = rf.upto(2)
+																										} else if postCreateLateFreePLN == 6 {
+																											// e18249: U4 U4 U1 F50 residual;
+																											// e18253: next Expression Function-only
+																											// (tries=1 reject Constant → Function).
+																											_ = rf.upto(4)
+																											_ = rf.upto(4)
+																											_ = rf.upto(1)
+																											_ = rf.flipcoin(50)
+																											postCreateFuncOnlyOnce = true
+																										} else {
+																											// e18394+: U4 U2 residual (default late)
+																											_ = rf.upto(4)
 																											_ = rf.upto(2)
 																										}
 																									} else {
@@ -17053,7 +17380,10 @@ lhsDerefLoop:
 																										// e17520 (n=10): F0 reselect; e17530 (n=11): U4 F50 U16…
 																										// e17637 (n=12): U6 + ** qfer F50 F10×2 F20 F20
 																										switch {
-																										case postCreateLateFreePPN >= 12:
+																										case postCreateLateFreePPN >= 13:
+																											// e18178: PP ok_vars U4 sole after late Comma residual
+																											_ = rf.upto(4)
+																										case postCreateLateFreePPN == 12:
 																											// e17637: PP U6 + qfer F50 F10 F50 F10 F20 F20
 																											// e17644: next Expression no_func (tries=1 → Comma)
 																											_ = rf.upto(6)
@@ -17626,6 +17956,8 @@ lhsDerefLoop:
 																							_ = rf.upto(100)
 																						}
 																						postCreateUseExAgain = false
+																						// e17733: next free Comma is Lhs SelectDeref F80
+																						postCreateLateCommaSelDerefOnce = true
 																						continue
 																					}
 																					if postCreatePostArrayDone && postCreateUseExHitN == 1 && sp >= 65 && sp < 95 {
@@ -17952,8 +18284,15 @@ lhsDerefLoop:
 																							postCreateUseExAgain = true
 																						}
 																					} else if sp < 65 {
-																						_ = rf.upto(6)
-																						_ = rf.upto(5)
+																						if postCreateLateFreeAsgN >= 1 {
+																							// e18303: late useEx PL U4 U3 F80
+																							_ = rf.upto(4)
+																							_ = rf.upto(3)
+																							_ = rf.flipcoin(80)
+																						} else {
+																							_ = rf.upto(6)
+																							_ = rf.upto(5)
+																						}
 																					} else if sp < 95 {
 																						_ = rf.upto(5)
 																					} else {
