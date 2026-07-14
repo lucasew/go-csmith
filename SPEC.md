@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →9651) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →10002) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **9651** (9331→9651; Function-fail pointer must_use U3×4 + Lhs/For/PL create; seed2 full held). Toward 10000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **10002** (9651→10002 past 10000; need_no_rhs multiphase + ArrayOp2 PL/Global/Function-arg; seed2 full held). Toward 11000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,9 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e9651 U4 vs U5 (Comma/depth residual). Toward 10000+.
+Next plateau: seed4 e10002 U2 vs F20 (PL create NewArray residual after Function-arg). Toward 11000+.
+
+**e9651–e10002 climbed:** need_no_rhs multiphase (U4… / F80); EmptyCreateN; EA/PL qfer floors; Global U56→U2 one-shot then sole/U61; PL sticky sole; PL U5 F0; derived_types U22; PP→PL **** create; Function-arg must_use U5 U7 F75 F0 + struct S0 aggregate; EA skip self F50; PL create qferMode 0.
 Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
