@@ -14140,7 +14140,19 @@ lhsDerefLoop:
 																		useExistingPackDone := false
 																		// e12594 only: first Assign may F50 (qfer);
 																		// e12721+ Assign nests without F50.
+																		// e13067+: after itemize, Assign under
+																		// SE-free again burns F50; skip once when
+																		// immediately after afterAsg Variable
+																		// (e13070 nested/non-SE-free).
 																		assignF50Done := false
+																		skipNextAssignF50 := false
+																		// e13179: Assign RHS Expression filters
+																		// Comma (110–119) once → Function tries=1.
+																		assignRhsNoComma := false
+																		// e13238: ptr-cmp operands no_func; Constant
+																		// LHS → RHS forced Variable (no U120).
+																		ptrCmpNoFunc := false
+																		ptrCmpLhsDone := false
 																		// e12841+: after ptr-cmp Function, Variable
 																		// must_use U2×3 F75 until accept.
 																		mustUseVar := false
@@ -14153,12 +14165,22 @@ lhsDerefLoop:
 																		// total late Global U36 (never reset) for
 																		// e12905 itemize gate.
 																		globalU36Total := 0
+																		// e13119+: post-itemize Global ok_vars n=102
+																		// chooses; 1st sole, 2nd F50 (e13157),
+																		// 3rd F50 U16 (e13280–81 array/extra).
+																		globalU102N := 0
 																		plF0Done := false
 																		// e12873: first late PP Variable F50 U64.
 																		latePPN := 0
 																		// e12985: after itemize pack, first Constant
 																		// trails U4 U100 before next Function.
 																		postItemizeExtra := false
+																		// e13056: after itemize clears depth
+																		// filter, do not re-arm on Variable
+																		// (expr_depth restarts low in new
+																		// Function/Comma trees; permanent
+																		// re-arm forced U120 tries=1 at e13056).
+																		depthFilterClosed := false
 																		// lastHexN: RandomHexDigits count for Constant
 																		// hex path; updated from NewValue U14
 																		// (historical simple table). e12696 gap=4
@@ -14185,6 +14207,10 @@ lhsDerefLoop:
 																		// Constant 90–99 (Function tries=1).
 																		depthFilterExpr := false
 																		depthFilterNoConst := false
+																		// e13009: Comma lhs type=nil → AllTypes U14
+																		// NonVoid filter (float/int128 reject);
+																		// lhs Expression no_const until non-Comma.
+																		commaLhsNoConst := false
 																		for j := 0; j < 250; j++ {
 																			var vv uint32
 																			if depthFilterExpr {
@@ -14192,30 +14218,110 @@ lhsDerefLoop:
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x < 70 || x >= 100
 																				})
-																			} else if depthFilterNoConst {
+																			} else if depthFilterNoConst || commaLhsNoConst {
 																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
 																					return x >= 90 && x < 100
 																				})
+																			} else if assignRhsNoComma {
+																				// e13179: Assign RHS rejects Comma
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x >= 110
+																				})
+																				assignRhsNoComma = false
+																			} else if ptrCmpNoFunc {
+																				// e13238: ptr-cmp LHS no_func
+																				// rejects Function 0–69.
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 70
+																				})
+																				ptrCmpNoFunc = false
+																				ptrCmpLhsDone = true
 																			} else {
 																				vv = rf.upto(120)
 																			}
 																			if vv >= 110 {
-																				_ = rf.upto(14)
+																				// ExpressionComma lhs: type=nil →
+																				// choose_random_nonvoid(_nonvolatile)
+																				// AllTypes n=14: reject float(9),
+																				// int128(11), uint128(12). e13009 tries=1.
+																				_ = rf.uptoWithFilter(14, func(x uint32) bool {
+																					return x == 9 || x == 11 || x == 12
+																				})
+																				// lhs no_const until a non-Comma term
+																				commaLhsNoConst = true
 																				afterAsg = false
 																				continue
+																			}
+																			// non-Comma term ends Comma lhs no_const
+																			if commaLhsNoConst {
+																				commaLhsNoConst = false
 																			}
 																			if vv >= 100 {
 																				// Assign: first may F50 (e12594);
 																				// later (e12721) nest directly.
+																				// e13067+: post-itemize SE-free F50
+																				// unless skipNextAssignF50 (e13070).
 																				if !assignF50Done {
 																					_ = rf.flipcoin(50)
 																					assignF50Done = true
+																				} else if depthFilterClosed {
+																					if skipNextAssignF50 {
+																						skipNextAssignF50 = false
+																					} else {
+																						_ = rf.flipcoin(50)
+																					}
+																					// e13179+: Assign RHS no Comma once
+																					assignRhsNoComma = true
 																				}
 																				afterAsg = true
 																				continue
 																			}
 																			if vv >= 90 {
 																				afterAsg = false
+																				// e13238: ptr-cmp pointer Constant is
+																				// null "0" (no residual); RHS forced
+																				// ExpressionVariable (no U120 term).
+																				if ptrCmpLhsDone {
+																					ptrCmpLhsDone = false
+																					// RHS Variable select residual
+																					sp := rf.upto(100)
+																					if sp < 35 {
+																						if plStackN <= 5 && depthFilterClosed {
+																							_ = rf.upto(102)
+																							globalU102N++
+																							if globalU102N >= 2 {
+																								_ = rf.flipcoin(50)
+																								if globalU102N >= 3 {
+																									_ = rf.upto(16)
+																								}
+																							}
+																						} else if plStackN <= 5 {
+																							_ = rf.upto(36)
+																						} else {
+																							_ = rf.upto(3)
+																						}
+																					} else if sp < 65 {
+																						_ = rf.upto(3)
+																						_ = rf.upto(plStackN)
+																					} else if sp < 95 {
+																						// PP residual e13240–46:
+																						// U4 U2 U5 F80 F20×2 U11
+																						_ = rf.upto(4)
+																						_ = rf.upto(2)
+																						_ = rf.upto(5)
+																						if rf.flipcoin(80) {
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																							_ = rf.upto(11)
+																						}
+																					} else {
+																						if !rf.flipcoin(10) {
+																							_ = rf.upto(4)
+																							_ = rf.upto(14)
+																						}
+																					}
+																					continue
+																				}
 																				if rf.flipcoin(50) {
 																					if rf.flipcoin(50) {
 																						_ = rf.upto(3)
@@ -14244,6 +14350,7 @@ lhsDerefLoop:
 																					_ = rf.upto(100)
 																					postItemizeExtra = false
 																					depthFilterExpr = false
+																					depthFilterClosed = true
 																					depthFilterNoConst = true
 																				}
 																				continue
@@ -14253,7 +14360,18 @@ lhsDerefLoop:
 																				// sole (no scope U100) → next Function.
 																				if afterAsg {
 																					afterAsg = false
+																					// e13070: next Assign under non-SE-free
+																					// / nested qfer skips F50.
+																					if depthFilterClosed {
+																						skipNextAssignF50 = true
+																					}
 																					continue
+																				}
+																				// ptr-cmp LHS Variable: fall through;
+																				// clear lhs flag (RHS also no_func
+																				// handled via must_use pre-itemize).
+																				if ptrCmpLhsDone {
+																					ptrCmpLhsDone = false
 																				}
 																				// e12841–50: must_use U2×3 F75
 																				if mustUseVar {
@@ -14271,8 +14389,12 @@ lhsDerefLoop:
 																				// Variable, depth filter U120 tries.
 																				// Constant hex from parent type (int×8),
 																				// not stale SafeOpFlags size.
-																				if plStackN <= 5 {
+																				// e13056: stop re-arming after itemize
+																				// closed the depth-filter window.
+																				if plStackN <= 5 && !depthFilterClosed {
 																					depthFilterExpr = true
+																					lastHexN = 8
+																				} else if plStackN <= 5 {
 																					lastHexN = 8
 																				}
 																				if sp < 35 {
@@ -14280,7 +14402,21 @@ lhsDerefLoop:
 																					// Global miss → PL U3 U6 →
 																					// SelectDeref F80× → PP U3 U2.
 																					// e12855+: Global inventory U36.
-																					if plStackN <= 5 {
+																					// e13119+: after itemize window,
+																					// expanded Global ok_vars n=102
+																					// (no CreateArray itemize pack).
+																					if plStackN <= 5 && depthFilterClosed {
+																						_ = rf.upto(102)
+																						globalU102N++
+																						// e13156+: 2nd Global F50; e13279+:
+																						// 3rd Global F50 + U16 residual.
+																						if globalU102N >= 2 {
+																							_ = rf.flipcoin(50)
+																							if globalU102N >= 3 {
+																								_ = rf.upto(16)
+																							}
+																						}
+																					} else if plStackN <= 5 {
 																						_ = rf.upto(36)
 																						globalU36N++
 																						globalU36Total++
@@ -14377,27 +14513,38 @@ lhsDerefLoop:
 																					}
 																				} else if sp < 65 {
 																					// e12711–13: PL U3 U6; e12853 U3 U5
-																					_ = rf.upto(3)
-																					_ = rf.upto(plStackN)
-																					// e12864: after Global U36 streak,
-																					// PL visit-fail F0 → PP.
-																					// e12879: later PL F50 U32.
-																					// e12891: U3 U3 U1 nested residual.
-																					if globalU36N > 0 && plStackN <= 5 {
-																						if !plF0Done {
-																							_ = rf.flipcoin(0)
-																							_ = rf.upto(100) // PP
-																							plF0Done = true
-																						} else {
-																							_ = rf.flipcoin(50)
-																							_ = rf.upto(32)
-																						}
-																						globalU36N = 0
-																					} else if plStackN <= 5 && plF0Done {
-																						// e12891 after F50 U32 era
+																					// e13249+: post-itemize stack n=4
+																					// then locals choose U5 + U3 U3 U1
+																					// (SelectParentLocal residual).
+																					if depthFilterClosed {
+																						_ = rf.upto(4)
+																						_ = rf.upto(5)
 																						_ = rf.upto(3)
 																						_ = rf.upto(3)
 																						_ = rf.upto(1)
+																					} else {
+																						_ = rf.upto(3)
+																						_ = rf.upto(plStackN)
+																						// e12864: after Global U36 streak,
+																						// PL visit-fail F0 → PP.
+																						// e12879: later PL F50 U32.
+																						// e12891: U3 U3 U1 nested residual.
+																						if globalU36N > 0 && plStackN <= 5 {
+																							if !plF0Done {
+																								_ = rf.flipcoin(0)
+																								_ = rf.upto(100) // PP
+																								plF0Done = true
+																							} else {
+																								_ = rf.flipcoin(50)
+																								_ = rf.upto(32)
+																							}
+																							globalU36N = 0
+																						} else if plStackN <= 5 && plF0Done {
+																							// e12891 after F50 U32 era
+																							_ = rf.upto(3)
+																							_ = rf.upto(3)
+																							_ = rf.upto(1)
+																						}
 																					}
 																				} else if sp < 95 {
 																					// e12869 bare PP after F0; e12873
@@ -14417,10 +14564,19 @@ lhsDerefLoop:
 																					// e12686–95: NewValue→PL create
 																					// F10=0 PL; U3 U14 type; F10 F20
 																					// qfer/NewArray; Constant init.
+																					// e13047+: U4 + SE-free F50 F10 +
+																					// Constant trails F50 (e13055).
 																					if !rf.flipcoin(10) {
-																						_ = rf.upto(3)
+																						if plStackN <= 5 {
+																							_ = rf.upto(4)
+																						} else {
+																							_ = rf.upto(3)
+																						}
 																						u14 := rf.upto(14)
 																						lastHexN = hexFromU14(u14)
+																						if plStackN <= 5 {
+																							_ = rf.flipcoin(50) // vol SE-free
+																						}
 																						_ = rf.flipcoin(10)
 																						_ = rf.flipcoin(20)
 																						if rf.flipcoin(50) {
@@ -14428,6 +14584,11 @@ lhsDerefLoop:
 																								_ = rf.upto(3)
 																							} else {
 																								_ = rf.upto(20)
+																							}
+																							// e13055: extra F50 after small
+																							// Constant (depth continuous).
+																							if plStackN <= 5 {
+																								_ = rf.flipcoin(50)
 																							}
 																						} else {
 																							hn := lastHexN
@@ -14446,7 +14607,25 @@ lhsDerefLoop:
 																			// skip → binary. e12633: one-shot
 																			// useExisting F50 pack (j>=8); later
 																			// pure binary F5 (e12679+).
+																			// e13071+: Function immediately after
+																			// Assign (afterAsg still set; no
+																			// intervening Variable) is bare —
+																			// no F5/F10 invocation residual
+																			// (e13137/e13179/e13224 too).
+																			if afterAsg {
+																				afterAsg = false
+																				if depthFilterNoConst {
+																					depthFilterNoConst = false
+																				}
+																				continue
+																			}
 																			afterAsg = false
+																			// e12987 no_const was one-shot for
+																			// first post-itemize Function; later
+																			// Constants allowed (e13040+).
+																			if depthFilterNoConst {
+																				depthFilterNoConst = false
+																			}
 																			if j >= 8 && !useExistingPackDone {
 																				if rf.flipcoin(50) {
 																					useExistingPackDone = true
@@ -14533,12 +14712,18 @@ lhsDerefLoop:
 																			} else if rf.flipcoin(10) {
 																				// e12835+: ptr-cmp residual then must_use
 																				// Variable operands (U2×3 F75).
+																				// e13238+: post-itemize ptr-cmp uses
+																				// no_func term filter (not must_use).
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.upto(4)
 																				_ = rf.upto(24)
-																				mustUseVar = true
+																				if depthFilterClosed {
+																					ptrCmpNoFunc = true
+																				} else {
+																					mustUseVar = true
+																				}
 																			} else {
 																				// binary: op U18 + signs F50×2 + size U4
 																				// e12758 U4=0 → char hex×2 for operand Const

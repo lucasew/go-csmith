@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13009) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13285) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13009** (12596→13009; after-Assign Variable sole→Function binary + useExisting pack + Expression residual past 13000; seed2 full held). Toward 15000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13285** (13056→13285; post-itemize depthFilter closed, Assign F50/bare-Function, Global U102, ptr-cmp no_func, PL stack4; seed2 full held). Toward 15000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e13009 Comma U14 tries (after itemize Expression residual past 13000). Toward 15000+.
+Next plateau: seed4 e13285 PL SelectParentLocal multiphase (U4 stack then U6/U5 choose vs create/SelectDeref variants). Toward 15000+.
+
+**e13009–e13285 climbed:**
+1. e13009–55: Comma lhs U14 NonVoid + no_const; NewValue U4+SE-free F50 trails (uncommitted→13056).
+2. e13056: stop re-arming depthFilterExpr after itemize closed (new Function trees restart low depth).
+3. e13067–70: post-itemize Assign F50 again; skip F50 once after afterAsg Variable; bare Function after Assign (no F5).
+4. e13119+: Global ok_vars n=102 (no itemize pack); 2nd F50 / 3rd F50+U16 residual.
+5. e13179: Assign RHS filter rejects Comma once; e13238 ptr-cmp no_func + Constant LHS→forced Variable RHS; e13249 PL stack U4+U5+U3×2+U1.
+6. seed2 37939 held.
 
 **e12596–e13009 climbed:**
 1. e12596: after Assign F50, Variable sole (skip U100) → Function binary.
