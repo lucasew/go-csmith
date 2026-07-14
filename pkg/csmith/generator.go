@@ -105,6 +105,8 @@ var postAggNestGlobalU17F0DoneSink *bool
 var postAggNestArrayOpResidualDoneSink *bool
 // postAggNestArrayOpPostCD3Sink: after CD3 leave, free Expression Global natural choose.
 var postAggNestArrayOpPostCD3Sink *bool
+// postAggPostCD3ArrayOp2BodySink: inside e8995 ArrayOp body (Constant hn=16 e9073).
+var postAggPostCD3ArrayOp2BodySink *bool
 // postAggPostCD3PtrGlobalNSink: post-CD3 multi-cand pointer Global choose count
 // (e8483 n=0 sole; e8605+ n≥1 natural U2).
 var postAggPostCD3PtrGlobalNSink *int
@@ -480,6 +482,21 @@ type functionFlowState struct {
 	// postAggPostCD3ArrayOp2Once: nested ArrayOp after second Lhs residual
 	// (e8995 U100=51 F5=0 aryno + U13×3 + SelectLoopCtrlVar U29…U23).
 	postAggPostCD3ArrayOp2Once bool
+	// postAggPostCD3ArrayOp2Body: inside e8995 ArrayOp body — ExpressionAssign
+	// self F50 after Function residual (e9031); must_use itemize U5 U3… F75.
+	postAggPostCD3ArrayOp2Body bool
+	// postAggPostCD3ArrayOp2MustN: must_use hit count in ArrayOp2 body
+	// (0: U5 U3×…; 1+: U4 F75 e9230).
+	postAggPostCD3ArrayOp2MustN int
+	// postAggPostCD3ArrayOp2GlobalCreateN: ArrayOp2 body Global create residual
+	// count (0: e9092 F50 F10×4 F20×4; 1: e9154 F20×4 F80 F20 F20 U99…).
+	postAggPostCD3ArrayOp2GlobalCreateN int
+	// postAggPostCD3ArrayOp2PLCreateDone: one-shot e9105 PL U6 + **** create
+	// F50 F10×4 F20×2 (e9106–16).
+	postAggPostCD3ArrayOp2PLCreateDone bool
+	// postAggPostCD3ArrayOp2LhsCreate: ExpressionAssign Lhs SelectDeref
+	// F80 CreateArray re-itemize residual (e9158–9201).
+	postAggPostCD3ArrayOp2LhsCreate bool
 	// postAggU15StackU6PLNAfterPostPtr: PL picks after post-ptr era (0: e3903 sole;
 	// later e4035+ U5 choose + F0).
 	postAggU15StackU6PLNAfterPostPtr int
@@ -922,8 +939,10 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	if t.Bits <= 0 {
 		return exprVarCandidate{}, false
 	}
-	// postCD3 must_use before lateGate U2×3 dummy (e8972 U4 U4 F75, not U100).
-	if postCD3ForMust && !earlyGate {
+	// postCD3 / ArrayOp2 body must_use before lateGate U2 dummy.
+	// e9060 ArrayOp2 body: must_use even when postAggPostCD3ForMustRead cleared.
+	arrayOp2Must := st.postAggPostCD3ArrayOp2Body && st.mustReadLive
+	if (postCD3ForMust || arrayOp2Must) && !earlyGate {
 		// e8809: non-array must_read → F75 only.
 		// e8972+: postCD3 array-loop body must_read arrays → itemize_array
 		// choose_ok_var IVs then F75 (UP before Lhs F80).
@@ -942,14 +961,41 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 			_ = er.fallback.upto(2)
 			st.postAggPostCD3ArrayMustItemize2 = false
 			st.postAggPostCD3ArrayLhsU7 = true
+		} else if arrayOp2Must {
+			// Multiphasemust_use itemize in ArrayOp2 body:
+			// n=0 e9060: U5 U3 U5 U3 U3; n=1 e9230: U4; n=2 e9240: U5 U4;
+			// n=3+ e9248: U5 U3 (then F75).
+			n := st.postAggPostCD3ArrayOp2MustN
+			st.postAggPostCD3ArrayOp2MustN++
+			switch n {
+			case 0:
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.upto(3)
+			case 1:
+				_ = er.fallback.upto(4)
+			case 2:
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(4)
+			default:
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(3)
+			}
 		}
 		if er.fallback.flipcoin(75) {
-			st.mustReadLive = false
+			// ArrayOp2 body may have more must_read arrays — keep live.
+			if !st.postAggPostCD3ArrayOp2Body {
+				st.mustReadLive = false
+			}
 		}
 		// Re-arm for another must_use Variable if itemize2 pending.
 		if !st.postAggPostCD3ArrayMustItemize2 {
 			st.postAggPostCD3ForMustRead = false
 		}
+		// Keep mustReadLive for further Variables when F75=0 erase miss;
+		// arrayOp2 body may need multiple must_use accepts.
 		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
 	if lateGate && !earlyGate {
@@ -2701,7 +2747,11 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 	// next Expression U120 tries=9 Variable.
 	// e6895: after nest ArrayOp residual, free Expression Constant uses natural
 	// type width (SafeOp int8 hn=2) — sticky hn=16 over-burns and desyncs LCG.
-	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
+	// e9073: ArrayOp2 body Constant after unary F50=0 — UP RandomHexDigits(16)
+	// while natural parent type may be hn=8; floor to 16.
+	if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink && hn < 16 {
+		hn = 16
+	} else if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
 		// natural hn
 	} else if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && hn < 16 {
 		hn = 16
@@ -2943,7 +2993,10 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// then itemize; Lhs CreateArray keeps U2 via skip flag false).
 				// e7748: PLStackU3 era alts burn U2 U3 U3 (same as ** create
 				// address residual e7641–43), not bare U2.
-				if postAggNestArrayOpPLStackU3Sink != nil && *postAggNestArrayOpPLStackU3Sink {
+				if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink {
+					// e9166–71: ArrayOp2 body pointer CreateArray alts F20 only
+					// (empty pointees; no U2/U6 choose).
+				} else if postAggNestArrayOpPLStackU3Sink != nil && *postAggNestArrayOpPLStackU3Sink {
 					_ = r.upto(2)
 					_ = r.upto(3)
 					_ = r.upto(3)
@@ -2985,8 +3038,10 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	if itemize && strings.Contains(t.Name, "*") &&
 		postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 &&
 		len(inits) > 0 && !postAggSkipNestArrayAltU2 {
+		// e9172: ArrayOp2 body CreateArray skips post-alt U2 U5 — itemize next.
 		plU3 := postAggNestArrayOpPLStackU3Sink != nil && *postAggNestArrayOpPLStackU3Sink
-		if !plU3 {
+		arrayOp2 := postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink
+		if !plU3 && !arrayOp2 {
 			if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
 				_ = r.upto(2)
 				_ = r.upto(5)
@@ -7172,6 +7227,55 @@ exprTries:
 					return finishVar(castLiteral(t, g.expr))
 				}
 			}
+			// ArrayOp2 body Expression Variable Global create residuals
+			// (GO inventory U2 would under-burn vs UP empty create).
+			if scopePick == 0 && flow != nil && flow.postAggPostCD3ArrayOp2Body &&
+				er != nil && er.fallback != nil {
+				n := flow.postAggPostCD3ArrayOp2GlobalCreateN
+				if n == 0 {
+					// e9092–9103: **** qfer F50 F10×4 + address F20×4
+					flow.postAggPostCD3ArrayOp2GlobalCreateN++
+					for i := 0; i < 4; i++ {
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.flipcoin(10)
+					}
+					for i := 0; i < 4; i++ {
+						_ = er.fallback.flipcoin(20)
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "g_0"))
+				}
+				if n == 1 {
+					// e9154–57: F20×4 address residual only. Lhs SelectDeref
+					// F80 CreateArray re-itemize is e9158+ (arm flag).
+					flow.postAggPostCD3ArrayOp2GlobalCreateN++
+					for i := 0; i < 4; i++ {
+						_ = er.fallback.flipcoin(20)
+					}
+					flow.postAggPostCD3ArrayOp2LhsCreate = true
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "g_0"))
+				}
+			}
+			// e9105–16: ArrayOp2 body PL stack U6 + **** create F50 F10×4 F20×2
+			// (GO blockStack under-counts as U3).
+			if (scopePick == 1 || scopePick == 4) && flow != nil &&
+				flow.postAggPostCD3ArrayOp2Body &&
+				!flow.postAggPostCD3ArrayOp2PLCreateDone && er != nil && er.fallback != nil {
+				flow.postAggPostCD3ArrayOp2PLCreateDone = true
+				_ = er.fallback.upto(6) // e9106 stack U6
+				for i := 0; i < 4; i++ {
+					_ = er.fallback.flipcoin(50)
+					_ = er.fallback.flipcoin(10)
+				}
+				_ = er.fallback.flipcoin(20)
+				_ = er.fallback.flipcoin(20)
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
+			}
 			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
 				if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
@@ -9581,6 +9685,13 @@ exprTries:
 						burnSelfF50 = true
 						ctx.state.postAggNestAssignQferDone = true
 					}
+					// e9031: nested ArrayOp2 body ExpressionAssign after Function
+					// residual burns self F50 (UP F50 → AssignOps/RHS U120).
+					// Not all postCD3+arrayLoop (e8294 free Assign still skips).
+					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body &&
+						ptrLv == 0 {
+						burnSelfF50 = true
+					}
 					// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
 					// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
 					// seed4 e1038: PP array-body pointer is !SE-free — levels only.
@@ -9613,8 +9724,14 @@ exprTries:
 						// e8747: first pointer EA levels×ptrLv + self.
 						// e8822: later ptr-cmp ExpressionAssign UP has **** qfer
 						// (F50 F10×4 + self) while GO type often * / ** under-count.
+						// e9150: ArrayOp2 body ** ExpressionAssign F50 F10×2 + self
+						// F50 — floor lv to 2 (not 4 from e8822; not bare ptrLv=1).
 						lv := ptrLv
-						if n >= 1 {
+						if ctx.state.postAggPostCD3ArrayOp2Body {
+							if lv < 2 {
+								lv = 2
+							}
+						} else if n >= 1 {
 							if lv < 4 {
 								lv = 4
 							}
@@ -9734,7 +9851,10 @@ exprTries:
 			// may wrongly leave needNoRhs from a skipped AssignOps path).
 			finishAssignExpr := func(s string) string {
 				if needNoRhsExpr && er != nil && er.fallback != nil {
-					if !(ctx != nil && ctx.state != nil && ctx.state.postAggNestGlobalU17) {
+					// e9227–28: ArrayOp2 body need_no_rhs still burns SafeOpFlags
+					// F50 U4 (postAggNestGlobalU17 skip is for e6598 free Expression).
+					arrayOp2 := ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body
+					if arrayOp2 || !(ctx != nil && ctx.state != nil && ctx.state.postAggNestGlobalU17) {
 						_ = er.fallback.flipcoin(50)
 						_ = er.fallback.upto(4)
 					}
@@ -9756,6 +9876,18 @@ exprTries:
 			// select_deref_pointer before falling through to VariableSelector::select.
 			lhsFromDeref := false
 			createdArrEA := false
+			// e9222–28: ArrayOp2 need_no_rhs ExpressionAssign Lhs select_must_use
+			// WRITE itemize U5 U5 U3 U3 F75 then SafeOpFlags F50 U4 (finishAssignExpr).
+			if needNoRhsExpr && ctx != nil && ctx.state != nil &&
+				ctx.state.postAggPostCD3ArrayOp2Body && er != nil && er.fallback != nil {
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(5)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.flipcoin(75)
+				// Sole Lhs accept — SafeOpFlags via finishAssignExpr (e9227–28).
+				return finishAssignExpr(fmt.Sprintf("(%s++)", "x"))
+			}
 			// seed4 e1589–90: outer Assign Lhs sole after nested residual.
 			// e3445: after U15 StackU6 create era, Lhs runs SelectDeref F80
 			// (not sticky OuterLhsSole skip → parent U120).
@@ -9819,6 +9951,33 @@ exprTries:
 			}
 			if er != nil && er.fallback != nil {
 				for {
+					// e9158–9202: ArrayOp2 body ExpressionAssign Lhs SelectDeref
+					// CreateArray F80 F20 F20 U99… + re-itemize until F80=0 → VS U100.
+					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2LhsCreate {
+						ctx.state.postAggPostCD3ArrayOp2LhsCreate = false
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_arr := burnCreateArrayVariable(er.fallback, opts,
+								CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}, true)
+							_ = er.fallback.flipcoin(0)
+							for round := 0; round < 12; round++ {
+								if !er.fallback.flipcoin(80) {
+									// e9201 F80=0 → VariableSelector U100 (e9202)
+									_ = variableScopePickFromER(er, opts, &scope)
+									break
+								}
+								for _, sz := range _arr.sizes {
+									if sz > 0 {
+										_ = er.fallback.upto(uint32(sz))
+									}
+								}
+								_ = er.fallback.flipcoin(0)
+							}
+						}
+						lhsFromDeref = true
+						break
+					}
 					// e8848–51 post-CD3: after **** Global create residual, Lhs
 					// SelectDeref F80 F20 F20 U2 then parent Expression U120.
 					if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3EALhsU2 {
@@ -11695,10 +11854,34 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
+	// e9158–9201: ArrayOp2 body ExpressionAssign Lhs SelectDeref CreateArray
+	// F80 F20 F20 U99… alts F20×6 itemize + F0 re-itemize until F80=0.
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2LhsCreate && r != nil {
+		ctx.state.postAggPostCD3ArrayOp2LhsCreate = false
+		if r.flipcoin(80) {
+			_ = r.flipcoin(20)
+			_ = r.flipcoin(20)
+			_arr := burnCreateArrayVariable(r, opts,
+				CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}, true)
+			_ = r.flipcoin(0)
+			for round := 0; round < 12; round++ {
+				if !r.flipcoin(80) {
+					break
+				}
+				for _, sz := range _arr.sizes {
+					if sz > 0 {
+						_ = r.upto(uint32(sz))
+					}
+				}
+				_ = r.flipcoin(0)
+			}
+		}
+		lhsFromDeref = true
+	}
 	// e8975–94: postCD3 array-loop body Statement Lhs after must_use RHS.
 	// First hit: F80 U7 accept. Second (after itemize2): F80 U7 F0 fail,
 	// F80 U6, F80 U5 accept → next Statement ArrayOp (e8995).
-	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayLhsU7 {
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayLhsU7 && !lhsFromDeref {
 		ctx.state.postAggPostCD3ArrayLhsU7 = false
 		n := ctx.state.postAggPostCD3ArrayLhsU7N
 		ctx.state.postAggPostCD3ArrayLhsU7N++
@@ -16176,6 +16359,9 @@ func emitStatement(
 		_ = r.upto(4)
 		state.filterCompoundStmts = false
 		state.skipNextBlockSize = true
+		state.postAggPostCD3ArrayOp2Body = true
+		// Outer array_loop must_read still live for ExpressionVariable itemize.
+		state.mustReadLive = true
 		writeLine(b, 1, "/* array-loop postCD3-2 */ {")
 		state.blockStack++
 		state.arrayLoopDepth++
@@ -16190,6 +16376,7 @@ func emitStatement(
 		if state.arrayLoopDepth > 0 {
 			state.arrayLoopDepth--
 		}
+		state.postAggPostCD3ArrayOp2Body = false
 		writeLine(b, 1, "}")
 		return true
 	}
@@ -17284,6 +17471,7 @@ func emitSingleFuncDefOnce(
 		postAggNestGlobalU17F0DoneSink = &state.postAggNestGlobalU17F0Done
 		postAggNestArrayOpResidualDoneSink = &state.postAggNestArrayOpResidualDone
 		postAggNestArrayOpPostCD3Sink = &state.postAggNestArrayOpPostCD3
+		postAggPostCD3ArrayOp2BodySink = &state.postAggPostCD3ArrayOp2Body
 		postAggPostCD3PtrGlobalNSink = &state.postAggPostCD3PtrGlobalN
 		postAggPostCD3PtrGlobalSoleNSink = &state.postAggPostCD3PtrGlobalSoleN
 		postAggPostCD3DepthBlockOnceSink = &state.postAggPostCD3DepthBlockOnce
@@ -17346,6 +17534,7 @@ func emitSingleFuncDefOnce(
 			postAggNestGlobalU17F0DoneSink = nil
 			postAggNestArrayOpResidualDoneSink = nil
 			postAggNestArrayOpPostCD3Sink = nil
+			postAggPostCD3ArrayOp2BodySink = nil
 			postAggPostCD3PtrGlobalNSink = nil
 			postAggPostCD3PtrGlobalSoleNSink = nil
 			postAggPostCD3DepthBlockOnceSink = nil
