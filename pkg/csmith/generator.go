@@ -82,6 +82,10 @@ var postAggNestStackU6Sink *bool
 var postAggNestVSMissesSink *int
 // postAggNestGlobalU17Sink: after nest Lhs Global residual, Global choose U17 (e6597).
 var postAggNestGlobalU17Sink *bool
+// postAggNestGlobalU17ChoosesSink: count nest U17 Global chooses (e6611 F50 on 2nd+).
+var postAggNestGlobalU17ChoosesSink *int
+// postAggNestNoConstOnceSink: next Expression noConst after nest Global F50 residual.
+var postAggNestNoConstOnceSink *bool
 // postAggExprNestDepthBlockOnce: after PL F0 VS, next Expression depth-block.
 var postAggExprNestDepthBlockOnce bool
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
@@ -482,6 +486,12 @@ type functionFlowState struct {
 	// postAggNestGlobalU17: after nest Lhs Global residual, GlobalList choose
 	// is U17 (e6597), not sticky nest U54 pad (e6424).
 	postAggNestGlobalU17 bool
+	// postAggNestGlobalU17Chooses: count of nest U17 Global chooses (e6597 first
+	// no F50; e6611 second+ F50 then Expression).
+	postAggNestGlobalU17Chooses int
+	// postAggNestNoConstOnce: after nest Global U17 F50 residual, next Expression
+	// filters Constant (UP e6612 Variable tries=14, not Constant).
+	postAggNestNoConstOnce bool
 	// postAggNestAssignQferDone: one-shot ExpressionAssign self F50 after nest
 	// VS (e6402); later nested Assigns skip F50 (e6455).
 	postAggNestAssignQferDone bool
@@ -1845,6 +1855,12 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 	hn := hexDigitsForConstant(t)
 	if hn <= 0 {
 		hn = 8
+	}
+	// e6608: nest residual Constant hex under-width (int8 hn=2) while UP
+	// burns wider RandomHexDigits after F50=0 — floor so LCG aligns for
+	// next Expression U120 tries=9 Variable.
+	if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && hn < 16 {
+		hn = 16
 	}
 	var bits uint32
 	for i := 0; i < hn; i++ {
@@ -3259,6 +3275,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			}
 		}
 		initLit = formatSimpleConstant(er.fallback, constTy)
+		// e6622: nest NewValue→PL simple create ends at Constant U20; UP continues
+		// F50 U8 residual before next Expression U120 (not free U120 immediately).
+		if !newArray && ctx.state.postAggNestGlobalU17 && er.fallback != nil {
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(8)
+		}
 	}
 	var arrRes arrayCreateResult
 	if newArray {
@@ -3798,6 +3820,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					// e849 F50 only on first U11-scale Global choose.
 					if target == 11 && er.fallback != nil && *postMustReadGlobalPicks == 3 {
 						_ = er.fallback.flipcoin(50)
+					}
+					// e6611: 2nd+ nest Global U17 choose burns F50 then Expression
+					// (e6597 first U17 has no F50). e6612: next Expression filters
+					// Constant (tries=14 Variable only).
+					if target == 17 && er.fallback != nil &&
+						postAggNestGlobalU17ChoosesSink != nil {
+						*postAggNestGlobalU17ChoosesSink++
+						if *postAggNestGlobalU17ChoosesSink >= 2 {
+							_ = er.fallback.flipcoin(50)
+							if postAggNestNoConstOnceSink != nil {
+								*postAggNestNoConstOnceSink = true
+							}
+						}
 					}
 					if n < 1 {
 						return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
@@ -4979,6 +5014,12 @@ func randomLeafExprWithMode(
 	}
 	// Hard nest cap (go-only) so stdfunc non-bumping depth cannot recurse forever.
 	nestNoFunc := depth > maxExprDepth(opts)*4
+	// e6612: after nest Global U17 F50 residual, filter Constant once
+	// (UP Variable tries=14; GO was accepting Constant 95).
+	if postAggNestNoConstOnceSink != nil && *postAggNestNoConstOnceSink {
+		*postAggNestNoConstOnceSink = false
+		noConst = true
+	}
 	disallowed := func(tc termChoice) bool {
 		forceNoFunc := ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc
 		allowFunc := ctx != nil && ctx.state != nil && ctx.state.ppPostPadAllowFuncOnce
@@ -5008,7 +5049,9 @@ func randomLeafExprWithMode(
 			}
 			return false
 		}
-		if tc == termAssign && allowAssignPad && !natDepthBlock {
+		// e6612: nest depthBlock must filter Assign (UP Variable tries=14);
+		// allowAssignPad must not re-open Assign under sticky depthBlock.
+		if tc == termAssign && allowAssignPad && !natDepthBlock && !depthBlock {
 			return false
 		}
 		// e6402: nest VS miss40 Expression residual selects nested Assign
@@ -14057,6 +14100,8 @@ func emitSingleFuncDefOnce(
 		postAggNestStackU6Sink = &state.postAggNestStackU6
 		postAggNestVSMissesSink = &state.postAggNestVSMisses
 		postAggNestGlobalU17Sink = &state.postAggNestGlobalU17
+		postAggNestGlobalU17ChoosesSink = &state.postAggNestGlobalU17Chooses
+		postAggNestNoConstOnceSink = &state.postAggNestNoConstOnce
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
 		postAggU15PLAfterGlobalF0Sink = &state.postAggU15PLAfterGlobalF0
@@ -14107,6 +14152,8 @@ func emitSingleFuncDefOnce(
 		postAggNestStackU6Sink = nil
 		postAggNestVSMissesSink = nil
 		postAggNestGlobalU17Sink = nil
+		postAggNestGlobalU17ChoosesSink = nil
+		postAggNestNoConstOnceSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
