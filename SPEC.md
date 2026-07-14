@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →15887) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →16417) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **15887** (15685→15887; PP U5 U4 catalog + late Global U3/U39 + Assign/Comma/Variable filters; seed2 full held). Toward 17000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **16417** (15887→16417; late PP F50 U32 threshold, Assign afterAsg/**/****, late Global/Constant/PP, residual j 500, CreateArray itemize; seed2 full held). Toward 17000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e15887 late PP F50 U32 residual (vs GO U120 Variable). Toward 17000+.
+Next plateau: seed4 e16417 after CreateArray itemize F80=0 Global → Variable residual. Toward 17000+.
+
+**e15887–e16417 climbed:**
+1. e15887: late PP F50 U32 threshold latePPN≥4 (was 6); Assign n≥8 F50+afterAsg.
+2. e15940: late Comma F80 one-shot; must_use residual; CREATE head NonVoid; post-CREATE-head stdfunc.
+3. e16088+: late Global U9 F0 / F0 reselect; late Constant F50+hex; residual j 250→500.
+4. e16096 ** WRITE / e16244 **** WRITE; useEx=0 Global CreateArray + itemize ladder.
+5. seed2 37939 held.
 
 **e15685–e15887 climbed:**
 1. e15685: PP multiphase U5 U4 (ppVS≥4).

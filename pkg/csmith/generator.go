@@ -14320,10 +14320,35 @@ lhsDerefLoop:
 																		// postCreateLateConstCreate: one-shot
 																		// e15769 Constant → Global create residual.
 																		postCreateLateConstCreate := true
+																		// postCreateLateConstN: late Constant hits
+																		// after assignN≥6 (e15769 create; e15901
+																		// F50 hex; e15903 F50 hex16 F80 residual).
+																		postCreateLateConstN := 0
 																		// postCreateLateCommaN: late Comma count
 																		// (e15737 first; e15867 → FuncOnly).
 																		postCreateLateCommaN := 0
-																		for j := 0; j < 250; j++ {
+																		// postCreateLateCommaF80: one-shot e15940
+																		// Comma Lhs SelectDeref F80 residual after
+																		// Assign n≥8; later late Commas use U14.
+																		postCreateLateCommaF80 := true
+																		// postCreateMustUseResidual: after e15940
+																		// Comma residual, next Variable is U4 U2× F75.
+																		postCreateMustUseResidual := false
+																		// postCreateAssignStarN: count of armed
+																		// star-WRITE Assigns after late useEx=0
+																		// Global (e16096 **=1; e16244 ****=2).
+																		postCreateAssignStarN := 0
+																		// postCreateAssignStarArmed: next Assign
+																		// n≥8 uses star WRITE qfer residual.
+																		postCreateAssignStarArmed := false
+																		// postCreateLateGlobalN: Global hits after
+																		// late Comma F80 era (e16088 U9; e16165 F0).
+																		postCreateLateGlobalN := 0
+																		// postCreateForceStdfunc: after late Constant
+																		// F50 residual, next Function is stdfunc F5
+																		// (not afterAsg bare; e16183–84).
+																		postCreateForceStdfunc := false
+																		for j := 0; j < 500; j++ {
 																			var vv uint32
 																			if postCreateNoFuncOnce {
 																				postCreateNoFuncOnce = false
@@ -14917,15 +14942,64 @@ lhsDerefLoop:
 																					// Comma (not NonVoid filter).
 																					// e15738/e15868: NonVoid filter tries=1.
 																					if postCreateAssignN >= 6 {
-																						_ = rf.uptoWithFilter(14, func(x uint32) bool {
-																							return x == 9 || x == 11 || x == 12
-																						})
 																						postCreateLateCommaN++
-																						// e15869: after 4th late Comma
-																						// (e15737,e15743,e15812,e15867),
-																						// next Function tries=1.
-																						if postCreateLateCommaN >= 4 {
-																							postCreateFuncOnlyOnce = true
+																						// e15940: first late Comma after
+																						// Assign n≥8 → Lhs SelectDeref F80
+																						// residual. e16085+: later late
+																						// Commas → NonVoid U14 (same as
+																						// assignN 6–7 path).
+																						if postCreateAssignN >= 8 && postCreateLateCommaF80 {
+																							postCreateLateCommaF80 = false
+																							// e15941–68: F80 U3 U7 ×2 F80=0
+																							// → PL itemize + F80 ladder →
+																							// Global create residual.
+																							for ri := 0; ri < 4; ri++ {
+																								if !rf.flipcoin(80) {
+																									_ = rf.upto(100) // PL
+																									_ = rf.upto(6)
+																									_ = rf.upto(5)
+																									// e15951–54: itemize U9 U9 U3 F0
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									// e15955–60: F80 U3 F80 U2 F0 F80=0
+																									if rf.flipcoin(80) {
+																										_ = rf.upto(3)
+																									}
+																									if rf.flipcoin(80) {
+																										_ = rf.upto(2)
+																										_ = rf.flipcoin(0)
+																									}
+																									if !rf.flipcoin(80) {
+																										// e15961–64: Global U4 F50 U4
+																										// then outer U120 Variable.
+																										_ = rf.upto(100)
+																										_ = rf.upto(4)
+																										_ = rf.flipcoin(50)
+																										_ = rf.upto(4)
+																										// e15965+: next Variable with
+																										// U4 U2 multiphase residual.
+																										postCreateMustUseResidual = true
+																									}
+																									break
+																								}
+																								_ = rf.upto(3)
+																								_ = rf.upto(7)
+																							}
+																						} else {
+																							_ = rf.uptoWithFilter(14, func(x uint32) bool {
+																								return x == 9 || x == 11 || x == 12
+																							})
+																							// e15869: after 4th late Comma
+																							// (assignN 6–7 era), next
+																							// Function tries=1. e16085+
+																							// assignN≥8 late Comma U14
+																							// does not re-arm FuncOnly
+																							// (next is free Variable).
+																							if postCreateAssignN < 8 && postCreateLateCommaN >= 4 {
+																								postCreateFuncOnlyOnce = true
+																							}
 																						}
 																					} else {
 																						_ = rf.upto(14)
@@ -14997,7 +15071,9 @@ lhsDerefLoop:
 																					default:
 																						// e15229 (n=3): bare, no afterAsg.
 																						// e15731 (n=6): F50 + afterAsg.
-																						// e15851+ (n>=7): bare + afterAsg.
+																						// e15851 (n=7): bare + afterAsg.
+																						// e15938+ (n>=8): F50 + afterAsg
+																						// (bare next Function; e16061).
 																						switch {
 																						case postCreateAssignN == 3:
 																							afterAsg = false
@@ -15005,9 +15081,27 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(50)
 																							postCreateNoAssignOnce = true
 																							afterAsg = true
-																						default:
-																							// n>=7 bare + afterAsg
+																						case postCreateAssignN == 7:
+																							// bare + afterAsg
 																							afterAsg = true
+																						default:
+																							if postCreateAssignStarArmed {
+																								// e16096: ** (2× F50 F10);
+																								// e16244: **** (4× F50 F10).
+																								postCreateAssignStarArmed = false
+																								postCreateAssignStarN++
+																								levels := 2 * postCreateAssignStarN
+																								for li := 0; li < levels; li++ {
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																								}
+																								afterAsg = false
+																								postCreateUseExAgain = true
+																							} else {
+																								// n>=8: F50 + afterAsg bare Func
+																								_ = rf.flipcoin(50)
+																								afterAsg = true
+																							}
 																						}
 																						continue
 																					}
@@ -15050,9 +15144,24 @@ lhsDerefLoop:
 																						// small then SelectDeref F80 ladder.
 																						// e15769–83: first late Constant
 																						// residual is VS Global create;
-																						// later late Constants bare.
+																						// e15811 bare; e15901+ F50 hex.
 																						if postCreateAssignN >= 6 {
-																							if postCreateLateConstCreate {
+																							postCreateLateConstN++
+																							if !postCreateLateCommaF80 {
+																								// e16181+: after late Comma
+																								// F80 era, Constant F50; on
+																								// F50=0 burn hex×8 (depth+9).
+																								// Next Function is stdfunc
+																								// (clear afterAsg).
+																								if !rf.flipcoin(50) {
+																									for h := 0; h < 8; h++ {
+																										_ = rf.next31()
+																									}
+																								}
+																								afterAsg = false
+																								postCreateUseExAgain = false
+																								postCreateForceStdfunc = true
+																							} else if postCreateLateConstCreate {
 																								postCreateLateConstCreate = false
 																								_ = rf.upto(100) // Global
 																								for qi := 0; qi < 3; qi++ {
@@ -15069,8 +15178,65 @@ lhsDerefLoop:
 																								for h := 0; h < 4; h++ {
 																									_ = rf.next31()
 																								}
+																							} else if postCreateLateConstN == 3 {
+																								// e15901–02: F50 hex×2 then
+																								// next Constant tries=2.
+																								if rf.flipcoin(50) {
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else {
+																									for h := 0; h < 2; h++ {
+																										_ = rf.next31()
+																									}
+																								}
+																								// e15903: Constant-only tries=2
+																								postCreateConstOnlyOnce = true
+																							} else if postCreateLateConstN >= 4 {
+																								// e15903–27: F50 hex×16 + F80
+																								// SelectDeref + Statement residual.
+																								if rf.flipcoin(50) {
+																									if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																								} else {
+																									for h := 0; h < 16; h++ {
+																										_ = rf.next31()
+																									}
+																									if rf.flipcoin(80) {
+																										_ = rf.upto(7)
+																									}
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(5)
+																									_ = rf.upto(4)
+																									_ = rf.upto(22)
+																									_ = rf.upto(3)
+																									_ = rf.upto(73)
+																									_ = rf.upto(2)
+																									_ = rf.upto(3)
+																									_ = rf.upto(3)
+																									_ = rf.upto(1)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100) // NewValue
+																									// e15928+: next Function
+																									// useExisting F50 F0 (not F5).
+																									lhsSelectDerefResidualRan = true
+																								}
 																							}
-																							// else bare (e15811+)
+																							// e15811 bare when lateConstN==2
 																							continue
 																						}
 																						if postCreateConstN >= 2 {
@@ -15283,6 +15449,84 @@ lhsDerefLoop:
 																					}
 																					continue
 																				}
+																				// e15965–70: after Comma Lhs residual,
+																				// Variable multiphase U4 U2 U4 U2 F75
+																				// (must_use-shaped) without scope U100.
+																				if postCreateMustUseResidual {
+																					postCreateMustUseResidual = false
+																					_ = rf.upto(4)
+																					_ = rf.upto(2)
+																					_ = rf.upto(4)
+																					_ = rf.upto(2)
+																					_ = rf.flipcoin(75)
+																					// e15971–78: SelectDeref F80 ladder
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(7)
+																					}
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(6)
+																						_ = rf.flipcoin(0)
+																					}
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(5)
+																					}
+																					// e15978–23: long VS multiphase residual
+																					// PL tries → PP → Global U2 F0 →
+																					// PL U6 U7 → Global U2 F0 → PL U5 U7
+																					// U9 U4 → PL create F5 U4 U20… For residual.
+																					_ = rf.uptoWithFilter(100, func(x uint32) bool {
+																						return x < 35
+																					})
+																					_ = rf.upto(100) // PP 83
+																					_ = rf.upto(100) // PL 44
+																					_ = rf.upto(100) // Global 9
+																					_ = rf.upto(2)
+																					_ = rf.flipcoin(0)
+																					_ = rf.upto(100) // PL 45
+																					_ = rf.upto(6)
+																					_ = rf.upto(7)
+																					_ = rf.upto(100) // PL 42
+																					_ = rf.upto(100) // Global 15
+																					_ = rf.upto(2)
+																					_ = rf.flipcoin(0)
+																					_ = rf.upto(100) // PL 39
+																					_ = rf.upto(5)
+																					_ = rf.upto(7)
+																					_ = rf.upto(9)
+																					_ = rf.upto(4)
+																					_ = rf.upto(100) // PL 54 create
+																					_ = rf.flipcoin(5)
+																						_ = rf.upto(4)
+																						_ = rf.upto(20)
+																						_ = rf.upto(3)
+																						_ = rf.upto(20)
+																						_ = rf.upto(3)
+																						_ = rf.upto(20)
+																						_ = rf.upto(3)
+																						_ = rf.upto(70)
+																						_ = rf.upto(69)
+																						_ = rf.upto(4)
+																						_ = rf.upto(9)
+																						_ = rf.flipcoin(0)
+																						// For residual
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(4)
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(2)
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(4)
+																						_ = rf.flipcoin(50)
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(4)
+																						_ = rf.upto(4)
+																						_ = rf.upto(100) // PP
+																					// e16023+: next Function useExisting
+																					// CREATE head F50 F20 U14.
+																					postCreateUseExAgain = true
+																					continue
+																				}
 																				sp := rf.upto(100)
 																				// e12855+: after first post-must_use
 																				// Variable, depth filter U120 tries.
@@ -15367,16 +15611,73 @@ lhsDerefLoop:
 																						// Function), not F50 trail.
 																						if postCreateEra {
 																							if postCreateAssignN >= 7 {
-																								// e15877: U3 + VS reselect.
-																								// e15883: U39 (larger pool).
-																								if postCreateLatePPN < 3 {
-																									_ = rf.upto(3)
-																									_ = rf.upto(100)
-																									postCreateVarOnlyOnce = true
+																								// e16088+: after late Comma F80
+																								// era Global multiphase.
+																								if !postCreateLateCommaF80 {
+																									postCreateLateGlobalN++
+																									if postCreateLateGlobalN == 1 {
+																										// e16088: U9 F0 reselect
+																										// U100 U8 + Func useEx.
+																										_ = rf.upto(9)
+																										_ = rf.flipcoin(0)
+																										_ = rf.upto(100)
+																										_ = rf.upto(8)
+																										postCreateUseExAgain = true
+																									} else {
+																										// e16165+: F0 reselect VS.
+																										_ = rf.flipcoin(0)
+																										rsp := rf.upto(100)
+																										if rsp >= 95 {
+																											// e16167–74: NewValue
+																											// F10=0 PL U1 U14 F10
+																											// F20 + burnConst (F50=0
+																											// hex×8 + trail F50).
+																											if !rf.flipcoin(10) {
+																												_ = rf.upto(1)
+																												_ = rf.upto(14)
+																												_ = rf.flipcoin(10)
+																												_ = rf.flipcoin(20)
+																												if rf.flipcoin(50) {
+																													if rf.flipcoin(50) {
+																														_ = rf.upto(3)
+																													} else {
+																														_ = rf.upto(20)
+																													}
+																												} else {
+																													for h := 0; h < 8; h++ {
+																														_ = rf.next31()
+																													}
+																													_ = rf.flipcoin(50)
+																												}
+																											}
+																											postCreateVarOnlyOnce = true
+																										} else if rsp >= 35 && rsp < 65 {
+																											// e16178–80: PL U1 U5
+																											_ = rf.upto(1)
+																											_ = rf.upto(5)
+																										} else if rsp < 35 {
+																											// Global reselect sole
+																										} else {
+																											// PP sole
+																										}
+																									}
 																								} else {
-																									_ = rf.upto(39)
-																									// e15885: next Variable tries=11
-																									postCreateVarOnlyOnce = true
+																									// e15877: U3 + VS reselect.
+																									// e15883 (latePPN=3): U39.
+																									// e15895 (latePPN=4): U38.
+																									switch {
+																									case postCreateLatePPN < 3:
+																										_ = rf.upto(3)
+																										_ = rf.upto(100)
+																										postCreateVarOnlyOnce = true
+																									case postCreateLatePPN == 3:
+																										_ = rf.upto(39)
+																										postCreateVarOnlyOnce = true
+																									default:
+																										// e15895 U38; e15897 Variable tries=1
+																										_ = rf.upto(38)
+																										postCreateVarOnlyOnce = true
+																									}
 																								}
 																							} else {
 																								_ = rf.upto(129)
@@ -15539,16 +15840,19 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(20)
 																							_ = rf.flipcoin(20)
 																						default:
-																							// e15815+: stack U6 U5 + itemize
-																							// U9 U9 U3 F0 then VS U100
-																							// (e15822 PP/NV sole).
+																							// e15815: stack U6 U5 + itemize
+																							// + VS U100. e15898+: U6 U5 sole.
 																							_ = rf.upto(6)
 																							_ = rf.upto(5)
-																							_ = rf.upto(9)
-																							_ = rf.upto(9)
-																							_ = rf.upto(3)
-																							_ = rf.flipcoin(0)
-																							_ = rf.upto(100)
+																							if postCreatePLN <= 6 {
+																								// e15815–21: itemize + VS
+																								_ = rf.upto(9)
+																								_ = rf.upto(9)
+																								_ = rf.upto(3)
+																								_ = rf.flipcoin(0)
+																								_ = rf.upto(100)
+																							}
+																							// e15898+: U6 U5 sole → U120
 																						}
 																					} else if depthFilterClosed {
 																						plClosedN++
@@ -15791,11 +16095,20 @@ lhsDerefLoop:
 																							// e15735: first late PP sole+F80;
 																							// e15746+/e15881: later PP bare;
 																							// e15886: F50 U32 residual.
+																							// e16207+: after late Comma F80
+																							// era, PP bare (no F50 U32).
 																							postCreateLatePPN++
-																							if postCreateLatePPF80 {
+																							// Counts only Variable residual PP
+																							// (not PL/Global trailing U100):
+																							// 1 e15735 F80; 2 e15746 bare;
+																							// 3 e15881 bare+VarOnly;
+																							// 4 e15886 F50 U32 SelectDeref.
+																							if !postCreateLateCommaF80 {
+																								// e16207+: bare PP sole
+																							} else if postCreateLatePPF80 {
 																								postCreateLatePPF80 = false
 																								_ = rf.flipcoin(80)
-																							} else if postCreateLatePPN >= 6 {
+																							} else if postCreateLatePPN >= 4 {
 																								// e15886–93: F50 U32 + SelectDeref
 																								// F80 F20 F20 F50 U32 residual.
 																								_ = rf.flipcoin(50)
@@ -15806,6 +16119,8 @@ lhsDerefLoop:
 																									_ = rf.flipcoin(50)
 																									_ = rf.upto(32)
 																								}
+																								// e15894: next Variable tries=9
+																								postCreateVarOnlyOnce = true
 																							} else if postCreateLatePPN >= 3 {
 																								// e15881+: next Variable tries=1
 																								postCreateVarOnlyOnce = true
@@ -15831,49 +16146,73 @@ lhsDerefLoop:
 																					// qfer/NewArray; Constant init.
 																					// e13047+: U4 + SE-free F50 F10 +
 																					// Constant trails F50 (e13055).
+																					// e16129+: late era F10=0 → stack U1
+																					// U14 F10 F20 F50×2 U3 F80 ladder.
 																					if !rf.flipcoin(10) {
-																						if plStackN <= 5 {
-																							_ = rf.upto(4)
-																						} else {
+																						if !postCreateLateCommaF80 {
+																							// e16129–42: PL stack U1 +
+																							// full U14 + F10 F20 F50 F50
+																							// U3 F80 F80 F20 F20 U3 F50 U8.
+																							_ = rf.upto(1)
+																							_ = rf.upto(14)
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(50)
+																							_ = rf.flipcoin(50)
 																							_ = rf.upto(3)
-																						}
-																						// e13325: NewValue type U14
-																						// NonVoid under re-armed depth
-																						// era (reject float 9,
-																						// int128 11, uint128 12).
-																						// e13048 accepts float (9).
-																						var u14 uint32
-																						if depthFilterExpr {
-																							u14 = rf.uptoWithFilter(14, func(x uint32) bool {
-																								return x == 9 || x == 11 || x == 12
-																							})
-																						} else {
-																							u14 = rf.upto(14)
-																						}
-																						lastHexN = hexFromU14(u14)
-																						if plStackN <= 5 {
-																							_ = rf.flipcoin(50) // vol SE-free
-																						}
-																						_ = rf.flipcoin(10)
-																						_ = rf.flipcoin(20)
-																						if rf.flipcoin(50) {
-																							if rf.flipcoin(50) {
+																							if rf.flipcoin(80) {
+																								if rf.flipcoin(80) {
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(20)
+																								}
 																								_ = rf.upto(3)
-																							} else {
-																								_ = rf.upto(20)
 																							}
-																							// e13055: extra F50 after small
-																							// Constant (depth continuous).
-																							if plStackN <= 5 {
-																								_ = rf.flipcoin(50)
-																							}
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(8)
 																						} else {
-																							hn := lastHexN
-																							if hn <= 0 {
-																								hn = 8
+																							if plStackN <= 5 {
+																								_ = rf.upto(4)
+																							} else {
+																								_ = rf.upto(3)
 																							}
-																							for h := 0; h < hn; h++ {
-																								_ = rf.next31()
+																							// e13325: NewValue type U14
+																							// NonVoid under re-armed depth
+																							// era (reject float 9,
+																							// int128 11, uint128 12).
+																							// e13048 accepts float (9).
+																							var u14 uint32
+																							if depthFilterExpr {
+																								u14 = rf.uptoWithFilter(14, func(x uint32) bool {
+																									return x == 9 || x == 11 || x == 12
+																								})
+																							} else {
+																								u14 = rf.upto(14)
+																							}
+																							lastHexN = hexFromU14(u14)
+																							if plStackN <= 5 {
+																								_ = rf.flipcoin(50) // vol SE-free
+																							}
+																							_ = rf.flipcoin(10)
+																							_ = rf.flipcoin(20)
+																							if rf.flipcoin(50) {
+																								if rf.flipcoin(50) {
+																									_ = rf.upto(3)
+																								} else {
+																									_ = rf.upto(20)
+																								}
+																								// e13055: extra F50 after small
+																								// Constant (depth continuous).
+																								if plStackN <= 5 {
+																									_ = rf.flipcoin(50)
+																								}
+																							} else {
+																								hn := lastHexN
+																								if hn <= 0 {
+																									hn = 8
+																								}
+																								for h := 0; h < hn; h++ {
+																									_ = rf.next31()
+																								}
 																							}
 																						}
 																					}
@@ -15889,6 +16228,13 @@ lhsDerefLoop:
 																			// intervening Variable) is bare —
 																			// no F5/F10 invocation residual
 																			// (e13137/e13179/e13224 too).
+																			// e16183+: after late Constant residual,
+																			// force stdfunc (ignore sticky afterAsg).
+																			if postCreateForceStdfunc {
+																				postCreateForceStdfunc = false
+																				afterAsg = false
+																				postCreateUseExAgain = false
+																			}
 																			if afterAsg {
 																				afterAsg = false
 																				if depthFilterNoConst {
@@ -16123,8 +16469,20 @@ lhsDerefLoop:
 																					// head F20 U14 (after SelectDeref).
 																					// Keep useExAgain for e15464 useEx=0.
 																					if postCreateUseExHitN >= 4 {
+																						// e15460 / e16024 CREATE head:
+																						// F20 + U14 (may tries=2 NonVoid).
 																						_ = rf.flipcoin(20)
-																						_ = rf.upto(14)
+																						if postCreateUseExHitN >= 5 {
+																							// e16026: NonVoid tries
+																							_ = rf.uptoWithFilter(14, func(x uint32) bool {
+																								return x == 9 || x == 11 || x == 12
+																							})
+																							// e16028+: must_use residual era
+																							postCreateUseExHitN = 100
+																						} else {
+																							// e15461: plain U14
+																							_ = rf.upto(14)
+																						}
 																						continue
 																					}
 																					// e15231–47 / e15296+: VS residual.
@@ -16319,6 +16677,36 @@ lhsDerefLoop:
 																				}
 																				// e15287–92 / e15359+ / e15464+:
 																				// useExisting=0 → VS residual.
+																				// e16028+: after CREATE head (sentinel
+																				// hitN=100), must_use U3 U8 F75 +
+																				// SelectDeref residual.
+																				if postCreateUseExHitN >= 100 {
+																					_ = rf.upto(3)
+																					_ = rf.upto(8)
+																					_ = rf.flipcoin(75)
+																					// e16032–42: F80 itemize residual
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(5)
+																						_ = rf.upto(9)
+																						_ = rf.upto(9)
+																						_ = rf.upto(3)
+																						_ = rf.flipcoin(0)
+																					}
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(5)
+																						_ = rf.flipcoin(0)
+																					}
+																					if rf.flipcoin(80) {
+																						_ = rf.upto(4)
+																					}
+																					// e16043: VS U100 then outer U120
+																					// Variable sole; Function is stdfunc.
+																					_ = rf.upto(100)
+																					afterAsg = true
+																					postCreateUseExAgain = false
+																					postCreateUseExHitN = 0
+																					continue
+																				}
 																				sp0 := rf.upto(100)
 																				if sp0 < 35 {
 																					if postCreateUseExHitN >= 4 {
@@ -16346,7 +16734,7 @@ lhsDerefLoop:
 																						_ = rf.upto(4)
 																						_ = rf.upto(4)
 																						_ = rf.upto(100)
-																					} else {
+																					} else if postCreateLateCommaF80 {
 																						// e15288–92: Global U2 F80 F20×2
 																						_ = rf.upto(2)
 																						if rf.flipcoin(80) {
@@ -16354,6 +16742,61 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(20)
 																						}
 																						postCreateNoFuncOnce = true
+																					} else if postCreateAssignStarN >= 2 {
+																						// e16255–318: after **** Assign,
+																						// useEx=0 Global CreateArray:
+																						// F20×4 F80 F20×2 U99 U10×3 U72
+																						// + long F20 alt residual.
+																						for hi := 0; hi < 4; hi++ {
+																							_ = rf.flipcoin(20)
+																						}
+																						if rf.flipcoin(80) {
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																						}
+																						_ = rf.upto(99)
+																						_ = rf.upto(10)
+																						_ = rf.upto(10)
+																						_ = rf.upto(10)
+																						_ = rf.upto(72)
+																						// e16268–318: ~51 F20 alts
+																						// (CreateArray init alternatives).
+																						for hi := 0; hi < 51; hi++ {
+																							_ = rf.flipcoin(20)
+																						}
+																						_ = rf.upto(6)
+																						_ = rf.upto(8)
+																						// e16321+: itemize U3 F0 F80
+																						// ladder U6 U8 until F80=0 → VS.
+																						for {
+																							_ = rf.upto(3)
+																							_ = rf.flipcoin(0)
+																							if !rf.flipcoin(80) {
+																								_ = rf.upto(100)
+																								// e16330+: after first F80=0
+																								// VS, continue itemize with
+																								// U1 U6 U8 U3 F0 F80 ladder.
+																								_ = rf.upto(1)
+																								for {
+																									_ = rf.upto(6)
+																									_ = rf.upto(8)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									if !rf.flipcoin(80) {
+																										// e16415–16: F80=0 → Global
+																										_ = rf.upto(100)
+																										break
+																									}
+																								}
+																								break
+																							}
+																							_ = rf.upto(6)
+																							_ = rf.upto(8)
+																						}
+																					} else {
+																						// e16095+: Global sole (sp0 only);
+																						// arm ** / **** WRITE Assign.
+																						postCreateAssignStarArmed = true
 																					}
 																				} else if sp0 < 65 {
 																					// e15360–63: PL stack multiphase
@@ -16366,7 +16809,40 @@ lhsDerefLoop:
 																					postCreateConstOnlyOnce = true
 																					postCreateConstWantF80 = true
 																				} else if sp0 < 95 {
-																					_ = rf.upto(5)
+																					// PP: e153xx bare U5; e16103+ late
+																					// era PP empty → create residual
+																					// U1 F20×4 U4 F80=0 → Global
+																					// CreateArray U99 U10 U5 F20×2
+																					// U10 F80 F20×2 U4.
+																					// e16143+: next Function is stdfunc
+																					// (clear useExAgain).
+																					if !postCreateLateCommaF80 {
+																						_ = rf.upto(1)
+																						for hi := 0; hi < 4; hi++ {
+																							_ = rf.flipcoin(20)
+																						}
+																						_ = rf.upto(4)
+																						if !rf.flipcoin(80) {
+																							_ = rf.upto(100) // Global
+																							for hi := 0; hi < 4; hi++ {
+																								_ = rf.flipcoin(20)
+																							}
+																							_ = rf.upto(99)
+																							_ = rf.upto(10)
+																							_ = rf.upto(5)
+																							_ = rf.flipcoin(20)
+																							_ = rf.flipcoin(20)
+																							_ = rf.upto(10)
+																							if rf.flipcoin(80) {
+																								_ = rf.flipcoin(20)
+																								_ = rf.flipcoin(20)
+																							}
+																							_ = rf.upto(4)
+																						}
+																						postCreateUseExAgain = false
+																					} else {
+																						_ = rf.upto(5)
+																					}
 																				} else {
 																					if !rf.flipcoin(10) {
 																						_ = rf.upto(5)
@@ -16462,11 +16938,16 @@ lhsDerefLoop:
 																				// Variable operands (U2×3 F75).
 																				// e13238+: post-itemize ptr-cmp uses
 																				// no_func term filter (not must_use).
+																				// e16238–44: after first ** Assign,
+																				// late ptr-cmp arms **** WRITE.
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.upto(4)
 																				_ = rf.upto(24)
+																				if !postCreateLateCommaF80 && postCreateAssignStarN >= 1 {
+																					postCreateAssignStarArmed = true
+																				}
 																				if depthFilterClosed {
 																					ptrCmpNoFunc = true
 																				} else {
