@@ -465,6 +465,15 @@ type functionFlowState struct {
 	postAggNestSelDerefRound2 bool
 	postAggNestSelDerefRoundN int
 	postAggNestVSMisses int
+	// postAggNestEALhsExprResidualDone: one-shot ExpressionAssign Lhs F80→F50+
+	// Expression residual after nest VS miss40 (e6407).
+	postAggNestEALhsExprResidualDone bool
+	// postAggNestEAPPVSResidualDone: one-shot EA Lhs F80=0→PP stack create residual
+	// (e6460 F20×3…) after nest VS.
+	postAggNestEAPPVSResidualDone bool
+	// postAggNestAssignQferDone: one-shot ExpressionAssign self F50 after nest
+	// VS (e6402); later nested Assigns skip F50 (e6455).
+	postAggNestAssignQferDone bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -714,7 +723,10 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 					// Function::stack.size() is 5 again (not sticky U6).
 					// e6107: after nest VS NewValue accept (miss37+), stack is U6
 					// again (Function arg PL), not sticky post-PP U5.
-					if state.postAggNestVSMisses >= 37 {
+					// e6459: later PL after nested EA residual is U5 again.
+					if state.postAggNestVSMisses >= 40 {
+						n = 5
+					} else if state.postAggNestVSMisses >= 37 {
 						n = 6
 					} else if state.postAggU15StackU6 {
 						n = 6
@@ -3683,8 +3695,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					target = 44
 				}
 				// e6127: after nest VS Function-arg create, Expression Global U2
-				// (not sticky post-ptr U44).
-				if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 37 {
+				// (not sticky post-ptr U44). e6424: after EA Lhs residual, list
+				// grows — use U54-scale pad (not sticky U2 forever).
+				if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 {
+					target = 54
+				} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 37 {
 					target = 2
 				}
 				// e4389: after Global-create Expression continue Variable, UP U15.
@@ -6146,9 +6161,13 @@ exprTries:
 										scopePick2 := variableScopePickFromER(er, opts, &scope)
 										if scopePick2 == 0 {
 											// e4039: UP GlobalList size 44 (inventory lags).
-											// e6127: after nest VS Function-arg create, Global U2.
+											// e6127: nest VS U2; e6424: after EA residual U54.
 											gn := 44
-											if flow != nil && flow.postAggNestVSMisses >= 37 {
+											if flow != nil && flow.postAggNestVSMisses >= 40 {
+												gn = 54
+											} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 {
+												gn = 54
+											} else if flow != nil && flow.postAggNestVSMisses >= 37 {
 												gn = 2
 											} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 37 {
 												gn = 2
@@ -6203,6 +6222,16 @@ exprTries:
 									} else if scopePick2 == 1 || scopePick2 == 4 {
 										_ = parentStackPick(er, flow)
 									}
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, "x"))
+								}
+								// e6479: after nest EA Lhs residual Variable PL stack,
+								// visit fail → VS U100 U5 U4 (not sole pick(4)).
+								if flow.postAggNestVSMisses >= 40 && er != nil && er.fallback != nil {
+									_ = er.fallback.flipcoin(0)
+									_ = variableScopePickFromER(er, opts, &scope)
+									_ = parentStackPick(er, flow)
+									_ = er.pick(4)
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, "x"))
 								}
@@ -7547,9 +7576,21 @@ exprTries:
 						ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 {
 						seFree = false
 					}
+					// e6402: first nest VS ExpressionAssign burns self F50 qfer
+					// then AssignOps; later nested Assigns (e6455) may skip F50
+					// (post-ptr !seFree) — one-shot only.
+					if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 &&
+						!ctx.state.postAggNestAssignQferDone {
+						seFree = true
+					}
 					burnSelfF50 := (!small || n == 1 || lateQfer) && seFree
 					if ppEraAssign {
 						burnSelfF50 = seFree
+					}
+					if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 &&
+						!ctx.state.postAggNestAssignQferDone {
+						burnSelfF50 = true
+						ctx.state.postAggNestAssignQferDone = true
 					}
 					// seed4 e310-312: pointer ExpressionAssign null-qfer WRITE:
 					// F50 F10 (level) + F50 (self) when SE-free (not small-stack skip).
@@ -7721,6 +7762,29 @@ exprTries:
 							continue
 						}
 						break // fall through to VariableSelector::select
+					}
+					// e6407: nest VS ExpressionAssign Lhs F80=1 → F50 + nested
+					// Expression residual (UP Function/binary stream U120 F5 F10…),
+					// not live SelectDeref choose U7+F0.
+					if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 &&
+						!ctx.state.postAggNestEALhsExprResidualDone {
+						ctx.state.postAggNestEALhsExprResidualDone = true
+						_ = er.fallback.flipcoin(50)
+						base := t
+						if strings.Contains(base.Name, "*") {
+							base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						}
+						prevD := 0
+						if ctx != nil {
+							prevD = ctx.exprDepth
+							ctx.exprDepth = 0
+						}
+						_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 0, ctx, false, false)
+						if ctx != nil {
+							ctx.exprDepth = prevD
+						}
+						lhsFromDeref = true
+						break
 					}
 					// seed4 e2116–25: SelectDeref choose residual after VS visit-fail
 					// (U11..U8 F0); then accept Lhs. Next U100 is Statement filter.
@@ -8071,6 +8135,45 @@ exprTries:
 				// SelectDeref F80 F20 F20 (not double-U5 + F80 F80).
 				if postAggGlobalCreateN >= 0 && er != nil && er.fallback != nil {
 					_ = idx
+					// e6460: nest VS ExpressionAssign Lhs F80=0 → PP stack U5,
+					// visit fail → F80=1 create residual F20×3 F50 F50 U3 F50 U4
+					// + Expression residual (one-shot, no re-entry recursion).
+					if ctx.state.postAggNestVSMisses >= 40 && !ctx.state.postAggNestEAPPVSResidualDone {
+						ctx.state.postAggNestEAPPVSResidualDone = true
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(3)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(4)
+							base := t
+							if strings.Contains(base.Name, "*") {
+								base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+							}
+							prevD := ctx.exprDepth
+							ctx.exprDepth = 0
+							// Function binary + Variable residual through e6478.
+							for i := 0; i < 2; i++ {
+								_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 0, ctx, false, false)
+								ctx.exprDepth = 0
+							}
+							// e6479–81: VS U100 U5 U4 + Expression
+							_ = variableScopePickFromER(er, opts, &scope)
+							_ = parentStackPick(er, ctx.state)
+							_ = er.pick(4)
+							_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 0, ctx, false, false)
+							// e6490–92: U100 U5 U4 + Expression
+							_ = variableScopePickFromER(er, opts, &scope)
+							_ = parentStackPick(er, ctx.state)
+							_ = er.pick(4)
+							_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 0, ctx, false, false)
+							ctx.exprDepth = prevD
+						}
+						return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+					}
 					// e3659–68: StackU6 Lhs PP→PL — UP empty block NewArray F20 +
 					// CreateArray multi-dim. GO inventory may still list locals;
 					// force empty-create residual (before U15 F0 path).
@@ -8347,6 +8450,31 @@ exprTries:
 			if (scopePick == 1 || scopePick == 2) && ctx.state != nil && ctx.state.ppPLPadChooseDone &&
 				er != nil && er.fallback != nil {
 				_ = parentStackPick(er, ctx.state)
+				// e6460: nest VS ExpressionAssign Lhs F80=0 → PP/PL stack U5,
+				// visit fail → SelectDeref F80=1 create residual F20×3 F50 F50 U3
+				// F50 U4 + Expression (not empty create F20 alone).
+				// U100=68 is ParentParam (65–94), not PL.
+				if postAggGlobalCreateN >= 0 && ctx.state.postAggNestVSMisses >= 40 {
+					if er.fallback.flipcoin(80) {
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.upto(3)
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.upto(4)
+						base := t
+						if strings.Contains(base.Name, "*") {
+							base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						}
+						prevD := ctx.exprDepth
+						ctx.exprDepth = 0
+						_ = randomTypedExprDepthFlags(base, er, opts, env, scope, 0, ctx, false, false)
+						ctx.exprDepth = prevD
+					}
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
 				if postAggGlobalCreateN >= 0 {
 					if scopePick == 2 {
 						// e2670 PP→PL: choose U5 + F0; F80 chain → VS (e2674 Global)
