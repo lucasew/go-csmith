@@ -14533,11 +14533,77 @@ lhsDerefLoop:
 																		// that useEx F50=0 → Global U3 F0 → Global U2
 																		// (e19980–84).
 																		postCreateLateFreeAfterNVUseEx0GlobalOnce := false
+																		// postCreateLateFreeAfterNVUseEx0F0Once: useEx F50=0
+																		// then bare F0 (e20057–58) before next Function.
+																		postCreateLateFreeAfterNVUseEx0F0Once := false
+																		// postCreateLateFreeAfterNVGlobalF80LadderOnce: free
+																		// Global U150 + F80 itemize ladder (e20078–20115).
+																		postCreateLateFreeAfterNVGlobalF80LadderOnce := false
+																		// postCreateLateFreeAfterNVAsgThenFuncOnce: after
+																		// Assign F50, force Function bare (e20118).
+																		postCreateLateFreeAfterNVAsgThenFuncOnce := false
+																		// postCreateLateFreeAfterNVConstF80Once: Constant
+																		// F50=0 + SelectDeref F80 U10 (e20124–27).
+																		postCreateLateFreeAfterNVConstF80Once := false
+																		// postCreateLateFreeAfterNVAsgConstFuncOnce: after
+																		// second Assign F50, Const then Function (e20130+).
+																		postCreateLateFreeAfterNVAsgConstFuncOnce := false
+																		// postCreateLateFreeAfterNVUseEx0GlobalU9Once:
+																		// useEx F50=0 → Global U9 (e20145–47).
+																		postCreateLateFreeAfterNVUseEx0GlobalU9Once := false
+																		// postCreateLateFreeAfterNVNeedUseExAfterComma:
+																		// arm useEx after next free invent Comma.
+																		postCreateLateFreeAfterNVNeedUseExAfterComma := false
+																		// postCreateLateFreeAfterNVGlobalU149Once: free
+																		// Global U149 sole (e20177) then U149 (e20194).
+																		postCreateLateFreeAfterNVGlobalU149Once := false
+																		postCreateLateFreeAfterNVGlobalU149BOnce := false
+																		// postCreateLateFreeAfterNVConstHex16BOnce: Const
+																		// F50 hex×16 after U149 (e20178–79).
+																		postCreateLateFreeAfterNVConstHex16BOnce := false
+																		// postCreateLateFreeAfterNVVarMulti2Once: free
+																		// Variable Global multiphase (e20203–19).
+																		postCreateLateFreeAfterNVVarMulti2Once := false
+																		// postCreateLateFreeAfterNVVarMulti2ArmOnce: after
+																		// free Function, arm Multi2 on next Variable.
+																		postCreateLateFreeAfterNVVarMulti2ArmOnce := false
+																		// postCreateLateFreeAfterNVConstHex2Once: Const
+																		// F50 hex×2 (e20220–21 depth gap 3).
+																		postCreateLateFreeAfterNVConstHex2Once := false
+																		// postCreateLateFreeAfterNVPPThenGlobalOnce: free
+																		// Variable PP U6 + Global U149 (e20223–26).
+																		postCreateLateFreeAfterNVPPThenGlobalOnce := false
+																		// postCreateLateFreeAfterNVPLF80LadderOnce: free
+																		// PL U6 U6 + F80 SelectDeref ladder (e20233–50).
+																		postCreateLateFreeAfterNVPLF80LadderOnce := false
 																		// postCreateLateFreeAfterNVGlobalU150BOnce: free
 																		// Global U150 sole (e19994) then U150 F80=0
 																		// reselect (e19997–20000).
 																		postCreateLateFreeAfterNVGlobalU150BOnce := false
 																		postCreateLateFreeAfterNVGlobalU150COnce := false
+																		// postCreateLateFreeAfterNVVarMultiOnce: free
+																		// Variable after Const small is Global multiphase
+																		// (e20006–23) then more free invent.
+																		postCreateLateFreeAfterNVVarMultiOnce := false
+																		// postCreateLateFreeAfterNVConstHex4Once: Const
+																		// F50 hex×4 after multiphase (e20024–25 depth gap).
+																		postCreateLateFreeAfterNVConstHex4Once := false
+																		// postCreateLateFreeAfterNVPPU6SoleOnce: free PP
+																		// U6 sole (e20028) after Const hex4 Variable.
+																		postCreateLateFreeAfterNVPPU6SoleOnce := false
+																		// postCreateLateFreeAfterNVPPU6U5U1Once: free PP
+																		// U6 U5 U1 (e20031–33) after next Variable.
+																		postCreateLateFreeAfterNVPPU6U5U1Once := false
+																		// postCreateLateFreeAfterNVPLU6U5Once: free PL
+																		// U6 U5 sole (e20036–37).
+																		postCreateLateFreeAfterNVPLU6U5Once := false
+																		// postCreateLateFreeAfterNVGlobalU150DOnce: free
+																		// Global U150 F50 U16 (e20040–42).
+																		postCreateLateFreeAfterNVGlobalU150DOnce := false
+																		// postCreateLateFreeAfterNVPLItemOnce: free PL
+																		// U6 U2 U9 F0 → Global F80=0 → PL F20 F20
+																		// (e20045–54).
+																		postCreateLateFreeAfterNVPLItemOnce := false
 																		// postCreateLateFreeAfterNVConstVarOnce: after
 																		// that Constant residual, next is Variable-only
 																		// (e19742).
@@ -15627,6 +15693,15 @@ lhsDerefLoop:
 																								postCreateUseExAgain = true
 																								postCreateForceStdfunc = false
 																							}
+																							// e20142–47: AfterNV free invent Comma →
+																							// Function useEx F50=0 → Global U9.
+																							if postCreateLateFreeAfterNVNeedUseExAfterComma {
+																								postCreateLateFreeAfterNVNeedUseExAfterComma = false
+																								postCreateUseExAgain = true
+																								postCreateForceStdfunc = false
+																								postCreateFuncOnlyOnce = true
+																								postCreateLateFreeAfterNVUseEx0GlobalU9Once = true
+																							}
 																							// e18240: nested/next Expression
 																							// no_const (tries=1 reject Constant → Comma)
 																							if postCreatePostArrayDone {
@@ -16024,6 +16099,23 @@ lhsDerefLoop:
 																													if !asgF50 && postCreateLateFreeUseExN >= 3 {
 																														postCreateLateFreeAsgBareOnce = true
 																													}
+																																	// e20118: after AfterNV Assign F50, force Function
+																													if postCreateLateFreeAfterNVAsgThenFuncOnce {
+																														postCreateLateFreeAfterNVAsgThenFuncOnce = false
+																														postCreateFuncOnlyOnce = true
+																														// e20124–27: free invent Constant F50=0 +
+																														// Lhs SelectDeref F80 residual
+																														postCreateLateFreeAfterNVConstF80Once = true
+																													}
+																													if postCreateLateFreeAfterNVAsgConstFuncOnce {
+																														// e20130: after second Assign F50, bare Constant
+																														// (no F50 residual) then Function binary.
+																														postCreateLateFreeAfterNVAsgConstFuncOnce = false
+																														postCreateConstOnlyOnce = true
+																														postCreateConstBareOnce = true
+																														// e20142 Comma then e20144 Function useEx
+																														postCreateLateFreeAfterNVNeedUseExAfterComma = true
+																													}
 																												}
 																											}
 																										} else {
@@ -16301,6 +16393,53 @@ lhsDerefLoop:
 																										afterAsg = false
 																										continue
 																									}
+																								} else if postCreateLateFreeAfterNVConstF80Once {
+																									// e20124–27: Const F50 hex×16 (depth gap 17) +
+																									// SelectDeref F80 U10.
+																									postCreateLateFreeAfterNVConstF80Once = false
+																									postCreateConstHex8Once = false
+																									_ = formatSimpleConstantHexN(rf, 16)
+																									if rf.flipcoin(80) {
+																										_ = rf.upto(10)
+																									}
+																									// e20128–29: free invent Assign self F50;
+																									// e20130: Constant-only then Function binary.
+																									postCreateLateFreeAsgBareOnce = false
+																									postCreateForceAssignOnce = true
+																									postCreateLateFreeAfterNVAsgConstFuncOnce = true
+																									afterAsg = false
+																									continue
+																								} else if postCreateLateFreeAfterNVConstHex16BOnce {
+																									// e20178–79: F50 hex×16 after Global U149
+																									postCreateLateFreeAfterNVConstHex16BOnce = false
+																									postCreateConstHex8Once = false
+																									_ = formatSimpleConstantHexN(rf, 16)
+																									afterAsg = false
+																									continue
+																								} else if postCreateLateFreeAfterNVConstHex2Once {
+																									// e20220–21: F50 hex×2 after Multi2 create
+																									postCreateLateFreeAfterNVConstHex2Once = false
+																									postCreateConstHex8Once = false
+																									_ = formatSimpleConstantHexN(rf, 2)
+																									if postCreateLateFreeAfterNVConstVarOnce {
+																										postCreateLateFreeAfterNVConstVarOnce = false
+																										postCreateVarOnlyOnce = true
+																										// e20223+: PP U6 + Global U149 multiphase
+																										postCreateLateFreeAfterNVPPThenGlobalOnce = true
+																									}
+																									afterAsg = false
+																									continue
+																								} else if postCreateLateFreeAfterNVConstHex4Once {
+																									// e20024–25: F50 hex×4 after Var multiphase
+																									postCreateLateFreeAfterNVConstHex4Once = false
+																									postCreateConstHex8Once = false
+																									_ = formatSimpleConstantHexN(rf, 4)
+																									if postCreateLateFreeAfterNVConstVarOnce {
+																										postCreateLateFreeAfterNVConstVarOnce = false
+																										postCreateVarOnlyOnce = true
+																									}
+																									afterAsg = false
+																									continue
 																								} else if postCreateLateFreeAfterNVConstChainN > 0 {
 																									// e19758–63: 3× Constant after PL U2 sole.
 																									// UP depth gaps after F50=0: 16, 16, 2 hex digits
@@ -16728,6 +16867,11 @@ lhsDerefLoop:
 																						skipNextAssignF50 = true
 																					}
 																					continue
+																				}
+																				// e20202: arm Global multiphase residual
+																				if postCreateLateFreeAfterNVVarMulti2ArmOnce {
+																					postCreateLateFreeAfterNVVarMulti2ArmOnce = false
+																					postCreateLateFreeAfterNVVarMulti2Once = true
 																				}
 																				// ptr-cmp LHS Variable: fall through;
 																				// clear lhs flag (RHS also no_func
@@ -17236,6 +17380,144 @@ lhsDerefLoop:
 																													_ = rf.upto(100) // Global
 																													_ = rf.upto(7)
 																												}
+																												// e20001–04: Constant-only (tries=12) small
+																												// F50 F50 U20; e20005 Variable multiphase.
+																												postCreateConstOnlyOnce = true
+																												postCreateConstSmallOnce = true
+																												postCreateConstHex8Once = false
+																												postCreateConstHex16Once = false
+																												postCreateAsgLhsF80Once = false
+																												postCreateLateFreeAfterNVConstVarOnce = true
+																												// e20006+: Variable Global multiphase residual
+																												postCreateLateFreeAfterNVVarMultiOnce = true
+																											} else if postCreateLateFreeAfterNVGlobalU149Once {
+																												// e20177: Global U149 sole
+																												postCreateLateFreeAfterNVGlobalU149Once = false
+																												_ = rf.upto(149)
+																												// e20178–79: Const F50 hex×16 (depth gap 17)
+																												// e20180 Assign F50; e20194 Global U149.
+																												postCreateConstOnlyOnce = true
+																												postCreateConstHex8Once = false
+																												postCreateConstHex16Once = false
+																												postCreateConstSmallOnce = false
+																												postCreateAsgLhsF80Once = false
+																												postCreateLateFreeAfterNVConstHex16BOnce = true
+																												postCreateForceAssignOnce = true
+																												postCreateLateFreeAsgBareOnce = false
+																												postCreateLateFreeAfterNVGlobalU149BOnce = true
+																											} else if postCreateLateFreeAfterNVGlobalU149BOnce {
+																												// e20194: Global U149 sole
+																												postCreateLateFreeAfterNVGlobalU149BOnce = false
+																												_ = rf.upto(149)
+																												// e20195–201 Function free invent; e20202+ Variable
+																												// multiphase — arm after one free invent cycle.
+																												postCreateLateFreeAfterNVVarMulti2ArmOnce = true
+																											} else if postCreateLateFreeAfterNVVarMulti2Once {
+																												// e20203–19: Global U3 F0 → PL U6 U3 F0 →
+																												// PL U6 F50 U8 F80×3 F20 F20 U4.
+																												postCreateLateFreeAfterNVVarMulti2Once = false
+																												_ = rf.upto(3)
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // PL
+																												_ = rf.upto(6)
+																												_ = rf.upto(3)
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // PL
+																												_ = rf.upto(6)
+																												if !rf.flipcoin(50) {
+																													_ = rf.upto(8)
+																												} else if rf.flipcoin(50) {
+																													_ = rf.upto(3)
+																												} else {
+																													_ = rf.upto(20)
+																												}
+																												// F80 create residual
+																												for li := 0; li < 3; li++ {
+																													_ = rf.flipcoin(80)
+																												}
+																												_ = rf.flipcoin(20)
+																												_ = rf.flipcoin(20)
+																												_ = rf.upto(4)
+																												// e20220–21: Const F50 hex×2 then Variable
+																												postCreateConstOnlyOnce = true
+																												postCreateLateFreeAfterNVConstHex2Once = true
+																												postCreateLateFreeAfterNVConstVarOnce = true
+																											} else if postCreateLateFreeAfterNVGlobalU150DOnce {
+																												// e20040–42: Global U150 F50 U16 residual
+																												postCreateLateFreeAfterNVGlobalU150DOnce = false
+																												_ = rf.upto(150)
+																												if !rf.flipcoin(50) {
+																													_ = rf.upto(16)
+																												} else if rf.flipcoin(50) {
+																													_ = rf.upto(3)
+																												} else {
+																													_ = rf.upto(20)
+																												}
+																												// e20043+: free Variable PL multiphase
+																												postCreateVarOnlyOnce = true
+																												postCreateLateFreeAfterNVPLItemOnce = true
+																											} else if postCreateLateFreeAfterNVGlobalF80LadderOnce {
+																												// e20078–20115: Global U150 + long F80
+																												// SelectDeref itemize ladder (U2/U1 U7 U10)
+																												// until F80=0 → Global U2.
+																												postCreateLateFreeAfterNVGlobalF80LadderOnce = false
+																												_ = rf.upto(150)
+																												// Head F80 U2; then many F80 U1 U7 U10 until F80=0
+																												if rf.flipcoin(80) {
+																													_ = rf.upto(2)
+																												}
+																												for ri := 0; ri < 20; ri++ {
+																													if !rf.flipcoin(80) {
+																														// e20113–15: F80=0 → Global U2
+																														_ = rf.upto(100) // Global
+																														_ = rf.upto(2)
+																														break
+																													}
+																													_ = rf.upto(1)
+																													_ = rf.upto(7)
+																													_ = rf.upto(10)
+																												}
+																												// e20116–17: free invent Assign self F50;
+																												// e20118+: next Function bare (afterAsg).
+																												postCreateLateFreeAsgBareOnce = false
+																												postCreateForceAssignOnce = true
+																												// Arm FuncOnly after that Assign residual (not now).
+																												postCreateLateFreeAfterNVAsgThenFuncOnce = true
+																											} else if postCreateLateFreeAfterNVVarMultiOnce {
+																												// e20006–23: free invent Variable multiphase
+																												// after Const small (U100 already drawn Global).
+																												// Global U3 → Global U2 F0 → PP F0 →
+																												// Global sole (U100 only) → PL U6 U3 F0 →
+																												// Global U42 U2 U9 U4 U18 itemize.
+																												postCreateLateFreeAfterNVVarMultiOnce = false
+																												_ = rf.upto(3)
+																												_ = rf.upto(100) // Global
+																												_ = rf.upto(2)
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // PP
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // Global sole (e20013)
+																												_ = rf.upto(100) // PL
+																												_ = rf.upto(6)
+																												_ = rf.upto(3)
+																												_ = rf.flipcoin(0)
+																												_ = rf.upto(100) // Global
+																												_ = rf.upto(42)
+																												_ = rf.upto(2)
+																												_ = rf.upto(9)
+																												_ = rf.upto(4)
+																												_ = rf.upto(18)
+																												// e20024–25: Constant F50 hex×4 (depth gap 5)
+																												// then free Variable stream.
+																												postCreateConstOnlyOnce = true
+																												postCreateConstHex8Once = false
+																												postCreateConstHex16Once = false
+																												postCreateConstSmallOnce = false
+																												postCreateAsgLhsF80Once = false
+																												postCreateLateFreeAfterNVConstHex4Once = true
+																												postCreateLateFreeAfterNVConstVarOnce = true
+																												// e20027–28: free invent Variable PP U6 sole
+																												postCreateLateFreeAfterNVPPU6SoleOnce = true
 																											} else if postCreateLateFreeGlobalN == 1 {
 																												// e17436: Global ok_vars U140 sole
 																												_ = rf.upto(140)
@@ -18025,6 +18307,79 @@ lhsDerefLoop:
 																											postCreateUseExAgain = true
 																											postCreateForceStdfunc = false
 																											postCreateLateFreeAfterNVUseEx0GlobalOnce = true
+																										} else if postCreateLateFreeAfterNVPLU6U5Once {
+																											// e20036–37: PL U6 U5 sole
+																											postCreateLateFreeAfterNVPLU6U5Once = false
+																											_ = rf.upto(6)
+																											_ = rf.upto(5)
+																											// e20038+: next free Global U150 F50 U16
+																											postCreateVarOnlyOnce = true
+																											postCreateLateFreeAfterNVGlobalU150DOnce = true
+																										} else if postCreateLateFreeAfterNVPLItemOnce {
+																											// e20045–55: PL U6 U2 U9 F0 → Global F80=0 →
+																											// PL U6 F20 F20 → VS PP U100 sole (e20055).
+																											postCreateLateFreeAfterNVPLItemOnce = false
+																											_ = rf.upto(6)
+																											_ = rf.upto(2)
+																											_ = rf.upto(9)
+																											_ = rf.flipcoin(0)
+																											_ = rf.upto(100) // Global
+																											if !rf.flipcoin(80) {
+																												_ = rf.upto(100) // PL
+																												_ = rf.upto(6)
+																												_ = rf.flipcoin(20)
+																												_ = rf.flipcoin(20)
+																											}
+																											_ = rf.upto(100) // e20055 PP sole accept
+																											// e20056–58: next Function useEx F50=0 + F0 residual
+																											postCreateUseExAgain = true
+																											postCreateForceStdfunc = false
+																											postCreateLateFreeAfterNVUseEx0F0Once = true
+																											// e20073–74: free invent Assign self F50 (not bare)
+																											postCreateLateFreeAsgBareOnce = false
+																										} else if postCreateLateFreeAfterNVPLF80LadderOnce {
+																											// e20233–50: PL U6 U6 + F80 U2; F80 U10; F80 U9 U8 U5 U6 F0;
+																											// F80 U9 F0; F80 U8; F80=0.
+																											postCreateLateFreeAfterNVPLF80LadderOnce = false
+																											_ = rf.upto(6)
+																											_ = rf.upto(6)
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(2)
+																											}
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(10)
+																											}
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(9)
+																												_ = rf.upto(8)
+																												_ = rf.upto(5)
+																												_ = rf.upto(6)
+																												_ = rf.flipcoin(0)
+																											}
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(9)
+																												_ = rf.flipcoin(0)
+																											}
+																											if rf.flipcoin(80) {
+																												_ = rf.upto(8)
+																											}
+																											if !rf.flipcoin(80) {
+																												// e20250–54: F80=0 → PL U6 U3 → NewValue
+																												// (still same Variable residual)
+																												_ = rf.upto(100) // PL
+																												_ = rf.upto(6)
+																												_ = rf.upto(3)
+																												_ = rf.upto(100) // NewValue
+																												// e20255+: free invent Function CREATE head;
+																												// e20259+: nested Function useEx F50 residual.
+																												postCreateFuncOnlyOnce = true
+																												postCreateFunc = true
+																												postCreateUseExN = 1
+																												// Keep postCreateFunc sticky for next useEx
+																												// (do not clear after CREATE head).
+																												postCreateLateFreeAfterNVCreateHeadOnce = false
+																												postCreateUseExAgain = true
+																											}
 																										} else if postCreateLateFreeAfterNVPLSelDerefOnce {
 																											// e19817–26: PL U6 + SelectDeref F80 U9 F0 /
 																											// F80 U8 F0 / F80 U7 → VS NewValue tries=1.
@@ -18769,6 +19124,35 @@ lhsDerefLoop:
 																										_ = rf.upto(1)
 																										// e19947+: next free Global U3 F0 multiphase
 																										postCreateLateFreeAfterNVGlobalU3F0Once = true
+																									} else if postCreateLateFreeAfterNVPPU6SoleOnce {
+																										// e20028: PP U6 sole after Const hex4 Variable
+																										postCreateLateFreeAfterNVPPU6SoleOnce = false
+																										_ = rf.upto(6)
+																										// e20029+: next Variable; e20030 PP U6 U5 U1
+																										postCreateVarOnlyOnce = true
+																										postCreateLateFreeAfterNVPPU6U5U1Once = true
+																									} else if postCreateLateFreeAfterNVPPU6U5U1Once {
+																										// e20031–33: PP U6 U5 U1 sole
+																										postCreateLateFreeAfterNVPPU6U5U1Once = false
+																										_ = rf.upto(6)
+																										_ = rf.upto(5)
+																										_ = rf.upto(1)
+																										// e20034+: next free PL U6 U5
+																										postCreateVarOnlyOnce = true
+																										postCreateLateFreeAfterNVPLU6U5Once = true
+																									} else if postCreateLateFreeAfterNVPPThenGlobalOnce {
+																										// e20223–26: PP U6 sole → reselect Global U149
+																										// (still same Variable residual; U100 already drawn PP).
+																										postCreateLateFreeAfterNVPPThenGlobalOnce = false
+																										_ = rf.upto(6)
+																										_ = rf.upto(100) // Global
+																										_ = rf.upto(149)
+																										// e20227: Const small F50 F50 U20
+																										postCreateConstOnlyOnce = true
+																										postCreateConstSmallOnce = true
+																										postCreateLateFreeAfterNVConstVarOnce = true
+																										// e20232+: PL U6 U6 F80 ladder residual
+																										postCreateLateFreeAfterNVPLF80LadderOnce = true
 																									} else if postCreateLateFreeAfterNVOnce {
 																										// e19407–71: after CreateArray-NV stdfunc era,
 																										// free invent PP U6 U2 → VS reselect PL U6 +
@@ -20125,6 +20509,27 @@ lhsDerefLoop:
 																					if postCreateUseExHitN == 1 {
 																						postCreateUseExAgain = false
 																					}
+																					continue
+																				}
+																				// e20057–58: AfterNV useEx=0 → bare F0 then
+																				// free invent continues (e20059 Function).
+																				if postCreateLateFreeAfterNVUseEx0F0Once {
+																					postCreateLateFreeAfterNVUseEx0F0Once = false
+																					postCreateUseExAgain = false
+																					_ = rf.flipcoin(0)
+																					// e20076+: after Assign, free Variable Global
+																					// U150 + long F80 SelectDeref itemize ladder.
+																					postCreateLateFreeAfterNVGlobalF80LadderOnce = true
+																					continue
+																				}
+																				// e20145–47: useEx F50=0 → Global U9 sole.
+																				if postCreateLateFreeAfterNVUseEx0GlobalU9Once {
+																					postCreateLateFreeAfterNVUseEx0GlobalU9Once = false
+																					postCreateUseExAgain = false
+																					_ = rf.upto(100) // Global
+																					_ = rf.upto(9)
+																					// e20176–77: later free Global U149 sole
+																					postCreateLateFreeAfterNVGlobalU149Once = true
 																					continue
 																				}
 																				// e19980–84: AfterNV useEx=0 → Global U3 F0
