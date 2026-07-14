@@ -109,6 +109,14 @@ var postAggNestArrayOpPostCD3Sink *bool
 var postAggPostCD3ArrayOp2BodySink *bool
 // postAggPostCD3ArrayOp2BodyActive: sticky even if nested generate rebinds sinks.
 var postAggPostCD3ArrayOp2BodyActive bool
+// burnCreateArrayCtxSink: genContext for CreateArray create_field_vars + aggregate
+// alt Constant::make_random (e10466 after U99 dims, before init_num).
+var burnCreateArrayCtxSink *genContext
+// burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
+// (e10988 PL U2 U2 F0 residual era).
+var burnCreateArrayFieldVarsDone bool
+// burnCreateArrayPLU2Done: one-shot e10988 U2 U2 F0 chain; later PL sole.
+var burnCreateArrayPLU2Done bool
 // postAggPostCD3ArrayOp2AfterGlobalU56: next free Expression Variable after
 // e9274 Global U56 must_use U5 U5 U2 F75 (e9276).
 var postAggPostCD3ArrayOp2AfterGlobalU56 bool
@@ -3132,6 +3140,16 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 		cp := append([]int(nil), sizes...)
 		*lastArraySizesSink = cp
 	}
+	// ArrayVariable.cpp after sizes: if (type->is_aggregate()) create_field_vars
+	// → per-field Constant::make_random (unless top is union). Must run BEFORE
+	// init_num (e10466 UP F50 residual after U99 U10 U10; GO drew initNum early).
+	// Pointers like "struct S0*" are ePointer, not aggregate.
+	isPtrTy := strings.Contains(t.Name, "*")
+	isAgg := !isPtrTy && (strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union"))
+	if isAgg && burnCreateArrayCtxSink != nil {
+		burnCreateFieldVarsConstants(r, t, burnCreateArrayCtxSink, opts)
+		burnCreateArrayFieldVarsDone = true
+	}
 	inits := []string{}
 	hadNullPtrAlt := false
 	if total/2 > 0 {
@@ -3200,8 +3218,13 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				inits = append(inits, "0")
 				continue
 			}
-			// Constant::make_random for array elements: unions use first field only.
-			inits = append(inits, formatElementConstant(r, t, opts))
+			// Constant::make_random(type) for alt inits — full aggregate when struct.
+			if isAgg && burnCreateArrayCtxSink != nil {
+				inits = append(inits, formatAggregateOrSimpleConstant(r, t, burnCreateArrayCtxSink, opts))
+			} else {
+				// Constant::make_random for array elements: unions use first field only.
+				inits = append(inits, formatElementConstant(r, t, opts))
+			}
 		}
 	}
 	// e6563: nest residual pointer CreateArray alts may address-of multi-dim
@@ -3233,6 +3256,11 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 			if sz > 0 {
 				_ = r.upto(uint32(sz))
 			}
+		}
+		// ArrayVariable::itemize: if aggregate, create_field_vars on the
+		// itemized var (e10935 UP F50 residual after index U8 U7).
+		if isAgg && burnCreateArrayCtxSink != nil {
+			burnCreateFieldVarsConstants(r, t, burnCreateArrayCtxSink, opts)
 		}
 	}
 	return arrayCreateResult{sizes: sizes, inits: inits, hadNullPtrAlt: hadNullPtrAlt}
@@ -7038,7 +7066,10 @@ exprTries:
 							// e7630: after keepExpr residual + PL stack U3 era, UP U19.
 							// e8304 post-CD3: ptr-cmp derived_types UP U21 (not sticky U17).
 							// e9886: after ArrayOp2 PLU5F0 era, UP U22 (more derived creates).
-							if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PLU5F0Done && nPtr < 22 {
+							// e11035: after CreateArray create_field_vars era, UP U23.
+							if burnCreateArrayFieldVarsDone && nPtr < 23 {
+								nPtr = 23
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PLU5F0Done && nPtr < 22 {
 								nPtr = 22
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 && nPtr < 21 {
 								nPtr = 21
@@ -8060,9 +8091,67 @@ exprTries:
 					// e10254+: after need_no_rhs n≥3 era, PL locals multiphase
 					// (0: U2; 1: U4; 2: U5+itemize U9 U9 U3 F0 → VS PL U6 U4;
 					//  3: U5 sole; 4+: U5+itemize → VS reselect chain).
+					// e10988+: after CreateArray create_field_vars era, U2 U2 F0
+					// (not sticky U5+993 itemize).
 					if flow != nil && flow.postAggPostCD3ArrayOp2Body &&
 						flow.postAggPostCD3ArrayOp2NeedNoRhsN >= 4 &&
 						er != nil {
+						// Late era after aggregate CreateArray field-vars residual.
+						if burnCreateArrayFieldVarsDone && er.fallback != nil {
+							if !burnCreateArrayPLU2Done {
+								// e10988–08: one-shot U2 U2 F0 → VS reselect create.
+								burnCreateArrayPLU2Done = true
+								_ = er.pick(2) // e10988
+								_ = er.pick(2) // e10989
+								_ = er.fallback.flipcoin(0)
+								scopePick2 := variableScopePickFromER(er, opts, &scope)
+								if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+									_ = parentStackPick(er, flow)
+									_ = er.pick(5) // e10993
+									_ = er.fallback.flipcoin(0)
+									scopePick3 := variableScopePickFromER(er, opts, &scope)
+									if scopePick3 == 0 {
+										_ = er.pick(2) // e10996
+										_ = er.fallback.flipcoin(0)
+										scopePick4 := variableScopePickFromER(er, opts, &scope)
+										if scopePick4 == 1 || scopePick4 == 2 || scopePick4 == 4 {
+											_ = parentStackPick(er, flow)
+											_ = er.pick(2) // e11000
+											_ = er.fallback.flipcoin(0)
+											scopePick5 := variableScopePickFromER(er, opts, &scope)
+											if scopePick5 == 1 || scopePick5 == 2 || scopePick5 == 4 {
+												_ = parentStackPick(er, flow)
+												// e11004–08: U14 + F50 F10 NewArray=0 + Constant
+												base := pickSimpleNonVoid(er.fallback, opts)
+												_ = er.fallback.flipcoin(50)
+												_ = er.fallback.flipcoin(10)
+												_ = er.fallback.flipcoin(20)
+												_ = formatSimpleConstant(er.fallback, base)
+												bumpExprDepth(ctx)
+												markVarSelectEffect()
+												return finishVar(castLiteral(t, "x"))
+											} else if scopePick5 == 0 {
+												_ = er.pick(2)
+											}
+										} else if scopePick4 == 0 {
+											_ = er.pick(2)
+										}
+									} else if scopePick3 == 1 || scopePick3 == 2 || scopePick3 == 4 {
+										_ = parentStackPick(er, flow)
+										_ = er.pick(5)
+									}
+								} else if scopePick2 == 0 {
+									_ = er.pick(2)
+								}
+							}
+							// e11025+: later PL stack sole (parent ShiftBy F50 U32).
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							if len(localCands) > 0 {
+								return finishVar(castLiteral(t, localCands[0].expr))
+							}
+							return finishVar(castLiteral(t, "x"))
+						}
 						pn := flow.postAggPostCD3ArrayOp2PLAfterNeedN
 						flow.postAggPostCD3ArrayOp2PLAfterNeedN++
 						switch pn {
@@ -10455,6 +10544,10 @@ exprTries:
 								if lv < 3 {
 									lv = 3 // e9603 ***
 								}
+							case aq >= 2 && burnCreateArrayFieldVarsDone:
+								if lv < 4 {
+									lv = 4 // e11037 **** after create_field_vars
+								}
 							default:
 								if lv < 1 {
 									lv = 1 // e9809 * + self F50 F10 F50
@@ -10473,8 +10566,11 @@ exprTries:
 						}
 						// e9994–95: after Function-arg must residual, free
 						// ExpressionAssign is F50 F10 only then RHS U120 (no self F50).
-						if !(ctx.state.postAggPostCD3ArrayOp2Body &&
-							ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone) {
+						// e11045: after create_field_vars era **** still burns self F50.
+						skipSelf := ctx.state.postAggPostCD3ArrayOp2Body &&
+							ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone &&
+							!burnCreateArrayFieldVarsDone
+						if !skipSelf {
 							_ = er.fallback.flipcoin(50) // self
 						}
 					} else if nestArrayOpPtrQfer {
@@ -17591,6 +17687,8 @@ func emitStatement(
 		postAggPostCD3ArrayOp2GlobalU56Done = false
 		postAggPostCD3ArrayOp2GlobalU2Done = false
 		postAggPostCD3ArrayOp2GlobalSoleN = 0
+		burnCreateArrayFieldVarsDone = false
+		burnCreateArrayPLU2Done = false
 		// Outer array_loop must_read still live for ExpressionVariable itemize.
 		state.mustReadLive = true
 		writeLine(b, 1, "/* array-loop postCD3-2 */ {")
@@ -18851,6 +18949,10 @@ func emitSingleFuncDefOnce(
 		residualBody: &residualBody,
 		effectSEFree: true,
 	}
+	// CreateArray create_field_vars / aggregate alt inits need struct field info.
+	prevBurnArrCtx := burnCreateArrayCtxSink
+	burnCreateArrayCtxSink = ctx
+	defer func() { burnCreateArrayCtxSink = prevBurnArrCtx }()
 
 	for _, p := range fn.params {
 		writeLine(&b, 1, fmt.Sprintf("x ^= (uint32_t)%s;", p.name))

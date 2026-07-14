@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →10466) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →11052) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **10466** (10002→10466; PL/Global multiphase + Lhs SelectDeref ladders + Function CREATE residual; seed2 full held). Toward 11000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **11052** (10466→11052 past 11000; CreateArray create_field_vars + itemize field-vars + PL/EA qfer; seed2 full held). Toward 12000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,11 +584,13 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e10466 F50 vs U28 (CreateArray alt-init residual after U99 U10 U10; UP F50×4 U20… before initNum U28). Toward 11000+.
+Next plateau: seed4 e11052 F20 vs U2 (SelectDeref empty create F20×4 residual after **** EA qfer; GO under-burns F20×2). Toward 12000+.
 
 **e9651–e10002 climbed:** need_no_rhs multiphase (U4… / F80); EmptyCreateN; EA/PL qfer floors; Global U56→U2 one-shot then sole/U61; PL sticky sole; PL U5 F0; derived_types U22; PP→PL **** create; Function-arg must_use U5 U7 F75 F0 + struct S0 aggregate; EA skip self F50; PL create qferMode 0.
 
-**e10002–e10466 climbed:** PLAfterNeed multiphase (U2/U4/U5+itemize); GlobalSoleN U70/U27/U3-reselect/U71; Lhs SelectDeref ladders (U3 U2 U5×9; U9 U8 F0… create); PL sole after ladder; F80 sole Lhs; PP Variable residual F80 U9 itemize + U39 create; Function user-path useExisting + CREATE F0 nest Comma; FuncFail PP→PL stack create. seed2 37939 held.
+**e10002–e10466 climbed:** PLAfterNeed multiphase; GlobalSoleN U70/U27/U3-reselect/U71; Lhs SelectDeref ladders; Function CREATE residual; FuncFail PP→PL. seed2 held.
+
+**e10466–e11052 climbed:** ArrayVariable create_field_vars after dims (before init_num) + after itemize; aggregate alt Constant::make_random; PL U2 U2 F0 reselect + U14 create; derived_types U23; EA **** qfer floor after field-vars. Past 11000. seed2 37939 held.
 Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
