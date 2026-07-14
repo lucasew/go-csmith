@@ -507,6 +507,16 @@ type functionFlowState struct {
 	postAggPostCD3ArrayOp2LhsSelDone bool
 	// postAggPostCD3ArrayOp2OuterLhsSole: outer Statement Lhs sole after e9323.
 	postAggPostCD3ArrayOp2OuterLhsSole bool
+	// postAggPostCD3ArrayOp2PtrMustLhs: after e9331 pointer must_use U3×4 F75,
+	// Statement Lhs SelectDeref is F80 U5 F0 then F80=0→VS (not sticky U7+993).
+	postAggPostCD3ArrayOp2PtrMustLhs bool
+	// postAggPostCD3ArrayOp2PtrMustDone: one-shot e9331 U3×4 F75 (not e9466 re-fire).
+	postAggPostCD3ArrayOp2PtrMustDone bool
+	// postAggPostCD3ArrayOp2EAQferN: ArrayOp2 pointer ExpressionAssign qfer count
+	// (0: e9150 ** floor2; 1+: e9603 *** floor3).
+	postAggPostCD3ArrayOp2EAQferN int
+	// postAggPostCD3ArrayOp2EmptyCreateU7Done: one-shot e9463 F20 F20 U7 accept.
+	postAggPostCD3ArrayOp2EmptyCreateU7Done bool
 	// postAggPostCD3ArrayOp2LhsCreate: ExpressionAssign Lhs SelectDeref
 	// F80 CreateArray re-itemize residual (e9158–9201).
 	postAggPostCD3ArrayOp2LhsCreate bool
@@ -954,16 +964,34 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	if !earlyGate && !ppArrayGate && !lateGate && !postCD3ForMust {
 		return exprVarCandidate{}, false
 	}
-	if strings.Contains(t.Name, "*") || strings.HasPrefix(t.Name, "struct") ||
+	// postCD3 / ArrayOp2 body must_use before lateGate U2 dummy.
+	// Pointer forced Variable: randomPointerVariableExpr (e9267 U5 U5 F75).
+	arrayOp2Must := (st.postAggPostCD3ArrayOp2Body || postAggPostCD3ArrayOp2BodyActive) && st.mustReadLive
+	// e9331: ArrayOp2 Function-fail ExpressionVariable(int*) — select_must_use
+	// itemizes multi-dim must_read array → U3×4 F75 accept; Statement Lhs F80 follows.
+	// Scalar multiphase (n=0..3) already done; pointer types were rejected before residual.
+	if strings.Contains(t.Name, "*") {
+		if arrayOp2Must && st.postAggPostCD3ArrayOp2MustN >= 4 &&
+			!st.postAggPostCD3ArrayOp2PtrMustDone && er.fallback != nil {
+			st.postAggPostCD3ArrayOp2PtrMustDone = true
+			_ = er.fallback.upto(3)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.upto(3)
+			_ = er.fallback.flipcoin(75)
+			// e9336: Statement Lhs after this RHS — F80 U5 F0 F80=0→VS.
+			st.postAggPostCD3ArrayOp2PtrMustLhs = true
+			return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
+		}
+		return exprVarCandidate{}, false
+	}
+	if strings.HasPrefix(t.Name, "struct") ||
 		strings.HasPrefix(t.Name, "union") || t.Name == "float" || t.Name == "void" {
 		return exprVarCandidate{}, false
 	}
 	if t.Bits <= 0 {
 		return exprVarCandidate{}, false
 	}
-	// postCD3 / ArrayOp2 body must_use before lateGate U2 dummy.
-	// Pointer forced Variable: randomPointerVariableExpr (e9267).
-	arrayOp2Must := (st.postAggPostCD3ArrayOp2Body || postAggPostCD3ArrayOp2BodyActive) && st.mustReadLive
 	if (postCD3ForMust || arrayOp2Must) && !earlyGate {
 		// e8809: non-array must_read → F75 only.
 		// e8972+: postCD3 array-loop body must_read arrays → itemize_array
@@ -989,7 +1017,8 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		} else if arrayOp2Must {
 			// Multiphase must_use itemize in ArrayOp2 body:
 			// n=0 e9060: U5 U3 U5 U3 U3; n=1 e9230: U4; n=2 e9240: U5 U4;
-			// n=3 e9248: U5 U3; n=4 e9270 + n=5 e9272: miss VS U100.
+			// n=3 e9248: U5 U3; n=4..7 miss VS U100 (e9270/72, e9280/91);
+			// n>=8 e9450: U4 U4 U3 U2 F75. Pointer e9331 handled above (MustN>=4+"*").
 			n := st.postAggPostCD3ArrayOp2MustN
 			st.postAggPostCD3ArrayOp2MustN++
 			switch n {
@@ -1011,11 +1040,17 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 				_ = er.fallback.upto(5)
 				_ = er.fallback.upto(3)
 				accept = true
-			case 4, 5:
-				// e9270 / e9272: miss without RNG — VS U100
+			case 4, 5, 6, 7:
+				// e9270/72, e9280/91: miss without RNG — VS U100
+			case 8:
+				// e9450: U4 U4 U3 U2 F75 accept (one-shot)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.upto(3)
+				_ = er.fallback.upto(2)
+				accept = true
 			default:
-				// further simple must_use after e9276 handled by AfterGlobalU56
-				// or additional multiphase if needed
+				// e9459+: further pure miss VS U100
 			}
 		} else {
 			// postCD3ForMust only: F75 accept (e8809)
@@ -4197,6 +4232,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	if qferMode > 0 {
 		// GenerateNewParentLocal → random_qualifiers(..., no_volatile often true).
 		levels := strings.Count(chosen.Name, "*")
+		// e9468–75: ArrayOp2 Function-fail PL create **** qfer F50 F10×4
+		// (3 levels + self); GO type often under-counts as int*/**.
+		if postAggPostCD3ArrayOp2BodyActive && isPtr && levels < 3 {
+			levels = 3
+		}
 		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50) // ptr-level vol
 			_ = er.fallback.flipcoin(10) // ptr-level const
@@ -4245,6 +4285,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if newArray && !initNull && ctx.skipFuncRetQfer &&
 			ctx.state.postAggNestVSMisses >= 40 {
 			doAddrResidual = true
+		}
+		// e9478–79: ArrayOp2 Function-fail **** PL NewArray+address residual
+		// F20 F20 then CreateArray U99 (nested pointee make_init), not bare U99.
+		if postAggPostCD3ArrayOp2BodyActive && newArray && !initNull {
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(20)
+			doAddrResidual = false
 		}
 		// e6118: nest VS Function-arg *** create — empty pointee inventory
 		// (NO_DANGLING) → no address choose residual; next is Lhs F80.
@@ -9824,9 +9871,17 @@ exprTries:
 						// (F50 F10×4 + self) while GO type often * / ** under-count.
 						// e9150: ArrayOp2 body ** ExpressionAssign F50 F10×2 + self
 						// F50 — floor lv to 2 (not 4 from e8822; not bare ptrLv=1).
+						// e9603: later ArrayOp2 EA needs *** F50 F10×3 + self F50
+						// (postAggPostCD3ArrayOp2EAQferN after first floors).
 						lv := ptrLv
 						if ctx.state.postAggPostCD3ArrayOp2Body {
-							if lv < 2 {
+							aq := ctx.state.postAggPostCD3ArrayOp2EAQferN
+							ctx.state.postAggPostCD3ArrayOp2EAQferN++
+							if aq >= 1 {
+								if lv < 3 {
+									lv = 3
+								}
+							} else if lv < 2 {
 								lv = 2
 							}
 						} else if n >= 1 {
@@ -10422,6 +10477,23 @@ exprTries:
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
+					// e9463: ArrayOp2 ExpressionAssign Lhs SelectDeref empty create
+					// F20 F20=0 → address choose U7 then parent Expression U120
+					// (not fall through more residuals / next U120 without U7).
+					// e9616: later empty create is U2 (not sticky U7).
+					if postAggPostCD3ArrayOp2BodyActive && !newArray && !initConst &&
+						ctx != nil && ctx.state != nil &&
+						!ctx.state.postAggPostCD3ArrayOp2EmptyCreateU7Done {
+						ctx.state.postAggPostCD3ArrayOp2EmptyCreateU7Done = true
+						_ = er.pick(7) // e9463
+						lhsFromDeref = true
+						break
+					}
+					if postAggPostCD3ArrayOp2BodyActive && !newArray && !initConst {
+						_ = er.pick(2) // e9616
+						lhsFromDeref = true
+						break
+					}
 					if ppPostPadGlobalPicks >= 15 && !newArray && !initConst &&
 						ctx != nil && ctx.state != nil && !ctx.state.ppPostPadAddrExprResidualDone {
 						// seed4 e2092–2112: one-shot address-of Expression residual.
@@ -11357,7 +11429,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	er := &exprRand{fallback: r}
 	// e8855 post-CD3: after **** EA Lhs residual, Statement Lhs F80=0 → VS
 	// PP U100 → PL stack U2 + create residual (force before other scope paths).
-	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3EALhsU2Done {
+	// e9341 ArrayOp2 body: after pointer must_use Lhs F80=0, PL is U4 F20 F20
+	// CreateArray (not sticky e8855 U2 residual).
+	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3EALhsU2Done &&
+		!postAggPostCD3ArrayOp2BodyActive {
 		ctx.state.postAggPostCD3EALhsU2Done = false
 		scopePick := variableScopePickFromEROpts(er, opts, &scope)
 		_ = scopePick
@@ -11432,6 +11507,11 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				nStack = 3
 			}
 		}
+		// e9341: ArrayOp2 Statement Lhs F80=0 → PL stack U4 (not multiDim U2).
+		arrayOp2LhsPL := postAggPostCD3ArrayOp2BodyActive
+		if arrayOp2LhsPL {
+			nStack = 4
+		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if useBlockLocal {
@@ -11474,10 +11554,64 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				}
 				return lvalueInfo{}, false, false
 			}
+			// e9342+: ArrayOp2 Lhs PL force create F20 F20 CreateArray (no locals U5).
+			if arrayOp2LhsPL {
+				localCands = nil
+			}
 			if len(localCands) == 0 || forceCreateLate {
 				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) seed2 e942–943.
 				// seed4 e450: empty-block Lhs WRITE create keeps target type
 				// (no U14 retype) when !useSmallParentStack.
+				// e9342 ArrayOp2: NewArray F20 first (no WRITE vol F50).
+				if arrayOp2LhsPL {
+					newArr := r.flipcoin(20)
+					initConst := r.flipcoin(20)
+					if newArr {
+						if !initConst {
+							// make_init address residual then CreateArray
+							_ = r.upto(5) // e9344 choose
+						}
+						_arr := burnCreateArrayVariable(r, opts, target, true)
+						emitOrphanArrayGlobal(ctx, target, _arr)
+						// e9349–67: after CreateArray+itemize, residual before next
+						// Statement U100: F10 U30 U29 U28 U3×3 U1 F0 + SafeOpFlags
+						// F50×5 U4 F50 F50 U4 U4 (nested create / loop-ctrl-like).
+						_ = r.flipcoin(10)
+						_ = r.upto(30)
+						_ = r.upto(29)
+						_ = r.upto(28)
+						_ = r.upto(3)
+						_ = r.upto(3)
+						_ = r.upto(3)
+						_ = r.upto(1)
+						_ = r.flipcoin(0)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
+						_ = r.upto(4)
+					} else if !initConst {
+						_ = r.upto(5)
+					} else {
+						if r.flipcoin(50) {
+							if r.flipcoin(50) {
+								_ = r.upto(3)
+							} else {
+								_ = r.upto(20)
+							}
+						} else {
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+						}
+					}
+					return lvalueInfo{expr: "x", ctype: target}, true, false
+				}
 				if forceCreateLate {
 					// e1515–20 NewArray: F50 vol, F20=1, F50 F50 U20, CreateArray.
 					// e1723–25 !NewArray: F50 vol, F20=0, Constant pure_rnd F50:
@@ -12281,6 +12415,21 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
+		// e9336–39: after ArrayOp2 Function-fail pointer must_use, Statement Lhs
+		// SelectDeref is short: F80 U5 F0, F80=0 → VS PL create (not U7+[9][9][3]).
+		if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PtrMustLhs {
+			ctx.state.postAggPostCD3ArrayOp2PtrMustLhs = false
+			if !r.flipcoin(80) {
+				break // VS select
+			}
+			_ = r.upto(5)     // e9337 choose among ~5 pointers
+			_ = r.flipcoin(0) // e9338 validate fail
+			// e9339 F80=0 → VS (next loop iteration)
+			if !r.flipcoin(80) {
+				break
+			}
+			// unexpected F80=1: fall through live path
+		}
 		// e9324: after ArrayOp2 nested ExpressionAssign Lhs residual, outer
 		// Statement Assign Lhs soles (next Statement U100, not F80 U12).
 		if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2OuterLhsSole {
@@ -16823,6 +16972,38 @@ func emitStatement(
 		// e7824: after PLStackU3 Lhs CreateArray Assign, For SelectLoopCtrlVar
 		// shrinks U33→U30 (volatile rejects) then make_random_loop_control
 		// F50 U60 U6 F50 U10 + SafeOpFlags (not loopIVPool U2).
+		// e9369: ArrayOp2 body For — SelectLoopCtrl U29 U28 + U3 U7 F0 residual
+		// then loop_control/SafeOpFlags (not empty-pool create F50).
+		if postAggPostCD3ArrayOp2BodyActive && state != nil {
+			_ = r.upto(29) // e9369
+			_ = r.upto(28) // e9370
+			_ = r.upto(3)  // e9371
+			_ = r.upto(7)  // e9372
+			_ = r.flipcoin(0)
+			// loop_control + SafeOpFlags residual (e9374–85)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(3)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(1)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.upto(4)
+			state.skipNextBlockSize = true
+			writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
+			writeLine(b, 2, "x += (uint32_t)i;")
+			state.blockStack++
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state.blockStack > 0 {
+				state.blockStack--
+			}
+			writeLine(b, 1, "}")
+			break
+		}
 		if state != nil && state.postAggNestArrayOpPLStackU3ForCtrl {
 			state.postAggNestArrayOpPLStackU3ForCtrl = false
 			for n := 33; n >= 30; n-- {

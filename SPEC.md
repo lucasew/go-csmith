@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →9331) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →9651) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **9331** (9267→9331; ptr-cmp must_use + Global U56 + SelectDeref; seed2 full held). Toward 10000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **9651** (9331→9651; Function-fail pointer must_use U3×4 + Lhs/For/PL create; seed2 full held). Toward 10000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -575,8 +575,17 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 4. e9288: Constant hex natural width (hn=16 only after unary size-3 once).
 5. e9294–23: SelectDeref U7…U5 F0 + U4/993 residual; Global U7; outer Lhs sole.
 
-Next plateau: seed4 e9331 Function F50 then U3×4 F75 (param must_use).
-Toward 10000+. Seeds 5–21; COUNT=20.
+**e9331–e9651 climbed:**
+1. e9331: ArrayOp2 Function-fail ExpressionVariable(int*) must_use U3×4 F75
+   (one-shot; pointer types previously pure-rejected).
+2. e9336: Statement Lhs F80 U5 F0 F80=0 → PL U4 force create F20 F20 + residual.
+3. e9369: ArrayOp2 For SelectLoopCtrl U29 U28 + loop_control/SafeOpFlags.
+4. e9450: multiphase must_use n=8 U4 U4 U3 U2 F75; later pure miss.
+5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
+6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
+
+Next plateau: seed4 e9651 U4 vs U5 (Comma/depth residual). Toward 10000+.
+Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
