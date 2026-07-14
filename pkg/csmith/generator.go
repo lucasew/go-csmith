@@ -626,12 +626,24 @@ type functionFlowState struct {
 	// postAggNestArrayOpPostCD3PLN: inventory PL after stack under post-CD3
 	// (e8273 first U4 sole; e8346+ U4+947 F0 → VS).
 	postAggNestArrayOpPostCD3PLN int
+	// postAggNestArrayOpPostCD3StackN: parentStackPick count under post-CD3
+	// (e8345 U2; e8438 U3).
+	postAggNestArrayOpPostCD3StackN int
 	// postAggNestArrayOpPostCD3LhsSelDone: one-shot ExpressionAssign Lhs
 	// SelectDeref residual after post-CD3 (e8308–36 U11… not F20 create).
 	postAggNestArrayOpPostCD3LhsSelDone bool
 	// postAggPostCD3DepthBlockOnce: after post-CD3 free Constant, next Expression
 	// depth-blocks Function/Assign (e8381 tries=3 Variable).
 	postAggPostCD3DepthBlockOnce bool
+	// postAggPostCD3DepthBlockArmed: first free-Expression Constant after post-CD3
+	// already armed depthBlock (do not re-arm on later Constants — e8410 Function).
+	postAggPostCD3DepthBlockArmed bool
+	// postAggPostCD3GlobalU2PadDone: first empty Global U2 pad after post-CD3
+	// (e8307); later empty Global soles (e8483).
+	postAggPostCD3GlobalU2PadDone bool
+	// postAggPostCD3PLAddrN: PL create address residual choose under post-CD3
+	// (e8445 U2; e8495 U5).
+	postAggPostCD3PLAddrN int
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -1045,8 +1057,16 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 					// drops to U3 (empty PL → create U14…, not sticky U4 inventory).
 					if state.postAggNestArrayOpResidualDone {
 						if state.postAggNestArrayOpPostCD3 {
-							// e8345: free Expression PL stack U2 (not sticky U6).
-							n = 2
+							// e8345–8383: free Expression PL stack U2; e8438 U3.
+							// U2Once (e8272) does not count. Counter is deepStack
+							// postCD3 picks only (≈4 U2 then U3).
+							sn := state.postAggNestArrayOpPostCD3StackN
+							state.postAggNestArrayOpPostCD3StackN++
+							if sn < 4 {
+								n = 2
+							} else {
+								n = 3
+							}
 						} else if state.postAggNestArrayOpPLStackU3 {
 							n = 3
 						} else if state.postAggNestArrayOpPLStackU4 {
@@ -2495,6 +2515,14 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 			_ = r.upto(3)
 		} else {
 			_ = r.upto(20)
+			// e8381 post-CD3: free Constant U20 path → next free Expression
+			// filters Function/Assign (UP Variable tries=3). U3 path (e8371)
+			// is often binary/ShiftBy operand and must not sticky-block Function
+			// (e8410 U120=110).
+			if postAggNestArrayOpPostCD3Sink != nil && *postAggNestArrayOpPostCD3Sink &&
+				postAggPostCD3DepthBlockOnceSink != nil {
+				*postAggPostCD3DepthBlockOnceSink = true
+			}
 		}
 		// seed2 e1398: after Global U28 era, pure U3 Constant then U4 residual.
 		// Only pure-U3 path (not U20); only once Global U28 scale has fired
@@ -2507,12 +2535,6 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 			if forceNextTermVariableSink != nil {
 				*forceNextTermVariableSink = true
 			}
-		}
-		// e8381 post-CD3: after free Constant (U3 or U20), next Expression
-		// filters Function/Assign (UP Variable tries≥3).
-		if postAggNestArrayOpPostCD3Sink != nil && *postAggNestArrayOpPostCD3Sink &&
-			postAggPostCD3DepthBlockOnceSink != nil {
-			*postAggPostCD3DepthBlockOnceSink = true
 		}
 		return castLiteral(t, "0")
 	}
@@ -3588,11 +3610,13 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
 		return exprVarCandidate{}, false
 	}
-	// e8307 post-CD3: free Expression Global empty must not GenerateNewGlobal
-	// (UP choose_ok_var U2 → SelectDeref F80). Pad U2 and accept inventory g_0.
-	// Caller finish paths still run; this only blocks residual create qfer.
+	// e8307 post-CD3: first free Expression Global empty pads U2 (SelectDeref).
+	// e8483 later Global empty soles without U2 (UP free Expression U120 next).
 	if ctx.state.postAggNestArrayOpPostCD3 && !skipRandomQfer {
-		_ = er.pick(2)
+		if !ctx.state.postAggPostCD3GlobalU2PadDone {
+			ctx.state.postAggPostCD3GlobalU2PadDone = true
+			_ = er.pick(2)
+		}
 		return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
 	}
 	name := ctx.state.allocGlobalName()
@@ -3977,6 +4001,18 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// Sometimes array itemize after choose (U2) then select_must_use F75
 			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
+			// e8445 post-CD3: PL create address residual U2 first; e8495 later U5
+			// (not nested pointee F20×2 Constant).
+			if ctx.state.postAggNestArrayOpPostCD3 {
+				n := ctx.state.postAggPostCD3PLAddrN
+				ctx.state.postAggPostCD3PLAddrN++
+				if n == 0 {
+					_ = er.fallback.upto(2) // e8445
+				} else {
+					_ = er.fallback.upto(5) // e8495
+				}
+				goto afterAddrResidual
+			}
 			// e6541: nest Assign RHS NewArray+address — choose_ok_var U2 then
 			// CreateArray U99 (not filterCompound U6 / multi-level U6).
 			if newArray && ctx.skipFuncRetQfer && ctx.state.postAggNestVSMisses >= 40 {
@@ -4614,10 +4650,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		}
 		// e7259/e7286: free Expression Global after nest ArrayOp residual —
 		// sole without array itemize U(n) (UP free Expression U120 next).
-		// e8276 post-CD3: natural inventory choose (U56) — residual sole ends.
+		// e8276 post-CD3: eFlexible multi-cand uses pad table (U56/U19); pointer
+		// exact multi soles again (e8483 U100 Global sole → U120, not U2).
 		nestArrayOpExprGlobal := !forAssign && postAggNestArrayOpResidualDoneSink != nil &&
 			*postAggNestArrayOpResidualDoneSink &&
 			(postAggNestArrayOpPostCD3Sink == nil || !*postAggNestArrayOpPostCD3Sink)
+		postCD3PtrSole := !forAssign && wantPtr &&
+			postAggNestArrayOpPostCD3Sink != nil && *postAggNestArrayOpPostCD3Sink
 		if len(exact) == 1 {
 			// e6947: 2nd pointer Global sole pads U2 (e6875 first / e7259 3rd+ no U2).
 			if wantPtr && nestArrayOpExprGlobal && er != nil &&
@@ -4628,7 +4667,7 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				}
 			}
 			// e7286: skip array itemize on free Expression Global sole after residual.
-			if !nestArrayOpExprGlobal {
+			if !nestArrayOpExprGlobal && !postCD3PtrSole {
 				itemize(exact[0], 1)
 			}
 			return exact[0], true
@@ -4645,7 +4684,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// e7259/e7286: after nest ArrayOp residual, free Expression Global multi
 		// sole-accepts without choose (n=2 U2 or n=4→U2 e1017 scale desyncs;
 		// UP free Expression U120 next).
-		if nestArrayOpExprGlobal && n >= 2 {
+		// e8483 post-CD3: pointer Global multi also soles (not U2 choose).
+		if (nestArrayOpExprGlobal || postCD3PtrSole) && n >= 2 {
 			return exact[0], true
 		}
 		if n == 2 && nestArrayOpExprGlobal {
@@ -4812,8 +4852,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 							switch {
 							case gn == 0:
 								target = 56 // e8276
+							case gn == 1:
+								target = 19 // e8339
 							default:
-								target = 19 // e8339+
+								// e8516+: GlobalList U56 again (not sticky U19).
+								target = 56
 							}
 						} else {
 							gn := 0
@@ -6150,7 +6193,7 @@ func randomLeafExprWithMode(
 		allowAssignPad := postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink &&
 			postAggGlobalU24AfterArrayOpDone
 		natDepthBlock := filterDepth+2 > maxExprDepth(opts)
-		// e8381: one-shot depthBlock after post-CD3 Constant.
+		// e8381: one-shot depthBlock after post-CD3 Constant U20 path.
 		if postAggPostCD3DepthBlockOnceSink != nil && *postAggPostCD3DepthBlockOnceSink {
 			*postAggPostCD3DepthBlockOnceSink = false
 			if ctx != nil && ctx.state != nil {
@@ -6251,12 +6294,17 @@ exprTries:
 		// Keep depth-block for a few Variable/Constant picks (e2105 + e2109).
 		// e6602: nest Lhs Global residual keeps depthBlock longer so later
 		// Expression still filters Function/Assign/Comma (UP tries=5 Variable).
+		// e8381 post-CD3 Constant arm: maxDB=1 (one free Variable then clear)
+		// so e8410 free Expression after binary Constant can select Function.
 		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock &&
 			(choice == termVariable || choice == termConstant) {
 			ctx.state.ppPostPadDepthBlockN++
 			maxDB := 3
 			if ctx.state.postAggNestGlobalU17 {
 				maxDB = 12
+			}
+			if ctx.state.postAggNestArrayOpPostCD3 {
+				maxDB = 1
 			}
 			if ctx.state.ppPostPadDepthBlockN >= maxDB {
 				ctx.state.ppPostPadDepthBlock = false
@@ -8582,8 +8630,12 @@ exprTries:
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "g_0"))
 					}
+					// e8307: first post-CD3 empty Global U2 pad; e8483 later sole.
 					if flow != nil && flow.postAggNestArrayOpPostCD3 && er != nil {
-						_ = er.pick(2)
+						if !flow.postAggPostCD3GlobalU2PadDone {
+							flow.postAggPostCD3GlobalU2PadDone = true
+							_ = er.pick(2)
+						}
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "g_0"))
@@ -9137,16 +9189,25 @@ exprTries:
 					// inventory empty must not GenerateNewGlobal (F50…).
 					// e7259/e7286: after nest ArrayOp residual, sole without U2
 					// (UP free Expression U120 next).
-					// e8307 post-CD3: U2 pad again (UP SelectDeref after choose).
+					// e8307 post-CD3: first empty Global U2 pad; e8483 later sole.
 					if strings.Contains(t.Name, "*") && ctx.state.postAggU15StackU6CreateDone && er != nil {
-						if !ctx.state.postAggNestArrayOpResidualDone || ctx.state.postAggNestArrayOpPostCD3 {
+						if !ctx.state.postAggNestArrayOpResidualDone {
 							_ = er.pick(2)
+						} else if ctx.state.postAggNestArrayOpPostCD3 {
+							if !ctx.state.postAggPostCD3GlobalU2PadDone {
+								ctx.state.postAggPostCD3GlobalU2PadDone = true
+								_ = er.pick(2)
+							}
 						}
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "g_0"))
 					}
+					// e8307 first U2 pad; e8483 later sole without U2.
 					if ctx.state.postAggNestArrayOpPostCD3 && er != nil {
-						_ = er.pick(2)
+						if !ctx.state.postAggPostCD3GlobalU2PadDone {
+							ctx.state.postAggPostCD3GlobalU2PadDone = true
+							_ = er.pick(2)
+						}
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "g_0"))
 					}
@@ -11228,6 +11289,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		if ctx != nil {
 			ctx.exprDepth = 0
 		}
+		// e8390 post-CD3: Statement Assign RHS is free Expression Function
+		// (U120=1 F5 F10 U18…) — sticky depthBlock after residual Constant
+		// would force Constant (U120=97). Clear for statement-level RHS.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 {
+			ctx.state.ppPostPadDepthBlock = false
+			ctx.state.ppPostPadDepthBlockN = 0
+			ctx.state.postAggPostCD3DepthBlockOnce = false
+		}
 		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 		// e7443: after residual-era Global F0 → PP sole + Constant, UP keeps
 		// free Expression Variable (PL U4 U5) then Lhs F80. GO ended Statement
@@ -11548,6 +11617,8 @@ lhsDerefLoop:
 							ctx.state.postAggNestArrayOpPostCD3 = true
 							ctx.state.postAggNestArrayOpGlobalChooseN = 0
 							ctx.state.postAggNestArrayOpPostCD3PLN = 0
+							ctx.state.postAggNestArrayOpPostCD3StackN = 0
+							ctx.state.postAggPostCD3PLAddrN = 0
 							ctx.state.postAggNestArrayOpPLStackU4 = false
 							ctx.state.postAggNestArrayOpPLItemizeOnce = false
 							ctx.state.postAggNestArrayOpPLAfterItemize = false

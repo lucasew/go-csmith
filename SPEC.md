@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8390) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8603) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8390** (8029→8390; 947/993 CD3 table + post-CD3 free Expression; seed2 full held). Toward 8500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8603** (8390→8603 past 8500; Statement Assign RHS Function + post-CD3 free Expression; seed2 full held). Toward 9000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -508,8 +508,16 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 6. e8345+: post-CD3 PL stack U2 + phased locals (U4 / U4+947 / U5).
 7. e8373–81: ShiftBy/Constant depthBlock for high-tries Variable filter.
 
-Next plateau: seed4 e8390 Statement Assign Lhs F50 F0 → RHS Expression Function
-(not Constant). Seeds 5–21; COUNT=20.
+**e8390–e8603 climbed (past 8500):**
+1. e8390: Statement Assign RHS clear sticky depthBlock → Function (U120=1 F5…).
+2. e8381: Constant U20 arms one-shot depthBlock (maxDB=1); not every Constant.
+3. e8438: post-CD3 PL stack multiphase U2×4 then U3.
+4. e8445/e8495: PL create address residual U2 then U5.
+5. e8483: empty Global sole after first U2 pad.
+6. e8516: GlobalList pad U56 again after U19.
+
+Next plateau: seed4 e8603 NewValue PP → Expression U120 (not stack U3).
+Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
