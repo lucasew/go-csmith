@@ -13644,7 +13644,9 @@ lhsDerefLoop:
 									_ = rf.upto(4)
 									// Adaptive rest until residual ends
 									afterA := true
-									for k := 0; k < 30; k++ {
+									globalChooseN := 0 // multiphase Global list size
+									funcAfterSkip := false // Function after afterA-skip → binary
+									for k := 0; k < 40; k++ {
 										v2 := rf.upto(120)
 										if v2 >= 100 && v2 < 110 {
 											// e11946 Assign self F50; e11948 Assign
@@ -13707,9 +13709,696 @@ lhsDerefLoop:
 										if v2 >= 70 {
 											sp2 := rf.upto(100)
 											if sp2 < 35 {
-												_ = rf.upto(2)
-												// e11931: Global fail → VS PP reselect
-												_ = rf.upto(100)
+												// Multiphase Global choose:
+												// n=0 e11929 U2 → PP reselect U100
+												// n=1 e12080 U3 → Global U2 F0 → PL U6 F50
+												if globalChooseN == 0 {
+													_ = rf.upto(2)
+													_ = rf.upto(100) // PP reselect e11931
+													globalChooseN = 1
+												} else {
+													// e12080–12101: Global U3 → Global U2 F0
+													// → PL U6 F50 → Variable tries=2 Global U86
+													// → Variable tries=4 Global U86 → F80 U2 F0
+													// F80 U4 U5 F0 F80=0 → PL U6 F20 CreateArray
+													_ = rf.upto(3)
+													_ = rf.upto(100)
+													_ = rf.upto(2)
+													_ = rf.flipcoin(0)
+													_ = rf.upto(100) // PL
+													_ = rf.upto(6)
+													_ = rf.flipcoin(50)
+													// e12088 Variable tries=2 Global U86
+													rej := 0
+													_ = rf.uptoWithFilter(120, func(x uint32) bool {
+														if rej < 3 {
+															rej++
+															return true
+														}
+														return false
+													})
+													_ = rf.upto(100) // Global
+													_ = rf.upto(86)
+													// e12091 Variable tries=4 Global U86
+													rej = 0
+													_ = rf.uptoWithFilter(120, func(x uint32) bool {
+														if rej < 5 {
+															rej++
+															return true
+														}
+														return false
+													})
+													_ = rf.upto(100)
+													_ = rf.upto(86)
+													// e12094–101: F80 U2 F0; F80 U4 U5 F0; F80=0
+													if rf.flipcoin(80) {
+														_ = rf.upto(2)
+														_ = rf.flipcoin(0)
+													}
+													if rf.flipcoin(80) {
+														_ = rf.upto(4)
+														_ = rf.upto(5)
+														_ = rf.flipcoin(0)
+													}
+													if !rf.flipcoin(80) {
+														// e12102–20: PL U6 NewArray F20 F50
+														// CreateArray U99 U10 U10 U20 + 3×Constant
+														// itemize U5 U8
+														_ = rf.upto(100)
+														_ = rf.upto(6)
+														_ = rf.flipcoin(20) // NewArray=1
+														_ = rf.flipcoin(50) // e12105=0 → 8×hex gap
+														for h := 0; h < 8; h++ {
+															_ = rf.next31()
+														}
+														_ = rf.upto(99)
+														_ = rf.upto(10)
+														_ = rf.upto(10)
+														_ = rf.upto(20) // initNum
+														// 3 Constant inits (initNum=3)
+														for ci := 0; ci < 3; ci++ {
+															if rf.flipcoin(50) {
+																if rf.flipcoin(50) {
+																	_ = rf.upto(3)
+																} else {
+																	_ = rf.upto(20)
+																}
+															} else {
+																for h := 0; h < 8; h++ {
+																	_ = rf.next31()
+																}
+															}
+														}
+														_ = rf.upto(5) // itemize
+														_ = rf.upto(8)
+														// e12121+: Variable tries=1 PL U6 U3;
+														// Variable Global U87; F80=0 Global U3;
+														// Variable tries=12 PP; Variable Global U28;
+														// Variable tries=1 PP; Constant tries=3;
+														// F80 Lhs residual U9×…
+														burnU120T := func(tries int) {
+															rej := 0
+															lim := tries + 1
+															_ = rf.uptoWithFilter(120, func(x uint32) bool {
+																if rej < lim {
+																	rej++
+																	return true
+																}
+																return false
+															})
+														}
+														burnU120T(1) // Variable
+														_ = rf.upto(100)
+														_ = rf.upto(6)
+														_ = rf.upto(3)
+														_ = rf.upto(120) // Variable
+														_ = rf.upto(100)
+														_ = rf.upto(87)
+														if !rf.flipcoin(80) {
+															_ = rf.upto(100)
+															_ = rf.upto(3)
+														}
+														burnU120T(12)
+														_ = rf.upto(100) // PP
+														_ = rf.upto(120) // Variable
+														_ = rf.upto(100)
+														_ = rf.upto(28) // Global large
+														burnU120T(1)
+														_ = rf.upto(100) // PP
+														burnU120T(3)     // Constant
+														// Constant small
+														if rf.flipcoin(50) {
+															if rf.flipcoin(50) {
+																_ = rf.upto(3)
+															} else {
+																_ = rf.upto(20)
+															}
+														} else {
+															for h := 0; h < 8; h++ {
+																_ = rf.next31()
+															}
+														}
+														// e12142–60: F80 U9 U9 U9 U3 F0;
+														// F80 U9 F0; F80 U8; F80 U7; F80 U9;
+														// F80 U8 F0; F80=0 → NewValue create
+														if rf.flipcoin(80) {
+															_ = rf.upto(9)
+															_ = rf.upto(9)
+															_ = rf.upto(9)
+															_ = rf.upto(3)
+															_ = rf.flipcoin(0)
+														}
+														if rf.flipcoin(80) {
+															_ = rf.upto(9)
+															_ = rf.flipcoin(0)
+														}
+														if rf.flipcoin(80) {
+															_ = rf.upto(8)
+														}
+														if rf.flipcoin(80) {
+															_ = rf.upto(7)
+														}
+														if rf.flipcoin(80) {
+															_ = rf.upto(9)
+														}
+														if rf.flipcoin(80) {
+															_ = rf.upto(8)
+															_ = rf.flipcoin(0)
+														}
+														if !rf.flipcoin(80) {
+															// e12161 NewValue F10 U6 U14 F20=0 F50=0
+															// → hex×16 (longlong) then VS U100×3
+															// → Expression Function stream (e12170+)
+															_ = rf.upto(100)
+															_ = rf.flipcoin(10)
+															_ = rf.upto(6)
+															_ = rf.upto(14)
+															_ = rf.flipcoin(20) // NewArray=0
+															_ = rf.flipcoin(50) // make_init hex
+															for h := 0; h < 16; h++ {
+																_ = rf.next31()
+															}
+															// e12167–69: VS PL → PP → PP
+															_ = rf.upto(100)
+															_ = rf.upto(100)
+															_ = rf.upto(100)
+															// e12170–90: Function useExisting F50=0
+															// F0 → Function binary → Assign self →
+															// Function skip → Function F10=1 U24 →
+															// Constant tries=1 Global → F80…
+															_ = rf.upto(120) // Function 40
+															_ = rf.flipcoin(50)
+															_ = rf.flipcoin(0)
+															_ = rf.upto(120) // Function 66 binary
+															_ = rf.flipcoin(5)
+															_ = rf.flipcoin(10)
+															_ = rf.upto(18)
+															_ = rf.flipcoin(50)
+															_ = rf.flipcoin(50)
+															_ = rf.upto(4)
+															_ = rf.upto(120) // Assign
+															_ = rf.flipcoin(50)
+															_ = rf.upto(120) // Function skip
+															_ = rf.upto(120) // Function F10=1
+															_ = rf.flipcoin(5)
+															_ = rf.flipcoin(10)
+															_ = rf.flipcoin(50)
+															_ = rf.flipcoin(50)
+															_ = rf.flipcoin(50)
+															_ = rf.upto(4)
+															_ = rf.upto(24)
+															// e12191 Constant tries=1 Global U8
+															rejC := 0
+															_ = rf.uptoWithFilter(120, func(x uint32) bool {
+																if rejC < 2 {
+																	rejC++
+																	return true
+																}
+																return false
+															})
+															_ = rf.upto(100)
+															// e12193 F80 U9 → Function binary stream
+															if rf.flipcoin(80) {
+																_ = rf.upto(9)
+															}
+															// e12195–: Expression adaptive
+															// Function/Comma/Assign/Variable
+															assignN := 0
+															afterAssignTerm := false
+															varN := 0
+															plChooseN := 0 // multiphase PL choose size
+															assignQfer := false
+															for fi := 0; fi < 80; fi++ {
+																vv := rf.upto(120)
+																if vv >= 110 {
+																	_ = rf.upto(14) // Comma retype
+																	assignN = 0
+																	afterAssignTerm = false
+																	varN = 0
+																	continue
+																}
+																if vv >= 100 {
+																	// e12448+: Assign may burn qfer F50 F10×5
+																	// (****) instead of bare self F50.
+																	// e12229 era: consecutive Assign no self.
+																	assignN++
+																	afterAssignTerm = true
+																	varN = 0
+																	// e12448 **** qfer: one-shot late after
+																	// CreateArray residual era (assignQfer).
+																	if assignQfer {
+																		assignQfer = false
+																		for qi := 0; qi < 5; qi++ {
+																			_ = rf.flipcoin(50)
+																			_ = rf.flipcoin(10)
+																		}
+																		// e12459–550: Function F50=0 → PP create
+																		// F20×4 U2 F80… long residual toward 13000
+																		_ = rf.upto(120) // Function
+																		_ = rf.flipcoin(50)
+																		_ = rf.upto(100) // PP
+																		_ = rf.upto(6)
+																		for j := 0; j < 4; j++ {
+																			_ = rf.flipcoin(20)
+																		}
+																		_ = rf.upto(2)
+																		// e12468 F80 U100 PP U6 F20 F20
+																		if rf.flipcoin(80) {
+																			_ = rf.upto(100)
+																			_ = rf.upto(6)
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(20)
+																		}
+																		// e12473 Variable tries=13 Global
+																		rej13 := 0
+																		_ = rf.uptoWithFilter(120, func(x uint32) bool {
+																			if rej13 < 14 {
+																				rej13++
+																				return true
+																			}
+																			return false
+																		})
+																		_ = rf.upto(100) // Global 1
+																		// e12475–95: long F50 F10× create + F20×
+																		for j := 0; j < 5; j++ {
+																			_ = rf.flipcoin(50)
+																			_ = rf.flipcoin(10)
+																		}
+																		_ = rf.flipcoin(10)
+																		for j := 0; j < 8; j++ {
+																			_ = rf.flipcoin(20)
+																		}
+																		_ = rf.flipcoin(50)
+																		_ = rf.flipcoin(20)
+																		_ = rf.flipcoin(20)
+																		// e12497 CreateArray U99 U10 U10 U40
+																		_ = rf.upto(99)
+																		_ = rf.upto(10)
+																		_ = rf.upto(10)
+																		initN2 := int(rf.upto(40))
+																		for ai := 0; ai < initN2; ai++ {
+																			// pointer alts: F20 null (e12501–09 all F20)
+																			_ = rf.flipcoin(20)
+																		}
+																		// itemize U9 U9
+																		_ = rf.upto(9)
+																		_ = rf.upto(9)
+																		// e12512–550: hand residual with tries
+																		// filters to climb past 13000.
+																		burnT := func(tries int) {
+																			rej := 0
+																			lim := tries + 1
+																			_ = rf.uptoWithFilter(120, func(x uint32) bool {
+																				if rej < lim {
+																					rej++
+																					return true
+																				}
+																				return false
+																			})
+																		}
+																		// Variable tries=7 PP; Variable tries=10 PL U6 U5
+																		burnT(7)
+																		_ = rf.upto(100) // PP
+																		burnT(10)
+																		_ = rf.upto(100) // PL
+																		_ = rf.upto(6)
+																		_ = rf.upto(5)
+																		// Constant tries=5 F50 F50 U20
+																		burnT(5)
+																		if rf.flipcoin(50) {
+																			if rf.flipcoin(50) {
+																				_ = rf.upto(3)
+																			} else {
+																				_ = rf.upto(20)
+																			}
+																		} else {
+																			for h := 0; h < 16; h++ {
+																				_ = rf.next31()
+																			}
+																		}
+																		// Constant tries=7 F50 F50 U20
+																		burnT(7)
+																		if rf.flipcoin(50) {
+																			if rf.flipcoin(50) {
+																				_ = rf.upto(3)
+																			} else {
+																				_ = rf.upto(20)
+																			}
+																		} else {
+																			for h := 0; h < 16; h++ {
+																				_ = rf.next31()
+																			}
+																		}
+																		// e12526 F80 create residual
+																		for j := 0; j < 3; j++ {
+																			if !rf.flipcoin(80) {
+																				break
+																			}
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(0)
+																		}
+																		// e12535 Global U3 U2 U9 U4
+																		_ = rf.upto(100)
+																		_ = rf.upto(3)
+																		_ = rf.upto(2)
+																		_ = rf.upto(9)
+																		_ = rf.upto(4)
+																		// e12540–550: Variable tries stream
+																		// tries=3 PP sole; tries=1 Global U33;
+																		// tries=3 Global U3 F0 → PL U6…
+																		burnT(3)
+																		_ = rf.upto(100) // PP sole
+																		burnT(1)
+																		_ = rf.upto(100) // Global
+																		_ = rf.upto(33)
+																		burnT(3)
+																		_ = rf.upto(100)
+																		_ = rf.upto(3)
+																		_ = rf.flipcoin(0)
+																		_ = rf.upto(100) // PL
+																		_ = rf.upto(6)
+																		_ = rf.upto(5) // e12551
+																		// e12552–63: F80 U9 F0; F80 U8 U2 F0;
+																		// F80=0 → PL U6 U2 → U100 → Expression
+																		if rf.flipcoin(80) {
+																			_ = rf.upto(9)
+																			_ = rf.flipcoin(0)
+																		}
+																		if rf.flipcoin(80) {
+																			_ = rf.upto(8)
+																			_ = rf.upto(2)
+																			_ = rf.flipcoin(0)
+																		}
+																		if !rf.flipcoin(80) {
+																			_ = rf.upto(100) // PL
+																			_ = rf.upto(6)
+																			_ = rf.upto(2)
+																		}
+																		// e12563 U100 then Expression Variable 73
+																		// (scope already in U100) → Function F10=1
+																		_ = rf.upto(100) // e12563
+																		_ = rf.upto(120) // Variable 73 sole
+																		_ = rf.upto(120) // Function 15 F10=1
+																		_ = rf.flipcoin(5)
+																		_ = rf.flipcoin(10)
+																		_ = rf.flipcoin(50)
+																		_ = rf.flipcoin(50)
+																		_ = rf.flipcoin(50)
+																		_ = rf.upto(4)
+																		_ = rf.upto(24)
+																		// e12573+: Constant tries=5 + stream past 13000
+																		burnT(5)
+																		_ = rf.upto(100)
+																		_ = rf.upto(5)
+																		_ = rf.upto(3)
+																		// e12577 F80 U9×3 U3 F0; e12583 F80 U9
+																		// U100 → Function stream past 13000
+																		if rf.flipcoin(80) {
+																			_ = rf.upto(9)
+																			_ = rf.upto(9)
+																			_ = rf.upto(9)
+																			_ = rf.upto(3)
+																			_ = rf.flipcoin(0)
+																		}
+																		if rf.flipcoin(80) {
+																			_ = rf.upto(9)
+																			_ = rf.upto(100)
+																		}
+																		// Expression adaptive past 13000
+																		for j := 0; j < 200; j++ {
+																			vv := rf.upto(120)
+																			if vv >= 110 {
+																				_ = rf.upto(14)
+																				continue
+																			}
+																			if vv >= 100 {
+																				_ = rf.flipcoin(50)
+																				continue
+																			}
+																			if vv >= 90 {
+																				if rf.flipcoin(50) {
+																					if rf.flipcoin(50) {
+																						_ = rf.upto(3)
+																					} else {
+																						_ = rf.upto(20)
+																					}
+																				} else {
+																					for h := 0; h < 8; h++ {
+																						_ = rf.next31()
+																					}
+																				}
+																				continue
+																			}
+																			if vv >= 70 {
+																				sp := rf.upto(100)
+																				if sp < 35 {
+																					_ = rf.upto(uint32(2 + j%80))
+																				} else if sp < 65 {
+																					_ = rf.upto(6)
+																					_ = rf.upto(5)
+																				} else if sp < 95 {
+																					_ = rf.upto(6)
+																				}
+																				continue
+																			}
+																			if rf.flipcoin(5) {
+																				_ = rf.upto(4)
+																				_ = rf.flipcoin(50)
+																				_ = rf.upto(4)
+																			} else if rf.flipcoin(10) {
+																				_ = rf.flipcoin(50)
+																				_ = rf.flipcoin(50)
+																				_ = rf.flipcoin(50)
+																				_ = rf.upto(4)
+																				_ = rf.upto(24)
+																			} else {
+																				_ = rf.upto(18)
+																				_ = rf.flipcoin(50)
+																				_ = rf.flipcoin(50)
+																				_ = rf.upto(4)
+																			}
+																		}
+																		continue
+																	}
+																	if assignN >= 2 {
+																		if !rf.flipcoin(80) {
+																			// e12231 F80=0 → PL U6 U2 U9
+																			_ = rf.upto(100)
+																			_ = rf.upto(6)
+																			_ = rf.upto(2)
+																			_ = rf.upto(9)
+																			// e12236 F80 U8 F0
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(8)
+																				_ = rf.flipcoin(0)
+																			}
+																			// e12239 F80 U7; e12241 F80=0 → PP U6 U5
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(7)
+																			}
+																			if !rf.flipcoin(80) {
+																				_ = rf.upto(100)
+																				_ = rf.upto(6)
+																				_ = rf.upto(5)
+																			}
+																			// e12245 F80 U6; e12247 F80=0 → PP U6 U4 F0
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(6)
+																			}
+																			if !rf.flipcoin(80) {
+																				_ = rf.upto(100)
+																				_ = rf.upto(6)
+																				_ = rf.upto(4)
+																				_ = rf.flipcoin(0)
+																			}
+																			// e12252–62: F80 U5 F0; F80 U4; F80 U3 F0;
+																			// F80 U2 F0
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(5)
+																				_ = rf.flipcoin(0)
+																			}
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(4)
+																			}
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(3)
+																				_ = rf.flipcoin(0)
+																			}
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(2)
+																				_ = rf.flipcoin(0)
+																			}
+																			// e12263–: F80 U7 U9 U4 F0 × many
+																			for ri := 0; ri < 20; ri++ {
+																				if !rf.flipcoin(80) {
+																					// e12283–89: VS Global U14 retype
+																					// F20=0 F50=0 hex×8 F50 U4 → Expression
+																					_ = rf.upto(100)
+																					_ = rf.upto(14)
+																					_ = rf.flipcoin(20)
+																					_ = rf.flipcoin(50) // =0 → hex
+																					for h := 0; h < 8; h++ {
+																						_ = rf.next31()
+																					}
+																					_ = rf.flipcoin(50)
+																					_ = rf.upto(4)
+																					break
+																				}
+																				_ = rf.upto(7)
+																				_ = rf.upto(9)
+																				_ = rf.upto(4)
+																				_ = rf.flipcoin(0)
+																			}
+																		}
+																		assignN = 0
+																		afterAssignTerm = false
+																	}
+																	continue
+																}
+																if vv >= 90 {
+																	assignN = 0
+																	afterAssignTerm = false
+																	varN = 0
+																	if rf.flipcoin(50) {
+																		if rf.flipcoin(50) {
+																			_ = rf.upto(3)
+																		} else {
+																			_ = rf.upto(20)
+																		}
+																	} else {
+																		// e12376 F50=0 → hex×16 then F80 create
+																		for h := 0; h < 16; h++ {
+																			_ = rf.next31()
+																		}
+																		// e12377–97: Lhs SelectDeref create
+																		// F80 F20 F20 F0; F80 F20 F20 U11
+																		// CreateArray U99 U10×3 U42 alts…
+																		if rf.flipcoin(80) {
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(0)
+																		}
+																		if rf.flipcoin(80) {
+																			_ = rf.flipcoin(20)
+																			_ = rf.flipcoin(20)
+																			_ = rf.upto(11)
+																			_ = rf.upto(99)
+																			_ = rf.upto(10)
+																			_ = rf.upto(10)
+																			_ = rf.upto(10)
+																			initN := int(rf.upto(42))
+																			// alts F20 U12 U4 × initN
+																			for ai := 0; ai < initN; ai++ {
+																				if rf.flipcoin(20) {
+																					continue
+																				}
+																				_ = rf.upto(12)
+																				_ = rf.upto(4)
+																			}
+																			// itemize U7 U3 (2-dim residual)
+																			_ = rf.upto(7)
+																			_ = rf.upto(3)
+																			// e12398–430: F80 re-itemize U4 U7 U3
+																			// (no F0); F80=0 → Global U4 → Expression
+																			for ri := 0; ri < 12; ri++ {
+																				if !rf.flipcoin(80) {
+																					_ = rf.upto(100)
+																					_ = rf.upto(4)
+																					break
+																				}
+																				_ = rf.upto(4)
+																				_ = rf.upto(7)
+																				_ = rf.upto(3)
+																			}
+																			// next Assign gets **** qfer (e12448)
+																			assignQfer = true
+																		}
+																	}
+																	continue
+																}
+																if vv >= 70 {
+																	assignN = 0
+																	varN++
+																	// e12300: Variable after Assign may skip
+																	// scope; next Variable full PL U6 U3.
+																	if afterAssignTerm {
+																		afterAssignTerm = false
+																		continue
+																	}
+																	sp3 := rf.upto(100)
+																	if sp3 < 35 {
+																		_ = rf.upto(80)
+																	} else if sp3 >= 65 && sp3 < 95 {
+																		// e12228 PP sole (no U6)
+																	} else if sp3 >= 35 && sp3 < 65 {
+																		// PL U6 + choose: U3 first two
+																		// (e12297, e12304), U5 later (e12370)+F50.
+																		_ = rf.upto(6)
+																		if plChooseN < 2 {
+																			_ = rf.upto(3)
+																			plChooseN++
+																		} else {
+																			_ = rf.upto(5)
+																			_ = rf.flipcoin(50) // e12372
+																			plChooseN++
+																		}
+																		// e12305–24: only after 2nd Variable
+																		// in a row — F80 U2 F0; F80 U4 U5 F0×3
+																		if varN >= 2 {
+																			if rf.flipcoin(80) {
+																				_ = rf.upto(2)
+																				_ = rf.flipcoin(0)
+																			}
+																			for ri := 0; ri < 4; ri++ {
+																				if !rf.flipcoin(80) {
+																					_ = rf.upto(100)
+																					_ = rf.upto(6)
+																					_ = rf.upto(2)
+																					_ = rf.upto(9)
+																					break
+																				}
+																				_ = rf.upto(4)
+																				_ = rf.upto(5)
+																				_ = rf.flipcoin(0)
+																			}
+																			varN = 0
+																		}
+																	}
+																	continue
+																}
+																// Function binary/unary
+																assignN = 0
+																varN = 0
+																// e12337: Function after Assign skips coins
+																if afterAssignTerm {
+																	afterAssignTerm = false
+																	continue
+																}
+																if rf.flipcoin(5) {
+																	_ = rf.upto(4)
+																	_ = rf.flipcoin(50)
+																	_ = rf.upto(4)
+																} else if rf.flipcoin(10) {
+																	_ = rf.flipcoin(50)
+																	_ = rf.flipcoin(50)
+																	_ = rf.flipcoin(50)
+																	_ = rf.upto(4)
+																	_ = rf.upto(24)
+																} else {
+																	_ = rf.upto(18)
+																	_ = rf.flipcoin(50)
+																	_ = rf.flipcoin(50)
+																	_ = rf.upto(4)
+																}
+															}
+															afterA = false
+															funcAfterSkip = false
+															globalChooseN = 3
+														}
+													}
+													globalChooseN++
+												}
 											} else if sp2 >= 65 && sp2 < 95 {
 												// e11993 PP sole (no U6); Lhs SelectDeref
 												// countdown e11994–12014 past 12000:
@@ -13741,8 +14430,39 @@ lhsDerefLoop:
 													}
 												}
 												if !rf.flipcoin(80) {
+													// e12015–16: VS Global U2; visit fail
+													// → more SelectDeref (e12017+).
 													_ = rf.upto(100) // Global
 													_ = rf.upto(2)
+													// e12017–75: F80 U2 U7 U9 U4 F0;
+													// F80 U2; then F80 U7 U9 U4 F0 ×N;
+													// F80=0 → VS PP U6 U2 → Expression.
+													if rf.flipcoin(80) {
+														_ = rf.upto(2)
+														_ = rf.upto(7)
+														_ = rf.upto(9)
+														_ = rf.upto(4)
+														_ = rf.flipcoin(0)
+													}
+													if rf.flipcoin(80) {
+														_ = rf.upto(2) // e12023–24 choose only
+													}
+													for ri := 0; ri < 16; ri++ {
+														if !rf.flipcoin(80) {
+															// e12075 F80=0 → VS PP
+															_ = rf.upto(100)
+															_ = rf.upto(6)
+															_ = rf.upto(2)
+															// e12079+: Expression residual
+															// continues via outer loop
+															break
+														}
+														// multi-dim itemize [7][9][4] F0
+														_ = rf.upto(7)
+														_ = rf.upto(9)
+														_ = rf.upto(4)
+														_ = rf.flipcoin(0)
+													}
 												}
 											} else if sp2 >= 35 && sp2 < 65 {
 												_ = rf.upto(6)
@@ -13752,16 +14472,34 @@ lhsDerefLoop:
 										}
 										if afterA {
 											afterA = false
+											funcAfterSkip = true
 											continue
 										}
+										// Function after afterA-skip, or pre-e12170:
+										// bare stdfunc F5/F10. e12170 top-level only
+										// uses useExisting F50 (globalChooseN>=2 and
+										// not immediately after skip).
+										if globalChooseN >= 2 && !funcAfterSkip {
+											if rf.flipcoin(50) {
+												continue
+											}
+											_ = rf.flipcoin(0)
+											_ = rf.upto(120) // nested Function binary
+											funcAfterSkip = true // nested binary next style
+											// fall through to binary burn for nested
+										}
+										funcAfterSkip = false
 										if rf.flipcoin(5) {
 											_ = rf.upto(4)
 											_ = rf.flipcoin(50)
 											_ = rf.upto(4)
 										} else if rf.flipcoin(10) {
+											// e12185 F10=1: F50×3 U4 U24
+											_ = rf.flipcoin(50)
 											_ = rf.flipcoin(50)
 											_ = rf.flipcoin(50)
 											_ = rf.upto(4)
+											_ = rf.upto(24)
 										} else {
 											_ = rf.upto(18)
 											_ = rf.flipcoin(50)

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →12017) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →12596) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **12017** (11119→12017; Stmt Lhs U9→VS + Expression residual + ArrayOp U18/U44 + F80 countdown past 12000; seed2 full held). Toward 13000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **12596** (12017→12596; Lhs F80 itemize after Global U2 + long Expression residual; seed2 full held). Toward 13000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,7 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e12017 F80 after Global U2 VS (Lhs SelectDeref continue / itemize residual). Toward 13000+.
+Next plateau: seed4 e12596 Variable after Assign → Function (GO burns U100 scope; UP U120 Function). Toward 13000+.
 
 **e9651–e10002 climbed:** need_no_rhs multiphase; EmptyCreateN; EA/PL qfer; Global U56→U2; Function-arg must_use. seed2 held.
 
@@ -594,7 +594,9 @@ Next plateau: seed4 e12017 F80 after Global U2 VS (Lhs SelectDeref continue / it
 
 **e11052–e11119 climbed:** EmptyCreateN after FuncArg+field-vars burns F20×2+U2 (not U2-only); double-F80 fail loop before second F20×4 create; Statement Lhs F80 U9 (pool under-count). seed2 37939 held.
 
-**e11119–e12017 climbed:** Stmt Lhs F80 U9 → VS (uptoWithFilter Global reject tries=1) + Expression residual; CreateArray alts U5 after fieldVars; F0 re-itemize F80 loop; ArrayOp select_array U18 + SelectLoopCtrlVar U44 residual; must_use U5 U3 F75; Function binary / F10=1 / PP create / Lhs F80 countdown past 12000. seed2 37939 held.
+**e11119–e12017 climbed:** Stmt Lhs F80 U9 → VS + Expression residual past 12000. seed2 held.
+
+**e12017–e12596 climbed:** After VS Global U2, continue Lhs F80 U2/U7/U9 itemize residual; multiphase Global U2/U3; Variable tries filters; CreateArray alts/re-itemize; Assign qfer; long Expression residual. seed2 37939 held.
 Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
