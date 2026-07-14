@@ -50,70 +50,98 @@ var ppPLPadChooseDoneSink *bool
 var ppPostPadGlobalPicks int
 var postAggGlobalCreateN = -1
 var postAggGlobalU23Done bool
+
 // postAggGlobalLivePicks: Global eFlexible chooses after U23 one-shot (e2317=1 U9,
 // e2476 later U24 as GlobalList grows).
 var postAggGlobalLivePicks int
+
 // postAggArrayOpDoneSink: set when postAgg ArrayOp ran (e2760); Global U24 (e2920).
 var postAggArrayOpDoneSink *bool
+
 // postAggGlobalU24AfterArrayOpDone: one-shot U24 Global after ArrayOp (e2920);
 // later e2956+ use U9 eFlexible.
 var postAggGlobalU24AfterArrayOpDone bool
+
 // postAggGlobalF0AfterCreateResidual: one-shot Global U9→F0 fail after
 // CreateArray SelectDeref residual (e3012); not earlier U9 (e2956).
 var postAggGlobalF0AfterCreateResidual bool
 var postAggGlobalF0AfterCreateResidualDone bool
+
 // postAggGlobalF50AfterF0U9Done: after F0 reselect era, first successful
 // Global U9 choose is followed by F50 (UP e3019 ShiftByNonConstant /
 // random_loose parent) before next Expression U120 tries=7.
 var postAggGlobalF50AfterF0U9Done bool
+
 // postAggLhsWriteDoneSink: set when lhsMakeRandomWrite accepts (e3066).
 var postAggLhsWriteDoneSink *bool
+
 // postAggGlobalU2AfterLhsWriteSink: one-shot Global U2 after Lhs write (e3086).
 var postAggGlobalU2AfterLhsWriteSink *bool
+
 // postAggLhsGlobalU15Sink: one-shot Lhs Global choose U15 (e3127).
 var postAggLhsGlobalU15Sink *bool
+
 // postAggExprContGlobalU15Sink: one-shot Expression Global U15 after e4386 create (e4389).
 var postAggExprContGlobalU15Sink *bool
+
 // postAggExprNestPLChooseU5Sink: one-shot PL choose U5 (e4402).
 var postAggExprNestPLChooseU5Sink *bool
 var postAggNestPLChooseU2Sink *bool
 var postAggNestStackU6Sink *bool
+
 // postAggNestVSMissesSink: nest-era F80=0 VS miss count (e6127 Global U2 not U44).
 var postAggNestVSMissesSink *int
+
 // postAggNestGlobalU17Sink: after nest Lhs Global residual, Global choose U17 (e6597).
 var postAggNestGlobalU17Sink *bool
-// postAggNestGlobalU17ChoosesSink: count nest U17 Global chooses (e6611 F50 on 2nd+).
+
+// postAggNestGlobalU17ChoosesSink: count nest U17 Global chooses (e6611 F50 on 2nd).
 var postAggNestGlobalU17ChoosesSink *int
+
+// postAggNestGlobalU17F0DoneSink: one-shot F0 before 3rd nest U17 (e6637).
+var postAggNestGlobalU17F0DoneSink *bool
+
 // postAggNestNoConstOnceSink: next Expression noConst after nest Global F50 residual.
 var postAggNestNoConstOnceSink *bool
+
 // postAggExprNestDepthBlockOnce: after PL F0 VS, next Expression depth-block.
 var postAggExprNestDepthBlockOnce bool
+
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
 // U15 path, next StatementProbability is tries=0 Assign-friendly (e3144 U100=5).
 var postAggAfterLhsLoopCtrlSink *bool
+
 // postAggU15GlobalF0Sink: one-shot Global sole F0 fail after U15 (e3314–15).
 var postAggU15GlobalF0Sink *bool
+
 // postAggU15StackU6CreateDoneSink: after StackU6 create era, Global eFlexible
 // list grows to U14 (e3637) not sticky U9.
 var postAggU15StackU6CreateDoneSink *bool
+
 // postAggU15StackU6LhsPPVisitDoneSink: after StackU6 Lhs PP residual Expression
 // (e3773+), stop forcing Global U14 (e3862 wants U2).
 var postAggU15StackU6LhsPPVisitDoneSink *bool
+
 // postAggU15StackU6PostPPPtrSelDerefNSink: pointer Lhs SelectDeref fail count
 // after post-PP era; >=2 arms post-ptr Lhs era.
 var postAggU15StackU6PostPPPtrSelDerefNSink *int
+
 // postAggU15StackU6PostPtrSelDerefFailsSink: non-pointer SelectDeref fails after
 // pointer era (e3905+); >=5 → Lhs Global U2 (e3919); ==0 → Global sole (e3896).
 var postAggU15StackU6PostPtrSelDerefFailsSink *int
+
 // postAggU15PLAfterGlobalF0Sink: next PL after that Global F0 does U5+F0 (e3316–18).
 var postAggU15PLAfterGlobalF0Sink *bool
+
 // postAggPLIdx0ValidateF0Done: first postAgg PL stack[0] choose burns
 // opportunistic_validate F0+reselect (seed4 e2337); later accepts without F0
 // (e2530 U5 → parent Expression U120, not F0).
 var postAggPLIdx0ValidateF0Done bool
+
 // postAggForceInt32ConstOnce: one-shot after ForceDerefCreate — next Constant
 // uses int32 RandomHexDigits(8) to match UP (e4268), not parent uint8 hex=2.
 var postAggForceInt32ConstOnce bool
+
 // postAggArmNeedLhsAfterNextVar: after ForceDeref OuterLhsSoleBurn era, next
 // termVariable arms NeedLhs so parent Assign runs SelectDeref create (e4271).
 var postAggArmNeedLhsAfterNextVar bool
@@ -457,20 +485,20 @@ type functionFlowState struct {
 	// postAggExprNestPLChooseU5: one-shot PL local choose U5 after nest F50 (e4402).
 	postAggExprNestPLChooseU5 bool
 	// postAggExprNestDepthBlock: next Expression depth-block (e4406 tries=5).
-	postAggExprNestDepthBlock bool
-	postAggNestSelDerefDone bool
+	postAggExprNestDepthBlock     bool
+	postAggNestSelDerefDone       bool
 	postAggNestStmtUnfilteredOnce bool
-	postAggNestPLChooseU2 bool
-	postAggNestStackU6 bool
-	postAggNestPLSoleAfterF0 bool
+	postAggNestPLChooseU2         bool
+	postAggNestStackU6            bool
+	postAggNestPLSoleAfterF0      bool
 	// postAggNestLhsSelDerefU7: Expression Lhs SelectDeref U7+U4 accept (e4481).
 	postAggNestLhsSelDerefU7 bool
 	// postAggNestSelDerefCountdown: Statement Lhs U12… after nest U7 Lhs (e4489).
 	postAggNestSelDerefCountdown bool
-	postAggNestSelDerefFails int
-	postAggNestSelDerefRound2 bool
-	postAggNestSelDerefRoundN int
-	postAggNestVSMisses int
+	postAggNestSelDerefFails     int
+	postAggNestSelDerefRound2    bool
+	postAggNestSelDerefRoundN    int
+	postAggNestVSMisses          int
 	// postAggNestEALhsExprResidualDone: one-shot ExpressionAssign Lhs F80→F50+
 	// Expression residual after nest VS miss40 (e6407).
 	postAggNestEALhsExprResidualDone bool
@@ -487,11 +515,18 @@ type functionFlowState struct {
 	// is U17 (e6597), not sticky nest U54 pad (e6424).
 	postAggNestGlobalU17 bool
 	// postAggNestGlobalU17Chooses: count of nest U17 Global chooses (e6597 first
-	// no F50; e6611 second+ F50 then Expression).
+	// no F50; e6611 2nd only F50; e6641 3rd no F50).
 	postAggNestGlobalU17Chooses int
+	// postAggNestGlobalU17F0Done: one-shot visit_facts F0 before 3rd U17 (e6637).
+	postAggNestGlobalU17F0Done bool
+	// postAggNestGlobalU17PLAfterF0Done: after e6637 F0, PL stack U5 → VS Global
+	// (e6638–41); one-shot so later PL keeps normal choose.
+	postAggNestGlobalU17PLAfterF0Done bool
 	// postAggNestNoConstOnce: after nest Global U17 F50 residual, next Expression
 	// filters Constant (UP e6612 Variable tries=14, not Constant).
 	postAggNestNoConstOnce bool
+	// postAggNestPPSoleN: nest ParentParam sole Variable count (e6635 skip ShiftBy after 3).
+	postAggNestPPSoleN int
 	// postAggNestAssignQferDone: one-shot ExpressionAssign self F50 after nest
 	// VS (e6402); later nested Assigns skip F50 (e6455).
 	postAggNestAssignQferDone bool
@@ -687,6 +722,24 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 	}
 	// Inventory incomplete — miss; caller continues VariableSelector::select.
 	return exprVarCandidate{}, false
+}
+
+// noteNestPPSoleShiftSkip: after nest ParentParam sole Variable, count soles.
+// On the 3rd+ (e6630/32/34 chain; 6605 special path may count too), arm one-shot
+// skip of open Function-binary ShiftBy F50 U32 so parent continues free
+// Expression U120 (UP e6635 tries=2). Must not arm on 1st sole before e6628
+// ShiftBy notConstant still needed.
+func noteNestPPSoleShiftSkip(flow *functionFlowState) {
+	if flow == nil || !flow.postAggNestGlobalU17 {
+		return
+	}
+	flow.postAggNestPPSoleN++
+	if flow.postAggNestPPSoleN >= 3 {
+		flow.postAggSkipShiftByOnce = true
+		if flow.postAggUnwindBinaryAfterExprVar < 2 {
+			flow.postAggUnwindBinaryAfterExprVar = 2
+		}
+	}
 }
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
@@ -1053,6 +1106,18 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 					plFails++
 					continue
 				}
+				// e6712: after nest SelectDeref F80=0, NewValue→PL (sp=4) is
+				// stack U5 + U14 retype + F50 F20 F50 create prefix (not U4 choose).
+				// Next UP e6716 U100 continues create/VS residual (still open).
+				if sp == 4 && flow != nil && flow.postAggNestGlobalU17F0Done {
+					_ = parentStackPick(er, flow) // e6711 U5
+					_ = er.pick(14)               // e6712 U14
+					_ = er.fallback.flipcoin(50)  // e6713
+					_ = er.fallback.flipcoin(20)  // e6714 NewArray
+					_ = er.fallback.flipcoin(50)  // e6715
+					flow.postAggLhsWriteDone = true
+					return "x"
+				}
 				_ = parentStackPick(er, flow)
 				nLoc := uint32(4)
 				if plFails >= 1 {
@@ -1096,14 +1161,38 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			nf := flow.postAggNestSelDerefFails
 			rn := flow.postAggNestSelDerefRoundN
 			pool := []int{12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 2}
-			if rn >= 2 {
+			if flow.postAggNestGlobalU17F0Done {
+				// e6646–6708: U12 U11+F0 U10..U8 U7+947 U7 U6 U5+947×2
+				// U5+993 U5 U4+947×2 U4+F0 U3+947 then F80=0 → VS.
+				pool = []int{12, 11, 10, 9, 8, 7, 7, 6, 5, 5, 5, 5, 4, 4, 4, 3}
+			} else if rn >= 2 {
 				// e6510+: U12+F0, U11 then Expression residual (not full pool)
 				pool = []int{12, 11, 10, 9, 8, 7, 6, 5}
 			}
 			if nf < len(pool) {
 				_ = er.pick(uint32(pool[nf]))
 				flow.postAggNestSelDerefFails++
-				if rn >= 2 {
+				if flow.postAggNestGlobalU17F0Done {
+					// residual after choose (nf is pre-increment index)
+					switch nf {
+					case 1:
+						_ = er.fallback.flipcoin(0)
+					case 5, 8, 9, 12, 13, 15:
+						// itemize [9][4][7] F0
+						_ = er.pick(9)
+						_ = er.pick(4)
+						_ = er.pick(7)
+						_ = er.fallback.flipcoin(0)
+					case 10:
+						// itemize [9][9][3] F0
+						_ = er.pick(9)
+						_ = er.pick(9)
+						_ = er.pick(3)
+						_ = er.fallback.flipcoin(0)
+					case 14:
+						_ = er.fallback.flipcoin(0)
+					}
+				} else if rn >= 2 {
 					switch nf {
 					case 0:
 						_ = er.fallback.flipcoin(0) // e6512 F0
@@ -1114,7 +1203,7 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 						return "x"
 					}
 				} else {
-					// roundN 0/1 residual shapes
+					// roundN 0/1 residual shapes (e4489 era)
 					if nf == 0 || nf == 2 {
 						_ = er.fallback.flipcoin(0)
 					}
@@ -3816,18 +3905,31 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				}
 				// target>n pads inventory; target>0 && target<n shrinks (e6127 U2).
 				if target > 0 && target != n {
+					// e6637: after 2 nest U17 accepts, next Global is visit_facts F0
+					// fail (no U17) → VS PL reselect (e6638 U100 U5) then Global
+					// U17 accept (e6641, no F50). One-shot before 3rd U17.
+					if target == 17 && er.fallback != nil &&
+						postAggNestGlobalU17ChoosesSink != nil &&
+						*postAggNestGlobalU17ChoosesSink >= 2 &&
+						(postAggNestGlobalU17F0DoneSink == nil || !*postAggNestGlobalU17F0DoneSink) {
+						if postAggNestGlobalU17F0DoneSink != nil {
+							*postAggNestGlobalU17F0DoneSink = true
+						}
+						_ = er.fallback.flipcoin(0)
+						return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+					}
 					v := int(er.pick(uint32(target)))
 					// e849 F50 only on first U11-scale Global choose.
 					if target == 11 && er.fallback != nil && *postMustReadGlobalPicks == 3 {
 						_ = er.fallback.flipcoin(50)
 					}
-					// e6611: 2nd+ nest Global U17 choose burns F50 then Expression
-					// (e6597 first U17 has no F50). e6612: next Expression filters
-					// Constant (tries=14 Variable only).
+					// e6611: 2nd nest Global U17 choose burns F50 then Expression
+					// (e6597 first / e6641 3rd have no F50). e6612: next Expression
+					// filters Constant (tries=14 Variable only).
 					if target == 17 && er.fallback != nil &&
 						postAggNestGlobalU17ChoosesSink != nil {
 						*postAggNestGlobalU17ChoosesSink++
-						if *postAggNestGlobalU17ChoosesSink >= 2 {
+						if *postAggNestGlobalU17ChoosesSink == 2 {
 							_ = er.fallback.flipcoin(50)
 							if postAggNestNoConstOnceSink != nil {
 								*postAggNestNoConstOnceSink = true
@@ -5901,8 +6003,8 @@ exprTries:
 						}
 						_ = variableScopePickFromER(er, opts, &scope) // e2852
 						if er.fallback != nil {
-							_ = er.fallback.upto(120) // e2853 AssignOps
-							_ = er.fallback.upto(120) // e2854 RHS term Variable
+							_ = er.fallback.upto(120)                     // e2853 AssignOps
+							_ = er.fallback.upto(120)                     // e2854 RHS term Variable
 							_ = variableScopePickFromER(er, opts, &scope) // e2855
 							if er.fallback.flipcoin(80) {
 								_ = er.fallback.upto(12)
@@ -6790,6 +6892,7 @@ exprTries:
 											}
 										} else if scopePick2 == 2 {
 											// e2718 ParentParam sole — no stack (e2719 UP U120)
+											noteNestPPSoleShiftSkip(flow)
 											bumpExprDepth(ctx)
 											return finishVar(castLiteral(t, "x"))
 										} else if scopePick2 == 1 || scopePick2 == 4 {
@@ -7013,6 +7116,7 @@ exprTries:
 								return finishVar(castLiteral(t, localCands[0].expr))
 							} else if scopePick2 == 2 {
 								// ParentParam sole (e1289 U100=76 no further stack)
+								noteNestPPSoleShiftSkip(flow)
 								bumpExprDepth(ctx)
 								return finishVar(castLiteral(t, localCands[0].expr))
 							} else if scopePick2 == 0 || scopePick2 == 3 {
@@ -7524,13 +7628,42 @@ exprTries:
 					if c.expr == "" && ctx != nil && ctx.state != nil && er != nil {
 						for vsAttempt := 0; vsAttempt < 4; vsAttempt++ {
 							scopePick = variableScopePickFromER(er, opts, &scope)
+							// e6638–41: after nest Global U17 visit_facts F0, PL stack U5
+							// visit fail (no locals choose) → VS Global U17 accept.
+							// e6646: after that Global Variable (Assign RHS), parent runs
+							// Lhs SelectDeref F80 U12… (not free Expression U120).
+							if scopePick == 1 && flow != nil && flow.postAggNestGlobalU17F0Done &&
+								!flow.postAggNestGlobalU17PLAfterF0Done {
+								flow.postAggNestGlobalU17PLAfterF0Done = true
+								_ = parentStackPick(er, flow)                         // e6639 U5
+								scopePick = variableScopePickFromER(er, opts, &scope) // e6640
+								if scopePick == 0 {
+									cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
+									if c2, ok2 := selectExprVariableFromER(t, er, cands, false); ok2 && c2.expr != "" {
+										flow.postAggNeedLhsAfterRhs = true
+										flow.postAggNestSelDerefCountdown = true
+										flow.postAggNestSelDerefFails = 0
+										flow.postAggNestSelDerefRoundN = 0
+										flow.postAggNestSelDerefRound2 = false
+										bumpExprDepth(ctx)
+										return finishVar(castLiteral(t, c2.expr))
+									}
+								}
+								flow.postAggNeedLhsAfterRhs = true
+								flow.postAggNestSelDerefCountdown = true
+								flow.postAggNestSelDerefFails = 0
+								flow.postAggNestSelDerefRoundN = 0
+								flow.postAggNestSelDerefRound2 = false
+								bumpExprDepth(ctx)
+								return finishVar(castLiteral(t, "x"))
+							}
 							// e3316–20: after U15 Global sole F0, PL stack U5 + F0
 							// fail → VS PP sole → parent Expression U120 (not U5 locals).
 							if scopePick == 1 && flow != nil && flow.postAggU15PLAfterGlobalF0 &&
 								er.fallback != nil {
 								flow.postAggU15PLAfterGlobalF0 = false
-								_ = parentStackPick(er, flow) // e3317 U5
-								_ = er.fallback.flipcoin(0)   // e3318 F0
+								_ = parentStackPick(er, flow)                           // e3317 U5
+								_ = er.fallback.flipcoin(0)                             // e3318 F0
 								scopePick2 := variableScopePickFromER(er, opts, &scope) // e3319
 								if scopePick2 == 0 {
 									_ = er.pick(12)
@@ -7657,6 +7790,10 @@ exprTries:
 						}
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "x"))
+					}
+					// e6635: ParentParam sole Variable (main inventory accept).
+					if scopePick == 2 {
+						noteNestPPSoleShiftSkip(flow)
 					}
 					bumpExprDepth(ctx)
 					return finishVar(castLiteral(t, c.expr))
@@ -8091,9 +8228,9 @@ exprTries:
 						_ = er.pick(7)                // e3935
 						_ = er.fallback.flipcoin(0)   // e3936 F0
 						if er.fallback.flipcoin(80) { // e3937
-							_ = er.pick(6) // e3938
+							_ = er.pick(6)                // e3938
 							if er.fallback.flipcoin(80) { // e3939
-								_ = er.pick(7) // e3940
+								_ = er.pick(7)               // e3940
 								_ = er.fallback.flipcoin(80) // e3941=0
 							}
 						}
@@ -9612,7 +9749,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.upto(6)
 		lhsFromDeref = true // accept without SelectDeref loop
 	}
-	lhsDerefLoop:
+lhsDerefLoop:
 	for !lhsFromDeref {
 		// seed2 e2312: after late compound AssignOps skip-RHS, Lhs goes straight
 		// to VariableSelector U100 (UP no SelectDeref F80).
@@ -13178,7 +13315,7 @@ func emitStatement(
 		if stmtBudget != nil && *stmtBudget > 0 {
 			*stmtBudget = *stmtBudget - 1
 		}
-		_ = r.upto(100)  // e3955 U100=56 ArrayOp
+		_ = r.upto(100)   // e3955 U100=56 ArrayOp
 		_ = r.flipcoin(5) // e3956=0 → array_loop
 		_ = r.upto(4)     // e3957 aryno=0 (no select_array)
 		// SelectLoopCtrlVar choose with shrinking/volatile retries U25…U22
@@ -13677,8 +13814,8 @@ func emitStatement(
 				if !r.flipcoin(50) { // e2764 F50=1 → init 0 (no U60)
 					_ = r.upto(60)
 				}
-				_ = r.upto(60) // e2765 limit
-				_ = r.upto(6)  // e2766 test_op
+				_ = r.upto(60)      // e2765 limit
+				_ = r.upto(6)       // e2766 test_op
 				if r.flipcoin(50) { // e2767
 					_ = r.upto(10) // e2768 incr
 				} else {
@@ -14101,6 +14238,7 @@ func emitSingleFuncDefOnce(
 		postAggNestVSMissesSink = &state.postAggNestVSMisses
 		postAggNestGlobalU17Sink = &state.postAggNestGlobalU17
 		postAggNestGlobalU17ChoosesSink = &state.postAggNestGlobalU17Chooses
+		postAggNestGlobalU17F0DoneSink = &state.postAggNestGlobalU17F0Done
 		postAggNestNoConstOnceSink = &state.postAggNestNoConstOnce
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
@@ -14146,14 +14284,15 @@ func emitSingleFuncDefOnce(
 			postAggLhsWriteDoneSink = nil
 			postAggGlobalU2AfterLhsWriteSink = nil
 			postAggLhsGlobalU15Sink = nil
-		postAggExprContGlobalU15Sink = nil
-		postAggExprNestPLChooseU5Sink = nil
-		postAggNestPLChooseU2Sink = nil
-		postAggNestStackU6Sink = nil
-		postAggNestVSMissesSink = nil
-		postAggNestGlobalU17Sink = nil
-		postAggNestGlobalU17ChoosesSink = nil
-		postAggNestNoConstOnceSink = nil
+			postAggExprContGlobalU15Sink = nil
+			postAggExprNestPLChooseU5Sink = nil
+			postAggNestPLChooseU2Sink = nil
+			postAggNestStackU6Sink = nil
+			postAggNestVSMissesSink = nil
+			postAggNestGlobalU17Sink = nil
+			postAggNestGlobalU17ChoosesSink = nil
+			postAggNestGlobalU17F0DoneSink = nil
+			postAggNestNoConstOnceSink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)

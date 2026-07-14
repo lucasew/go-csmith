@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6635) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6716) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6635** (6608→6635; nest Constant hex16 + Global F50/noConst + create residual; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6716** (6635→6716; nest PP sole skip-ShiftBy + Global F0/PL + Lhs SelectDeref U12 table + NewValue→PL U14; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -398,8 +398,20 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e6611: 2nd nest Global U17 F50 residual + next Expression noConst (Variable tries=14).
 4. e6622: nest NewValue→PL create F50 U8 residual after Constant U20.
 
-Next plateau: seed4 e6635 UP U120=73 tries=2 vs GO ShiftBy F50=0 U32 after nest PP
-Variable sole chain. Seeds 5–21; source; COUNT=20.
+**e6635–e6716 climbed:**
+1. e6635: after 3rd nest ParentParam sole Variable, skip open Function-binary
+   ShiftBy F50 U32 (UP free Expression U120 tries=2). Count≥3 only — earlier
+   soles must keep e6628 ShiftBy notConstant.
+2. e6637: 3rd nest Global U17 attempt is visit_facts F0 (no U17) then VS PL;
+   F50 residual only on exactly 2nd U17 choose (not 3rd).
+3. e6638–41: after that F0, PL stack U5 visit fail → VS Global U17 accept
+   (no locals choose U5).
+4. e6646: arm NeedLhs + nest SelectDeref countdown U12… with e6646 residual
+   table (U11+F0; U7/U5/U4 itemize 947; one 993; U4+F0) through F80=0.
+5. e6712: NewValue→PL after F80=0 is stack U5 + U14 + F50 F20 F50 (not U4 choose).
+
+Next plateau: seed4 e6716 UP U100=57 (Lhs create/VS residual after NewValue→PL
+prefix) vs GO Statement U100 tries=2. Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
