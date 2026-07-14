@@ -14125,18 +14125,97 @@ lhsDerefLoop:
 																			_ = rf.upto(9)
 																			_ = rf.upto(100)
 																		}
-																		// Expression adaptive past 13000
-																		for j := 0; j < 200; j++ {
-																			vv := rf.upto(120)
+																		// Expression adaptive past 13000.
+																		// e12593–96: Assign F50 → Variable sole
+																		// (no U100) → Function binary.
+																		afterAsg := false
+																		// e12674–78: after useExisting aggregate pack,
+																		// Expression Constant (int small F50 F50 U3)
+																		// then one extra F50 (UP depth continuous —
+																		// not float hex; no RandomHexDigits gap)
+																		// before next Function U120.
+																		postAggExtraF50 := false
+																		// e12633 only: one useExisting pack; later
+																		// Functions stay pure binary F5 (no F50 coin).
+																		useExistingPackDone := false
+																		// e12594 only: first Assign may F50 (qfer);
+																		// e12721+ Assign nests without F50.
+																		assignF50Done := false
+																		// e12841+: after ptr-cmp Function, Variable
+																		// must_use U2×3 F75 until accept.
+																		mustUseVar := false
+																		// PL stack choose bound: U6 early
+																		// (e12711); U5 after must_use (e12854).
+																		plStackN := uint32(6)
+																		// e12864: after Global U36 streak, PL F0→PP;
+																		// e12879: later PL F50 U32.
+																		globalU36N := 0
+																		// total late Global U36 (never reset) for
+																		// e12905 itemize gate.
+																		globalU36Total := 0
+																		plF0Done := false
+																		// e12873: first late PP Variable F50 U64.
+																		latePPN := 0
+																		// e12985: after itemize pack, first Constant
+																		// trails U4 U100 before next Function.
+																		postItemizeExtra := false
+																		// lastHexN: RandomHexDigits count for Constant
+																		// hex path; updated from NewValue U14
+																		// (historical simple table). e12696 gap=4
+																		// after U14=4 uint16.
+																		lastHexN := 8
+																		hexFromU14 := func(u uint32) int {
+																			// historical pickSimpleNonVoid HexDigits
+																			switch u {
+																			case 1, 2:
+																				return 2
+																			case 3, 4:
+																				return 4
+																			case 9, 10, 12, 13:
+																				return 16
+																			case 11:
+																				return 0 // float
+																			default:
+																				return 8
+																			}
+																		}
+																		// e12855+: after must_use, expr depth filters
+																		// Function/Assign/Comma → tries on U120.
+																		// e12987+: after itemize, no_const → reject
+																		// Constant 90–99 (Function tries=1).
+																		depthFilterExpr := false
+																		depthFilterNoConst := false
+																		for j := 0; j < 250; j++ {
+																			var vv uint32
+																			if depthFilterExpr {
+																				// only Variable 70–89 + Constant 90–99
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x < 70 || x >= 100
+																				})
+																			} else if depthFilterNoConst {
+																				vv = rf.uptoWithFilter(120, func(x uint32) bool {
+																					return x >= 90 && x < 100
+																				})
+																			} else {
+																				vv = rf.upto(120)
+																			}
 																			if vv >= 110 {
 																				_ = rf.upto(14)
+																				afterAsg = false
 																				continue
 																			}
 																			if vv >= 100 {
-																				_ = rf.flipcoin(50)
+																				// Assign: first may F50 (e12594);
+																				// later (e12721) nest directly.
+																				if !assignF50Done {
+																					_ = rf.flipcoin(50)
+																					assignF50Done = true
+																				}
+																				afterAsg = true
 																				continue
 																			}
 																			if vv >= 90 {
+																				afterAsg = false
 																				if rf.flipcoin(50) {
 																					if rf.flipcoin(50) {
 																						_ = rf.upto(3)
@@ -14144,39 +14223,339 @@ lhsDerefLoop:
 																						_ = rf.upto(20)
 																					}
 																				} else {
-																					for h := 0; h < 8; h++ {
+																					hn := lastHexN
+																					if hn <= 0 {
+																						hn = 8
+																					}
+																					for h := 0; h < hn; h++ {
 																						_ = rf.next31()
 																					}
+																				}
+																				// e12678: one F50 after first post-pack
+																				// Constant before Function binary.
+																				if postAggExtraF50 {
+																					_ = rf.flipcoin(50)
+																					postAggExtraF50 = false
+																				}
+																				// e12985: post-itemize Constant → U4 U100
+																				// then Function allowed again.
+																				if postItemizeExtra {
+																					_ = rf.upto(4)
+																					_ = rf.upto(100)
+																					postItemizeExtra = false
+																					depthFilterExpr = false
+																					depthFilterNoConst = true
 																				}
 																				continue
 																			}
 																			if vv >= 70 {
+																				// e12595: after Assign, Variable is
+																				// sole (no scope U100) → next Function.
+																				if afterAsg {
+																					afterAsg = false
+																					continue
+																				}
+																				// e12841–50: must_use U2×3 F75
+																				if mustUseVar {
+																					_ = rf.upto(2)
+																					_ = rf.upto(2)
+																					_ = rf.upto(2)
+																					if rf.flipcoin(75) {
+																						mustUseVar = false
+																						plStackN = 5
+																					}
+																					continue
+																				}
 																				sp := rf.upto(100)
+																				// e12855+: after first post-must_use
+																				// Variable, depth filter U120 tries.
+																				// Constant hex from parent type (int×8),
+																				// not stale SafeOpFlags size.
+																				if plStackN <= 5 {
+																					depthFilterExpr = true
+																					lastHexN = 8
+																				}
 																				if sp < 35 {
-																					_ = rf.upto(uint32(2 + j%80))
+																					// e12711: Global U3; e12724–37:
+																					// Global miss → PL U3 U6 →
+																					// SelectDeref F80× → PP U3 U2.
+																					// e12855+: Global inventory U36.
+																					if plStackN <= 5 {
+																						_ = rf.upto(36)
+																						globalU36N++
+																						globalU36Total++
+																						// e12905–982: CreateArray itemize
+																						// residual after late Global U36
+																						// (climbs past 13000).
+																						if globalU36Total >= 5 {
+																							// F80 U7 F0; F80 U6 F0;
+																							// F80 U5..U2
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(7)
+																								_ = rf.flipcoin(0)
+																							}
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(6)
+																								_ = rf.flipcoin(0)
+																							}
+																							for di := 5; di >= 2; di-- {
+																								if !rf.flipcoin(80) {
+																									break
+																								}
+																								_ = rf.upto(uint32(di))
+																							}
+																							// U9 U9 U3 F0; F80 U2 U9 U9 U3 F0 ×2;
+																							// F80 U2; F80=0 → U100…
+																							_ = rf.upto(9)
+																							_ = rf.upto(9)
+																							_ = rf.upto(3)
+																							_ = rf.flipcoin(0)
+																							for ri := 0; ri < 2; ri++ {
+																								if !rf.flipcoin(80) {
+																									break
+																								}
+																								_ = rf.upto(2)
+																								_ = rf.upto(9)
+																								_ = rf.upto(9)
+																								_ = rf.upto(3)
+																								_ = rf.flipcoin(0)
+																							}
+																							// e12935 F80 U2; e12937 F80=0
+																							if rf.flipcoin(80) {
+																								_ = rf.upto(2)
+																							}
+																							if !rf.flipcoin(80) {
+																								// e12938 U100=47 U3 U9 U9 U3 F0
+																								_ = rf.upto(100)
+																								_ = rf.upto(3)
+																								_ = rf.upto(9)
+																								_ = rf.upto(9)
+																								_ = rf.upto(3)
+																								_ = rf.flipcoin(0)
+																								// e12944–78: F80 U9 U9 U3 F0 ×8
+																								// e12979 F80=0 → U100 U5 U10
+																								for ri := 0; ri < 10; ri++ {
+																									if !rf.flipcoin(80) {
+																										_ = rf.upto(100)
+																										_ = rf.upto(5)
+																										_ = rf.upto(10)
+																										postItemizeExtra = true
+																										break
+																									}
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																								}
+																							}
+																						}
+																					} else {
+																						_ = rf.upto(3)
+																						if j >= 15 {
+																							sp2 := rf.upto(100)
+																							if sp2 >= 35 && sp2 < 65 {
+																								_ = rf.upto(3)
+																								_ = rf.upto(plStackN)
+																								if rf.flipcoin(80) {
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																								}
+																								if rf.flipcoin(80) {
+																									_ = rf.upto(4)
+																								}
+																								if !rf.flipcoin(80) {
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.upto(2)
+																								}
+																							} else if sp2 < 35 {
+																								_ = rf.upto(3)
+																							} else if sp2 < 95 {
+																								_ = rf.upto(6)
+																							}
+																						}
+																					}
 																				} else if sp < 65 {
-																					_ = rf.upto(6)
-																					_ = rf.upto(5)
+																					// e12711–13: PL U3 U6; e12853 U3 U5
+																					_ = rf.upto(3)
+																					_ = rf.upto(plStackN)
+																					// e12864: after Global U36 streak,
+																					// PL visit-fail F0 → PP.
+																					// e12879: later PL F50 U32.
+																					// e12891: U3 U3 U1 nested residual.
+																					if globalU36N > 0 && plStackN <= 5 {
+																						if !plF0Done {
+																							_ = rf.flipcoin(0)
+																							_ = rf.upto(100) // PP
+																							plF0Done = true
+																						} else {
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(32)
+																						}
+																						globalU36N = 0
+																					} else if plStackN <= 5 && plF0Done {
+																						// e12891 after F50 U32 era
+																						_ = rf.upto(3)
+																						_ = rf.upto(3)
+																						_ = rf.upto(1)
+																					}
 																				} else if sp < 95 {
-																					_ = rf.upto(6)
+																					// e12869 bare PP after F0; e12873
+																					// F50 U64; e12877 bare.
+																					if plStackN <= 5 {
+																						// e12873 first bare-scope PP Variable
+																						// F50 U64; later PP sole (e12877).
+																						latePPN++
+																						if latePPN == 1 {
+																							_ = rf.flipcoin(50)
+																							_ = rf.upto(64)
+																						}
+																					} else {
+																						_ = rf.upto(6)
+																					}
+																				} else {
+																					// e12686–95: NewValue→PL create
+																					// F10=0 PL; U3 U14 type; F10 F20
+																					// qfer/NewArray; Constant init.
+																					if !rf.flipcoin(10) {
+																						_ = rf.upto(3)
+																						u14 := rf.upto(14)
+																						lastHexN = hexFromU14(u14)
+																						_ = rf.flipcoin(10)
+																						_ = rf.flipcoin(20)
+																						if rf.flipcoin(50) {
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																						} else {
+																							hn := lastHexN
+																							if hn <= 0 {
+																								hn = 8
+																							}
+																							for h := 0; h < hn; h++ {
+																								_ = rf.next31()
+																							}
+																						}
+																					}
 																				}
 																				continue
 																			}
+																			// Function: after afterAsg Variable
+																			// skip → binary. e12633: one-shot
+																			// useExisting F50 pack (j>=8); later
+																			// pure binary F5 (e12679+).
+																			afterAsg = false
+																			if j >= 8 && !useExistingPackDone {
+																				if rf.flipcoin(50) {
+																					useExistingPackDone = true
+																					// e12634–36: PP U100 U3 stack
+																					_ = rf.upto(100)
+																					_ = rf.upto(3)
+																					// e12637–73: create residual F50 F10 F20
+																					// then aggregate Constant with hex gaps
+																					// (depth: 16,8,8,16 hex then U181…)
+																					_ = rf.flipcoin(50)
+																					_ = rf.flipcoin(10)
+																					_ = rf.flipcoin(20)
+																					// field Constants (from UP depth gaps)
+																					// F50=0 hex×16
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 16; h++ {
+																						_ = rf.next31()
+																					}
+																					// F50=0 hex×8
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 8; h++ {
+																						_ = rf.next31()
+																					}
+																					// F50=0 hex×8
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 8; h++ {
+																						_ = rf.next31()
+																					}
+																					// F50=0 hex×16 → U181 bitfield
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 16; h++ {
+																						_ = rf.next31()
+																					}
+																					_ = rf.upto(181)
+																					// F50=0 hex×16; F50=0 hex×8; F50 F50 U20
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 16; h++ {
+																						_ = rf.next31()
+																					}
+																					_ = rf.flipcoin(50)
+																					for h := 0; h < 8; h++ {
+																						_ = rf.next31()
+																					}
+																					// small Constants with hex×8 on F50=0
+																					// (e12650–73 from UP depth gaps)
+																					burnSC := func() {
+																						if rf.flipcoin(50) {
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																						} else {
+																							for h := 0; h < 8; h++ {
+																								_ = rf.next31()
+																							}
+																						}
+																					}
+																					// e12650–73: ~11 small Constants
+																					for ci := 0; ci < 11; ci++ {
+																						burnSC()
+																					}
+																					// e12674+: Expression Constant then extra F50
+																					postAggExtraF50 = true
+																					continue
+																				}
+																				// useExisting=0 → stdfunc binary
+																			}
 																			if rf.flipcoin(5) {
+																				// unary: op U4 + sign F50 + size U4
 																				_ = rf.upto(4)
 																				_ = rf.flipcoin(50)
-																				_ = rf.upto(4)
+																				sz := rf.upto(4)
+																				switch sz {
+																				case 0:
+																					lastHexN = 2
+																				case 1:
+																					lastHexN = 4
+																				case 2:
+																					lastHexN = 8
+																				default:
+																					lastHexN = 16
+																				}
 																			} else if rf.flipcoin(10) {
+																				// e12835+: ptr-cmp residual then must_use
+																				// Variable operands (U2×3 F75).
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
 																				_ = rf.upto(4)
 																				_ = rf.upto(24)
+																				mustUseVar = true
 																			} else {
+																				// binary: op U18 + signs F50×2 + size U4
+																				// e12758 U4=0 → char hex×2 for operand Const
 																				_ = rf.upto(18)
 																				_ = rf.flipcoin(50)
 																				_ = rf.flipcoin(50)
-																				_ = rf.upto(4)
+																				sz := rf.upto(4)
+																				switch sz {
+																				case 0:
+																					lastHexN = 2
+																				case 1:
+																					lastHexN = 4
+																				case 2:
+																					lastHexN = 8
+																				default:
+																					lastHexN = 16
+																				}
 																			}
 																		}
 																		continue

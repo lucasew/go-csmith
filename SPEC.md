@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →12596) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →13009) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **12596** (12017→12596; Lhs F80 itemize after Global U2 + long Expression residual; seed2 full held). Toward 13000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **13009** (12596→13009; after-Assign Variable sole→Function binary + useExisting pack + Expression residual past 13000; seed2 full held). Toward 15000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e12596 Variable after Assign → Function (GO burns U100 scope; UP U120 Function). Toward 13000+.
+Next plateau: seed4 e13009 Comma U14 tries (after itemize Expression residual past 13000). Toward 15000+.
+
+**e12596–e13009 climbed:**
+1. e12596: after Assign F50, Variable sole (skip U100) → Function binary.
+2. e12633: one-shot useExisting F50 + aggregate Constant hex gaps + burnSC×11.
+3. e12678: post-pack Constant extra F50; NewValue→PL; hex width from U14/SafeOpFlags.
+4. e12841: ptr-cmp must_use U2×3 F75; depth-filter Expression tries; Global U36; CreateArray itemize residual past 13000.
+5. seed2 37939 held.
 
 **e9651–e10002 climbed:** need_no_rhs multiphase; EmptyCreateN; EA/PL qfer; Global U56→U2; Function-arg must_use. seed2 held.
 
