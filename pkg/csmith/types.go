@@ -136,6 +136,55 @@ func pickChooseRandom(r *rng, info compositeInfo, opts Options) CType {
 	return types[idx]
 }
 
+// rejectAllTypesNonVoidNonVolatile mirrors NonVoidNonVolatileTypeFilter +
+// SIMPLE_TYPES_PROB_FILTER over AllTypes indices (Type.cpp:162–187).
+// Used by pickNonVoidNonVolatile and free-invent ExpressionComma lhs type burns
+// (ExpressionComma::make_random → choose_random_nonvoid_nonvolatile).
+func rejectAllTypesNonVoidNonVolatile(x uint32, types []CType, info compositeInfo, opts Options) bool {
+	i := int(x)
+	if i < 0 || i >= len(types) {
+		return true
+	}
+	t := types[i]
+	// SIMPLE_TYPES_PROB_FILTER: disabled float / int128 / uint128
+	if t.Name == "float" && !opts.EnableFloat {
+		return true
+	}
+	if t.Name == "__int128" && !opts.Int128 {
+		return true
+	}
+	if t.Name == "unsigned __int128" && !opts.UInt128 {
+		return true
+	}
+	// NonVoidNonVolatileTypeFilter rejects only volatile aggregates
+	// (is_volatile_struct_union), not all structs when the option is on.
+	// seed4/seed2 S0 is volatile → AllTypes index 13 rejected (e19638 tries=3).
+	if strings.HasPrefix(t.Name, "struct S") {
+		var si int
+		if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil {
+			if si >= 0 && si < len(info.structs) && info.structs[si].isVolatile {
+				return true
+			}
+		}
+	}
+	if strings.HasPrefix(t.Name, "union U") {
+		var ui int
+		if _, err := fmt.Sscanf(t.Name, "union U%d", &ui); err == nil {
+			if ui >= 0 && ui < len(info.unions) && info.unions[ui].isVolatile {
+				return true
+			}
+		}
+	}
+	// arg_structs / arg_unions (Type.cpp:171–177)
+	if strings.HasPrefix(t.Name, "struct") && !opts.ArgStructs {
+		return true
+	}
+	if strings.HasPrefix(t.Name, "union") && !opts.ArgUnions {
+		return true
+	}
+	return false
+}
+
 // pickNonVoidNonVolatile mirrors Type::choose_random_nonvoid_nonvolatile
 // (NonVoidNonVolatileTypeFilter + SIMPLE_TYPES_PROB_FILTER).
 func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Options) CType {
@@ -144,51 +193,28 @@ func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Optio
 	if len(types) == 0 {
 		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 	}
-	reject := func(x uint32) bool {
-		i := int(x)
-		if i < 0 || i >= len(types) {
-			return true
-		}
-		t := types[i]
-		// SIMPLE_TYPES_PROB_FILTER: disabled float / int128 / uint128
-		if t.Name == "float" && !opts.EnableFloat {
-			return true
-		}
-		if t.Name == "__int128" && !opts.Int128 {
-			return true
-		}
-		if t.Name == "unsigned __int128" && !opts.UInt128 {
-			return true
-		}
-		// NonVoidNonVolatileTypeFilter rejects only volatile aggregates
-		// (is_volatile_struct_union), not all structs when the option is on.
-		if strings.HasPrefix(t.Name, "struct S") {
-			var si int
-			if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil {
-				if si >= 0 && si < len(info.structs) && info.structs[si].isVolatile {
-					return true
-				}
-			}
-		}
-		if strings.HasPrefix(t.Name, "union U") {
-			var ui int
-			if _, err := fmt.Sscanf(t.Name, "union U%d", &ui); err == nil {
-				if ui >= 0 && ui < len(info.unions) && info.unions[ui].isVolatile {
-					return true
-				}
-			}
-		}
-		// arg_structs / arg_unions (Type.cpp:171–177)
-		if strings.HasPrefix(t.Name, "struct") && !opts.ArgStructs {
-			return true
-		}
-		if strings.HasPrefix(t.Name, "union") && !opts.ArgUnions {
-			return true
-		}
-		return false
-	}
-	idx := int(r.uptoWithFilter(uint32(len(types)), reject))
+	idx := int(r.uptoWithFilter(uint32(len(types)), func(x uint32) bool {
+		return rejectAllTypesNonVoidNonVolatile(x, types, info, opts)
+	}))
 	return types[idx]
+}
+
+// burnAllTypesNonVoidNonVolatile burns rnd_upto(AllTypes.size(), NonVoidNonVolatile)
+// without returning a type — free-invent ExpressionComma lhs residual.
+// Bound must match AllTypes.size() (seed2/seed4: 13 simples + S0 = 14).
+func burnAllTypesNonVoidNonVolatile(r *rng, info compositeInfo, opts Options) {
+	types := allTypesList(info)
+	n := len(types)
+	if n == 0 {
+		n = 14
+	}
+	_ = r.uptoWithFilter(uint32(n), func(x uint32) bool {
+		if len(types) == 0 {
+			// Fallback SIMPLE-only when info empty (legacy residual).
+			return x == 9 || x == 11 || x == 12
+		}
+		return rejectAllTypesNonVoidNonVolatile(x, types, info, opts)
+	})
 }
 
 // pickSimpleNonVoid mirrors Type::choose_random_nonvoid_simple /
