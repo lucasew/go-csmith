@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7305) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7443) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7305** (7259→7305; Global sole no U2 after residual + ptr Assign qfer + Function-arg create; seed2 full held). Toward 7500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7443** (7305→7443; nest ArrayOp PL residual era PP→PL/** create + Global pad + NewValue qfer; seed2 full held). Toward 7500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -451,8 +451,18 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 2. e7299: pointer ExpressionAssign qfer ≥2 levels F50 F10 + self F50 after residual.
 3. e7305: Function-arg aggregate Global create NewArray F20 first (skip SEFree F50).
 
-Next plateau: seed4 e7308 F20 vs F50 formatSimpleConstant in Function-arg Global
-create residual. Seeds 5–21; COUNT=20.
+**e7305–e7443 climbed:**
+1. e7305–72: Function-arg Global CreateArray residual + dim ladder; Lhs NewArray
+   residual U2 U2 U5 → PL stack U4 sole F20 F20 (not sticky U6/F80).
+2. e7372–82: PP→PL after residual — choose U2 visit miss → VS PP→PL stack +
+   ** qfer F50 F10×3 F20 F20; skip address residual (UP Expression U120 next).
+3. e7401: GlobalList multi-cand gn=10 U54; gn=11 e7439 visit_facts F0 reselect.
+4. e7413: NewValue→PL simple qferMode 2 F10 (not sticky residual SE-free F50 F10).
+5. e7421–35: inventory PL after NewValue — U4 sole, U5 choose, then stack-only
+   VS Global U19 reselect (no sticky itemize re-arm).
+
+Next plateau: seed4 e7443 after F0→PP sole + Constant, UP free Expression U120
+Variable PL+Lhs F80 vs GO Statement U4. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
