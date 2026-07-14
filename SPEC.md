@@ -114,28 +114,31 @@ When reviewing a climb/commit, **read** `pkg/csmith/*.go` (and related) and fail
 | Coin sequences with no corresponding C++ call path | Unmotivated hacks |
 | **Discarding entropy** (see below) | Advances LCG without using the draw |
 
-#### No discarding entropy
+#### No discarding entropy (unless upstream does too)
 
-Every `upto` / `flipcoin` / `next31` (and filtered variants) must **use** its result for the same purpose Csmith does: choose a term, accept/reject a filter, build a constant digit, pick a pool index, etc.
+**Default:** every `upto` / `flipcoin` / `next31` (and filtered variants) must **use** its result for the same purpose Csmith does: choose a term, accept/reject a filter, build a constant digit, pick a pool index, etc.
 
-| Reject | Why |
-|--------|-----|
-| `_ = r.upto(n)` / `_ = r.flipcoin(p)` / `_ = r.next31()` solely to pad the trace | Discarded draw — stream alignment without a decision |
-| Loops of untraced `next31` “hex gaps” that never append digits (or other consumed bits) into the AST/string | Fake LCG sync |
-| Residual multiphase tables that burn catalogued U/F sequences then throw away the values | Event pack without generation |
-| Drawing a value then ignoring it to force a different path | Same as discarding |
+**Exception — only when upstream discards too:** a draw may be ignored in Go **if and only if** the corresponding Csmith C++ call path also consumes RNG without using that value for generation (same call site / same reason). Cite the C++ function and show the upstream discard (e.g. failed candidate still advanced `rand_depth_`, short-circuit after genrand, DFS rollback that re-draws). Matching an untraced LCG step that Csmith performs for a real API (e.g. `RandomHexDigits` digits written into the constant) is **not** discard — the value is used.
 
-**Allowed (not discard):**
+| Reject (Go-only discard) | Why |
+|--------------------------|-----|
+| `_ = r.upto(n)` / `_ = r.flipcoin(p)` / `_ = r.next31()` solely to pad the trace with **no** matching C++ draw | Discarded entropy to fake stream alignment |
+| Loops of untraced `next31` “hex gaps” that never append digits **and** are not what `RandomHexDigits` / sibling C++ does | Fake LCG sync |
+| Residual multiphase tables that burn catalogued U/F sequences then throw away values **without** a C++ path that burns the same sequence | Event pack without generation |
+| Drawing a value then ignoring it to force a different path when C++ uses the value | Divergent control flow + discard |
 
-- Csmith itself uses the draw untraced (e.g. `RandomHexDigits` → digit in the constant text; pure filter retries that re-draw until accept — the final accepted value is used).
+**Allowed:**
+
+- Csmith uses the draw (including untraced `RandomHexDigits` → digit in constant text).
+- Csmith discards the draw at that site — Go may discard **only** by implementing that same C++ path (not a free-standing pad).
 - `uptoWithFilter` / VectorFilter retries where **tries** match upstream and the accepted index drives selection.
-- Drawing for a real create/select that fails visit_facts and legitimately retries (upstream does this).
+- Real create/select that fails visit_facts and retries (upstream does this).
 
-**Review heuristic:** if removing the RNG call would not change generated C (only the event stream), it is discard and must be replaced by the real C++ path that consumes that draw.
+**Review heuristic:** if removing the RNG call would not change generated C (only the event stream) **and** there is no C++ call at that point that performs the same genrand, it is illegal discard. Prefer implementing the real C++ path over inventing pads.
 
-**Review process for implementers:** after a patch, a separate pass **reads the code** (diff + call graph around the fix) and confirms it maps to Csmith C++ methods — not only that `find-rng-divergence` score improved. Explicitly check for discarded draws (`_ = r.…` padding, hex-gap loops, residual catalogs).
+**Review process for implementers:** after a patch, a separate pass **reads the code** (diff + call graph around the fix) and confirms it maps to Csmith C++ methods — not only that `find-rng-divergence` score improved. Explicitly check for Go-only discarded draws (`_ = r.…` padding, hex-gap loops, residual catalogs) unless the review cites matching upstream discard.
 
-Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs and **use** accepted RNG values; instrumented upstream for measurement only.
+Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs; instrumented upstream for measurement only.
 
 ### 5.3 Technique constraints
 
@@ -144,9 +147,9 @@ Any remaining technique must:
 1. Stay inside the repo’s blast radius
 2. Have timeouts against non-termination
 3. Converge by consulting C++ (not unmotivated RNG hacks)
-4. **Never discard entropy** — every RNG consumer feeds a real decision or materialised value (§5.2)
+4. **No discarding entropy unless upstream does too** — every RNG consumer either feeds a real decision/materialised value or mirrors a documented C++ discard at the same site (§5.2)
 
-Order of preference: fix local RNG/call-path alignment first; structural reshape only when the same divergence class blocks progress. Residual multiphase catalogs that only burn stream are **out**; reimplement the C++ path that produces those draws.
+Order of preference: fix local RNG/call-path alignment first; structural reshape only when the same divergence class blocks progress. Residual multiphase catalogs that only burn stream without a C++ counterpart are **out**; reimplement the C++ path that produces those draws.
 
 ## 6. Explicit non-goals (current)
 
