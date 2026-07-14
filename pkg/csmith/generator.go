@@ -573,6 +573,22 @@ type functionFlowState struct {
 	// postAggNestArrayOpPLStackU3AddrCreateN: ExpressionAssign Lhs SelectDeref
 	// !NewArray&&!initNull under PLStackU3 (0: U2 accept e7605; 1+: CreateArray e7736).
 	postAggNestArrayOpPLStackU3AddrCreateN int
+	// postAggNestArrayOpPLStackU3GlobalCreateDone: one-shot free Expression
+	// Global pointer create after Lhs CreateArray residual (e7776 SE-free
+	// F50 F10×n → CreateArray; not residual sole → Statement Assign F80).
+	postAggNestArrayOpPLStackU3GlobalCreateDone bool
+	// postAggNestArrayOpPLStackU3StmtLhsCreate: next Statement Assign Lhs
+	// SelectDeref empty create (e7809 F80 F10 F50 F20 F20… CreateArray).
+	postAggNestArrayOpPLStackU3StmtLhsCreate bool
+	// postAggNestArrayOpPLStackU3ForCtrl: next For SelectLoopCtrlVar U33…U30
+	// shrinking + loop_control F50 U60… (e7824 after Lhs CreateArray Assign).
+	postAggNestArrayOpPLStackU3ForCtrl bool
+	// postAggNestArrayOpPLStackU4SkipU2Once: after ForCtrl re-arms PLStackU4,
+	// first PP→PL creates without e7372 U2 choose (e7849 F50 F10…).
+	postAggNestArrayOpPLStackU4SkipU2Once bool
+	// postAggNestArrayOpPLStackU4AddrU8: that create burns address residual U8
+	// (e7855; e7383 sticky skip would omit it).
+	postAggNestArrayOpPLStackU4AddrU8 bool
 	// postAggNestArrayOpPLStackU4N: inventory PL choose count under PLStackU4
 	// (e7421 U4 first; e7431 U5; e7435 VS reselect; e7445+ U5).
 	postAggNestArrayOpPLStackU4N int
@@ -3255,6 +3271,111 @@ func burnCreateFieldVarsConstants(r *rng, t CType, ctx *genContext, opts Options
 	}
 }
 
+// createOnDemandGlobalPLStackU3 mirrors GenerateNewGlobal for free Expression
+// Global pointer after Lhs CreateArray residual (e7776). UP type is 4-star SE-free
+// qfer (F50 F10×5), NewArray + make_init address peels * with random_loose F50s
+// and nested create_and_initialize (qfer provided → no random_qualifiers), then
+// outer CreateArray U99.
+func createOnDemandGlobalPLStackU3(er *exprRand, opts Options, ctx *genContext) (exprVarCandidate, bool) {
+	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
+		return exprVarCandidate{}, false
+	}
+	r := er.fallback
+	// Floor **** — GO Expression type often under-counts stars vs UP derived.
+	t := CType{Name: "int32_t****", Signed: true, Bits: 32, HexDigits: 8}
+	levels := 4
+	// SE-free random_qualifiers: levels + self each F50 vol + F10 const.
+	for i := 0; i < levels; i++ {
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(10)
+	}
+	_ = r.flipcoin(50) // self vol
+	_ = r.flipcoin(10) // self const
+	// create_and_initialize
+	newArray := r.flipcoin(20)
+	initConst := r.flipcoin(20)
+	if !initConst {
+		// make_init_value address-of: random_loose_qualifiers then GenerateNewGlobal
+		// for pointee with non-wildcard qfer (skip random_qualifiers).
+		// e7788+: nested peel residual F50 F50 F20 F20… then U2 + outer CreateArray.
+		burnPLStackU3NestedPointerInit(r, opts, ctx, levels-1)
+	}
+	var arrRes arrayCreateResult
+	if newArray {
+		arrRes = burnCreateArrayVariable(r, opts, t, true)
+	}
+	name := ctx.state.allocGlobalName()
+	arrLen := 0
+	var sizesCopy []int
+	if newArray {
+		sizesCopy = append(sizesCopy, arrRes.sizes...)
+		if len(sizesCopy) == 0 {
+			sizesCopy = []int{4}
+		}
+		arrLen = 4
+		initBody := formatArrayInitBrace(sizesCopy, arrRes.inits, "0")
+		dims := ""
+		for _, s := range sizesCopy {
+			if s < 1 {
+				s = 1
+			}
+			dims += fmt.Sprintf("[%d]", s)
+		}
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s%s = %s;", t.Name, name, dims, initBody))
+	} else {
+		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s %s = 0;", t.Name, name))
+	}
+	g := globalInfo{
+		name: name, ctype: t, isArray: newArray, arrayLen: arrLen, arraySizes: sizesCopy,
+	}
+	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+	ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, g)
+	// Next Statement Assign Lhs SelectDeref empty create (e7809+).
+	ctx.state.postAggNestArrayOpPLStackU3StmtLhsCreate = true
+	return exprVarCandidate{
+		expr: name, ctype: t, assignable: true,
+		isArray: newArray, arrayLen: arrLen, arraySizes: sizesCopy,
+	}, true
+}
+
+// burnPLStackU3NestedPointerInit burns make_init address residual for multi-level
+// pointer pointee under e7776: random_loose F50s + create_and_initialize (skip
+// random_qualifiers). Peels one * per nest until simple / choose U2.
+func burnPLStackU3NestedPointerInit(r *rng, opts Options, ctx *genContext, levels int) {
+	if r == nil {
+		return
+	}
+	if levels <= 0 {
+		// simple pointee Constant::make_random
+		_ = formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
+		return
+	}
+	// random_loose_qualifiers: eligible levels burn F50 vol and/or F50 const.
+	// Depth>2 keeps storage match; looser coins on trailing levels (e7788 F50 F50).
+	if levels >= 2 {
+		_ = r.flipcoin(50)
+		_ = r.flipcoin(50)
+	} else {
+		_ = r.flipcoin(50)
+	}
+	// create_and_initialize for pointee (qfer already set — no random_qualifiers)
+	newArray := r.flipcoin(20)
+	initConst := r.flipcoin(20)
+	if !initConst {
+		if levels > 1 {
+			burnPLStackU3NestedPointerInit(r, opts, ctx, levels-1)
+		} else {
+			// single-star pointee: choose_ok_var among pointees (e7799 U2)
+			_ = r.upto(2)
+		}
+	}
+	if newArray {
+		stars := strings.Repeat("*", levels)
+		pt := CType{Name: "int32_t" + stars, Signed: true, Bits: 32, HexDigits: 8}
+		_ = burnCreateArrayVariable(r, opts, pt, true)
+	}
+}
+
 // createOnDemandGlobalFromERSEFree mirrors GenerateNewGlobal when effect context
 // is side-effect-free: self F50 RegularVolatileProb + F10 const, then NewArray
 // and Constant::make_random (seed4 e2133 maxFuncs Function-fail → struct Global).
@@ -3743,8 +3864,15 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// e7383: after nest ArrayOp Lhs CreateArray residual era, PP→PL ** create
 		// (NewArray=0 initNull=0) skips address residual — parent Expression U120
 		// then Lhs F80 (not multi-level pointee F20 F20 U6).
+		// e7855: after ForCtrl re-arm, first PL create needs address residual U8.
 		if ctx.state.postAggNestArrayOpPLStackU4 && !newArray {
-			doAddrResidual = false
+			if ctx.state.postAggNestArrayOpPLStackU4AddrU8 {
+				ctx.state.postAggNestArrayOpPLStackU4AddrU8 = false
+				_ = er.fallback.upto(8) // e7855
+				doAddrResidual = false
+			} else {
+				doAddrResidual = false
+			}
 		}
 		if doAddrResidual {
 			// Address-of residual (make_init_value → choose_var → choose_ok_var).
@@ -6605,6 +6733,24 @@ exprTries:
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "x"))
 			}
+			// e7776: after PLStackU3 Lhs CreateArray residual (AddrCreateN≥1),
+			// free Expression Global pointer is empty choose_var → GenerateNewGlobal
+			// SE-free. Residual-era sole accept ends Expression → Statement Assign
+			// Lhs F80; UP stays in create residual. UP qfer = 4 levels + self
+			// (F50 F10×5); make_init address peels one * with random_loose + nested
+			// create_and_initialize (skip random_qualifiers) then outer CreateArray.
+			if scopePick == 0 && flow != nil &&
+				flow.postAggNestArrayOpPLStackU3 &&
+				flow.postAggNestArrayOpPLStackU3AddrCreateN >= 1 &&
+				!flow.postAggNestArrayOpPLStackU3GlobalCreateDone &&
+				strings.Contains(t.Name, "*") && er != nil {
+				flow.postAggNestArrayOpPLStackU3GlobalCreateDone = true
+				if g, ok := createOnDemandGlobalPLStackU3(er, opts, ctx); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
+			}
 			// 3/4 = force create (from NewValue table entry)
 			if scopePick == 3 {
 				if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
@@ -8387,37 +8533,57 @@ exprTries:
 						// e7372–75: PL stack U4 era — choose_ok_var U2 then VS
 						// reselect; PP/PL/NewValue→PL stack + GenerateNewParentLocal
 						// (UP U2 U100=92 PP→PL U4 F50…; not PP sole → parent U120).
+						// e7849: after ForCtrl re-armed PLStackU4 (PLStackU4N reset),
+						// first PP→PL is empty create F50 F10… (no U2; stack already
+						// U4). Flag postAggNestArrayOpPLStackU4SkipU2Once.
 						if flow != nil && flow.postAggNestArrayOpPLStackU4 && er != nil {
-							_ = er.pick(2) // e7372
-							scopePick2 := variableScopePickFromER(er, opts, &scope)
-							if scopePick2 == 0 {
-								cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
-								if len(cands) > 1 {
-									_ = er.pick(uint32(len(cands)))
+							if flow.postAggNestArrayOpPLStackU4SkipU2Once {
+								// e7849: stack already U4 from PP→PL parentStackPick;
+								// create qferMode 1 without e7372 U2 or second stack.
+								// UP qfer F50 F10×2 = one ptr level + self (keep * not **).
+								// e7855: address residual U8 after F20 F20.
+								flow.postAggNestArrayOpPLStackU4SkipU2Once = false
+								flow.postAggNestArrayOpPLStackU4AddrU8 = true
+								createT := t
+								if !strings.Contains(createT.Name, "*") {
+									createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 								}
-								bumpExprDepth(ctx)
-								if len(cands) > 0 {
-									return finishVar(castLiteral(t, cands[0].expr))
-								}
-								return finishVar(castLiteral(t, "g_0"))
-							}
-							if scopePick2 == 3 {
-								if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, g.expr))
 								}
-							}
-							// PL / PP miss / NewValue→PL: stack + create (e7374–75).
-							// e7375–80: UP qfer is 2 ptr levels + self (F50 F10×3);
-							// requested t often has only one * — force ** keep-type.
-							idx2 := parentStackPick(er, flow)
-							createT := t
-							if strings.Count(createT.Name, "*") < 2 {
-								createT = CType{Name: "int32_t**", Signed: true, Bits: 32, HexDigits: 8}
-							}
-							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, idx2); ok {
-								bumpExprDepth(ctx)
-								return finishVar(castLiteral(t, g.expr))
+							} else {
+								_ = er.pick(2) // e7372
+								scopePick2 := variableScopePickFromER(er, opts, &scope)
+								if scopePick2 == 0 {
+									cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
+									if len(cands) > 1 {
+										_ = er.pick(uint32(len(cands)))
+									}
+									bumpExprDepth(ctx)
+									if len(cands) > 0 {
+										return finishVar(castLiteral(t, cands[0].expr))
+									}
+									return finishVar(castLiteral(t, "g_0"))
+								}
+								if scopePick2 == 3 {
+									if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+										bumpExprDepth(ctx)
+										return finishVar(castLiteral(t, g.expr))
+									}
+								}
+								// PL / PP miss / NewValue→PL: stack + create (e7374–75).
+								// e7375–80: UP qfer is 2 ptr levels + self (F50 F10×3);
+								// requested t often has only one * — force ** keep-type.
+								idx2 := parentStackPick(er, flow)
+								createT := t
+								if strings.Count(createT.Name, "*") < 2 {
+									createT = CType{Name: "int32_t**", Signed: true, Bits: 32, HexDigits: 8}
+								}
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, idx2); ok {
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, g.expr))
+								}
 							}
 						}
 						if postAggGlobalCreateN >= 0 && !nestPtrCreate {
@@ -10906,6 +11072,59 @@ lhsDerefLoop:
 		// to VariableSelector U100 (UP no SelectDeref F80).
 		if needNoRhs && ctx != nil && ctx.state != nil &&
 			ctx.state.lateAssignOpsFiltered && ctx.state.lateDerefCreateN >= 2 {
+			break
+		}
+		// e7809: after PLStackU3 free Expression Global create, Statement Assign
+		// Lhs SelectDeref empty create: random_add_qualifiers F10 F50 + NewArray
+		// F20 + make_init address F20 + nested residual F50 F50 F20 F20 CreateArray.
+		// GO inventory falsely non-empty would choose/retry F80×2 without residual.
+		if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU3StmtLhsCreate {
+			if !r.flipcoin(80) {
+				break // VS select
+			}
+			ctx.state.postAggNestArrayOpPLStackU3StmtLhsCreate = false
+			if opts.ConstPointers {
+				_ = r.flipcoin(10) // random_add const
+			}
+			if opts.VolatilePointers {
+				_ = r.flipcoin(50) // random_add vol
+			}
+			newArray := r.flipcoin(20)
+			initConst := r.flipcoin(20)
+			if !initConst {
+				// make_init address: random_loose + nested create residual
+				// e7814+: F50 F50 F20 F20 CreateArray U99 (pointee NewArray path)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				tgtNew := r.flipcoin(20)
+				_ = r.flipcoin(20) // nested make_init
+				if tgtNew || newArray {
+					ptrType := targetType
+					if !strings.Contains(ptrType.Name, "*") {
+						ptrType = CType{
+							Name: targetType.Name + "*", Signed: targetType.Signed,
+							Bits: targetType.Bits, HexDigits: targetType.HexDigits,
+						}
+					}
+					_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+					emitOrphanArrayGlobal(ctx, ptrType, _arr)
+					createdArrayThisLhs = true
+					// e7822: after CreateArray itemize U9, UP burns extra U4
+					// before next Statement U100=26 tries=0 For (not filtered).
+					// Arm For SelectLoopCtrlVar U33…U30 + loop_control residual.
+					_ = r.upto(4)
+					if ctx != nil && ctx.state != nil {
+						ctx.state.skipNextBlockSize = false
+						ctx.state.postAggNestStmtUnfilteredOnce = true
+						ctx.state.postAggNestArrayOpPLStackU3ForCtrl = true
+					}
+				}
+			} else {
+				_ = r.flipcoin(0) // null validate fail
+				continue
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
 		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
@@ -14703,6 +14922,49 @@ func emitStatement(
 		// 1 after first nested for (e503 reuse IV, no choose RNG + loop_control);
 		// 0 → create IV via burnSelectLoopCtrlVarCreate (vol retry, NewArray may
 		// expand to full multi-dim CreateArrayVariable + itemize; seed2 e560–e678).
+		// e7824: after PLStackU3 Lhs CreateArray Assign, For SelectLoopCtrlVar
+		// shrinks U33→U30 (volatile rejects) then make_random_loop_control
+		// F50 U60 U6 F50 U10 + SafeOpFlags (not loopIVPool U2).
+		if state != nil && state.postAggNestArrayOpPLStackU3ForCtrl {
+			state.postAggNestArrayOpPLStackU3ForCtrl = false
+			for n := 33; n >= 30; n-- {
+				_ = r.upto(uint32(n))
+			}
+			// make_random_loop_control
+			_ = r.flipcoin(50)
+			_ = r.upto(60)
+			_ = r.upto(6)
+			if r.flipcoin(50) {
+				_ = r.upto(10)
+			} else {
+				_ = r.flipcoin(50)
+			}
+			// SafeOpFlags ×3
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			_ = r.flipcoin(50)
+			_ = r.upto(4)
+			// e7848: after this For, PL stack is U4 again (not sticky U3 from
+			// keepExpr residual era). First PP→PL creates without e7372 U2.
+			state.postAggNestArrayOpPLStackU3 = false
+			state.postAggNestArrayOpPLStackU4 = true
+			state.postAggNestArrayOpPLStackU4N = 0
+			state.postAggNestArrayOpPLStackU4SkipU2Once = true
+			writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
+			writeLine(b, 2, "x += (uint32_t)i;")
+			if state != nil {
+				state.blockStack++
+			}
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state != nil && state.blockStack > 0 {
+				state.blockStack--
+			}
+			writeLine(b, 1, "}")
+			break
+		}
 		postArrayFor := state != nil && state.loopIVPool > 1
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
 		// seed4 e783: first nested For in PP-era array-loop body has no real
