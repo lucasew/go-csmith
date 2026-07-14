@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8029) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →8390) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8029** (7857→8029 past 8000; SelectDeref U6 + multiphase countdown; seed2 full held). Toward 8500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **8390** (8029→8390; 947/993 CD3 table + post-CD3 free Expression; seed2 full held). Toward 8500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -499,8 +499,17 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e7876–906: multiphase SelectDeref ladder (CD2 U11…U6, CD3 U4/U3/U2 itemize,
    Global/PP create residuals) through 8000+.
 
-Next plateau: seed4 e8029 SelectDeref itemize 947/993 pattern residual.
-Seeds 5–21; COUNT=20.
+**e8029–e8390 climbed:**
+1. e8029: CD3 n≥400 explicit 947/993 itemize table + F0 residual multiphase leave.
+2. e8271–73: free Expression PL stack U2 + locals U4 (clear sticky PLStackU4/itemize).
+3. e8276+: post-CD3 free Expression Global multiphase U56→U19 (not residual sole/U2).
+4. e8294+: ExpressionAssign skip residual qfer; ptr-cmp derived_types U21.
+5. e8308–36: ExpressionAssign Lhs SelectDeref residual U11…U8 (not F20 create).
+6. e8345+: post-CD3 PL stack U2 + phased locals (U4 / U4+947 / U5).
+7. e8373–81: ShiftBy/Constant depthBlock for high-tries Variable filter.
+
+Next plateau: seed4 e8390 Statement Assign Lhs F50 F0 → RHS Expression Function
+(not Constant). Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
