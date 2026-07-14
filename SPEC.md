@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6099) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6402) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6099** (5308→6099; nest VS miss16–37 + U2 phases; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6402** (6099→6402; NewValue accept + nest Function/Assign residual; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -365,7 +365,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
    U6+itemize 993/947, short create → multi-phase U2 via `nestU2ItemizeKind`.
 3. miss37: NewValue U100=95 → F10 PL create Constant residual (partial accept).
 
-Next plateau: seed4 e6099 GO extra F50 after NewValue residual vs UP Statement U100 tries=1.
+**e6099–e6402 climbed:**
+1. e6099: NewValue residual must not burn trailing F50+U4 (those are needNoRhs SafeOpFlags).
+2. SelectLType derived_types U13 pad; stack U6 after nest VS; multi-level *** PL create.
+3. Function-arg PP→PL force create; skip empty-pointee address residual; Global U2 not U44.
+4. Re-arm nest SelectDeref countdown U12 after Lhs create; roundN≥2 short U10…U3 + U2 phases.
+5. miss38–40: U2 / U5+993 / U4+U8 accept; VS miss cap 50.
+
+Next plateau: seed4 e6402 nested ExpressionAssign U120=104 → UP F50 qfer vs GO term re-pick U120.
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
