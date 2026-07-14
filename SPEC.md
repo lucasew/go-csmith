@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7736) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7776) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7736** (7516→7736; PL stack U3 create era + derived U18/U19; seed2 full held). Toward 8500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7776** (7736→7776; Lhs CreateArray residual under PLStackU3; seed2 full held). Toward 8500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -476,8 +476,18 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e7634–95: ptr-cmp/PP→PL create qferMode 2 keep type; address residual
    U2 U3 U3 (**) or U4 (*).
 
-Next plateau: seed4 e7736 ExpressionAssign Lhs SelectDeref F20 create residual
-(UP F20 F20 U2 U3 U3 U99 CreateArray). Seeds 5–21; COUNT=20.
+**e7736–e7776 climbed:**
+1. e7605/e7736: PLStackU3 AddrCreateN — first address residual U2 accept; later
+   !NewArray&&!initNull burns pointee NewArray F20 + make_init F20 + ** U2 U3 U3
+   + CreateArray U99 **inline** inside ppPostPad≥15 block (live-picks swallow
+   fall-through).
+2. e7748: CreateArray pointer alts under PLStackU3 burn U2 U3 U3 (not bare U2);
+   skip post-alt U2 U5 itemize residual (e7754).
+3. e7762: Global multi-cand gn=14 visit_facts F0 → PL U3+U4 accept (not sticky
+   e7008 U5 F0 under PLStackU3).
+
+Next plateau: seed4 e7776 after Expression U120, GO Statement Assign Lhs F80 vs
+UP Global/create F50 F10 qfer ladder → CreateArray. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 
