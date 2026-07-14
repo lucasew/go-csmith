@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →15387) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →15685) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **15387** (15185→15387; post-CREATE Function useExisting / Assign ****/** qfer / CreateArray + field hex / PL residual; seed2 full held). Toward 17000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **15685** (15387→15685; Global U129 + VS/PL/PP multiphase + second Lhs SelectDeref residual; seed2 full held). Toward 17000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -584,7 +584,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 5. e9463/e9616: EA Lhs empty create U7 then U2; **** PL qfer floor3; EA qfer *** .
 6. e9603: ArrayOp2 EA qfer floor lv=3 after first ** floor2.
 
-Next plateau: seed4 e15387 Variable Global ok_vars U129 vs GO U102 (inventory under-count after post-CREATE residual). Toward 17000+.
+Next plateau: seed4 e15685 second Lhs residual PP multiphase U5 U4 (vs GO U5 U2). Toward 17000+.
+
+**e15387–e15685 climbed:**
+1. e15387: post-CREATE Global ok_vars **U129** (was U102; CreateArray + field growth).
+2. e15397–405: Variable PP U5 U3; PL U5 U5 U2 U5; no-Assign tries=1.
+3. e15413–60: PL ***** create qfer; Constant SelectDeref F80 ladder; useExisting CREATE head.
+4. e15483–685: Comma re-enters Lhs SelectDeref residual — Global U9/U8U10/U8U4; PP itemize; PL U5 U5/U3.
+5. seed2 37939 held.
 
 **e15185–e15387 climbed:**
 1. e15185: post-CREATE Function useExisting residual — PL stack U6 multiphase (was U5 sole).
