@@ -112,10 +112,30 @@ When reviewing a climb/commit, **read** `pkg/csmith/*.go` (and related) and fail
 | Seed-literal branches (`if seed == 2`) in generation paths | Non-portable hardcodes |
 | Event match with **thin/wrong source** (Go C ≪ upstream structure) while claiming “done” | Events advanced without materializing real AST |
 | Coin sequences with no corresponding C++ call path | Unmotivated hacks |
+| **Discarding entropy** (see below) | Advances LCG without using the draw |
 
-**Review process for implementers:** after a patch, a separate pass **reads the code** (diff + call graph around the fix) and confirms it maps to Csmith C++ methods — not only that `find-rng-divergence` score improved.
+#### No discarding entropy
 
-Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs; instrumented upstream for measurement only.
+Every `upto` / `flipcoin` / `next31` (and filtered variants) must **use** its result for the same purpose Csmith does: choose a term, accept/reject a filter, build a constant digit, pick a pool index, etc.
+
+| Reject | Why |
+|--------|-----|
+| `_ = r.upto(n)` / `_ = r.flipcoin(p)` / `_ = r.next31()` solely to pad the trace | Discarded draw — stream alignment without a decision |
+| Loops of untraced `next31` “hex gaps” that never append digits (or other consumed bits) into the AST/string | Fake LCG sync |
+| Residual multiphase tables that burn catalogued U/F sequences then throw away the values | Event pack without generation |
+| Drawing a value then ignoring it to force a different path | Same as discarding |
+
+**Allowed (not discard):**
+
+- Csmith itself uses the draw untraced (e.g. `RandomHexDigits` → digit in the constant text; pure filter retries that re-draw until accept — the final accepted value is used).
+- `uptoWithFilter` / VectorFilter retries where **tries** match upstream and the accepted index drives selection.
+- Drawing for a real create/select that fails visit_facts and legitimately retries (upstream does this).
+
+**Review heuristic:** if removing the RNG call would not change generated C (only the event stream), it is discard and must be replaced by the real C++ path that consumes that draw.
+
+**Review process for implementers:** after a patch, a separate pass **reads the code** (diff + call graph around the fix) and confirms it maps to Csmith C++ methods — not only that `find-rng-divergence` score improved. Explicitly check for discarded draws (`_ = r.…` padding, hex-gap loops, residual catalogs).
+
+Allowed: temporary debug prints; timeouts; bounded retries that still call real create/select APIs and **use** accepted RNG values; instrumented upstream for measurement only.
 
 ### 5.3 Technique constraints
 
@@ -124,8 +144,9 @@ Any remaining technique must:
 1. Stay inside the repo’s blast radius
 2. Have timeouts against non-termination
 3. Converge by consulting C++ (not unmotivated RNG hacks)
+4. **Never discard entropy** — every RNG consumer feeds a real decision or materialised value (§5.2)
 
-Order of preference: fix local RNG/call-path alignment first; structural reshape only when the same divergence class blocks progress.
+Order of preference: fix local RNG/call-path alignment first; structural reshape only when the same divergence class blocks progress. Residual multiphase catalogs that only burn stream are **out**; reimplement the C++ path that produces those draws.
 
 ## 6. Explicit non-goals (current)
 
@@ -169,7 +190,7 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
 | 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **17013** (16417→17013; post-itemize Variable multiphase, useEx field catalog, late PL/Global/PP residuals; seed2 full held). Toward 20000+. |
 
-**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
+**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
 
 **e2133–e2229 climbed:**
 1. Function-fail `struct S0` Global: sameWidth fix + SE-free GenerateNewGlobal + struct Constant (bitfield pow half-width).
