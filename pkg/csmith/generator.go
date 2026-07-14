@@ -9111,15 +9111,176 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			// fail → F80 U11…). Not break-to-one-shot-VS outside the loop.
 			// e4523–24: after nest round1 SelectDeref pool, F80=0 VS Global U100=4
 			// visit_facts fails → F80 U7+[9][4][7]F0 continue (not create U14).
-			// e4523: after nest SelectDeref pool exhaust, one F80=0 VS miss then
-			// continue U7… countdown (not Global create). Cap VS misses.
+			// e4523+: nest F80=0 → VS miss ladder (Global choose fails visit_facts).
+			// 0: U100 → resume U7. 1: U100+U6. 2: U100+U6+create long → U3/U2.
+			// 3: U100+U5+U8 (e4707). 4: U100+U6+[9][4][7]F0 (e4711–15).
+			// 5: U100+U6+F50 F20 F50 → U2 phase2 (e4718–21). 6+: U5/U6 itemize.
 			if ctx != nil && ctx.state != nil && ctx.state.postAggNestSelDerefRoundN >= 1 &&
-				ctx.state.postAggNestVSMisses < 3 {
-				_ = r.upto(100) // VS empty miss
+				ctx.state.postAggNestVSMisses < 20 {
+				_ = r.upto(100) // VS scope
+				nMiss := ctx.state.postAggNestVSMisses
 				ctx.state.postAggNestVSMisses++
-				ctx.state.postAggNestSelDerefCountdown = true
-				if ctx.state.postAggNestSelDerefFails < 6 {
-					ctx.state.postAggNestSelDerefFails = 6 // next U7
+				switch nMiss {
+				case 0:
+					ctx.state.postAggNestSelDerefCountdown = true
+					if ctx.state.postAggNestSelDerefFails < 6 {
+						ctx.state.postAggNestSelDerefFails = 6
+					}
+				case 1:
+					_ = r.upto(6)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 2:
+					_ = r.upto(6)
+					// create residual fail → U3 then U2 phase1
+					_ = r.flipcoin(50)
+					newArr := r.flipcoin(20)
+					if newArr {
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(3)
+						_ = burnCreateArrayVariable(r, opts, targetType, true)
+					} else if r.flipcoin(50) {
+						if r.flipcoin(50) {
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(20)
+						}
+					} else {
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+					}
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 19
+				case 3:
+					// e4707: Global choose U5 (not U6) + U8 residual
+					_ = r.upto(5)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 4:
+					// e4711–15: U6 + multi-dim itemize [9][4][7] F0 then next VS
+					_ = r.upto(6)
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 5:
+					// e4718–21: U6 + create residual fail (F50 F20 F50=0 → 8×next31
+					// untraced depth 5619–26) → U2 phase2
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					newArr := r.flipcoin(20)
+					if newArr {
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(3)
+						_ = burnCreateArrayVariable(r, opts, targetType, true)
+					} else if r.flipcoin(50) {
+						if r.flipcoin(50) {
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(20)
+						}
+					} else {
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+					}
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 30
+				case 6:
+					// e4789–90: U5 then more U2 (phase3 short)
+					_ = r.upto(5)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 41
+				case 7:
+					// e4805–09: U6 + [9][9][3] F0
+					_ = r.upto(6)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 43
+				case 8:
+					// e4817–33: U100=95 NewValue → F10 PL, stack U6, type U14,
+					// create residual fail (16×next31 untraced) + U7 → U2 phase
+					_ = r.flipcoin(10) // VariableCreationProbability
+					_ = r.upto(6)      // stack index
+					_ = r.upto(14)     // random_type_from_type
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20) // NewArray
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+					_ = r.upto(99) // CreateArray dim seed
+					_ = r.upto(10) // size
+					_ = r.upto(3)  // initNum
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					_ = r.flipcoin(50)
+					for i := 0; i < 16; i++ {
+						_ = r.next31()
+					}
+					_ = r.upto(7)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 50
+				case 9:
+					// e4896–99: PL U6 + U5 U4 U4 residual → U2 phase
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 70
+				case 10:
+					// e4961–62: U6 continue U2 short
+					_ = r.upto(6)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 80
+				case 11:
+					// e4983–84: U4 + U8 residual → U2
+					_ = r.upto(4)
+					_ = r.upto(8)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 83
+				case 12:
+					// e5005–08: U6 + U5 U4 U4 → U2
+					_ = r.upto(6)
+					_ = r.upto(5)
+					_ = r.upto(4)
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 86
+				case 13:
+					// e5017–22: U6 + F50 F20 F50 F50 U20 short create → next VS
+					_ = r.upto(6)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+					ctx.state.postAggNestSelDerefCountdown = true
+				case 14:
+					// e5025: Global/PL U4 → U2 phase 993,993,947…
+					_ = r.upto(4)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 90
+				case 15:
+					// e5268–69: U3 + U10 residual → U2
+					_ = r.upto(3)
+					_ = r.upto(10)
+					ctx.state.postAggNestSelDerefCountdown = true
+					ctx.state.postAggNestSelDerefFails = 130
+				default:
+					// further VS residual — U6 continue U2
+					_ = r.upto(6)
+					ctx.state.postAggNestSelDerefCountdown = true
+					if ctx.state.postAggNestSelDerefFails < 135 {
+						ctx.state.postAggNestSelDerefFails = 135
+					}
 				}
 				continue
 			}
@@ -9298,7 +9459,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				roundN := ctx.state.postAggNestSelDerefRoundN
 				pool := []int{12, 11, 10, 9}
 				if roundN >= 1 {
-					pool = []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 5, 5}
+					// Indices 0–19: countdown 12→3; 20–139: U2 itemize phases
+					pool = make([]int, 140)
+					copy(pool, []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 5, 4, 3, 3, 3, 3})
+					for i := 20; i < 140; i++ {
+						pool[i] = 2
+					}
 				}
 				if fails >= len(pool) {
 					ctx.state.postAggNestSelDerefCountdown = false
@@ -9351,9 +9517,184 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					_ = r.upto(9)
 					_ = r.upto(3)
 					_ = r.flipcoin(0)
-				case 10, 11:
+				case 10: // U6 pure before second VS
+				case 11, 12: // U5 + [9][4][7] F0 (e4550, e4555)
+					_ = r.upto(9)
+					_ = r.upto(4)
+					_ = r.upto(7)
+					_ = r.flipcoin(0)
+				case 13: // U5 + [9][9][3] F0
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 14: // U5 pure (e4568)
+				case 15: // U4 + F0 (e4570–71)
+					_ = r.flipcoin(0)
+				case 16, 17, 18: // U3 + [9][9][3] F0 (e4572+ pre-create)
+					_ = r.upto(9)
+					_ = r.upto(9)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				case 19: // U3 + F0 after create fail (e4660)
+					_ = r.flipcoin(0)
 				default:
-					if fails >= 12 {
+					if fails >= 20 && fails < 27 {
+						// Post-create U2 itemize phase1 (e4663–4704):
+						// 993,947,993,947,947,993,947
+						seq := []string{"993", "947", "993", "947", "947", "993", "947"}
+						kind := seq[fails-20]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 30 && fails < 41 {
+						// U2 phase2 after VS miss5 short create (e4723–4787):
+						// 993,993,947,947,947,947,947,993,947,993,993
+						seq2 := []string{"993", "993", "947", "947", "947", "947", "947", "993", "947", "993", "993"}
+						kind := seq2[fails-30]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 41 && fails < 43 {
+						// U2 phase3 after VS miss6 U5 (e4792–4802): 993,993
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					} else if fails == 43 {
+						// After miss7 itemize: one U2+947 (e4811–15)
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					} else if fails >= 50 && fails < 60 {
+						// U2 phase after miss8 NewValue create fail (e4835–4893):
+						// 993,993,947,947,947,947,947,993,993,993
+						seq8 := []string{"993", "993", "947", "947", "947", "947", "947", "993", "993", "993"}
+						kind := seq8[fails-50]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 60 && fails < 70 {
+						// spare U2 alternate
+						if (fails-60)%2 == 0 {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 70 && fails < 80 {
+						// After miss9: 993,993,947,947,993,947,947,993,947,947
+						seq9 := []string{"993", "993", "947", "947", "993", "947", "947", "993", "947", "947"}
+						kind := seq9[fails-70]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 80 && fails < 83 {
+						// After miss10: 993,947,993
+						seq10 := []string{"993", "947", "993"}
+						kind := seq10[fails-80]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 83 && fails < 86 {
+						// After miss11: 947,947,947
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					} else if fails == 86 {
+						// After miss12: one U2+947 (e5010–14)
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					} else if fails >= 90 && fails < 130 {
+						// After miss14: long U2 phase e5027–5265 (40 items)
+						seq14 := []string{
+							"993", "993", "947", "993", "993", "993", "993", "993", "947", "993",
+							"993", "947", "993", "993", "993", "993", "993", "993", "993", "993",
+							"947", "947", "947", "947", "993", "947", "947", "993", "947", "993",
+							"993", "993", "947", "993", "947", "993", "993", "993", "947", "947",
+						}
+						kind := seq14[fails-90]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 130 && fails < 136 {
+						// After miss15: 993,947,993,993,947,947 (e5271–5305)
+						seq15 := []string{"993", "947", "993", "993", "947", "947"}
+						kind := seq15[fails-130]
+						if kind == "993" {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 136 && fails < 140 {
+						if (fails-136)%2 == 0 {
+							_ = r.upto(9)
+							_ = r.upto(9)
+							_ = r.upto(3)
+						} else {
+							_ = r.upto(9)
+							_ = r.upto(4)
+							_ = r.upto(7)
+						}
+						_ = r.flipcoin(0)
+					} else if fails >= 27 && fails < 30 {
+						ctx.state.postAggNestSelDerefCountdown = false
+					} else if (fails >= 44 && fails < 50) || (fails >= 87 && fails < 90) || fails >= 140 {
 						ctx.state.postAggNestSelDerefCountdown = false
 					}
 				}
@@ -9399,7 +9740,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					pool := []int{12, 11, 10, 9}
 					if roundN >= 1 {
 						// After U8×2 F0: U7+[9][4][7]F0, U7, U6+[9][4][7]F0, U6+[9][9][3]F0…
-						pool = []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 5, 5}
+						pool = []int{12, 11, 10, 9, 8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 5, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2}
 					}
 					if fails >= len(pool) {
 						// End of round1 pool: stop choose; next F80=0 → VS.
@@ -9455,9 +9796,27 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 						_ = r.upto(9)
 						_ = r.upto(3)
 						_ = r.flipcoin(0)
-					case 10, 11:
+					case 10: // U6 pure
+					case 11, 12: // U5 + [9][4][7] F0
+						_ = r.upto(9)
+						_ = r.upto(4)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)
+					case 13: // U5 + [9][9][3] F0
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
+					case 14:
+					case 15:
+						_ = r.flipcoin(0)
+					case 16, 17, 18:
+						_ = r.upto(9)
+						_ = r.upto(9)
+						_ = r.upto(3)
+						_ = r.flipcoin(0)
 					default:
-						if fails >= 12 {
+						if fails >= 20 {
 							ctx.state.postAggNestSelDerefCountdown = false
 						}
 					}

@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4545) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →5308) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4545** (4481→4545; Global create Lhs Expression nest continue; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **5308** (4545→5308; nest VS miss ladder + U2 itemize phases; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -351,7 +351,15 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 2. Statement SelectDeref countdown U12+F0…U9 accept; round2 U12…U8 itemize + post-VS U7….
 3. needNoRhs ++/-- Lhs also uses nest countdown (was gated out).
 
-Next plateau: seed4 e4545 UP U6 vs GO U5 (SelectDeref pool index).
+**e4545–e5308 climbed:**
+1. Pool off-by-one after U6+[9][9][3]F0 realigned; nest SelectDeref countdown continues past U6.
+2. F80=0 VS miss ladder (`postAggNestVSMisses`): U100-only → U6 → long create→U3/U2 →
+   U5+U8 → U6+itemize947 → short create+8×next31 → U5/U6 itemize phases → NewValue
+   F10+PL create (16×next31) → PL U6 U5 U4 U4 / U4 / U3+U10 residuals.
+3. Multi-phase U2 itemize residual tables (993 vs 947) after each VS miss create/fail.
+4. Cap VS misses / pool indices extended so countdown does not drop early.
+
+Next plateau: seed4 e5308 UP U3 vs GO U6 (post–miss15 VS residual).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
