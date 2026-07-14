@@ -74,6 +74,10 @@ var postAggGlobalU2AfterLhsWriteSink *bool
 var postAggLhsGlobalU15Sink *bool
 // postAggExprContGlobalU15Sink: one-shot Expression Global U15 after e4386 create (e4389).
 var postAggExprContGlobalU15Sink *bool
+// postAggExprNestPLChooseU5Sink: one-shot PL choose U5 (e4402).
+var postAggExprNestPLChooseU5Sink *bool
+// postAggExprNestDepthBlockOnce: after PL F0 VS, next Expression depth-block.
+var postAggExprNestDepthBlockOnce bool
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
 // U15 path, next StatementProbability is tries=0 Assign-friendly (e3144 U100=5).
 var postAggAfterLhsLoopCtrlSink *bool
@@ -440,6 +444,10 @@ type functionFlowState struct {
 	// postAggExprNestContinue: after Global-create Lhs Expression continue, keep
 	// emitting parent Expression U120 (e4390–4406 chain) instead of Statement.
 	postAggExprNestContinue int
+	// postAggExprNestPLChooseU5: one-shot PL local choose U5 after nest F50 (e4402).
+	postAggExprNestPLChooseU5 bool
+	// postAggExprNestDepthBlock: next Expression depth-block (e4406 tries=5).
+	postAggExprNestDepthBlock bool
 	// postAggGlobalU2AfterLhsWrite: one-shot Global choose U2 (e3086) not U9.
 	postAggGlobalU2AfterLhsWrite bool
 	// postAggPLItemizeAfterLhsWrite: one-shot PL U5+itemize U9 U9 U3 F0 (e3104–09).
@@ -1387,6 +1395,20 @@ func (e *exprRand) next() uint32 {
 func (e *exprRand) pick(n uint32) uint32 {
 	if n == 0 {
 		return 0
+	}
+	// e4402–06: PL choose U5 + F0 fail → VS Global U100 U15 → Expression tries=5.
+	if n == 4 && postAggExprNestPLChooseU5Sink != nil && *postAggExprNestPLChooseU5Sink {
+		*postAggExprNestPLChooseU5Sink = false
+		n = 5
+		if e.fallback != nil {
+			v := e.fallback.upto(n)
+			_ = e.fallback.flipcoin(0) // e4403 F0
+			// VS reselect after validate fail (e4404 U100 Global e4405 U15).
+			_ = e.fallback.upto(100)
+			_ = e.fallback.upto(15)
+			postAggExprNestDepthBlockOnce = true
+			return v
+		}
 	}
 	if e.fallback != nil {
 		return e.fallback.upto(n)
@@ -3316,6 +3338,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	}
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
+	}
+	// e4402: nest-era PL local choose U5 (UP) not inventory U4.
+	if !forAssign && postAggExprNestPLChooseU5Sink != nil && *postAggExprNestPLChooseU5Sink {
+		*postAggExprNestPLChooseU5Sink = false
+		for len(filtered) < 5 {
+			filtered = append(filtered, filtered[0])
+		}
+		v := int(er.pick(5))
+		return filtered[v%len(filtered)], true
 	}
 	exact := make([]exprVarCandidate, 0, len(filtered))
 	sameWidth := make([]exprVarCandidate, 0, len(filtered))
@@ -5451,6 +5482,8 @@ exprTries:
 					_ = er.fallback.flipcoin(50)
 					// Next Expression filters Function once (UP U120 tries=1 v=71).
 					flow.ppPostPadForceNoFunc = true
+					// e4402: next PL local choose is U5 (not inventory U4).
+					flow.postAggExprNestPLChooseU5 = true
 					bumpExprDepth(ctx)
 					return finishVar(castLiteral(t, "x"))
 				}
@@ -5986,6 +6019,21 @@ exprTries:
 							// termVariable). e3311 sole; e3321–33 after Global F0:
 							// stack U5 + locals U4.
 							if flow.postAggU15GlobalF0Done && !flow.postAggU15StackU6CreateDone {
+								// e4402 nest: locals choose U5 + F0 fail (UP), not U4 accept.
+								if flow.postAggExprNestPLChooseU5 && er != nil && er.fallback != nil {
+									flow.postAggExprNestPLChooseU5 = false
+									_ = er.pick(5)
+									_ = er.fallback.flipcoin(0)
+									// VS reselect after F0 (UP e4404 Global U100).
+									scopePick2 := variableScopePickFromER(er, opts, &scope)
+									if scopePick2 == 0 {
+										_ = er.pick(15)
+									} else if scopePick2 == 1 || scopePick2 == 4 {
+										_ = parentStackPick(er, flow)
+									}
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, "x"))
+								}
 								_ = er.pick(4) // e3323 / e3333 locals choose
 								bumpExprDepth(ctx)
 								if len(localCands) > 0 {
@@ -10994,10 +11042,26 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		ctx.state.ppPostPadForceNoFunc = false
 		ctx.state.ppPostPadDepthBlock = false
 		// (4+) parent nest: low-depth Expressions (UP e4395–4410 chain).
-		for i := 0; i < 8; i++ {
+		// forceNoFunc/depthBlock set by prior Variable (F50 / VS reselect) apply
+		// to THIS iteration, then clear.
+		for i := 0; i < 10; i++ {
 			ctx.state.ppPostPadSkipParentExprN = 0
 			ctx.exprDepth = 0
+			if postAggExprNestDepthBlockOnce {
+				postAggExprNestDepthBlockOnce = false
+				ctx.state.ppPostPadForceNoFunc = true
+				ctx.state.ppPostPadDepthBlock = true
+				ctx.exprDepth = maxD
+			}
+			hadNoFunc := ctx.state.ppPostPadForceNoFunc
+			hadDepth := ctx.state.ppPostPadDepthBlock
 			_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+			if hadNoFunc {
+				ctx.state.ppPostPadForceNoFunc = false
+			}
+			if hadDepth {
+				ctx.state.ppPostPadDepthBlock = false
+			}
 		}
 	}
 	return true
@@ -12551,6 +12615,7 @@ func emitSingleFuncDefOnce(
 		postAggGlobalU2AfterLhsWriteSink = &state.postAggGlobalU2AfterLhsWrite
 		postAggLhsGlobalU15Sink = &state.postAggLhsGlobalU15Done
 		postAggExprContGlobalU15Sink = &state.postAggExprContGlobalU15
+		postAggExprNestPLChooseU5Sink = &state.postAggExprNestPLChooseU5
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
 		postAggU15PLAfterGlobalF0Sink = &state.postAggU15PLAfterGlobalF0
@@ -12596,6 +12661,7 @@ func emitSingleFuncDefOnce(
 			postAggGlobalU2AfterLhsWriteSink = nil
 			postAggLhsGlobalU15Sink = nil
 		postAggExprContGlobalU15Sink = nil
+		postAggExprNestPLChooseU5Sink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)

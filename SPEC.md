@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4402) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →4408) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4402** (4335→4402; Global create Lhs Expression nest continue; seed2 full held). |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **4408** (4335→4408; Global create Lhs Expression nest continue; seed2 full held). |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -337,15 +337,17 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 2. After Global Lhs sole: next Expression Variable VS sole-accept; unwind nested
    binaries (`postAggUnwindBinaryAfterExprVar`) + SkipParentExpr → Statement Lhs F80.
 
-**e4335–e4402 climbed:**
+**e4335–e4408 climbed:**
 1. Statement Lhs do-while after Expression unwind: F80=0 → VS; ParentParam U5 U5;
    SelectDeref countdown U11…; later PL/PP itemize; Global create U14 F20 F50 hex.
 2. After Global create Lhs: clear `SkipParentExprN` and continue Expression nest
    (depth-block Variable tries=3 → parent U120 → F50+noConst tries=16 → …).
 3. Expression Global choose U15 (not post-ptr U44); PL stack then F50 parent
    (not local choose U4); nest continues through e4401.
+4. PL choose U5+F0 → VS Global U15; nest Expression depth-block tries=5
+   (through e4407).
 
-Next plateau: seed4 e4402 UP U5 after PL stack vs GO U4 (choose pool).
+Next plateau: seed4 e4408 UP U120 tries=1 vs GO tries=0 (after ParentParam U100=71).
 Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
