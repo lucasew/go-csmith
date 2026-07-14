@@ -3330,6 +3330,19 @@ func burnCreateAndInitialize(r *rng, opts Options, t CType) (newArray bool) {
 	return newArray
 }
 
+// burnLhsResidualScopeCreate mirrors residual-era VS create after ok_vars miss:
+// qfer F50 (vol residual) + create_and_initialize (NewArray F20 + Constant +
+// optional CreateArray U99…itemize). Used by long Lhs SelectDeref residual
+// e13484–15095 (e14315 NewArray path U20 U99 U10×3 U48 + inits + itemize).
+func burnLhsResidualScopeCreate(r *rng, opts Options) {
+	if r == nil {
+		return
+	}
+	_ = r.flipcoin(50) // residual qfer vol F50
+	t := CType{Name: "int", Signed: true, Bits: 32, HexDigits: 8}
+	_ = burnCreateAndInitialize(r, opts, t)
+}
+
 // burnSelectLoopCtrlVarCreate mirrors SelectLoopCtrlVar when no suitable
 // non-array integer is visible.
 //
@@ -14228,6 +14241,12 @@ lhsDerefLoop:
 																		// NonVoid filter (float/int128 reject);
 																		// lhs Expression no_const until non-Comma.
 																		commaLhsNoConst := false
+																		// e15083+: Lhs SelectDeref residual accept
+																		// (NewValue N2); next Function may CREATE.
+																		// lhsSelectDerefResidualRan: one-shot long
+																		// residual (do not re-enter on later Comma).
+																		lhsSelectDerefResidualRan := false
+																		lhsResidualDone := false
 																		for j := 0; j < 250; j++ {
 																			var vv uint32
 																			if depthNoConstNext {
@@ -14269,7 +14288,10 @@ lhsDerefLoop:
 																				// cleared), residual is Lhs
 																				// SelectDeref F80 ladder (not U14) —
 																				// StatementAssign Lhs after expr.
-																				if !depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone {
+																				// One-shot: later Comma (e15100 CREATE
+																				// body) uses normal U14 type burn.
+																				if !depthFilterExpr && depthFilterClosed && depthConstSelectDerefDone && !lhsSelectDerefResidualRan {
+																					lhsSelectDerefResidualRan = true
 																					// e13484–15095: long Statement Lhs
 																					// SelectDeref residual after deep
 																					// Expression (LShift) ends.
@@ -14281,6 +14303,7 @@ lhsDerefLoop:
 																					plVS := 0
 																					globalVS := 0
 																					ppVS := 0
+																					nvVS := 0
 																					for lhsDerefN < 400 {
 																						lhsDerefN++
 																						if !rf.flipcoin(80) {
@@ -14314,58 +14337,122 @@ lhsDerefLoop:
 																									case globalVS == 5:
 																										// e13852: U7 sole
 																										_ = rf.upto(7)
-																									default:
-																										// e13880+: U6 [U8];
-																										// e13968 U5 U8 later.
+																									case globalVS == 6:
+																										// e13879: U6 U8
 																										_ = rf.upto(6)
-																										if globalVS%2 == 0 {
+																										_ = rf.upto(8)
+																									case globalVS == 7:
+																										// e13883: U6 sole
+																										_ = rf.upto(6)
+																									case globalVS == 8:
+																										// e13968: U5 U8
+																										_ = rf.upto(5)
+																										_ = rf.upto(8)
+																									case globalVS == 9:
+																										// e14064: U5 sole
+																										_ = rf.upto(5)
+																									case globalVS == 10:
+																										// e14122: U4 U4
+																										_ = rf.upto(4)
+																										_ = rf.upto(4)
+																									case globalVS == 11:
+																										// e14126: U4 U8
+																										_ = rf.upto(4)
+																										_ = rf.upto(8)
+																									case globalVS == 12:
+																										// e14178: U4 U4
+																										_ = rf.upto(4)
+																										_ = rf.upto(4)
+																									case globalVS == 13:
+																										// e14430: U4 U10
+																										_ = rf.upto(4)
+																										_ = rf.upto(10)
+																									case globalVS == 14:
+																										// e14644: U4 sole
+																										_ = rf.upto(4)
+																									case globalVS == 15, globalVS == 16, globalVS == 17, globalVS == 22:
+																										// e14696/e14735/e14744/e14907: U3 U8
+																										_ = rf.upto(3)
+																										_ = rf.upto(8)
+																									case globalVS == 18, globalVS == 20, globalVS == 21, globalVS == 23:
+																										// e14763/e14820/e14878/e15044: U3 U10
+																										_ = rf.upto(3)
+																										_ = rf.upto(10)
+																									case globalVS == 19:
+																										// e14795: U3 U4
+																										_ = rf.upto(3)
+																										_ = rf.upto(4)
+																									default:
+																										// later U3 [U8|U10|U4]
+																										_ = rf.upto(3)
+																										switch globalVS % 3 {
+																										case 0:
 																											_ = rf.upto(8)
+																										case 1:
+																											_ = rf.upto(10)
+																										default:
+																											_ = rf.upto(4)
 																										}
 																									}
 																								}
 																							} else if sp < 65 {
-																								// PL multiphase from residual
-																								// catalog e13502–15000.
+																								// PL multiphase catalog
+																								// e13502–15000 residual.
 																								plVS++
 																								_ = rf.upto(5)
 																								switch {
 																								case plVS <= 2:
-																									// U5 U3 U9
+																									// e13502/e13525: U5 U3 U9
 																									_ = rf.upto(3)
 																									_ = rf.upto(9)
 																								case plVS <= 4:
-																									// U5 + itemize U9 U9 U3 F0
+																									// e13540/e13602: itemize
 																									_ = rf.upto(9)
 																									_ = rf.upto(9)
 																									_ = rf.upto(3)
 																									_ = rf.flipcoin(0)
 																								case plVS == 5:
 																									// e13804: U5 sole
+																								case plVS == 12, plVS == 17:
+																									// e14187/e14669: itemize
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																								case plVS == 14:
+																									// e14512: U3 sole
+																									_ = rf.upto(3)
+																								case plVS == 15:
+																									// e14568: U2 U9
+																									_ = rf.upto(2)
+																									_ = rf.upto(9)
+																								case plVS == 19, plVS == 20:
+																									// e14804/e14954: U3 U4 U8
+																									_ = rf.upto(3)
+																									_ = rf.upto(4)
+																									_ = rf.upto(8)
+																								case plVS == 21:
+																									// e14995: U2 U5
+																									_ = rf.upto(2)
+																									_ = rf.upto(5)
+																								case plVS == 22:
+																									// e15000: U9
+																									_ = rf.upto(9)
 																								default:
-																									// e13909+: U5 F50 F20 F50
-																									// create small/hex
-																									_ = rf.flipcoin(50)
-																									_ = rf.flipcoin(20)
-																									if rf.flipcoin(50) {
-																										if rf.flipcoin(50) {
-																											_ = rf.upto(3)
-																										} else {
-																											_ = rf.upto(20)
-																										}
-																									} else {
-																										for h := 0; h < 8; h++ {
-																											_ = rf.next31()
-																										}
-																									}
+																									// e13909+ create (L6–11,
+																									// L13, L16, L18…):
+																									// U5 F50 F20 Const
+																									// [+CreateArray if NewArray]
+																									burnLhsResidualScopeCreate(rf, opts)
 																								}
 																							} else if sp < 95 {
-																								// PP: first create U5 U14
-																								// F50 F20 F50+hex (e13495);
-																								// later U5 U2 F0 fail
-																								// (e13532–34).
+																								// PP multiphase catalog
+																								// e13493–14937 residual.
 																								ppVS++
 																								_ = rf.upto(5)
-																								if ppVS == 1 {
+																								switch {
+																								case ppVS == 1:
+																									// e13495: U5 U14 F50 F20 F50+hex
 																									u14 := rf.upto(14)
 																									_ = rf.flipcoin(50)
 																									_ = rf.flipcoin(20)
@@ -14389,43 +14476,70 @@ lhsDerefLoop:
 																											_ = rf.next31()
 																										}
 																									}
-																								} else if sp >= 85 {
-																									// e13888: high PP U5 F50
-																									// F20 F50 create; F50=0
-																									// hex×8 (e13891 gap).
-																									_ = rf.flipcoin(50)
-																									_ = rf.flipcoin(20)
-																									if rf.flipcoin(50) {
-																										if rf.flipcoin(50) {
-																											_ = rf.upto(3)
-																										} else {
-																											_ = rf.upto(20)
-																										}
-																									} else {
-																										for h := 0; h < 8; h++ {
-																											_ = rf.next31()
-																										}
-																									}
-																								} else if ppVS == 2 {
-																									// e13532 U2 F0
+																								case ppVS == 2:
+																									// e13532: U2 F0
 																									_ = rf.upto(2)
 																									_ = rf.flipcoin(0)
-																								} else if ppVS == 4 {
-																									// e13840 U5 sole
-																								} else {
-																									// e13728 U2
+																								case ppVS == 3:
+																									// e13728: U2
 																									_ = rf.upto(2)
+																								case ppVS == 4:
+																									// e13840: U5 sole
+																								case ppVS == 5:
+																									// e13888: U5 F50 F20 Const create
+																									burnLhsResidualScopeCreate(rf, opts)
+																								case ppVS == 6, ppVS == 9, ppVS == 14:
+																									// e14021/e14556/e14937:
+																									// U5 + itemize U9 U9 U3 F0
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																								case ppVS == 7, ppVS == 8:
+																									// e14315/e14434: create
+																									// (+CreateArray when NewArray)
+																									burnLhsResidualScopeCreate(rf, opts)
+																								case ppVS == 10, ppVS == 13:
+																									// e14633/e14931: U3 U4 U8
+																									_ = rf.upto(3)
+																									_ = rf.upto(4)
+																									_ = rf.upto(8)
+																								case ppVS == 11:
+																									// e14849: U2
+																									_ = rf.upto(2)
+																								case ppVS == 12:
+																									// e14873: U2 U5
+																									_ = rf.upto(2)
+																									_ = rf.upto(5)
+																								default:
+																									// later: alternate itemize / U2
+																									if ppVS%2 == 0 {
+																										_ = rf.upto(9)
+																										_ = rf.upto(9)
+																										_ = rf.upto(3)
+																										_ = rf.flipcoin(0)
+																									} else {
+																										_ = rf.upto(2)
+																									}
 																								}
 																							} else {
-																								// NewValue create F10=0 PL
-																								// e13816: U5 U14 F50 F20 F50
-																								// hex×16 when U14=5.
+																								// NewValue: F10 scope
+																								// (Global vs PL).
+																								// e13816 N1: F10=0 U5 U14
+																								// F50 F20 F50 hex → fail
+																								// validate, more F80.
+																								// e15083 N2: F10=0 U5 U14
+																								// F50 F20 Const U3 → Lhs
+																								// accept; residual ends.
+																								nvVS++
 																								if !rf.flipcoin(10) {
 																									_ = rf.upto(5)
 																									u14 := rf.upto(14)
 																									_ = rf.flipcoin(50)
 																									_ = rf.flipcoin(20)
+																									constSmall := false
 																									if rf.flipcoin(50) {
+																										constSmall = true
 																										if rf.flipcoin(50) {
 																											_ = rf.upto(3)
 																										} else {
@@ -14445,7 +14559,16 @@ lhsDerefLoop:
 																											_ = rf.next31()
 																										}
 																									}
+																									// e15083+: NewValue
+																									// Constant small path
+																									// accepts Lhs (N2+).
+																									if nvVS >= 2 && constSmall {
+																										lhsResidualDone = true
+																									}
 																								}
+																							}
+																							if lhsResidualDone {
+																								break
 																							}
 																							// often more F80 after VS
 																							continue
@@ -14476,12 +14599,33 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(0)
 																						}
 																					}
+																					// e15093–95: after Lhs residual
+																					// accepts (NewValue N2):
+																					// SafeOpFlags F50 + size U4,
+																					// then Statement/VS U100 before
+																					// next Expression U120.
+																					if lhsResidualDone {
+																						_ = rf.flipcoin(50)
+																						_ = rf.upto(4)
+																						_ = rf.upto(100)
+																					}
 																					afterAsg = false
 																					continue
 																				}
-																				_ = rf.uptoWithFilter(14, func(x uint32) bool {
-																					return x == 9 || x == 11 || x == 12
-																				})
+																				// e13009 Comma type=nil: filtered
+																				// NonVoid U14 (reject float/int128).
+																				// e15100 CREATE body Comma: full U14
+																				// (UP U14=13).
+																				if lhsSelectDerefResidualRan {
+																					// e15100 CREATE body Comma: full
+																					// U14; lhs still no_const (Comma
+																					// make_random lhs no_const=true).
+																					_ = rf.upto(14)
+																				} else {
+																					_ = rf.uptoWithFilter(14, func(x uint32) bool {
+																						return x == 9 || x == 11 || x == 12
+																					})
+																				}
 																				// lhs no_const until a non-Comma term
 																				commaLhsNoConst = true
 																				afterAsg = false
@@ -15163,6 +15307,21 @@ lhsDerefLoop:
 																			// Constants allowed (e13040+).
 																			if depthFilterNoConst {
 																				depthFilterNoConst = false
+																			}
+																			// e15097+: after Lhs SelectDeref residual
+																			// ends, Function useExisting F50=1 →
+																			// CREATE (make_random_signature head
+																			// F20 U14 then nested Expression body).
+																			if lhsResidualDone {
+																				lhsResidualDone = false
+																				if rf.flipcoin(50) {
+																					// e15098–99: CREATE signature head
+																					_ = rf.flipcoin(20)
+																					_ = rf.upto(14)
+																					// e15100+: live U120 body/params
+																					continue
+																				}
+																				// useExisting=0 → stdfunc below
 																			}
 																			if j >= 8 && !useExistingPackDone {
 																				if rf.flipcoin(50) {
