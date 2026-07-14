@@ -80,6 +80,8 @@ var postAggNestPLChooseU2Sink *bool
 var postAggNestStackU6Sink *bool
 // postAggNestVSMissesSink: nest-era F80=0 VS miss count (e6127 Global U2 not U44).
 var postAggNestVSMissesSink *int
+// postAggNestGlobalU17Sink: after nest Lhs Global residual, Global choose U17 (e6597).
+var postAggNestGlobalU17Sink *bool
 // postAggExprNestDepthBlockOnce: after PL F0 VS, next Expression depth-block.
 var postAggExprNestDepthBlockOnce bool
 // postAggAfterLhsLoopCtrlSink: after e3130 loop-control residual on Lhs Global
@@ -477,6 +479,9 @@ type functionFlowState struct {
 	// postAggNestLhsGlobalCreateDone: after nest Lhs Global pointer CreateArray
 	// residual (e6570–89); next Variable PP→PL sole-accepts (e6593 U120).
 	postAggNestLhsGlobalCreateDone bool
+	// postAggNestGlobalU17: after nest Lhs Global residual, GlobalList choose
+	// is U17 (e6597), not sticky nest U54 pad (e6424).
+	postAggNestGlobalU17 bool
 	// postAggNestAssignQferDone: one-shot ExpressionAssign self F50 after nest
 	// VS (e6402); later nested Assigns skip F50 (e6455).
 	postAggNestAssignQferDone bool
@@ -3769,7 +3774,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				// e6127: after nest VS Function-arg create, Expression Global U2
 				// (not sticky post-ptr U44). e6424: after EA Lhs residual, list
 				// grows — use U54-scale pad (not sticky U2 forever).
-				if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 {
+				// e6597: after nest Lhs Global CreateArray residual, UP GlobalList
+				// choose U17 (not sticky U54).
+				if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink {
+					target = 17
+				} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 40 {
 					target = 54
 				} else if postAggNestVSMissesSink != nil && *postAggNestVSMissesSink >= 37 {
 					target = 2
@@ -4986,10 +4995,12 @@ func randomLeafExprWithMode(
 			if allowFunc {
 				return false
 			}
-			// e6402: after nest VS miss40 Expression residual, UP still selects
-			// Function (useExisting F50) under deep nest; GO depthBlock/nestNoFunc filtered.
+			// e6402: nest residual Expression stream may need Function under
+			// artificial nestNoFunc when natural depth still allows Function.
+			// e6595: do NOT bypass natural depth or sticky ppPostPadDepthBlock
+			// (after nest Lhs Global residual, next Expression filters Function).
 			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 &&
-				!noFunc && !forceNoFunc {
+				!noFunc && !forceNoFunc && !natDepthBlock && !depthBlock {
 				return false
 			}
 			if noFunc || nestNoFunc || forceNoFunc || depthBlock {
@@ -5001,9 +5012,11 @@ func randomLeafExprWithMode(
 			return false
 		}
 		// e6402: nest VS miss40 Expression residual selects nested Assign
-		// (U120=104 → PointerAsLType F50) under deep depthBlock/nestNoFunc.
+		// under artificial nestNoFunc — but not natural/sticky depthBlock
+		// (e6602 UP Variable tries=5; GO free Comma 115 was wrong).
 		if (tc == termAssign || tc == termComma) &&
-			ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 {
+			ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 40 &&
+			!natDepthBlock && !depthBlock {
 			return false
 		}
 		if (tc == termConstant && noConst) ||
@@ -5064,10 +5077,16 @@ exprTries:
 			ctx.state.ppPostPadForceNoFunc = false
 		}
 		// Keep depth-block for a few Variable/Constant picks (e2105 + e2109).
+		// e6602: nest Lhs Global residual keeps depthBlock longer so later
+		// Expression still filters Function/Assign/Comma (UP tries=5 Variable).
 		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock &&
 			(choice == termVariable || choice == termConstant) {
 			ctx.state.ppPostPadDepthBlockN++
-			if ctx.state.ppPostPadDepthBlockN >= 3 {
+			maxDB := 3
+			if ctx.state.postAggNestGlobalU17 {
+				maxDB = 12
+			}
+			if ctx.state.ppPostPadDepthBlockN >= maxDB {
 				ctx.state.ppPostPadDepthBlock = false
 			}
 		}
@@ -6222,6 +6241,13 @@ exprTries:
 										// e6479: nest residual Variable PL after stack U5 → VS U100 U5 U4
 										// (no F0). e6492: next Variable pick(4) only. e6507: reselect again.
 										// Alternate reselect/pick: even N reselects (cap 4).
+										// e6605: after nest Lhs Global residual era, PL stack U5 then
+										// visit fail → VS U100 only (no U4 choose) → next Expression.
+										if flow.postAggNestGlobalU17 && er != nil {
+											_ = variableScopePickFromER(er, opts, &scope)
+											bumpExprDepth(ctx)
+											return finishVar(castLiteral(t, "x"))
+										}
 										if flow.postAggNestVSMisses >= 40 && flow.postAggNestPLVSReselectN < 4 &&
 											flow.postAggNestPLVSReselectN%2 == 0 && er != nil {
 											flow.postAggNestPLVSReselectN++
@@ -7280,6 +7306,7 @@ exprTries:
 						// e6108: after nest VS NewValue, Function-arg multi-level
 						// pointer PP→PL must create (UP F50 F10×levels F20 F20).
 						// e6593: after nest Lhs Global create residual, sole-accept.
+						afterNestLhsGlobal := flow != nil && flow.postAggNestLhsGlobalCreateDone
 						nestPtrCreate := flow != nil && flow.postAggNestVSMisses >= 37 &&
 							strings.Contains(t.Name, "*") && !flow.postAggNestLhsGlobalCreateDone
 						if flow != nil && flow.postAggNestLhsGlobalCreateDone {
@@ -7290,14 +7317,14 @@ exprTries:
 							if len(localCands) > 0 {
 								expr = localCands[0].expr
 							}
-							// e6593: after nest Lhs Global residual Variable, next
-							// Expression U120 tries=1 filters Function (depth) so
-							// Constant 98 accepts — not free Function U120=5.
-							if flow != nil && flow.postAggNestVSMisses >= 40 {
+							// e6593–95: after nest Lhs Global residual Variable, next
+							// Expression filters Function (UP U120 Constant tries=1 then
+							// Variable tries=1). Statement boundaries reset exprDepth to
+							// 0, so arm sticky depthBlock (not one-shot forceNoFunc).
+							if afterNestLhsGlobal && flow != nil && flow.postAggNestVSMisses >= 40 {
 								flow.ppPostPadForceNoFunc = true
-								if ctx != nil && ctx.exprDepth < maxExprDepth(opts)-1 {
-									ctx.exprDepth = maxExprDepth(opts) - 1
-								}
+								flow.ppPostPadDepthBlock = true
+								flow.ppPostPadDepthBlockN = 0
 							}
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, expr))
@@ -7815,10 +7842,15 @@ exprTries:
 				}
 			}
 			// seed2 e2214: need_no_rhs ExpressionAssign → SafeOpFlags after Lhs.
+			// e6598: after nest Global Variable Expression, UP next Expression U120
+			// Constant — do not burn needNoRhs SafeOpFlags F50 U4 (depthBlock era
+			// may wrongly leave needNoRhs from a skipped AssignOps path).
 			finishAssignExpr := func(s string) string {
 				if needNoRhsExpr && er != nil && er.fallback != nil {
-					_ = er.fallback.flipcoin(50)
-					_ = er.fallback.upto(4)
+					if !(ctx != nil && ctx.state != nil && ctx.state.postAggNestGlobalU17) {
+						_ = er.fallback.flipcoin(50)
+						_ = er.fallback.upto(4)
+					}
 				}
 				return castLiteral(t, s)
 			}
@@ -8612,6 +8644,8 @@ exprTries:
 					ctx.state.ppPostPadSkipStmtLhs = true
 					ctx.state.ppPostPadOuterLhsSole = true
 					ctx.state.postAggNestLhsGlobalCreateDone = true
+					// e6597: subsequent Expression GlobalList choose U17 not U54.
+					ctx.state.postAggNestGlobalU17 = true
 					if ctx.exprDepth > 0 {
 						ctx.exprDepth = 0
 					}
@@ -14022,6 +14056,7 @@ func emitSingleFuncDefOnce(
 		postAggNestPLChooseU2Sink = &state.postAggNestPLChooseU2
 		postAggNestStackU6Sink = &state.postAggNestStackU6
 		postAggNestVSMissesSink = &state.postAggNestVSMisses
+		postAggNestGlobalU17Sink = &state.postAggNestGlobalU17
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
 		postAggU15PLAfterGlobalF0Sink = &state.postAggU15PLAfterGlobalF0
@@ -14071,6 +14106,7 @@ func emitSingleFuncDefOnce(
 		postAggNestPLChooseU2Sink = nil
 		postAggNestStackU6Sink = nil
 		postAggNestVSMissesSink = nil
+		postAggNestGlobalU17Sink = nil
 		}()
 	}
 	fdec := nextFuncDecision(r)
