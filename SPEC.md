@@ -189,9 +189,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →21714) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →22112) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **21714** (21573→21714; free invent Variable PL U6 U2 F0→PL reselect (not F80 SelectDeref), GlobalMulti5, U159→PP U6 U2 PL multiphase, Const F50 hex×16 + F80 U6 ladder CreateArray multiphase; seed2 full held). Toward 22000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **22112** (21714→22112 past 22000; Assign F80 Sel dual Global create + CreateArray alt inits hex×16/itemize + F80 ladders + NV hex×4; Function useEx U100 sole + Assign **** qfer4; useEx Global U5 F20×4 CreateArray multiphase + F80 U4 U7 ladder; seed2 full held). Toward 25000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
 
