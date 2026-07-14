@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →6895) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7033) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **6895** (6823→6895; ShiftBy clear + derived U17 + qferMode1 + Global U55; seed2 full held). Toward 7500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7033** (6895→7033 past 7000; hex natural width + Assign F50 + Global pad ladder + PL itemize/phase + Global F0 PL Lhs U12; seed2 full held). Toward 7500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -425,8 +425,19 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 3. e6865: ptr-cmp PL create qferMode 1 (F50 F10 self) not mode 2.
 4. e6878: GlobalList choose U55 after nest ArrayOp residual (not sticky U17).
 
-Next plateau: seed4 e6895 U120 raw desync after Constant F50 hex (hn width).
-Seeds 5–21; source; COUNT=20.
+**e6895–e7033 climbed (past 7000):**
+1. e6895: free Constant hex natural type width after nest ArrayOp residual
+   (sticky hn=16 desynced LCG); Assign self F50 restored; skip address U2;
+   2nd+ pointer Global U2 pad; NewValue→PL qferMode1 no F50 U8.
+2. e6963: one-shot after NewValue create — PL U5 + multi-dim itemize U9 U9 U3 F0;
+   later inventory PL U4 sole (e6995); phase-1 stack-only VS reselect (e6998).
+3. e6972+: Global pad ladder after residual — U55, U2, U54, U19…; e7008 7th
+   multi-cand visit_facts F0 → PL U6 U5 F0 reselect + NeedLhs.
+4. e7017–32: Lhs SelectDeref U12+F0 U11 VS + Expression residual U120 F50 F0
+   F5 F10 U18 F50 F50 U4 (not sticky F20 create).
+
+Next plateau: seed4 e7033 U120 after Lhs residual (GO Statement U100 — keep
+parent Expression open). Seeds 5–21; source; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

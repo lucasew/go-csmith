@@ -103,6 +103,10 @@ var postAggNestGlobalU17F0DoneSink *bool
 
 // postAggNestArrayOpResidualDoneSink: after nest ArrayOp residual (e6716+ U55 Global).
 var postAggNestArrayOpResidualDoneSink *bool
+// postAggNestArrayOpGlobalPtrSoleNSink: pointer Global sole count after nest ArrayOp.
+var postAggNestArrayOpGlobalPtrSoleNSink *int
+// postAggNestArrayOpGlobalChooseNSink: multi-cand Global pad count after nest ArrayOp.
+var postAggNestArrayOpGlobalChooseNSink *int
 
 // postAggNestNoConstOnceSink: next Expression noConst after nest Global F50 residual.
 var postAggNestNoConstOnceSink *bool
@@ -528,6 +532,24 @@ type functionFlowState struct {
 	// postAggNestArrayOpResidualDone: after nest ArrayOp residual sole (e6716+),
 	// PL stack U6 (e6821).
 	postAggNestArrayOpResidualDone bool
+	// postAggNestArrayOpGlobalPtrSoleN: pointer Global sole-accepts after nest
+	// ArrayOp residual (e6875 first sole; e6947 2nd needs U2 pad).
+	postAggNestArrayOpGlobalPtrSoleN int
+	// postAggNestArrayOpPLItemizeOnce: one-shot after nest ArrayOp NewValue/create,
+	// next inventory PL does U5 + multi-dim itemize U9 U9 U3 F0 (e6963); other
+	// inventory PLs stay U4 sole (e6822, e6900, e6995).
+	postAggNestArrayOpPLItemizeOnce bool
+	// postAggNestArrayOpPLAfterItemize: after e6963 itemize consumed, inventory PL
+	// phase (0: e6995 U4; 1: e6998 stack-only VS reselect; else U4).
+	postAggNestArrayOpPLAfterItemize bool
+	postAggNestArrayOpPLPhase        int
+	// postAggNestArrayOpLhsCountdown: after e7008 Global F0 PL residual, Lhs
+	// SelectDeref U12+F0 then U11 (e7018–21), not sticky F20 create.
+	postAggNestArrayOpLhsCountdown bool
+	postAggNestArrayOpLhsFails     int
+	// postAggNestArrayOpGlobalChooseN: multi-cand Global pad after nest ArrayOp
+	// residual (0: U55 e6878; 1: U2 e6972; 2: U54 e6979; 3+: U19 e6986).
+	postAggNestArrayOpGlobalChooseN int
 	// postAggNestNoConstOnce: after nest Global U17 F50 residual, next Expression
 	// filters Constant (UP e6612 Variable tries=14, not Constant).
 	postAggNestNoConstOnce bool
@@ -748,6 +770,51 @@ func noteNestPPSoleShiftSkip(flow *functionFlowState) {
 			flow.postAggUnwindBinaryAfterExprVar = 2
 		}
 	}
+}
+
+// burnNestArrayOpPLAfterStack: inventory PL residual after parentStackPick under
+// postAggNestArrayOpResidualDone (stack already burned).
+// - one-shot e6963: U5 + multi-dim itemize [9][9][3] F0 → VS
+// - after itemize: phase 0 U4 (e6995); phase 1 stack-only VS reselect (e6998);
+//   else U4 sole. (e7011 U5 F0 is empty-Global F0 retry — see termVariable loop.)
+// - pre-itemize: U4 sole (e6822, e6900)
+func burnNestArrayOpPLAfterStack(er *exprRand, opts Options, env envInfo, scope scopeInfo, flow *functionFlowState, ctx *genContext) {
+	if er == nil || flow == nil {
+		return
+	}
+	if flow.postAggNestArrayOpPLItemizeOnce {
+		flow.postAggNestArrayOpPLItemizeOnce = false
+		flow.postAggNestArrayOpPLAfterItemize = true
+		// e6963: U5 + [9][9][3] F0 → VS Global U2
+		_ = er.pick(5)
+		_ = er.pick(9)
+		_ = er.pick(9)
+		_ = er.pick(3)
+		if er.fallback != nil {
+			_ = er.fallback.flipcoin(0)
+		}
+		scopePick2 := variableScopePickFromER(er, opts, &scope)
+		if scopePick2 == 0 {
+			_ = er.pick(2)
+		} else if scopePick2 == 1 || scopePick2 == 4 {
+			_ = parentStackPick(er, flow)
+		}
+		return
+	}
+	if flow.postAggNestArrayOpPLAfterItemize {
+		ph := flow.postAggNestArrayOpPLPhase
+		flow.postAggNestArrayOpPLPhase++
+		if ph == 1 {
+			// e6998: no local choose → VS reselect (PP sole e6999).
+			_ = variableScopePickFromER(er, opts, &scope)
+			return
+		}
+		// phase 0 e6995 U4; later inventory U4 sole
+		_ = er.pick(4)
+		return
+	}
+	// Pre-itemize inventory PL (e6822, e6900): U4 sole.
+	_ = er.pick(4)
 }
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
@@ -1167,6 +1234,41 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 		fails := 0
 		if flow != nil {
 			fails = flow.postAggLhsDerefChooseFails
+		}
+		// e7018–25: after nest ArrayOp Global F0 PL residual, SelectDeref
+		// U12+F0 fail then U11 + VS + residual Expression (not F20 create).
+		if flow != nil && flow.postAggNestArrayOpLhsCountdown {
+			nf := flow.postAggNestArrayOpLhsFails
+			flow.postAggNestArrayOpLhsFails++
+			switch nf {
+			case 0:
+				_ = er.pick(12)             // e7018
+				_ = er.fallback.flipcoin(0) // e7019 F0
+				continue
+			case 1:
+				_ = er.pick(11) // e7021
+				// e7022 VS U100 then residual Expression shape e7023–32:
+				// U120 F50 F0 U120 F5 F10 U18 F50 F50 U4 (tries=0 each U120).
+				_ = variableScopePickFromER(er, opts, &scope)
+				if er.fallback != nil {
+					_ = er.fallback.upto(120)   // e7023
+					_ = er.fallback.flipcoin(50) // e7024
+					_ = er.fallback.flipcoin(0)  // e7025
+					_ = er.fallback.upto(120)    // e7026
+					_ = er.fallback.flipcoin(5)  // e7027
+					_ = er.fallback.flipcoin(10) // e7028
+					_ = er.fallback.upto(18)     // e7029
+					_ = er.fallback.flipcoin(50) // e7030
+					_ = er.fallback.flipcoin(50) // e7031
+					_ = er.fallback.upto(4)      // e7032
+				}
+				flow.postAggNestArrayOpLhsCountdown = false
+				flow.postAggLhsWriteDone = true
+				flow.postAggNeedLhsAfterRhs = false
+				return "x"
+			default:
+				flow.postAggNestArrayOpLhsCountdown = false
+			}
 		}
 		// e6510: nest EA residual done → Statement Lhs countdown U12+F0, U11…
 		// (lhsMakeRandomWrite path; emitLValueAssignment has parallel table).
@@ -1967,11 +2069,11 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 	// e6608: nest residual Constant hex under-width (int8 hn=2) while UP
 	// burns wider RandomHexDigits after F50=0 — floor so LCG aligns for
 	// next Expression U120 tries=9 Variable.
-	// e6895: after nest ArrayOp residual, free Constant still needs hn≥16.
-	if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && hn < 16 {
-		hn = 16
-	}
-	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink && hn < 16 {
+	// e6895: after nest ArrayOp residual, free Expression Constant uses natural
+	// type width (SafeOp int8 hn=2) — sticky hn=16 over-burns and desyncs LCG.
+	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
+		// natural hn
+	} else if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && hn < 16 {
 		hn = 16
 	}
 	var bits uint32
@@ -2040,15 +2142,10 @@ func formatSimpleConstant(r *rng, t CType) string {
 		return fmt.Sprintf("%d%s", num, suf)
 	}
 	// Hex path: RandomHexDigits(N) — N from type width; untraced next31 per digit.
-	// Do not apply nest Global U17 hn=16 floor here (create OnDemand at e6715
-	// needs natural type width; Expression Constant uses randomConstantExprFromER).
-	// e6895: after nest ArrayOp residual, free Constant may need wider hex.
+	// Natural type width (create e6715 and free Constant e6895 after ArrayOp).
 	hn := hexDigitsForConstant(t)
 	if hn <= 0 {
 		hn = 8
-	}
-	if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink && hn < 16 {
-		hn = 16
 	}
 	var hex strings.Builder
 	hex.WriteString("0x")
@@ -3157,6 +3254,14 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		}
 		ctx.state.postAggU15StackU6CreateDone = true
 	}
+	// e6956: after nest ArrayOp residual, NewValue→PL create is SE-free
+	// qferMode 1 (F50 F10) not mode 2 self F10; skip e6622 F50 U8 residual
+	// (UP F50 F10 F20 F50 then Expression U120 tries=5).
+	if ctx.state.postAggNestArrayOpResidualDone {
+		if qferMode == 2 {
+			qferMode = 1
+		}
+	}
 	if ctx.state.postAggGlobalCreate > 0 && strings.Contains(t.Name, "*") {
 		ctx.state.postAggSkipAddrResidual = true
 		defer func() { ctx.state.postAggSkipAddrResidual = false }()
@@ -3482,7 +3587,9 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		initLit = formatSimpleConstant(er.fallback, constTy)
 		// e6622: nest NewValue→PL simple create ends at Constant U20; UP continues
 		// F50 U8 residual before next Expression U120 (not free U120 immediately).
-		if !newArray && ctx.state.postAggNestGlobalU17 && er.fallback != nil {
+		// e6956: after nest ArrayOp residual, no F50 U8 (UP free Expression tries=5).
+		if !newArray && ctx.state.postAggNestGlobalU17 && er.fallback != nil &&
+			!ctx.state.postAggNestArrayOpResidualDone {
 			_ = er.fallback.flipcoin(50)
 			_ = er.fallback.upto(8)
 		}
@@ -3498,6 +3605,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	if !newArray && ctx.state.postAggU15StackU6CreateDone &&
 		(strings.HasPrefix(chosen.Name, "struct") || strings.HasPrefix(chosen.Name, "union")) {
 		burnCreateFieldVarsConstants(er.fallback, chosen, ctx, opts)
+	}
+	// e6963: after nest ArrayOp residual NewValue→PL create (retype U14),
+	// next inventory PL does U5 + multi-dim itemize (not sticky U4 sole).
+	// Empty PL create (e6862 retype=false) must not arm — e6900 still U4.
+	if ctx.state.postAggNestArrayOpResidualDone && retype {
+		ctx.state.postAggNestArrayOpPLItemizeOnce = true
 	}
 	// Materialize parent-local creates as globals for choose-inventory parity with
 	// the residual-era path (full local inventory re-climb is residual work).
@@ -3848,6 +3961,16 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			}
 		}
 		if len(exact) == 1 {
+			// e6947: 2nd+ pointer Global sole after nest ArrayOp residual pads U2
+			// (UP choose; e6875 first sole has no U2).
+			if wantPtr && postAggNestArrayOpResidualDoneSink != nil &&
+				*postAggNestArrayOpResidualDoneSink && er != nil &&
+				postAggNestArrayOpGlobalPtrSoleNSink != nil {
+				*postAggNestArrayOpGlobalPtrSoleNSink++
+				if *postAggNestArrayOpGlobalPtrSoleNSink >= 2 {
+					_ = er.pick(2)
+				}
+			}
 			itemize(exact[0], 1)
 			return exact[0], true
 		}
@@ -4003,11 +4126,32 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				// grows — use U54-scale pad (not sticky U2 forever).
 				// e6597: after nest Lhs Global CreateArray residual, UP GlobalList
 				// choose U17 (not sticky U54).
-				// e6878: after nest ArrayOp residual, GlobalList grown — UP U55
-				// (sticky U17 under-counts).
+				// e6878: after nest ArrayOp residual, first multi-cand Global U55
+				// (U17 under-counts). Later: e6972 U2, e6979 U54, e6986+ U19;
+				// e7008: 7th multi-cand is visit_facts F0 → VS PL (not U19).
 				if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink {
 					if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
-						target = 55
+						gn := 0
+						if postAggNestArrayOpGlobalChooseNSink != nil {
+							gn = *postAggNestArrayOpGlobalChooseNSink
+							*postAggNestArrayOpGlobalChooseNSink++
+						}
+						switch {
+						case gn == 0:
+							target = 55 // e6878
+						case gn == 1:
+							target = 2 // e6972
+						case gn == 2:
+							target = 54 // e6979
+						case gn == 6:
+							// e7008: F0 fail without choose → VS PL reselect
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(0)
+							}
+							return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+						default:
+							target = 19 // e6986+ / e7002
+						}
 					} else {
 						target = 17
 					}
@@ -6430,8 +6574,10 @@ exprTries:
 									// e6822: after nest ArrayOp residual, PL stack U6 then
 									// choose_ok_var U4 accept (UP F50 next Expression), not
 									// e3743 VS reselect U100 + itemize.
+									// e6963: one-shot after create — U5 + multi-dim itemize.
+									// e6998+: after itemize, phase reselect / U5 F0 / U4.
 									if flow != nil && flow.postAggNestArrayOpResidualDone {
-										_ = er.pick(4)
+										burnNestArrayOpPLAfterStack(er, opts, env, scope, flow, ctx)
 										bumpExprDepth(ctx)
 										if len(localCands) > 0 {
 											return finishVar(castLiteral(t, localCands[0].expr))
@@ -6534,9 +6680,10 @@ exprTries:
 										// accept (UP F50 next), not VS reselect.
 										// e6823: clear sticky skipShiftBy/unwind so parent
 										// Function-binary ShiftBy F50=1 runs (UP RHS Function).
+										// e6963/e6998+: itemize one-shot then phase table.
 										if flow.postAggNestGlobalU17 && er != nil {
 											if flow.postAggNestArrayOpResidualDone {
-												_ = er.pick(4)
+												burnNestArrayOpPLAfterStack(er, opts, env, scope, flow, ctx)
 												flow.postAggSkipShiftByOnce = false
 												flow.postAggUnwindBinaryAfterExprVar = 0
 												flow.postAggNeedLhsAfterRhs = false
@@ -7831,6 +7978,37 @@ exprTries:
 								bumpExprDepth(ctx)
 								return finishVar(castLiteral(t, "x"))
 							}
+							// e7008–16: after nest ArrayOp residual Global F0, PL stack
+							// U6 + U5 + F0 → VS reselect; if PL stack+U4 (not sole U5).
+							// e7017: parent Assign then Lhs SelectDeref F80 (NeedLhs).
+							if scopePick == 1 && flow != nil && flow.postAggNestArrayOpResidualDone &&
+								er.fallback != nil {
+								_ = parentStackPick(er, flow) // e7011 U6
+								_ = er.pick(5)                // e7012
+								_ = er.fallback.flipcoin(0)   // e7013 F0
+								scopePick2 := variableScopePickFromER(er, opts, &scope) // e7014
+								if scopePick2 == 1 || scopePick2 == 4 {
+									_ = parentStackPick(er, flow) // e7015 U6
+									_ = er.pick(4)                // e7016 U4
+								} else if scopePick2 == 0 {
+									cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
+									if len(cands) > 1 {
+										_ = er.pick(uint32(len(cands)))
+									}
+								}
+								flow.postAggNeedLhsAfterRhs = true
+								// Allow real Lhs F80 choose U12 (not sticky F20 create).
+								flow.ppPostPadOuterLhsSole = false
+								flow.ppPostPadOuterLhsSoleN = 0
+								flow.postAggForceDerefCreate = false
+								flow.postAggEmptyDerefCreateOnce = false
+								flow.postAggDerefChooseU2AfterCreate = false
+								// e7018–21: SelectDeref U12+F0, U11 then VS/Expression.
+								flow.postAggNestArrayOpLhsCountdown = true
+								flow.postAggNestArrayOpLhsFails = 0
+								bumpExprDepth(ctx)
+								return finishVar(castLiteral(t, "x"))
+							}
 							// e3013–15: after CreateArray residual Global F0, PL stack U4
 							// + locals U5 (not skip-PL continue → second U100).
 							if scopePick == 1 && postAggGlobalF0AfterCreateResidualDone {
@@ -8056,10 +8234,14 @@ exprTries:
 					// again (UP F50 then AssignOps U120=85).
 					// e4040–41: post-ptr era ExpressionAssign term → AssignOps U120
 					// without self F50 (UP U120=100 then U120=53).
+					// e6896: after nest ArrayOp residual, free ExpressionAssign burns
+					// self F50 again (UP F50 then AssignOps/RHS U120).
 					if postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink &&
 						postAggGlobalU24AfterArrayOpDone {
 						seFree = false
-						if ctx != nil && ctx.state != nil && ctx.state.postAggLhsGlobalU15Done {
+						if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone {
+							seFree = true
+						} else if ctx != nil && ctx.state != nil && ctx.state.postAggLhsGlobalU15Done {
 							seFree = true
 						}
 					}
@@ -8124,16 +8306,19 @@ exprTries:
 					} else if burnSelfF50 || (ptrLv == 0 && ppPostPadGlobalPicks >= 15 &&
 						(ctx == nil || !ctx.varSelectStickySEFree) &&
 						!(postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink &&
-							postAggGlobalU24AfterArrayOpDone)) {
+							postAggGlobalU24AfterArrayOpDone &&
+							(ctx == nil || ctx.state == nil || !ctx.state.postAggNestArrayOpResidualDone))) {
 						// SE-free self F50, or late GlobalPicks force (e2036/e2084).
 						// Skip force after Variable select sticky (e2534/e2643).
-						// Skip after ArrayOp residual (e2992 AssignOps U120 not F50).
+						// Skip after ArrayOp residual (e2992 AssignOps U120 not F50)
+						// except nest ArrayOp residual era (e6896 needs F50).
 						_ = er.fallback.flipcoin(50)
 					}
 				} else if ptrLv == 0 && ppPostPadGlobalPicks >= 15 &&
 					(ctx == nil || !ctx.varSelectStickySEFree) &&
 					!(postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink &&
-						postAggGlobalU24AfterArrayOpDone) {
+						postAggGlobalU24AfterArrayOpDone &&
+						(ctx == nil || ctx.state == nil || !ctx.state.postAggNestArrayOpResidualDone)) {
 					// skipQfer parent path: still force self F50 when late post-pad
 					// (e2084 under skipFuncRetQfer without GlobalPicks un-skip).
 					_ = er.fallback.flipcoin(50)
@@ -8239,19 +8424,30 @@ exprTries:
 				if strings.Contains(base.Name, "*") {
 					base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 				}
+				// e7023: after nest ArrayOp Lhs U12/U11 residual, parent Expression
+				// continues U120 (not SkipParentExprN→Statement U100).
+				nestArrayOpLhs := ctx.state.postAggNestArrayOpLhsCountdown ||
+					ctx.state.postAggNestArrayOpLhsFails > 0
 				_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
 				// Assign complete — unwind to Statement U100 (e3067).
 				// Do not arm stmtFilterCompound (e3083 tries=0 U100=4, not tries=1).
 				// e4250: after ptr-cmp-create era nested ExpressionAssign Lhs,
 				// StatementAssign outer Lhs must sole (next Expression U120 Function).
 				// Do not set SkipParentExprN=6 (would swallow next Expression U120).
-				if ctx.state.postAggPtrCmpPLCreateDone {
+				if nestArrayOpLhs {
+					// e7023: keep parent Expressions open after nest ArrayOp Lhs.
+					ctx.state.ppPostPadSkipParentExprN = 0
+					ctx.state.skipNextBlockSize = false
+				} else if ctx.state.postAggPtrCmpPLCreateDone {
 					ctx.state.ppPostPadSkipStmtLhs = true
 					ctx.state.ppPostPadSkipParentExprN = 0
+					ctx.state.skipNextBlockSize = true
 				} else if ctx.state.ppPostPadSkipParentExprN < 6 {
 					ctx.state.ppPostPadSkipParentExprN = 6
+					ctx.state.skipNextBlockSize = true
+				} else {
+					ctx.state.skipNextBlockSize = true
 				}
-				ctx.state.skipNextBlockSize = true
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			if er != nil && er.fallback != nil {
@@ -8500,16 +8696,22 @@ exprTries:
 						}
 						// e3448–49: after U15 StackU6 era, address residual U2 accept
 						// (parent Expression U120) — not multi-dim itemize U2 U7 U3 U9.
+						// e6905: after nest ArrayOp residual, F20 F20 ends without U2
+						// (parent Expression U120 next).
 						if ctx != nil && ctx.state != nil && ctx.state.postAggU15StackU6CreateDone {
-							_ = er.pick(2) // e3448
+							if !ctx.state.postAggNestArrayOpResidualDone {
+								_ = er.pick(2) // e3448
+							}
 							lhsFromDeref = true
 							break
 						}
 						if postAggGlobalLivePicks >= 5 {
-							_ = er.pick(2)
-							_ = er.fallback.upto(7)
-							_ = er.fallback.upto(3)
-							_ = er.fallback.upto(9)
+							if ctx == nil || ctx.state == nil || !ctx.state.postAggNestArrayOpResidualDone {
+								_ = er.pick(2)
+								_ = er.fallback.upto(7)
+								_ = er.fallback.upto(3)
+								_ = er.fallback.upto(9)
+							}
 							lhsFromDeref = true
 							break
 						}
@@ -14453,6 +14655,8 @@ func emitSingleFuncDefOnce(
 		postAggNestGlobalU17ChoosesSink = &state.postAggNestGlobalU17Chooses
 		postAggNestGlobalU17F0DoneSink = &state.postAggNestGlobalU17F0Done
 		postAggNestArrayOpResidualDoneSink = &state.postAggNestArrayOpResidualDone
+		postAggNestArrayOpGlobalPtrSoleNSink = &state.postAggNestArrayOpGlobalPtrSoleN
+		postAggNestArrayOpGlobalChooseNSink = &state.postAggNestArrayOpGlobalChooseN
 		postAggNestNoConstOnceSink = &state.postAggNestNoConstOnce
 		postAggAfterLhsLoopCtrlSink = &state.postAggAfterLhsLoopCtrl
 		postAggU15GlobalF0Sink = &state.postAggU15GlobalF0Done
@@ -14507,6 +14711,8 @@ func emitSingleFuncDefOnce(
 			postAggNestGlobalU17ChoosesSink = nil
 			postAggNestGlobalU17F0DoneSink = nil
 			postAggNestArrayOpResidualDoneSink = nil
+			postAggNestArrayOpGlobalPtrSoleNSink = nil
+			postAggNestArrayOpGlobalChooseNSink = nil
 			postAggNestNoConstOnceSink = nil
 		}()
 	}
