@@ -165,9 +165,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7259) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →7305) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7259** (7033→7259; Lhs residual trail + Function Expression stream; seed2 full held). Toward 7500+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **7305** (7259→7305; Global sole no U2 after residual + ptr Assign qfer + Function-arg create; seed2 full held). Toward 7500+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs. Require call flow aligned with Csmith C++.
 
@@ -445,7 +445,14 @@ Expression nest after Global create Lhs; U15 Global; PL F50; U5+F0 VS.
 4. e7057–7110: Assign/Lhs create residual trail + hex next31.
 5. e7111+: real Expression with Function allowed → Function residual stream.
 
-Next plateau: seed4 e7259 U120 vs Global U2 after VS U100. Seeds 5–21; COUNT=20.
+**e7259–e7305 climbed:**
+1. e7259: StackU6 empty pointer Global sole without U2 after nest ArrayOp residual
+   (was sticky choose_ok_var U2 residual).
+2. e7299: pointer ExpressionAssign qfer ≥2 levels F50 F10 + self F50 after residual.
+3. e7305: Function-arg aggregate Global create NewArray F20 first (skip SEFree F50).
+
+Next plateau: seed4 e7308 F20 vs F50 formatSimpleConstant in Function-arg Global
+create residual. Seeds 5–21; COUNT=20.
 
 **e716–e788 climbed:** `select_must_use_var` after multi-dim IV creates (U2+F75), max-funcs forces stdfunc without F80, ptr-comparison uses `derived_types` size + pointer operand types, parent stack n=5 after multi-dim nesting.
 

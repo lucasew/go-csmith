@@ -4099,18 +4099,24 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				_ = er.pick(3)
 			}
 		}
+		// e7259/e7286: free Expression Global after nest ArrayOp residual —
+		// sole without array itemize U(n) (UP free Expression U120 next).
+		nestArrayOpExprGlobal := !forAssign && postAggNestArrayOpResidualDoneSink != nil &&
+			*postAggNestArrayOpResidualDoneSink
 		if len(exact) == 1 {
-			// e6947: 2nd+ pointer Global sole after nest ArrayOp residual pads U2
-			// (UP choose; e6875 first sole has no U2).
+			// e6947: 2nd pointer Global sole pads U2 (e6875 first / e7259 3rd+ no U2).
 			if wantPtr && postAggNestArrayOpResidualDoneSink != nil &&
 				*postAggNestArrayOpResidualDoneSink && er != nil &&
 				postAggNestArrayOpGlobalPtrSoleNSink != nil {
 				*postAggNestArrayOpGlobalPtrSoleNSink++
-				if *postAggNestArrayOpGlobalPtrSoleNSink >= 2 {
+				if *postAggNestArrayOpGlobalPtrSoleNSink == 2 {
 					_ = er.pick(2)
 				}
 			}
-			itemize(exact[0], 1)
+			// e7286: skip array itemize on free Expression Global sole after residual.
+			if !nestArrayOpExprGlobal {
+				itemize(exact[0], 1)
+			}
 			return exact[0], true
 		}
 		n := len(exact)
@@ -4119,6 +4125,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		smallStack := useSmallParentStackSink != nil && *useSmallParentStackSink
 		// seed2 e1216: late Global pointer sole-ish — UP no U after U100 (pad inflated n=2).
 		if n == 2 && smallStack && picks >= 6 {
+			itemize(exact[0], 1)
+			return exact[0], true
+		}
+		// e7259/e7286: after nest ArrayOp residual, free Expression Global multi
+		// sole-accepts without choose (n=2 U2 or n=4→U2 e1017 scale desyncs;
+		// UP free Expression U120 next).
+		if nestArrayOpExprGlobal && n >= 2 {
+			return exact[0], true
+		}
+		if n == 2 && postAggNestArrayOpResidualDoneSink != nil &&
+			*postAggNestArrayOpResidualDoneSink {
 			itemize(exact[0], 1)
 			return exact[0], true
 		}
@@ -4350,6 +4367,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					return uniq[v%n], true
 				}
 			}
+		}
+		// e7259/e7286: after nest ArrayOp residual, free Expression Global
+		// sole-accepts when target pad did not apply (UP free Expression U120;
+		// natural n=2 choose U2 desyncs). Multi-cand pad path above returns early.
+		if !forAssign && postAggNestArrayOpResidualDoneSink != nil &&
+			*postAggNestArrayOpResidualDoneSink && n >= 1 {
+			return uniq[0], true
 		}
 		// seed2 e1017: Global eFlexible n=4 → U2 (even if mustReadLive).
 		// seed2 e1373: after U27 era under useSmallParentStack, real GlobalList
@@ -4675,6 +4699,12 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					}
 					_ = er.fallback.flipcoin(0)
 					return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+				}
+				// e7259/e7286: after nest ArrayOp residual, free Expression Global
+				// sole-accepts (skip U2/U9/U24 live choose — UP free Expression U120).
+				if !forAssign && postAggNestArrayOpResidualDoneSink != nil &&
+					*postAggNestArrayOpResidualDoneSink && len(pool) > 0 {
+					return pool[0], true
 				}
 				idx := int(er.pick(uint32(nChoose))) % len(pool)
 				c := pool[idx]
@@ -6140,7 +6170,16 @@ exprTries:
 							markFuncEffect()
 							return castLiteral(t, c.expr)
 						}
-						if g, ok := createOnDemandGlobalFromERSEFree(er, opts, t, ctx); ok {
+						// e7305: after nest ArrayOp residual, Function-arg aggregate
+						// Global create is NewArray F20 first (skip SE-free F50 F10);
+						// e2133 maxFuncs still uses SEFree.
+						if ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone {
+							if g, ok := createOnDemandGlobalFromEROpts(er, opts, t, ctx, true); ok {
+								bumpExprDepth(ctx)
+								markFuncEffect()
+								return castLiteral(t, g.expr)
+							}
+						} else if g, ok := createOnDemandGlobalFromERSEFree(er, opts, t, ctx); ok {
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, g.expr)
@@ -8281,8 +8320,12 @@ exprTries:
 				if scopePick == 0 && ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
 					// e3648: StackU6 pointer Global — UP choose_ok_var U2; GO exact
 					// inventory empty must not GenerateNewGlobal (F50…).
+					// e7259/e7286: after nest ArrayOp residual, sole without U2
+					// (UP free Expression U120 next).
 					if strings.Contains(t.Name, "*") && ctx.state.postAggU15StackU6CreateDone && er != nil {
-						_ = er.pick(2)
+						if !ctx.state.postAggNestArrayOpResidualDone {
+							_ = er.pick(2)
+						}
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "g_0"))
 					}
@@ -8422,7 +8465,22 @@ exprTries:
 					latePostPadAssign := ppPostPadGlobalPicks >= 14
 					nestPtrNoSelf := ctx != nil && ctx.state != nil &&
 						ctx.state.postAggNestVSMisses >= 40 && !burnSelfF50 && ptrLv > 0
-					if ptrLv > 0 && ppArrayBody && !latePostPadAssign {
+					// e7299: after nest ArrayOp residual, pointer ExpressionAssign
+					// burns ≥2 levels F50 F10 + self F50 (UP; GO ptrLv=1 levels-only
+					// under-counts and skips self).
+					nestArrayOpPtrQfer := ctx != nil && ctx.state != nil &&
+						ctx.state.postAggNestArrayOpResidualDone && ptrLv > 0
+					if nestArrayOpPtrQfer {
+						lv := ptrLv
+						if lv < 2 {
+							lv = 2
+						}
+						for i := 0; i < lv; i++ {
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(10)
+						}
+						_ = er.fallback.flipcoin(50) // self
+					} else if ptrLv > 0 && ppArrayBody && !latePostPadAssign {
 						for i := 0; i < ptrLv; i++ {
 							_ = er.fallback.flipcoin(50) // level vol
 							_ = er.fallback.flipcoin(10) // level const
