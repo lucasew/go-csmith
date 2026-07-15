@@ -336,8 +336,14 @@ var nullValidatePostResidualPPU7Done bool
 var nullValidatePostResidualGlobalItemizeU4Once bool
 
 // nullValidatePostResidualPLCreateN: PL create count after residual Assign Lhs
-// era. 1st = full qfer create (e1715 F50 F10 F20…); 2nd = F50+U32 (e1826–27).
+// era. 1st = full qfer (e1715); N==2 sole residual (e1825); later pointer
+// creates floor qfer levels (e1914 N>=3).
 var nullValidatePostResidualPLCreateN int
+
+// nullValidatePostResidualSimplePLN: simple (non-ptr) ParentLocal picks under
+// residual Assign Lhs era. 0: sole after stack (e2064–65); 1+: empty create
+// with U14 retype (e2068) even when GO inventory non-empty.
+var nullValidatePostResidualSimplePLN int
 
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
@@ -4744,12 +4750,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		nullValidatePostResidualNVPL = false
 	}
 	// After residual Assign Lhs era: count PL creates.
-	// 1st: full qfer (e1715 F50 F10 F20…). 2nd: F50+U32 residual (e1826–27).
-	if nullValidatePostResidualPPU7Done && er != nil && er.fallback != nil {
+	// 1st: full qfer (e1715 F50 F10 F20…). 2nd: PP→PL force-create is actually
+	// sole (e1825); parent ShiftByNonConstantProb burns F50 U32 (e1826–27).
+	// Later pointer creates live with qfer levels floor (e1914).
+	if nullValidatePostResidualPPU7Done {
 		nullValidatePostResidualPLCreateN++
-		if nullValidatePostResidualPLCreateN >= 2 {
-			_ = er.fallback.flipcoin(50) // e1826
-			_ = er.fallback.upto(32)     // e1827
+		if nullValidatePostResidualPLCreateN == 2 {
 			return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 		}
 	}
@@ -4869,6 +4875,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			case n >= 3:
 				levels = 1 // e9821 * + self
 			}
+		}
+		// seed5 e1914 residual-era ptr-cmp PL create: type is ** (default
+		// idx>0) but UP derived_types[7] is * → qfer F50 F10×2 then NewArray
+		// (not *** self F50 F10 overshoot at e1918). N==2 is sole residual;
+		// live creates are N>=3.
+		if nullValidatePostResidualPPU7Done && nullValidatePostResidualPLCreateN >= 3 && levels > 1 {
+			levels = 1
 		}
 		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50) // ptr-level vol
@@ -7940,29 +7953,42 @@ exprTries:
 					if er.fallback.flipcoin(5) {
 						// make_random_unary: rnd_upto(MAX_UNARY_OP) then
 						// SafeOpFlags::make_random_unary (F50 signed + U4 size).
+						// UP reassigns type = flags->get_lhs_type() before
+						// Expression::make_random(operand) — operand width follows
+						// SafeOp size, not the parent expression type (seed5 e2012
+						// usz=2 → int32 hex hn=8; parent was int16 hn=4 desync).
 						uop := int(er.fallback.upto(4))
 						uSigned := er.fallback.flipcoin(50)
 						usz := int(er.fallback.upto(4))
 						ubits := 32
+						opTy := t
 						switch usz {
 						case 0:
 							ubits = 8
+							opTy = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
 						case 1:
 							ubits = 16
+							opTy = CType{Name: "int16_t", Signed: true, Bits: 16, HexDigits: 4}
 						case 2:
 							ubits = 32
+							opTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 						default:
 							ubits = 64
+							opTy = CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
 							// e9073: ArrayOp2 unary size-3 → next Constant hn=16
 							if postAggPostCD3ArrayOp2BodyActive {
 								postAggPostCD3ArrayOp2Hex16Once = true
 							}
 						}
+						if !uSigned {
+							opTy.Signed = false
+							opTy.Name = strings.Replace(opTy.Name, "int", "uint", 1)
+						}
 						// safe unary minus gensyms one t_ temp (CreateFunctionInvocationUnary).
 						if opts.SafeMath && uop == 0 && ctx != nil && ctx.state != nil {
 							_ = ctx.state.gensym("t_")
 						}
-						operand := randomTypedExprDepthFlags(t, er, opts, env, scope, nest, ctx, false, false)
+						operand := randomTypedExprDepthFlags(opTy, er, opts, env, scope, nest, ctx, false, false)
 						out = formatUnaryInvocation(uop, operand, ubits, uSigned, opts)
 						out = castLiteral(t, out)
 					} else {
@@ -8630,8 +8656,10 @@ exprTries:
 			// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 			// (UP expand_struct_union / multi-param; GO inventory sole-accepts).
 			// Intercept before any PP sole / miss path skips the choose.
-			// e1714+: after residual Assign Lhs era, live PP U5 create (not sticky U7).
-			if scopePick == 2 && nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done && er != nil {
+			// e1714+: after residual Assign Lhs era, pointer PP→PL is live U5
+			// create (not sticky U7). e2050: simple PP still ok_vars U7.
+			if scopePick == 2 && nullValidatePostResidualParamU7 && er != nil &&
+				(!nullValidatePostResidualPPU7Done || !strings.Contains(t.Name, "*")) {
 				_ = er.pick(7)
 				expr := "x"
 				if len(scope.params) > 0 {
@@ -8668,20 +8696,55 @@ exprTries:
 					return finishVar(castLiteral(t, g.expr))
 				}
 			}
+			// seed5 residual Assign Lhs era simple ParentLocal:
+			//   n=0 e2064 sole after stack (U120 next; no local U6)
+			//   n=1 e2068 force U14 + qferMode 2 create (UP empty; GO inventory)
+			//   n>=2 e2077 sole after stack → parent Assign Lhs F80 (e2078)
+			// Pointers keep live create (e1914).
+			if (scopePick == 1 || scopePick == 4) && nullValidatePostResidualPPU7Done &&
+				nullValidatePostResidualParamU7 && !strings.Contains(t.Name, "*") && er != nil {
+				idx := parentStackPick(er, flow)
+				n := nullValidatePostResidualSimplePLN
+				nullValidatePostResidualSimplePLN++
+				if n != 1 {
+					// sole (e2065 / e2077 → parent Lhs F80)
+					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					expr := "x"
+					if len(localCands) > 0 {
+						expr = localCands[0].expr
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, expr))
+				}
+				// e2068 only: U14 retype + !SE-free qferMode 2 (F10 only)
+				// then NewArray F20 (UP e2069 F10 F20 F50…).
+				es := true
+				prevES := useESimpleRetypeSink
+				useESimpleRetypeSink = &es
+				g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, true, idx)
+				useESimpleRetypeSink = prevES
+				if ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
+			}
 			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
 			// e1271+: sticky residual ParamU7 GlobalList U18; itemize when inventory
 			// candidate is array (e1282 U4 after U18=2).
-			// e1821: after residual Assign Lhs era (PPU7Done), live Global U2
-			// (not sticky U18 pad).
+			// e1821: after residual Assign Lhs era (PPU7Done), pointer Global is
+			// live U2 (not sticky U18). e2042: simple Global still U18.
 			if scopePick == 0 &&
 				(nullValidatePostResidualGlobalU18 ||
-					(nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done)) &&
+					(nullValidatePostResidualParamU7 &&
+						(!nullValidatePostResidualPPU7Done || !strings.Contains(t.Name, "*")))) &&
 				er != nil {
 				oneShot := nullValidatePostResidualGlobalU18
 				if oneShot {
 					nullValidatePostResidualGlobalU18 = false
 				}
-				v := int(er.pick(18)) // e929 / e1025 / e1271
+				v := int(er.pick(18)) // e929 / e1025 / e1271 / e2042
 				if oneShot && nullValidatePostResidualGlobalItemizeU10 {
 					nullValidatePostResidualGlobalItemizeU10 = false
 					_ = er.pick(10)
