@@ -695,10 +695,16 @@ type functionFlowState struct {
 	// multi-IV need_no_rhs Lhs do-while (dummy shrinks ok_vars).
 	// 0→U3+F0 (e4560); 1→U2 no F0 (e4570); later Global live.
 	freeMultiIVNeedNoRhsGlobalN int
-		// freeMultiIVNeedNoRhsEra: sticky after Global dummy multiphase starts
+	// freeMultiIVNeedNoRhsEra: sticky after Global dummy multiphase starts
 	// (GlobalN>=2). Free Expression Variable Global inventory pad after
 	// need_no_rhs Lhs accepts (seed5 e5117 GlobalList U4).
 	freeMultiIVNeedNoRhsEra bool
+	// freeMultiIVNeedNoRhsIfBody: inside free multi-IV need_no_rhs-era free
+	// Statement IfElse then/else (sole BlockSize; PL stack U5 at e5133).
+	freeMultiIVNeedNoRhsIfBody bool
+	// freeMultiIVNeedNoRhsIfLhsSelDone: one-shot Statement Lhs SelectDeref
+	// live multiphase under If body (e5140–45); then F80=0→VS.
+	freeMultiIVNeedNoRhsIfLhsSelDone bool
 	// freeMultiIVNeedNoRhsPLN: SelectParentLocal choose attempts under free
 	// multi-IV need_no_rhs after Global dummy era (e4624 U3, e4692 U7,
 	// e4750 U6+U8 itemize, e4771 U6, e4777 sole…).
@@ -2171,6 +2177,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e5133: free multi-IV need_no_rhs-era free If then-body Assign RHS
+	// Expression Variable PL: Function::stack.size()=5 (not GO blockStack 6).
+	// Highest priority — freeMultiIVForBodyU3 / deepStack would under/over-burn.
+	if state != nil && state.freeMultiIVNeedNoRhsIfBody {
+		return int(er.pick(5))
+	}
 	// seed5 e4368: after multi-level SelectDeref create ladder, free Expression
 	// Variable PL stack is U3 (For body depth) not sticky residual forceU6.
 	if state != nil && state.freeMultiIVPostEAMultiLvlPLStackU3 {
@@ -2189,6 +2201,8 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	}
 	// Free multi-IV For body (func+ArrayOp+For): stack U3 takes priority over
 	// sticky residual ParamU7 U6 / postCD3 ArrayOp2 U6 (seed5 e2967).
+	// Nested If then-body under free multi-IV For pushes Function::stack to
+	// U4 (e4468); blockStack tracks that push (seed5 multi-level residual).
 	// Nested If then-body under free multi-IV For pushes Function::stack to
 	// U4 (e4468); blockStack tracks that push (seed5 multi-level residual).
 	if state != nil && state.freeMultiIVForBodyU3 {
@@ -7782,14 +7796,15 @@ if pointerGlobalPicksSink != nil {
 			_ = er.pick(3)
 			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 		}
-		// seed5 e5117–19: post-need_no_rhs free Expression Global eFlexible
-		// live U4 + array itemize U4 then visit_facts fail → ExpressionVariable
-		// retries NewValue (U100=98). Mirror seed2 filterCompound U2+U3 fail
-		// pattern with live pool size.
+		// seed5 e5117–18: post-need_no_rhs free Expression Global eFlexible
+		// live U4 + array itemize U4 then visit_facts ACCEPT (If condition
+		// ExpressionVariable ends). Next is then-body StatementProbability
+		// U100=98 Assign → AssignOps U120 (e5119–20). Empty-return visit-fail
+		// retried NewValue and stole U100 as VS → F10 create vs UP U120.
 		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
 			!selectVarLocalScope && chooseN == 4 {
-			_ = er.pick(4) // itemize / residual second U4
-			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+			_ = er.pick(4) // itemize second U4 (e5118)
+			return uniq[idx], true
 		}
 		if lateU2 {
 			_ = er.pick(3) // e1374 itemize residual
@@ -10442,11 +10457,14 @@ exprTries:
 					// (e3058–59) then parent Assign Lhs F80 — not sticky forceU6 sole.
 					// seed5 e4368: multi-level create ladder arms MultiLvlPLStackU3 —
 					// intercept above burns U3+choose; do not forceU6 sole here.
+					// seed5 e5133: need_no_rhs free If then-body PL stack U5
+					// (not sticky residual forceU6 sole without choose U3).
 					var idx int
 					freeMultiIVExprPL := flow != nil && flow.freeMultiIVForLhsExprContinue
 					multiLvlPLU3 := flow != nil && flow.freeMultiIVPostEAMultiLvlPLStackU3
+					needNoRhsIfPL := flow != nil && flow.freeMultiIVNeedNoRhsIfBody
 					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone &&
-						!freeMultiIVExprPL && !multiLvlPLU3
+						!freeMultiIVExprPL && !multiLvlPLU3 && !needNoRhsIfPL
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
 						// e3003/e3058/e3405: stack U2 during early residual Expression.
@@ -10456,6 +10474,13 @@ exprTries:
 						} else {
 							idx = int(er.pick(2)) // e3003/e3058 U2
 						}
+					} else if needNoRhsIfPL {
+						// e5133–34: stack U5 + choose_ok_var U3 (live block locals).
+						idx = int(er.pick(5))
+						_ = er.pick(3)
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "l_iv"))
 					} else if forceU6Stack {
 						idx = int(er.pick(6))
 					} else {
@@ -115928,6 +115953,26 @@ commaF80MultiDone:
 				break
 			}
 		}
+		// seed5 e5140–45: need_no_rhs free If then-body Statement Assign Lhs
+		// SelectDeref — C++ live eDereference pool (U5; U4+U7 itemize; U4
+		// accept). GO inventory under-counts as empty → F10 create residual.
+		// One-shot live multiphase then accept Lhs (next Statement U100 For).
+		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsIfBody &&
+			!ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone {
+			ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone = true
+			// F80 already true this iteration (SelectDerefPointerProb).
+			_ = r.upto(5) // e5140 choose among ~5 pointers
+			if r.flipcoin(80) { // e5141
+				_ = r.upto(4) // e5142
+				_ = r.upto(7) // e5143 itemize / expand
+			}
+			if r.flipcoin(80) { // e5144
+				_ = r.upto(4) // e5145 accept
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
 		// seed5 e2150–51: residual-era Statement Lhs after EA Lhs CreateArray —
 		// first SelectDeref fails (UP has pointer inventory; GO empty under-count
 		// skips choose) without choose U → second F80 create with F10 F20 F20 F20
@@ -119235,15 +119280,38 @@ func emitStatement(
 		// C++ Block::make_random always pushes Function::stack. Free multi-IV
 		// For nest If then/else needs stack U4 for SelectParentLocal
 		// (seed5 e4468) — not sticky freeMultiIVForBodyU3 forceU3.
-		pushIfStack := state != nil && state.freeMultiIVForBodyU3
+		// seed5 e5119: after free multi-IV need_no_rhs Lhs era, free
+		// Statement IfElse condition Variable accepts (Global U4+itemize U4);
+		// then-body StatementProbability is U100 tries=0 next (Assign 98 →
+		// AssignOps U120 SelectLType). GO BlockSize U4 stole that raw.
+		// Mirror sole-body residual: no BlockProbability U (stmtCount=1).
+		// e5133: nested RHS Expression Variable PL stack is U5 (not U6) —
+		// freeMultiIVForBodyU3 pushIfStack over-counts once under this era
+		// (Function::stack already tracks the If then frame via other paths).
+		// e5146: then-body Statement U100=27 For tries=0 (IN_LOOP under free
+		// multi-IV For); GO !inLoop rejected Continue 38 → Assign 92.
+		needNoRhsIfSole := state != nil && state.freeMultiIVNeedNoRhsEra
+		pushIfStack := state != nil && state.freeMultiIVForBodyU3 && !needNoRhsIfSole
+		if needNoRhsIfSole && state != nil && state.freeMultiIVForBodyU3 {
+			thenInLoop = true
+		}
 		if state != nil {
 			prevFilter = state.filterCompoundStmts
-			if postAggGlobalCreateN >= 0 && !bodyInLoop {
+			if postAggGlobalCreateN >= 0 && !bodyInLoop && !needNoRhsIfSole {
 				state.filterCompoundStmts = true
 			}
 			// Ensure BlockSize U is burned for if body (skipNextBlockSize would
 			// desync e2355 U4 when inheriting inLoop from parent for).
-			if postAggGlobalCreateN >= 0 {
+			// need_no_rhs-era free If: sole then/else (e5119 U100, not U4).
+			if needNoRhsIfSole {
+				state.skipNextBlockSize = true
+				state.freeMultiIVNeedNoRhsIfBody = true
+				state.freeMultiIVNeedNoRhsIfLhsSelDone = false
+				// e5146: UP Statement For U100=27 tries=0 (not atMax compound
+				// filter). Sticky filterCompoundStmts from free multi-IV For
+				// body would reject If/For → Continue 38 tries=5.
+				state.filterCompoundStmts = false
+			} else if postAggGlobalCreateN >= 0 {
 				state.skipNextBlockSize = false
 			}
 			if pushIfStack {
@@ -119251,6 +119319,9 @@ func emitStatement(
 			}
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, thenInLoop, stmtBudget, ctx)
+		if state != nil && needNoRhsIfSole {
+			state.freeMultiIVNeedNoRhsIfBody = false
+		}
 		if nullValidatePostResidualSkipIfElse {
 			nullValidatePostResidualSkipIfElse = false
 			skipElse = true
@@ -119276,7 +119347,17 @@ func emitStatement(
 			if state != nil && pushIfStack {
 				state.blockStack++
 			}
+			// seed5 e5119+: need_no_rhs-era If else is also sole (no BlockSize U).
+			if needNoRhsIfSole && state != nil {
+				state.skipNextBlockSize = true
+				state.freeMultiIVNeedNoRhsIfBody = true
+				state.freeMultiIVNeedNoRhsIfLhsSelDone = false
+				state.filterCompoundStmts = false
+			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, inLoop, stmtBudget, ctx)
+			if state != nil && needNoRhsIfSole {
+				state.freeMultiIVNeedNoRhsIfBody = false
+			}
 			if state != nil && pushIfStack && state.blockStack > 0 {
 				state.blockStack--
 			}
@@ -120163,7 +120244,13 @@ func emitStatements(
 	}
 	// seed2 e1126: afterContFor body skips BlockSize U.
 	stmtCount := 1
+	// needNoRhsIfSoleBlock: need_no_rhs free If then/else skipNextBlockSize is
+	// exactly one Statement (e5146 For U100=27). multiDim/isParam bonuses would
+	// add Continue/Assign slots and desync. Other sole paths keep historical
+	// multiDim bonus (skipNextBlockSize was cleared before the check).
+	needNoRhsIfSoleBlock := false
 	if state != nil && state.skipNextBlockSize {
+		needNoRhsIfSoleBlock = state.freeMultiIVNeedNoRhsIfBody
 		state.skipNextBlockSize = false
 		stmtCount = 1
 	} else {
@@ -120213,7 +120300,7 @@ func emitStatements(
 		}
 		// Arm after first stmt (Break); second emitStatement consumes.
 		state.ppPostPadAssignLhsGlobalPending = true
-	} else if state != nil && state.multiDimArrays > 0 && !state.skipNextBlockSize {
+	} else if state != nil && state.multiDimArrays > 0 && !needNoRhsIfSoleBlock {
 		if depth == 0 {
 			stmtCount++
 		} else if state.filterCompoundStmts {
