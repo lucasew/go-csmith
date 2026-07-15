@@ -222,15 +222,21 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2851** (CreateArray after nested init); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2862** (Lhs SelectDeref after nested create); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+**seed5 e2851→2862 climbed — create_and_initialize Constant HexDigits width:**
+1. UP `derived_types[9]=eULongLong**` → `find_pointer_type` deepens to `***`; leaf `Constant` burns `RandomHexDigits(16)` (depth gap 16 after F50=0).
+2. SelectLType multi-level pointer under residual GlobalU21 sets `HexDigits=16`/`Bits=64` on the Expression type (Name stays `int32_t***` for inventory).
+3. Nested `create_and_initialize` peels preserve `Bits`/`HexDigits` so digits write into constant strings (not discarded).
+4. Seed2/3/4/6 held. Next: e2862 Lhs SelectDeref F80 F10 then missing VolatilePointers F50 before NewArray F20s.
+
 **seed5 e2842→2851 climbed — nested address random_loose_qualifiers:**
 1. Track outer random_qualifiers vol/const bits; `random_loose_qualifiers` only draws F50 when parent bits allow (CVQualifiers.cpp:422–457); LooserConstProb=50.
 2. `remove_qualifiers(1)` pops self; nested `create_and_initialize` with non-wildcard qfer (no re-random_qualifiers).
-3. Seed2/3/4/6 held. Next: e2851 CreateArray / Constant hex digit LCG after nested init.
+3. Seed2/3/4/6 held. Next was e2851 Constant hex width (climbed).
 
 **seed5 e2831→2842 climbed — Function-fail Global SE-free qfer:**
 1. Residual GlobalU21 Function-fail empty Global: first create keeps skipRandomQfer (e2279 F20 NewArray); later uses `createOnDemandGlobalFromERSEFree` (CVQualifiers self F50 when SE-free).
