@@ -700,6 +700,14 @@ type functionFlowState struct {
 	// freeMultiIVForLhsExprPostNestLhsFailGlobal: first VS Global after post-nest
 	// SelectDeref U2 fail must continue Lhs do-while (e3184 F80), not e4330 sole.
 	freeMultiIVForLhsExprPostNestLhsFailGlobal bool
+	// freeMultiIVForLhsExprPostNestLhsEmptyCreate: after post-nest U2 choose fail
+	// + Global fail, C++ invalid_vars holds both (Lhs.cpp dummy) so next
+	// select_deref soles the remaining pointer without choose RNG then empty-
+	// creates (e3184 pure/sole fail; e3185+ F10 F50 F20 F20…). Do not use
+	// sticky postAggLhsDerefChooseFails pool U10.
+	// freeMultiIVForLhsExprPostNestLhsEmptyCreateN: 0=sole fail, 1+=create.
+	freeMultiIVForLhsExprPostNestLhsEmptyCreate  bool
+	freeMultiIVForLhsExprPostNestLhsEmptyCreateN int
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -2546,9 +2554,14 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			case sp == 0: // Global
 				// free multi-IV post-nest Lhs (e3183 U100=7 Global): visit fails →
 				// Lhs do-while more SelectDeref (e3184 F80…), not e4330 sole-accept.
+				// After Global fails, dummy holds U2-chosen ptr + Global; remaining
+				// matching ptr soles without U then empty create (e3184–85).
 				if flow != nil && flow.freeMultiIVForLhsExprPostNestLhsFailGlobal {
 					flow.freeMultiIVForLhsExprPostNestLhsFailGlobal = false
 					flow.postAggDerefChooseU2AfterCreate = false
+					flow.postAggLhsDerefChooseFails = 0
+					flow.freeMultiIVForLhsExprPostNestLhsEmptyCreate = true
+					flow.freeMultiIVForLhsExprPostNestLhsEmptyCreateN = 0
 					globalFails++
 					continue
 				}
@@ -2948,6 +2961,76 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			return "x"
 		}
 		ptrs := collectLhsDerefPointers(env, scope, ctx, t)
+		// free multi-IV post-nest after Global fail (e3184+): C++ select_deref
+		// with invalid_vars=[U2-chosen, Global] → sole remaining (no U) fails
+		// visit_facts, then empty create random_add F10 F50 + create_and_initialize
+		// F20 NewArray + F20 init (null → F0 continue; address → choose U3…).
+		// VariableSelector.cpp:1248–54 random_add; create_and_initialize F20/F20.
+		if flow != nil && flow.freeMultiIVForLhsExprPostNestLhsEmptyCreate {
+			n := flow.freeMultiIVForLhsExprPostNestLhsEmptyCreateN
+			flow.freeMultiIVForLhsExprPostNestLhsEmptyCreateN++
+			if n == 0 {
+				// e3184: sole remaining pointer (choose_ok_var len==1, no RNG) fails.
+				continue
+			}
+			// Empty create: random_add_qualifiers (SE-free → F10 const + F50 vol).
+			if opts.ConstPointers {
+				_ = er.fallback.flipcoin(10)
+			}
+			addVol := false
+			if opts.VolatilePointers {
+				addVol = er.fallback.flipcoin(50)
+			}
+			// find_pointer_type(LhsType, true): Lhs want is simple → one-star ptr
+			// (not deeper on forced int32_t*). Always materializes into GlobalList
+			// when addVol (GenerateNewGlobal) even if later visit_facts fails.
+			if ctx != nil && ctx.state != nil {
+				noteDerivedPointer(ctx.state, pointerBaseKey(t), false)
+				if addVol {
+					// Pad GlobalList inventory (SelectGlobal / eFlexible simple).
+					gname := fmt.Sprintf("g_fmiv_%d", ctx.state.derivedPtrTypes)
+					g := globalInfo{
+						name:  gname,
+						ctype: CType{Name: "int32_t*", Signed: true, Bits: 32},
+					}
+					ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+					ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, g)
+				}
+			}
+			newArray := er.fallback.flipcoin(20)
+			initNull := er.fallback.flipcoin(20)
+			if initNull {
+				// null Constant primary — opportunistic_validate F0 fail → more SelectDeref.
+				// C++ still left the new Global on GlobalList / derived_types.
+				_ = er.fallback.flipcoin(0)
+				continue
+			}
+			if newArray {
+				// CreateArray residual then accept / fail — rare at e3185 ladder.
+				_ = er.fallback.upto(99)
+				_ = er.fallback.upto(10)
+				_ = er.fallback.upto(1)
+				_ = er.fallback.upto(2)
+				flow.freeMultiIVForLhsExprPostNestLhsEmptyCreate = false
+				flow.postAggLhsWriteDone = true
+				return "x"
+			}
+			// address-of choose_ok_var (e3196 U3 among visible).
+			_ = er.pick(3)
+			// Lhs visit may still fail → VS multiphase (e3197 U100) then Expression.
+			// Hand off: one more VS-style U100 residual then accept Lhs.
+			_ = variableScopePickFromER(er, opts, &scope)
+			// Two addVol creates (null-fail + address-accept) grew derived_types;
+			// free multi-IV Expression nest CreateArray residual also added ptr
+			// types not tracked in GO burns. Floor so next ptr-cmp matches UP U15
+			// (e3238) rather than under-count U12.
+			if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes < 15 {
+				ctx.state.derivedPtrTypes = 15
+			}
+			flow.freeMultiIVForLhsExprPostNestLhsEmptyCreate = false
+			flow.postAggLhsWriteDone = true
+			return "x"
+		}
 		// e4272: after NeedLhs Variable, SelectDeref create without inventory
 		// choose (UP F80 F20=1 NewArray F20 U99…, not U5). Prior ForceDeref
 		// may have left ptrs in inventory that still fail type/visit_facts.
@@ -8712,7 +8795,11 @@ exprTries:
 				// is simple-typed stdfunc (F5 binary) at max_funcs — Comma LHS
 				// retype. GO outer Assign pointer may still tag nested terms as
 				// pointer user-path F50; force atMax stdfunc simple.
-				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
+				// Exception: ptr-cmp operands are real pointer types
+				// (ExpressionFuncall.cpp:73–75 forces std_func=false → user F50;
+				// e3403 UP F50). Do not forceSimple under inPtrCmpExpr.
+				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue &&
+					!ctx.state.inPtrCmpExpr {
 					forceStdFuncSimple = true
 					atMaxFuncs = true
 					forceUserFunc = false
