@@ -701,6 +701,10 @@ type functionFlowState struct {
 	// postAggLhsExprContinue: after Global create Lhs accept (e4386), parent
 	// Expression continues U120 (not next Statement U100).
 	postAggLhsExprContinue bool
+	// postAggNullValidateExprContinue: after SelectDeref NewArray+null multi-scope
+	// Lhs accept (seed5 e804–09), UP continues free Expression U120 nest (e810+)
+	// instead of Statement U100.
+	postAggNullValidateExprContinue bool
 	// postAggExprContGlobalU15: one-shot Global choose U15 after that Expression
 	// continue Variable (e4389 UP U15; not post-ptr U44 inventory).
 	postAggExprContGlobalU15 bool
@@ -109982,7 +109986,9 @@ commaF80MultiDone:
 					_ = r.flipcoin(0)
 					continue
 				}
-				// e804–09: U100 U5 U3 U100 U15 then leave NullValidate → AssignOps/Expr
+				// e804–09: U100 U5 U3 U100 U15 then Lhs accepts.
+				// UP e810+ free Expression (U120…) — arm flag for emitStatement
+				// to burn Expression as next "statement" content before U100.
 				_ = r.upto(100)
 				_ = r.upto(5)
 				_ = r.upto(3)
@@ -109993,6 +109999,12 @@ commaF80MultiDone:
 				createdArrayThisLhs = false
 				lhsFromDeref = true
 				lv = lvalueInfo{expr: "x", ctype: targetType}
+				if ctx != nil && ctx.state != nil {
+					// Next StatementProbability skipped: burn free Expression nest
+					// then resume statements (UP e810 U120 not U100).
+					ctx.state.postAggNullValidateExprContinue = true
+					ctx.state.skipNextBlockSize = false
+				}
 				break
 			}
 			// e8892+ post-CD3: after U7 countdown, F80=0 VS residual multiphase.
@@ -113993,6 +114005,25 @@ func emitStatement(
 	maybeDeclareOnDemandLocal(b, r, opts, ctx)
 	if stmtBudget != nil && *stmtBudget > 0 {
 		*stmtBudget = *stmtBudget - 1
+	}
+	// seed5 e810+: after NullValidate multi-scope Lhs accept, UP continues free
+	// Expression nest (U120 F5 F10…) instead of Statement U100. Burn free
+	// Expressions as statement-level residual before StatementProbability.
+	if state != nil && state.postAggNullValidateExprContinue {
+		state.postAggNullValidateExprContinue = false
+		state.ppPostPadSkipParentExprN = 0
+		base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+		// e810–834: Function×3 + Constant match with free depth-0 Expressions.
+		// e835+: Variable tries=1 needs parent depthBlock (next plateau).
+		for i := 0; i < 4; i++ {
+			state.ppPostPadSkipParentExprN = 0
+			if ctx != nil {
+				ctx.exprDepth = 0
+			}
+			_ = randomTypedExpr(base, r, opts, env, scope, ctx)
+		}
+		writeLine(b, 1, "x = x;")
+		return true
 	}
 	chooseStmt := func() stmtKind {
 		toKind := func(v int) stmtKind {
