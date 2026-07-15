@@ -751,8 +751,9 @@ type functionFlowState struct {
 	freeMultiIVPostEAGlobalPadDone bool
 	// freeMultiIVPostEAGlobalLiveU4Done: one-shot e3563 live Global choose U4.
 	freeMultiIVPostEAGlobalLiveU4Done bool
-	// freeMultiIVPostEAFuncCreateAttrDone: one-shot e3569–70 FuncAttr F30 F0
-	// after useExisting=0 at max_funcs under free multi-IV post-itemize era.
+	// freeMultiIVPostEAFuncCreateAttrDone: one-shot e3568–70 SelectLType F50 F30 F0
+	// + RHS Expression + Lhs after free multi-IV post-itemize era (AssignOps-shaped
+	// residual when free Expression term lands as Function useExisting=0).
 	freeMultiIVPostEAFuncCreateAttrDone bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
@@ -8022,15 +8023,104 @@ func buildFunctionCallExpr(
 				}
 				return castLiteral(t, "0"), true
 			}
-			// seed5 e3568–70: free multi-IV post-itemize era Function useExisting=0
-			// at max_funcs — UP still burns CREATE-head FuncAttr F30 + F0 before
-			// ExpressionVariable (e3571). GO atMax fallthrough skips F30 F0.
-		if state.freeMultiIVPostEAGlobalPadDone && r != nil &&
+			// seed5 e3568–82: free multi-IV post-itemize era after Lhs ladder,
+			// next U120 is AssignOps simple (v=10) + Type::SelectLType F50 F30 F0
+			// then RHS Expression U120 Constant + Lhs SelectDeref multiphase
+			// (StatementAssign order; Type.cpp:1597–1629, Lhs.cpp:70–140).
+			// GO residual free Expression term may land as Function useExisting=0
+			// at max_funcs; burn SelectLType coins then RHS+Lhs residual instead
+			// of ExpressionVariable U100 / sticky nest SelectDeref U12.
+			if state.freeMultiIVPostEAGlobalPadDone && r != nil &&
 				!state.freeMultiIVPostEAFuncCreateAttrDone {
 				state.freeMultiIVPostEAFuncCreateAttrDone = true
-				_ = r.flipcoin(30) // e3569 FuncAttrProb
-				_ = r.flipcoin(0)  // e3570
-				// fall through to ExpressionVariable
+				// e3568 F50 already consumed as useExisting; SelectLType Pointer
+				// coin is that same F50. Continue StructAsLType + FloatAsLType:
+				_ = r.flipcoin(30) // e3569 StructAsLTypeProb
+				_ = r.flipcoin(0)  // e3570 FloatAsLTypeProb (disabled → 0)
+				// e3571+: RHS Expression::make_random then Lhs::make_random.
+				if er != nil && er.fallback != nil {
+					prevDepth := 0
+					if ctx != nil {
+						prevDepth = ctx.exprDepth
+						ctx.exprDepth = 0
+					}
+					// SelectLType default → get_int_type() (int32).
+					rhsT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					_ = randomTypedExprDepthFlags(rhsT, er, opts, env, scope, 0, ctx, false, false)
+					// e3575–81: Lhs SelectDeref F80=1 choose U2 → VS multiphase
+					// U100 U100 U2 U4 U100 (not sticky nest U12 itemize ladder).
+					// Same family as e3557–59 / e3564–66 compact SelectDeref residual.
+					if er.fallback.flipcoin(80) { // e3575 F80=1
+						_ = er.pick(2)   // e3576 SelectDeref choose among 2
+						_ = er.pick(100) // e3577 VS fallthrough / reselect
+						_ = er.pick(100) // e3578 VS
+						_ = er.pick(2)   // e3579 PP/stack
+						_ = er.pick(4)   // e3580 choose
+						_ = er.pick(100) // e3581 VS accept
+					}
+					// e3582+: AssignOps need_no_rhs (U120=102 ++/--) then Lhs
+					// SelectDeref empty-create ladder (Lhs.cpp do-while +
+					// VariableSelector create_and_initialize). Not free Expression
+					// term Assign (WRITE qfer F50 would desync).
+					_ = er.fallback.upto(120)    // e3582 AssignOps need_no_rhs
+					_ = er.fallback.flipcoin(80) // e3583 F80=1
+					_ = er.pick(2)               // e3584 U2 choose fail/empty
+					_ = er.fallback.flipcoin(80) // e3585 F80=1
+					_ = er.fallback.flipcoin(80) // e3586 F80=1 empty create
+					// random_add_qualifiers + create_and_initialize:
+					_ = er.fallback.flipcoin(50) // e3587
+					_ = er.fallback.flipcoin(10) // e3588
+					_ = er.fallback.flipcoin(50) // e3589
+					_ = er.fallback.flipcoin(20) // e3590 NewArray
+					_ = er.fallback.flipcoin(20) // e3591 init
+					_ = er.pick(4)               // e3592
+					_ = er.pick(3)               // e3593
+					_ = er.fallback.flipcoin(80) // e3594 F80=1
+					_ = er.fallback.flipcoin(50) // e3595
+					_ = er.fallback.flipcoin(10) // e3596
+					_ = er.fallback.flipcoin(50) // e3597
+					_ = er.fallback.flipcoin(20) // e3598 NewArray=1
+					_ = er.fallback.flipcoin(20) // e3599 init
+					_ = er.pick(4)               // e3600
+					// e3601–04: CreateArray U99 sizes (dims + itemize)
+					_arr := burnCreateArrayVariable(er.fallback, opts, rhsT, true)
+					emitOrphanArrayGlobal(ctx, rhsT, _arr)
+					// e3605+: Lhs do-while after CreateArray — SelectDeref soles
+					// collective array → ArrayVariable::itemize last sizes U7
+					// (ArrayVariable.cpp:253) until F80=0 → VS; visit may fail
+					// (F0 / create residual) and resume SelectDeref (e3619+).
+					// Mirror Lhs.cpp:70–140 loop, not free Expression U120.
+					for phase := 0; phase < 4; phase++ {
+						for {
+							if !er.fallback.flipcoin(80) {
+								break
+							}
+							_ = er.pick(7) // itemize sizes[i] or choose_ok_var
+						}
+						// F80=0 → VariableSelector::select WRITE
+						_ = er.pick(100) // VS U100
+						_ = er.pick(3)   // stack / ParentLocal
+						if phase == 0 {
+							_ = er.fallback.flipcoin(0) // e3618 visit F0 fail
+							continue
+						}
+						if phase == 1 {
+							// e3644–46: VS create residual F50 F20 F50 then more SelectDeref
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(50)
+							continue
+						}
+						// later phases: accept or light residual
+						if phase >= 2 {
+							break
+						}
+					}
+					if ctx != nil {
+						ctx.exprDepth = prevDepth
+					}
+				}
+				return castLiteral(t, "0"), true
 			}
 			// Upstream: failed invocation → ExpressionVariable::make_random
 			// (seed2 e814 U100 NewValue after useExisting miss at max funcs).
