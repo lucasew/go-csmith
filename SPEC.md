@@ -222,10 +222,22 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4215** (ptr-cmp operand qfer F10 after e4210 U16 match — star-depth under-model); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4221** (Global U2 match then itemize U8 U7 vs Lhs F80 — array multi-dim itemize under-model); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e4220→4221 climbed — GlobalU21 Function-fail SelectGlobal choose first:**
+1. Capture: e4220 UP U2=0 vs GO F50 SE-free create after ptr-cmp ** Assign RHS Function-fail Variable Global.
+2. C++: `SelectGlobal` always `choose_var` first; only `GenerateNewGlobal` when empty (VariableSelector.cpp:648–666).
+3. GO: GlobalU21 Function-fail path always force-created. For multi-level want (`**+`), try `selectExprVariableFromER` live choose first (e4220 U2). Next: e4221 U8 U7 itemize (multi-dim array) vs Lhs F80.
+4. Seed2/3/4/6 held.
+
+**seed5 e4215→4220 climbed — ptr-cmp operand star-depth (GlobalU21 * clamp gate):**
+1. Capture: e4215 UP F10=0 vs GO U120=82 after matching e4210 U16=9 (ptr-cmp choose) + ExpressionAssign WRITE qfer short one F10/F50 pair.
+2. C++: `choose_random_pointer_type` → `derived_types[9]` is `eULongLong**` (ind=2). ExpressionAssign null-qfer WRITE burns F50 F10 ×2 levels + self F50 (no self const).
+3. GO: sticky GlobalU21 `stars=1` clamp (e2274 era — early qfer-burning picks were ind=1) under-modeled idx=9 as `*`. Gate clamp on `derivedPtrTypes < 16` (pre-eULong* inventory); once n≥16, non-PP `idx>0 → **` yields ind=2 WRITE qfer.
+4. Seed2/3/4/6 held.
 
 **seed5 e4210→4215 climbed — eULong* derived inventory (pointerBaseKey):**
 1. Capture: e4210 UP U16=9 vs GO U15=9 same raw (ptr-cmp `choose_random_pointer_type`).

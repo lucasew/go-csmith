@@ -9340,11 +9340,25 @@ exprTries:
 							if ppEra && ppPostPadGlobalPicks >= 14 && stars > 2 {
 								stars = 2
 							}
-							// e2274 residual GlobalU21: ptr-cmp ExpressionAssign
-							// WRITE qfer is one level F50 F10 + self F50 (not **
-							// F50 F10×2 + self → extra F10 before parent U120).
+							// e2274 residual GlobalU21: early ptr-cmp operands under-
+							// modeled as * (WRITE qfer F50 F10 + self F50). That was
+							// correct while choose_random_pointer_type n < 16 — picks
+							// that burn qfer were ind=1 (e2263 idx=6 eULongLong*,
+							// e3397 idx=8 eLong*). After eULong* inventory reaches
+							// n=16 (seed5 e4210), idx=9 is eULongLong** (ind=2) and
+							// ExpressionAssign WRITE needs F50 F10×2 + self F50
+							// (e4215). Stop the sticky * clamp once derived_types
+							// size has grown to that multi-level inventory
+							// (Type.cpp:550–553 get_indirect_level of chosen).
+							// Non-PP path uses idx>0 → ** when unclamped.
 							if nullValidatePostResidualGlobalU21 && stars > 1 {
-								stars = 1
+								nDer := 0
+								if ctx != nil && ctx.state != nil {
+									nDer = ctx.state.derivedPtrTypes
+								}
+								if nDer < 16 {
+									stars = 1
+								}
 							}
 							var ptrTy CType
 							if outOfRangeS0 {
@@ -9860,7 +9874,17 @@ exprTries:
 					// e2831+: SelectLType multi-level pointer + SE-free context →
 					// random_qualifiers levels F50 F10 + self F50 F10 (CVQualifiers
 					// .cpp:306–343; GenerateNewGlobal wildcard qfer).
+					// e4220: after ptr-cmp ** ExpressionAssign RHS Function-fail,
+					// SelectGlobal choose_var has ok_vars U2 — try live choose for
+					// multi-level want before force-create (VariableSelector.cpp:648).
 					if scopePick == 0 && nullValidatePostResidualGlobalU21 && er != nil {
+						if strings.Count(t.Name, "*") >= 2 && len(candidates) > 0 {
+							if c, ok := selectExprVariableFromER(t, er, candidates, false); ok && c.expr != "" {
+								bumpExprDepth(ctx)
+								markFuncEffect()
+								return castLiteral(t, c.expr)
+							}
+						}
 						n := globalU21FFGlobalN
 						globalU21FFGlobalN++
 						// e2279 first: skipRandomQfer F20 (non-wildcard residual).
