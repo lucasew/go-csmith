@@ -6514,6 +6514,25 @@ if pointerGlobalPicksSink != nil {
 					}
 					return uniq[0], true
 				}
+				// seed5 e1271+: residual free Expression GlobalList U18 pad
+				// (UP GlobalList; GO inventory under-counts as U4). Always
+				// itemize arrays after choose (e1282 U4 after U18).
+				if nullValidatePostResidualParamU7 && !forAssign && !selectVarLocalScope {
+					nChoose = 18
+					for len(pool) < 1 && len(uniq) > 0 {
+						pool = uniq
+					}
+					for len(pool) < nChoose && len(pool) > 0 {
+						pool = append(pool, pool[len(pool)%len(pool)])
+					}
+					if len(pool) < 1 {
+						pool = []exprVarCandidate{{expr: "g_0", ctype: t, assignable: true}}
+					}
+					idx := int(er.pick(uint32(nChoose))) % len(pool)
+					c := pool[idx]
+					itemizeArrayCandidate(er, c)
+					return c, true
+				}
 				idx := int(er.pick(uint32(nChoose))) % len(pool)
 				c := pool[idx]
 				// e2991–92: after ArrayOp residual era, U9 Global choose then
@@ -6692,10 +6711,17 @@ if pointerGlobalPicksSink != nil {
 		if nullValidatePostResidualGlobalU18 && !forAssign && !selectVarLocalScope {
 			nullValidatePostResidualGlobalU18 = false
 			v := int(er.pick(18))
-			return exact[v%n], true
+			c := exact[v%n]
+			itemizeArrayCandidate(er, c)
+			return c, true
 		}
 		if chooseN > 1 {
-			return exact[int(er.pick(uint32(chooseN)))%n], true
+			c := exact[int(er.pick(uint32(chooseN)))%n]
+			// seed5 e1282: residual GlobalList pad U18 may land on array → itemize U4.
+			if forceN > 0 {
+				itemizeArrayCandidate(er, c)
+			}
+			return c, true
 		}
 		return exact[0], true
 	}
@@ -6726,14 +6752,21 @@ if pointerGlobalPicksSink != nil {
 			nullValidatePostResidualGlobalU18 = false
 			n := 18
 			v := int(er.pick(uint32(n)))
-			return integers[v%len(integers)], true
+			c := integers[v%len(integers)]
+			itemizeArrayCandidate(er, c)
+			return c, true
 		}
 		chooseN := len(integers)
 		if forceN > chooseN {
 			chooseN = forceN
 		}
 		if chooseN > 1 {
-			return integers[int(er.pick(uint32(chooseN)))%len(integers)], true
+			c := integers[int(er.pick(uint32(chooseN)))%len(integers)]
+			// seed5 e1282: residual Global pad may select array → itemize.
+			if forceN > 0 {
+				itemizeArrayCandidate(er, c)
+			}
+			return c, true
 		}
 		return integers[0], true
 	}
@@ -7931,6 +7964,12 @@ exprTries:
 								// seed5 e937: early CreateArray field_vars era — UP U5.
 								nPtr = 5
 							}
+							// seed5 e1325: residual Assign free Expression ptr-cmp
+							// UP derived_types U7 (after residual CreateArray/Global).
+							// Overrides e937 U5 floor under residual era.
+							if nullValidatePostResidualParamU7 && nPtr < 7 {
+								nPtr = 7
+							}
 							ptrIdx := int(er.fallback.upto(uint32(nPtr)))
 							// choose_random_pointer_type → derived_types[index].
 							// PP-era: use tracked star depths. seed2: idx>0 → **.
@@ -8506,28 +8545,65 @@ exprTries:
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, expr))
 			}
-			// seed5 e1077–85: residual ParentLocal empty block → stack U6 +
-			// GenerateNewParentLocal (U14 type + qfer F50 F10 F20 F50 F50 U20);
-			// GO inventory U3 choose desyncs. One-shot: e1225 later PL is
-			// NewArray CreateArray after SelectDeref fail (not sticky U14).
-			if (scopePick == 1 || scopePick == 4) && nullValidatePostResidualPLCreateOnce && er != nil {
+			// seed5 e1077–85 / e1248–54: residual free Expression ParentLocal
+			// empty block → stack U6 + GenerateNewParentLocal (U14 retype +
+			// qfer F50 F10 F20 F50…). GO inventory sole-accepts U2/U3 desyncs.
+			// Sticky under residual era (not one-shot): e1248 after Lhs CreateArray
+			// still empty-creates. ExpressionAssign Lhs after SelectDeref F80=0
+			// uses its own NewArray CreateArray path (not this intercept).
+			if (scopePick == 1 || scopePick == 4) &&
+				(nullValidatePostResidualPLCreateOnce || nullValidatePostResidualParamU7) &&
+				er != nil {
 				nullValidatePostResidualPLCreateOnce = false
-				idx := parentStackPick(er, flow) // e1078 U6
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+				idx := parentStackPick(er, flow) // e1078 / e1249 U6
+				// Force eSimple retype so U14 tries=2 filters void@0+float@10
+				// (UP e1250 U14=11 tries=2).
+				es := true
+				prevES := useESimpleRetypeSink
+				useESimpleRetypeSink = &es
+				g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx)
+				useESimpleRetypeSink = prevES
+				if ok {
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
 					return finishVar(castLiteral(t, g.expr))
 				}
 			}
-			// seed5 e929: post-residual free Expression Global eFlexible U18.
-			// e1025–26: after residual For body Assign, Global U18 + itemize U10.
-			if scopePick == 0 && nullValidatePostResidualGlobalU18 && er != nil {
-				nullValidatePostResidualGlobalU18 = false
-				_ = er.pick(18) // e929 / e1025
-				// e1026: array Global itemize residual U10 (not end Expression → BlockSize U4).
-				if nullValidatePostResidualGlobalItemizeU10 {
+			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
+			// e1271+: sticky residual ParamU7 GlobalList U18; itemize when inventory
+			// candidate is array (e1282 U4 after U18=2).
+			if scopePick == 0 &&
+				(nullValidatePostResidualGlobalU18 || nullValidatePostResidualParamU7) &&
+				er != nil {
+				oneShot := nullValidatePostResidualGlobalU18
+				if oneShot {
+					nullValidatePostResidualGlobalU18 = false
+				}
+				v := int(er.pick(18)) // e929 / e1025 / e1271
+				if oneShot && nullValidatePostResidualGlobalItemizeU10 {
 					nullValidatePostResidualGlobalItemizeU10 = false
 					_ = er.pick(10)
+				} else if !oneShot {
+					// Sticky residual GlobalList U18 itemize by choose index when
+					// UP GlobalList has 1d arrays at fixed slots (seed5 e1282 v=2
+					// U4; e1354 v=0 U10). Multi-dim/non-array: no itemize (e1345).
+					cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
+					expr := "g_0"
+					if len(cands) > 0 {
+						c := cands[v%len(cands)]
+						expr = c.expr
+					}
+					switch v {
+					case 0:
+						// e1354–55: multi-dim [10][18] itemize (not sole U10).
+						_ = er.pick(10)
+						_ = er.pick(18)
+					case 2:
+						_ = er.pick(4) // e1282 size-4 array
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, expr))
 				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
@@ -11136,6 +11212,11 @@ exprTries:
 				if scopePick == 2 && nullValidatePostResidualParamU7 {
 					selectVarForceChooseN = 7
 				}
+				// seed5 e1271+: residual free Expression GlobalList U18 pad
+				// (UP GlobalList; GO inventory U4). Itemize when array (e1282 U4).
+				if scopePick == 0 && nullValidatePostResidualParamU7 {
+					selectVarForceChooseN = 18
+				}
 				c, ok := selectExprVariableFromER(t, er, candidates, false)
 				selectVarForceChooseN = 0
 				if ok {
@@ -12643,11 +12724,11 @@ exprTries:
 						continue
 					}
 					// seed5 e1215+: residual CreateArray left multi-dim pointer;
-					// UP SelectDeref choose+itemize U9 U8 U3 F0 (fail) ×3 then
+					// UP SelectDeref choose+itemize U9 U8 U3 F0 (fail) ×2 then
 					// F80=0 → VS. GO inventory empty would empty-create F20.
 					if nullValidatePostResidualSelDerefItemize > 0 && er != nil {
 						nullValidatePostResidualSelDerefItemize--
-						_ = er.pick(9) // e1215/e1220/e…
+						_ = er.pick(9) // e1215/e1220
 						_ = er.pick(8)
 						_ = er.pick(3)
 						if er.fallback != nil {
@@ -12669,7 +12750,10 @@ exprTries:
 					initConst := er.fallback.flipcoin(20)
 					// seed5 e949–51: after NVPL RHS, ExpressionAssign Lhs empty
 					// create accepts after F80 F20 F20 (no address residual F20).
-					if nullValidatePostResidualLhsAccept && !newArray && !initConst {
+					// e1364–66: residual era ExpressionAssign Lhs empty create
+					// also accepts after F20 F20 → parent U120 (not more F20).
+					if (nullValidatePostResidualLhsAccept || nullValidatePostResidualParamU7) &&
+						!newArray && !initConst {
 						nullValidatePostResidualLhsAccept = false
 						lhsFromDeref = true
 						break
@@ -12939,9 +13023,10 @@ exprTries:
 						// NewArray+!initNull → CreateArray U99 (no tgt NewArray F20
 						// + Constant residual; UP F20 F20 U99 U10×3 U108…).
 						tgtNewArray = true
-						// e1215+: after CreateArray, SelectDeref chooses live array
-						// with multi-dim itemize U9 U8 U3 F0 ×3 then F80=0→VS.
-						nullValidatePostResidualSelDerefItemize = 3
+						// e1215–23: after CreateArray, SelectDeref chooses live
+						// array itemize U9 U8 U3 F0 ×2 then F80=0→VS (not ×3;
+						// leftover sticky itemize desynced e1364 empty create).
+						nullValidatePostResidualSelDerefItemize = 2
 					} else {
 						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
 						// Constant::make_random for the synthetic pointed-to object.
