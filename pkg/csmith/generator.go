@@ -702,6 +702,9 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsIfBody: inside free multi-IV need_no_rhs-era free
 	// Statement IfElse then/else (sole BlockSize; PL stack U5 at e5133).
 	freeMultiIVNeedNoRhsIfBody bool
+	// freeMultiIVNeedNoRhsIfNestedFor: nested free For body under need_no_rhs
+	// If then/else — Function::stack includes For frame → PL U6 (e5170).
+	freeMultiIVNeedNoRhsIfNestedFor bool
 	// freeMultiIVNeedNoRhsIfLhsSelDone: one-shot Statement Lhs SelectDeref
 	// live multiphase under If body (e5140–45); then F80=0→VS.
 	freeMultiIVNeedNoRhsIfLhsSelDone bool
@@ -2180,8 +2183,14 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// seed5 e5133: free multi-IV need_no_rhs-era free If then-body Assign RHS
 	// Expression Variable PL: Function::stack.size()=5 (not GO blockStack 6).
 	// Highest priority — freeMultiIVForBodyU3 / deepStack would under/over-burn.
+	// seed5 e5170: nested free For body under that If → Function::stack U6
+	// (For frame pushed; freeMultiIVNeedNoRhsIfNestedFor).
 	if state != nil && state.freeMultiIVNeedNoRhsIfBody {
-		return int(er.pick(5))
+		n := uint32(5)
+		if state.freeMultiIVNeedNoRhsIfNestedFor {
+			n = 6
+		}
+		return int(er.pick(n))
 	}
 	// seed5 e4368: after multi-level SelectDeref create ladder, free Expression
 	// Variable PL stack is U3 (For body depth) not sticky residual forceU6.
@@ -16925,6 +16934,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if arrayOp2LhsPL {
 			nStack = 4
 		}
+		// seed5 e5174: free multi-IV need_no_rhs If then-body nested free For
+		// Lhs F80=0 → VS PL Function::stack.size()=6 (For frame) then empty
+		// create NewArray F20. multiDim sticky e940 U2 + live U15 residual
+		// when postAggGlobalCreateN already exhausted.
+		needNoRhsNestedForPL := flow != nil && flow.freeMultiIVNeedNoRhsIfNestedFor
+		if needNoRhsNestedForPL {
+			nStack = 6
+		}
 		// seed5 e4554–55: free multi-IV For body need_no_rhs Lhs PL —
 		// Function::stack.size()=4 + live choose U7 (not multiDim sticky U2).
 		// seed5 e4622–24 / e4690+ / e4750+: multiphase eDerefExact local pools
@@ -17023,6 +17040,11 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		// seed5 e5174–75: need_no_rhs nested For Lhs PL empty create (NewArray
+		// F20 + Constant hex + CreateArray) — not multiDim live choose U15 residual.
+		if needNoRhsNestedForPL {
+			useBlockLocal = true
+		}
 		// C++ SelectParentLocal (VariableSelector.cpp:979–989): empty
 		// block.local_vars → random_type_from_type + GenerateNewParentLocal.
 		// multiDimArrays only gates inventory choose/itemize — not empty create.
@@ -17050,6 +17072,11 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		}
 		if useBlockLocal {
 			localCands := localsInStackBlock(er, env, scope, ctx, idx)
+			// seed5 e5174: need_no_rhs nested For stack idx often empty in C++
+			// (GenerateNewParentLocal NewArray F20); GO residual locals over-count.
+			if needNoRhsNestedForPL {
+				localCands = nil
+			}
 			// Late PL residual by pick count:
 			//   1 (e1469): retype create U14
 			//   2 (e1514): force NewArray CreateArray
@@ -17177,11 +17204,19 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				}
 				// seed4 e450: after PP pad era, empty PL Lhs WRITE create keeps
 				// target type (no U14). seed2 e942 early still retypes.
+				// seed5 e5175: need_no_rhs nested For Lhs PL empty create inherits
+				// StatementAssign qfer (match_exact) → create_and_initialize
+				// NewArray F20 first (no WRITE random_qualifiers F50).
 				retype := true
 				if flow != nil && flow.isParamPPFallPicks >= 2 && !flow.useSmallParentStack {
 					retype = false
 				}
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, retype, idx); ok {
+				qferM := 3
+				if needNoRhsNestedForPL {
+					qferM = 0
+					retype = false
+				}
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, qferM, retype, idx); ok {
 					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 				}
 			} else if postAggGlobalCreateN >= 0 {
@@ -119238,13 +119273,19 @@ func emitStatement(
 	}
 	// seed2 e948: after continue ends array-loop body, next parent stmt U100=68
 	// then U2 — For with postArrayFor (not Assign+U120). Flag survives body exit.
+	// Gate: array-loop frame only (arrayLoopDepth/Fresh). Free multi-IV need_no_rhs
+	// If then-body For (seed5 e5161–63) can still sit under sticky arrayLoopDepth>0
+	// + loopIVPool>1 + multiDimArrays; C++ StatementProbability Continue then
+	// Assign is plain AssignOps U120 — not remapped postArrayFor U2+U9 U8.
 	afterCont := state != nil && state.lastStmtWasContinue
 	if state != nil {
 		state.lastStmtWasContinue = false
 	}
 	remappedAssignToFor := false
 	if st == stmtAssign && afterCont && state != nil &&
-		state.loopIVPool > 1 && state.multiDimArrays > 0 {
+		state.loopIVPool > 1 && state.multiDimArrays > 0 &&
+		(state.arrayLoopDepth > 0 || state.arrayLoopFresh) &&
+		!state.freeMultiIVNeedNoRhsIfBody && !state.freeMultiIVNeedNoRhsEra {
 		st = stmtFor
 		state.useSmallParentStack = true
 		remappedAssignToFor = true
@@ -119650,8 +119691,15 @@ func emitStatement(
 		}
 		writeLine(b, 1, "for (int32_t i = 0; i < 10; ++i) {")
 		writeLine(b, 2, "x += (uint32_t)i;")
+		prevNeedNoRhsNestedFor := false
 		if state != nil {
 			state.blockStack++
+			// seed5 e5170: need_no_rhs If then-body free For pushes
+			// Function::stack → PL parentStackPick U6 (was sticky U5).
+			prevNeedNoRhsNestedFor = state.freeMultiIVNeedNoRhsIfNestedFor
+			if state.freeMultiIVNeedNoRhsIfBody {
+				state.freeMultiIVNeedNoRhsIfNestedFor = true
+			}
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 		if state != nil && state.blockStack > 0 {
@@ -119659,6 +119707,7 @@ func emitStatement(
 		}
 		if state != nil {
 			state.freeMultiIVForBodyU3 = false
+			state.freeMultiIVNeedNoRhsIfNestedFor = prevNeedNoRhsNestedFor
 		}
 		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")

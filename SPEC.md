@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5163** (For body U120 vs U2); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5289** (Statement U100 tries=1 vs 0 after nested For Lhs); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5163→5289 climbed — For body Continue→Assign (not postArrayFor U2) + PL U6 empty create:**
+1. Capture: e5163 UP U120=7 (AssignOps) vs GO U2=1 (postArrayFor) after For body U100=38 Continue, U100=65 Assign.
+2. C++: free multi-IV need_no_rhs If then-body free For body keeps Continue then StatementAssign → AssignOps U120=7 → SelectLType F50 F30 U3 → RHS Expression Function-fail Variable PL stack U6 (For frame) + Lhs F80=0 → VS PL U6 empty create NewArray F20 (match_exact qfer, no WRITE F50).
+3. GO: seed2 e948 Assign→For remap fired on sticky loopIVPool>1+multiDim under arrayLoopDepth=1 even outside array-loop Continue; gate remap to array-loop frame and exclude freeMultiIVNeedNoRhsIfBody/Era. Nested For arms freeMultiIVNeedNoRhsIfNestedFor → parentStackPick/Lhs PL U6 + empty create qferMode 0 F20-first. Seeds 2/3/4/6 held.
+4. Next: e5289 UP U100=42 tries=1 vs GO U100=59 tries=0 (StatementFilter).
 
 **seed5 e5147→5163 climbed — SelectLoopCtrl U37 inventory (need_no_rhs If-body For):**
 1. Capture: e5147 UP U37=27 (SelectLoopCtrlVar) vs GO U16=4 (same raw; live count under-materialised).
