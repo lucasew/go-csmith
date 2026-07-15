@@ -8095,8 +8095,16 @@ func buildFunctionCallExpr(
 					if len(lastSizes) == 0 {
 						lastSizes = []int{7}
 					}
+					// Global matching under Lhs dummy (Lhs.cpp:139 + choose_var):
+					// phase A = choose_var pointer-preference subset (higher
+					// indirection) U3→U2→sole; phase B = remaining eDerefExact
+					// ok_vars countdown. Late PL creates refresh eligibility
+					// (FactMgr new-var facts) so the live pool settles and stays
+					// at the post-create size (e3932/e4018/e4093 all U3) rather
+					// than keep shrinking on every dummy push.
 					globalOK := 2
 					globalChooseN := 0
+					globalPoolSettled := false
 					itemizeLast := func() {
 						for _, sz := range lastSizes {
 							if sz > 0 {
@@ -8104,19 +8112,23 @@ func buildFunctionCallExpr(
 							}
 						}
 					}
-					burnVSCreateResidual := func() (didNewArray bool, sizes []int) {
+					burnVSCreateResidual := func(ct CType) (didNewArray bool, sizes []int) {
+						if ct.Name == "" {
+							ct = rhsT
+						}
 						_ = er.fallback.flipcoin(50) // random_qualifiers volatile
 						if er.fallback.flipcoin(20) { // NewArrayVariableProb
-							burnSimpleConstant(er.fallback, rhsT)
-							arr2 := burnCreateArrayVariable(er.fallback, opts, rhsT, true)
+							burnSimpleConstant(er.fallback, ct)
+							arr2 := burnCreateArrayVariable(er.fallback, opts, ct, true)
 							return true, arr2.sizes
 						}
-						burnSimpleConstant(er.fallback, rhsT)
+						burnSimpleConstant(er.fallback, ct)
 						// Create can grow the Global matching pool late in the
 						// ladder (e3893 U2 -> e3932 U3 after two PL creates). Early
 						// creates (e3772 before e3778 U6) must not inflate the pool.
 						if globalChooseN > 0 && globalChooseN <= 2 {
 							globalChooseN++
+							globalPoolSettled = true
 						}
 						return false, nil
 					}
@@ -8143,7 +8155,7 @@ func buildFunctionCallExpr(
 					blockSizes := [][]int{nil, nil, append([]int(nil), lastSizes...)}
 					burnBlockOrCreate := func(idx int) {
 						if idx < 0 || idx >= len(blockOK) {
-							_, _ = burnVSCreateResidual()
+							_, _ = burnVSCreateResidual(rhsT)
 							return
 						}
 						switch n := blockOK[idx]; {
@@ -8158,7 +8170,7 @@ func buildFunctionCallExpr(
 								}
 							}
 						case n == 0:
-							didNA, sizes := burnVSCreateResidual()
+							didNA, sizes := burnVSCreateResidual(rhsT)
 							if didNA && len(sizes) > 0 {
 								blockOK[idx] = -1
 								blockSizes[idx] = sizes
@@ -8170,6 +8182,23 @@ func buildFunctionCallExpr(
 							blockOK[idx]--
 						}
 					}
+					// NewValue create: Type::random_type_from_type → choose_random_simple
+					// (U14 + SIMPLE_TYPES_PROB_FILTER tries). Generated var usually
+					// passes Lhs visit_facts → exit do-while; need_no_rhs then
+					// SafeOpFlags::make_random_binary (F50 + size U4).
+					burnNewValueCreate := func(asGlobal bool) {
+						if !asGlobal {
+							_ = er.pick(stackSz)
+						}
+						// eSimpleType order in free multi-IV era (float@10 filtered).
+						es := true
+						prev := useESimpleRetypeSink
+						useESimpleRetypeSink = &es
+						chosen := pickSimpleNonVoid(er.fallback, opts)
+						useESimpleRetypeSink = prev
+						_, _ = burnVSCreateResidual(chosen)
+					}
+				lhsLoop:
 					for iter := 0; iter < 256; iter++ {
 						if er.fallback.flipcoin(80) {
 							itemizeLast()
@@ -8192,7 +8221,13 @@ func buildFunctionCallExpr(
 								}
 								if globalChooseN > 1 {
 									_ = er.pick(uint32(globalChooseN))
-									globalChooseN--
+									// After late creates settle the live pool,
+									// dummy no longer shrinks choose n (e3932+
+									// stay U3 through e4093). Pre-settle phase B
+									// still counts down U7…U2.
+									if !globalPoolSettled {
+										globalChooseN--
+									}
 								} else {
 									globalChooseN = 0
 								}
@@ -8202,14 +8237,29 @@ func buildFunctionCallExpr(
 						case scopeV < 95: // eParentParam -> fall to PL
 							burnBlockOrCreate(int(er.pick(stackSz)))
 						default: // eNewValue
-							if er.fallback.flipcoin(10) {
-								_ = er.pick(14)
-								burnVSCreateResidual()
-							} else {
-								_ = er.pick(stackSz)
-								_ = er.pick(14)
-								burnVSCreateResidual()
+							// VariableCreationProbability: F10 global vs PL.
+							burnNewValueCreate(er.fallback.flipcoin(10))
+							// Lhs accepts created var; StatementAssign need_no_rhs
+							// SafeOpFlags (SafeOpFlags.cpp:188–212).
+							_ = er.fallback.flipcoin(50) // SafeOpsSignedProb
+							_ = er.fallback.upto(4)      // MAX_SAFE_OP_SIZE-1
+							// Assign complete → next Statement U100 (e4119 IfElse).
+							// Stop freeMultiIVForLhsExprContinue nest (which would
+							// clear Skip and force more Expression U120) and unwind
+							// wrappers so Block continues StatementProbability.
+							if ctx != nil && ctx.state != nil {
+								// need_no_rhs Assign complete → next Statement U100
+								// (e4119 IfElse condition U120). Stop sticky free
+								// multi-IV Expression nests that would steal the
+								// next raw as Expression U120; do not arm Expression
+								// skip (would swallow IfElse condition).
+								ctx.state.freeMultiIVForLhsExprContinue = false
+								ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+								ctx.state.postAggLhsExprContinue = false
+								ctx.state.ppPostPadSkipParentExprN = 0
+								ctx.state.skipNextBlockSize = true
 							}
+							break lhsLoop
 						}
 					}
 					if ctx != nil {
@@ -8760,6 +8810,9 @@ func randomLeafExprWithMode(
 		return castLiteral(t, out)
 	}
 
+	if ctx != nil && ctx.state != nil {
+	} else {
+	}
 	type termChoice int
 	const (
 		termFunction termChoice = iota
@@ -116958,46 +117011,60 @@ commaF80MultiDone:
 	// Constant has no pure_rnd F50 (e2989→e2990 U120). Keep continue flag so
 	// PL stack U2 (e3003) and nested Function atMax stdfunc F5 (e3045).
 	if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
-		ctx.state.ppPostPadSkipParentExprN = 0
-		// (1) e2989 U120=97 Constant
-		ctx.exprDepth = 0
-		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
-		// (2) e2990 U120=113 Comma → Function binary + nested Comma/Variable
-		// through e3179 PL U4 Variable (Comma rhs).
-		ctx.exprDepth = 0
-		ctx.state.ppPostPadSkipParentExprN = 0
-		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
-		// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
-		// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
-		// F80=0 → VS U100…) then more free Expression (e3198 U120). StatementAssign
-		// order is RHS then Lhs — residual Expressions act as RHS of a parent
-		// ExpressionAssign whose Lhs runs after the nest.
-		if ctx.state.freeMultiIVForLhsExprPostNestLhs {
+		// e3568+ free multi-IV post-EA Function residual may run inside the first
+		// nest Expression and finish a full need_no_rhs Assign (e4119 next is
+		// Statement IfElse). It clears this flag and arms Skip — do not force
+		// more Expression U120 or clobber Skip after that.
+		if ctx.state.freeMultiIVPostEAFuncCreateAttrDone {
+			ctx.state.freeMultiIVForLhsExprContinue = false
 			ctx.state.freeMultiIVForLhsExprPostNestLhs = false
-			er := newExprRand(r, exprDecisionBudget(opts))
-			base := targetType
-			if !strings.Contains(base.Name, "*") {
-				base = CType{Name: "int32_t*", Signed: true, Bits: 32}
-			}
-			// e3180–82: SelectDeref live choose U2 (not sticky nest U12) then
-			// F80=0 → VS Global fail → more SelectDeref (e3184+). Clear nest
-			// SelectDeref countdowns; arm U2 choose + first Global fail.
-			ctx.state.postAggNestArrayOpKeepExprSelActive = false
-			ctx.state.postAggNestArrayOpLhsCountdown = false
-			ctx.state.postAggNestSelDerefCountdown = false
-			ctx.state.postAggNestSelDerefRound2 = false
-			ctx.state.postAggLhsDerefChooseFails = 0
-			ctx.state.postAggDerefChooseU2AfterCreate = true
-			ctx.state.freeMultiIVForLhsExprPostNestLhsFailGlobal = true
-			_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
-			// Continue free Expression residual after parent Lhs (e3198+).
-			for extra := 0; extra < 8; extra++ {
+		} else {
+			ctx.state.ppPostPadSkipParentExprN = 0
+			// (1) e2989 U120=97 Constant
+			ctx.exprDepth = 0
+			_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+			// Residual Assign inside nest Expression can clear continue (e4117+).
+			if !ctx.state.freeMultiIVForLhsExprContinue {
+				// Keep residual Skip / skipNextBlockSize for Statement U100.
+			} else {
+				// (2) e2990 U120=113 Comma → Function binary + nested Comma/Variable
+				// through e3179 PL U4 Variable (Comma rhs).
 				ctx.exprDepth = 0
 				ctx.state.ppPostPadSkipParentExprN = 0
 				_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+				// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
+				// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
+				// F80=0 → VS U100…) then more free Expression (e3198 U120). StatementAssign
+				// order is RHS then Lhs — residual Expressions act as RHS of a parent
+				// ExpressionAssign whose Lhs runs after the nest.
+				if ctx.state.freeMultiIVForLhsExprContinue && ctx.state.freeMultiIVForLhsExprPostNestLhs {
+					ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+					er := newExprRand(r, exprDecisionBudget(opts))
+					base := targetType
+					if !strings.Contains(base.Name, "*") {
+						base = CType{Name: "int32_t*", Signed: true, Bits: 32}
+					}
+					// e3180–82: SelectDeref live choose U2 (not sticky nest U12) then
+					// F80=0 → VS Global fail → more SelectDeref (e3184+). Clear nest
+					// SelectDeref countdowns; arm U2 choose + first Global fail.
+					ctx.state.postAggNestArrayOpKeepExprSelActive = false
+					ctx.state.postAggNestArrayOpLhsCountdown = false
+					ctx.state.postAggNestSelDerefCountdown = false
+					ctx.state.postAggNestSelDerefRound2 = false
+					ctx.state.postAggLhsDerefChooseFails = 0
+					ctx.state.postAggDerefChooseU2AfterCreate = true
+					ctx.state.freeMultiIVForLhsExprPostNestLhsFailGlobal = true
+					_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
+					// Continue free Expression residual after parent Lhs (e3198+).
+					for extra := 0; extra < 8 && ctx.state.freeMultiIVForLhsExprContinue; extra++ {
+						ctx.exprDepth = 0
+						ctx.state.ppPostPadSkipParentExprN = 0
+						_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+					}
+				}
+				ctx.state.freeMultiIVForLhsExprContinue = false
 			}
 		}
-		ctx.state.freeMultiIVForLhsExprContinue = false
 	}
 	// e4387+: after Global create Lhs accept under StmtLhsAfterExprUnwind, UP
 	// continues a nest of Expressions (not Statement U100). Pattern from UP:
