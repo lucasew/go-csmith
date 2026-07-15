@@ -222,10 +222,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2966** (Assign RHS Funcall vs GO U2 after e2943→2965 SelectLoopCtrl climb); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2989** (after free multi-IV Function-fail ExpressionVariable + Lhs VS multiphase e2966→2988); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+
+**seed5 e2966→2989 climbed — maxFuncs Function-fail pointer ExpressionVariable + free multi-IV Lhs residual:**
+1. Capture: after free For SelectLoopCtrl, Assign RHS Function useExisting empty candidates — GO residual U2 pad vs UP ExpressionVariable U100.
+2. C++ FunctionInvocation::make_random: empty choose_func at max_funcs → failed → ExpressionVariable (ExpressionFuncall.cpp:84–90). GlobalU21 U2 residual only for early multiphase (e2410/e2440).
+3. GO: stop FuncUseExistingU2 residual after 2 fires; free multi-IV For body stack U3 + empty PL create + address U4; Lhs SelectDeref addVol residual F50 F20 F20 U3 U3 then VS multiphase U100 PL / PP U7 / PL accept (no F80 between).
+4. Seed2/3/4/6 held. Next: e2989 UP U120 vs GO Statement U100.
 
 **seed5 e2943→2966 climbed — free For SelectLoopCtrl inventory + loop_control:**
 1. Capture: Statement For e2942, UP SelectLoopCtrl U15 + make_random_loop_control; GO sticky loopIVPool U2 + multi-dim array_control U9 U8.

@@ -672,6 +672,15 @@ type functionFlowState struct {
 	arrayLoopFresh bool
 	// arrayLoopFreshStack saves outer frames' fresh flags when nesting array-loops.
 	arrayLoopFreshStack []bool
+	// freeMultiIVForBodyU3: free multi-IV For after residual ArrayOp free
+	// SelectLoopCtrl (seed5 e2943 U15) — body PL stack is U3 not residual U5.
+	freeMultiIVForBodyU3 bool
+	// freeMultiIVForLhsVSPhase: after free multi-IV Lhs SelectDeref addVol
+	// create residual validate fail → VS multiphase (seed5 e2985–88).
+	// 0=off; 1=PL miss; 2=PP+U7 miss; 3=PL accept.
+	freeMultiIVForLhsVSPhase int
+	// freeMultiIVForLhsVSAccepted: phase-3 accept — clean Lhs finish (no F80).
+	freeMultiIVForLhsVSAccepted bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -2057,6 +2066,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		n = 6
 		if nullValidatePostResidualPPU7Done {
 			n = 5
+		}
+		// Free multi-IV For body after residual ArrayOp free SelectLoopCtrl
+		// (U15 inventory): Function::stack = {func, ArrayOp, For} = 3.
+		// Only while freeMultiIVForBodyU3 is armed (not earlier residual U5).
+		if state != nil && state.freeMultiIVForBodyU3 {
+			n = 3
 		}
 		_ = er.pick(uint32(n))
 		return 0
@@ -5555,7 +5570,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		}
 		// e2273 residual: after GlobalU21 PL create F50 F10 F20 F20=0, UP
 		// parent Expression U120 (no address choose U2).
-		if nullValidatePostResidualGlobalU21 && !newArray {
+		// seed5 e2974: free multi-IV For body Function-fail PL create with
+		// !NewArray && !initNull still burns address choose_ok_var U4 before
+		// Lhs SelectDeref F80 — do not skip under freeMultiIVForBodyU3.
+		if nullValidatePostResidualGlobalU21 && !newArray &&
+			!ctx.state.freeMultiIVForBodyU3 {
 			doAddrResidual = false
 		}
 		// e6541: nest Assign RHS NewArray+!initNull still address-of choose U2
@@ -5609,6 +5628,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// Sometimes array itemize after choose (U2) then select_must_use F75
 			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
+			// seed5 e2974: free multi-IV For body PL address-of choose_ok_var U4
+			// then parent Assign Lhs F80 (no nested pointee CreateArray residual).
+			if ctx.state.freeMultiIVForBodyU3 && !newArray {
+				_ = er.fallback.upto(4)
+				goto afterAddrResidual
+			}
 			// e8445 post-CD3: PL create address residual U2 first; e8495 later U5
 			// (not nested pointee F20×2 Constant).
 			if ctx.state.postAggNestArrayOpPostCD3 {
@@ -7681,43 +7706,50 @@ func buildFunctionCallExpr(
 	} else if useExisting && len(candidates) == 0 && r != nil &&
 		nullValidatePostResidualGlobalU21 {
 		// seed5 residual GlobalU21 ArrayOp body Function useExisting=1 but GO
-		// built inventory empty (UP U2 choose among 2 funcs). Multiphase pad.
+		// built inventory empty while UP still had ok_funcs (e2410/e2440).
+		// Only the first two empty-choose visits match that multiphase; later
+		// empty choose is structural (max_funcs + no matching return type) and
+		// C++ fails the invocation → ExpressionVariable (seed5 e2966 U100).
 		n := nullValidatePostResidualFuncUseExistingU2N
-		nullValidatePostResidualFuncUseExistingU2N++
-		_ = r.upto(2) // choose_func U2
-		if n == 0 {
-			// e2410–12: U2 + param must U2 F75; arm Statement Lhs residual.
-			_ = r.upto(2)
-			_ = r.flipcoin(75)
-			nullValidatePostResidualFuncAfterMustLhs = true
+		if n >= 2 {
+			// Fall through: calleeIdx stays -1 → maxFuncs fail → ExpressionVariable.
+		} else {
+			nullValidatePostResidualFuncUseExistingU2N++
+			_ = r.upto(2) // choose_func U2
+			if n == 0 {
+				// e2410–12: U2 + param must U2 F75; arm Statement Lhs residual.
+				_ = r.upto(2)
+				_ = r.flipcoin(75)
+				nullValidatePostResidualFuncAfterMustLhs = true
+				return castLiteral(t, "0"), true
+			}
+			// e2440+: U2 choose then param Expression Constant residual
+			// F50 F50 U20 + F50 F50 U3 F75 (UP e2441–47) then free U120.
+			if er != nil {
+				prevDepth := 0
+				if ctx != nil {
+					prevDepth = ctx.exprDepth
+					ctx.exprDepth = 0
+				}
+				// Burn Constant-shaped residual matching UP (not full Expression tree).
+				if r.flipcoin(50) { // e2441
+					_ = r.flipcoin(50) // e2442
+					_ = r.upto(20)     // e2443
+				} else {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+				}
+				_ = r.flipcoin(50) // e2444
+				_ = r.flipcoin(50) // e2445
+				_ = r.upto(3)      // e2446
+				_ = r.flipcoin(75) // e2447
+				if ctx != nil {
+					ctx.exprDepth = prevDepth
+				}
+			}
 			return castLiteral(t, "0"), true
 		}
-		// e2440+: U2 choose then param Expression Constant residual
-		// F50 F50 U20 + F50 F50 U3 F75 (UP e2441–47) then free U120.
-		if er != nil {
-			prevDepth := 0
-			if ctx != nil {
-				prevDepth = ctx.exprDepth
-				ctx.exprDepth = 0
-			}
-			// Burn Constant-shaped residual matching UP (not full Expression tree).
-			if r.flipcoin(50) { // e2441
-				_ = r.flipcoin(50) // e2442
-				_ = r.upto(20)     // e2443
-			} else {
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(3)
-			}
-			_ = r.flipcoin(50) // e2444
-			_ = r.flipcoin(50) // e2445
-			_ = r.upto(3)      // e2446
-			_ = r.flipcoin(75) // e2447
-			if ctx != nil {
-				ctx.exprDepth = prevDepth
-			}
-		}
-		return castLiteral(t, "0"), true
 	}
 
 	if calleeIdx < 0 {
@@ -9072,8 +9104,20 @@ exprTries:
 							flow.arrayLoopDepth > 0 {
 							forceCreate = true
 						}
+						// seed5 e2967: maxFuncs Function-fail ExpressionVariable
+						// ParentLocal for SelectLType pointer under free multi-IV
+						// For body — choose_var empty → GenerateNewParentLocal
+						// F50 F10… (GO dyn inventory over-counts int* locals U2).
+						// Keep requested pointer type (no random_type_from_type U14).
+						forcePtrPLCreate := strings.Contains(t.Name, "*") &&
+							flow != nil && flow.freeMultiIVForBodyU3
+						if forcePtrPLCreate {
+							forceCreate = true
+							localCands = nil
+						}
 						if len(localCands) == 0 || forceCreate {
-							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok {
+							retype := !forcePtrPLCreate
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, retype, idx); ok {
 								bumpExprDepth(ctx)
 								markFuncEffect()
 								return castLiteral(t, g.expr)
@@ -15234,6 +15278,29 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	var flow *functionFlowState
 	if ctx != nil {
 		flow = ctx.state
+	}
+	// seed5 e2985–88: free multi-IV For Lhs SelectDeref addVol create residual
+	// then VS multiphase (no F80): U100 PL miss, U100 PP U7 miss, U100 PL accept.
+	if flow != nil && flow.freeMultiIVForLhsVSPhase > 0 && er != nil {
+		ph := flow.freeMultiIVForLhsVSPhase
+		switch ph {
+		case 1:
+			// U100 PL miss (no stack U)
+			flow.freeMultiIVForLhsVSPhase = 2
+			return lvalueInfo{}, false, false
+		case 2:
+			// U100 PP + choose U7 miss
+			_ = er.pick(7)
+			flow.freeMultiIVForLhsVSPhase = 3
+			return lvalueInfo{}, false, false
+		case 3:
+			// U100 PL accept
+			flow.freeMultiIVForLhsVSPhase = 0
+			flow.freeMultiIVForLhsVSAccepted = true
+			return lvalueInfo{expr: "l_iv", ctype: target}, true, true
+		default:
+			flow.freeMultiIVForLhsVSPhase = 0
+		}
 	}
 	// seed5 e2883–2908: after SelectDeref !addVol address create validate fail,
 	// Lhs VariableSelector multiphase (no F80 between scope reselects).
@@ -114301,6 +114368,21 @@ commaF80MultiDone:
 			// random_loose_qualifiers draws F50 only for eligible vol levels
 			// (CVQualifiers.cpp:441–457); then create_and_initialize of pointee.
 			stars := strings.Count(targetType.Name, "*")
+			// seed5 e2980–88: free multi-IV For body Lhs SelectDeref addVol
+			// create — nested residual F50 F20 F20 U3 U3 then validate fail →
+			// VariableSelector multiphase (U100 PL miss, U100 PP U7, U100 PL
+			// accept) like AddrCreateVS (not filterCompound first sole).
+			if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForBodyU3 {
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.upto(3)
+				_ = r.upto(3)
+				ctx.state.lhsDerefCreates++
+				// Refuse accept: Lhs do-while falls to VariableSelector.
+				ctx.state.freeMultiIVForLhsVSPhase = 1
+				break
+			}
 			// seed2 e2202 late for-body (filterCompound, simple/1-star): first
 			// create accepts after F10 F50 F20 F20 with no looser.
 			// e2295 second late create: F50 F20 F20 U6 + VS U100 U100.
@@ -115560,8 +115642,22 @@ commaF80MultiDone:
 		if nullValidatePostResidualAddrCreateVSPhase > 0 {
 			maxVSTries = 16
 		}
+		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsVSPhase > 0 {
+			maxVSTries = 8
+		}
 		for try := 0; try < maxVSTries && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+				// seed5 e2988: free multi-IV Lhs VS multiphase accept (no F80).
+				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsVSAccepted {
+					ctx.state.freeMultiIVForLhsVSAccepted = false
+					lv = picked
+					lhsFromDeref = true
+					lhsAfterParamMiss = false
+					if ctx.state != nil {
+						ctx.state.postAggLhsExprContinue = false
+					}
+					break
+				}
 				// seed5 e2908: after addr-create VS Global residual, accept Lhs
 				// cleanly → next Statement U100 (not Expression U120 residual).
 				if nullValidatePostResidualAddrCreateVSAccepted {
@@ -115976,7 +116072,9 @@ commaF80MultiDone:
 			}
 			// seed5 e2883+ addr-create VS multiphase: no SelectDeref F80 between
 			// VariableSelector reselects (UP U100 ladder contiguous).
-			if nullValidatePostResidualAddrCreateVSPhase > 0 {
+			// seed5 e2985+ free multi-IV Lhs VS multiphase: same contiguous U100 ladder.
+			if nullValidatePostResidualAddrCreateVSPhase > 0 ||
+				(ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsVSPhase > 0) {
 				continue
 			}
 			if !r.flipcoin(80) {
@@ -117403,9 +117501,11 @@ func emitStatement(
 			nCtrl := countVisibleIntLoopCtrl(env, scope, ctx)
 			// GO dynGlobals under-materialises true GlobalList inside residual
 			// GlobalU21 ArrayOp body; floor to UP U15 while still nested there.
+			flooredU15 := false
 			if nullValidatePostResidualArrayOpLoopCtrlU13Done &&
 				state.arrayLoopDepth > 0 && nCtrl < 15 {
 				nCtrl = 15
+				flooredU15 = true
 			}
 			if nCtrl > 1 {
 				_ = r.upto(uint32(nCtrl))
@@ -117413,6 +117513,10 @@ func emitStatement(
 				burnSelectLoopCtrlVarCreate(r, opts)
 			}
 			// nCtrl==1: no choose RNG
+			// Body PL stack U3 (func+ArrayOp+For) after free U15 SelectLoopCtrl.
+			if flooredU15 {
+				state.freeMultiIVForBodyU3 = true
+			}
 		}
 		// loopIVPool==0 (and not createIV): no SelectLoopCtrl choose.
 		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
@@ -117491,6 +117595,9 @@ func emitStatement(
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 		if state != nil && state.blockStack > 0 {
 			state.blockStack--
+		}
+		if state != nil {
+			state.freeMultiIVForBodyU3 = false
 		}
 		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")
