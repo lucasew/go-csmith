@@ -291,6 +291,7 @@ func pickSimpleNonVoid(r *rng, opts Options) CType {
 	// eSimpleType order: seed2 late useSmallParentStack; seed4 PP-era
 	// (isParamPPFallPicks>=2 or explicit retype sink). seed4 e1236: NewValue PL
 	// retype U14=2 must be eInt (hex 8), not historical uint8 (hex 2).
+	// seed5 e486 PL retype still historical when !smallStack (next fix).
 	useESimple := (useSmallParentStackSink != nil && *useSmallParentStackSink) ||
 		(useESimpleRetypeSink != nil && *useESimpleRetypeSink) ||
 		(isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2)

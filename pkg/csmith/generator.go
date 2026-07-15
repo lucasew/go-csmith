@@ -5196,6 +5196,73 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 	return filtered[idx], true
 }
 
+// expandStructUnionVars mirrors VariableSelector::expand_struct_union_vars:
+// replace aggregate vars with field_vars when want type is simple/aggregate and
+// aggregate type ≠ want (seed5 e456: struct fields enter eFlexible Global choose).
+func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeInfo) []exprVarCandidate {
+	wantAgg := strings.HasPrefix(want.Name, "struct") || strings.HasPrefix(want.Name, "union")
+	wantSimple := !strings.Contains(want.Name, "*") && !wantAgg &&
+		want.Name != "float" && want.Name != "void"
+	if !wantSimple && !wantAgg {
+		return cands
+	}
+	out := make([]exprVarCandidate, 0, len(cands)+8)
+	for _, c := range cands {
+		isAgg := !strings.Contains(c.ctype.Name, "*") &&
+			(strings.HasPrefix(c.ctype.Name, "struct") || strings.HasPrefix(c.ctype.Name, "union"))
+		if !isAgg || sameBaseType(c.ctype, want) {
+			out = append(out, c)
+			continue
+		}
+		var fields []fieldInfo
+		if strings.HasPrefix(c.ctype.Name, "struct") {
+			var si int
+			if _, err := fmt.Sscanf(c.ctype.Name, "struct S%d", &si); err == nil &&
+				si >= 0 && si < len(info.structs) {
+				fields = info.structs[si].fields
+			}
+		} else if strings.HasPrefix(c.ctype.Name, "union") {
+			var ui int
+			if _, err := fmt.Sscanf(c.ctype.Name, "union U%d", &ui); err == nil &&
+				ui >= 0 && ui < len(info.unions) {
+				fields = info.unions[ui].fields
+			}
+		}
+		if len(fields) == 0 {
+			out = append(out, c)
+			continue
+		}
+		// Replace aggregate with fields (C++ erase + insert field_vars).
+		// Skip bitfields: Expression Variable often avoids them for READ match
+		// noise; seed2 S0 is all-bitfield — expand would overcount U7 vs U4.
+		// Non-bitfield fields (seed5 S0.f0 uint64 / f1 int8) feed eFlexible.
+		fi := 0
+		expanded := 0
+		for _, f := range fields {
+			if f.bitfield {
+				if f.bitWidth <= 0 {
+					continue // unamed padding
+				}
+				fi++ // still advance field index for naming
+				continue
+			}
+			out = append(out, exprVarCandidate{
+				expr:       fmt.Sprintf("%s.f%d", c.expr, fi),
+				ctype:      f.ctype,
+				assignable: c.assignable,
+				isVolatile: c.isVolatile,
+			})
+			fi++
+			expanded++
+		}
+		if expanded == 0 {
+			// No non-bitfield fields — keep aggregate (e.g. seed2 bitfield-only S0).
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
 	filtered := make([]exprVarCandidate, 0, len(candidates))
 	// is_eligible_var: volatile forbidden when !effect_context.is_side_effect_free().
@@ -5221,6 +5288,12 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	}
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
+	}
+	// expand_struct_union_vars for free Expression READ eFlexible
+	// (choose_var default no_expand_struct=false). Lhs WRITE uses eDerefExact —
+	// skip expand to avoid seed2/4 Assign inventory skew.
+	if !forAssign && burnCreateArrayCtxSink != nil {
+		filtered = expandStructUnionVars(filtered, t, burnCreateArrayCtxSink.info)
 	}
 	// e4402: nest-era PL local choose U5 (UP) not inventory U4.
 	if !forAssign && postAggExprNestPLChooseU5Sink != nil && *postAggExprNestPLChooseU5Sink {
@@ -10262,22 +10335,24 @@ exprTries:
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "x"))
 					}
-					// SelectParentParam: if choose_var would reject type, fall through
-					// to SelectParentLocal. Early: sameBase/same-bits. After multi-dim:
-					// eFlexible int↔int (seed2 e887 width convert).
+					// SelectParentParam: type match uses eFlexible (is_derivable /
+					// is_convertable) — any non-void simples interconvert
+					// (ExpressionVariable.cpp eFlexible). Do not gate on multiDim
+					// (seed5 e476: PP uchar want vs int param must accept, not PL).
 					if scopePick == 2 {
 						wantPtr := strings.Contains(t.Name, "*")
 						havePtr := strings.Contains(c.ctype.Name, "*")
 						compat := sameBaseType(c.ctype, t) ||
 							(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
-						if !compat && !wantPtr && !havePtr &&
-							ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 {
+						if !compat && !wantPtr && !havePtr {
 							cSimple := !strings.HasPrefix(c.ctype.Name, "struct") &&
 								!strings.HasPrefix(c.ctype.Name, "union") &&
-								c.ctype.Name != "float" && c.ctype.Name != "void"
+								c.ctype.Name != "float" && c.ctype.Name != "void" &&
+								c.ctype.Bits > 0
 							tSimple := !strings.HasPrefix(t.Name, "struct") &&
 								!strings.HasPrefix(t.Name, "union") &&
-								t.Name != "float" && t.Name != "void"
+								t.Name != "float" && t.Name != "void" &&
+								t.Bits > 0
 							compat = cSimple && tSimple
 						}
 						if !compat {
