@@ -222,10 +222,15 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2827** (SelectDeref pool U12 vs U9); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2831** (Function-fail Global qfer F50 vs F20); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e2827→2831 climbed — derived_types permanent + composite pointers:**
+1. `Type::derived_types` is process-global; do not restore on Expression snapshot rollback.
+2. Residual GlobalU21 SelectLType F20 ptr-to-ptr: ensure `find_pointer_type` for each AllTypes struct/union before `rnd_upto(derived_types.size())` (UP U12 vs under-count U9).
+3. Seed2/3/4/6 held. Next: e2831 Function-fail Global create qfer (F50 SE-free vs F20 NewArray).
 
 **seed5 e2817→2827 climbed — Lhs WRITE must_use on must_write_vars:**
 1. Array-loop tracks both `must_read` (access 0/2) and `must_write` (access 1/2).

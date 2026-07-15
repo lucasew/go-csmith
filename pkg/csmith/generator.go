@@ -3206,10 +3206,10 @@ func restoreGenSnapshot(ctx *genContext, s *genSnapshot) {
 		} else {
 			ctx.state.arrayLoopFreshStack = append([]bool(nil), s.arrayLoopFreshStack...)
 		}
-		ctx.state.derivedPtrTypes = s.derivedPtr
-		if len(ctx.state.derivedPtrList) > s.derivedPtr {
-			ctx.state.derivedPtrList = ctx.state.derivedPtrList[:s.derivedPtr]
-		}
+		// Type::derived_types is process-global and never rolled back on
+		// Expression failure (Type.cpp static vector). Do NOT restore
+		// derivedPtrTypes / derivedPtrList / derivedPtrBases — under-counts
+		// make_random_pointer_type U(n) (seed5 e2827 UP U12 vs GO U9).
 	}
 	ctx.exprDepth = s.exprDepth
 }
@@ -15653,6 +15653,22 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				n := 1
 				if ctx != nil && ctx.state != nil && ctx.state.derivedPtrTypes > 0 {
 					n = ctx.state.derivedPtrTypes
+				}
+				// seed5 e2827: residual GlobalU21 era — ensure pointer-to-each
+				// composite is registered before choose_random_pointer_type U(n).
+				// C++ derived_types already holds these once SelectLType/choose_random
+				// has touched aggregates; GO under-notes until later F20=0 base path.
+				if nullValidatePostResidualGlobalU21 && ctx != nil && ctx.state != nil && n < 12 {
+					for i := range ctx.info.structs {
+						noteDerivedPointer(ctx.state, fmt.Sprintf("struct S%d", i), false)
+					}
+					for i := range ctx.info.unions {
+						noteDerivedPointer(ctx.state, fmt.Sprintf("union U%d", i), false)
+					}
+					n = ctx.state.derivedPtrTypes
+					if n < 1 {
+						n = 1
+					}
 				}
 				// e6103: after nest VS NewValue accept (miss37), UP derived_types
 				// U13 for choose_random_pointer_type; GO inventory under-counts.
