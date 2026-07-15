@@ -189,10 +189,12 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 full match) |
+| Seed 2 event match | **PASS** — full **37939/37939** |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| Seed 4 event match | **PASS** — full **106117/106117** (36000→49992→full; free invent multiphase burn to stream end + silenceTrace after residual exhausts UP; seed2 full held) |
-| 20-seed gate | **In progress** — seed2/3/4 event PASS; measure seeds 5–21 + COUNT=20 SEED_START=2. |
+| Seed 3 event match | **PASS** — full **64/64** |
+| Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
+| Seeds 5–21 event | **FAIL** — early first_div (seed5@155, seed6@12, seed7@47, …); residual is free-invent path-specific, not general Csmith flow |
+| 20-seed gate | **OPEN** — COUNT=20 SEED_START=2 still fails (source/runtime parity); event-only seed2/3/4 PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
 
