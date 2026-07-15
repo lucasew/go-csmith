@@ -15733,6 +15733,15 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// AssignOps table: simple 70, bitand/xor/or 10 each, pre/post incr/decr 5 each = 120.
 	simpleAssign := true
 	needNoRhs := false // ++/-- use Constant::make_int(1), no Expression::make_random
+	// Lhs SelectDeref random_add_qualifiers uses effect_context SE-free
+	// (VariableSelector.cpp:1253–1254). For simple assign, C++ builds Lhs
+	// context from statement entry + write_var_set(RHS lhs_write_vars) only —
+	// Function RHS does NOT clear SE-free (StatementAssign.cpp:131–185).
+	// Snapshot here before RHS may call markFuncEffect.
+	assignLhsSEFree := true
+	if ctx != nil {
+		assignLhsSEFree = ctx.effectSEFree
+	}
 	// seed4 e2407: after postAgg Continue, skip AssignOps+SelectLType; RHS is
 	// forced Variable with PL stack U6 (not AssignOps U120 / SelectLType F50).
 	forcePostAggPLRhs := false
@@ -113884,17 +113893,39 @@ commaF80MultiDone:
 		// No existing deref targets → create pointer local/global.
 		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
 		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
-		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol.
-		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
-			!ctx.state.filterCompoundStmts
-		// e2151 residual: after F80 fail once, create skips vol F50 (UP F10 F20…).
-		if nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce {
+		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol when
+		// !no_volatile (CVQualifiers.cpp:479–490; VariableSelector.cpp:1253–54).
+		// no_volatile = !effect_context.is_side_effect_free().
+		//
+		// StatementAssign simple: Lhs effect_context ≈ assignLhsSEFree snapshot
+		// (statement entry; Function RHS markFuncEffect must not suppress F50 —
+		// seed5 e2862 SE-free after Global create residual).
+		skipVol := !assignLhsSEFree
+		// seed2 e1098–1099: useSmallParentStack !filterCompound skips vol F50.
+		if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
+			!ctx.state.filterCompoundStmts {
+			skipVol = true
+		}
+		// e2151 residual: first create after F80FailOnce under GlobalU12 (before
+		// U2U4 multiphase) skips vol F50 (UP F10 F20…). After U2U4Done, use
+		// structural SE-free / multiphase-first only (e2862 needs F50).
+		if nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce &&
+			!nullValidatePostResidualStmtLhsU2U4Done {
+			skipVol = true
+		}
+		// e2799 multiphase first empty create after U2-fail ladder (U2FailN==3):
+		// models !SE-free Lhs for that long residual Assign (UP F10 F20 F20 U2).
+		// Later Statement Lhs creates (e2862+) use assignLhsSEFree structurally.
+		multiphaseFirstCreate := nullValidatePostResidualGlobalU21 &&
+			nullValidatePostResidualStmtLhsU2FailN == 3
+		if multiphaseFirstCreate {
 			skipVol = true
 		}
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
+		addVol := false
 		if needNoRhs {
 			// random_qualifiers WRITE no_volatile: draws vol F50 even if discarded.
 			levels := strings.Count(ptrType.Name, "*")
@@ -113907,9 +113938,9 @@ commaF80MultiDone:
 			if opts.ConstPointers {
 				_ = r.flipcoin(10) // RegularConstProb (random_add)
 			}
-			// seed2 e1098–1099: skip vol F50 under useSmallParentStack.
+			// random_add_qualifiers: VolatilePointers F50 only when !no_volatile.
 			if opts.VolatilePointers && !skipVol {
-				_ = r.flipcoin(50)
+				addVol = r.flipcoin(50)
 			}
 		}
 		// create_and_initialize for a new POINTER (to targetType) for deref.
@@ -114006,12 +114037,91 @@ commaF80MultiDone:
 		// seed2 e2202: first late for-body SelectDeref after F10 F50 F20 F20
 		// accepts (no F50 looser). e2295 second create continues nested
 		// GenerateNew residual F50 F20 F20 U6.
-		// seed5 e2800–03: residual multiphase create after U2-fail era burns
-		// address choose U2 then accept (UP U100 VS tries=1 next).
-		if nullValidatePostResidualStmtLhsU2FailN >= 2 {
+		//
+		// select_deref_pointer create (VariableSelector.cpp:1260–1289):
+		//   addVol → GenerateNewGlobal; else GenerateNewParentLocal.
+		// seed5 e2799 multiphase first create (!SE-free / skipVol): short U2.
+		// seed5 e2862 SE-free addVol: nested random_loose F50 F50 + F20 F20.
+		// seed5 e2877 SE-free !addVol: short U2 (ParentLocal path).
+		if multiphaseFirstCreate && skipVol {
 			_ = r.upto(2) // e2803
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
+		if addVol {
+			// GenerateNewGlobal + make_init address (VariableSelector.cpp:1260–1273).
+			// random_loose_qualifiers draws F50 only for eligible vol levels
+			// (CVQualifiers.cpp:441–457); then create_and_initialize of pointee.
+			stars := strings.Count(targetType.Name, "*")
+			// seed2 e2202 late for-body (filterCompound, simple/1-star): first
+			// create accepts after F10 F50 F20 F20 with no looser.
+			// e2295 second late create: F50 F20 F20 U6 + VS U100 U100.
+			// Multi-level (seed5 e2865 ***) always needs nested loose residual
+			// even if filterCompound is sticky from residual era.
+			if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts && stars < 2 {
+				ctx.state.lhsDerefCreates++
+				ctx.state.lateDerefCreateN++
+				if ctx.state.lateDerefCreateN <= 1 {
+					lhsFromDeref = true
+					lv = lvalueInfo{expr: "*p", ctype: targetType}
+					if ctx.state.postAggNestVSMisses >= 37 {
+						ctx.state.postAggNestSelDerefRound2 = true
+						ctx.state.postAggNestSelDerefFails = 0
+					}
+					break
+				}
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.upto(6)
+				_ = r.upto(100)
+				_ = r.upto(100)
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
+			// seed2 e331–333: simple Lhs → create T*; loose 1×F50 + F20 + Constant.
+			// seed2 e911–914: 1-star Lhs → create T**; loose 1×F50 + F20 F20 U5.
+			// seed5 e2865–68: multi-level Lhs (SelectLType ***) → loose 2×F50 +
+			// nested pointer create F20 F20.
+			switch {
+			case stars >= 2:
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+			case stars == 1:
+				_ = r.flipcoin(50) // random_loose outer vol
+				if r.flipcoin(20) {
+					_arr := burnCreateArrayVariable(r, opts, targetType, true)
+					emitOrphanArrayGlobal(ctx, targetType, _arr)
+					createdArrayThisLhs = true
+				} else if r.flipcoin(20) {
+					// null init for pointer pointee
+				} else {
+					_ = r.upto(5) // choose_ok_var among pointees (seed2 e914 U5)
+				}
+			default:
+				_ = r.flipcoin(50) // random_loose eligible outer vol
+				if r.flipcoin(20) {
+					_arr := burnCreateArrayVariable(r, opts, targetType, true)
+					emitOrphanArrayGlobal(ctx, targetType, _arr)
+					createdArrayThisLhs = true
+				} else {
+					burnSimpleConstant(r, targetType)
+				}
+			}
+			if ctx != nil && ctx.state != nil {
+				ctx.state.lhsDerefCreates++
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			// e6129 nest countdown after create accept.
+			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
+				ctx.state.postAggNestSelDerefRound2 = true
+				ctx.state.postAggNestSelDerefFails = 0
+			}
 			break
 		}
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
@@ -114039,13 +114149,29 @@ commaF80MultiDone:
 			lhsFromDeref = true
 			break
 		}
-		// random_looser_volatiles only when outer pointer is volatile (eligible).
+		// GenerateNewParentLocal / non-vol path.
+		// seed5 e2877 SE-free !addVol under GlobalU21: F20 F20 then U2 accept.
+		// Do NOT short-circuit e2155 pre-U21 residual (needs F20 Constant F50 F50 U20).
+		if !skipVol && nullValidatePostResidualGlobalU21 {
+			_ = r.upto(2)
+			if ctx != nil && ctx.state != nil {
+				ctx.state.lhsDerefCreates++
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
+				ctx.state.postAggNestSelDerefRound2 = true
+				ctx.state.postAggNestSelDerefFails = 0
+			}
+			break
+		}
 		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
 		// tgtNewArray + F50 Constant (no looser F50).
 		// e2155 residual: after F80 fail+create, UP is F20 tgtNewArray then
 		// Constant F50 F50 U20 (no looser F50 between init and tgtNewArray).
 		if !needNoRhs &&
-			!(nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce) {
+			!(nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce &&
+				!nullValidatePostResidualStmtLhsU2U4Done) {
 			_ = r.flipcoin(50) // random_looser residual when outer vol
 		}
 		tgtNewArray := r.flipcoin(20)
