@@ -226,6 +226,24 @@ var nullValidateEmptyParamsDepthBlock bool
 // free Expression Global eFlexible choose is U18 (seed5 e929).
 var nullValidatePostResidualGlobalU18 bool
 
+// nullValidatePostResidualNVPL: sticky after NullValidate multiphase residual —
+// NewValue→PL create is qferMode 0 F20-first (seed5 e947).
+var nullValidatePostResidualNVPL bool
+
+// nullValidatePostResidualLhsAccept: after NVPL RHS, ExpressionAssign Lhs
+// SelectDeref empty create accepts after F80 F20 F20 (no address residual).
+var nullValidatePostResidualLhsAccept bool
+
+// nullValidatePostResidualNeedQfer: after NVPL one-shot no-qfer create (e947),
+// next free Expression NewValue→PL has wildcard qfer → random_qualifiers
+// (seed5 e956 F50 F10 F50 F10 then NewArray F20 F20 CreateArray).
+var nullValidatePostResidualNeedQfer bool
+
+// nullValidatePostResidualCreateArrayAltU2: that CreateArray pointer alts burn
+// address choose U2 (seed5 e966 F20 U2 F20 U2 then itemize; postAgg empty
+// path under-burns F20-only).
+var nullValidatePostResidualCreateArrayAltU2 bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -3409,6 +3427,10 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 						_ = r.upto(2)
 					}
 					// skip flag: no choose residual
+				} else if nullValidatePostResidualCreateArrayAltU2 {
+					// seed5 e966: NullValidate residual free Expression CreateArray
+					// pointer alts address choose U2 (UP F20 U2×2 then itemize).
+					_ = r.upto(2)
 				} else if useSmallParentStackSink != nil && *useSmallParentStackSink {
 					_ = r.upto(6)
 				} else if postAggGlobalCreateN >= 0 {
@@ -3501,6 +3523,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	if lastArraySizesSink != nil && len(sizes) > 0 {
 		cp := append([]int(nil), sizes...)
 		*lastArraySizesSink = cp
+	}
+	if nullValidatePostResidualCreateArrayAltU2 && strings.Contains(t.Name, "*") {
+		nullValidatePostResidualCreateArrayAltU2 = false
 	}
 	return arrayCreateResult{sizes: sizes, inits: inits, hadNullPtrAlt: hadNullPtrAlt}
 }
@@ -4596,6 +4621,16 @@ func createOnDemandFromParentLocalPathER(er *exprRand, opts Options, t CType, ct
 // retype: empty-block SelectParentLocal runs random_type_from_type; choose_var-miss keeps t.
 // stackIndex: 0-based Function::stack index for blockDepth (-1 → use blockStack).
 func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType, ctx *genContext, qferMode int, retype bool, stackIndex int) (exprVarCandidate, bool) {
+	// seed5 e947: NullValidate residual NewValue→PL force F20-first.
+	// Stick through StackU6 upgrades; arm LhsAccept (e952).
+	forceNVPLNoQfer := false
+	if nullValidatePostResidualNVPL {
+		qferMode = 0
+		forceNVPLNoQfer = true
+		nullValidatePostResidualLhsAccept = true
+		nullValidatePostResidualNeedQfer = true
+		nullValidatePostResidualNVPL = false
+	}
 	// e10000: after Function-arg must residual, PL create is NewArray F20 F20
 	// CreateArray (no random_qualifiers F50 F10).
 	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone &&
@@ -4628,7 +4663,8 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	// e6539: nest Assign RHS create with non-null parent qfer keeps mode 0
 	// (NewArray F20 first; no random_qualifiers).
 	if ctx.state.postAggU15StackU6 {
-		if qferMode == 0 && !(ctx.skipFuncRetQfer && ctx.state.postAggNestVSMisses >= 40) {
+		if qferMode == 0 && !forceNVPLNoQfer &&
+			!(ctx.skipFuncRetQfer && ctx.state.postAggNestVSMisses >= 40) {
 			qferMode = 1
 		}
 		// Keep caller's type (may be struct → field-by-field Constant), except
@@ -7759,8 +7795,12 @@ exprTries:
 							// e7630: after keepExpr residual + PL stack U3 era, UP U19.
 							// e8304 post-CD3: ptr-cmp derived_types UP U21 (not sticky U17).
 							// e9886: after ArrayOp2 PLU5F0 era, UP U22 (more derived creates).
-							// e11035: after CreateArray create_field_vars era, UP U23.
-							if burnCreateArrayFieldVarsDone && nPtr < 23 {
+							// e11035: after CreateArray create_field_vars era, UP U23 —
+							// only under late ArrayOp2 body (not early seed5 e711
+							// burnCreateArrayFieldVarsDone; e937 NullValidate residual
+							// ptr-cmp is UP U5).
+							if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body &&
+								burnCreateArrayFieldVarsDone && nPtr < 23 {
 								nPtr = 23
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PLU5F0Done && nPtr < 22 {
 								nPtr = 22
@@ -7781,6 +7821,9 @@ exprTries:
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggLhsDerefFailOnce &&
 								nPtr < 9 {
 								nPtr = 9
+							} else if burnCreateArrayFieldVarsDone && nPtr < 5 {
+								// seed5 e937: early CreateArray field_vars era — UP U5.
+								nPtr = 5
 							}
 							ptrIdx := int(er.fallback.upto(uint32(nPtr)))
 							// choose_random_pointer_type → derived_types[index].
@@ -8408,6 +8451,7 @@ exprTries:
 				_ = vsPick(false) // e912
 				nullValidateEmptyParamsVS = false
 				nullValidatePostResidualGlobalU18 = true // e929 GlobalList U18
+				nullValidatePostResidualNVPL = true      // e947 NewValue→PL F20-first
 				return finishVar(castLiteral(t, "g_0"))
 			}
 			// e4332: after Expression-level Lhs Global sole, next Expression
@@ -8644,6 +8688,19 @@ exprTries:
 					if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
 						!strings.Contains(t.Name, "*") {
 						needQfer = true
+					}
+					// seed5 e947: free Expression NewValue→PL after NullValidate
+					// residual multiphase — UP F20 NewArray first (qferMode 0).
+					// Arm LhsAccept before clearing NVPL.
+					if nullValidatePostResidualNVPL {
+						needQfer = false
+						nullValidatePostResidualLhsAccept = true
+						nullValidatePostResidualNeedQfer = true
+						nullValidatePostResidualNVPL = false // one-shot
+					} else if nullValidatePostResidualNeedQfer && !isParam {
+						needQfer = true
+						nullValidatePostResidualNeedQfer = false
+						nullValidatePostResidualCreateArrayAltU2 = true
 					}
 					if needQfer {
 						qferMode = 1
@@ -12431,6 +12488,13 @@ exprTries:
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
+					// seed5 e949–51: after NVPL RHS, ExpressionAssign Lhs empty
+					// create accepts after F80 F20 F20 (no address residual F20).
+					if nullValidatePostResidualLhsAccept && !newArray && !initConst {
+						nullValidatePostResidualLhsAccept = false
+						lhsFromDeref = true
+						break
+					}
 					// e9463: ArrayOp2 ExpressionAssign Lhs SelectDeref empty create
 					// F20 F20=0 → address choose U7 then parent Expression U120.
 					// e9616: second empty create U2.
@@ -111905,6 +111969,13 @@ commaF80MultiDone:
 			continue
 		}
 		// Address-of path for pointer init.
+		// seed5 e949–51: NVPL Lhs empty create accept after F80 F20 F20.
+		if nullValidatePostResidualLhsAccept && !newArray {
+			nullValidatePostResidualLhsAccept = false
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
 		if newArray {
 			// create_and_initialize → create_array_and_itemize for the pointer
 			// variable type (seed2 e346 U99+U10+U1 with size-1, no alt inits).
