@@ -403,6 +403,10 @@ type functionFlowState struct {
 	nestedNullPreferDone bool
 	// isParamGlobalFlexPicks: capped eFlexible isParam Global chooses (seed4 e340).
 	isParamGlobalFlexPicks int
+	// paramExprCommaAllTypes: after isParam array Global choose (seed5 e251),
+	// ExpressionComma lhs uses AllTypes+NonVoidNonVolatile (seed5 e264 float filter).
+	// Not set by seed4 nested scalar flex (e340) — keeps early seed2 unfiltered.
+	paramExprCommaAllTypes bool
 	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body.
 	isParamPPFallPicks int
 	// forcePPEmptyOnce: after must_use F80 residual, next ParentParam is empty
@@ -3484,6 +3488,55 @@ func sameBaseType(a, b CType) bool {
 	return a.Bits == b.Bits && a.Signed == b.Signed
 }
 
+// isConvertable mirrors Type::is_convertable(want, have): can `have` convert to `want`?
+// Used by Function::choose_func (want = expression type, have = return type).
+func isConvertable(want, have CType) bool {
+	if normTypeName(want.Name) == normTypeName(have.Name) &&
+		want.Bits == have.Bits && want.Signed == have.Signed {
+		return true
+	}
+	wantPtr := strings.Contains(want.Name, "*")
+	havePtr := strings.Contains(have.Name, "*")
+	wantAgg := strings.HasPrefix(want.Name, "struct") || strings.HasPrefix(want.Name, "union")
+	haveAgg := strings.HasPrefix(have.Name, "struct") || strings.HasPrefix(have.Name, "union")
+	// Aggregates only match by name identity (above).
+	if wantAgg || haveAgg {
+		return false
+	}
+	if wantPtr || havePtr {
+		if !wantPtr || !havePtr {
+			return false
+		}
+		// Same pointed-to simple width: C non-strict-float converts equal SizeInBytes.
+		wb := strings.ReplaceAll(want.Name, "*", "")
+		hb := strings.ReplaceAll(have.Name, "*", "")
+		if normTypeName(wb) == normTypeName(hb) {
+			return true
+		}
+		// Strip and compare bits if both simple pointees.
+		// Heuristic: same star count and base bits (GO CType Bits is base width).
+		if strings.Count(want.Name, "*") == strings.Count(have.Name, "*") &&
+			want.Bits > 0 && have.Bits > 0 && want.Bits == have.Bits &&
+			want.Name != "float*" && have.Name != "float*" {
+			return true
+		}
+		return false
+	}
+	// Both simple: non-void interconvert, except float→non-float forbidden.
+	if have.Name == "float" && want.Name != "float" {
+		return false
+	}
+	if want.Name == "void" || have.Name == "void" {
+		return want.Name == have.Name
+	}
+	if want.Name == "float" || have.Name == "float" {
+		// float↔float only via name identity; int→float OK (have not float).
+		return want.Name == "float" // have is non-float simple → OK
+	}
+	// Both non-void simple integers.
+	return want.Bits > 0 && have.Bits > 0
+}
+
 func normTypeName(name string) string {
 	return strings.ReplaceAll(strings.TrimSpace(name), " ", "")
 }
@@ -4228,8 +4281,9 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 			}
 		}
 	} else {
-		// Constant::make_random — capture literal for emission
-		initLit = formatSimpleConstant(er.fallback, t)
+		// Constant::make_random — simple, struct, or union (seed5 e373–375:
+		// struct S0 NewArray init = field Constants before CreateArray U99).
+		initLit = formatAggregateOrSimpleConstant(er.fallback, t, ctx, opts)
 		if newArray {
 			arrRes = burnCreateArrayVariable(er.fallback, opts, t, true)
 		}
@@ -4262,6 +4316,9 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 	} else {
 		writeLine(&ctx.state.lateGlobals, 0, fmt.Sprintf("static %s%s %s = %s;", qual, t.Name, name, initLit))
 	}
+	// Variable::CreateVariable: create_field_vars for non-array aggregates.
+	// NewArray path: ArrayVariable::CreateArrayVariable does create_field_vars
+	// inside burnCreateArrayVariable.
 	if !newArray && (strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")) {
 		burnCreateFieldVarsConstants(er.fallback, t, ctx, opts)
 	}
@@ -4391,6 +4448,14 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	// CreateArray (no random_qualifiers F50 F10).
 	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone &&
 		postAggPostCD3ArrayOp2BodyActive {
+		qferMode = 0
+	}
+	// make_random_param ExpressionVariable with formal qfer: GenerateNewParentLocal
+	// copies qfer (no random_qualifiers → F20 NewArray first). Arm after isParam
+	// array Global choose (paramExprCommaAllTypes / seed5 e251→e300). Early seed2
+	// isParam PL create still needs SE-free qfer F50 in some paths.
+	if ctx != nil && ctx.inParamExpr && ctx.state != nil &&
+		ctx.state.paramExprCommaAllTypes && qferMode > 0 {
 		qferMode = 0
 	}
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
@@ -6234,14 +6299,16 @@ func buildFunctionCallExpr(
 	state := ctx.state
 	from := ctx.from
 
-	// Only functions with known effect (body already built) are choosable —
-	// mirrors Function::choose_func skipping is_effect_known()==false.
+	// Function::choose_func: known effect (body built) + return is_convertable.
+	// seed5 e399: without type filter GO U5 over-counts; UP empty → CREATE F50 F10.
+	// Keep i<=from acyclic guard (historical seed2/4); unbuilt already excluded.
 	candidates := make([]int, 0, len(state.funcs))
 	for i := 0; i < len(state.funcs); i++ {
 		if i <= from {
 			continue
 		}
-		if i < len(state.built) && state.built[i] {
+		if i < len(state.built) && state.built[i] &&
+			isConvertable(t, state.funcs[i].ret) {
 			candidates = append(candidates, i)
 		}
 	}
@@ -6402,29 +6469,35 @@ func buildFunctionCallExpr(
 			return "", false // caller termFunction falls through; see below
 		}
 		// Return qfer before ParamList (Function::make_random_signature).
-		// qfer==0: CVQualifiers::random_qualifiers(type, READ, no_volatile) —
-		//   per pointer level + self: F50 (vol) + F10 (const); vol discarded.
+		// qfer==0: CVQualifiers::random_qualifiers(type, READ, no_volatile=true) —
+		//   per pointer level + self: F50 (vol) + F10 (const); vol then cleared.
+		//   Aggregates still burn self F50+F10 (seed5 e399); do NOT skip isAgg.
 		// qfer!=0: qfer->random_qualifiers → random_looser_consts (F50 per
 		//   eligible true-const level). WRITE all-false / wildcard → 0 coins.
 		// Param-arg nested CREATE passes formal constLevels as incoming qfer.
 		ptrDepth := strings.Count(t.Name, "*")
 		isAgg := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+		// Return qfer before ParamList (Function::make_random_signature).
+		// qfer==0: CVQualifiers::random_qualifiers(type, READ, no_volatile=true) —
+		//   per pointer level + self: F50 (vol) + F10 (const); vol then cleared.
+		//   Aggregates still burn self F50+F10 (do NOT skip isAgg).
+		// qfer!=0: instance → random_looser_consts (F50 per eligible const level).
+		// skipFuncRetQfer (Assign WRITE): 0 coins (seed2/4 Assign CREATE path).
+		// seed5 e399: free CREATE needs static F50 F10 — skip must stay off there.
 		skipRetQfer := ctx != nil && ctx.skipFuncRetQfer
-		if skipRetQfer || isAgg {
-			// 0 coins
+		if skipRetQfer {
+			// WRITE parent qfer: 0 coins.
 		} else if ctx != nil && ctx.incomingQferConsts != nil {
 			// Instance path: no_volatile skips vol draws; looser_consts only.
 			depthN := len(ctx.incomingQferConsts)
 			for i, c := range ctx.incomingQferConsts {
-				// random_looser_consts: coin only when is_const && (depth-i)<=2
 				if c && (depthN-i) <= 2 {
 					_ = r.flipcoin(50) // LooserConstProb
 				}
 			}
 		} else {
 			// Null qfer static path: ptr levels + self each F50+F10.
-			// Pointer returns also burn one extra pair before ParamList
-			// (seed2 e246 — member/stricter path or double indirection quirk).
+			// Pointer returns also burn one extra pair (seed2 e246).
 			pairs := ptrDepth + 1
 			if ptrDepth > 0 {
 				pairs++
@@ -9679,67 +9752,101 @@ exprTries:
 							return finishVar(castLiteral(t, flex[0].expr))
 						}
 					}
-					// seed5 e251: bit-exact empty but array convertibles exist —
-					// UP choose_ok_var U2 + itemize (not retype create). Only when
-					// nestedFuncBodies==0 (CREATE args before body); nested seed4
-					// e340 still uses flex block above.
+					// seed5 e251+: isParam Global bit-exact empty (CREATE args).
+					// First hit only if arrays exist (e251 U2+itemize). Later hits
+					// after paramExprCommaAllTypes (e371 scalar U2). Seed4 e173
+					// scalar-only under-count still creates (no arrays → fallthrough).
 					if len(real) == 0 && !wantPtr && flow.nestedFuncBodies == 0 &&
 						flow.isParamGlobalFlexPicks < 3 && er != nil {
-						arrs := make([]exprVarCandidate, 0, 8)
-						for _, g := range env.globals {
-							if g.isArray && isSimpleInt(g.ctype) && isSimpleInt(t) &&
-								!strings.HasPrefix(g.name, "g_min_") {
-								arrs = append(arrs, exprVarCandidate{
-									expr: g.name, ctype: g.ctype, assignable: !g.isConst,
-									isArray: true, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
-								})
+						flex := make([]exprVarCandidate, 0, 16)
+						addFlex := func(g globalInfo) {
+							if !isSimpleInt(g.ctype) || !isSimpleInt(t) {
+								return
 							}
+							if strings.HasPrefix(g.name, "g_min_") || strings.HasPrefix(g.name, "g_p") {
+								return
+							}
+							flex = append(flex, exprVarCandidate{
+								expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+								isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+							})
+						}
+						for _, g := range env.globals {
+							addFlex(g)
 						}
 						if ctx != nil && ctx.state != nil {
 							for _, g := range ctx.state.dynGlobals {
-								if g.isArray && isSimpleInt(g.ctype) && isSimpleInt(t) &&
-									!strings.HasPrefix(g.name, "g_min_") {
-									arrs = append(arrs, exprVarCandidate{
-										expr: g.name, ctype: g.ctype, assignable: !g.isConst,
-										isArray: true, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
-									})
-								}
+								addFlex(g)
 							}
 						}
-						if len(arrs) >= 1 {
-							for len(arrs) < 2 {
-								arrs = append(arrs, arrs[0])
+						arrs := make([]exprVarCandidate, 0, len(flex))
+						for _, c := range flex {
+							if c.isArray {
+								arrs = append(arrs, c)
 							}
-							idx := int(er.pick(2)) % len(arrs)
-							c := arrs[idx]
+						}
+						useFlex := false
+						if flow.isParamGlobalFlexPicks == 0 {
+							// First: arrays only (seed5 e251). No arrays → create.
+							if len(arrs) >= 1 {
+								flex = arrs
+								useFlex = true
+							}
+						} else if flow.paramExprCommaAllTypes && len(flex) >= 1 {
+							// After e251 arm: all convertibles (seed5 e371).
+							useFlex = true
+						}
+						if useFlex {
+							for len(flex) < 2 {
+								flex = append(flex, flex[0])
+							}
+							chooseN := uint32(2)
+							if flow.isParamPPFallPicks >= 2 {
+								chooseN = 4
+								if chooseN > uint32(len(flex)) {
+									chooseN = uint32(len(flex))
+								}
+							}
+							idx := int(er.pick(chooseN)) % len(flex)
+							c := flex[idx]
 							flow.isParamGlobalFlexPicks++
-							if len(c.arraySizes) > 0 {
-								for _, dim := range c.arraySizes {
-									if dim < 1 {
-										dim = 1
+							if !flow.paramExprCommaAllTypes {
+								flow.paramExprCommaAllTypes = true
+							}
+							if c.isArray {
+								if len(c.arraySizes) > 0 {
+									for _, dim := range c.arraySizes {
+										if dim < 1 {
+											dim = 1
+										}
+										_ = er.pick(uint32(dim))
 									}
-									_ = er.pick(uint32(dim))
+								} else {
+									al := c.arrayLen
+									if al < 1 {
+										al = 4
+									}
+									_ = er.pick(uint32(al))
 								}
-							} else {
-								al := c.arrayLen
-								if al < 1 {
-									al = 4
-								}
-								_ = er.pick(uint32(al))
 							}
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, c.expr))
 						}
 					}
 					if len(real) == 0 {
-						retype := t
-						if !wantPtr {
+						// SelectGlobal empty → random_type_from_type then
+						// GenerateNewGlobal(t, formal qfer). Simple: choose_random_simple
+						// U14 (seed4 e173). Struct/union/pointer: keep type (seed5 e373
+						// F20 first, no U14). skipRandomQfer from non-wildcard formal.
+						createT := t
+						if !wantPtr && !strings.HasPrefix(t.Name, "struct") &&
+							!strings.HasPrefix(t.Name, "union") {
 							esimple := true
 							useESimpleRetypeSink = &esimple
-							retype = pickSimpleNonVoid(er.fallback, opts)
+							createT = pickSimpleNonVoid(er.fallback, opts)
 							useESimpleRetypeSink = nil
 						}
-						if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
+						if g, ok := createOnDemandGlobalFromEROpts(er, opts, createT, ctx, true); ok {
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, g.expr))
 						}
@@ -12468,23 +12575,20 @@ exprTries:
 				ctx.state.ppPostPadCommaAfterPP = false
 			}
 			if !skipCommaType && er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
-				// Upstream ExpressionComma lhs: type=nil → choose_random_nonvoid_nonvolatile.
-				// Early seed2: pool cardinality without filter (historical match).
-				// Late useSmallParentStack e1310: AllTypes n=14, float filtered tries>=1.
-				// seed4 e993: PP-era array body also AllTypes U14 with filter (tries=1).
+				// ExpressionComma::make_random: lhs type=nullptr →
+				// Type::choose_random_nonvoid_nonvolatile() (ExpressionComma.cpp:59–60).
+				// Early free Expression (seed2): unfiltered pool cardinality hack.
+				// Filtered AllTypes: late eras, PP array body, or after isParam array
+				// Global choose (paramExprCommaAllTypes — seed5 e251→e264 float@9).
 				useAllTypesFilter := ctx.state.useSmallParentStack ||
-					(ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0)
+					(ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0) ||
+					(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes)
 				if useAllTypesFilter {
-					// !SE-free → choose_random_nonvoid_nonvolatile (seed4 e1536
-					// tries=2; e3588 tries=4); SE-free uses nonvoid (float/int128).
-					// e3532: first Comma after StackU6 create — sticky !SE-free
-					// over-rejects volatile struct (UP NonVoid tries=0). One-shot
-					// NonVoid; later e3588 uses real NonVoidNonVolatile (tries=4).
-					useNonVoid := ctx.effectSEFree
-					// e3464 and e3532: !SE-free in GO (binaryRhs/sticky) but UP
-					// choose_random_nonvoid (accept volatile S0). Two NonVoid forces
-					// then NonVoidNonVolatile for e3588 (tries=4).
-					if !useNonVoid && ctx.state.postAggU15StackU6CreateDone {
+					// !SE-free → NonVoidNonVolatile; SE-free residual may use NonVoid.
+					// Param-tree after array Global: always NonVoidNonVolatile.
+					useNonVoid := ctx.effectSEFree && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes)
+					if !useNonVoid && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
+						ctx.state.postAggU15StackU6CreateDone {
 						if ctx.state.postAggU15CommaNonVoidLeft == 0 && !ctx.state.postAggU15CommaNonVoidInit {
 							ctx.state.postAggU15CommaNonVoidLeft = 2
 							ctx.state.postAggU15CommaNonVoidInit = true
@@ -12494,8 +12598,8 @@ exprTries:
 							useNonVoid = true
 						}
 					}
-					// e9937 ArrayOp2 Comma: UP NonVoid U14 tries=0 (not NonVoidNonVolatile tries=1).
-					if !useNonVoid && postAggPostCD3ArrayOp2BodyActive {
+					if !useNonVoid && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
+						postAggPostCD3ArrayOp2BodyActive {
 						useNonVoid = true
 					}
 					if !useNonVoid {
@@ -12525,6 +12629,7 @@ exprTries:
 						}
 					}
 				} else {
+					// Early free Expression / early param trees before array Global.
 					allCount := len(ctx.state.pool) + len(ctx.state.info.structs) + len(ctx.state.info.unions)
 					if allCount > 0 {
 						pick := int(er.fallback.upto(uint32(allCount)))
