@@ -222,11 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3450** (Global pool U23 vs U22 after free multi-IV residual EA Lhs ladder); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3516** (after free multi-IV Global U23/U8 + Lhs sole F0 empty create; VS PL U2 → UP U120 vs GO F20); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+**seed5 e3450→3516 climbed — free multi-IV GlobalList inventory + post-EA Lhs ladder:**
+1. Capture: e3450 Global choose U23 (UP) vs U22 (GO) same raw — sticky residual GlobalU21 pad stuck at U22 after e2702 while C++ eFlexible simple grew by nested GenerateNewGlobal pointee on free multi-IV residual EA Lhs SelectDeref empty create (e3434 Constant residual).
+2. C++ SelectDeref non-vol → GenerateNewParentLocal(ptr) + make_init address-of empty → GenerateNewGlobal(simple) on GlobalList. Later e3470 Global filtered live U8 (not sticky U23); e3471 Lhs SelectDeref soles null pointer F0 then empty create NewArray CreateArray. PL choose after e3440 NewValue create grows eFlexible U6→U7 (e3462).
+3. GO: residual Global pad multiphase U23 then U8 under freeMultiIVEALhsF20x4Done; materialize nested simple Global on e3434 Constant residual; LivePL floor U6 then U7; one-shot Lhs sole F0 after Global U8 pad before empty create.
+4. Seed2/3/4/6 held. Next: e3516 after Lhs VS F80=0 PL U2 — UP U120 Expression vs GO F20 create residual.
 
 **seed5 e3185→3406 climbed — free multi-IV post-nest SelectDeref empty create after Global fails=1:**
 1. Capture: after post-nest SelectDeref U2 choose fail + VS Global fail (e3180–83 match), UP e3184 F80 sole/pure fail then e3185 F80 empty create F10 F50 F20 F20 F0 vs GO sticky `postAggLhsDerefChooseFails=1` pool U10.
@@ -237,9 +242,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after user Function F50=0 create-fail → ExpressionVariable PL U100 U2 (e3403–05 match), UP e3406 F80 Lhs SelectDeref empty F20×4 U3 U4 vs GO sticky force Residual/BodyU3 PL createOnDemand F50 qfer.
 2. C++ StatementAssign order RHS then Lhs: maxFuncs Function-fail → ExpressionVariable SelectParentLocal soles existing local (no create RNG) then Lhs::make_random SelectDeref empty create (outer F20 F20 + nested pointee create_and_initialize F20 F20 + choose U3 U4). Later free Expression Variable PL empty create F50 F10×2 F20 F20 + address U2 U4; then live PL choose U6 eFlexible integers.
 3. GO: stop sticky freeMultiIVForBodyU3 force-create under residual continue; Function-fail PL sole when no exact ptr; one-shot EA Lhs F20×4 U3 U4; arm freeMultiIVPostEALhsPLCreate then LivePL (U6 floor); residual PL address U2 U4 under continue; int32 hex width 8 (not 16) on address pointee Constant.
-4. Seed2/3/4/6 held. Next: e3450 Global choose U23 vs U22 (inventory off-by-one).
-
-5. Seed2/3/4/6 held. Next was e3406 (climbed).
+4. Seed2/3/4/6 held. Next was e3450 (climbed to e3516).
 
 
 **seed5 e3176→3185 climbed — free multi-IV parent Expression U120 Variable + post-nest Lhs (not F80 end RHS early):**

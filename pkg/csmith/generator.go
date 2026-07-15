@@ -716,10 +716,23 @@ type functionFlowState struct {
 	// freeMultiIVPostEALhsLivePL: after e3416 PL create, residual PL uses live
 	// choose_ok_var inventory (e3427 U6) not sticky e3058 U5.
 	freeMultiIVPostEALhsLivePL bool
+	// freeMultiIVPostEALhsLivePLN: LivePL choose count after e3416. e3427 first
+	// floor U6; after e3440 NewValue→PL create inventory grows — e3462+ U7.
+	freeMultiIVPostEALhsLivePLN int
 	// freeMultiIVEALhsF20x4Done: one-shot e3406–12 ExpressionAssign Lhs
 	// SelectDeref empty create F20×4 U3 U4 under free multi-IV residual.
 	// Later Lhs empty create (e3434+) is F20×3 F50… not sticky F20×4.
+	// Also grows sticky GlobalList simple pad U22→U23 (e3450).
 	freeMultiIVEALhsF20x4Done bool
+	// freeMultiIVPostEAGlobalPadN: simple Global residual pad draws after
+	// freeMultiIVEALhsF20x4Done. e3450 first U23; e3470 later U8 (filtered
+	// live / not sticky U23 forever).
+	freeMultiIVPostEAGlobalPadN int
+	// freeMultiIVPostEALhsSelDerefSoleF0: after e3470 Global U8 RHS, parent
+	// ExpressionAssign Lhs SelectDeref soles a live null pointer (no choose
+	// RNG) → opportunistic_validate F0 fail → next F80 empty create NewArray
+	// (e3471–76). One-shot; without it GO empty-creates on first F80.
+	freeMultiIVPostEALhsSelDerefSoleF0 bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -9805,10 +9818,18 @@ exprTries:
 							// UP choose_ok_var pool after free multi-IV residual
 							// creates / expand_struct fields is U6 (e3427); GO
 							// dynLocs eFlexible integers under-count by 1.
+							// After e3440 NewValue→PL create (U14 simple), pool
+							// grows to U7 (e3462 / e3467); sticky floor U6 under-
+							// counts. Track LivePL choose count.
 							n := len(ok)
-							if wantSimple && n < 6 {
-								n = 6
+							floor := 6
+							if flow.freeMultiIVPostEALhsLivePLN >= 1 {
+								floor = 7 // e3462+ after post-e3416 PL create era
 							}
+							if wantSimple && n < floor {
+								n = floor
+							}
+							flow.freeMultiIVPostEALhsLivePLN++
 							if n > 1 {
 								_ = er.pick(uint32(n))
 							}
@@ -9955,7 +9976,19 @@ exprTries:
 						nullValidatePostResidualGlobalU20AfterLongDB = true
 						nG = 20 // e2730
 					case nullValidatePostResidualEALhsSelU4Done:
-						nG = 22 // e2702+
+						// e2702+ U22; after free multi-IV residual EA Lhs
+						// nested GenerateNewGlobal (e3434) GlobalList simple
+						// is U23 once (e3450), then later filtered live U8
+						// (e3470) — not sticky U23.
+						nG = 22
+						if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVEALhsF20x4Done {
+							if ctx.state.freeMultiIVPostEAGlobalPadN == 0 {
+								nG = 23 // e3450
+							} else {
+								nG = 8 // e3470+
+							}
+							ctx.state.freeMultiIVPostEAGlobalPadN++
+						}
 					default:
 						nG = 20
 					}
@@ -13928,6 +13961,20 @@ exprTries:
 						break
 					}
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
+					// seed5 e3471–72: free multi-IV residual ExpressionAssign Lhs
+					// after Global U8 RHS (freeMultiIVPostEAGlobalPadN≥1) —
+					// SelectDeref soles live null pointer (no choose U) → F0
+					// fail → next F80 empty create NewArray CreateArray
+					// (e3473–78). Do NOT arm on e3434 (first Lhs after
+					// freeMultiIVEA F20×4 — empty create F20×3 F50).
+					if deref && ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVForLhsExprContinue &&
+						ctx.state.freeMultiIVPostEAGlobalPadN >= 1 &&
+						!ctx.state.freeMultiIVPostEALhsSelDerefSoleF0 {
+						ctx.state.freeMultiIVPostEALhsSelDerefSoleF0 = true
+						_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
+						continue
+					}
 					// seed5 e2723–24: after ladder era, later ExpressionAssign Lhs
 					// SelectDeref still chooses U4 (UP); GO empty-creates F20.
 					if deref && nullValidatePostResidualEALhsSelU4Done &&
@@ -14711,6 +14758,24 @@ exprTries:
 							for i := 0; i < hn; i++ {
 								_ = er.fallback.next31()
 							}
+						}
+						// seed5 e3434–38: free multi-IV residual ExpressionAssign
+						// Lhs SelectDeref empty create address residual burns
+						// nested create_and_initialize Constant for the simple
+						// pointee. C++ GenerateNewGlobal puts that int on
+						// GlobalList (eFlexible simple inventory e2795 U22 →
+						// e3450 U23). GO previously only burned Constant RNG.
+						if ctx != nil && ctx.state != nil &&
+							ctx.state.freeMultiIVForLhsExprContinue &&
+							ctx.state.freeMultiIVEALhsF20x4Done &&
+							!newArray && !tgtNewArray {
+							gname := ctx.state.allocGlobalName()
+							g := globalInfo{
+								name:  gname,
+								ctype: CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
+							}
+							ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+							ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, g)
 						}
 					}
 					// seed2 e1043: after Constant pure_rnd U20, CreateArray when
