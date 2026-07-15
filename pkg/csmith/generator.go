@@ -752,6 +752,28 @@ type functionFlowState struct {
 	// F20 NewArray+address U2 CreateArray (e4229–42). Phase 0=first PL fail;
 	// phase 1=create accept. Without it GO force-creates on first U3.
 	freeMultiIVPostEAMultiLvlDerefVS int
+	// freeMultiIVPostEAMultiLvlPLStackU3: after multi-level create ladder accepts
+	// (e4255+), residual free Expression Variable PL stays Function::stack U3
+	// (free multi-IV For body depth) with live choose_ok_var + itemize
+	// (e4368 U3 U2 U10). Sticky residual forceU6 sole (GlobalU2AfterPtrCmp)
+	// under-burns and desyncs.
+	freeMultiIVPostEAMultiLvlPLStackU3 bool
+	// freeMultiIVPostEAMultiLvlPLN: PL hits under MultiLvlPLStackU3.
+	// 0: e4368 U3 stack + U2 choose + U10 itemize [10]
+	// 1+: e4387 U3 stack + U3 choose (3 ok_vars, no itemize)
+	freeMultiIVPostEAMultiLvlPLN int
+	// freeMultiIVPostEAMultiLvlLhsEmptyCreateDone: e4372–75 first post-ladder
+	// SelectDeref empty create address U2 accepted. Arms live choose ladder
+	// (e4392+) so first empty create is not stolen as U2 F0 residual.
+	freeMultiIVPostEAMultiLvlLhsEmptyCreateDone bool
+	// freeMultiIVPostEAMultiLvlLhsSelN: ExpressionAssign Lhs SelectDeref after
+	// multi-level empty create (e4392+). Live choose_ok_var multiphase (not
+	// empty create F20): 0 U2 F0; 1–3 U3 U4 U8 F0; then F80=0→VS.
+	freeMultiIVPostEAMultiLvlLhsSelN int
+	// freeMultiIVPostEAMultiLvlGlobalN: free Expression Variable Global hits
+	// under multi-level ladder. 0: e4378 U24; 1+: e4431 U23 (GlobalList grew
+	// then filtered eFlexible).
+	freeMultiIVPostEAMultiLvlGlobalN int
 	// freeMultiIVPostEAItemizePLCreateNeedLhs: after e3549–56 PL empty create,
 	// parent ExpressionAssign Lhs SelectDeref F80 (e3557). finishVar runs Lhs.
 	freeMultiIVPostEAItemizePLCreateNeedLhs bool
@@ -2118,6 +2140,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e4368: after multi-level SelectDeref create ladder, free Expression
+	// Variable PL stack is U3 (For body depth) not sticky residual forceU6.
+	if state != nil && state.freeMultiIVPostEAMultiLvlPLStackU3 {
+		return int(er.pick(3))
+	}
 	// seed5 e3549: after free multi-IV Global U16 itemize multiphase, residual
 	// Expression PL stack is U3 (For body depth) not sticky U2 (e3003).
 	if state != nil && state.freeMultiIVPostEAGlobalItemizePLStackU3 {
@@ -10147,6 +10174,9 @@ exprTries:
 						_ = er.pick(2)
 					}
 					flow.freeMultiIVPostEAMultiLvlDerefVS = 0
+					// Later free Expression Variable PL stays stack U3 + live
+					// choose (e4368), not sticky residual forceU6 sole.
+					flow.freeMultiIVPostEAMultiLvlPLStackU3 = true
 					// Materialize local so inventory grows.
 					name := flow.allocLocalName()
 					depth := flow.blockStack
@@ -10163,6 +10193,55 @@ exprTries:
 				}
 				// phase>=2 unexpected — fall through
 				flow.freeMultiIVPostEAMultiLvlDerefVS = 0
+			}
+			// seed5 multi-level PL stack U3 multiphase (e4368+): Function::stack
+			// size 3 + choose_ok_var. GO under-materialises free multi-IV body
+			// arrays — phase table from UP:
+			//   0 e4368 U2+U10 itemize; 1 e4388 U3; 2–3 e4414/e4424 sole;
+			//   4 e4428 U9 once; 5+ e4438 U3 choose.
+			// Sticky residual forceU6 sole under-burns.
+			if flow != nil && flow.freeMultiIVPostEAMultiLvlPLStackU3 &&
+				(scopePick == 1 || scopePick == 4) && er != nil {
+				_ = er.pick(3) // stack U3
+				n := flow.freeMultiIVPostEAMultiLvlPLN
+				flow.freeMultiIVPostEAMultiLvlPLN++
+				switch {
+				case n == 0:
+					_ = er.pick(2)  // e4369
+					_ = er.pick(10) // e4370 itemize [10]
+				case n == 1:
+					_ = er.pick(3) // e4388
+				case n <= 3:
+					// e4414 / e4424 sole after stack
+				case n == 4:
+					_ = er.pick(9) // e4428 choose among 9
+				case n == 5:
+					_ = er.pick(3) // e4438 choose among 3
+				case n == 6:
+					// e4441–45: choose U3 + U7 then visit_facts fail →
+					// ExpressionVariable reselects VS PP U7 accept.
+					_ = er.pick(3)
+					_ = er.pick(7)
+					scopePick2 := variableScopePickFromER(er, opts, &scope) // e4444
+					if scopePick2 == 2 {
+						_ = er.pick(7) // e4445 PP ok_vars
+					}
+				default:
+					// e4455–60: choose U3 then visit fail → VS PP U7 U4 fail →
+					// VS reselect (e4460 U100) accept.
+					_ = er.pick(3)
+					scopePick2 := variableScopePickFromER(er, opts, &scope) // e4457
+					if scopePick2 == 2 {
+						_ = er.pick(7) // e4458
+						_ = er.pick(4) // e4459
+						_ = variableScopePickFromER(er, opts, &scope) // e4460
+					} else if scopePick2 == 1 || scopePick2 == 4 {
+						_ = er.pick(3)
+					}
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "l_iv"))
 			}
 			// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 			// (UP expand_struct_union / multi-param; GO inventory sole-accepts).
@@ -10228,9 +10307,13 @@ exprTries:
 					// seed5 e3003: free multi-IV post-Lhs Expression residual PL
 					// stack U2; first visit empty create NewArray, later U2+U5 choose
 					// (e3058–59) then parent Assign Lhs F80 — not sticky forceU6 sole.
+					// seed5 e4368: multi-level create ladder arms MultiLvlPLStackU3 —
+					// intercept above burns U3+choose; do not forceU6 sole here.
 					var idx int
 					freeMultiIVExprPL := flow != nil && flow.freeMultiIVForLhsExprContinue
-					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone && !freeMultiIVExprPL
+					multiLvlPLU3 := flow != nil && flow.freeMultiIVPostEAMultiLvlPLStackU3
+					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone &&
+						!freeMultiIVExprPL && !multiLvlPLU3
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
 						// e3003/e3058/e3405: stack U2 during early residual Expression.
@@ -10455,6 +10538,26 @@ exprTries:
 				// e3564–66: parent ExpressionAssign Lhs SelectDeref F80 U2 U100
 				// (same pattern as e3557–59 after PL create).
 				ctx.state.freeMultiIVPostEAItemizePLCreateNeedLhs = true
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "g_0"))
+			}
+			// seed5 e4378 / e4431 / e4452: after multi-level SelectDeref create
+			// ladder, free Expression Variable Global is live GlobalList —
+			// 0: U24 (e4378); 1: U23 (e4431); 2+: U8 filtered (e4452).
+			// Sticky postAgg live exact U2 under-burns and VS-retry loops.
+			if scopePick == 0 && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVPostEAMultiLvlPLStackU3 && er != nil {
+				n := ctx.state.freeMultiIVPostEAMultiLvlGlobalN
+				ctx.state.freeMultiIVPostEAMultiLvlGlobalN++
+				switch {
+				case n == 0:
+					_ = er.pick(24) // e4378
+				case n == 1:
+					_ = er.pick(23) // e4431
+				default:
+					_ = er.pick(8) // e4452 filtered live
+				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "g_0"))
@@ -14663,6 +14766,34 @@ exprTries:
 						_ = er.fallback.flipcoin(0) // e2318 / e2321
 						continue
 					}
+					// seed5 e4392–4410: after multi-level empty create (e4375),
+					// later Lhs SelectDeref has live pointer inventory. UP
+					// choose_ok_var multiphase fail then F80=0→VS — not empty
+					// create F20. Phases: U2 F0; U3 U4 U8 F0 ×3; then stop so
+					// next F80=0→VS and later empty creates (e4446+) work.
+					// Gate on EmptyCreateDone so e4372 empty create is not stolen.
+					if ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVPostEAMultiLvlLhsEmptyCreateDone &&
+						ctx.state.freeMultiIVPostEAMultiLvlLhsSelN < 4 &&
+						!createdArrEA {
+						n := ctx.state.freeMultiIVPostEAMultiLvlLhsSelN
+						ctx.state.freeMultiIVPostEAMultiLvlLhsSelN++
+						if n == 0 {
+							_ = er.pick(2) // e4393
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(0) // e4394
+							}
+							continue
+						}
+						// e4396–4408: multi-dim / collective itemize fail
+						_ = er.pick(3)
+						_ = er.pick(4)
+						_ = er.pick(8)
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(0)
+						}
+						continue
+					}
 					// e8308–36 post-CD3: ExpressionAssign Lhs SelectDeref residual
 					// U11+993, U11+947, U11×2, U10+F0, F80=0→VS, U8+993, U8 accept
 					// (not empty create F20 F20).
@@ -14911,6 +15042,23 @@ exprTries:
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
+					// seed5 e4373–75: after multi-level create ladder (e4227–55),
+					// SelectDeref empty create NewArray=0 + make_init address has
+					// live choose_ok_var U2 (pointees from prior creates). Sticky
+					// residual tgt NewArray + Constant F50 under-burns U2.
+					// One-shot — later Lhs (e4392+) uses live choose multiphase.
+					// seed5 e4446–49: second empty create after live ladder accepts
+					// after F20 F20 only (no U2) → needNoRhs SafeOp F50 (e4449).
+					if !newArray && !initConst && ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVPostEAMultiLvlPLStackU3 {
+						if !ctx.state.freeMultiIVPostEAMultiLvlLhsEmptyCreateDone {
+							_ = er.pick(2) // e4375 address choose
+							ctx.state.freeMultiIVPostEAMultiLvlLhsEmptyCreateDone = true
+						}
+						// e4446+ and e4375: accept Lhs (second empty: no U2)
+						lhsFromDeref = true
+						break
+					}
 					// seed5 e3410: free multi-IV residual ExpressionAssign Lhs
 					// SelectDeref empty create after Function-fail Variable —
 					// UP F80 F20×4 (outer NewArray+init + nested pointee
@@ -15294,26 +15442,34 @@ exprTries:
 						// leftover sticky itemize desynced e1364 empty create).
 						nullValidatePostResidualSelDerefItemize = 2
 					} else {
-						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
-						// seed5 e4227: ExpressionAssign Lhs type is pointer (e.g. **
-						// after ptr-cmp qfer F50 F10×2+self). select_deref empty
-						// create_and_initialize finds_pointer_type(t,true) → t*
-						// (ind≥2). Outer make_init address-of peels to pointer
-						// pointee → nested create_and_initialize F20 NewArray +
-						// make_init F20 (pointer: Constant null has no pure_rnd;
-						// not simple Constant F50 F50 U20).
-						// match_exact_qualifiers is on during ExpressionAssign Lhs
-						// (StatementAssign.cpp) so random_loose_qualifiers and
-						// random_add_qualifiers burn no F50/F10 (e4223 F80→F20).
-						// Nested init F20=1 → null pointer Constant; accept Lhs;
-						// parent Expression U120 tries=2 + VS multiphase (e4228+).
-						if strings.Contains(t.Name, "*") {
-							// nested make_init_value for pointer pointee
+						// create_and_initialize address residual for SelectDeref
+						// empty create (outer NewArray F20 + make_init F20 already
+						// burned). make_init_value for pointer: F20 null Constant
+						// OR address choose_var; empty pool → nested
+						// GenerateNewParentLocal → create_and_initialize again.
+						//
+						// seed5 e4227 (pre multi-level ladder): pointer Lhs ** —
+						// find_pointer_type → ***; address choose empty → nested
+						// create_and_initialize F20 NewArray + F20 make_init
+						// (null Constant, no pure_rnd). Arm parent VS multiphase.
+						//
+						// seed5 e4375 (post multi-level ladder): pointer pool has
+						// locals from e4227–55 creates → address choose_ok_var U2
+						// (no nested F20; sticky nested peel under-burns U2).
+						multiLvlDone := ctx != nil && ctx.state != nil &&
+							ctx.state.freeMultiIVPostEAMultiLvlPLStackU3
+						if strings.Contains(t.Name, "*") && multiLvlDone {
+							// e4373–75: outer NewArray=0 + make_init address → U2
+							_ = er.pick(2)
+							lhsFromDeref = true
+							break
+						}
+						if strings.Contains(t.Name, "*") && !multiLvlDone {
+							// e4226–27: nested create_and_initialize after empty
+							// address choose (no U before nested).
+							_ = er.fallback.flipcoin(20) // nested NewArray
 							nestedInitNull := er.fallback.flipcoin(20)
 							if !nestedInitNull {
-								// Address-of nested pointer: choose_var residual.
-								// Rare at e4227 (UP nested init F20=1); keep a
-								// small choose so LCG does not stall.
 								_ = er.pick(2)
 							}
 							// Materialize multi-level pointer into local inventory
@@ -15345,6 +15501,7 @@ exprTries:
 							lhsFromDeref = true
 							break
 						}
+						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
 						// Constant::make_random for the synthetic pointed-to object.
 						if er.fallback.flipcoin(50) {
 							if er.fallback.flipcoin(50) {

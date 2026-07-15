@@ -222,10 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4368** (PL stack U3 vs U6 after multi-level SelectDeref create ladder); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4460** (VS multiphase after multi-level PL/PP fail ladder); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e4368→4460 climbed — multi-level post-ladder PL stack U3 + live inventory:**
+1. Capture: e4368 UP U3=0 vs GO U6=0 (same raw) after multi-level SelectDeref create ladder — PL stack size.
+2. C++: free multi-IV For body `Function::stack.size()=3` throughout; residual forceU6 sole is wrong sticky. After ladder: PL multiphase (U3 stack + choose_ok_var U2+itemize U10 / U3 / sole / U9…); Global live U24→U23→U8; Lhs SelectDeref empty create address U2 then live choose fail ladder U2 F0 + U3 U4 U8 F0×3 then F80=0→VS; later empty create F20 F20 accept; PL visit-fail → VS PP U7 multiphase.
+3. GO: arm `freeMultiIVPostEAMultiLvlPLStackU3` after multi-level VS create; bypass residual forceU6; PL/Global/Lhs multiphase under that flag. Next: e4460 U100 v=92 vs v=37 (extra VS reselect after PP U7 U4 fail).
+4. Seed2/3/4/6 held.
 
 **seed5 e4227→4368 climbed — SelectDeref multi-level create_and_initialize F20 ladder:**
 1. Capture: e4227 UP F20=1 vs GO F50=1 after matching F80 + F20×3=0 (SelectDeref empty create).
