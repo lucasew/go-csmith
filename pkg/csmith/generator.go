@@ -6434,6 +6434,12 @@ func buildFunctionCallExpr(
 				_ = r.flipcoin(10) // RegularConstProb
 			}
 		}
+		// rv = CreateVariable(rvname, type, nullptr, &ret_qfer): aggregate
+		// return types expand field_vars with Constant::make_random per field
+		// (Variable.cpp create_field_vars) before GenerateParameterList.
+		if isAgg && !strings.HasPrefix(t.Name, "union") {
+			burnCreateFieldVarsConstants(r, t, ctx, opts)
+		}
 		maxP := opts.MaxParams
 		if maxP < 1 {
 			maxP = 1
@@ -6465,6 +6471,12 @@ func buildFunctionCallExpr(
 			}
 			_ = r.flipcoin(50)
 			constLevels = append(constLevels, r.flipcoin(10))
+			// new_variable → CreateVariable(name, type, init=0, qfer):
+			// aggregate params expand create_field_vars → Constant::make_random
+			// per field (seed5 e155 after first struct S0 param qfer).
+			if strings.HasPrefix(pt.Name, "struct") && !strings.Contains(pt.Name, "*") {
+				burnCreateFieldVarsConstants(r, pt, ctx, opts)
+			}
 			params = append(params, paramInfo{
 				name:        state.allocParamName(),
 				ctype:       pt,
@@ -9785,7 +9797,29 @@ exprTries:
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "g_0"))
 					}
-					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+					// SelectGlobal empty → random_type_from_type (simple retype U14)
+					// then GenerateNewGlobal (VariableSelector.cpp:664–666).
+					// choose_random_simple uses eSimpleType order. Simple SE-free
+					// self F50+F10 (seed5 e214); pointers keep !SE-free path
+					// (seed2 e827 levels F50 F10 + self F10 only).
+					createT := t
+					isSimple := !strings.Contains(t.Name, "*") &&
+						!strings.HasPrefix(t.Name, "struct") &&
+						!strings.HasPrefix(t.Name, "union")
+					if er != nil && er.fallback != nil && isSimple {
+						esimple := true
+						useESimpleRetypeSink = &esimple
+						createT = pickSimpleNonVoid(er.fallback, opts)
+						useESimpleRetypeSink = nil
+					}
+					var g exprVarCandidate
+					var ok bool
+					if isSimple && ctx != nil && ctx.effectSEFree {
+						g, ok = createOnDemandGlobalFromERSEFree(er, opts, createT, ctx)
+					} else {
+						g, ok = createOnDemandGlobalFromER(er, opts, createT, ctx)
+					}
+					if ok {
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, g.expr))
 					}
@@ -10448,7 +10482,26 @@ exprTries:
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, "g_0"))
 					}
-					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
+					// SelectGlobal empty miss (type mismatch): same retype + create
+					// as candidates-empty path (seed5 e214); eSimpleType order.
+					createT := t
+					isSimple := !strings.Contains(t.Name, "*") &&
+						!strings.HasPrefix(t.Name, "struct") &&
+						!strings.HasPrefix(t.Name, "union")
+					if er != nil && er.fallback != nil && isSimple {
+						esimple := true
+						useESimpleRetypeSink = &esimple
+						createT = pickSimpleNonVoid(er.fallback, opts)
+						useESimpleRetypeSink = nil
+					}
+					var g exprVarCandidate
+					var ok bool
+					if isSimple && ctx.effectSEFree {
+						g, ok = createOnDemandGlobalFromERSEFree(er, opts, createT, ctx)
+					} else {
+						g, ok = createOnDemandGlobalFromER(er, opts, createT, ctx)
+					}
+					if ok {
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, g.expr))
 					}
@@ -10506,10 +10559,16 @@ exprTries:
 			needNoRhsExpr := false
 			if er != nil && er.fallback != nil {
 				// ExpressionAssign.cpp: when qfer!=null, skip random_qualifiers.
-				// GO maps non-null parent qfer via skipFuncRetQfer (Assign RHS).
-				// PP-era only so seed2 residual paths stay intact.
-				skipQfer := ctx != nil && ctx.skipFuncRetQfer &&
-					ctx.state != nil && ctx.state.isParamPPFallPicks >= 2
+				// isParam top-level: make_random_param always passes &v->qfer
+				// (seed5 e178 AssignOps next, not self F50). Nested Expression under
+				// stdfunc operands uses null qfer (isParam=false) and still burns
+				// WRITE self F50 (seed5 e202) — never blanket inParamExpr.
+				// PP-era Assign RHS: skipFuncRetQfer (WRITE parent qfer).
+				skipQfer := isParam
+				if ctx != nil && ctx.skipFuncRetQfer &&
+					ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+					skipQfer = true
+				}
 				// seed4 e1873: after residual term-retry Assign, burn pointer
 				// qfer F50 F10… even under skipFuncRetQfer parent context.
 				if skipQfer && ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceAssignQfer {
