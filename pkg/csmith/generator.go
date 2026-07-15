@@ -184,6 +184,31 @@ var postAggPostCD3PtrGlobalSoleNSink *int
 // (e8381 UP U120 tries=3 Variable).
 var postAggPostCD3DepthBlockOnceSink *bool
 
+// nullValidateExprDepthArm: during post-NullValidate Expression residual (seed5
+// e810+), Constant U20 path arms depthBlock so next nested Expression is
+// Variable tries=1 (e835), not free Comma at depth 0.
+var nullValidateExprDepthArm bool
+
+// nullValidateSkipArrayItemize: under NullValidate depthBlock free Expression,
+// force PL sole (seed5 e840) and stick depthBlock maxDB.
+var nullValidateSkipArrayItemize bool
+
+// nullValidateGlobalItemizeN: Global eFlexible chooses under NullValidate
+// depthBlock that need post-choose U10 F50 residual (seed5 e843–45 on 2nd Global).
+var nullValidateGlobalItemizeN int
+
+// nullValidateClearDepthBlock: after Variable multiphase residual ends (e853),
+// clear sticky depthBlock so next Expression can be Function (e854 U120=0).
+var nullValidateClearDepthBlock bool
+
+// nullValidateForceUserFunc: after clear depthBlock, next Function is user-path
+// (UP e855 F50 useExisting; GO atMaxFuncs would skip F80 and take stdfunc F5).
+var nullValidateForceUserFunc bool
+
+// nullValidateUserFuncChoosePad: with force user + empty built candidates, burn
+// Builtin F20 + U16 choose residual (seed5 e856–57) before CREATE/fallthrough.
+var nullValidateUserFuncChoosePad bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -3010,6 +3035,13 @@ func randomConstantExprFromER(t CType, er *exprRand, opts Options) string {
 				postAggPostCD3DepthBlockOnceSink != nil &&
 				!postAggPostCD3ArrayOp2BodyActive {
 				*postAggPostCD3DepthBlockOnceSink = true
+			}
+			// seed5 e834→835: NullValidate Expression residual nested binary
+			// Function×3 then Constant U20; next operand needs depthBlock
+			// (UP U120 tries=1 Variable, not Comma tries=0).
+			if nullValidateExprDepthArm && postAggPostCD3DepthBlockOnceSink != nil {
+				*postAggPostCD3DepthBlockOnceSink = true
+				nullValidateSkipArrayItemize = true
 			}
 		}
 		// seed2 e1398: after Global U28 era, pure U3 Constant then U4 residual.
@@ -5931,7 +5963,35 @@ if pointerGlobalPicksSink != nil {
 					if n < 1 {
 						return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
 					}
-					return uniq[v%n], true
+					c := uniq[v%n]
+					// seed5 NullValidate depthBlock Global eFlexible multiphase:
+					// N=2 (e843–45): itemize U10 + F50 once.
+					// N=3 (e847–53): visit miss → VS U100×2 + PL U1 U4 + U100
+					// then empty so caller retries / parent Expression continues.
+					if nullValidateSkipArrayItemize {
+						nullValidateGlobalItemizeN++
+						if nullValidateGlobalItemizeN == 2 {
+							if c.isArray {
+								itemizeArrayCandidate(er, c)
+							} else {
+								_ = er.pick(10)
+							}
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(50)
+							}
+						} else if nullValidateGlobalItemizeN == 3 && er != nil && er.fallback != nil {
+							// e849–53: visit miss → VS U100 U100 U1 U4 U100 accept
+							// (UP next Expression U120 Function tries=0).
+							_ = er.fallback.upto(100)
+							_ = er.fallback.upto(100)
+							_ = er.pick(1)
+							_ = er.pick(4)
+							_ = er.fallback.upto(100)
+							nullValidateClearDepthBlock = true
+							return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
+						}
+					}
+					return c, true
 				}
 			}
 		}
@@ -6592,6 +6652,27 @@ func buildFunctionCallExpr(
 			calleeIdx = candidates[int(er.pick(uint32(len(candidates))))]
 		}
 		callee = state.funcs[calleeIdx]
+	} else if useExisting && len(candidates) == 0 && r != nil &&
+		nullValidateUserFuncChoosePad {
+		// seed5 e856–: NullValidate force user Function, useExisting=1 but GO
+		// built-func inventory empty. UP: F20 + U16 choose then
+		// build_invocation param Expressions (U120…). Accept synthetic call.
+		nullValidateUserFuncChoosePad = false
+		_ = r.flipcoin(20) // e856
+		_ = r.upto(16)     // e857
+		// build_invocation: param Expression::make_random (e858 U120…).
+		if er != nil {
+			prevDepth := 0
+			if ctx != nil {
+				prevDepth = ctx.exprDepth
+				ctx.exprDepth = 0
+			}
+			_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+			if ctx != nil {
+				ctx.exprDepth = prevDepth
+			}
+		}
+		return castLiteral(t, "0"), true
 	}
 
 	if calleeIdx < 0 {
@@ -7259,6 +7340,15 @@ func randomLeafExprWithMode(
 				ctx.state.ppPostPadDepthBlockN = 0
 			}
 		}
+		// seed5 e853→854: end NullValidate Variable multiphase — clear sticky
+		// depthBlock so next Expression Function is unfiltered (UP U120=0).
+		if nullValidateClearDepthBlock && ctx != nil && ctx.state != nil {
+			nullValidateClearDepthBlock = false
+			ctx.state.ppPostPadDepthBlock = false
+			ctx.state.ppPostPadDepthBlockN = 0
+			nullValidateSkipArrayItemize = false
+			nullValidateForceUserFunc = true
+		}
 		depthBlock := natDepthBlock ||
 			(ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock)
 		if tc == termFunction {
@@ -7364,8 +7454,14 @@ exprTries:
 			if ctx.state.postAggNestArrayOpPostCD3 {
 				maxDB = 1
 			}
+			// seed5 e835–846: NullValidate depthBlock keeps filtering through
+			// Variable multiphase (tries=1,4,5,7) — default maxDB=3 clears too early.
+			if nullValidateSkipArrayItemize {
+				maxDB = 12
+			}
 			if ctx.state.ppPostPadDepthBlockN >= maxDB {
 				ctx.state.ppPostPadDepthBlock = false
+				nullValidateSkipArrayItemize = false
 			}
 		}
 		// Clear only when Function actually selected (may skip intermediate Assign soles).
@@ -7404,6 +7500,14 @@ exprTries:
 				stdFunc := true
 				atMaxFuncs := ctx != nil && ctx.state != nil &&
 					len(ctx.state.funcs) >= ctx.state.maxFuncs
+				if nullValidateForceUserFunc {
+					// seed5 e855: after NullValidate Variable multiphase, UP
+					// user Function (F50 useExisting) not atMax stdfunc F5.
+					nullValidateForceUserFunc = false
+					forceUserFunc = true
+					atMaxFuncs = false
+					nullValidateUserFuncChoosePad = true
+				}
 				if !atMaxFuncs && !forceStdFuncSimple && !forceUserFunc {
 					stdFunc = er.fallback.flipcoin(80)
 				}
@@ -9858,6 +9962,14 @@ exprTries:
 							return finishVar(castLiteral(t, g.expr))
 						}
 					} else {
+						// seed5 e839–41: NullValidate depthBlock era PL stack U1
+						// then sole (UP next Expression U120 tries=5). GO multi
+						// local inventory burns choose U3. Force sole under
+						// nullValidateSkipArrayItemize (armed with depthBlock).
+						if nullValidateSkipArrayItemize && len(localCands) > 0 {
+							bumpExprDepth(ctx)
+							return finishVar(castLiteral(t, localCands[0].expr))
+						}
 						if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok {
 							// seed4 e1217: PP-era simple ParentLocal choose fails
 							// visit_facts → ExpressionVariable do-while retries
@@ -114007,14 +114119,17 @@ func emitStatement(
 		*stmtBudget = *stmtBudget - 1
 	}
 	// seed5 e810+: after NullValidate multi-scope Lhs accept, UP continues free
-	// Expression nest (U120 F5 F10…) instead of Statement U100. Burn free
-	// Expressions as statement-level residual before StatementProbability.
+	// Expression nest (U120 F5 F10…) instead of Statement U100. Nested binary
+	// Function×3 + Constant U20 then Variable tries=1 (depthBlock on next
+	// operand after Constant — nullValidateExprDepthArm).
 	if state != nil && state.postAggNullValidateExprContinue {
 		state.postAggNullValidateExprContinue = false
 		state.ppPostPadSkipParentExprN = 0
 		base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-		// e810–834: Function×3 + Constant match with free depth-0 Expressions.
-		// e835+: Variable tries=1 (depthBlock) — next plateau.
+		nullValidateExprDepthArm = true
+		nullValidateGlobalItemizeN = 0
+		// One (or few) free Expressions expand to nested binary Function tree
+		// matching UP e810–…; Constant U20 arms depthBlock for next operand.
 		for i := 0; i < 4; i++ {
 			state.ppPostPadSkipParentExprN = 0
 			if ctx != nil {
@@ -114022,6 +114137,9 @@ func emitStatement(
 			}
 			_ = randomTypedExpr(base, r, opts, env, scope, ctx)
 		}
+		nullValidateExprDepthArm = false
+		nullValidateSkipArrayItemize = false
+		nullValidateGlobalItemizeN = 0
 		writeLine(b, 1, "x = x;")
 		return true
 	}
