@@ -258,6 +258,15 @@ var nullValidatePostResidualForBodyAssign bool
 // next free Expression Global U18 also burns itemize U10 (e1026).
 var nullValidatePostResidualGlobalItemizeU10 bool
 
+// nullValidatePostResidualReturnMust: after residual For/If body, Statement
+// Return ExpressionVariable burns Constant hex residual F50×2 (+digits) F75 U4
+// (e1029–32) instead of immediate VS U100.
+var nullValidatePostResidualReturnMust bool
+
+// nullValidatePostResidualSkipIfElse: after residual Return in If then-body,
+// skip else BlockSize (UP depth guard / sole Return; e1033 Statement U100).
+var nullValidatePostResidualSkipIfElse bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -7296,6 +7305,29 @@ func continueAfterF10Constant(r *rng, opts Options, env envInfo, scope scopeInfo
 
 func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope scopeInfo, ctx *genContext) string {
 	er := newExprRand(r, exprDecisionBudget(opts))
+	// seed5 e1029–32: after NullValidate residual For body Assign + If condition
+	// Global U18, Statement Return must_use residual F50 F50 F75 U4 accept
+	// (UP; GO was VS U100 immediately).
+	if nullValidatePostResidualReturnMust && r != nil {
+		nullValidatePostResidualReturnMust = false
+		// e1029–32: Constant hex residual before must_use-like F75 U4.
+		// F50=0 → RandomHexDigits (untraced next31; UP depth gaps 16 then 2).
+		if !r.flipcoin(50) { // e1029
+			for i := 0; i < 16; i++ {
+				_ = r.next31()
+			}
+		}
+		if !r.flipcoin(50) { // e1030
+			for i := 0; i < 2; i++ {
+				_ = r.next31()
+			}
+		}
+		_ = r.flipcoin(75) // e1031
+		_ = r.upto(4)      // e1032
+		// Sole Return in If then → skip else BlockSize (e1033 Statement U100).
+		nullValidatePostResidualSkipIfElse = true
+		return castLiteral(t, "x")
+	}
 	if c, ok := trySelectMustUseVar(er, t, ctx); ok && c.expr != "" {
 		return castLiteral(t, c.expr)
 	}
@@ -14028,6 +14060,8 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		// e1025–26: free Expression Global U18 + itemize U10 after residual.
 		nullValidatePostResidualGlobalU18 = true
 		nullValidatePostResidualGlobalItemizeU10 = true
+		// e1029: next Statement Return uses must_use residual F50 F50 F75 U4.
+		nullValidatePostResidualReturnMust = true
 		writeLine(b, 1, "x = x;")
 		return true
 	}
@@ -114753,6 +114787,14 @@ func emitStatement(
 			}
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, thenInLoop, stmtBudget, ctx)
+		if nullValidatePostResidualSkipIfElse {
+			nullValidatePostResidualSkipIfElse = false
+			skipElse = true
+			// Nested Return must not stop outer For body (e1033 U100 next).
+			if state != nil {
+				state.lastStmtWasReturn = false
+			}
+		}
 		if skipElse {
 			// Clear for-body filter after sole Break body.
 			if state != nil {
@@ -115029,7 +115071,10 @@ func emitStatement(
 			// seed4 e2760: postAgg if-then keeps generating after Return
 			// (ArrayOp U100=52 F5…). Csmith Block must_return would stop; GO
 			// filterCompound depth lag left more Statement slots — do not halt.
-			if !(postAggGlobalCreateN >= 0 && state.filterCompoundStmts) {
+			// seed5 residual Return in If then: skipElse clears / do not halt outer.
+			if nullValidatePostResidualSkipIfElse {
+				// leave false
+			} else if !(postAggGlobalCreateN >= 0 && state.filterCompoundStmts) {
 				state.lastStmtWasReturn = true
 			}
 		}
