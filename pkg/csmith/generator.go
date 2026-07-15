@@ -689,6 +689,17 @@ type functionFlowState struct {
 	// is empty create (e3003 U2 + F50 F10 F20 NewArray). Later PL chooses among
 	// locals (e3058 U2 + U5, then parent Assign Lhs F80).
 	freeMultiIVForLhsExprPLCreateOnce bool
+	// freeMultiIVForLhsExprPLChooseU4Once: after null-alt CreateArray Lhs residual
+	// (e3161–74), next free Expression Variable PL choose is U4 (e3179) not sticky
+	// early residual U5 (e3058–59).
+	freeMultiIVForLhsExprPLChooseU4Once bool
+	// freeMultiIVForLhsExprPostNestLhs: after free multi-IV Expression nest ends
+	// on PL U4 Variable (Comma rhs), parent ExpressionAssign Lhs SelectDeref
+	// continues (e3180 F80 U2 F80=0 → VS…) before next Statement.
+	freeMultiIVForLhsExprPostNestLhs bool
+	// freeMultiIVForLhsExprPostNestLhsFailGlobal: first VS Global after post-nest
+	// SelectDeref U2 fail must continue Lhs do-while (e3184 F80), not e4330 sole.
+	freeMultiIVForLhsExprPostNestLhsFailGlobal bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -2533,6 +2544,14 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 			sp := variableScopePickFromER(er, opts, &scope)
 			switch {
 			case sp == 0: // Global
+				// free multi-IV post-nest Lhs (e3183 U100=7 Global): visit fails →
+				// Lhs do-while more SelectDeref (e3184 F80…), not e4330 sole-accept.
+				if flow != nil && flow.freeMultiIVForLhsExprPostNestLhsFailGlobal {
+					flow.freeMultiIVForLhsExprPostNestLhsFailGlobal = false
+					flow.postAggDerefChooseU2AfterCreate = false
+					globalFails++
+					continue
+				}
 				// e4330: after empty CreateArray U2-era, Global Lhs sole-accept
 				// (UP next Expression U120), not U2+F50 residual (that was e4248).
 				// Do not SkipStmtLhs/OuterLhsSole — parent Expression continues.
@@ -9595,7 +9614,16 @@ exprTries:
 						localCands = nil
 					} else if freeMultiIVExprPL && scopePick == 1 {
 						// e3058–59: later residual ParentLocal stack U2 + choose U5.
-						_ = er.pick(5)
+						// e3179: after null-alt CreateArray Lhs residual, choose U4.
+						nChoose := 5
+						if flow.freeMultiIVForLhsExprPLChooseU4Once {
+							flow.freeMultiIVForLhsExprPLChooseU4Once = false
+							nChoose = 4
+							// After this Variable (Comma rhs of free multi-IV expr nest),
+							// parent ExpressionAssign Lhs SelectDeref continues (e3180 F80).
+							flow.freeMultiIVForLhsExprPostNestLhs = true
+						}
+						_ = er.pick(uint32(nChoose))
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "l_iv"))
@@ -13319,10 +13347,13 @@ exprTries:
 			// follow; keep OuterLhsSoleN even under StackU6CreateDone.
 			// e8337 post-CD3 nested Lhs residual done: outer Lhs must sole even
 			// under StackU6CreateDone (UP parent Expression U120 next).
+			// free multi-IV nested CreateArray residual arms OuterLhsSole so parent
+			// shift ShiftBy F50 + RHS U120 (e3175–76); do not skip under StackU6CreateDone.
 			skipOuterLhsSole := ctx != nil && ctx.state != nil &&
 				ctx.state.postAggU15StackU6CreateDone &&
 				!ctx.state.postAggPtrCmpPLCreateDone &&
-				!ctx.state.postAggNestArrayOpPostCD3LhsSelDone
+				!ctx.state.postAggNestArrayOpPostCD3LhsSelDone &&
+				!ctx.state.freeMultiIVForLhsExprContinue
 			if !skipOuterLhsSole && ctx != nil && ctx.state != nil && ctx.state.ppPostPadOuterLhsSoleN > 0 {
 				ctx.state.ppPostPadOuterLhsSoleN--
 				return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
@@ -14539,8 +14570,13 @@ exprTries:
 			// Lhs after null-alt CreateArray itemize ladder F80=0 → VS ParentLocal.
 			// C++ Function::stack.size()=2 (for body); choose_ok_var among 2
 			// matching locals; visit_facts fails → Lhs do-while SelectDeref:
-			//   F80 U2 F0; F80 lastArraySizes itemize F0; F80=0 → VS PP/PL U3 F50.
+			//   F80 U2 F0; F80 lastArraySizes itemize F0; F80=0 → VS PP/PL U3 accept.
 			// Sticky ParamU7 residual e1225 force U6+create desyncs (e3162 U6 vs U2).
+			// Call stack: nested Assign is RHS of outer ExpressionAssign which is
+			// binary shift lhs (e3044 U18=17). After nested Lhs accept, outer Lhs must
+			// sole (no SelectDeref F80) so parent shift runs ShiftByNonConstantProb F50
+			// then RHS Expression U120 Variable (e3175–76). Clear sticky
+			// postAggSkipShiftByOnce from earlier ParamU7 ExpressionAssign residuals.
 			if ctx.state.freeMultiIVForLhsExprContinue && createdArrEANullValidate &&
 				scopePick == 1 && er != nil {
 				_ = parentStackPick(er, ctx.state) // e3162 U2
@@ -14563,17 +14599,25 @@ exprTries:
 					}
 					if !er.fallback.flipcoin(80) { // e3172 F80=0 → VS
 						sp2 := variableScopePickFromER(er, opts, &scope) // e3173
-						// ParentParam miss / reselect → stack or choose U3 then F50.
 						// freeMultiIV parentStackPick is sticky U2; UP e3174 is U3.
+						// Lhs accepts after choose — no F50 (e3175 is parent ShiftBy).
 						if sp2 == 1 || sp2 == 2 || sp2 == 4 {
 							_ = er.pick(3) // e3174
 						} else if sp2 == 3 {
 							// NewValue → VariableCreationProbability / stack
 							_ = er.pick(3)
 						}
-						_ = er.fallback.flipcoin(50) // e3175
 					}
 				}
+				// Outer ExpressionAssign Lhs soles; parent shift continues ShiftBy+RHS.
+				// Next free Expression Variable PL choose U4 (e3179), not sticky U5.
+				ctx.state.ppPostPadOuterLhsSole = true
+				ctx.state.ppPostPadOuterLhsSoleN = 0
+				ctx.state.freeMultiIVForLhsExprPLChooseU4Once = true
+				ctx.state.postAggSkipShiftByOnce = false
+				ctx.state.postAggNeedLhsAfterRhs = false
+				ctx.state.postAggUnwindBinaryAfterExprVar = 0
+				ctx.state.ppPostPadSkipParentExprN = 0
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			// seed5 e1225–29: residual Assign ExpressionAssign Lhs after
@@ -116268,10 +116312,40 @@ commaF80MultiDone:
 		ctx.exprDepth = 0
 		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 		// (2) e2990 U120=113 Comma → Function binary + nested Comma/Variable
-		// through e3044+, then clear continue flag.
+		// through e3179 PL U4 Variable (Comma rhs).
 		ctx.exprDepth = 0
 		ctx.state.ppPostPadSkipParentExprN = 0
 		_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
+		// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
+		// F80=0 → VS U100…) then more free Expression (e3198 U120). StatementAssign
+		// order is RHS then Lhs — residual Expressions act as RHS of a parent
+		// ExpressionAssign whose Lhs runs after the nest.
+		if ctx.state.freeMultiIVForLhsExprPostNestLhs {
+			ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+			er := newExprRand(r, exprDecisionBudget(opts))
+			base := targetType
+			if !strings.Contains(base.Name, "*") {
+				base = CType{Name: "int32_t*", Signed: true, Bits: 32}
+			}
+			// e3180–82: SelectDeref live choose U2 (not sticky nest U12) then
+			// F80=0 → VS Global fail → more SelectDeref (e3184+). Clear nest
+			// SelectDeref countdowns; arm U2 choose + first Global fail.
+			ctx.state.postAggNestArrayOpKeepExprSelActive = false
+			ctx.state.postAggNestArrayOpLhsCountdown = false
+			ctx.state.postAggNestSelDerefCountdown = false
+			ctx.state.postAggNestSelDerefRound2 = false
+			ctx.state.postAggLhsDerefChooseFails = 0
+			ctx.state.postAggDerefChooseU2AfterCreate = true
+			ctx.state.freeMultiIVForLhsExprPostNestLhsFailGlobal = true
+			_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
+			// Continue free Expression residual after parent Lhs (e3198+).
+			for extra := 0; extra < 8; extra++ {
+				ctx.exprDepth = 0
+				ctx.state.ppPostPadSkipParentExprN = 0
+				_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+			}
+		}
 		ctx.state.freeMultiIVForLhsExprContinue = false
 	}
 	// e4387+: after Global create Lhs accept under StmtLhsAfterExprUnwind, UP
