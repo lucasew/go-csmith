@@ -222,18 +222,24 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4900** (need_no_rhs Lhs PP→PL empty create NewArray); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5120** (NewValue after free Expression Global U4 fail → U120); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+**seed5 e4900→5120 climbed — PP→PL empty create NewArray CreateArray + PL U8:**
+1. Capture: e4900 UP F50=1 (NewArray create) vs GO U7 choose after need_no_rhs PP U100=69 stack U4=3.
+2. C++: SelectParentParam empty params → SelectParentLocal; nested `local_vars.empty()` → GenerateNewParentLocal WRITE F50 vol + create_and_initialize NewArray F20=1 → Constant primary hex + CreateArray U99 itemize; no_signed_overflow rejects → SelectDeref U7. Later PL choose grows U8 after NewArray; more PP/PL empty creates; Lhs accepts SafeOpFlags F50 U4 → free Statement.
+3. GO: free multi-IV PP multiphase empty create with `burnSimpleConstant` + `burnCreateArrayVariable`; PL pool U8 after create era; further PP/PL empty-create residuals.
+4. Seed2/3/4/6 held. Next: e5120 NewValue U100=98 then UP U120 vs GO F10 create (depth/Expression retry).
+
 **seed5 e4560→4900 climbed — need_no_rhs Lhs Global eDerefExact + PP/PL multiphase:**
 1. Capture: e4560 UP U3=1 (SelectGlobal eDerefExact pointer-preference) vs GO U15 residual (e3127) after need_no_rhs PreDecr F80=0 → VS Global.
 2. C++: Lhs WRITE eDerefExact + pointer preference; dummy shrinks U3→U2→sole; F0 null; no_signed_overflow; SelectDeref U7 ladders; PP→PL stack U4 create/choose multiphase; PL pools U3/U6/U7/U8; empty create hex next31; long do-while.
 3. GO: skip e3127 U15 under `lhsNoSignedOverflow`; free multi-IV Global/PL/PP multiphase + SelectDeref U7; maxVSTries=80; hex Constant residual.
-4. Seed2/3/4/6 held. Next: e4900 PP→PL empty create NewArray F20=1 → CreateArray U99.
+4. Seed2/3/4/6 held.
 
 **seed5 e4504→4560 climbed — NewValue Global/PL U14 + need_no_rhs Lhs ladder:**
 1. Capture: e4504 UP U14=5 tries=1 vs GO F10 (createOnDemandGlobal without retype) after need_no_rhs PreDecr F80=0 → VS NewValue Global.

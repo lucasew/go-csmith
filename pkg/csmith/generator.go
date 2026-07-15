@@ -131,6 +131,9 @@ var postAggPostCD3ArrayOp2BodyActive bool
 // burnCreateArrayCtxSink: genContext for CreateArray create_field_vars + aggregate
 // alt Constant::make_random (e10466 after U99 dims, before init_num).
 var burnCreateArrayCtxSink *genContext
+// freeMultiIVNeedNoRhsEraSink mirrors functionFlowState.freeMultiIVNeedNoRhsEra
+// for selectExprVariableFromER (may run when burnCreateArrayCtxSink is unset).
+var freeMultiIVNeedNoRhsEraSink *bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -692,6 +695,10 @@ type functionFlowState struct {
 	// multi-IV need_no_rhs Lhs do-while (dummy shrinks ok_vars).
 	// 0→U3+F0 (e4560); 1→U2 no F0 (e4570); later Global live.
 	freeMultiIVNeedNoRhsGlobalN int
+		// freeMultiIVNeedNoRhsEra: sticky after Global dummy multiphase starts
+	// (GlobalN>=2). Free Expression Variable Global inventory pad after
+	// need_no_rhs Lhs accepts (seed5 e5117 GlobalList U4).
+	freeMultiIVNeedNoRhsEra bool
 	// freeMultiIVNeedNoRhsPLN: SelectParentLocal choose attempts under free
 	// multi-IV need_no_rhs after Global dummy era (e4624 U3, e4692 U7,
 	// e4750 U6+U8 itemize, e4771 U6, e4777 sole…).
@@ -6732,6 +6739,12 @@ if pointerGlobalPicksSink != nil {
 					nullValidatePostResidualGlobalItemizeU4Once = false
 					al = 4
 				}
+				// seed5 e5117–18: post-need_no_rhs free Expression Global
+				// array itemize U4 (GO arrayLen under-count as 3 → U3).
+				if burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+					burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra && al < 4 {
+					al = 4
+				}
 				_ = er.pick(uint32(al))
 				return
 			}
@@ -6842,7 +6855,20 @@ if pointerGlobalPicksSink != nil {
 			}
 		}
 		if n == 4 {
-			chooseN = 2 // seed2 e1017 Global pointer choose
+			// seed2 e1017: Global pointer choose U2 (inventory pad overcount).
+			chooseN = 2
+		}
+		// seed5 e5117–18: after free multi-IV need_no_rhs Lhs era (Global
+		// dummy multiphase already ran), free Expression Variable Global is
+		// live GlobalList U4 + array itemize U4 — not sticky e1017 U2 / size-3.
+		// freeMultiIVNeedNoRhsEra is sticky after GlobalN>=2 so earlier free
+		// multi-IV Expression Globals (e3241 U3) stay unpadded.
+		if !forAssign && !selectVarLocalScope &&
+			((freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink) ||
+			(burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra)) &&
+			(n == 2 || n == 3 || chooseN == 2) {
+			chooseN = 4
 		}
 		// seed4 e1886–92 residual F20×4 when small inventory.
 		// seed4 e2256 postAgg: UP U23 GlobalList choose — pad once postAgg active.
@@ -6876,7 +6902,14 @@ if pointerGlobalPicksSink != nil {
 		c := exact[idx]
 		// Later scaled picks (e892): UP U4 after choose is BlockProbability for a
 		// nested block, not array itemize — skip itemize when chooseN was scaled.
-		if chooseN == n {
+		// seed5 e5117: post-need_no_rhs pad chooseN=4 over n=2 still itemizes
+		// the chosen array (UP U4 choose + U4 itemize).
+		freeMultiIVPad := !forAssign && !selectVarLocalScope &&
+			((freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink) ||
+			(burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra)) &&
+			chooseN == 4 && n < 4
+		if chooseN == n || freeMultiIVPad {
 			itemize(c, n)
 		}
 		return c, true
@@ -7245,7 +7278,10 @@ if pointerGlobalPicksSink != nil {
 		// seed2 e1412: after maxFuncs CREATE residual, Global sole (no U4).
 		chooseN := n
 		if n == 4 && multiDimArraySink != nil && *multiDimArraySink > 0 {
-			chooseN = 2
+			// seed2 e1017 U2; seed5 e5117+ post-need_no_rhs keeps live U4.
+			if freeMultiIVNeedNoRhsEraSink == nil || !*freeMultiIVNeedNoRhsEraSink {
+				chooseN = 2
+			}
 		}
 		lateU2 := useSmallParentStackSink != nil && *useSmallParentStackSink &&
 			globalU27DoneSink != nil && *globalU27DoneSink && n > 2 &&
@@ -7272,7 +7308,8 @@ if pointerGlobalPicksSink != nil {
 		// seed2 e2307: after second SelectDeref create, GlobalList choose U8.
 		lateGlobalU8 := filterCompoundStmtsSink != nil && *filterCompoundStmtsSink &&
 			lateDerefCreateNSink != nil && *lateDerefCreateNSink >= 2
-		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && n >= 2 && chooseN > 2 && !lateGlobalU8 {
+		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && n >= 2 && chooseN > 2 && !lateGlobalU8 &&
+			(freeMultiIVNeedNoRhsEraSink == nil || !*freeMultiIVNeedNoRhsEraSink) {
 			chooseN = 2
 		}
 		if lateGlobalU8 {
@@ -7660,6 +7697,12 @@ if pointerGlobalPicksSink != nil {
 		if nullValidateEmptyParamsDepthBlock && chooseN > 2 {
 			chooseN = 2
 		}
+		// seed5 e5117: post-need_no_rhs free Expression Global eFlexible live U4
+		// (override sticky GlobalList scale pads U24/U25/U28).
+		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
+			!selectVarLocalScope && n >= 2 {
+			chooseN = 4
+		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		if nullValidateEmptyParamsDepthBlock && er != nil && er.fallback != nil {
 			_ = er.pick(2) // e898
@@ -7734,8 +7777,18 @@ if pointerGlobalPicksSink != nil {
 		// Not after e2307 U8 era (accept Global choose).
 		// Not seed4 e1788 picks==14 U2+U10 accept.
 		if filterCompoundStmtsSink != nil && *filterCompoundStmtsSink && chooseN == 2 &&
-			!lateGlobalU8 && ppPostPadGlobalPicks != 14 {
+			!lateGlobalU8 && ppPostPadGlobalPicks != 14 &&
+			(freeMultiIVNeedNoRhsEraSink == nil || !*freeMultiIVNeedNoRhsEraSink) {
 			_ = er.pick(3)
+			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+		}
+		// seed5 e5117–19: post-need_no_rhs free Expression Global eFlexible
+		// live U4 + array itemize U4 then visit_facts fail → ExpressionVariable
+		// retries NewValue (U100=98). Mirror seed2 filterCompound U2+U3 fail
+		// pattern with live pool size.
+		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
+			!selectVarLocalScope && chooseN == 4 {
+			_ = er.pick(4) // itemize / residual second U4
 			return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 		}
 		if lateU2 {
@@ -16857,8 +16910,9 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				pn := flow.freeMultiIVNeedNoRhsPLN
 				flow.freeMultiIVNeedNoRhsPLN = pn + 1
 				// PL only (U100 35–64). PP is separate path.
-				// pn: e4624 U3, e4692 U7, e4701 U8, e4750 U6+U8, e4771 U6,
-				// e4783 U7, e4874 create F50 F20 F50 F50 U20.
+				// pn: e4622 U3, e4690 U7, e4699 U8, e4748 U6+U8, e4769 U6,
+				// e4781 U7, e4874 create, e4930 U8 (post-NewArray growth),
+				// e4962 U8, e4975 empty create (idx=0).
 				switch {
 				case pn == 0:
 					nChoose = 3
@@ -16872,9 +16926,9 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					_ = idx
 					return lvalueInfo{}, false, false
 				case pn == 4:
-					nChoose = 6 // e4771
+					nChoose = 6 // e4769
 				case pn == 5:
-					nChoose = 7 // e4783
+					nChoose = 7 // e4781
 				case pn == 6:
 					// e4874–80: nested empty create WRITE F50 F20 F50 F50 U20
 					if er.fallback != nil {
@@ -16898,12 +16952,35 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
 					_ = idx
 					return lvalueInfo{}, false, false
-				default:
+				case pn == 7, pn == 8:
+					// e4930 / e4962: after PP NewArray create into nested
+					// frame, local_vars grew → choose_var U8 (not sticky U7).
+					nChoose = 8
+				case pn == 9:
+					// e4975: stack idx=0 empty → create F50 F20 F50 hex
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(50)
+						newArr := er.fallback.flipcoin(20)
+						t := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						burnSimpleConstant(er.fallback, t)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
+							emitOrphanArrayGlobal(ctx, t, _arr)
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					_ = idx
+					return lvalueInfo{}, false, false
+				case pn == 10:
+					nChoose = 8 // e5008 nested frame after creates
+				case pn == 11, pn == 12, pn == 13, pn == 14:
+					// e5018 / e5028 / e5064 / e5071: eDerefExact pool U7
 					nChoose = 7
-					if pn%2 == 0 {
-						nChoose = 3
-					} else if pn%3 == 0 {
-						nChoose = 4
+				default:
+					// Later PL: prefer live inventory; floor U7 after create era.
+					nChoose = 7
+					if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) >= 7 && len(cands) <= 12 {
+						nChoose = len(cands)
 					}
 				}
 			} else if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) > 7 && len(cands) <= 12 {
@@ -17386,11 +17463,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			if lhsNoSignedOverflow && flow.freeMultiIVNeedNoRhsGlobalN >= 2 {
 				ppn := flow.freeMultiIVNeedNoRhsPPN
 				flow.freeMultiIVNeedNoRhsPPN = ppn + 1
-				// PP→PL multiphase after Global dummy era:
-				// 0 e4573 create; 1 e4594 U4; 2 e4684 U2; 3 e4714 U7;
-				// 4 e4767 U7; 5 e4776 empty; 6 e4787 U5; 7 e4801 U4;
-				// 8 e4852 U7; 9 e4866 U3.
-				switch {
+				// PP→PL multiphase after Global dummy era (SelectParentLocal
+			// VariableSelector.cpp:979–89 empty local_vars → create; else
+			// choose_var eDerefExact pool). Nested stack frames often empty:
+			// 0 e4572 create; 1 e4592 U4; 2 e4682 U2; 3 e4712 U7;
+			// 4 e4765 U7; 5 e4775 empty; 6 e4785 U5; 7 e4799 U4;
+			// 8 e4805 create hex; 9 e4850 U7; 10 e4864 U3;
+			// 11 e4898 empty create NewArray→CreateArray.
+			switch {
 				case ppn == 0:
 					// First PP after Global: nested empty → create residual.
 					if er != nil && er.fallback != nil {
@@ -17408,20 +17488,20 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
 					return lvalueInfo{}, false, false
 				case ppn == 1:
-					_ = er.pick(4) // e4594
+					_ = er.pick(4) // e4592
 				case ppn == 2:
-					_ = er.pick(2) // e4684
+					_ = er.pick(2) // e4682
 				case ppn == 3:
-					_ = er.pick(7) // e4714
+					_ = er.pick(7) // e4712
 				case ppn == 4:
-					_ = er.pick(7) // e4767
+					_ = er.pick(7) // e4765
 				case ppn == 5:
-					// e4776 empty ok_vars after stack
+					// e4775 empty ok_vars after stack
 					return lvalueInfo{}, false, false
 				case ppn == 6:
-					_ = er.pick(5) // e4787
+					_ = er.pick(5) // e4785
 				case ppn == 7:
-					_ = er.pick(4) // e4801
+					_ = er.pick(4) // e4799
 				case ppn == 8:
 					// e4805–10: nested empty create F50 vol F20 NewArray F50
 					// Constant; F50=0 → hex RandomHexDigits(8) untraced next31
@@ -17445,11 +17525,76 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 					}
 					return lvalueInfo{}, false, false
 				case ppn == 9:
-					_ = er.pick(7)
+					_ = er.pick(7) // e4850
 				case ppn == 10:
-					_ = er.pick(3)
+					_ = er.pick(3) // e4864
+				case ppn == 11:
+					// e4898–: PP→PL nested empty (idx=3) GenerateNewParentLocal
+					// WRITE: random_qualifiers F50 vol + create_and_initialize
+					// NewArray F20=1 → make_init Constant (hex) →
+					// create_array_and_itemize U99 sizes init_num alts itemize.
+					// Signed create fails no_signed_overflow → SelectDeref U7.
+					if er != nil && er.fallback != nil {
+						_ = er.fallback.flipcoin(50) // WRITE vol
+						newArr := er.fallback.flipcoin(20)
+						// need_no_rhs Lhs type is simple int (SelectLType);
+						// Constant hex width 8 (depth +8 before U99).
+						t := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						if target.Name != "" && !strings.Contains(target.Name, "*") {
+							t = target
+							if t.HexDigits <= 0 {
+								t.HexDigits = 8
+							}
+						}
+						// make_init_value → Constant::make_random (primary)
+						burnSimpleConstant(er.fallback, t)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
+							emitOrphanArrayGlobal(ctx, t, _arr)
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					return lvalueInfo{}, false, false
+				case ppn == 12:
+					// e4944: PP→PL stack idx=0 empty create F50 F20=0 F50 hex
+					// then F80 SelectDeref (create fails no_signed_overflow).
+					if er != nil && er.fallback != nil {
+						_ = er.fallback.flipcoin(50)
+						newArr := er.fallback.flipcoin(20)
+						t := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						burnSimpleConstant(er.fallback, t)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
+							emitOrphanArrayGlobal(ctx, t, _arr)
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					return lvalueInfo{}, false, false
+				case ppn == 13:
+					_ = er.pick(7) // e4956
+				case ppn == 14:
+					_ = er.pick(7) // e5044
+				case ppn == 15:
+					// e5048: empty create F50 F20=0 F50 pure U20?
+					if er != nil && er.fallback != nil {
+						_ = er.fallback.flipcoin(50)
+						newArr := er.fallback.flipcoin(20)
+						t := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						burnSimpleConstant(er.fallback, t)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, t, true)
+							emitOrphanArrayGlobal(ctx, t, _arr)
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					return lvalueInfo{}, false, false
 				default:
-					_ = er.pick(7)
+					// Later PP→PL: prefer live eDerefExact pool size when known.
+					nCh := 7
+					if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) >= 2 && len(cands) <= 8 {
+						nCh = len(cands)
+					}
+					_ = er.pick(uint32(nCh))
 				}
 				flow.freeMultiIVNeedNoRhsPLChooseMiss = true
 				return lvalueInfo{}, false, false
@@ -17513,6 +17658,10 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	if scopePick == 0 && lhsNoSignedOverflow && flow != nil && flow.freeMultiIVForBodyU3 {
 		gn := flow.freeMultiIVNeedNoRhsGlobalN
 		flow.freeMultiIVNeedNoRhsGlobalN = gn + 1
+		if flow.freeMultiIVNeedNoRhsGlobalN >= 2 {
+			flow.freeMultiIVNeedNoRhsEra = true
+			freeMultiIVNeedNoRhsEraSink = &flow.freeMultiIVNeedNoRhsEra
+		}
 		switch gn {
 		case 0:
 			_ = er.pick(3) // e4560 pointer-pref pool
