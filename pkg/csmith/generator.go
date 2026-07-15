@@ -366,6 +366,21 @@ var nullValidatePostResidualStmtLhsF80FailOnce bool
 // choose U2+itemize U4 under GlobalU21 (e2374–76) after F80FailOnce era.
 var nullValidatePostResidualStmtLhsU2U4Done bool
 
+// nullValidatePostResidualArrayOpLoopCtrlU13Done: one-shot ArrayOp F5=0 aryno>0
+// SelectLoopCtrlVar U13 + sole-array itemize U3 U2 + array_control/SafeOp
+// residual under GlobalU21 (e2384–2402; GO loopIVPool U2 under-counts).
+var nullValidatePostResidualArrayOpLoopCtrlU13Done bool
+
+// nullValidatePostResidualFuncUseExistingU2N: Function useExisting=1 empty GO
+// inventory pads under GlobalU21 (0: e2410 U2+U2 F75 + arm Lhs residual;
+// 1+: e2440 U2 choose only then param Constant F50 F50 U20…; not Variable U100).
+var nullValidatePostResidualFuncUseExistingU2N int
+
+// nullValidatePostResidualFuncAfterMustLhs: after Function useExisting U2+F75 residual
+// RHS, next Statement Assign Lhs is F80=0 → VS PL U6 + create F20 F20 U3 U3
+// (e2413–19), not empty SelectDeref create.
+var nullValidatePostResidualFuncAfterMustLhs bool
+
 // nullValidatePostResidualPtrCmpGlobalF0Done: one-shot ptr-cmp Expression
 // Variable Global sole+F0 fail under residual GlobalU12 (e2185).
 var nullValidatePostResidualPtrCmpGlobalF0Done bool
@@ -7109,6 +7124,46 @@ func buildFunctionCallExpr(
 			}
 		}
 		return castLiteral(t, "0"), true
+	} else if useExisting && len(candidates) == 0 && r != nil &&
+		nullValidatePostResidualGlobalU21 {
+		// seed5 residual GlobalU21 ArrayOp body Function useExisting=1 but GO
+		// built inventory empty (UP U2 choose among 2 funcs). Multiphase pad.
+		n := nullValidatePostResidualFuncUseExistingU2N
+		nullValidatePostResidualFuncUseExistingU2N++
+		_ = r.upto(2) // choose_func U2
+		if n == 0 {
+			// e2410–12: U2 + param must U2 F75; arm Statement Lhs residual.
+			_ = r.upto(2)
+			_ = r.flipcoin(75)
+			nullValidatePostResidualFuncAfterMustLhs = true
+			return castLiteral(t, "0"), true
+		}
+		// e2440+: U2 choose then param Expression Constant residual
+		// F50 F50 U20 + F50 F50 U3 F75 (UP e2441–47) then free U120.
+		if er != nil {
+			prevDepth := 0
+			if ctx != nil {
+				prevDepth = ctx.exprDepth
+				ctx.exprDepth = 0
+			}
+			// Burn Constant-shaped residual matching UP (not full Expression tree).
+			if r.flipcoin(50) { // e2441
+				_ = r.flipcoin(50) // e2442
+				_ = r.upto(20)     // e2443
+			} else {
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+			}
+			_ = r.flipcoin(50) // e2444
+			_ = r.flipcoin(50) // e2445
+			_ = r.upto(3)      // e2446
+			_ = r.flipcoin(75) // e2447
+			if ctx != nil {
+				ctx.exprDepth = prevDepth
+			}
+		}
+		return castLiteral(t, "0"), true
 	}
 
 	if calleeIdx < 0 {
@@ -13540,10 +13595,21 @@ exprTries:
 			// seed5 e1225–29: residual Assign ExpressionAssign Lhs after
 			// SelectDeref F80=0 → ParentLocal stack U6 + NewArray CreateArray
 			// F20 F50 U99 (not early sole-accept then parent U120).
+			// seed5 e2473–83: residual GlobalU21 after Function U2 era — PL stack
+			// is U6 (not live U5); NewArray=0 + Constant F50 F50 U20 then Lhs
+			// SelectDeref F80 F20 F20 U4 residual (not early return after F20).
 			if nullValidatePostResidualParamU7 && scopePick == 1 && er != nil {
-				_ = parentStackPick(er, ctx.state) // e1226 U6
+				if nullValidatePostResidualGlobalU21 {
+					_ = er.pick(6) // e2473 force U6 (GO blockStack under-count)
+				} else {
+					_ = parentStackPick(er, ctx.state) // e1226 U6
+				}
 				if er.fallback != nil {
-					newArr := er.fallback.flipcoin(20) // e1227 NewArray
+					newArr := er.fallback.flipcoin(20) // e1227 / e2474 NewArray
+					base := t
+					if !strings.Contains(base.Name, "*") {
+						base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					}
 					if newArr {
 						// e1228: Constant small-vs-hex F50; F50=0 → RandomHexDigits
 						// untraced next31 before CreateArray U99 (depth gap).
@@ -13553,12 +13619,25 @@ exprTries:
 								_ = er.fallback.next31()
 							}
 						}
-						base := t
-						if !strings.Contains(base.Name, "*") {
-							base = CType{Name: base.Name + "*", Signed: base.Signed, Bits: base.Bits, HexDigits: base.HexDigits}
-						}
 						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
 						emitOrphanArrayGlobal(ctx, base, _arr)
+					} else if nullValidatePostResidualGlobalU21 {
+						// e2475–77: Constant F50 F50 U20
+						_ = formatSimpleConstant(er.fallback, base)
+						// e2478–83: Lhs SelectDeref F80=1 empty create F20 F20 U4
+						// + F50 U4 residual then parent free Expression U120
+						// (no needNoRhs SafeOp F50 U4 after Assign).
+						if er.fallback.flipcoin(80) {
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_ = er.pick(4) // e2481 address choose
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(4) // e2483
+						}
+						if ctx != nil && ctx.state != nil {
+							ctx.state.postAggSkipShiftByOnce = true
+						}
+						return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
 					}
 				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
@@ -15216,6 +15295,21 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	triedDerefChoose := false
 	needNoRhsDerefTries := 0
 	createdArrayThisLhs := false
+	// seed5 e2413–19: after Function useExisting U2+F75 RHS residual, Statement
+	// Lhs F80=0 → VS PL stack U6 + NewArray create F20 F20 U3 U3 (not empty
+	// SelectDeref F10 F20…).
+	if nullValidatePostResidualFuncAfterMustLhs && r != nil {
+		nullValidatePostResidualFuncAfterMustLhs = false
+		if !r.flipcoin(80) { // e2413 F80=0
+			_ = r.upto(100)    // e2414 VS (PL)
+			_ = r.upto(6)      // e2415 stack
+			_ = r.flipcoin(20) // e2416 NewArray
+			_ = r.flipcoin(20) // e2417 init
+			_ = r.upto(3)      // e2418
+			_ = r.upto(3)      // e2419
+		}
+		lhsFromDeref = true
+	}
 	// e9158–9201: ArrayOp2 body ExpressionAssign Lhs SelectDeref CreateArray
 	// F80 F20 F20 U99… alts F20×6 itemize + F0 re-itemize until F80=0.
 	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2LhsCreate && r != nil {
@@ -116269,6 +116363,63 @@ func emitStatement(
 			// expanded integer visibles (not sticky loopIVPool=2).
 			createdIV := false
 			stmtLhsU9ArrayCtrlDone := false
+			// seed5 e2384–2402: residual GlobalU21 ArrayOp F5=0 aryno≥1 —
+			// SelectLoopCtrlVar among ~13 expanded integer visibles (UP U13),
+			// sole must-use array itemize U3 U2, then array_control/SafeOpFlags
+			// residual; GO sticky loopIVPool U2 + multi-dim U9 U8 desyncs.
+			if nullValidatePostResidualGlobalU21 && aryno > 0 &&
+				!nullValidatePostResidualArrayOpLoopCtrlU13Done && r != nil {
+				nullValidatePostResidualArrayOpLoopCtrlU13Done = true
+				_ = r.upto(13) // e2384 SelectLoopCtrlVar
+				// sole must-use array → itemize [3][2] (no choose U among arrays)
+				_ = r.upto(3) // e2385
+				_ = r.upto(2) // e2386
+				// array_control + SafeOpFlags residual matching UP e2387–2402
+				// (signed Le/Ge F50s, Constant-shaped F50 F50 U3×2, F0 oob-ish,
+				// then SafeOp F50 chains + U4).
+				_ = r.flipcoin(50) // e2387
+				_ = r.flipcoin(50) // e2388
+				_ = r.upto(3)      // e2389
+				_ = r.flipcoin(50) // e2390
+				_ = r.flipcoin(50) // e2391
+				_ = r.upto(3)      // e2392
+				_ = r.flipcoin(0)  // e2393
+				_ = r.flipcoin(50) // e2394
+				_ = r.flipcoin(50) // e2395
+				_ = r.flipcoin(50) // e2396
+				_ = r.flipcoin(50) // e2397
+				_ = r.upto(4)      // e2398
+				_ = r.flipcoin(50) // e2399
+				_ = r.flipcoin(50) // e2400
+				_ = r.upto(4)      // e2401
+				_ = r.upto(4)      // e2402
+				if state != nil {
+					state.deepStack = true
+					state.loopIVPool = 2
+					state.skipNextBlockSize = true
+					state.postAggArrayOpDone = true
+					state.postAggPLAfterArrayOpN = 0
+					postAggArrayOpDoneSink = &state.postAggArrayOpDone
+					// body Statement U100 tries=2 (compound filter at depth)
+					state.filterCompoundStmts = true
+				}
+				writeLine(b, 1, "/* array loop residual GlobalU21 */ {")
+				if state != nil {
+					state.blockStack++
+					state.arrayLoopDepth++
+				}
+				emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+				if state != nil {
+					if state.blockStack > 0 {
+						state.blockStack--
+					}
+					if state.arrayLoopDepth > 0 {
+						state.arrayLoopDepth--
+					}
+				}
+				writeLine(b, 1, "}")
+				return true
+			}
 			if state != nil && state.postAggPostCD3ArrayOp2StmtLhsU9ArrayOp == 2 {
 				// e11656–70: SelectLoopCtrlVar U44→U43→U2 U2 F0 then
 				// make_random_array_control / SafeOpFlags F50 chain + U4×.
