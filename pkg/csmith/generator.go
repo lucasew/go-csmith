@@ -286,6 +286,20 @@ var nullValidatePostResidualSelDerefItemize int
 // NewArray CreateArray F20 F50 U99 — not sticky retype U14.
 var nullValidatePostResidualPLCreateOnce bool
 
+// nullValidatePostResidualKeepExprBeforeLhs: residual Statement Assign RHS
+// ended one free Expression short (UP e1370 must_use U2 F75 + VS multiphase
+// + U120… before Statement Lhs F80; GO jumped to Lhs). One-shot keep Expression.
+var nullValidatePostResidualKeepExprBeforeLhs bool
+
+// nullValidatePostResidualSkipCommaTypeOnce: after keep-expr residual, next
+// free Comma skips AllTypes U16 (UP e1377 F80 nested Assign Lhs).
+var nullValidatePostResidualSkipCommaTypeOnce bool
+
+// nullValidatePostResidualKeepExprAltU2U3: keep-expr residual CreateArray
+// pointer alts burn U2 U3 address residual for first N alts (e1397+), then U2.
+// Counter of remaining U2+U3 alts; after 0, bare U2.
+var nullValidatePostResidualKeepExprAltU2U3 int
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -3479,7 +3493,13 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				} else if nullValidatePostResidualCreateArrayAltU2 {
 					// seed5 e966: NullValidate residual free Expression CreateArray
 					// pointer alts address choose U2 (UP F20 U2×2 then itemize).
-					_ = r.upto(2)
+					// e1397+: keep-expr residual CreateArray alts F20=0 → U2;
+					// when choose=0, multi-level residual U3 (e1398); choose=1
+					// sole (e1403 U2 only).
+					v := int(r.upto(2))
+					if nullValidatePostResidualKeepExprAltU2U3 > 0 && v == 0 {
+						_ = r.upto(3)
+					}
 				} else if useSmallParentStackSink != nil && *useSmallParentStackSink {
 					_ = r.upto(6)
 				} else if postAggGlobalCreateN >= 0 {
@@ -13609,9 +13629,16 @@ exprTries:
 			}
 			// seed4 e1791–92: after PP miss term→Comma, skip lhs type choose
 			// (UP U120 Function immediately; not AllTypes U14).
+			// seed5 e1376–77: after keep-expr residual (must_use U2 F75+VS), free
+			// Comma — UP next F80 (nested Assign Lhs), not AllTypes U16. One-shot
+			// after KeepExprBeforeLhs consumed (do not sticky all residual Commas).
 			skipCommaType := ctx != nil && ctx.state != nil && ctx.state.ppPostPadCommaAfterPP
 			if skipCommaType {
 				ctx.state.ppPostPadCommaAfterPP = false
+			}
+			if nullValidatePostResidualSkipCommaTypeOnce {
+				nullValidatePostResidualSkipCommaTypeOnce = false
+				skipCommaType = true
 			}
 			if !skipCommaType && er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
 				// ExpressionComma lhs type=nullptr → Expression::make_random:
@@ -14527,6 +14554,73 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.exprDepth = 0
 			erKeep := newExprRand(r, exprDecisionBudget(opts))
 			_ = randomTypedExprDepthFlags(targetType, erKeep, opts, env, scope, 0, ctx, false, false)
+		}
+		// seed5 e1370+: residual Statement Assign RHS ended at Constant; UP
+		// continues free Expression Variable must_use U2 F75 + VS multiphase
+		// then more Expression U120… before Statement Lhs F80.
+		if nullValidatePostResidualParamU7 && nullValidatePostResidualKeepExprBeforeLhs {
+			nullValidatePostResidualKeepExprBeforeLhs = false
+			if ctx != nil {
+				if ctx.state != nil {
+					ctx.state.ppPostPadSkipStmtLhs = false
+					ctx.state.ppPostPadSkipParentExprN = 0
+				}
+				ctx.exprDepth = 0
+			}
+			// e1370–75: free Expression Variable must_use U2 F75 + VS multiphase
+			// (no term U120 — forceNextTermVariable-style after Constant).
+			// e1376: ExpressionAssign AssignOps U120=112 post-incr (need_no_rhs)
+			// e1377–84: Lhs SelectDeref F80 F50 F10 F50 F20 F20 U2 U3
+			// e1385–95: 2nd F80 F50 F10 F50 F20 F20 CreateArray U99 U10×3 U36…
+			if r != nil {
+				_ = r.upto(2)
+				_ = r.flipcoin(75)
+				_ = r.upto(100)
+				_ = r.upto(100)
+				_ = r.upto(7)
+				_ = r.upto(100)
+				// AssignOps post-incr (110–114) — U120=112 matched UP
+				_ = r.upto(120)
+				// need_no_rhs: Lhs SelectDeref create residual (2 rounds)
+				for round := 0; round < 2; round++ {
+					if !r.flipcoin(80) {
+						break
+					}
+					// qfer F50 F10 F50 + NewArray F20 F20
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					newArr := r.flipcoin(20)
+					_ = r.flipcoin(20)
+					if newArr {
+						// e1391+: CreateArray U99 + dims U10×3 U36 + alts F20 U2 U3…
+						nullValidatePostResidualCreateArrayAltU2 = true
+						// e1397+: address alts U2 then U3 when choose=0.
+						nullValidatePostResidualKeepExprAltU2U3 = 1
+						_arr := burnCreateArrayVariable(r, opts,
+							CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}, true)
+						nullValidatePostResidualKeepExprAltU2U3 = 0
+						emitOrphanArrayGlobal(ctx, CType{Name: "int32_t*", Signed: true, Bits: 32}, _arr)
+						// e1427: opportunistic_validate F0 after multi-dim itemize.
+						_ = r.flipcoin(0)
+						// e1428–47: SelectDeref choose+itemize U9 U8 U1 F0 ×5 then
+						// F80=0 → Statement Lhs continues.
+						for i := 0; i < 5; i++ {
+							if !r.flipcoin(80) {
+								break
+							}
+							_ = r.upto(9)
+							_ = r.upto(8)
+							_ = r.upto(1)
+							_ = r.flipcoin(0)
+						}
+						break
+					}
+					// address residual U2 U3
+					_ = r.upto(2)
+					_ = r.upto(3)
+				}
+			}
 		}
 		// e8682 post-CD3: long Statement Assign RHS ends at free Expression
 		// Constant; Lhs must run real SelectDeref F80 (U12+947…), not sticky
@@ -116127,6 +116221,9 @@ func emitSingleFuncDefOnce(
 				ctx.exprDepth = 0
 				ctx.effectSEFree = true
 			}
+			// e1370: residual Assign RHS ends one free Expression short — keep
+			// Expression before Statement Lhs (must_use U2 F75 + VS multiphase).
+			nullValidatePostResidualKeepExprBeforeLhs = true
 			_ = emitLValueAssignment(&body, r, opts, env, scope, ctx)
 		}
 	} else if len(env.globals) > 0 {
