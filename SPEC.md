@@ -90,13 +90,33 @@ All generation/compare steps use **timeouts**. Filter/retry loops must be bounde
 
 ### 5.1 Technique — Csmith control flow (required)
 
-**Implementers MUST mirror Csmith’s control flow**, not invent an independent generator that only matches LCG outputs.
+**Implementers MUST mirror Csmith’s control flow**, not invent an independent generator that only matches LCG outputs for one seed.
 
-1. Open the relevant C++ under `.build/csmith-src/src/` (e.g. `Expression.cpp`, `FunctionInvocation.cpp`, `VariableSelector.cpp`, `StatementAssign.cpp`, `Lhs.cpp`, `CVQualifiers.cpp`).
+**Goal of a patch:** make Go take the **same branch decisions for the same reasons** as C++ (types, inventory, effects, depth, visit_facts), so RNG *and* source generalize across seeds.
+
+1. Open the relevant C++ under `.build/csmith-src/src/` (e.g. `Expression.cpp`, `FunctionInvocation.cpp`, `VariableSelector.cpp`, `StatementAssign.cpp`, `Lhs.cpp`, `CVQualifiers.cpp`, `FactPointTo.cpp`).
 2. Trace the **same function/method sequence** for the failing event (SITE lines / callsites in traces).
-3. Patch Go so the **same RNG consumers** run in the **same order** (e.g. FunctionInvocation CREATE → `make_random_signature` → param exprs → body; Assign → AssignOps → RHS Expression → Lhs).
-4. Prefer shared helpers that name the upstream API (`burnCreateArrayVariable` ≈ `CreateArrayVariable`) over ad-hoc coin sequences.
-5. Multi-seed: fixes must be **structural** (options/effects/inventory), not `if seed == 4`.
+3. Patch Go so the **same RNG consumers** run in the **same order** because the **same predicates** hold (e.g. empty `local_vars` → create; `!qfer` → `random_qualifiers`; NewArray → `create_array_and_itemize`).
+4. Prefer shared helpers that name the upstream API (`createOnDemand` ≈ `GenerateNewParentLocal` / `CreateArrayVariable`) over ad-hoc coin sequences.
+5. Multi-seed: fixes must be **structural** (options, effects, inventory, depth, visit_facts), not seed literals and not event-index multiphase catalogs.
+6. **After every structural patch:** re-check **at least two other seeds** (e.g. seed2 + the climb seed). A fix that raises seed5 but breaks seed2 is invalid.
+
+### 5.1.1 Overfitting ban (seed multiphase residual)
+
+**Do not “overfit” a single seed’s event stream.** The following are **rejected** even if `first_div` climbs:
+
+| Reject | Why |
+|--------|-----|
+| Sticky flags named for **event numbers** or one-shot eras (`postAggGlobalU24AfterArrayOpDone`, `nullValidatePostResidualForBodyAssign`, “after e2151 do U12…”) as the *primary* control mechanism | Encodes seed4/seed5 history, not Csmith state |
+| Multiphase counters that switch U/F catalogs by `n`th visit (`GlobalN==7 → U56`, `PLN==11 → residual ladder`) **without** a C++ state variable that increments the same way | Event pack dressed as generation |
+| Growing a free-invent residual burn to “exhaust” one seed’s UP stream (`silenceTrace` after ~106k draws) | Event match without real AST / multi-seed path |
+| Patch description that only cites `eNNNN` and not the C++ function + predicate | Metric gaming |
+
+**Allowed structural signals** (mirror real C++ state, not event index):
+
+- `expr_depth` / max depth filters, `effectSEFree`, empty params, empty block locals, `max_funcs` reached, type kind (pointer/simple/struct), `must_read` / visit_facts failure, stack size from real function stack model.
+
+**Review test:** “Would this branch fire for **any** seed that hits the same C++ path?” If it only fires because we remembered seed5 event 2151, reject.
 
 ### 5.2 Integrity review (read the code — no integrity scripts)
 
@@ -108,6 +128,7 @@ When reviewing a climb/commit, **read** `pkg/csmith/*.go` (and related) and fail
 |-------------------|-----|
 | Packed residual event tables (`f10_late_residual_data.go`, `f10LateResidualPacked`, offline `[]uint32` stream dumps of one seed) | Replays a seed offline instead of generating |
 | `residualPlayer` / `burnF10LateExprResidual` as primary stream driver | RNG burns without Csmith Expression/Statement graph |
+| Event-indexed / multiphase residual catalogs as primary driver (§5.1.1) | Overfits one seed’s stream |
 | `silenceTrace` / `rng.silent` to stop tracing | Fakes event-count match after residual exhausts |
 | Seed-literal branches (`if seed == 2`) in generation paths | Non-portable hardcodes |
 | Event match with **thin/wrong source** (Go C ≪ upstream structure) while claiming “done” | Events advanced without materializing real AST |
