@@ -650,6 +650,9 @@ type functionFlowState struct {
 	lastStmtWasContinue bool
 	// lastStmtWasReturn: Block must_return — stop more stmts in this block.
 	lastStmtWasReturn bool
+	// earlyPureAppendReturn: depth0 BlockProbability max=0 early pure body —
+	// use Block::append_return_stmt ExpressionVariable (seed6 e20–23).
+	earlyPureAppendReturn bool
 	// filterCompoundStmts: StatementFilter at max depth (is_compound reject).
 	// Set after late SelectLoopCtrlVar U28 (seed2 e2189); sticky for late era.
 	filterCompoundStmts bool
@@ -3952,6 +3955,21 @@ func mergedGlobals(env envInfo, ctx *genContext) []globalInfo {
 	out := make([]globalInfo, 0, len(env.globals)+len(ctx.state.dynGlobals))
 	out = append(out, env.globals...)
 	out = append(out, ctx.state.dynGlobals...)
+	return out
+}
+
+// mergedGlobalsTrueSelect mirrors C++ GlobalList for SelectGlobal: exclude
+// fromParentLocal (GenerateNewParentLocal only fills block->local_vars).
+// Historical mergedGlobals still includes them as inventory pad for seed2/4.
+func mergedGlobalsTrueSelect(env envInfo, ctx *genContext) []globalInfo {
+	all := mergedGlobals(env, ctx)
+	out := make([]globalInfo, 0, len(all))
+	for _, g := range all {
+		if g.fromParentLocal {
+			continue
+		}
+		out = append(out, g)
+	}
 	return out
 }
 
@@ -7716,6 +7734,38 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 				return castLiteral(t, scope.params[idx].name)
 			}
 			return castLiteral(t, scope.params[0].name)
+		}
+	}
+	// SelectGlobal empty create with true GlobalList (no fromParentLocal): only
+	// for early pure append_return (seed6 e20–23). Free stmtReturn keeps
+	// historical buildScopedCandidates (seed2/5 Return inventory pad).
+	if scopePick == 0 && flow != nil && flow.earlyPureAppendReturn {
+		globals := make([]exprVarCandidate, 0, 8)
+		for _, g := range mergedGlobalsTrueSelect(env, ctx) {
+			globals = append(globals, exprVarCandidate{
+				expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+				isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+				isVolatile: g.isVolatile,
+			})
+		}
+		if c, ok := selectExprVariableFromER(t, er, globals, false); ok && c.expr != "" {
+			return castLiteral(t, c.expr)
+		}
+		createT := t
+		isSimple := !strings.Contains(t.Name, "*") &&
+			!strings.HasPrefix(t.Name, "struct") &&
+			!strings.HasPrefix(t.Name, "union")
+		if isSimple && er.fallback != nil {
+			esimple := true
+			prevES := useESimpleRetypeSink
+			useESimpleRetypeSink = &esimple
+			createT = pickSimpleNonVoid(er.fallback, opts)
+			useESimpleRetypeSink = prevES
+			flow.globalSimpleESimpleDone = true
+		}
+		// skipRandomQfer: formal rv qfer (StatementReturn).
+		if g, ok := createOnDemandGlobalFromEROpts(er, opts, createT, ctx, true); ok {
+			return castLiteral(t, g.expr)
 		}
 	}
 	if scopePick == 1 {
@@ -14818,6 +14868,31 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+		// C++ SelectParentLocal (VariableSelector.cpp:979–989): empty
+		// block.local_vars → random_type_from_type + GenerateNewParentLocal.
+		// multiDimArrays only gates inventory choose/itemize — not empty create.
+		// Restrict to early pure Lhs (stack n≤2, no residual/multiDim era) so
+		// seed2/5 historical fallthrough paths stay intact; seed6 e12 is nStack=1.
+		if !useBlockLocal {
+			earlyCands := localsInStackBlock(er, env, scope, ctx, idx)
+			earlyEmptyPL := len(earlyCands) == 0 && nStack <= 2 &&
+				(flow == nil || (!flow.useSmallParentStack && !flow.filterCompoundStmts &&
+					!flow.globalLateU2MissDone && postAggGlobalCreateN < 0)) &&
+				!nullValidatePostResidualParamU7 && nullValidatePostResidualLhsVSPhase == 0
+			if earlyEmptyPL {
+				// choose_random_simple: eSimpleType order + SIMPLE_TYPES_PROB_FILTER
+				// (seed6 e12 U14 tries=2 float@10 → ULongLong).
+				es := true
+				prevES := useESimpleRetypeSink
+				useESimpleRetypeSink = &es
+				// Lhs WRITE: qferMode 3 (F50 vol, no const F10) + retype U14.
+				g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx)
+				useESimpleRetypeSink = prevES
+				if ok {
+					return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
+				}
+			}
+		}
 		if useBlockLocal {
 			localCands := localsInStackBlock(er, env, scope, ctx, idx)
 			// Late PL residual by pick count:
@@ -117021,7 +117096,29 @@ func emitStatements(
 		state.skipNextBlockSize = false
 		stmtCount = 1
 	} else {
-		stmtCount = base + int(r.upto(uint32(stmtLimit)))
+		maxV := int(r.upto(uint32(stmtLimit)))
+		// C++ Block::make_random: for (i=0; i<=max; i++) → max+1 free stmts.
+		// Historical depth0 base=2 over-counts by 1. When max=0 on an early pure
+		// function body (no multiDim/residual), C++ has exactly one free statement
+		// then append_return (seed6 e6–23). Keep base=2 for all other depth0
+		// cases (seed2/4/5 historical matching).
+		// Seed6: no aggregate types, max=0 → C++ one free stmt + append_return.
+		// Seed5: aggregates present; historical base=2 matches longer until
+		// SelectGlobal/Return inventory is fully structural (e810 control split
+		// when append_return armed too early after IfElse bodies).
+		noAggregates := len(info.structs) == 0 && len(info.unions) == 0
+		earlyPureMax0 := depth == 0 && maxV == 0 && noAggregates &&
+			(state == nil || (state.multiDimArrays == 0 && !state.filterCompoundStmts &&
+				state.isParamPPFallPicks < 2 && postAggGlobalCreateN < 0))
+		if earlyPureMax0 {
+			stmtCount = 1 // max+1 with max=0
+			if state != nil {
+				// Signal emitSingleFuncDefOnce to use append_return ExpressionVariable.
+				state.earlyPureAppendReturn = true
+			}
+		} else {
+			stmtCount = base + maxV
+		}
 	}
 	// seed2 e2186: depth-0 function body with multi-dim still has another
 	// StatementProbability after GO's base+U count (UP continues U100=24 For;
@@ -117365,25 +117462,47 @@ func emitSingleFuncDefOnce(
 			}
 			emitStatements(&body, r, opts, env, scope, state, info, idx, 0, false, &extraBudget, ctx)
 		}
-	} else if len(env.globals) > 0 {
-		writable := make([]globalInfo, 0, len(env.globals))
-		for _, g := range env.globals {
-			if g.isConst {
-				continue
-			}
-			writable = append(writable, g)
-		}
-		if len(writable) > 0 {
-			g := writable[int(fdec.pick(2, uint32(len(writable))))]
-			writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", g.name, randomTypedExpr(g.ctype, r, opts, env, scope, ctx)))
-		}
 	}
 	// Residual-era Statement materialization before return.
 	if residualBody.Len() > 0 {
 		body.WriteString(residualBody.String())
 	}
-	writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", retName, castLiteral(fn.ret, "x")))
-	writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
+	// C++ Block::post_creation_analysis (Block.cpp:734–736): when function body
+	// needs a return and must_return() is false, append_return_stmt →
+	// StatementReturn::make_random → ExpressionVariable (seed6 e20–23 after
+	// sole free Assign with max=0). Only when earlyPureAppendReturn was armed
+	// by emitStatements (max=0 early pure); other eras keep invent residual.
+	needRet := fn.ret.Name != "void" && fn.ret.Name != ""
+	earlyAppendReturn := needRet && state != nil && state.earlyPureAppendReturn &&
+		!state.lastStmtWasReturn
+	if earlyAppendReturn {
+		// Keep earlyPureAppendReturn true through randomReturnVariableExpr so
+		// SelectGlobal uses true GlobalList (no fromParentLocal pad).
+		retExpr := randomReturnVariableExpr(fn.ret, r, opts, env, scope, ctx)
+		state.earlyPureAppendReturn = false
+		writeLine(&body, 1, fmt.Sprintf("%s = %s;", retName, retExpr))
+		writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
+		state.lastStmtWasReturn = true
+	} else {
+		if state != nil {
+			state.earlyPureAppendReturn = false
+		}
+		if len(env.globals) > 0 {
+			writable := make([]globalInfo, 0, len(env.globals))
+			for _, g := range env.globals {
+				if g.isConst {
+					continue
+				}
+				writable = append(writable, g)
+			}
+			if len(writable) > 0 {
+				g := writable[int(fdec.pick(2, uint32(len(writable))))]
+				writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", g.name, randomTypedExpr(g.ctype, r, opts, env, scope, ctx)))
+			}
+		}
+		writeLine(&body, 1, fmt.Sprintf("%s ^= %s;", retName, castLiteral(fn.ret, "x")))
+		writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
+	}
 	// Upstream Block::OutputVariableList: declare locals before stmts.
 	for _, loc := range ctx.dynLocs {
 		if !loc.emitDecl || !strings.HasPrefix(loc.name, "l_") {

@@ -221,10 +221,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
-| Seeds 5–21 event | **FAIL** — early first_div (seed5@155, seed6@12, seed7@47, …); residual is free-invent path-specific, not general Csmith flow |
-| 20-seed gate | **OPEN** — COUNT=20 SEED_START=2 still fails (source/runtime parity); event-only seed2/3/4 PASS |
+| Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2808** (SelectLType ok_structs U3 vs U2); seed7@47, seed8@42, … |
+| 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed6 full PASS (23/23) — structural:**
+1. **Lhs WRITE `SelectParentLocal` empty** (`VariableSelector.cpp:979–989`): when `!multiDimArrays` and stack block `local_vars` empty, `random_type_from_type` → `choose_random_simple` (**eSimpleType** + `SIMPLE_TYPES_PROB_FILTER`) + `GenerateNewParentLocal` qferMode 3 WRITE (was F80 retry).
+2. **`Block::make_random` max=0** (`Block.cpp:140–146`): no-aggregate pure function body → free stmt count `max+1=1` then **`append_return_stmt`** → `StatementReturn` → `ExpressionVariable` SelectGlobal (true `GlobalList`, no `fromParentLocal` pad) → empty `GenerateNewGlobal` retype U14 + skipRandomQfer NewArray/Constant.
+3. Seed2/4 held; seed5 first_div restored **2808** (SelectLType non-vol struct pool U3 vs U2).
 
 **e2133–e2229 climbed:**
 1. Function-fail `struct S0` Global: sameWidth fix + SE-free GenerateNewGlobal + struct Constant (bitfield pow half-width).
