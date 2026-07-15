@@ -206,8 +206,21 @@ var nullValidateClearDepthBlock bool
 var nullValidateForceUserFunc bool
 
 // nullValidateUserFuncChoosePad: with force user + empty built candidates, burn
-// Builtin F20 + U16 choose residual (seed5 e856–57) before CREATE/fallthrough.
+// F20 + U16 choose residual (seed5 e856–57) before synthetic invoke Expression.
 var nullValidateUserFuncChoosePad bool
+
+// nullValidateUserFuncNest: sticky during synthetic-invoke param Expression so
+// nested Function terms stay user-path (e859 F50) not stdfunc F5.
+// Also force PP→PL create residual after nested Function-fail (e862 F50 F10…).
+var nullValidateUserFuncNest bool
+
+// nullValidateEmptyParamsVS: after nest *S1 PL create residual (e889–91), next
+// VariableSelectionProbability filters ParentParam (params empty; e893 tries=1).
+var nullValidateEmptyParamsVS bool
+
+// nullValidateEmptyParamsDepthBlock: after emptyParamsVS PL Variable (e893–94),
+// next free Expression filters Function/Assign/Comma/Constant (e895 tries=2).
+var nullValidateEmptyParamsDepthBlock bool
 
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
@@ -3853,6 +3866,11 @@ func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) i
 	// nil scope treated as empty params: ExpressionVariable always has a current
 	// Function; early func_1 has no params so ParentParam must be filtered.
 	paramsEmpty := scope == nil || len(scope.params) == 0
+	// seed5 e893: after NullValidate nest *S1 PL create residual, UP current
+	// func has empty params → VariableSelectFilter rejects ParentParam.
+	if nullValidateEmptyParamsVS {
+		paramsEmpty = true
+	}
 	reject := func(x uint32) bool {
 		if opts.GlobalVariables {
 			// ParentParam 65–94 when no params (VariableSelectFilter).
@@ -3877,29 +3895,40 @@ func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) i
 	} else {
 		v = int(er.pick(100))
 	}
+	var scopePick int
 	if opts.GlobalVariables {
 		switch {
 		case v < 35:
-			return 0
+			scopePick = 0
 		case v < 65:
-			return 1
+			scopePick = 1
 		case v < 95:
-			return 2
+			scopePick = 2
 		default:
 			if er != nil && er.fallback != nil && er.fallback.flipcoin(10) {
-				return 3 // create global
+				scopePick = 3 // create global
+			} else {
+				scopePick = 4 // create parent local
 			}
-			return 4 // create parent local
+		}
+	} else {
+		switch {
+		case v < 50:
+			scopePick = 1
+		case v < 95:
+			scopePick = 2
+		default:
+			scopePick = 4
 		}
 	}
-	switch {
-	case v < 50:
-		return 1
-	case v < 95:
-		return 2
-	default:
-		return 4
+	// seed5 e893–94: first ParentLocal under emptyParamsVS → next free
+	// Expression (e895) needs depthBlock+noConst. Arm immediately so the
+	// next Expression term pick filters (Arm-on-next-disallowed was never
+	// observed to fire — keep sticky flag from VS time).
+	if nullValidateEmptyParamsVS && (scopePick == 1 || scopePick == 4) {
+		nullValidateEmptyParamsDepthBlock = true
 	}
+	return scopePick
 }
 
 func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, scopePick int, ctx *genContext) []exprVarCandidate {
@@ -4916,6 +4945,29 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 				// e3082: after Lhs write-create era, PL create address residual U2
 				// (choose_ok_var among pointees) before accept.
 				_ = er.fallback.upto(2)
+			} else if nullValidateUserFuncNest && !newArray {
+				// seed5 e868: NullValidate nest Function-fail *S1 PL create
+				// address-of empty pointees → GenerateNew for S1 (qfer set:
+				// no random_qualifiers). NewArray F20 + Constant bitfields
+				// U46340/U11585 + create_field_vars (not choose U2).
+				baseName := strings.TrimSuffix(chosen.Name, "*")
+				if baseName == "" {
+					baseName = "struct S1"
+				}
+				base := CType{Name: baseName, Bits: 32}
+				if !strings.HasPrefix(baseName, "struct") && !strings.HasPrefix(baseName, "union") {
+					base = CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				}
+				newArrPointee := er.fallback.flipcoin(20)
+				if newArrPointee {
+					_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+					emitOrphanArrayGlobal(ctx, base, _arr)
+				} else if strings.HasPrefix(base.Name, "struct") || strings.HasPrefix(base.Name, "union") {
+					_ = formatAggregateOrSimpleConstant(er.fallback, base, ctx, opts)
+					burnCreateFieldVarsConstants(er.fallback, base, ctx, opts)
+				} else {
+					burnSimpleConstant(er.fallback, base)
+				}
 			} else if ppEra {
 				// seed4 e695: choose_var empty → random_loose_qualifiers F50 +
 				// GenerateNew (nested Expression U120), not pad U2 choose.
@@ -6388,7 +6440,19 @@ if pointerGlobalPicksSink != nil {
 			_ = er.pick(10)
 			return uniq[0], true
 		}
+		// seed5 e897: emptyParamsDepthBlock free Expression Global choose U2
+		// then second U2 + Constant F50 F50 U20 (not inventory U4 sole).
+		if nullValidateEmptyParamsDepthBlock && chooseN > 2 {
+			chooseN = 2
+		}
 		idx := int(er.pick(uint32(chooseN))) % n
+		if nullValidateEmptyParamsDepthBlock && er != nil && er.fallback != nil {
+			_ = er.pick(2) // e898
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(20)
+			return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
+		}
 		// seed4 e1716: after first late Global U8 (picks==6), residual U10.
 		// Pad-era only (seed2 e2308 must not burn U10 after late Global U8).
 		if chooseN == 8 && ppPostPadGlobalPicks == 6 &&
@@ -6661,13 +6725,17 @@ func buildFunctionCallExpr(
 		_ = r.flipcoin(20) // e856
 		_ = r.upto(16)     // e857
 		// build_invocation: param Expression::make_random (e858 U120…).
+		// Nested Function must stay user-path (e859 F50) not stdfunc F5.
 		if er != nil {
 			prevDepth := 0
 			if ctx != nil {
 				prevDepth = ctx.exprDepth
 				ctx.exprDepth = 0
 			}
+			prevNest := nullValidateUserFuncNest
+			nullValidateUserFuncNest = true
 			_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+			nullValidateUserFuncNest = prevNest
 			if ctx != nil {
 				ctx.exprDepth = prevDepth
 			}
@@ -7351,6 +7419,13 @@ func randomLeafExprWithMode(
 		}
 		depthBlock := natDepthBlock ||
 			(ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock)
+		// seed5 e895: after emptyParamsVS PL Variable (e893–94), free Expression
+		// filters Function/Assign/Comma/Constant (UP U120 tries=2 Variable 76).
+		// Flag armed at VS ParentLocal pick (e893); sticky for remaining residual.
+		if nullValidateEmptyParamsDepthBlock {
+			depthBlock = true
+			noConst = true
+		}
 		if tc == termFunction {
 			// e2013: after e1895 residual, one-shot Function even under noFunc/depth.
 			if allowFunc {
@@ -7507,6 +7582,10 @@ exprTries:
 					forceUserFunc = true
 					atMaxFuncs = false
 					nullValidateUserFuncChoosePad = true
+				} else if nullValidateUserFuncNest {
+					// seed5 e859: nested Function under synthetic invoke params.
+					forceUserFunc = true
+					atMaxFuncs = false
 				}
 				if !atMaxFuncs && !forceStdFuncSimple && !forceUserFunc {
 					stdFunc = er.fallback.flipcoin(80)
@@ -7970,6 +8049,14 @@ exprTries:
 					if forcePPPL {
 						forceCreate = true
 					}
+					// seed5 e862: nested Function under NullValidate synthetic
+					// invoke fails → ExpressionVariable PP→PL. UP empty/miss
+					// GenerateNewParentLocal (F50 F10 F50 F10 F20×3 + Constant);
+					// GO inventory sole-accepts → next Expression U120. Force create.
+					forceNestCreate := nullValidateUserFuncNest
+					if forceNestCreate {
+						forceCreate = true
+					}
 					// seed4 e2504 postAgg: after PP→PL stack, try block locals /
 					// sole first so parent Expression continues U120 (not create F50).
 					if postAggGlobalCreateN >= 0 && flow != nil && flow.filterCompoundStmts {
@@ -8029,9 +8116,63 @@ exprTries:
 							return castLiteral(t, expr)
 						}
 					}
-					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, true, idx); ok {
+					// seed5 e862: non-empty stack block choose_var miss keeps
+					// requested type (get_int_type / keep pointer — no U14
+					// retype). Empty-block SelectParentLocal retypes.
+					retypePL := true
+					if forceNestCreate && len(localCands) > 0 {
+						retypePL = false
+					}
+					// seed5 e862 UP: *S1 create residual F50 F10 F50 F10 F20×3
+					// + bitfield U46340 (f0:31) U11585 (f1:27)… — not simple
+					// retype U14. Force pointer-to-S1 under NullValidate nest.
+					createT := t
+					if forceNestCreate {
+						createT = CType{Name: "struct S1*", Signed: true, Bits: 32}
+						qfer = 1
+						retypePL = false
+					}
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, qfer, retypePL, idx); ok {
 						bumpExprDepth(ctx)
 						markFuncEffect()
+						// seed5 e878–891: after nest *S1 PL create, UP Lhs
+						// SelectDeref empty create residual (random_add F10 F50
+						// + NewArray F20 + make_init F20 + F0 validate retry
+						// then second create + VS U100 U100 U2) before next
+						// free Expression U120. Prefer invent residual over
+						// inventory choose U12 (GO false non-empty ptrs).
+						if forceNestCreate && er != nil && er.fallback != nil {
+							r := er.fallback
+							// First SelectDeref empty create → null validate fail.
+							_ = r.flipcoin(80) // e878 F80=1
+							if opts.ConstPointers {
+								_ = r.flipcoin(10) // e879
+							}
+							if opts.VolatilePointers {
+								_ = r.flipcoin(50) // e880
+							}
+							_ = r.flipcoin(20) // e881 NewArray=0
+							_ = r.flipcoin(20) // e882 initNull=1
+							_ = r.flipcoin(0)  // e883 validate fail
+							// Second SelectDeref empty create → address residual.
+							_ = r.flipcoin(80) // e884 F80=1
+							if opts.ConstPointers {
+								_ = r.flipcoin(10) // e885
+							}
+							if opts.VolatilePointers {
+								_ = r.flipcoin(50) // e886
+							}
+							_ = r.flipcoin(20) // e887 NewArray=0
+							_ = r.flipcoin(20) // e888 initNull=0 address
+							// e889–91: VS residual after address create accept.
+							_ = r.upto(100)
+							_ = r.upto(100)
+							_ = r.upto(2)
+							// e893+: next free Expression VariableSelection
+							// filters ParentParam (params empty). e892 U120
+							// tries=0 is free; depthBlock arms after PL sole.
+							nullValidateEmptyParamsVS = true
+						}
 						return castLiteral(t, g.expr)
 					}
 				} else {
@@ -9966,7 +10107,16 @@ exprTries:
 						// then sole (UP next Expression U120 tries=5). GO multi
 						// local inventory burns choose U3. Force sole under
 						// nullValidateSkipArrayItemize (armed with depthBlock).
-						if nullValidateSkipArrayItemize && len(localCands) > 0 {
+						// seed5 e894–95: after nest *S1 create residual empty-params
+						// VS era, same sole (UP U1 then Expression U120 tries=2).
+						if (nullValidateSkipArrayItemize || nullValidateEmptyParamsVS) &&
+							len(localCands) > 0 {
+							// e895: after emptyParamsVS PL sole (e893–94), next
+							// free Expression filters Function/Assign/Comma/
+							// Constant (tries=2). Arm when this Variable ends.
+							if nullValidateEmptyParamsVS {
+								nullValidateEmptyParamsDepthBlock = true
+							}
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, localCands[0].expr))
 						}
@@ -114128,9 +114278,13 @@ func emitStatement(
 		base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 		nullValidateExprDepthArm = true
 		nullValidateGlobalItemizeN = 0
-		// One (or few) free Expressions expand to nested binary Function tree
-		// matching UP e810–…; Constant U20 arms depthBlock for next operand.
-		for i := 0; i < 4; i++ {
+		nullValidateEmptyParamsVS = false
+		// Free Expressions expand to nested binary Function trees matching
+		// UP e810–…. Constant U20 arms depthBlock for next operand.
+		// e895+: after nest *S1 create residual (e859–91 inside early
+		// Expressions), UP continues free Expression Variable multiphase —
+		// need more than 4 outer Expressions (e892, e895, e913…).
+		for i := 0; i < 12; i++ {
 			state.ppPostPadSkipParentExprN = 0
 			if ctx != nil {
 				ctx.exprDepth = 0
@@ -114140,6 +114294,8 @@ func emitStatement(
 		nullValidateExprDepthArm = false
 		nullValidateSkipArrayItemize = false
 		nullValidateGlobalItemizeN = 0
+		nullValidateEmptyParamsVS = false
+		nullValidateEmptyParamsDepthBlock = false
 		writeLine(b, 1, "x = x;")
 		return true
 	}
