@@ -345,6 +345,10 @@ var nullValidatePostResidualPLCreateN int
 // with U14 retype (e2068) even when GO inventory non-empty.
 var nullValidatePostResidualSimplePLN int
 
+// nullValidatePostResidualGlobalU12: after residual ExpressionAssign Lhs
+// PP→PL create (e2084–88), simple GlobalList pad is U12 (e2094+) not U18.
+var nullValidatePostResidualGlobalU12 bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -8735,6 +8739,7 @@ exprTries:
 			// candidate is array (e1282 U4 after U18=2).
 			// e1821: after residual Assign Lhs era (PPU7Done), pointer Global is
 			// live U2 (not sticky U18). e2042: simple Global still U18.
+			// e2094+: after Lhs PP→PL create, simple Global pad is U12.
 			if scopePick == 0 &&
 				(nullValidatePostResidualGlobalU18 ||
 					(nullValidatePostResidualParamU7 &&
@@ -8744,27 +8749,40 @@ exprTries:
 				if oneShot {
 					nullValidatePostResidualGlobalU18 = false
 				}
-				v := int(er.pick(18)) // e929 / e1025 / e1271 / e2042
+				nG := uint32(18)
+				if nullValidatePostResidualGlobalU12 {
+					nG = 12 // e2094+
+				}
+				v := int(er.pick(nG)) // e929 / e1025 / e1271 / e2042 / e2094
 				if oneShot && nullValidatePostResidualGlobalItemizeU10 {
 					nullValidatePostResidualGlobalItemizeU10 = false
 					_ = er.pick(10)
 				} else if !oneShot {
-					// Sticky residual GlobalList U18 itemize by choose index when
+					// Sticky residual GlobalList itemize by choose index when
 					// UP GlobalList has 1d arrays at fixed slots (seed5 e1282 v=2
 					// U4; e1354 v=0 U10). Multi-dim/non-array: no itemize (e1345).
+					// e2094+ U12 pad: no sticky itemize (UP sole-accepts).
 					cands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
 					expr := "g_0"
 					if len(cands) > 0 {
 						c := cands[v%len(cands)]
 						expr = c.expr
 					}
-					switch v {
-					case 0:
-						// e1354–55: multi-dim [10][18] itemize (not sole U10).
-						_ = er.pick(10)
-						_ = er.pick(18)
-					case 2:
-						_ = er.pick(4) // e1282 size-4 array
+					if nullValidatePostResidualGlobalU12 {
+						// e2094+ U12 pad: e2140 Global v=0 is 1d itemize U10 only
+						// (not e1354 multi-dim U10 U18; not sole → parent U120).
+						if v == 0 {
+							_ = er.pick(10) // e2140
+						}
+					} else {
+						switch v {
+						case 0:
+							// e1354–55: multi-dim [10][18] itemize (not sole U10).
+							_ = er.pick(10)
+							_ = er.pick(18)
+						case 2:
+							_ = er.pick(4) // e1282 size-4 array
+						}
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
@@ -12920,6 +12938,9 @@ exprTries:
 					// also accepts after F20 F20 → parent U120 (not more F20).
 					// e1705–06: after residual Assign Lhs accept, empty create
 					// continues address residual U2 U4 (not sticky early-accept).
+					// e2128+: after Lhs PP→PL create (GlobalU12), empty create
+					// continues live address residual F20+Constant+CreateArray
+					// (sticky ParamU7 early-accept desyncs).
 					if !newArray && !initConst {
 						if nullValidatePostResidualEmptyCreateAddr {
 							nullValidatePostResidualEmptyCreateAddr = false
@@ -12933,7 +12954,8 @@ exprTries:
 							lhsFromDeref = true
 							break
 						}
-						if nullValidatePostResidualLhsAccept || nullValidatePostResidualParamU7 {
+						if !nullValidatePostResidualGlobalU12 &&
+							(nullValidatePostResidualLhsAccept || nullValidatePostResidualParamU7) {
 							nullValidatePostResidualLhsAccept = false
 							lhsFromDeref = true
 							break
@@ -13235,11 +13257,31 @@ exprTries:
 					// pointer vars), not the bare Lhs value type — seed4 e99+
 					// pointer alt inits are make_init_value F20, not int Constant.
 					if newArray || tgtNewArray {
+						// Outer SelectDeref NewArray CreateArray is the POINTER type
+						// (select_deref creates pointer vars). Address residual
+						// tgtNewArray alone creates the POINTEE (simple/int array:
+						// Constant F50 element alts, not pointer F20 — seed5 e2135).
 						arrTy := t
-						if !strings.Contains(arrTy.Name, "*") {
-							arrTy = CType{
-								Name: arrTy.Name + "*", Signed: arrTy.Signed,
-								Bits: arrTy.Bits, HexDigits: arrTy.HexDigits,
+						if newArray {
+							if !strings.Contains(arrTy.Name, "*") {
+								arrTy = CType{
+									Name: arrTy.Name + "*", Signed: arrTy.Signed,
+									Bits: arrTy.Bits, HexDigits: arrTy.HexDigits,
+								}
+							}
+						} else {
+							// pointee: strip one * if present, else keep simple t
+							if strings.Contains(arrTy.Name, "*") {
+								baseName := strings.Replace(arrTy.Name, "*", "", 1)
+								arrTy = CType{
+									Name: baseName, Signed: arrTy.Signed,
+									Bits: arrTy.Bits, HexDigits: arrTy.HexDigits,
+								}
+								if arrTy.HexDigits == 0 {
+									arrTy.HexDigits = hexDigitsForConstant(arrTy)
+								}
+							} else if arrTy.Name == "" || arrTy.Bits == 0 {
+								arrTy = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 							}
 						}
 						_arr := burnCreateArrayVariable(er.fallback, opts, arrTy, true)
@@ -13308,6 +13350,30 @@ exprTries:
 						emitOrphanArrayGlobal(ctx, base, _arr)
 					}
 				}
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			// seed5 e2083–88: residual Assign Lhs era after SelectDeref F80=0 →
+			// VS ParentParam miss → PL stack U5 + NewArray F20=0 + Constant
+			// F50 F50 U20 (not early sole-accept after U100 → parent U120).
+			// Only after residual Assign Lhs accept (PPU7Done); earlier residual
+			// PP Lhs still uses live / e1225 PL path.
+			if nullValidatePostResidualPPU7Done && nullValidatePostResidualParamU7 &&
+				scopePick == 2 && er != nil {
+				_ = parentStackPick(er, ctx.state) // e2084 U5
+				if er.fallback != nil {
+					newArr := er.fallback.flipcoin(20) // e2085 NewArray
+					base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					if newArr {
+						_ = formatSimpleConstant(er.fallback, base)
+						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+						emitOrphanArrayGlobal(ctx, base, _arr)
+					} else {
+						// e2086–88: Constant decimal U20 path (F50=1 F50=0 U20).
+						_ = formatSimpleConstant(er.fallback, base)
+					}
+				}
+				// e2094+: next simple GlobalList pad is U12 (not sticky U18).
+				nullValidatePostResidualGlobalU12 = true
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			ppLhsEra := ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
