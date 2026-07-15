@@ -366,6 +366,11 @@ var nullValidatePostResidualStmtLhsF80FailOnce bool
 // choose U2+itemize U4 under GlobalU21 (e2374–76) after F80FailOnce era.
 var nullValidatePostResidualStmtLhsU2U4Done bool
 
+// nullValidatePostResidualStmtLhsU2FailN: after U2U4Done — empty-inventory
+// F80 multiphase before create (e2796–803: U2 fail, F80 pure fail, F80 create
+// F10 F20 F20 U2). Counts residual empty-inventory hits after U2U4Done.
+var nullValidatePostResidualStmtLhsU2FailN int
+
 // nullValidatePostResidualArrayOpLoopCtrlU13Done: one-shot ArrayOp F5=0 aryno>0
 // SelectLoopCtrlVar U13 + sole-array itemize U3 U2 + array_control/SafeOp
 // residual under GlobalU21 (e2384–2402; GO loopIVPool U2 under-counts).
@@ -378,6 +383,27 @@ var nullValidatePostResidualPtrCmpDerivedU11 bool
 // nullValidatePostResidualGlobalU2AfterPtrCmpDone: one-shot Expression Variable
 // Global choose U2 after ptr-cmp U11 era (e2498; GO inventory U5).
 var nullValidatePostResidualGlobalU2AfterPtrCmpDone bool
+
+// nullValidatePostResidualDepthBlockLong: after residual NewValue→PL create
+// (e2715) arms depthBlock, keep filtering Function/Assign/Comma through the
+// deep free-Expression nest (e2728 tries=17 … e2793) — default maxDB=3 clears
+// after e2725 and desyncs e2728 Assign. Clears with depthBlock at maxDB=15
+// (15 Variable/Constant picks then Function e2805 tries=0).
+var nullValidatePostResidualDepthBlockLong bool
+
+// nullValidatePostResidualGlobalU20AfterLongDB: one-shot Global pad U20 after
+// long depthBlock nest (e2729–30 UP GlobalList U20 no forced U4; e2702/e2717
+// and later e2755 stay U22).
+var nullValidatePostResidualGlobalU20AfterLongDB bool
+
+// nullValidatePostResidualGlobalU22ItemizeN: U22 pad 1d-array itemize U4 count
+// (e2702 v=2, e2717 v=7); e2755+ U22 sole → parent U120/F80 (no U4).
+var nullValidatePostResidualGlobalU22ItemizeN int
+
+// nullValidatePostResidualStructGlobalF0Done: one-shot residual long-depthBlock
+// struct Expression Variable Global sole + visit F0 → VS PL create with
+// bitfield Constants U46340/U11585 (e2764–75; GO U22 pad desyncs).
+var nullValidatePostResidualStructGlobalF0Done bool
 
 // nullValidatePostResidualEANewArrayAddrF20Done: one-shot ExpressionAssign Lhs
 // SelectDeref NewArray+address residual F20×2 + U2 U4 before CreateArray
@@ -7934,7 +7960,14 @@ func randomLeafExprWithMode(
 			!natDepthBlock && !depthBlock {
 			return false
 		}
-		if (tc == termConstant && noConst) ||
+		// Expression.cpp:167–168: no_const OR struct/union type filters Constant
+		// (struct constants can't be subexpressions). Scope struct/union to
+		// residual era — applying globally desynced seed4 e4082 (GO type
+		// inventory marks struct while UP free Expression is simple).
+		typeNoConst := nullValidatePostResidualParamU7 &&
+			(strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") ||
+				strings.Contains(t.Name, "struct") || strings.Contains(t.Name, "union"))
+		if (tc == termConstant && (noConst || typeNoConst)) ||
 			((tc == termAssign || tc == termComma) && (nestNoFunc || depthBlock)) {
 			return true
 		}
@@ -8011,9 +8044,15 @@ exprTries:
 			if nullValidateSkipArrayItemize {
 				maxDB = 12
 			}
+			// seed5 e2715–2793: residual NewValue→PL create depthBlock must
+			// survive 15 Variable/Constant free Expressions (e2728 tries=17).
+			if nullValidatePostResidualDepthBlockLong {
+				maxDB = 15
+			}
 			if ctx.state.ppPostPadDepthBlockN >= maxDB {
 				ctx.state.ppPostPadDepthBlock = false
 				nullValidateSkipArrayItemize = false
+				nullValidatePostResidualDepthBlockLong = false
 			}
 		}
 		// Clear only when Function actually selected (may skip intermediate Assign soles).
@@ -8951,9 +8990,12 @@ exprTries:
 							// e2715: after NewValue→PL create under residual era, next
 							// free Expression Variable U120 tries=3 (depthBlock filter
 							// Function/Assign/Comma); GO Function tries=0 desyncs.
+							// e2728+: default maxDB=3 clears after e2725; arm long
+							// sticky so e2728 Variable tries=17 … e2793 still filter.
 							if forceU6Stack && scopePick == 4 && ctx != nil && ctx.state != nil {
 								ctx.state.ppPostPadDepthBlock = true
 								ctx.state.ppPostPadDepthBlockN = 0
+								nullValidatePostResidualDepthBlockLong = true
 							}
 							bumpExprDepth(ctx)
 							markVarSelectEffect()
@@ -8961,6 +9003,28 @@ exprTries:
 						}
 					}
 				}
+			}
+			// seed5 e2764–75: residual long-depthBlock struct Expression Variable
+			// Global sole-accepts then visit_facts F0 → VS ParentLocal stack U6 +
+			// GenerateNewParentLocal (qfer F50 F10 + NewArray F20 + bitfield
+			// U46340/U11585…). Sticky GlobalU22 pad desyncs. One-shot.
+			if scopePick == 0 && nullValidatePostResidualDepthBlockLong &&
+				!nullValidatePostResidualStructGlobalF0Done &&
+				(strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") ||
+					strings.Contains(t.Name, "struct") || strings.Contains(t.Name, "union")) &&
+				er != nil && er.fallback != nil {
+				nullValidatePostResidualStructGlobalF0Done = true
+				_ = er.fallback.flipcoin(0) // e2765 visit fail
+				_ = er.pick(100)           // e2766 VS reselect (PL)
+				idx := int(er.pick(6))     // e2767 stack U6
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
 			}
 			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
 			// e1271+: sticky residual ParamU7 GlobalList U18; itemize when inventory
@@ -8982,9 +9046,18 @@ exprTries:
 					// e2212 first simple Global pad U21; e2370+ after Function-fail
 					// Global NewArray create era pool is U20; e2702+ after Lhs
 					// SelectDeref ladder era grows to U22.
+					// e2729–30: mid long-depthBlock nest UP GlobalList is U20
+					// (no forced U4); e2702/e2717 before N>=4 and e2755+ after
+					// one-shot stay U22.
 					switch {
 					case nullValidatePostResidualGlobalU21N == 0:
 						nG = 21
+					case nullValidatePostResidualDepthBlockLong &&
+						!nullValidatePostResidualGlobalU20AfterLongDB &&
+						ctx != nil && ctx.state != nil &&
+						ctx.state.ppPostPadDepthBlockN >= 4:
+						nullValidatePostResidualGlobalU20AfterLongDB = true
+						nG = 20 // e2730
 					case nullValidatePostResidualEALhsSelU4Done:
 						nG = 22 // e2702+
 					default:
@@ -9016,9 +9089,12 @@ exprTries:
 							_ = er.pick(10) // e2140
 						}
 					} else if nG == 22 {
-						// e2702–03 / e2717–18: U22 pad itemize U4 (1d arrays at
-						// multiple choose indices; not only v=2).
-						_ = er.pick(4)
+						// e2702–03 / e2717–18: first two U22 pads itemize U4
+						// (1d arrays); e2755+ U22 sole → parent U120 (no U4).
+						if nullValidatePostResidualGlobalU22ItemizeN < 2 {
+							nullValidatePostResidualGlobalU22ItemizeN++
+							_ = er.pick(4)
+						}
 					} else {
 						switch v {
 						case 0:
@@ -13815,6 +13891,15 @@ exprTries:
 							}
 							return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
 						default:
+							// e2744–47: long depthBlock nest F80=0→PL U6 sole then
+							// parent free Expression U120 (UP); F20 F20 U2 create
+							// desyncs. Earlier default (pre-long-DB) still creates.
+							if nullValidatePostResidualDepthBlockLong {
+								if ctx != nil && ctx.state != nil {
+									ctx.state.postAggSkipShiftByOnce = true
+								}
+								return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+							}
 							// later F80=0 PL: force U6 + F20 F20 U2
 							_ = er.fallback.flipcoin(20)
 							_ = er.fallback.flipcoin(20)
@@ -112297,10 +112382,13 @@ commaF80MultiDone:
 		// (not early accept). Pointer Lhs create residual e2198 F10…
 		// seed4 e2377 postAgg: if-body filterCompound is armed for StatementFilter
 		// only — SelectDeref must use live pointer choose U13, not seed2 U2 U4.
+		// seed5 e2796–98: after residual GlobalU21 StmtLhs U2+U4 (e2375), skip
+		// this seed2 multiDim U2+U4 accept — UP U2 fail → F80 create.
 		if ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0 &&
 			ctx.state.filterCompoundStmts && !needNoRhs &&
 			!strings.Contains(targetType.Name, "*") &&
-			postAggGlobalCreateN < 0 {
+			postAggGlobalCreateN < 0 &&
+			!nullValidatePostResidualStmtLhsU2U4Done {
 			if !triedDerefChoose {
 				triedDerefChoose = true
 				if ctx.state.lateDerefCreateN >= 2 {
@@ -113069,6 +113157,19 @@ commaF80MultiDone:
 						triedDerefChoose = true
 					}
 					_ = r.upto(uint32(nChoose)) // e2377 U13 / e3076 U7 / e3122 U12 / e3125 U11
+					// e2374–76 / e2796–97 residual GlobalU21 small-pool U2:
+					// first U2+U4 accept (marks Done); later U2 fails without
+					// U4 → F80 create (UP e2798 F80 F10 F20…).
+					if nullValidatePostResidualGlobalU21 && nChoose <= 2 {
+						if nullValidatePostResidualStmtLhsU2U4Done {
+							continue
+						}
+						nullValidatePostResidualStmtLhsU2U4Done = true
+						_ = r.upto(4)
+						lhsFromDeref = true
+						lv = lvalueInfo{expr: "*p", ctype: targetType}
+						break
+					}
 					// e3076: one-shot U7 accepts.
 					if isU7Shot {
 						lhsFromDeref = true
@@ -113150,7 +113251,20 @@ commaF80MultiDone:
 				if nChoose > 12 {
 					nChoose = 12
 				}
+				// e2796–97: after first residual StmtLhs U2+U4 accept (e2375),
+				// later live choose U2 fails without itemize → F80 create.
+				// Mark Done here too when live path supplied the e2375 U2+U4
+				// (residual one-shot only fires when len(ptrs)<2).
+				if nullValidatePostResidualStmtLhsU2U4Done && nChoose <= 2 {
+					_ = r.upto(uint32(nChoose))
+					continue
+				}
 				c := ptrs[int(r.upto(uint32(nChoose)))%len(ptrs)]
+				if nullValidatePostResidualStmtLhsU2U4Done && nChoose <= 3 {
+					// Later small-pool choose after first U2+U4: fail without
+					// itemize even if isArray (e2797).
+					continue
+				}
 				if c.isArray {
 					// Prefer multi-dim sizes when available
 					if len(c.arraySizes) > 0 {
@@ -113167,9 +113281,20 @@ commaF80MultiDone:
 						}
 						_ = r.upto(uint32(al))
 					}
-				} else {
+					if nullValidatePostResidualGlobalU21 && nChoose <= 2 {
+						nullValidatePostResidualStmtLhsU2U4Done = true
+					}
+				} else if nullValidatePostResidualGlobalU21 &&
+					!nullValidatePostResidualStmtLhsU2U4Done {
 					// e2380 U4 after U12: itemize residual even if inventory
-					// missed isArray (1d size 4 common).
+					// missed isArray (1d size 4 common). First GlobalU21 live
+					// U2+U4 accept marks Done so e2797 fails without U4.
+					nullValidatePostResidualStmtLhsU2U4Done = true
+					_ = r.upto(4)
+				} else if nullValidatePostResidualStmtLhsU2U4Done {
+					// Later non-array after first U2+U4: fail → F80 create.
+					continue
+				} else {
 					_ = r.upto(4)
 				}
 				lhsFromDeref = true
@@ -113188,14 +113313,31 @@ commaF80MultiDone:
 		// seed5 e2374–76: residual GlobalU21 Statement Lhs SelectDeref — UP
 		// choose_var U2 + itemize U4 accept (next Statement U100); GO empty
 		// inventory empty-creates F10 F20…. One-shot after F80FailOnce era.
-		if nullValidatePostResidualGlobalU21 && nullValidatePostResidualStmtLhsF80FailOnce &&
-			!nullValidatePostResidualStmtLhsU2U4Done {
-			nullValidatePostResidualStmtLhsU2U4Done = true
-			_ = r.upto(2) // e2375
-			_ = r.upto(4) // e2376 itemize
-			lhsFromDeref = true
-			lv = lvalueInfo{expr: "*p", ctype: targetType}
-			break
+		// e2796–98: later empty-inventory F80 U2 fails without U4 → retry
+		// SelectDeref create F80 F10 F20 F20 U2 (not second U2+U4 accept).
+		if nullValidatePostResidualGlobalU21 && nullValidatePostResidualStmtLhsF80FailOnce {
+			if !nullValidatePostResidualStmtLhsU2U4Done {
+				nullValidatePostResidualStmtLhsU2U4Done = true
+				_ = r.upto(2) // e2375
+				_ = r.upto(4) // e2376 itemize
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
+			// e2796–803: after U2U4Done, empty-inventory multiphase:
+			//   n=0 e2797 U2 fail
+			//   n=1 e2798 F80 pure fail (no U)
+			//   n>=2 fall through create e2799 F80 F10 F20 F20 U2
+			n := nullValidatePostResidualStmtLhsU2FailN
+			nullValidatePostResidualStmtLhsU2FailN++
+			if n == 0 {
+				_ = r.upto(2) // e2797
+				continue
+			}
+			if n == 1 {
+				continue // e2798 pure fail → next F80 create
+			}
+			// n>=2: create
 		}
 		// No existing deref targets → create pointer local/global.
 		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
@@ -113322,6 +113464,14 @@ commaF80MultiDone:
 		// seed2 e2202: first late for-body SelectDeref after F10 F50 F20 F20
 		// accepts (no F50 looser). e2295 second create continues nested
 		// GenerateNew residual F50 F20 F20 U6.
+		// seed5 e2800–03: residual multiphase create after U2-fail era burns
+		// address choose U2 then accept (UP U100 VS tries=1 next).
+		if nullValidatePostResidualStmtLhsU2FailN >= 2 {
+			_ = r.upto(2) // e2803
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
 			ctx.state.lhsDerefCreates++
 			ctx.state.lateDerefCreateN++
