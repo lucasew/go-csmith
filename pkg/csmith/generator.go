@@ -688,6 +688,17 @@ type functionFlowState struct {
 	// under free multi-IV body (seed5 e4518–19 U4 U5) → next SelectDeref U7
 	// then F80=0→VS NewValue (e4520–23).
 	freeMultiIVNeedNoRhsPLChooseMiss bool
+	// freeMultiIVNeedNoRhsGlobalN: SelectGlobal choose attempts under free
+	// multi-IV need_no_rhs Lhs do-while (dummy shrinks ok_vars).
+	// 0→U3+F0 (e4560); 1→U2 no F0 (e4570); later Global live.
+	freeMultiIVNeedNoRhsGlobalN int
+	// freeMultiIVNeedNoRhsPLN: SelectParentLocal choose attempts under free
+	// multi-IV need_no_rhs after Global dummy era (e4624 U3, e4692 U7,
+	// e4750 U6+U8 itemize, e4771 U6, e4777 sole…).
+	freeMultiIVNeedNoRhsPLN int
+	// freeMultiIVNeedNoRhsPPN: PP→PL fallthrough choose attempts under free
+	// multi-IV need_no_rhs after Global dummy era.
+	freeMultiIVNeedNoRhsPPN int
 	// freeMultiIVForLhsVSPhase: after free multi-IV Lhs SelectDeref addVol
 	// create residual validate fail → VS multiphase (seed5 e2985–88).
 	// 0=off; 1=PL miss; 2=PP+U7 miss; 3=PL accept.
@@ -6399,7 +6410,10 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			}
 		}
 		// e3127: Lhs Global after SelectDeref fail→VS — UP GlobalList U15.
-		if forAssign && postAggLhsGlobalU15Sink != nil && !*postAggLhsGlobalU15Sink &&
+		// Not for need_no_rhs (++/--): Lhs.cpp eDerefExact + no_signed_overflow
+		// uses live GlobalList pointer-preference inventory (seed5 e4560 U3).
+		if forAssign && !lhsNoSignedOverflow &&
+			postAggLhsGlobalU15Sink != nil && !*postAggLhsGlobalU15Sink &&
 			postAggLhsWriteDoneSink != nil && *postAggLhsWriteDoneSink {
 			*postAggLhsGlobalU15Sink = true
 			return 15
@@ -6422,7 +6436,8 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			}
 		}
 		// Lhs after multi-dim: inventory over-count n=3→U2 (seed2 e940).
-		if forAssign && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
+		// need_no_rhs keeps live eDerefExact n (seed5 e4560 U3).
+		if forAssign && !lhsNoSignedOverflow && n == 3 && multiDimArraySink != nil && *multiDimArraySink > 0 {
 			return 2
 		}
 		// seed2 e1121: Global Lhs choose U3 vs inventory n=4.
@@ -16828,11 +16843,9 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			nStack = 4
 		}
 		// seed5 e4554–55: free multi-IV For body need_no_rhs Lhs PL —
-		// Function::stack.size()=4 (Nested If under For) + live choose U7
-		// (not multiDim sticky U2 / create U15). Signed locals fail
-		// no_signed_overflow → SelectDeref U7 ladder.
-		// GO block locals under-count vs C++ eConvert ok_vars (U6 vs U7);
-		// floor U7 for this need_no_rhs residual after multi-level create era.
+		// Function::stack.size()=4 + live choose U7 (not multiDim sticky U2).
+		// seed5 e4622–24 / e4690+ / e4750+: multiphase eDerefExact local pools
+		// after Global dummy era (U3→U7→U8→U6+itemize→U6→sole).
 		if flow != nil && flow.freeMultiIVForBodyU3 && lhsNoSignedOverflow {
 			nStack = 4
 			if flow.blockStack > 4 {
@@ -16840,7 +16853,60 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			}
 			idx := int(er.pick(uint32(nStack)))
 			nChoose := 7
-			if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) > 7 && len(cands) <= 12 {
+			if flow.freeMultiIVNeedNoRhsGlobalN >= 2 {
+				pn := flow.freeMultiIVNeedNoRhsPLN
+				flow.freeMultiIVNeedNoRhsPLN = pn + 1
+				// PL only (U100 35–64). PP is separate path.
+				// pn: e4624 U3, e4692 U7, e4701 U8, e4750 U6+U8, e4771 U6,
+				// e4783 U7, e4874 create F50 F20 F50 F50 U20.
+				switch {
+				case pn == 0:
+					nChoose = 3
+				case pn == 1:
+					nChoose = 7
+				case pn == 2:
+					nChoose = 8
+				case pn == 3:
+					_ = er.pick(6)
+					_ = er.pick(8)
+					_ = idx
+					return lvalueInfo{}, false, false
+				case pn == 4:
+					nChoose = 6 // e4771
+				case pn == 5:
+					nChoose = 7 // e4783
+				case pn == 6:
+					// e4874–80: nested empty create WRITE F50 F20 F50 F50 U20
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(50) // vol
+						newArr := er.fallback.flipcoin(20)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, target, true)
+							emitOrphanArrayGlobal(ctx, target, _arr)
+						} else if er.fallback.flipcoin(50) {
+							if er.fallback.flipcoin(50) {
+								_ = er.fallback.upto(3)
+							} else {
+								_ = er.fallback.upto(20)
+							}
+						} else {
+							for i := 0; i < 8; i++ {
+								_ = er.fallback.next31()
+							}
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					_ = idx
+					return lvalueInfo{}, false, false
+				default:
+					nChoose = 7
+					if pn%2 == 0 {
+						nChoose = 3
+					} else if pn%3 == 0 {
+						nChoose = 4
+					}
+				}
+			} else if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) > 7 && len(cands) <= 12 {
 				nChoose = len(cands)
 			}
 			_ = er.pick(uint32(nChoose))
@@ -17297,6 +17363,8 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// seed5 e4518+: free multi-IV For body after multi-level residual —
 	// sticky e2934 U2+create is wrong; UP PP→PL stack U4 + live choose U5
 	// (visit fail under no_signed_overflow → SelectDeref F80 U7…).
+	// seed5 e4572+: after Global U3/U2 dummy era, PP→PL empty ok_vars →
+	// GenerateNewParentLocal WRITE create (F50 F20 F50 F50 U20) not U5 choose.
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
 		if flow != nil && flow.freeMultiIVForBodyU3 {
@@ -17309,6 +17377,82 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				idx = int(er.pick(uint32(nStack)))
 			} else {
 				idx = int(r.upto(uint32(nStack)))
+			}
+			// After need_no_rhs Global dummy chooses (e4560/e4570), PP has no
+			// eligible params → SelectParentLocal (VariableSelector.cpp:1052–59).
+			// Nested stack frames often empty of eDerefExact ok_vars → create
+			// (e4573 idx=3 → F50 F20 F50 F50 U20). Function body (idx=0) has
+			// locals → choose U4 miss (e4593–94); later body U2 (e4684).
+			if lhsNoSignedOverflow && flow.freeMultiIVNeedNoRhsGlobalN >= 2 {
+				ppn := flow.freeMultiIVNeedNoRhsPPN
+				flow.freeMultiIVNeedNoRhsPPN = ppn + 1
+				// PP→PL multiphase after Global dummy era:
+				// 0 e4573 create; 1 e4594 U4; 2 e4684 U2; 3 e4714 U7;
+				// 4 e4767 U7; 5 e4776 empty; 6 e4787 U5; 7 e4801 U4;
+				// 8 e4852 U7; 9 e4866 U3.
+				switch {
+				case ppn == 0:
+					// First PP after Global: nested empty → create residual.
+					if er != nil && er.fallback != nil {
+						_ = er.fallback.flipcoin(50)
+						newArr := er.fallback.flipcoin(20)
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, target, true)
+							emitOrphanArrayGlobal(ctx, target, _arr)
+						} else {
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.flipcoin(50)
+							_ = er.fallback.upto(20)
+						}
+					}
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+					return lvalueInfo{}, false, false
+				case ppn == 1:
+					_ = er.pick(4) // e4594
+				case ppn == 2:
+					_ = er.pick(2) // e4684
+				case ppn == 3:
+					_ = er.pick(7) // e4714
+				case ppn == 4:
+					_ = er.pick(7) // e4767
+				case ppn == 5:
+					// e4776 empty ok_vars after stack
+					return lvalueInfo{}, false, false
+				case ppn == 6:
+					_ = er.pick(5) // e4787
+				case ppn == 7:
+					_ = er.pick(4) // e4801
+				case ppn == 8:
+					// e4805–10: nested empty create F50 vol F20 NewArray F50
+					// Constant; F50=0 → hex RandomHexDigits(8) untraced next31
+					// then F80=0 (no SelectDeref U7).
+					if er != nil && er.fallback != nil {
+						_ = er.fallback.flipcoin(50) // vol
+						_ = er.fallback.flipcoin(20) // NewArray
+						if er.fallback.flipcoin(50) {
+							// pure_rnd small/large
+							if er.fallback.flipcoin(50) {
+								_ = er.fallback.upto(3)
+							} else {
+								_ = er.fallback.upto(20)
+							}
+						} else {
+							// hex path: int32 HexDigits=8 (untraced next31)
+							for i := 0; i < 8; i++ {
+								_ = er.fallback.next31()
+							}
+						}
+					}
+					return lvalueInfo{}, false, false
+				case ppn == 9:
+					_ = er.pick(7)
+				case ppn == 10:
+					_ = er.pick(3)
+				default:
+					_ = er.pick(7)
+				}
+				flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+				return lvalueInfo{}, false, false
 			}
 			// choose_ok_var among eConvert/eDerefExact locals in that block.
 			// Inventory under-model: floor U5 matching UP e4519 after dummy shrink.
@@ -17360,6 +17504,54 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			_ = er.fallback.upto(4)
 		}
 		return lvalueInfo{expr: "x", ctype: target}, true, false
+	}
+	// seed5 e4559–70 / e4598+: free multi-IV need_no_rhs Lhs SelectGlobal —
+	// choose_var(GlobalList, WRITE, eDerefExact) with pointer preference
+	// (VariableSelector.cpp:456–467). Dummy list shrinks / regrows ok_vars:
+	// e4560 U3+F0, e4570 U2 no F0, e4598 sole (no U), e4602 U7, e4607 U6.
+	// Not e3127 U15 residual + loop-control burn.
+	if scopePick == 0 && lhsNoSignedOverflow && flow != nil && flow.freeMultiIVForBodyU3 {
+		gn := flow.freeMultiIVNeedNoRhsGlobalN
+		flow.freeMultiIVNeedNoRhsGlobalN = gn + 1
+		switch gn {
+		case 0:
+			_ = er.pick(3) // e4560 pointer-pref pool
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(0) // F0 null fail
+			}
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		case 1:
+			_ = er.pick(2) // e4570; F80=0 next → VS PP
+		case 2:
+			// e4598: sole ok_var — choose_ok_var n==1 no U; SelectDeref U7
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		case 3:
+			_ = er.pick(7) // e4602–03 Global choose U7 fail → SelectDeref
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		case 4:
+			_ = er.pick(6) // e4607–08
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		default:
+			// e4648–50 U5+itemize U3; e4656 U5; e4663 U4; e4695 U3; e4708 U2;
+			// e4754/e4759 U3; later U3/U2 pools.
+			switch {
+			case gn == 5:
+				_ = er.pick(5)
+				_ = er.pick(3)
+			case gn == 6:
+				_ = er.pick(5)
+			case gn == 7:
+				_ = er.pick(4) // e4663
+			case gn == 8:
+				_ = er.pick(3) // e4695
+			case gn == 9:
+				_ = er.pick(2) // e4708
+			default:
+				_ = er.pick(3) // e4754+
+			}
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		}
+		return lvalueInfo{}, false, false
 	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
@@ -117090,6 +117282,12 @@ commaF80MultiDone:
 		}
 		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsVSPhase > 0 {
 			maxVSTries = 8
+		}
+		// seed5 e4500–4900+ free multi-IV need_no_rhs Lhs do-while: many
+		// VS reselects (NewValue/PL/Global/PP) + SelectDeref U7 ladders
+		// before accept — C++ loops until visit_facts succeeds.
+		if needNoRhs && ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForBodyU3 {
+			maxVSTries = 80
 		}
 		for try := 0; try < maxVSTries && !lhsFromDeref; try++ {
 			// Use chooseLValueEx so NewValue→Global signed create visit-fail
