@@ -733,6 +733,27 @@ type functionFlowState struct {
 	// RNG) → opportunistic_validate F0 fail → next F80 empty create NewArray
 	// (e3471–76). One-shot; without it GO empty-creates on first F80.
 	freeMultiIVPostEALhsSelDerefSoleF0 bool
+	// freeMultiIVPostEAGlobalItemizeMustUseOnce: after free multi-IV Global U16
+	// pad v=6 rechoose+itemize multiphase (e3532–36), next free Expression
+	// Variable select_must_use accepts without U100 scope (e3537 sole → e3538
+	// Function). Without it GO residual Global empty-create desyncs.
+	freeMultiIVPostEAGlobalItemizeMustUseOnce bool
+	// freeMultiIVPostEAGlobalItemizePLStackU3: after that multiphase, residual
+	// Expression Variable PL stack is U3 (e3549; free multi-IV For body depth)
+	// not sticky freeMultiIVForLhsExprContinue U2 (e3003/e3405).
+	freeMultiIVPostEAGlobalItemizePLStackU3 bool
+	// freeMultiIVPostEAItemizePLCreateNeedLhs: after e3549–56 PL empty create,
+	// parent ExpressionAssign Lhs SelectDeref F80 (e3557). finishVar runs Lhs.
+	freeMultiIVPostEAItemizePLCreateNeedLhs bool
+	// freeMultiIVPostEAGlobalPadDone: after e3532–59 itemize+Lhs multiphase,
+	// stop sticky free multi-IV Global U16 residual pad so later Global is
+	// live choose (e3563 U4) not empty create F20.
+	freeMultiIVPostEAGlobalPadDone bool
+	// freeMultiIVPostEAGlobalLiveU4Done: one-shot e3563 live Global choose U4.
+	freeMultiIVPostEAGlobalLiveU4Done bool
+	// freeMultiIVPostEAFuncCreateAttrDone: one-shot e3569–70 FuncAttr F30 F0
+	// after useExisting=0 at max_funcs under free multi-IV post-itemize era.
+	freeMultiIVPostEAFuncCreateAttrDone bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -2074,6 +2095,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e3549: after free multi-IV Global U16 itemize multiphase, residual
+	// Expression PL stack is U3 (For body depth) not sticky U2 (e3003).
+	if state != nil && state.freeMultiIVPostEAGlobalItemizePLStackU3 {
+		return int(er.pick(3))
+	}
 	// seed5 e3003: free multi-IV post-Lhs Expression residual Variable PL —
 	// UP Function::stack.size()=2 (not residual ParamU7 U6 / body U3).
 	// Return the actual stack index (e3405 U2=1 → stack[1] sole, not always 0).
@@ -7996,6 +8022,16 @@ func buildFunctionCallExpr(
 				}
 				return castLiteral(t, "0"), true
 			}
+			// seed5 e3568–70: free multi-IV post-itemize era Function useExisting=0
+			// at max_funcs — UP still burns CREATE-head FuncAttr F30 + F0 before
+			// ExpressionVariable (e3571). GO atMax fallthrough skips F30 F0.
+		if state.freeMultiIVPostEAGlobalPadDone && r != nil &&
+				!state.freeMultiIVPostEAFuncCreateAttrDone {
+				state.freeMultiIVPostEAFuncCreateAttrDone = true
+				_ = r.flipcoin(30) // e3569 FuncAttrProb
+				_ = r.flipcoin(0)  // e3570
+				// fall through to ExpressionVariable
+			}
 			// Upstream: failed invocation → ExpressionVariable::make_random
 			// (seed2 e814 U100 NewValue after useExisting miss at max funcs).
 			// e8831: after **** ExpressionAssign, burn Global create residual
@@ -8831,7 +8867,10 @@ exprTries:
 				// (ExpressionFuncall.cpp:73–75 forces std_func=false → user F50;
 				// e3403 UP F50). Do not forceSimple under inPtrCmpExpr.
 				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue &&
-					!ctx.state.inPtrCmpExpr {
+					!ctx.state.inPtrCmpExpr &&
+					!ctx.state.freeMultiIVPostEAGlobalPadDone {
+					// e3045 era: force atMax stdfunc simple. After e3532–66 itemize
+					// multiphase (PadDone), UP user Function F50 (e3568) not F5.
 					forceStdFuncSimple = true
 					atMaxFuncs = true
 					forceUserFunc = false
@@ -9659,13 +9698,38 @@ exprTries:
 				ctx.state.ppPostPadOuterLhsSoleN = 0
 			}
 			finishVar := func(s string) string {
-				if !runLhsAfterVar || ctx == nil || ctx.state == nil || er == nil {
+				needLhs := runLhsAfterVar
+				itemizePLLhs := false
+				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVPostEAItemizePLCreateNeedLhs {
+					needLhs = true
+					itemizePLLhs = true
+					ctx.state.freeMultiIVPostEAItemizePLCreateNeedLhs = false
+				}
+				if !needLhs || ctx == nil || ctx.state == nil || er == nil {
 					return s
 				}
 				runLhsAfterVar = false
 				base := t
 				if strings.Contains(base.Name, "*") {
 					base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+				}
+				if itemizePLLhs {
+					// e3557–59: Lhs SelectDeref F80=1 choose U2 (pool empty/invalid
+					// after choose) falls through to VariableSelector::select U100
+					// in the same do-while iteration (Lhs.cpp:78–98) — not another
+					// F80 SelectDeref. Sticky nest U12 ladder / post-nest FailGlobal
+					// desyncs (GO was F80 U2 F80…; UP F80 U2 U100).
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(80) // e3557 F80=1
+					}
+					_ = er.pick(2)   // e3558 SelectDeref choose
+					_ = er.pick(100) // e3559 VS fallthrough
+					// e3560: next free Expression Variable must_use sole (no U100
+					// Global residual create); UP e3561 U120 continues nest.
+					ctx.state.freeMultiIVPostEAGlobalItemizeMustUseOnce = true
+					// e3563: later Global is live ok_vars U4 not sticky U16 pad create.
+					ctx.state.freeMultiIVPostEAGlobalPadDone = true
+					return s
 				}
 				_ = lhsMakeRandomWrite(er, opts, env, scope, ctx, base, ctx.state)
 				return s
@@ -9674,6 +9738,20 @@ exprTries:
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, c.expr))
+			}
+			// seed5 e3537: after free multi-IV Global U16 pad itemize multiphase,
+			// next free Expression Variable select_must_use accepts (no U100
+			// scope / Global create). UP e3538 Function; GO empty-create desyncs.
+			if flow := func() *functionFlowState {
+				if ctx != nil {
+					return ctx.state
+				}
+				return nil
+			}(); flow != nil && flow.freeMultiIVPostEAGlobalItemizeMustUseOnce {
+				flow.freeMultiIVPostEAGlobalItemizeMustUseOnce = false
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
 			}
 			scopePick := variableScopePickFromER(er, opts, &scope)
 			var flow *functionFlowState
@@ -9749,7 +9827,13 @@ exprTries:
 					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone && !freeMultiIVExprPL
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
-						idx = int(er.pick(2)) // e3003/e3058 U2
+						// e3003/e3058/e3405: stack U2 during early residual Expression.
+						// e3549: after Global U16 itemize multiphase, For body depth U3.
+						if flow != nil && flow.freeMultiIVPostEAGlobalItemizePLStackU3 {
+							idx = int(er.pick(3)) // e3549
+						} else {
+							idx = int(er.pick(2)) // e3003/e3058 U2
+						}
 					} else if forceU6Stack {
 						idx = int(er.pick(6))
 					} else {
@@ -9786,6 +9870,17 @@ exprTries:
 						sole = false
 						forcePtrCreate = true
 						localCands = nil
+					} else if freeMultiIVExprPL && scopePick == 1 && flow.freeMultiIVPostEALhsLivePL &&
+						flow.freeMultiIVPostEAGlobalItemizePLStackU3 {
+						// e3549–56: after Global U16 itemize multiphase, residual PL
+						// is empty create with random_type_from_type U14 (not sticky
+						// LivePL choose U7). One-shot; later LivePL resumes.
+						flow.freeMultiIVPostEAGlobalItemizePLStackU3 = false
+						flow.freeMultiIVPostEAItemizePLCreateNeedLhs = true // e3557 Lhs F80
+						sole = false
+						forcePtrCreate = true
+						localCands = nil
+						// fall through to create with retype U14 below
 					} else if freeMultiIVExprPL && scopePick == 1 && flow.freeMultiIVPostEALhsLivePL {
 						// e3427: after e3416 PL create, residual PL choose_ok_var
 						// among live block inventory (UP U6 eFlexible integers)
@@ -9943,6 +10038,21 @@ exprTries:
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "x"))
 			}
+			// seed5 e3562–63: after free multi-IV Global itemize+Lhs multiphase,
+			// Expression Variable Global is live ok_vars choose U4 (UP eFlexible
+			// filtered list) not sticky residual pad empty create F20.
+			if scopePick == 0 && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVPostEAGlobalPadDone && er != nil &&
+				!ctx.state.freeMultiIVPostEAGlobalLiveU4Done {
+				ctx.state.freeMultiIVPostEAGlobalLiveU4Done = true
+				_ = er.pick(4) // e3563
+				// e3564–66: parent ExpressionAssign Lhs SelectDeref F80 U2 U100
+				// (same pattern as e3557–59 after PL create).
+				ctx.state.freeMultiIVPostEAItemizePLCreateNeedLhs = true
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "g_0"))
+			}
 			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
 			// e1271+: sticky residual ParamU7 GlobalList U18; itemize when inventory
 			// candidate is array (e1282 U4 after U18=2).
@@ -9953,7 +10063,10 @@ exprTries:
 				(nullValidatePostResidualGlobalU18 ||
 					(nullValidatePostResidualParamU7 &&
 						(!nullValidatePostResidualPPU7Done || !strings.Contains(t.Name, "*")))) &&
-				er != nil {
+				er != nil &&
+				// seed5 e3563: after free multi-IV Global itemize+Lhs multiphase,
+			// live GlobalList choose (U4) not sticky residual pad create.
+				!(ctx != nil && ctx.state != nil && ctx.state.freeMultiIVPostEAGlobalPadDone) {
 				oneShot := nullValidatePostResidualGlobalU18
 				if oneShot {
 					nullValidatePostResidualGlobalU18 = false
@@ -9981,7 +10094,8 @@ exprTries:
 						// is U23 once (e3450), then later filtered live U8
 						// (e3470) — not sticky U23.
 						nG = 22
-						if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVEALhsF20x4Done {
+						if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVEALhsF20x4Done &&
+							!ctx.state.freeMultiIVPostEAGlobalPadDone {
 							switch ctx.state.freeMultiIVPostEAGlobalPadN {
 							case 0:
 								nG = 23 // e3450 first eFlexible simple
@@ -10014,7 +10128,43 @@ exprTries:
 						c := cands[v%len(cands)]
 						expr = c.expr
 					}
-					if nullValidatePostResidualGlobalU12 && nG != 22 {
+					if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVEALhsF20x4Done && nG == 16 {
+						// seed5 e3523+: free multi-IV post-EA GlobalList U16 pad —
+						// C++ choose_ok_var itemizes collective arrays (ArrayVariable::itemize).
+						// Must run before sticky GlobalU12 branch (still true in this era).
+						// e3523 v=0 → 1d [10]; e3534 v=10 → 1d [4].
+						// e3532 v=6: non-array first choose → ExpressionVariable reject
+						// path burns F50 then rechoose Global U16 (array slot 10) +
+						// itemize U4 (e3533–35). Without this, GO accepts early and
+						// parent binary ShiftBy steals F50 U16 (same raws) then U120
+						// instead of U4.
+						switch v {
+						case 0:
+							_ = er.pick(10) // e3524
+						case 6:
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(50) // e3533
+							}
+							v2 := int(er.pick(16)) // e3534
+							if v2 == 10 {
+								_ = er.pick(4) // e3535 itemize size-4 array
+							}
+							// e3536: after itemize accept path UP burns VS/scope U100
+							// (ParentParam sole) before parent Expression U120.
+							// Without this GO free Expression U120 advances early.
+							_ = er.pick(100) // e3536
+							// Parent Function-binary may still open ShiftBy after
+							// Variable LHS; UP next is U120 (not ShiftBy F50).
+							ctx.state.postAggSkipShiftByOnce = true
+							// e3537: next free Expression Variable must_use sole
+							// (no U100) → e3538 Function binary.
+							ctx.state.freeMultiIVPostEAGlobalItemizeMustUseOnce = true
+							// e3549: later PL stack U3 (For body depth) not U2.
+							ctx.state.freeMultiIVPostEAGlobalItemizePLStackU3 = true
+						case 10:
+							_ = er.pick(4)
+						}
+					} else if nullValidatePostResidualGlobalU12 && nG != 22 {
 						// e2094+ U12 pad: e2140 Global v=0 is 1d itemize U10 only
 						// (not e1354 multi-dim U10 U18; not sole → parent U120).
 						if v == 0 {

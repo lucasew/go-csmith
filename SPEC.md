@@ -222,16 +222,22 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3535** (after free multi-IV Global pad U23/U8/U16 multiphase + Lhs sole F0 + VS PP sole; e3535 UP U4 itemize vs GO U120); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3571** (after free multi-IV Global U16 itemize multiphase + PL U14 create + Lhs F80 U2 U100 + live Global U4 + FuncAttr F30 F0; e3571 UP U120 vs GO U100); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e3535→3571 climbed — free multi-IV Global U16 itemize + PL create + Lhs + FuncAttr:**
+1. Capture: e3535 UP U4=3 vs GO U120=55 same raw — after free multi-IV Global residual U16=6, C++ ExpressionVariable multiphase F50 rechoose U16=10 + ArrayVariable::itemize U4 then VS U100 ParentParam; GO accepted early and parent binary ShiftBy stole F50 U16.
+2. C++: choose_ok_var itemizes collective arrays; Lhs after residual PL/Global creates is SelectDeref F80 U2 fallthrough VS U100 (same iteration); post-itemize free Expression Variable select_must_use soles (no U100); later Global live U4; Function useExisting=0 burns FuncAttr F30 F0 before ExpressionVariable.
+3. GO: free multi-IV U16 pad itemize multiphase (v=0 U10; v=6 F50+U16+U4+U100; skip ShiftBy); must_use sole; PL stack U3 + empty create U14 + Lhs F80 U2 U100; PadDone stops sticky U16 pad; live Global U4 + Lhs; stop forceStdFuncSimple; FuncAttr F30 F0 residual.
+4. Seed2/3/4/6 held. Next: e3571 after F30 F0 — UP U120=90 (Constant/Expression) vs GO U100 Variable scope.
 
 **seed5 e3450→3535 climbed — free multi-IV GlobalList inventory + post-EA Lhs ladder:**
 1. Capture: e3450 Global choose U23 (UP) vs U22 (GO) same raw — sticky residual GlobalU21 pad stuck at U22 after e2702 while C++ eFlexible simple grew by nested GenerateNewGlobal pointee on free multi-IV residual EA Lhs SelectDeref empty create (e3434 Constant residual).
 2. C++ SelectDeref non-vol → GenerateNewParentLocal(ptr) + make_init address-of empty → GenerateNewGlobal(simple) on GlobalList. Later Global multiphase: e3470 filtered live U8, e3523+ U16 (not sticky U23). e3471 Lhs SelectDeref soles null pointer F0 then empty create NewArray CreateArray + U1 ladder; F80=0 → VS PP U100=70 stack U2 sole (no create) → parent U120. PL choose after e3440 NewValue create grows eFlexible U6→U7 (e3462).
 3. GO: residual Global pad multiphase U23 / U8 / U16 under freeMultiIVEALhsF20x4Done; materialize nested simple Global on e3434 Constant residual; LivePL floor U6 then U7; one-shot Lhs sole F0 after Global U8 pad; free multi-IV VS PP/PL sole accept (not sticky e2083 F20 create).
-4. Seed2/3/4/6 held. Next: e3535 after Global U16=6 F50 U16 — UP U4 (array itemize 2nd dim?) vs GO U120 Expression.
+4. Seed2/3/4/6 held. Next was e3535 (climbed to e3571).
 
 **seed5 e3185→3406 climbed — free multi-IV post-nest SelectDeref empty create after Global fails=1:**
 1. Capture: after post-nest SelectDeref U2 choose fail + VS Global fail (e3180–83 match), UP e3184 F80 sole/pure fail then e3185 F80 empty create F10 F50 F20 F20 F0 vs GO sticky `postAggLhsDerefChooseFails=1` pool U10.
