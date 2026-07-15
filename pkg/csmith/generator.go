@@ -409,6 +409,12 @@ type functionFlowState struct {
 	paramExprCommaAllTypes bool
 	// isParamPPFallPicks: ParentParam→PL fallthrough count in nested body.
 	isParamPPFallPicks int
+	// globalSimpleESimpleDone: after SelectGlobal empty simple retype used
+	// eSimpleType order (seed5 e214). Free Expression PL empty retype then
+	// matches C++ choose_random_simple (seed5 e486 float@10). Early seed2 PL
+	// retypes stay historical until a Global simple eSimple retype (none before
+	// e351 inventory).
+	globalSimpleESimpleDone bool
 	// forcePPEmptyOnce: after must_use F80 residual, next ParentParam is empty
 	// (seed4 e831 PL stack U3 create).
 	forcePPEmptyOnce bool
@@ -4515,7 +4521,19 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	if retype && (t.Name == "" || (!isAggregate && !isPtr)) {
 		// random_type_from_type(simple, !strict) → choose_random_simple (U14
 		// simple table), not AllTypes. Wrong hex width desynced LCG at e944–947.
+		// C++ always eSimpleType order. Historical until Global simple eSimple
+		// retype era (seed2 e66/173/319 inventory); after that free Expression
+		// PL retype uses eSimple (seed5 e486 U14 tries=1 float@10).
+		es := ctx.state.globalSimpleESimpleDone
+		var prev *bool
+		if es {
+			prev = useESimpleRetypeSink
+			useESimpleRetypeSink = &es
+		}
 		chosen = pickSimpleNonVoid(er.fallback, opts)
+		if es {
+			useESimpleRetypeSink = prev
+		}
 	}
 	// e8597 post-CD3 first simple NewValue→PL: mode 1 F50 F10; e8669 later mode 2 F10.
 	if ctx.state.postAggNestArrayOpPostCD3 && !isPtr && !isAggregate && qferMode >= 1 {
@@ -4831,10 +4849,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		initLit = "{" + formatSimpleConstant(er.fallback, field0) + "}"
 	} else if isStruct {
 		// GenerateRandomStructConstant.
-		// e3376+: U15 StackU6 create uses formatAggregateOrSimpleConstant (field
-		// order + nested struct recursion). Pre-U15 keeps historical residual
-		// (bitfields then simples) for seed2.
-		if ctx != nil && ctx.state != nil && ctx.state.postAggU15StackU6CreateDone {
+		// e3376+: U15 StackU6 uses formatAggregate (field order + nested).
+		// seed5 after Global simple eSimple era (e502 NewArray S0): real field
+		// F50s then CreateArray U99 — not historical bitfield U181 residual.
+		// Early seed2 keeps historical bitfield-first residual (e432 inventory).
+		useAggFmt := ctx != nil && ctx.state != nil &&
+			(ctx.state.postAggU15StackU6CreateDone || ctx.state.globalSimpleESimpleDone)
+		if useAggFmt {
 			initLit = formatAggregateOrSimpleConstant(er.fallback, chosen, ctx, opts)
 		} else {
 			fieldLits := []string{}
@@ -7482,10 +7503,15 @@ exprTries:
 								out = castLiteral(t, lhs)
 								_ = op2Signed
 							} else {
-								// Shift: after LHS, ShiftByNonConstantProb F50 (seed4 e668).
+								// Shift: after LHS, ShiftByNonConstantProb F50
+								// (FunctionInvocation.cpp for eLShift/eRShift).
+								// Early seed2 free Expression shifts omit this burn
+								// (inventory model); after Global simple eSimple era
+								// (seed5 e214→e493), free shifts match C++.
 								var rhs string
 								postAggShift := postAggArrayOpDoneSink != nil && *postAggArrayOpDoneSink
-								if (opV == 16 || opV == 17) && (ppEra || postAggShift) {
+								globalES := ctx != nil && ctx.state != nil && ctx.state.globalSimpleESimpleDone
+								if (opV == 16 || opV == 17) && (ppEra || postAggShift || globalES) {
 									notConstant := er.fallback.flipcoin(50)
 									if !notConstant {
 										lim := bits
@@ -9918,6 +9944,9 @@ exprTries:
 							useESimpleRetypeSink = &esimple
 							createT = pickSimpleNonVoid(er.fallback, opts)
 							useESimpleRetypeSink = nil
+							if ctx != nil && ctx.state != nil {
+								ctx.state.globalSimpleESimpleDone = true
+							}
 						}
 						if g, ok := createOnDemandGlobalFromEROpts(er, opts, createT, ctx, true); ok {
 							bumpExprDepth(ctx)
@@ -10046,6 +10075,9 @@ exprTries:
 						useESimpleRetypeSink = &esimple
 						createT = pickSimpleNonVoid(er.fallback, opts)
 						useESimpleRetypeSink = nil
+						if ctx != nil && ctx.state != nil {
+							ctx.state.globalSimpleESimpleDone = true
+						}
 					}
 					var g exprVarCandidate
 					var ok bool
@@ -10730,6 +10762,9 @@ exprTries:
 						useESimpleRetypeSink = &esimple
 						createT = pickSimpleNonVoid(er.fallback, opts)
 						useESimpleRetypeSink = nil
+						if ctx != nil && ctx.state != nil {
+							ctx.state.globalSimpleESimpleDone = true
+						}
 					}
 					var g exprVarCandidate
 					var ok bool

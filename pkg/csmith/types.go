@@ -285,13 +285,14 @@ func pickSimpleNonVoid(r *rng, opts Options) CType {
 		{Name: "unsigned __int128", Signed: false, Bits: 128, HexDigits: 16},
 	}
 	// eSimple: true choose_random_simple order. historical left-shifts for early
-	// seed2. useESimpleRetypeSink: seed4 e585 after PP pads only.
+	// seed2. useESimpleRetypeSink: seed4 PP-era + seed5 after Global simple eSimple
+	// (PL retype float@10, seed5 e486).
 	simples := historical
 	floatIdx, i128Idx, u128Idx := 11, 12, 13
 	// eSimpleType order: seed2 late useSmallParentStack; seed4 PP-era
 	// (isParamPPFallPicks>=2 or explicit retype sink). seed4 e1236: NewValue PL
 	// retype U14=2 must be eInt (hex 8), not historical uint8 (hex 2).
-	// seed5 e486 PL retype still historical when !smallStack (next fix).
+	// seed5 e486: PL retype after Global simple eSimple era (globalSimpleESimpleDone).
 	useESimple := (useSmallParentStackSink != nil && *useSmallParentStackSink) ||
 		(useESimpleRetypeSink != nil && *useESimpleRetypeSink) ||
 		(isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2)
