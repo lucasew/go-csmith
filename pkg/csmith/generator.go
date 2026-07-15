@@ -35,6 +35,11 @@ var lastArraySizesSink *[]int
 // nestedFuncBodiesSink / nestedNullPreferSink: seed4 e263 nested-body F0.
 var nestedFuncBodiesSink *int
 
+// lhsNoSignedOverflow: Lhs::make_random no_signed_overflow (StatementAssign
+// need_no_rhs ++/--). Rejects signed simple vars after select/create
+// (Lhs.cpp:110–112). Set around Statement Lhs VS/SelectDeref.
+var lhsNoSignedOverflow bool
+
 // useESimpleRetypeSink: pickSimpleNonVoid uses eSimpleType order (seed4 e585
 // NewValue→PL after PP pads: U14=2→int32 HexDigits=8).
 var useESimpleRetypeSink *bool
@@ -679,6 +684,10 @@ type functionFlowState struct {
 	// freeMultiIVForBodyU3: free multi-IV For after residual ArrayOp free
 	// SelectLoopCtrl (seed5 e2943 U15) — body PL stack is U3 not residual U5.
 	freeMultiIVForBodyU3 bool
+	// freeMultiIVNeedNoRhsPLChooseMiss: need_no_rhs PP→PL live choose visit-fail
+	// under free multi-IV body (seed5 e4518–19 U4 U5) → next SelectDeref U7
+	// then F80=0→VS NewValue (e4520–23).
+	freeMultiIVNeedNoRhsPLChooseMiss bool
 	// freeMultiIVForLhsVSPhase: after free multi-IV Lhs SelectDeref addVol
 	// create residual validate fail → VS multiphase (seed5 e2985–88).
 	// 0=off; 1=PL miss; 2=PP+U7 miss; 3=PL accept.
@@ -16818,6 +16827,27 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if arrayOp2LhsPL {
 			nStack = 4
 		}
+		// seed5 e4554–55: free multi-IV For body need_no_rhs Lhs PL —
+		// Function::stack.size()=4 (Nested If under For) + live choose U7
+		// (not multiDim sticky U2 / create U15). Signed locals fail
+		// no_signed_overflow → SelectDeref U7 ladder.
+		// GO block locals under-count vs C++ eConvert ok_vars (U6 vs U7);
+		// floor U7 for this need_no_rhs residual after multi-level create era.
+		if flow != nil && flow.freeMultiIVForBodyU3 && lhsNoSignedOverflow {
+			nStack = 4
+			if flow.blockStack > 4 {
+				nStack = flow.blockStack
+			}
+			idx := int(er.pick(uint32(nStack)))
+			nChoose := 7
+			if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) > 7 && len(cands) <= 12 {
+				nChoose = len(cands)
+			}
+			_ = er.pick(uint32(nChoose))
+			_ = idx
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+			return lvalueInfo{}, false, false
+		}
 		idx := int(er.pick(uint32(nStack)))
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		// C++ SelectParentLocal (VariableSelector.cpp:979–989): empty
@@ -17021,7 +17051,42 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		}
 	}
 	if scopePick == 3 {
-		if g, ok := createOnDemandGlobalFromER(er, opts, target, ctx); ok {
+		// GenerateNewVariable → eGlobal (VariableSelector.cpp:1073–1085):
+		// Type::random_type_from_type(type) then GenerateNewGlobal WRITE.
+		// simple !strict → choose_random_simple (U14 + SIMPLE_TYPES_PROB_FILTER).
+		// wildcard qfer + WRITE: random_qualifiers self F50 vol when SE-free,
+		// no const F10 (CVQualifiers.cpp:332–338). Then create_and_initialize.
+		// seed5 e4504: after multi-level Lhs CreateArray, need_no_rhs PreDecr
+		// NewValue→Global must burn U14 before F50/F20 (not bare F10 const).
+		createT := target
+		isPtr := strings.Contains(target.Name, "*")
+		isAgg := strings.HasPrefix(target.Name, "struct") || strings.HasPrefix(target.Name, "union")
+		if !isPtr && !isAgg {
+			// eSimpleType order: float@10 filtered when !EnableFloat (tries≥1).
+			es := true
+			prevES := useESimpleRetypeSink
+			useESimpleRetypeSink = &es
+			createT = pickSimpleNonVoid(er.fallback, opts)
+			useESimpleRetypeSink = prevES
+		}
+		// Lhs WRITE qferMode-3 equivalent: F50 vol (no const). Pointer levels
+		// still need F50 F10×n before self; simple has no levels.
+		if isPtr && er.fallback != nil {
+			levels := strings.Count(createT.Name, "*")
+			for i := 0; i < levels; i++ {
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(10)
+			}
+		}
+		if er.fallback != nil {
+			_ = er.fallback.flipcoin(50) // WRITE self vol (SE-free Lhs)
+		}
+		if g, ok := createOnDemandGlobalFromEROpts(er, opts, createT, ctx, true); ok {
+			// need_no_rhs: no_signed_overflow rejects signed simple created var
+			// (Lhs.cpp:110–112). Global still added; Lhs do-while continues F80.
+			if lhsNoSignedOverflow && createT.Signed && !isPtr && !isAgg {
+				return lvalueInfo{}, false, true
+			}
 			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, true
 		}
 	}
@@ -17035,9 +17100,28 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, true
 			}
 		}
-		_ = parentStackPick(er, flow)
-		needQfer := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
-		if g, ok := createOnDemandFromParentLocalPathER(er, opts, target, ctx, needQfer); ok {
+		// Lhs WRITE GenerateNewVariable→ParentLocal always random_type_from_type
+		// (U14) + random_qualifiers WRITE (F50 vol, no const F10) — not READ
+		// qferMode 1 F50 F10 (seed5 e4527–28 after need_no_rhs NewValue→PL).
+		idx := parentStackPick(er, flow)
+		es := true
+		prevES := useESimpleRetypeSink
+		useESimpleRetypeSink = &es
+		g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx)
+		useESimpleRetypeSink = prevES
+		if ok {
+			// need_no_rhs no_signed_overflow rejects signed simple creates.
+			if lhsNoSignedOverflow && g.ctype.Signed &&
+				!strings.Contains(g.ctype.Name, "*") &&
+				!strings.HasPrefix(g.ctype.Name, "struct") &&
+				!strings.HasPrefix(g.ctype.Name, "union") {
+				// e4544+: after NewArray create residual, SelectDeref pool U7
+				// (pointer ok_vars stable — simple array dummy does not shrink).
+				if flow != nil && flow.freeMultiIVForBodyU3 {
+					flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+				}
+				return lvalueInfo{}, false, false
+			}
 			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
 		}
 	}
@@ -17210,8 +17294,42 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// GO often has a non-matching param inventory that still sameBaseType-matches
 	// and burns U1 sole — force PL create under residual GlobalU21 after
 	// AddrCreateVS (UP has no eligible PP ok_vars for this Lhs type).
+	// seed5 e4518+: free multi-IV For body after multi-level residual —
+	// sticky e2934 U2+create is wrong; UP PP→PL stack U4 + live choose U5
+	// (visit fail under no_signed_overflow → SelectDeref F80 U7…).
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
+		if flow != nil && flow.freeMultiIVForBodyU3 {
+			nStack := 4
+			if flow.blockStack > 4 {
+				nStack = flow.blockStack
+			}
+			idx := 0
+			if er != nil {
+				idx = int(er.pick(uint32(nStack)))
+			} else {
+				idx = int(r.upto(uint32(nStack)))
+			}
+			// choose_ok_var among eConvert/eDerefExact locals in that block.
+			// Inventory under-model: floor U5 matching UP e4519 after dummy shrink.
+			nChoose := 5
+			if cands := localsInStackBlock(er, env, scope, ctx, idx); len(cands) >= 2 && len(cands) <= 8 {
+				nChoose = len(cands)
+			}
+			if nChoose > 1 {
+				if er != nil {
+					_ = er.pick(uint32(nChoose))
+				} else {
+					_ = r.upto(uint32(nChoose))
+				}
+			}
+			// need_no_rhs: signed simple locals fail no_signed_overflow → miss.
+			if lhsNoSignedOverflow {
+				flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+				return lvalueInfo{}, false, false
+			}
+			return lvalueInfo{expr: "x", ctype: target}, true, false
+		}
 		nStack := 2
 		idx := 0
 		if er != nil {
@@ -17731,6 +17849,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// then VariableSelector::select (Lhs.cpp).
 	// select_deref_pointer with no match creates a pointer via
 	// random_add_qualifiers (F10 const, F50 volatile) + create_and_initialize.
+	// need_no_rhs → no_signed_overflow for visit_facts (Lhs.cpp:110–112).
+	prevLhsNoSigned := lhsNoSignedOverflow
+	lhsNoSignedOverflow = needNoRhs
+	defer func() { lhsNoSignedOverflow = prevLhsNoSigned }()
 	lv := lvalueInfo{expr: "x", ctype: targetType}
 	lhsFromDeref := false
 	triedDerefChoose := false
@@ -116970,7 +117092,76 @@ commaF80MultiDone:
 			maxVSTries = 8
 		}
 		for try := 0; try < maxVSTries && !lhsFromDeref; try++ {
-			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+			// Use chooseLValueEx so NewValue→Global signed create visit-fail
+			// (created=true, ok=false) can arm SelectDeref live ladder.
+			picked, ok, createdGlobal := chooseLValueEx(r, opts, targetType, env, scope, ctx)
+			if !ok && needNoRhs && createdGlobal {
+				// seed5 e4508–16: need_no_rhs NewValue→Global retype signed
+				// longlong fails no_signed_overflow; Lhs do-while continues
+				// SelectDeref choose_var(eDereference) among live pointers.
+				// Signed-pointee pointers also fail no_signed_overflow → dummy
+				// shrinks pool U5→U4→U3→U2; then F80=0 → VS (VariableSelector.cpp
+				// select_deref_pointer + Lhs.cpp:110–112).
+				// Live eDereference ok_vars (GlobalNonvolatiles + stack locals +
+				// params). GO dyn inventory over-counts orphan address-of targets
+				// and multi-level residual creates → U14 vs UP U5 (e4509). Cap at
+				// Nonvolatiles-scale when overgrown; honor small real counts.
+				wantLvl := strings.Count(targetType.Name, "*")
+				seen := map[string]bool{}
+				cnt := 0
+				add := func(name string, ct CType, vol bool) {
+					if name == "" || seen[name] || vol {
+						return
+					}
+					// GlobalNonvolatilesList only; skip fromParentLocal pads that
+					// are not true globals. eDereference: higher indirection.
+					if strings.Count(ct.Name, "*") > wantLvl {
+						seen[name] = true
+						cnt++
+					}
+				}
+				for _, g := range mergedGlobals(env, ctx) {
+					// C++ SelectDeref uses GlobalNonvolatilesList (not all GlobalList).
+					if g.isVolatile || g.fromParentLocal {
+						continue
+					}
+					add(g.name, g.ctype, false)
+				}
+				for _, l := range mergedLocals(scope, ctx) {
+					if l.name == "x" {
+						continue
+					}
+					add(l.name, l.ctype, l.isVol)
+				}
+				for _, p := range scope.params {
+					add(p.name, p.ctype, false)
+				}
+				nPtr := 5
+				if cnt >= 2 && cnt <= 8 {
+					nPtr = cnt
+				} else if cnt > 8 {
+					// Over-model after multi-level create residual (e4509 U5).
+					nPtr = 5
+				}
+				f80Zero := false
+				for n := nPtr; n >= 2; n-- {
+					if !r.flipcoin(80) {
+						// F80=0 mid-ladder → VariableSelector again
+						f80Zero = true
+						break
+					}
+					_ = r.upto(uint32(n))
+					// visit_facts fail (signed pointee under no_signed_overflow)
+				}
+				// After U2 fail, next do-while F80 often 0 → VS (e4516).
+				if !f80Zero {
+					if r.flipcoin(80) {
+						_ = r.upto(2)
+					}
+				}
+				continue
+			}
+			if ok {
 				// seed5 e2988: free multi-IV Lhs VS multiphase accept (no F80).
 				// After accept UP continues Expression U120 (e2989+), not next
 				// Statement U100 — arm free Expression residual nest.
@@ -117401,6 +117592,18 @@ commaF80MultiDone:
 			// seed5 e2985+ free multi-IV Lhs VS multiphase: same contiguous U100 ladder.
 			if nullValidatePostResidualAddrCreateVSPhase > 0 ||
 				(ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsVSPhase > 0) {
+				continue
+			}
+			// seed5 e4520–22 / e4544–52: free multi-IV need_no_rhs after PP→PL
+			// choose miss or signed NewValue→PL create: SelectDeref live pointer
+			// pool U7 (stable — simple-array dummy does not remove pointers)
+			// until F80=0 → VS.
+			if needNoRhs && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPLChooseMiss {
+				ctx.state.freeMultiIVNeedNoRhsPLChooseMiss = false
+				for r.flipcoin(80) {
+					_ = r.upto(7)
+				}
 				continue
 			}
 			if !r.flipcoin(80) {

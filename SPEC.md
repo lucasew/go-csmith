@@ -222,11 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4504** (NewValue Global F10 vs U14 after multi-level Lhs CreateArray); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4560** (need_no_rhs Lhs Global choose U3 vs U15 after NewValue create rejects); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+
+
+**seed5 e4504→4560 climbed — NewValue Global/PL U14 + need_no_rhs Lhs ladder:**
+1. Capture: e4504 UP U14=5 tries=1 vs GO F10 (createOnDemandGlobal without retype) after need_no_rhs PreDecr F80=0 → VS NewValue Global.
+2. C++: `GenerateNewVariable` → `random_type_from_type` choose_random_simple U14 then GenerateNewGlobal WRITE (F50 vol, no const F10) + create_and_initialize. Signed retype fails `no_signed_overflow` (Lhs.cpp:110–112) → SelectDeref live pointer pool shrink U5→U2 then F80=0→VS. Later PP→PL stack U4 + choose U5 miss; NewValue→PL qferMode WRITE F50 only (not READ F50 F10); NewArray create residual then more SelectDeref U7; PL stack U4 + choose U7.
+3. GO: chooseLValueEx NewValue→Global retype eSimple U14 + WRITE F50 + skipRandomQfer create; `lhsNoSignedOverflow` rejects signed creates; free multi-IV need_no_rhs SelectDeref ladders + PP/PL stack U4 choose; NewValue→PL always qferMode 3 WRITE + retype.
+4. Seed2/3/4/6 held. Next: e4560 Global choose U3 vs U15 (Lhs Global inventory over-count under need_no_rhs).
 
 **seed5 e4473→4504 climbed — multi-level SelectLType *** + PL qfer + Lhs nested peel:**
 1. Capture: e4473 UP F50=1 vs GO F20=0 after PL create F50 F10×2 (GO 1-star underburn).
