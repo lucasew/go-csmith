@@ -708,6 +708,18 @@ type functionFlowState struct {
 	// freeMultiIVForLhsExprPostNestLhsEmptyCreateN: 0=sole fail, 1+=create.
 	freeMultiIVForLhsExprPostNestLhsEmptyCreate  bool
 	freeMultiIVForLhsExprPostNestLhsEmptyCreateN int
+	// freeMultiIVPostEALhsPLCreate: after free multi-IV residual ExpressionAssign
+	// Lhs SelectDeref empty create F20×4 U3 U4 (e3406–12), next free Expression
+	// Variable PL is empty create F50 F10 F50 F10 F20 F20 (e3416) — not sticky
+	// e3058 U5 choose. One-shot.
+	freeMultiIVPostEALhsPLCreate bool
+	// freeMultiIVPostEALhsLivePL: after e3416 PL create, residual PL uses live
+	// choose_ok_var inventory (e3427 U6) not sticky e3058 U5.
+	freeMultiIVPostEALhsLivePL bool
+	// freeMultiIVEALhsF20x4Done: one-shot e3406–12 ExpressionAssign Lhs
+	// SelectDeref empty create F20×4 U3 U4 under free multi-IV residual.
+	// Later Lhs empty create (e3434+) is F20×3 F50… not sticky F20×4.
+	freeMultiIVEALhsF20x4Done bool
 	// multiDimArrays: CreateArrayVariable results with dim>1. Seed2 first
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
@@ -2051,9 +2063,9 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	n := 1
 	// seed5 e3003: free multi-IV post-Lhs Expression residual Variable PL —
 	// UP Function::stack.size()=2 (not residual ParamU7 U6 / body U3).
+	// Return the actual stack index (e3405 U2=1 → stack[1] sole, not always 0).
 	if state != nil && state.freeMultiIVForLhsExprContinue {
-		_ = er.pick(2)
-		return 0
+		return int(er.pick(2))
 	}
 	// Free multi-IV For body (func+ArrayOp+For): stack U3 takes priority over
 	// sticky residual ParamU7 U6 / postCD3 ArrayOp2 U6 (seed5 e2967).
@@ -5752,8 +5764,15 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			levels := strings.Count(chosen.Name, "*")
 			// seed5 e2974: free multi-IV For body PL address-of choose_ok_var U4
 			// then parent Assign Lhs F80 (no nested pointee CreateArray residual).
+			// seed5 e3422: free multi-IV residual Expression (post EA Lhs) PL
+			// create address residual is U2 U4 (not sticky body U4-only).
 			if ctx.state.freeMultiIVForBodyU3 && !newArray {
-				_ = er.fallback.upto(4)
+				if ctx.state.freeMultiIVForLhsExprContinue {
+					_ = er.fallback.upto(2) // e3422 U2
+					_ = er.fallback.upto(4) // e3423 U4
+				} else {
+					_ = er.fallback.upto(4) // e2974 U4
+				}
 				goto afterAddrResidual
 			}
 			// e8445 post-CD3: PL create address residual U2 first; e8495 later U5
@@ -9244,14 +9263,59 @@ exprTries:
 						// For body — choose_var empty → GenerateNewParentLocal
 						// F50 F10… (GO dyn inventory over-counts int* locals U2).
 						// Keep requested pointer type (no random_type_from_type U14).
+						// Only while freeMultiIVForBodyU3 body Statements (not
+						// post-Lhs free Expression residual, which reuses the same
+						// sticky flag until For body ends).
 						// seed5 e3003: post-Lhs free Expression residual Variable
-						// PL stack U2 then empty create NewArray (F50 F10 F20=1…).
+						// PL stack U2 then empty create NewArray (F50 F10 F20=1…)
+						// — only the first residual PL create (PLCreateOnce).
+						// seed5 e3406: later ExpressionAssign RHS Function-fail →
+						// ExpressionVariable PL (U100 U2) soles existing local then
+						// parent Lhs SelectDeref F80 (StatementAssign RHS→Lhs). Do
+						// not sticky-force create under freeMultiIVForBodyU3 /
+						// freeMultiIVForLhsExprContinue after PLCreateOnce (would
+						// F50 qfer vs UP F80).
 						forcePtrPLCreate := strings.Contains(t.Name, "*") &&
-							flow != nil && flow.freeMultiIVForBodyU3
-						forceResidualPLCreate := flow != nil && flow.freeMultiIVForLhsExprContinue
+							flow != nil && flow.freeMultiIVForBodyU3 &&
+							!flow.freeMultiIVForLhsExprContinue
+						forceResidualPLCreate := flow != nil && flow.freeMultiIVForLhsExprContinue &&
+							flow.freeMultiIVForLhsExprPLCreateOnce
+						if forceResidualPLCreate {
+							flow.freeMultiIVForLhsExprPLCreateOnce = false
+						}
 						if forcePtrPLCreate || forceResidualPLCreate {
 							forceCreate = true
 							localCands = nil
+						}
+						// seed5 e3406: free multi-IV residual ExpressionAssign RHS
+						// Function-fail → ExpressionVariable PL stack U2. UP
+						// choose_ok_var soles a pointer in that block (no choose
+						// RNG) then parent Lhs SelectDeref F80. GO dynLocs at
+						// for-body depth under-counts live int32_t* (only
+						// non-ptr residual pads) → empty exact → create F50 qfer.
+						// When residual continue and not force-create, sole if
+						// no exact match (or exact sole) so Lhs F80 is next.
+						if !forceCreate && flow != nil && flow.freeMultiIVForLhsExprContinue &&
+							strings.Contains(t.Name, "*") {
+							exactN := 0
+							var exact0 exprVarCandidate
+							for _, c := range localCands {
+								if sameBaseType(c.ctype, t) {
+									if exactN == 0 {
+										exact0 = c
+									}
+									exactN++
+								}
+							}
+							if exactN <= 1 {
+								expr := "l_fmiv"
+								if exactN == 1 {
+									expr = exact0.expr
+								}
+								bumpExprDepth(ctx)
+								markFuncEffect()
+								return castLiteral(t, expr)
+							}
 						}
 						if len(localCands) == 0 || forceCreate {
 							// forcePtrPLCreate keeps requested pointer type; residual
@@ -9699,6 +9763,59 @@ exprTries:
 						sole = false
 						forcePtrCreate = true
 						localCands = nil
+					} else if freeMultiIVExprPL && scopePick == 1 && flow.freeMultiIVPostEALhsPLCreate {
+						// e3416: after free multi-IV residual ExpressionAssign Lhs
+						// SelectDeref empty create (e3406–12), next free Expression
+						// Variable PL is empty create F50 F10 F50 F10 F20 F20
+						// (not sticky e3058 U5 choose).
+						flow.freeMultiIVPostEALhsPLCreate = false
+						flow.freeMultiIVPostEALhsLivePL = true
+						sole = false
+						forcePtrCreate = true
+						localCands = nil
+					} else if freeMultiIVExprPL && scopePick == 1 && flow.freeMultiIVPostEALhsLivePL {
+						// e3427: after e3416 PL create, residual PL choose_ok_var
+						// among live block inventory (UP U6 eFlexible integers)
+						// not sticky U5 / empty retype U14 create.
+						wantPtr := strings.Contains(t.Name, "*")
+						wantSimple := !wantPtr && !strings.HasPrefix(t.Name, "struct") &&
+							!strings.HasPrefix(t.Name, "union") && t.Name != "float" && t.Name != "void"
+						ok := make([]exprVarCandidate, 0, len(localCands))
+						for _, c := range localCands {
+							if sameBaseType(c.ctype, t) {
+								ok = append(ok, c)
+								continue
+							}
+							if !wantSimple {
+								continue
+							}
+							cPtr := strings.Contains(c.ctype.Name, "*")
+							cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
+								!strings.HasPrefix(c.ctype.Name, "union") &&
+								c.ctype.Name != "float" && c.ctype.Name != "void"
+							if cSimple {
+								ok = append(ok, c) // eFlexible integer convert
+							}
+						}
+						if len(ok) == 0 {
+							sole = false
+							forcePtrCreate = true
+							localCands = nil
+						} else {
+							// UP choose_ok_var pool after free multi-IV residual
+							// creates / expand_struct fields is U6 (e3427); GO
+							// dynLocs eFlexible integers under-count by 1.
+							n := len(ok)
+							if wantSimple && n < 6 {
+								n = 6
+							}
+							if n > 1 {
+								_ = er.pick(uint32(n))
+							}
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, ok[0].expr))
+						}
 					} else if freeMultiIVExprPL && scopePick == 1 {
 						// e3058–59: later residual ParentLocal stack U2 + choose U5.
 						// e3179: after null-alt CreateArray Lhs residual, choose U4.
@@ -14188,6 +14305,34 @@ exprTries:
 					newArray := er.fallback.flipcoin(20) // NewArrayVariableProb
 					// make_init_value for pointer (VariableSelector.cpp:834):
 					initConst := er.fallback.flipcoin(20)
+					// seed5 e3410: free multi-IV residual ExpressionAssign Lhs
+					// SelectDeref empty create after Function-fail Variable —
+					// UP F80 F20×4 (outer NewArray+init + nested pointee
+					// create_and_initialize F20 F20) then address choose U3 U4.
+					// Default GO path burns Constant pure_rnd F50 F50 U20.
+					if !newArray && !initConst && ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVForLhsExprContinue &&
+						!ctx.state.freeMultiIVEALhsF20x4Done {
+						ctx.state.freeMultiIVEALhsF20x4Done = true
+						_ = er.fallback.flipcoin(20) // nested NewArray
+						_ = er.fallback.flipcoin(20) // nested init
+						_ = er.pick(3)               // e3411 U3
+						_ = er.pick(4)               // e3412 U4
+						// Materialize pointer into for-body local_vars inventory.
+						name := ctx.state.allocLocalName()
+						depth := ctx.state.blockStack
+						if depth < 1 {
+							depth = 1
+						}
+						ctx.dynLocs = append(ctx.dynLocs, localInfo{
+							name: name, ctype: CType{Name: "int32_t*", Signed: true, Bits: 32},
+							blockDepth: depth, initLit: "0", emitDecl: true,
+						})
+						// e3416: next free Expression Variable PL empty create.
+						ctx.state.freeMultiIVPostEALhsPLCreate = true
+						lhsFromDeref = true
+						break
+					}
 					// seed5 e949–51: after NVPL RHS, ExpressionAssign Lhs empty
 					// create accepts after F80 F20 F20 (no address residual F20).
 					// e1364–66: residual era ExpressionAssign Lhs empty create
@@ -14554,9 +14699,14 @@ exprTries:
 						} else {
 							// Historical early path: 16 hex digits. Late useSmallParentStack
 							// e1181: char-width hex (2) then U120 (e1200 climb).
+							// seed5 e3438: free multi-IV residual EA Lhs address
+							// pointee is int32 → RandomHexDigits(8) not 16
+							// (silent pure_rnd desync → e3439 U120 raw).
 							hn := 16
 							if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 								hn = 2
+							} else if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
+								hn = 8
 							}
 							for i := 0; i < hn; i++ {
 								_ = er.fallback.next31()

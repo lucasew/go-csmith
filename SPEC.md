@@ -222,7 +222,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3406** (after free multi-IV empty create + ptr-cmp user F50; e3406 UP F80 Lhs create vs GO PL F50 qfer); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3450** (Global pool U23 vs U22 after free multi-IV residual EA Lhs ladder); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
@@ -233,7 +233,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 2. C++ Lhs::make_random dummy invalid_vars: first SelectDeref chooses among 2 (U2), fails visit → dummy; F80=0 VS Global fails → dummy; next SelectDeref `choose_ok_var` soles remaining pointer (len==1, no RNG) then empty; next empty → `random_add_qualifiers` F10 F50 + `create_and_initialize` F20 NewArray + F20 init (null→validate F0 continue; address→choose U3) (VariableSelector.cpp:1240–89, Lhs.cpp:70–140). addVol GenerateNewGlobal grows GlobalList + `find_pointer_type` even on visit fail.
 3. GO: arm `freeMultiIVForLhsExprPostNestLhsEmptyCreate` on Global fail (clear sticky fails pool); SelectDeref phase 0 pure/sole fail; phase 1+ empty create random_add F10 F50 + F20 F20 (null F0 retry + GlobalList pad; address U3 + VS U100 accept). Floor `derivedPtrTypes` to 15 after accept so ptr-cmp e3238 U15 matches (free multi-IV nest CreateArray residual also grew derived_types).
 4. freeMultiIV forceStdFuncSimple skips `inPtrCmpExpr` (ExpressionFuncall.cpp:73–75 pointer → user F50; e3403 matched).
-5. Seed2/3/4/6 held. Next: e3406 UP F80 (Lhs SelectDeref empty F20×4) vs GO PL create F50 F10… under Function user create.
+**seed5 e3406→3450 climbed — free multi-IV residual ExpressionAssign RHS Function-fail → Lhs SelectDeref empty create:**
+1. Capture: after user Function F50=0 create-fail → ExpressionVariable PL U100 U2 (e3403–05 match), UP e3406 F80 Lhs SelectDeref empty F20×4 U3 U4 vs GO sticky force Residual/BodyU3 PL createOnDemand F50 qfer.
+2. C++ StatementAssign order RHS then Lhs: maxFuncs Function-fail → ExpressionVariable SelectParentLocal soles existing local (no create RNG) then Lhs::make_random SelectDeref empty create (outer F20 F20 + nested pointee create_and_initialize F20 F20 + choose U3 U4). Later free Expression Variable PL empty create F50 F10×2 F20 F20 + address U2 U4; then live PL choose U6 eFlexible integers.
+3. GO: stop sticky freeMultiIVForBodyU3 force-create under residual continue; Function-fail PL sole when no exact ptr; one-shot EA Lhs F20×4 U3 U4; arm freeMultiIVPostEALhsPLCreate then LivePL (U6 floor); residual PL address U2 U4 under continue; int32 hex width 8 (not 16) on address pointee Constant.
+4. Seed2/3/4/6 held. Next: e3450 Global choose U23 vs U22 (inventory off-by-one).
+
+5. Seed2/3/4/6 held. Next was e3406 (climbed).
 
 
 **seed5 e3176→3185 climbed — free multi-IV parent Expression U120 Variable + post-nest Lhs (not F80 end RHS early):**
