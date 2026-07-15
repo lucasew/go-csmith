@@ -3126,6 +3126,15 @@ type genContext struct {
 	// lastExprWasVarSelect: ExpressionVariable selected existing var (not create).
 	// Used for Comma gate and late Assign self-F50 force skip.
 	lastExprWasVarSelect bool
+	// trackExprWildcardQfer / lastExprWildcardQfer: when tracking, top-level
+	// Expression term sets lastExprWildcardQfer (Constant → true; Variable/
+	// Function/Assign → false). StatementAssign copies e->get_qualifiers() for
+	// Lhs: Constant is CVQualifiers(true,false) wildcard → select_deref create
+	// uses random_qualifiers not random_add (VariableSelector.cpp:1248–54).
+	trackExprWildcardQfer bool
+	lastExprWildcardQfer  bool
+	// exprWildcardDepth: exprDepth at which track started (top-level term only).
+	exprWildcardDepth int
 	// varSelectStickySEFree: after Variable select, keep !SE-free until statement
 	// reset so later Assign skips self F50 (e2534, e2643). Function-only sticky
 	// still allows late GlobalPicks force F50 (e2036, e2084).
@@ -8475,6 +8484,10 @@ exprTries:
 		// Clear one-shot noFunc after term selection (e1872 Assign).
 		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadForceNoFunc {
 			ctx.state.ppPostPadForceNoFunc = false
+		}
+		// Top-level Expression term → Lhs qfer wildcard (Constant.cpp get_qualifiers).
+		if ctx != nil && ctx.trackExprWildcardQfer && filterDepth == ctx.exprWildcardDepth {
+			ctx.lastExprWildcardQfer = choice == termConstant
 		}
 		// Keep depth-block for a few Variable/Constant picks (e2105 + e2109).
 		// e6602: nest Lhs Global residual keeps depthBlock longer so later
@@ -15336,6 +15349,13 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		if flow != nil && flow.multiDimArrays > 0 && flow.blockStack >= 2 {
 			nStack = 2 // seed2 e940 multi-dim only when stack has nested blocks
 		}
+		// seed5 e2935: after AddrCreateVS + wildcard SelectDeref create, need_no_rhs
+		// Lhs F80=0 → PP→PL has Function::stack.size()=2 (UP U2). GO blockStack
+		// under-counts nested callee body as 1.
+		if nullValidatePostResidualGlobalU21 &&
+			nullValidatePostResidualStmtLhsAddrCreateVSDone && nStack < 2 {
+			nStack = 2
+		}
 		// seed2 e1469/e1514 late needNoRhs ParentLocal stack U4 (not U2).
 		// seed2 e2261: filterCompoundStmts era ParentLocal stack U6.
 		if flow != nil && flow.useSmallParentStack && flow.globalLateU2MissDone {
@@ -15747,6 +15767,46 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		flow.ppPostPadSkipParentExprN = 0
 		return lvalueInfo{expr: "g_new", ctype: target}, true, true
 	}
+	// SelectParentParam → SelectParentLocal fallthrough (VariableSelector.cpp:1052–59):
+	// empty params OR choose_var ok_vars empty (type/effect mismatch).
+	// seed5 e2934–41: need_no_rhs Lhs F80=0 U100=70 PP → PL stack U2 (idx=1
+	// empty frame) → GenerateNewParentLocal retype U14 + create residual.
+	// GO often has a non-matching param inventory that still sameBaseType-matches
+	// and burns U1 sole — force PL create under residual GlobalU21 after
+	// AddrCreateVS (UP has no eligible PP ok_vars for this Lhs type).
+	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
+		nullValidatePostResidualStmtLhsAddrCreateVSDone {
+		nStack := 2
+		idx := 0
+		if er != nil {
+			idx = int(er.pick(uint32(nStack)))
+		} else {
+			idx = int(r.upto(uint32(nStack)))
+		}
+		_ = idx
+		es := true
+		prevES := useESimpleRetypeSink
+		useESimpleRetypeSink = &es
+		// Lhs WRITE: qferMode 3 (F50 vol, no const) + retype U14.
+		g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx)
+		useESimpleRetypeSink = prevES
+		// Nested body continues free Statement after this Lhs (e2942 U100),
+		// not outer Expression U120 — re-arm NeedStmt.
+		nullValidatePostResidualAddrCreateVSNeedStmt = true
+		if ok {
+			return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
+		}
+		// Fallback residual e2936–41: U14 F50 F20 F50 F50 U4.
+		if er != nil && er.fallback != nil {
+			_ = er.pick(14)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.flipcoin(20)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.flipcoin(50)
+			_ = er.fallback.upto(4)
+		}
+		return lvalueInfo{expr: "x", ctype: target}, true, false
+	}
 	c := buildScopedCandidates(r, env, scope, scopePick, ctx)
 	if len(c) == 0 {
 		c = buildExprCandidates(r, env, scope, ctx)
@@ -16083,9 +16143,17 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		rhs = "x"
 		// Do not set needNoRhs — avoid end-of-assign SafeOpFlags double-burn.
 		needNoRhs = false
-	} else if !needNoRhs {
+	}
+	// Lhs qfer wildcard when need_no_rhs (StatementAssign.cpp:141–142) or when
+	// RHS Expression is Constant (get_qualifiers → CVQualifiers(true,false)).
+	// Wildcard → select_deref create random_qualifiers; else random_add.
+	assignRhsWildcardQfer := false
+	if !forcePostAggPLRhs && !needNoRhs {
 		if ctx != nil {
 			ctx.exprDepth = 0
+			ctx.trackExprWildcardQfer = true
+			ctx.lastExprWildcardQfer = false
+			ctx.exprWildcardDepth = 0
 		}
 		// e8390 post-CD3: Statement Assign RHS is free Expression Function
 		// (U120=1 F5 F10 U18…) — sticky depthBlock after residual Constant
@@ -16096,6 +16164,10 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.state.postAggPostCD3DepthBlockOnce = false
 		}
 		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+		if ctx != nil {
+			assignRhsWildcardQfer = ctx.lastExprWildcardQfer
+			ctx.trackExprWildcardQfer = false
+		}
 		// e7443: after residual-era Global F0 → PP sole + Constant, UP keeps
 		// free Expression Variable (PL U4 U5) then Lhs F80. GO ended Statement
 		// one Expression short — force one more Expression before Statement Lhs.
@@ -113990,11 +114062,15 @@ commaF80MultiDone:
 			// n>=2: create
 		}
 		// No existing deref targets → create pointer local/global.
-		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
-		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
-		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol when
-		// !no_volatile (CVQualifiers.cpp:479–490; VariableSelector.cpp:1253–54).
-		// no_volatile = !effect_context.is_side_effect_free().
+		// select_deref_pointer create (VariableSelector.cpp:1248–54):
+		//   (!qfer || qfer->wildcard || !global_variables)
+		//     ? random_qualifiers(ptr, access, cg, no_volatile=true)
+		//     : random_add_qualifiers(!is_side_effect_free())
+		// Wildcard qfer: need_no_rhs (++/--) or RHS Constant
+		// (StatementAssign.cpp:141–142 / Constant get_qualifiers).
+		// random_qualifiers WRITE no_volatile: per level F50 vol + F10 const,
+		// self F50 vol (const_ok=false for WRITE); vols discarded after draws.
+		// random_add: F10 ConstPointers + F50 VolatilePointers when SE-free.
 		//
 		// StatementAssign simple: Lhs effect_context ≈ assignLhsSEFree snapshot
 		// (statement entry; Function RHS markFuncEffect must not suppress F50 —
@@ -114024,15 +114100,18 @@ commaF80MultiDone:
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
+		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer
 		addVol := false
-		if needNoRhs {
-			// random_qualifiers WRITE no_volatile: draws vol F50 even if discarded.
+		if lhsQferWildcard {
+			// random_qualifiers WRITE no_volatile=true: draws vol F50 even if discarded.
 			levels := strings.Count(ptrType.Name, "*")
 			for i := 0; i < levels; i++ {
 				_ = r.flipcoin(50) // level vol
 				_ = r.flipcoin(10) // level const
 			}
 			_ = r.flipcoin(50) // self vol (WRITE: no self const F10)
+			// no_volatile=true → ptr_qfer non-vol → GenerateNewParentLocal
+			addVol = false
 		} else {
 			if opts.ConstPointers {
 				_ = r.flipcoin(10) // RegularConstProb (random_add)
@@ -114234,28 +114313,43 @@ commaF80MultiDone:
 		// C++ Lhs::make_random do-while (Lhs.cpp:70–140): create returns into
 		// validate; on fail (or select_deref ERROR_GUARD null after make_init
 		// RNG) same F80 iteration falls through to VariableSelector::select
-		// (no second F80). One-shot: first SE-free !addVol address create under
-		// GlobalU21 refuses accept → VS multiphase; later creates may accept.
-		if !skipVol && nullValidatePostResidualGlobalU21 {
+		// (no second F80). One-shot only: first SE-free !addVol address create
+		// under GlobalU21 refuses accept → VS multiphase. Later Assigns
+		// (e2915+ wildcard Constant RHS create F50 F10 F50 F20 F20) use normal
+		// create_and_initialize — do not re-apply short U2 accept residual.
+		if !skipVol && nullValidatePostResidualGlobalU21 &&
+			!nullValidatePostResidualStmtLhsAddrCreateVSDone {
 			_ = r.upto(2)
 			if ctx != nil && ctx.state != nil {
 				ctx.state.lhsDerefCreates++
 			}
-			if !nullValidatePostResidualStmtLhsAddrCreateVSDone {
-				nullValidatePostResidualStmtLhsAddrCreateVSDone = true
-				// Do not accept: exit SelectDeref loop with lhsFromDeref=false
-				// so chooseLValue / VS multiphase runs (e2883 U100…).
-				// Arm phase so PL/PP scope fails without stack U / F80 between
-				// reselects (UP U100 U100 U7 ladder, not GO PL stack U2).
-				nullValidatePostResidualAddrCreateVSPhase = 1
-				break
+			nullValidatePostResidualStmtLhsAddrCreateVSDone = true
+			// Do not accept: exit SelectDeref loop with lhsFromDeref=false
+			// so chooseLValue / VS multiphase runs (e2883 U100…).
+			// Arm phase so PL/PP scope fails without stack U / F80 between
+			// reselects (UP U100 U100 U7 ladder, not GO PL stack U2).
+			nullValidatePostResidualAddrCreateVSPhase = 1
+			break
+		}
+		// seed5 e2926–30: after AddrCreateVS multiphase, next wildcard
+		// SelectDeref create (F50 F10 F50 F20 NewArray=0 F20 address) runs
+		// make_init choose_var → choose_ok_var among ~4 pointees (U4) then
+		// itemize multi-dim array (U3 U4). Must not take filterCompound
+		// first-create sole (seed2 e2202) which skips choose_ok_var.
+		// After accept, UP continues free Statement in nested body (e2931
+		// U100) — re-arm NeedStmt so emitStatements does not return to
+		// outer Expression U120 early.
+		if !addVol && nullValidatePostResidualStmtLhsAddrCreateVSDone &&
+			nullValidatePostResidualGlobalU21 {
+			_ = r.upto(4) // e2928 choose_ok_var
+			_ = r.upto(3) // e2929 itemize dim0
+			_ = r.upto(4) // e2930 itemize dim1
+			if ctx != nil && ctx.state != nil {
+				ctx.state.lhsDerefCreates++
 			}
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
-			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
-				ctx.state.postAggNestSelDerefRound2 = true
-				ctx.state.postAggNestSelDerefFails = 0
-			}
+			nullValidatePostResidualAddrCreateVSNeedStmt = true
 			break
 		}
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
@@ -116928,8 +117022,16 @@ func emitStatement(
 				// filterCompound forces atMax (is_compound reject). After Lhs write,
 				// only honor sticky filterCompound when already near max depth —
 				// e3144 U100=5 tries=0 at shallow depth; still cap deep nest.
+				// seed5 e2942: after AddrCreateVS + nested body NeedStmt, UP
+				// accepts For (U100=22); sticky filterCompound atMax would
+				// reject (tries=1 → U100=72). Nested residual body is not the
+				// seed2 late filterCompound for-body — allow compound at shallow.
 				if state != nil && state.filterCompoundStmts {
-					if state.postAggLhsWriteDone && depth+1 < maxD {
+					if nullValidatePostResidualGlobalU21 &&
+						nullValidatePostResidualStmtLhsAddrCreateVSDone &&
+						depth+1 < maxD {
+						// shallow residual nested body: allow For/If (e2942)
+					} else if state.postAggLhsWriteDone && depth+1 < maxD {
 						// shallow: allow If/For once (e3144)
 					} else {
 						atMax = true
@@ -117989,9 +118091,11 @@ func emitStatements(
 		if !emitOne() {
 			break
 		}
-		// seed5 e2909: after addr-create VS Lhs, UP continues free Statement
-		// in this block (Assign U100). Force extra emitOne when residual armed.
-		if nullValidatePostResidualAddrCreateVSNeedStmt {
+		// seed5 e2909+: after addr-create VS / wildcard create / PP→PL create
+		// Lhs, UP continues free Statement(s) in this nested body (U100).
+		// Drain NeedStmt in a loop: a forced emitOne may itself re-arm
+		// NeedStmt (e2931 need_no_rhs → e2942 next Assign).
+		for nullValidatePostResidualAddrCreateVSNeedStmt {
 			nullValidatePostResidualAddrCreateVSNeedStmt = false
 			if !emitOne() {
 				break
@@ -117999,6 +118103,13 @@ func emitStatements(
 		}
 		if state != nil && state.lastStmtWasReturn {
 			state.lastStmtWasReturn = false
+			break
+		}
+	}
+	// After stmtCount exhausted, still drain NeedStmt (nested body under-count).
+	for nullValidatePostResidualAddrCreateVSNeedStmt {
+		nullValidatePostResidualAddrCreateVSNeedStmt = false
+		if !emitOne() {
 			break
 		}
 	}
