@@ -9982,10 +9982,13 @@ exprTries:
 						// (e3470) — not sticky U23.
 						nG = 22
 						if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVEALhsF20x4Done {
-							if ctx.state.freeMultiIVPostEAGlobalPadN == 0 {
-								nG = 23 // e3450
-							} else {
-								nG = 8 // e3470+
+							switch ctx.state.freeMultiIVPostEAGlobalPadN {
+							case 0:
+								nG = 23 // e3450 first eFlexible simple
+							case 1:
+								nG = 8 // e3470 filtered live
+							default:
+								nG = 16 // e3523+ after Lhs U1 ladder era
 							}
 							ctx.state.freeMultiIVPostEAGlobalPadN++
 						}
@@ -15019,6 +15022,16 @@ exprTries:
 						emitOrphanArrayGlobal(ctx, base, _arr)
 					}
 				}
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			// seed5 e3514–16: free multi-IV residual ExpressionAssign Lhs after
+			// SelectDeref U1 ladder + F80=0 → VS ParentParam (U100=70) → PL
+			// stack U2 soles existing local (no create RNG) → parent Expression
+			// U120. Sticky residual e2083 PP→PL NewArray F20 F50 desyncs.
+			if ctx.state.freeMultiIVForLhsExprContinue &&
+				ctx.state.freeMultiIVPostEALhsSelDerefSoleF0 &&
+				(scopePick == 1 || scopePick == 2) && er != nil {
+				_ = parentStackPick(er, ctx.state) // e3515 U2
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			// seed5 e2083–88: residual Assign Lhs era after SelectDeref F80=0 →
