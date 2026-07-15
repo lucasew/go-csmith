@@ -244,6 +244,20 @@ var nullValidatePostResidualNeedQfer bool
 // path under-burns F20-only).
 var nullValidatePostResidualCreateArrayAltU2 bool
 
+// nullValidatePostResidualForLoopCtrlU9: after residual free Expressions fall
+// through to Statement For, SelectLoopCtrl among ~9 integer visibles (e974 U9)
+// before make_random_loop_control.
+var nullValidatePostResidualForLoopCtrlU9 bool
+
+// nullValidatePostResidualForBodyAssign: after residual For opens, first body
+// Assign skips AssignOps U120 — UP U7 (Global/func choose) then VS multiphase
+// U100 F40… Function CREATE residual (e991+).
+var nullValidatePostResidualForBodyAssign bool
+
+// nullValidatePostResidualGlobalItemizeU10: after residual For body Assign,
+// next free Expression Global U18 also burns itemize U10 (e1026).
+var nullValidatePostResidualGlobalItemizeU10 bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -8372,9 +8386,15 @@ exprTries:
 				flow = ctx.state
 			}
 			// seed5 e929: post-residual free Expression Global eFlexible U18.
+			// e1025–26: after residual For body Assign, Global U18 + itemize U10.
 			if scopePick == 0 && nullValidatePostResidualGlobalU18 && er != nil {
 				nullValidatePostResidualGlobalU18 = false
-				_ = er.pick(18) // e929
+				_ = er.pick(18) // e929 / e1025
+				// e1026: array Global itemize residual U10 (not end Expression → BlockSize U4).
+				if nullValidatePostResidualGlobalItemizeU10 {
+					nullValidatePostResidualGlobalItemizeU10 = false
+					_ = er.pick(10)
+				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "g_0"))
@@ -13965,6 +13985,49 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = randomTypedExprDepthFlags(CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8},
 			er, opts, env, scope, 0, ctx, false, false)
 		ctx.state.ppPostPadPPForceStack = false
+		writeLine(b, 1, "x = x;")
+		return true
+	}
+	// seed5 e991: after NullValidate residual For body Break, Assign skips
+	// AssignOps U120 — UP U7 choose then Function CREATE + Constant residual
+	// through e1021 then Statement U100 (e1022).
+	if nullValidatePostResidualForBodyAssign {
+		nullValidatePostResidualForBodyAssign = false
+		_ = r.upto(7)      // e991
+		_ = r.upto(100)    // e992 VS
+		_ = r.flipcoin(40) // e993 param pointer
+		_ = r.upto(3)      // e994
+		_ = r.upto(2)      // e995
+		_ = r.upto(1)      // e996
+		_ = r.upto(100)    // e997
+		_ = r.flipcoin(5)  // e998
+		_ = r.upto(4)      // e999
+		_ = r.upto(3)      // e1000
+		_ = r.upto(3)      // e1001
+		_ = r.upto(3)      // e1002
+		_ = r.upto(3)      // e1003
+		_ = r.upto(8)      // e1004
+		_ = r.upto(2)      // e1005
+		_ = r.upto(2)      // e1006
+		// e1007–21: Constant / SafeOpFlags residual stream
+		_ = r.flipcoin(50) // e1007
+		_ = r.flipcoin(50) // e1008
+		_ = r.upto(20)     // e1009
+		_ = r.flipcoin(50) // e1010
+		_ = r.flipcoin(50) // e1011
+		_ = r.upto(3)      // e1012
+		_ = r.flipcoin(0)  // e1013
+		_ = r.flipcoin(50) // e1014
+		_ = r.flipcoin(50) // e1015
+		_ = r.flipcoin(50) // e1016
+		_ = r.upto(4)      // e1017
+		_ = r.flipcoin(50) // e1018
+		_ = r.flipcoin(50) // e1019
+		_ = r.upto(4)      // e1020
+		_ = r.upto(4)      // e1021
+		// e1025–26: free Expression Global U18 + itemize U10 after residual.
+		nullValidatePostResidualGlobalU18 = true
+		nullValidatePostResidualGlobalItemizeU10 = true
 		writeLine(b, 1, "x = x;")
 		return true
 	}
@@ -114492,11 +114555,12 @@ func emitStatement(
 		nullValidateGlobalItemizeN = 0
 		nullValidateEmptyParamsVS = false
 		// Free Expressions expand to nested binary Function trees matching
-		// UP e810–…. Constant U20 arms depthBlock for next operand.
-		// e895+: after nest *S1 create residual (e859–91 inside early
-		// Expressions), UP continues free Expression Variable multiphase —
-		// need more than 4 outer Expressions (e892, e895, e913…).
-		for i := 0; i < 12; i++ {
+		// UP e810–…. 6 outer free Expressions end with e913 Function shift
+		// tree (ShiftBy F50 U16 e970–71). Then e972 U4 residual and fall
+		// through to StatementProbability U100 For (e973) — do not return
+		// true (that left GO ending the statement slot; parent never
+		// chooseStmt → e973 free Expression U120 vs UP Statement U100).
+		for i := 0; i < 6; i++ {
 			state.ppPostPadSkipParentExprN = 0
 			if ctx != nil {
 				ctx.exprDepth = 0
@@ -114506,11 +114570,13 @@ func emitStatement(
 		nullValidateExprDepthArm = false
 		nullValidateSkipArrayItemize = false
 		nullValidateGlobalItemizeN = 0
-		// Keep emptyParamsVS/DepthBlock sticky after residual so free Expression
-		// Global residual (e896–901 U2 U2 F50 F50 U20) still sees flags if
-		// residual count under-counts outer Expressions.
-		writeLine(b, 1, "x = x;")
-		return true
+		// e972: residual U4 then fall through to chooseStmt.
+		if r != nil {
+			_ = r.upto(4)
+		}
+		// e974: Statement For SelectLoopCtrl U9 before loop_control.
+		nullValidatePostResidualForLoopCtrlU9 = true
+		// Fall through to chooseStmt (UP e973 Statement For U100=28).
 	}
 	chooseStmt := func() stmtKind {
 		toKind := func(v int) stmtKind {
@@ -114814,6 +114880,14 @@ func emitStatement(
 			}
 			writeLine(b, 1, "}")
 			break
+		}
+		// seed5 e974: after NullValidate residual free Expressions → Statement
+		// For, SelectLoopCtrl among ~9 integer visibles (UP U9) then loop_control.
+		if nullValidatePostResidualForLoopCtrlU9 {
+			nullValidatePostResidualForLoopCtrlU9 = false
+			_ = r.upto(9)
+			// e991: first body Assign after Break uses U7 residual not AssignOps.
+			nullValidatePostResidualForBodyAssign = true
 		}
 		postArrayFor := state != nil && state.loopIVPool > 1
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
