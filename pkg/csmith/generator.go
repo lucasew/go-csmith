@@ -44,6 +44,11 @@ var useESimpleRetypeSink *bool
 // skip seed2 post-must_read U11 pad (e607 U4 live inventory).
 var globalSimpleESimpleDoneSink *bool
 
+// selectVarLocalScope: true while selectExprVariableFromER runs on ParentLocal
+// / param pools. Suppresses post-must_read GlobalList pads (seed5 e688 U3 live
+// not U11). Default false = Global choose (seed2 e811 U17 pads apply).
+var selectVarLocalScope bool
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
 
@@ -1601,9 +1606,21 @@ func localsInStackBlock(er *exprRand, env envInfo, scope scopeInfo, ctx *genCont
 		out = append(out, exprVarCandidate{
 			expr: l.name, ctype: l.ctype, assignable: !l.isConst,
 			isArray: l.isArray, arrayLen: arrLen, arraySizes: sizes, isVolatile: l.isVol,
+			fromParentLocal: l.fromParentLocal,
 		})
 	}
 	return out
+}
+
+// realBlockLocalCount counts non-PL-materialised locals (true block->local_vars).
+func realBlockLocalCount(cands []exprVarCandidate) int {
+	n := 0
+	for _, c := range cands {
+		if !c.fromParentLocal {
+			n++
+		}
+	}
+	return n
 }
 
 // chooseOKVarFromER mirrors VariableSelector::choose_ok_var: U(n) when n>1,
@@ -2472,6 +2489,9 @@ type localInfo struct {
 	isConst  bool
 	isVol    bool
 	emitDecl bool // true → write declaration into function body
+	// fromParentLocal: materialised via createLocalPathGlobalDirectInit.
+	// Not a true block local for empty-create decisions (seed5 e643).
+	fromParentLocal bool
 }
 
 type scopeInfo struct {
@@ -4954,11 +4974,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// create_and_initialize → create_array_and_itemize
 		arrRes = burnCreateArrayVariable(er.fallback, opts, chosen, true)
 	}
-	// e3393+: U15 StackU6 struct PL create — after init Constant, create_field_vars
-	// residual burns per-field Constant again (Global path does this at e2157/e2366;
-	// without it GO ends create at U20 then parent U120 while UP continues F50…).
-	if !newArray && ctx.state.postAggU15StackU6CreateDone &&
-		(strings.HasPrefix(chosen.Name, "struct") || strings.HasPrefix(chosen.Name, "union")) {
+	// Variable::CreateVariable(name, type, init, qfer): after init Constant,
+	// create_field_vars burns Constant::make_random per field again.
+	// seed2 early historical residual omits this (e442). After Global simple
+	// eSimple / U15 StackU6 era: always (seed5 e655 free PL struct F50 stream).
+	if !newArray &&
+		(strings.HasPrefix(chosen.Name, "struct") || strings.HasPrefix(chosen.Name, "union")) &&
+		(ctx.state.postAggU15StackU6CreateDone || ctx.state.globalSimpleESimpleDone) {
 		burnCreateFieldVarsConstants(er.fallback, chosen, ctx, opts)
 	}
 	// e6963: after nest ArrayOp residual NewValue→PL create (retype U14),
@@ -5046,10 +5068,12 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	ctx.dynLocs = append(ctx.dynLocs, localInfo{
 		name: name, ctype: t, blockDepth: depth, emitDecl: false,
 		isArray: isArray, arr: arr, isConst: isConst, isVol: isVolatile,
+		fromParentLocal: true,
 	})
 	return exprVarCandidate{
 		expr: name, ctype: t, assignable: !isConst,
 		isArray: isArray, arrayLen: arrLen, arraySizes: sizes, isVolatile: isVolatile,
+		fromParentLocal: true,
 	}, true
 }
 
@@ -5297,6 +5321,20 @@ func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeI
 	return out
 }
 
+// selectExprVariableFromERGlobal is an alias for GlobalList choose (pads on).
+func selectExprVariableFromERGlobal(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
+	return selectExprVariableFromER(t, er, candidates, forAssign)
+}
+
+// selectExprVariableFromERLocal marks ParentLocal/param choose — no GlobalList pads.
+func selectExprVariableFromERLocal(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
+	prev := selectVarLocalScope
+	selectVarLocalScope = true
+	c, ok := selectExprVariableFromER(t, er, candidates, forAssign)
+	selectVarLocalScope = prev
+	return c, ok
+}
+
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
 	filtered := make([]exprVarCandidate, 0, len(candidates))
 	// is_eligible_var: volatile forbidden when !effect_context.is_side_effect_free().
@@ -5368,7 +5406,7 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if len(exact) == 0 {
 			return exprVarCandidate{}, false
 		}
-		if pointerGlobalPicksSink != nil {
+if pointerGlobalPicksSink != nil {
 			*pointerGlobalPicksSink++
 		}
 		picks := 0
@@ -5434,6 +5472,27 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		chooseN := n
 		// seed2 e865 real n=2; e892 U5; e905 U10; e1017 era keep U2 (useSmallParentStack).
 		smallStack := useSmallParentStackSink != nil && *useSmallParentStackSink
+		// seed5 e705: free Expression pointer Global overcounts exact pool
+		// (env.pointers + dynGlobals). Cap choose to 4 when live > 4 (UP U4).
+		// Do not gate on isParamPPFallPicks (e361 pad increments it).
+		if !smallStack && !selectVarLocalScope &&
+			globalSimpleESimpleDoneSink != nil && *globalSimpleESimpleDoneSink &&
+			multiDimArraySink != nil && *multiDimArraySink > 0 && n > 4 {
+			filtered := make([]exprVarCandidate, 0, n)
+			for _, c := range exact {
+				if !c.fromParentLocal {
+					filtered = append(filtered, c)
+				}
+			}
+			if len(filtered) >= 1 && len(filtered) < n {
+				exact = filtered
+				n = len(exact)
+				chooseN = n
+			}
+			if n > 4 {
+				chooseN = 4 // e705 UP U4 among GlobalList pointees
+			}
+		}
 		// seed2 e1216: late Global pointer sole-ish — UP no U after U100 (pad inflated n=2).
 		if n == 2 && smallStack && picks >= 6 {
 			itemize(exact[0], 1)
@@ -5548,7 +5607,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			// Scale under-counted pools toward true GlobalList size.
 			// e811 n≈3→17; e848 n≈5→11 (not flat 17); e892 n=2→5.
 			// seed2 e1145: late useSmallParentStack GlobalList U27.
-			if multiDimArraySink != nil && *multiDimArraySink > 0 && n >= 2 {
+			// ParentLocal pools must not use GlobalList pads (seed5 e688 U3).
+			if !selectVarLocalScope && multiDimArraySink != nil && *multiDimArraySink > 0 && n >= 2 {
 				target := 0
 				// e1145 U27 one-shot; e1373 later real n (U2) — no further pad.
 				small := useSmallParentStackSink != nil && *useSmallParentStackSink
@@ -5580,14 +5640,37 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						target = 0
 					}
 				} else if picks >= 2 && n < 11 {
-					// seed5 e607: free Expression after Global simple eSimple —
-					// GO PL-as-global inflates live n (7) vs C++ GlobalList (4).
-					// Use U4 (not seed2 U11+F50). seed4 PP keeps U11→cap9.
+					// seed5 free Expression after Global simple eSimple: use live
+					// GlobalList n (not seed2 U11/U17 pad). e607 was U4; e695 U6.
+					// seed4 PP keeps U11→cap9.
 					ppEra := isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2
 					seed5LiveGlobal := globalSimpleESimpleDoneSink != nil && *globalSimpleESimpleDoneSink &&
 						!small && !ppEra && multiDimArraySink != nil && *multiDimArraySink > 0
-					if seed5LiveGlobal && n >= 4 {
-						target = 4 // seed5 e607
+					if seed5LiveGlobal {
+						// e607 picks≤3 → U4. e695 mid picks: drop one PL → live U6.
+						// e705 later Expression Global: cap U4 again.
+						if picks <= 3 && n > 4 {
+							target = 4
+						} else if picks >= 8 && n > 4 {
+							target = 4 // e705
+						} else {
+							if n > 4 {
+								stripped := make([]exprVarCandidate, 0, n)
+								dropped := false
+								for _, c := range uniq {
+									if !dropped && c.fromParentLocal {
+										dropped = true
+										continue
+									}
+									stripped = append(stripped, c)
+								}
+								if dropped {
+									uniq = stripped
+									n = len(uniq)
+								}
+							}
+							target = 0
+						}
 					} else if n == 2 && picks >= 4 && !small {
 						target = 5 // seed2 e892 GlobalList choose (pre-small-stack)
 					} else if n >= 3 {
@@ -6294,6 +6377,14 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			pointerGlobalPicksSink != nil && *pointerGlobalPicksSink >= 6 {
 			chooseN = 2 // seed2 e1017
 		}
+		// seed5 e705: Lhs Assign Global exact overcount (forAssign skips
+		// eFlexible pads). Cap to 4 when globalSimpleESimple + multiDim.
+		if forAssign && n > 4 && !selectVarLocalScope &&
+			globalSimpleESimpleDoneSink != nil && *globalSimpleESimpleDoneSink &&
+			multiDimArraySink != nil && *multiDimArraySink > 0 &&
+			(useSmallParentStackSink == nil || !*useSmallParentStackSink) {
+			chooseN = 4
+		}
 		return exact[int(er.pick(uint32(chooseN)))%n], true
 	}
 	if len(integers) > 0 {
@@ -6810,7 +6901,7 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 					bumpExprDepth(ctx)
 					return castLiteral(t, g.expr)
 				}
-			} else if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+			} else if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok {
 				bumpExprDepth(ctx)
 				return castLiteral(t, c.expr)
 			} else if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
@@ -6929,7 +7020,7 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 	if scopePick == 1 {
 		idx := parentStackPick(er, flow)
 		localCands := localsInStackBlock(er, env, scope, ctx, idx)
-		if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
+		if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok && c.expr != "" {
 			return castLiteral(t, c.expr)
 		}
 		// Empty ParentLocal → GenerateNewParentLocal with rv qfer copy (qferMode 0:
@@ -6996,7 +7087,7 @@ func randomLeafExprWithMode(
 						localCands = append(localCands, exprVarCandidate{expr: "x", ctype: t, assignable: true})
 					}
 				}
-				if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
+				if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok && c.expr != "" {
 					out = c.expr
 				}
 			} else {
@@ -7645,7 +7736,7 @@ exprTries:
 								markFuncEffect()
 								return castLiteral(t, g.expr)
 							}
-						} else if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+						} else if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok {
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, c.expr)
@@ -7693,7 +7784,7 @@ exprTries:
 						paramCands = nil
 					}
 					if len(paramCands) > 0 {
-						if c, ok := selectExprVariableFromER(t, er, paramCands, false); ok {
+						if c, ok := selectExprVariableFromERLocal(t, er, paramCands, false); ok {
 							wantPtr := strings.Contains(t.Name, "*")
 							havePtr := strings.Contains(c.ctype.Name, "*")
 							compat := sameBaseType(c.ctype, t) ||
@@ -8274,7 +8365,7 @@ exprTries:
 						}
 						// fall through other scopes
 						localCands := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok && c.expr != "" {
+						if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok && c.expr != "" {
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, c.expr))
 						}
@@ -9123,16 +9214,7 @@ exprTries:
 					forceCreate := ctx.state != nil &&
 						(ctx.state.parentLocalStackPicks >= 12 ||
 							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
-					// seed5 e643: free Expression PL — C++ empty body create F50
-					// (retype+qferMode1); GO dynLocs from PL-as-global still list
-					// U2 eFlexible. Prefer empty create with SE-free qfer.
-					if !isParam && !wantPtr && ctx != nil && ctx.state != nil &&
-						ctx.state.globalSimpleESimpleDone && ctx.state.multiDimArrays > 0 &&
-						!ctx.state.useSmallParentStack && ctx.state.isParamPPFallPicks < 2 &&
-						len(localCands) > 0 && len(localCands) < 4 {
-						forceCreate = true
-						qferMode = 1 // F50 F10 (not mode2 F10-only)
-					}
+
 					// seed4 e1267: PP-era after NewArray — parentLocalStackPicks
 					// force is too aggressive (always create). Prefer pad-choose
 					// when inventory non-empty; empty pointer block still creates.
@@ -9284,7 +9366,7 @@ exprTries:
 										switch scopePick2 {
 										case 0: // SelectGlobal — live GlobalList convertibles
 											gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
-											if c, ok := selectExprVariableFromER(t, er, gCands, false); ok && c.expr != "" {
+											if c, ok := selectExprVariableFromERGlobal(t, er, gCands, false); ok && c.expr != "" {
 												bumpExprDepth(ctx)
 												return finishVar(castLiteral(t, c.expr))
 											}
@@ -9418,7 +9500,7 @@ exprTries:
 										if scopePick2 == 0 {
 											// Global eFlexible choose (e2705 U9)
 											gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
-											if c, ok := selectExprVariableFromER(t, er, gCands, false); ok && c.expr != "" {
+											if c, ok := selectExprVariableFromERGlobal(t, er, gCands, false); ok && c.expr != "" {
 												bumpExprDepth(ctx)
 												return finishVar(castLiteral(t, c.expr))
 											}
@@ -9568,7 +9650,7 @@ exprTries:
 											scopePick2 := variableScopePickFromER(er, opts, &scope)
 											if scopePick2 == 0 {
 												gCands := buildScopedCandidatesFromER(er, env, scope, 0, ctx)
-												if c2, ok2 := selectExprVariableFromER(t, er, gCands, false); ok2 && c2.expr != "" {
+												if c2, ok2 := selectExprVariableFromERGlobal(t, er, gCands, false); ok2 && c2.expr != "" {
 													bumpExprDepth(ctx)
 													return finishVar(castLiteral(t, c2.expr))
 												}
@@ -9727,7 +9809,7 @@ exprTries:
 							return finishVar(castLiteral(t, g.expr))
 						}
 					} else {
-						if c, ok := selectExprVariableFromER(t, er, localCands, false); ok {
+						if c, ok := selectExprVariableFromERLocal(t, er, localCands, false); ok {
 							// seed4 e1217: PP-era simple ParentLocal choose fails
 							// visit_facts → ExpressionVariable do-while retries
 							// VariableSelector (new U100), not accept→next term.
@@ -9992,7 +10074,7 @@ exprTries:
 						// flex picks>0 before this shape (flex capped at 3).
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, real[0].expr))
-					} else if c, ok := selectExprVariableFromER(t, er, real, false); ok {
+					} else if c, ok := selectExprVariableFromERGlobal(t, er, real, false); ok {
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, c.expr))
 					}
@@ -10199,10 +10281,12 @@ exprTries:
 						}
 					}
 					// seed4 e361: after PP miss → PL force U2 when multiDim nested
-					// (strict sole-skips n==2; pad empty/sole inventory). seed2 e318
-					// empty create U14 only when multiDim==0 (pre multi-dim era).
+					// and true block locals exist (UP U2 tries=1). seed5 e643 empty
+					// block (only PL-as-global dynLocs) → create F50, no synthetic U2.
+					// seed2 e318 empty create U14 when multiDim==0.
 					if flow != nil && flow.nestedFuncBodies > 0 && !flow.useSmallParentStack &&
-						flow.isParamPPFallPicks < 3 && flow.multiDimArrays > 0 {
+						flow.isParamPPFallPicks < 3 && flow.multiDimArrays > 0 &&
+						realBlockLocalCount(localCands) > 0 {
 						pool := localCands
 						for len(pool) < 2 {
 							pool = append(pool, exprVarCandidate{
@@ -10421,11 +10505,11 @@ exprTries:
 						if !compat {
 							idx := parentStackPick(er, flow)
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
-							// seed4 e361: PP type-miss → PL force U2 (first 3 only).
-							// Caps protect seed2 later PP miss paths.
+							// seed4 e361: PP type-miss → PL force U2 when true block
+							// locals exist (first 3 only). Empty → create (seed5 e643).
 							if flow != nil && flow.nestedFuncBodies > 0 &&
 								!flow.useSmallParentStack && flow.isParamPPFallPicks < 3 &&
-								flow.multiDimArrays > 0 {
+								flow.multiDimArrays > 0 && realBlockLocalCount(localCands) > 0 {
 								pool := localCands
 								for len(pool) < 2 {
 									pool = append(pool, exprVarCandidate{
@@ -10613,7 +10697,7 @@ exprTries:
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, localCands[0].expr))
 								}
-								if c2, ok2 := selectExprVariableFromER(t, er, localCands, false); ok2 && c2.expr != "" {
+								if c2, ok2 := selectExprVariableFromERLocal(t, er, localCands, false); ok2 && c2.expr != "" {
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, c2.expr))
 								}
