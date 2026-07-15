@@ -300,6 +300,28 @@ var nullValidatePostResidualSkipCommaTypeOnce bool
 // Counter of remaining U2+U3 alts; after 0, bare U2.
 var nullValidatePostResidualKeepExprAltU2U3 int
 
+// nullValidatePostResidualLhsItemizeN: residual Statement Lhs SelectDeref
+// after VS fail — itemize U9 U8 U1 F0 per F80=1 until F80=0 (e1456+).
+var nullValidatePostResidualLhsItemizeN int
+
+// nullValidatePostResidualLhsVSPhase: multiphase Statement Lhs VS residual after
+// keep-expr SelectDeref F80=0 (e1454–1677). Phases match UP GlobalList pad
+// shrink + PL/PP multi-dim fail + NewValue create accept:
+//   1 Global U6 fail+itemize (e1455)
+//   2 Global U5+U3 fail+itemize (e1478)
+//   3 Global U5 fail+itemize (e1517)
+//   4 Global U4+U3 fail+itemize (e1555)
+//   5 Global U4 fail no-itemize F80=0 (e1594)
+//   6 ParentLocal U5+U9U8U1F0 fail+itemize (e1597)
+//   7 ParentParam U5+U9U8U1F0 fail+itemize (e1619)
+//   8 ParentParam U5+U9U8U1F0 fail+itemize (e1646; U100=90 still PP)
+//   9 NewValue F10→PL create U5 U14… accept (e1677; F10 already drawn)
+var nullValidatePostResidualLhsVSPhase int
+
+// nullValidatePostResidualDerivedU8: one-shot derived_types floor U8 after
+// residual Assign Lhs accept (e1697 Function F10=1 CREATE param pointer).
+var nullValidatePostResidualDerivedU8 bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -7990,6 +8012,12 @@ exprTries:
 							if nullValidatePostResidualParamU7 && nPtr < 7 {
 								nPtr = 7
 							}
+							// e1697: after residual Assign Lhs accept, Function F10=1
+							// CREATE param pointer choose UP U8 (one-shot).
+							if nullValidatePostResidualDerivedU8 && nPtr < 8 {
+								nullValidatePostResidualDerivedU8 = false
+								nPtr = 8
+							}
 							ptrIdx := int(er.fallback.upto(uint32(nPtr)))
 							// choose_random_pointer_type → derived_types[index].
 							// PP-era: use tracked star depths. seed2: idx>0 → **.
@@ -13851,6 +13879,113 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	if ctx != nil {
 		flow = ctx.state
 	}
+	// seed5 e1454–1677: multiphase Statement Lhs VS residual after keep-expr.
+	// Must run before live PL/PP/Global paths (those sole-accept inventory).
+	// Outer try-loop miss burns SelectDeref itemize until F80=0 then re-VS.
+	if nullValidatePostResidualLhsVSPhase > 0 && er != nil {
+		ph := nullValidatePostResidualLhsVSPhase
+		switch ph {
+		case 1:
+			if scopePick == 0 {
+				_ = er.pick(6) // e1455 Global U6
+				nullValidatePostResidualLhsVSPhase = 2
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 2:
+			if scopePick == 0 {
+				_ = er.pick(5) // e1478
+				_ = er.pick(3)
+				nullValidatePostResidualLhsVSPhase = 3
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 3:
+			if scopePick == 0 {
+				_ = er.pick(5) // e1517
+				nullValidatePostResidualLhsVSPhase = 4
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 4:
+			if scopePick == 0 {
+				_ = er.pick(4) // e1555
+				_ = er.pick(3)
+				nullValidatePostResidualLhsVSPhase = 5
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 5:
+			if scopePick == 0 {
+				_ = er.pick(4) // e1594 no itemize
+				nullValidatePostResidualLhsVSPhase = 6
+				nullValidatePostResidualLhsItemizeN = 0
+				return lvalueInfo{}, false, false
+			}
+		case 6:
+			if scopePick == 1 {
+				_ = er.pick(5) // e1597 PL stack
+				_ = er.pick(9)
+				_ = er.pick(8)
+				_ = er.pick(1)
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0)
+				}
+				nullValidatePostResidualLhsVSPhase = 7
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 7, 8:
+			// e1619 / e1646 ParentParam (U100=86,90) multi-dim fail
+			if scopePick == 2 {
+				_ = er.pick(5)
+				_ = er.pick(9)
+				_ = er.pick(8)
+				_ = er.pick(1)
+				if er.fallback != nil {
+					_ = er.fallback.flipcoin(0)
+				}
+				if ph == 7 {
+					nullValidatePostResidualLhsVSPhase = 8
+				} else {
+					nullValidatePostResidualLhsVSPhase = 9
+				}
+				nullValidatePostResidualLhsItemizeN = 16
+				return lvalueInfo{}, false, false
+			}
+		case 9:
+			// e1677 NewValue: F10 already drawn; UP F10=0 → scopePick=4 PL create
+			if scopePick == 4 {
+				nullValidatePostResidualLhsVSPhase = 0
+				_ = er.pick(5) // e1679 stack
+				if er.fallback != nil {
+					// e1680 U14 eSimple retype (void@0 → tries=1, v=6 eUChar hn=2)
+					es := true
+					prevES := useESimpleRetypeSink
+					useESimpleRetypeSink = &es
+					base := pickSimpleNonVoid(er.fallback, opts)
+					useESimpleRetypeSink = prevES
+					_ = er.fallback.flipcoin(50) // e1681 WRITE vol
+					newArr := er.fallback.flipcoin(20)
+					if newArr {
+						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+						emitOrphanArrayGlobal(ctx, base, _arr)
+					} else {
+						// e1683+: Constant pure_rnd (UP F50=0 → hex hn from type)
+						_ = formatSimpleConstant(er.fallback, base)
+					}
+					// e1684–85: post-create residual F50 U4
+					_ = er.fallback.flipcoin(50)
+					_ = er.fallback.upto(4)
+				}
+				return lvalueInfo{expr: "x", ctype: target}, true, false
+			}
+			if scopePick == 3 {
+				nullValidatePostResidualLhsVSPhase = 0
+				return lvalueInfo{expr: "g_new", ctype: target}, true, true
+			}
+		}
+	}
 	// SelectParentLocal: stack pick then block locals / create (seed2 e939–941).
 	if scopePick == 1 {
 		// e4371–75: after SelectDeref countdown VS, PL stack U5 + multi-dim
@@ -14614,6 +14749,8 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							_ = r.upto(1)
 							_ = r.flipcoin(0)
 						}
+						// e1453 Statement Lhs F80=0 → multiphase VS residual.
+						nullValidatePostResidualLhsVSPhase = 1
 						break
 					}
 					// address residual U2 U3
@@ -113568,7 +113705,13 @@ commaF80MultiDone:
 				}
 			}
 		}
-		for try := 0; try < 8 && !lhsFromDeref; try++ {
+		// seed5 e1454–1677 multiphase VS residual needs >8 VS rounds
+		// (Global×5 + PL + PP×2 + NewValue create).
+		maxVSTries := 8
+		if nullValidatePostResidualLhsVSPhase > 0 {
+			maxVSTries = 24
+		}
+		for try := 0; try < maxVSTries && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
 				// seed4 e450–486: first VS ParentLocal create fails visit_facts →
 				// Lhs do-while SelectDeref create chain until F80=0 then VS again.
@@ -113814,6 +113957,24 @@ commaF80MultiDone:
 				lv = picked
 				lhsFromDeref = true
 				break
+			}
+			// seed5 e1456+: after residual Global U6 VS fail, Lhs do-while
+			// SelectDeref itemize U9 U8 U1 F0 until F80=0 then VS again.
+			// (chooseLValue runs in this try-loop after lhsDerefLoop break on
+			// F80=0 — not inside lhsDerefLoop head.)
+			if nullValidatePostResidualLhsItemizeN > 0 && r != nil {
+				for nullValidatePostResidualLhsItemizeN > 0 {
+					if !r.flipcoin(80) {
+						nullValidatePostResidualLhsItemizeN = 0
+						break
+					}
+					nullValidatePostResidualLhsItemizeN--
+					_ = r.upto(9)
+					_ = r.upto(8)
+					_ = r.upto(1)
+					_ = r.flipcoin(0)
+				}
+				continue
 			}
 			// seed2 e2314: ParentParam U4 miss → immediate VS Global U100 (no F80).
 			if ctx != nil && ctx.state != nil && ctx.state.lateAssignOpsFiltered &&
@@ -116225,6 +116386,23 @@ func emitSingleFuncDefOnce(
 			// Expression before Statement Lhs (must_use U2 F75 + VS multiphase).
 			nullValidatePostResidualKeepExprBeforeLhs = true
 			_ = emitLValueAssignment(&body, r, opts, env, scope, ctx)
+			// e1697: next Function CREATE may choose_random_pointer_type U8.
+			nullValidatePostResidualDerivedU8 = true
+			// e1686+: after residual Assign Lhs NewValue create accept, UP
+			// continues Statement stream (U100 IfElse…) not invent Expression
+			// U120 / BlockSize U4. Skip BlockSize; emit Statements live.
+			if ctx != nil {
+				ctx.exprDepth = 0
+				ctx.effectSEFree = true
+			}
+			if state != nil {
+				state.skipNextBlockSize = true
+			}
+			extraBudget := 80
+			if stmtBudget != nil && *stmtBudget > 0 {
+				extraBudget = *stmtBudget
+			}
+			emitStatements(&body, r, opts, env, scope, state, info, idx, 0, false, &extraBudget, ctx)
 		}
 	} else if len(env.globals) > 0 {
 		writable := make([]globalInfo, 0, len(env.globals))
