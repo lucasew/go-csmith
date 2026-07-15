@@ -222,10 +222,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4460** (VS multiphase after multi-level PL/PP fail ladder); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4473** (PL create multi-level qfer after post-multilevel Statement Assign); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+
+**seed5 e4460→4473 climbed — VS multiphase PP accept (no extra U100) + StatementFilter + If stack U4:**
+1. Capture: e4460 UP U100=92 tries=1 vs GO U100=37 (extra VS reselect after PP U7 U4).
+2. C++: ExpressionVariable PL visit-fail → VS PP U7 + pointer-boost U4 accepts (no further VS U100). Free Expression multiphase ends → StatementProbability tries=1 rejects Continue 37 → Assign 92. Nested If then-body under free multi-IV For pushes Function::stack → PL create stack U4 (e4468).
+3. GO: remove residual extra VS U100 after PP U7 U4; arm StmtNoLoop one-shot for StatementFilter Continue reject; clear MultiLvl forceU3; push blockStack on free multi-IV If then/else; freeMultiIVForBodyU3 uses live blockStack when >3.
+4. Seed2/3/4/6 held. Next: e4473 F50 vs F20 (PL create multi-level random_qualifiers underburns vs UP F50 F10×4 then NewArray).
 
 **seed5 e4368→4460 climbed — multi-level post-ladder PL stack U3 + live inventory:**
 1. Capture: e4368 UP U3=0 vs GO U6=0 (same raw) after multi-level SelectDeref create ladder — PL stack size.

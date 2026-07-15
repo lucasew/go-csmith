@@ -774,6 +774,10 @@ type functionFlowState struct {
 	// under multi-level ladder. 0: e4378 U24; 1+: e4431 U23 (GlobalList grew
 	// then filtered eFlexible).
 	freeMultiIVPostEAMultiLvlGlobalN int
+// freeMultiIVPostEAMultiLvlStmtNoLoop: after multi-level free Expression
+// multiphase ends (e4459 PP accept), next StatementFilter rejects
+// Continue/Break as !IN_LOOP (e4460 tries=1). Cleared when Statement picks.
+freeMultiIVPostEAMultiLvlStmtNoLoop bool
 	// freeMultiIVPostEAItemizePLCreateNeedLhs: after e3549–56 PL empty create,
 	// parent ExpressionAssign Lhs SelectDeref F80 (e3557). finishVar runs Lhs.
 	freeMultiIVPostEAItemizePLCreateNeedLhs bool
@@ -2158,9 +2162,14 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	}
 	// Free multi-IV For body (func+ArrayOp+For): stack U3 takes priority over
 	// sticky residual ParamU7 U6 / postCD3 ArrayOp2 U6 (seed5 e2967).
+	// Nested If then-body under free multi-IV For pushes Function::stack to
+	// U4 (e4468); blockStack tracks that push (seed5 multi-level residual).
 	if state != nil && state.freeMultiIVForBodyU3 {
-		_ = er.pick(3)
-		return 0
+		n := 3
+		if state.blockStack > 3 {
+			n = state.blockStack
+		}
+		return int(er.pick(uint32(n)))
 	}
 	// e9282: ArrayOp2 body PL stack U6 then sole (no local U5; UP U120 next).
 	// Sticky sole every PL stack pick — e9292 second PL also soles then F80 Lhs.
@@ -10227,17 +10236,27 @@ exprTries:
 						_ = er.pick(7) // e4445 PP ok_vars
 					}
 				default:
-					// e4455–60: choose U3 then visit fail → VS PP U7 U4 fail →
-					// VS reselect (e4460 U100) accept.
+					// e4455–59: stack U3 + choose U3 visit_facts fail →
+					// ExpressionVariable reselects VS PP U7 + U4 (pointer
+					// boost / itemize) and ACCEPTs — no further VS U100.
+					// GO residual reselect U100 stole raw that UP
+					// StatementFilter used as tries=1 intermediate
+					// (Continue 37 rejected, Assign 92 accepted) →
+					// e4460 U100=92 tries=1 vs GO extra U100=37 then
+					// Statement U100=92 tries=0.
 					_ = er.pick(3)
 					scopePick2 := variableScopePickFromER(er, opts, &scope) // e4457
 					if scopePick2 == 2 {
 						_ = er.pick(7) // e4458
-						_ = er.pick(4) // e4459
-						_ = variableScopePickFromER(er, opts, &scope) // e4460
+						_ = er.pick(4) // e4459 accept (no extra U100)
 					} else if scopePick2 == 1 || scopePick2 == 4 {
 						_ = er.pick(3)
 					}
+					// Multi-level free Expression multiphase ends: next
+					// StatementFilter is !IN_LOOP (e4460 Continue reject);
+					// later PL is live stack U4 (e4468) not forceU3.
+					flow.freeMultiIVPostEAMultiLvlPLStackU3 = false
+					flow.freeMultiIVPostEAMultiLvlStmtNoLoop = true
 				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
@@ -118481,7 +118500,15 @@ func emitStatement(
 			}
 			v := int(dec.r.uptoWithFilter(100, func(x uint32) bool {
 				k := toKind(int(x))
-				if (k == stmtBreak || k == stmtContinue) && !inLoop {
+				// seed5 e4460: after multi-level free Expression multiphase ends,
+				// UP StatementFilter tries=1 rejects Continue 37 → Assign 92.
+				// GO free multi-IV For/If thenInLoop still true would accept
+				// Continue. One-shot StmtNoLoop mirrors UP !IN_LOOP here.
+				effInLoop := inLoop
+				if state != nil && state.freeMultiIVPostEAMultiLvlStmtNoLoop {
+					effInLoop = false
+				}
+				if (k == stmtBreak || k == stmtContinue) && !effInLoop {
 					return true
 				}
 				// StatementFilter: at max_blk_depth filter is_compound
@@ -118525,6 +118552,9 @@ func emitStatement(
 				}
 				return false
 			}))
+			if state != nil && state.freeMultiIVPostEAMultiLvlStmtNoLoop {
+				state.freeMultiIVPostEAMultiLvlStmtNoLoop = false
+			}
 			return toKind(v)
 		}
 		return toKind(int(dec.pick(0, 100)))
@@ -118591,6 +118621,10 @@ func emitStatement(
 		// in for (seed4 e2405 U100=36 Continue). Do not arm skipNextBlockSize.
 		thenInLoop := bodyInLoop || inLoop
 		prevFilter := false
+		// C++ Block::make_random always pushes Function::stack. Free multi-IV
+		// For nest If then/else needs stack U4 for SelectParentLocal
+		// (seed5 e4468) — not sticky freeMultiIVForBodyU3 forceU3.
+		pushIfStack := state != nil && state.freeMultiIVForBodyU3
 		if state != nil {
 			prevFilter = state.filterCompoundStmts
 			if postAggGlobalCreateN >= 0 && !bodyInLoop {
@@ -118600,6 +118634,9 @@ func emitStatement(
 			// desync e2355 U4 when inheriting inLoop from parent for).
 			if postAggGlobalCreateN >= 0 {
 				state.skipNextBlockSize = false
+			}
+			if pushIfStack {
+				state.blockStack++
 			}
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, thenInLoop, stmtBudget, ctx)
@@ -118615,11 +118652,23 @@ func emitStatement(
 			// Clear for-body filter after sole Break body.
 			if state != nil {
 				state.filterCompoundStmts = false
+				if pushIfStack && state.blockStack > 0 {
+					state.blockStack--
+				}
 			}
 			writeLine(b, 1, "}")
 		} else {
+			if state != nil && pushIfStack && state.blockStack > 0 {
+				state.blockStack-- // pop then before else
+			}
 			writeLine(b, 1, "} else {")
+			if state != nil && pushIfStack {
+				state.blockStack++
+			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, inLoop, stmtBudget, ctx)
+			if state != nil && pushIfStack && state.blockStack > 0 {
+				state.blockStack--
+			}
 			writeLine(b, 1, "}")
 			if state != nil && postAggGlobalCreateN >= 0 {
 				state.filterCompoundStmts = prevFilter
