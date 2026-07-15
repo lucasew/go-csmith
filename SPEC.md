@@ -222,17 +222,23 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2877** (Rhs Variable PL U5 then Lhs F80 vs GO choose U4); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2883** (Lhs SelectDeref !addVol address U2 then UP VS U100 multiphase vs GO Expression U120); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e2877→2883 climbed — RHS PP→PL residual sole + Lhs !addVol address U2:**
+1. Assign RHS ExpressionVariable ParentParam (U100=92) miss on non-matching param → SelectParentLocal stack U5.
+2. Residual GlobalU21 after first pointer PL create: free Expression PL is sole after stack (choose_ok_var n==1; VariableSelector.cpp:979–1001). ParentParam miss falls through to the same SelectParentLocal — GO dynLocs over-count exact `int32_t*` (U4) while UP soles then Lhs SelectDeref F80.
+3. Lhs SelectDeref empty create !addVol → GenerateNewParentLocal (VariableSelector.cpp:1274–1289): make_init address-of choose_ok_var U2 before seed2 filterCompound first-create sole (which skipped U2).
+4. Seed2/3/4/6 held. Next: e2883 UP VS U100 multiphase after address U2 vs GO Expression U120 (Lhs accept too early / missing post-create residual).
 
 **seed5 e2862→2877 climbed — Lhs SelectDeref random_add VolatilePointers SE-free:**
 1. `select_deref_pointer` empty create: `random_add_qualifiers(no_volatile=!SE-free)` → F10 ConstPointers then F50 VolatilePointers when SE-free (CVQualifiers.cpp:479–490; VariableSelector.cpp:1253–54).
 2. StatementAssign simple Lhs uses statement-entry SE-free snapshot (Function RHS must not suppress F50 via markFuncEffect).
 3. `addVol` → GenerateNewGlobal nested residual by Lhs star depth; multi-level (***): F50×2 + F20×2; 1-star: F50 + F20 F20 U5; simple: F50 + Constant.
 4. Multiphase e2799 first create still short non-vol U2; seed2 late for-body early-accept preserved for stars < 2.
-5. Seed2/3/4/6 held. Next: e2877 RHS Variable PL U5 sole vs GO choose U4 before Lhs F80.
+5. Seed2/3/4/6 held. Next was e2877 RHS PP→PL U4 (climbed).
 
 **seed5 e2851→2862 climbed — create_and_initialize Constant HexDigits width:**
 1. UP `derived_types[9]=eULongLong**` → `find_pointer_type` deepens to `***`; leaf `Constant` burns `RandomHexDigits(16)` (depth gap 16 after F50=0).

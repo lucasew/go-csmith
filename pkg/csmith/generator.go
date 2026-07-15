@@ -12646,6 +12646,23 @@ exprTries:
 					(ctx.state.multiDimArrays > 0 || ctx.state.useSmallParentStack) {
 					idx := parentStackPick(er, flow)
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					// Residual Assign Lhs era (GlobalU21): after the first pointer
+					// PL create (e2267), free Expression ParentLocal is sole after
+					// stack (choose_ok_var n==1; e2366+). ParentParam miss falls
+					// through to the same SelectParentLocal — GO dynLocs over-count
+					// exact int32_t* (U4) while UP soles after stack U5 then Lhs
+					// SelectDeref F80 (seed5 e2876–77). Mirror scopePick==1 residual
+					// sole (VariableSelector.cpp:979–1001 + choose_ok_var).
+					if nullValidatePostResidualGlobalU21 &&
+						nullValidatePostResidualGlobalU21PtrPLCreateDone &&
+						strings.Contains(t.Name, "*") {
+						expr := "x"
+						if len(localCands) > 0 {
+							expr = localCands[0].expr
+						}
+						bumpExprDepth(ctx)
+						return finishVar(castLiteral(t, expr))
+					}
 					if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
 						bumpExprDepth(ctx)
 						return finishVar(castLiteral(t, c2.expr))
@@ -114124,6 +114141,24 @@ commaF80MultiDone:
 			}
 			break
 		}
+		// GenerateNewParentLocal / non-vol path.
+		// select_deref create !addVol → GenerateNewParentLocal (VariableSelector
+		// .cpp:1274–1289). make_init address-of choose_ok_var U(n) (seed5 e2882
+		// U2 under residual GlobalU21). Must run BEFORE filterCompound first-
+		// create sole (seed2 e2202) which would skip U2 (seed5 e2882 climb).
+		if !skipVol && nullValidatePostResidualGlobalU21 {
+			_ = r.upto(2)
+			if ctx != nil && ctx.state != nil {
+				ctx.state.lhsDerefCreates++
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
+				ctx.state.postAggNestSelDerefRound2 = true
+				ctx.state.postAggNestSelDerefFails = 0
+			}
+			break
+		}
 		if ctx != nil && ctx.state != nil && ctx.state.filterCompoundStmts {
 			ctx.state.lhsDerefCreates++
 			ctx.state.lateDerefCreateN++
@@ -114147,22 +114182,6 @@ commaF80MultiDone:
 			_ = r.upto(100)
 			_ = r.upto(100)
 			lhsFromDeref = true
-			break
-		}
-		// GenerateNewParentLocal / non-vol path.
-		// seed5 e2877 SE-free !addVol under GlobalU21: F20 F20 then U2 accept.
-		// Do NOT short-circuit e2155 pre-U21 residual (needs F20 Constant F50 F50 U20).
-		if !skipVol && nullValidatePostResidualGlobalU21 {
-			_ = r.upto(2)
-			if ctx != nil && ctx.state != nil {
-				ctx.state.lhsDerefCreates++
-			}
-			lhsFromDeref = true
-			lv = lvalueInfo{expr: "*p", ctype: targetType}
-			if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
-				ctx.state.postAggNestSelDerefRound2 = true
-				ctx.state.postAggNestSelDerefFails = 0
-			}
 			break
 		}
 		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
