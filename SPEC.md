@@ -222,11 +222,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4473** (PL create multi-level qfer after post-multilevel Statement Assign); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4504** (NewValue Global F10 vs U14 after multi-level Lhs CreateArray); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+
+**seed5 e4473→4504 climbed — multi-level SelectLType *** + PL qfer + Lhs nested peel:**
+1. Capture: e4473 UP F50=1 vs GO F20=0 after PL create F50 F10×2 (GO 1-star underburn).
+2. C++: SelectLType PointerAsLType F50 + make_random_pointer_type F20 pick derived[5] ind=2 → find_pointer_type → *** ; Function-fail PL create random_qualifiers F50 F10×4 (3 levels+self) + NewArray F20 F20 address sole; Lhs SelectDeref empty create random_add F10 F50 + NewArray=0 address → random_loose F50 + nested create_and_initialize peels F20×6 + CreateArray U99….
+3. GO: free multi-IV For body SelectLType F20 deepen+floor *** (list under-models mid indices); skip residual e1914 levels=1 floor under freeMultiIVForBodyU3; multi-level PL address sole (no sticky U4); Lhs addVol multi-level nested peel residual (not sticky e2980 U3 U3).
+4. Seed2/3/4/6 held. Next: e4504 U14 vs F10 (NewValue→Global create after F80=0 VS).
 
 **seed5 e4460→4473 climbed — VS multiphase PP accept (no extra U100) + StatementFilter + If stack U4:**
 1. Capture: e4460 UP U100=92 tries=1 vs GO U100=37 (extra VS reselect after PP U7 U4).

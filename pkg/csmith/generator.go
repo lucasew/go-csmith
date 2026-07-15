@@ -5089,6 +5089,33 @@ func createOnDemandGlobalPLStackU3(er *exprRand, opts Options, ctx *genContext) 
 	}, true
 }
 
+// burnMultiLvlAddrNestedCreatePeel burns nested create_and_initialize peels for
+// make_init address-of on multi-level pointers when qfer is non-wildcard
+// (GenerateNew* skips random_qualifiers). Each level: F20 NewArray + F20
+// make_init; if !initNull and depth>0 recurse; if NewArray CreateArray after
+// peels (VariableSelector.cpp:498–508). seed5 e4485–91: depth=2 → 6×F20 + U99.
+func burnMultiLvlAddrNestedCreatePeel(r *rng, opts Options, ctx *genContext, depth int) {
+	if r == nil {
+		return
+	}
+	newArray := r.flipcoin(20)
+	initNull := r.flipcoin(20)
+	if !initNull && depth > 0 {
+		burnMultiLvlAddrNestedCreatePeel(r, opts, ctx, depth-1)
+	}
+	if newArray {
+		stars := depth + 1
+		if stars < 1 {
+			stars = 1
+		}
+		pt := CType{Name: "int32_t" + strings.Repeat("*", stars), Signed: true, Bits: 32, HexDigits: 8}
+		_arr := burnCreateArrayVariable(r, opts, pt, true)
+		if ctx != nil {
+			emitOrphanArrayGlobal(ctx, pt, _arr)
+		}
+	}
+}
+
 // burnPLStackU3NestedPointerInit burns make_init address residual for multi-level
 // pointer pointee under e7776: random_loose F50s + create_and_initialize (skip
 // random_qualifiers). Peels one * per nest until simple / choose U2.
@@ -5779,7 +5806,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// idx>0) but UP derived_types[7] is * → qfer F50 F10×2 then NewArray
 		// (not *** self F50 F10 overshoot at e1918). N==2 is sole residual;
 		// live creates are N>=3.
-		if nullValidatePostResidualPPU7Done && nullValidatePostResidualPLCreateN >= 3 && levels > 1 {
+		// seed5 e4473: free multi-IV For body SelectLType multi-level pointer
+		// (*** after find_pointer_type) keeps real levels for random_qualifiers
+		// F50 F10 ×4 — sticky residual floor underburns vs UP.
+		if nullValidatePostResidualPPU7Done && nullValidatePostResidualPLCreateN >= 3 && levels > 1 &&
+			!ctx.state.freeMultiIVForBodyU3 {
 			levels = 1
 		}
 		for i := 0; i < levels; i++ {
@@ -5895,10 +5926,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// then parent Assign Lhs F80 (no nested pointee CreateArray residual).
 			// seed5 e3422: free multi-IV residual Expression (post EA Lhs) PL
 			// create address residual is U2 U4 (not sticky body U4-only).
+			// seed5 e4477–79: multi-level SelectLType *** PL create address-of
+			// soles an existing multi-level local from the create ladder
+			// (choose_ok_var len==1, no RNG) then parent Lhs F80 — sticky U4
+			// underburns (F80 next on UP).
 			if ctx.state.freeMultiIVForBodyU3 && !newArray {
 				if ctx.state.freeMultiIVForLhsExprContinue {
 					_ = er.fallback.upto(2) // e3422 U2
 					_ = er.fallback.upto(4) // e3423 U4
+				} else if levels >= 2 {
+					// multi-level: sole existing ** / * local, no choose RNG
 				} else {
 					_ = er.fallback.upto(4) // e2974 U4
 				}
@@ -17394,8 +17431,9 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				// F50 F10 ×4 = levels3+self for GenerateNewParentLocal).
 				// Type.cpp:1122–1127: F20 path returns find_pointer_type(t,true)
 				// = one more star than chosen entry. Apply deepen in residual
-				// GlobalU21 era (seed5 e2831 *** qfer); early seed2 U1 path
-				// keeps historical star=list value (inventory under-model).
+				// GlobalU21 era (seed5 e2831 *** qfer) and free multi-IV For body
+				// (seed5 e4464 pick=5 ind=2 → ***); early seed2 U1 path keeps
+				// historical star=list value (inventory under-model).
 				if ctx != nil && ctx.state != nil {
 					if ptrIdx >= 0 && ptrIdx < len(ctx.state.derivedPtrList) {
 						ptrStars = ctx.state.derivedPtrList[ptrIdx]
@@ -17403,13 +17441,17 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							ptrStars = 1
 						}
 					}
-					if nullValidatePostResidualGlobalU21 {
-						// find_pointer_type(chosen, true) deepens one level.
-						if ptrStars < 3 {
+					// find_pointer_type(chosen, true) deepens one level when
+					// ind < max_indirect_level. List under-model often leaves
+					// mid indices at * while UP has ** (e4464 pick=5 ind=2).
+					// Floor to *** so PL create random_qualifiers is
+					// F50 F10 ×4 (3 levels + self) matching GenerateNewParentLocal.
+					needMultiLvlPtr := nullValidatePostResidualGlobalU21 ||
+						ctx.state.freeMultiIVForBodyU3
+					if needMultiLvlPtr {
+						if ptrStars < 5 {
 							ptrStars++
 						}
-						// seed5 e2831: after U12 pick, UP type is *** (4× F50 F10
-						// qfer = 3 levels + self). List star under-model left **.
 						if ptrStars < 3 {
 							ptrStars = 3
 						}
@@ -115635,7 +115677,26 @@ commaF80MultiDone:
 			// create — nested residual F50 F20 F20 U3 U3 then validate fail →
 			// VariableSelector multiphase (U100 PL miss, U100 PP U7, U100 PL
 			// accept) like AddrCreateVS (not filterCompound first sole).
+			// seed5 e4484–91: multi-level SelectLType Assign Lhs (*** / ****
+			// after find_pointer_type) — make_init address empty → one eligible
+			// random_loose F50 + nested create_and_initialize peels (qfer set,
+			// no random_qualifiers; each peel F20 NewArray + F20 make_init) then
+			// CreateArray U99 when a nest hits NewArray. Sticky 1-star U3 U3
+			// underburns (UP F50 F20=1 F20×4 F20=1 U99…).
 			if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForBodyU3 {
+				ptrStars := strings.Count(ptrType.Name, "*")
+				if ptrStars >= 3 {
+					// random_loose: one eligible vol level (outer random_add).
+					_ = r.flipcoin(50)
+					// Nested peels for multi-level pointee. Depth 2 → 3 creates
+					// × (F20 NewArray + F20 make_init) = 6 F20 matching e4485–90
+					// then CreateArray on NewArray=1 nest (e4491 U99…).
+					burnMultiLvlAddrNestedCreatePeel(r, opts, ctx, 2)
+					ctx.state.lhsDerefCreates++
+					lhsFromDeref = true
+					lv = lvalueInfo{expr: "*p", ctype: targetType}
+					break
+				}
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(20)
 				_ = r.flipcoin(20)
