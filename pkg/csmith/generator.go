@@ -578,6 +578,15 @@ type arrayInfo struct {
 	len   int
 }
 
+// mustReadArrayEntry tracks one ArrayVariable in rw_directive must_read_vars
+// (StatementFor::make_random_array_loop access 0/2). Used by
+// VariableSelector::select_must_use_var → itemize_array + F75.
+type mustReadArrayEntry struct {
+	name  string
+	ctype CType // element type (Variable::type for arrays)
+	sizes []int
+}
+
 type pointerInfo struct {
 	name            string
 	target          string
@@ -640,6 +649,16 @@ type functionFlowState struct {
 	multiDimArrays int
 	// mustReadLive: must_read set non-empty. Cleared on F75 erase (e717).
 	mustReadLive bool
+	// mustReadArrays: real must_read_vars list (names+sizes+element types)
+	// installed by make_random_array_loop. select_must_use walks this for
+	// itemize_array + aggregate create_field_vars Constants + F75 erase
+	// (VariableSelector.cpp:1461–1506; seed5 e2811 Function-fail EV).
+	mustReadArrays []mustReadArrayEntry
+	// mustReadArraysStack: outer frames when nesting array-loops (CGContext
+	// parent rw_directive restore on exit).
+	mustReadArraysStack [][]mustReadArrayEntry
+	// mustReadSpent: names already select_must_use'd (inventory expand path).
+	mustReadSpent map[string]bool
 	// postMustReadGlobalPicks: SelectGlobal eFlexible picks after must_read spent.
 	postMustReadGlobalPicks int
 	globalCreatesPostMR     int
@@ -1354,6 +1373,191 @@ func pointerBaseKey(t CType) string {
 	return strings.ReplaceAll(name, "*", "")
 }
 
+// collectMustReadArrayInventory lists collective arrays eligible for
+// VariableSelector::select_array (non-const, non-volatile).
+func collectMustReadArrayInventory(env envInfo, scope scopeInfo, ctx *genContext) []mustReadArrayEntry {
+	seen := map[string]bool{}
+	out := make([]mustReadArrayEntry, 0, 16)
+	add := func(name string, ct CType, isArr, isConst, isVol bool, sizes []int, arrLen int) {
+		if !isArr || isConst || isVol || name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		sz := append([]int(nil), sizes...)
+		if len(sz) == 0 {
+			if arrLen > 0 {
+				sz = []int{arrLen}
+			} else {
+				sz = []int{2}
+			}
+		}
+		out = append(out, mustReadArrayEntry{name: name, ctype: ct, sizes: sz})
+	}
+	for _, g := range mergedGlobals(env, ctx) {
+		add(g.name, g.ctype, g.isArray, g.isConst, g.isVolatile, g.arraySizes, g.arrayLen)
+	}
+	for _, l := range mergedLocals(scope, ctx) {
+		al := 0
+		var sizes []int
+		if l.isArray {
+			al = 4
+			if ctx != nil {
+				// locals rarely track multi-dim; keep 1d pad
+			}
+		}
+		add(l.name, l.ctype, l.isArray, l.isConst, l.isVol, sizes, al)
+	}
+	for _, a := range env.arrays {
+		if seen[a.name] {
+			continue
+		}
+		add(a.name, a.ctype, true, false, false, nil, a.len)
+	}
+	return out
+}
+
+// typeMatchMustUse mirrors Type::match(v->type, eFlexible) for must_use:
+// element type of array vs requested Expression type (is_derivable).
+func typeMatchMustUse(want, have CType) bool {
+	if want.Name == have.Name {
+		return true
+	}
+	// Aggregates: exact struct/union name.
+	if (strings.HasPrefix(want.Name, "struct") || strings.HasPrefix(want.Name, "union")) &&
+		want.Name == have.Name {
+		return true
+	}
+	// Pointers / simples: same base or convertable widths.
+	if sameBaseType(want, have) {
+		return true
+	}
+	if isConvertable(want, have) {
+		return true
+	}
+	return false
+}
+
+// selectMustUseFromListOnce mirrors one iteration of select_must_use_var
+// over mustReadArrays: type match → itemize_array (IV choose) → aggregate
+// create_field_vars Constants → F75 erase. Returns burned=true when a match
+// consumed RNG. accept=true when F75 kept the entry (caller may use var);
+// accept=false models visit_facts miss after erase (ExpressionVariable retry).
+func selectMustUseFromListOnce(er *exprRand, t CType, ctx *genContext, opts Options) (burned, accept bool) {
+	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
+		return false, false
+	}
+	st := ctx.state
+	r := er.fallback
+	// iv_bounds size ≈ array-loop frames (one IV each). loopIVPool is sticky
+	// SelectLoopCtrlVar pool — not iv_bounds.size().
+	ivBoundSize := st.arrayLoopDepth
+	if ivBoundSize < 1 {
+		ivBoundSize = 1
+	}
+
+	// Candidate list: must_read_vars first. When inventory order under-counts
+	// vs C++ select_array, multi-dim may be recorded while C++ has 1d of the
+	// same element type. Expand with itemizable 1d inventory matches of type t
+	// while mustReadLive (seed5 e2811: g_46[2] S0 not only g_60[7][6]).
+	cands := make([]mustReadArrayEntry, 0, len(st.mustReadArrays)+4)
+	seen := map[string]bool{}
+	typeMatchButDimFail := false
+	addCand := func(e mustReadArrayEntry) {
+		if e.name == "" || seen[e.name] {
+			return
+		}
+		if st.mustReadSpent != nil && st.mustReadSpent[e.name] {
+			return
+		}
+		if !typeMatchMustUse(t, e.ctype) {
+			return
+		}
+		if len(e.sizes) > ivBoundSize {
+			// itemize_array returns nullptr — note for inventory expand
+			typeMatchButDimFail = true
+			return
+		}
+		seen[e.name] = true
+		cands = append(cands, e)
+	}
+	for _, e := range st.mustReadArrays {
+		addCand(e)
+	}
+	// Expand inventory only when must_read has a type match that failed the
+	// dim>iv_bounds check (select_array inventory under-count recorded multi-dim
+	// while C++ has a 1d of same element type — seed5 g_60 vs g_46). Do NOT
+	// expand on bare mustReadLive (seed4 Function-fail must miss → VS U100).
+	if typeMatchButDimFail && len(cands) == 0 && ctx != nil {
+		for _, g := range mergedGlobals(envInfo{}, ctx) {
+			if !g.isArray || g.isConst || g.isVolatile {
+				continue
+			}
+			sz := append([]int(nil), g.arraySizes...)
+			if len(sz) == 0 && g.arrayLen > 0 {
+				sz = []int{g.arrayLen}
+			}
+			addCand(mustReadArrayEntry{name: g.name, ctype: g.ctype, sizes: sz})
+		}
+	}
+	if len(cands) == 0 {
+		return false, false
+	}
+
+	// Process first candidate (C++ takes first successful match in set order).
+	av := cands[0]
+	// Map back to mustReadArrays index for erase, or synthetic inventory entry.
+	eraseIdx := -1
+	for i, e := range st.mustReadArrays {
+		if e.name == av.name {
+			eraseIdx = i
+			break
+		}
+	}
+	// itemize_array: per dim choose_ok_var among ok IVs, optional offset.
+	for di, sz := range av.sizes {
+		if sz < 1 {
+			sz = 1
+		}
+		nOk := ivBoundSize
+		// 1d size≥2 with loopIVPool≥2: second outer IV often qualifies → U2.
+		if di == 0 && len(av.sizes) == 1 && st.loopIVPool >= 2 && nOk < 2 {
+			nOk = 2
+		}
+		if nOk > 1 {
+			_ = r.upto(uint32(nOk))
+		}
+		// offset: bound ≈ sz-1 → range 1 → no offset for size 2.
+		bound := sz - 1
+		if bound < 0 {
+			bound = 0
+		}
+		if sz-bound > 1 {
+			_ = r.upto(uint32(sz - bound))
+		}
+	}
+	// ArrayVariable::itemize(indices): aggregate → create_field_vars Constants.
+	isAgg := !strings.Contains(av.ctype.Name, "*") &&
+		(strings.HasPrefix(av.ctype.Name, "struct") || strings.HasPrefix(av.ctype.Name, "union"))
+	if isAgg {
+		burnCreateFieldVarsConstants(r, av.ctype, ctx, opts)
+	}
+	if st.mustReadSpent == nil {
+		st.mustReadSpent = map[string]bool{}
+	}
+	st.mustReadSpent[av.name] = true
+	if r.flipcoin(75) {
+		if eraseIdx >= 0 {
+			st.mustReadArrays = append(st.mustReadArrays[:eraseIdx:eraseIdx], st.mustReadArrays[eraseIdx+1:]...)
+		}
+		if len(st.mustReadArrays) == 0 {
+			st.mustReadLive = false
+		}
+		// visit_facts miss after erase (ExpressionVariable retry).
+		return true, false
+	}
+	return true, true
+}
+
 // trySelectMustUseVar mirrors VariableSelector::select_must_use_var (READ).
 // Seed2 e716: F75 inside make_random_param after multi-dim IV creates.
 // mustReadLive cleared on F75 erase so e810 does not re-burn.
@@ -1372,6 +1576,9 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		st.postAggPostCD3ArrayOp2StmtLhsU9Lhs = true
 		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
 	}
+	// Aggregates: select_must_use over mustReadArrays is invoked only from
+	// Function-fail ExpressionVariable (selectMustUseFromListOnce). Do not
+	// burn here — free EV aggregate on seed4 must reach VS U100 (e9091).
 	// seed2 e716: inParam+arrayLoop+multiDim+mustRead → U2 F75.
 	// seed2 e1001: U2 after term variable when multiDim (must-use attempt).
 	if st.multiDimArrays <= 0 {
@@ -8528,7 +8735,28 @@ exprTries:
 			// with ExpressionVariable without a new term pick (seed2 e813–814).
 			// Do not restoreGenSnapshot (useExisting F50 already consumed).
 			if ctx != nil && ctx.state != nil && len(ctx.state.funcs) >= ctx.state.maxFuncs {
-				if c, ok := trySelectMustUseVar(er, t, ctx); ok {
+				// ExpressionVariable::make_random do-while: select_must_use then
+				// visit_facts. Aggregates: select_must_use over mustReadArrays
+				// (itemize + create_field_vars Constants + F75). visit_facts miss
+				// after erase retries (seed5 e2811→2816 first must_use match).
+				wantAggFF := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+				// seed5 e2811: Function-fail aggregate select_must_use after
+				// residual GlobalU21 array-loop installed must_read (not free
+				// EV / seed4 later Function-fail with empty UP must_read).
+				if wantAggFF && len(ctx.state.mustReadArrays) > 0 &&
+					nullValidatePostResidualGlobalU21 {
+					for round := 0; round < 4; round++ {
+						burned, accept := selectMustUseFromListOnce(er, t, ctx, opts)
+						if accept {
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, "x")
+						}
+						if !burned {
+							break
+						}
+					}
+				} else if c, ok := trySelectMustUseVar(er, t, ctx); ok {
 					bumpExprDepth(ctx)
 					markFuncEffect()
 					return castLiteral(t, c.expr)
@@ -116684,8 +116912,6 @@ func emitStatement(
 					}
 				}
 				// create_random_array → CreateArrayVariable without itemize
-				if os.Getenv("CSMITH_DEBUG_ARRAY") != "" {
-				}
 				{
 					_arr := burnCreateArrayVariable(r, opts, arrTy, false)
 					emitOrphanArrayGlobal(ctx, arrTy, _arr)
@@ -116751,6 +116977,10 @@ func emitStatement(
 				return true
 			}
 			frameMustRead := false
+			var frameMustReads []mustReadArrayEntry
+			// Live inventory for must_read tracking only — do NOT change nArr RNG
+			// selection (seed4 e760 empty→F25 create; pad nArr must stay historical).
+			liveArrays := collectMustReadArrayInventory(env, scope, ctx)
 			nArr := len(env.arrays)
 			// e6719: after nest Lhs NewValue create era, env.arrays under-counts
 			// live arrays (UP select_array U13). Inventory filters incomplete vs
@@ -116784,6 +117014,7 @@ func emitStatement(
 				}
 			}
 			for i := 0; i < aryno; i++ {
+				var chosen mustReadArrayEntry
 				if ppEraEmpty || nArr == 0 {
 					// select_array empty → create_random_array: F25 as_global.
 					asGlobal := opts.GlobalVariables && r.flipcoin(25)
@@ -116813,17 +117044,44 @@ func emitStatement(
 					{
 						_arr := burnCreateArrayVariable(r, opts, arrTy, false)
 						emitOrphanArrayGlobal(ctx, arrTy, _arr)
+						chosen = mustReadArrayEntry{
+							name:  "g_arr",
+							ctype: arrTy,
+							sizes: append([]int(nil), _arr.sizes...),
+						}
+						if len(chosen.sizes) == 0 {
+							chosen.sizes = []int{2}
+						}
+						liveArrays = append(liveArrays, chosen)
 					}
 					nArr = 1 // subsequent selects may see the new array
 					ppEraEmpty = false
 				} else if nArr > 1 {
 					// select_array: len==1 → no U; len>1 → rnd_upto(len) (seed2 e918 U5).
 					// e6719: nest ArrayOp U13 among live arrays.
-					_ = r.upto(uint32(nArr))
+					idx := int(r.upto(uint32(nArr)))
+					if len(liveArrays) > 0 {
+						chosen = liveArrays[idx%len(liveArrays)]
+					}
+				} else if len(liveArrays) > 0 {
+					chosen = liveArrays[0]
 				}
 				access := int(r.upto(3)) // 0 must-read, 1 must-write, 2 both
 				if access == 0 || access == 2 {
 					frameMustRead = true
+					// add_variable_to_set: unique by name
+					if chosen.name != "" {
+						dup := false
+						for _, e := range frameMustReads {
+							if e.name == chosen.name {
+								dup = true
+								break
+							}
+						}
+						if !dup {
+							frameMustReads = append(frameMustReads, chosen)
+						}
+					}
 				}
 			}
 			// SelectLoopCtrlVar among integer visibles.
@@ -116879,6 +117137,28 @@ func emitStatement(
 				if state != nil {
 					state.blockStack++
 					state.arrayLoopDepth++
+					// Install must_read list from aryno access 0/2 (seed5 e2811).
+					parentMR := append([]mustReadArrayEntry(nil), state.mustReadArrays...)
+					state.mustReadArraysStack = append(state.mustReadArraysStack, parentMR)
+					if len(frameMustReads) > 0 {
+						combined := append([]mustReadArrayEntry(nil), parentMR...)
+						for _, e := range frameMustReads {
+							dup := false
+							for _, c := range combined {
+								if c.name == e.name {
+									dup = true
+									break
+								}
+							}
+							if !dup {
+								combined = append(combined, e)
+							}
+						}
+						state.mustReadArrays = combined
+						state.mustReadLive = true
+					} else if frameMustRead {
+						state.mustReadLive = true
+					}
 				}
 				emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 				if state != nil {
@@ -116887,6 +117167,11 @@ func emitStatement(
 					}
 					if state.arrayLoopDepth > 0 {
 						state.arrayLoopDepth--
+					}
+					if n := len(state.mustReadArraysStack); n > 0 {
+						state.mustReadArrays = state.mustReadArraysStack[n-1]
+						state.mustReadArraysStack = state.mustReadArraysStack[:n-1]
+						state.mustReadLive = len(state.mustReadArrays) > 0
 					}
 				}
 				writeLine(b, 1, "}")
@@ -117076,7 +117361,28 @@ func emitStatement(
 				// Push outer fresh so nested array-loops restore it on exit.
 				state.arrayLoopFreshStack = append(state.arrayLoopFreshStack, state.arrayLoopFresh)
 				state.arrayLoopFresh = true
-				if frameMustRead {
+				// RWDirective: combine parent must_read with frame (StatementFor.cpp).
+				// Push parent list; body sees combined; pop on exit.
+				parentMR := append([]mustReadArrayEntry(nil), state.mustReadArrays...)
+				state.mustReadArraysStack = append(state.mustReadArraysStack, parentMR)
+				if len(frameMustReads) > 0 {
+					combined := append([]mustReadArrayEntry(nil), parentMR...)
+					for _, e := range frameMustReads {
+						dup := false
+						for _, c := range combined {
+							if c.name == e.name {
+								dup = true
+								break
+							}
+						}
+						if !dup {
+							combined = append(combined, e)
+						}
+					}
+					state.mustReadArrays = combined
+					state.mustReadLive = true
+				} else if frameMustRead {
+					// access said must-read but inventory miss — keep bool only.
 					state.mustReadLive = true
 				}
 			}
@@ -117093,6 +117399,12 @@ func emitStatement(
 					state.arrayLoopFreshStack = state.arrayLoopFreshStack[:n-1]
 				} else {
 					state.arrayLoopFresh = false
+				}
+				// Restore parent must_read list (child CGContext discarded).
+				if n := len(state.mustReadArraysStack); n > 0 {
+					state.mustReadArrays = state.mustReadArraysStack[n-1]
+					state.mustReadArraysStack = state.mustReadArraysStack[:n-1]
+					state.mustReadLive = len(state.mustReadArrays) > 0
 				}
 			}
 			writeLine(b, 1, "}")
