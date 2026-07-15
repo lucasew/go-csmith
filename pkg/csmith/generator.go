@@ -352,6 +352,7 @@ var nullValidatePostResidualGlobalU12 bool
 // nullValidatePostResidualGlobalU21: after residual Statement Lhs SelectDeref
 // create (e2158), simple GlobalList pad grows to U21 (e2212).
 var nullValidatePostResidualGlobalU21 bool
+var globalU21FFGlobalN int // Function-fail empty Global create count under GlobalU21
 
 // nullValidatePostResidualGlobalU21N: simple Global pad draws under GlobalU21
 // (0: e2212 U21; later e2370+ U20 after Function-fail Global create era).
@@ -4765,30 +4766,71 @@ func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *
 	initLit := "0"
 	var arrRes arrayCreateResult
 	if levels > 0 {
-		// make_init_value: F20 null vs address-of
+		// make_init_value (VariableSelector.cpp:810+): F20 Constant vs address-of.
 		if r.flipcoin(20) {
 			initLit = "0"
 		} else {
-			baseName := strings.ReplaceAll(t.Name, "*", "")
-			base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
-			if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
-				base.Signed = false
+			// Peel one *: create visible var of ptr_type (may still be pointer).
+			// Nested GenerateNewGlobal uses random_loose_qualifiers then
+			// create_and_initialize (F50/F10 peel + NewArray/Constant).
+			pointeeName := strings.TrimSuffix(t.Name, "*")
+			if pointeeName == t.Name {
+				pointeeName = strings.ReplaceAll(t.Name, "*", "")
 			}
-			tgtName := ctx.state.allocGlobalName()
-			tgtNewArray := r.flipcoin(20)
-			tgtInit := formatAggregateOrSimpleConstant(r, base, ctx, opts)
-			var tgtArr arrayCreateResult
-			if tgtNewArray {
-				tgtArr = burnCreateArrayVariable(r, opts, base, true)
+			pointee := CType{Name: pointeeName, Signed: true, Bits: 32, HexDigits: 8}
+			if strings.Contains(pointeeName, "uint") || strings.HasPrefix(pointeeName, "unsigned") {
+				pointee.Signed = false
 			}
-			emitGlobalDecl(&ctx.state.lateGlobals, base, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
-			ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-				name: tgtName, ctype: base, isArray: tgtNewArray, arrayLen: 4,
-			})
-			if tgtNewArray {
-				initLit = fmt.Sprintf("&%s[0]", tgtName)
-			} else {
+			if strings.Contains(pointeeName, "*") {
+				// Nested pointer: SE-free random_qualifiers for remaining levels + self.
+				pLevels := strings.Count(pointeeName, "*")
+				for i := 0; i < pLevels; i++ {
+					_ = opts.Volatiles && r.flipcoin(50)
+					_ = opts.Consts && r.flipcoin(10)
+				}
+				_ = opts.Volatiles && r.flipcoin(50) // self vol
+				_ = opts.Consts && r.flipcoin(10)    // self const
+				tgtNewArray := r.flipcoin(20)
+				tgtInit := "0"
+				if r.flipcoin(20) {
+					tgtInit = "0"
+				} else {
+					// Peel again toward a simple/aggregate address target.
+					baseName := strings.ReplaceAll(pointeeName, "*", "")
+					base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+					tgtInit = formatAggregateOrSimpleConstant(r, base, ctx, opts)
+					if r.flipcoin(20) {
+						_ = burnCreateArrayVariable(r, opts, base, true)
+					}
+				}
+				var tgtArr arrayCreateResult
+				if tgtNewArray {
+					tgtArr = burnCreateArrayVariable(r, opts, pointee, true)
+				}
+				tgtName := ctx.state.allocGlobalName()
+				emitGlobalDecl(&ctx.state.lateGlobals, pointee, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
+				ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+					name: tgtName, ctype: pointee, isArray: tgtNewArray, arrayLen: 4,
+				})
 				initLit = "&" + tgtName
+			} else {
+				// Simple/aggregate pointee: NewArray then Constant (create_and_initialize).
+				tgtNewArray := r.flipcoin(20)
+				tgtInit := formatAggregateOrSimpleConstant(r, pointee, ctx, opts)
+				var tgtArr arrayCreateResult
+				if tgtNewArray {
+					tgtArr = burnCreateArrayVariable(r, opts, pointee, true)
+				}
+				tgtName := ctx.state.allocGlobalName()
+				emitGlobalDecl(&ctx.state.lateGlobals, pointee, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
+				ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+					name: tgtName, ctype: pointee, isArray: tgtNewArray, arrayLen: 4,
+				})
+				if tgtNewArray {
+					initLit = fmt.Sprintf("&%s[0]", tgtName)
+				} else {
+					initLit = "&" + tgtName
+				}
 			}
 		}
 		if newArray {
@@ -9069,13 +9111,25 @@ exprTries:
 					}
 				} else {
 					candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-					// seed5 e2279–82: residual GlobalU21 maxFuncs Function-fail →
-					// ExpressionVariable Global. UP SelectGlobal empty →
-					// GenerateNewGlobal with non-wildcard qfer (F20 NewArray +
-					// F20 make_init + CreateArray U99…); GO loose inventory
-					// chooses U5. Force empty create before any choose.
+					// seed5 residual GlobalU21 maxFuncs Function-fail → empty Global.
+					// e2279–82: non-wildcard/skip qfer → F20 NewArray+CreateArray
+					// (1-level pointer Lhs residual).
+					// e2831+: SelectLType multi-level pointer + SE-free context →
+					// random_qualifiers levels F50 F10 + self F50 F10 (CVQualifiers
+					// .cpp:306–343; GenerateNewGlobal wildcard qfer).
 					if scopePick == 0 && nullValidatePostResidualGlobalU21 && er != nil {
-						if g, ok := createOnDemandGlobalFromEROpts(er, opts, t, ctx, true); ok {
+						n := globalU21FFGlobalN
+						globalU21FFGlobalN++
+						// e2279 first: skipRandomQfer F20 (non-wildcard residual).
+						// Later (e2831+): SE-free full random_qualifiers F50 F10…
+						var g exprVarCandidate
+						var ok bool
+						if n == 0 {
+							g, ok = createOnDemandGlobalFromEROpts(er, opts, t, ctx, true)
+						} else {
+							g, ok = createOnDemandGlobalFromERSEFree(er, opts, t, ctx)
+						}
+						if ok {
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, g.expr)
@@ -15690,11 +15744,26 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				// choose_random_pointer_type → derived_types[index] star depth.
 				// e6103 idx=2 often multi-level; pad list shortfall as *** (UP qfer
 				// F50 F10 ×4 = levels3+self for GenerateNewParentLocal).
+				// Type.cpp:1122–1127: F20 path returns find_pointer_type(t,true)
+				// = one more star than chosen entry. Apply deepen in residual
+				// GlobalU21 era (seed5 e2831 *** qfer); early seed2 U1 path
+				// keeps historical star=list value (inventory under-model).
 				if ctx != nil && ctx.state != nil {
 					if ptrIdx >= 0 && ptrIdx < len(ctx.state.derivedPtrList) {
 						ptrStars = ctx.state.derivedPtrList[ptrIdx]
 						if ptrStars < 1 {
 							ptrStars = 1
+						}
+					}
+					if nullValidatePostResidualGlobalU21 {
+						// find_pointer_type(chosen, true) deepens one level.
+						if ptrStars < 3 {
+							ptrStars++
+						}
+						// seed5 e2831: after U12 pick, UP type is *** (4× F50 F10
+						// qfer = 3 levels + self). List star under-model left **.
+						if ptrStars < 3 {
+							ptrStars = 3
 						}
 					}
 					// e6108: UP qfer F50 F10×4 = levels3+self; list under-count
