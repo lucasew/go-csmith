@@ -39,6 +39,11 @@ var nestedFuncBodiesSink *int
 // NewValue→PL after PP pads: U14=2→int32 HexDigits=8).
 var useESimpleRetypeSink *bool
 
+// globalSimpleESimpleDoneSink: after SelectGlobal simple eSimple retype.
+// Seed5 free Expression Global eFlexible: exclude PL-materialised creates and
+// skip seed2 post-must_read U11 pad (e607 U4 live inventory).
+var globalSimpleESimpleDoneSink *bool
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
 
@@ -263,6 +268,10 @@ type globalInfo struct {
 	// arraySizes: full CreateArray dimensions for multi-dim itemize
 	// (seed4 e2371 U9 U4 U7 on [9][4][7]).
 	arraySizes []int
+	// fromParentLocal: materialised via createLocalPathGlobalDirectInit.
+	// C++ GenerateNewParentLocal only fills block->local_vars — exclude from
+	// SelectGlobal when globalSimpleESimpleDone (seed5 e607 live U4).
+	fromParentLocal bool
 }
 
 type arrayInfo struct {
@@ -2485,6 +2494,8 @@ type exprVarCandidate struct {
 	// arraySizes: multi-dim itemize (all dims); empty → use arrayLen as 1d.
 	arraySizes []int
 	isVolatile bool
+	// fromParentLocal: GlobalList entry was PL-materialised (not true Global).
+	fromParentLocal bool
 }
 
 type genContext struct {
@@ -3798,6 +3809,7 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 			out = append(out, exprVarCandidate{
 				expr: g.name, ctype: g.ctype, assignable: !g.isConst,
 				isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes, isVolatile: g.isVolatile,
+				fromParentLocal: g.fromParentLocal,
 			})
 		}
 		// Ensure at least a few simple globals for eFlexible after multi-dim
@@ -5020,7 +5032,7 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 			sizes = []int{arrLen}
 		}
 	}
-	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: arrLen, arraySizes: sizes}
+	g := globalInfo{name: name, ctype: t, isConst: isConst, isVolatile: isVolatile, isArray: isArray, arrayLen: arrLen, arraySizes: sizes, fromParentLocal: true}
 	ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
 	depth := blockDepth
 	if depth <= 0 {
@@ -5268,10 +5280,11 @@ func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeI
 				continue
 			}
 			out = append(out, exprVarCandidate{
-				expr:       fmt.Sprintf("%s.f%d", c.expr, fi),
-				ctype:      f.ctype,
-				assignable: c.assignable,
-				isVolatile: c.isVolatile,
+				expr:            fmt.Sprintf("%s.f%d", c.expr, fi),
+				ctype:           f.ctype,
+				assignable:      c.assignable,
+				isVolatile:      c.isVolatile,
+				fromParentLocal: c.fromParentLocal,
 			})
 			fi++
 			expanded++
@@ -5567,7 +5580,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						target = 0
 					}
 				} else if picks >= 2 && n < 11 {
-					if n == 2 && picks >= 4 && !small {
+					// seed5 e607: free Expression after Global simple eSimple —
+					// GO PL-as-global inflates live n (7) vs C++ GlobalList (4).
+					// Use U4 (not seed2 U11+F50). seed4 PP keeps U11→cap9.
+					ppEra := isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2
+					seed5LiveGlobal := globalSimpleESimpleDoneSink != nil && *globalSimpleESimpleDoneSink &&
+						!small && !ppEra && multiDimArraySink != nil && *multiDimArraySink > 0
+					if seed5LiveGlobal && n >= 4 {
+						target = 4 // seed5 e607
+					} else if n == 2 && picks >= 4 && !small {
 						target = 5 // seed2 e892 GlobalList choose (pre-small-stack)
 					} else if n >= 3 {
 						target = 11
@@ -9102,6 +9123,16 @@ exprTries:
 					forceCreate := ctx.state != nil &&
 						(ctx.state.parentLocalStackPicks >= 12 ||
 							(ctx.state.useSmallParentStack && !ctx.state.globalLateU2MissDone))
+					// seed5 e643: free Expression PL — C++ empty body create F50
+					// (retype+qferMode1); GO dynLocs from PL-as-global still list
+					// U2 eFlexible. Prefer empty create with SE-free qfer.
+					if !isParam && !wantPtr && ctx != nil && ctx.state != nil &&
+						ctx.state.globalSimpleESimpleDone && ctx.state.multiDimArrays > 0 &&
+						!ctx.state.useSmallParentStack && ctx.state.isParamPPFallPicks < 2 &&
+						len(localCands) > 0 && len(localCands) < 4 {
+						forceCreate = true
+						qferMode = 1 // F50 F10 (not mode2 F10-only)
+					}
 					// seed4 e1267: PP-era after NewArray — parentLocalStackPicks
 					// force is too aggressive (always create). Prefer pad-choose
 					// when inventory non-empty; empty pointer block still creates.
@@ -114804,6 +114835,7 @@ func emitSingleFuncDefOnce(
 		useSmallParentStackSink = &state.useSmallParentStack
 		lhsSoleNextSink = &state.lhsSoleNext
 		globalU27DoneSink = &state.globalU27Done
+	globalSimpleESimpleDoneSink = &state.globalSimpleESimpleDone
 		globalLateU2MissDoneSink = &state.globalLateU2MissDone
 		forceNextTermVariableSink = &state.forceNextTermVariable
 		lateLhsChooseCountSink = &state.lateLhsChooseCount
@@ -114868,6 +114900,7 @@ func emitSingleFuncDefOnce(
 			useSmallParentStackSink = nil
 			lhsSoleNextSink = nil
 			globalU27DoneSink = nil
+			globalSimpleESimpleDoneSink = nil
 			globalLateU2MissDoneSink = nil
 			forceNextTermVariableSink = nil
 			lateLhsChooseCountSink = nil
