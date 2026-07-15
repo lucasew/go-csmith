@@ -222,10 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2883** (Lhs SelectDeref !addVol address U2 then UP VS U100 multiphase vs GO Expression U120); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2916** (Lhs SelectDeref create F50 vs F10 order after e2883–2915 VS multiphase); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e2883→2916 climbed — Lhs !addVol address create validate-fail → VS multiphase:**
+1. Capture: after F80 F10 F50 F20 F20 U2, UP U100 Global/PL/PP ladder… U16 create residual through e2908; GO accepted Lhs → Expression U120.
+2. C++ Lhs::make_random do-while (Lhs.cpp:70–140): SelectDeref create may fail visit_facts / fall through to VariableSelector::select without second F80.
+3. GO: one-shot residual phase after SE-free !addVol address U2 under GlobalU21 — scope-fail ladder (PL miss, PP U7×2, PL stack U3 U5, Global U16 + create residual) without F80 between reselects; arm +1 free Statement so nested func body continues U100 Assign (e2909).
+4. Seed2/3/4/6 held. Next: e2916 UP F50 F10 F50 create qfer vs GO F10 F50 (random_add order / wildcard random_qualifiers).
 
 **seed5 e2877→2883 climbed — RHS PP→PL residual sole + Lhs !addVol address U2:**
 1. Assign RHS ExpressionVariable ParentParam (U100=92) miss on non-matching param → SelectParentLocal stack U5.

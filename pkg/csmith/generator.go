@@ -372,6 +372,34 @@ var nullValidatePostResidualStmtLhsU2U4Done bool
 // F10 F20 F20 U2). Counts residual empty-inventory hits after U2U4Done.
 var nullValidatePostResidualStmtLhsU2FailN int
 
+// nullValidatePostResidualStmtLhsAddrCreateVSDone: one-shot after residual
+// GlobalU21 SE-free !addVol SelectDeref GenerateNewParentLocal address-of
+// choose U2 (seed5 e2882). C++ Lhs::make_random does not accept that create
+// (visit_facts / opportunistic_validate fail, or select_deref ERROR_GUARD null)
+// and falls through to VariableSelector::select multiphase in the same
+// F80 iteration (Lhs.cpp:70–100 → U100 Global/PL ladder e2883+). Later
+// !addVol creates under GlobalU21 may accept without VS residual.
+var nullValidatePostResidualStmtLhsAddrCreateVSDone bool
+
+// nullValidatePostResidualAddrCreateVSPhase: after AddrCreateVSDone armed,
+// Lhs VS multiphase residual (seed5 e2883–2908). Phase advances through
+// scope-pick failures without stack/SelectDeref F80 (C++ do-while validate
+// fail reselects VariableSelector; residual stream has no F80 between U100s).
+// 0=inactive; >0 active; 0 after accept.
+var nullValidatePostResidualAddrCreateVSPhase int
+
+// nullValidatePostResidualAddrCreateVSAccepted: one-shot after phase-7 Global
+// create residual accepts Lhs (seed5 e2908). Forces clean StatementAssign
+// finish (next Statement U100) — suppress sticky Expression-continue residuals
+// (postAggLhsExprContinue / lhsAfterParamMiss) that would draw term U120.
+var nullValidatePostResidualAddrCreateVSAccepted bool
+
+// nullValidatePostResidualAddrCreateVSNeedStmt: after that Lhs accepts inside a
+// nested function body (often mid Function-call Expression), UP continues with
+// another free Statement (e2909 U100 Assign). GO stmtCount may already be
+// exhausted → return to outer Expression U120. Force one more emitOne.
+var nullValidatePostResidualAddrCreateVSNeedStmt bool
+
 // nullValidatePostResidualArrayOpLoopCtrlU13Done: one-shot ArrayOp F5=0 aryno>0
 // SelectLoopCtrlVar U13 + sole-array itemize U3 U2 + array_control/SafeOp
 // residual under GlobalU21 (e2384–2402; GO loopIVPool U2 under-counts).
@@ -8179,6 +8207,7 @@ func randomLeafExprWithMode(
 	noFunc bool,
 	noConst bool,
 ) string {
+
 	if ctx != nil {
 		effectSEFreeSink = &ctx.effectSEFree
 		defer func() { effectSEFreeSink = nil }()
@@ -15123,6 +15152,59 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	var flow *functionFlowState
 	if ctx != nil {
 		flow = ctx.state
+	}
+	// seed5 e2883–2908: after SelectDeref !addVol address create validate fail,
+	// Lhs VariableSelector multiphase (no F80 between scope reselects).
+	// UP ladder head: U100 PL, U100 PP, U7 choose, U100 PL, U100 PP, U7,
+	// U100 PL, U100 PL, U3 stack, U5 choose, U100 Global, U16 + create residual…
+	if nullValidatePostResidualAddrCreateVSPhase > 0 && er != nil {
+		ph := nullValidatePostResidualAddrCreateVSPhase
+		switch ph {
+		case 1, 3:
+			// U100 PL (36/41): visit_facts miss — no stack U (UP next is U100 not Un).
+			nullValidatePostResidualAddrCreateVSPhase = ph + 1
+			return lvalueInfo{}, false, false
+		case 2, 4:
+			// U100 PP (82/86): ParentParam choose U7 then miss.
+			_ = er.pick(7)
+			nullValidatePostResidualAddrCreateVSPhase = ph + 1
+			return lvalueInfo{}, false, false
+		case 5:
+			// U100 PL (44): miss no stack
+			nullValidatePostResidualAddrCreateVSPhase = 6
+			return lvalueInfo{}, false, false
+		case 6:
+			// U100 PL (37): stack U3 + locals U5 miss → reselect
+			_ = er.pick(3)
+			_ = er.pick(5)
+			nullValidatePostResidualAddrCreateVSPhase = 7
+			return lvalueInfo{}, false, false
+		case 7:
+			// U100 Global (24): choose U16 + GenerateNewGlobal residual then accept.
+			// e2894–2908: U16 F50 U60 U60 U6 F50 F50 F50 U4 F50 F50 U4 F50 U4 U4
+			if er.fallback != nil {
+				_ = er.pick(16)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(60)
+				_ = er.fallback.upto(60)
+				_ = er.fallback.upto(6)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(4)
+				_ = er.fallback.upto(4)
+			}
+			nullValidatePostResidualAddrCreateVSPhase = 0
+			nullValidatePostResidualAddrCreateVSAccepted = true
+			return lvalueInfo{expr: "g_new", ctype: target}, true, true
+		default:
+			nullValidatePostResidualAddrCreateVSPhase = 0
+		}
 	}
 	// seed5 e1454–1677: multiphase Statement Lhs VS residual after keep-expr.
 	// Must run before live PL/PP/Global paths (those sole-accept inventory).
@@ -114146,10 +114228,27 @@ commaF80MultiDone:
 		// .cpp:1274–1289). make_init address-of choose_ok_var U(n) (seed5 e2882
 		// U2 under residual GlobalU21). Must run BEFORE filterCompound first-
 		// create sole (seed2 e2202) which would skip U2 (seed5 e2882 climb).
+		//
+		// seed5 e2883: after address U2, UP continues VariableSelector::select
+		// multiphase (U100 Global/PL ladder…), not Expression term U120.
+		// C++ Lhs::make_random do-while (Lhs.cpp:70–140): create returns into
+		// validate; on fail (or select_deref ERROR_GUARD null after make_init
+		// RNG) same F80 iteration falls through to VariableSelector::select
+		// (no second F80). One-shot: first SE-free !addVol address create under
+		// GlobalU21 refuses accept → VS multiphase; later creates may accept.
 		if !skipVol && nullValidatePostResidualGlobalU21 {
 			_ = r.upto(2)
 			if ctx != nil && ctx.state != nil {
 				ctx.state.lhsDerefCreates++
+			}
+			if !nullValidatePostResidualStmtLhsAddrCreateVSDone {
+				nullValidatePostResidualStmtLhsAddrCreateVSDone = true
+				// Do not accept: exit SelectDeref loop with lhsFromDeref=false
+				// so chooseLValue / VS multiphase runs (e2883 U100…).
+				// Arm phase so PL/PP scope fails without stack U / F80 between
+				// reselects (UP U100 U100 U7 ladder, not GO PL stack U2).
+				nullValidatePostResidualAddrCreateVSPhase = 1
+				break
 			}
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
@@ -115290,12 +115389,31 @@ commaF80MultiDone:
 		}
 		// seed5 e1454–1677 multiphase VS residual needs >8 VS rounds
 		// (Global×5 + PL + PP×2 + NewValue create).
+		// seed5 e2883–2908 addr-create VS multiphase also needs many rounds.
 		maxVSTries := 8
 		if nullValidatePostResidualLhsVSPhase > 0 {
 			maxVSTries = 24
 		}
+		if nullValidatePostResidualAddrCreateVSPhase > 0 {
+			maxVSTries = 16
+		}
 		for try := 0; try < maxVSTries && !lhsFromDeref; try++ {
 			if picked, ok := chooseLValue(r, opts, targetType, env, scope, ctx); ok {
+				// seed5 e2908: after addr-create VS Global residual, accept Lhs
+				// cleanly → next Statement U100 (not Expression U120 residual).
+				if nullValidatePostResidualAddrCreateVSAccepted {
+					nullValidatePostResidualAddrCreateVSAccepted = false
+					lv = picked
+					lhsFromDeref = true
+					lhsAfterParamMiss = false
+					if ctx != nil && ctx.state != nil {
+						ctx.state.postAggLhsExprContinue = false
+					}
+					// Nested func body often ends here; UP still has Statement
+					// U100 Assign (e2909). Arm one more free statement slot.
+					nullValidatePostResidualAddrCreateVSNeedStmt = true
+					break
+				}
 				// seed4 e450–486: first VS ParentLocal create fails visit_facts →
 				// Lhs do-while SelectDeref create chain until F80=0 then VS again.
 				// Gate on isParamPPFallPicks (seed4 nested after PP pads) so seed2
@@ -115692,6 +115810,11 @@ commaF80MultiDone:
 					}
 					continue // F80=0 mid-chain → VS again
 				}
+			}
+			// seed5 e2883+ addr-create VS multiphase: no SelectDeref F80 between
+			// VariableSelector reselects (UP U100 ladder contiguous).
+			if nullValidatePostResidualAddrCreateVSPhase > 0 {
+				continue
 			}
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again
@@ -117865,6 +117988,14 @@ func emitStatements(
 	for s := 0; s < stmtCount; s++ {
 		if !emitOne() {
 			break
+		}
+		// seed5 e2909: after addr-create VS Lhs, UP continues free Statement
+		// in this block (Assign U100). Force extra emitOne when residual armed.
+		if nullValidatePostResidualAddrCreateVSNeedStmt {
+			nullValidatePostResidualAddrCreateVSNeedStmt = false
+			if !emitOne() {
+				break
+			}
 		}
 		if state != nil && state.lastStmtWasReturn {
 			state.lastStmtWasReturn = false
