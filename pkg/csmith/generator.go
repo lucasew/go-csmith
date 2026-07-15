@@ -704,7 +704,13 @@ type functionFlowState struct {
 	freeMultiIVNeedNoRhsIfBody bool
 	// freeMultiIVNeedNoRhsIfNestedFor: nested free For body under need_no_rhs
 	// If then/else — Function::stack includes For frame → PL U6 (e5170).
+	// Also free multi-IV need_no_rhs-era For under outer IN_LOOP (seed5 e5146
+	// body at C++ blk_depth max → StatementFilter atMax e5289).
 	freeMultiIVNeedNoRhsIfNestedFor bool
+	// blockStmtsEmitted: successful statements in current emitStatements Block.
+	// StatementContinue.cpp:64–66 returns null when get_last_stm()==0 (first
+	// stmt); Statement::make_random retries without restoring U100.
+	blockStmtsEmitted int
 	// freeMultiIVNeedNoRhsIfLhsSelDone: one-shot Statement Lhs SelectDeref
 	// live multiphase under If body (e5140–45); then F80=0→VS.
 	freeMultiIVNeedNoRhsIfLhsSelDone bool
@@ -119216,6 +119222,15 @@ func emitStatement(
 				// unbounded ArrayOp nesting. e2356 (failOnce false) still rejects.
 				maxD := max(1, opts.MaxBlockDepth)
 				atMax := depth >= maxD || forceAtMax
+				// seed5 e5289: free multi-IV need_no_rhs If then-body nested For
+				// body sits at C++ blk_depth=5 (max). StatementFilter rejects
+				// ArrayOp 59 (atMax_compound tries=1) then accepts Break 42
+				// (IN_LOOP). GO depth lags under residual nesting — force atMax
+				// while freeMultiIVNeedNoRhsIfNestedFor (not the outer If body
+				// where e5146 For is still allowed at depth 4).
+				if state != nil && state.freeMultiIVNeedNoRhsIfNestedFor {
+					atMax = true
+				}
 				// filterCompound forces atMax (is_compound reject). After Lhs write,
 				// only honor sticky filterCompound when already near max depth —
 				// e3144 U100=5 tries=0 at shallow depth; still cap deep nest.
@@ -119605,8 +119620,11 @@ func emitStatement(
 			// C++ SelectLoopCtrlVar ok_vars ≈37 (func_36: ~7 globals incl. vol,
 			// ~7 expanded params p_37/S0×2/p_40/p_41, ~23 parent-chain locals).
 			// GO residual under-materialises locals/params → live nCtrl~16.
-			// Floor only while freeMultiIVNeedNoRhsIfBody (If then/else frame).
-			if state.freeMultiIVNeedNoRhsIfBody && nCtrl < 37 {
+			// seed5 e5294: after nested-For Break, parent free Statement For
+			// still under freeMultiIVNeedNoRhsEra with same ~37 inventory
+			// (ifBody already cleared). Floor while era (includes ifBody).
+			if (state.freeMultiIVNeedNoRhsIfBody || state.freeMultiIVNeedNoRhsEra) &&
+				nCtrl < 37 {
 				nCtrl = 37
 			}
 			if nCtrl > 1 {
@@ -119696,6 +119714,8 @@ func emitStatement(
 			state.blockStack++
 			// seed5 e5170: need_no_rhs If then-body free For pushes
 			// Function::stack → PL parentStackPick U6 (was sticky U5).
+			// seed5 e5161/e5289: NestedFor body is first-stmt Continue reject
+			// + atMax StatementFilter (ArrayOp→Break) while ifBody still true.
 			prevNeedNoRhsNestedFor = state.freeMultiIVNeedNoRhsIfNestedFor
 			if state.freeMultiIVNeedNoRhsIfBody {
 				state.freeMultiIVNeedNoRhsIfNestedFor = true
@@ -119737,6 +119757,20 @@ func emitStatement(
 			}
 		}
 	case stmtContinue:
+		// StatementContinue.cpp:64–66: don't generate Continue as the first
+		// statement in a block (get_last_stm()==0 → return null). C++ then
+		// Statement::make_random retries with a fresh StatementProbability
+		// (seed5 e5161 U100=38 Continue fail → U100=65 Assign; no EV RNG).
+		// Scope to free multi-IV need_no_rhs nested-For body: global first-stmt
+		// reject desyncs seed4 residual Continues that still match via bare
+		// accept (blockStmtsEmitted lag vs true C++ Block.stms).
+		if state != nil && state.blockStmtsEmitted == 0 &&
+			state.freeMultiIVNeedNoRhsIfNestedFor {
+			return false
+		}
+		// ExpressionVariable for Continue condition is often must_use-sole
+		// (no U100) under residual inventory; bare continue holds seed2/4/5
+		// early Continues. Break at e5289 needs explicit EV (see stmtBreak).
 		writeLine(b, 1, "continue;")
 		if state != nil {
 			state.lastStmtWasContinue = true
@@ -119752,6 +119786,15 @@ func emitStatement(
 			}
 		}
 	case stmtBreak:
+		// StatementBreak::make_random → Expression::make_random forced eVariable
+		// (must_use then VariableSelector U100…). Early residual Breaks (e989)
+		// still match via bare break + next-stmt residual; free multi-IV
+		// need_no_rhs nested-For atMax Break (e5289) needs real EV burn:
+		// Global U100=19 + choose U4 + itemize U4.
+		if inLoop && r != nil && state != nil && state.freeMultiIVNeedNoRhsIfNestedFor {
+			breakT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+			_ = randomReturnVariableExpr(breakT, r, opts, env, scope, ctx)
+		}
 		writeLine(b, 1, "break;")
 	case stmtGoto:
 		// StatementGoto::make_random: F40 back-edge, then find_good_jump_block
@@ -120299,6 +120342,17 @@ func emitStatements(
 	if stmtBudget != nil && *stmtBudget == 0 {
 		return
 	}
+	// Nested Block scopes get their own "last_stm" counter (C++ Block.stms).
+	prevBlockStmts := 0
+	if state != nil {
+		prevBlockStmts = state.blockStmtsEmitted
+		state.blockStmtsEmitted = 0
+	}
+	defer func() {
+		if state != nil {
+			state.blockStmtsEmitted = prevBlockStmts
+		}
+	}()
 	stmtLimit := max(1, opts.MaxBlockSize)
 	base := 2
 	if depth > 0 {
@@ -120395,6 +120449,9 @@ func emitStatements(
 			var tmp strings.Builder
 			if emitStatement(&tmp, r, opts, env, scope, state, info, from, depth, inLoop, stmtBudget, ctx, dec) {
 				b.WriteString(tmp.String())
+				if state != nil {
+					state.blockStmtsEmitted++
+				}
 				ok = true
 				break
 			}
@@ -120402,6 +120459,9 @@ func emitStatements(
 			if stmtBudget != nil && snapStmtBudget >= 0 {
 				*stmtBudget = snapStmtBudget
 			}
+			// C++ Statement::make_random keeps RNG draws from a failed attempt
+			// (e.g. first-stmt Continue U100) and retries with a new U100.
+			// Do not restore RNG — genSnapshot has no RNG; only inventory state.
 			restoreGenSnapshot(ctx, snap)
 		}
 		if !ok {

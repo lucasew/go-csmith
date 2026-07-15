@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5289** (Statement U100 tries=1 vs 0 after nested For Lhs); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5324** (Lhs SelectDeref U5 vs F10 create after parent For Assign); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5289→5324 climbed — StatementContinue first-stmt null + atMax Break EV + SelectLoopCtrl U37 era floor:**
+1. Capture: e5289 UP U100=42 tries=1 (reject ArrayOp 59 atMax_compound blk_depth=5) vs GO U100=59 tries=0.
+2. C++: nested For body (BLOCKPROB max=2) rejects first-stmt Continue (StatementContinue.cpp:64–66, no EV RNG) → retries Assign; third StatementProbability at max rejects ArrayOp then Break + EV Global U4+U4; parent free For SelectLoopCtrl ~37 then Assign Lhs SelectDeref.
+3. GO: `blockStmtsEmitted` + scoped first-stmt Continue null under NestedFor; StatementFilter atMax; Break EV; SelectLoopCtrl floor 37 under freeMultiIVNeedNoRhsEra. Seeds 2/3/4/6 held.
+4. Next: e5324 UP U5 (SelectDeref) vs GO F10 (empty create) after parent For Assign Lhs F80=1.
 
 **seed5 e5163→5289 climbed — For body Continue→Assign (not postArrayFor U2) + PL U6 empty create:**
 1. Capture: e5163 UP U120=7 (AssignOps) vs GO U2=1 (postArrayFor) after For body U100=38 Continue, U100=65 Assign.
