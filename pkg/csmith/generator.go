@@ -12575,11 +12575,13 @@ exprTries:
 				ctx.state.ppPostPadCommaAfterPP = false
 			}
 			if !skipCommaType && er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
-				// ExpressionComma::make_random: lhs type=nullptr →
-				// Type::choose_random_nonvoid_nonvolatile() (ExpressionComma.cpp:59–60).
-				// Early free Expression (seed2): unfiltered pool cardinality hack.
+				// ExpressionComma lhs: type=nullptr → Expression::make_random picks
+				// type via SE-free ? choose_random_nonvoid : NonVoidNonVolatile.
+				// Early free Expression SE-free (seed2): unfiltered pool cardinality.
 				// Filtered AllTypes: late eras, PP array body, or after isParam array
 				// Global choose (paramExprCommaAllTypes — seed5 e251→e264 float@9).
+				// seed5 e453: Statement Assign RHS Comma needs NonVoidNonVolatile
+				// (tries=1) — effectSEFree tracking still incomplete for statements.
 				useAllTypesFilter := ctx.state.useSmallParentStack ||
 					(ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0) ||
 					(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes)
@@ -12645,8 +12647,23 @@ exprTries:
 				}
 			}
 			// Upstream ExpressionComma::make_random:
-			// lhs = make_random(..., type=nil, no_const=true), rhs = make_random(..., type=t)
+			// lhs = make_random(cg, type=nil, qfer=nullptr, no_const=true)
+			// rhs = make_random(cg, type=t, qfer=qfer, no_const=false)
+			// LHS must not inherit param formal / Assign WRITE qfer — nested
+			// Function CREATE under Comma lhs uses static ret F50+F10 (seed5 e399).
+			var prevSkip bool
+			var prevQfer []bool
+			if ctx != nil {
+				prevSkip = ctx.skipFuncRetQfer
+				prevQfer = ctx.incomingQferConsts
+				ctx.skipFuncRetQfer = false
+				ctx.incomingQferConsts = nil
+			}
 			lhs := randomTypedExprDepthFlags(lhsType, er, opts, env, scope, depth+1, ctx, false, true)
+			if ctx != nil {
+				ctx.skipFuncRetQfer = prevSkip
+				ctx.incomingQferConsts = prevQfer
+			}
 			rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
 			return castLiteral(t, fmt.Sprintf("((%s), (%s))", lhs, rhs))
 		}
@@ -13369,10 +13386,31 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 			targetType = CType{Name: "int32_t" + stars, Signed: true, Bits: 32}
 		} else {
-			// StructAsLTypeProb skipped when ok_struct_types empty (vol structs filtered).
-			// FloatAsLTypeProb is 0 when !enable_float, but flipcoin(0) still runs
-			// for simple assign (AssignOpWorksForFloat).
-			_ = r.flipcoin(0)
+			// Type::SelectLType after PointerAsLType miss:
+			// get_all_ok_struct_union_types(no_const=true, no_volatile=!SE-free, …).
+			// Statement Assign often !SE-free → filter is_volatile_struct_union.
+			// seed2 e44: only volatile S0 → empty → no F30, just FloatAsLType F0.
+			// seed5 e443: non-vol S0 survives → F30 then F0 (or F30 hit → choose).
+			// Use non-vol structs only (conservative; matches common !SE-free Assign).
+			okStructs := make([]int, 0, 4)
+			if ctx != nil {
+				for i, s := range ctx.info.structs {
+					if s.isVolatile {
+						continue
+					}
+					okStructs = append(okStructs, i)
+				}
+			}
+			if len(okStructs) > 0 && r.flipcoin(30) {
+				si := okStructs[0]
+				if len(okStructs) > 1 {
+					si = okStructs[int(r.upto(uint32(len(okStructs))))%len(okStructs)]
+				}
+				targetType = CType{Name: fmt.Sprintf("struct S%d", si), Bits: 32}
+			} else {
+				// FloatAsLTypeProb (default 0): still consume flipcoin(0).
+				_ = r.flipcoin(0)
+			}
 		}
 	}
 
