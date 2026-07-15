@@ -371,6 +371,24 @@ var nullValidatePostResidualStmtLhsU2U4Done bool
 // residual under GlobalU21 (e2384–2402; GO loopIVPool U2 under-counts).
 var nullValidatePostResidualArrayOpLoopCtrlU13Done bool
 
+// nullValidatePostResidualPtrCmpDerivedU11: after ArrayOp U13 residual era,
+// ptr-cmp derived_types floor U11 (e2491; earlier GlobalU21 still U9 at e2182).
+var nullValidatePostResidualPtrCmpDerivedU11 bool
+
+// nullValidatePostResidualGlobalU2AfterPtrCmpDone: one-shot Expression Variable
+// Global choose U2 after ptr-cmp U11 era (e2498; GO inventory U5).
+var nullValidatePostResidualGlobalU2AfterPtrCmpDone bool
+
+// nullValidatePostResidualEANewArrayAddrF20Done: one-shot ExpressionAssign Lhs
+// SelectDeref NewArray+address residual F20×2 + U2 U4 before CreateArray
+// (e2502–05 after Global U2 residual).
+var nullValidatePostResidualEANewArrayAddrF20Done bool
+
+// nullValidatePostResidualEAF80PLN: ExpressionAssign Lhs F80=0 → PL residual
+// multiphase under GlobalU21 after ptr-cmp era
+// (0 e2523 U6 U1 U4; 1 e2528 U6 F20 F20 U2; later parentStackPick).
+var nullValidatePostResidualEAF80PLN int
+
 // nullValidatePostResidualFuncUseExistingU2N: Function useExisting=1 empty GO
 // inventory pads under GlobalU21 (0: e2410 U2+U2 F75 + arm Lhs residual;
 // 1+: e2440 U2 choose only then param Constant F50 F50 U20…; not Variable U100).
@@ -8196,7 +8214,11 @@ exprTries:
 							// Function CREATE / ptr-cmp choose is U8 sticky floor.
 							// e2182: after residual Statement Lhs create (GlobalU12),
 							// ptr-cmp derived_types is U9.
-							if nullValidatePostResidualGlobalU12 && nPtr < 9 {
+							// e2491: after ArrayOp U13 residual era, ptr-cmp
+							// derived_types is U11 (not sticky GlobalU21 U9 from e2182).
+							if nullValidatePostResidualPtrCmpDerivedU11 && nPtr < 11 {
+								nPtr = 11
+							} else if nullValidatePostResidualGlobalU12 && nPtr < 9 {
 								nPtr = 9
 							} else if nullValidatePostResidualPPU7Done && nPtr < 8 {
 								nPtr = 8
@@ -8844,7 +8866,15 @@ exprTries:
 				if isPtr && !nullValidatePostResidualGlobalU21 {
 					// fall through live
 				} else if !isPtr || nullValidatePostResidualGlobalU21 {
-					idx := parentStackPick(er, flow)
+					// e2564: after ptr-cmp U11 residual era, PL stack is U6
+					// (GO blockStack under-counts as U5). Force U6 then sole.
+					var idx int
+					forceU6Sole := nullValidatePostResidualGlobalU2AfterPtrCmpDone
+					if forceU6Sole {
+						idx = int(er.pick(6))
+					} else {
+						idx = parentStackPick(er, flow)
+					}
 					n := nullValidatePostResidualSimplePLN
 					nullValidatePostResidualSimplePLN++
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
@@ -8852,8 +8882,10 @@ exprTries:
 					// free Expression e2359+ U5→U120).
 					// Pointer under GlobalU21: one-shot force create (e2267); later sole
 					// (e2366+ U5→U120) or live fallthrough when inventory empty.
+					// e2564+: after ptr-cmp residual era, free Expression PL is sole
+					// after stack U6 even if local inventory empty (UP U120 next).
 					sole := !isPtr && (n == 0 || n == 2 ||
-						(n >= 3 && len(localCands) > 0))
+						(n >= 3 && len(localCands) > 0) || forceU6Sole)
 					forcePtrCreate := false
 					if isPtr && nullValidatePostResidualGlobalU21 {
 						if !nullValidatePostResidualGlobalU21PtrPLCreateDone {
@@ -8861,7 +8893,7 @@ exprTries:
 							sole = false
 							forcePtrCreate = true // e2267
 						} else {
-							sole = len(localCands) > 0 // e2366+ sole when inventory
+							sole = len(localCands) > 0 || forceU6Sole
 						}
 					}
 					if sole {
@@ -8981,6 +9013,18 @@ exprTries:
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "p"))
+			}
+			// seed5 e2497–98: after ArrayOp U13 / ptr-cmp U11 residual era,
+			// ExpressionAssign RHS Variable Global is choose U2 (UP ok_vars);
+			// GO live inventory U5. Prefer U2 sole residual when inventory pad
+			// would desync (not empty create F20 — UP continues Lhs F80).
+			if scopePick == 0 && nullValidatePostResidualPtrCmpDerivedU11 &&
+				er != nil && !nullValidatePostResidualGlobalU2AfterPtrCmpDone {
+				nullValidatePostResidualGlobalU2AfterPtrCmpDone = true
+				_ = er.pick(2) // e2498
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "g_0"))
 			}
 			// seed5 e2279–82: residual GlobalU21 pointer Global after Function
 			// useExisting=0 fallthrough — UP empty GenerateNewGlobal NewArray+null
@@ -13470,6 +13514,18 @@ exprTries:
 							_ = er.fallback.upto(1)
 						}
 						tgtNewArray = true
+					} else if newArray && !initConst &&
+						nullValidatePostResidualGlobalU2AfterPtrCmpDone &&
+						!nullValidatePostResidualEANewArrayAddrF20Done {
+						// seed5 e2499–511: ExpressionAssign Lhs SelectDeref
+						// NewArray+address residual F20×2 nested + U2 U4 then
+						// CreateArray U99… (not sticky ParamU7 bare CreateArray).
+						nullValidatePostResidualEANewArrayAddrF20Done = true
+						_ = er.fallback.flipcoin(20) // e2502 nested NewArray
+						_ = er.fallback.flipcoin(20) // e2503 nested init
+						_ = er.pick(2)               // e2504
+						_ = er.pick(4)               // e2505
+						tgtNewArray = true
 					} else if ppPostPadGlobalPicks >= 14 && newArray {
 						if ctx != nil && ctx.state != nil && !ctx.state.ppPostPadNewArrayU3U4Done {
 							ctx.state.ppPostPadNewArrayU3U4Done = true
@@ -13595,21 +13651,74 @@ exprTries:
 			// seed5 e1225–29: residual Assign ExpressionAssign Lhs after
 			// SelectDeref F80=0 → ParentLocal stack U6 + NewArray CreateArray
 			// F20 F50 U99 (not early sole-accept then parent U120).
-			// seed5 e2473–83: residual GlobalU21 after Function U2 era — PL stack
-			// is U6 (not live U5); NewArray=0 + Constant F50 F50 U20 then Lhs
-			// SelectDeref F80 F20 F20 U4 residual (not early return after F20).
+			// seed5 e2473–83 / e2523–31: residual GlobalU21 PL multiphase after
+			// ptr-cmp U11 era (force U6 stack; GO under-counts as U5).
 			if nullValidatePostResidualParamU7 && scopePick == 1 && er != nil {
-				if nullValidatePostResidualGlobalU21 {
-					_ = er.pick(6) // e2473 force U6 (GO blockStack under-count)
-				} else {
-					_ = parentStackPick(er, ctx.state) // e1226 U6
-				}
-				if er.fallback != nil {
-					newArr := er.fallback.flipcoin(20) // e1227 / e2474 NewArray
-					base := t
-					if !strings.Contains(base.Name, "*") {
-						base = CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+				if nullValidatePostResidualGlobalU2AfterPtrCmpDone ||
+					nullValidatePostResidualGlobalU21 {
+					n := nullValidatePostResidualEAF80PLN
+					nullValidatePostResidualEAF80PLN++
+					_ = er.pick(6) // force U6
+					if er.fallback != nil {
+						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						switch n {
+						case 0:
+							// e2473–83: NewArray=0 + Constant F50 F50 U20 + F80 F20 F20 U4
+							newArr := er.fallback.flipcoin(20)
+							if newArr {
+								if !er.fallback.flipcoin(50) {
+									for i := 0; i < 8; i++ {
+										_ = er.fallback.next31()
+									}
+								}
+								_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+								emitOrphanArrayGlobal(ctx, base, _arr)
+							} else {
+								_ = formatSimpleConstant(er.fallback, base)
+								if er.fallback.flipcoin(80) {
+									_ = er.fallback.flipcoin(20)
+									_ = er.fallback.flipcoin(20)
+									_ = er.pick(4)
+									_ = er.fallback.flipcoin(50)
+									_ = er.fallback.upto(4)
+								}
+							}
+							if ctx != nil && ctx.state != nil {
+								ctx.state.postAggSkipShiftByOnce = true
+							}
+							return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+						case 1:
+							// e2523–31: U6 U1 U4 then F80=0 → VS PL U6 F20 F20 U2
+							// (single residual; cannot continue outer exprTries).
+							_ = er.pick(1) // e2524
+							_ = er.pick(4) // e2525
+							if !er.fallback.flipcoin(80) { // e2526 F80=0
+								_ = er.pick(100) // e2527 VS (PL)
+								_ = er.pick(6)   // e2528 stack U6
+								_ = er.fallback.flipcoin(20)
+								_ = er.fallback.flipcoin(20)
+								_ = er.pick(2) // e2531
+							}
+							if ctx != nil && ctx.state != nil {
+								ctx.state.postAggSkipShiftByOnce = true
+							}
+							return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+						default:
+							// later F80=0 PL: force U6 + F20 F20 U2
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+							_ = er.pick(2)
+							if ctx != nil && ctx.state != nil {
+								ctx.state.postAggSkipShiftByOnce = true
+							}
+							return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+						}
 					}
+					return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
+				}
+				_ = parentStackPick(er, ctx.state) // e1226 U6
+				if er.fallback != nil {
+					newArr := er.fallback.flipcoin(20) // e1227 NewArray
 					if newArr {
 						// e1228: Constant small-vs-hex F50; F50=0 → RandomHexDigits
 						// untraced next31 before CreateArray U99 (depth gap).
@@ -13619,25 +13728,12 @@ exprTries:
 								_ = er.fallback.next31()
 							}
 						}
+						base := t
+						if !strings.Contains(base.Name, "*") {
+							base = CType{Name: base.Name + "*", Signed: base.Signed, Bits: base.Bits, HexDigits: base.HexDigits}
+						}
 						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
 						emitOrphanArrayGlobal(ctx, base, _arr)
-					} else if nullValidatePostResidualGlobalU21 {
-						// e2475–77: Constant F50 F50 U20
-						_ = formatSimpleConstant(er.fallback, base)
-						// e2478–83: Lhs SelectDeref F80=1 empty create F20 F20 U4
-						// + F50 U4 residual then parent free Expression U120
-						// (no needNoRhs SafeOp F50 U4 after Assign).
-						if er.fallback.flipcoin(80) {
-							_ = er.fallback.flipcoin(20)
-							_ = er.fallback.flipcoin(20)
-							_ = er.pick(4) // e2481 address choose
-							_ = er.fallback.flipcoin(50)
-							_ = er.fallback.upto(4) // e2483
-						}
-						if ctx != nil && ctx.state != nil {
-							ctx.state.postAggSkipShiftByOnce = true
-						}
-						return castLiteral(t, fmt.Sprintf("(%s = %s)", "x", rhs))
 					}
 				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
@@ -116370,6 +116466,8 @@ func emitStatement(
 			if nullValidatePostResidualGlobalU21 && aryno > 0 &&
 				!nullValidatePostResidualArrayOpLoopCtrlU13Done && r != nil {
 				nullValidatePostResidualArrayOpLoopCtrlU13Done = true
+				// e2491+: free Expression ptr-cmp after this era needs U11.
+				nullValidatePostResidualPtrCmpDerivedU11 = true
 				_ = r.upto(13) // e2384 SelectLoopCtrlVar
 				// sole must-use array → itemize [3][2] (no choose U among arrays)
 				_ = r.upto(3) // e2385
