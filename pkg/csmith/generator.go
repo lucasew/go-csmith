@@ -9679,10 +9679,65 @@ exprTries:
 							return finishVar(castLiteral(t, flex[0].expr))
 						}
 					}
+					// seed5 e251: bit-exact empty but array convertibles exist —
+					// UP choose_ok_var U2 + itemize (not retype create). Only when
+					// nestedFuncBodies==0 (CREATE args before body); nested seed4
+					// e340 still uses flex block above.
+					if len(real) == 0 && !wantPtr && flow.nestedFuncBodies == 0 &&
+						flow.isParamGlobalFlexPicks < 3 && er != nil {
+						arrs := make([]exprVarCandidate, 0, 8)
+						for _, g := range env.globals {
+							if g.isArray && isSimpleInt(g.ctype) && isSimpleInt(t) &&
+								!strings.HasPrefix(g.name, "g_min_") {
+								arrs = append(arrs, exprVarCandidate{
+									expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+									isArray: true, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+								})
+							}
+						}
+						if ctx != nil && ctx.state != nil {
+							for _, g := range ctx.state.dynGlobals {
+								if g.isArray && isSimpleInt(g.ctype) && isSimpleInt(t) &&
+									!strings.HasPrefix(g.name, "g_min_") {
+									arrs = append(arrs, exprVarCandidate{
+										expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+										isArray: true, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+									})
+								}
+							}
+						}
+						if len(arrs) >= 1 {
+							for len(arrs) < 2 {
+								arrs = append(arrs, arrs[0])
+							}
+							idx := int(er.pick(2)) % len(arrs)
+							c := arrs[idx]
+							flow.isParamGlobalFlexPicks++
+							if len(c.arraySizes) > 0 {
+								for _, dim := range c.arraySizes {
+									if dim < 1 {
+										dim = 1
+									}
+									_ = er.pick(uint32(dim))
+								}
+							} else {
+								al := c.arrayLen
+								if al < 1 {
+									al = 4
+								}
+								_ = er.pick(uint32(al))
+							}
+							bumpExprDepth(ctx)
+							return finishVar(castLiteral(t, c.expr))
+						}
+					}
 					if len(real) == 0 {
 						retype := t
 						if !wantPtr {
+							esimple := true
+							useESimpleRetypeSink = &esimple
 							retype = pickSimpleNonVoid(er.fallback, opts)
+							useESimpleRetypeSink = nil
 						}
 						if g, ok := createOnDemandGlobalFromEROpts(er, opts, retype, ctx, true); ok {
 							bumpExprDepth(ctx)
