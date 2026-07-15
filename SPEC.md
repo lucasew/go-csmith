@@ -222,16 +222,22 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2943** (For SelectLoopCtrl U15 vs U2 after e2916–2942 wildcard create climb); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2966** (Assign RHS Funcall vs GO U2 after e2943→2965 SelectLoopCtrl climb); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e2943→2966 climbed — free For SelectLoopCtrl inventory + loop_control:**
+1. Capture: Statement For e2942, UP SelectLoopCtrl U15 + make_random_loop_control; GO sticky loopIVPool U2 + multi-dim array_control U9 U8.
+2. C++ SelectLoopCtrlVar (VariableSelector.cpp:1120–53): find_all_non_array_visible + choose_var(WRITE, int, eConvert, no_bitfield); array_control only when rw_directive must_use arrays non-empty — free For uses loop_control.
+3. GO: postArrayFor only when arrayLoopFresh or continue-remapped (not sticky loopIVPool alone); free multi-IV path uses countVisibleIntLoopCtrl (expand non-bitfield fields, dedupe) + floor U15 inside residual GlobalU21 ArrayOp body; loop_control residual.
+4. Seed2/3/4/6 held. Next: e2966 UP U100=50 vs GO U2 (Funcall-ish).
 
 **seed5 e2916→2943 climbed — SelectDeref create wildcard qfer + nested body continue:**
 1. Capture: after VS multiphase e2908 + Statement Assign Constant RHS, UP SelectDeref create F50 F10 F50 (random_qualifiers) vs GO F10 F50 (random_add).
 2. C++ select_deref_pointer (VariableSelector.cpp:1248–54): `qfer->wildcard` (Constant get_qualifiers / need_no_rhs) → `random_qualifiers(ptr, WRITE, no_volatile=true)` = per-level F50+F10 + self F50; else `random_add_qualifiers`.
 3. GO: track top-level RHS term Constant → `assignRhsWildcardQfer`; create uses random_qualifiers when wildcard. After AddrCreateVS one-shot, address create runs choose_ok_var U4+itemize (not filterCompound sole). Nested body NeedStmt drain loop + PP→PL empty create (stack U2 U14) + Statement filter allows For at shallow residual depth.
-4. Seed2/3/4/6 held. Next: e2943 For SelectLoopCtrl U15 vs U2 inventory.
+4. Seed2/3/4/6 held. Next was e2943 (climbed).
 
 **seed5 e2883→2916 climbed — Lhs !addVol address create validate-fail → VS multiphase:**
 1. Capture: after F80 F10 F50 F20 F20 U2, UP U100 Global/PL/PP ladder… U16 create residual through e2908; GO accepted Lhs → Expression U120.

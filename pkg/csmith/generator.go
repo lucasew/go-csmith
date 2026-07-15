@@ -4287,63 +4287,132 @@ func countVisibleArrays(env envInfo, scope scopeInfo, ctx *genContext) int {
 	return n
 }
 
-// countVisibleIntLoopCtrl approximates SelectLoopCtrlVar expanded integer
-// pool (non-array, non-vol, with struct field expansion). Nest ArrayOp e6721 U39.
+// countVisibleIntLoopCtrl mirrors SelectLoopCtrlVar → choose_var ok_vars size:
+// find_all_non_array_visible_vars + drop non-int / pointer-union + expand_struct
+// (no_bitfield=true) + integer eConvert match. Globals (incl. fromParentLocal),
+// residual orphans, locals, params — deduped by name. Nest ArrayOp e6721 era;
+// free For e2943 floors to U15 when GO inventory under-materialises.
 func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int {
-	n := 0
-	isIntish := func(t CType) bool {
+	isIntSimple := func(t CType) bool {
 		if strings.Contains(t.Name, "*") {
 			return false
 		}
 		if strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") {
-			// expand_struct_union_vars: count a few int fields
-			return true
+			return false
 		}
 		return t.Bits > 0 && t.Name != "float" && t.Name != "void"
 	}
-	fieldPad := func(t CType) int {
+	info := compositeInfo{}
+	if ctx != nil {
+		info = ctx.info
+	}
+	structFields := func(t CType) []fieldInfo {
 		if strings.HasPrefix(t.Name, "struct") {
-			return 6 // typical S0 bitfield/simple field count
+			var si int
+			if _, err := fmt.Sscanf(t.Name, "struct S%d", &si); err == nil &&
+				si >= 0 && si < len(info.structs) {
+				return info.structs[si].fields
+			}
 		}
 		if strings.HasPrefix(t.Name, "union") {
-			return 0 // often filtered (pointer fields)
+			var ui int
+			if _, err := fmt.Sscanf(t.Name, "union U%d", &ui); err == nil &&
+				ui >= 0 && ui < len(info.unions) {
+				return info.unions[ui].fields
+			}
 		}
-		return 1
+		return nil
 	}
+	// has_int_field: simple int, or aggregate with at least one int-ish field.
+	hasIntField := func(t CType) bool {
+		if strings.Contains(t.Name, "*") {
+			return false
+		}
+		if isIntSimple(t) {
+			return true
+		}
+		fields := structFields(t)
+		if len(fields) == 0 {
+			// Unknown aggregate: treat as expandable int carrier (historical pad).
+			return strings.HasPrefix(t.Name, "struct")
+		}
+		for _, f := range fields {
+			if isIntSimple(f.ctype) || (!strings.Contains(f.ctype.Name, "*") &&
+				(strings.HasPrefix(f.ctype.Name, "struct") || strings.HasPrefix(f.ctype.Name, "union"))) {
+				return true
+			}
+		}
+		return false
+	}
+	unionHasPointer := func(t CType) bool {
+		if !strings.HasPrefix(t.Name, "union") {
+			return false
+		}
+		for _, f := range structFields(t) {
+			if strings.Contains(f.ctype.Name, "*") {
+				return true
+			}
+		}
+		return false
+	}
+	// expand count: no_bitfield — skip bitfields; count int simple fields only.
+	expandCount := func(t CType) int {
+		if isIntSimple(t) {
+			return 1
+		}
+		fields := structFields(t)
+		if len(fields) == 0 {
+			if strings.HasPrefix(t.Name, "struct") {
+				return 6 // fallback when struct metadata missing
+			}
+			return 0
+		}
+		n := 0
+		for _, f := range fields {
+			if f.bitfield {
+				continue // choose_var no_bitfield=true
+			}
+			if isIntSimple(f.ctype) {
+				n++
+			}
+		}
+		return n
+	}
+
+	seen := map[string]bool{}
+	n := 0
+	add := func(name string, t CType, arr, vol, cnst bool) {
+		if name == "" || arr || vol || cnst || seen[name] {
+			return
+		}
+		if !hasIntField(t) || unionHasPointer(t) {
+			return
+		}
+		seen[name] = true
+		n += expandCount(t)
+	}
+	// GlobalList: include fromParentLocal entries that GO never mirrored into
+	// dynLocs (C++ GenerateNewParentLocal still sits on a parent block).
+	// Name-dedupe against locals below.
 	for _, g := range mergedGlobals(env, ctx) {
-		if g.isArray || g.isVolatile || g.isConst {
-			continue
-		}
-		if !isIntish(g.ctype) {
-			continue
-		}
-		n += fieldPad(g.ctype)
+		add(g.name, g.ctype, g.isArray, g.isVolatile, g.isConst)
 	}
+	// Residual address-of / create orphans may still be on C++ GlobalList.
 	if ctx != nil && ctx.state != nil {
 		for _, g := range ctx.state.orphanGlobals {
-			if g.isArray || g.isVolatile || g.isConst {
-				continue
-			}
-			if isIntish(g.ctype) {
-				n += fieldPad(g.ctype)
-			}
+			add(g.name, g.ctype, g.isArray, g.isVolatile, g.isConst)
 		}
 	}
+	// Locals on stack (incl. PL materialisations). Name-dedupe vs globals.
 	for _, l := range mergedLocals(scope, ctx) {
-		if l.isArray || l.isVol || l.isConst || l.name == "x" {
+		if l.name == "x" {
 			continue
 		}
-		if isIntish(l.ctype) {
-			n += fieldPad(l.ctype)
-		}
+		add(l.name, l.ctype, l.isArray, l.isVol, l.isConst)
 	}
+	// Function params.
 	for _, p := range scope.params {
-		if strings.Contains(p.ctype.Name, "*") {
-			continue
-		}
-		if isIntish(p.ctype) {
-			n += fieldPad(p.ctype)
-		}
+		add(p.name, p.ctype, false, false, false)
 	}
 	return n
 }
@@ -117267,13 +117336,20 @@ func emitStatement(
 		}
 		// seed5 e974: after NullValidate residual free Expressions → Statement
 		// For, SelectLoopCtrl among ~9 integer visibles (UP U9) then loop_control.
+		nullValidateForU9 := false
 		if nullValidatePostResidualForLoopCtrlU9 {
 			nullValidatePostResidualForLoopCtrlU9 = false
+			nullValidateForU9 = true
 			_ = r.upto(9)
 			// e991: first body Assign after Break uses U7 residual not AssignOps.
 			nullValidatePostResidualForBodyAssign = true
 		}
-		postArrayFor := state != nil && state.loopIVPool > 1
+		// postArrayFor: multi-IV + array_control only while arrayLoopFresh (first
+		// nested For of a real array-loop) or continue-remapped parent (seed2 e949).
+		// Sticky loopIVPool>1 without arrayLoopFresh (residual ArrayOp body, or after
+		// body climb) is free SelectLoopCtrl + loop_control (seed5 e2943 U15 vs U2).
+		postArrayFor := state != nil && state.loopIVPool > 1 &&
+			(state.arrayLoopFresh || remappedAssignToFor)
 		createIV := state != nil && state.deepStack && state.loopIVPool == 0
 		// seed4 e783: first nested For in PP-era array-loop body has no real
 		// integer IV (array-loop burned fictional U2/U3); create like empty pool
@@ -117292,7 +117368,11 @@ func emitStatement(
 		// residual but itemize U2 (not U1 / U9 U8) after create stream.
 		ppCreateArrayBody := createIV && state != nil && state.isParamPPFallPicks >= 2 &&
 			state.arrayLoopFresh && state.multiDimArrays > 0
-		if postArrayFor {
+		if nullValidateForU9 {
+			// already burned SelectLoopCtrl U9; fall through to loop_control
+		} else if postArrayFor {
+			// Nested array-loop For: C++ still uses full inventory, but early
+			// seed2 era pool size equals sticky loopIVPool (e370 U2).
 			_ = r.upto(uint32(state.loopIVPool))
 		} else if afterContFor {
 			_ = r.upto(5)
@@ -117314,8 +117394,27 @@ func emitStatement(
 			// e2189 body StatementFilter at max depth (compound reject).
 			state.filterCompoundStmts = true
 		} else if state != nil && state.loopIVPool == 1 {
-			// sole IV early — no choose RNG
+			// sole IV early — no choose RNG (len==1)
+		} else if state != nil && state.loopIVPool > 1 {
+			// Sticky multi-IV without arrayLoopFresh/remap (residual ArrayOp body
+			// or post-body climb): free SelectLoopCtrl full inventory + loop_control
+			// (seed5 e2943 U15). Do NOT run this for loopIVPool==0 early Fors —
+			// sole/empty pools burn no choose RNG (seed2 e183 F50 loop_control).
+			nCtrl := countVisibleIntLoopCtrl(env, scope, ctx)
+			// GO dynGlobals under-materialises true GlobalList inside residual
+			// GlobalU21 ArrayOp body; floor to UP U15 while still nested there.
+			if nullValidatePostResidualArrayOpLoopCtrlU13Done &&
+				state.arrayLoopDepth > 0 && nCtrl < 15 {
+				nCtrl = 15
+			}
+			if nCtrl > 1 {
+				_ = r.upto(uint32(nCtrl))
+			} else if nCtrl == 0 {
+				burnSelectLoopCtrlVarCreate(r, opts)
+			}
+			// nCtrl==1: no choose RNG
 		}
+		// loopIVPool==0 (and not createIV): no SelectLoopCtrl choose.
 		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
 		if useArrayControl && !afterContFor {
 			// make_random_array_control + SafeOpFlags.
