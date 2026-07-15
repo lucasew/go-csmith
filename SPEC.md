@@ -222,15 +222,21 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4210** (U16 vs U15 same raw after NewValue Lhs accept / IfElse nest); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4215** (ptr-cmp operand qfer F10 after e4210 U16 match — star-depth under-model); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+**seed5 e4210→4215 climbed — eULong* derived inventory (pointerBaseKey):**
+1. Capture: e4210 UP U16=9 vs GO U15=9 same raw (ptr-cmp `choose_random_pointer_type`).
+2. C++: `Type::derived_types` is keyed by `Type*` identity — `eULong` and `eULongLong` are distinct even when both are 64-bit on LP64. SelectDeref empty create at e3434 called `find_pointer_type(eULong, true)` → ADD n=16 (ind=1). GO collapsed both to `uint64_t` so `noteDerivedPointer` was a no-op.
+3. GO: `pointerBaseKey` distinguishes `uint64_t` by `HexDigits` (8 = eULong / GenerateRandomLongConstant; 16 = eULongLong). Do **not** split signed `int64_t` the same way — that over-counted seed4 SelectDeref live inventory (e2732 U14 vs U13). Next: e4215 qfer F10 (operand star-depth for derived idx=9).
+4. Seed2/3/4/6 held.
+
 **seed5 e4094→4210 climbed — Global pool settle + NewValue Lhs accept:**
 1. Capture: e4094 UP Global choose U3 vs GO U2 (same raw) late in Lhs do-while; after fix e4111 U14 tries + NewValue create; e4119 Statement IfElse.
 2. C++: choose_var pointer-preference then remaining eDerefExact ok_vars; late PL creates settle live Global pool so choose n stays U3 (e3932/e4018/e4093); NewValue→PL Type::random_type_from_type choose_random_simple (U14 + SIMPLE_TYPES_PROB_FILTER tries); need_no_rhs SafeOpFlags F50+U4; visit accept → next Statement. freeMultiIV Expression nest must stop after that Assign.
-3. GO: globalPoolSettled freezes phase-B countdown after late create growth; NewValue pickSimpleNonVoid + create + SafeOpFlags + clear freeMultiIVForLhsExprContinue. Next: e4210 U16 vs U15.
+3. GO: globalPoolSettled freezes phase-B countdown after late create growth; NewValue pickSimpleNonVoid + create + SafeOpFlags + clear freeMultiIVForLhsExprContinue.
 4. Seed2/3/4/6 held.
 
 **seed5 e3647→4094 climbed — Lhs do-while U7 + Constant hex + VS inventory:**

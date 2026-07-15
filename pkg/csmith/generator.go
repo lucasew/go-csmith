@@ -1484,7 +1484,19 @@ func pointerBaseKey(t CType) string {
 			name = fmt.Sprintf("uint%d_t", t.Bits)
 		}
 	}
-	return strings.ReplaceAll(name, "*", "")
+	base := strings.ReplaceAll(name, "*", "")
+	// Type::derived_types keys by Type* identity. eULong vs eULongLong are
+	// distinct simples even when both are 64-bit on LP64 and GO emits both as
+	// uint64_t. HexDigits encodes that: GenerateRandomLongConstant uses 8 hex
+	// digits; LongLong uses 16 (Constant.cpp). Without this, noteDerivedPointer
+	// collapses eULong* into eULongLong* and under-counts
+	// choose_random_pointer_type (seed5 e3434 ADD eULong* → e4210 U16).
+	// Only distinguish unsigned long — signed eLong/eLongLong separation
+	// over-counted seed4 SelectDeref live inventory (e2732 U14 vs U13).
+	if base == "uint64_t" && t.HexDigits > 0 {
+		return fmt.Sprintf("%s#%d", base, t.HexDigits)
+	}
+	return base
 }
 
 // pushMustRW / popMustRW install combined must_read + must_write lists for an
