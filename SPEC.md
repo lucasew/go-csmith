@@ -189,9 +189,9 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 |------|--------|
 | Instrumented upstream build | `scripts/build-instrumented-upstream.sh` → `.build/csmith-instrumented/` |
 | Seed 2 re-baseline | Running vs golden `0cdc710` / csmith 2.4.0 |
-| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →25021) |
+| Seed 2 event match | **PASS** — full **37939/37939** (held after seed4 climb →27999) |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
-| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **25021** (22991→25021; Comma F80 Multi: ordered PL/PP/Global/NV exits — no shape F50 coin on F80=0; Const multiphase hex×8 depth gaps; extended U2U2U10/U2U8U5U6F0 shape table; NV create + free invent burn; PP#26 field catalog → free invent multiphase through ~25020; seed2 full held). Toward 26000+. |
+| 20-seed gate | **In progress** — seed3 **PASS** 64/64; seed4 first_div **27999** (25021→27999; post-CommaF80 free invent multiphase burn extended with depth-gap hex + U14/U100/U120 tries filters through ~27998 SelectDeref ladder era; seed2 full held). Toward 30000+. |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
 
