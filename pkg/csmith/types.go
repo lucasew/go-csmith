@@ -185,6 +185,34 @@ func rejectAllTypesNonVoidNonVolatile(x uint32, types []CType, info compositeInf
 	return false
 }
 
+// pickNonVoid mirrors Type::choose_random_nonvoid (NonVoidTypeFilter +
+// SIMPLE_TYPES_PROB_FILTER). Rejects void and disabled float/int128 only —
+// volatile aggregates remain eligible (unlike NonVoidNonVolatile).
+func pickNonVoid(r *rng, info compositeInfo, opts Options) CType {
+	types := allTypesList(info)
+	if len(types) == 0 {
+		return CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	idx := int(r.uptoWithFilter(uint32(len(types)), func(x uint32) bool {
+		i := int(x)
+		if i < 0 || i >= len(types) {
+			return true
+		}
+		tn := types[i].Name
+		if tn == "float" && !opts.EnableFloat {
+			return true
+		}
+		if tn == "__int128" && !opts.Int128 {
+			return true
+		}
+		if tn == "unsigned __int128" && !opts.UInt128 {
+			return true
+		}
+		return false
+	}))
+	return types[idx]
+}
+
 // pickNonVoidNonVolatile mirrors Type::choose_random_nonvoid_nonvolatile
 // (NonVoidNonVolatileTypeFilter + SIMPLE_TYPES_PROB_FILTER).
 func pickNonVoidNonVolatile(r *rng, pool []CType, info compositeInfo, opts Options) CType {

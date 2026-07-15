@@ -12575,75 +12575,37 @@ exprTries:
 				ctx.state.ppPostPadCommaAfterPP = false
 			}
 			if !skipCommaType && er != nil && er.fallback != nil && ctx != nil && ctx.state != nil {
-				// ExpressionComma lhs: type=nullptr → Expression::make_random picks
-				// type via SE-free ? choose_random_nonvoid : NonVoidNonVolatile.
-				// Early free Expression SE-free (seed2): unfiltered pool cardinality.
-				// Filtered AllTypes: late eras, PP array body, or after isParam array
-				// Global choose (paramExprCommaAllTypes — seed5 e251→e264 float@9).
-				// seed5 e453: Statement Assign RHS Comma needs NonVoidNonVolatile
-				// (tries=1) — effectSEFree tracking still incomplete for statements.
-				useAllTypesFilter := ctx.state.useSmallParentStack ||
-					(ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0) ||
+				// ExpressionComma lhs type=nullptr → Expression::make_random:
+				// SE-free ? choose_random_nonvoid : NonVoidNonVolatile (AllTypes).
+				// Always AllTypes + SIMPLE float/int128 filter (no unfiltered pool).
+				// seed5 e453: float@9 reject tries=1 under NonVoid.
+				// Param-tree after array Global forces NonVolatile (e264 float@9).
+				// useSmallParentStack does NOT alone force NonVolatile (seed2 e972
+				// SE-free NonVoid accepts volatile S0@13 tries=0).
+				forceNonVol := !ctx.effectSEFree ||
 					(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes)
-				if useAllTypesFilter {
-					// !SE-free → NonVoidNonVolatile; SE-free residual may use NonVoid.
-					// Param-tree after array Global: always NonVoidNonVolatile.
-					useNonVoid := ctx.effectSEFree && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes)
-					if !useNonVoid && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
-						ctx.state.postAggU15StackU6CreateDone {
-						if ctx.state.postAggU15CommaNonVoidLeft == 0 && !ctx.state.postAggU15CommaNonVoidInit {
-							ctx.state.postAggU15CommaNonVoidLeft = 2
-							ctx.state.postAggU15CommaNonVoidInit = true
-						}
-						if ctx.state.postAggU15CommaNonVoidLeft > 0 {
-							ctx.state.postAggU15CommaNonVoidLeft--
-							useNonVoid = true
-						}
+				// Late PP array body historically filtered; keep NonVolatile when
+				// !SE-free already covered; when SE-free still NonVoid.
+				useNonVoid := !forceNonVol
+				if forceNonVol && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
+					ctx.state.postAggU15StackU6CreateDone {
+					if ctx.state.postAggU15CommaNonVoidLeft == 0 && !ctx.state.postAggU15CommaNonVoidInit {
+						ctx.state.postAggU15CommaNonVoidLeft = 2
+						ctx.state.postAggU15CommaNonVoidInit = true
 					}
-					if !useNonVoid && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
-						postAggPostCD3ArrayOp2BodyActive {
+					if ctx.state.postAggU15CommaNonVoidLeft > 0 {
+						ctx.state.postAggU15CommaNonVoidLeft--
 						useNonVoid = true
 					}
-					if !useNonVoid {
-						lhsType = pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.state.info, opts)
-					} else {
-						types := allTypesList(ctx.state.info)
-						if len(types) > 0 {
-							reject := func(x uint32) bool {
-								i := int(x)
-								if i < 0 || i >= len(types) {
-									return true
-								}
-								tn := types[i].Name
-								if tn == "float" && !opts.EnableFloat {
-									return true
-								}
-								if tn == "__int128" && !opts.Int128 {
-									return true
-								}
-								if tn == "unsigned __int128" && !opts.UInt128 {
-									return true
-								}
-								return false
-							}
-							idx := int(er.fallback.uptoWithFilter(uint32(len(types)), reject))
-							lhsType = types[idx]
-						}
-					}
+				}
+				if forceNonVol && !useNonVoid && !(ctx.inParamExpr && ctx.state.paramExprCommaAllTypes) &&
+					postAggPostCD3ArrayOp2BodyActive {
+					useNonVoid = true
+				}
+				if useNonVoid {
+					lhsType = pickNonVoid(er.fallback, ctx.state.info, opts)
 				} else {
-					// Early free Expression / early param trees before array Global.
-					allCount := len(ctx.state.pool) + len(ctx.state.info.structs) + len(ctx.state.info.unions)
-					if allCount > 0 {
-						pick := int(er.fallback.upto(uint32(allCount)))
-						switch {
-						case pick < len(ctx.state.pool):
-							lhsType = ctx.state.pool[pick]
-						case pick < len(ctx.state.pool)+len(ctx.state.info.structs):
-							lhsType = CType{Name: fmt.Sprintf("struct S%d", pick-len(ctx.state.pool)), Bits: 32}
-						default:
-							lhsType = CType{Name: fmt.Sprintf("union U%d", pick-len(ctx.state.pool)-len(ctx.state.info.structs)), Bits: 32}
-						}
-					}
+					lhsType = pickNonVoidNonVolatile(er.fallback, ctx.state.pool, ctx.state.info, opts)
 				}
 			}
 			// Upstream ExpressionComma::make_random:
