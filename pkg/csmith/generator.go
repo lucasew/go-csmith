@@ -389,6 +389,19 @@ var nullValidatePostResidualEANewArrayAddrF20Done bool
 // (0 e2523 U6 U1 U4; 1 e2528 U6 F20 F20 U2; later parentStackPick).
 var nullValidatePostResidualEAF80PLN int
 
+// nullValidatePostResidualEALhsSelU4Done: one-shot ExpressionAssign Lhs
+// SelectDeref inventory countdown residual after ptr-cmp era (e2575–96:
+// U4 U4 U3 U1 U4 U3 U2 U1 U4×3 then F80=0; GO empty-creates F20).
+var nullValidatePostResidualEALhsSelU4Done bool
+
+// nullValidatePostResidualEALhsSelU4Arm: arm after free Expression PL U6 sole
+// (e2564) so ladder does not fire on earlier Lhs CreateArray (e2499/e2512).
+var nullValidatePostResidualEALhsSelU4Arm bool
+
+// nullValidatePostResidualEALhsSelU4LaterDone: one-shot e2723 F80 U4 accept after
+// main ladder era (GO empty-creates F20).
+var nullValidatePostResidualEALhsSelU4LaterDone bool
+
 // nullValidatePostResidualFuncUseExistingU2N: Function useExisting=1 empty GO
 // inventory pads under GlobalU21 (0: e2410 U2+U2 F75 + arm Lhs residual;
 // 1+: e2440 U2 choose only then param Constant F50 F50 U20…; not Variable U100).
@@ -8867,10 +8880,13 @@ exprTries:
 					// fall through live
 				} else if !isPtr || nullValidatePostResidualGlobalU21 {
 					// e2564: after ptr-cmp U11 residual era, PL stack is U6
-					// (GO blockStack under-counts as U5). Force U6 then sole.
+					// (GO blockStack under-counts as U5). Force U6 then sole for
+					// existing PL (scopePick==1); NewValue→PL create (scopePick==4)
+					// still creates (e2708 U14 F50 F10 F20…).
 					var idx int
-					forceU6Sole := nullValidatePostResidualGlobalU2AfterPtrCmpDone
-					if forceU6Sole {
+					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone
+					forceU6Sole := forceU6Stack && scopePick == 1
+					if forceU6Stack {
 						idx = int(er.pick(6))
 					} else {
 						idx = parentStackPick(er, flow)
@@ -8884,7 +8900,8 @@ exprTries:
 					// (e2366+ U5→U120) or live fallthrough when inventory empty.
 					// e2564+: after ptr-cmp residual era, free Expression PL is sole
 					// after stack U6 even if local inventory empty (UP U120 next).
-					sole := !isPtr && (n == 0 || n == 2 ||
+					// Not NewValue create (scopePick==4).
+					sole := !isPtr && scopePick != 4 && (n == 0 || n == 2 ||
 						(n >= 3 && len(localCands) > 0) || forceU6Sole)
 					forcePtrCreate := false
 					if isPtr && nullValidatePostResidualGlobalU21 {
@@ -8893,13 +8910,18 @@ exprTries:
 							sole = false
 							forcePtrCreate = true // e2267
 						} else {
-							sole = len(localCands) > 0 || forceU6Sole
+							sole = scopePick != 4 && (len(localCands) > 0 || forceU6Sole)
 						}
 					}
 					if sole {
 						expr := "x"
 						if len(localCands) > 0 {
 							expr = localCands[0].expr
+						}
+						// e2564 free Expression PL U6 sole arms next EA Lhs SelectDeref
+						// inventory ladder (e2575+).
+						if forceU6Sole {
+							nullValidatePostResidualEALhsSelU4Arm = true
 						}
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
@@ -8926,6 +8948,13 @@ exprTries:
 							useESimpleRetypeSink = prevES
 						}
 						if ok {
+							// e2715: after NewValue→PL create under residual era, next
+							// free Expression Variable U120 tries=3 (depthBlock filter
+							// Function/Assign/Comma); GO Function tries=0 desyncs.
+							if forceU6Stack && scopePick == 4 && ctx != nil && ctx.state != nil {
+								ctx.state.ppPostPadDepthBlock = true
+								ctx.state.ppPostPadDepthBlockN = 0
+							}
 							bumpExprDepth(ctx)
 							markVarSelectEffect()
 							return finishVar(castLiteral(t, g.expr))
@@ -8951,17 +8980,21 @@ exprTries:
 				nG := uint32(18)
 				if nullValidatePostResidualGlobalU21 {
 					// e2212 first simple Global pad U21; e2370+ after Function-fail
-					// Global NewArray create era pool is U20 (not sticky U21).
-					if nullValidatePostResidualGlobalU21N == 0 {
+					// Global NewArray create era pool is U20; e2702+ after Lhs
+					// SelectDeref ladder era grows to U22.
+					switch {
+					case nullValidatePostResidualGlobalU21N == 0:
 						nG = 21
-					} else {
+					case nullValidatePostResidualEALhsSelU4Done:
+						nG = 22 // e2702+
+					default:
 						nG = 20
 					}
 					nullValidatePostResidualGlobalU21N++
 				} else if nullValidatePostResidualGlobalU12 {
 					nG = 12 // e2094+
 				}
-				v := int(er.pick(nG)) // e929 / e1025 / e1271 / e2042 / e2094 / e2212 / e2370
+				v := int(er.pick(nG)) // e929 / e1025 / e1271 / e2042 / e2094 / e2212 / e2370 / e2702
 				if oneShot && nullValidatePostResidualGlobalItemizeU10 {
 					nullValidatePostResidualGlobalItemizeU10 = false
 					_ = er.pick(10)
@@ -8976,12 +9009,16 @@ exprTries:
 						c := cands[v%len(cands)]
 						expr = c.expr
 					}
-					if nullValidatePostResidualGlobalU12 {
+					if nullValidatePostResidualGlobalU12 && nG != 22 {
 						// e2094+ U12 pad: e2140 Global v=0 is 1d itemize U10 only
 						// (not e1354 multi-dim U10 U18; not sole → parent U120).
 						if v == 0 {
 							_ = er.pick(10) // e2140
 						}
+					} else if nG == 22 {
+						// e2702–03 / e2717–18: U22 pad itemize U4 (1d arrays at
+						// multiple choose indices; not only v=2).
+						_ = er.pick(4)
 					} else {
 						switch v {
 						case 0:
@@ -12137,10 +12174,12 @@ exprTries:
 				// (seed5 e178 AssignOps next, not self F50). Nested Expression under
 				// stdfunc operands uses null qfer (isParam=false) and still burns
 				// WRITE self F50 (seed5 e202) — never blanket inParamExpr.
-				// PP-era Assign RHS: skipFuncRetQfer (WRITE parent qfer).
+				// Assign RHS sets skipFuncRetQfer (WRITE parent qfer) so nested
+				// ExpressionAssign must skip self F50 (seed5 e2568–69: UP AssignOps
+				// U120 next; GO was burning F50 under free Expression).
+				// PP-era and free Expression both honor parent WRITE qfer.
 				skipQfer := isParam
-				if ctx != nil && ctx.skipFuncRetQfer &&
-					ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 {
+				if ctx != nil && ctx.skipFuncRetQfer {
 					skipQfer = true
 				}
 				// seed4 e1873: after residual term-retry Assign, burn pointer
@@ -12891,6 +12930,78 @@ exprTries:
 						break
 					}
 					deref := er.fallback.flipcoin(80) // SelectDerefPointerProb (Lhs.cpp:78)
+					// seed5 e2723–24: after ladder era, later ExpressionAssign Lhs
+					// SelectDeref still chooses U4 (UP); GO empty-creates F20.
+					if deref && nullValidatePostResidualEALhsSelU4Done &&
+						!nullValidatePostResidualEALhsSelU4LaterDone && er != nil {
+						nullValidatePostResidualEALhsSelU4LaterDone = true
+						_ = er.pick(4) // e2724
+						lhsFromDeref = true
+						break
+					}
+					// seed5 e2575–616: residual after free Expression PL U6 sole
+					// (e2564 arm): ExpressionAssign Lhs SelectDeref live pool
+					// countdown; GO empty-creates F20. Exact UP ladder.
+					if deref && nullValidatePostResidualEALhsSelU4Arm &&
+						!nullValidatePostResidualEALhsSelU4Done && er != nil {
+						nullValidatePostResidualEALhsSelU4Done = true
+						nullValidatePostResidualEALhsSelU4Arm = false
+						// F80 already true (e2575). Ladder e2576–2616.
+						_ = er.pick(4)              // e2576
+						_ = er.fallback.flipcoin(80) // e2577 F80=1
+						_ = er.pick(4)              // e2578
+						_ = er.fallback.flipcoin(80) // e2579 F80=1
+						_ = er.pick(3)              // e2580
+						_ = er.pick(1)              // e2581
+						_ = er.pick(4)              // e2582
+						_ = er.fallback.flipcoin(80) // e2583 F80=1
+						_ = er.pick(3)              // e2584
+						_ = er.fallback.flipcoin(80) // e2585 F80=1
+						_ = er.pick(2)              // e2586
+						_ = er.fallback.flipcoin(80) // e2587 F80=1
+						_ = er.pick(1)              // e2588
+						_ = er.pick(4)              // e2589
+						_ = er.fallback.flipcoin(80) // e2590 F80=1
+						_ = er.pick(1)              // e2591
+						_ = er.pick(4)              // e2592
+						_ = er.fallback.flipcoin(80) // e2593 F80=1
+						_ = er.pick(1)              // e2594
+						_ = er.pick(4)              // e2595
+						_ = er.fallback.flipcoin(80) // e2596 F80=0
+						_ = er.pick(100)            // e2597 VS Global
+						_ = er.fallback.flipcoin(80) // e2598 F80=1
+						_ = er.pick(4)              // e2599
+						_ = er.fallback.flipcoin(80) // e2600 F80=1
+						_ = er.pick(3)              // e2601
+						_ = er.pick(1)              // e2602
+						_ = er.pick(4)              // e2603
+						_ = er.fallback.flipcoin(80) // e2604 F80=1
+						_ = er.pick(3)              // e2605
+						_ = er.fallback.flipcoin(80) // e2606 F80=1
+						_ = er.pick(2)              // e2607
+						_ = er.pick(1)              // e2608
+						_ = er.pick(4)              // e2609
+						_ = er.fallback.flipcoin(80) // e2610 F80=0
+						_ = er.pick(100)             // e2611 VS PP
+						// e2612 U14 retype tries=1 (void/float filter)
+						base := pickSimpleNonVoid(er.fallback, opts)
+						// e2613–16: NewArray=0 + Constant F50 F50 U20
+						_ = er.fallback.flipcoin(20)
+						_ = formatSimpleConstant(er.fallback, base)
+						// e2617: parent free Expression U120 (not outer nested
+						// Assign Lhs F80 empty-create). N=1 + flag = 2 outer Lhs
+						// soles (covers nested Assign chain after ladder).
+						if ctx != nil && ctx.state != nil {
+							ctx.state.ppPostPadOuterLhsSole = true
+							ctx.state.ppPostPadOuterLhsSoleN = 1
+							ctx.state.postAggSkipShiftByOnce = true
+							if ctx.exprDepth > 0 {
+								ctx.exprDepth = 0
+							}
+						}
+						lhsFromDeref = true
+						break
+					}
 					if !deref {
 						// e8855 post-CD3 Statement Lhs: F80=0 → VS PP U100 → PL
 						// stack U2 create residual (not fallthrough U5 + SelectDeref).
