@@ -4797,14 +4797,25 @@ func burnCreateAndInitializeNested(r *rng, opts Options, ctx *genContext, t CTyp
 			if pointeeName == t.Name {
 				pointeeName = strings.ReplaceAll(t.Name, "*", "")
 			}
-			pointee := CType{Name: pointeeName, Signed: true, Bits: 32, HexDigits: 8}
+			// Preserve HexDigits/Bits through peels for RandomHexDigits width
+			// (eLongLong=16; seed5 e2851 create_and_initialize leaf Constant).
+			pointee := CType{Name: pointeeName, Signed: t.Signed, Bits: t.Bits, HexDigits: t.HexDigits}
 			if strings.Contains(pointeeName, "uint") || strings.HasPrefix(pointeeName, "unsigned") {
 				pointee.Signed = false
 			}
 			if nextVols == nil {
-				// Peeled to scalar qfer — create non-pointer.
+				// Peeled to scalar qfer — create non-pointer; keep type width.
 				baseName := strings.ReplaceAll(pointeeName, "*", "")
-				base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				if baseName == "" {
+					baseName = "int32_t"
+				}
+				base := CType{Name: baseName, Signed: t.Signed, Bits: t.Bits, HexDigits: t.HexDigits}
+				if base.HexDigits <= 0 {
+					base.HexDigits = hexDigitsForConstant(base)
+				}
+				if base.Bits <= 0 {
+					base.Bits = 32
+				}
 				initLit = burnCreateAndInitializeNested(r, opts, ctx, base, nil, nil)
 			} else {
 				initLit = burnCreateAndInitializeNested(r, opts, ctx, pointee, nextVols, nextConsts)
@@ -4882,13 +4893,22 @@ func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *
 			if pointeeName == t.Name {
 				pointeeName = strings.ReplaceAll(t.Name, "*", "")
 			}
-			pointee := CType{Name: pointeeName, Signed: true, Bits: 32, HexDigits: 8}
+			pointee := CType{Name: pointeeName, Signed: t.Signed, Bits: t.Bits, HexDigits: t.HexDigits}
 			if strings.Contains(pointeeName, "uint") || strings.HasPrefix(pointeeName, "unsigned") {
 				pointee.Signed = false
 			}
 			if nextVols == nil {
 				baseName := strings.ReplaceAll(pointeeName, "*", "")
-				base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				if baseName == "" {
+					baseName = "int32_t"
+				}
+				base := CType{Name: baseName, Signed: t.Signed, Bits: t.Bits, HexDigits: t.HexDigits}
+				if base.HexDigits <= 0 {
+					base.HexDigits = hexDigitsForConstant(base)
+				}
+				if base.Bits <= 0 {
+					base.Bits = 32
+				}
 				initLit = burnCreateAndInitializeNested(r, opts, ctx, base, nil, nil)
 			} else {
 				initLit = burnCreateAndInitializeNested(r, opts, ctx, pointee, nextVols, nextConsts)
@@ -15856,7 +15876,22 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			if stars == "" {
 				stars = "*"
 			}
-			targetType = CType{Name: "int32_t" + stars, Signed: true, Bits: 32}
+			// Name consolidates to int32_t* for inventory (Type.cpp:1137–1140 simples
+			// → int*; GO under-models distinct bases in derived_types). HexDigits must
+			// still follow the chosen derived entry's simple width for create_and_
+			// initialize leaf Constant::RandomHexDigits (untraced next31 written into
+			// the constant string).
+			// seed5 e2827–2851: UP derived_types[9]=eULongLong** → find_pointer_type
+			// deepens to eULongLong***; Constant leaf burns RandomHexDigits(16).
+			// GO list under-model often picks wrong base while stars floor to ***;
+			// under residual GlobalU21 multi-level pointer Lhs, use longlong width.
+			hexDigits := 8
+			bits := 32
+			if nullValidatePostResidualGlobalU21 && ptrToPtr && ptrStars >= 3 {
+				hexDigits = 16
+				bits = 64
+			}
+			targetType = CType{Name: "int32_t" + stars, Signed: true, Bits: bits, HexDigits: hexDigits}
 		} else {
 			// Type::SelectLType after PointerAsLType miss (Type.cpp:1591–1597):
 			// get_all_ok_struct_union_types(no_const=true, no_volatile=!SE-free,
