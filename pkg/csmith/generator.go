@@ -4743,36 +4743,56 @@ func burnPLStackU3NestedPointerInit(r *rng, opts Options, ctx *genContext, level
 	}
 }
 
-// createOnDemandGlobalFromERSEFree mirrors GenerateNewGlobal when effect context
-// is side-effect-free: self F50 RegularVolatileProb + F10 const, then NewArray
-// and Constant::make_random (seed4 e2133 maxFuncs Function-fail → struct Global).
-func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
-	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
-		return exprVarCandidate{}, false
+// burnRandomLooseQualifiers mirrors CVQualifiers::random_loose_qualifiers
+// (looser vols/consts only). isVols/isConsts are the parent qfer bits.
+func burnRandomLooseQualifiers(r *rng, isVols, isConsts []bool) (outVols, outConsts []bool) {
+	depth := len(isVols)
+	outVols = make([]bool, depth)
+	outConsts = make([]bool, depth)
+	for i := 0; i < depth; i++ {
+		if !isVols[i] || (i == 0 && depth > 1) || (depth-i > 2) {
+			outVols[i] = isVols[i]
+		} else {
+			outVols[i] = r.flipcoin(50) // RegularVolatileProb
+		}
 	}
-	r := er.fallback
-	name := ctx.state.allocGlobalName()
-	levels := strings.Count(t.Name, "*")
-	isConst, isVolatile := false, false
-	// Ptr levels: F50 vol + F10 const each.
-	for i := 0; i < levels; i++ {
-		_ = opts.Volatiles && r.flipcoin(50)
-		_ = opts.Consts && r.flipcoin(10)
+	for i := 0; i < depth; i++ {
+		if !isConsts[i] || (depth-i > 2) {
+			outConsts[i] = isConsts[i]
+		} else {
+			outConsts[i] = r.flipcoin(50) // LooserConstProb
+		}
 	}
-	// Self: SE-free → F50 vol; READ → F10 const.
-	isVolatile = opts.Volatiles && r.flipcoin(50)
-	isConst = opts.Consts && r.flipcoin(10)
+	return outVols, outConsts
+}
+
+// removeQualifiers1 mirrors CVQualifiers::remove_qualifiers(1) — pop_back self.
+func removeQualifiers1(vols, consts []bool) (outVols, outConsts []bool) {
+	if len(vols) <= 1 {
+		return nil, nil
+	}
+	return append([]bool(nil), vols[:len(vols)-1]...), append([]bool(nil), consts[:len(consts)-1]...)
+}
+
+// burnCreateAndInitializeNested mirrors create_and_initialize for nested
+// address-of targets with non-wildcard qfer (VariableSelector.cpp:492–510).
+// isVols/isConsts are the current qfer bits after loose+remove.
+func burnCreateAndInitializeNested(r *rng, opts Options, ctx *genContext, t CType, isVols, isConsts []bool) string {
+	if r == nil || ctx == nil || ctx.state == nil {
+		return "0"
+	}
+	// create_and_initialize: F20 NewArray then make_init then materialize.
 	newArray := r.flipcoin(20)
 	initLit := "0"
-	var arrRes arrayCreateResult
+	levels := strings.Count(t.Name, "*")
 	if levels > 0 {
-		// make_init_value (VariableSelector.cpp:810+): F20 Constant vs address-of.
+		// make_init_value: F20 Constant("0") vs address-of.
 		if r.flipcoin(20) {
 			initLit = "0"
 		} else {
-			// Peel one *: create visible var of ptr_type (may still be pointer).
-			// Nested GenerateNewGlobal uses random_loose_qualifiers then
-			// create_and_initialize (F50/F10 peel + NewArray/Constant).
+			// random_loose on current qfer, remove_qualifiers(1), nested create.
+			looseVols, looseConsts := burnRandomLooseQualifiers(r, isVols, isConsts)
+			nextVols, nextConsts := removeQualifiers1(looseVols, looseConsts)
 			pointeeName := strings.TrimSuffix(t.Name, "*")
 			if pointeeName == t.Name {
 				pointeeName = strings.ReplaceAll(t.Name, "*", "")
@@ -4781,56 +4801,97 @@ func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *
 			if strings.Contains(pointeeName, "uint") || strings.HasPrefix(pointeeName, "unsigned") {
 				pointee.Signed = false
 			}
-			if strings.Contains(pointeeName, "*") {
-				// Nested pointer: SE-free random_qualifiers for remaining levels + self.
-				pLevels := strings.Count(pointeeName, "*")
-				for i := 0; i < pLevels; i++ {
-					_ = opts.Volatiles && r.flipcoin(50)
-					_ = opts.Consts && r.flipcoin(10)
-				}
-				_ = opts.Volatiles && r.flipcoin(50) // self vol
-				_ = opts.Consts && r.flipcoin(10)    // self const
-				tgtNewArray := r.flipcoin(20)
-				tgtInit := "0"
-				if r.flipcoin(20) {
-					tgtInit = "0"
-				} else {
-					// Peel again toward a simple/aggregate address target.
-					baseName := strings.ReplaceAll(pointeeName, "*", "")
-					base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
-					tgtInit = formatAggregateOrSimpleConstant(r, base, ctx, opts)
-					if r.flipcoin(20) {
-						_ = burnCreateArrayVariable(r, opts, base, true)
-					}
-				}
-				var tgtArr arrayCreateResult
-				if tgtNewArray {
-					tgtArr = burnCreateArrayVariable(r, opts, pointee, true)
-				}
-				tgtName := ctx.state.allocGlobalName()
-				emitGlobalDecl(&ctx.state.lateGlobals, pointee, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
-				ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-					name: tgtName, ctype: pointee, isArray: tgtNewArray, arrayLen: 4,
-				})
-				initLit = "&" + tgtName
+			if nextVols == nil {
+				// Peeled to scalar qfer — create non-pointer.
+				baseName := strings.ReplaceAll(pointeeName, "*", "")
+				base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				initLit = burnCreateAndInitializeNested(r, opts, ctx, base, nil, nil)
 			} else {
-				// Simple/aggregate pointee: NewArray then Constant (create_and_initialize).
-				tgtNewArray := r.flipcoin(20)
-				tgtInit := formatAggregateOrSimpleConstant(r, pointee, ctx, opts)
-				var tgtArr arrayCreateResult
-				if tgtNewArray {
-					tgtArr = burnCreateArrayVariable(r, opts, pointee, true)
-				}
-				tgtName := ctx.state.allocGlobalName()
-				emitGlobalDecl(&ctx.state.lateGlobals, pointee, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
-				ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-					name: tgtName, ctype: pointee, isArray: tgtNewArray, arrayLen: 4,
-				})
-				if tgtNewArray {
-					initLit = fmt.Sprintf("&%s[0]", tgtName)
-				} else {
-					initLit = "&" + tgtName
-				}
+				initLit = burnCreateAndInitializeNested(r, opts, ctx, pointee, nextVols, nextConsts)
+			}
+		}
+	} else {
+		// Non-pointer: make_init = Constant::make_random.
+		initLit = formatAggregateOrSimpleConstant(r, t, ctx, opts)
+	}
+	var arrRes arrayCreateResult
+	if newArray {
+		arrRes = burnCreateArrayVariable(r, opts, t, true)
+	}
+	tgtName := ctx.state.allocGlobalName()
+	emitGlobalDecl(&ctx.state.lateGlobals, t, tgtName, initLit, newArray, false, false, arrRes)
+	ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
+		name: tgtName, ctype: t, isArray: newArray, arrayLen: 4,
+	})
+	if newArray && levels == 0 {
+		return fmt.Sprintf("&%s[0]", tgtName)
+	}
+	return "&" + tgtName
+}
+
+// createOnDemandGlobalFromERSEFree mirrors GenerateNewGlobal when effect context
+// is side-effect-free: random_qualifiers (levels+self F50/F10) then
+// create_and_initialize. Nested address-of uses random_loose_qualifiers then
+// GenerateNewGlobal with non-wildcard qfer (VariableSelector.cpp:849–874).
+func createOnDemandGlobalFromERSEFree(er *exprRand, opts Options, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	if ctx == nil || ctx.state == nil || er == nil || er.fallback == nil {
+		return exprVarCandidate{}, false
+	}
+	r := er.fallback
+	name := ctx.state.allocGlobalName()
+	levels := strings.Count(t.Name, "*")
+	// is_volatiles / is_consts: index 0..levels-1 = ptr levels (outer→inner fill
+	// order in C++ is reverse into vector; we store in draw order then use by index).
+	// C++ fills is_volatiles[level-1] walking ptr_type chain then push self.
+	// Draw order: for *** first F50→index[2], then [1], then [0], then self [3].
+	isVols := make([]bool, 0, levels+1)
+	isConsts := make([]bool, 0, levels+1)
+	// Temporary slice in C++ order: [0]=innermost ptr level, [levels-1]=outermost, then self.
+	levelVols := make([]bool, levels)
+	levelConsts := make([]bool, levels)
+	for i := levels - 1; i >= 0; i-- {
+		// Walk outer→inner in reverse index fill (matches C++ --level fill).
+		v := opts.Volatiles && r.flipcoin(50)
+		c := opts.Consts && r.flipcoin(10)
+		levelVols[i] = v
+		levelConsts[i] = c
+	}
+	// Self: SE-free → F50 vol; READ → F10 const.
+	selfVol := opts.Volatiles && r.flipcoin(50)
+	selfConst := opts.Consts && r.flipcoin(10)
+	isVols = append(isVols, levelVols...)
+	isVols = append(isVols, selfVol)
+	isConsts = append(isConsts, levelConsts...)
+	isConsts = append(isConsts, selfConst)
+	isConst, isVolatile := selfConst, selfVol
+
+	// create_and_initialize: F20 NewArray then make_init then create.
+	newArray := r.flipcoin(20)
+	initLit := "0"
+	var arrRes arrayCreateResult
+	if levels > 0 {
+		// make_init_value: F20 Constant("0") vs address-of.
+		if r.flipcoin(20) {
+			initLit = "0"
+		} else {
+			// choose_var empty → random_loose_qualifiers + remove_qualifiers(1)
+			// + GenerateNewGlobal(non-wildcard) → create_and_initialize.
+			looseVols, looseConsts := burnRandomLooseQualifiers(r, isVols, isConsts)
+			nextVols, nextConsts := removeQualifiers1(looseVols, looseConsts)
+			pointeeName := strings.TrimSuffix(t.Name, "*")
+			if pointeeName == t.Name {
+				pointeeName = strings.ReplaceAll(t.Name, "*", "")
+			}
+			pointee := CType{Name: pointeeName, Signed: true, Bits: 32, HexDigits: 8}
+			if strings.Contains(pointeeName, "uint") || strings.HasPrefix(pointeeName, "unsigned") {
+				pointee.Signed = false
+			}
+			if nextVols == nil {
+				baseName := strings.ReplaceAll(pointeeName, "*", "")
+				base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+				initLit = burnCreateAndInitializeNested(r, opts, ctx, base, nil, nil)
+			} else {
+				initLit = burnCreateAndInitializeNested(r, opts, ctx, pointee, nextVols, nextConsts)
 			}
 		}
 		if newArray {
