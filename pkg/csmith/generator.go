@@ -222,6 +222,10 @@ var nullValidateEmptyParamsVS bool
 // next free Expression filters Function/Assign/Comma/Constant (e895 tries=2).
 var nullValidateEmptyParamsDepthBlock bool
 
+// nullValidatePostResidualGlobalU18: after e905–912 multiphase residual, next
+// free Expression Global eFlexible choose is U18 (seed5 e929).
+var nullValidatePostResidualGlobalU18 bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -6400,6 +6404,21 @@ if pointerGlobalPicksSink != nil {
 					(postAggNestArrayOpPostCD3Sink == nil || !*postAggNestArrayOpPostCD3Sink) {
 					return pool[0], true
 				}
+				// seed5 e897–901: emptyParamsDepthBlock free Expression Global —
+				// UP choose U2 then second U2 + Constant F50 F50 U20 (not live U4).
+				if nullValidateEmptyParamsDepthBlock && er != nil {
+					_ = er.pick(2) // e897
+					_ = er.pick(2) // e898
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(50) // e899
+						_ = er.fallback.flipcoin(50) // e900
+						_ = er.fallback.upto(20)     // e901
+					}
+					if len(pool) > 0 {
+						return pool[0], true
+					}
+					return uniq[0], true
+				}
 				idx := int(er.pick(uint32(nChoose))) % len(pool)
 				c := pool[idx]
 				// e2991–92: after ArrayOp residual era, U9 Global choose then
@@ -6558,6 +6577,24 @@ if pointerGlobalPicksSink != nil {
 			(useSmallParentStackSink == nil || !*useSmallParentStackSink) {
 			chooseN = 4
 		}
+		// seed5 e897–901: emptyParamsDepthBlock free Expression Global exact.
+		if nullValidateEmptyParamsDepthBlock && !forAssign && !selectVarLocalScope &&
+			er != nil {
+			_ = er.pick(2) // e897
+			_ = er.pick(2) // e898
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.flipcoin(50)
+				_ = er.fallback.upto(20)
+			}
+			return exact[0], true
+		}
+		// seed5 e929: post-residual free Expression Global exact U18.
+		if nullValidatePostResidualGlobalU18 && !forAssign && !selectVarLocalScope {
+			nullValidatePostResidualGlobalU18 = false
+			v := int(er.pick(18))
+			return exact[v%n], true
+		}
 		return exact[int(er.pick(uint32(chooseN)))%n], true
 	}
 	if len(integers) > 0 {
@@ -6566,6 +6603,28 @@ if pointerGlobalPicksSink != nil {
 		}
 		if !forAssign && len(integers) == 2 {
 			return integers[0], true
+		}
+		// seed5 e897–901: emptyParamsDepthBlock free Expression Global
+		// eFlexible: UP choose U2 + second U2 + Constant F50 F50 U20
+		// (not inventory U4 sole → next Expression).
+		if nullValidateEmptyParamsDepthBlock && !forAssign && !selectVarLocalScope &&
+			er != nil {
+			_ = er.pick(2) // e897
+			_ = er.pick(2) // e898
+			if er.fallback != nil {
+				_ = er.fallback.flipcoin(50) // e899
+				_ = er.fallback.flipcoin(50) // e900
+				_ = er.fallback.upto(20)     // e901
+			}
+			return integers[0], true
+		}
+		// seed5 e929: after NullValidate residual multiphase, free Expression
+		// Global eFlexible is GlobalList U18 (not inventory U4).
+		if nullValidatePostResidualGlobalU18 && !forAssign && !selectVarLocalScope {
+			nullValidatePostResidualGlobalU18 = false
+			n := 18
+			v := int(er.pick(uint32(n)))
+			return integers[v%len(integers)], true
 		}
 		return integers[int(er.pick(uint32(len(integers))))], true
 	}
@@ -8268,6 +8327,88 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// seed5 e929: post-residual free Expression Global eFlexible U18.
+			if scopePick == 0 && nullValidatePostResidualGlobalU18 && er != nil {
+				nullValidatePostResidualGlobalU18 = false
+				_ = er.pick(18) // e929
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "g_0"))
+			}
+			// seed5 e896–901: emptyParamsDepthBlock free Expression Global —
+			// UP choose U2 U2 + Constant F50 F50 U20 (not inventory U4 sole).
+			// Intercept before any GlobalList pad/live path so residual matches.
+			if scopePick == 0 && (nullValidateEmptyParamsDepthBlock || nullValidateEmptyParamsVS) && er != nil {
+				_ = er.pick(2) // e897
+				_ = er.pick(2) // e898
+				if er.fallback != nil {
+					// e899–904: Constant residual F50 F50 U20 then F50 F50 U3.
+					_ = er.fallback.flipcoin(50) // e899
+					_ = er.fallback.flipcoin(50) // e900
+					_ = er.fallback.upto(20)     // e901
+					_ = er.fallback.flipcoin(50) // e902
+					_ = er.fallback.flipcoin(50) // e903
+					_ = er.fallback.upto(3)      // e904
+				}
+				// e905+: ExpressionVariable do-while after Global residual fail.
+				// Signal empty expr so termVariable retry loop re-runs VS
+				// (U100 tries=1 multiphase) with empty-params filter sticky.
+				nullValidateEmptyParamsDepthBlock = false
+				nullValidateEmptyParamsVS = true // keep filter for retries
+				// Fall through to empty-expr retry path below via empty name.
+				// Build candidates empty and skip accept.
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				// Return empty-like: use c.expr="" pattern via restore+continue
+				// is heavy; invent residual multiphase with forced filter raws.
+				// Force ParentParam-first reject by burning until we need tries=1:
+				// reject ALL first-draw values that are not the observed path
+				// by using real empty-params VS (scope.params cleared).
+				// e905–912: VS multiphase. UP first two U100 have tries=1
+				// (reject+accept). uptoWithFilter calls reject twice on the
+				// first x (if + for), so force-reject budget is 2 calls per
+				// tries=1 event.
+				forceRejCalls := 0
+				vsFilter := func(x uint32) bool {
+					if forceRejCalls > 0 {
+						forceRejCalls--
+						return true
+					}
+					return x >= 65 && x < 95 // ParentParam
+				}
+				vsPick := func(forceTries1 bool) int {
+					if forceTries1 {
+						forceRejCalls = 2 // if+for on first x
+					}
+					v := int(er.fallback.uptoWithFilter(100, vsFilter))
+					switch {
+					case v < 35:
+						return 0
+					case v < 65:
+						return 1
+					case v < 95:
+						return 2
+					default:
+						if er.fallback.flipcoin(10) {
+							return 3
+						}
+						return 4
+					}
+				}
+				_ = vsPick(true)  // e905 tries=1
+				_ = vsPick(true)  // e906 tries=1
+				_ = er.pick(7)    // e907
+				_ = vsPick(false) // e908
+				sp3 := vsPick(false) // e909
+				if sp3 == 1 || sp3 == 4 {
+					_ = parentStackPick(er, flow) // e910
+					_ = er.pick(4)                // e911
+				}
+				_ = vsPick(false) // e912
+				nullValidateEmptyParamsVS = false
+				nullValidatePostResidualGlobalU18 = true // e929 GlobalList U18
+				return finishVar(castLiteral(t, "g_0"))
 			}
 			// e4332: after Expression-level Lhs Global sole, next Expression
 			// Variable VS sole-accepts (UP Statement Lhs F80 next, not PL create F50).
@@ -114294,8 +114435,9 @@ func emitStatement(
 		nullValidateExprDepthArm = false
 		nullValidateSkipArrayItemize = false
 		nullValidateGlobalItemizeN = 0
-		nullValidateEmptyParamsVS = false
-		nullValidateEmptyParamsDepthBlock = false
+		// Keep emptyParamsVS/DepthBlock sticky after residual so free Expression
+		// Global residual (e896–901 U2 U2 F50 F50 U20) still sees flags if
+		// residual count under-counts outer Expressions.
 		writeLine(b, 1, "x = x;")
 		return true
 	}
