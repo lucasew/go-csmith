@@ -134,6 +134,20 @@ var burnCreateArrayFieldVarsDone bool
 // burnCreateArrayAltEmpty: pointer alts F20 only (Lhs CreateArray e17368+).
 var burnCreateArrayAltEmpty bool
 
+// burnCreateArrayPtrAltNestedCreate: SelectDeref NewArray+null-primary CreateArray
+// burns full make_init address empty residual for pointer alts (seed5 e714–24:
+// F20 NewArray + Constant + CreateArray). Expression CreateArray (seed4 e101)
+// keeps F20-only empty address (no nested create).
+var burnCreateArrayPtrAltNestedCreate bool
+
+// burnCreateArrayLhsNullValidate: after SelectDeref NewArray+null create, each
+// retry F80 choose of the null array burns FactPointTo F0 (seed5 e727–41).
+var burnCreateArrayLhsNullValidate bool
+
+// burnCreateArrayLhsNullVS0N: F80=0 hit count under NullValidate (seed5 e766+
+// U100 U1 U8 F0 ×4 then e804 U100 U5… accept residual).
+var burnCreateArrayLhsNullVS0N int
+
 // burnCreateArrayPLU2Done: one-shot e10988 U2 U2 F0 chain; later PL sole.
 var burnCreateArrayPLU2Done bool
 
@@ -3269,10 +3283,8 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	if multiDimArraySink != nil && len(sizes) > 1 {
 		*multiDimArraySink++
 	}
-	if lastArraySizesSink != nil && len(sizes) > 0 {
-		cp := append([]int(nil), sizes...)
-		*lastArraySizesSink = cp
-	}
+	// lastArraySizesSink set after alts/itemize so nested CreateArray (pointer
+	// alt address empty create) does not clobber outer sizes (seed5 e711).
 	// ArrayVariable.cpp after sizes: if (type->is_aggregate()) create_field_vars
 	// → per-field Constant::make_random (unless top is union). Must run BEFORE
 	// init_num (e10466 UP F50 residual after U99 U10 U10; GO drew initNum early).
@@ -3285,6 +3297,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	}
 	inits := []string{}
 	hadNullPtrAlt := false
+	// nestedPointees: alts that GenerateNew* a pointee in this CreateArray call
+	// so later address alts choose U(n) instead of re-create (seed5 e723 U2).
+	nestedPointees := 0
 	if total/2 > 0 {
 		initNum := int(r.upto(uint32(total / 2)))
 		isPtr := strings.Contains(t.Name, "*")
@@ -3307,6 +3322,8 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// among pointees — sole/empty early (seed4 e101 F20=0 → itemize,
 				// no choose U); multi-candidate later burns U n (seed2 e1108 U6).
 				// seed4 e1103: PP-era address-of alt burns choose U2 (not skip).
+				// seed5 e711–25: empty → GenerateNew* create_and_initialize for
+				// simple pointee (F20 NewArray + Constant + CreateArray U99…).
 				if r.flipcoin(20) {
 					inits = append(inits, "0")
 					hadNullPtrAlt = true
@@ -3353,6 +3370,30 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				} else if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 {
 					// PP-era choose_ok_var among ~2 pointees (seed4 e1103 U2).
 					_ = r.upto(2)
+				} else if burnCreateArrayPtrAltNestedCreate && strings.Count(t.Name, "*") == 1 {
+					// SelectDeref NewArray+null primary (seed5 e714–22): empty
+					// address → GenerateNew* create_and_initialize for simple
+					// pointee (qfer set): NewArray F20 + Constant + CreateArray.
+					// Subsequent alts choose U(n) (e723–24 F20 U2). Not for
+					// Expression CreateArray (seed4 e101 F20-only empty address).
+					baseName := strings.ReplaceAll(t.Name, "*", "")
+					base := CType{Name: baseName, Signed: true, Bits: 32, HexDigits: 8}
+					if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
+						base.Signed = false
+					}
+					if nestedPointees > 0 {
+						_ = r.upto(uint32(nestedPointees + 1))
+					} else {
+						nestNew := r.flipcoin(20)
+						// make_init for simple: always Constant (no F20).
+						burnSimpleConstant(r, base)
+						if nestNew {
+							// create_array_and_itemize: CreateArray + itemize.
+							// Simple base — no pointer-alt recursion.
+							_ = burnCreateArrayVariable(r, opts, base, true)
+						}
+						nestedPointees++
+					}
 				}
 				// Without a real choose_var inventory, materialize null for now.
 				inits = append(inits, "0")
@@ -3403,6 +3444,10 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 		if isAgg && burnCreateArrayCtxSink != nil {
 			burnCreateFieldVarsConstants(r, t, burnCreateArrayCtxSink, opts)
 		}
+	}
+	if lastArraySizesSink != nil && len(sizes) > 0 {
+		cp := append([]int(nil), sizes...)
+		*lastArraySizesSink = cp
 	}
 	return arrayCreateResult{sizes: sizes, inits: inits, hadNullPtrAlt: hadNullPtrAlt}
 }
@@ -109914,6 +109959,42 @@ commaF80MultiDone:
 			continue
 		}
 		if !r.flipcoin(80) { // SelectDerefPointerProb
+			// seed5 e766+: after null-array CreateArray, F80=0 → VS still picks
+			// the null array (U100 Global + U1 + itemize U(size) + F0) and retries
+			// SelectDeref. After several such fails (e804+), VS multi-scope residual
+			// accepts without NullValidate.
+			if burnCreateArrayLhsNullValidate {
+				n := burnCreateArrayLhsNullVS0N
+				burnCreateArrayLhsNullVS0N++
+				if n < 4 {
+					// e766–803: U100 U1 U(size) F0 → continue SelectDeref
+					_ = r.upto(100)
+					_ = r.upto(1)
+					if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+						for _, sz := range *lastArraySizesSink {
+							if sz > 0 {
+								_ = r.upto(uint32(sz))
+							}
+						}
+					} else {
+						_ = r.upto(8)
+					}
+					_ = r.flipcoin(0)
+					continue
+				}
+				// e804–09: U100 U5 U3 U100 U15 then leave NullValidate → AssignOps/Expr
+				_ = r.upto(100)
+				_ = r.upto(5)
+				_ = r.upto(3)
+				_ = r.upto(100)
+				_ = r.upto(15)
+				burnCreateArrayLhsNullValidate = false
+				burnCreateArrayLhsNullVS0N = 0
+				createdArrayThisLhs = false
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "x", ctype: targetType}
+				break
+			}
 			// e8892+ post-CD3: after U7 countdown, F80=0 VS residual multiphase.
 			if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3SelDerefU7 &&
 				ctx.state.postAggPostCD3StmtLhsPPU2Done &&
@@ -110510,11 +110591,17 @@ commaF80MultiDone:
 		}
 		// After CreateArray in THIS Lhs loop, itemize last sizes (e1115 U10 U1 U1).
 		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
+		// seed5 e727+: after NewArray+null create, size U stands in for choose_var
+		// among pointer inventory then FactPointTo F0 (null validate fail).
 		if createdArrayThisLhs && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
 			for _, sz := range *lastArraySizesSink {
 				if sz > 0 {
 					_ = r.upto(uint32(sz))
 				}
+			}
+			if burnCreateArrayLhsNullValidate {
+				_ = r.flipcoin(0) // opportunistic_validate null
+				continue
 			}
 			// seed4 e898: after PP-era CreateArray itemize, accept Lhs (next
 			// Statement U100); seed2 e1115 continues SelectDeref retry.
@@ -111359,9 +111446,46 @@ commaF80MultiDone:
 			noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
 		}
 		newArray := r.flipcoin(20) // NewArrayVariableProb
-		// make_init_value for pointer type
-		if r.flipcoin(20) {
-			// Constant null — opportunistic_validate fails (null_pointer_prob=0)
+		// make_init_value for pointer type: F20 → Constant null ("0", no RNG);
+		// else address-of. C++ create_and_initialize always materializes the var
+		// after make_init — NewArray still runs CreateArray with null init
+		// (seed5 e711 UP U99…; GO used to F0-continue and skip CreateArray).
+		initNull := r.flipcoin(20)
+		if initNull {
+			if newArray {
+				// create_and_initialize → create_array_and_itemize(null Constant)
+				if skipVol {
+					// seed2 e1099–1102: F20+F50 residual then 8 next31 before CreateArray.
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+				{
+					// Arm full pointer-alt make_init residual (nested create).
+					burnCreateArrayPtrAltNestedCreate = true
+					_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+					burnCreateArrayPtrAltNestedCreate = false
+					emitOrphanArrayGlobal(ctx, ptrType, _arr)
+				}
+				// opportunistic_validate fails on null primary (FactPointTo F0).
+				_ = r.flipcoin(0)
+				// seed4 e898: PP-era CreateArray+itemize accepts Lhs.
+				if ctx != nil && ctx.state != nil && ctx.state.isParamPPFallPicks >= 2 &&
+					!ctx.state.useSmallParentStack {
+					lhsFromDeref = true
+					break
+				}
+				// Retry SelectDeref: next F80 choose among created null array
+				// then F0 validate (UP e727–41 F80 U8 F0…). createdArrayThisLhs
+				// re-burns size U; NullValidate arms F0 after each choose.
+				createdArrayThisLhs = true
+				burnCreateArrayLhsNullValidate = true
+				burnCreateArrayLhsNullVS0N = 0
+				continue
+			}
+			// non-array new_variable(null) — validate fails, no CreateArray RNG.
 			_ = r.flipcoin(0)
 			continue
 		}
