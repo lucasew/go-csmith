@@ -13246,6 +13246,12 @@ exprTries:
 			// select_deref_pointer before falling through to VariableSelector::select.
 			lhsFromDeref := false
 			createdArrEA := false
+			// createdArrEANullValidate: CreateArray pointer alts included null
+			// (hadNullPtrAlt). After create_array_and_itemize, FactPointTo
+			// opportunistic_validate burns F0; SelectDeref retries re-itemize
+			// lastArraySizes + F0 until F80=0 (seed5 e3074–e31xx U3 U4 U8 F0
+			// ladder for sizes [3][4][8] — not residual U9 U8 U3).
+			createdArrEANullValidate := false
 			// e9222–28: ArrayOp2 need_no_rhs ExpressionAssign Lhs select_must_use
 			// WRITE itemize U5 U5 U3 U3 F75 then SafeOpFlags F50 U4 (finishAssignExpr).
 			// e9651: second need_no_rhs — U4 U3 U4 U3 U2 F75 F80=0 → VS U100 U14 create
@@ -14023,18 +14029,26 @@ exprTries:
 					}
 					// Itemize only after CreateArray in THIS ExpressionAssign Lhs loop
 					// (e1052). Stale sizes force wrong path at e1174 (need F20 create).
+					// After null-alt CreateArray (e3074+): choose_ok_var soles the
+					// new collective array → ArrayVariable::itemize sizes + F0
+					// opportunistic_validate fail, retry until F80=0 → VS.
 					if createdArrEA && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
 						for _, sz := range *lastArraySizesSink {
 							if sz > 0 {
 								_ = er.fallback.upto(uint32(sz))
 							}
 						}
+						if createdArrEANullValidate && er.fallback != nil {
+							_ = er.fallback.flipcoin(0)
+						}
 						continue
 					}
 					// seed5 e1215+: residual CreateArray left multi-dim pointer;
 					// UP SelectDeref choose+itemize U9 U8 U3 F0 (fail) ×2 then
 					// F80=0 → VS. GO inventory empty would empty-create F20.
-					if nullValidatePostResidualSelDerefItemize > 0 && er != nil {
+					// Skip when this Lhs already created an array — lastArraySizes
+					// path above must own retries (e3076 U3 U4 U8 not U9 U8 U3).
+					if nullValidatePostResidualSelDerefItemize > 0 && er != nil && !createdArrEA {
 						nullValidatePostResidualSelDerefItemize--
 						_ = er.pick(9) // e1215/e1220
 						_ = er.pick(8)
@@ -14466,14 +14480,19 @@ exprTries:
 						}
 						_arr := burnCreateArrayVariable(er.fallback, opts, arrTy, true)
 						emitOrphanArrayGlobal(ctx, arrTy, _arr)
-						// Null pointer alts → opportunistic_validate F0 (seed4 e104)
-						// then F80 exit. Non-null alts → re-itemize on retry (seed2 e1051).
+						// create_array_and_itemize leaves a collective array in the
+						// pool. Null alts → opportunistic_validate F0 then SelectDeref
+						// retries re-itemize last sizes + F0 (seed5 e3074– ladder;
+						// seed4 e104 often F80=0 immediately after first F0).
+						// Non-null alts → re-itemize without F0 (seed2 e1051).
 						if newArray {
+							createdArrEA = true
+							// Prefer live CreateArray sizes over sticky e1215 residual
+							// U9 U8 U3 (would desync e3076 after matching U99…itemize).
+							nullValidatePostResidualSelDerefItemize = 0
 							if _arr.hadNullPtrAlt {
 								_ = er.fallback.flipcoin(0)
-								createdArrEA = false
-							} else {
-								createdArrEA = true
+								createdArrEANullValidate = true
 							}
 							continue
 						}
@@ -14514,6 +14533,47 @@ exprTries:
 				_ = er.pick(2) // e2324
 				_ = er.pick(8) // e2325 itemize
 				_ = er.pick(7) // e2326
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			// seed5 e3161–76: free multi-IV Expression residual ExpressionAssign
+			// Lhs after null-alt CreateArray itemize ladder F80=0 → VS ParentLocal.
+			// C++ Function::stack.size()=2 (for body); choose_ok_var among 2
+			// matching locals; visit_facts fails → Lhs do-while SelectDeref:
+			//   F80 U2 F0; F80 lastArraySizes itemize F0; F80=0 → VS PP/PL U3 F50.
+			// Sticky ParamU7 residual e1225 force U6+create desyncs (e3162 U6 vs U2).
+			if ctx.state.freeMultiIVForLhsExprContinue && createdArrEANullValidate &&
+				scopePick == 1 && er != nil {
+				_ = parentStackPick(er, ctx.state) // e3162 U2
+				_ = er.pick(2)                   // e3163 choose among 2
+				if er.fallback != nil {
+					if er.fallback.flipcoin(80) { // e3164 SelectDeref
+						_ = er.pick(2)              // e3165 live pool
+						_ = er.fallback.flipcoin(0) // e3166 validate fail
+					}
+					if er.fallback.flipcoin(80) { // e3167
+						// Re-itemize collective array just created (sizes [3][4][8]).
+						if lastArraySizesSink != nil {
+							for _, sz := range *lastArraySizesSink {
+								if sz > 0 {
+									_ = er.fallback.upto(uint32(sz))
+								}
+							}
+						}
+						_ = er.fallback.flipcoin(0) // e3171
+					}
+					if !er.fallback.flipcoin(80) { // e3172 F80=0 → VS
+						sp2 := variableScopePickFromER(er, opts, &scope) // e3173
+						// ParentParam miss / reselect → stack or choose U3 then F50.
+						// freeMultiIV parentStackPick is sticky U2; UP e3174 is U3.
+						if sp2 == 1 || sp2 == 2 || sp2 == 4 {
+							_ = er.pick(3) // e3174
+						} else if sp2 == 3 {
+							// NewValue → VariableCreationProbability / stack
+							_ = er.pick(3)
+						}
+						_ = er.fallback.flipcoin(50) // e3175
+					}
+				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			// seed5 e1225–29: residual Assign ExpressionAssign Lhs after

@@ -222,17 +222,23 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3076** (after free multi-IV Lhs VS accept → Expression nest e2989→3075; SelectDeref itemize U3 vs U9); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3176** (after null-alt CreateArray re-itemize ladder e3076→3175; post-Lhs parent U120 Variable vs GO F80); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+**seed5 e3076→3176 climbed — CreateArray null-alt re-itemize sizes + free multi-IV PL U2 (not residual U9 U8 U3 / ParamU7 U6):**
+1. Capture: after ExpressionAssign Lhs SelectDeref NewArray CreateArray (e3060–75 match U99 dims [3][4][8] + alts + itemize F0), UP SelectDeref re-itemize U3 U4 U8 F0 ladder vs GO sticky e1215 residual U9 U8 U3; then F80=0 → VS PL U2 vs GO ParamU7 force U6 create.
+2. C++ `create_array_and_itemize` leaves collective array in pool; null pointer alts → FactPointTo opportunistic_validate F0; Lhs do-while SelectDeref `choose_ok_var` soles array → `ArrayVariable::itemize` last sizes + F0 until F80=0. Free multi-IV `Function::stack.size()=2`; VS PL choose among 2; visit fail → more SelectDeref (U2 F0; sizes itemize F0; F80=0 → PP/PL U3 F50 accept).
+3. GO: after CreateArray `hadNullPtrAlt`, keep `createdArrEA` + `createdArrEANullValidate` so retries burn `lastArraySizes`+F0 (clear sticky U9 U8 U3 residual). Free multi-IV ExpressionAssign F80=0 → PL stack U2 + choose U2 + SelectDeref ladder (not ParamU7 e1225 U6+create).
+4. Seed2/3/4/6 held. Next: e3176 UP U120 Variable (parent Expression after Lhs accept) vs GO F80.
+
 **seed5 e2989→3076 climbed — free multi-IV Lhs VS accept → Expression nest (not Statement U100):**
 1. Capture: after Lhs VS multiphase PL accept (e2988), UP U120 Expression (Constant+Comma… stdfunc F5, PL create/choose, ExpressionAssign Lhs F80 CreateArray) vs GO next Statement U100.
 2. C++ StatementAssign ends after Lhs, but residual free Expression stream (lhsAfterParamMiss family) continues before next StatementProbability; Comma LHS retypes to simple → atMax stdfunc F5; residual PL stack U2; first PL empty create, NewValue→PL U14 retype, later PL choose U5.
 3. GO: arm freeMultiIVForLhsExprContinue after VS accept; two free Expressions; parentStackPick U2; termVariable residual PL multiphase (create once / NewValue retype / choose U5); force atMax stdfunc simple under residual; hoist freeMultiIV body stack U3 above sticky ParamU7 U6.
-4. Seed2/3/4/6 held. Next: e3076 UP SelectDeref itemize U3 U4 U8 vs GO U9 U8 U3.
+4. Seed2/3/4/6 held. Next was e3076 (climbed).
 
 **seed5 e2966→2989 climbed — maxFuncs Function-fail pointer ExpressionVariable + free multi-IV Lhs residual:**
 1. Capture: after free For SelectLoopCtrl, Assign RHS Function useExisting empty candidates — GO residual U2 pad vs UP ExpressionVariable U100.
