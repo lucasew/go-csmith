@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5147** (For SelectLoopCtrl U37 vs U16); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5163** (For body U120 vs U2); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5147→5163 climbed — SelectLoopCtrl U37 inventory (need_no_rhs If-body For):**
+1. Capture: e5147 UP U37=27 (SelectLoopCtrlVar) vs GO U16=4 (same raw; live count under-materialised).
+2. C++ SelectLoopCtrlVar (VariableSelector.cpp:1120–53): find_all_non_array_visible + choose_var(WRITE, int, eConvert, no_bitfield). At e5147 (func_36): ok_vars≈37 = ~7 globals (incl. volatile g_170; make_iteration rejects vol after choose), ~7 expanded params (p_37 + S0 p_38/p_39 fields + p_40/p_41), ~23 parent-chain locals. Volatiles stay in pool (effect_stm cleared). Free For uses make_random_loop_control (no rw_directive arrays).
+3. GO: countVisibleIntLoopCtrl keeps volatiles; under freeMultiIVNeedNoRhsIfBody floor nCtrl to 37 when residual under-materialises locals/params (mirror e2943 U15 ArrayOp-body floor). Seeds 2/3/4/6 held.
+4. Next: e5163 UP U120=7 vs GO U2=1 (same raw) after For body Statement U100=38 U100=65.
 
 **seed5 e5120→5147 climbed — need_no_rhs Global accept + If sole + SelectDeref + For:**
 1. Capture: e5120 UP U120=67 (AssignOps after If then Statement U100=98) vs GO F10 (NewValue create after forced Global visit-fail).

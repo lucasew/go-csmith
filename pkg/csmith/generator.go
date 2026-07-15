@@ -4608,9 +4608,11 @@ func countVisibleArrays(env envInfo, scope scopeInfo, ctx *genContext) int {
 
 // countVisibleIntLoopCtrl mirrors SelectLoopCtrlVar → choose_var ok_vars size:
 // find_all_non_array_visible_vars + drop non-int / pointer-union + expand_struct
-// (no_bitfield=true) + integer eConvert match. Globals (incl. fromParentLocal),
-// residual orphans, locals, params — deduped by name. Nest ArrayOp e6721 era;
-// free For e2943 floors to U15 when GO inventory under-materialises.
+// (no_bitfield=true) + integer eConvert match. Volatiles stay in the pool
+// (make_iteration rejects after choose). Const excluded (WRITE ineligible).
+// Globals (incl. fromParentLocal), residual orphans, locals, params — deduped
+// by name. Nest ArrayOp e6721 era; free For e2943 floors to U15 when GO
+// inventory under-materialises; need_no_rhs If-body For floors to U37 (e5147).
 func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int {
 	isIntSimple := func(t CType) bool {
 		if strings.Contains(t.Name, "*") {
@@ -4701,7 +4703,10 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 	seen := map[string]bool{}
 	n := 0
 	add := func(name string, t CType, arr, vol, cnst bool) {
-		if name == "" || arr || vol || cnst || seen[name] {
+		// vol kept: choose_var is_eligible allows vol when side-effect-free
+		// (StatementFor clears effect_stm before SelectLoopCtrlVar).
+		_ = vol
+		if name == "" || arr || cnst || seen[name] {
 			return
 		}
 		if !hasIntField(t) || unionHasPointer(t) {
@@ -119554,6 +119559,14 @@ func emitStatement(
 				state.arrayLoopDepth > 0 && nCtrl < 15 {
 				nCtrl = 15
 				flooredU15 = true
+			}
+			// seed5 e5147: free multi-IV need_no_rhs-era If then-body For —
+			// C++ SelectLoopCtrlVar ok_vars ≈37 (func_36: ~7 globals incl. vol,
+			// ~7 expanded params p_37/S0×2/p_40/p_41, ~23 parent-chain locals).
+			// GO residual under-materialises locals/params → live nCtrl~16.
+			// Floor only while freeMultiIVNeedNoRhsIfBody (If then/else frame).
+			if state.freeMultiIVNeedNoRhsIfBody && nCtrl < 37 {
+				nCtrl = 37
 			}
 			if nCtrl > 1 {
 				_ = r.upto(uint32(nCtrl))
