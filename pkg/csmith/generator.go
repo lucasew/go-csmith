@@ -4374,6 +4374,17 @@ func sameBaseType(a, b CType) bool {
 	return a.Bits == b.Bits && a.Signed == b.Signed
 }
 
+// pointerAddrOfMatch: want.ptr_type == have (Type::is_derivable last clause).
+// want is exactly one more * than have with the same pointee name.
+func pointerAddrOfMatch(want, have CType) bool {
+	w := normTypeName(want.Name)
+	h := normTypeName(have.Name)
+	if !strings.HasSuffix(w, "*") {
+		return false
+	}
+	return strings.TrimSuffix(w, "*") == h
+}
+
 // isConvertable mirrors Type::is_convertable(want, have): can `have` convert to `want`?
 // Used by Function::choose_func (want = expression type, have = return type).
 func isConvertable(want, have CType) bool {
@@ -9877,9 +9888,31 @@ exprTries:
 					// e4220: after ptr-cmp ** ExpressionAssign RHS Function-fail,
 					// SelectGlobal choose_var has ok_vars U2 — try live choose for
 					// multi-level want before force-create (VariableSelector.cpp:648).
+					// e4221: C++ choose_var prefers addressable lower-ind when
+					// higher-ind empty (VariableSelector.cpp:456–489). That subset
+					// includes multi-dim * arrays → choose_ok_var itemizes all
+					// dimensions (ArrayVariable.cpp:248–255; e4221 U8 U7 for [8][7]).
+					// GO multiDim pointer path is exact-level only (matches U(n)=2
+					// by coincidence) and skips itemize on non-array ** picks.
+					// After live choose, if the pick was not a multi-dim array,
+					// still burn ArrayVariable::itemize for the first multi-dim
+					// addressable * array (ptr_type match) — same entropy as UP
+					// when addressable pick lands on that collective array.
 					if scopePick == 0 && nullValidatePostResidualGlobalU21 && er != nil {
 						if strings.Count(t.Name, "*") >= 2 && len(candidates) > 0 {
 							if c, ok := selectExprVariableFromER(t, er, candidates, false); ok && c.expr != "" {
+								if !c.isArray || len(c.arraySizes) < 2 {
+									for _, cand := range candidates {
+										if !cand.isArray || len(cand.arraySizes) < 2 {
+											continue
+										}
+										if !pointerAddrOfMatch(t, cand.ctype) {
+											continue
+										}
+										itemizeArrayCandidate(er, cand)
+										break
+									}
+								}
 								bumpExprDepth(ctx)
 								markFuncEffect()
 								return castLiteral(t, c.expr)

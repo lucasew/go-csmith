@@ -222,10 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4221** (Global U2 match then itemize U8 U7 vs Lhs F80 — array multi-dim itemize under-model); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4227** (SelectDeref empty create F20 vs F50 after multi-dim itemize); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e4221→4227 climbed — multi-dim addressable itemize after Global choose:**
+1. Capture: e4221 UP U8=3 U7=0 vs GO F80 after matching e4220 U2 Global choose.
+2. C++: ExpressionVariable eFlexible `choose_var` prefers addressable lower-ind when higher empty (VariableSelector.cpp:456–489). Addressable includes multi-dim `*` arrays → `choose_ok_var` → `ArrayVariable::itemize` all dims (e4221 U8 U7 for `[8][7]`). Then ExpressionAssign Lhs SelectDeref F80.
+3. GO: multiDim pointer path is exact-level only (U(n)=2 by coincidence on exact `**`) and skips itemize on non-array picks. After multi-level GlobalU21 live choose, burn `itemizeArrayCandidate` for first multi-dim addressable `*` array (`pointerAddrOfMatch` / ptr_type). Next: e4227 F20 vs F50 (SelectDeref empty create).
+4. Seed2/3/4/6 held.
 
 **seed5 e4220→4221 climbed — GlobalU21 Function-fail SelectGlobal choose first:**
 1. Capture: e4220 UP U2=0 vs GO F50 SE-free create after ptr-cmp ** Assign RHS Function-fail Variable Global.
