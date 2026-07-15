@@ -222,17 +222,21 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2817** (second Function-fail must_use); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2827** (SelectDeref pool U12 vs U9); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
+**seed5 e2817→2827 climbed — Lhs WRITE must_use on must_write_vars:**
+1. Array-loop tracks both `must_read` (access 0/2) and `must_write` (access 1/2).
+2. Function-fail EV READ `select_must_use` accepts after itemize+fields+F75 (visit success).
+3. StatementAssign Lhs WRITE `select_must_use` over `must_write_vars` (Lhs.cpp:74–75) — second U2+S0 Constants+F75 (e2817–22).
+4. Seed2/3/4/6 held. Next: e2827 SelectDeref/pointer pool U12 vs U9.
+
 **seed5 e2811→2817 climbed — Function-fail EV aggregate select_must_use (VariableSelector.cpp:1461–1506):**
-1. Track real `must_read` array list (name+element type+sizes) when `make_random_array_loop` access 0/2; push/pop with array-loop frames (RWDirective).
-2. Function-fail `ExpressionVariable` for aggregates: `select_must_use_var` over list → `itemize_array` (IV choose) → aggregate `create_field_vars` Constants → F75 erase; visit miss retries.
-3. `dim > iv_bounds.size()` skip; inventory expand only when type-match failed dim (under-count multi-dim vs 1d of same element type).
-4. Gate free EV / non-residual Function-fail: only when residual GlobalU21 era has list (avoids seed4 VS desync). Seed2/3/4/6 held.
-5. Next: e2817 second must_use U2+fields+F75 (second must_read entry / re-visit) then VS U100.
+1. Track real `must_read` array list when `make_random_array_loop` access 0/2; push/pop with array-loop frames.
+2. Function-fail aggregates: `select_must_use_var` → itemize + create_field_vars Constants + F75.
+3. dim>iv_bounds skip; inventory expand on type-match dim-fail. Gate on residual GlobalU21.
 
 **seed5 e2808→2811 climbed — SelectLType ok_structs (Type.cpp:1591–1597):**
 1. `StatementAssign::make_random` passes `no_volatile = !effect_context.is_side_effect_free()`.
