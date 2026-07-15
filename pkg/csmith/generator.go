@@ -714,6 +714,18 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsIfLhsSelDone: one-shot Statement Lhs SelectDeref
 	// live multiphase under If body (e5140–45); then F80=0→VS.
 	freeMultiIVNeedNoRhsIfLhsSelDone bool
+	// freeMultiIVNeedNoRhsEraLhsSelN: SelectDeref live multiphase under sticky
+	// freeMultiIVNeedNoRhsEra outside If body (parent free For after need_no_rhs
+	// If). C++ eDereference pool ~5; GO inventory empty → wrong F10 create.
+	// e5323–27: U5+U7 itemize fail then F80 U5 accept (not empty create).
+	freeMultiIVNeedNoRhsEraLhsSelN int
+	// freeMultiIVNeedNoRhsPostIfPLN: VS PL choose under post-If need_no_rhs-era
+	// free For (e5332+). First: live U5 miss; later create/U6 multiphase.
+	freeMultiIVNeedNoRhsPostIfPLN int
+	// freeMultiIVNeedNoRhsPostIfSelDeref: after post-If era PL U5 miss, Lhs
+	// do-while SelectDeref live multiphase (e5334–38 U5; U4+U7) then F80=0→VS.
+	// Without this flag, VS-miss falls to empty create F10 residual.
+	freeMultiIVNeedNoRhsPostIfSelDeref bool
 	// freeMultiIVNeedNoRhsPLN: SelectParentLocal choose attempts under free
 	// multi-IV need_no_rhs after Global dummy era (e4624 U3, e4692 U7,
 	// e4750 U6+U8 itemize, e4771 U6, e4777 sole…).
@@ -16944,8 +16956,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		// Lhs F80=0 → VS PL Function::stack.size()=6 (For frame) then empty
 		// create NewArray F20. multiDim sticky e940 U2 + live U15 residual
 		// when postAggGlobalCreateN already exhausted.
+		// seed5 e5332: free multi-IV need_no_rhs-era parent free For after the
+		// need_no_rhs If (IfBody cleared, NestedFor off). Lhs F80=0 → VS PL
+		// stack U6 + live choose U5 (not multiDim sticky U2). LhsSelDone marks
+		// that a need_no_rhs If arm already ran (post-If free stream).
 		needNoRhsNestedForPL := flow != nil && flow.freeMultiIVNeedNoRhsIfNestedFor
-		if needNoRhsNestedForPL {
+		needNoRhsPostIfEraPL := flow != nil && flow.freeMultiIVNeedNoRhsEra &&
+			flow.freeMultiIVNeedNoRhsIfLhsSelDone && !flow.freeMultiIVNeedNoRhsIfBody
+		if needNoRhsNestedForPL || needNoRhsPostIfEraPL {
 			nStack = 6
 		}
 		// seed5 e4554–55: free multi-IV For body need_no_rhs Lhs PL —
@@ -17050,6 +17068,23 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		// F20 + Constant hex + CreateArray) — not multiDim live choose U15 residual.
 		if needNoRhsNestedForPL {
 			useBlockLocal = true
+		}
+		// seed5 e5332–33: post-If need_no_rhs-era free For Lhs PL — live
+		// eDerefExact choose among ~5 (UP U5) then visit_facts fail → F80.
+		// GO inventory under-counts sole U1. Only first VS PL; later F80=0
+		// (e5339+) falls through create (U14…) / multiphase.
+		// Arm PostIfSelDeref so VS-miss handler burns live U5/U4+U7 ladder
+		// (not sticky PLChooseMiss U7 or empty create F10 residual).
+		if needNoRhsPostIfEraPL && flow != nil {
+			pn := flow.freeMultiIVNeedNoRhsPostIfPLN
+			flow.freeMultiIVNeedNoRhsPostIfPLN = pn + 1
+			if pn == 0 {
+				useBlockLocal = true
+				_ = er.pick(5)
+				flow.freeMultiIVNeedNoRhsPostIfSelDeref = true
+				// visit_facts fail → Lhs do-while continues SelectDeref (e5334 F80)
+				return lvalueInfo{}, false, false
+			}
 		}
 		// C++ SelectParentLocal (VariableSelector.cpp:979–989): empty
 		// block.local_vars → random_type_from_type + GenerateNewParentLocal.
@@ -17690,7 +17725,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			}
 			return lvalueInfo{expr: "x", ctype: target}, true, false
 		}
+		// seed5 e2935: sticky PP→PL stack U2 + create. seed5 e5341: post-If
+		// need_no_rhs-era free For Lhs F80=0 U100=73 PP → PL Function::stack
+		// size 6 then GenerateNewParentLocal U14 (not sticky U2).
 		nStack := 2
+		if flow != nil && flow.freeMultiIVNeedNoRhsEra &&
+			flow.freeMultiIVNeedNoRhsIfLhsSelDone && !flow.freeMultiIVNeedNoRhsIfBody {
+			nStack = 6
+		}
 		idx := 0
 		if er != nil {
 			idx = int(er.pick(uint32(nStack)))
@@ -115999,22 +116041,47 @@ commaF80MultiDone:
 				break
 			}
 		}
-		// seed5 e5140–45: need_no_rhs free If then-body Statement Assign Lhs
-		// SelectDeref — C++ live eDereference pool (U5; U4+U7 itemize; U4
-		// accept). GO inventory under-counts as empty → F10 create residual.
-		// One-shot live multiphase then accept Lhs (next Statement U100 For).
+		// seed5 e5140–45 / e5282–88: need_no_rhs free If then/else Statement
+		// Assign Lhs SelectDeref — C++ live eDereference pool (U5; U4+U7
+		// itemize; U4 accept). GO inventory under-counts as empty → F10 create.
+		// One-shot per If then/else arm (LhsSelDone reset on arm entry).
 		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsIfBody &&
 			!ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone {
 			ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone = true
 			// F80 already true this iteration (SelectDerefPointerProb).
-			_ = r.upto(5) // e5140 choose among ~5 pointers
-			if r.flipcoin(80) { // e5141
-				_ = r.upto(4) // e5142
-				_ = r.upto(7) // e5143 itemize / expand
+			_ = r.upto(5) // e5140/e5283 choose among ~5 pointers
+			if r.flipcoin(80) { // e5141/e5284
+				_ = r.upto(4) // e5142/e5285
+				_ = r.upto(7) // e5143/e5286 itemize
 			}
-			if r.flipcoin(80) { // e5144
-				_ = r.upto(4) // e5145 accept
+			if r.flipcoin(80) { // e5144/e5287
+				_ = r.upto(4) // e5145/e5288 accept
 			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
+		// seed5 e5323–27 / e5359–60: free multi-IV need_no_rhs-era parent free
+		// For Assign Lhs after the need_no_rhs If (IfBody already cleared).
+		// C++ live select_deref_pointer eDereference pool; GO inventory empty
+		// → empty create residual. Gate: era + !IfBody + LhsSelDone (post-If
+		// free stream only). Simple Assign (not need_no_rhs):
+		//   n0 e5324–25 U5+U7 fail; n1 e5327 U5 accept
+		//   n2+ e5360 later simple Assign live U5 accept
+		// need_no_rhs Assign uses F80=0→VS then PostIfSelDeref (e5334+).
+		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsEra &&
+			!ctx.state.freeMultiIVNeedNoRhsIfBody &&
+			ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone && !needNoRhs {
+			n := ctx.state.freeMultiIVNeedNoRhsEraLhsSelN
+			ctx.state.freeMultiIVNeedNoRhsEraLhsSelN = n + 1
+			if n == 0 {
+				// e5324–25: choose U5 + array itemize U7 → visit_facts fail
+				_ = r.upto(5)
+				_ = r.upto(7)
+				continue
+			}
+			// e5327 / e5360+: choose U5 accept
+			_ = r.upto(5)
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
@@ -118043,6 +118110,27 @@ commaF80MultiDone:
 					_ = r.upto(7)
 				}
 				continue
+			}
+			// seed5 e5334–38: post-If need_no_rhs-era free For Lhs after VS PL
+			// U5 miss — SelectDeref live multiphase then F80=0→VS create:
+			//   F80 U5 fail; F80 U4+U7 itemize fail; F80=0.
+			// Must run before empty create F10 residual (VariableSelector.cpp
+			// select_deref_pointer choose_var before create).
+			if needNoRhs && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostIfSelDeref {
+				ctx.state.freeMultiIVNeedNoRhsPostIfSelDeref = false
+				selN := 0
+				for r.flipcoin(80) {
+					if selN == 0 {
+						_ = r.upto(5) // e5335
+					} else {
+						// e5337–38: pool shrink U4 + array itemize U7
+						_ = r.upto(4)
+						_ = r.upto(7)
+					}
+					selN++
+				}
+				continue // F80=0 → VS again (e5339+)
 			}
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again

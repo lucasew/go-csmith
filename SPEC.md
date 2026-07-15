@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5324** (Lhs SelectDeref U5 vs F10 create after parent For Assign); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5373** (PP→PL stack U6 vs U5 after post-If era Lhs climb); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5324→5373 climbed — post-If need_no_rhs-era Lhs SelectDeref live + VS PL/PP stack U6:**
+1. Capture: e5324 UP U5=2 (SelectDeref live) vs GO F10=0 (empty create) after parent free For Assign Lhs F80=1 (IfBody cleared).
+2. C++: free multi-IV need_no_rhs-era parent free For after need_no_rhs If — select_deref_pointer eDereference pool ~5 (U5+U7 fail → F80 U5 accept); need_no_rhs Assign F80=0 → VS PL U6+U5 miss → SelectDeref U5/U4+U7; PP U100=73 → PL stack U6 + NewValue U14 create; later simple Assign SelectDeref live U5.
+3. GO: freeMultiIVNeedNoRhsEraLhsSelN live multiphase under era+!IfBody+LhsSelDone; PostIfPL nStack=6 + U5 miss; PostIfSelDeref multiphase after PL miss; sticky PP→PL U2 overridden to U6 post-If; later simple Assign live U5 accept. Seeds 2/3/4/6 held.
+4. Next: e5373 UP U6 vs GO U5 (same raw) after U100=93 PP.
 
 **seed5 e5289→5324 climbed — StatementContinue first-stmt null + atMax Break EV + SelectLoopCtrl U37 era floor:**
 1. Capture: e5289 UP U100=42 tries=1 (reject ArrayOp 59 atMax_compound blk_depth=5) vs GO U100=59 tries=0.
