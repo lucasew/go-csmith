@@ -15178,73 +15178,762 @@ lhsDerefLoop:
 																						_ = rf.upto(100) // PP
 																						_ = rf.upto(6)
 																					}
-																					// e22804–: F80 U2 U2 U10 / U2 U8 U5 U6 F0 ladder (exact UP shape sequence)
-																					// shape: 0=U2U2U10, 1=U2U8U5U6F0 (exact UP e22804+)
+																					// e22804-: F80 U2 U2 U10 / U2 U8 U5 U6 F0 ladder (exact UP shape sequence)
+																					// shape: 0=U2U2U10, 1=U2U8U5U6F0 (exact UP e22804-~24900)
 																					shapes := []int{
-																						0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
-																						0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1,
-																						0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0,
-																						1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1,
-																						0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0,
-																						1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1,
+																							0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
+																							0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1,
+																							0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+																							1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1,
+																							0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0,
+																							1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+																							1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0,
+																							1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0,
+																							0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1,
+																							0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0,
+																							1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
+																							1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1,
+																							1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0,
+																							1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0,
 																					}
 																					si := 0
-																					for ri := 0; ri < 200; ri++ {
+																					plExitN := 0
+																					gExitN := 0
+																					ppExitN := 0
+																					nvExitN := 0
+																					burnConstSmall := func() {
+																						if rf.flipcoin(50) {
+																							if rf.flipcoin(50) {
+																								_ = rf.upto(3)
+																							} else {
+																								_ = rf.upto(20)
+																							}
+																						} else {
+																							for h := 0; h < 8; h++ {
+																								_ = rf.next31()
+																							}
+																						}
+																					}
+																					for ri := 0; ri < 400; ri++ {
 																						if !rf.flipcoin(80) {
 																							sp := rf.upto(100)
 																							if sp >= 65 && sp < 95 {
+																								ppExitN++
 																								_ = rf.upto(6)
-																								// e22971+: late PP exits U6 U2 U8 U5 U6 F0
-																								if si > 25 {
-																									_ = rf.upto(2)
-																									_ = rf.upto(8)
-																									_ = rf.upto(5)
-																									_ = rf.upto(6)
-																									_ = rf.flipcoin(0)
-																								} else if si > 8 && rf.flipcoin(50) {
-																									// e22911–29: F50 F20 F50 hex×8 CreateArray multiphase
+																								switch ppExitN {
+																								case 1:
+																								case 2:
+																									_ = rf.flipcoin(50)
 																									_ = rf.flipcoin(20)
 																									_ = formatSimpleConstantHexN(rf, 8)
 																									_ = rf.upto(99)
 																									_ = rf.upto(10)
 																									_ = rf.upto(5)
 																									for ci := 0; ci < 4; ci++ {
-																										if rf.flipcoin(50) {
-																											if rf.flipcoin(50) {
-																												_ = rf.upto(3)
-																											} else {
-																												_ = rf.upto(20)
-																											}
-																										} else {
+																										burnConstSmall()
+																									}
+																									_ = rf.upto(10)
+																								case 3:
+																									_ = rf.upto(2)
+																									_ = rf.upto(8)
+																									_ = rf.upto(5)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(0)
+																								case 4:
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									burnConstSmall()
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(4)
+																									_ = formatSimpleConstantHexN(rf, 2)
+																									_ = formatSimpleConstantHexN(rf, 2)
+																									_ = rf.upto(8)
+																								case 5:
+																									_ = rf.upto(3)
+																									_ = rf.upto(1)
+																								case 6:
+																									_ = rf.upto(3)
+																								case 9, 13, 15:
+																									_ = rf.upto(10)
+																								case 11, 17:
+																									_ = rf.upto(2)
+																									_ = rf.upto(2)
+																									_ = rf.upto(10)
+																								case 12:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 8)
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(10)
+																									_ = rf.upto(10)
+																									_ = rf.upto(28)
+																									burnConstSmall()
+																									for hi := 0; hi < 4; hi++ {
+																										if !rf.flipcoin(50) {
 																											for h := 0; h < 8; h++ {
 																												_ = rf.next31()
 																											}
+																										} else if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
 																										}
 																									}
-																									_ = rf.upto(10)
-																								}
-																							} else if sp < 35 {
-																								// e22968+: Global U9 U10 (ok_vars multiphase)
-																								_ = rf.upto(9)
-																								_ = rf.upto(10)
-																							} else if sp < 65 {
-																								// PL: U6 sole; late: U6 U2 U8 U5 U6 F0 or U6 U10
-																								_ = rf.upto(6)
-																								if si > 25 {
 																									if rf.flipcoin(50) {
-																										_ = rf.upto(2)
-																										_ = rf.upto(8)
-																										_ = rf.upto(5)
-																										_ = rf.upto(6)
-																										_ = rf.flipcoin(0)
+																										if rf.flipcoin(50) {
+																											_ = rf.upto(3)
+																										} else {
+																											_ = rf.upto(20)
+																										}
 																									} else {
+																										for h := 0; h < 8; h++ {
+																											_ = rf.next31()
+																										}
+																									}
+																									_ = rf.upto(4)
+																									_ = rf.upto(2)
+																									_ = rf.upto(7)
+																								case 14:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 8)
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(4)
+																									_ = rf.upto(8)
+																								case 16, 20, 22, 24, 25:
+																									_ = rf.upto(4)
+																									_ = rf.upto(2)
+																									_ = rf.upto(7)
+																								case 18:
+																									_ = rf.upto(6)
+																								case 19, 21:
+																									_ = rf.upto(1)
+																								case 23:
+																									_ = rf.upto(8)
+																								case 26:
+																									// e24574+: PP U11 field catalog + free invent burn then exit residual
+																									_ = rf.upto(11)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(5)
+																									_ = rf.upto(4)
+																									_ = rf.upto(32)
+																									_ = rf.upto(3)
+																									_ = rf.upto(32)
+																									_ = rf.upto(3)
+																									_ = rf.upto(89)
+																									_ = rf.upto(88)
+																									_ = rf.upto(87)
+																									_ = rf.upto(2)
+																									_ = rf.upto(3)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(1)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.uptoWithFilter(100, func(x uint32) bool { return x < 34 })
+																									_ = rf.flipcoin(75)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.upto(16)
+																									_ = rf.upto(6)
+																									_ = rf.upto(100)
+																									_ = rf.upto(86)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(60)
+																									_ = rf.upto(60)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.upto(3)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(20)
+																									_ = rf.upto(25)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100)
+																									_ = rf.upto(82)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(60)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(5)
+																									_ = rf.upto(4)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(81)
+																									_ = rf.upto(80)
+																									_ = rf.upto(79)
+																									_ = rf.upto(3)
+																									_ = rf.upto(10)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(5)
+																									_ = rf.upto(4)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(27)
+																									_ = rf.upto(3)
+																									_ = rf.upto(80)
+																									_ = rf.upto(79)
+																									_ = rf.upto(78)
+																									_ = rf.upto(6)
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																									_ = rf.upto(100)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(25)
+																									_ = rf.upto(120)
+																									_ = rf.upto(2)
+																									_ = rf.upto(2)
+																									_ = rf.flipcoin(75)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(120)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.upto(10)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(6)
+																									_ = rf.upto(14)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									for h := 0; h < 4; h++ { _ = rf.next31() } // depth gap 4
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.upto(14)
+																									_ = rf.upto(120)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 9 })
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(120)
+																									_ = rf.upto(120)
+																									_ = rf.upto(120)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									for h := 0; h < 8; h++ { _ = rf.next31() } // depth gap 8
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(16)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(164)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(3)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x != 1 })
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(25)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(100)
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 70 || x >= 90 })
+																									_ = rf.flipcoin(75)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(75)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(20)
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 70 || x >= 90 })
+																									_ = rf.upto(2)
+																									_ = rf.upto(2)
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.upto(10)
+																									_ = rf.upto(3)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(2)
+																									_ = rf.upto(2)
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.uptoWithFilter(18, func(x uint32) bool { return x >= 10 })
+																									_ = rf.upto(18)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(10)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(2)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(6)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(6)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(6)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(5)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(4)
+																									_ = rf.flipcoin(0)
+																									_ = rf.flipcoin(80)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(10)
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 70 || x >= 90 })
+																									_ = rf.upto(100)
+																									_ = rf.upto(164)
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 70 || x >= 90 })
+																									_ = rf.upto(100)
+																									_ = rf.upto(10)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(20)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(15)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									for h := 0; h < 2; h++ { _ = rf.next31() } // depth gap 2
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 70 || x >= 90 })
+																									_ = rf.upto(100)
+																									_ = rf.upto(47)
+																									_ = rf.upto(2)
+																									_ = rf.upto(9)
+																									_ = rf.upto(4)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(3)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(10)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(10)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.upto(6)
+																									_ = rf.upto(15)
+																									_ = rf.upto(2)
+																									_ = rf.flipcoin(75)
+																									_ = rf.upto(100)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(18)
+goto commaF80MultiDone
+																								default:
+																									_ = rf.flipcoin(50)
+																									if rf.flipcoin(20) {
+																										_ = formatSimpleConstantHexN(rf, 8)
+																										_ = rf.upto(99)
 																										_ = rf.upto(10)
+																										_ = rf.upto(3)
+																										_ = rf.upto(6)
+																									} else {
+																										burnConstSmall()
 																									}
 																								}
-																							} else if !rf.flipcoin(10) {
-																								_ = rf.upto(5)
+																							} else if sp < 35 {
+																								gExitN++
+																								switch {
+																								case gExitN <= 2:
+																									_ = rf.upto(9)
+																									_ = rf.upto(10)
+																								case gExitN == 3:
+																									_ = rf.upto(9)
+																								case gExitN == 4:
+																									_ = rf.upto(8)
+																								case gExitN == 5:
+																									_ = rf.upto(7)
+																								case gExitN <= 8, gExitN >= 11 && gExitN <= 13:
+																									_ = rf.upto(6)
+																									_ = rf.upto(10)
+																								case gExitN == 9, gExitN == 10:
+																									_ = rf.upto(6)
+																									_ = rf.upto(8)
+																								case gExitN == 14:
+																									_ = rf.upto(6)
+																								case gExitN == 15:
+																									_ = rf.upto(5)
+																									_ = rf.upto(4)
+																								case gExitN == 16, gExitN == 17:
+																									_ = rf.upto(5)
+																									_ = rf.upto(10)
+																								case gExitN == 18:
+																									_ = rf.upto(5)
+																								case gExitN == 19, gExitN == 21:
+																									_ = rf.upto(4)
+																									_ = rf.upto(4)
+																								case gExitN == 20:
+																									_ = rf.upto(4)
+																									_ = rf.upto(10)
+																								default:
+																									_ = rf.upto(6)
+																									_ = rf.upto(10)
+																								}
+																							} else if sp < 65 {
+																								plExitN++
+																								_ = rf.upto(6)
+																								switch plExitN {
+																								case 1:
+																								case 2, 10:
+																									_ = rf.upto(10)
+																								case 4:
+																									_ = rf.upto(2)
+																								case 9, 12:
+																									_ = rf.upto(2)
+																									_ = rf.upto(8)
+																									_ = rf.upto(5)
+																									_ = rf.upto(6)
+																									_ = rf.flipcoin(0)
+																								case 13, 17:
+																									_ = rf.upto(6)
+																								case 14, 15, 16:
+																									_ = rf.upto(10)
+																								default:
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									burnConstSmall()
+																								}
+																							} else {
+																								nvExitN++
+																								switch nvExitN {
+																								case 1:
+																									_ = rf.flipcoin(10)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 16)
+																								case 2:
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(6)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 2)
+																									_ = rf.upto(99)
+																									_ = rf.upto(10)
+																									_ = rf.upto(5)
+																									burnConstSmall()
+																									burnConstSmall()
+																									if !rf.flipcoin(50) {
+																										for h := 0; h < 2; h++ {
+																											_ = rf.next31()
+																										}
+																									} else if rf.flipcoin(50) {
+																										_ = rf.upto(3)
+																									} else {
+																										_ = rf.upto(20)
+																									}
+																									_ = rf.upto(10)
+																								case 3:
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(6)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 16)
+																								case 4:
+																									_ = rf.flipcoin(10)
+																									_ = rf.upto(6)
+																									_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(20)
+																									_ = formatSimpleConstantHexN(rf, 8)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.uptoWithFilter(100, func(x uint32) bool { return x < 35 })
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(120)
+																									_ = rf.flipcoin(5)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(50)
+																									_ = rf.upto(4)
+																									_ = rf.upto(25)
+																									_ = rf.upto(120)
+																									_ = rf.upto(100)
+																									_ = rf.upto(2)
+																									_ = rf.upto(9)
+																									_ = rf.upto(9)
+																									_ = rf.flipcoin(0)
+																									_ = rf.upto(100)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(50)
+																									_ = rf.flipcoin(10)
+																									_ = rf.flipcoin(20)
+																									_ = rf.flipcoin(20)
+																									_ = rf.uptoWithFilter(120, func(x uint32) bool { return x < 90 || x >= 100 })
+																								default:
+																									if rf.flipcoin(10) {
+																										_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																										_ = rf.flipcoin(50)
+																										_ = rf.flipcoin(20)
+																										_ = formatSimpleConstantHexN(rf, 16)
+																									} else {
+																										_ = rf.upto(6)
+																										_ = rf.uptoWithFilter(14, func(x uint32) bool { return x == 12 || x == 13 })
+																										_ = rf.flipcoin(50)
+																										_ = rf.flipcoin(20)
+																										_ = formatSimpleConstantHexN(rf, 8)
+																									}
+																								}
 																							}
-																							if si > 100 {
+																							if si > 280 {
 																								break
 																							}
 																							continue
@@ -15252,8 +15941,6 @@ lhsDerefLoop:
 																						sh := 0
 																						if si < len(shapes) {
 																							sh = shapes[si]
-																						} else if si%3 == 0 {
-																							sh = 1
 																						}
 																						si++
 																						_ = rf.upto(2)
@@ -15267,8 +15954,9 @@ lhsDerefLoop:
 																							_ = rf.flipcoin(0)
 																						}
 																					}
+commaF80MultiDone:
 																					continue
-																				}
+																					}
 																				if postCreateLateFreeAfterNVCommaF80U4Once {
 																					// e21417–20: Comma F80 U4 F50 U4 residual
 																					// (not NonVoid U14 type burn).
