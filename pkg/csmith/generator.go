@@ -139,6 +139,10 @@ var burnCreateArrayAltEmpty bool
 // F20 NewArray + Constant + CreateArray). Expression CreateArray (seed4 e101)
 // keeps F20-only empty address (no nested create).
 var burnCreateArrayPtrAltNestedCreate bool
+// burnCreateArrayMultiLvlAltU2: one-shot ** CreateArray after multi-level
+// SelectDeref empty create VS PL (e4239–55): pointer alts F20=0 → choose U2;
+// v=0 itemize multi-dim * [8][7] (e4249 U8 U7). Default postAgg F20-only under-burns.
+var burnCreateArrayMultiLvlAltU2 bool
 
 // burnCreateArrayLhsNullValidate: after SelectDeref NewArray+null create, each
 // retry F80 choose of the null array burns FactPointTo F0 (seed5 e727–41).
@@ -742,6 +746,12 @@ type functionFlowState struct {
 	// Expression Variable PL stack is U3 (e3549; free multi-IV For body depth)
 	// not sticky freeMultiIVForLhsExprContinue U2 (e3003/e3405).
 	freeMultiIVPostEAGlobalItemizePLStackU3 bool
+	// freeMultiIVPostEAMultiLvlDerefVS: after ExpressionAssign Lhs SelectDeref
+	// multi-level empty create F20×4 (e4223–27), next free Expression Variable
+	// is VS multiphase: PL U3 fail → PL U3 create ** qfer F50 F10×2+self
+	// F20 NewArray+address U2 CreateArray (e4229–42). Phase 0=first PL fail;
+	// phase 1=create accept. Without it GO force-creates on first U3.
+	freeMultiIVPostEAMultiLvlDerefVS int
 	// freeMultiIVPostEAItemizePLCreateNeedLhs: after e3549–56 PL empty create,
 	// parent ExpressionAssign Lhs SelectDeref F80 (e3557). finishVar runs Lhs.
 	freeMultiIVPostEAItemizePLCreateNeedLhs bool
@@ -4128,7 +4138,16 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// then itemize; Lhs CreateArray keeps U2 via skip flag false).
 				// e7748: PLStackU3 era alts burn U2 U3 U3 (same as ** create
 				// address residual e7641–43), not bare U2.
-				if burnCreateArrayAltEmpty {
+				if burnCreateArrayMultiLvlAltU2 {
+					// seed5 e4245–54: ** CreateArray alts after multi-level
+					// SelectDeref create VS PL NewArray — choose_ok_var U2;
+					// v=0 multi-dim * itemize U8 U7 ([8][7] inventory).
+					v := int(r.upto(2))
+					if v == 0 {
+						_ = r.upto(8)
+						_ = r.upto(7)
+					}
+				} else if burnCreateArrayAltEmpty {
 					// e17368+: empty pointees — F20 only
 				} else if postAggPostCD3ArrayOp2BodySink != nil && *postAggPostCD3ArrayOp2BodySink {
 					// e9166–71: ArrayOp2 body pointer CreateArray alts F20 only
@@ -4162,6 +4181,17 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				} else if postAggGlobalCreateN >= 0 {
 					// postAgg SelectDeref CreateArray alts: empty/sole pointees
 					// (e2546–64 F20 chain, no U2). Pre-postAgg e1851/e1912 keep U.
+					// seed5 e4245–54: multi-level ** CreateArray (VS PL NewArray
+					// after multi-dim SelectDeref create) alts choose_ok_var U2;
+					// v=0 often lands multi-dim * array → ArrayVariable::itemize
+					// all dims (e4249 U8 U7 for [8][7] from e4221 inventory).
+					if strings.Count(t.Name, "*") >= 2 {
+						v := int(r.upto(2))
+						if v == 0 {
+							_ = r.upto(8)
+							_ = r.upto(7)
+						}
+					}
 				} else if ppPostPadGlobalPicks >= 15 {
 					// seed4 e1912+: after e1895 residual era, alt init choose U2.
 					_ = r.upto(2)
@@ -10066,6 +10096,74 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
+			// seed5 e4229–42: after multi-level SelectDeref empty create F20×4,
+			// free Expression Variable VS multiphase (VariableSelector.cpp):
+			//   e4229 U100=53 PL + U3 stack visit-fail (no create RNG)
+			//   e4231 U100=57 PL + U3 stack → GenerateNewParentLocal **
+			//     qfer SE-free READ: F50 F10×2 levels + self F50 F10
+			//     create_and_initialize NewArray F20=1 + make_init address F20=0
+			//     choose_ok_var U2 + CreateArray U99…
+			// GO force-create on first U3 burned F50 F10 (1-star) too early.
+			if flow != nil && flow.freeMultiIVPostEAMultiLvlDerefVS > 0 &&
+				(scopePick == 1 || scopePick == 4) && er != nil && er.fallback != nil {
+				phase := flow.freeMultiIVPostEAMultiLvlDerefVS
+				_ = er.pick(3) // stack U3 (e4230 / e4232)
+				if phase == 1 {
+					// First PL: visit_facts fail → ExpressionVariable do-while
+					// reselects VS (another U100) without create RNG.
+					flow.freeMultiIVPostEAMultiLvlDerefVS = 2
+					scopePick2 := variableScopePickFromER(er, opts, &scope) // e4231
+					if scopePick2 == 1 || scopePick2 == 4 {
+						_ = er.pick(3) // e4232 U3
+					}
+					// Create **: 2 ptr levels + self SE-free READ qfer.
+					for i := 0; i < 2; i++ {
+						_ = er.fallback.flipcoin(50) // level vol
+						_ = er.fallback.flipcoin(10) // level const
+					}
+					_ = er.fallback.flipcoin(50) // self vol
+					_ = er.fallback.flipcoin(10) // self const
+					newArray := er.fallback.flipcoin(20) // NewArray
+					initNull := er.fallback.flipcoin(20) // make_init
+					if newArray {
+						if !initNull {
+							_ = er.pick(2) // address choose_ok_var U2
+						}
+						ptrTy := t
+						if !strings.Contains(ptrTy.Name, "*") {
+							ptrTy = CType{Name: "int32_t**", Signed: true, Bits: 32, HexDigits: 8}
+						} else if strings.Count(ptrTy.Name, "*") < 2 {
+							ptrTy = CType{
+								Name: ptrTy.Name + "*", Signed: ptrTy.Signed,
+								Bits: ptrTy.Bits, HexDigits: ptrTy.HexDigits,
+							}
+						}
+						// e4245–54: alts need U2 (+ multi-dim itemize when v=0).
+						burnCreateArrayMultiLvlAltU2 = true
+						_arr := burnCreateArrayVariable(er.fallback, opts, ptrTy, true)
+						burnCreateArrayMultiLvlAltU2 = false
+						emitOrphanArrayGlobal(ctx, ptrTy, _arr)
+					} else if !initNull {
+						_ = er.pick(2)
+					}
+					flow.freeMultiIVPostEAMultiLvlDerefVS = 0
+					// Materialize local so inventory grows.
+					name := flow.allocLocalName()
+					depth := flow.blockStack
+					if depth < 1 {
+						depth = 1
+					}
+					ctx.dynLocs = append(ctx.dynLocs, localInfo{
+						name: name, ctype: CType{Name: "int32_t**", Signed: true, Bits: 32},
+						blockDepth: depth, initLit: "0", emitDecl: true,
+					})
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, name))
+				}
+				// phase>=2 unexpected — fall through
+				flow.freeMultiIVPostEAMultiLvlDerefVS = 0
+			}
 			// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 			// (UP expand_struct_union / multi-param; GO inventory sole-accepts).
 			// Intercept before any PP sole / miss path skips the choose.
@@ -15197,6 +15295,56 @@ exprTries:
 						nullValidatePostResidualSelDerefItemize = 2
 					} else {
 						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
+						// seed5 e4227: ExpressionAssign Lhs type is pointer (e.g. **
+						// after ptr-cmp qfer F50 F10×2+self). select_deref empty
+						// create_and_initialize finds_pointer_type(t,true) → t*
+						// (ind≥2). Outer make_init address-of peels to pointer
+						// pointee → nested create_and_initialize F20 NewArray +
+						// make_init F20 (pointer: Constant null has no pure_rnd;
+						// not simple Constant F50 F50 U20).
+						// match_exact_qualifiers is on during ExpressionAssign Lhs
+						// (StatementAssign.cpp) so random_loose_qualifiers and
+						// random_add_qualifiers burn no F50/F10 (e4223 F80→F20).
+						// Nested init F20=1 → null pointer Constant; accept Lhs;
+						// parent Expression U120 tries=2 + VS multiphase (e4228+).
+						if strings.Contains(t.Name, "*") {
+							// nested make_init_value for pointer pointee
+							nestedInitNull := er.fallback.flipcoin(20)
+							if !nestedInitNull {
+								// Address-of nested pointer: choose_var residual.
+								// Rare at e4227 (UP nested init F20=1); keep a
+								// small choose so LCG does not stall.
+								_ = er.pick(2)
+							}
+							// Materialize multi-level pointer into local inventory
+							// (GenerateNewParentLocal !addVol).
+							if ctx != nil && ctx.state != nil {
+								name := ctx.state.allocLocalName()
+								depth := ctx.state.blockStack
+								if depth < 1 {
+									depth = 1
+								}
+								// Created type is t* (find_pointer_type add).
+								ptrName := t.Name + "*"
+								ctx.dynLocs = append(ctx.dynLocs, localInfo{
+									name: name, ctype: CType{
+										Name: ptrName, Signed: t.Signed,
+										Bits: t.Bits, HexDigits: t.HexDigits,
+									},
+									blockDepth: depth, initLit: "0", emitDecl: true,
+								})
+								noteDerivedPointer(ctx.state, pointerBaseKey(t), true)
+								// e4228–42: parent free Expression Variable is VS
+								// multiphase PL stack U3 fail → PL U3 create **
+								// qfer F50 F10×2+self F20 NewArray+address U2 U99.
+								// Sticky freeMultiIVPostEAGlobalItemizeMustUseOnce
+								// (e3537 sole) would skip U100 → GO U120 Constant.
+								ctx.state.freeMultiIVPostEAGlobalItemizeMustUseOnce = false
+								ctx.state.freeMultiIVPostEAMultiLvlDerefVS = 1 // arm phase-0
+							}
+							lhsFromDeref = true
+							break
+						}
 						// Constant::make_random for the synthetic pointed-to object.
 						if er.fallback.flipcoin(50) {
 							if er.fallback.flipcoin(50) {

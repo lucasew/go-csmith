@@ -222,10 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4227** (SelectDeref empty create F20 vs F50 after multi-dim itemize); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4368** (PL stack U3 vs U6 after multi-level SelectDeref create ladder); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e4227→4368 climbed — SelectDeref multi-level create_and_initialize F20 ladder:**
+1. Capture: e4227 UP F20=1 vs GO F50=1 after matching F80 + F20×3=0 (SelectDeref empty create).
+2. C++: ExpressionAssign Lhs type is pointer (`**`); `find_pointer_type(t,true)` → `t*` (ind≥2). Outer `create_and_initialize` NewArray F20 + make_init address F20; nested pointee is still a pointer → nested NewArray F20 + make_init F20 (null Constant has no pure_rnd — not simple Constant F50 F50 U20). `match_exact_qualifiers` during ExpressionAssign Lhs skips `random_add`/`random_loose` F50/F10 (F80→F20). Parent free Expression Variable: VS multiphase PL U3 fail → PL U3 create `**` qfer F50 F10×2+self + NewArray address U2 CreateArray; alts F20=0 → choose U2 (+ multi-dim `*` itemize U8 U7 when v=0).
+3. GO: default address residual assumed simple pointee Constant F50. Multi-level Lhs now peels nested make_init F20; clear sticky must_use sole; arm VS multiphase PL U3 fail/create; `burnCreateArrayMultiLvlAltU2` for ** alts. Next: e4368 U3 vs U6 (PL stack after ladder).
+4. Seed2/3/4/6 held.
 
 **seed5 e4221→4227 climbed — multi-dim addressable itemize after Global choose:**
 1. Capture: e4221 UP U8=3 U7=0 vs GO F80 after matching e4220 U2 Global choose.
