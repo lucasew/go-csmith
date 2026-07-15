@@ -222,16 +222,22 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **3647** (after free multi-IV post-itemize AssignOps+SelectLType residual + RHS Constant + Lhs SelectDeref CreateArray U7 itemize ladder; e3647 UP F80=1 vs GO F80=0); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **4094** (Lhs do-while after CreateArray U7; e4094 Global choose U3 vs U2); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e3647→4094 climbed — Lhs do-while U7 + Constant hex + VS inventory:**
+1. Capture: e3647 UP F80=1 vs GO F80=0 after CreateArray U7 ladder + F50 F20 F50 create residual.
+2. C++: Lhs.cpp do-while after CreateArray; Constant::make_random F50=0 burns RandomHexDigits(8) untraced; F80 continues SelectDeref itemize; VS scope table Global/PL/PP/NewValue; dummy.push_back shrinks choose pools; PL stack blocks differ (pre-existing locals / empty create / array itemize); NewArray create marks block with new sizes for later itemize.
+3. GO: structural Lhs residual — burnSimpleConstant hex, Global phase-A U3→U2→sole then phase-B countdown, per-block PL inventory, NewArray block size tracking. Next: e4094 Global choose U3 vs U2.
+4. Seed2/3/4/6 held.
 
 **seed5 e3571→3647 climbed — free multi-IV post-F30 AssignOps SelectLType + Lhs CreateArray U7:**
 1. Capture: e3571 UP U120=90 vs GO U100=50 same raw — after useExisting=0 + F30 F0, GO ExpressionVariable fallthrough; UP continues AssignOps/SelectLType-shaped body (RHS Constant U120 then Lhs).
 2. C++: F50 F30 F0 is Type::SelectLType (Pointer/Struct/FloatAsLType; float disabled → F0) after simple AssignOps, then RHS Expression Constant + Lhs::make_random SelectDeref multiphase; need_no_rhs AssignOps (U120=102) continues Lhs empty create + CreateArray; post-CreateArray SelectDeref itemizes collective array sizes U7 (ArrayVariable::itemize) until F80=0 → VS.
 3. GO: free Expression term Function useExisting=0 residual burns SelectLType F30 F0 then RHS Expression + compact Lhs residual (not maxFuncs ExpressionVariable); AssignOps need_no_rhs + Lhs empty-create CreateArray + U7 itemize ladder phases (F0 then F50 F20 F50).
-4. Seed2/3/4/6 held. Next: e3647 after F50 F20 F50 create residual — UP F80=1 more SelectDeref U7 vs GO F80=0 ends ladder early.
+4. Seed2/3/4/6 held. Next was e3647 (climbed to 4094).
 
 **seed5 e3535→3571 climbed — free multi-IV Global U16 itemize + PL create + Lhs + FuncAttr:**
 1. Capture: e3535 UP U4=3 vs GO U120=55 same raw — after free multi-IV Global residual U16=6, C++ ExpressionVariable multiphase F50 rechoose U16=10 + ArrayVariable::itemize U4 then VS U100 ParentParam; GO accepted early and parent binary ShiftBy stole F50 U16.

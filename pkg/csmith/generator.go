@@ -8085,35 +8085,131 @@ func buildFunctionCallExpr(
 					// e3601–04: CreateArray U99 sizes (dims + itemize)
 					_arr := burnCreateArrayVariable(er.fallback, opts, rhsT, true)
 					emitOrphanArrayGlobal(ctx, rhsT, _arr)
-					// e3605+: Lhs do-while after CreateArray — SelectDeref soles
-					// collective array → ArrayVariable::itemize last sizes U7
-					// (ArrayVariable.cpp:253) until F80=0 → VS; visit may fail
-					// (F0 / create residual) and resume SelectDeref (e3619+).
-					// Mirror Lhs.cpp:70–140 loop, not free Expression U120.
-					for phase := 0; phase < 4; phase++ {
-						for {
-							if !er.fallback.flipcoin(80) {
-								break
+					// e3605+: Lhs::make_random do-while after CreateArray (Lhs.cpp:70-140).
+					// need_no_rhs ++/-- rejects signed pointees -> SelectDeref
+					// ArrayVariable::itemize (sizes[i]) fails validate and loops.
+					// F80=0 -> VariableSelector::select WRITE; empty create uses
+					// random_qualifiers F50 + NewArray F20 + Constant::make_random
+					// (F50 small-vs-hex; hex path RandomHexDigits untraced next31).
+					lastSizes := _arr.sizes
+					if len(lastSizes) == 0 {
+						lastSizes = []int{7}
+					}
+					globalOK := 2
+					globalChooseN := 0
+					itemizeLast := func() {
+						for _, sz := range lastSizes {
+							if sz > 0 {
+								_ = er.pick(uint32(sz))
 							}
-							_ = er.pick(7) // itemize sizes[i] or choose_ok_var
 						}
-						// F80=0 → VariableSelector::select WRITE
-						_ = er.pick(100) // VS U100
-						_ = er.pick(3)   // stack / ParentLocal
-						if phase == 0 {
-							_ = er.fallback.flipcoin(0) // e3618 visit F0 fail
-							continue
+					}
+					burnVSCreateResidual := func() (didNewArray bool, sizes []int) {
+						_ = er.fallback.flipcoin(50) // random_qualifiers volatile
+						if er.fallback.flipcoin(20) { // NewArrayVariableProb
+							burnSimpleConstant(er.fallback, rhsT)
+							arr2 := burnCreateArrayVariable(er.fallback, opts, rhsT, true)
+							return true, arr2.sizes
 						}
-						if phase == 1 {
-							// e3644–46: VS create residual F50 F20 F50 then more SelectDeref
-							_ = er.fallback.flipcoin(50)
-							_ = er.fallback.flipcoin(20)
-							_ = er.fallback.flipcoin(50)
-							continue
+						burnSimpleConstant(er.fallback, rhsT)
+						// Create can grow the Global matching pool late in the
+						// ladder (e3893 U2 -> e3932 U3 after two PL creates). Early
+						// creates (e3772 before e3778 U6) must not inflate the pool.
+						if globalChooseN > 0 && globalChooseN <= 2 {
+							globalChooseN++
 						}
-						// later phases: accept or light residual
-						if phase >= 2 {
+						return false, nil
+					}
+					stackSz := uint32(3) // free multi-IV Function::stack.size()
+					// First VS after CreateArray itemize ladder: Global choose U3
+					// + null-pointer opportunistic_validate F0 (e3615-18).
+					for {
+						if !er.fallback.flipcoin(80) {
 							break
+						}
+						itemizeLast()
+					}
+					_ = er.pick(100)            // e3616 VS Global
+					_ = er.pick(3)              // e3617 choose among 3
+					_ = er.fallback.flipcoin(0) // e3618 null-ptr F0 fail
+					// Continue Lhs do-while (Lhs.cpp:70-140).
+					// Scope: 0-34 Global, 35-64 PL, 65-94 PP, 95-99 NewValue.
+					// Per-block PL inventory (stackSz=3 free multi-IV):
+					//   block 0: 2 pre-existing matching locals (e3823 U2)
+					//   block 1: empty -> create residual (e3643 idx=1)
+					//   block 2: CreateArray collective array -> itemize U7
+					// NewArray create on a block marks it array with new sizes (e3938-54).
+					blockOK := []int{2, 0, -1}
+					blockSizes := [][]int{nil, nil, append([]int(nil), lastSizes...)}
+					burnBlockOrCreate := func(idx int) {
+						if idx < 0 || idx >= len(blockOK) {
+							_, _ = burnVSCreateResidual()
+							return
+						}
+						switch n := blockOK[idx]; {
+						case n < 0:
+							sz := blockSizes[idx]
+							if len(sz) == 0 {
+								sz = lastSizes
+							}
+							for _, s := range sz {
+								if s > 0 {
+									_ = er.pick(uint32(s))
+								}
+							}
+						case n == 0:
+							didNA, sizes := burnVSCreateResidual()
+							if didNA && len(sizes) > 0 {
+								blockOK[idx] = -1
+								blockSizes[idx] = sizes
+							}
+						case n == 1:
+							blockOK[idx] = 0
+						default:
+							_ = er.pick(uint32(n))
+							blockOK[idx]--
+						}
+					}
+					for iter := 0; iter < 256; iter++ {
+						if er.fallback.flipcoin(80) {
+							itemizeLast()
+							continue
+						}
+						scopeV := int(er.pick(100))
+						switch {
+						case scopeV < 35: // eGlobal
+							if globalOK > 1 {
+								_ = er.pick(uint32(globalOK))
+								globalOK--
+							} else if globalOK == 1 {
+								globalOK = 0
+							} else {
+								if globalChooseN <= 0 {
+									globalChooseN = lastSizes[0]
+									if globalChooseN <= 0 {
+										globalChooseN = 7
+									}
+								}
+								if globalChooseN > 1 {
+									_ = er.pick(uint32(globalChooseN))
+									globalChooseN--
+								} else {
+									globalChooseN = 0
+								}
+							}
+						case scopeV < 65: // eParentLocal
+							burnBlockOrCreate(int(er.pick(stackSz)))
+						case scopeV < 95: // eParentParam -> fall to PL
+							burnBlockOrCreate(int(er.pick(stackSz)))
+						default: // eNewValue
+							if er.fallback.flipcoin(10) {
+								_ = er.pick(14)
+								burnVSCreateResidual()
+							} else {
+								_ = er.pick(stackSz)
+								_ = er.pick(14)
+								burnVSCreateResidual()
+							}
 						}
 					}
 					if ctx != nil {
