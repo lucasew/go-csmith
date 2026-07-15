@@ -322,6 +322,23 @@ var nullValidatePostResidualLhsVSPhase int
 // residual Assign Lhs accept (e1697 Function F10=1 CREATE param pointer).
 var nullValidatePostResidualDerivedU8 bool
 
+// nullValidatePostResidualEmptyCreateAddr: after residual Assign Lhs accept,
+// next ExpressionAssign SelectDeref empty create (F80 F20 F20) burns address
+// residual U2 U4 (e1705–06), not sticky ParamU7 early-accept with zero RNG.
+var nullValidatePostResidualEmptyCreateAddr bool
+
+// nullValidatePostResidualPPU7Done: after residual Assign Lhs era, stop sticky
+// ParentParam ok_vars U7 pad (e1714 UP U5 live create; sticky U7 sole desyncs).
+var nullValidatePostResidualPPU7Done bool
+
+// nullValidatePostResidualGlobalItemizeU4Once: one-shot pointer Global n==2
+// itemize U4 after residual Assign Lhs (e1701); later e1822 is U3 again.
+var nullValidatePostResidualGlobalItemizeU4Once bool
+
+// nullValidatePostResidualPLCreateN: PL create count after residual Assign Lhs
+// era. 1st = full qfer create (e1715 F50 F10 F20…); 2nd = F50+U32 (e1826–27).
+var nullValidatePostResidualPLCreateN int
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -1631,8 +1648,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	}
 	// seed5 e1078: residual Assign RHS ParentLocal stack U6 (UP Function::stack
 	// after residual free Expressions + For; GO blockStack under-counts → U1).
+	// e1714: after residual Assign Lhs era (PPU7Done), stack shrinks to U5.
 	if nullValidatePostResidualParamU7 {
 		n = 6
+		if nullValidatePostResidualPPU7Done {
+			n = 5
+		}
 		_ = er.pick(uint32(n))
 		return 0
 	}
@@ -4722,6 +4743,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		nullValidatePostResidualNeedQfer = true
 		nullValidatePostResidualNVPL = false
 	}
+	// After residual Assign Lhs era: count PL creates.
+	// 1st: full qfer (e1715 F50 F10 F20…). 2nd: F50+U32 residual (e1826–27).
+	if nullValidatePostResidualPPU7Done && er != nil && er.fallback != nil {
+		nullValidatePostResidualPLCreateN++
+		if nullValidatePostResidualPLCreateN >= 2 {
+			_ = er.fallback.flipcoin(50) // e1826
+			_ = er.fallback.upto(32)     // e1827
+			return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
+		}
+	}
 	// e10000: after Function-arg must residual, PL create is NewArray F20 F20
 	// CreateArray (no random_qualifiers F50 F10).
 	if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2FuncArgMustDone &&
@@ -5700,12 +5731,26 @@ if pointerGlobalPicksSink != nil {
 				if al < 1 {
 					al = 4
 				}
+				// seed5 e1701 residual: after Assign Lhs era, first Global n==2
+				// array itemize bound U4 (inventory arrayLen may under-count as 3).
+				if nullValidatePostResidualGlobalItemizeU4Once && n == 2 {
+					nullValidatePostResidualGlobalItemizeU4Once = false
+					al = 4
+				}
 				_ = er.pick(uint32(al))
 				return
 			}
-			// First pointer Global n==2 pick itemizes (e845); later ones do not (e866).
-			if n == 2 && picks == 1 && mustReadLiveSink != nil && !*mustReadLiveSink {
-				_ = er.pick(3)
+			// First pointer Global n==2 pick itemizes (e845 U3); later ones do not (e866)
+			// except residual Assign Lhs era: e1701 one-shot U4; e1822 later U3.
+			if n == 2 && mustReadLiveSink != nil && !*mustReadLiveSink {
+				if nullValidatePostResidualGlobalItemizeU4Once {
+					nullValidatePostResidualGlobalItemizeU4Once = false
+					_ = er.pick(4) // e1701
+				} else if picks == 1 {
+					_ = er.pick(3) // e845
+				} else if nullValidatePostResidualPPU7Done && picks >= 2 {
+					_ = er.pick(3) // e1822 residual-era later n==2
+				}
 			}
 		}
 		// e7259/e7286: free Expression Global after nest ArrayOp residual —
@@ -8009,12 +8054,14 @@ exprTries:
 							// seed5 e1325: residual Assign free Expression ptr-cmp
 							// UP derived_types U7 (after residual CreateArray/Global).
 							// Overrides e937 U5 floor under residual era.
-							if nullValidatePostResidualParamU7 && nPtr < 7 {
+							// e1697/e1818: after residual Assign Lhs era (PPU7Done),
+							// Function CREATE / ptr-cmp choose is U8 sticky floor.
+							if nullValidatePostResidualPPU7Done && nPtr < 8 {
+								nPtr = 8
+							} else if nullValidatePostResidualParamU7 && nPtr < 7 {
 								nPtr = 7
-							}
-							// e1697: after residual Assign Lhs accept, Function F10=1
-							// CREATE param pointer choose UP U8 (one-shot).
-							if nullValidatePostResidualDerivedU8 && nPtr < 8 {
+							} else if nullValidatePostResidualDerivedU8 && nPtr < 8 {
+								// one-shot before PPU7Done arms (e1697 early Function)
 								nullValidatePostResidualDerivedU8 = false
 								nPtr = 8
 							}
@@ -8313,7 +8360,7 @@ exprTries:
 					if len(paramCands) > 0 {
 						// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 						// (UP expand_struct_union / multi-param; GO sole-accepts).
-						if nullValidatePostResidualParamU7 && er != nil {
+						if nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done && er != nil {
 							_ = er.pick(7)
 							for _, c := range paramCands {
 								wantPtr := strings.Contains(t.Name, "*")
@@ -8583,7 +8630,8 @@ exprTries:
 			// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 			// (UP expand_struct_union / multi-param; GO inventory sole-accepts).
 			// Intercept before any PP sole / miss path skips the choose.
-			if scopePick == 2 && nullValidatePostResidualParamU7 && er != nil {
+			// e1714+: after residual Assign Lhs era, live PP U5 create (not sticky U7).
+			if scopePick == 2 && nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done && er != nil {
 				_ = er.pick(7)
 				expr := "x"
 				if len(scope.params) > 0 {
@@ -8599,8 +8647,11 @@ exprTries:
 			// Sticky under residual era (not one-shot): e1248 after Lhs CreateArray
 			// still empty-creates. ExpressionAssign Lhs after SelectDeref F80=0
 			// uses its own NewArray CreateArray path (not this intercept).
+			// e1825+: after residual Assign Lhs era (PPU7Done), live PL path
+			// (UP U5 F50 U32…; sticky mode-1 F50 F10 desyncs).
 			if (scopePick == 1 || scopePick == 4) &&
-				(nullValidatePostResidualPLCreateOnce || nullValidatePostResidualParamU7) &&
+				(nullValidatePostResidualPLCreateOnce ||
+					(nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done)) &&
 				er != nil {
 				nullValidatePostResidualPLCreateOnce = false
 				idx := parentStackPick(er, flow) // e1078 / e1249 U6
@@ -8620,8 +8671,11 @@ exprTries:
 			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
 			// e1271+: sticky residual ParamU7 GlobalList U18; itemize when inventory
 			// candidate is array (e1282 U4 after U18=2).
+			// e1821: after residual Assign Lhs era (PPU7Done), live Global U2
+			// (not sticky U18 pad).
 			if scopePick == 0 &&
-				(nullValidatePostResidualGlobalU18 || nullValidatePostResidualParamU7) &&
+				(nullValidatePostResidualGlobalU18 ||
+					(nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done)) &&
 				er != nil {
 				oneShot := nullValidatePostResidualGlobalU18
 				if oneShot {
@@ -10926,7 +10980,8 @@ exprTries:
 				!flow.postAggPostCD3ArrayOp2PPFallDone {
 				// seed5 e1068: residual Assign RHS needs ParentParam U7 choose
 				// (UP ok_vars); do not sole-skip under residual ParamU7 pad.
-				if nullValidatePostResidualParamU7 && er != nil {
+				// e1714+: after residual Assign Lhs era, live PP (no sticky U7).
+				if nullValidatePostResidualParamU7 && !nullValidatePostResidualPPU7Done && er != nil {
 					_ = er.pick(7)
 				}
 				noteNestPPSoleShiftSkip(flow)
@@ -12800,11 +12855,26 @@ exprTries:
 					// create accepts after F80 F20 F20 (no address residual F20).
 					// e1364–66: residual era ExpressionAssign Lhs empty create
 					// also accepts after F20 F20 → parent U120 (not more F20).
-					if (nullValidatePostResidualLhsAccept || nullValidatePostResidualParamU7) &&
-						!newArray && !initConst {
-						nullValidatePostResidualLhsAccept = false
-						lhsFromDeref = true
-						break
+					// e1705–06: after residual Assign Lhs accept, empty create
+					// continues address residual U2 U4 (not sticky early-accept).
+					if !newArray && !initConst {
+						if nullValidatePostResidualEmptyCreateAddr {
+							nullValidatePostResidualEmptyCreateAddr = false
+							_ = er.pick(2) // e1705 address choose
+							_ = er.pick(4) // e1706 residual
+							// e1707: If-body Statement U100 without BlockSize U4
+							// (UP after residual Assign-era ExpressionAssign Lhs).
+							if ctx != nil && ctx.state != nil {
+								ctx.state.skipNextBlockSize = true
+							}
+							lhsFromDeref = true
+							break
+						}
+						if nullValidatePostResidualLhsAccept || nullValidatePostResidualParamU7 {
+							nullValidatePostResidualLhsAccept = false
+							lhsFromDeref = true
+							break
+						}
 					}
 					// e9463: ArrayOp2 ExpressionAssign Lhs SelectDeref empty create
 					// F20 F20=0 → address choose U7 then parent Expression U120.
@@ -116388,6 +116458,12 @@ func emitSingleFuncDefOnce(
 			_ = emitLValueAssignment(&body, r, opts, env, scope, ctx)
 			// e1697: next Function CREATE may choose_random_pointer_type U8.
 			nullValidatePostResidualDerivedU8 = true
+			// e1705: next ExpressionAssign SelectDeref empty create → address U2 U4.
+			nullValidatePostResidualEmptyCreateAddr = true
+			// e1714: stop sticky ParentParam U7 pad (live U5 create residual).
+			nullValidatePostResidualPPU7Done = true
+			// e1701: first pointer Global n==2 itemize U4 (not sticky e845 U3).
+			nullValidatePostResidualGlobalItemizeU4Once = true
 			// e1686+: after residual Assign Lhs NewValue create accept, UP
 			// continues Statement stream (U100 IfElse…) not invent Expression
 			// U120 / BlockSize U4. Skip BlockSize; emit Statements live.
