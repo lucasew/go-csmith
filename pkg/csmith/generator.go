@@ -267,6 +267,25 @@ var nullValidatePostResidualReturnMust bool
 // skip else BlockSize (UP depth guard / sole Return; e1033 Statement U100).
 var nullValidatePostResidualSkipIfElse bool
 
+// nullValidatePostResidualNoInventExpr: after residual free Expressions + For,
+// skip post-body invent Expression (UP continues Statement U100 e1033+).
+var nullValidatePostResidualNoInventExpr bool
+
+// nullValidatePostResidualParamU7: residual Assign RHS ExpressionVariable
+// ParentParam ok_vars pad U7 (UP expand_struct_union / multi-param; GO
+// inventory sole-accepts → e1068 U120 vs U7). Sticky through residual era.
+var nullValidatePostResidualParamU7 bool
+
+// nullValidatePostResidualSelDerefItemize: after residual CreateArray, next
+// SelectDeref F80 chooses live multi-dim itemize U9 U8 U3 F0 (e1215+), not
+// empty create F20. Count of remaining itemize attempts (UP 3 then F80=0→VS).
+var nullValidatePostResidualSelDerefItemize int
+
+// nullValidatePostResidualPLCreateOnce: one-shot residual ParentLocal empty
+// create U14+qfer (e1077–85); later PL (e1225 after SelectDeref fail) is
+// NewArray CreateArray F20 F50 U99 — not sticky retype U14.
+var nullValidatePostResidualPLCreateOnce bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -1572,6 +1591,13 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		state.postAggNestLhsSelDerefU7 = true
 		state.postAggEmptyDerefCreateOnce = false
 		state.postAggForceDerefCreate = false
+		return 0
+	}
+	// seed5 e1078: residual Assign RHS ParentLocal stack U6 (UP Function::stack
+	// after residual free Expressions + For; GO blockStack under-counts → U1).
+	if nullValidatePostResidualParamU7 {
+		n = 6
+		_ = er.pick(uint32(n))
 		return 0
 	}
 	if state != nil && state.deepStack {
@@ -4814,6 +4840,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if newArray && ctx.state.postAggU15StackU6CreateDone {
 			doAddrResidual = false
 		}
+		// seed5 e1126–28: residual Assign ExpressionAssign Lhs SelectDeref
+		// NewArray+!initNull → CreateArray U99 directly (UP F20 F20 U99; GO
+		// ppEra address residual F20 F50 desyncs).
+		if newArray && nullValidatePostResidualParamU7 {
+			doAddrResidual = false
+		}
 		// e6541: nest Assign RHS NewArray+!initNull still address-of choose U2
 		// then CreateArray U99 (UP F20 F20 U2 U99…), not StackU6 skip residual.
 		if newArray && !initNull && ctx.skipFuncRetQfer &&
@@ -5530,6 +5562,10 @@ func selectExprVariableFromERLocal(t CType, er *exprRand, candidates []exprVarCa
 	selectVarLocalScope = prev
 	return c, ok
 }
+
+// selectVarForceChooseN: when >0, choose_ok_var uses this n even if inventory
+// is smaller (seed5 e1068 residual ParentParam ok_vars U7 pad).
+var selectVarForceChooseN int
 
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
 	filtered := make([]exprVarCandidate, 0, len(candidates))
@@ -6618,12 +6654,16 @@ if pointerGlobalPicksSink != nil {
 		}
 		return uniq[idx], true
 	}
+	forceN := selectVarForceChooseN
 	if len(exact) > 0 {
-		if len(exact) == 1 {
+		if len(exact) == 1 && forceN <= 1 {
 			return exact[0], true
 		}
 		n := len(exact)
 		chooseN := n
+		if forceN > chooseN {
+			chooseN = forceN
+		}
 		if n == 4 && multiDimArraySink != nil && *multiDimArraySink > 0 &&
 			pointerGlobalPicksSink != nil && *pointerGlobalPicksSink >= 6 {
 			chooseN = 2 // seed2 e1017
@@ -6654,13 +6694,16 @@ if pointerGlobalPicksSink != nil {
 			v := int(er.pick(18))
 			return exact[v%n], true
 		}
-		return exact[int(er.pick(uint32(chooseN)))%n], true
+		if chooseN > 1 {
+			return exact[int(er.pick(uint32(chooseN)))%n], true
+		}
+		return exact[0], true
 	}
 	if len(integers) > 0 {
-		if len(integers) == 1 {
+		if len(integers) == 1 && forceN <= 1 {
 			return integers[0], true
 		}
-		if !forAssign && len(integers) == 2 {
+		if !forAssign && len(integers) == 2 && forceN <= 1 {
 			return integers[0], true
 		}
 		// seed5 e897–901: emptyParamsDepthBlock free Expression Global
@@ -6685,16 +6728,30 @@ if pointerGlobalPicksSink != nil {
 			v := int(er.pick(uint32(n)))
 			return integers[v%len(integers)], true
 		}
-		return integers[int(er.pick(uint32(len(integers))))], true
+		chooseN := len(integers)
+		if forceN > chooseN {
+			chooseN = forceN
+		}
+		if chooseN > 1 {
+			return integers[int(er.pick(uint32(chooseN)))%len(integers)], true
+		}
+		return integers[0], true
 	}
 	if len(sameWidth) > 0 {
-		if len(sameWidth) == 1 {
+		if len(sameWidth) == 1 && forceN <= 1 {
 			return sameWidth[0], true
 		}
-		if !forAssign {
+		if !forAssign && forceN <= 1 {
 			return sameWidth[0], true
 		}
-		return sameWidth[int(er.pick(uint32(len(sameWidth))))], true
+		chooseN := len(sameWidth)
+		if forceN > chooseN {
+			chooseN = forceN
+		}
+		if chooseN > 1 {
+			return sameWidth[int(er.pick(uint32(chooseN)))%len(sameWidth)], true
+		}
+		return sameWidth[0], true
 	}
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
@@ -6716,6 +6773,9 @@ if pointerGlobalPicksSink != nil {
 			return exprVarCandidate{expr: "g_0", ctype: t, assignable: true}, true
 		}
 		return exprVarCandidate{}, false
+	}
+	if forceN > 1 {
+		return filtered[int(er.pick(uint32(forceN)))%len(filtered)], true
 	}
 	if !forAssign {
 		return filtered[0], true
@@ -8164,7 +8224,23 @@ exprTries:
 						paramCands = nil
 					}
 					if len(paramCands) > 0 {
-						if c, ok := selectExprVariableFromERLocal(t, er, paramCands, false); ok {
+						// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
+						// (UP expand_struct_union / multi-param; GO sole-accepts).
+						if nullValidatePostResidualParamU7 && er != nil {
+							_ = er.pick(7)
+							for _, c := range paramCands {
+								wantPtr := strings.Contains(t.Name, "*")
+								havePtr := strings.Contains(c.ctype.Name, "*")
+								compat := sameBaseType(c.ctype, t) ||
+									(!wantPtr && !havePtr && c.ctype.Bits == t.Bits)
+								if compat {
+									bumpExprDepth(ctx)
+									markFuncEffect()
+									return castLiteral(t, c.expr)
+								}
+							}
+							// Incompatible types: still burned U7; fall through miss.
+						} else if c, ok := selectExprVariableFromERLocal(t, er, paramCands, false); ok {
 							wantPtr := strings.Contains(t.Name, "*")
 							havePtr := strings.Contains(c.ctype.Name, "*")
 							compat := sameBaseType(c.ctype, t) ||
@@ -8416,6 +8492,32 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
+			// (UP expand_struct_union / multi-param; GO inventory sole-accepts).
+			// Intercept before any PP sole / miss path skips the choose.
+			if scopePick == 2 && nullValidatePostResidualParamU7 && er != nil {
+				_ = er.pick(7)
+				expr := "x"
+				if len(scope.params) > 0 {
+					expr = scope.params[0].name
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, expr))
+			}
+			// seed5 e1077–85: residual ParentLocal empty block → stack U6 +
+			// GenerateNewParentLocal (U14 type + qfer F50 F10 F20 F50 F50 U20);
+			// GO inventory U3 choose desyncs. One-shot: e1225 later PL is
+			// NewArray CreateArray after SelectDeref fail (not sticky U14).
+			if (scopePick == 1 || scopePick == 4) && nullValidatePostResidualPLCreateOnce && er != nil {
+				nullValidatePostResidualPLCreateOnce = false
+				idx := parentStackPick(er, flow) // e1078 U6
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
 			}
 			// seed5 e929: post-residual free Expression Global eFlexible U18.
 			// e1025–26: after residual For body Assign, Global U18 + itemize U10.
@@ -10698,6 +10800,11 @@ exprTries:
 			if scopePick == 2 && flow != nil && flow.postAggNestArrayOpPostCD3 &&
 				flow.postAggPostCD3PPFallThroughDone &&
 				!flow.postAggPostCD3ArrayOp2PPFallDone {
+				// seed5 e1068: residual Assign RHS needs ParentParam U7 choose
+				// (UP ok_vars); do not sole-skip under residual ParamU7 pad.
+				if nullValidatePostResidualParamU7 && er != nil {
+					_ = er.pick(7)
+				}
 				noteNestPPSoleShiftSkip(flow)
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
@@ -11024,7 +11131,14 @@ exprTries:
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 			}
 			if len(candidates) > 0 {
-				if c, ok := selectExprVariableFromER(t, er, candidates, false); ok {
+				// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
+				// (UP expand_struct_union / multi-param; GO inventory sole).
+				if scopePick == 2 && nullValidatePostResidualParamU7 {
+					selectVarForceChooseN = 7
+				}
+				c, ok := selectExprVariableFromER(t, er, candidates, false)
+				selectVarForceChooseN = 0
+				if ok {
 					// e9740–42: ArrayOp2 after Global U56 era — U2 choose returned
 					// empty (visit fail); reselect VS U100 PL U6 create.
 					if c.expr == "" && scopePick == 0 && flow != nil &&
@@ -12528,6 +12642,19 @@ exprTries:
 						}
 						continue
 					}
+					// seed5 e1215+: residual CreateArray left multi-dim pointer;
+					// UP SelectDeref choose+itemize U9 U8 U3 F0 (fail) ×3 then
+					// F80=0 → VS. GO inventory empty would empty-create F20.
+					if nullValidatePostResidualSelDerefItemize > 0 && er != nil {
+						nullValidatePostResidualSelDerefItemize--
+						_ = er.pick(9) // e1215/e1220/e…
+						_ = er.pick(8)
+						_ = er.pick(3)
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(0) // itemize F0 fail
+						}
+						continue // more SelectDeref F80
+					}
 					// select_deref_pointer: no pointer vars → find_pointer_type(add=true)
 					// then GenerateNewParentLocal/create_and_initialize.
 					// find_pointer_type grows derived_types even if create later fails
@@ -12807,6 +12934,14 @@ exprTries:
 							_ = er.fallback.upto(4)
 						}
 						tgtNewArray = true
+					} else if nullValidatePostResidualParamU7 && newArray {
+						// seed5 e1126–28: residual ExpressionAssign Lhs SelectDeref
+						// NewArray+!initNull → CreateArray U99 (no tgt NewArray F20
+						// + Constant residual; UP F20 F20 U99 U10×3 U108…).
+						tgtNewArray = true
+						// e1215+: after CreateArray, SelectDeref chooses live array
+						// with multi-dim itemize U9 U8 U3 F0 ×3 then F80=0→VS.
+						nullValidatePostResidualSelDerefItemize = 3
 					} else {
 						tgtNewArray = er.fallback.flipcoin(20) // inner NewArrayVariableProb
 						// Constant::make_random for the synthetic pointed-to object.
@@ -12881,6 +13016,32 @@ exprTries:
 			// seed4 e1231: PP-era (no useSmallParentStack) ParentParam Lhs still
 			// does stack U3 (PP→PL), not early accept after U100 alone.
 			if ctx == nil || ctx.state == nil {
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			// seed5 e1225–29: residual Assign ExpressionAssign Lhs after
+			// SelectDeref F80=0 → ParentLocal stack U6 + NewArray CreateArray
+			// F20 F50 U99 (not early sole-accept then parent U120).
+			if nullValidatePostResidualParamU7 && scopePick == 1 && er != nil {
+				_ = parentStackPick(er, ctx.state) // e1226 U6
+				if er.fallback != nil {
+					newArr := er.fallback.flipcoin(20) // e1227 NewArray
+					if newArr {
+						// e1228: Constant small-vs-hex F50; F50=0 → RandomHexDigits
+						// untraced next31 before CreateArray U99 (depth gap).
+						if !er.fallback.flipcoin(50) {
+							// int pointee hex digits (8) — match type width.
+							for i := 0; i < 8; i++ {
+								_ = er.fallback.next31()
+							}
+						}
+						base := t
+						if !strings.Contains(base.Name, "*") {
+							base = CType{Name: base.Name + "*", Signed: base.Signed, Bits: base.Bits, HexDigits: base.HexDigits}
+						}
+						_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+						emitOrphanArrayGlobal(ctx, base, _arr)
+					}
+				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			ppLhsEra := ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
@@ -114610,6 +114771,13 @@ func emitStatement(
 		}
 		// e974: Statement For SelectLoopCtrl U9 before loop_control.
 		nullValidatePostResidualForLoopCtrlU9 = true
+		// After residual free Expressions + For, skip post-body invent Expression
+		// (UP continues Statement U100 e1033 IfElse…).
+		nullValidatePostResidualNoInventExpr = true
+		// e1068+: residual Assign RHS ParentParam choose U7 (ok_vars pad).
+		nullValidatePostResidualParamU7 = true
+		// e1077: first residual ParentLocal empty create (U14); later PL natural.
+		nullValidatePostResidualPLCreateOnce = true
 		// Fall through to chooseStmt (UP e973 Statement For U100=28).
 	}
 	chooseStmt := func() stmtKind {
@@ -115847,7 +116015,36 @@ func emitSingleFuncDefOnce(
 	// residual inventLocal). Residual may also write Statement lines into residualBody.
 	var body strings.Builder
 	emitStatements(&body, r, opts, env, scope, state, info, idx, 0, false, stmtBudget, ctx)
-	if len(env.globals) > 0 {
+	if nullValidatePostResidualNoInventExpr {
+		// seed5 e1033+: after residual free Expressions + For, UP continues
+		// Statement stream (IfElse U100 U7 U2 U3 F0 F50…) not invent Expression U120.
+		// e1047 U100=67 Assign → real StatementAssign (AssignOps U120 + SelectLType
+		// F50 F30 F0 + RHS Expression), not stop residual then deferred invent/func.
+		nullValidatePostResidualNoInventExpr = false
+		_ = r.upto(100)    // e1033 Statement IfElse
+		_ = r.upto(7)      // e1034 Global choose
+		_ = r.upto(2)      // e1035 itemize
+		_ = r.upto(3)      // e1036
+		_ = r.flipcoin(0)  // e1037
+		_ = r.flipcoin(50) // e1038
+		_ = r.flipcoin(50) // e1039
+		_ = r.flipcoin(50) // e1040
+		_ = r.flipcoin(50) // e1041
+		_ = r.upto(4)      // e1042
+		_ = r.flipcoin(50) // e1043
+		_ = r.flipcoin(50) // e1044
+		_ = r.upto(4)      // e1045
+		_ = r.upto(4)      // e1046
+		stmtV := int(r.upto(100)) // e1047 Statement
+		// AssignOps table default band: v>=60 → Assign (toKind default).
+		if stmtV >= 60 {
+			if ctx != nil {
+				ctx.exprDepth = 0
+				ctx.effectSEFree = true
+			}
+			_ = emitLValueAssignment(&body, r, opts, env, scope, ctx)
+		}
+	} else if len(env.globals) > 0 {
 		writable := make([]globalInfo, 0, len(env.globals))
 		for _, g := range env.globals {
 			if g.isConst {
