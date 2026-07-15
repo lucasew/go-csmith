@@ -222,10 +222,16 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2808** (SelectLType ok_structs U3 vs U2); seed7@47, seed8@42, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **2811** (Function-fail ExpressionVariable U2 vs VS U100 after SelectLType U3 fix); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+
+**seed5 e2808→2811 climbed — SelectLType ok_structs (Type.cpp:1591–1597):**
+1. `StatementAssign::make_random` passes `no_volatile = !effect_context.is_side_effect_free()`.
+2. Each Statement starts SE-free → `no_volatile=false` → **include** `is_volatile_struct_union` types (S2 with vol bitfields).
+3. Go always filtered `s.isVolatile` → n=2; UP n=3 (S0+S1+S2). Now `ctx.effectSEFree` gates the filter; track `isConst` for `no_const=true`.
+4. Next: e2811 Function useExisting=0 at max_funcs → ExpressionVariable — UP U2 tries=1 (live inventory/must_use/choose_ok) vs GO VS U100 Global create.
 
 **seed6 full PASS (23/23) — structural:**
 1. **Lhs WRITE `SelectParentLocal` empty** (`VariableSelector.cpp:979–989`): when `!multiDimArrays` and stack block `local_vars` empty, `random_type_from_type` → `choose_random_simple` (**eSimpleType** + `SIMPLE_TYPES_PROB_FILTER`) + `GenerateNewParentLocal` qferMode 3 WRITE (was F80 retry).

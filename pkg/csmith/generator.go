@@ -540,11 +540,13 @@ var nestedNullPreferSink *bool
 type structTypeInfo struct {
 	fields     []fieldInfo
 	isVolatile bool // true if any field is volatile (is_volatile_struct_union)
+	isConst    bool // true if any field is const (is_const_struct_union)
 }
 
 type unionTypeInfo struct {
 	fields     []fieldInfo
 	isVolatile bool
+	isConst    bool
 }
 
 type fieldInfo struct {
@@ -15450,16 +15452,26 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 			targetType = CType{Name: "int32_t" + stars, Signed: true, Bits: 32}
 		} else {
-			// Type::SelectLType after PointerAsLType miss:
-			// get_all_ok_struct_union_types(no_const=true, no_volatile=!SE-free, …).
-			// Statement Assign often !SE-free → filter is_volatile_struct_union.
-			// seed2 e44: only volatile S0 → empty → no F30, just FloatAsLType F0.
-			// seed5 e443: non-vol S0 survives → F30 then F0 (or F30 hit → choose).
-			// Use non-vol structs only (conservative; matches common !SE-free Assign).
+			// Type::SelectLType after PointerAsLType miss (Type.cpp:1591–1597):
+			// get_all_ok_struct_union_types(no_const=true, no_volatile=!SE-free,
+			// need_int_field=false, bStruct=true).
+			// StatementAssign::make_random passes
+			// no_volatile = !effect_context.is_side_effect_free().
+			// Each Statement starts SE-free (emitStatement) → no_volatile=false
+			// → include is_volatile_struct_union types (seed5 e2808 U3 = S0+S1+S2).
+			// Nested ExpressionAssign may inherit !SE-free → filter volatile.
+			// no_const always true → filter is_const_struct_union.
+			noVolatile := true
+			if ctx != nil && ctx.effectSEFree {
+				noVolatile = false
+			}
 			okStructs := make([]int, 0, 4)
 			if ctx != nil {
 				for i, s := range ctx.info.structs {
-					if s.isVolatile {
+					if s.isConst {
+						continue
+					}
+					if noVolatile && s.isVolatile {
 						continue
 					}
 					okStructs = append(okStructs, i)
@@ -115276,9 +115288,9 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 	// Upstream Type::GenerateSimpleTypes pushes eChar..eUInt128, i.e. 13
 	// simple types before aggregate generation starts.
 	typeCount := 13
-	// fieldQual draws vol/const; sets *volOut when volatile is taken so the
-	// enclosing aggregate can mark is_volatile_struct_union.
-	fieldQual := func(volOut *bool) string {
+	// fieldQual draws vol/const; sets *volOut/*constOut so the enclosing
+	// aggregate can mark is_volatile_struct_union / is_const_struct_union.
+	fieldQual := func(volOut, constOut *bool) string {
 		// Mirrors CVQualifiers::random_qualifiers(..., FieldConstProb, FieldVolatileProb):
 		// volatile draw first, then const draw.
 		isVolatile := opts.VolStructUnionFields && r.flipcoin(fieldVolatileProb)
@@ -115289,6 +115301,9 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 		q := ""
 		if isConst {
 			q += "const "
+			if constOut != nil {
+				*constOut = true
+			}
 		}
 		if isVolatile {
 			q += "volatile "
@@ -115327,7 +115342,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(scalarFieldInFullBitfieldProb) {
 						name := fmt.Sprintf("f%d", f)
 						t := pickFieldType(r, opts, sidx)
-						writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile), t.Name, name))
+						writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile, &st.isConst), t.Name, name))
 						st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 						continue
 					}
@@ -115336,7 +115351,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual(&st.isVolatile)
+					qual := fieldQual(&st.isVolatile, &st.isConst)
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
@@ -115350,7 +115365,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual(&st.isVolatile)
+					qual := fieldQual(&st.isVolatile, &st.isConst)
 					width := bitfieldLength(opts.IntSize*8, st.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					st.fields = append(st.fields, fieldInfo{
@@ -115360,7 +115375,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 				}
 				name := fmt.Sprintf("f%d", f)
 				t := pickFieldType(r, opts, sidx)
-				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile), t.Name, name))
+				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&st.isVolatile, &st.isConst), t.Name, name))
 				st.fields = append(st.fields, fieldInfo{name: name, ctype: t})
 			}
 			if opts.PackedStruct {
@@ -115370,23 +115385,31 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 			}
 			writeLine(b, 0, "};")
 			writeLine(b, 0, "")
-			// is_volatile_struct_union: also true if any nested field type is a
-			// volatile aggregate (Type.cpp:461–462), not only this struct's fieldQual.
+			// is_volatile/const_struct_union: also true if any nested field type
+			// is a volatile/const aggregate (Type.cpp:437–468).
 			for _, f := range st.fields {
 				if strings.HasPrefix(f.ctype.Name, "struct S") {
 					var si int
 					if _, err := fmt.Sscanf(f.ctype.Name, "struct S%d", &si); err == nil &&
-						si >= 0 && si < len(info.structs) && info.structs[si].isVolatile {
-						st.isVolatile = true
-						break
+						si >= 0 && si < len(info.structs) {
+						if info.structs[si].isVolatile {
+							st.isVolatile = true
+						}
+						if info.structs[si].isConst {
+							st.isConst = true
+						}
 					}
 				}
 				if strings.HasPrefix(f.ctype.Name, "union U") {
 					var ui int
 					if _, err := fmt.Sscanf(f.ctype.Name, "union U%d", &ui); err == nil &&
-						ui >= 0 && ui < len(info.unions) && info.unions[ui].isVolatile {
-						st.isVolatile = true
-						break
+						ui >= 0 && ui < len(info.unions) {
+						if info.unions[ui].isVolatile {
+							st.isVolatile = true
+						}
+						if info.unions[ui].isConst {
+							st.isConst = true
+						}
 					}
 				}
 			}
@@ -115410,7 +115433,7 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					if r.flipcoin(bitfieldsSignedProb) {
 						base = "signed"
 					}
-					qual := fieldQual(&ut.isVolatile)
+					qual := fieldQual(&ut.isVolatile, &ut.isConst)
 					width := bitfieldLength(opts.IntSize*8, ut.fields)
 					writeLine(b, 1, fmt.Sprintf("%s%s %s : %d;", qual, base, name, width))
 					ut.fields = append(ut.fields, fieldInfo{
@@ -115419,8 +115442,23 @@ func emitCompositeTypes(b *strings.Builder, r *rng, opts Options, pool []CType) 
 					continue
 				}
 				t := pickUnionFieldType(r, opts, len(info.structs))
-				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&ut.isVolatile), t.Name, name))
+				writeLine(b, 1, fmt.Sprintf("%s%s %s;", fieldQual(&ut.isVolatile, &ut.isConst), t.Name, name))
 				ut.fields = append(ut.fields, fieldInfo{name: name, ctype: t})
+			}
+			// Nested aggregate const/vol (Type.cpp:437–468).
+			for _, f := range ut.fields {
+				if strings.HasPrefix(f.ctype.Name, "struct S") {
+					var si int
+					if _, err := fmt.Sscanf(f.ctype.Name, "struct S%d", &si); err == nil &&
+						si >= 0 && si < len(info.structs) {
+						if info.structs[si].isVolatile {
+							ut.isVolatile = true
+						}
+						if info.structs[si].isConst {
+							ut.isConst = true
+						}
+					}
+				}
 			}
 			writeLine(b, 0, "};")
 			writeLine(b, 0, "")
