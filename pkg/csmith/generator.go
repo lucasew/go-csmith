@@ -114014,7 +114014,7 @@ func emitStatement(
 		state.ppPostPadSkipParentExprN = 0
 		base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 		// e810–834: Function×3 + Constant match with free depth-0 Expressions.
-		// e835+: Variable tries=1 needs parent depthBlock (next plateau).
+		// e835+: Variable tries=1 (depthBlock) — next plateau.
 		for i := 0; i < 4; i++ {
 			state.ppPostPadSkipParentExprN = 0
 			if ctx != nil {
