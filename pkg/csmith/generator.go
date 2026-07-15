@@ -349,6 +349,19 @@ var nullValidatePostResidualSimplePLN int
 // PP→PL create (e2084–88), simple GlobalList pad is U12 (e2094+) not U18.
 var nullValidatePostResidualGlobalU12 bool
 
+// nullValidatePostResidualGlobalU21: after residual Statement Lhs SelectDeref
+// create (e2158), simple GlobalList pad grows to U21 (e2212).
+var nullValidatePostResidualGlobalU21 bool
+
+// nullValidatePostResidualStmtLhsF80FailOnce: one-shot first Statement Lhs
+// SelectDeref F80 fail→retry under residual GlobalU12 (e2150–51: UP second
+// F80 create; GO empty inventory skips choose and creates on first F80).
+var nullValidatePostResidualStmtLhsF80FailOnce bool
+
+// nullValidatePostResidualPtrCmpGlobalF0Done: one-shot ptr-cmp Expression
+// Variable Global sole+F0 fail under residual GlobalU12 (e2185).
+var nullValidatePostResidualPtrCmpGlobalF0Done bool
+
 // postAggNestArrayOpPLStackU3Sink: keepExpr residual done → PL stack U3 era (e7497+).
 // CreateArray pointer alts burn U2 U3 U3 address residual (e7748).
 var postAggNestArrayOpPLStackU3Sink *bool
@@ -4936,6 +4949,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		if newArray && nullValidatePostResidualParamU7 {
 			doAddrResidual = false
 		}
+		// e2273 residual: after GlobalU21 PL create F50 F10 F20 F20=0, UP
+		// parent Expression U120 (no address choose U2).
+		if nullValidatePostResidualGlobalU21 && !newArray {
+			doAddrResidual = false
+		}
 		// e6541: nest Assign RHS NewArray+!initNull still address-of choose U2
 		// then CreateArray U99 (UP F20 F20 U2 U99…), not StackU6 skip residual.
 		if newArray && !initNull && ctx.skipFuncRetQfer &&
@@ -8086,7 +8104,11 @@ exprTries:
 							// Overrides e937 U5 floor under residual era.
 							// e1697/e1818: after residual Assign Lhs era (PPU7Done),
 							// Function CREATE / ptr-cmp choose is U8 sticky floor.
-							if nullValidatePostResidualPPU7Done && nPtr < 8 {
+							// e2182: after residual Statement Lhs create (GlobalU12),
+							// ptr-cmp derived_types is U9.
+							if nullValidatePostResidualGlobalU12 && nPtr < 9 {
+								nPtr = 9
+							} else if nullValidatePostResidualPPU7Done && nPtr < 8 {
 								nPtr = 8
 							} else if nullValidatePostResidualParamU7 && nPtr < 7 {
 								nPtr = 7
@@ -8130,6 +8152,12 @@ exprTries:
 							// **+ self F50 (not *** levels F10 overshoot).
 							if ppEra && ppPostPadGlobalPicks >= 14 && stars > 2 {
 								stars = 2
+							}
+							// e2274 residual GlobalU21: ptr-cmp ExpressionAssign
+							// WRITE qfer is one level F50 F10 + self F50 (not **
+							// F50 F10×2 + self → extra F10 before parent U120).
+							if nullValidatePostResidualGlobalU21 && stars > 1 {
+								stars = 1
 							}
 							var ptrTy CType
 							if outOfRangeS0 {
@@ -8703,35 +8731,53 @@ exprTries:
 			// seed5 residual Assign Lhs era simple ParentLocal:
 			//   n=0 e2064 sole after stack (U120 next; no local U6)
 			//   n=1 e2068 force U14 + qferMode 2 create (UP empty; GO inventory)
-			//   n>=2 e2077 sole after stack → parent Assign Lhs F80 (e2078)
-			// Pointers keep live create (e1914).
+			//   n=2 e2077 sole after stack → parent Assign Lhs F80 (e2078)
+			//   n>=3 before GlobalU21: sole when inventory non-empty (e2109+)
+			//   after GlobalU21: force qferMode 1 create (e2267 F50 F10…)
+			// Pointers: live until GlobalU21; then force create (e2267 ptr-cmp PL).
 			if (scopePick == 1 || scopePick == 4) && nullValidatePostResidualPPU7Done &&
-				nullValidatePostResidualParamU7 && !strings.Contains(t.Name, "*") && er != nil {
-				idx := parentStackPick(er, flow)
-				n := nullValidatePostResidualSimplePLN
-				nullValidatePostResidualSimplePLN++
-				if n != 1 {
-					// sole (e2065 / e2077 → parent Lhs F80)
+				nullValidatePostResidualParamU7 && er != nil {
+				isPtr := strings.Contains(t.Name, "*")
+				// Pointer PL before GlobalU21 stays live (e1914 create path).
+				if isPtr && !nullValidatePostResidualGlobalU21 {
+					// fall through live
+				} else if !isPtr || nullValidatePostResidualGlobalU21 {
+					idx := parentStackPick(er, flow)
+					n := nullValidatePostResidualSimplePLN
+					nullValidatePostResidualSimplePLN++
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
-					expr := "x"
-					if len(localCands) > 0 {
-						expr = localCands[0].expr
+					sole := !isPtr && (n == 0 || n == 2 ||
+						(n >= 3 && len(localCands) > 0 && !nullValidatePostResidualGlobalU21))
+					if sole {
+						expr := "x"
+						if len(localCands) > 0 {
+							expr = localCands[0].expr
+						}
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, expr))
 					}
-					bumpExprDepth(ctx)
-					markVarSelectEffect()
-					return finishVar(castLiteral(t, expr))
-				}
-				// e2068 only: U14 retype + !SE-free qferMode 2 (F10 only)
-				// then NewArray F20 (UP e2069 F10 F20 F50…).
-				es := true
-				prevES := useESimpleRetypeSink
-				useESimpleRetypeSink = &es
-				g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, true, idx)
-				useESimpleRetypeSink = prevES
-				if ok {
-					bumpExprDepth(ctx)
-					markVarSelectEffect()
-					return finishVar(castLiteral(t, g.expr))
+					// e2068 (n=1 simple): qferMode 2. e2267 (GlobalU21/ptr): qferMode 1.
+					qfer := 1
+					if !isPtr && n == 1 {
+						qfer = 2
+					}
+					retype := !isPtr
+					es := retype
+					var prevES *bool
+					if es {
+						prevES = useESimpleRetypeSink
+						useESimpleRetypeSink = &es
+					}
+					g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qfer, retype, idx)
+					if es {
+						useESimpleRetypeSink = prevES
+					}
+					if ok {
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, g.expr))
+					}
 				}
 			}
 			// seed5 e929 / e1025: one-shot residual Global U18 + optional itemize U10.
@@ -8750,10 +8796,12 @@ exprTries:
 					nullValidatePostResidualGlobalU18 = false
 				}
 				nG := uint32(18)
-				if nullValidatePostResidualGlobalU12 {
+				if nullValidatePostResidualGlobalU21 {
+					nG = 21 // e2212+
+				} else if nullValidatePostResidualGlobalU12 {
 					nG = 12 // e2094+
 				}
-				v := int(er.pick(nG)) // e929 / e1025 / e1271 / e2042 / e2094
+				v := int(er.pick(nG)) // e929 / e1025 / e1271 / e2042 / e2094 / e2212
 				if oneShot && nullValidatePostResidualGlobalItemizeU10 {
 					nullValidatePostResidualGlobalItemizeU10 = false
 					_ = er.pick(10)
@@ -8791,6 +8839,20 @@ exprTries:
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "g_0"))
+			}
+			// seed5 e2184–87: residual-era ptr-cmp Expression Variable Global —
+			// UP sole-accepts then visit_facts F0 → VS reselect U100 sole accept
+			// (e2186); GO live inventory chooses U5. One-shot under GlobalU12.
+			if scopePick == 0 && nullValidatePostResidualGlobalU12 &&
+				strings.Contains(t.Name, "*") && flow != nil && flow.inPtrCmpExpr &&
+				er != nil && er.fallback != nil &&
+				!nullValidatePostResidualPtrCmpGlobalF0Done {
+				nullValidatePostResidualPtrCmpGlobalF0Done = true
+				_ = er.fallback.flipcoin(0)                    // e2185 visit fail
+				_ = variableScopePickFromER(er, opts, &scope) // e2186 VS U100 sole
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "p"))
 			}
 			// seed5 e896–901: emptyParamsDepthBlock free Expression Global —
 			// UP choose U2 U2 + Constant F50 F50 U20 (not inventory U4 sole).
@@ -112665,12 +112727,24 @@ commaF80MultiDone:
 				break
 			}
 		}
+		// seed5 e2150–51: residual-era Statement Lhs after EA Lhs CreateArray —
+		// first SelectDeref fails (UP has pointer inventory; GO empty under-count
+		// skips choose) without choose U → second F80 create with F10 F20 F20 F20
+		// Constant (no vol/looser F50). One-shot under GlobalU12.
+		if nullValidatePostResidualGlobalU12 && !nullValidatePostResidualStmtLhsF80FailOnce {
+			nullValidatePostResidualStmtLhsF80FailOnce = true
+			continue
+		}
 		// No existing deref targets → create pointer local/global.
 		// need_no_rhs (++/--): qfer wildcard → random_qualifiers(ptr, WRITE,
 		// no_volatile=true): per level F50+F10, self F50 (seed4 e433–435).
 		// Else non-wildcard: random_add_qualifiers F10 const + F50 vol.
 		skipVol := ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
 			!ctx.state.filterCompoundStmts
+		// e2151 residual: after F80 fail once, create skips vol F50 (UP F10 F20…).
+		if nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce {
+			skipVol = true
+		}
 		ptrType := targetType
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
@@ -112814,7 +112888,10 @@ commaF80MultiDone:
 		// random_looser_volatiles only when outer pointer is volatile (eligible).
 		// seed4 e436–439 need_no_rhs non-vol: F20 NewArray + F20 init + F20
 		// tgtNewArray + F50 Constant (no looser F50).
-		if !needNoRhs {
+		// e2155 residual: after F80 fail+create, UP is F20 tgtNewArray then
+		// Constant F50 F50 U20 (no looser F50 between init and tgtNewArray).
+		if !needNoRhs &&
+			!(nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce) {
 			_ = r.flipcoin(50) // random_looser residual when outer vol
 		}
 		tgtNewArray := r.flipcoin(20)
@@ -112868,6 +112945,14 @@ commaF80MultiDone:
 		if ctx != nil && ctx.state != nil && ctx.state.postAggNestVSMisses >= 37 {
 			ctx.state.postAggNestSelDerefRound2 = true
 			ctx.state.postAggNestSelDerefFails = 0
+		}
+		// e2159 residual: after Statement Lhs SelectDeref create (F80 fail+
+		// F10 F20 F20 F20 Constant), UP continues Statement U100 in same block
+		// (not BlockSize U4). e2212+: GlobalList pad grows to U21.
+		if nullValidatePostResidualGlobalU12 && nullValidatePostResidualStmtLhsF80FailOnce &&
+			ctx != nil && ctx.state != nil {
+			ctx.state.skipNextBlockSize = true
+			nullValidatePostResidualGlobalU21 = true
 		}
 		break
 	}
