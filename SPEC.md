@@ -169,8 +169,15 @@ Any remaining technique must:
 2. Have timeouts against non-termination
 3. Converge by consulting C++ (not unmotivated RNG hacks)
 4. **No discarding entropy unless upstream does too** — every RNG consumer either feeds a real decision/materialised value or mirrors a documented C++ discard at the same site (§5.2)
+5. **No seed overfitting** — prefer C++ predicates and shared helpers; reject event-indexed multiphase residual as the main strategy (§5.1.1)
 
-Order of preference: fix local RNG/call-path alignment first; structural reshape only when the same divergence class blocks progress. Residual multiphase catalogs that only burn stream without a C++ counterpart are **out**; reimplement the C++ path that produces those draws.
+**Order of preference for a divergence:**
+
+1. Identify the **C++ function + predicate** that should fire (inventory empty? depth block? SE-free? visit_facts fail?).
+2. Implement or fix that predicate and the real callee (create/select/Expression).
+3. Only then use a temporary diagnostic residual — and replace it with (2) before claiming progress.
+
+Residual multiphase catalogs that only burn stream without a C++ counterpart are **out**. Reimplement the C++ path that produces those draws.
 
 ## 6. Explicit non-goals (current)
 
@@ -217,7 +224,7 @@ Order of preference: fix local RNG/call-path alignment first; structural reshape
 | Seeds 5–21 event | **FAIL** — early first_div (seed5@155, seed6@12, seed7@47, …); residual is free-invent path-specific, not general Csmith flow |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2 still fails (source/runtime parity); event-only seed2/3/4 PASS |
 
-**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, `silenceTrace`, seed hardcodes, event-only climbs, and **discarded entropy** (`_ = r.upto/flipcoin/next31` padding, unused hex gaps, residual catalogs that only advance LCG). Require call flow aligned with Csmith C++ where every draw is used.
+**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 **e2133–e2229 climbed:**
 1. Function-fail `struct S0` Global: sameWidth fix + SE-free GenerateNewGlobal + struct Constant (bitfield pow half-width).
