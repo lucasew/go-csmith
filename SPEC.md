@@ -190,10 +190,10 @@ Any remaining technique must:
 **Order of preference for a divergence:**
 
 1. Identify the **C++ function + predicate** that should fire (inventory empty? depth block? SE-free? visit_facts fail?).
-2. Implement or fix that predicate and the real callee (create/select/Expression).
-3. Only then use a temporary diagnostic residual — and replace it with (2) before claiming progress.
+2. Implement or fix that predicate and the real callee (create/select/Expression), including **inventory materialisation** (GlobalList / local_vars / derived_types) so later `upto(n)` uses a true pool size.
+3. **Do not** ship temporary residual multiphase / blank-draw pads. Diagnostics only (prints, traces) — never `_ = r.…` packs as a climb vehicle.
 
-Residual multiphase catalogs that only burn stream without a C++ counterpart are **out**. Reimplement the C++ path that produces those draws.
+Residual multiphase catalogs that only burn stream without a C++ counterpart are **out**. Reimplement the C++ path that produces those draws. Anything that **looks like** entropy discard (§5.2) is **rejected** even if first_div rises.
 
 ## 6. Explicit non-goals (current)
 
@@ -241,7 +241,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seeds 5,7–21 event | **FAIL** — seed5 first_div **6046** (post-Return free Expression after F50: UP U120 tries=0 Assign→F80 Lhs vs GO U120 tries=1); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
-**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
+**Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
 
 
 
