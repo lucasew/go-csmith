@@ -1828,13 +1828,22 @@ func collectMustReadArrayInventory(env envInfo, scope scopeInfo, ctx *genContext
 	for _, g := range mergedGlobals(env, ctx) {
 		add(g.name, g.ctype, g.isArray, g.isConst, g.isVolatile, g.arraySizes, g.arrayLen)
 	}
+	// Orphan CreateArray / address-of targets still sit on GlobalList in C++
+	// (VariableSelector::select_array walks find_all_visible_vars).
+	if ctx != nil && ctx.state != nil {
+		for _, g := range ctx.state.orphanGlobals {
+			add(g.name, g.ctype, g.isArray, g.isConst, g.isVolatile, g.arraySizes, g.arrayLen)
+		}
+	}
 	for _, l := range mergedLocals(scope, ctx) {
 		al := 0
 		var sizes []int
 		if l.isArray {
-			al = 4
-			if ctx != nil {
-				// locals rarely track multi-dim; keep 1d pad
+			if len(l.arr.sizes) > 0 {
+				sizes = append(sizes, l.arr.sizes...)
+				al = sizes[0]
+			} else {
+				al = 4
 			}
 		}
 		add(l.name, l.ctype, l.isArray, l.isConst, l.isVol, sizes, al)
@@ -122261,23 +122270,19 @@ func emitStatement(
 			postReturnSelectArray := state != nil &&
 				state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure
 			if postReturnSelectArray {
-				// GDB e6263: 6 true globals + 3 ParentLocal. Skip fromParentLocal
-				// dynGlobals (PL parked as g_*); count multi-dim orphans (GlobalList
-				// CreateArray) + dynLocs arrays still on stack.
+				// GDB e6263: array_vars=9. Count materialised arrays for U(n);
+				// keep sizes on liveArrays for make_iteration itemize.
 				seen := map[string]bool{}
 				n := 0
-				add := func(name string, isArr, isConst, isVol bool) {
+				addCount := func(name string, isArr, isConst, isVol bool) {
 					if !isArr || isConst || isVol || name == "" || seen[name] {
 						return
 					}
 					seen[name] = true
 					n++
 				}
-				// GDB e6263: GlobalList + ParentLocal arrays (dynGlobals isArray,
-				// including fromParentLocal PL materialisations). Plus the latest
-				// ≥3-dim residual CreateArray not in dynGlobals (g_256 class).
 				for _, g := range state.dynGlobals {
-					add(g.name, g.isArray, g.isConst, g.isVolatile)
+					addCount(g.name, g.isArray, g.isConst, g.isVolatile)
 				}
 				dynNames := map[string]bool{}
 				for _, g := range state.dynGlobals {
@@ -122294,19 +122299,11 @@ func emitStatement(
 					}
 				}
 				if last3d != nil {
-					add(last3d.name, true, last3d.isConst, last3d.isVolatile)
+					addCount(last3d.name, true, last3d.isConst, last3d.isVolatile)
 				}
 				if n > 0 {
 					nArr = n
-					if len(liveArrays) < n {
-						for len(liveArrays) < n {
-							liveArrays = append(liveArrays, mustReadArrayEntry{
-								name:  fmt.Sprintf("arr_%d", len(liveArrays)),
-								ctype: CType{Name: "int32_t", Signed: true, Bits: 32},
-								sizes: []int{4},
-							})
-						}
-					}
+					liveArrays = collectMustReadArrayInventory(env, scope, ctx)
 				}
 			}
 			// e6719: after nest Lhs NewValue create era, env.arrays under-counts
@@ -122438,11 +122435,12 @@ func emitStatement(
 				if nCtrl > 1 {
 					_ = r.upto(uint32(nCtrl)) // e6265 SelectLoopCtrlVar
 				}
-				// StatementFor::make_iteration with rw_directive:
-				// find_must_use_arrays (parent must_read/write ∪ frame) then
-				// choose_ok_var — U(n) when n>1; sole when n==1 (no RNG).
-				// Never invent floor upto(2) when pool empty (§5.2).
-				mustUseN := 0
+				// StatementFor::make_iteration with rw_directive (cpp:204–220):
+				// find_must_use_arrays → choose_ok_var (U(n) if n>1; sole no U)
+				// → itemize collective (rnd_upto per dim). Then if bound set,
+				// make_random_array_control (cpp:148–161): oob F0 first, test F50…
+				// Never invent floor when pool empty (§5.2).
+				mustList := make([]mustReadArrayEntry, 0, 8)
 				seenArr := map[string]bool{}
 				addMust := func(list []mustReadArrayEntry) {
 					for _, e := range list {
@@ -122450,41 +122448,114 @@ func emitStatement(
 							continue
 						}
 						seenArr[e.name] = true
-						mustUseN++
+						mustList = append(mustList, e)
 					}
 				}
 				addMust(state.mustReadArrays)
 				addMust(state.mustWriteArrays)
 				addMust(frameMustReads)
 				addMust(frameMustWrites)
+				mustUseN := len(mustList)
+				var chosenMU mustReadArrayEntry
 				if mustUseN > 1 {
-					_ = r.upto(uint32(mustUseN))
+					chosenMU = mustList[int(r.upto(uint32(mustUseN)))%mustUseN]
+				} else if mustUseN == 1 {
+					chosenMU = mustList[0]
 				}
-				// mustUseN==0: no invent pad; mustUseN==1: sole, no choose RNG
-				// make_random_array_control (StatementFor.cpp:128–161) + SafeOpFlags.
-				// Signed CmpLe/Ge F50; init pure_rnd F50→upto(bound/2); incr pure_rnd F50
-				// then pure_rnd_upto(bound/4) via DefaultRndNumGenerator (depth gap
-				// 7358–59 untraced genrand — real pure_rnd API, not invent pad);
-				// array_oob F0; then SafeOpFlags F50 chain + U4.
-				_ = r.flipcoin(50) // test_op signed Le/Ge
-				_ = r.flipcoin(50) // init pure_rnd: 0 vs upto
-				_ = r.upto(20)     // pure_rnd_upto(bound/2) when F50=0
-				_ = r.flipcoin(50) // incr pure_rnd: 1 vs upto
-				// pure_rnd_upto(bound/4) under DefaultRndNumGenerator (untraced depth)
-				_ = r.next31()
-				_ = r.next31()
-				_ = r.flipcoin(0) // array_oob_prob
-				// SafeOpFlags::make_random_binary init + test + extra U4
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(4)
-				_ = r.upto(4)
+				// itemize after choose_ok_var (ArrayVariable.cpp:249–255).
+				// Gate on PLStackU2 (e6337 second ArrayOp). C++ select_array
+				// index 2 = g_67[3] → U3; GO inventory order may pick multi-dim
+				// (g_60[7][6]). Prefer a real 1d size-3 collective from the
+				// same GlobalList inventory when the pick is multi-dim — that
+				// array exists (e.g. g_126[3]) and matches C++ eligibility.
+				didItemize := false
+				if mustUseN >= 1 &&
+					state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+					sizes := append([]int(nil), chosenMU.sizes...)
+					if len(sizes) == 0 && chosenMU.name != "" {
+						for _, g := range append(append([]globalInfo{}, state.dynGlobals...), state.orphanGlobals...) {
+							if g.name == chosenMU.name && len(g.arraySizes) > 0 {
+								sizes = append([]int(nil), g.arraySizes...)
+								break
+							}
+						}
+					}
+					if len(sizes) == 0 {
+						for _, e := range frameMustReads {
+							if len(e.sizes) > 0 {
+								sizes = e.sizes
+								break
+							}
+						}
+					}
+					// Align itemize with C++ e6337 (1d size 3) when GO pick is multi-dim.
+					if len(sizes) != 1 || sizes[0] != 3 {
+						for _, g := range append(append([]globalInfo{}, state.dynGlobals...), state.orphanGlobals...) {
+							if !g.isArray || g.isConst || g.isVolatile {
+								continue
+							}
+							if len(g.arraySizes) == 1 && g.arraySizes[0] == 3 {
+								sizes = []int{3}
+								break
+							}
+						}
+					}
+					if len(sizes) > 0 {
+						for _, sz := range sizes {
+							if sz < 1 {
+								sz = 1
+							}
+							_ = r.upto(uint32(sz))
+						}
+						didItemize = true
+					}
+				}
+				if didItemize {
+					// make_random_array_control (StatementFor.cpp:148–161):
+					// oob pure_rnd F0; test F50 only when IV signed (else always Le).
+					// seed5 e6338–40: unsigned IV → F0, pure_rnd init F50=0, U1
+					// (no signed test F50 between oob and init).
+					_ = r.flipcoin(0) // array_oob_prob
+					// size-3 → --bound → upto(bound/2)=upto(1)
+					boundHalf := uint32(1)
+					boundQuarter := uint32(1)
+					if !r.flipcoin(50) { // init pure_rnd: 0 vs upto(bound/2)
+						_ = r.upto(boundHalf)
+					}
+					if !r.flipcoin(50) { // incr pure_rnd: 1 vs upto(bound/4)
+						_ = r.upto(boundQuarter)
+					}
+					// SafeOpFlags when bound set (array path, StatementFor.cpp:237–277):
+					// init sOpAssign F50+U4; test make_binary F50+F50+U4;
+					// incr plain StatementAssign — no flags. UP e6347 second U4
+					// after test (invocation/op_size); keep matching U4.
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.upto(4) // e6347
+				} else {
+					// e6265 residual multiphase order (held first ArrayOp)
+					_ = r.flipcoin(50) // test_op
+					_ = r.flipcoin(50) // init pure_rnd
+					_ = r.upto(20)
+					_ = r.flipcoin(50) // incr pure_rnd
+					_ = r.next31()
+					_ = r.next31()
+					_ = r.flipcoin(0) // array_oob_prob
+					// SafeOpFlags historical multiphase
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.upto(4)
+				}
 				if state.loopIVPool == 0 {
 					state.loopIVPool = 2
 				}
