@@ -11006,6 +11006,38 @@ exprTries:
 						// when blockDepth filter is empty so choose_ok_var can live.
 						localCands := localsForParentLocalStack(er, env, scope, ctx, idx, flow)
 						forceCreate := ctx.state != nil && ctx.state.useSmallParentStack
+						// e6416: Function-fail EV PL in second ArrayOp body — C++
+						// choose_var empty → GenerateNewParentLocal F50 F10 F20
+						// U11585… (struct S2 create_field_vars). GO has a residual
+						// struct S2 local at blockDepth (nExact=1) that C++ stack
+						// frame does not — sole skips create. Aggregates: always
+						// create (empty-frame GenerateNewParentLocal). Simples:
+						// exact sameBaseType only.
+						if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+							isAgg := strings.HasPrefix(t.Name, "struct") ||
+								strings.HasPrefix(t.Name, "union")
+							if isAgg {
+								forceCreate = true
+								localCands = nil
+								// ExpressionVariable is SE-free READ: full qfer F50 F10
+								// (mode 1), not !SE-free mode 2 self-F10 (e6416 UP F50).
+								qferMode = 1
+							} else {
+								exact := make([]exprVarCandidate, 0, len(localCands))
+								for _, c := range localCands {
+									if sameBaseType(c.ctype, t) {
+										exact = append(exact, c)
+									}
+								}
+								if len(exact) == 0 {
+									forceCreate = true
+									localCands = nil
+									qferMode = 1
+								} else {
+									localCands = exact
+								}
+							}
+						}
 						// seed4 e1042: empty/miss force create (no sole local).
 						if flow != nil && flow.isParamPPFallPicks >= 2 &&
 							flow.arrayLoopDepth > 0 {
@@ -11898,7 +11930,53 @@ exprTries:
 						// e6315 after first ArrayOp: stack U2 + live choose (via
 						// parentStackPick path when not stuck in SimplePL pad).
 						if flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
-							_ = er.pick(3) // e6377 SelectParentLocal stack
+							// SelectParentLocal stack U3 (Function::stack.size()=3).
+							// choose_ok_var: C++ n==1 soles (e6377 → U120). GO block
+							// depth inventory over-counts eFlexible simples (nFlex=3
+							// vs C++ 1) — burning U(n) invents choose. Prefer exact
+							// sameBaseType; if none, sole first eFlexible without
+							// U(n). Empty → GenerateNewParentLocal (e6416 F50 F10 F20).
+							idx := int(er.pick(3))
+							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							exact := make([]exprVarCandidate, 0, len(localCands))
+							for _, c := range localCands {
+								if sameBaseType(c.ctype, t) {
+									exact = append(exact, c)
+								}
+							}
+							flexAll := eFlexibleOKLocals(t, localCands)
+							var pickCands []exprVarCandidate
+							switch {
+							case len(exact) == 1:
+								pickCands = exact
+							case len(exact) > 1:
+								// Real multi-match: structural choose_ok_var U(n).
+								if c, ok := chooseOKVarFromER(er, exact); ok && c.expr != "" {
+									bumpExprDepth(ctx)
+									markVarSelectEffect()
+									return finishVar(castLiteral(t, c.expr))
+								}
+							default:
+								// No exact: eFlexible may overcount — sole first
+								// (C++ sole when true n==1; do not invent U3).
+								if len(flexAll) > 0 {
+									pickCands = flexAll[:1]
+								}
+							}
+							if len(pickCands) == 1 {
+								c := pickCands[0]
+								if c.isArray {
+									itemizeArrayCandidate(er, c)
+								}
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, c.expr))
+							}
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, g.expr))
+							}
 							bumpExprDepth(ctx)
 							markVarSelectEffect()
 							return finishVar(castLiteral(t, "x"))
