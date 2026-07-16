@@ -287,6 +287,8 @@ var nullValidatePostResidualSkipIfElse bool
 // nullValidatePostResidualNoInventExpr: after residual free Expressions + For,
 // skip post-body invent Expression (UP continues Statement U100 e1033+).
 var nullValidatePostResidualNoInventExpr bool
+// postArrayOpUnwindExpr: e6585 absorb parent Expression after CREATE Return residual.
+var postArrayOpUnwindExpr bool
 
 // nullValidatePostResidualParamU7: residual Assign RHS ExpressionVariable
 // ParentParam ok_vars pad U7 (UP expand_struct_union / multi-param; GO
@@ -854,6 +856,9 @@ type functionFlowState struct {
 	// StatementReturn EV after post-U44 choose U2+itemize U2 — Constant residual
 	// (hex16 + small path) then parent Statement U100 (e5735–37 family).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpReturnConstDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr: after e6581–84,
+	// absorb parent Expression nest without RNG until Statement U100 (e6585).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -1060,6 +1065,11 @@ freeMultiIVPostEAMultiLvlStmtNoLoop bool
 	lastStmtWasContinue bool
 	// lastStmtWasReturn: Block must_return — stop more stmts in this block.
 	lastStmtWasReturn bool
+	// funcBodyHadReturn: sticky for current emitSingleFuncDefOnce — true if any
+	// StatementReturn ran in the free body (including nested ArrayOp/If).
+	// Survives lastStmtWasReturn clear so post-body invent residual skips free
+	// Expression U120 (e6585: UP parent Statement U100 after CREATE body Return).
+	funcBodyHadReturn bool
 	// earlyPureAppendReturn: depth0 BlockProbability max=0 early pure body —
 	// use Block::append_return_stmt ExpressionVariable (seed6 e20–23).
 	earlyPureAppendReturn bool
@@ -10223,12 +10233,23 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 					_ = er.fallback.next31()
 				}
 			}
-			flow.skipNextBlockSize = true
-			flow.lastStmtWasReturn = false
+			// e6585: Return is inside FunctionInvocation CREATE body nested
+			// under Expression. After Constant residual UP next is Statement
+			// U100 (not outer Function arg Expression U120, not BlockSize U4).
+			// Unwind parent Expression without RNG; skip invent residual;
+			// e5737-style skipNextBlockSize so parent free body Statement U100.
 			flow.freeMultiIVForLhsExprContinue = false
 			flow.freeMultiIVForLhsExprPostNestLhs = false
 			flow.postAggLhsExprContinue = false
 			flow.postAggNullValidateExprContinue = false
+			flow.skipNextBlockSize = true
+			flow.lastStmtWasReturn = false
+			// Absorb remaining outer Expression nest without RNG (e6585 U100).
+			flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr = true
+			postArrayOpUnwindExpr = true
+			if flow.ppPostPadSkipParentExprN < 64 {
+				flow.ppPostPadSkipParentExprN = 64
+			}
 		}
 		return castLiteral(t, c.expr)
 	}
@@ -10258,6 +10279,11 @@ func randomLeafExprWithMode(
 	}
 	// seed4 e2126: after e2092 address Lhs residual absorb parent RHS operands,
 	// return dummy without RNG so Expression stack unwinds to Statement U100.
+	// e6585: post-ArrayOp CREATE Return Constant residual — same unwind until
+	// parent free StatementProbability U100 (clear on next Statement).
+	if postArrayOpUnwindExpr {
+		return castLiteral(t, "0")
+	}
 	if ctx != nil && ctx.state != nil && ctx.state.ppPostPadSkipParentExprN > 0 {
 		ctx.state.ppPostPadSkipParentExprN--
 		return castLiteral(t, "0")
@@ -11052,6 +11078,13 @@ exprTries:
 			// User-function path runs whenever stdfunc was not taken. Nest depth
 			// must not gate this (upstream already chose eFunction term).
 			if call, ok := buildFunctionCallExpr(t, er, opts, env, scope, depth, ctx); ok {
+				// e6585: CREATE body Return residual may have armed Expression
+				// unwind mid-leaf (after entry absorb check). Stop further RNG
+				// in this Expression nest so parent Statement U100 is next.
+				if postArrayOpUnwindExpr {
+					markFuncEffect()
+					return castLiteral(t, call)
+				}
 				markFuncEffect()
 				return call
 			}
@@ -122037,6 +122070,12 @@ func emitStatement(
 			// e3144: after Lhs Global U15 + loop-control residual, Statement
 			// U100=5 tries=0 → IfElse (condition Expression U120…), not AssignOps
 			// and not atMax is_compound reject (tries=3 Assign).
+			// e6585: stop absorbing parent Expression once StatementProbability runs.
+			if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr {
+				state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr = false
+				state.ppPostPadSkipParentExprN = 0
+			}
+			postArrayOpUnwindExpr = false
 			if state != nil && state.postAggAfterLhsLoopCtrl {
 				state.postAggAfterLhsLoopCtrl = false
 				v := int(dec.r.upto(100))
@@ -122633,6 +122672,7 @@ func emitStatement(
 		writeLine(b, 1, fmt.Sprintf("%s = %s;", ret, retExpr))
 		writeLine(b, 1, fmt.Sprintf("return %s;", ret))
 		if state != nil {
+			state.funcBodyHadReturn = true
 			// seed4 e2760: postAgg if-then keeps generating after Return
 			// (ArrayOp U100=52 F5…). Csmith Block must_return would stop; GO
 			// filterCompound depth lag left more Statement slots — do not halt.
@@ -123688,6 +123728,7 @@ func emitSingleFuncDefOnce(
 		if idx > 0 {
 			state.nestedFuncBodies++
 		}
+		state.funcBodyHadReturn = false
 		prevSink := multiDimArraySink
 		multiDimArraySink = &state.multiDimArrays
 		prevMR := mustReadLiveSink
@@ -123933,6 +123974,9 @@ func emitSingleFuncDefOnce(
 	needRet := fn.ret.Name != "void" && fn.ret.Name != ""
 	earlyAppendReturn := needRet && state != nil && state.earlyPureAppendReturn &&
 		!state.lastStmtWasReturn
+	// e6585: free body already emitted StatementReturn — skip invent Expression
+	// residual (UP parent Statement U100; invent U120 desyncs).
+	bodyHadReturn := state != nil && state.funcBodyHadReturn
 	if earlyAppendReturn {
 		// Keep earlyPureAppendReturn true through randomReturnVariableExpr so
 		// SelectGlobal uses true GlobalList (no fromParentLocal pad).
@@ -123941,6 +123985,11 @@ func emitSingleFuncDefOnce(
 		writeLine(&body, 1, fmt.Sprintf("%s = %s;", retName, retExpr))
 		writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
 		state.lastStmtWasReturn = true
+	} else if bodyHadReturn {
+		if state != nil {
+			state.earlyPureAppendReturn = false
+		}
+		writeLine(&body, 1, fmt.Sprintf("return %s;", retName))
 	} else {
 		if state != nil {
 			state.earlyPureAppendReturn = false

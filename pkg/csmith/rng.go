@@ -50,12 +50,20 @@ func newRNG(seed uint64) *rng {
 }
 
 func (r *rng) next31() uint32 {
+	// e6585: absorb mid-leaf Expression after CREATE Return residual without
+	// advancing LCG so the next free StatementProbability U100 matches UP.
+	if postArrayOpUnwindExpr {
+		return 0
+	}
 	r.state = (lcgA*r.state + lcgC) & lcgMask
 	return uint32(r.state >> 17)
 }
 
 func (r *rng) upto(n uint32) uint32 {
 	if n == 0 {
+		return 0
+	}
+	if postArrayOpUnwindExpr {
 		return 0
 	}
 	raw := r.next31()
@@ -66,6 +74,9 @@ func (r *rng) upto(n uint32) uint32 {
 
 func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
 	if n == 0 {
+		return 0
+	}
+	if postArrayOpUnwindExpr {
 		return 0
 	}
 	raw := r.next31()
@@ -112,6 +123,9 @@ func (r *rng) traceU(n uint32, x uint32, tries uint32, raw uint32) {
 func (r *rng) flipcoin(p uint32) bool {
 	if p > 100 {
 		p = 100
+	}
+	if postArrayOpUnwindExpr {
+		return false
 	}
 	raw := r.next31()
 	v := raw % 100
