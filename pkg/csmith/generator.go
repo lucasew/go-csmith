@@ -794,7 +794,8 @@ type functionFlowState struct {
 	freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN: free Expression Function-fail
 	// ParentParam after NewArray VS residual. 0 e6009–10: live choose U7;
-	// 1+ e6013–14: sole (UP no RNG) then Expression U120. Sticky multiphase U7.
+	// 1 e6013–14: sole (UP no RNG) then Expression U120; 2+ e6034: live U7 again.
+	// Sticky multiphase always-U7 / always-sole after first sole desyncs.
 	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN int
 	// freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done: one-shot e5886 free Expression
 	// Variable Global eFlexible U36 + collective array itemize U4 after residual
@@ -9160,8 +9161,8 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 		if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 			pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
 			flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
-			if pn == 0 {
-				_ = er.pick(7)
+			if pn != 1 {
+				_ = er.pick(7) // 0 e6010; 2+ e6034 live again
 			}
 			bumpExprDepth(ctx)
 			return castLiteral(t, "x")
@@ -10291,10 +10292,10 @@ exprTries:
 					if ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 						pn := ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
 						ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
-						if pn == 0 {
-							_ = er.pick(7) // e6010
+						if pn != 1 {
+							_ = er.pick(7) // 0 e6010; 2+ e6034 live again
 						}
-						// pn>=1 sole — no choose RNG
+						// pn==1 sole e6013 — no choose RNG
 						bumpExprDepth(ctx)
 						markFuncEffect()
 						return castLiteral(t, "x")
@@ -10934,8 +10935,8 @@ exprTries:
 				if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 					pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
 					flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
-					if pn == 0 {
-						_ = er.pick(7) // e6010
+					if pn != 1 {
+						_ = er.pick(7) // 0 e6010; 2+ e6034 live again
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
@@ -11218,13 +11219,21 @@ exprTries:
 						// (and SelectDeref empty create), free Expression PL choose
 						// pool is U13 (UP live expanded ok_vars) — sticky U14 over-counts.
 						// Multiphase: first two post-Return PL hits keep U14; later U13.
+						// e6024: after NewArray+address Lhs CreateArray residual
+						// (SelectDeref ParentLocal array + nested pointees), free
+						// Expression PL choose is U14 again (UP live ok_vars grew).
+						// Sticky multiphase pn≥2 U13 under-counts.
 						idx = int(er.pick(1))
-						pn := flow.freeMultiIVNeedNoRhsPostEAReturnPLN
-						flow.freeMultiIVNeedNoRhsPostEAReturnPLN = pn + 1
-						if pn < 2 {
-							_ = er.pick(14) // e5755 / e5781 choose_ok_var
+						if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+							_ = er.pick(14) // e6024
 						} else {
-							_ = er.pick(13) // e5843 live expanded PL ok_vars
+							pn := flow.freeMultiIVNeedNoRhsPostEAReturnPLN
+							flow.freeMultiIVNeedNoRhsPostEAReturnPLN = pn + 1
+							if pn < 2 {
+								_ = er.pick(14) // e5755 / e5781 choose_ok_var
+							} else {
+								_ = er.pick(13) // e5843 live expanded PL ok_vars
+							}
 						}
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
