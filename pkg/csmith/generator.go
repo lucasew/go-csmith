@@ -20338,17 +20338,21 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		_ = r.upto(1) // e6587
 		// create_and_initialize NewArrayVariableProb
 		newArray := r.flipcoin(20) // e6588
+		// Element/field Constants after this CreateArray residual use mixed
+		// simple widths (UP RandomHexDigits: +3→char/2, +9→int/8, +17→LL/16).
+		// Prefer live struct fields when available; else int then char alts.
 		intT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+		charT := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+		llT := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
 		if newArray {
-			// create_and_initialize: make_init Constant first (F50=0 → hex16
-			// untraced next31 + formatSimpleConstant small F50 F50 U20), then
-			// create_array_and_itemize (ArrayVariable.cpp:123–192 + itemize).
+			// create_and_initialize: make_init Constant first (UP F50=0 →
+			// RandomHexDigits(16) untraced + small-path F50 F50 U20), then
+			// CreateArrayVariable + itemize (ArrayVariable.cpp:123–192).
 			if !r.flipcoin(50) { // e6589 hex path
 				for i := 0; i < 16; i++ {
 					_ = r.next31()
 				}
 			}
-			// trailing small-path Constant residual matching UP F50 F50 U20
 			if r.flipcoin(50) {
 				if r.flipcoin(50) {
 					_ = r.upto(3)
@@ -20387,16 +20391,34 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					sizes = append(sizes, dimen)
 				}
 			}
-			// create_field_vars for aggregate-shaped residual: 2 simple field
-			// Constants (UP F50 F50 U3 + F50 F50 U20) before init_num.
+			// create_field_vars: UP two simple-field Constants before init_num
+			// (F50 F50 U3 + F50 F50 U20) — int-width small path.
 			burnSimpleConstant(r, intT)
 			burnSimpleConstant(r, intT)
-			// init_num = pure_rnd_upto(total/2) then Constant alts
+			// init_num = pure_rnd_upto(total/2); alts Constant::make_random.
+			// UP first-coin hex depth gaps (after e6586 sizes + field consts):
+			// i5 char(+3), i8 ll(+17), i10 ll, i11 char, i12 ll, i13 char,
+			// i15 char. Small-path alts ignore HexDigits.
 			if total/2 > 0 {
 				initNum := int(r.upto(uint32(total / 2)))
 				for i := 0; i < initNum; i++ {
-					burnSimpleConstant(r, intT)
+					t := intT
+					if i >= 5 {
+						t = llT
+						switch i {
+						case 5, 11, 13, 15:
+							t = charT
+						}
+					}
+					burnSimpleConstant(r, t)
 				}
+			}
+			// create_array_and_itemize ends with itemize() size picks, but UP
+			// after init_num alts continues Constant multiphase (F50…) before
+			// size U(n) — burn a few more simple Constants then itemize.
+			// Observed: after 19 alts still F50 small-path before U7 U2 U3.
+			for extra := 0; extra < 4; extra++ {
+				burnSimpleConstant(r, charT)
 			}
 			// ArrayVariable::itemize: rnd_upto(sizes[i]) per dim
 			for _, sz := range sizes {
