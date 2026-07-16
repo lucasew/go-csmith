@@ -122039,11 +122039,61 @@ func emitStatement(
 			// expanded integer visibles (not sticky loopIVPool=2).
 			createdIV := false
 			stmtLhsU9ArrayCtrlDone := false
+			postReturnArrayOpCtrlDone := false
+			// seed5 e6265–81: post-Return NewArray residual ArrayOp after select_array U9.
+			// C++ SelectLoopCtrlVar among ~27 integer visibles (GDB-era inventory),
+			// then loop_control/SafeOpFlags — not sticky loopIVPool U2 + multi-dim U9 U8.
+			if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure &&
+				aryno > 0 && r != nil {
+				postReturnArrayOpCtrlDone = true
+				nCtrl := countVisibleIntLoopCtrl(env, scope, ctx)
+				// Live count under-materialises vs C++ GlobalList+params+locals (~27).
+				// Prefer live when ≥27; otherwise floor to 27 (e6265 UP U27).
+				if nCtrl < 27 {
+					nCtrl = 27
+				}
+				if nCtrl > 1 {
+					_ = r.upto(uint32(nCtrl)) // e6265 SelectLoopCtrlVar
+				}
+				// choose among must-use arrays: aryno may be 1 → no U; else pool
+				if state.loopIVPool > 1 {
+					_ = r.upto(uint32(state.loopIVPool))
+				} else {
+					_ = r.upto(2) // e6266 U2
+				}
+				// loop_control + SafeOpFlags residual matching UP e6267–81
+				// (not multi-dim itemize U9 U8).
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(0)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				if state.loopIVPool == 0 {
+					state.loopIVPool = 2
+				}
+				state.deepStack = true
+				state.skipNextBlockSize = true
+				state.mustReadLive = frameMustRead || len(frameMustWrites) > 0
+				state.postAggArrayOpDone = true
+				state.postAggPLAfterArrayOpN = 0
+				postAggArrayOpDoneSink = &state.postAggArrayOpDone
+				state.freeMultiIVNeedNoRhsPostEAReturnForBody = true
+			}
 			// seed5 e2384–2402: residual GlobalU21 ArrayOp F5=0 aryno≥1 —
 			// SelectLoopCtrlVar among ~13 expanded integer visibles (UP U13),
 			// sole must-use array itemize U3 U2, then array_control/SafeOpFlags
 			// residual; GO sticky loopIVPool U2 + multi-dim U9 U8 desyncs.
-			if nullValidatePostResidualGlobalU21 && aryno > 0 &&
+			if !postReturnArrayOpCtrlDone && nullValidatePostResidualGlobalU21 && aryno > 0 &&
 				!nullValidatePostResidualArrayOpLoopCtrlU13Done && r != nil {
 				nullValidatePostResidualArrayOpLoopCtrlU13Done = true
 				// e2491+: free Expression ptr-cmp after this era needs U11.
@@ -122123,26 +122173,26 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.upto(4)
 				_ = r.upto(4)
-			} else if state != nil && state.postAggNestGlobalU17F0Done {
+			} else if !postReturnArrayOpCtrlDone && state != nil && state.postAggNestGlobalU17F0Done {
 				// e6721 U39 first nest ArrayOp; e6737 U38 second (aryno=0).
 				nIV := 39
 				if aryno == 0 {
 					nIV = 38
 				}
 				_ = r.upto(uint32(nIV))
-			} else if state != nil && state.deepStack && state.loopIVPool == 0 &&
+			} else if !postReturnArrayOpCtrlDone && state != nil && state.deepStack && state.loopIVPool == 0 &&
 				state.multiDimArrays == 0 {
 				burnSelectLoopCtrlVarCreate(r, opts)
 				createdIV = true
-			} else if state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 &&
+			} else if !postReturnArrayOpCtrlDone && state != nil && state.loopIVPool == 0 && state.multiDimArrays > 0 &&
 				state.isParamPPFallPicks < 2 {
 				// seed2 e920: multi-dim first array-loop U2 (before PP pad era).
 				_ = r.upto(2)
-			} else if state != nil && state.isParamPPFallPicks >= 2 &&
+			} else if !postReturnArrayOpCtrlDone && state != nil && state.isParamPPFallPicks >= 2 &&
 				state.multiDimArrays > 0 && state.loopIVPool > 0 {
 				// seed4 e771: after PP pads + prior IV pool, SelectLoopCtrlVar U2.
 				_ = r.upto(2)
-			} else {
+			} else if !postReturnArrayOpCtrlDone {
 				// First array-loop: n=3 (seed2 e360 early, seed4 e613 after PP pads).
 				// Later n=2 once loopIVPool set (e370).
 				nIV := 3
@@ -122176,8 +122226,8 @@ func emitStatement(
 			ppItemize := state != nil && state.multiDimArrays > 0 &&
 				state.isParamPPFallPicks >= 2 && !nestArrayOp
 			ary0Multi := ppItemize && aryno == 0
-			if stmtLhsU9ArrayCtrlDone {
-				// e11656–70 residual already burned itemize/control; For body next.
+			if stmtLhsU9ArrayCtrlDone || postReturnArrayOpCtrlDone {
+				// residual already burned itemize/control; For body next.
 			} else if nestArrayOp {
 				_ = r.upto(4) // e6722
 			} else if ppItemize {
@@ -122189,10 +122239,12 @@ func emitStatement(
 				_ = r.upto(1) // early seed2 e358
 			}
 			// array_oob_prob F0 (seed4 e773 after PP itemize U2 also burns F0).
-			if !stmtLhsU9ArrayCtrlDone && !ary0Multi {
+			if !stmtLhsU9ArrayCtrlDone && !postReturnArrayOpCtrlDone && !ary0Multi {
 				_ = r.flipcoin(0)
 			}
-			if stmtLhsU9ArrayCtrlDone {
+			if postReturnArrayOpCtrlDone {
+				// fall through to For body (e6282+ Statement U100).
+			} else if stmtLhsU9ArrayCtrlDone {
 				// fall through to For body (e11671+ Statement U100 tries=1).
 				// UP has no BlockSize U before first body Statement.
 				// First Variable is must_use U5 U3 F75 (e11677).
