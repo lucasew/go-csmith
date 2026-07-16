@@ -835,6 +835,11 @@ type functionFlowState struct {
 	// path, make_init choose_ok_var among ~9 visibles (e6304 U9) then F10 U4
 	// residual — not sticky GlobalU21 AddrCreateVS U4 U3 U4 (e2928).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9 bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2: after sole ArrayOp
+	// body Assign completes, Function::stack drops to 2 (ArrayOp frame popped).
+	// Sticky SelPure parentStackPick U3 over-burns (e6315 UP U2).
+	// Structural: rnd_upto(Function::stack.size()) only — no invent choose pads.
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -2397,6 +2402,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// seed5 e6175 / e6286: after post-Return NewArray residual + ArrayOp body,
 	// Function::stack.size()=3 (free multi-IV For + ArrayOp + body). Prefer over
 	// NewArrayVSDone U1 / ForBody U2. After ForBody arm from ArrayOp control.
+	// e6315: after sole ArrayOp body Assign ends, stack drops to U2 — sticky
+	// SelPure U3 over-burns free Expression PL after parent !IN_LOOP Assign.
+	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+		return int(er.pick(2))
+	}
 	if state != nil && (state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure ||
 		state.freeMultiIVNeedNoRhsPostEAReturnForBody) {
 		// e6286 UP U3 after ArrayOp body Statement Lhs PL; e5928 was U2 before
@@ -118231,6 +118241,8 @@ commaF80MultiDone:
 			// StatementFilter is !IN_LOOP (tries=1 Break 43 → Assign 76). GO may
 			// still mark inLoop from outer For/ArrayOp — force StmtNoLoop once.
 			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = true
+			// e6315: free Expression PL stack U2 after ArrayOp frame popped.
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 = true
 			break
 		}
 		// seed5 e2926–30: after AddrCreateVS multiphase, next wildcard
