@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5928** (For body U2 vs Statement U100 after post-Return SelectLoopCtrl U26 + SafeOp); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5953** (Expression U120 tries=1 vs tries=0 after post-Return For body Return PP→PL U2); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5928→5953 climbed — post-Return For body StatementReturn ParentParam→PL stack U2:**
+1. Capture: e5928 UP U2=0 vs GO U100=52 (StatementProbability after Return EV under-burned).
+2. C++: For body BlockSize U4=2 then StatementReturn (U100=30) → ExpressionVariable VS ParentParam (U100=83) empty/choose miss → SelectParentLocal stack U2 (Function::stack={parent free body, For body}) sole accept → For ends; parent free Statement U100=6 IfElse + Expression U120…
+3. GO: armed `freeMultiIVNeedNoRhsPostEAReturnForBody` on SelectLoopCtrl U26 floor; Return EV ParentParam burns stack U2 direct (beats sticky ifBody U6 / post-Return U1). Seeds 2/3/4/6 held.
+4. Next: e5953 UP U120=6 tries=1 vs GO U120=109 tries=0 (Expression term filter after nested Function/pickNonVoid U16).
 
 **seed5 e5882→5928 climbed — post-Return Lhs SelectDeref sole + Global U36 + Stmt need_no_rhs multiphase + SelectLoopCtrl U26:**
 1. Capture: e5882 UP U120 tries=1 vs GO F20 (SelectDeref empty create residual after PP U7).

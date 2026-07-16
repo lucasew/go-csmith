@@ -801,6 +801,12 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsPostEAReturnStmtSafeOpU4: after PL create accept +
 	// SafeOpFlags F50 U4, UP burns one more U4 (e5910) before Statement U100.
 	freeMultiIVNeedNoRhsPostEAReturnStmtSafeOpU4 bool
+	// freeMultiIVNeedNoRhsPostEAReturnForBody: inside free For body after
+	// post-Return SelectLoopCtrl U26 residual (e5912). Function::stack is
+	// {parent free body, For body}=2 — not sticky post-Return U1.
+	// StatementReturn ExpressionVariable ParentParam falls through to
+	// SelectParentLocal stack U2 sole (e5926–28).
+	freeMultiIVNeedNoRhsPostEAReturnForBody bool
 	// freeMultiIVNeedNoRhsPostEALhsAddrU3Done: one-shot e5621 Lhs SelectDeref
 	// empty create address choose U3 after null F0×2 ladder (e5610–20).
 	freeMultiIVNeedNoRhsPostEALhsAddrU3Done bool
@@ -2287,6 +2293,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e5928: post-Return free For body (SelectLoopCtrl U26) — stack U2
+	// (parent free body + For). Must beat sticky ifBody U5/U6 and post-Return U1.
+	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnForBody {
+		return int(er.pick(2))
+	}
 	// seed5 e5133: free multi-IV need_no_rhs-era free If then-body Assign RHS
 	// Expression Variable PL: Function::stack.size()=5 (not GO blockStack 6).
 	// Highest priority — freeMultiIVForBodyU3 / deepStack would under/over-burn.
@@ -9269,6 +9280,15 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 	// SelectParentParam: choose_var among params (eFlexible); miss → SelectParentLocal.
 	// seed4 e2758–59: U100=72 ParentParam then U5 (ok_vars pad). Accept after choose —
 	// next U100=52 is StatementArrayOp (not EV VS retry / PL stack U6).
+	// seed5 e5926–28: post-Return For body StatementReturn EV ParentParam
+	// (U100=83) — C++ params empty/choose miss → SelectParentLocal stack U2
+	// sole (Function::stack={parent free body, For body}). GO live params
+	// sole-accept under-burns; next parent Statement steals U2 raw as U100.
+	// Burn U2 directly (do not rely on parentStackPick priority vs sticky flags).
+	if scopePick == 2 && flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnForBody {
+		_ = er.pick(2) // e5928
+		return castLiteral(t, "x")
+	}
 	if scopePick == 2 {
 		n := len(scope.params)
 		if n == 0 {
@@ -120711,10 +120731,12 @@ func emitStatement(
 			// seed5 e5912: after post-Return residual era, For SelectLoopCtrlVar
 			// ok_vars ≈26 (stack shallower; Return ended nested If frame). Sticky
 			// era U37 over-burns.
+			// e5926–28: body StatementReturn EV ParentParam→PL stack U2 residual.
 			if state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone {
 				if nCtrl < 26 {
 					nCtrl = 26 // e5912
 				}
+				state.freeMultiIVNeedNoRhsPostEAReturnForBody = true
 			} else if (state.freeMultiIVNeedNoRhsIfBody || state.freeMultiIVNeedNoRhsEra) &&
 				nCtrl < 37 {
 				nCtrl = 37
@@ -120819,6 +120841,7 @@ func emitStatement(
 		}
 		if state != nil {
 			state.freeMultiIVForBodyU3 = false
+			state.freeMultiIVNeedNoRhsPostEAReturnForBody = false
 			state.freeMultiIVNeedNoRhsIfNestedFor = prevNeedNoRhsNestedFor
 		}
 		// Keep filterCompoundStmts sticky (late era continues after for body).
