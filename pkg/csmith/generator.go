@@ -897,6 +897,13 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsPostArrayOpQferLvl1: after stack U1, next PL create
 	// random_qualifiers uses levels=1 (consumed in createOnDemand).
 	freeMultiIVNeedNoRhsPostArrayOpQferLvl1 bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0: arm invent ArrayOp body so
+	// multi-dim CreateArray burns visit F0 (e7284+). Seed2 e1115 keeps off.
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active: set after first multi-dim
+	// CreateArray F0 under VisitF0 — subsequent F80 re-itemize last sizes F0.
+	// Not armed at body entry (would steal early F80 empty-create F10 path).
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -2584,10 +2591,14 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// e6315: free Expression after first ArrayOp (PLStackU2, not InBody) → U2.
 	// Do not key off arrayLoopDepth alone — first-body tail may still have depth>0
 	// when PLStackU2 is armed mid-statement (Lhs), and UP stack is already U2.
-	// e7221: invent ArrayOp body Expression PL — UP stack U1 (not sticky U2).
-	if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
-		state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
-		state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
+	// e7221 / e7317: invent ArrayOp body PL/PP stack U1 (not sticky U2/U3).
+	// Sticky LhsVisitF0 keeps U1 for VS after multi-dim CreateArray multiphase.
+	if state != nil && (state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 ||
+		state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0) {
+		if state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
+			state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
+			state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
+		}
 		return int(er.pick(1))
 	}
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
@@ -19922,6 +19933,28 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// GenerateNewParentLocal WRITE create (F50 F20 F50 F50 U20) not U5 choose.
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
+		// seed5 e7317: invent ArrayOp-body multi-dim CreateArray F80=0 → VS PP
+		// stack U1 + re-itemize last sizes F0 (not sticky e6175 U3 U4 U1 U2).
+		if flow != nil && flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 {
+			if er != nil {
+				_ = er.pick(1) // e7317
+				if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+					for _, sz := range *lastArraySizesSink {
+						if sz > 0 {
+							_ = er.pick(uint32(sz))
+						}
+					}
+				} else {
+					_ = er.pick(9)
+					_ = er.pick(7)
+					_ = er.pick(4)
+				}
+			}
+			if er != nil && er.fallback != nil {
+				_ = er.fallback.flipcoin(0) // e7321
+			}
+			return lvalueInfo{}, false, false
+		}
 		// seed5 e6174–79: after post-Return NewArray Global-miss SelectDeref
 		// CreateArray residual F80=0 → VS PP→PL Function::stack.size()=3 +
 		// live eDerefExact choose U4 + multi-dim itemize U1 U2 F0 visit fail
@@ -118033,7 +118066,12 @@ commaF80MultiDone:
 		// Do not use stale sizes from earlier ExpressionAssign arrays (broke e1098).
 		// seed5 e727+: after NewArray+null create, size U stands in for choose_var
 		// among pointer inventory then FactPointTo F0 (null validate fail).
-		if createdArrayThisLhs && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+		// seed5 e7323+: invent ArrayOp-body VisitF0Active re-itemizes after
+		// F80=0→VS miss (createdArrayThisLhs may not cover VS try loop return).
+		visitF0ReItemize := ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active &&
+			lastArraySizesSink != nil && len(*lastArraySizesSink) > 1
+		if (createdArrayThisLhs || visitF0ReItemize) && lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
 			for _, sz := range *lastArraySizesSink {
 				if sz > 0 {
 					_ = r.upto(uint32(sz))
@@ -118049,6 +118087,11 @@ commaF80MultiDone:
 				!ctx.state.useSmallParentStack {
 				lhsFromDeref = true
 				break
+			}
+			// seed5 e7285+: invent ArrayOp-body multi-dim re-itemize F0 loop.
+			// Seed2 e1115 multi-dim re-itemize continues F80 without F0.
+			if visitF0ReItemize {
+				_ = r.flipcoin(0)
 			}
 			continue
 		}
@@ -119160,8 +119203,16 @@ commaF80MultiDone:
 				lhsFromDeref = true
 				break
 			}
-			// Seed2: array pointer Lhs fails opportunistic_validate once and
-			// retries (next SelectDeref F80=0 → VariableSelector::select).
+			// seed5 e7284: invent ArrayOp-body multi-dim CreateArray then visit
+			// F0. Seed2 e1115 multi-dim CreateArray continues F80 without F0.
+			// Arm Active for re-itemize; clear sticky SelPure U4 U1 U2.
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 &&
+				lastArraySizesSink != nil && len(*lastArraySizesSink) > 1 {
+				_ = r.flipcoin(0)
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active = true
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure = false
+			}
 			continue
 		}
 		// make_init_value address-of: choose_var miss → random_loose_qualifiers
@@ -121137,9 +121188,12 @@ commaF80MultiDone:
 			// e6557: ArrayOp-body Lhs after must_use WRITE + Global sole visit
 			// miss — C++ select_deref_pointer choose empty → empty create
 			// random_add F10 F20 F20 + address U7 (not sticky SelPure U4 U1 U2 F0).
+			// e7323: invent ArrayOp-body multi-dim CreateArray residual keeps
+			// VisitF0Active re-itemize [9][7][4] — skip sticky SelPure U4 U1 U2.
 			if ctx != nil && ctx.state != nil &&
 				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure &&
-				!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+				!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody &&
+				!ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active {
 				// F80 already true. Live pointer pool residual then more F80.
 				_ = r.upto(4)
 				_ = r.upto(1)
@@ -123120,6 +123174,8 @@ func emitStatement(
 				state.skipNextBlockSize = true
 				// e7221: body Expression PL stack U1 (not sticky PLStackU2).
 				state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = true
+				// e7284+: multi-dim CreateArray Lhs visit F0 multiphase.
+				state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 = true
 			}
 			writeLine(b, 1, "/* array loop postArrayOp */ {")
 			if state != nil {

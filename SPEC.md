@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7284** (ArrayOp body Assign RHS + PL create; next open visit F0 vs Lhs F80 after multi-dim itemize)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7323** (multi-dim CreateArray visit F0 multiphase + PP VS U1 re-itemize; next open re-itemize U9 vs F80 after VS miss)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
