@@ -792,6 +792,27 @@ type functionFlowState struct {
 	// multi-dim itemize U8 visit fail → SelectDeref live U8×2 F80=0 → NewValue
 	// F10→PL create F20 F20 U3 accept. Sticky ParamU7 GlobalU21 force U6 create.
 	freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate: after NewArray
+	// residual, a simple (non-ptr) GenerateNewParentLocal accepted (e6106–11
+	// NewValue→PL retype+create). block->local_vars grew → next free Expression
+	// PL choose_ok_var is U15 (e6115), not sticky residual pad U14 (e6024/e6043).
+	// Also floors post-Return SelectLoopCtrlVar U26→U27 (e6118).
+	freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop: one-shot after
+	// that simple PL create — next StatementFilter rejects Break/Continue as
+	// !IN_LOOP (e6117 tries=1 Break 41 → For 20). GO residual For body may
+	// still mark inLoop after UP parent frame is non-loop.
+	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss: one-shot
+	// e6136–37 Statement Assign Lhs F80=0 → VS Global choose U4 then
+	// visit_facts/no_signed_overflow miss → SelectDeref F80 continue (not
+	// accept → RHS F50). GO residual inventory accept desyncs.
+	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure: one-shot after
+	// that Global miss — first SelectDeref pure-fails (e6137 F80, no create
+	// RNG); next F80 empty-creates with random_qualifiers WRITE F50 F10 +
+	// self F50 (e6138–41) then NewArray F20 F20 F0 (e6142–44).
+	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -6868,6 +6889,23 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 		lateDerefCreateNSink != nil && *lateDerefCreateNSink >= 2) ||
 		(forAssign && postAggU15StackU6CreateDoneSink != nil && *postAggU15StackU6CreateDoneSink)
 	if len(exact) > 0 {
+		// seed5 e6136: Lhs Global after post-Return NewArray NewValue→PL simple
+		// create — C++ GlobalList choose_ok_var U4 (PL only on block locals).
+		// GO createLocalPathGlobalDirectInit parks that PL on dynGlobals with
+		// fromParentLocal; strip so eDerefExact pool matches UP U4 then
+		// visit miss → SelectDeref F80 continue (not accept → wrong F50).
+		if forAssign && burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate {
+			stripped := make([]exprVarCandidate, 0, len(exact))
+			for _, c := range exact {
+				if !c.fromParentLocal {
+					stripped = append(stripped, c)
+				}
+			}
+			if len(stripped) >= 1 && len(stripped) < len(exact) {
+				exact = stripped
+			}
+		}
 		n := len(exact)
 		cn := scaleAssign(n)
 		if cn <= 1 {
@@ -11464,6 +11502,10 @@ exprTries:
 						// e6087: ptr-cmp operand after NewArray residual — PL empty
 						// for multi-level derived pointer → GenerateNewParentLocal
 						// qfer+create (F50 multiphase), not sticky U14 simple choose.
+						// e6115: after NewValue→PL simple create accept (e6106–11),
+						// free Expression PL choose_ok_var U15 (block local_vars +1)
+						// then collective array itemize U4 — sticky U14 under-counts
+						// and skips itemize (next raw becomes Statement U100).
 						idx = int(er.pick(1))
 						if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 							if flow.inPtrCmpExpr && isPtr && er.fallback != nil {
@@ -11475,7 +11517,28 @@ exprTries:
 									return finishVar(castLiteral(t, g.expr))
 								}
 							}
-							_ = er.pick(14) // e6024
+							if flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate {
+								// Prefer live eFlexible ok_vars (includes dynLocs
+								// from GenerateNewParentLocal). When inventory
+								// matches UP U15, choose_ok_var + itemize.
+								localCands := localsInStackBlock(er, env, scope, ctx, idx)
+								flex := eFlexibleOKLocals(t, localCands)
+								if len(flex) == 15 {
+									if c, ok := chooseOKVarFromER(er, flex); ok && c.expr != "" {
+										bumpExprDepth(ctx)
+										markVarSelectEffect()
+										return finishVar(castLiteral(t, c.expr))
+									}
+								}
+								// Residual pad when GO inventory ≠15: U15 + one-dim
+								// itemize U4 (e6115–16 UP after simple PL create).
+								_ = er.pick(15) // e6115 choose_ok_var
+								_ = er.pick(4)  // e6116 ArrayVariable::itemize
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
+							_ = er.pick(14) // e6024 / e6043
 						} else {
 							pn := flow.freeMultiIVNeedNoRhsPostEAReturnPLN
 							flow.freeMultiIVNeedNoRhsPostEAReturnPLN = pn + 1
@@ -14981,11 +15044,22 @@ exprTries:
 								if ctx != nil && !ctx.effectSEFree {
 									qferMode = 2
 								}
+								simpleNVPL := !strings.Contains(t.Name, "*")
 								if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
-									!strings.Contains(t.Name, "*") {
+									simpleNVPL {
 									qferMode = 2
 								}
 								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok2 {
+									// seed5 e6115: NewValue→PL simple create grows
+									// block->local_vars; next free Expression PL
+									// choose is U15 (not sticky post-NewArray U14).
+									// e6117: next StatementFilter !IN_LOOP (Break
+									// reject tries=1 → For). e6118: SelectLoopCtrl U27.
+									if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
+										simpleNVPL {
+										flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate = true
+										flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = true
+									}
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, g.expr))
 								}
@@ -18066,7 +18140,15 @@ func buildScopedCandidates(r *rng, env envInfo, scope scopeInfo, scopePick int, 
 	switch scopePick {
 	case 0:
 		for _, g := range mergedGlobals(env, ctx) {
-			out = append(out, exprVarCandidate{expr: g.name, ctype: g.ctype, assignable: !g.isConst})
+			// seed5 e6136: carry fromParentLocal so Lhs Global choose can
+			// strip GenerateNewParentLocal materialisations (C++ only puts
+			// those on block->local_vars, not GlobalList). After NewValue→PL
+			// simple create, unstripped inventory is U5 vs UP U4.
+			out = append(out, exprVarCandidate{
+				expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+				isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+				isVolatile: g.isVolatile, fromParentLocal: g.fromParentLocal,
+			})
 		}
 	case 1:
 		for _, l := range mergedLocals(scope, ctx) {
@@ -19334,6 +19416,17 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	}
 	pick, ok := selectExprVariable(target, r, c, true)
 	if !ok {
+		return lvalueInfo{}, false, false
+	}
+	// seed5 e6136–37: post-Return NewArray NewValue→PL simple create era —
+	// Statement Assign Lhs F80=0 → VS Global choose_ok_var U4 then
+	// visit_facts / no_signed_overflow miss → Lhs do-while continues
+	// SelectDeref F80 (UP F80 F80 F50 empty create…). GO residual inventory
+	// accept ends Lhs early (F50 RHS / wrong stream).
+	if ok && scopePick == 0 && flow != nil &&
+		flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate &&
+		!flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss {
+		flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss = true
 		return lvalueInfo{}, false, false
 	}
 	return lvalueInfo{expr: pick.expr, ctype: pick.ctype}, true, false
@@ -117618,6 +117711,16 @@ commaF80MultiDone:
 			nullValidatePostResidualStmtLhsF80FailOnce = true
 			continue
 		}
+		// seed5 e6137–38: after post-Return NewArray Global U4 visit miss,
+		// first SelectDeref pure-fails (UP F80 only — empty pointees under
+		// residual inventory); next F80 empty-creates. Without this GO jumps
+		// straight to create (F10) and under-burns one F80.
+		if ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss &&
+			!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure = true
+			continue
+		}
 		// seed5 e2374–76: residual GlobalU21 Statement Lhs SelectDeref — UP
 		// choose_var U2 + itemize U4 accept (next Statement U100); GO empty
 		// inventory empty-creates F10 F20…. One-shot after F80FailOnce era.
@@ -117662,6 +117765,11 @@ commaF80MultiDone:
 		// (statement entry; Function RHS markFuncEffect must not suppress F50 —
 		// seed5 e2862 SE-free after Global create residual).
 		skipVol := !assignLhsSEFree
+		// seed5 e6139–41: after pure-fail SelectDeref post Global miss,
+		// empty create uses random_qualifiers WRITE no_volatile (F50 F10 +
+		// self F50) not random_add F10 F50 — C++ null/wildcard Lhs qfer.
+		postNewArrayLhsCreateQfer := ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure
 		// seed2 e1098–1099: useSmallParentStack !filterCompound skips vol F50.
 		if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
 			!ctx.state.filterCompoundStmts {
@@ -117686,11 +117794,15 @@ commaF80MultiDone:
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
-		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer
+		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer || postNewArrayLhsCreateQfer
 		addVol := false
 		if lhsQferWildcard {
 			// random_qualifiers WRITE no_volatile=true: draws vol F50 even if discarded.
 			levels := strings.Count(ptrType.Name, "*")
+			// e6139–41: empty create after Global miss is * (one level + self).
+			if postNewArrayLhsCreateQfer && levels < 1 {
+				levels = 1
+			}
 			for i := 0; i < levels; i++ {
 				_ = r.flipcoin(50) // level vol
 				_ = r.flipcoin(10) // level const
@@ -120840,8 +120952,15 @@ func emitStatement(
 				// UP StatementFilter tries=1 rejects Continue 37 → Assign 92.
 				// GO free multi-IV For/If thenInLoop still true would accept
 				// Continue. One-shot StmtNoLoop mirrors UP !IN_LOOP here.
+				// seed5 e6117: after post-Return NewArray NewValue→PL simple
+				// create, next StatementFilter rejects Break 41 (!IN_LOOP)
+				// → For 20 tries=1. Sticky residual For-body inLoop would
+				// accept Break as bare U100 then retry For as second U100.
 				effInLoop := inLoop
 				if state != nil && state.freeMultiIVPostEAMultiLvlStmtNoLoop {
+					effInLoop = false
+				}
+				if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop {
 					effInLoop = false
 				}
 				if (k == stmtBreak || k == stmtContinue) && !effInLoop {
@@ -120899,6 +121018,9 @@ func emitStatement(
 			}))
 			if state != nil && state.freeMultiIVPostEAMultiLvlStmtNoLoop {
 				state.freeMultiIVPostEAMultiLvlStmtNoLoop = false
+			}
+			if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop {
+				state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = false
 			}
 			return toKind(v)
 		}
@@ -121261,9 +121383,15 @@ func emitStatement(
 			// ok_vars ≈26 (stack shallower; Return ended nested If frame). Sticky
 			// era U37 over-burns.
 			// e5926–28: body StatementReturn EV ParentParam→PL stack U2 residual.
+			// seed5 e6118: after NewValue→PL simple create (e6106–11), integer
+			// local_vars +1 → SelectLoopCtrlVar U27 (not sticky U26 floor).
 			if state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone {
-				if nCtrl < 26 {
-					nCtrl = 26 // e5912
+				floor := 26 // e5912
+				if state.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate {
+					floor = 27 // e6118
+				}
+				if nCtrl < floor {
+					nCtrl = floor
 				}
 				state.freeMultiIVNeedNoRhsPostEAReturnForBody = true
 			} else if (state.freeMultiIVNeedNoRhsIfBody || state.freeMultiIVNeedNoRhsEra) &&
