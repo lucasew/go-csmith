@@ -792,6 +792,11 @@ type functionFlowState struct {
 	// multi-dim itemize U8 visit fail → SelectDeref live U8×2 F80=0 → NewValue
 	// F10→PL create F20 F20 U3 accept. Sticky ParamU7 GlobalU21 force U6 create.
 	freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
+	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
+	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
+	// GO inventory under-counts pointees and falls to CreateArray.
+	freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN: free Expression Function-fail
 	// ParentParam after NewArray VS residual. 0 e6009–10: live choose U7;
 	// 1 e6013–14: sole (UP no RNG) then Expression U120; 2+ e6034: live U7 again.
@@ -15152,6 +15157,22 @@ exprTries:
 				// forces eSimpleAssign with zero RNG (StatementAssign.cpp).
 				// Signed simple: VectorFilter excludes pre/post ± (StatementAssign.cpp
 				// e96–104) — rnd_upto(120, filter) retries (e3440 tries=1).
+				//
+				// seed5 e6046: post-Return free Expression under NewArray residual
+				// era — C++ Expression type at this nest is unsigned (AssignOps
+				// PostDecr tries=0 → Lhs F80 accept → SafeOpFlags F50 U4). GO
+				// nested binary SafeOp often retypes to signed int32 → filters
+				// pre/post and Lhs no_signed_overflow empty-create F20. Retype
+				// simple signed → unsigned for AssignOps+Lhs when post-Return
+				// F0 + NewArray VS residual (mirrors C++ unsigned inventory).
+				if ptrLv == 0 && t.Signed && t.Name != "float" &&
+					!strings.HasPrefix(t.Name, "struct") &&
+					!strings.HasPrefix(t.Name, "union") &&
+					ctx != nil && ctx.state != nil &&
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+					t = unsignedOf(t.Bits)
+				}
 				isNonSimple := ptrLv > 0 ||
 					strings.HasPrefix(t.Name, "struct") ||
 					strings.HasPrefix(t.Name, "union") ||
@@ -15676,6 +15697,18 @@ exprTries:
 					if deref && ctx != nil && ctx.state != nil &&
 						ctx.state.freeMultiIVNeedNoRhsPostIfS2LhsF80Sole {
 						ctx.state.freeMultiIVNeedNoRhsPostIfS2LhsF80Sole = false
+						lhsFromDeref = true
+						break
+					}
+					// seed5 e6047: after post-Return NewArray residual, free
+					// Expression need_no_rhs ExpressionAssign Lhs SelectDeref
+					// F80 soles live pointer (no choose) → SafeOpFlags F50 U4
+					// (UP e6047–49). GO empty inventory falls to F20 CreateArray.
+					if deref && needNoRhsExpr && ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
+						!ctx.state.freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone {
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone = true
 						lhsFromDeref = true
 						break
 					}
