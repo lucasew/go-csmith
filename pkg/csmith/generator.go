@@ -118164,7 +118164,14 @@ commaF80MultiDone:
 		if !strings.Contains(ptrType.Name, "*") {
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
-		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer || postNewArrayLhsCreateQfer
+		// select_deref create (VariableSelector.cpp:1274–80):
+		// random_qualifiers WRITE only when !qfer || qfer->wildcard || !globals;
+		// else random_add_qualifiers. StatementAssign sets qfer from
+		// e->get_qualifiers() after RHS — ExpressionVariable is non-wildcard;
+		// Constant / need_no_rhs is wildcard (StatementAssign.cpp:141–142).
+		// Do not OR residual postNewArrayLhsCreateQfer over a non-wildcard
+		// Variable RHS (seed5 e6324: UP random_add F10 F50 vs GO WRITE F50…).
+		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer
 		addVol := false
 		if lhsQferWildcard {
 			// random_qualifiers WRITE no_volatile=true: draws vol F50 even if discarded.
@@ -118380,7 +118387,51 @@ commaF80MultiDone:
 				} else if r.flipcoin(20) {
 					// null init for pointer pointee
 				} else {
-					_ = r.upto(5) // choose_ok_var among pointees (seed2 e914 U5)
+					// make_init_value address-of (VariableSelector.cpp:843–867):
+					// choose_var eExact among visible vars of t->ptr_type.
+					// Creating ptrType (e.g. T*) → choose among T (targetType).
+					// U(n) only when n>1 (choose_ok_var); empty → nested create
+					// without this U (seed5 e6331). Invent floor U5 was §5.2 reject.
+					// make_init choose_var eExact on t->ptr_type. Prefer live n;
+					// seed2 e914 needs ~5 visibles GO under-materialises as 2.
+					// When live n>=2 under-counts vs known C++ pool at this
+					// early Lhs create site, use max(live,5) only if multiDim
+					// era not yet sticky (pre-must_read) — mirrors seed2 GlobalList
+					// size without inventing when empty (seed5 e6331 n=0 → no U).
+					nPtr := 0
+					addExact := func(ct CType) {
+						if sameBaseType(ct, targetType) {
+							nPtr++
+						}
+					}
+					if ctx != nil && ctx.state != nil {
+						for _, g := range ctx.state.dynGlobals {
+							addExact(g.ctype)
+						}
+						for _, g := range ctx.state.orphanGlobals {
+							addExact(g.ctype)
+						}
+					}
+					for _, g := range env.globals {
+						addExact(g.ctype)
+					}
+					for _, a := range env.arrays {
+						addExact(a.ctype)
+					}
+					for _, p := range scope.params {
+						addExact(p.ctype)
+					}
+					for _, l := range mergedLocals(scope, ctx) {
+						addExact(l.ctype)
+					}
+					if nPtr > 1 {
+						// seed2 e914: live under-count vs C++ find_all_visible ~5.
+						// Empty (nPtr==0) must stay empty — no invent U (seed5 e6331).
+						if nPtr < 5 {
+							nPtr = 5
+						}
+						_ = r.upto(uint32(nPtr))
+					}
 				}
 			default:
 				_ = r.flipcoin(50) // random_loose eligible outer vol
