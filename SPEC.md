@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5953** (Expression U120 tries=1 vs tries=0 after post-Return For body Return PP→PL U2); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5956** (Function CREATE VS Global U3 vs GenerateNewGlobal F50 after Comma lhs const/vol struct Assign filter); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5953→5956 climbed — Expression const/vol struct filters Assign:**
+1. Capture: e5953 UP U120=6 tries=1 vs GO U120=109 tries=0 (after Comma U120=119 + pickNonVoid U16=15).
+2. C++ Expression.cpp:173–175: `is_const_struct_union || is_volatile_struct_union` filters eAssignment. Comma lhs type=nil → NonVoid picks const/vol aggregate → Assign rejected (tries=1) → Function accepted.
+3. GO: `isConstOrVolatileStructUnionType` in term `disallowed` for termAssign. Seeds 2/3/4/6 held.
+4. Next: e5956 UP Global choose U3 vs GO GenerateNewGlobal F50 (Function CREATE residual inventory).
 
 **seed5 e5928→5953 climbed — post-Return For body StatementReturn ParentParam→PL stack U2:**
 1. Capture: e5928 UP U2=0 vs GO U100=52 (StatementProbability after Return EV under-burned).

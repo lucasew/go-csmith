@@ -2285,6 +2285,41 @@ func burnNestArrayOpPLAfterStack(er *exprRand, opts Options, env envInfo, scope 
 	_ = er.pick(4)
 }
 
+// isConstOrVolatileStructUnionType mirrors Type::is_const_struct_union ||
+// is_volatile_struct_union for Expression term filtering (Expression.cpp:173).
+func isConstOrVolatileStructUnionType(t CType, ctx *genContext) bool {
+	if ctx == nil {
+		return false
+	}
+	info := ctx.info
+	if len(info.structs) == 0 && len(info.unions) == 0 && ctx.state != nil {
+		info = ctx.state.info
+	}
+	name := t.Name
+	// Strip pointer stars for pointed-to aggregate checks (name may be "struct S0*").
+	base := strings.TrimRight(name, "*")
+	base = strings.TrimSpace(base)
+	if strings.HasPrefix(base, "struct S") {
+		var si int
+		if _, err := fmt.Sscanf(base, "struct S%d", &si); err == nil {
+			if si >= 0 && si < len(info.structs) {
+				st := info.structs[si]
+				return st.isConst || st.isVolatile
+			}
+		}
+	}
+	if strings.HasPrefix(base, "union U") {
+		var ui int
+		if _, err := fmt.Sscanf(base, "union U%d", &ui); err == nil {
+			if ui >= 0 && ui < len(info.unions) {
+				ut := info.unions[ui]
+				return ut.isConst || ut.isVolatile
+			}
+		}
+	}
+	return false
+}
+
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
 // Early seed2 keeps n=1. After array-loop (deepStack), use blockStack cap 3.
 // Returns the chosen stack index (0-based).
@@ -9625,6 +9660,13 @@ func randomLeafExprWithMode(
 				strings.Contains(t.Name, "struct") || strings.Contains(t.Name, "union"))
 		if (tc == termConstant && (noConst || typeNoConst)) ||
 			((tc == termAssign || tc == termComma) && (nestNoFunc || depthBlock)) {
+			return true
+		}
+		// Expression.cpp:173–175: is_const_struct_union || is_volatile_struct_union
+		// filters eAssignment (assign to const/volatile aggregate is trouble).
+		// seed5 e5953: Comma lhs pickNonVoid U16=const/vol struct → U120 tries=1
+		// rejects Assign 109 → Function 6. GO accepted Assign tries=0.
+		if tc == termAssign && isConstOrVolatileStructUnionType(t, ctx) {
 			return true
 		}
 		return false
