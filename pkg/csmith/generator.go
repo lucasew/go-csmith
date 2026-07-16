@@ -2351,6 +2351,11 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e6106: after post-Return NewArray residual + free Expression
+	// Global U4 empty visit → VS NewValue→PL, Function::stack.size()=1.
+	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+		return int(er.pick(1))
+	}
 	// seed5 e5928: post-Return free For body (SelectLoopCtrl U26) — stack U2
 	// (parent free body + For). Must beat sticky ifBody U5/U6 and post-Return U1.
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnForBody {
@@ -5190,6 +5195,13 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 		for _, p := range scope.params {
 			out = append(out, exprVarCandidate{expr: p.name, ctype: p.ctype, assignable: true})
 		}
+	case 3, 4:
+		// NewValue create Global/ParentLocal — no existing-var inventory.
+		// Fallthrough must not append env.pointers/arrays: each array burns
+		// er.pick(arrayLen) for index materialization. seed5 e6106 after
+		// free Expression Global U4 empty → VS NewValue F10=0→PL: that pad
+		// stole U4 (arrayLen=4) before parentStackPick U1 + retype U14.
+		return out
 	}
 	if scopePick != 2 {
 		for _, ptr := range env.pointers {
@@ -7316,73 +7328,156 @@ if pointerGlobalPicksSink != nil {
 		}
 		// VariableSelector::choose_var pointer preference (cpp:456–467):
 		// when ok_vars multi and any var has higher indirection than want
-		// (is_derivable via is_dereferenced_from), choose among those only.
+		// (is_derivable via is_dereferenced_from), choose among those only
+		// via choose_ok_var(ptrs) — sole when 1, U(n) when multi.
 		// seed5 e6061: free Expression Comma→std binary operand Global under
 		// post-Return NewArray residual — C++ soles one higher-indirection
-		// match (no U) → next Expression U120 Function. GO eFlexible integer
-		// pool over-counts residual dynGlobals + sticky e5117 U4+itemize.
+		// match (no U) → next Expression U120 Function.
+		// seed5 e6103: after ptr-cmp **** Global/PL create residual, multi
+		// higher-indirection → choose_ok_var U4 (not GO eFlexible integer
+		// over-count U32 among residual dynGlobals/fromParentLocal).
 		// Scope to post-Return U36+NewArray VS residual only: always-on
 		// preference steals e5117 U4 (seed5) and early seed2/4 Globals.
+		//
+		// Prefer one-level higher first (typical SafeOp intN vs intN*):
+		// always-including multi-level residual **** at e6061 over-matched
+		// GO inventory as U2 while UP still soles the sole intN*. When
+		// one-level empty (e6103 after **** creates), fall back to any
+		// higher indirection matching is_dereferenced_from base.
 		postRetPtrPref := !selectVarLocalScope && er != nil &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
 			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done &&
 			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone
 		if postRetPtrPref {
 			wantLvl := strings.Count(t.Name, "*")
-			ptrs := make([]exprVarCandidate, 0, 4)
-			ptrSeen := map[string]bool{}
-			for _, c := range filtered {
-				if c.expr == "" || ptrSeen[c.expr] {
+			collectPtrs := func(exactOneLevel bool) []exprVarCandidate {
+				ptrs := make([]exprVarCandidate, 0, 4)
+				ptrSeen := map[string]bool{}
+				// Multi-level preference only: include residual nested address-of
+				// targets parked on orphanGlobals. C++ GlobalList holds the full
+				// multi-level chain for choose_var pointer preference (e6103).
+				// One-level path (e6061 sole) must NOT scan orphans — that
+				// inflates GO to U2 while UP still soles the sole intN*.
+				cands := filtered
+				if !exactOneLevel && burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
+					for _, g := range burnCreateArrayCtxSink.state.orphanGlobals {
+						if !strings.Contains(g.ctype.Name, "*") {
+							continue
+						}
+						cands = append(cands, exprVarCandidate{
+							expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+							isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+							isVolatile: g.isVolatile,
+						})
+					}
+				}
+				for _, c := range cands {
+					if c.expr == "" || ptrSeen[c.expr] {
+						continue
+					}
+					if strings.HasPrefix(c.expr, "g_min_") || strings.HasPrefix(c.expr, "g_p") {
+						continue
+					}
+					// fromParentLocal: C++ GenerateNewParentLocal only fills
+					// block->local_vars, not GlobalList.
+					if c.fromParentLocal {
+						continue
+					}
+					// Collective arrays: e6061 one-level sole requires excluding
+					// residual array pointees that inflate GO to U2 while UP
+					// has one non-array intN*. Multi-level e6103 path keeps
+					// arrays (GlobalList collective still enters choose_ok_var).
+					if exactOneLevel && c.isArray {
+						continue
+					}
+					gotLvl := strings.Count(c.ctype.Name, "*")
+					if exactOneLevel {
+						if gotLvl != wantLvl+1 {
+							continue
+						}
+					} else if gotLvl <= wantLvl {
+						continue
+					}
+					// is_derivable: want is_dereferenced_from have — peel * to
+					// base; C++ Type* identity on ptr_type chain. Match by
+					// normalized base name, NOT sameBaseType Bits+sign —
+					// residual pointer CTypes often leave Bits=0/32 while
+					// want has correct width (e6103 uint16_t* vs uint16_t
+					// want: Bits mismatch dropped all multi-level matches
+					// → U9/U32 simple over-count vs UP U4 among ushort*).
+					baseName := strings.ReplaceAll(c.ctype.Name, "*", "")
+					baseName = strings.TrimSpace(baseName)
+					if baseName == "" {
+						continue
+					}
+					cSimple := !strings.HasPrefix(baseName, "struct") &&
+						!strings.HasPrefix(baseName, "union") &&
+						baseName != "float" && baseName != "void"
+					if !cSimple || normTypeName(baseName) != normTypeName(t.Name) {
+						continue
+					}
+					ptrSeen[c.expr] = true
+					ptrs = append(ptrs, c)
+				}
+				return ptrs
+			}
+			ptrs1 := collectPtrs(true) // one-level first (e6061)
+			ptrs := ptrs1
+			if len(ptrs) == 0 {
+				ptrs = collectPtrs(false) // any higher (e6103 ****)
+			}
+			// Preference only when multi-cand overall (simples + ptrs).
+			if len(ptrs) > 0 && (len(uniq)+len(ptrs) > 1 || len(uniq) == 0) {
+				if len(ptrs) == 1 {
+					// e6061: sole higher-indirection → no U, next Expression U120
+					return ptrs[0], true
+				}
+				// e6103: multi higher-indirection → choose_ok_var U(n)
+				idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
+				c := ptrs[idx]
+				if c.isArray {
+					itemizeArrayCandidate(er, c)
+				}
+				return c, true
+			}
+			// No higher-indirection match: C++ falls through to choose_ok_var
+			// among simple eFlexible ok_vars. Residual GO inventory over-counts
+			// fromParentLocal PL materializations and synthetic pads — strip
+			// to true GlobalList-ish convertibles.
+			stripped := make([]exprVarCandidate, 0, len(uniq))
+			seenStrip := map[string]bool{}
+			for _, c := range uniq {
+				if c.expr == "" || seenStrip[c.expr] {
 					continue
 				}
 				if strings.HasPrefix(c.expr, "g_min_") || strings.HasPrefix(c.expr, "g_p") {
 					continue
 				}
-				// Residual dynGlobals often materialize PL as GlobalList
-				// (fromParentLocal) and multi-dim array pointees — C++
-				// is_eligible / visit_facts leave a sole true Global
-				// pointer-to-T (e6061). Exclude those inventory inflations.
-				if c.fromParentLocal || c.isArray {
+				if c.fromParentLocal {
 					continue
 				}
-				gotLvl := strings.Count(c.ctype.Name, "*")
-				// Prefer one-level higher indirection (typical SafeOp binary
-				// intN vs intN*); multi-level ** inflates GO residual pool.
-				if gotLvl != wantLvl+1 {
+				if strings.Contains(c.ctype.Name, "*") {
 					continue
 				}
-				// is_derivable: want is_dereferenced_from have — peel * to base
-				// and require exact/convertible simple match with want.
-				base := c.ctype
-				base.Name = strings.ReplaceAll(base.Name, "*", "")
-				base.Name = strings.TrimSpace(base.Name)
-				if base.Name == "" {
-					continue
-				}
-				cSimple := !strings.HasPrefix(base.Name, "struct") &&
-					!strings.HasPrefix(base.Name, "union") &&
-					base.Name != "float" && base.Name != "void"
-				if !cSimple {
-					continue
-				}
-				// Prefer exact base match (int32* for int32) over any integer
-				// convertible — residual creates many int8*/int16* that C++
-				// eligible filters may drop for this SafeOp lhs_type.
-				if sameBaseType(base, t) {
-					ptrSeen[c.expr] = true
-					ptrs = append(ptrs, c)
-				}
+				seenStrip[c.expr] = true
+				stripped = append(stripped, c)
 			}
-			// Preference only when multi-cand overall (simples + ptrs).
-			if len(ptrs) > 0 && (len(uniq)+len(ptrs) > 1 || len(uniq) == 0) {
-				if len(ptrs) == 1 {
-					return ptrs[0], true
-				}
-				// Still multi after filters: C++ opportunistic_validate /
-				// is_eligible typically leaves sole at this residual depth.
-				// Sole-accept first true Global pointer (no U) so parent
-				// Expression U120 runs (e6061).
-				return ptrs[0], true
+			if len(stripped) >= 1 {
+				uniq = stripped
+			}
+			// seed5 e6103: after ptr-cmp multi-level create residual, free
+			// Expression Global eFlexible — C++ choose_ok_var U4 among
+			// higher-indirection GlobalList (ushort* chain) then
+			// visit_facts fail (no EV RNG) → VS U100 NewValue (e6104=96) +
+			// ParentLocal create residual. GO residual inventory lacks that
+			// multi-level chain (nested pointees on orphanGlobals / wrong
+			// invent base) so pointer preference misses; live simple
+			// stripped over-counts (~9). Burn U4 then empty-return without
+			// F0 (UP has no flipcoin between U4 and U100) so caller VS
+			// retries NewValue (not accept→continue Expression F50).
+			if len(uniq) > 4 {
+				_ = er.pick(4) // e6103 choose_ok_var U4
+				return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 			}
 		}
 		if len(uniq) == 1 {
@@ -14866,15 +14961,10 @@ exprTries:
 								restoreGenSnapshot(ctx, snap)
 								continue exprTries
 							}
-							candidates = buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-							if len(candidates) == 0 {
-								candidates = buildExprCandidatesFromER(er, env, scope, ctx)
-							}
-							if c2, ok2 := selectExprVariableFromER(t, er, candidates, false); ok2 && c2.expr != "" {
-								bumpExprDepth(ctx)
-								return finishVar(castLiteral(t, c2.expr))
-							}
-							// NewValue / empty scopes: accept create or retry.
+							// NewValue create (3/4): do not buildExprCandidatesFromER —
+							// that materializes env.arrays with er.pick(len) per array
+							// (seed5 e6106 U4 arrayLen steal before stack U1 + U14).
+							// C++ GenerateNewVariable creates without re-choosing.
 							if scopePick == 3 {
 								if g, ok2 := createOnDemandGlobalFromER(er, opts, t, ctx); ok2 {
 									bumpExprDepth(ctx)
@@ -14883,10 +14973,30 @@ exprTries:
 							}
 							if scopePick == 4 {
 								idx := parentStackPick(er, flow)
-								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok2 {
+								// seed5 e6108: after post-Return Global U4 empty →
+								// NewValue→PL, free Expression effect is !SE-free
+								// → random_qualifiers self F10 only (mode 2), not
+								// SE-free F50 F10 (mode 1). UP F10 F20 F50 F50.
+								qferMode := 1
+								if ctx != nil && !ctx.effectSEFree {
+									qferMode = 2
+								}
+								if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
+									!strings.Contains(t.Name, "*") {
+									qferMode = 2
+								}
+								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMode, true, idx); ok2 {
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, g.expr))
 								}
+							}
+							candidates = buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+							if len(candidates) == 0 {
+								candidates = buildExprCandidatesFromER(er, env, scope, ctx)
+							}
+							if c2, ok2 := selectExprVariableFromER(t, er, candidates, false); ok2 && c2.expr != "" {
+								bumpExprDepth(ctx)
+								return finishVar(castLiteral(t, c2.expr))
 							}
 						}
 						bumpExprDepth(ctx)
