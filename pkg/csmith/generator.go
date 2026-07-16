@@ -823,6 +823,14 @@ type functionFlowState struct {
 	// Function::stack.size()=3 + empty GenerateNewParentLocal (e6286 U3 U14…).
 	// GO blockStack U1 + live choose U4 desyncs; one-shot after ArrayOp control.
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsSelPure: after e6286 PL create
+	// accept, next Statement Assign Lhs first SelectDeref pure-fails (e6298 F80
+	// only) then F80 empty-create F10 F50 F20… (e6299+). GO jumps to create F50.
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsSelPure bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd: after that pure-fail,
+	// empty SelectDeref create uses random_add F10 F50 (not sticky SelPure WRITE
+	// F50 F10) + NewArray F20 F20 (e6300–03).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -20320,6 +20328,8 @@ lhsDerefLoop:
 					} else {
 						lv = lvalueInfo{expr: "x", ctype: targetType}
 					}
+					// e6298+: next Statement Assign Lhs pure-fail SelectDeref once.
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsSelPure = true
 					lhsFromDeref = true
 					break
 				}
@@ -20327,6 +20337,19 @@ lhsDerefLoop:
 				continue
 			}
 			// F80=1: leave flag for next iteration / empty create path
+		}
+		// seed5 e6298–305: after post-ArrayOp PL create Assign, next Statement
+		// Assign Lhs (often compound with RHS first — !needNoRhs) pure-fails
+		// SelectDeref once (F80 only) then F80 empty-create F10 F50 F20 F20 U9…
+		if ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsSelPure {
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsSelPure = false
+			if r.flipcoin(80) {
+				// e6298 pure fail — no choose/create RNG; next F80 create is random_add
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd = true
+				continue
+			}
+			// F80=0 unexpected: fall through to normal VS
 		}
 		// e11680–: after e11118 For-body must_use RHS, Statement Lhs F80=0 →
 		// VS Global sole → PL U100 F40 → PP U100 → free Expression residual.
@@ -117882,11 +117905,20 @@ commaF80MultiDone:
 		// seed5 e6139–41: after pure-fail SelectDeref post Global miss,
 		// empty create uses random_qualifiers WRITE no_volatile (F50 F10 +
 		// self F50) not random_add F10 F50 — C++ null/wildcard Lhs qfer.
+		// e6300+: post-ArrayOp Lhs create uses random_add F10 F50 (not sticky WRITE).
+		postArrayOpLhsCreateAdd := ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd
+		if postArrayOpLhsCreateAdd {
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd = false
+			// e6300–01: random_add F10 F50 — force SE-free addVol draw
+			skipVol = false
+		}
 		postNewArrayLhsCreateQfer := ctx != nil && ctx.state != nil &&
-			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure &&
+			!postArrayOpLhsCreateAdd
 		// seed2 e1098–1099: useSmallParentStack !filterCompound skips vol F50.
 		if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack &&
-			!ctx.state.filterCompoundStmts {
+			!ctx.state.filterCompoundStmts && !postArrayOpLhsCreateAdd {
 			skipVol = true
 		}
 		// e2151 residual: first create after F80FailOnce under GlobalU12 (before
