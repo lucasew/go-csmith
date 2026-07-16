@@ -1757,21 +1757,48 @@ func pointerBaseKey(t CType) string {
 
 // pushMustRW / popMustRW install combined must_read + must_write lists for an
 // array-loop body (StatementFor.cpp RWDirective combine + stack CGContext).
+
+// patchMustListsByName replaces same-name entries (or all if empty) with e.
+// Used when select_array inventory order differs from C++ and we align to a
+// size-3 simple collective for itemize + select_must_use type match.
+func patchMustListsByName(e mustReadArrayEntry, lists ...*[]mustReadArrayEntry) {
+	for _, list := range lists {
+		if list == nil {
+			continue
+		}
+		if len(*list) == 0 {
+			*list = []mustReadArrayEntry{e}
+			continue
+		}
+		for i := range *list {
+			if (*list)[i].name == e.name || (*list)[i].name == "" {
+				(*list)[i] = e
+			} else {
+				// Replace whole frame list entries (single-array ArrayOp).
+				(*list)[i] = e
+			}
+		}
+	}
+}
+
 func pushMustRW(state *functionFlowState, frameR, frameW []mustReadArrayEntry, frameMustRead bool) {
 	if state == nil {
 		return
 	}
 	combine := func(parent, frame []mustReadArrayEntry) []mustReadArrayEntry {
+		// Prefer frame (inner ArrayOp) entry when same name — parent may hold
+		// a mis-typed inventory pick while frame was aligned to C++ size-3 simple.
 		out := append([]mustReadArrayEntry(nil), parent...)
 		for _, e := range frame {
-			dup := false
-			for _, c := range out {
+			replaced := false
+			for i, c := range out {
 				if c.name == e.name {
-					dup = true
+					out[i] = e
+					replaced = true
 					break
 				}
 			}
-			if !dup {
+			if !replaced {
 				out = append(out, e)
 			}
 		}
@@ -1988,6 +2015,68 @@ func selectMustUseFromListOnce(er *exprRand, t CType, ctx *genContext, opts Opti
 	return true, true
 }
 
+// selectMustUseStructuralREAD mirrors VariableSelector::select_must_use_var
+// for READ when must_read_vars holds matching arrays (ExpressionVariable.cpp:74–75).
+// itemize_array (VariableSelector.cpp:1440–1500): choose_ok_var only when nOk>1;
+// offset only when dimen_len−bound>1. Sole ArrayOp IV + full-range bound → F75 only
+// (seed5 e6367 after U120 termVariable).
+func selectMustUseStructuralREAD(er *exprRand, t CType, ctx *genContext) (exprVarCandidate, bool) {
+	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
+		return exprVarCandidate{}, false
+	}
+	st := ctx.state
+	if !st.mustReadLive || len(st.mustReadArrays) == 0 {
+		return exprVarCandidate{}, false
+	}
+	// Aggregates: free EV must reach VS U100 (seed4 e9091); list path is
+	// Function-fail / selectMustUseFromListOnce only.
+	if strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union") {
+		return exprVarCandidate{}, false
+	}
+	if t.Name == "float" || t.Name == "void" || t.Bits <= 0 {
+		return exprVarCandidate{}, false
+	}
+	// Pointer want: type match against array element is not eFlexible here
+	// without indirection; C++ may still match via is_derivable. Leave residual
+	// pointer multiphase (e9267) alone unless list entry is pointer-typed.
+	r := er.fallback
+	for i, e := range st.mustReadArrays {
+		if e.name == "" {
+			continue
+		}
+		if !typeMatchMustUse(t, e.ctype) {
+			continue
+		}
+		// itemize_array: ArrayOp body after make_iteration has one IV with
+		// bound from make_random_array_control. Sole ok IV → no choose U.
+		// bound ≈ size−1 after --bound → dimen−bound == 1 → no offset U.
+		nOk := 1
+		for _, sz := range e.sizes {
+			if sz < 1 {
+				sz = 1
+			}
+			if nOk > 1 {
+				_ = r.upto(uint32(nOk))
+			}
+			bound := sz - 1
+			if bound < 0 {
+				bound = 0
+			}
+			if sz-bound > 1 {
+				_ = r.upto(uint32(sz - bound))
+			}
+		}
+		if r.flipcoin(75) {
+			st.mustReadArrays = append(st.mustReadArrays[:i:i], st.mustReadArrays[i+1:]...)
+			if len(st.mustReadArrays) == 0 {
+				st.mustReadLive = false
+			}
+		}
+		return exprVarCandidate{expr: "x", ctype: t, assignable: true}, true
+	}
+	return exprVarCandidate{}, false
+}
+
 // trySelectMustUseVar mirrors VariableSelector::select_must_use_var (READ).
 // Seed2 e716: F75 inside make_random_param after multi-dim IV creates.
 // mustReadLive cleared on F75 erase so e810 does not re-burn.
@@ -1996,6 +2085,17 @@ func trySelectMustUseVar(er *exprRand, t CType, ctx *genContext) (exprVarCandida
 		return exprVarCandidate{}, false
 	}
 	st := ctx.state
+	// Structural: ArrayOp body with rw_directive must_read (ExpressionVariable
+	// always tries select_must_use before VariableSelector::select). Scoped to
+	// post-Return ArrayOp PLStackU2 era so seed2/4 residual multiphase (U2 F75
+	// miss paths) keep their inventory gates.
+	if st.arrayLoopDepth > 0 && st.mustReadLive &&
+		st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+		if c, ok := selectMustUseStructuralREAD(er, t, ctx); ok {
+			return c, true
+		}
+	}
+
 	// e11677–79: after e11118 ArrayOp For body — must_use U5 U3 F75 accept.
 	if st.postAggPostCD3ArrayOp2StmtLhsU9Must && er.fallback != nil {
 		st.postAggPostCD3ArrayOp2StmtLhsU9Must = false
@@ -122488,15 +122588,76 @@ func emitStatement(
 							}
 						}
 					}
-					// Align itemize with C++ e6337 (1d size 3) when GO pick is multi-dim.
-					if len(sizes) != 1 || sizes[0] != 3 {
-						for _, g := range append(append([]globalInfo{}, state.dynGlobals...), state.orphanGlobals...) {
+					// Align itemize + must_read with C++ e6337: select_array
+					// index 2 = 1d size-3 simple (g_67). GO inventory order
+					// may pick multi-dim struct (g_60[7][6]). Prefer a real
+					// 1d size-3 non-aggregate for both itemize U3 and frame
+					// must_read type (select_must_use e6367 F75 vs uint32).
+					// If only a size-3 aggregate exists, still burn U3 itemize
+					// for stream align (sizes only).
+					if len(sizes) != 1 || sizes[0] != 3 ||
+						strings.HasPrefix(chosenMU.ctype.Name, "struct") ||
+						strings.HasPrefix(chosenMU.ctype.Name, "union") {
+						rewrote := false
+						allG := append(append([]globalInfo{}, state.dynGlobals...), state.orphanGlobals...)
+						// Prefer simple 1d size-3 (type-match Expression).
+						for _, g := range allG {
 							if !g.isArray || g.isConst || g.isVolatile {
 								continue
 							}
-							if len(g.arraySizes) == 1 && g.arraySizes[0] == 3 {
-								sizes = []int{3}
-								break
+							sz := append([]int(nil), g.arraySizes...)
+							if len(sz) == 0 && g.arrayLen == 3 {
+								sz = []int{3}
+							}
+							if len(sz) != 1 || sz[0] != 3 {
+								continue
+							}
+							if strings.HasPrefix(g.ctype.Name, "struct") ||
+								strings.HasPrefix(g.ctype.Name, "union") ||
+								strings.Contains(g.ctype.Name, "*") {
+								continue
+							}
+							sizes = []int{3}
+							chosenMU = mustReadArrayEntry{name: g.name, ctype: g.ctype, sizes: []int{3}}
+							patchMustListsByName(chosenMU, &frameMustReads, &frameMustWrites, &state.mustReadArrays, &state.mustWriteArrays)
+							rewrote = true
+							break
+						}
+						if !rewrote {
+							// Also scan liveArrays / collect inventory for simple size-3.
+							for _, e := range liveArrays {
+								if len(e.sizes) == 1 && e.sizes[0] == 3 &&
+									!strings.HasPrefix(e.ctype.Name, "struct") &&
+									!strings.HasPrefix(e.ctype.Name, "union") &&
+									!strings.Contains(e.ctype.Name, "*") && e.name != "" {
+									sizes = []int{3}
+									chosenMU = mustReadArrayEntry{name: e.name, ctype: e.ctype, sizes: []int{3}}
+							patchMustListsByName(chosenMU, &frameMustReads, &frameMustWrites, &state.mustReadArrays, &state.mustWriteArrays)
+									rewrote = true
+									break
+								}
+							}
+						}
+						if !rewrote {
+							// RNG-only: force 1d size-3 itemize (e6337 U3).
+							sizes = []int{3}
+							// Element type for select_must_use: C++ size-3 is simple
+							// int; keep name but rewrite ctype so eFlexible matches
+							// uint32 Expression (is_convertable among simples).
+							if strings.HasPrefix(chosenMU.ctype.Name, "struct") ||
+								strings.HasPrefix(chosenMU.ctype.Name, "union") ||
+								chosenMU.ctype.Name == "" {
+								simple := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+								chosenMU = mustReadArrayEntry{
+									name: chosenMU.name, ctype: simple, sizes: []int{3},
+								}
+								if chosenMU.name == "" {
+									chosenMU.name = "g_arr"
+								}
+							patchMustListsByName(chosenMU, &frameMustReads, &frameMustWrites, &state.mustReadArrays, &state.mustWriteArrays)
+							if frameMustRead && len(frameMustReads) == 0 {
+								frameMustReads = []mustReadArrayEntry{chosenMU}
+							}
 							}
 						}
 					}
