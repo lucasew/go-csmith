@@ -831,6 +831,10 @@ type functionFlowState struct {
 	// empty SelectDeref create uses random_add F10 F50 (not sticky SelPure WRITE
 	// F50 F10) + NewArray F20 F20 (e6300–03).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9: after F20 F20 address
+	// path, make_init choose_ok_var among ~9 visibles (e6304 U9) then F10 U4
+	// residual — not sticky GlobalU21 AddrCreateVS U4 U3 U4 (e2928).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9 bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -117912,6 +117916,8 @@ commaF80MultiDone:
 			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsCreateAdd = false
 			// e6300–01: random_add F10 F50 — force SE-free addVol draw
 			skipVol = false
+			// e6304+: after NewArray=0 make_init address, choose among ~9 (not U4 U3 U4)
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9 = true
 		}
 		postNewArrayLhsCreateQfer := ctx != nil && ctx.state != nil &&
 			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure &&
@@ -118207,6 +118213,24 @@ commaF80MultiDone:
 			// Arm phase so PL/PP scope fails without stack U / F80 between
 			// reselects (UP U100 U100 U7 ladder, not GO PL stack U2).
 			nullValidatePostResidualAddrCreateVSPhase = 1
+			break
+		}
+		// seed5 e6304–06: post-ArrayOp Lhs empty create make_init address —
+		// choose_ok_var among ~9 visibles (U9) then F10 U4 residual (UP), not
+		// sticky e2928 U4 U3 U4 itemize under GlobalU21 AddrCreateVS.
+		if !addVol && ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9 {
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpLhsAddrU9 = false
+			_ = r.upto(9)      // e6304 choose_ok_var
+			_ = r.flipcoin(10) // e6305
+			_ = r.upto(4)      // e6306
+			ctx.state.lhsDerefCreates++
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			// e6307: ArrayOp body was sole stmt (skipNextBlockSize); parent free
+			// StatementFilter is !IN_LOOP (tries=1 Break 43 → Assign 76). GO may
+			// still mark inLoop from outer For/ArrayOp — force StmtNoLoop once.
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = true
 			break
 		}
 		// seed5 e2926–30: after AddrCreateVS multiphase, next wildcard
