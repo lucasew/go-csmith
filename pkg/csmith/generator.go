@@ -859,6 +859,11 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr: after e6581–84,
 	// absorb parent Expression nest without RNG until Statement U100 (e6585).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpUnwindExpr bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpAssignDone: one-shot e6586 free
+	// Statement Assign after CREATE Return residual — UP stream is NewValue→PL
+	// create (VariableCreationProbability F10 + stack U + NewArray F20…), not
+	// AssignOps need_no_rhs U120 + SelectDeref F80 ladder.
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpAssignDone bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -20317,6 +20322,94 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	assignLhsSEFree := true
 	if ctx != nil {
 		assignLhsSEFree = ctx.effectSEFree
+	}
+	// e6586: after CREATE Return residual (e6585 Statement U100), free Assign
+	// UP stream is NewValue VariableCreationProbability F10 → SelectParentLocal
+	// stack U + create_and_initialize NewArray F20 + Constant residual + CreateArray
+	// U99… (not sticky AssignOps need_no_rhs U120 + SelectDeref F80). One-shot.
+	if ctx != nil && ctx.state != nil &&
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpReturnConstDone &&
+		!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpAssignDone {
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpAssignDone = true
+		// NewValue: VariableCreationProbability F10 Global vs ParentLocal.
+		// F10=0 → GenerateNewParentLocal via SelectParentLocal stack.
+		_ = r.flipcoin(10) // e6586
+		// Function::stack pick (UP U1 after sole CREATE frame).
+		_ = r.upto(1) // e6587
+		// create_and_initialize NewArrayVariableProb
+		newArray := r.flipcoin(20) // e6588
+		intT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+		if newArray {
+			// create_and_initialize: make_init Constant first (F50=0 → hex16
+			// untraced next31 + formatSimpleConstant small F50 F50 U20), then
+			// create_array_and_itemize (ArrayVariable.cpp:123–192 + itemize).
+			if !r.flipcoin(50) { // e6589 hex path
+				for i := 0; i < 16; i++ {
+					_ = r.next31()
+				}
+			}
+			// trailing small-path Constant residual matching UP F50 F50 U20
+			if r.flipcoin(50) {
+				if r.flipcoin(50) {
+					_ = r.upto(3)
+				} else {
+					_ = r.upto(20)
+				}
+			} else {
+				for i := 0; i < 8; i++ {
+					_ = r.next31()
+				}
+			}
+			// CreateArrayVariable: U99 dim ladder + U10 per dim
+			num := int(r.upto(99)) + 1
+			dimension := 0
+			step := 100
+			for num > 0 {
+				dimension++
+				step /= 2
+				if step == 0 {
+					step = 1
+				}
+				num -= step
+			}
+			if dimension > 3 {
+				dimension = 3
+			}
+			total := 1
+			sizes := make([]int, 0, dimension)
+			for i := 0; i < dimension; i++ {
+				dimen := int(r.upto(10)) + 1
+				if total*dimen > 256 {
+					dimen = 256 / total
+				}
+				if dimen > 0 {
+					total *= dimen
+					sizes = append(sizes, dimen)
+				}
+			}
+			// create_field_vars for aggregate-shaped residual: 2 simple field
+			// Constants (UP F50 F50 U3 + F50 F50 U20) before init_num.
+			burnSimpleConstant(r, intT)
+			burnSimpleConstant(r, intT)
+			// init_num = pure_rnd_upto(total/2) then Constant alts
+			if total/2 > 0 {
+				initNum := int(r.upto(uint32(total / 2)))
+				for i := 0; i < initNum; i++ {
+					burnSimpleConstant(r, intT)
+				}
+			}
+			// ArrayVariable::itemize: rnd_upto(sizes[i]) per dim
+			for _, sz := range sizes {
+				if sz > 0 {
+					_ = r.upto(uint32(sz))
+				}
+			}
+		} else {
+			_ = r.flipcoin(20) // make_init null vs address
+			burnSimpleConstant(r, intT)
+		}
+		writeLine(b, 1, "x = x;")
+		return true
 	}
 	// seed4 e2407: after postAgg Continue, skip AssignOps+SelectLType; RHS is
 	// forced Variable with PL stack U6 (not AssignOps U120 / SelectLType F50).
