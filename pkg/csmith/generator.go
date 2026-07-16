@@ -120673,12 +120673,19 @@ commaF80MultiDone:
 					createdArrayThisLhs = true
 					lhsFromDeref = true
 					lv = lvalueInfo{expr: "*p", ctype: targetType}
+					// e6562: sole ArrayOp body (skipNextBlockSize stmtCount=1)
+					// ends after this Assign; C++ next is Statement U100 in the
+					// same body. NeedStmt drains another emitOne after emitOne
+					// returns (emitStatements) → StatementProbability U100.
+					nullValidatePostResidualAddrCreateVSNeedStmt = true
 					break
 				}
 				// address-of: choose_ok_var among visible pointees (UP U7).
 				_ = r.upto(7)
 				lhsFromDeref = true
 				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				// e6562: same NeedStmt arm for address-accept path (UP F10 F20 F20 U7).
+				nullValidatePostResidualAddrCreateVSNeedStmt = true
 				break
 			}
 			// seed5 e6137–44: after post-Return NewArray Global U4 visit miss
@@ -120806,6 +120813,17 @@ commaF80MultiDone:
 	if ctx != nil {
 		c := exprVarCandidate{expr: lv.expr, ctype: lv.ctype, assignable: true}
 		ctx.mustUse = &c
+	}
+	// e6562: after ArrayOp-body Lhs empty create, next is Statement U100 not
+	// free Expression residual (UP SelectLType F50 F30 after Statement U100).
+	if ctx != nil && ctx.state != nil &&
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody &&
+		nullValidatePostResidualAddrCreateVSNeedStmt {
+		ctx.state.freeMultiIVForLhsExprContinue = false
+		ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+		ctx.state.postAggLhsExprContinue = false
+		ctx.state.postAggNullValidateExprContinue = false
+		lhsAfterParamMiss = false
 	}
 	// seed2 e1225: after ParentParam-miss Global sole Lhs, UP continues as
 	// Expression term U120 (ExpressionAssign nested under Funcall/binary), not
