@@ -2636,6 +2636,33 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	return int(er.pick(uint32(n)))
 }
 
+// localInfoToExprCand converts a materialised local to an Expression candidate.
+// Skips synthetic "x". Never invents names or pads pool size.
+func localInfoToExprCand(l localInfo) (exprVarCandidate, bool) {
+	if l.name == "x" {
+		return exprVarCandidate{}, false
+	}
+	arrLen := 0
+	var sizes []int
+	if l.isArray {
+		sizes = append(sizes, l.arr.sizes...)
+		if len(sizes) > 0 {
+			arrLen = sizes[0]
+		}
+		if arrLen < 1 {
+			arrLen = 4
+		}
+		if len(sizes) == 0 {
+			sizes = []int{arrLen}
+		}
+	}
+	return exprVarCandidate{
+		expr: l.name, ctype: l.ctype, assignable: !l.isConst,
+		isArray: l.isArray, arrayLen: arrLen, arraySizes: sizes, isVolatile: l.isVol,
+		fromParentLocal: l.fromParentLocal,
+	}, true
+}
+
 // localsInStackBlock returns parent-local candidates belonging to stack[index].
 // blockDepth is 1-based (body=1); stack index 0 → depth 1.
 // Skips synthetic "x" (not a real block local in upstream).
@@ -2643,9 +2670,6 @@ func localsInStackBlock(er *exprRand, env envInfo, scope scopeInfo, ctx *genCont
 	wantDepth := stackIndex + 1
 	out := make([]exprVarCandidate, 0, 8)
 	for _, l := range mergedLocals(scope, ctx) {
-		if l.name == "x" {
-			continue
-		}
 		d := l.blockDepth
 		if d == 0 {
 			d = 1 // static scope locals → function body
@@ -2653,27 +2677,54 @@ func localsInStackBlock(er *exprRand, env envInfo, scope scopeInfo, ctx *genCont
 		if d != wantDepth {
 			continue
 		}
-		arrLen := 0
-		var sizes []int
-		if l.isArray {
-			sizes = append(sizes, l.arr.sizes...)
-			if len(sizes) > 0 {
-				arrLen = sizes[0]
-			}
-			if arrLen < 1 {
-				arrLen = 4
-			}
-			if len(sizes) == 0 {
-				sizes = []int{arrLen}
-			}
+		if c, ok := localInfoToExprCand(l); ok {
+			out = append(out, c)
 		}
-		out = append(out, exprVarCandidate{
-			expr: l.name, ctype: l.ctype, assignable: !l.isConst,
-			isArray: l.isArray, arrayLen: arrLen, arraySizes: sizes, isVolatile: l.isVol,
-			fromParentLocal: l.fromParentLocal,
-		})
 	}
 	return out
+}
+
+// localsMergedAnyDepth returns all real materialised locals (any blockDepth).
+// Used when stack frames have popped (e.g. post-ArrayOp) and blockDepth tags lag
+// C++ Function::stack — still only real dynLocs/scope.locals, never invent n.
+func localsMergedAnyDepth(scope scopeInfo, ctx *genContext) []exprVarCandidate {
+	out := make([]exprVarCandidate, 0, 8)
+	for _, l := range mergedLocals(scope, ctx) {
+		if c, ok := localInfoToExprCand(l); ok {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// localsForParentLocalStack: depth-filtered block locals; after ArrayOp body pop
+// (PLStackU2) if that is empty, fall back to all materialised locals so choose_ok_var
+// can draw U(n) instead of empty GenerateNewParentLocal (seed5 e6316 class).
+func localsForParentLocalStack(er *exprRand, env envInfo, scope scopeInfo, ctx *genContext, stackIndex int, flow *functionFlowState) []exprVarCandidate {
+	cands := localsInStackBlock(er, env, scope, ctx, stackIndex)
+	if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+		// C++ stack[i]->local_vars: prefer true block locals (not PL-as-global pads).
+		trueLoc := make([]exprVarCandidate, 0, len(cands))
+		for _, c := range cands {
+			if !c.fromParentLocal {
+				trueLoc = append(trueLoc, c)
+			}
+		}
+		if len(trueLoc) > 0 {
+			return trueLoc
+		}
+		if len(cands) > 0 {
+			return cands
+		}
+		// Empty depth: fall back to true block locals any depth.
+		for _, c := range localsMergedAnyDepth(scope, ctx) {
+			if !c.fromParentLocal {
+				trueLoc = append(trueLoc, c)
+			}
+		}
+		return trueLoc
+	}
+	return cands
 }
 
 // realBlockLocalCount counts non-PL-materialised locals (true block->local_vars).
@@ -9527,7 +9578,7 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 		useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 		if useBlockLocal {
 			// Pointer forced-variable path: full qfer (levels+self F50+F10).
-			localCands := localsInStackBlock(er, env, scope, ctx, idx)
+			localCands := localsForParentLocalStack(er, env, scope, ctx, idx, flow)
 			if len(localCands) == 0 {
 				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
 					bumpExprDepth(ctx)
@@ -10687,7 +10738,9 @@ exprTries:
 							flow.arrayLoopDepth > 0 {
 							qferMode = 0
 						}
-						localCands := localsInStackBlock(er, env, scope, ctx, idx)
+						// e6316: post-ArrayOp PLStackU2 — materialise any-depth locals
+						// when blockDepth filter is empty so choose_ok_var can live.
+						localCands := localsForParentLocalStack(er, env, scope, ctx, idx, flow)
 						forceCreate := ctx.state != nil && ctx.state.useSmallParentStack
 						// seed4 e1042: empty/miss force create (no sole local).
 						if flow != nil && flow.isParamPPFallPicks >= 2 &&
@@ -10725,12 +10778,18 @@ exprTries:
 						// C++ stack block is empty — force create. Later free
 						// Expression PL live choose is Expression Variable path
 						// (e5670), not this Function-arg path.
-						if flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+						// e6316: after ArrayOp body pop, UP live choose_ok_var U2 —
+						// sticky GlobalU21 force-create must not wipe materialised
+						// inventory (would F50 vs U2).
+						postArrayOpPLLive := flow != nil &&
+							flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2
+						if flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+							!postArrayOpPLLive {
 							forceCreate = true
 							localCands = nil
 							qferMode = 1 // SE-free self F50 F10
 						}
-						if forcePtrPLCreate || forceResidualPLCreate {
+						if (forcePtrPLCreate || forceResidualPLCreate) && !postArrayOpPLLive {
 							forceCreate = true
 							localCands = nil
 						}
@@ -12698,7 +12757,8 @@ exprTries:
 				}
 				useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 				if useBlockLocal {
-					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					// e6316: PLStackU2 empty blockDepth → materialise any-depth locals.
+					localCands := localsForParentLocalStack(er, env, scope, ctx, idx, flow)
 					// e9833–38: one-shot ArrayOp2 PL U5 F0 → VS PL U100 U6 U4 accept.
 					// Do NOT burn F50 U32 — parent binary ShiftByNonConstantProb does
 					// that after LHS returns (e9839–40), then next Expression U120.
