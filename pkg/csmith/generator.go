@@ -889,6 +889,14 @@ type functionFlowState struct {
 	// Break — UP e7210–12 is U100=56 then U1 U4 (stack/choose residual), not
 	// F5 array_loop / U4 aryno. Mirrors lateArrayOp-style short residual.
 	freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 bool
+	// freeMultiIVNeedNoRhsPostArrayOpPLStackU1: one-shot Function::stack.size()=1
+	// for PL pick inside that ArrayOp body Expression (e7221 UP U1; sticky
+	// PLStackU2 would burn U2). Also clamps PL create qfer to * levels=1
+	// (e7222–25 F50 F10×2 then NewArray; sticky ** floor over-burns).
+	freeMultiIVNeedNoRhsPostArrayOpPLStackU1 bool
+	// freeMultiIVNeedNoRhsPostArrayOpQferLvl1: after stack U1, next PL create
+	// random_qualifiers uses levels=1 (consumed in createOnDemand).
+	freeMultiIVNeedNoRhsPostArrayOpQferLvl1 bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -2576,6 +2584,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// e6315: free Expression after first ArrayOp (PLStackU2, not InBody) → U2.
 	// Do not key off arrayLoopDepth alone — first-body tail may still have depth>0
 	// when PLStackU2 is armed mid-statement (Lhs), and UP stack is already U2.
+	// e7221: invent ArrayOp body Expression PL — UP stack U1 (not sticky U2).
+	if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
+		state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
+		state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
+		return int(er.pick(1))
+	}
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
 		if state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 			return int(er.pick(3))
@@ -6481,7 +6495,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// self F50 F10 + NewArray F20 + bitfields, not forced ** qfer).
 		// seed5 e5707: live-PL multiphase empty create is *** !SE-free READ
 		// (mode 2): F50 F10×3 levels + self F10 only (UP 7 flips then F20).
-		if ctx.state.freeMultiIVNeedNoRhsPostEALivePLCreate && isPtr {
+		if ctx.state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 && isPtr {
+			// e7222–25: * SE-free qfer F50 F10 + self F50 F10 then NewArray.
+			levels = 1
+			ctx.state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = false
+		} else if ctx.state.freeMultiIVNeedNoRhsPostEALivePLCreate && isPtr {
 			if levels < 3 {
 				levels = 3
 			}
@@ -20743,6 +20761,12 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			ctx.state.ppPostPadDepthBlock = false
 			ctx.state.ppPostPadDepthBlockN = 0
 			ctx.state.postAggPostCD3DepthBlockOnce = false
+		}
+		// e7218: post-ArrayOp residual Lhs set SkipParentExprN to unwind
+		// parent Expression after invent Assign; that must not absorb this
+		// Assign's real RHS Expression (UP U120 after SelectLType U16).
+		if ctx != nil && ctx.state != nil && ctx.state.ppPostPadSkipParentExprN > 0 {
+			ctx.state.ppPostPadSkipParentExprN = 0
 		}
 		rhs = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 		if ctx != nil {
@@ -123094,6 +123118,8 @@ func emitStatement(
 			_ = r.upto(4) // e7212
 			if state != nil {
 				state.skipNextBlockSize = true
+				// e7221: body Expression PL stack U1 (not sticky PLStackU2).
+				state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = true
 			}
 			writeLine(b, 1, "/* array loop postArrayOp */ {")
 			if state != nil {
