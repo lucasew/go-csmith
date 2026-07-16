@@ -2210,6 +2210,16 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		}
 		return int(er.pick(n))
 	}
+	// seed5 e5373: free multi-IV need_no_rhs-era parent free For after the
+	// need_no_rhs If (IfBody cleared, NestedFor off). Expression Variable
+	// PP→PL (Function-fail → eVariable U100=93) uses Function::stack.size()=6
+	// — same depth as Lhs post-If PL (e5332/e5341). freeMultiIVForBodyU3
+	// + blockStack=5 under-burns U5; force U6. LhsSelDone marks post-If
+	// free stream (set during If then/else Lhs SelectDeref).
+	if state != nil && state.freeMultiIVNeedNoRhsEra &&
+		state.freeMultiIVNeedNoRhsIfLhsSelDone && !state.freeMultiIVNeedNoRhsIfBody {
+		return int(er.pick(6))
+	}
 	// seed5 e4368: after multi-level SelectDeref create ladder, free Expression
 	// Variable PL stack is U3 (For body depth) not sticky residual forceU6.
 	if state != nil && state.freeMultiIVPostEAMultiLvlPLStackU3 {
@@ -5940,8 +5950,15 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// seed5 e2974: free multi-IV For body Function-fail PL create with
 		// !NewArray && !initNull still burns address choose_ok_var U4 before
 		// Lhs SelectDeref F80 — do not skip under freeMultiIVForBodyU3.
+		// seed5 e5374: post-If need_no_rhs-era S2* empty create still needs
+		// address residual (pointee NewArray F20 + bitfield Constants) even
+		// when freeMultiIVForBodyU3 has been cleared — GlobalU21 skip would
+		// jump straight to parent Lhs F80 after outer F20 F20.
 		if nullValidatePostResidualGlobalU21 && !newArray &&
-			!ctx.state.freeMultiIVForBodyU3 {
+			!ctx.state.freeMultiIVForBodyU3 &&
+			!(ctx.state.freeMultiIVNeedNoRhsEra &&
+				strings.HasPrefix(chosen.Name, "struct S") &&
+				strings.Count(chosen.Name, "*") == 1) {
 			doAddrResidual = false
 		}
 		// e6541: nest Assign RHS NewArray+!initNull still address-of choose U2
@@ -6003,6 +6020,27 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// soles an existing multi-level local from the create ladder
 			// (choose_ok_var len==1, no RNG) then parent Lhs F80 — sticky U4
 			// underburns (F80 next on UP).
+			// seed5 e5374–85: post-If need_no_rhs-era Function-fail PP→PL empty
+			// create struct S2* — address-of empty pointees → GenerateNewGlobal
+			// S2: NewArray F20 + formatAggregate bitfield Constants U11585…
+			// (UP g_282/g_283). Must run before freeMultiIVForBodyU3 U4/sole
+			// residual (which would underburn vs F20+bitfields). Single-level
+			// struct S* only under sticky freeMultiIVNeedNoRhsEra.
+			if !newArray && ctx.state.freeMultiIVNeedNoRhsEra &&
+				strings.Count(chosen.Name, "*") == 1 &&
+				strings.HasPrefix(chosen.Name, "struct S") {
+				baseName := strings.TrimSuffix(chosen.Name, "*")
+				base := CType{Name: baseName, Bits: 32}
+				newArrPointee := er.fallback.flipcoin(20)
+				if newArrPointee {
+					_arr := burnCreateArrayVariable(er.fallback, opts, base, true)
+					emitOrphanArrayGlobal(ctx, base, _arr)
+				} else {
+					_ = formatAggregateOrSimpleConstant(er.fallback, base, ctx, opts)
+					burnCreateFieldVarsConstants(er.fallback, base, ctx, opts)
+				}
+				goto afterAddrResidual
+			}
 			if ctx.state.freeMultiIVForBodyU3 && !newArray {
 				if ctx.state.freeMultiIVForLhsExprContinue {
 					_ = er.fallback.upto(2) // e3422 U2
@@ -10004,7 +10042,24 @@ exprTries:
 						forceCreate = false
 						flow.postAggNestLhsGlobalCreateDone = false
 					}
+					// seed5 e5373–77: free multi-IV need_no_rhs-era parent free
+					// For after need_no_rhs If — ExpressionAssign RHS Function-
+					// fail → ExpressionVariable PP→PL. C++ stack[1] empty →
+					// GenerateNewParentLocal (qfer mode 0: NewArray F20 + make_init
+					// address F20 + pointee S2 NewArray F20 + bitfield Constants
+					// U11585…). GO inventory sole-accepts → parent Lhs F80.
+					// Same gate as parentStackPick post-If U6 (era+LhsSelDone+
+					// !IfBody) — freeMultiIVForBodyU3 may already be false here.
+					needNoRhsPostIfExprPPPL := flow != nil && flow.freeMultiIVNeedNoRhsEra &&
+						flow.freeMultiIVNeedNoRhsIfLhsSelDone && !flow.freeMultiIVNeedNoRhsIfBody
+					if needNoRhsPostIfExprPPPL {
+						forceCreate = true
+						qfer = 0
+					}
 					localCands := localsInStackBlock(er, env, scope, ctx, idx)
+					if needNoRhsPostIfExprPPPL {
+						localCands = nil
+					}
 					// seed4 e1055: Function-fail→PP→PL first stack fails visit_facts
 					// → retry VariableSelector U100 (ParentParam) then stack+create.
 					if flow != nil && flow.isParamPPFallPicks >= 2 && flow.arrayLoopDepth > 0 &&
@@ -10060,6 +10115,15 @@ exprTries:
 						createT = CType{Name: "struct S1*", Signed: true, Bits: 32}
 						qfer = 1
 						retypePL = false
+					}
+					// seed5 e5373: post-If need_no_rhs-era Function-fail PP→PL
+					// empty create is struct S2* (UP g_282/g_283) — keep pointer
+					// type, no U14 retype. Force S2* so address residual burns
+					// S2 bitfield Constants U11585… (want type may be int**).
+					if needNoRhsPostIfExprPPPL {
+						retypePL = false
+						createT = CType{Name: "struct S2*", Signed: true, Bits: 32}
+						qfer = 0
 					}
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, qfer, retypePL, idx); ok {
 						bumpExprDepth(ctx)

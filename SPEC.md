@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5373** (PP→PL stack U6 vs U5 after post-If era Lhs climb); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5398** (Lhs F80=0→VS Global U13 create F20 vs GO F80); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5373→5398 climbed — post-If Expression PP→PL stack U6 + S2* empty create:**
+1. Capture: e5373 UP U6=1 vs GO U5=3 (same raw) after ExpressionAssign RHS Function-fail → ExpressionVariable U100=93 ParentParam.
+2. C++: Function::stack.size()=6; stack[1] empty → GenerateNewParentLocal struct S2* qferMode 0: NewArray F20 + make_init address F20 + pointee S2 NewArray F20 + bitfield Constants U11585… (g_282/g_283) then Lhs F80=0→VS Global.
+3. GO: parentStackPick post-If U6 (era+LhsSelDone+!IfBody); Function-fail PP→PL force empty create S2* qfer 0; keep doAddrResidual under GlobalU21 when era S2*; formatAggregate S2 bitfields. Seeds 2/3/4/6 held.
+4. Next: e5398 UP F20 (Global empty create after U100=13) vs GO F80 after Lhs F80=0→VS.
 
 **seed5 e5324→5373 climbed — post-If need_no_rhs-era Lhs SelectDeref live + VS PL/PP stack U6:**
 1. Capture: e5324 UP U5=2 (SelectDeref live) vs GO F10=0 (empty create) after parent free For Assign Lhs F80=1 (IfBody cleared).
