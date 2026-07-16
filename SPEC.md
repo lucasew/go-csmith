@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5956** (Function CREATE VS Global U3 vs GenerateNewGlobal F50 after Comma lhs const/vol struct Assign filter); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5984** (ptr-cmp ExpressionAssign Lhs SelectDeref NewArray address nested create F20 F20 U3 vs GO CreateArray U99); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5956→5984 climbed — Function CREATE Global U3 + ptr-cmp * qfer + Assign RHS PP sole:**
+1. Capture: e5956 UP U3 vs GO F50 createOnDemandGlobalFromERSEFree after Function CREATE residual (useExisting=0) → ExpressionVariable Global.
+2. C++: sticky GlobalU21 force-create is wrong after post-Return F0 residual — SelectGlobal still has ~3 matching globals (Comma lhs const/vol struct). Later free Expression ptr-cmp nPtr floor U21 + idx=10 is * (WRITE qfer F50 F10 + self F50) not default ** levels-only; Assign RHS Function-fail ParentParam soles then Lhs SelectDeref F80 (not sticky free Expression PP U7).
+3. GO: after `freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done`, Function-fail Global pads choose_ok_var U3; post-Return non-PP ptr-cmp clamps stars=1; Assign RHS (`skipFuncRetQfer`) ParentParam sole-accept. Seeds 2/3/4/6 held.
+4. Next: e5984 UP F20 (nested address create under SelectDeref NewArray) vs GO U99 CreateArray.
 
 **seed5 e5953→5956 climbed — Expression const/vol struct filters Assign:**
 1. Capture: e5953 UP U120=6 tries=1 vs GO U120=109 tries=0 (after Comma U120=119 + pickNonVoid U16=15).

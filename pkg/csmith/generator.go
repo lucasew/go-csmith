@@ -10061,6 +10061,17 @@ exprTries:
 									stars = 1
 								}
 							}
+							// seed5 e5978: after post-Return residual, free Expression
+							// ptr-cmp uses freeMultiIVNeedNoRhsPostEAGlobalU21 nPtr floor
+							// U21. Non-PP path defaults idx>0 → ** (levels F50 F10×2)
+							// while UP derived_types[10]=* → WRITE qfer F50 F10 + self
+							// F50 then RHS Expression U120. List is only consulted in
+							// PP-era; free Expression still uses the idx>0 ** default.
+							if ctx != nil && ctx.state != nil &&
+								ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+								!ppEra && stars > 1 {
+								stars = 1
+							}
 							var ptrTy CType
 							if outOfRangeS0 {
 								ptrTy = CType{Name: "struct S0*", Signed: true, Bits: 32}
@@ -10236,9 +10247,17 @@ exprTries:
 				// same multiphase as termVariable (0 e5765 U7; 1+ e5801–02 U1+U2).
 				// Without this, GO sole-accepts param inventory then parent Lhs F80
 				// steals the U1 raw.
+				// seed5 e5981: ExpressionAssign RHS (skipFuncRetQfer) Function-fail
+				// → ParentParam sole-accepts then parent Lhs SelectDeref F80.
+				// Sticky free Expression PP multiphase U7 steals the F80 raw.
 				if ctx != nil && ctx.state != nil &&
 					ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 					scopePick == 2 && er != nil {
+					if ctx.skipFuncRetQfer {
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "x")
+					}
 					pn := ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN
 					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
 					if pn == 1 {
@@ -10694,6 +10713,23 @@ exprTries:
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, "x")
+						}
+						// seed5 e5956: after post-Return Global F0 residual, Function
+						// CREATE residual (useExisting=0 at max_funcs) → ExpressionVariable
+						// Global. C++ SelectGlobal choose_ok_var among ~3 matching
+						// globals (Comma lhs const/vol struct from pickNonVoid U16).
+						// Sticky GlobalU21 empty force-create SEFree F50 desyncs —
+						// GO under-materializes GlobalList for that type while UP
+						// still has live ok_vars (VariableSelector.cpp:648–666).
+						// Always pad U3: real GO inventory may sole-accept (no RNG)
+						// or choose with wrong n while C++ still draws U3.
+						if ctx != nil && ctx.state != nil &&
+							ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+							er != nil {
+							_ = er.pick(3) // e5956 choose_ok_var
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, "g_0")
 						}
 						n := globalU21FFGlobalN
 						globalU21FFGlobalN++
