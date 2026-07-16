@@ -7322,21 +7322,6 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					}
 				}
 				if c, okc := chooseOK(ptrs); okc {
-					// seed5 e6317+: after higher-indirection choose U2, UP U7 then
-					// Constant pure_rnd: F50=0 hex path (8×next31 depth gap) then
-					// second Constant small multiphase F50 F50 U3 F50 before Lhs F80.
-					// Same residual family as e5862 U7+Constant after PL choose.
-					// formatSimpleConstant uses entropy (digits written / value used).
-					if strings.Count(c.ctype.Name, "*") > wantLvl && er.fallback != nil {
-						_ = er.pick(7) // e6317
-						base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-						_ = formatSimpleConstant(er.fallback, base)
-						_ = formatSimpleConstant(er.fallback, base)
-						_ = er.fallback.flipcoin(50)
-						// UP depth gap 7423→7426 (2× pure_rnd next31) before Lhs F80.
-						// Write 2 hex digits (RandomHexDigits) — entropy used.
-						_ = formatHexConstantDigits(er.fallback, 2, base)
-					}
 					return c, true
 				}
 			}
@@ -118112,15 +118097,6 @@ commaF80MultiDone:
 			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
 		}
 		lhsQferWildcard := needNoRhs || assignRhsWildcardQfer || postNewArrayLhsCreateQfer
-		// seed5 e6324: after post-ArrayOp free Expression PL residual Variable
-		// (higher-indirection), parent Assign Lhs SelectDeref empty create uses
-		// random_add_qualifiers F10 F50 (ConstPointers+VolatilePointers), not
-		// WRITE wildcard F50 F10×levels + self F50 (assignRhsWildcardQfer from
-		// Function/pointer RHS was over-arming).
-		if ctx != nil && ctx.state != nil &&
-			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
-			lhsQferWildcard = false
-		}
 		addVol := false
 		if lhsQferWildcard {
 			// random_qualifiers WRITE no_volatile=true: draws vol F50 even if discarded.
@@ -118335,11 +118311,6 @@ commaF80MultiDone:
 					createdArrayThisLhs = true
 				} else if r.flipcoin(20) {
 					// null init for pointer pointee
-				} else if ctx != nil && ctx.state != nil &&
-					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
-					// seed5 e6331: after post-ArrayOp Lhs SelectDeref create residual
-					// F10 F50 F20×2 F50 F20×2, UP accepts → Statement U100 (no
-					// seed2 e914 address choose_ok_var U5 among pointees).
 				} else {
 					_ = r.upto(5) // choose_ok_var among pointees (seed2 e914 U5)
 				}
@@ -122348,12 +122319,29 @@ func emitStatement(
 				if nCtrl > 1 {
 					_ = r.upto(uint32(nCtrl)) // e6265 SelectLoopCtrlVar
 				}
-				// choose among must-use arrays: aryno may be 1 → no U; else pool
-				if state.loopIVPool > 1 {
-					_ = r.upto(uint32(state.loopIVPool))
-				} else {
-					_ = r.upto(2) // e6266 U2
+				// StatementFor::make_iteration with rw_directive:
+				// find_must_use_arrays (parent must_read/write ∪ frame) then
+				// choose_ok_var — U(n) when n>1; sole when n==1 (no RNG).
+				// Never invent floor upto(2) when pool empty (§5.2).
+				mustUseN := 0
+				seenArr := map[string]bool{}
+				addMust := func(list []mustReadArrayEntry) {
+					for _, e := range list {
+						if e.name == "" || seenArr[e.name] {
+							continue
+						}
+						seenArr[e.name] = true
+						mustUseN++
+					}
 				}
+				addMust(state.mustReadArrays)
+				addMust(state.mustWriteArrays)
+				addMust(frameMustReads)
+				addMust(frameMustWrites)
+				if mustUseN > 1 {
+					_ = r.upto(uint32(mustUseN))
+				}
+				// mustUseN==0: no invent pad; mustUseN==1: sole, no choose RNG
 				// make_random_array_control (StatementFor.cpp:128–161) + SafeOpFlags.
 				// Signed CmpLe/Ge F50; init pure_rnd F50→upto(bound/2); incr pure_rnd F50
 				// then pure_rnd_upto(bound/4) via DefaultRndNumGenerator (depth gap
