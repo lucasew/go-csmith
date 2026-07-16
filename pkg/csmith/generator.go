@@ -122061,13 +122061,20 @@ func emitStatement(
 				} else {
 					_ = r.upto(2) // e6266 U2
 				}
-				// loop_control + SafeOpFlags residual matching UP e6267–81
-				// (not multi-dim itemize U9 U8).
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(50)
-				_ = r.upto(20)
-				_ = r.flipcoin(50)
-				_ = r.flipcoin(0)
+				// make_random_array_control (StatementFor.cpp:128–161) + SafeOpFlags.
+				// Signed CmpLe/Ge F50; init pure_rnd F50→upto(bound/2); incr pure_rnd F50
+				// then pure_rnd_upto(bound/4) via DefaultRndNumGenerator (depth gap
+				// 7358–59 untraced genrand — real pure_rnd API, not invent pad);
+				// array_oob F0; then SafeOpFlags F50 chain + U4.
+				_ = r.flipcoin(50) // test_op signed Le/Ge
+				_ = r.flipcoin(50) // init pure_rnd: 0 vs upto
+				_ = r.upto(20)     // pure_rnd_upto(bound/2) when F50=0
+				_ = r.flipcoin(50) // incr pure_rnd: 1 vs upto
+				// pure_rnd_upto(bound/4) under DefaultRndNumGenerator (untraced depth)
+				_ = r.next31()
+				_ = r.next31()
+				_ = r.flipcoin(0) // array_oob_prob
+				// SafeOpFlags::make_random_binary init + test + extra U4
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
