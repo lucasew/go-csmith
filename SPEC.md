@@ -222,12 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5692** (post residual free Expression PL retype U14); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5730** (post residual Lhs SelectDeref U5+U4); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+
+**seed5 e5692→5730 climbed — PL choose_ok_var U14 (not retype) + Global U23 + live PL multiphase:**
+1. Capture: e5692 UP U14=0 tries=0 (null Filter) vs GO U14 tries=1 (pickSimpleNonVoid SIMPLE_TYPES).
+2. C++: free Expression PL after stack U5 is **choose_ok_var** among 14 live locals (VariableSelector::choose_ok_var — no Filter), not `random_type_from_type` / SIMPLE_TYPES_PROB_FILTER. Later GlobalList pad multiphase U31 (e5608 itemize) then U23 (e5697). Live PL multiphase: U14 choose → sole → *** mode-2 create (F50 F10×3 + F10 + F20 F20 U2 addr) → sole again.
+3. GO: replace residual retype with unfiltered U14; Global pad U31 once then U23; live PL multiphase soles/create/qfer/address. Seeds 2/3/4/6 held.
+4. Next: e5730 UP U4 (Lhs SelectDeref itemize/continue) vs GO U100 (Statement after F80 U5 accept).
 
 **seed5 e5554→5692 climbed — post residual PL empty create multiphase + PP sole + live choose:**
 1. Capture: e5554 UP F50 (PP→PL empty create) vs GO U120 (sole after stack U5).
