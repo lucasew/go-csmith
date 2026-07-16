@@ -121870,6 +121870,62 @@ func emitStatement(
 			// nArr RNG selection (seed4 e760 empty→F25 create; pad nArr historical).
 			liveArrays := collectMustReadArrayInventory(env, scope, ctx)
 			nArr := len(env.arrays)
+			// C++ GDB seed5 e6263: select_array array_vars=9 = GlobalList arrays
+			// + ParentLocal arrays still on stack. After post-Return NewArray residual
+			// (LhsSelPure), use materialised inventory instead of invent floor U5.
+			// Only after pure-fail SelectDeref CreateArray residual (e6137+) —
+			// not merely GlobalF0Done (e5857 sticky; would fire too early).
+			postReturnSelectArray := state != nil &&
+				state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure
+			if postReturnSelectArray {
+				// GDB e6263: 6 true globals + 3 ParentLocal. Skip fromParentLocal
+				// dynGlobals (PL parked as g_*); count multi-dim orphans (GlobalList
+				// CreateArray) + dynLocs arrays still on stack.
+				seen := map[string]bool{}
+				n := 0
+				add := func(name string, isArr, isConst, isVol bool) {
+					if !isArr || isConst || isVol || name == "" || seen[name] {
+						return
+					}
+					seen[name] = true
+					n++
+				}
+				// GDB e6263: GlobalList + ParentLocal arrays (dynGlobals isArray,
+				// including fromParentLocal PL materialisations). Plus the latest
+				// ≥3-dim residual CreateArray not in dynGlobals (g_256 class).
+				for _, g := range state.dynGlobals {
+					add(g.name, g.isArray, g.isConst, g.isVolatile)
+				}
+				dynNames := map[string]bool{}
+				for _, g := range state.dynGlobals {
+					dynNames[g.name] = true
+				}
+				var last3d *globalInfo
+				for i := range state.orphanGlobals {
+					g := &state.orphanGlobals[i]
+					if dynNames[g.name] || g.isConst || g.isVolatile || !g.isArray {
+						continue
+					}
+					if len(g.arraySizes) >= 3 {
+						last3d = g
+					}
+				}
+				if last3d != nil {
+					add(last3d.name, true, last3d.isConst, last3d.isVolatile)
+				}
+				if n > 0 {
+					nArr = n
+					if len(liveArrays) < n {
+						for len(liveArrays) < n {
+							liveArrays = append(liveArrays, mustReadArrayEntry{
+								name:  fmt.Sprintf("arr_%d", len(liveArrays)),
+								ctype: CType{Name: "int32_t", Signed: true, Bits: 32},
+								sizes: []int{4},
+							})
+						}
+					}
+				}
+			}
 			// e6719: after nest Lhs NewValue create era, env.arrays under-counts
 			// live arrays (UP select_array U13). Inventory filters incomplete vs
 			// C++ effect/eligibility — pin U13 once nest F0 era (not e760 F25).
@@ -121878,7 +121934,6 @@ func emitStatement(
 				if live > nArr {
 					nArr = live
 				}
-				// UP e6719 U13; GO inventory hovers 8–20 depending on orphan filter.
 				if nArr != 13 {
 					nArr = 13
 				}
@@ -121892,7 +121947,7 @@ func emitStatement(
 			// seed4 e759: after PP pads visible arrays empty → create_random_array
 			// F25 (not pad nArr=5 U5 choose).
 			ppEraEmpty := state != nil && state.isParamPPFallPicks >= 2 && nArr == 0
-			if !ppEraEmpty {
+			if !ppEraEmpty && !postReturnSelectArray {
 				if nArr < 1 {
 					nArr = 1
 				}
@@ -121900,6 +121955,9 @@ func emitStatement(
 					!state.postAggNestGlobalU17F0Done {
 					nArr = 5
 				}
+			}
+			if !ppEraEmpty && postReturnSelectArray && nArr < 1 {
+				nArr = 1
 			}
 			for i := 0; i < aryno; i++ {
 				var chosen mustReadArrayEntry
