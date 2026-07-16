@@ -7276,6 +7276,7 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		// (is_dereferenced_from) via choose_ok_var(ptrs) first.
 		// seed5 e6316: ParentLocal want int32_t* — exact pool U5 but higher
 		// indirection (** / ****) is U2; GO exact-only drew U5.
+		// choose_ok_var then itemizes collective arrays (VariableSelector.cpp:348–355).
 		if selectVarLocalScope && !forAssign &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
 			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
@@ -7300,6 +7301,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 					ok = append(ok, c)
 				}
 			}
+			chooseOK := func(pool []exprVarCandidate) (exprVarCandidate, bool) {
+				if len(pool) == 0 {
+					return exprVarCandidate{}, false
+				}
+				c := pool[0]
+				if len(pool) > 1 {
+					c = pool[int(er.pick(uint32(len(pool))))%len(pool)]
+				}
+				if c.isArray {
+					itemizeArrayCandidate(er, c)
+				}
+				return c, true
+			}
 			if len(ok) > 1 {
 				ptrs := make([]exprVarCandidate, 0, len(ok))
 				for _, c := range ok {
@@ -7307,20 +7321,12 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 						ptrs = append(ptrs, c)
 					}
 				}
-				if len(ptrs) > 0 {
-					if len(ptrs) == 1 {
-						return ptrs[0], true
-					}
-					idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
-					return ptrs[idx], true
+				if c, okc := chooseOK(ptrs); okc {
+					return c, true
 				}
 			}
-			if len(ok) == 1 {
-				return ok[0], true
-			}
-			if len(ok) > 1 {
-				idx := int(er.pick(uint32(len(ok)))) % len(ok)
-				return ok[idx], true
+			if c, okc := chooseOK(ok); okc {
+				return c, true
 			}
 			return exprVarCandidate{}, false
 		}
