@@ -230,7 +230,9 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 ### 8.2 Closed after SPEC §5.1.1 / §5.2 hardening (post-`cf7198d` / `eaad659`, 2026-07-16)
 
-These were locked in continued grilling / agent execution after the integrity language landed in SPEC. They **do not reopen** earlier items; they close process gaps that showed up while climbing seed5.
+**Anchor:** last pre-closure SPEC integrity edits were `cf7198d` (looks-like entropy discard fail-closed in §5.2) and `eaad659` (residual climb vehicle banned; living integrity line). Everything below was locked in **continued grilling while climbing seed5** after those commits. They **do not reopen** §8.1 or product goals; they close process gaps that showed up in agent execution.
+
+#### What grilling closed (durable)
 
 | # | Decision | Status |
 |---|----------|--------|
@@ -242,9 +244,21 @@ These were locked in continued grilling / agent execution after the integrity la
 | 17 | **Multi-seed hold is mandatory after every patch** — At least seeds **2, 4, 6** (and 3 when cheap) must keep full event match when climbing seed5. A seed5 climb that breaks 2/4 is **invalid** even if first_div rises. | **CLOSED** |
 | 18 | **`pure_rnd` / DefaultRndNumGenerator untraced `next31` is not invent pad** when it mirrors C++ `pure_rnd_upto` / hex digit generation at the same API site (value is used by upstream). Still reject free-standing next31 packs with no C++ cite. | **CLOSED** |
 | 19 | **Done = COUNT=20 SEED_START=2 parity-gate exit 0** — Keep grinding until that gate; no “good enough first_div” stop. Source match and residual-debt strip remain open work after events. | **CLOSED** (goal; work ongoing) |
-| 20 | **Scheduled continue loops are process only** — Recurring agent “continue” jobs do not change integrity rules; each fire is still subject to §5.1–5.2. | **CLOSED** |
+| 20 | **Scheduled continue loops are process only** — Recurring agent “continue” / “commit and continue” jobs do not change integrity rules; each fire is still subject to §5.1–5.2. | **CLOSED** |
+| 21 | **Invent packs are stripped on sight** — If a patch lands blank invent choose / multiphase `U2 U7 F50…` (or similar) to force stream match, **revert/strip** it even when `first_div` rose. Do not leave it as temporary debt. | **CLOSED** (reaffirmation of 12–13; applied after e6316 invent attempt) |
+| 22 | **Empty create vs live choose is an inventory bug** — Class: UP `choose_ok_var Un` vs GO empty `create` F50 (e.g. seed5 e6316). Fix is **materialise** the C++-visible pool so choose is live, **or** true empty → full `GenerateNewParentLocal` / create path with **used** draws. Not invent-`Un` floors. | **CLOSED** (diagnosis rule; fix work open) |
+| 23 | **`select_array` / loop-ctrl pool size = materialised lists** — GDB on C++ `select_array` is authoritative (GlobalList + ParentLocal arrays after effect filters). Invent `nArr++` / floors that break seeds 2/4 are invalid even if seed5 climbs. Same rule for `SelectLoopCtrl` / `Function::stack` sizes (`parentStackPick` must reflect real stack depth). | **CLOSED** (e6263–e6286 class) |
+| 24 | **1:1 means events then source under structural path** — “Matched through eN” is progress only. Full drop-in requires event match **and** bit-identical program body for the gate seeds, via C++-like control flow — not residual exhaust + thin AST. | **CLOSED** (reaffirmation of §3 + §5.1) |
 
-**Explicitly still open (not closed by grill):** seed5 full event stream; seeds 7–21; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt; full flag parity (§4 phase C).
+#### Explicit rejections locked in the same sessions (do not reopen)
+
+- Residual multiphase as primary climb strategy (§5.1.1) — still banned.
+- `silenceTrace` / seed-literal branches / event-only “done” — still banned.
+- “Why discarding entropy?” answer locked: **we do not**, except same-hunk C++ discard cite; looks-like is enough to reject.
+- Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
+- Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
+
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~6316); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
