@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5730** (post residual Lhs SelectDeref U5+U4); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5843** (Global choose U13 vs U14 after post-Return free Expression); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5809→5843 climbed — SelectGlobal empty simple retype U14 + OuterLhsSole:**
+1. Capture: e5809 UP U14=11 tries=1 (random_type_from_type) vs GO F20 (sticky e5397 multiphase F20 F20 without retype).
+2. C++: free ExpressionAssign Lhs F80=0→VS Global U100=13 empty → SelectGlobal `Type::random_type_from_type` choose_random_simple U14 + GenerateNewGlobal WRITE create_and_initialize (NewArray F20 + Constant pure_rnd F50 F50 U3) → visit fail → SelectDeref F80 F0 + empty create F20 F20 accept → next free Expression U120. Sticky e5397 residual re-fired F20 F20 multiphase (pointer-era pack) after PostEAGlobalU21 already set.
+3. GO: one-shot e5397 multiphase under `!PostEAGlobalU21`; later simple Global empty retypes U14 + Constant create residual; arm OuterLhsSole so nested outer ExpressionAssign Lhs soles (UP free Expression U120, not outer SelectDeref F80). Seeds 2/3/4/6 held.
+4. Next: e5843 UP U13 (Global choose_ok_var) vs GO U14 (same raw; inventory +1).
 
 **seed5 e5692→5730 climbed — PL choose_ok_var U14 (not retype) + Global U23 + live PL multiphase:**
 1. Capture: e5692 UP U14=0 tries=0 (null Filter) vs GO U14 tries=1 (pickSimpleNonVoid SIMPLE_TYPES).

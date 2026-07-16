@@ -2855,11 +2855,29 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				// F20 F20 (NewArray+init) then visit fail → continue SelectDeref
 				// F80 F10 F50 F20 F20 CreateArray… (not sticky first-Global
 				// sole-continue without create → parent ends early).
+				// seed5 e5808+: after PostEAGlobalU21, simple SelectGlobal empty
+				// is random_type_from_type U14 + NewArray/Constant (not F20 F20).
 				if flow != nil && flow.freeMultiIVNeedNoRhsEra &&
 					flow.freeMultiIVNeedNoRhsIfLhsSelDone &&
 					!flow.freeMultiIVNeedNoRhsIfBody && globalFails == 0 {
-					_ = er.fallback.flipcoin(20) // NewArray
-					_ = er.fallback.flipcoin(20) // make_init
+					isPtr := strings.Contains(t.Name, "*")
+					isAgg := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+					if flow.freeMultiIVNeedNoRhsPostEAGlobalU21 && !isPtr && !isAgg {
+						es := true
+						prevES := useESimpleRetypeSink
+						useESimpleRetypeSink = &es
+						createT := pickSimpleNonVoid(er.fallback, opts) // U14
+						useESimpleRetypeSink = prevES
+						newArr := er.fallback.flipcoin(20)
+						if newArr {
+							_ = burnCreateArrayVariable(er.fallback, opts, createT, true)
+						} else {
+							_ = formatSimpleConstant(er.fallback, createT)
+						}
+					} else {
+						_ = er.fallback.flipcoin(20) // NewArray
+						_ = er.fallback.flipcoin(20) // make_init
+					}
 					globalFails++
 					continue
 				}
@@ -16615,6 +16633,13 @@ exprTries:
 			// (not emitLValueAssignment F80 U5). GenerateNewGlobal always
 			// pushes GlobalList (even NewArray=0) — materialize dynGlobals so
 			// later free Expression eFlexible choose sees U21 not sticky U17.
+			//
+			// seed5 e5808–19: later free ExpressionAssign Lhs under the same era
+			// (PostEAGlobalU21 already set) is simple-typed SelectGlobal empty →
+			// Type::random_type_from_type U14 + GenerateNewGlobal WRITE
+			// create_and_initialize (NewArray F20 + Constant pure_rnd F50…) then
+			// visit fail → SelectDeref F80 F0 + empty create F20 F20 accept.
+			// Sticky e5397 multiphase pack re-fires F20 F20 (no U14) and desyncs.
 			if scopePick == 0 && ctx.state.freeMultiIVNeedNoRhsEra &&
 				ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone &&
 				!ctx.state.freeMultiIVNeedNoRhsIfBody && er != nil && er.fallback != nil {
@@ -16628,6 +16653,59 @@ exprTries:
 					ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
 					writeLine(&ctx.state.lateGlobals, 0,
 						fmt.Sprintf("static %s %s = 0;", ty.Name, name))
+				}
+				if ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+					// e5808+: SelectGlobal empty (VariableSelector.cpp:664–666):
+					// random_type_from_type(simple) → choose_random_simple U14
+					// then GenerateNewGlobal. WRITE non-SE-free: no self-vol F50;
+					// create_and_initialize NewArray F20 + Constant pure_rnd.
+					isPtr := strings.Contains(t.Name, "*")
+					isAgg := strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union")
+					if !isPtr && !isAgg {
+						es := true
+						prevES := useESimpleRetypeSink
+						useESimpleRetypeSink = &es
+						createT := pickSimpleNonVoid(er.fallback, opts) // e5809 U14
+						useESimpleRetypeSink = prevES
+						newArr := er.fallback.flipcoin(20) // e5810 NewArray
+						if newArr {
+							_arr := burnCreateArrayVariable(er.fallback, opts, createT, true)
+							emitOrphanArrayGlobal(ctx, createT, _arr)
+						} else {
+							// e5811–13: Constant pure_rnd F50 F50 U3
+							_ = formatSimpleConstant(er.fallback, createT)
+						}
+						// Materialize with retyped width so later choose sees growth.
+						name := ctx.state.allocGlobalName()
+						g := globalInfo{name: name, ctype: createT}
+						ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+						writeLine(&ctx.state.lateGlobals, 0,
+							fmt.Sprintf("static %s %s = 0;", createT.Name, name))
+					} else {
+						_ = er.fallback.flipcoin(20) // NewArray
+						_ = er.fallback.flipcoin(20) // make_init
+						materializeResidualGlobal()
+					}
+					// visit_facts / no_signed_overflow reject → Lhs do-while
+					// SelectDeref: F80 sole/null F0 fail then empty create F20 F20
+					// accept (era path skips random_add F10 F50; matches e5804–05).
+					if er.fallback.flipcoin(80) { // e5814
+						_ = er.fallback.flipcoin(0) // e5815 F0
+						if er.fallback.flipcoin(80) { // e5816
+							_ = er.fallback.flipcoin(20) // e5817 NewArray
+							_ = er.fallback.flipcoin(20) // e5818 init
+						}
+					}
+					// Nested under free Expression stream: this residual may be
+					// the Lhs of an ExpressionAssign that is itself the RHS of
+					// an outer ExpressionAssign. After return, outer Lhs would
+					// re-enter SelectDeref F80 (GO stack one frame shallower)
+					// while UP next free Expression is U120 Function. Sole outer
+					// Lhs silently (no F50) so free Expression continues U120.
+					ctx.state.ppPostPadOuterLhsSole = true
+					ctx.state.postAggOuterLhsSoleBurnF50 = false
+					ctx.state.ppPostPadSkipStmtLhs = false
+					return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 				}
 				_ = er.fallback.flipcoin(20) // e5398 NewArray Global create
 				_ = er.fallback.flipcoin(20) // e5399 make_init
@@ -18494,11 +18572,28 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// freeMultiIVForBodyU3 multiphase above may already be off; fallthrough
 	// sole-accepts inventory and ends ExpressionAssign early (next Statement
 	// Lhs F80). Force empty Global create residual then miss.
+	// seed5 e5808+: after PostEAGlobalU21, simple type retypes U14 first.
 	if scopePick == 0 && flow != nil && flow.freeMultiIVNeedNoRhsEra &&
 		flow.freeMultiIVNeedNoRhsIfLhsSelDone && !flow.freeMultiIVNeedNoRhsIfBody &&
 		er != nil && er.fallback != nil {
-		_ = er.fallback.flipcoin(20) // NewArray
-		_ = er.fallback.flipcoin(20) // make_init
+		isPtr := strings.Contains(target.Name, "*")
+		isAgg := strings.HasPrefix(target.Name, "struct") || strings.HasPrefix(target.Name, "union")
+		if flow.freeMultiIVNeedNoRhsPostEAGlobalU21 && !isPtr && !isAgg {
+			es := true
+			prevES := useESimpleRetypeSink
+			useESimpleRetypeSink = &es
+			createT := pickSimpleNonVoid(er.fallback, opts) // U14
+			useESimpleRetypeSink = prevES
+			newArr := er.fallback.flipcoin(20)
+			if newArr {
+				_ = burnCreateArrayVariable(er.fallback, opts, createT, true)
+			} else {
+				_ = formatSimpleConstant(er.fallback, createT)
+			}
+		} else {
+			_ = er.fallback.flipcoin(20) // NewArray
+			_ = er.fallback.flipcoin(20) // make_init
+		}
 		if flow != nil {
 			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
 		}
