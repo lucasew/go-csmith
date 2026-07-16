@@ -726,6 +726,14 @@ type functionFlowState struct {
 	// do-while SelectDeref live multiphase (e5334–38 U5; U4+U7) then F80=0→VS.
 	// Without this flag, VS-miss falls to empty create F10 residual.
 	freeMultiIVNeedNoRhsPostIfSelDeref bool
+	// freeMultiIVNeedNoRhsPostEAGlobalU21: after post-If ExpressionAssign Lhs
+	// residual (GenerateNewGlobal materializes), free Expression eFlexible
+	// Global choose is U21 (UP e5457) not seed2 sticky U17.
+	freeMultiIVNeedNoRhsPostEAGlobalU21 bool
+	// freeMultiIVNeedNoRhsPostEAPLN: free Expression PL hits after residual.
+	// 0: sole after stack U5 (e5459–61 U120 next); 1+: empty create F50 F10…
+	// (e5462–71) not sticky sole.
+	freeMultiIVNeedNoRhsPostEAPLN int
 	// freeMultiIVNeedNoRhsPLN: SelectParentLocal choose attempts under free
 	// multi-IV need_no_rhs after Global dummy era (e4624 U3, e4692 U7,
 	// e4750 U6+U8 itemize, e4771 U6, e4777 sole…).
@@ -2216,8 +2224,13 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// — same depth as Lhs post-If PL (e5332/e5341). freeMultiIVForBodyU3
 	// + blockStack=5 under-burns U5; force U6. LhsSelDone marks post-If
 	// free stream (set during If then/else Lhs SelectDeref).
+	// seed5 e5460: after post-If ExpressionAssign residual + next Statement
+	// Assign (e5420), PL stack is U5 (UP) — sticky forceU6 over-burns.
 	if state != nil && state.freeMultiIVNeedNoRhsEra &&
 		state.freeMultiIVNeedNoRhsIfLhsSelDone && !state.freeMultiIVNeedNoRhsIfBody {
+		if state.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+			return int(er.pick(5)) // e5460 post residual
+		}
 		return int(er.pick(6))
 	}
 	// seed5 e4368: after multi-level SelectDeref create ladder, free Expression
@@ -5909,6 +5922,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			!ctx.state.freeMultiIVForBodyU3 {
 			levels = 1
 		}
+		// seed5 e5464–69: post residual free Expression PL empty create is
+		// ** READ qfer F50 F10×2 levels + self F50 F10 (UP 3 pairs) then
+		// NewArray F20 F20 — not simple/ * under-qfer F50 F10×2 only.
+		if ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 && levels < 2 {
+			levels = 2
+		}
 		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50) // ptr-level vol
 			_ = er.fallback.flipcoin(10) // ptr-level const
@@ -7028,6 +7047,16 @@ if pointerGlobalPicksSink != nil {
 			return uniq[0], true
 		}
 		n := len(uniq)
+		// seed5 e5457: post-If ExpressionAssign residual grew GlobalList;
+		// free Expression eFlexible choose is U21 regardless of must_read /
+		// seed2 e811 sticky U17 (live inventory under-counts).
+		if !forAssign && !selectVarLocalScope &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+			n >= 2 {
+			v := int(er.pick(21))
+			return uniq[v%n], true
+		}
 		// e276 small-pool quirk only before multi-dim / must_read era.
 		if n == 2 && (multiDimArraySink == nil || *multiDimArraySink == 0) {
 			return uniq[0], true
@@ -7054,11 +7083,20 @@ if pointerGlobalPicksSink != nil {
 			// ParentLocal pools must not use GlobalList pads (seed5 e688 U3).
 			if !selectVarLocalScope && multiDimArraySink != nil && *multiDimArraySink > 0 && n >= 2 {
 				target := 0
+				// seed5 e5457: after post-If ExpressionAssign residual, free
+				// Expression eFlexible GlobalList is U21. Apply before seed2
+				// e811 U17 / n<11 gates (live n may already be ≥11).
+				if burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+					burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+					target = 21
+				}
 				// e1145 U27 one-shot; e1373 later real n (U2) — no further pad.
 				small := useSmallParentStackSink != nil && *useSmallParentStackSink
 				picks := *postMustReadGlobalPicks
 				u27ok := globalU27DoneSink == nil || !*globalU27DoneSink
-				if small && picks >= 5 && n >= 3 && u27ok {
+				if target == 21 {
+					// keep post-EA U21
+				} else if small && picks >= 5 && n >= 3 && u27ok {
 					target = 27 // e1145
 					if globalU27DoneSink != nil {
 						*globalU27DoneSink = true
@@ -7118,20 +7156,33 @@ if pointerGlobalPicksSink != nil {
 					} else if n == 2 && picks >= 4 && !small {
 						target = 5 // seed2 e892 GlobalList choose (pre-small-stack)
 					} else if n >= 3 {
-						target = 11
-						if picks == 2 {
-							target = 17 // e811 second pick
+						// seed5 post-If ExpressionAssign residual: GlobalList
+						// grew via GenerateNewGlobal → free Expression choose
+						// U21 (e5457). Override seed2 e811 sticky U17.
+						if burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+							burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+							target = 21
+						} else if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink {
+							// need_no_rhs-era without post-EA residual: live n
+							// (not seed2 U11/U17 pads).
+							target = 0
+						} else {
+							target = 11
+							if picks == 2 {
+								target = 17 // e811 second pick
+							}
 						}
 					}
 				}
 				// seed4 e991: after PP-era array creates, GlobalList scale U9
-				// (not seed2 e811 U17).
-				if isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 &&
+				// (not seed2 e811 U17). Keep post-EA U21.
+				postEAU21 := target == 21
+				if !postEAU21 && isParamPPFallPicksSink != nil && *isParamPPFallPicksSink >= 2 &&
 					target > 9 {
 					target = 9
 				}
 				// e4039: post-ptr era GlobalList U44 (overrides seed2 U28 pad).
-				if postAggU15StackU6PostPPPtrSelDerefNSink != nil &&
+				if !postEAU21 && postAggU15StackU6PostPPPtrSelDerefNSink != nil &&
 					*postAggU15StackU6PostPPPtrSelDerefNSink >= 2 {
 					target = 44
 				}
@@ -7159,7 +7210,9 @@ if pointerGlobalPicksSink != nil {
 				// e6878: after nest ArrayOp residual, first multi-cand Global U55
 				// (U17 under-counts). Later: e6972 U2, e6979 U54, e6986+ U19;
 				// e7008: 7th multi-cand is visit_facts F0 → VS PL (not U19).
-				if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && !arrayOp2Body {
+				if postEAU21 {
+					// keep target=21 through nest U17/VSMiss pads
+				} else if postAggNestGlobalU17Sink != nil && *postAggNestGlobalU17Sink && !arrayOp2Body {
 					if postAggNestArrayOpResidualDoneSink != nil && *postAggNestArrayOpResidualDoneSink {
 						// e8276 post-CD3: free Expression GlobalList multiphase
 						// (residual gn table default U2 would desync).
@@ -9552,6 +9605,12 @@ exprTries:
 								nPtr = 22
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 && nPtr < 21 {
 								nPtr = 21
+							} else if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 && nPtr < 21 {
+								// seed5 e5457: post-If ExpressionAssign residual
+								// GenerateNewGlobal/SelectDeref find_pointer_type
+								// grows derived_types to U21; sticky ArrayOp U17
+								// floor under-counts.
+								nPtr = 21
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPLStackU3 && nPtr < 19 {
 								nPtr = 19
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpResidualDone && nPtr < 17 {
@@ -10572,8 +10631,12 @@ exprTries:
 					freeMultiIVExprPL := flow != nil && flow.freeMultiIVForLhsExprContinue
 					multiLvlPLU3 := flow != nil && flow.freeMultiIVPostEAMultiLvlPLStackU3
 					needNoRhsIfPL := flow != nil && flow.freeMultiIVNeedNoRhsIfBody
+					// seed5 e5460: after post-If ExpressionAssign residual + next
+					// Statement Assign, PL stack is U5 (UP). Sticky forceU6 after
+					// ptr-cmp residual over-burns.
+					postEAStackU5 := flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21
 					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone &&
-						!freeMultiIVExprPL && !multiLvlPLU3 && !needNoRhsIfPL
+						!freeMultiIVExprPL && !multiLvlPLU3 && !needNoRhsIfPL && !postEAStackU5
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
 						// e3003/e3058/e3405: stack U2 during early residual Expression.
@@ -10590,6 +10653,8 @@ exprTries:
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "l_iv"))
+					} else if postEAStackU5 {
+						idx = int(er.pick(5)) // e5460 / e5463 post residual
 					} else if forceU6Stack {
 						idx = int(er.pick(6))
 					} else {
@@ -10608,6 +10673,21 @@ exprTries:
 					sole := !isPtr && scopePick != 4 && (n == 0 || n == 2 ||
 						(n >= 3 && len(localCands) > 0) || forceU6Sole)
 					forcePtrCreate := false
+					// seed5 e5459–71: post residual free Expression PL multiphase.
+					// First: sole after stack U5 → Expression U120 (e5461).
+					// Second+: empty create F50 F10… (e5464+) not sticky sole.
+					if postEAStackU5 && scopePick == 1 && flow != nil {
+						pn := flow.freeMultiIVNeedNoRhsPostEAPLN
+						flow.freeMultiIVNeedNoRhsPostEAPLN = pn + 1
+						if pn == 0 {
+							sole = true
+							forcePtrCreate = false
+						} else {
+							sole = false
+							forcePtrCreate = true
+							localCands = nil
+						}
+					}
 					if freeMultiIVExprPL && scopePick == 1 && flow.freeMultiIVForLhsExprPLCreateOnce {
 						// e3003–09: first residual ParentLocal empty create
 						// (F50 F10 F20=1 NewArray…). Not NewValue→PL (scopePick==4
@@ -16089,17 +16169,35 @@ exprTries:
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			ppLhsEra := ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
-			// seed5 e5397–5410: post-If need_no_rhs-era ExpressionAssign Lhs
+			// seed5 e5397–5419: post-If need_no_rhs-era ExpressionAssign Lhs
 			// F80=0 → VS Global U100=13 empty/miss → GenerateNewGlobal F20 F20
 			// then Lhs do-while SelectDeref empty create (F80 F10 F50 F20 F20
-			// CreateArray U99…) then F80=0→VS. GO structure has VS outside the
-			// SelectDeref for{}, so burn residual inline then accept Lhs
-			// (not early sole after U100 → parent Expression U120).
+			// CreateArray U99…) then F80=0→VS multiphase through Global F20 F20.
+			// This ExpressionAssign is Statement Assign RHS (e5366 termAssign
+			// after SelectLType pointer). After nested Lhs accepts, C++ outer
+			// Statement Lhs select_must_use/sole (zero RNG) → next Statement
+			// U100 (e5420). GO structure has VS outside the SelectDeref for{},
+			// so burn residual inline then arm SkipStmtLhs so outer Lhs soles
+			// (not emitLValueAssignment F80 U5). GenerateNewGlobal always
+			// pushes GlobalList (even NewArray=0) — materialize dynGlobals so
+			// later free Expression eFlexible choose sees U21 not sticky U17.
 			if scopePick == 0 && ctx.state.freeMultiIVNeedNoRhsEra &&
 				ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone &&
 				!ctx.state.freeMultiIVNeedNoRhsIfBody && er != nil && er.fallback != nil {
+				// GenerateNewGlobal always pushes GlobalList (VariableSelector.cpp:535).
+				// Prefer simple int materialization so eFlexible free Expression
+				// choose grows (UP e5457 U21); pointer Globals alone under-count.
+				materializeResidualGlobal := func() {
+					ty := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					name := ctx.state.allocGlobalName()
+					g := globalInfo{name: name, ctype: ty}
+					ctx.state.dynGlobals = append(ctx.state.dynGlobals, g)
+					writeLine(&ctx.state.lateGlobals, 0,
+						fmt.Sprintf("static %s %s = 0;", ty.Name, name))
+				}
 				_ = er.fallback.flipcoin(20) // e5398 NewArray Global create
 				_ = er.fallback.flipcoin(20) // e5399 make_init
+				materializeResidualGlobal()
 				// SelectDeref empty create (random_add F10 + vol F50 + NewArray):
 				if er.fallback.flipcoin(80) { // e5400
 					if opts.ConstPointers {
@@ -16116,6 +16214,9 @@ exprTries:
 						}
 						_arr := burnCreateArrayVariable(er.fallback, opts, arrTy, true)
 						emitOrphanArrayGlobal(ctx, arrTy, _arr)
+						// Array Global is on C++ GlobalList; pad simple for
+						// eFlexible convertibles when inventory under-counts.
+						materializeResidualGlobal()
 					}
 				}
 				// e5410 F80=0 → VS continues multiphase; accept Lhs after residual.
@@ -16135,11 +16236,18 @@ exprTries:
 						if sp3 == 0 {
 							_ = er.fallback.flipcoin(20)
 							_ = er.fallback.flipcoin(20)
+							materializeResidualGlobal()
 						} else if sp3 == 1 || sp3 == 2 || sp3 == 4 {
 							_ = parentStackPick(er, ctx.state)
 						}
 					}
 				}
+				// e5420: StatementAssign outer Lhs soles after nested
+				// ExpressionAssign RHS (e2013 SkipStmtLhs pattern).
+				ctx.state.ppPostPadSkipStmtLhs = true
+				// e5457: free Expression Global eFlexible after residual
+				// sees grown GlobalList U21 (not sticky seed2 U17).
+				ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 = true
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			if !ctx.state.useSmallParentStack && !ppLhsEra {

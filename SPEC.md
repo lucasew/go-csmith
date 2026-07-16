@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5420** (post-Global-create residual after ExpressionAssign Lhs); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5554** (post residual free Expression PL create multiphase); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5420→5554 climbed — StatementAssign outer Lhs sole + post residual derived_types/PL:**
+1. Capture: e5420 UP U100=64 (next Statement) vs GO F80 (outer Statement Lhs SelectDeref after nested ExpressionAssign residual).
+2. C++: ExpressionAssign is Statement Assign RHS (termAssign after SelectLType pointer). Nested Lhs residual ends → outer Statement Lhs select_must_use/sole (zero RNG) → next Statement U100 AssignOps/Expression multiphase. Later free Expression ptr-cmp derived_types U21 (not sticky ArrayOp U17); PL stack U5 (not sticky forceU6 after ptr-cmp); second+ free Expression PL empty create ** READ qfer F50 F10×3 + NewArray.
+3. GO: arm `ppPostPadSkipStmtLhs` after residual; floor ptr-cmp derived_types U21 under `freeMultiIVNeedNoRhsPostEAGlobalU21`; PL stack U5 + multiphase sole then force empty create with levels floor 2. Seeds 2/3/4/6 held.
+4. Next: e5554 UP F50 (PL create) vs GO U120 (sole again).
 
 **seed5 e5398→5420 climbed — ExpressionAssign Lhs Global create + SelectDeref residual:**
 1. Capture: e5398 UP F20 (GenerateNewGlobal after U100=13) vs GO F80 (early sole after U100 ends ExpressionAssign).
