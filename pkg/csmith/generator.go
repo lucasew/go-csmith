@@ -873,6 +873,22 @@ type functionFlowState struct {
 	// residual Assign completes, next free Assign skips AssignOps U120 and
 	// SelectLType — Lhs VS U100… (UP e6686 U100=1 after Statement U100=61).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs bool
+	// freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce: one-shot after post-ArrayOp
+	// Assign residual Lhs — next StatementFilter uses IN_LOOP (e7209 tries=1
+	// rejects Continue then accepts Break; sticky !IN_LOOP rejects Break too).
+	freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce bool
+	// freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce: with InLoopOnce,
+	// still reject Continue once (UP e7209 first draw 36) so Break 43 is the
+	// accept — bare IN_LOOP would accept Continue at tries=0.
+	freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce bool
+	// freeMultiIVNeedNoRhsPostArrayOpNeedStmtN: after residual Assign Lhs, drain
+	// this many extra free Statements (e7209 Break then e7210+ ArrayOp/Assign…).
+	// NeedStmt bool only drains one; UP continues U100 in the same block.
+	freeMultiIVNeedNoRhsPostArrayOpNeedStmtN int
+	// freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4: one-shot ArrayOp after that
+	// Break — UP e7210–12 is U100=56 then U1 U4 (stack/choose residual), not
+	// F5 array_loop / U4 aryno. Mirrors lateArrayOp-style short residual.
+	freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -21329,7 +21345,35 @@ lhsDerefLoop:
 		postArrayOpLhsDone:
 			lv = lvalueInfo{expr: "x", ctype: targetType}
 			lhsFromDeref = true
+			// Residual Lhs was armed with needNoRhs=true (skip RHS Expression
+			// before Lhs). Keep false here so end-of-assign SafeOpFlags F50+U4
+			// do not fire — invent residual Lhs for a free Assign, not true
+			// ++/--. After residual, UP next is StatementProbability U100
+			// (e7209 tries=1) in the same block — absorb parent Expression
+			// (SkipParentExprN) and arm NeedStmt so emitStatements drains
+			// another free Statement instead of ending with BlockSize U4.
 			needNoRhs = false
+			if ctx != nil && ctx.state != nil {
+				ctx.state.freeMultiIVForLhsExprContinue = false
+				ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+				ctx.state.postAggLhsExprContinue = false
+				ctx.state.postAggNullValidateExprContinue = false
+				// e7209 UP StatementFilter tries=1: first draw Continue 36
+				// rejected, Break 43 accepted (IN_LOOP). Clear sticky
+				// StmtNoLoop; force next Statement pick as in-loop so Break
+				// is legal after Continue reject.
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = false
+				ctx.state.freeMultiIVPostEAMultiLvlStmtNoLoop = false
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce = true
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce = true
+				// e7209 Break + e7210+ more free Statements in same block.
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 = true
+				if ctx.state.ppPostPadSkipParentExprN < 64 {
+					ctx.state.ppPostPadSkipParentExprN = 64
+				}
+			}
+			nullValidatePostResidualAddrCreateVSNeedStmt = true
 			break
 		}
 		// seed5 e6284–92: after post-Return ArrayOp control residual, Statement
@@ -122399,6 +122443,15 @@ func emitStatement(
 				if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop {
 					effInLoop = false
 				}
+				if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce {
+					effInLoop = true
+				}
+				// e7209: IN_LOOP + one-shot Continue reject so Break accepts
+				// (first draw Continue 36 rejected, Break 43 accepted tries=1).
+				if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce &&
+					k == stmtContinue {
+					return true
+				}
 				if (k == stmtBreak || k == stmtContinue) && !effInLoop {
 					return true
 				}
@@ -122457,6 +122510,12 @@ func emitStatement(
 			}
 			if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop {
 				state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayStmtNoLoop = false
+			}
+			if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce {
+				state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce = false
+			}
+			if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce {
+				state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce = false
 			}
 			return toKind(v)
 		}
@@ -123026,6 +123085,32 @@ func emitStatement(
 		// StatementArrayOp::make_random
 		if !opts.Arrays {
 			return false
+		}
+		// seed5 e7210–12: after post-ArrayOp Assign residual Break, next
+		// ArrayOp is U1 U4 residual (not F5/aryno) then body continues VS.
+		if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 {
+			state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 = false
+			_ = r.upto(1) // e7211
+			_ = r.upto(4) // e7212
+			if state != nil {
+				state.skipNextBlockSize = true
+			}
+			writeLine(b, 1, "/* array loop postArrayOp */ {")
+			if state != nil {
+				state.blockStack++
+				state.arrayLoopDepth++
+			}
+			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
+			if state != nil {
+				if state.blockStack > 0 {
+					popFunctionStackFrame(state, ctx)
+				}
+				if state.arrayLoopDepth > 0 {
+					state.arrayLoopDepth--
+				}
+			}
+			writeLine(b, 1, "}")
+			return true
 		}
 		// seed2 e1127: late ArrayOp in afterContFor body: U3 U2 then continue
 		// (skip F5 init-vs-loop and U4 aryno).
@@ -123960,8 +124045,14 @@ func emitStatements(
 		// Lhs, UP continues free Statement(s) in this nested body (U100).
 		// Drain NeedStmt in a loop: a forced emitOne may itself re-arm
 		// NeedStmt (e2931 need_no_rhs → e2942 next Assign).
-		for nullValidatePostResidualAddrCreateVSNeedStmt {
+		// e7209+: post-ArrayOp residual Assign may request N extra Statements
+		// (Break then ArrayOp/Assign…) via freeMultiIVNeedNoRhsPostArrayOpNeedStmtN.
+		for nullValidatePostResidualAddrCreateVSNeedStmt ||
+			(state != nil && state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN > 0) {
 			nullValidatePostResidualAddrCreateVSNeedStmt = false
+			if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN > 0 {
+				state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN--
+			}
 			if !emitOne() {
 				break
 			}
@@ -123972,8 +124063,12 @@ func emitStatements(
 		}
 	}
 	// After stmtCount exhausted, still drain NeedStmt (nested body under-count).
-	for nullValidatePostResidualAddrCreateVSNeedStmt {
+	for nullValidatePostResidualAddrCreateVSNeedStmt ||
+		(state != nil && state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN > 0) {
 		nullValidatePostResidualAddrCreateVSNeedStmt = false
+		if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN > 0 {
+			state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN--
+		}
 		if !emitOne() {
 			break
 		}
