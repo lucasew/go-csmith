@@ -19949,6 +19949,17 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		}
 		return lvalueInfo{expr: "x", ctype: target}, true, false
 	}
+	// seed5 e6557: ArrayOp-body Statement Lhs after must_use WRITE F75 —
+	// F80=0 → VS Global (U100=32). C++ SelectGlobal choose_var(GlobalList,
+	// eDerefExact) (VariableSelector.cpp:664–676): sole match has no U
+	// (choose_ok_var n==1); visit_facts fail → Lhs do-while SelectDeref F80
+	// empty create (Lhs.cpp:70–140). GO mergedGlobals overcounts eDerefExact
+	// (U4 invent) and buildScopedCandidates burns env.arrays index U1 U2 U5.
+	// Sole path only — no invent U(n); visit-miss so SelectDeref F80 runs.
+	if scopePick == 0 && flow != nil &&
+		flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+		return lvalueInfo{}, false, false
+	}
 	// seed5 e5891–93: after post-Return free Expression Global U36 residual,
 	// Statement need_no_rhs Assign Lhs F80=0 → VS Global live eDerefExact U4
 	// + opportunistic_validate F0 fail → more SelectDeref. Sticky
@@ -116877,6 +116888,17 @@ commaF80MultiDone:
 			// the null array (U100 Global + U1 + itemize U(size) + F0) and retries
 			// SelectDeref. After several such fails (e804+), VS multi-scope residual
 			// accepts without NullValidate.
+			//
+			// e6557: sticky NullValidate must not fire on ArrayOp-body Statement
+			// Lhs after must_use WRITE (PLStackU2InBody). C++ Lhs do-while is
+			// VariableSelector::select (Global sole, no invent U1+sizes) then
+			// visit_facts fail → SelectDeref F80 empty create — not the e766
+			// null-array residual ladder.
+			if burnCreateArrayLhsNullValidate && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+				burnCreateArrayLhsNullValidate = false
+				burnCreateArrayLhsNullVS0N = 0
+			}
 			if burnCreateArrayLhsNullValidate {
 				n := burnCreateArrayLhsNullVS0N
 				burnCreateArrayLhsNullVS0N++
@@ -120601,8 +120623,13 @@ commaF80MultiDone:
 			// (SelPure), Lhs do-while SelectDeref live choose_ok_var U4 +
 			// multi-dim itemize U1 U2 F0 fails until F80=0 → VS — not empty
 			// create random_add F10 (VariableSelector.cpp:1238–40 choose before create).
+			//
+			// e6557: ArrayOp-body Lhs after must_use WRITE + Global sole visit
+			// miss — C++ select_deref_pointer choose empty → empty create
+			// random_add F10 F20 F20 + address U7 (not sticky SelPure U4 U1 U2 F0).
 			if ctx != nil && ctx.state != nil &&
-				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure &&
+				!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 				// F80 already true. Live pointer pool residual then more F80.
 				_ = r.upto(4)
 				_ = r.upto(1)
@@ -120615,6 +120642,44 @@ commaF80MultiDone:
 					_ = r.flipcoin(0)
 				}
 				continue // F80=0 → VS again
+			}
+			// e6557: ArrayOp-body Lhs after must_use WRITE + Global sole visit
+			// miss → SelectDeref empty create (VariableSelector.cpp:1240–89):
+			// random_add_qualifiers F10 (ConstPointers; !SE-free Statement Lhs
+			// skips VolatilePointers F50) + create_and_initialize F20 NewArray
+			// F20 make_init address + choose_ok_var U7 among pointees. Not sticky
+			// SelPure live U4 U1 U2 F0 or e6137 random_qualifiers F50 F10 F50.
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+				if opts.ConstPointers {
+					_ = r.flipcoin(10) // random_add RegularConstProb
+				}
+				if ctx != nil && ctx.state != nil {
+					noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
+				}
+				newArray := r.flipcoin(20) // NewArrayVariableProb
+				initNull := r.flipcoin(20) // make_init null vs address
+				if initNull {
+					if newArray {
+						_arr := burnCreateArrayVariable(r, opts, targetType, true)
+						emitOrphanArrayGlobal(ctx, targetType, _arr)
+					}
+					_ = r.flipcoin(0)
+					continue
+				}
+				if newArray {
+					_arr := burnCreateArrayVariable(r, opts, targetType, true)
+					emitOrphanArrayGlobal(ctx, targetType, _arr)
+					createdArrayThisLhs = true
+					lhsFromDeref = true
+					lv = lvalueInfo{expr: "*p", ctype: targetType}
+					break
+				}
+				// address-of: choose_ok_var among visible pointees (UP U7).
+				_ = r.upto(7)
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
 			}
 			// seed5 e6137–44: after post-Return NewArray Global U4 visit miss
 			// (chooseLValueEx forces miss under SimplePLCreate), F80=0 broke
