@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~6460); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~6514); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)

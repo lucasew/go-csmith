@@ -845,6 +845,11 @@ type functionFlowState struct {
 	// (second ArrayOp nest). SelectParentLocal stack U3 (e6377); outside that
 	// body sticky PLStackU2 alone is U2 (e6315).
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
+	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
+	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
+	// under-counts expanded ok_vars / field expand).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN int
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -11982,12 +11987,35 @@ exprTries:
 						// parentStackPick path when not stuck in SimplePL pad).
 						if flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 							// SelectParentLocal stack U3 (Function::stack.size()=3).
-							// choose_ok_var: C++ n==1 soles (e6377 → U120). GO block
-							// depth inventory over-counts eFlexible simples (nFlex=3
-							// vs C++ 1) — burning U(n) invents choose. Prefer exact
-							// sameBaseType; if none, sole first eFlexible without
-							// U(n). Empty → GenerateNewParentLocal (e6416 F50 F10 F20).
+							// 0 e6377: sole after stack (C++ n==1; GO flex overcount
+							// must not invent U(n)). 1+ e6460: choose_ok_var U15 among
+							// expanded ok_vars (field expand / multi-block inventory
+							// GO under-counts → pad chooseN, not empty create F50).
+							// Only count scopePick==1 (existing PL); NewValue→PL create
+							// (scopePick==4, e6465–70) must GenerateNewParentLocal F50…
+							// not sticky U15 pad / sole inventory.
 							idx := int(er.pick(3))
+							if scopePick == 4 {
+								// e6468–71: NewValue→GenerateNewParentLocal after stack U3
+								// (empty choose_var) — F50 F10 F20 + create_field_vars.
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+									bumpExprDepth(ctx)
+									markVarSelectEffect()
+									return finishVar(castLiteral(t, g.expr))
+								}
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
+							pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN
+							flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN = pn + 1
+							if pn >= 1 {
+								// e6460: live choose_ok_var U15 after stack.
+								_ = er.pick(15)
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
 							exact := make([]exprVarCandidate, 0, len(localCands))
 							for _, c := range localCands {
