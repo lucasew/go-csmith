@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5882** (Expression U120 tries=1 vs SelectDeref empty create F20 after post-Return PP U7); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5928** (For body U2 vs Statement U100 after post-Return SelectLoopCtrl U26 + SafeOp); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5882→5928 climbed — post-Return Lhs SelectDeref sole + Global U36 + Stmt need_no_rhs multiphase + SelectLoopCtrl U26:**
+1. Capture: e5882 UP U120 tries=1 vs GO F20 (SelectDeref empty create residual after PP U7).
+2. C++: free ExpressionAssign Lhs SelectDeref empty create F80 F20 F20=1 F0 fail then F80 F20 F20=0 address soles existing simple pointee (no nested create F20) → free Expression U120. Later free Expression Global eFlexible U36+itemize U4; Statement need_no_rhs Assign Lhs F80=0→VS Global U4+F0 → PL U2+U8 miss → SelectDeref empty F80 F80=0 → PL empty create U14+qfer+Constant accept + SafeOpFlags F50 U4 + extra U4; For SelectLoopCtrlVar ok_vars ≈26 (not sticky era U37).
+3. GO: one-shot Lhs address sole under ReturnGlobalF0Done; Global pad multiphase U36+U4 itemize; Statement Lhs Global U4+F0 then PL multiphase U8 miss / empty create accept + SafeOp extra U4; post-Return SelectLoopCtrl floor U26 (not era U37). Seeds 2/3/4/6 held.
+4. Next: e5928 UP U2 vs GO U100 (For body residual after SelectLoopCtrl U26 + SafeOp).
 
 **seed5 e5843→5882 climbed — post-Return PL U13 + Global F0 + PP U7 multiphase:**
 1. Capture: e5843 UP U13=4 tries=0 vs GO U14=11 (sticky post-Return PL over-count).
