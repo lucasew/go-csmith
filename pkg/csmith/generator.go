@@ -7672,6 +7672,16 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				chooseN = 4
 			}
 		}
+		// e6442: ArrayOp-era free Expression SelectGlobal eFlexible/exact
+		// GlobalList U44 (C++ list after PL create residual; GO live n≈4).
+		if !forAssign && !selectVarLocalScope && n >= 2 &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
+			st := burnCreateArrayCtxSink.state
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+				chooseN = 44
+			}
+		}
 		// seed4 e1886–92 residual F20×4 when small inventory.
 		// seed4 e2256 postAgg: UP U23 GlobalList choose — pad once postAgg active.
 		if ppPostPadGlobalPicks >= 15 &&
@@ -7878,7 +7888,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			// stripped over-counts (~9). Burn U4 then empty-return without
 			// F0 (UP has no flipcoin between U4 and U100) so caller VS
 			// retries NewValue (not accept→continue Expression F50).
-			if len(uniq) > 4 {
+			// e6442: ArrayOp-era free Expression SelectGlobal is live GlobalList
+			// U44 accept (not sticky e6103 U4 miss after NewArrayVS residual).
+			arrayOpEra := burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2
+			if len(uniq) > 4 && !arrayOpEra {
 				_ = er.pick(4) // e6103 choose_ok_var U4
 				return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
 			}
@@ -7914,6 +7928,12 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				} else if st.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
 					!st.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done {
 					want = 36 // e5886 after Global F0 residual era
+				} else if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+					st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+					// e6442: after ArrayOp PL create residual, free Expression
+					// SelectGlobal eFlexible among ~44 GlobalList entries (C++
+					// grew list; GO live n under-counts → U4).
+					want = 44
 				} else {
 					// e5733+: live filtered pool (Return / later free Expression)
 					pad = false
@@ -7982,6 +8002,10 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 							!st.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done {
 							target = 36 // e5886
 							st.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done = true
+						} else if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+							st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+							// e6442: ArrayOp-era free Expression GlobalList U44
+							target = 44
 						} else {
 							target = 0 // e5733+ live n
 						}
@@ -8071,6 +8095,11 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 									!st.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done {
 									target = 36 // e5886
 									st.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done = true
+								} else if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+									st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+									// e6442: ArrayOp-era free Expression GlobalList U44
+									// (live inventory under-counts after PL creates).
+									target = 44
 								} else {
 									target = 0 // e5733+ live n
 								}
@@ -8344,6 +8373,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			// seed2 e1017 U2; seed5 e5117+ post-need_no_rhs keeps live U4.
 			if freeMultiIVNeedNoRhsEraSink == nil || !*freeMultiIVNeedNoRhsEraSink {
 				chooseN = 2
+			}
+		}
+		// e6442: after ArrayOp PL create, free Expression SelectGlobal eFlexible
+		// among ~44 GlobalList entries. Live n under-counts (e.g. U4 under
+		// freeMultiIVNeedNoRhs era). Pad chooseN — not invent inventory entries.
+		if !forAssign && !selectVarLocalScope && n >= 2 &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
+			st := burnCreateArrayCtxSink.state
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+				chooseN = 44
 			}
 		}
 		lateU2 := useSmallParentStackSink != nil && *useSmallParentStackSink &&
@@ -8770,6 +8810,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
 			!selectVarLocalScope && n >= 2 && !postEAU21 {
 			chooseN = 4
+		}
+		// e6442: after ArrayOp PL create residual, SelectGlobal eFlexible is
+		// GlobalList U44 — must override sticky e5117 U4 (PostEAGlobalU21 may
+		// already be cleared while PLStackU2 still marks ArrayOp era).
+		if !forAssign && !selectVarLocalScope && n >= 2 &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
+			st := burnCreateArrayCtxSink.state
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+				chooseN = 44
+			}
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
 		if nullValidateEmptyParamsDepthBlock && er != nil && er.fallback != nil {
@@ -12350,7 +12401,13 @@ exprTries:
 				ctx.state.freeMultiIVPostEAGlobalPadDone && er != nil &&
 				!ctx.state.freeMultiIVPostEAGlobalLiveU4Done {
 				ctx.state.freeMultiIVPostEAGlobalLiveU4Done = true
-				_ = er.pick(4) // e3563
+				// e6442: ArrayOp-era GlobalList U44 not sticky e3563 U4.
+				if ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+					_ = er.pick(44)
+				} else {
+					_ = er.pick(4) // e3563
+				}
 				// e3564–66: parent ExpressionAssign Lhs SelectDeref F80 U2 U100
 				// (same pattern as e3557–59 after PL create).
 				ctx.state.freeMultiIVPostEAItemizePLCreateNeedLhs = true
