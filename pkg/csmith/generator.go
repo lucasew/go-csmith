@@ -7271,10 +7271,63 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	// itemize: arrays always; also n==2 early post-must_read picks (e845 U3)
 	// but not later forced-variable ptr-cmp RHS (e866).
 	if wantPtr && multiDimArraySink != nil && *multiDimArraySink > 0 {
+		// C++ ExpressionVariable eFlexible + VariableSelector::choose_var
+		// (cpp:458–469): when ok_vars multi, prefer higher-indirection ptrs
+		// (is_dereferenced_from) via choose_ok_var(ptrs) first.
+		// seed5 e6316: ParentLocal want int32_t* — exact pool U5 but higher
+		// indirection (** / ****) is U2; GO exact-only drew U5.
+		if selectVarLocalScope && !forAssign &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+			wantLvl := strings.Count(t.Name, "*")
+			baseOf := func(name string) string {
+				return strings.TrimRight(normTypeName(name), "*")
+			}
+			wantBase := baseOf(t.Name)
+			ok := make([]exprVarCandidate, 0, len(filtered))
+			for _, c := range filtered {
+				if sameBaseType(c.ctype, t) {
+					ok = append(ok, c)
+					continue
+				}
+				cl := strings.Count(c.ctype.Name, "*")
+				// is_dereferenced_from: want obtained by deref from c.
+				if cl > wantLvl && baseOf(c.ctype.Name) == wantBase {
+					ok = append(ok, c)
+					continue
+				}
+				if pointerAddrOfMatch(t, c.ctype) {
+					ok = append(ok, c)
+				}
+			}
+			if len(ok) > 1 {
+				ptrs := make([]exprVarCandidate, 0, len(ok))
+				for _, c := range ok {
+					if strings.Count(c.ctype.Name, "*") > wantLvl {
+						ptrs = append(ptrs, c)
+					}
+				}
+				if len(ptrs) > 0 {
+					if len(ptrs) == 1 {
+						return ptrs[0], true
+					}
+					idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
+					return ptrs[idx], true
+				}
+			}
+			if len(ok) == 1 {
+				return ok[0], true
+			}
+			if len(ok) > 1 {
+				idx := int(er.pick(uint32(len(ok)))) % len(ok)
+				return ok[idx], true
+			}
+			return exprVarCandidate{}, false
+		}
 		if len(exact) == 0 {
 			return exprVarCandidate{}, false
 		}
-if pointerGlobalPicksSink != nil {
+		if pointerGlobalPicksSink != nil {
 			*pointerGlobalPicksSink++
 		}
 		picks := 0
