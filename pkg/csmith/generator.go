@@ -20586,6 +20586,34 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			}
 		}
 	}
+	// e6554–55: second ArrayOp body Statement Lhs — select_must_use WRITE F75
+	// then visit_facts fail → SelectDeref F80 (Lhs.cpp:74–88). Scope to
+	// PLStackU2InBody only. Sole-IV itemize burns no U (only F75); do not use
+	// selectMustUseFromListOnce which floors nOk=2 (e2811 residual READ/WRITE).
+	// Do not accept Lhs — continue to SelectDeref (visit_facts fail path).
+	if !lhsFromDeref && ctx != nil && ctx.state != nil && r != nil &&
+		len(ctx.state.mustWriteArrays) > 0 &&
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+		// Type match eFlexible / sameBaseType against must_write entry.
+		matched := false
+		eraseIdx := -1
+		for i, e := range ctx.state.mustWriteArrays {
+			if typeMatchMustUse(targetType, e.ctype) {
+				matched = true
+				eraseIdx = i
+				break
+			}
+		}
+		if matched {
+			if r.flipcoin(75) {
+				if eraseIdx >= 0 {
+					ctx.state.mustWriteArrays = append(
+						ctx.state.mustWriteArrays[:eraseIdx:eraseIdx],
+						ctx.state.mustWriteArrays[eraseIdx+1:]...)
+				}
+			}
+		}
+	}
 	// seed5 e2413–19: after Function useExisting U2+F75 RHS residual, Statement
 	// Lhs F80=0 → VS PL stack U6 + NewArray create F20 F20 U3 U3 (not empty
 	// SelectDeref F10 F20…).
