@@ -222,13 +222,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5984** (ptr-cmp ExpressionAssign Lhs SelectDeref NewArray address nested create F20 F20 U3 vs GO CreateArray U99); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **6024** (post-Return PL empty create retype U14 vs GO U13 after NewArray+address Lhs residual); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
 
+
+**seed5 e5984→6024 climbed — SelectDeref NewArray address nested create + Lhs VS itemize + PP sole:**
+1. Capture: e5984 UP F20 (nested address create under SelectDeref NewArray) vs GO U99 CreateArray.
+2. C++: ExpressionAssign Lhs SelectDeref empty create NewArray=1 + make_init address → choose empty → nested `create_and_initialize` for pointer pointee (NewArray F20 + make_init address F20 + choose_ok_var U3) then outer CreateArray U99 U10 U4 itemize U8. SelectDeref continue F80=0 → VS ParentLocal stack U1 + multi-dim itemize U8 visit fail → SelectDeref live U8×2 F80=0 → NewValue F10→PL create F20 F20 U3 accept. Free Expression Function-fail/PP after: first live U7 then sole (not sticky multiphase always-U7). Sticky `ppPostPad≥14` bare CreateArray and ParamU7 GlobalU21 force U6 skip the nested residual.
+3. GO: after `freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done`, NewArray+address burns nested F20 F20 U3 before CreateArray; F80=0 VS residual stack U1 + itemize multiphase + NewValue→PL create; shared `PostNewArrayPPN` (0 U7, 1+ sole) across termVariable/Function-fail/pointer PP. Seeds 2/3/4/6 held.
+4. Next: e6024 UP retype U14 vs GO U13 (PL empty create after free Expression VS U100=56 stack U1).
 
 **seed5 e5956→5984 climbed — Function CREATE Global U3 + ptr-cmp * qfer + Assign RHS PP sole:**
 1. Capture: e5956 UP U3 vs GO F50 createOnDemandGlobalFromERSEFree after Function CREATE residual (useExisting=0) → ExpressionVariable Global.

@@ -779,6 +779,23 @@ type functionFlowState struct {
 	// empty create NewArray=0 + make_init address soles existing simple pointee
 	// (no choose RNG, no nested create_and_initialize F20 F50…) → Expression U120.
 	freeMultiIVNeedNoRhsPostEAReturnLhsAddrSoleDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayAddrNestedDone: one-shot e5984–86
+	// after post-Return residual — ExpressionAssign Lhs SelectDeref empty create
+	// NewArray=1 + make_init address: outer address choose empty → nested
+	// create_and_initialize for pointer pointee (NewArray F20 + make_init
+	// address F20 + choose_ok_var U3) then outer CreateArray U99…
+	// (VariableSelector.cpp:840–873 + 498–508). Sticky ppPostPad≥14 bare
+	// CreateArray skips the nested residual.
+	freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayAddrNestedDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone: one-shot e5993–05 after
+	// that CreateArray SelectDeref continue F80=0 → VS ParentLocal stack U1 +
+	// multi-dim itemize U8 visit fail → SelectDeref live U8×2 F80=0 → NewValue
+	// F10→PL create F20 F20 U3 accept. Sticky ParamU7 GlobalU21 force U6 create.
+	freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN: free Expression Function-fail
+	// ParentParam after NewArray VS residual. 0 e6009–10: live choose U7;
+	// 1+ e6013–14: sole (UP no RNG) then Expression U120. Sticky multiphase U7.
+	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN int
 	// freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done: one-shot e5886 free Expression
 	// Variable Global eFlexible U36 + collective array itemize U4 after residual
 	// creates grew GlobalList (GO live n under-counts → sticky U4).
@@ -9137,8 +9154,18 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 	// (randomPointerVariableExpr — no term U120). Same as termVariable:
 	//   0 e5765 U7; 1+ e5801–02 U1+U2. Sole param accept skips these and
 	// parent Lhs SelectDeref burns F80 with the U1 raw.
+	// After NewArray VS residual: 0 e6010 U7; 1+ sole (shared PostNewArrayPPN).
 	if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 		scopePick == 2 && er != nil {
+		if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+			pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
+			flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
+			if pn == 0 {
+				_ = er.pick(7)
+			}
+			bumpExprDepth(ctx)
+			return castLiteral(t, "x")
+		}
 		pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
 		flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
 		if pn == 1 {
@@ -10250,10 +10277,24 @@ exprTries:
 				// seed5 e5981: ExpressionAssign RHS (skipFuncRetQfer) Function-fail
 				// → ParentParam sole-accepts then parent Lhs SelectDeref F80.
 				// Sticky free Expression PP multiphase U7 steals the F80 raw.
+				// seed5 e6009–14: after NewArray+address Lhs VS residual accept,
+				// free Expression Function-fail PP: first live U7 (e6010) then
+				// sole (e6013→U120). Sticky multiphase always-U7 under-burns.
 				if ctx != nil && ctx.state != nil &&
 					ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 					scopePick == 2 && er != nil {
 					if ctx.skipFuncRetQfer {
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "x")
+					}
+					if ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+						pn := ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
+						if pn == 0 {
+							_ = er.pick(7) // e6010
+						}
+						// pn>=1 sole — no choose RNG
 						bumpExprDepth(ctx)
 						markFuncEffect()
 						return castLiteral(t, "x")
@@ -10886,8 +10927,20 @@ exprTries:
 			//     F0 residual); sticky U1+U2 under-burns F80 SelectDeref.
 			// Sticky e5677 sole skips U7; residual U7 pad is off for pointers
 			// after PPU7Done. Early intercept before postEA sole paths.
+			// seed5 e6009–14 after NewArray VS residual: first U7 (e6010) then
+			// sole (e6013 Function-fail / later PP) — shared PostNewArrayPPN.
 			if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 				scopePick == 2 && er != nil {
+				if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+					pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
+					flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
+					if pn == 0 {
+						_ = er.pick(7) // e6010
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "x"))
+				}
 				pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
 				flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
 				if pn == 1 {
@@ -16450,6 +16503,24 @@ exprTries:
 						_ = er.pick(2)               // e2504
 						_ = er.pick(4)               // e2505
 						tgtNewArray = true
+					} else if newArray && !initConst &&
+						ctx != nil && ctx.state != nil &&
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+						!ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayAddrNestedDone {
+						// seed5 e5984–86: after post-Return residual,
+						// ExpressionAssign Lhs SelectDeref NewArray+address.
+						// C++ make_init address empty → nested GenerateNew*
+						// create_and_initialize for pointer pointee:
+						//   NewArray F20=0 + make_init address F20=0 +
+						//   choose_ok_var U3 (live simple pointees)
+						// then outer CreateArray U99 U10 U4 itemize U8…
+						// Sticky ppPostPad≥14 bare CreateArray under-burns
+						// nested F20 F20 U3 (GO U99 first).
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayAddrNestedDone = true
+						_ = er.fallback.flipcoin(20) // e5984 nested NewArray
+						_ = er.fallback.flipcoin(20) // e5985 nested make_init
+						_ = er.pick(3)               // e5986 nested address choose
+						// outer newArray already true → CreateArray below
 					} else if ppPostPadGlobalPicks >= 14 && newArray {
 						if ctx != nil && ctx.state != nil && !ctx.state.ppPostPadNewArrayU3U4Done {
 							ctx.state.ppPostPadNewArrayU3U4Done = true
@@ -16657,6 +16728,68 @@ exprTries:
 				_ = er.pick(2) // e2324
 				_ = er.pick(8) // e2325 itemize
 				_ = er.pick(7) // e2326
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
+			// seed5 e5993–05: after post-Return NewArray+address nested CreateArray
+			// SelectDeref continue F80=0 → VS ParentLocal:
+			//   stack U1 (post-Return Function::stack.size()=1) + live multi-dim
+			//   itemize U8 (CreateArray size) visit_facts fail → Lhs do-while
+			//   SelectDeref live itemize U8×2 then F80=0 → VS NewValue F10=0
+			//   → GenerateNewParentLocal stack U1 + NewArray=0 make_init address
+			//   U3 accept → parent Expression U120.
+			// Sticky ParamU7 GlobalU21 force U6+create under-burns U1 (GO U6).
+			if ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayAddrNestedDone &&
+				!ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
+				scopePick == 1 && er != nil {
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone = true
+				// Force stack U1 (post-Return GlobalDone); ForBody sticky U2 over-burns.
+				_ = er.pick(1) // e5993
+				itemizeLast := func() {
+					if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
+						for _, sz := range *lastArraySizesSink {
+							if sz > 0 {
+								_ = er.fallback.upto(uint32(sz))
+							}
+						}
+					} else {
+						_ = er.pick(8)
+					}
+				}
+				itemizeLast() // e5994
+				if er.fallback != nil {
+					// visit fail → SelectDeref live itemize until F80=0
+					for {
+						if !er.fallback.flipcoin(80) {
+							break
+						}
+						itemizeLast()
+					}
+					// e6000 VS NewValue (U100=99). variableScopePickFromER already
+					// burns VariableCreationProbability F10 → scopePick 3=Global /
+					// 4=ParentLocal CREATE (not raw NewValue token).
+					sp2 := variableScopePickFromER(er, opts, &scope)
+					if sp2 == 4 {
+						// NewValue→PL: stack U1 + create_and_initialize
+						_ = er.pick(1)               // e6002
+						_ = er.fallback.flipcoin(20) // e6003 NewArray
+						_ = er.fallback.flipcoin(20) // e6004 make_init
+						_ = er.pick(3)               // e6005 address choose
+					} else if sp2 == 3 {
+						// NewValue→Global create (no stack)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+						_ = er.pick(3)
+					} else if sp2 == 1 || sp2 == 2 {
+						_ = er.pick(1)
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+						_ = er.pick(3)
+					} else if sp2 == 0 {
+						_ = er.fallback.flipcoin(20)
+						_ = er.fallback.flipcoin(20)
+						_ = er.pick(3)
+					}
+				}
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			// seed5 e3161–76: free multi-IV Expression residual ExpressionAssign
