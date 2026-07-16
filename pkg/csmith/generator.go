@@ -2636,6 +2636,27 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	return int(er.pick(uint32(n)))
 }
 
+// popFunctionStackFrame mirrors Function::stack.pop_back: destroy the top
+// Block and drop dynLocs whose blockDepth equals that frame. Without this,
+// sibling/nested blocks leak locals into later SelectParentLocal pools
+// (seed5 e6316: body int32_t* U5 vs C++ block-local U2).
+func popFunctionStackFrame(state *functionFlowState, ctx *genContext) {
+	if state == nil || state.blockStack <= 0 {
+		return
+	}
+	depth := state.blockStack
+	if ctx != nil && len(ctx.dynLocs) > 0 {
+		kept := ctx.dynLocs[:0]
+		for _, l := range ctx.dynLocs {
+			if l.blockDepth != depth {
+				kept = append(kept, l)
+			}
+		}
+		ctx.dynLocs = kept
+	}
+	state.blockStack--
+}
+
 // localInfoToExprCand converts a materialised local to an Expression candidate.
 // Skips synthetic "x". Never invents names or pads pool size.
 func localInfoToExprCand(l localInfo) (exprVarCandidate, bool) {
@@ -121097,7 +121118,7 @@ func emitStatement(
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, bodyDepth, true, stmtBudget, ctx)
 		if state.blockStack > 0 {
-			state.blockStack--
+			popFunctionStackFrame(state, ctx)
 		}
 		if state.arrayLoopDepth > 0 {
 			state.arrayLoopDepth--
@@ -121162,7 +121183,7 @@ func emitStatement(
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, bodyDepth, true, stmtBudget, ctx)
 		if state.blockStack > 0 {
-			state.blockStack--
+			popFunctionStackFrame(state, ctx)
 		}
 		if state.arrayLoopDepth > 0 {
 			state.arrayLoopDepth--
@@ -121489,13 +121510,13 @@ func emitStatement(
 			if state != nil {
 				state.filterCompoundStmts = false
 				if pushIfStack && state.blockStack > 0 {
-					state.blockStack--
+					popFunctionStackFrame(state, ctx)
 				}
 			}
 			writeLine(b, 1, "}")
 		} else {
 			if state != nil && pushIfStack && state.blockStack > 0 {
-				state.blockStack-- // pop then before else
+				popFunctionStackFrame(state, ctx) //pop then before else
 			}
 			writeLine(b, 1, "} else {")
 			if state != nil && pushIfStack {
@@ -121513,7 +121534,7 @@ func emitStatement(
 				state.freeMultiIVNeedNoRhsIfBody = false
 			}
 			if state != nil && pushIfStack && state.blockStack > 0 {
-				state.blockStack--
+				popFunctionStackFrame(state, ctx)
 			}
 			writeLine(b, 1, "}")
 			if state != nil && postAggGlobalCreateN >= 0 {
@@ -121557,7 +121578,7 @@ func emitStatement(
 			state.blockStack++
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state.blockStack > 0 {
-				state.blockStack--
+				popFunctionStackFrame(state, ctx)
 			}
 			writeLine(b, 1, "}")
 			break
@@ -121597,7 +121618,7 @@ func emitStatement(
 			}
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state != nil && state.blockStack > 0 {
-				state.blockStack--
+				popFunctionStackFrame(state, ctx)
 			}
 			writeLine(b, 1, "}")
 			break
@@ -121629,7 +121650,7 @@ func emitStatement(
 			state.blockStack++
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state.blockStack > 0 {
-				state.blockStack--
+				popFunctionStackFrame(state, ctx)
 			}
 			writeLine(b, 1, "}")
 			break
@@ -121831,7 +121852,7 @@ func emitStatement(
 		}
 		emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 		if state != nil && state.blockStack > 0 {
-			state.blockStack--
+			popFunctionStackFrame(state, ctx)
 		}
 		if state != nil {
 			state.freeMultiIVForBodyU3 = false
@@ -121945,7 +121966,7 @@ func emitStatement(
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state != nil {
 				if state.blockStack > 0 {
-					state.blockStack--
+					popFunctionStackFrame(state, ctx)
 				}
 				if state.arrayLoopDepth > 0 {
 					state.arrayLoopDepth--
@@ -122039,7 +122060,7 @@ func emitStatement(
 				state.arrayLoopDepth++
 				emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 				if state.blockStack > 0 {
-					state.blockStack--
+					popFunctionStackFrame(state, ctx)
 				}
 				if state.arrayLoopDepth > 0 {
 					state.arrayLoopDepth--
@@ -122338,7 +122359,7 @@ func emitStatement(
 				emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 				if state != nil {
 					if state.blockStack > 0 {
-						state.blockStack--
+						popFunctionStackFrame(state, ctx)
 					}
 					if state.arrayLoopDepth > 0 {
 						state.arrayLoopDepth--
@@ -122539,7 +122560,7 @@ func emitStatement(
 			emitStatements(b, r, opts, env, scope, state, info, from, depth+1, true, stmtBudget, ctx)
 			if state != nil {
 				if state.blockStack > 0 {
-					state.blockStack--
+					popFunctionStackFrame(state, ctx)
 				}
 				if state.arrayLoopDepth > 0 {
 					state.arrayLoopDepth--
