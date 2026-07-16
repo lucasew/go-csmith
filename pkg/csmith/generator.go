@@ -840,6 +840,11 @@ type functionFlowState struct {
 	// Sticky SelPure parentStackPick U3 over-burns (e6315 UP U2).
 	// Structural: rnd_upto(Function::stack.size()) only — no invent choose pads.
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody: true only while
+	// an ArrayOp body is active that was entered after PLStackU2 was already set
+	// (second ArrayOp nest). SelectParentLocal stack U3 (e6377); outside that
+	// body sticky PLStackU2 alone is U2 (e6315).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -2513,7 +2518,14 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// NewArrayVSDone U1 / ForBody U2. After ForBody arm from ArrayOp control.
 	// e6315: after sole ArrayOp body Assign ends, stack drops to U2 — sticky
 	// SelPure U3 over-burns free Expression PL after parent !IN_LOOP Assign.
+	// e6377: second ArrayOp body entered after PLStackU2 → stack U3.
+	// e6315: free Expression after first ArrayOp (PLStackU2, not InBody) → U2.
+	// Do not key off arrayLoopDepth alone — first-body tail may still have depth>0
+	// when PLStackU2 is armed mid-statement (Lhs), and UP stack is already U2.
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+		if state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+			return int(er.pick(3))
+		}
 		return int(er.pick(2))
 	}
 	if state != nil && (state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure ||
@@ -11879,6 +11891,41 @@ exprTries:
 						// free Expression PL choose_ok_var U15 (block local_vars +1)
 						// then collective array itemize U4 — sticky U14 under-counts
 						// and skips itemize (next raw becomes Statement U100).
+						//
+						// After ArrayOp re-enters with stack>1, sticky U1 is wrong:
+						// e6377 second ArrayOp body Function::stack.size()=3 then
+						// sole accept (next Expression U120) — not U1+U15 residual.
+						// e6315 after first ArrayOp: stack U2 + live choose (via
+						// parentStackPick path when not stuck in SimplePL pad).
+						if flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+							_ = er.pick(3) // e6377 SelectParentLocal stack
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, "x"))
+						}
+						if flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+							// e6315–17: stack U2 + choose U2 + itemize/field U7…
+							// Use parentStackPick (U2) then fall through to live
+							// inventory choose below (not sticky U1+U14/U15 pad).
+							idx = parentStackPick(er, flow)
+							localCands := localsInStackBlock(er, env, scope, ctx, idx)
+							if len(localCands) > 0 {
+								if c, ok := chooseOKVarFromER(er, eFlexibleOKLocals(t, localCands)); ok && c.expr != "" {
+									bumpExprDepth(ctx)
+									markVarSelectEffect()
+									return finishVar(castLiteral(t, c.expr))
+								}
+							}
+							// Empty: GenerateNewParentLocal via shared create path.
+							if g, ok := createOnDemandFromParentLocalPathER(er, opts, t, ctx, true); ok {
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, g.expr))
+							}
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, "x"))
+						}
 						idx = int(er.pick(1))
 						if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 							if flow.inPtrCmpExpr && isPtr && er.fallback != nil {
@@ -122979,6 +123026,10 @@ func emitStatement(
 			if state != nil {
 				state.blockStack++
 				state.arrayLoopDepth++
+				// Second ArrayOp after PLStackU2: body has stack U3 (e6377).
+				if state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+					state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody = true
+				}
 				// Push outer fresh so nested array-loops restore it on exit.
 				state.arrayLoopFreshStack = append(state.arrayLoopFreshStack, state.arrayLoopFresh)
 				state.arrayLoopFresh = true
@@ -122992,6 +123043,7 @@ func emitStatement(
 				if state.arrayLoopDepth > 0 {
 					state.arrayLoopDepth--
 				}
+				state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody = false
 				if n := len(state.arrayLoopFreshStack); n > 0 {
 					state.arrayLoopFresh = state.arrayLoopFreshStack[n-1]
 					state.arrayLoopFreshStack = state.arrayLoopFreshStack[:n-1]
