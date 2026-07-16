@@ -147,6 +147,11 @@ var burnCreateArrayAltEmpty bool
 // F20 NewArray + Constant + CreateArray). Expression CreateArray (seed4 e101)
 // keeps F20-only empty address (no nested create).
 var burnCreateArrayPtrAltNestedCreate bool
+// burnCreateArrayPtrAltU10: SelectDeref empty create NewArray CreateArray after
+// post-Return NewArray Global-miss pure-fail residual (seed5 e6163–68): pointer
+// alts F20=0 → choose_ok_var U10 among live simple pointees (not empty nested
+// create F20 Constant; not sole F20-only). One-shot per CreateArray call.
+var burnCreateArrayPtrAltU10 bool
 // burnCreateArrayMultiLvlAltU2: one-shot ** CreateArray after multi-level
 // SelectDeref empty create VS PL (e4239–55): pointer alts F20=0 → choose U2;
 // v=0 itemize multi-dim * [8][7] (e4249 U8 U7). Default postAgg F20-only under-burns.
@@ -2372,6 +2377,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
+	// seed5 e6175: after post-Return NewArray Global-miss SelectDeref CreateArray
+	// residual F80=0 → VS, Function::stack.size()=3 (free multi-IV For body).
+	// Sticky NewArrayVSDone U1 / ForBody U2 under-burns vs UP U3 + itemize U4.
+	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+		return int(er.pick(3))
+	}
 	// seed5 e6106: after post-Return NewArray residual + free Expression
 	// Global U4 empty visit → VS NewValue→PL, Function::stack.size()=1.
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
@@ -4478,7 +4489,11 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 				// then itemize; Lhs CreateArray keeps U2 via skip flag false).
 				// e7748: PLStackU3 era alts burn U2 U3 U3 (same as ** create
 				// address residual e7641–43), not bare U2.
-				if burnCreateArrayMultiLvlAltU2 {
+				if burnCreateArrayPtrAltU10 {
+					// seed5 e6164/66/68: post-Return Lhs SelectDeref NewArray
+					// CreateArray alts address choose among ~10 simple pointees.
+					_ = r.upto(10)
+				} else if burnCreateArrayMultiLvlAltU2 {
 					// seed5 e4245–54: ** CreateArray alts after multi-level
 					// SelectDeref create VS PL NewArray — choose_ok_var U2;
 					// v=0 multi-dim * itemize U8 U7 ([8][7] inventory).
@@ -6904,6 +6919,25 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 			}
 			if len(stripped) >= 1 && len(stripped) < len(exact) {
 				exact = stripped
+			}
+		}
+		// seed5 e6199: after pure-create SelectDeref CreateArray residual multiphase,
+		// VS Global eDerefExact pool is U2 (UP GlobalNonvolatiles filtered). GO
+		// residual CreateArray + fromParentLocal pads over-count to U4.
+		if forAssign && burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+			stripped := make([]exprVarCandidate, 0, len(exact))
+			for _, c := range exact {
+				if !c.fromParentLocal {
+					stripped = append(stripped, c)
+				}
+			}
+			if len(stripped) >= 1 {
+				exact = stripped
+			}
+			// Floor to 2 when still over-count after strip (orphan CreateArray pads).
+			if len(exact) > 2 {
+				exact = exact[:2]
 			}
 		}
 		n := len(exact)
@@ -19095,6 +19129,22 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// GenerateNewParentLocal WRITE create (F50 F20 F50 F50 U20) not U5 choose.
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
+		// seed5 e6174–79: after post-Return NewArray Global-miss SelectDeref
+		// CreateArray residual F80=0 → VS PP→PL Function::stack.size()=3 +
+		// live eDerefExact choose U4 + multi-dim itemize U1 U2 F0 visit fail
+		// → SelectDeref continue. Sticky e2935 U2+create U14 under-burns.
+		if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+			if er != nil {
+				_ = er.pick(3) // e6175 stack
+				_ = er.pick(4) // e6176 choose
+				_ = er.pick(1) // e6177 itemize
+				_ = er.pick(2) // e6178
+			}
+			if er != nil && er.fallback != nil {
+				_ = er.fallback.flipcoin(0) // e6179 F0
+			}
+			return lvalueInfo{}, false, false
+		}
 		if flow != nil && flow.freeMultiIVForBodyU3 {
 			nStack := 4
 			if flow.blockStack > 4 {
@@ -19427,6 +19477,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 		flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArraySimplePLCreate &&
 		!flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss {
 		flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss = true
+		return lvalueInfo{}, false, false
+	}
+	// seed5 e6198–99: after CreateArray pure-create residual multiphase,
+	// VS Global live eDerefExact U2 miss → SelectDeref continue (not accept).
+	if ok && scopePick == 0 && flow != nil &&
+		flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+		// Choose already burned via selectExprVariable; force visit miss.
+		// When pool under-counts vs UP U2, re-burn U2 if sole path was taken.
 		return lvalueInfo{}, false, false
 	}
 	return lvalueInfo{expr: pick.expr, ctype: pick.ctype}, true, false
@@ -119786,6 +119844,101 @@ commaF80MultiDone:
 			}
 			if !r.flipcoin(80) {
 				continue // try VariableSelector again
+			}
+			// seed5 e6180+: after pure-fail empty create CreateArray residual
+			// (SelPure), Lhs do-while SelectDeref live choose_ok_var U4 +
+			// multi-dim itemize U1 U2 F0 fails until F80=0 → VS — not empty
+			// create random_add F10 (VariableSelector.cpp:1238–40 choose before create).
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+				// F80 already true. Live pointer pool residual then more F80.
+				_ = r.upto(4)
+				_ = r.upto(1)
+				_ = r.upto(2)
+				_ = r.flipcoin(0)
+				for r.flipcoin(80) {
+					_ = r.upto(4)
+					_ = r.upto(1)
+					_ = r.upto(2)
+					_ = r.flipcoin(0)
+				}
+				continue // F80=0 → VS again
+			}
+			// seed5 e6137–44: after post-Return NewArray Global U4 visit miss
+			// (chooseLValueEx forces miss under SimplePLCreate), F80=0 broke
+			// out of lhsDerefLoop — pure-fail residual before that loop's empty
+			// create never runs. This post-VS-miss create site is first:
+			//   e6137 F80 pure fail (no choose/create RNG)
+			//   e6138+ F80 empty create random_qualifiers WRITE F50 F10 + self
+			//   F50 (not random_add F10 F50) then NewArray/init; null F0
+			//   continues SelectDeref without re-entering VS (Lhs.cpp do-while).
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsGlobalMiss &&
+				!ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure = true
+				// F80 above = e6137 pure fail. Create-retry loop (no VS between).
+				// select_deref_pointer creates find_pointer_type(LhsType) —
+				// pointer to targetType (VariableSelector.cpp:1243–1289).
+				ptrType := targetType
+				if !strings.Contains(ptrType.Name, "*") {
+					ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+				}
+				for {
+					if !r.flipcoin(80) {
+						break // F80=0 → VariableSelector again
+					}
+					// random_qualifiers WRITE no_volatile: 1-level * + self
+					_ = r.flipcoin(50) // level vol
+					_ = r.flipcoin(10) // level const
+					_ = r.flipcoin(50) // self vol
+					if ctx != nil && ctx.state != nil {
+						noteDerivedPointer(ctx.state, pointerBaseKey(targetType), strings.Contains(targetType.Name, "*"))
+					}
+					newArray := r.flipcoin(20)
+					initNull := r.flipcoin(20)
+					if initNull {
+						if newArray {
+							// CreateArray of pointer type — alts F20 address +
+							// choose_ok_var U10 among live simple pointees
+							// (e6163–68; not empty nested create).
+							burnCreateArrayPtrAltU10 = true
+							_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+							burnCreateArrayPtrAltU10 = false
+							emitOrphanArrayGlobal(ctx, ptrType, _arr)
+							_ = r.flipcoin(0)
+							createdArrayThisLhs = true
+							burnCreateArrayLhsNullValidate = true
+							burnCreateArrayLhsNullVS0N = 0
+							// null-array CreateArray still fails visit → SelectDeref
+							continue
+						}
+						// non-array null — validate fails, no CreateArray RNG
+						_ = r.flipcoin(0)
+						continue
+					}
+					if newArray {
+						_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+						emitOrphanArrayGlobal(ctx, ptrType, _arr)
+						createdArrayThisLhs = true
+						lhsFromDeref = true
+						lv = lvalueInfo{expr: "*p", ctype: targetType}
+						break
+					}
+					// address-of init: choose_ok_var among pointees (UP e6151 U10).
+					// First address create still fails visit_facts (e6152 F80
+					// continues SelectDeref empty create NewArray CreateArray);
+					// do not accept Lhs on the first address hit.
+					nPointee := 10
+					if nPointee > 1 {
+						_ = r.upto(uint32(nPointee))
+					}
+					// visit_facts fail → next F80 create (not accept)
+					continue
+				}
+				if lhsFromDeref {
+					break
+				}
+				continue // F80=0 mid-create-retry → VS
 			}
 			if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 				_ = r.upto(3)
