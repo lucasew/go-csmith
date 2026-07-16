@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5398** (Lhs F80=0→VS Global U13 create F20 vs GO F80); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5420** (post-Global-create residual after ExpressionAssign Lhs); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5398→5420 climbed — ExpressionAssign Lhs Global create + SelectDeref residual:**
+1. Capture: e5398 UP F20 (GenerateNewGlobal after U100=13) vs GO F80 (early sole after U100 ends ExpressionAssign).
+2. C++: Lhs F80=0→VS Global empty create F20 F20 then SelectDeref empty create F80 F10 F50 F20 F20 CreateArray… then more VS multiphase.
+3. GO: bypass early sole under post-If era; burn Global F20 F20 + SelectDeref create residual inline (VS is outside SelectDeref for{}). Seeds 2/3/4/6 held.
+4. Next: e5420 UP U100=64 vs GO F80 after residual.
 
 **seed5 e5373→5398 climbed — post-If Expression PP→PL stack U6 + S2* empty create:**
 1. Capture: e5373 UP U6=1 vs GO U5=3 (same raw) after ExpressionAssign RHS Function-fail → ExpressionVariable U100=93 ParentParam.

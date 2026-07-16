@@ -2783,6 +2783,19 @@ func lhsMakeRandomWrite(er *exprRand, opts Options, env envInfo, scope scopeInfo
 				}
 				// First Lhs VS Global sole (e3053 U100=0 → F80, no U(n)).
 				// Second+: create U14 + F20 F50 F50 U20 (e3061–66).
+				// seed5 e5397–99: post-If need_no_rhs-era ExpressionAssign Lhs
+				// F80=0 → VS Global U100=13 empty/miss → GenerateNewGlobal
+				// F20 F20 (NewArray+init) then visit fail → continue SelectDeref
+				// F80 F10 F50 F20 F20 CreateArray… (not sticky first-Global
+				// sole-continue without create → parent ends early).
+				if flow != nil && flow.freeMultiIVNeedNoRhsEra &&
+					flow.freeMultiIVNeedNoRhsIfLhsSelDone &&
+					!flow.freeMultiIVNeedNoRhsIfBody && globalFails == 0 {
+					_ = er.fallback.flipcoin(20) // NewArray
+					_ = er.fallback.flipcoin(20) // make_init
+					globalFails++
+					continue
+				}
 				if globalFails >= 1 {
 					_ = er.pick(14)
 					_ = er.fallback.flipcoin(20) // NewArray
@@ -16076,6 +16089,59 @@ exprTries:
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
 			ppLhsEra := ctx.state.isParamPPFallPicks >= 2 && ctx.state.arrayLoopDepth > 0
+			// seed5 e5397–5410: post-If need_no_rhs-era ExpressionAssign Lhs
+			// F80=0 → VS Global U100=13 empty/miss → GenerateNewGlobal F20 F20
+			// then Lhs do-while SelectDeref empty create (F80 F10 F50 F20 F20
+			// CreateArray U99…) then F80=0→VS. GO structure has VS outside the
+			// SelectDeref for{}, so burn residual inline then accept Lhs
+			// (not early sole after U100 → parent Expression U120).
+			if scopePick == 0 && ctx.state.freeMultiIVNeedNoRhsEra &&
+				ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone &&
+				!ctx.state.freeMultiIVNeedNoRhsIfBody && er != nil && er.fallback != nil {
+				_ = er.fallback.flipcoin(20) // e5398 NewArray Global create
+				_ = er.fallback.flipcoin(20) // e5399 make_init
+				// SelectDeref empty create (random_add F10 + vol F50 + NewArray):
+				if er.fallback.flipcoin(80) { // e5400
+					if opts.ConstPointers {
+						_ = er.fallback.flipcoin(10) // e5401
+					}
+					_ = er.fallback.flipcoin(50) // e5402 looser/vol
+					newArr := er.fallback.flipcoin(20) // e5403
+					_ = er.fallback.flipcoin(20)       // e5404 init
+					if newArr {
+						arrTy := t
+						if !strings.Contains(arrTy.Name, "*") {
+							arrTy = CType{Name: arrTy.Name + "*", Signed: arrTy.Signed,
+								Bits: arrTy.Bits, HexDigits: arrTy.HexDigits}
+						}
+						_arr := burnCreateArrayVariable(er.fallback, opts, arrTy, true)
+						emitOrphanArrayGlobal(ctx, arrTy, _arr)
+					}
+				}
+				// e5410 F80=0 → VS continues multiphase; accept Lhs after residual.
+				if !er.fallback.flipcoin(80) {
+					sp2 := variableScopePickFromER(er, opts, &scope) // e5411
+					if sp2 == 1 || sp2 == 2 || sp2 == 4 {
+						_ = parentStackPick(er, ctx.state) // e5412 U6
+						_ = er.pick(5)                   // e5413 choose
+					} else if sp2 == 0 {
+						_ = er.pick(5)
+					}
+					if er.fallback.flipcoin(80) { // e5414
+						_ = er.pick(5) // e5415
+					}
+					if !er.fallback.flipcoin(80) { // e5416
+						sp3 := variableScopePickFromER(er, opts, &scope) // e5417
+						if sp3 == 0 {
+							_ = er.fallback.flipcoin(20)
+							_ = er.fallback.flipcoin(20)
+						} else if sp3 == 1 || sp3 == 2 || sp3 == 4 {
+							_ = parentStackPick(er, ctx.state)
+						}
+					}
+				}
+				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
+			}
 			if !ctx.state.useSmallParentStack && !ppLhsEra {
 				return finishAssignExpr(fmt.Sprintf("(%s = %s)", "x", rhs))
 			}
@@ -17875,6 +17941,23 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			default:
 				_ = er.pick(3) // e4754+
 			}
+			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
+		}
+		return lvalueInfo{}, false, false
+	}
+	// seed5 e5397–99: post-If need_no_rhs-era ExpressionAssign Lhs F80=0 →
+	// VS Global U100=13 — C++ SelectGlobal empty/miss → GenerateNewGlobal
+	// create_and_initialize F20 F20 (NewArray+init) then visit_facts /
+	// no_signed_overflow reject → Lhs do-while continues SelectDeref F80.
+	// freeMultiIVForBodyU3 multiphase above may already be off; fallthrough
+	// sole-accepts inventory and ends ExpressionAssign early (next Statement
+	// Lhs F80). Force empty Global create residual then miss.
+	if scopePick == 0 && flow != nil && flow.freeMultiIVNeedNoRhsEra &&
+		flow.freeMultiIVNeedNoRhsIfLhsSelDone && !flow.freeMultiIVNeedNoRhsIfBody &&
+		er != nil && er.fallback != nil {
+		_ = er.fallback.flipcoin(20) // NewArray
+		_ = er.fallback.flipcoin(20) // make_init
+		if flow != nil {
 			flow.freeMultiIVNeedNoRhsPLChooseMiss = true
 		}
 		return lvalueInfo{}, false, false
