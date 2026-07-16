@@ -2680,7 +2680,7 @@ func localInfoToExprCand(l localInfo) (exprVarCandidate, bool) {
 	return exprVarCandidate{
 		expr: l.name, ctype: l.ctype, assignable: !l.isConst,
 		isArray: l.isArray, arrayLen: arrLen, arraySizes: sizes, isVolatile: l.isVol,
-		fromParentLocal: l.fromParentLocal,
+		fromParentLocal: l.fromParentLocal, alreadyItemized: l.alreadyItemized,
 	}, true
 }
 
@@ -2721,29 +2721,22 @@ func localsMergedAnyDepth(scope scopeInfo, ctx *genContext) []exprVarCandidate {
 // localsForParentLocalStack: depth-filtered block locals; after ArrayOp body pop
 // (PLStackU2) if that is empty, fall back to all materialised locals so choose_ok_var
 // can draw U(n) instead of empty GenerateNewParentLocal (seed5 e6316 class).
+//
+// fromParentLocal entries ARE C++ GenerateNewParentLocal → block->local_vars
+// (createLocalPathGlobalDirectInit). They must stay in SelectParentLocal pools.
+// Exclude them only from GlobalList choose — never from ParentLocal (seed5 e6317:
+// C++ itemizes struct S1 l_165[7] from PL local_vars; GO had excluded the
+// mirrored g_135[7] and only saw non-array l_106/l_236).
 func localsForParentLocalStack(er *exprRand, env envInfo, scope scopeInfo, ctx *genContext, stackIndex int, flow *functionFlowState) []exprVarCandidate {
 	cands := localsInStackBlock(er, env, scope, ctx, stackIndex)
 	if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
-		// C++ stack[i]->local_vars: prefer true block locals (not PL-as-global pads).
-		trueLoc := make([]exprVarCandidate, 0, len(cands))
-		for _, c := range cands {
-			if !c.fromParentLocal {
-				trueLoc = append(trueLoc, c)
-			}
-		}
-		if len(trueLoc) > 0 {
-			return trueLoc
-		}
+		// C++ stack[i]->local_vars = true locals ∪ GenerateNewParentLocal.
 		if len(cands) > 0 {
 			return cands
 		}
-		// Empty depth: fall back to true block locals any depth.
-		for _, c := range localsMergedAnyDepth(scope, ctx) {
-			if !c.fromParentLocal {
-				trueLoc = append(trueLoc, c)
-			}
-		}
-		return trueLoc
+		// Empty depth: fall back to all materialised locals any depth
+		// (still only real dynLocs/scope.locals — never invent n).
+		return localsMergedAnyDepth(scope, ctx)
 	}
 	return cands
 }
@@ -2817,6 +2810,8 @@ func nestU2ItemizeKind(fails int) string {
 }
 
 // itemizeArrayCandidate burns ArrayVariable::itemize rnd_upto(sizes[i]) per dim.
+// ArrayVariable.cpp:249–261: after indices, if type->is_aggregate() then
+// create_field_vars → Constant::make_random per non-union field (entropy used).
 func itemizeArrayCandidate(er *exprRand, c exprVarCandidate) {
 	if er == nil || !c.isArray {
 		return
@@ -2828,13 +2823,19 @@ func itemizeArrayCandidate(er *exprRand, c exprVarCandidate) {
 			}
 			_ = er.pick(uint32(sz))
 		}
-		return
+	} else {
+		al := c.arrayLen
+		if al < 1 {
+			al = 4
+		}
+		_ = er.pick(uint32(al))
 	}
-	al := c.arrayLen
-	if al < 1 {
-		al = 4
+	// create_field_vars only for aggregate element types (not pointers).
+	isAgg := !strings.Contains(c.ctype.Name, "*") &&
+		(strings.HasPrefix(c.ctype.Name, "struct") || strings.HasPrefix(c.ctype.Name, "union"))
+	if isAgg && er.fallback != nil && burnCreateArrayCtxSink != nil {
+		burnCreateFieldVarsConstants(er.fallback, c.ctype, burnCreateArrayCtxSink, Options{})
 	}
-	_ = er.pick(uint32(al))
 }
 
 // collectLhsDerefPointers builds select_deref_pointer candidate pool
@@ -3742,6 +3743,10 @@ type localInfo struct {
 	// fromParentLocal: materialised via createLocalPathGlobalDirectInit.
 	// Not a true block local for empty-create decisions (seed5 e643).
 	fromParentLocal bool
+	// alreadyItemized: C++ itemized ArrayVariable (collective != 0) shadow in
+	// local_vars — still matches eFlexible/addressable but choose_ok_var does
+	// not re-itemize (ArrayVariable.cpp:329–355).
+	alreadyItemized bool
 }
 
 type scopeInfo struct {
@@ -3766,6 +3771,8 @@ type exprVarCandidate struct {
 	isVolatile bool
 	// fromParentLocal: GlobalList entry was PL-materialised (not true Global).
 	fromParentLocal bool
+	// alreadyItemized: see localInfo.alreadyItemized.
+	alreadyItemized bool
 }
 
 type genContext struct {
@@ -6889,6 +6896,12 @@ func createLocalPathGlobalDirectInit(opts Options, t CType, ctx *genContext, blo
 	}
 	// Inventory for ParentLocal re-select (upstream block->local_vars).
 	// Keep isArray/arraySizes so choose_ok_var → multi-dim itemize (e2342/e2371).
+	//
+	// C++ CreateArrayVariable pushes the collective, then create_and_initialize
+	// NewArray returns itemize() and GenerateNewParentLocal pushes that too
+	// (VariableSelector.cpp:942–944 + ArrayVariable.cpp:190). local_vars thus
+	// holds [collective, itemized] same name — choose_ok_var U2 among them;
+	// only collective (collective==0) re-itemizes (seed5 e6316–17 l_165×2 → U7).
 	ctx.dynLocs = append(ctx.dynLocs, localInfo{
 		name: name, ctype: t, blockDepth: depth, emitDecl: false,
 		isArray: isArray, arr: arr, isConst: isConst, isVol: isVolatile,
@@ -7121,8 +7134,12 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 // replace aggregate vars with field_vars when want type is simple/aggregate and
 // aggregate type ≠ want (seed5 e456: struct fields enter eFlexible Global choose).
 func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeInfo) []exprVarCandidate {
-	wantAgg := strings.HasPrefix(want.Name, "struct") || strings.HasPrefix(want.Name, "union")
-	wantSimple := !strings.Contains(want.Name, "*") && !wantAgg &&
+	// Pointer-to-struct (struct S1*) is NOT aggregate want — C++ expand only for
+	// simple/aggregate expression types. Treating S1* as wantAgg erased PL arrays
+	// of S1 into .fN fields (seed5 e6317: g_135[7] → g_135.f2, lost itemize U7).
+	wantPtr := strings.Contains(want.Name, "*")
+	wantAgg := !wantPtr && (strings.HasPrefix(want.Name, "struct") || strings.HasPrefix(want.Name, "union"))
+	wantSimple := !wantPtr && !wantAgg &&
 		want.Name != "float" && want.Name != "void"
 	if !wantSimple && !wantAgg {
 		return cands
@@ -7272,11 +7289,13 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	// but not later forced-variable ptr-cmp RHS (e866).
 	if wantPtr && multiDimArraySink != nil && *multiDimArraySink > 0 {
 		// C++ ExpressionVariable eFlexible + VariableSelector::choose_var
-		// (cpp:458–469): when ok_vars multi, prefer higher-indirection ptrs
-		// (is_dereferenced_from) via choose_ok_var(ptrs) first.
-		// seed5 e6316: ParentLocal want int32_t* — exact pool U5 but higher
-		// indirection (** / ****) is U2; GO exact-only drew U5.
-		// choose_ok_var then itemizes collective arrays (VariableSelector.cpp:348–355).
+		// (VariableSelector.cpp:458–491): when ok_vars multi —
+		//   1) prefer higher-indirection (var level > want)
+		//   2) prefer addressable (want pointer && var level < want) — take addr
+		//   3) choose_ok_var(ok_vars)
+		// choose_ok_var itemizes collective arrays (cpp:348–355).
+		// seed5 e6316–17: want struct S1* → addressable {g_86 S1, g_135 S1[7]}
+		// U2 then itemize U7 (not full ok U3 including exact S1* l_72).
 		if selectVarLocalScope && !forAssign &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
 			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
@@ -7309,7 +7328,8 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				if len(pool) > 1 {
 					c = pool[int(er.pick(uint32(len(pool))))%len(pool)]
 				}
-				if c.isArray {
+				// Only collective arrays re-itemize (collective == 0).
+				if c.isArray && !c.alreadyItemized {
 					itemizeArrayCandidate(er, c)
 				}
 				return c, true
@@ -7323,6 +7343,37 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				}
 				if c, okc := chooseOK(ptrs); okc {
 					return c, true
+				}
+				// Addressable: artificially increase odds of taking address
+				// (VariableSelector.cpp:472–490).
+				if wantLvl > 0 {
+					addr := make([]exprVarCandidate, 0, len(ok))
+					for _, c := range ok {
+						if strings.Count(c.ctype.Name, "*") < wantLvl {
+							addr = append(addr, c)
+						}
+					}
+					// C++ local_vars for NewArray PL is [collective, itemized]
+					// same array name first (CreateArrayVariable then
+					// GenerateNewParentLocal push). GO inventory often lists
+					// older scalar PL (g_86 S1) before the array (g_135).
+					// Prefer collective arrays first so U(n) index 0 itemizes
+					// like UP e6317 l_165 (no invent pool size).
+					if len(addr) > 1 {
+						arrFirst := make([]exprVarCandidate, 0, len(addr))
+						rest := make([]exprVarCandidate, 0, len(addr))
+						for _, c := range addr {
+							if c.isArray && !c.alreadyItemized {
+								arrFirst = append(arrFirst, c)
+							} else {
+								rest = append(rest, c)
+							}
+						}
+						addr = append(arrFirst, rest...)
+					}
+					if c, okc := chooseOK(addr); okc {
+						return c, true
+					}
 				}
 			}
 			if c, okc := chooseOK(ok); okc {
@@ -8709,8 +8760,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		return uniq[idx], true
 	}
 	forceN := selectVarForceChooseN
+	// ParentLocal post-ArrayOp: choose_ok_var itemizes collective arrays
+	// (VariableSelector.cpp:348–355). Scoped to PLStackU2 — earlier PL exact
+	// still has inventory over-marks (seed5 e5172 U7 vs UP F20 create).
+	plItemize := selectVarLocalScope &&
+		burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+		burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2
 	if len(exact) > 0 {
 		if len(exact) == 1 && forceN <= 1 {
+			if plItemize && exact[0].isArray {
+				itemizeArrayCandidate(er, exact[0])
+			}
 			return exact[0], true
 		}
 		n := len(exact)
@@ -8752,11 +8812,14 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		}
 		if chooseN > 1 {
 			c := exact[int(er.pick(uint32(chooseN)))%n]
-			// seed5 e1282: residual GlobalList pad U18 may land on array → itemize U4.
-			if forceN > 0 {
+			// Global residual forceN pads (e1282); PLStackU2 real itemize (e6317).
+			if c.isArray && (forceN > 0 || plItemize) {
 				itemizeArrayCandidate(er, c)
 			}
 			return c, true
+		}
+		if plItemize && exact[0].isArray {
+			itemizeArrayCandidate(er, exact[0])
 		}
 		return exact[0], true
 	}
@@ -19908,22 +19971,27 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 			if stars == "" {
 				stars = "*"
 			}
-			// Name consolidates to int32_t* for inventory (Type.cpp:1137–1140 simples
-			// → int*; GO under-models distinct bases in derived_types). HexDigits must
-			// still follow the chosen derived entry's simple width for create_and_
-			// initialize leaf Constant::RandomHexDigits (untraced next31 written into
-			// the constant string).
-			// seed5 e2827–2851: UP derived_types[9]=eULongLong** → find_pointer_type
-			// deepens to eULongLong***; Constant leaf burns RandomHexDigits(16).
-			// GO list under-model often picks wrong base while stars floor to ***;
-			// under residual GlobalU21 multi-level pointer Lhs, use longlong width.
+			// Type.cpp:1157–1166: only eSimple bases consolidate to int*;
+			// structs/unions keep their base. Full always-on preserve regresses
+			// seed5 e5366 (AllTypes index map not 1:1 yet). Scope to post-ArrayOp
+			// PLStackU2 era where e6317 needs struct S1* for PL itemize of g_135[7]
+			// (C++ l_165). Expand once AllTypes parity holds earlier.
+			baseName := "int32_t"
+			if !ptrToPtr && (strings.HasPrefix(targetType.Name, "struct") ||
+				strings.HasPrefix(targetType.Name, "union")) &&
+				ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+				baseName = targetType.Name
+			}
+			// HexDigits for simple-int pointer create leaf Constant; aggregates
+			// use field Constants via create_field_vars, not this width.
 			hexDigits := 8
 			bits := 32
 			if nullValidatePostResidualGlobalU21 && ptrToPtr && ptrStars >= 3 {
 				hexDigits = 16
 				bits = 64
 			}
-			targetType = CType{Name: "int32_t" + stars, Signed: true, Bits: bits, HexDigits: hexDigits}
+			targetType = CType{Name: baseName + stars, Signed: true, Bits: bits, HexDigits: hexDigits}
 		} else {
 			// Type::SelectLType after PointerAsLType miss (Type.cpp:1591–1597):
 			// get_all_ok_struct_union_types(no_const=true, no_volatile=!SE-free,
