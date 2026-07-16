@@ -222,12 +222,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5554** (post residual free Expression PL create multiphase); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5692** (post residual free Expression PL retype U14); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
 
 
+
+**seed5 e5554→5692 climbed — post residual PL empty create multiphase + PP sole + live choose:**
+1. Capture: e5554 UP F50 (PP→PL empty create) vs GO U120 (sole after stack U5).
+2. C++: free Expression ParentParam miss → SelectParentLocal empty → GenerateNewParentLocal ** READ qfer + nested address residual (random_loose F50 + nested NewArray F20 F20 U3); later S2* Function-fail PP→PL address U4 among live pointees; Lhs F80 sole; GlobalList U31 + array itemize U3; Lhs SelectDeref null F0×2 then address U3; PL live U2+itemize / U3 fail reselect create F10 F20 F50 F50 U20; PP sole after one-shot empty create.
+3. GO: one-shot PP empty force + ** create residual multiphase; skip sticky PLCreateN==2 sole under postEA; S2* address multiphase (first nested bitfields, later U4); Lhs F80 sole after 2nd S2 create; Global U21→U31 after PostEACreateN≥2 + U3 itemize; Lhs empty create address U3 after U31; Function PL force S2 create; Expression PL live multiphase (empty create / U2 itemize / U3 reselect create / PP sole). Seeds 2/3/4/6 held.
+4. Next: e5692 UP U14=0 tries=0 vs GO U14 tries=1 (retype filter / LCG after stack U5).
 
 **seed5 e5420→5554 climbed — StatementAssign outer Lhs sole + post residual derived_types/PL:**
 1. Capture: e5420 UP U100=64 (next Statement) vs GO F80 (outer Statement Lhs SelectDeref after nested ExpressionAssign residual).
