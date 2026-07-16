@@ -818,6 +818,11 @@ type functionFlowState struct {
 	// RNG); next F80 empty-creates with random_qualifiers WRITE F50 F10 +
 	// self F50 (e6138–41) then NewArray F20 F20 F0 (e6142–44).
 	freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3: after post-Return ArrayOp
+	// control residual (e6265–81), next Statement Lhs ParentLocal uses
+	// Function::stack.size()=3 + empty GenerateNewParentLocal (e6286 U3 U14…).
+	// GO blockStack U1 + live choose U4 desyncs; one-shot after ArrayOp control.
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 bool
 	// freeMultiIVNeedNoRhsPostEAReturnNeedNoRhsLhsSoleDone: one-shot e6047
 	// need_no_rhs ExpressionAssign Lhs SelectDeref F80 soles live pointer
 	// (no empty create F20) → SafeOpFlags F50 U4. After NewArray residual,
@@ -18257,6 +18262,25 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	if ctx != nil {
 		flow = ctx.state
 	}
+	// seed5 e6286: post-Return ArrayOp body Statement Lhs ParentLocal — must run
+	// before multiphase early-returns (freeMultiIVForLhsVSPhase / AddrCreateVS /
+	// LhsVSPhase) that would skip the scopePick==1 residual below.
+	// Function::stack.size()=3 + empty GenerateNewParentLocal (U3 U14 F50 F20…).
+	if scopePick == 1 && flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 && er != nil {
+		flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 = false
+		idx := int(er.pick(3)) // e6286 stack
+		if er.fallback != nil {
+			es := true
+			prevES := useESimpleRetypeSink
+			useESimpleRetypeSink = &es
+			g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, target, ctx, 3, true, idx)
+			useESimpleRetypeSink = prevES
+			if ok {
+				return lvalueInfo{expr: g.expr, ctype: g.ctype}, true, false
+			}
+		}
+		return lvalueInfo{expr: "x", ctype: target}, true, false
+	}
 	// seed5 e2985–88: free multi-IV For Lhs SelectDeref addVol create residual
 	// then VS multiphase (no F80): U100 PL miss, U100 PP U7 miss, U100 PL accept.
 	if flow != nil && flow.freeMultiIVForLhsVSPhase > 0 && er != nil {
@@ -20273,6 +20297,37 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
+		// seed5 e6284–92: after post-Return ArrayOp control residual, Statement
+		// need_no_rhs Lhs F80=0 → VS ParentLocal Function::stack.size()=3 empty
+		// GenerateNewParentLocal retype U14 + WRITE F50 + NewArray F20 + Constant
+		// F50 F50 U4. Intercept here — chooseLValueEx is not reached for this Lhs
+		// (lhsDerefLoop SelectDeref/create multiphase exits before VS try loop).
+		if needNoRhs && ctx != nil && ctx.state != nil &&
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 {
+			if !r.flipcoin(80) { // e6284 F80=0 → VariableSelector
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 = false
+				er := &exprRand{fallback: r}
+				sp := variableScopePickFromEROpts(er, opts, &scope) // e6285 U100
+				if sp == 1 {
+					idx := int(er.pick(3)) // e6286 stack
+					es := true
+					prevES := useESimpleRetypeSink
+					useESimpleRetypeSink = &es
+					g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, targetType, ctx, 3, true, idx)
+					useESimpleRetypeSink = prevES
+					if ok {
+						lv = lvalueInfo{expr: g.expr, ctype: g.ctype}
+					} else {
+						lv = lvalueInfo{expr: "x", ctype: targetType}
+					}
+					lhsFromDeref = true
+					break
+				}
+				// non-PL: fall through without re-arm (UP this site is PL)
+				continue
+			}
+			// F80=1: leave flag for next iteration / empty create path
+		}
 		// e11680–: after e11118 For-body must_use RHS, Statement Lhs F80=0 →
 		// VS Global sole → PL U100 F40 → PP U100 → free Expression residual.
 		if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2StmtLhsU9Lhs {
@@ -122096,6 +122151,12 @@ func emitStatement(
 				state.postAggPLAfterArrayOpN = 0
 				postAggArrayOpDoneSink = &state.postAggArrayOpDone
 				state.freeMultiIVNeedNoRhsPostEAReturnForBody = true
+				// e6286: body Statement Lhs PL stack U3 + empty create.
+				state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLU3 = true
+				// Function::stack ≈ func frame + ArrayOp For + body (size 3).
+				if state.blockStack < 3 {
+					state.blockStack = 3
+				}
 			}
 			// seed5 e2384–2402: residual GlobalU21 ArrayOp F5=0 aryno≥1 —
 			// SelectLoopCtrlVar among ~13 expanded integer visibles (UP U13),
