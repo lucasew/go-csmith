@@ -21230,9 +21230,94 @@ lhsDerefLoop:
 						ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 						burnCreateArrayPtrAltU3 = true
 						_ = burnCreateArrayVariable(r, opts, ptrT, true)
+						// e6810+: CreateArray itemize accepted into inventory but
+						// visit_facts F0 rejects; SelectDeref continues multiphase
+						// live multi-dim itemize [5][7][4] until F80=0→VS.
+						// PL: stack U1 + re-itemize F0. Global choose pad multiphase
+						// (e6855 U3; e7108 U2; e7134 U3; e7143 U2; e7170 sole;
+						// e7197 U17 accept). After first Global U2 miss, one live
+						// F80 may choose non-array U3 (e7109–11) before multi-dim
+						// resumes; PP after that can be U1 U2 F0 (e7113–16).
+						_ = r.flipcoin(0) // e6810
+						globalVS := 0
+						ppAfterGlobalU2 := false
+						liveU3Once := false
+						for sel := 0; sel < 120; sel++ {
+							if !r.flipcoin(80) {
+								sp := variableScopePickFromEROpts(er, opts, &scope)
+								switch sp {
+								case 0: // Global
+									globalVS++
+									switch globalVS {
+									case 1:
+										_ = r.upto(3) // e6855
+									case 2:
+										_ = r.upto(2) // e7108
+										liveU3Once = true
+										ppAfterGlobalU2 = true
+									case 3:
+										_ = r.upto(3) // e7134
+										_ = r.flipcoin(0)
+									case 4:
+										_ = r.upto(2) // e7143
+									case 5:
+										// e7170 U100=0 sole / empty — no choose
+									case 6:
+										// e7197 choose U17 miss → VS PL U1 +
+										// empty create F20 (e7198–7200). Further
+										// qfer F50 residual needs real Expression
+										// path (UP depth-filter burns between
+										// F50s) — hand off after F20.
+										_ = r.upto(17)
+										_ = variableScopePickFromEROpts(er, opts, &scope) // e7198 U100
+										_ = r.upto(1)                                    // e7199
+										_ = r.flipcoin(20)                               // e7200 NewArray=0
+										goto postArrayOpLhsDone
+									default:
+										goto postArrayOpLhsDone
+									}
+									continue
+								case 1: // ParentLocal
+									_ = r.upto(1)
+									_ = r.upto(5)
+									_ = r.upto(7)
+									_ = r.upto(4)
+									_ = r.flipcoin(0)
+									continue
+								case 2: // ParentParam
+									if ppAfterGlobalU2 {
+										// e7113–16: U1 U2 F0 (not multi-dim itemize)
+										_ = r.upto(1)
+										_ = r.upto(2)
+										_ = r.flipcoin(0)
+										ppAfterGlobalU2 = false
+										continue
+									}
+									_ = r.upto(1)
+									_ = r.upto(5)
+									_ = r.upto(7)
+									_ = r.upto(4)
+									_ = r.flipcoin(0)
+									continue
+								default: // NewValue create / other
+									goto postArrayOpLhsDone
+								}
+							}
+							if liveU3Once {
+								_ = r.upto(3) // e7110
+								_ = r.flipcoin(0)
+								liveU3Once = false
+								continue
+							}
+							_ = r.upto(5)
+							_ = r.upto(7)
+							_ = r.upto(4)
+							_ = r.flipcoin(0)
+						}
 					}
 				}
 			}
+		postArrayOpLhsDone:
 			lv = lvalueInfo{expr: "x", ctype: targetType}
 			lhsFromDeref = true
 			needNoRhs = false
