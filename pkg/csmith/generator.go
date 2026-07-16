@@ -156,6 +156,11 @@ var burnCreateArrayPtrAltU10 bool
 // SelectDeref empty create VS PL (e4239–55): pointer alts F20=0 → choose U2;
 // v=0 itemize multi-dim * [8][7] (e4249 U8 U7). Default postAgg F20-only under-burns.
 var burnCreateArrayMultiLvlAltU2 bool
+// burnCreateArrayPtrAltU3: one-shot * CreateArray after post-ArrayOp Assign
+// SelectDeref NewArray residual (seed5 e6712+): pointer alts F20=0 → choose_ok_var
+// U3 among ~3 simple pointees; v=0 rechoose U3 (visit/filter reject of index 0).
+// Default fall-through is F20-only and under-burns vs UP F20 U3…
+var burnCreateArrayPtrAltU3 bool
 
 // burnCreateArrayLhsNullValidate: after SelectDeref NewArray+null create, each
 // retry F80 choose of the null array burns FactPointTo F0 (seed5 e727–41).
@@ -4754,6 +4759,14 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 					// seed5 e6164/66/68: post-Return Lhs SelectDeref NewArray
 					// CreateArray alts address choose among ~10 simple pointees.
 					_ = r.upto(10)
+				} else if burnCreateArrayPtrAltU3 {
+					// seed5 e6714+: * CreateArray alts after post-ArrayOp residual
+					// NewArray+address — choose_ok_var U3; index 0 fails filter
+					// → second U3 among same pad (UP F20 U3 | F20 U3 U3).
+					v := int(r.upto(3))
+					if v == 0 {
+						_ = r.upto(3)
+					}
 				} else if burnCreateArrayMultiLvlAltU2 {
 					// seed5 e4245–54: ** CreateArray alts after multi-level
 					// SelectDeref create VS PL NewArray — choose_ok_var U2;
@@ -4898,6 +4911,9 @@ func burnCreateArrayVariable(r *rng, opts Options, t CType, itemize bool) arrayC
 	}
 	if nullValidatePostResidualCreateArrayAltU2 && strings.Contains(t.Name, "*") {
 		nullValidatePostResidualCreateArrayAltU2 = false
+	}
+	if burnCreateArrayPtrAltU3 {
+		burnCreateArrayPtrAltU3 = false
 	}
 	return arrayCreateResult{sizes: sizes, inits: inits, hadNullPtrAlt: hadNullPtrAlt}
 }
@@ -21172,26 +21188,54 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
-		// e6686: after e6586 residual Assign, next Assign Lhs is VS U100 first
-		// (must_use miss + no SelectDeref F80 on UP) — Global U100=1 then
-		// choose_ok_var U13 + itemize U4, visit fail → VS reselect U100=89
-		// then Expression term U120 (e6687–90).
+		// e6686–: after e6586 residual Assign, next free Assign skips AssignOps
+		// / SelectLType. UP stream: Lhs VS Global U100=1 choose U13 itemize U4
+		// reselect U100=89 → Expression term U120=69 then Function residual
+		// F50 F30 F0 + nested Expression U120s + VS U100 U3 + SelectDeref
+		// create F80 F0 F80 F20 F20 U3 U3 U99… (e6686–e6716).
 		if forcePostArrayOpLhsVS {
 			forcePostArrayOpLhsVS = false
 			er := &exprRand{fallback: r}
 			_ = variableScopePickFromEROpts(er, opts, &scope) // e6686 U100
-			// choose_ok_var among GlobalList pad (~13) + array itemize U4
 			if r != nil {
-				_ = r.upto(13) // e6687
-				_ = r.upto(4)  // e6688
+				_ = r.upto(13) // e6687 choose_ok_var
+				_ = r.upto(4)  // e6688 itemize
 			}
 			_ = variableScopePickFromEROpts(er, opts, &scope) // e6689 U100
+			if r != nil {
+				_ = r.upto(120)    // e6690 Expression term Function
+				_ = r.flipcoin(50) // e6691
+				_ = r.flipcoin(30) // e6692
+				_ = r.flipcoin(0)  // e6693
+				_ = r.upto(120)    // e6694 nested Expression
+				_ = r.flipcoin(50) // e6695
+				_ = r.upto(120)    // e6696
+				_ = r.upto(120)    // e6697
+				_ = r.upto(100)    // e6698 VS
+				_ = r.upto(3)      // e6699 stack / choose
+				// SelectDeref create residual (e6700–)
+				if r.flipcoin(80) { // e6700
+					_ = r.flipcoin(0) // e6701 visit fail
+				}
+				if r.flipcoin(80) { // e6702
+					newArr := r.flipcoin(20) // e6703
+					_ = r.flipcoin(20)       // e6704 init null vs address
+					if newArr {
+						// address-of choose pad U3 U3 (e6705–06) then CreateArray
+						// of pointer type so alt inits use make_init F20×n (UP
+						// e6712+) not simple Constant F50. PtrAltU3: each address
+						// alt burns choose U3 (+ rechoose when v=0).
+						_ = r.upto(3)
+						_ = r.upto(3)
+						ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						burnCreateArrayPtrAltU3 = true
+						_ = burnCreateArrayVariable(r, opts, ptrT, true)
+					}
+				}
+			}
 			lv = lvalueInfo{expr: "x", ctype: targetType}
 			lhsFromDeref = true
 			needNoRhs = false
-			if r != nil {
-				_ = r.upto(120) // e6690 Expression / AssignOps-shaped
-			}
 			break
 		}
 		// seed5 e6284–92: after post-Return ArrayOp control residual, Statement
