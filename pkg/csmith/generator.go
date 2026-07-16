@@ -759,7 +759,15 @@ type functionFlowState struct {
 	freeMultiIVNeedNoRhsPostEAU23Done bool
 	// freeMultiIVNeedNoRhsPostEAReturnGlobalDone: one-shot e5732–36 StatementReturn
 	// ExpressionVariable Global U2+itemize U2 + Constant F50 hex16 F50.
+	// After this, Function::stack.size()=1 (Return ended nested If; parent free
+	// multi-IV body continues shallower) — sticky postEAStackU5 U5 sole under-burns.
 	freeMultiIVNeedNoRhsPostEAReturnGlobalDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnPLN: free Expression PL hits after Return
+	// Global residual. 0–1 e5754/e5780: stack U1 + choose_ok_var U14; later U1+U14…
+	freeMultiIVNeedNoRhsPostEAReturnPLN int
+	// freeMultiIVNeedNoRhsPostEAReturnPPN: free Expression PP after Return residual.
+	// 0 e5764–65: live choose_ok_var U7 accept; 1+ e5800–02: miss → PL U1+U2.
+	freeMultiIVNeedNoRhsPostEAReturnPPN int
 	// freeMultiIVNeedNoRhsPostEALhsAddrU3Done: one-shot e5621 Lhs SelectDeref
 	// empty create address choose U3 after null F0×2 ladder (e5610–20).
 	freeMultiIVNeedNoRhsPostEALhsAddrU3Done bool
@@ -2257,6 +2265,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 			n = 6
 		}
 		return int(er.pick(n))
+	}
+	// seed5 e5754: after StatementReturn Global residual, Function::stack.size()=1
+	// (Return ended nested If frame; parent free multi-IV body continues). Sticky
+	// postEA U5 / post-If U6 over-burns vs UP U1 + choose_ok_var.
+	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone {
+		return int(er.pick(1))
 	}
 	// seed5 e5373: free multi-IV need_no_rhs-era parent free For after the
 	// need_no_rhs If (IfBody cleared, NestedFor off). Expression Variable
@@ -9005,6 +9019,23 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 	if ctx != nil {
 		flow = ctx.state
 	}
+	// seed5 post-Return forced-pointer ExpressionVariable ParentParam multiphase
+	// (randomPointerVariableExpr — no term U120). Same as termVariable:
+	//   0 e5765 U7; 1+ e5801–02 U1+U2. Sole param accept skips these and
+	// parent Lhs SelectDeref burns F80 with the U1 raw.
+	if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+		scopePick == 2 && er != nil {
+		pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
+		flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
+		if pn == 0 {
+			_ = er.pick(7)
+		} else {
+			_ = er.pick(1)
+			_ = er.pick(2)
+		}
+		bumpExprDepth(ctx)
+		return castLiteral(t, "x")
+	}
 	if scopePick == 3 {
 		if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 			bumpExprDepth(ctx)
@@ -10071,6 +10102,25 @@ exprTries:
 					return castLiteral(t, c.expr)
 				}
 				scopePick := variableScopePickFromER(er, opts, &scope)
+				// seed5 post-Return Function-fail → ExpressionVariable ParentParam:
+				// same multiphase as termVariable (0 e5765 U7; 1+ e5801–02 U1+U2).
+				// Without this, GO sole-accepts param inventory then parent Lhs F80
+				// steals the U1 raw.
+				if ctx != nil && ctx.state != nil &&
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+					scopePick == 2 && er != nil {
+					pn := ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN
+					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
+					if pn == 0 {
+						_ = er.pick(7)
+					} else {
+						_ = er.pick(1)
+						_ = er.pick(2)
+					}
+					bumpExprDepth(ctx)
+					markFuncEffect()
+					return castLiteral(t, "x")
+				}
 				if scopePick == 3 {
 					if g, ok := createOnDemandGlobalFromER(er, opts, t, ctx); ok {
 						bumpExprDepth(ctx)
@@ -10639,6 +10689,25 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
+			// seed5 post-Return free Expression ParentParam multiphase:
+			//   0 e5764–65: live choose_ok_var U7 accept → Expression U120
+			//   1+ e5800–02: miss → SelectParentLocal stack U1 + choose U2
+			// Sticky e5677 sole skips U7; residual U7 pad is off for pointers
+			// after PPU7Done. Early intercept before postEA sole paths.
+			if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+				scopePick == 2 && er != nil {
+				pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
+				flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
+				if pn == 0 {
+					_ = er.pick(7) // e5765 choose_ok_var among params
+				} else {
+					_ = er.pick(1) // e5801 PL stack
+					_ = er.pick(2) // e5802 choose_ok_var
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
+			}
 			// seed5 e4229–42: after multi-level SelectDeref empty create F20×4,
 			// free Expression Variable VS multiphase (VariableSelector.cpp):
 			//   e4229 U100=53 PL + U3 stack visit-fail (no create RNG)
@@ -10841,12 +10910,17 @@ exprTries:
 					freeMultiIVExprPL := flow != nil && flow.freeMultiIVForLhsExprContinue
 					multiLvlPLU3 := flow != nil && flow.freeMultiIVPostEAMultiLvlPLStackU3
 					needNoRhsIfPL := flow != nil && flow.freeMultiIVNeedNoRhsIfBody
+					// seed5 e5754: after StatementReturn Global residual, stack U1 +
+					// choose_ok_var (not sticky postEA U5 sole).
+					postEAReturnPL := flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone
 					// seed5 e5460: after post-If ExpressionAssign residual + next
 					// Statement Assign, PL stack is U5 (UP). Sticky forceU6 after
-					// ptr-cmp residual over-burns.
-					postEAStackU5 := flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21
+					// ptr-cmp residual over-burns. Cleared once Return residual done.
+					postEAStackU5 := flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+						!flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone
 					forceU6Stack := nullValidatePostResidualGlobalU2AfterPtrCmpDone &&
-						!freeMultiIVExprPL && !multiLvlPLU3 && !needNoRhsIfPL && !postEAStackU5
+						!freeMultiIVExprPL && !multiLvlPLU3 && !needNoRhsIfPL && !postEAStackU5 &&
+						!postEAReturnPL
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
 						// e3003/e3058/e3405: stack U2 during early residual Expression.
@@ -10863,6 +10937,17 @@ exprTries:
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "l_iv"))
+					} else if postEAReturnPL {
+						// e5754–55 / e5780–81: Function::stack.size()=1 after Return;
+						// choose_ok_var among expanded inventory U14. Sticky postEA
+						// sole after U5 desyncs Expression U120 onto the U14 raw.
+						// (e5801 U1+U2 is PP→PL fallthrough, not direct PL.)
+						idx = int(er.pick(1))
+						flow.freeMultiIVNeedNoRhsPostEAReturnPLN++
+						_ = er.pick(14) // e5755 / e5781 choose_ok_var
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "x"))
 					} else if postEAStackU5 {
 						idx = int(er.pick(5)) // e5460 / e5463 post residual
 					} else if forceU6Stack {
@@ -13608,7 +13693,9 @@ exprTries:
 			// SelectParentLocal empty create (UP U100=72 → U5 → F50 qfer).
 			// One-shot force empty; later PP soles (e5677 U100=71 → U120) even
 			// when GO param inventory type-misses (UP choose_var accepts).
-			if scopePick == 2 && flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 {
+			// Post-Return PP multiphase is intercepted earlier (U7 then U1+U2).
+			if scopePick == 2 && flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+				!flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone {
 				if !flow.freeMultiIVNeedNoRhsPostEAPPEmptyDone {
 					flow.freeMultiIVNeedNoRhsPostEAPPEmptyDone = true
 					candidates = nil
@@ -13762,7 +13849,9 @@ exprTries:
 					// e5554). GO over-inventory soles after U5 → Expression
 					// U120. Force empty create (same as direct PL PostEAPLN
 					// create; levels floor 2 in createOnDemand).
+					// Post-Return PP→PL is intercepted earlier (U1+U2).
 					if flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+						!flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 						er != nil {
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
 							bumpExprDepth(ctx)
