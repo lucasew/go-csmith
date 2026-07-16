@@ -718,6 +718,8 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsEra outside If body (parent free For after need_no_rhs
 	// If). C++ eDereference pool ~5; GO inventory empty → wrong F10 create.
 	// e5323–27: U5+U7 itemize fail then F80 U5 accept (not empty create).
+	// e5360: U5 accept; e5729–30: U5 + 1d array itemize U4 accept (Lhs.cpp
+	// choose_ok_var → ArrayVariable::itemize sizes[i]).
 	freeMultiIVNeedNoRhsEraLhsSelN int
 	// freeMultiIVNeedNoRhsPostIfPLN: VS PL choose under post-If need_no_rhs-era
 	// free For (e5332+). First: live U5 miss; later create/U6 multiphase.
@@ -751,6 +753,13 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsPostEAU31ItemizeDone: one-shot e5609 U3 itemize after
 	// first post-EA GlobalList U31 choose (collective array).
 	freeMultiIVNeedNoRhsPostEAU31ItemizeDone bool
+	// freeMultiIVNeedNoRhsPostEAU23Done: one-shot e5697 free Expression Global
+	// eFlexible U23 after U31 itemize. Later Global (e5733 StatementReturn
+	// ExpressionVariable) is live filtered U2 — not sticky U23 forever.
+	freeMultiIVNeedNoRhsPostEAU23Done bool
+	// freeMultiIVNeedNoRhsPostEAReturnGlobalDone: one-shot e5732–36 StatementReturn
+	// ExpressionVariable Global U2+itemize U2 + Constant F50 hex16 F50.
+	freeMultiIVNeedNoRhsPostEAReturnGlobalDone bool
 	// freeMultiIVNeedNoRhsPostEALhsAddrU3Done: one-shot e5621 Lhs SelectDeref
 	// empty create address choose U3 after null F0×2 ladder (e5610–20).
 	freeMultiIVNeedNoRhsPostEALhsAddrU3Done bool
@@ -6942,8 +6951,11 @@ if pointerGlobalPicksSink != nil {
 				}
 				// seed5 e5117–18: post-need_no_rhs free Expression Global
 				// array itemize U4 (GO arrayLen under-count as 3 → U3).
+				// Once PostEAGlobalU21 (e5457+), live arrayLen (e5733 Return
+				// size-2 itemize U2) — not sticky U4 under residual era.
 				if burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
-					burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra && al < 4 {
+					burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra && al < 4 &&
+					!burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21 {
 					al = 4
 				}
 				_ = er.pick(uint32(al))
@@ -7064,12 +7076,19 @@ if pointerGlobalPicksSink != nil {
 		// live GlobalList U4 + array itemize U4 — not sticky e1017 U2 / size-3.
 		// freeMultiIVNeedNoRhsEra is sticky after GlobalN>=2 so earlier free
 		// multi-IV Expression Globals (e3241 U3) stay unpadded.
+		// Once post-If ExpressionAssign residual era arms (PostEAGlobalU21),
+		// free Expression uses U21/U31/U23 multiphase (eFlexible path); exact
+		// pointer/Return Global must keep live ok_vars (e5733 U2) not U4 pad.
 		if !forAssign && !selectVarLocalScope &&
 			((freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink) ||
 			(burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
 				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsEra)) &&
 			(n == 2 || n == 3 || chooseN == 2) {
-			chooseN = 4
+			postEA := burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21
+			if !postEA {
+				chooseN = 4
+			}
 		}
 		// seed4 e1886–92 residual F20×4 when small inventory.
 		// seed4 e2256 postAgg: UP U23 GlobalList choose — pad once postAgg active.
@@ -7137,7 +7156,9 @@ if pointerGlobalPicksSink != nil {
 		// seed2 e811 sticky U17 (live inventory under-counts).
 		// seed5 e5608: after post residual PL/S2 creates (PostEACreateN≥2),
 		// first GlobalList choose is U31 + collective itemize U3 (e5609).
-		// Later free Expression Global (e5697) is U23 — not sticky U31.
+		// seed5 e5697: one free Expression Global U23 after U31 itemize.
+		// seed5 e5733: StatementReturn ExpressionVariable Global is live
+		// filtered ok_vars U2 (+ optional itemize) — not sticky U23.
 		// C++ GlobalList shrank / filter after e5608 itemize accept.
 		if !forAssign && !selectVarLocalScope &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
@@ -7145,22 +7166,32 @@ if pointerGlobalPicksSink != nil {
 			n >= 2 {
 			st := burnCreateArrayCtxSink.state
 			want := 21
+			pad := true
 			if st.freeMultiIVNeedNoRhsPostEACreateN >= 2 {
 				if !st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone {
 					want = 31 // e5608 first post-create Global
+				} else if !st.freeMultiIVNeedNoRhsPostEAU23Done {
+					want = 23 // e5697 one-shot after U31 itemize era
 				} else {
-					want = 23 // e5697+ after U31 itemize era
+					// e5733+: live filtered pool (Return / later free Expression)
+					pad = false
 				}
 			}
-			v := int(er.pick(uint32(want)))
-			c := uniq[v%n]
-			if want == 31 && !st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone {
-				st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone = true
-				_ = er.pick(3) // e5609 ArrayVariable::itemize
-			} else {
-				itemizeArrayCandidate(er, c)
+			if pad {
+				v := int(er.pick(uint32(want)))
+				c := uniq[v%n]
+				if want == 31 && !st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone {
+					st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone = true
+					_ = er.pick(3) // e5609 ArrayVariable::itemize
+				} else {
+					if want == 23 {
+						st.freeMultiIVNeedNoRhsPostEAU23Done = true
+					}
+					itemizeArrayCandidate(er, c)
+				}
+				return c, true
 			}
-			return c, true
+			// fall through to live n choose below
 		}
 		// e276 small-pool quirk only before multi-dim / must_read era.
 		if n == 2 && (multiDimArraySink == nil || *multiDimArraySink == 0) {
@@ -7199,8 +7230,11 @@ if pointerGlobalPicksSink != nil {
 					if st.freeMultiIVNeedNoRhsPostEACreateN >= 2 {
 						if !st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone {
 							target = 31 // e5608
+						} else if !st.freeMultiIVNeedNoRhsPostEAU23Done {
+							target = 23 // e5697 one-shot
+							st.freeMultiIVNeedNoRhsPostEAU23Done = true
 						} else {
-							target = 23 // e5697+
+							target = 0 // e5733+ live n
 						}
 					}
 				}
@@ -7208,8 +7242,8 @@ if pointerGlobalPicksSink != nil {
 				small := useSmallParentStackSink != nil && *useSmallParentStackSink
 				picks := *postMustReadGlobalPicks
 				u27ok := globalU27DoneSink == nil || !*globalU27DoneSink
-				if target == 21 {
-					// keep post-EA U21
+				if target == 21 || target == 23 || target == 31 {
+					// keep post-EA pad
 				} else if small && picks >= 5 && n >= 3 && u27ok {
 					target = 27 // e1145
 					if globalU27DoneSink != nil {
@@ -7281,8 +7315,11 @@ if pointerGlobalPicksSink != nil {
 							if st.freeMultiIVNeedNoRhsPostEACreateN >= 2 {
 								if !st.freeMultiIVNeedNoRhsPostEAU31ItemizeDone {
 									target = 31 // e5608
+								} else if !st.freeMultiIVNeedNoRhsPostEAU23Done {
+									target = 23 // e5697 one-shot
+									st.freeMultiIVNeedNoRhsPostEAU23Done = true
 								} else {
-									target = 23 // e5697+
+									target = 0 // e5733+ live n
 								}
 							}
 						} else if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink {
@@ -9181,6 +9218,38 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 		if g, ok := createOnDemandGlobalFromEROpts(er, opts, createT, ctx, true); ok {
 			return castLiteral(t, g.expr)
 		}
+	}
+	// seed5 e5732–36: post-If ExpressionAssign residual era StatementReturn
+	// ExpressionVariable Global — C++ choose_ok_var among 2 return-typed
+	// globals + 1d array itemize size 2, then Constant residual F50 hex16
+	// F50 hex2 (depth gaps +17/+3 match RandomHexDigits). Sticky era U4/U23
+	// pads desync (UP U2 U2 F50 F50 then parent Statement U100).
+	if scopePick == 0 && flow != nil && flow.freeMultiIVNeedNoRhsPostEAGlobalU21 &&
+		!flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone {
+		flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone = true
+		_ = er.pick(2) // e5733 choose_ok_var
+		_ = er.pick(2) // e5734 ArrayVariable::itemize size 2
+		if er.fallback != nil {
+			// e5735 F50=0 → RandomHexDigits(16); e5736 F50=0 → hex2
+			if !er.fallback.flipcoin(50) {
+				for i := 0; i < 16; i++ {
+					_ = er.fallback.next31()
+				}
+			}
+			if !er.fallback.flipcoin(50) {
+				for i := 0; i < 2; i++ {
+					_ = er.fallback.next31()
+				}
+			}
+		}
+		// e5737: parent block continues StatementProbability U100 (IfElse);
+		// GO would open sibling/else BlockProbability U4 with the same raw.
+		// C++ Return ends only the current block; parent free multi-IV body
+		// keeps generating without a fresh Block::make_random.
+		flow.skipNextBlockSize = true
+		// Nested Return must not halt outer free multi-IV body (parent U100).
+		flow.lastStmtWasReturn = false
+		return castLiteral(t, "g_0")
 	}
 	if scopePick == 1 {
 		idx := parentStackPick(er, flow)
@@ -116592,13 +116661,14 @@ commaF80MultiDone:
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
 			break
 		}
-		// seed5 e5323–27 / e5359–60: free multi-IV need_no_rhs-era parent free
-		// For Assign Lhs after the need_no_rhs If (IfBody already cleared).
+		// seed5 e5323–27 / e5359–60 / e5728–30: free multi-IV need_no_rhs-era
+		// parent free For Assign Lhs after the need_no_rhs If (IfBody cleared).
 		// C++ live select_deref_pointer eDereference pool; GO inventory empty
 		// → empty create residual. Gate: era + !IfBody + LhsSelDone (post-If
 		// free stream only). Simple Assign (not need_no_rhs):
-		//   n0 e5324–25 U5+U7 fail; n1 e5327 U5 accept
-		//   n2+ e5360 later simple Assign live U5 accept
+		//   n0 e5324–25 U5+U7 fail; n1 e5327 U5 accept; n2 e5360 U5 accept
+		//   n3+ e5729–30 U5 + choose_ok_var array itemize U4 accept
+		//     (VariableSelector.cpp:327–331 ArrayVariable::itemize)
 		// need_no_rhs Assign uses F80=0→VS then PostIfSelDeref (e5334+).
 		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsEra &&
 			!ctx.state.freeMultiIVNeedNoRhsIfBody &&
@@ -116611,7 +116681,17 @@ commaF80MultiDone:
 				_ = r.upto(7)
 				continue
 			}
-			// e5327 / e5360+: choose U5 accept
+			if n >= 3 {
+				// e5729–30: choose U5 + 1d size-4 itemize U4 → Lhs accept
+				// (next StatementProbability U100; GO used to skip itemize
+				// and consume that raw as Statement U100).
+				_ = r.upto(5)
+				_ = r.upto(4)
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
+			// e5327 / e5360: choose U5 accept (non-array pointer)
 			_ = r.upto(5)
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
@@ -120369,8 +120449,14 @@ func emitStatement(
 			// (ArrayOp U100=52 F5…). Csmith Block must_return would stop; GO
 			// filterCompound depth lag left more Statement slots — do not halt.
 			// seed5 residual Return in If then: skipElse clears / do not halt outer.
+			// seed5 e5737: post-EA Return residual already cleared lastStmtWasReturn
+			// and armed skipNextBlockSize so parent free multi-IV body continues
+			// Statement U100 (not else/sibling BlockSize U4).
 			if nullValidatePostResidualSkipIfElse {
 				// leave false
+			} else if state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+				state.skipNextBlockSize {
+				// leave false — parent continues (e5737 U100)
 			} else if !(postAggGlobalCreateN >= 0 && state.filterCompoundStmts) {
 				state.lastStmtWasReturn = true
 			}
