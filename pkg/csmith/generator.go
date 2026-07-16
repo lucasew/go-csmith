@@ -21264,14 +21264,23 @@ lhsDerefLoop:
 										// e7170 U100=0 sole / empty — no choose
 									case 6:
 										// e7197 choose U17 miss → VS PL U1 +
-										// empty create F20 (e7198–7200). Further
-										// qfer F50 residual needs real Expression
-										// path (UP depth-filter burns between
-										// F50s) — hand off after F20.
+										// empty create NewArray=0 + Constant(s)
+										// (e7198+). Hex Constant path burns
+										// untraced next31 digits (UP depth gaps).
 										_ = r.upto(17)
 										_ = variableScopePickFromEROpts(er, opts, &scope) // e7198 U100
 										_ = r.upto(1)                                    // e7199
 										_ = r.flipcoin(20)                               // e7200 NewArray=0
+										// e7201–08: Constant residual after NewArray=0
+										// (small int + hex char + hex longlong +
+										// small). Hex path burns untraced next31
+										// digits matching UP depth gaps. Next open
+										// e7209 U100 tries=1 (VS filter rejects a
+										// PL draw GO accepts — needs real filter).
+										_ = formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
+										_ = formatSimpleConstant(r, CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2})
+										_ = formatSimpleConstant(r, CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16})
+										_ = formatSimpleConstant(r, CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8})
 										goto postArrayOpLhsDone
 									default:
 										goto postArrayOpLhsDone
