@@ -2377,21 +2377,22 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		return 0
 	}
 	n := 1
-	// seed5 e6175: after post-Return NewArray Global-miss SelectDeref CreateArray
-	// residual F80=0 → VS, Function::stack.size()=3 (free multi-IV For body).
-	// Sticky NewArrayVSDone U1 / ForBody U2 under-burns vs UP U3 + itemize U4.
-	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
-		return int(er.pick(3))
+	// seed5 e6175 / e6286: after post-Return NewArray residual + ArrayOp body,
+	// Function::stack.size()=3 (free multi-IV For + ArrayOp + body). Prefer over
+	// NewArrayVSDone U1 / ForBody U2. After ForBody arm from ArrayOp control.
+	if state != nil && (state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure ||
+		state.freeMultiIVNeedNoRhsPostEAReturnForBody) {
+		// e6286 UP U3 after ArrayOp body Statement Lhs PL; e5928 was U2 before
+		// ArrayOp residual — use U3 once SelPure ArrayOp control has run.
+		if state.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayLhsSelPure {
+			return int(er.pick(3))
+		}
+		return int(er.pick(2))
 	}
 	// seed5 e6106: after post-Return NewArray residual + free Expression
 	// Global U4 empty visit → VS NewValue→PL, Function::stack.size()=1.
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 		return int(er.pick(1))
-	}
-	// seed5 e5928: post-Return free For body (SelectLoopCtrl U26) — stack U2
-	// (parent free body + For). Must beat sticky ifBody U5/U6 and post-Return U1.
-	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnForBody {
-		return int(er.pick(2))
 	}
 	// seed5 e5133: free multi-IV need_no_rhs-era free If then-body Assign RHS
 	// Expression Variable PL: Function::stack.size()=5 (not GO blockStack 6).
