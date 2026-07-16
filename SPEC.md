@@ -214,6 +214,8 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 ## 8. Changelog of decisions (grill)
 
+### 8.1 Original lock (2026-07)
+
 1. Goal = feature parity, drop-in replacement (not “random C is fine”)
 2. Bit-identical default output via RNG stream alignment
 3. Golden = current `pkgs.csmith` / `.src` (not classic 2.3.0 tarball alone)
@@ -226,6 +228,24 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 10. Agent-driven iteration; remove Ralph loop
 11. Binary name: `csmith`
 
+### 8.2 Closed after SPEC §5.1.1 / §5.2 hardening (post-`cf7198d` / `eaad659`, 2026-07-16)
+
+These were locked in continued grilling / agent execution after the integrity language landed in SPEC. They **do not reopen** earlier items; they close process gaps that showed up while climbing seed5.
+
+| # | Decision | Status |
+|---|----------|--------|
+| 12 | **Looks-like entropy discard is fail-closed forever** — Appearance is enough to reject (`_ = r.upto`, invent floors, multiphase residual ladders, untraced gap-fills). No “temporary pad to climb then clean later.” Reaffirmed when a climb pack (`U2 U7 F50…` invent choose) was introduced after §5.2: **strip the pack**; do not argue score. | **CLOSED** |
+| 13 | **No residual as climb vehicle** — Preference order is only: C++ predicate → materialise inventory + real callee. Diagnostics = traces/prints only. Blank-draw multiphase is never a step on the path to “done.” | **CLOSED** (`eaad659` + reaffirmation) |
+| 14 | **Integrity = read the diff** — No integrity scripts as acceptance. Multi-seed hold + `first_div` climb are **metrics**, not a substitute for code review against §5.1–5.2. | **CLOSED** (reaffirmed) |
+| 15 | **Deviations are often non-RNG** — When GO and UP share the same raw but differ on `n` (e.g. U1 vs U3), diagnose **C++ state** (inventory, `Function::stack`, effect filters), not invent pool size. **GDB / instrumented C++ inspection is preferred** over smoke unit tests of isolated Go helpers for parity. | **CLOSED** |
+| 16 | **Parity measure stays the instrumented stream** — Climb with `scripts/find-rng-divergence.sh` (and related parity scripts). Do **not** substitute ad-hoc C++ unit “smoke” or Go-only unit tests as the proof of 1:1. | **CLOSED** |
+| 17 | **Multi-seed hold is mandatory after every patch** — At least seeds **2, 4, 6** (and 3 when cheap) must keep full event match when climbing seed5. A seed5 climb that breaks 2/4 is **invalid** even if first_div rises. | **CLOSED** |
+| 18 | **`pure_rnd` / DefaultRndNumGenerator untraced `next31` is not invent pad** when it mirrors C++ `pure_rnd_upto` / hex digit generation at the same API site (value is used by upstream). Still reject free-standing next31 packs with no C++ cite. | **CLOSED** |
+| 19 | **Done = COUNT=20 SEED_START=2 parity-gate exit 0** — Keep grinding until that gate; no “good enough first_div” stop. Source match and residual-debt strip remain open work after events. | **CLOSED** (goal; work ongoing) |
+| 20 | **Scheduled continue loops are process only** — Recurring agent “continue” jobs do not change integrity rules; each fire is still subject to §5.1–5.2. | **CLOSED** |
+
+**Explicitly still open (not closed by grill):** seed5 full event stream; seeds 7–21; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt; full flag parity (§4 phase C).
+
 
 ## 9. Progress (living)
 
@@ -236,9 +256,9 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 2 event match | **PASS** — full **37939/37939** |
 | Seed 2 source match | **FAIL** — residual-driven path; not full Csmith-flow AST |
 | Seed 3 event match | **PASS** — full **64/64** |
-| Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
+| Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **6046** (post-Return free Expression after F50: UP U120 tries=0 Assign→F80 Lhs vs GO U120 tries=1); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~6316** (post-ArrayOp free Expression PL: UP live choose_ok_var U2 vs GO empty create F50…); seed7+ open |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
