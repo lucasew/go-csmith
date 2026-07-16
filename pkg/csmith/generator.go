@@ -7677,14 +7677,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				chooseN = 4
 			}
 		}
-		// e6442: ArrayOp-era free Expression SelectGlobal eFlexible/exact
-		// GlobalList U44 (C++ list after PL create residual; GO live n≈4).
+		// e6442: after ArrayOp body (PLStackU2 sticky, !InBody) free Expression
+		// SelectGlobal eFlexible GlobalList U44. e6579: InBody NeedStmt stream
+		// keeps live ok_vars (UP U2) — sticky U44 invents.
 		if !forAssign && !selectVarLocalScope && n >= 2 &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
 			st := burnCreateArrayCtxSink.state
-			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
-				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 &&
+				!st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 				chooseN = 44
+			}
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody && n >= 2 {
+				// e6579: InBody Global choose live ≈2 (not eFlexible overcount / U44).
+				chooseN = 2
 			}
 		}
 		// seed4 e1886–92 residual F20×4 when small inventory.
@@ -8380,15 +8385,19 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 				chooseN = 2
 			}
 		}
-		// e6442: after ArrayOp PL create, free Expression SelectGlobal eFlexible
-		// among ~44 GlobalList entries. Live n under-counts (e.g. U4 under
-		// freeMultiIVNeedNoRhs era). Pad chooseN — not invent inventory entries.
+		// e6442: after ArrayOp body (!InBody sticky PLStackU2) free Expression
+		// SelectGlobal eFlexible U44. e6579: InBody keeps live ok_vars (UP U2).
 		if !forAssign && !selectVarLocalScope && n >= 2 &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
 			st := burnCreateArrayCtxSink.state
-			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
-				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 &&
+				!st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 				chooseN = 44
+			}
+			// e6579: InBody Global eFlexible — C++ ok_vars ≈2 (UP U2 U2),
+			// GO over-counts convertibles / sticky U44.
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody && n >= 2 {
+				chooseN = 2
 			}
 		}
 		lateU2 := useSmallParentStackSink != nil && *useSmallParentStackSink &&
@@ -8816,15 +8825,17 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 			!selectVarLocalScope && n >= 2 && !postEAU21 {
 			chooseN = 4
 		}
-		// e6442: after ArrayOp PL create residual, SelectGlobal eFlexible is
-		// GlobalList U44 — must override sticky e5117 U4 (PostEAGlobalU21 may
-		// already be cleared while PLStackU2 still marks ArrayOp era).
+		// e6442: after ArrayOp body (!InBody sticky PLStackU2) SelectGlobal
+		// eFlexible U44. e6579: InBody keeps live ok_vars (UP U2).
 		if !forAssign && !selectVarLocalScope && n >= 2 &&
 			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil {
 			st := burnCreateArrayCtxSink.state
-			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
-				st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 &&
+				!st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 				chooseN = 44
+			}
+			if st.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody && n >= 2 {
+				chooseN = 2 // e6579
 			}
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
@@ -10046,7 +10057,7 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 				chooseN = 5
 			}
 			if chooseN > 1 {
-				idx := int(er.pick(uint32(chooseN))) % n // e2759 U5
+		idx := int(er.pick(uint32(chooseN))) % n // e2759 U5
 				return castLiteral(t, scope.params[idx].name)
 			}
 			return castLiteral(t, scope.params[0].name)
@@ -11514,10 +11525,20 @@ exprTries:
 						// still has live ok_vars (VariableSelector.cpp:648–666).
 						// Always pad U3: real GO inventory may sole-accept (no RNG)
 						// or choose with wrong n while C++ still draws U3.
+						//
+						// e6570: ArrayOp-body Statement Assign RHS Function →
+						// ExpressionVariable Global after useExisting. C++
+						// SelectGlobal choose_ok_var among ~5 matching GlobalList
+						// (VariableSelector.cpp:648–666; GlobalList grew through
+						// ArrayOp/PL creates). Sticky e5956 U3 under-counts.
 						if ctx != nil && ctx.state != nil &&
 							ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
 							er != nil {
-							_ = er.pick(3) // e5956 choose_ok_var
+							nOk := uint32(3) // e5956
+							if ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+								nOk = 5 // e6570
+							}
+							_ = er.pick(nOk)
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, "g_0")
@@ -12451,10 +12472,13 @@ exprTries:
 				ctx.state.freeMultiIVPostEAGlobalPadDone && er != nil &&
 				!ctx.state.freeMultiIVPostEAGlobalLiveU4Done {
 				ctx.state.freeMultiIVPostEAGlobalLiveU4Done = true
-				// e6442: ArrayOp-era GlobalList U44 not sticky e3563 U4.
-				if ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody ||
-					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
-					_ = er.pick(44)
+				// e6442: ArrayOp-era GlobalList U44 (outside body sticky PLStackU2).
+				// e6579: InBody NeedStmt Assign after Lhs create — C++ eFlexible
+				// choose_ok_var among ~2 matching (UP U2 U2), not invent U44.
+				if ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
+					_ = er.pick(2) // e6579
+				} else if ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
+					_ = er.pick(44) // e6442
 				} else {
 					_ = er.pick(4) // e3563
 				}
@@ -118698,6 +118722,23 @@ commaF80MultiDone:
 			// random_loose_qualifiers draws F50 only for eligible vol levels
 			// (CVQualifiers.cpp:441–457); then create_and_initialize of pointee.
 			stars := strings.Count(targetType.Name, "*")
+			// e6576: ArrayOp-body Statement Assign Lhs SelectDeref empty create
+			// after RHS Function Global U5 — random_add F10 F50, NewArray=0,
+			// make_init address choose_ok_var among ~4 pointees of Lhs type
+			// (struct SelectLType; VariableSelector.cpp:843–867). Sticky
+			// stars==0 default (random_loose F50 + Constant) under-burns U4
+			// and invents Constant residual. Accept Lhs; NeedStmt so body
+			// continues Statement U100 (sole stmtCount would end ArrayOp body).
+			if ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody &&
+				stars == 0 {
+				_ = r.upto(4) // e6576 address choose_ok_var
+				ctx.state.lhsDerefCreates++
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				nullValidatePostResidualAddrCreateVSNeedStmt = true
+				break
+			}
 			// seed5 e2980–88: free multi-IV For body Lhs SelectDeref addVol
 			// create — nested residual F50 F20 F20 U3 U3 then validate fail →
 			// VariableSelector multiphase (U100 PL miss, U100 PP U7, U100 PL
