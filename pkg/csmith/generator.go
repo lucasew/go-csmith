@@ -763,7 +763,8 @@ type functionFlowState struct {
 	// multi-IV body continues shallower) — sticky postEAStackU5 U5 sole under-burns.
 	freeMultiIVNeedNoRhsPostEAReturnGlobalDone bool
 	// freeMultiIVNeedNoRhsPostEAReturnPLN: free Expression PL hits after Return
-	// Global residual. 0–1 e5754/e5780: stack U1 + choose_ok_var U14; later U1+U14…
+	// Global residual. 0–1 e5754/e5780: stack U1 + choose_ok_var U14;
+	// 2+ e5843: U13 (live expanded ok_vars after e5808 residual; not sticky U14).
 	freeMultiIVNeedNoRhsPostEAReturnPLN int
 	// freeMultiIVNeedNoRhsPostEAReturnPPN: free Expression PP after Return residual.
 	// 0 e5764–65: live choose_ok_var U7 accept; 1+ e5800–02: miss → PL U1+U2.
@@ -10960,9 +10961,18 @@ exprTries:
 						// choose_ok_var among expanded inventory U14. Sticky postEA
 						// sole after U5 desyncs Expression U120 onto the U14 raw.
 						// (e5801 U1+U2 is PP→PL fallthrough, not direct PL.)
+						// e5843: after e5808 SelectGlobal empty retype+create residual
+						// (and SelectDeref empty create), free Expression PL choose
+						// pool is U13 (UP live expanded ok_vars) — sticky U14 over-counts.
+						// Multiphase: first two post-Return PL hits keep U14; later U13.
 						idx = int(er.pick(1))
-						flow.freeMultiIVNeedNoRhsPostEAReturnPLN++
-						_ = er.pick(14) // e5755 / e5781 choose_ok_var
+						pn := flow.freeMultiIVNeedNoRhsPostEAReturnPLN
+						flow.freeMultiIVNeedNoRhsPostEAReturnPLN = pn + 1
+						if pn < 2 {
+							_ = er.pick(14) // e5755 / e5781 choose_ok_var
+						} else {
+							_ = er.pick(13) // e5843 live expanded PL ok_vars
+						}
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "x"))
