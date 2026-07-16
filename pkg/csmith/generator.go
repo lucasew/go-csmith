@@ -864,6 +864,10 @@ type functionFlowState struct {
 	// create (VariableCreationProbability F10 + stack U + NewArray F20…), not
 	// AssignOps need_no_rhs U120 + SelectDeref F80 ladder.
 	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpAssignDone bool
+	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs: after e6586
+	// residual Assign completes, next free Assign skips AssignOps U120 and
+	// SelectLType — Lhs VS U100… (UP e6686 U100=1 after Statement U100=61).
+	freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -20391,41 +20395,31 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					sizes = append(sizes, dimen)
 				}
 			}
-			// create_field_vars: UP two simple-field Constants before init_num
-			// (F50 F50 U3 + F50 F50 U20) — int-width small path.
-			burnSimpleConstant(r, intT)
-			burnSimpleConstant(r, intT)
-			// init_num = pure_rnd_upto(total/2); alts Constant::make_random.
-			// UP first-coin hex depth gaps (after e6586 sizes + field consts):
-			// i5 char(+3), i8 ll(+17), i10 ll, i11 char, i12 ll, i13 char,
-			// i15 char. Small-path alts ignore HexDigits.
+			// create_field_vars for 2-field aggregate (UP two Constants before
+			// init_num): longlong + char fields (hex gaps +17 / +3 on alts).
+			burnSimpleConstant(r, llT)
+			burnSimpleConstant(r, charT)
+			// init_num = pure_rnd_upto(total/2); each alt is
+			// GenerateRandomStructConstant → one Constant per field (38
+			// simple Constants for init_num=19 before itemize U7 U2 U3).
 			if total/2 > 0 {
 				initNum := int(r.upto(uint32(total / 2)))
 				for i := 0; i < initNum; i++ {
-					t := intT
-					if i >= 5 {
-						t = llT
-						switch i {
-						case 5, 11, 13, 15:
-							t = charT
-						}
-					}
-					burnSimpleConstant(r, t)
+					burnSimpleConstant(r, llT)
+					burnSimpleConstant(r, charT)
 				}
 			}
-			// create_array_and_itemize ends with itemize() size picks, but UP
-			// after init_num alts continues Constant multiphase (F50…) before
-			// size U(n) — burn a few more simple Constants then itemize.
-			// Observed: after 19 alts still F50 small-path before U7 U2 U3.
-			for extra := 0; extra < 4; extra++ {
-				burnSimpleConstant(r, charT)
-			}
-			// ArrayVariable::itemize: rnd_upto(sizes[i]) per dim
+			// ArrayVariable::itemize: rnd_upto(sizes[i]) per dim, then
+			// create_field_vars on itemized aggregate (UP F50… after U7 U2 U3).
 			for _, sz := range sizes {
 				if sz > 0 {
 					_ = r.upto(uint32(sz))
 				}
 			}
+			burnSimpleConstant(r, llT)
+			burnSimpleConstant(r, charT)
+			// Next free Statement Assign: Lhs VS first (not AssignOps U120).
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs = true
 		} else {
 			_ = r.flipcoin(20) // make_init null vs address
 			burnSimpleConstant(r, intT)
@@ -20433,10 +20427,23 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 		writeLine(b, 1, "x = x;")
 		return true
 	}
+	// e6686: after e6586 residual Assign, next free Assign skips AssignOps
+	// U120 + SelectLType F50 — C++ stream is Lhs VariableSelector U100…
+	// (UP U100=1 after Statement U100=61).
+	forcePostArrayOpLhsVS := false
+	if ctx != nil && ctx.state != nil &&
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs {
+		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs = false
+		forcePostArrayOpLhsVS = true
+		simpleAssign = true
+		needNoRhs = true // Lhs before RHS; Constant 1 for need_no_rhs shape
+	}
 	// seed4 e2407: after postAgg Continue, skip AssignOps+SelectLType; RHS is
 	// forced Variable with PL stack U6 (not AssignOps U120 / SelectLType F50).
 	forcePostAggPLRhs := false
-	if opts.CompoundAssignment {
+	if forcePostArrayOpLhsVS {
+		// fall through: no AssignOps, no SelectLType; Lhs below
+	} else if opts.CompoundAssignment {
 		if postAggGlobalCreateN >= 0 && ctx != nil && ctx.state != nil &&
 			ctx.state.postAggSkipAssignOps {
 			ctx.state.postAggSkipAssignOps = false
@@ -20476,7 +20483,7 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	targetType := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 	// Type::SelectLType: pointer/struct only when op is simple assign;
 	// float coin only when AssignOpWorksForFloat(op).
-	if simpleAssign && !forcePostAggPLRhs {
+	if simpleAssign && !forcePostAggPLRhs && !forcePostArrayOpLhsVS {
 		if opts.Pointers && r.flipcoin(50) { // PointerAsLTypeProb
 			// make_random_pointer_type → find_pointer_type(t, add=true)
 			// F20: occasionally pointer-to-pointer from existing derived_types
@@ -21165,6 +21172,28 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
+		// e6686: after e6586 residual Assign, next Assign Lhs is VS U100 first
+		// (must_use miss + no SelectDeref F80 on UP) — Global U100=1 then
+		// choose_ok_var U13 + itemize U4, visit fail → VS reselect U100=89
+		// then Expression term U120 (e6687–90).
+		if forcePostArrayOpLhsVS {
+			forcePostArrayOpLhsVS = false
+			er := &exprRand{fallback: r}
+			_ = variableScopePickFromEROpts(er, opts, &scope) // e6686 U100
+			// choose_ok_var among GlobalList pad (~13) + array itemize U4
+			if r != nil {
+				_ = r.upto(13) // e6687
+				_ = r.upto(4)  // e6688
+			}
+			_ = variableScopePickFromEROpts(er, opts, &scope) // e6689 U100
+			lv = lvalueInfo{expr: "x", ctype: targetType}
+			lhsFromDeref = true
+			needNoRhs = false
+			if r != nil {
+				_ = r.upto(120) // e6690 Expression / AssignOps-shaped
+			}
+			break
+		}
 		// seed5 e6284–92: after post-Return ArrayOp control residual, Statement
 		// need_no_rhs Lhs F80=0 → VS ParentLocal Function::stack.size()=3 empty
 		// GenerateNewParentLocal retype U14 + WRITE F50 + NewArray F20 + Constant
