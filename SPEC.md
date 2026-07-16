@@ -222,7 +222,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (climb through free invent multiphase residual + silenceTrace after UP stream exhaust; seed2 held) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5858** (Global empty create F0 miss vs SE-free F50 after Function-fail); seed7@47, … |
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **5882** (Expression U120 tries=1 vs SelectDeref empty create F20 after post-Return PP U7); seed7@47, … |
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **Go-only discarded entropy**. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be used **or** mirror upstream discard at the same site.
@@ -230,11 +230,11 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
-**seed5 e5843→5858 climbed — post-Return PL choose multiphase U14→U13:**
-1. Capture: e5843 UP U13=4 tries=0 vs GO U14=11 (same raw; sticky residual over-count).
-2. C++: free Expression Variable U100=57 ParentLocal (not Global — scope table 35–64) after Return residual has stack U1 + choose_ok_var among expanded live ok_vars. e5755/e5781 pool U14; after e5808 SelectGlobal empty retype+create residual, e5843 pool is U13.
-3. GO: sticky postEAReturnPL always forced U14. Multiphase: PLN 0–1 keep U14; PLN≥2 U13. Seeds 2/3/4/6 held.
-4. Next: e5858 UP F0 (Global empty create miss → VS PP U100=71) vs GO F50 createOnDemandGlobalFromERSEFree after Function-fail U100=13.
+**seed5 e5843→5882 climbed — post-Return PL U13 + Global F0 + PP U7 multiphase:**
+1. Capture: e5843 UP U13=4 tries=0 vs GO U14=11 (sticky post-Return PL over-count).
+2. C++: free Expression Variable U100=57 is ParentLocal (scope 35–64), not Global. After Return, stack U1 + choose_ok_var expanded ok_vars U14 (e5755/e5781) then U13 (e5843 after e5808 residual). Later Function-fail Global visit F0 → VS PP→PL U1 U2 U7 + Constant; subsequent PP live U7 (e5874) not sticky U1+U2.
+3. GO: multiphase PLN 0–1 U14 / 2+ U13; one-shot GlobalU21 Function-fail Global F0 residual; PP multiphase 0/2+ U7, 1 U1+U2. Seeds 2/3/4/6 held.
+4. Next: e5882 UP U120 tries=1 vs GO F20 (SelectDeref empty create residual).
 
 **seed5 e5809→5843 climbed — SelectGlobal empty simple retype U14 + OuterLhsSole:**
 1. Capture: e5809 UP U14=11 tries=1 (random_type_from_type) vs GO F20 (sticky e5397 multiphase F20 F20 without retype).

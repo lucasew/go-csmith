@@ -767,8 +767,13 @@ type functionFlowState struct {
 	// 2+ e5843: U13 (live expanded ok_vars after e5808 residual; not sticky U14).
 	freeMultiIVNeedNoRhsPostEAReturnPLN int
 	// freeMultiIVNeedNoRhsPostEAReturnPPN: free Expression PP after Return residual.
-	// 0 e5764–65: live choose_ok_var U7 accept; 1+ e5800–02: miss → PL U1+U2.
+	// 0 e5764–65: live choose_ok_var U7 accept; 1 e5800–02: miss → PL U1+U2;
+	// 2+ e5874: live U7 again after e5858 Global F0 residual.
 	freeMultiIVNeedNoRhsPostEAReturnPPN int
+	// freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done: one-shot e5857–71 free
+	// Expression Variable Global sole/empty visit F0 → VS PP→PL create residual
+	// (U100 PP + stack U1 + choose U2 + U7 + Constant F50× multiphase).
+	freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done bool
 	// freeMultiIVNeedNoRhsPostEALhsAddrU3Done: one-shot e5621 Lhs SelectDeref
 	// empty create address choose U3 after null F0×2 ladder (e5610–20).
 	freeMultiIVNeedNoRhsPostEALhsAddrU3Done bool
@@ -9046,11 +9051,11 @@ func randomPointerVariableExpr(t CType, er *exprRand, opts Options, env envInfo,
 		scopePick == 2 && er != nil {
 		pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
 		flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
-		if pn == 0 {
-			_ = er.pick(7)
-		} else {
+		if pn == 1 {
 			_ = er.pick(1)
 			_ = er.pick(2)
+		} else {
+			_ = er.pick(7) // pn==0 e5765; pn>=2 e5874
 		}
 		bumpExprDepth(ctx)
 		return castLiteral(t, "x")
@@ -10130,11 +10135,11 @@ exprTries:
 					scopePick == 2 && er != nil {
 					pn := ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN
 					ctx.state.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
-					if pn == 0 {
-						_ = er.pick(7)
-					} else {
+					if pn == 1 {
 						_ = er.pick(1)
 						_ = er.pick(2)
+					} else {
+						_ = er.pick(7) // pn==0 e5765; pn>=2 e5874
 					}
 					bumpExprDepth(ctx)
 					markFuncEffect()
@@ -10560,6 +10565,30 @@ exprTries:
 								return castLiteral(t, c.expr)
 							}
 						}
+						// seed5 e5857–71: after Return residual + Function-fail,
+						// free Expression Variable Global visit_facts F0 (UP sole
+						// null/ineligible) → VS PP→PL U1 U2 U7 + Constant multiphase.
+						// Sticky GlobalU21 force-create SEFree F50 desyncs.
+						if ctx != nil && ctx.state != nil &&
+							ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+							!ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+							er.fallback != nil {
+							ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done = true
+							_ = er.fallback.flipcoin(0) // e5858
+							scopePick2 := variableScopePickFromER(er, opts, &scope) // e5859
+							if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+								_ = er.pick(1) // e5860
+								_ = er.pick(2) // e5861
+								_ = er.pick(7) // e5862
+								base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+								_ = formatSimpleConstant(er.fallback, base)
+								_ = formatSimpleConstant(er.fallback, base)
+								_ = formatSimpleConstant(er.fallback, base)
+							}
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, "x")
+						}
 						n := globalU21FFGlobalN
 						globalU21FFGlobalN++
 						// e2279 first: skipRandomQfer F20 (non-wildcard residual).
@@ -10710,18 +10739,47 @@ exprTries:
 			}
 			// seed5 post-Return free Expression ParentParam multiphase:
 			//   0 e5764–65: live choose_ok_var U7 accept → Expression U120
-			//   1+ e5800–02: miss → SelectParentLocal stack U1 + choose U2
+			//   1 e5800–02: miss → SelectParentLocal stack U1 + choose U2
+			//   2+ e5873–74: live choose_ok_var U7 again (after e5858 Global
+			//     F0 residual); sticky U1+U2 under-burns F80 SelectDeref.
 			// Sticky e5677 sole skips U7; residual U7 pad is off for pointers
 			// after PPU7Done. Early intercept before postEA sole paths.
 			if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
 				scopePick == 2 && er != nil {
 				pn := flow.freeMultiIVNeedNoRhsPostEAReturnPPN
 				flow.freeMultiIVNeedNoRhsPostEAReturnPPN = pn + 1
-				if pn == 0 {
-					_ = er.pick(7) // e5765 choose_ok_var among params
-				} else {
+				if pn == 1 {
 					_ = er.pick(1) // e5801 PL stack
 					_ = er.pick(2) // e5802 choose_ok_var
+				} else {
+					// pn==0 e5765; pn>=2 e5874 after Global F0 residual
+					_ = er.pick(7)
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
+			}
+			// seed5 e5857–71: after Function-fail free Expression Variable
+			// Global (U100=13) — C++ sole/eligible Global visit_facts F0
+			// (null_pointer_dereference_prob=0) → ExpressionVariable do-while
+			// reselects VS ParentParam → PL stack U1 + choose U2 + U7 residual
+			// + Constant pure_rnd multiphase. GO empty inventory SE-free creates
+			// F50 F10 F20 + aggregate bitfields U46340 (desync).
+			if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
+				!flow.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+				scopePick == 0 && er != nil && er.fallback != nil {
+				flow.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done = true
+				_ = er.fallback.flipcoin(0) // e5858 visit fail
+				scopePick2 := variableScopePickFromER(er, opts, &scope) // e5859 U100
+				if scopePick2 == 2 || scopePick2 == 1 || scopePick2 == 4 {
+					_ = er.pick(1) // e5860 stack U1
+					_ = er.pick(2) // e5861 choose_ok_var
+					_ = er.pick(7) // e5862 residual pool / itemize
+					// e5863–71: Constant pure_rnd multiphase (3 draws)
+					base := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+					_ = formatSimpleConstant(er.fallback, base)
+					_ = formatSimpleConstant(er.fallback, base)
+					_ = formatSimpleConstant(er.fallback, base)
 				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
