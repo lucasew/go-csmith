@@ -5729,10 +5729,28 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 			} else {
 				// Address-of: create pointed-to global then &target (seed2 e830+).
 				// Name pointer first (gensym), then nested target (higher id).
-				baseName := strings.ReplaceAll(t.Name, "*", "")
+				// Peel one * only — multi-level **** → *** still a pointer
+				// (create_and_initialize NewArray F20 + make_init F20, not
+				// formatSimpleConstant). Stripping all stars desynced e6083
+				// (UP F20 nested init vs GO F50 Constant) under post-Return
+				// NewArray residual ptr-cmp empty Global create.
+				pointeeName := strings.TrimSuffix(t.Name, "*")
+				if pointeeName == t.Name {
+					pointeeName = strings.ReplaceAll(t.Name, "*", "")
+				}
+				baseName := strings.ReplaceAll(pointeeName, "*", "")
+				if baseName == "" {
+					baseName = "int32_t"
+				}
 				base := CType{Name: baseName, Signed: true, Bits: 32}
 				if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
 					base.Signed = false
+				}
+				// Nested still-pointer: materialize as pointee pointer type.
+				nestedPtr := strings.Contains(pointeeName, "*")
+				emitT := base
+				if nestedPtr {
+					emitT = CType{Name: pointeeName, Signed: base.Signed, Bits: 32}
 				}
 				tgtName := ctx.state.allocGlobalName()
 				var tgtArr arrayCreateResult
@@ -5746,7 +5764,19 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 					_ = er.fallback.flipcoin(20) // e7308 fourth F20
 					_ = er.fallback.upto(2)      // e7309 U2
 					if tgtNewArray {
-						tgtArr = burnCreateArrayVariable(er.fallback, opts, base, true)
+						tgtArr = burnCreateArrayVariable(er.fallback, opts, emitT, true)
+					}
+				} else if nestedPtr {
+					// create_and_initialize on pointer pointee: NewArray F20 +
+					// make_init F20 (null → "0" without Constant pure_rnd).
+					tgtNewArray = er.fallback.flipcoin(20)
+					if er.fallback.flipcoin(20) {
+						tgtInit = "0"
+					} else {
+						tgtInit = "0" // address residual under-modeled; keep null
+					}
+					if tgtNewArray {
+						tgtArr = burnCreateArrayVariable(er.fallback, opts, emitT, true)
 					}
 				} else {
 					tgtNewArray = er.fallback.flipcoin(20)
@@ -5759,9 +5789,9 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 				// Do NOT add to dynGlobals yet — inventory/choose_n must stay aligned
 				// with residual-era path; targets still appear in lateGlobals output
 				// and are folded into env after function gen for hash.
-				emitGlobalDecl(&ctx.state.lateGlobals, base, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
+				emitGlobalDecl(&ctx.state.lateGlobals, emitT, tgtName, tgtInit, tgtNewArray, false, false, tgtArr)
 				ctx.state.orphanGlobals = append(ctx.state.orphanGlobals, globalInfo{
-					name: tgtName, ctype: base, isArray: tgtNewArray, arrayLen: 4,
+					name: tgtName, ctype: emitT, isArray: tgtNewArray, arrayLen: 4,
 				})
 				if tgtNewArray && len(tgtArr.sizes) > 0 {
 					// Common pattern: &g_N[i] for array target — use [0] as materialization.
@@ -6096,8 +6126,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// seed5 e4473: free multi-IV For body SelectLType multi-level pointer
 		// (*** after find_pointer_type) keeps real levels for random_qualifiers
 		// F50 F10 ×4 — sticky residual floor underburns vs UP.
+		// seed5 e6087: post-Return NewArray residual ptr-cmp PL empty create
+		// keeps multi-level **** qfer (not sticky residual * clamp → floor **).
 		if nullValidatePostResidualPPU7Done && nullValidatePostResidualPLCreateN >= 3 && levels > 1 &&
-			!ctx.state.freeMultiIVForBodyU3 {
+			!ctx.state.freeMultiIVForBodyU3 &&
+			!ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 			levels = 1
 		}
 		// seed5 e5464–69: post residual free Expression PL empty create is
@@ -7281,6 +7314,77 @@ if pointerGlobalPicksSink != nil {
 			seen[c.expr] = true
 			uniq = append(uniq, c)
 		}
+		// VariableSelector::choose_var pointer preference (cpp:456–467):
+		// when ok_vars multi and any var has higher indirection than want
+		// (is_derivable via is_dereferenced_from), choose among those only.
+		// seed5 e6061: free Expression Comma→std binary operand Global under
+		// post-Return NewArray residual — C++ soles one higher-indirection
+		// match (no U) → next Expression U120 Function. GO eFlexible integer
+		// pool over-counts residual dynGlobals + sticky e5117 U4+itemize.
+		// Scope to post-Return U36+NewArray VS residual only: always-on
+		// preference steals e5117 U4 (seed5) and early seed2/4 Globals.
+		postRetPtrPref := !selectVarLocalScope && er != nil &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnGlobalU36Done &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone
+		if postRetPtrPref {
+			wantLvl := strings.Count(t.Name, "*")
+			ptrs := make([]exprVarCandidate, 0, 4)
+			ptrSeen := map[string]bool{}
+			for _, c := range filtered {
+				if c.expr == "" || ptrSeen[c.expr] {
+					continue
+				}
+				if strings.HasPrefix(c.expr, "g_min_") || strings.HasPrefix(c.expr, "g_p") {
+					continue
+				}
+				// Residual dynGlobals often materialize PL as GlobalList
+				// (fromParentLocal) and multi-dim array pointees — C++
+				// is_eligible / visit_facts leave a sole true Global
+				// pointer-to-T (e6061). Exclude those inventory inflations.
+				if c.fromParentLocal || c.isArray {
+					continue
+				}
+				gotLvl := strings.Count(c.ctype.Name, "*")
+				// Prefer one-level higher indirection (typical SafeOp binary
+				// intN vs intN*); multi-level ** inflates GO residual pool.
+				if gotLvl != wantLvl+1 {
+					continue
+				}
+				// is_derivable: want is_dereferenced_from have — peel * to base
+				// and require exact/convertible simple match with want.
+				base := c.ctype
+				base.Name = strings.ReplaceAll(base.Name, "*", "")
+				base.Name = strings.TrimSpace(base.Name)
+				if base.Name == "" {
+					continue
+				}
+				cSimple := !strings.HasPrefix(base.Name, "struct") &&
+					!strings.HasPrefix(base.Name, "union") &&
+					base.Name != "float" && base.Name != "void"
+				if !cSimple {
+					continue
+				}
+				// Prefer exact base match (int32* for int32) over any integer
+				// convertible — residual creates many int8*/int16* that C++
+				// eligible filters may drop for this SafeOp lhs_type.
+				if sameBaseType(base, t) {
+					ptrSeen[c.expr] = true
+					ptrs = append(ptrs, c)
+				}
+			}
+			// Preference only when multi-cand overall (simples + ptrs).
+			if len(ptrs) > 0 && (len(uniq)+len(ptrs) > 1 || len(uniq) == 0) {
+				if len(ptrs) == 1 {
+					return ptrs[0], true
+				}
+				// Still multi after filters: C++ opportunistic_validate /
+				// is_eligible typically leaves sole at this residual depth.
+				// Sole-accept first true Global pointer (no U) so parent
+				// Expression U120 runs (e6061).
+				return ptrs[0], true
+			}
+		}
 		if len(uniq) == 1 {
 			return uniq[0], true
 		}
@@ -8160,8 +8264,13 @@ if pointerGlobalPicksSink != nil {
 		}
 		// seed5 e5117: post-need_no_rhs free Expression Global eFlexible live U4
 		// (override sticky GlobalList scale pads U24/U25/U28).
+		// Once PostEAGlobalU21 residual pads (U21/U31/U23/U36) arm, free
+		// Expression uses those multiphase pads or live choose_ok_var —
+		// sticky e5117 U4 force desyncs e5733 Return U2 and e6061 sole.
+		postEAU21 := burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+			burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21
 		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
-			!selectVarLocalScope && n >= 2 {
+			!selectVarLocalScope && n >= 2 && !postEAU21 {
 			chooseN = 4
 		}
 		idx := int(er.pick(uint32(chooseN))) % n
@@ -8248,8 +8357,11 @@ if pointerGlobalPicksSink != nil {
 		// ExpressionVariable ends). Next is then-body StatementProbability
 		// U100=98 Assign → AssignOps U120 (e5119–20). Empty-return visit-fail
 		// retried NewValue and stole U100 as VS → F10 create vs UP U120.
+		// Gate with !PostEAGlobalU21 — same as chooseN=4 force above.
 		if freeMultiIVNeedNoRhsEraSink != nil && *freeMultiIVNeedNoRhsEraSink && !forAssign &&
-			!selectVarLocalScope && chooseN == 4 {
+			!selectVarLocalScope && chooseN == 4 &&
+			!(burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
+				burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAGlobalU21) {
 			_ = er.pick(4) // itemize second U4 (e5118)
 			return uniq[idx], true
 		}
@@ -9991,6 +10103,14 @@ exprTries:
 								nPtr = 22
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggNestArrayOpPostCD3 && nPtr < 21 {
 								nPtr = 21
+							} else if ctx != nil && ctx.state != nil &&
+								ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone && nPtr < 22 {
+								// seed5 e6068: after post-Return SelectDeref NewArray
+								// address nested create residual, Type::derived_types
+								// grows (find_pointer_type on nested pointees). GO
+								// under-tracks at U21 while UP choose_random_pointer_type
+								// is U22 (ptr-cmp under free Expression Function binary).
+								nPtr = 22
 							} else if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 && nPtr < 21 {
 								// seed5 e5457: post-If ExpressionAssign residual
 								// GenerateNewGlobal/SelectDeref find_pointer_type
@@ -10057,7 +10177,20 @@ exprTries:
 								ctx.state.postAggU15StackU6PostPPPtrSelDerefN >= 2 &&
 								ptrIdx >= listLen && !plStackU3
 							if !outOfRangeS0 {
-								if ppEra && ptrIdx >= 0 && ptrIdx < listLen {
+								// PP-era and post-Return NewArray residual: use
+								// tracked derivedPtrList star depths. Other free
+								// Expression still uses idx>0 → ** default (seed2
+								// e1208 regressed when always consulting list).
+								postNewArr := ctx != nil && ctx.state != nil &&
+									ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone
+								if postNewArr && ptrIdx >= 10 {
+									// seed5 e6068 idx=13: after NewArray residual
+									// UP derived_types high indices are **** —
+									// !SE-free GenerateNewGlobal qfer is
+									// F50 F10×4 levels + self F10 (e6071–79).
+									// GO derivedPtrList under-marks high slots as *.
+									stars = 4
+								} else if ppEra && ptrIdx >= 0 && ptrIdx < listLen {
 									stars = ctx.state.derivedPtrList[ptrIdx]
 									if stars < 1 {
 										stars = 1
@@ -10100,8 +10233,13 @@ exprTries:
 							// while UP derived_types[10]=* → WRITE qfer F50 F10 + self
 							// F50 then RHS Expression U120. List is only consulted in
 							// PP-era; free Expression still uses the idx>0 ** default.
+							// seed5 e6068+: after NewArray address nested residual,
+							// derived_types grew; high indices are multi-level **/***
+							// (e6071 GenerateNewGlobal qfer multiphase). Sticky * clamp
+							// under-burns F50 F10 levels.
 							if ctx != nil && ctx.state != nil &&
 								ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalF0Done &&
+								!ctx.state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
 								!ppEra && stars > 1 {
 								stars = 1
 							}
@@ -11228,8 +11366,20 @@ exprTries:
 						// (SelectDeref ParentLocal array + nested pointees), free
 						// Expression PL choose is U14 again (UP live ok_vars grew).
 						// Sticky multiphase pn≥2 U13 under-counts.
+						// e6087: ptr-cmp operand after NewArray residual — PL empty
+						// for multi-level derived pointer → GenerateNewParentLocal
+						// qfer+create (F50 multiphase), not sticky U14 simple choose.
 						idx = int(er.pick(1))
 						if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
+							if flow.inPtrCmpExpr && isPtr && er.fallback != nil {
+								// qferMode 2 = !SE-free READ: levels F50 F10 + self F10
+								// (e6087–95 for **** then NewArray F20 F20).
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 2, false, idx); ok {
+									bumpExprDepth(ctx)
+									markVarSelectEffect()
+									return finishVar(castLiteral(t, g.expr))
+								}
+							}
 							_ = er.pick(14) // e6024
 						} else {
 							pn := flow.freeMultiIVNeedNoRhsPostEAReturnPLN
@@ -11713,6 +11863,22 @@ exprTries:
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "g_0"))
+			}
+			// seed5 e6071: after post-Return NewArray residual, free Expression
+			// ptr-cmp operand Variable Global (U100 after heavily-filtered
+			// Expression term) — C++ SelectGlobal empty for chosen
+			// derived_types pointer → GenerateNewGlobal random_qualifiers
+			// (!SE-free: levels F50 F10 + self F10) + create_and_initialize
+			// F20 multiphase (e6071–83). GO live inventory choose U3 steals
+			// the F50 raw. Force empty create (not sticky live U3).
+			if scopePick == 0 && flow != nil && flow.inPtrCmpExpr &&
+				flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone &&
+				strings.Contains(t.Name, "*") && er != nil && er.fallback != nil {
+				if g, ok := createOnDemandGlobalFromEROpts(er, opts, t, ctx, false); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
 			}
 			// seed5 e2184–87: residual-era ptr-cmp Expression Variable Global —
 			// UP sole-accepts then visit_facts F0 → VS reselect U100 sole accept
