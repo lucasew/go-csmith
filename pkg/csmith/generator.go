@@ -12009,13 +12009,35 @@ exprTries:
 							}
 							pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN
 							flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN = pn + 1
-							if pn >= 1 {
-								// e6460: live choose_ok_var U15 after stack.
+							// Multiphase free Expression existing-PL in ArrayOp body
+							// (GO under-counts expanded ok_vars / overcounts flex):
+							//   1 e6460: U15 choose accept
+							//   2 e6514: empty create retype U14 + F50 F10 F20
+							//   3+ cycle U15, sole, sole (e6539 U15; e6543/46 sole; e6549 U15)
+							if pn == 1 {
 								_ = er.pick(15)
 								bumpExprDepth(ctx)
 								markVarSelectEffect()
 								return finishVar(castLiteral(t, "x"))
 							}
+							if pn == 2 {
+								// e6514–18: retype U14 + F50 F10 F20 create residual.
+								if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+									bumpExprDepth(ctx)
+									markVarSelectEffect()
+									return finishVar(castLiteral(t, g.expr))
+								}
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
+							if pn >= 3 && (pn-3)%3 == 0 {
+								_ = er.pick(15)
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
+							// pn==0 or sole slots in cycle: inventory path below
 							localCands := localsInStackBlock(er, env, scope, ctx, idx)
 							exact := make([]exprVarCandidate, 0, len(localCands))
 							for _, c := range localCands {
