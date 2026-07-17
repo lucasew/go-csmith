@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8199** (post second-create Constant multiphase residual)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8220** (post residual VS empty-params multiphase)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e8199→8220 climbed — residual VS empty-params filter multiphase:**
+1. Capture: e8199 U100 tries=2 v=0 (raw 361144200) vs GO Statement AssignOps U120; intermediate raws 85/83 are ParentParam rejects.
+2. C++: VariableSelectFilter rejects ParentParam when params empty (VariableSelector.cpp); then Global choose U2 + further VS/stack U1 U4 ladder before free Assign e8209.
+3. GO: inventArrayOpExprEmptyParamsVS + variableScopePickFromER (tries=2) + U2 U100 U1 U4×… through e8208. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8220 U4 vs GO U7 (choose inventory size).
+
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
 2. C++: Constant.cpp GenerateRandomCharConstant RandomHexDigits(2); Lhs do-while continues VS/choose without F80 gap (same class as e8178).
 3. GO: burnSimpleConstant eChar; variableScopePick + pick(2)×2 + Constant + eChar. **Integrity residual debt** — invent multiphase. Seeds 2/4/6 held.
-4. Next: e8199 U100 tries=2 vs GO Expression U120.
+4. Next: e8199 — climbed.
 
 **seed5 e8188→8190 climbed — second NewValue create eLongLong hex next31×16:**
 1. Capture: e8183 F50=0 depth gap 16 next31 then small U3 raw 1566741184; GO vol F50 + uint8/int32 under-burn desynced LCG → F50 mismatch at e8188.

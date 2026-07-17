@@ -122511,6 +122511,25 @@ commaF80MultiDone:
 								burnSimpleConstant(er.fallback, ll) // e8194–96 small U3
 								// e8197 F50=0 + hn=2 char hex then more VS
 								burnSimpleConstant(er.fallback, ch) // e8197
+								// e8198–8208: residual continues before free Assign e8209.
+								// e8198 bare U100=73 (PP band). e8199 VariableSelectFilter
+								// empty-params rejects ParentParam 65–94 twice (raw%100
+								// 85,83) then Global 0 tries=2 — VariableSelector.cpp
+								// VariableSelectFilter. Force empty-params for these picks.
+								_ = er.pick(100) // e8198 U100=73
+								prevEmpty := inventArrayOpExprEmptyParamsVS
+								inventArrayOpExprEmptyParamsVS = true
+								_ = variableScopePickFromER(er, opts, &scope) // e8199 tries=2 Global
+								_ = er.pick(2)  // e8200 U2
+								_ = variableScopePickFromER(er, opts, &scope) // e8201
+								_ = er.pick(1)  // e8202 U1
+								_ = er.pick(4)  // e8203 U4
+								_ = variableScopePickFromER(er, opts, &scope) // e8204
+								_ = variableScopePickFromER(er, opts, &scope) // e8205 tries=1
+								inventArrayOpExprEmptyParamsVS = prevEmpty
+								_ = er.pick(1)  // e8206 U1
+								_ = er.pick(4)  // e8207 U4
+								_ = er.pick(4)  // e8208 U4
 							}
 						}
 					}
