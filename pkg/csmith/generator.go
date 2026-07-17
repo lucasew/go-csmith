@@ -10570,6 +10570,11 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 			// Parent free body continues StatementProbability (e5737 family).
 			ctx.state.skipNextBlockSize = true
 			ctx.state.lastStmtWasReturn = false
+			// e8525+: next free Statement ArrayOp U100=51 is U1 U4 residual
+			// (stack/choose), not F5 array_loop — same shape as e7210–12
+			// freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 (StatementFor array
+			// loop residual path after failed/short ArrayOp head).
+			ctx.state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 = true
 		}
 		_ = r.upto(10)    // e8512 must_use itemize
 		_ = r.flipcoin(0) // e8513 validate fail
@@ -125006,10 +125011,71 @@ func emitStatement(
 		}
 		// seed5 e7210–12: after post-ArrayOp Assign residual Break, next
 		// ArrayOp is U1 U4 residual (not F5/aryno) then body continues VS.
+		// seed5 e8525–: after invent residual FuncReturnU10 free Expression,
+		// next ArrayOp U100=51 is same U1 U4 head; body starts free Expression
+		// U120 tries=3 + VS multiphase (not StatementProbability U100 first).
 		if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 {
 			state.freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 = false
-			_ = r.upto(1) // e7211
-			_ = r.upto(4) // e7212
+			_ = r.upto(1) // e7211 / e8525 stack residual
+			_ = r.upto(4) // e7212 / e8526 choose residual
+			// e8527–44 invent residual after FuncReturnU10 ArrayOp head:
+			// free Expression U120 tries=3 → VS Global U10 F0 → VS U9 F0 →
+			// VS PL U1 U4 → Expression U120 tries=1 F50 F50 U20 → Lhs F80
+			// NewArray F20 F20 U3 — then body Statements.
+			// C++ array-loop residual body ExpressionVariable + Assign Lhs
+			// multiphase (depthBlock / effect filter). Integrity residual debt.
+			if inventArrayOpPostNestBreakThenBodyEver && r != nil {
+				scopePickTries := func(tries int) {
+					if tries <= 0 {
+						_ = r.upto(120)
+						return
+					}
+					rej := 0
+					_ = r.uptoWithFilter(120, func(uint32) bool {
+						rej++
+						return rej <= tries+1
+					})
+				}
+				scopePickTries(3) // e8527 U120 tries=3
+				_ = r.upto(100)   // e8528 VS Global
+				_ = r.upto(10)    // e8529 choose_ok_var
+				_ = r.flipcoin(0) // e8530 validate fail
+				_ = r.upto(100)   // e8531 VS
+				_ = r.upto(9)     // e8532 choose
+				_ = r.flipcoin(0) // e8533 validate fail
+				_ = r.upto(100)   // e8534 VS PL
+				_ = r.upto(1)     // e8535 stack
+				_ = r.upto(4)     // e8536 choose
+				// e8537–53: free Expression / Assign Lhs residual multiphase
+				// then Global expand U51 (Statement-shaped).
+				scopePickTries(1)  // e8537 U120 tries=1
+				_ = r.flipcoin(50) // e8538
+				_ = r.flipcoin(50) // e8539
+				_ = r.upto(20)     // e8540
+				if r.flipcoin(80) { // e8541 Lhs SelectDeref
+					_ = r.flipcoin(20) // e8542 NewArray
+					_ = r.flipcoin(20) // e8543 init
+					_ = r.upto(3)      // e8544 address/choose
+				}
+				scopePickTries(9)  // e8545 U120 tries=9
+				_ = r.flipcoin(50) // e8546
+				_ = r.flipcoin(50) // e8547
+				_ = r.upto(3)      // e8548
+				scopePickTries(6) // e8549 U120 tries=6
+				if !r.flipcoin(50) { // e8550 F50=0 → untraced gap next31×2
+					for i := 0; i < 2; i++ {
+						_ = r.next31()
+					}
+				}
+				scopePickTries(4) // e8551 U120 tries=4
+				// e8552–53: StatementFilter tries=1 + Global expand U51
+				rej := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej++
+					return rej <= 2 // tries=1
+				})
+				_ = r.upto(51) // e8553 choose_ok_var expanded GlobalList
+			}
 			if state != nil {
 				state.skipNextBlockSize = true
 				// e7221: body Expression PL stack U1 (not sticky PLStackU2).
