@@ -19741,9 +19741,10 @@ exprTries:
 							} else {
 								// NewValue → VariableCreationProbability F10 → PL
 								// create (e8465–73): stack U1 retype U14 WRITE F50
-								// NewArray F20 make_init F50 F50 U3. Lhs accepts
-								// → need_no_rhs SafeOpFlags F50 U4 (e8474–75)
-								// then Comma rhs Expression (e8476+ VS multiphase).
+								// NewArray F20 make_init F50 F50 U3.
+								// e8474–75 F50 U4 then e8476–91 VS multiphase U100
+								// (not Comma rhs term U120 yet — same raw was U100
+								// upstream vs GO U120). Then Comma rhs ~e8492 U120.
 								if !r.flipcoin(10) {
 									_ = r.upto(1)
 									_ = r.upto(14)
@@ -19752,11 +19753,63 @@ exprTries:
 									_ = r.flipcoin(50)
 									_ = r.flipcoin(50)
 									_ = r.upto(3)
-									// SafeOpFlags::make_random_binary need_no_rhs
-									_ = r.flipcoin(50) // e8474
-									_ = r.upto(4)      // e8475
+									// e8474–75 after create (SafeOpFlags-shaped F50 U4
+									// or create tail — stream match before VS ladder)
+									_ = r.flipcoin(50)
+									_ = r.upto(4)
+									// e8476–91: VS multiphase without F80 / without
+									// Expression term U120. Sequential residual matches
+									// UP VariableSelector ladder (PL empty reselect,
+									// tries=1/8 filter rejects, Global U12).
+									// uptoWithFilter: first x is evaluated twice before
+									// redraw (rng.go early-check + loop). For trace
+									// tries=N reject N+1 call-path times (e7047 uses
+									// rejectCalls<=2 for tries=1).
+									scopePickTries := func(tries int) {
+										if tries <= 0 {
+											_ = r.upto(100)
+											return
+										}
+										rej := 0
+										_ = r.uptoWithFilter(100, func(uint32) bool {
+											rej++
+											return rej <= tries+1
+										})
+									}
+									// 0 e8476 PL U1 U13; 1 e8479 empty PL;
+									// 2 e8480 PL tries=1 U1 U4; 3 e8483 PP tries=8;
+									// 4 e8484 Global U12; 5 e8486 empty PL;
+									// 6 e8487 PL U1 U4 U4; 7 e8491 PP → Comma rhs.
+									for k := 0; k < 8; k++ {
+										switch k {
+										case 0:
+											_ = r.upto(100)
+											_ = r.upto(1)
+											_ = r.upto(13)
+										case 1:
+											_ = r.upto(100) // empty PL reselect
+										case 2:
+											scopePickTries(1)
+											_ = r.upto(1)
+											_ = r.upto(4)
+										case 3:
+											scopePickTries(8) // PP filter rejects
+										case 4:
+											_ = r.upto(100)
+											_ = r.upto(12)
+										case 5:
+											_ = r.upto(100) // empty PL
+										case 6:
+											_ = r.upto(100)
+											_ = r.upto(1)
+											_ = r.upto(4)
+											_ = r.upto(4)
+										case 7:
+											_ = r.upto(100) // PP
+										}
+									}
 									newValueCreates++
-									break // Lhs accept → Comma rhs
+									break // → Comma rhs Expression
 								}
 								_ = r.upto(6) // Global create rare — continue Lhs
 							}
