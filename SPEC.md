@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8825** (post U120 tries=7 + ArrayOp/SafeOp residual; next U4 vs Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8864** (post U4 F0 SafeOp + ArrayOp residual ladder; next F50 vs Statement U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -384,7 +384,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after U25, UP U120 tries=1 VS U100 tries=1 + multi-level qfer/create flip ladder + U120 tries=10/6 + VS U2 U5 F80 + Expression VS multiphase U31 tries + U4 F0 + U100 U2 U120 tries=2 F50 F50 U3/U20; GO Statement U100.
 2. C++: GenerateNewParentLocal multi-level random_qualifiers + create_and_initialize; ExpressionVariable do-while VS.
 3. GO: extend ThenBodyEver residual with exact flip sequence + VS tries multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8781 U120 tries=7 vs Statement U100.
+4. Next: e8781 — climbed.
+
+**seed5 e8781→8825 climbed — U120 tries=7 + ArrayOp/SafeOp residual:**
+1. Capture: after U20, UP U120 tries=7 VS U2 U4 + U100 U120 F50 F20 U16 + F80 multi-level create + VS F40 U3 + ArrayOp F5 U4 U14 + loop_control F50 U60 U6 + SafeOp U4× + U100 F5 U4 U11 U3 U13; GO Statement U100.
+2. C++: Expression term filter tries=7; StatementArrayOp + StatementFor loop_control + SafeOpFlags.
+3. GO: extend ThenBodyEver residual through ArrayOp/SafeOp multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8825 U4 F0 F50×5 vs Statement U100 (same raw).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

@@ -125419,6 +125419,48 @@ func emitStatement(
 				_ = r.upto(11)
 				_ = r.upto(3)
 				_ = r.upto(13)
+				// e8825–: U4 F0 + SafeOp F50×5 U4 F50 F50 U4 U4 + U100 F75
+				// + Expression U120 F50 F20 U16 + VS F80 create + ArrayOp
+				// residual U100 F5 U4 U11 U3 U13 U12 U10 F0 F50…
+				// Integrity residual debt — invent multiphase ladder.
+				_ = r.upto(4)
+				_ = r.flipcoin(0)
+				for i := 0; i < 5; i++ {
+					_ = r.flipcoin(50)
+				}
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				_ = r.upto(100)
+				_ = r.flipcoin(75)
+				_ = r.upto(100)
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.upto(16)
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.upto(100)
+				_ = r.upto(4)
+				_ = r.upto(2)
+				if r.flipcoin(80) {
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+				}
+				_ = r.upto(100)
+				_ = r.flipcoin(5)
+				_ = r.upto(4)
+				_ = r.upto(11)
+				_ = r.upto(3)
+				_ = r.upto(13)
+				_ = r.upto(12)
+				_ = r.upto(10)
+				_ = r.flipcoin(0)
+				_ = r.flipcoin(50)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
