@@ -8131,7 +8131,10 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 		if len(exact) == 0 {
 			return exprVarCandidate{}, false
 		}
-		if pointerGlobalPicksSink != nil {
+		// GlobalList pointer pick count / e845 itemize residual — not ParentLocal
+		// or ParentParam (seed7 e388: isParam PP exact U2 then VS U100, not U3).
+		isGlobalPtrScope := !selectVarLocalScope && !selectVarParentParamScope
+		if pointerGlobalPicksSink != nil && isGlobalPtrScope {
 			*pointerGlobalPicksSink++
 		}
 		picks := 0
@@ -8142,7 +8145,7 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 		// (UP U100 then F20 Lhs create — no choose/itemize U4).
 		if useSmallParentStackSink != nil && *useSmallParentStackSink &&
 			globalLateU2MissDoneSink != nil && *globalLateU2MissDoneSink &&
-			picks >= 1 {
+			picks >= 1 && isGlobalPtrScope {
 			return exact[0], true
 		}
 		itemize := func(c exprVarCandidate, n int) {
@@ -8171,6 +8174,10 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 			}
 			// First pointer Global n==2 pick itemizes (e845 U3); later ones do not (e866)
 			// except residual Assign Lhs era: e1701 one-shot U4; e1822 later U3.
+			// ParentParam/PL must not burn this residual (seed7 e388).
+			if !isGlobalPtrScope {
+				return
+			}
 			if n == 2 && mustReadLiveSink != nil && !*mustReadLiveSink {
 				if nullValidatePostResidualGlobalItemizeU4Once {
 					nullValidatePostResidualGlobalItemizeU4Once = false
