@@ -901,9 +901,19 @@ type functionFlowState struct {
 	// multi-dim CreateArray burns visit F0 (e7284+). Seed2 e1115 keeps off.
 	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 bool
 	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active: set after first multi-dim
-	// CreateArray F0 under VisitF0 — subsequent F80 re-itemize last sizes F0.
+	// CreateArray F0 under VisitF0 — enables Global empty residual (e7404).
 	// Not armed at body entry (would steal early F80 empty-create F10 path).
 	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize: set by first PP VS
+	// residual after CreateArray multiphase; one F80+itemize F0 loop then clear
+	// (e7322–7401). Not set after Global empty residual (e7408 next is VS).
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone: first PP U1+itemize residual
+	// consumed (e7317). Later PP (e7408 U100=92) uses U4 miss → SelectDeref create.
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS: after Global empty
+	// residual miss, next is VS try (e7408); not SelectDeref F80.
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -2591,15 +2601,17 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// e6315: free Expression after first ArrayOp (PLStackU2, not InBody) → U2.
 	// Do not key off arrayLoopDepth alone — first-body tail may still have depth>0
 	// when PLStackU2 is armed mid-statement (Lhs), and UP stack is already U2.
-	// e7221 / e7317: invent ArrayOp body PL/PP stack U1 (not sticky U2/U3).
-	// Sticky LhsVisitF0 keeps U1 for VS after multi-dim CreateArray multiphase.
-	if state != nil && (state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 ||
-		state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0) {
-		if state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
-			state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
-			state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
-		}
+	// e7221 / e7317: invent ArrayOp body PL stack U1 (not sticky U2/U3).
+	if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
+		state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
+		state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
 		return int(er.pick(1))
+	}
+	// e7409: after first PP residual done, invent ArrayOp-body PP→PL stack U4
+	// (not sticky PLStackU2).
+	if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active &&
+		state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone {
+		return int(er.pick(4))
 	}
 	if state != nil && state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 {
 		if state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
@@ -19041,6 +19053,18 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	if ctx != nil {
 		flow = ctx.state
 	}
+	// seed5 e7403–07: invent ArrayOp-body multi-dim CreateArray residual
+	// F80=0→VS Global empty — F20 NewArray + F20 make_init address + U3 U3
+	// pad then miss (not live Global choose U15…). Next VS try continues.
+	if scopePick == 0 && flow != nil &&
+		flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active && er != nil && er.fallback != nil {
+		_ = er.fallback.flipcoin(20) // e7404 NewArray
+		_ = er.fallback.flipcoin(20) // e7405 init null vs address
+		_ = er.fallback.upto(3)     // e7406
+		_ = er.fallback.upto(3)     // e7407
+		flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS = true
+		return lvalueInfo{}, false, false
+	}
 	// seed5 e6286: post-Return ArrayOp body Statement Lhs ParentLocal — must run
 	// before multiphase early-returns (freeMultiIVForLhsVSPhase / AddrCreateVS /
 	// LhsVSPhase) that would skip the scopePick==1 residual below.
@@ -19933,9 +19957,12 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// GenerateNewParentLocal WRITE create (F50 F20 F50 F50 U20) not U5 choose.
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
-		// seed5 e7317: invent ArrayOp-body multi-dim CreateArray F80=0 → VS PP
-		// stack U1 + re-itemize last sizes F0 (not sticky e6175 U3 U4 U1 U2).
-		if flow != nil && flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 {
+		// seed5 e7317: invent ArrayOp-body multi-dim CreateArray F80=0 → first
+		// VS PP stack U1 + re-itemize last sizes F0 (not sticky e6175 U3…).
+		// One-shot: later PP e7408 U4→SelectDeref create, not itemize again.
+		if flow != nil && flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0 &&
+			!flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone {
+			flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone = true
 			if er != nil {
 				_ = er.pick(1) // e7317
 				if lastArraySizesSink != nil && len(*lastArraySizesSink) > 0 {
@@ -19953,6 +19980,14 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			if er != nil && er.fallback != nil {
 				_ = er.fallback.flipcoin(0) // e7321
 			}
+			flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize = true
+			return lvalueInfo{}, false, false
+		}
+		// seed5 e7408–13: second PP after Global empty — stack/choose U4 miss
+		// → SelectDeref F80 F20 F20 F0 (not PL create F50 F10).
+		if flow != nil && flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active &&
+			flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone && er != nil {
+			_ = er.pick(4) // e7409
 			return lvalueInfo{}, false, false
 		}
 		// seed5 e6174–79: after post-Return NewArray Global-miss SelectDeref
@@ -120629,6 +120664,31 @@ commaF80MultiDone:
 			// Use chooseLValueEx so NewValue→Global signed create visit-fail
 			// (created=true, ok=false) can arm SelectDeref live ladder.
 			picked, ok, createdGlobal := chooseLValueEx(r, opts, targetType, env, scope, ctx)
+			// seed5 e7322–7401: after first PP VS residual (NeedReItemize), F80
+			// re-itemize until F80=0→VS. After Global empty residual, continue
+			// VS (e7408 PP). After second PP U4 miss, fall through to SelectDeref
+			// create (e7410 F80 F20…) — do not continue VS.
+			if !ok && ctx != nil && ctx.state != nil &&
+				ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active && r != nil {
+				if ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize &&
+					lastArraySizesSink != nil && len(*lastArraySizesSink) > 1 {
+					ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize = false
+					for r.flipcoin(80) {
+						for _, sz := range *lastArraySizesSink {
+							if sz > 0 {
+								_ = r.upto(uint32(sz))
+							}
+						}
+						_ = r.flipcoin(0)
+					}
+					continue // F80=0 → next VS try
+				}
+				if ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS {
+					ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS = false
+					continue // e7408 next VS after Global empty
+				}
+				// second PP U4 miss: fall through to SelectDeref create residual
+			}
 			if !ok && needNoRhs && createdGlobal {
 				// seed5 e4508–16: need_no_rhs NewValue→Global retype signed
 				// longlong fails no_signed_overflow; Lhs do-while continues
