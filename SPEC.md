@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8506** (post invent residual FuncPLU1 * qfer + NewArray F20 F20)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8511** (post FuncF20U16 Lhs empty create F80 F10 F50 F20 F20; next U10=6 vs Return VS)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -342,7 +342,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after U1, UP * qfer F50 F10 + self F50 F10 then NewArray F20 F20; GO sticky freeMultiIVNeedNoRhsPostEAGlobalU21 floored levels to 2 (extra F50 F10) then NewArray.
 2. C++: GenerateNewParentLocal for int* uses 1-level random_qualifiers + self then make_init NewArray.
 3. GO: invent residual FuncPLCreateLvl1 one-shot levels=1 before GlobalU21/StmtEra floors. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8506 F80 F10 F50 F20 F20 residual after address init vs GO Expression U120.
+4. Next: e8506 — climbed.
+
+**seed5 e8506→8511 climbed — post-FuncF20U16 Lhs empty create residual + Expression unwind:**
+1. Capture: after PL create F20 F20, UP F80 F10 F50 F20 F20 then Statement U100=33; GO nested Expression U120 Function CREATE F50 F30 F0 then Lhs F80.
+2. C++: Lhs.cpp:77 SelectDerefPointerProb empty → VariableSelector.cpp:1266–1315 random_add_qualifiers F10 F50 + create_and_initialize F20 F20; free Expression nest ends → StatementProbability.
+3. GO: after FuncF20U16 nested param Expression, burn F80 random_add F10 F50 NewArray F20 init F20; arm ppPostPadSkipParentExprN to unwind Comma-right/parent Expression without RNG. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8511 U10=6 F0 (UP Return/loop residual) vs GO Return VS U100=26.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

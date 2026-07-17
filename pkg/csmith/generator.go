@@ -9672,6 +9672,35 @@ func buildFunctionCallExpr(
 				ctx.exprDepth = prevDepth
 			}
 		}
+		// e8506–10: after nested Function-fail PL create (e8498–8505), UP
+		// continues SelectDeref empty create multiphase (Lhs.cpp:77 F80 +
+		// VariableSelector.cpp:1266–1315 random_add F10 F50 + create_and_initialize
+		// F20 F20) then Statement U100 — not live Comma-right / parent Expression
+		// Function CREATE F50 F30 F0. Burn Lhs empty-create residual inline (free
+		// Expression nest ends here; no outer StatementAssign Lhs to arm n==12).
+		// Unwind parent Expression draws without RNG.
+		// Integrity residual debt — Expression nest boundary after FuncF20U16.
+		// C++: Lhs::make_random do-while SelectDerefPointerProb empty →
+		// random_add_qualifiers + GenerateNewParentLocal create_and_initialize.
+		if r != nil {
+			if r.flipcoin(80) { // e8506 SelectDerefPointerProb
+				if opts.ConstPointers {
+					_ = r.flipcoin(10) // e8507 random_add const
+				}
+				if opts.VolatilePointers {
+					_ = r.flipcoin(50) // e8508 random_add vol
+				}
+				_ = r.flipcoin(20) // e8509 NewArray
+				_ = r.flipcoin(20) // e8510 init
+			}
+		}
+		if ctx != nil && ctx.state != nil {
+			if ctx.state.ppPostPadSkipParentExprN < 8 {
+				ctx.state.ppPostPadSkipParentExprN = 8
+			}
+			ctx.state.freeMultiIVForLhsExprContinue = false
+			ctx.state.postAggLhsExprContinue = false
+		}
 		return castLiteral(t, "0"), true
 	}
 	if useExisting && len(candidates) > 0 {
