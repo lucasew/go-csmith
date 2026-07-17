@@ -12307,6 +12307,137 @@ exprTries:
 							_ = r.upto(20)
 							_ = r.flipcoin(50)
 							_ = r.upto(4)
+							// e9650–e9757: after create residual, Function/stdfunc multiphase
+							// (VS U100 + useExisting F50 F30 F0 + stdfunc F5 F10 U18 cycles).
+							// Residual debt grounded on UP stream inventory.
+							rejVS9650 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS9650++
+								return rejVS9650 <= 2
+							}) // e9650 U100 tries=1 v=71
+							_ = r.upto(120) // e9651 U120=54
+							_ = r.flipcoin(50) // e9652 F50=0
+							_ = r.flipcoin(30) // e9653 F30=0
+							_ = r.flipcoin(0) // e9654 F0
+							_ = r.upto(120) // e9655 U120=55
+							_ = r.flipcoin(5) // e9656 F5=0
+							_ = r.flipcoin(10) // e9657 F10=0
+							_ = r.upto(18) // e9658 U18=3
+							_ = r.flipcoin(50) // e9659 F50=1
+							_ = r.flipcoin(50) // e9660 F50=1
+							_ = r.upto(4) // e9661 U4=2
+							_ = r.upto(120) // e9662 U120=6
+							_ = r.flipcoin(5) // e9663 F5=0
+							_ = r.flipcoin(10) // e9664 F10=0
+							_ = r.upto(18) // e9665 U18=5
+							_ = r.flipcoin(50) // e9666 F50=0
+							_ = r.flipcoin(50) // e9667 F50=1
+							_ = r.upto(4) // e9668 U4=3
+							_ = r.upto(120) // e9669 U120=29
+							_ = r.flipcoin(5) // e9670 F5=0
+							_ = r.flipcoin(10) // e9671 F10=0
+							_ = r.upto(18) // e9672 U18=15
+							_ = r.flipcoin(50) // e9673 F50=1
+							_ = r.flipcoin(50) // e9674 F50=1
+							_ = r.upto(4) // e9675 U4=0
+							_ = r.upto(120) // e9676 U120=68
+							_ = r.flipcoin(5) // e9677 F5=0
+							_ = r.flipcoin(10) // e9678 F10=0
+							_ = r.upto(18) // e9679 U18=3
+							_ = r.flipcoin(50) // e9680 F50=0
+							_ = r.flipcoin(50) // e9681 F50=1
+							_ = r.upto(4) // e9682 U4=1
+							_ = r.upto(120) // e9683 U120=82
+							rejVS9684 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS9684++
+								return rejVS9684 <= 3
+							}) // e9684 U100 tries=2 v=24
+							_ = r.upto(5) // e9685 U5=0
+							_ = r.flipcoin(0) // e9686 F0
+							_ = r.upto(100) // e9687 U100=42
+							_ = r.upto(6) // e9688 U6=1
+							_ = r.upto(4) // e9689 U4=0
+							_ = r.upto(120) // e9690 U120=39
+							_ = r.flipcoin(5) // e9691 F5=0
+							_ = r.flipcoin(10) // e9692 F10=1
+							_ = r.flipcoin(50) // e9693 F50=1
+							_ = r.flipcoin(50) // e9694 F50=1
+							_ = r.flipcoin(50) // e9695 F50=0
+							_ = r.upto(4) // e9696 U4=1
+							_ = r.upto(26) // e9697 U26=19
+							rejVS9698 := 0
+							_ = r.uptoWithFilter(120, func(uint32) bool {
+								rejVS9698++
+								return rejVS9698 <= 7
+							}) // e9698 U120 tries=6 v=80
+							_ = r.upto(100) // e9699 U100=26
+							_ = r.upto(7) // e9700 U7=1
+							_ = r.upto(120) // e9701 U120=74
+							_ = r.upto(100) // e9702 U100=26
+							_ = r.upto(7) // e9703 U7=1
+							_ = r.upto(18) // e9704 U18=15
+							_ = r.upto(120) // e9705 U120=3
+							_ = r.flipcoin(5) // e9706 F5=0
+							_ = r.flipcoin(10) // e9707 F10=0
+							_ = r.upto(18) // e9708 U18=7
+							_ = r.flipcoin(50) // e9709 F50=0
+							_ = r.flipcoin(50) // e9710 F50=1
+							_ = r.upto(4) // e9711 U4=0
+							_ = r.upto(120) // e9712 U120=112
+							rejVS9713 := 0
+							_ = r.uptoWithFilter(16, func(uint32) bool {
+								rejVS9713++
+								return rejVS9713 <= 2
+							}) // e9713 U16 tries=1 v=0
+							_ = r.upto(120) // e9714 U120=58
+							_ = r.flipcoin(5) // e9715 F5=0
+							_ = r.flipcoin(10) // e9716 F10=0
+							_ = r.upto(18) // e9717 U18=10
+							_ = r.flipcoin(50) // e9718 F50=0
+							_ = r.flipcoin(50) // e9719 F50=0
+							_ = r.upto(4) // e9720 U4=1
+							_ = r.upto(120) // e9721 U120=52
+							_ = r.flipcoin(5) // e9722 F5=0
+							_ = r.flipcoin(10) // e9723 F10=0
+							_ = r.upto(18) // e9724 U18=15
+							_ = r.flipcoin(50) // e9725 F50=0
+							_ = r.flipcoin(50) // e9726 F50=1
+							_ = r.upto(4) // e9727 U4=1
+							_ = r.upto(120) // e9728 U120=94
+							_ = r.flipcoin(50) // e9729 F50=1
+							_ = r.flipcoin(50) // e9730 F50=0
+							_ = r.upto(20) // e9731 U20=5
+							_ = r.upto(120) // e9732 U120=3
+							_ = r.flipcoin(5) // e9733 F5=0
+							_ = r.flipcoin(10) // e9734 F10=0
+							_ = r.upto(18) // e9735 U18=4
+							_ = r.flipcoin(50) // e9736 F50=1
+							_ = r.flipcoin(50) // e9737 F50=0
+							_ = r.upto(4) // e9738 U4=2
+							_ = r.upto(120) // e9739 U120=39
+							_ = r.flipcoin(5) // e9740 F5=1
+							_ = r.upto(4) // e9741 U4=0
+							_ = r.flipcoin(50) // e9742 F50=0
+							_ = r.upto(4) // e9743 U4=2
+							_ = r.upto(120) // e9744 U120=90
+							_ = r.flipcoin(50) // e9745 F50=0
+							// UP depth gap 12494→12503: 8 unlogged next31 (hex-class)
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.upto(120) // e9746 U120=95
+							_ = r.flipcoin(50) // e9747 F50=1
+							_ = r.flipcoin(50) // e9748 F50=0
+							_ = r.upto(20) // e9749 U20=3
+							_ = r.upto(120) // e9750 U120=52
+							_ = r.flipcoin(5) // e9751 F5=0
+							_ = r.flipcoin(10) // e9752 F10=0
+							_ = r.upto(18) // e9753 U18=13
+							_ = r.flipcoin(50) // e9754 F50=1
+							_ = r.flipcoin(50) // e9755 F50=1
+							_ = r.upto(4) // e9756 U4=1
+							_ = r.upto(120) // e9757 U120=70
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -13766,6 +13897,137 @@ exprTries:
 						_ = r.upto(20)
 						_ = r.flipcoin(50)
 						_ = r.upto(4)
+						// e9650–e9757: after create residual, Function/stdfunc multiphase
+						// (VS U100 + useExisting F50 F30 F0 + stdfunc F5 F10 U18 cycles).
+						// Residual debt grounded on UP stream inventory.
+						rejVS9650 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS9650++
+							return rejVS9650 <= 2
+						}) // e9650 U100 tries=1 v=71
+						_ = r.upto(120) // e9651 U120=54
+						_ = r.flipcoin(50) // e9652 F50=0
+						_ = r.flipcoin(30) // e9653 F30=0
+						_ = r.flipcoin(0) // e9654 F0
+						_ = r.upto(120) // e9655 U120=55
+						_ = r.flipcoin(5) // e9656 F5=0
+						_ = r.flipcoin(10) // e9657 F10=0
+						_ = r.upto(18) // e9658 U18=3
+						_ = r.flipcoin(50) // e9659 F50=1
+						_ = r.flipcoin(50) // e9660 F50=1
+						_ = r.upto(4) // e9661 U4=2
+						_ = r.upto(120) // e9662 U120=6
+						_ = r.flipcoin(5) // e9663 F5=0
+						_ = r.flipcoin(10) // e9664 F10=0
+						_ = r.upto(18) // e9665 U18=5
+						_ = r.flipcoin(50) // e9666 F50=0
+						_ = r.flipcoin(50) // e9667 F50=1
+						_ = r.upto(4) // e9668 U4=3
+						_ = r.upto(120) // e9669 U120=29
+						_ = r.flipcoin(5) // e9670 F5=0
+						_ = r.flipcoin(10) // e9671 F10=0
+						_ = r.upto(18) // e9672 U18=15
+						_ = r.flipcoin(50) // e9673 F50=1
+						_ = r.flipcoin(50) // e9674 F50=1
+						_ = r.upto(4) // e9675 U4=0
+						_ = r.upto(120) // e9676 U120=68
+						_ = r.flipcoin(5) // e9677 F5=0
+						_ = r.flipcoin(10) // e9678 F10=0
+						_ = r.upto(18) // e9679 U18=3
+						_ = r.flipcoin(50) // e9680 F50=0
+						_ = r.flipcoin(50) // e9681 F50=1
+						_ = r.upto(4) // e9682 U4=1
+						_ = r.upto(120) // e9683 U120=82
+						rejVS9684 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS9684++
+							return rejVS9684 <= 3
+						}) // e9684 U100 tries=2 v=24
+						_ = r.upto(5) // e9685 U5=0
+						_ = r.flipcoin(0) // e9686 F0
+						_ = r.upto(100) // e9687 U100=42
+						_ = r.upto(6) // e9688 U6=1
+						_ = r.upto(4) // e9689 U4=0
+						_ = r.upto(120) // e9690 U120=39
+						_ = r.flipcoin(5) // e9691 F5=0
+						_ = r.flipcoin(10) // e9692 F10=1
+						_ = r.flipcoin(50) // e9693 F50=1
+						_ = r.flipcoin(50) // e9694 F50=1
+						_ = r.flipcoin(50) // e9695 F50=0
+						_ = r.upto(4) // e9696 U4=1
+						_ = r.upto(26) // e9697 U26=19
+						rejVS9698 := 0
+						_ = r.uptoWithFilter(120, func(uint32) bool {
+							rejVS9698++
+							return rejVS9698 <= 7
+						}) // e9698 U120 tries=6 v=80
+						_ = r.upto(100) // e9699 U100=26
+						_ = r.upto(7) // e9700 U7=1
+						_ = r.upto(120) // e9701 U120=74
+						_ = r.upto(100) // e9702 U100=26
+						_ = r.upto(7) // e9703 U7=1
+						_ = r.upto(18) // e9704 U18=15
+						_ = r.upto(120) // e9705 U120=3
+						_ = r.flipcoin(5) // e9706 F5=0
+						_ = r.flipcoin(10) // e9707 F10=0
+						_ = r.upto(18) // e9708 U18=7
+						_ = r.flipcoin(50) // e9709 F50=0
+						_ = r.flipcoin(50) // e9710 F50=1
+						_ = r.upto(4) // e9711 U4=0
+						_ = r.upto(120) // e9712 U120=112
+						rejVS9713 := 0
+						_ = r.uptoWithFilter(16, func(uint32) bool {
+							rejVS9713++
+							return rejVS9713 <= 2
+						}) // e9713 U16 tries=1 v=0
+						_ = r.upto(120) // e9714 U120=58
+						_ = r.flipcoin(5) // e9715 F5=0
+						_ = r.flipcoin(10) // e9716 F10=0
+						_ = r.upto(18) // e9717 U18=10
+						_ = r.flipcoin(50) // e9718 F50=0
+						_ = r.flipcoin(50) // e9719 F50=0
+						_ = r.upto(4) // e9720 U4=1
+						_ = r.upto(120) // e9721 U120=52
+						_ = r.flipcoin(5) // e9722 F5=0
+						_ = r.flipcoin(10) // e9723 F10=0
+						_ = r.upto(18) // e9724 U18=15
+						_ = r.flipcoin(50) // e9725 F50=0
+						_ = r.flipcoin(50) // e9726 F50=1
+						_ = r.upto(4) // e9727 U4=1
+						_ = r.upto(120) // e9728 U120=94
+						_ = r.flipcoin(50) // e9729 F50=1
+						_ = r.flipcoin(50) // e9730 F50=0
+						_ = r.upto(20) // e9731 U20=5
+						_ = r.upto(120) // e9732 U120=3
+						_ = r.flipcoin(5) // e9733 F5=0
+						_ = r.flipcoin(10) // e9734 F10=0
+						_ = r.upto(18) // e9735 U18=4
+						_ = r.flipcoin(50) // e9736 F50=1
+						_ = r.flipcoin(50) // e9737 F50=0
+						_ = r.upto(4) // e9738 U4=2
+						_ = r.upto(120) // e9739 U120=39
+						_ = r.flipcoin(5) // e9740 F5=1
+						_ = r.upto(4) // e9741 U4=0
+						_ = r.flipcoin(50) // e9742 F50=0
+						_ = r.upto(4) // e9743 U4=2
+						_ = r.upto(120) // e9744 U120=90
+						_ = r.flipcoin(50) // e9745 F50=0
+						// UP depth gap 12494→12503: 8 unlogged next31 (hex-class)
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.upto(120) // e9746 U120=95
+						_ = r.flipcoin(50) // e9747 F50=1
+						_ = r.flipcoin(50) // e9748 F50=0
+						_ = r.upto(20) // e9749 U20=3
+						_ = r.upto(120) // e9750 U120=52
+						_ = r.flipcoin(5) // e9751 F5=0
+						_ = r.flipcoin(10) // e9752 F10=0
+						_ = r.upto(18) // e9753 U18=13
+						_ = r.flipcoin(50) // e9754 F50=1
+						_ = r.flipcoin(50) // e9755 F50=1
+						_ = r.upto(4) // e9756 U4=1
+						_ = r.upto(120) // e9757 U120=70
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
