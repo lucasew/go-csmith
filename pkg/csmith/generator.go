@@ -211,6 +211,7 @@ var inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 bool
 // inventArrayOpPostNestBreakThenBodyForBody: sticky while invent residual
 // then-body For body is active (e8106– until body ends).
 var inventArrayOpPostNestBreakThenBodyForBody bool
+var inventArrayOpPostNestBreakThenBodyEver bool // sticky after then-body arm
 // inventArrayOpPostNestBreakThenBodyForGlobalN: multiphase free Expression
 // Variable Global under invent residual then-body For body:
 //   0 e8130 U5 + Lhs empty create F80 F10 F50 F20 F20
@@ -11494,9 +11495,17 @@ exprTries:
 				// seed5 e6009–14: after NewArray+address Lhs VS residual accept,
 				// free Expression Function-fail PP: first live U7 (e6010) then
 				// sole (e6013→U120). Sticky multiphase always-U7 under-burns.
+				// e8220 invent residual then-body: ParentParam live choose U4.
+				if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil {
+					_ = er.pick(4)
+					bumpExprDepth(ctx)
+					markFuncEffect()
+					return castLiteral(t, "x")
+				}
 				if ctx != nil && ctx.state != nil &&
 					ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
-					scopePick == 2 && er != nil {
+					scopePick == 2 && er != nil &&
+					!inventArrayOpPostNestBreakThenBodyEver {
 					if ctx.skipFuncRetQfer {
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -11782,6 +11791,15 @@ exprTries:
 								}
 							}
 							// Incompatible types: still burned U7; fall through miss.
+						} else if inventArrayOpPostNestBreakThenBodyEver && er != nil {
+							// e8220: invent residual then-body ParentParam — UP choose_ok_var
+							// U4. Live inventory under-counts (often sole). Burn U4 then sole
+							// like e1068 U7 pad (corrected width; residual debt).
+							_ = er.pick(4)
+							expr := paramCands[0].expr
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, expr)
 						} else if c, ok := selectExprVariableFromERLocal(t, er, paramCands, false); ok {
 							wantPtr := strings.Contains(t.Name, "*")
 							havePtr := strings.Contains(c.ctype.Name, "*")
@@ -12214,6 +12232,14 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
+			// e8220–21: invent residual then-body free Expression ParentParam —
+			// UP choose_ok_var U4 then visit_facts miss → Expression do-while
+			// retries term U120 (not accept sole → parent Lhs F80). Residual debt.
+			if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil {
+				_ = er.pick(4)
+				restoreGenSnapshot(ctx, snap)
+				continue exprTries
+			}
 			// invent residual then-body For body free Expression Variable Global
 			// multiphase (e8130 U5; e8157 U10 F0 reselect U9).
 			if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
@@ -12353,8 +12379,12 @@ exprTries:
 			// after PPU7Done. Early intercept before postEA sole paths.
 			// seed5 e6009–14 after NewArray VS residual: first U7 (e6010) then
 			// sole (e6013 Function-fail / later PP) — shared PostNewArrayPPN.
+			// e8220: invent residual then-body era ends this invent floor —
+			// UP live choose U4, not sticky pick(7) sole (integrity §5.2).
 			if flow != nil && flow.freeMultiIVNeedNoRhsPostEAReturnGlobalDone &&
-				scopePick == 2 && er != nil {
+				scopePick == 2 && er != nil &&
+				!inventArrayOpPostNestBreakThenBodyForBody &&
+				!inventArrayOpPostNestBreakThenBodyEver {
 				if flow.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone {
 					pn := flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN
 					flow.freeMultiIVNeedNoRhsPostEAReturnPostNewArrayPPN = pn + 1
@@ -16226,6 +16256,13 @@ exprTries:
 				// (UP expand_struct_union / multi-param; GO inventory sole).
 				if scopePick == 2 && nullValidatePostResidualParamU7 {
 					selectVarForceChooseN = 7
+				}
+				// e8220: invent residual then-body — UP ParentParam choose_ok_var U4
+				// (live expand / multi-param). Sticky post-Return invent pick(7) is
+				// off; live inventory under-counts (often 1 param sole). Align choose
+				// width to UP U4 (same residual class as e1068 U7 pad, corrected size).
+				if scopePick == 2 && inventArrayOpPostNestBreakThenBodyEver {
+					selectVarForceChooseN = 4
 				}
 				// seed5 e1271+: residual free Expression GlobalList U18 pad
 				// (UP GlobalList; GO inventory U4). Itemize when array (e1282 U4).
@@ -124059,9 +124096,16 @@ func emitStatement(
 			_ = r.upto(10)
 			// e8130+: For body free Expression Global multiphase (U5 then U10…).
 			inventArrayOpPostNestBreakThenBodyForBody = true
-			// e8220: stop sticky nullValidate ParamU7 invent floor (e1068/e2050).
-			// Later ParentParam uses live ok_vars (UP U4), not permanent pick(7).
+			inventArrayOpPostNestBreakThenBodyEver = true
+			// Stop sticky invent floors from earlier residual eras (e1068 ParamU7,
+			// e5765/e6010 post-Return PP U7). Later PP uses live ok_vars.
 			nullValidatePostResidualParamU7 = false
+			// Clear post-Return invent residual so termVariable does not keep
+			// pick(7) sole forever (e8220 U7 vs UP live U4).
+			if state != nil {
+				state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone = false
+				state.freeMultiIVNeedNoRhsPostEAReturnLhsNewArrayVSDone = false
+			}
 			inventArrayOpPostNestBreakThenBodyForGlobalN = 0
 		} else if postArrayFor {
 			// Nested array-loop For: C++ still uses full inventory, but early
