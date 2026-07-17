@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **316** (was 280): free For isParam Global SelectGlobal inventory before create |
+| 7 | first_div **341** (was 316): nested CREATE Function::stack relative to caller free For |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e316→341 climbed — nested CREATE parentStackPick relative stack:**
+1. Capture: after free For isParam call args, nested CREATE body make_random_param PL — UP Function::stack.size()=1; GO parentStackPick used caller's free For blockStack==2 → U2.
+2. C++ nested Function has its own Function::stack (body frame only until local For/If push). Shared GO `blockStack` still holds caller depth.
+3. GO: track `nestedFuncDepth` + `nestedFuncEntryBlockStack`; parentStackPick base n = 1+(blockStack−entry) while nested (no blanket blockStack reset — that broke seed2/4 residual paths). Seeds 2/3/4/6 full match; seed5 still GO-extra after 13634.
+4. Next: seed7 e341 UP empty PL create F20 vs GO choose U3 (nested body frame inventory overcount); continue COUNT=20.
 
 **seed7 e280→316 climbed — free For isParam Global SelectGlobal inventory-first:**
 1. Capture: after first formal-qfer Global create (e273–77), second isParam pointer Global — UP SelectGlobal sole/choose among matching pointers (e279 U100=2) then next Expression U100; GO force-create F20+ again over-created inventory.

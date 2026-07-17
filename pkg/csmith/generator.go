@@ -1361,6 +1361,14 @@ freeMultiIVPostEAMultiLvlStmtNoLoop bool
 	// seed4 e263: first Global simple EV in a nested body prefers sole null
 	// higher-indirection → F0 fail → retry U100 U2 (not integer U2).
 	nestedFuncBodies int
+	// nestedFuncDepth: how many emitSingleFuncDefOnce frames are active above
+	// func_1 (0 = in func_1 or top-level). Unlike nestedFuncBodies (sticky
+	// lifetime count), this tracks live nesting for Function::stack relative
+	// size (seed7 e316).
+	nestedFuncDepth int
+	// nestedFuncEntryBlockStack: caller's blockStack when current nested
+	// CREATE body started; parentStackPick uses blockStack-entry+1 as n.
+	nestedFuncEntryBlockStack int
 	// nestedNullPreferDone: one-shot F0 after nested body Global simple prefer.
 	nestedNullPreferDone bool
 	// isParamGlobalFlexPicks: capped eFlexible isParam Global chooses (seed4 e340).
@@ -2826,8 +2834,19 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// Free For body with only {func, for} is blockStack==2 (seed7 e127 U2).
 	// When GO over-counts frames (seed2 e318 blockStack=3 vs UP U1), keep
 	// historical n=1 until deepStack/residual floors apply.
+	// Nested CREATE body: Function::stack is independent of the caller's free
+	// For. Shared GO blockStack still holds caller depth — use relative size
+	// 1+(blockStack-entry) so first PL pick is U1 (seed7 e316), not caller U2.
 	n := 1
-	if state != nil && !state.deepStack && state.multiDimArrays == 0 &&
+	if state != nil && state.nestedFuncDepth > 0 &&
+		!state.deepStack && state.multiDimArrays == 0 &&
+		!state.useSmallParentStack {
+		rel := 1 + (state.blockStack - state.nestedFuncEntryBlockStack)
+		if rel < 1 {
+			rel = 1
+		}
+		n = rel
+	} else if state != nil && !state.deepStack && state.multiDimArrays == 0 &&
 		!state.useSmallParentStack && state.blockStack == 2 {
 		n = 2
 	}
@@ -138756,6 +138775,17 @@ func emitSingleFuncDefOnce(
 		// Nested CREATE callee body (not func_1): enable one-shot null prefer.
 		if idx > 0 {
 			state.nestedFuncBodies++
+			// C++ new Function::stack starts at size 1. Shared GO blockStack
+			// still holds the caller's free For depth — record entry base so
+			// parentStackPick burns relative n (seed7 e316 U1 not caller U2).
+			prevDepth := state.nestedFuncDepth
+			prevEntry := state.nestedFuncEntryBlockStack
+			state.nestedFuncDepth = prevDepth + 1
+			state.nestedFuncEntryBlockStack = state.blockStack
+			defer func() {
+				state.nestedFuncDepth = prevDepth
+				state.nestedFuncEntryBlockStack = prevEntry
+			}()
 		}
 		state.funcBodyHadReturn = false
 		prevSink := multiDimArraySink
