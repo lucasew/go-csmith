@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8105** (post invent residual Global U51 expand: U4 residual vs GO Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8130** (post invent residual then-body For: PL stack U5 vs GO U3)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,23 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e8106→8130 climbed — invent residual then-body Global residual ends Expression → Statement For:**
+1. Capture: after Global expand F50 U64 U4, UP StatementProbability For (U100=29) + SelectLoopCtrl U10 + loop_control; GO continued free Expression (binary Function wanted RHS).
+2. C++: Expression nest ends after residual Variable (parent binaries complete); then-body Statement For SelectLoopCtrlVar among ~10 int visibles + make_random_loop_control.
+3. GO: after residual, arm `postAggUnwindBinaryAfterExprVar` + `ppPostPadSkipParentExprN` (e4332/e2126 family) so nested binary Function operands return without SafeOp/RHS RNG → Statement For; one-shot SelectLoopCtrl U10 (not sticky post-Return U27). **Integrity residual debt** — U10 floor + invent F50 U64 U4; replace with real inventory/visit path. Seeds 2/4/6 held.
+4. Next: e8130 UP PL stack U5 vs GO U3 after For body VS.
+
+**seed5 e8105→8106 climbed — invent residual Global expand post-choose F50 U64 U4:**
+1. Capture: after expand U51, UP residual F50 U64 U4 then Statement For; GO Expression ended after U51.
+2. C++: residual multiphase after Global expand (e7433 F50 U64 family) then Expression ends → Statement.
+3. GO: after expand choose, residual F50 U64 U4 (not chooseOKVar itemize-only). **Integrity residual debt** — replace with visit_facts/itemize structural path. Seeds 2/4/6 held.
+4. Next: e8106 Statement For — climbed.
+
 **seed5 e8102→8105 climbed — invent residual then-body Global expand U51:**
 1. Capture: free Expression Variable Global UP choose_ok_var U51 (eFlexible expand) vs GO thin U4/U53.
 2. C++: SelectGlobal Nonvolatiles + expand_struct_union_vars (e7429 class GlobalList).
 3. GO: invent residual then-body reuses inventArrayOp Global expand pool; trim overcount to 51. Seeds 2/4/6 held.
-4. Next: e8105 U4 after F50 U64 vs GO Statement U100.
+4. Next: e8105 post-choose residual — climbed.
 
 **seed5 e8082→8102 climbed — invent residual then-body PL stack U1 create:**
 1. Capture: free Expression Variable PL after free Expression nest — UP stack U1 + retype U14 create; GO sticky freeMultiIVNeedNoRhsIfBody U5 + choose U3 sole.

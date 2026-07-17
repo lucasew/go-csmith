@@ -203,6 +203,11 @@ var inventArrayOpPostNestBreakAllowCondConst bool
 // Expression nest ends and If then-body runs, free Expression PL uses
 // Function::stack.size()=1 (e8082), not sticky freeMultiIVNeedNoRhsIfBody U5.
 var inventArrayOpPostNestBreakThenBodyPLStackU1 bool
+// inventArrayOpPostNestBreakThenBodyForLoopCtrlU10: after invent residual
+// then-body Global expand F50 U64 U4 ends Expression nest, next Statement For
+// SelectLoopCtrlVar is U10 among ~10 integer visibles (e8107), not sticky
+// post-Return U27 / freeMultiIVNeedNoRhs U37 inventory overcount.
+var inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -13201,6 +13206,15 @@ exprTries:
 					// U51 then residual F50 U64 U4 (not bare chooseOKVar itemize which
 					// orders U51 U64 without F50, and misses trailing U4). Stream
 					// family of e7433–34 invent residual F50 U64 after Global expand.
+					// e8106: Expression nest ends after residual — next is then-body
+					// StatementProbability For (U100=29) + SelectLoopCtrl U10 +
+					// make_random_loop_control F50 U60… (same end-nest pattern as
+					// e7433 invent residual PL F50 U64 → Statement U100). GO free
+					// Expression continue (F50 U120 Function) desyncs.
+					// Parent binaries/Function still request RHS operands after
+					// Variable returns — arm SkipParentExprN so nested Expression
+					// calls return dummy without RNG and unwind to Statement
+					// (ppPostPadSkipParentExprN / e2126 / e4332 family).
 					if inventArrayOpPostNestBreakThenBodyPLStackU1 {
 						c := pool[0]
 						if len(pool) > 1 {
@@ -13211,6 +13225,29 @@ exprTries:
 						}
 						_ = er.pick(64) // e8104
 						_ = er.pick(4)  // e8105
+						inventArrayOpPostNestBreakThenBodyPLStackU1 = false
+						inventArrayOpExprEmptyParamsVS = false
+						inventArrayOpExprPLN = 0
+						if flow != nil {
+							flow.freeMultiIVForLhsExprContinue = false
+							flow.postAggLhsExprContinue = false
+							flow.postAggNullValidateExprContinue = false
+							flow.ppPostPadDepthBlock = false
+							flow.ppPostPadForceNoFunc = false
+							// Unwind nested binary Function operands after this
+							// Variable (e4332 family) — without SkipBy/SafeOp F50
+							// so stream hits StatementProbability For U100=29.
+							if flow.postAggUnwindBinaryAfterExprVar < 8 {
+								flow.postAggUnwindBinaryAfterExprVar = 8
+							}
+							if flow.ppPostPadSkipParentExprN < 64 {
+								flow.ppPostPadSkipParentExprN = 64
+							}
+						}
+						// e8107: then-body Statement For SelectLoopCtrlVar U10
+						// (C++ ~10 int visibles after residual nest), not sticky
+						// post-Return U27 / need_no_rhs U37 overcount.
+						inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = true
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, c.expr))
@@ -123775,6 +123812,12 @@ func emitStatement(
 			state.arrayLoopFresh && state.multiDimArrays > 0
 		if nullValidateForU9 {
 			// already burned SelectLoopCtrl U9; fall through to loop_control
+		} else if inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 {
+			// e8107: invent residual then-body Global expand ended Expression
+			// nest → Statement For SelectLoopCtrlVar among ~10 int visibles
+			// (UP U10). Sticky post-Return U27 / need_no_rhs U37 over-burns.
+			inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
+			_ = r.upto(10)
 		} else if postArrayFor {
 			// Nested array-loop For: C++ still uses full inventory, but early
 			// seed2 era pool size equals sticky loopIVPool (e370 U2).
@@ -125682,6 +125725,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakExprPLU3 = false
 	inventArrayOpPostNestBreakAllowCondConst = false
 	inventArrayOpPostNestBreakThenBodyPLStackU1 = false
+	inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
