@@ -6695,13 +6695,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 	}
 	// make_random_param ExpressionVariable with formal qfer: GenerateNewParentLocal
 	// copies qfer (no random_qualifiers → F20 NewArray first).
-	// - paramExprCommaAllTypes era (seed5 e251→e300)
-	// - free For body Function-arg (blockStack==2): seed7 e129 F20 first
-	// Early seed2 isParam PL create still needs SE-free qfer F50 in some paths.
+	// Callers pass qferMode 0 for isParam (seed7 e128 free For param PL).
+	// Do not force mode 0 for all free For + inParamExpr — free Expression
+	// Variable inside For still needs SE-free F50 F10 (seed7 e195).
+	// paramExprCommaAllTypes era (seed5 e251→e300) still forces formal path.
 	if ctx != nil && ctx.inParamExpr && qferMode > 0 {
-		if ctx.state != nil && (ctx.state.paramExprCommaAllTypes ||
-			(!ctx.state.deepStack && ctx.state.multiDimArrays == 0 &&
-				!ctx.state.useSmallParentStack && ctx.state.blockStack == 2)) {
+		if ctx.state != nil && ctx.state.paramExprCommaAllTypes {
 			qferMode = 0
 		}
 	}
@@ -26067,7 +26066,16 @@ exprTries:
 						return finishVar(castLiteral(t, g.expr))
 					}
 				}
+				// multiDim: blockDepth inventory reliable (seed2 e871).
+				// Free For (blockStack==2, early): C++ SelectParentLocal uses only
+				// stack[idx]->local_vars — empty → random_type U14 create (seed7 e194).
+				// Pre-multi-dim fallthrough over-accepts all-locals inventory.
 				useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
+				if !useBlockLocal && flow != nil && !flow.deepStack &&
+					flow.multiDimArrays == 0 && !flow.useSmallParentStack &&
+					flow.blockStack == 2 {
+					useBlockLocal = true
+				}
 				if useBlockLocal {
 					// e6316: PLStackU2 empty blockDepth → materialise any-depth locals.
 					localCands := localsForParentLocalStack(er, env, scope, ctx, idx, flow)
@@ -27409,7 +27417,24 @@ exprTries:
 						}
 					}
 					if len(localCands) == 0 || forceCreate {
-						retype := !isParam
+						// Empty block SelectParentLocal always random_type_from_type
+						// (VariableSelector.cpp:1005–15) — retype even for isParam.
+						// seed7 e128: free For param ExpressionVariable PL empty →
+						// U14 then formal-qfer create F20 (not skip retype → F20 first).
+						retype := !isParam || len(localCands) == 0
+						if len(localCands) == 0 && flow != nil && !flow.deepStack &&
+							flow.multiDimArrays == 0 && !flow.useSmallParentStack &&
+							flow.blockStack == 2 {
+							retype = true
+							// isParam (make_random_param): formal qfer → no random_qualifiers.
+							// Free Expression Variable: SE-free READ qfer F50 F10 (mode 1).
+							// seed7 e195: free PL create after U14 is F50 F10 not F20.
+							if isParam {
+								qferMode = 0
+							} else {
+								qferMode = 1
+							}
+						}
 						postN := 0
 						if flow != nil {
 							postN = flow.postAggGlobalCreate

@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **194** (was 185); 8–21 early fail|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **218** (was 194); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **194** (was 185): free For Lhs pointee hex width + sole fail |
+| 7 | first_div **195** (was 194): free For PL empty-block retype create |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e194→195 climbed — free For SelectParentLocal empty-block create:**
+1. Capture: e194 UP U14 retype vs GO U120 (all-locals PL fallthrough after stack U2).
+2. C++ empty `stack[idx]->local_vars` → `random_type_from_type` U14 + GenerateNewParentLocal (even isParam formal qfer).
+3. GO: free For enables block-local inventory; empty → retype + qferMode 0 when inParamExpr. Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e195; continue COUNT=20.
 
 **seed7 e185→194 climbed — free For Lhs address residual RandomHexDigits width:**
 1. Capture: e185 UP F20=0 vs GO F20=1 after F80 F80 (LCG desync from hex digit overburn).
