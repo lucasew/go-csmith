@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8499** (post invent residual Comma rhs Function F20 U16 pad)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8504** (post invent residual Func-fail PP→PL stack U1 + * qfer)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -330,7 +330,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8493 F50=1 useExisting; UP F20 + U16 choose_func then param Expression; GO sole/empty inventory skipped choose → Variable U100.
 2. C++: Function::choose_func BuiltinFunctionProb-shaped F20 + get_one_function U(n) among ok_funcs then build_invocation params.
 3. GO: invent residual FuncF20U16 residual on useExisting (even if GO candidates non-empty undercount); skip ThenBody F30 under nested userFuncNest. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8499 U1 PL stack after PP miss vs GO U4 (sticky ThenBodyEver PP choose / VisitF0 stack).
+4. Next: e8499 — climbed.
+
+**seed5 e8499→8504 climbed — Function-fail PP miss → PL stack U1 + int* qfer:**
+1. Capture: e8498 U100=68 PP; UP empty miss → stack U1 + GenerateNewParentLocal * qfer F50 F10×2 F20 F20; GO sticky ThenBodyEver pick(4) on Function-fail path (paramCands non-empty).
+2. C++: SelectParentParam empty/miss → SelectParentLocal (VariableSelector.cpp:1052–59) stack + create.
+3. GO: Function-fail PP path — skip ThenBodyEver U4 when FuncPLU1; force stack U1 + create int* qferMode 1 retype=false. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8504 F20 NewArray vs GO extra F50 F10 (sticky ** levels floor in createOnDemand).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

@@ -11858,10 +11858,16 @@ exprTries:
 								}
 							}
 							// Incompatible types: still burned U7; fall through miss.
-						} else if inventArrayOpPostNestBreakThenBodyEver && er != nil {
+						} else if inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 && er != nil {
+							// e8498–99: force miss → ParentLocal stack U1 + create below.
+							// Only invent residual Comma FuncF20U16 era (not all userFuncNest).
+							paramCands = nil
+						} else if inventArrayOpPostNestBreakThenBodyEver && er != nil &&
+							!inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
 							// e8220: invent residual then-body ParentParam — UP choose_ok_var
 							// U4. Live inventory under-counts (often sole). Burn U4 then sole
 							// like e1068 U7 pad (corrected width; residual debt).
+							// Skip when FuncPLU1 armed (e8498–99 UP PP→PL U1).
 							_ = er.pick(4)
 							expr := paramCands[0].expr
 							bumpExprDepth(ctx)
@@ -11880,6 +11886,27 @@ exprTries:
 						}
 					}
 					// ParentParam miss → ParentLocal (stack + create).
+					// e8499: invent residual Comma FuncPLU1 — force stack U1 before VisitF0 U4.
+					// UP GenerateNewParentLocal int* qfer F50 F10×2 + NewArray F20 F20
+					// (e8500–05); retype=false and force * so levels=1 not simple self-only.
+					if inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
+						if er != nil {
+							_ = er.pick(1)
+						}
+						createT := t
+						if !strings.Contains(createT.Name, "*") {
+							createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						}
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
+							bumpExprDepth(ctx)
+							markFuncEffect()
+							return castLiteral(t, g.expr)
+						}
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "x")
+					}
 					idx := parentStackPick(er, flow)
 					qfer := 1
 					if flow != nil && flow.useSmallParentStack && strings.Contains(t.Name, "*") {
@@ -16079,14 +16106,16 @@ exprTries:
 				// stack pick, choose_var on that block, else any-depth
 				// dynLocs (inventory approx), else create.
 				if scopePick == 2 {
-					// e8498–99: invent residual Comma rhs Function residual → nested
-					// Function-fail ExpressionVariable ParentParam — UP miss → PL
-					// stack U1 + create qfer F50 F10… before VisitF0 stack U4.
-					if er != nil &&
-						(inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 || nullValidateUserFuncNest) {
+					// e8498–99: invent residual Comma FuncPLU1 — PP miss → PL stack U1
+					// + create (only when FuncF20U16 armed, not all userFuncNest).
+					if er != nil && inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
 						inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
 						_ = er.pick(1) // e8499 Function::stack.size()=1
-						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, 0); ok {
+						createT := t
+						if !strings.Contains(createT.Name, "*") {
+							createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						}
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 							bumpExprDepth(ctx)
 							markVarSelectEffect()
 							return finishVar(castLiteral(t, g.expr))
@@ -16359,16 +16388,15 @@ exprTries:
 				}
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 			}
-			// e8498–99: invent residual Comma rhs Function residual → nested
-			// Function-fail ExpressionVariable ParentParam — UP miss → PL stack U1
-			// + GenerateNewParentLocal qfer F50 F10… (e8500+). GO param inventory
-			// accepts choose U4. Intercept before candidates.
-			if scopePick == 2 && er != nil &&
-				(inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 || nullValidateUserFuncNest) {
+			// e8498–99: invent residual Comma FuncPLU1 only (see Function-fail path).
+			if scopePick == 2 && er != nil && inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
 				inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
 				_ = er.pick(1) // e8499 Function::stack.size()=1
-				// qferMode 1: SE-free READ random_qualifiers F50 F10 per level
-				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, 0); ok {
+				createT := t
+				if !strings.Contains(createT.Name, "*") {
+					createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+				}
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
 					return finishVar(castLiteral(t, g.expr))
