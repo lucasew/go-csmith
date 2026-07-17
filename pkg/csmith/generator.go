@@ -60,6 +60,11 @@ var globalSimpleESimpleDoneSink *bool
 // not U11). Default false = Global choose (seed2 e811 U17 pads apply).
 var selectVarLocalScope bool
 
+// selectVarParentParamScope: true during SelectParentParam choose_var.
+// Enables is_dereferenced_from + higher-indirection prefer (VariableSelector.cpp:460–471).
+// seed7 e366. Does NOT imply LocalScope (PP used Global pad rules historically).
+var selectVarParentParamScope bool
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
 
@@ -2009,6 +2014,49 @@ func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
 		}
 		st.derivedPtrNames = append(st.derivedPtrNames, ptrName)
 	}
+}
+
+// ctypeFromDerivedPtrName builds a CType for a Type::derived_types pointer name.
+func ctypeFromDerivedPtrName(name string) CType {
+	if name == "" {
+		return CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+	}
+	stars := strings.Count(name, "*")
+	if stars < 1 {
+		stars = 1
+	}
+	base := strings.ReplaceAll(name, "*", "")
+	hexDigits := 0
+	if j := strings.IndexByte(base, '#'); j >= 0 {
+		fmt.Sscanf(base[j+1:], "%d", &hexDigits)
+		base = base[:j]
+	}
+	outName := base + strings.Repeat("*", stars)
+	signed := true
+	bits := 32
+	hex := 8
+	switch base {
+	case "int8_t":
+		bits, hex = 8, 2
+	case "uint8_t":
+		signed, bits, hex = false, 8, 2
+	case "int16_t":
+		bits, hex = 16, 4
+	case "uint16_t":
+		signed, bits, hex = false, 16, 4
+	case "int32_t":
+		bits, hex = 32, 8
+	case "uint32_t":
+		signed, bits, hex = false, 32, 8
+	case "int64_t":
+		bits, hex = 64, 16
+	case "uint64_t":
+		signed, bits, hex = false, 64, 16
+	}
+	if hexDigits > 0 {
+		hex = hexDigits
+	}
+	return CType{Name: outName, Signed: signed, Bits: bits, HexDigits: hex}
 }
 
 func pointerBaseKey(t CType) string {
@@ -7871,6 +7919,17 @@ func selectExprVariableFromERLocal(t CType, er *exprRand, candidates []exprVarCa
 	return c, ok
 }
 
+// selectExprVariableFromERParentParam is SelectParentParam choose_var.
+// Sets selectVarParentParamScope only (not LocalScope — PP historically used
+// the same pad rules as selectExprVariableFromER). seed7 e366.
+func selectExprVariableFromERParentParam(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
+	prev := selectVarParentParamScope
+	selectVarParentParamScope = true
+	c, ok := selectExprVariableFromER(t, er, candidates, forAssign)
+	selectVarParentParamScope = prev
+	return c, ok
+}
+
 // selectVarForceChooseN: when >0, choose_ok_var uses this n even if inventory
 // is smaller (seed5 e1068 residual ParentParam ok_vars U7 pad).
 var selectVarForceChooseN int
@@ -8287,6 +8346,52 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 			}
 			seen[c.expr] = true
 			uniq = append(uniq, c)
+		}
+		// SelectParentParam isParam: C++ eFlexible includes is_dereferenced_from
+		// then higher-indirection prefer (VariableSelector.cpp:460–471).
+		// seed7 e366: want int16_t among 3 int16_t* formals → U3 (not U2
+		// convertibles). Gate to isParam + nested multiDim + int16_t* formals
+		// (sole short* materialise) with nPtr≥3 so seed2/4 int32_t* formals
+		// keep historical convertibles choose.
+		if selectVarParentParamScope &&
+			nestedFuncBodiesSink != nil && *nestedFuncBodiesSink > 0 &&
+			multiDimArraySink != nil && *multiDimArraySink > 0 &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.inParamExpr {
+			hasShortPtr := false
+			for _, c := range filtered {
+				if c.ctype.Name == "int16_t*" {
+					hasShortPtr = true
+					break
+				}
+			}
+			if hasShortPtr {
+				for _, c := range filtered {
+					if c.expr == "" || seen[c.expr] {
+						continue
+					}
+					if !strings.Contains(c.ctype.Name, "*") {
+						continue
+					}
+					if !eFlexibleDerivable(t, c.ctype) {
+						continue
+					}
+					seen[c.expr] = true
+					uniq = append(uniq, c)
+				}
+				if len(uniq) > 1 {
+					wantLvl := strings.Count(t.Name, "*")
+					ptrs := make([]exprVarCandidate, 0, len(uniq))
+					for _, c := range uniq {
+						if strings.Count(c.ctype.Name, "*") > wantLvl {
+							ptrs = append(ptrs, c)
+						}
+					}
+					if len(ptrs) >= 3 {
+						idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
+						return ptrs[idx], true
+					}
+				}
+			}
 		}
 		// VariableSelector::choose_var pointer preference (cpp:456–467):
 		// when ok_vars multi and any var has higher indirection than want
@@ -10469,11 +10574,16 @@ func buildFunctionCallExpr(
 			var pt CType
 			if wantPtr && opts.Pointers && state.derivedPtrTypes > 0 {
 				// choose_random_pointer_type → rnd_upto(derived_types.size()).
-				// Burn the index; materialising derivedPtrNames[idx] broke seed4
-				// e178 (list order/content ≠ C++ Type::derived_types yet).
-				// Keep historical int32_t* until names track UP derived_types.
+				// Sole derived int16_t*: idx always 0; materialise so nested
+				// CREATE formals match UP (seed7 e366 isParam prefer U3).
+				// Other sole entries under-count vs UP multi (seed4 uint64*) —
+				// keep int32_t* hardcode. Multi-entry lists still diverge.
 				_ = r.upto(uint32(state.derivedPtrTypes))
 				pt = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+				if state.nestedFuncBodies > 0 && len(state.derivedPtrNames) == 1 &&
+					state.derivedPtrNames[0] == "int16_t*" {
+					pt = ctypeFromDerivedPtrName(state.derivedPtrNames[0])
+				}
 			} else {
 				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
 			}
@@ -28409,7 +28519,13 @@ exprTries:
 				if scopePick == 0 && nullValidatePostResidualParamU7 {
 					selectVarForceChooseN = 18
 				}
-				c, ok := selectExprVariableFromER(t, er, candidates, false)
+				var c exprVarCandidate
+				var ok bool
+				if scopePick == 2 {
+					c, ok = selectExprVariableFromERParentParam(t, er, candidates, false)
+				} else {
+					c, ok = selectExprVariableFromER(t, er, candidates, false)
+				}
 				selectVarForceChooseN = 0
 				if ok {
 					// e9740–42: ArrayOp2 after Global U56 era — U2 choose returned
@@ -28434,6 +28550,7 @@ exprTries:
 					// is_convertable) — any non-void simples interconvert
 					// (ExpressionVariable.cpp eFlexible). Do not gate on multiDim
 					// (seed5 e476: PP uchar want vs int param must accept, not PL).
+					// is_dereferenced_from: preferred * formals (seed7 e366).
 					if scopePick == 2 {
 						wantPtr := strings.Contains(t.Name, "*")
 						havePtr := strings.Contains(c.ctype.Name, "*")
@@ -28449,6 +28566,11 @@ exprTries:
 								t.Name != "float" && t.Name != "void" &&
 								t.Bits > 0
 							compat = cSimple && tSimple
+						}
+						// seed7 e366 prefer: accept int16_t* formals for simple want only.
+						if !compat && havePtr && !wantPtr && c.ctype.Name == "int16_t*" &&
+							eFlexibleDerivable(t, c.ctype) {
+							compat = true
 						}
 						if !compat {
 							idx := parentStackPick(er, flow)
