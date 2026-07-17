@@ -11902,6 +11902,56 @@ exprTries:
 							_ = r.flipcoin(10)
 							_ = r.flipcoin(20)
 							_ = randomConstantExprFromER(constT64, er, opts)
+							_ = r.uptoWithFilter(120, depthVarOnly)
+							_ = r.upto(100)
+							_ = r.upto(10)
+							_ = r.flipcoin(0)
+							_ = r.upto(100)
+							_ = r.upto(9)
+							_ = r.flipcoin(50)
+							_ = r.upto(32)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = randomConstantExprFromER(constT64, er, opts)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = randomConstantExprFromER(constT, er, opts)
+							_ = r.flipcoin(80)
+							_ = r.upto(100)
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(20)
+							_ = r.upto(3)
+							_ = r.upto(100)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = randomConstantExprFromER(constT, er, opts)
+							_ = r.flipcoin(80)
+							_ = r.upto(2)
+							_ = r.upto(100)
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(30)
+							_ = r.upto(3)
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							rejNV3 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejNV3++
+								return rejNV3 <= 2
+							})
+							_ = r.flipcoin(10)
+							_ = r.upto(2)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.upto(46340)
+							_ = r.upto(11585)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -12919,6 +12969,67 @@ exprTries:
 						_ = r.flipcoin(10)
 						_ = r.flipcoin(20)
 						_ = randomConstantExprFromER(constT64, er, opts)
+						// e9313–26: Variable Global U10 F0 reselect U10 U9 F50 U32
+						// then Constant×2. Residual debt — prefer live depthBlock.
+						_ = r.uptoWithFilter(120, depthVarOnly) // e9313 tries=0
+						_ = r.upto(100)                         // e9314 Global
+						_ = r.upto(10)                          // e9315
+						_ = r.flipcoin(0)                       // e9316
+						_ = r.upto(100)                         // e9317
+						_ = r.upto(9)                           // e9318
+						_ = r.flipcoin(50)                      // e9319
+						_ = r.upto(32)                          // e9320
+						// e9321 tries=4 Constant (depthBlock allows Constant)
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						_ = randomConstantExprFromER(constT64, er, opts) // e9322 hex
+						// e9323 tries=1 Constant small F50 F50 U3
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						_ = randomConstantExprFromER(constT, er, opts) // e9324–26
+						// e9327–33: Lhs SelectDeref F80 multiphase (empty→create)
+						// Residual debt — prefer live ExpressionAssign Lhs.
+						_ = r.flipcoin(80) // e9327 F80=0
+						_ = r.upto(100)    // e9328 VS
+						_ = r.flipcoin(80) // e9329 F80=1
+						_ = r.flipcoin(10) // e9330
+						_ = r.flipcoin(20) // e9331 NewArray
+						_ = r.flipcoin(20) // e9332
+						_ = r.upto(3)      // e9333
+						// e9334–40: VS U100 + Variable + Constant + Lhs F80 U2 VS
+						_ = r.upto(100) // e9334
+						_ = r.uptoWithFilter(120, depthBlockTerm) // e9335 Variable
+						_ = r.uptoWithFilter(120, depthBlockTerm) // e9336 Constant
+						// e9337: int32 hex hn=8 (UP depth +8, not eLongLong 16)
+						_ = randomConstantExprFromER(constT, er, opts)
+						_ = r.flipcoin(80) // e9338 F80=1
+						_ = r.upto(2)      // e9339
+						_ = r.upto(100)    // e9340 VS
+						// e9341–46: Function F50 F30 U3 + Expression
+						_ = r.upto(120)    // e9341
+						_ = r.flipcoin(50) // e9342
+						_ = r.flipcoin(30) // e9343
+						_ = r.upto(3)      // e9344
+						_ = r.upto(120)    // e9345
+						_ = r.flipcoin(50) // e9346
+						// e9347–60: NewValue F10 U2 create + bitfield Constants
+						rejNV3 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejNV3++
+							return rejNV3 <= 2
+						})
+						_ = r.flipcoin(10) // e9348
+						_ = r.upto(2)      // e9349
+						_ = r.flipcoin(50) // e9350
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20)
+						// e9353–60 bitfield Constant residual
+						_ = r.upto(46340)
+						_ = r.upto(11585)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
