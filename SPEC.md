@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8911** (post SafeOp + stdfunc residual cycles; next U4 U25 vs Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8951** (post U4 U25 + multi-level create residual; next U1 vs Statement U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -396,7 +396,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after U13, UP U4 F0 F50×5 U4 F50 F50 U4 U4 U100 F75 + Expression U16 + F80 create + ArrayOp U100 F5 U4 U11 U3 U13 U12 U10 F0 F50; GO Statement U100.
 2. C++: SafeOpFlags multiphase; must_use F75; StatementArrayOp body residual.
 3. GO: extend ThenBodyEver residual with U4 F0 SafeOp + second ArrayOp ladder. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8864 F50 vs Statement U100 (SafeOp residual continues).
+4. Next: e8864 — climbed.
+
+**seed5 e8864→8911 climbed — SafeOp complete + stdfunc residual cycles:**
+1. Capture: after F0, UP F50 F50 U4 F50 F50 U4 F50 F50 U4 U4 + U100 U120 + 4×stdfunc (F5 F10 U18 F50 F50 U4 + U120) + VS U100 tries=2 U5 U120 F5 F50×3; GO Statement U100 mid-SafeOp.
+2. C++: SafeOpFlags; ExpressionFuncall stdfunc residual multiphase.
+3. GO: complete SafeOp F50 ladder + stdfunc cycles + VS U5 F50×3. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8911 U4 U25 vs Statement U100 (same raw).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

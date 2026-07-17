@@ -125488,7 +125488,7 @@ func emitStatement(
 					_ = r.upto(4)
 					_ = r.upto(120) // trailing U120 after each cycle (incl. last)
 				}
-				// e8903–09: VS U100 tries=2 U5 U120 + F5 F10 F50×3
+				// e8903–09: VS U100 tries=2 U5 U120 + F5 F10 F50×3 U4 U25
 				rej19 := 0
 				_ = r.uptoWithFilter(100, func(uint32) bool {
 					rej19++
@@ -125501,6 +125501,63 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
+				_ = r.upto(4)  // e8911
+				_ = r.upto(25) // e8912
+				// e8913–24: U120 VS U100 tries=1 U5 + multi-level qfer create
+				// F50 F10×4 + NewArray F20 F20
+				_ = r.upto(120)
+				rej20 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej20++
+					return rej20 <= 2
+				})
+				_ = r.upto(5)
+				for i := 0; i < 4; i++ {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+				}
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				// e8925–35: U120 VS NewValue U100 tries=2 F10 U5 U14 + create
+				// F50 F10 F20 F50 F50 U20 F50 U64
+				_ = r.upto(120)
+				rej21 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej21++
+					return rej21 <= 3
+				})
+				_ = r.flipcoin(10)
+				_ = r.upto(5)
+				_ = r.upto(14)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(20)
+				_ = r.flipcoin(50)
+				_ = r.upto(64)
+				// e8938–49: U120 F50 F50 U20 U4 + VS multiphase U100 tries
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(20)
+				_ = r.upto(4)
+				rej22 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej22++
+					return rej22 <= 2
+				})
+				_ = r.upto(100)
+				_ = r.upto(6)
+				_ = r.upto(4)
+				rej23 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej23++
+					return rej23 <= 5 // tries=4
+				})
+				_ = r.flipcoin(40)
+				_ = r.upto(8)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
