@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **355** (was 341): isParam pointer PL empty exact → create (no U3 U10 U4 invent) |
+| 7 | first_div **366** (was 355): isParam ParentParam live U2 (no nestedNullPrefer invent F0) |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e355→366 climbed — isParam ParentParam live choose_ok_var U2:**
+1. Capture: after CreateArray PL, make_random_param Variable ParentParam — UP choose_ok_var U2 among 2 formals then Expression U100; GO nestedNullPrefer invent F0 (seed4 e263 Global residual) then VS reselect.
+2. C++ SelectParentParam choose_var among matching formals; no forced null-prefer F0 on live param pools.
+3. GO: gate nestedNullPrefer invent F0 with `!inParamExpr` so make_random_param ParentParam/PL uses live U(n). Seeds 2/3/4/6 full match; seed5 still GO-extra after 13634.
+4. Next: seed7 e366; continue COUNT=20.
 
 **seed7 e341→355 climbed — isParam pointer PL empty exact force create:**
 1. Capture: nested CREATE body make_random_param ParentLocal pointer — UP empty choose_var → GenerateNewParentLocal F20 F20 CreateArray…; GO isParam pointer pad burned invent U3 U10 U4 when nExact==0 among non-pointer frame locals.

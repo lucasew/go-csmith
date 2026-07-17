@@ -8518,10 +8518,14 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 		// seed4 e263–266: nested body Global simple — UP prefers sole null
 		// higher-indirection → F0 fail → retry U100 U2. Invent one-shot F0
 		// instead of integer U2 when GO inventory lacks the null pointer.
+		// Do not fire during make_random_param ParentParam/PL (seed7 e355:
+		// live U2 among 2 formals — invent F0 desyncs vs UP choose_ok_var).
+		inParamExpr := burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.inParamExpr
 		if n == 2 && multiDimArraySink != nil && *multiDimArraySink > 0 &&
 			(useSmallParentStackSink == nil || !*useSmallParentStackSink) &&
 			nestedNullPreferSink != nil && !*nestedNullPreferSink &&
 			nestedFuncBodiesSink != nil && *nestedFuncBodiesSink > 0 &&
+			!inParamExpr &&
 			er != nil && er.fallback != nil {
 			*nestedNullPreferSink = true
 			_ = er.fallback.flipcoin(0) // null_pointer_dereference_prob
