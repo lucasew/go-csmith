@@ -136357,6 +136357,8 @@ func emitStatement(
 		}
 		// loopIVPool==0 (and not createIV): no SelectLoopCtrl choose.
 		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
+		// NOTE: C++ always SelectLoopCtrlVar (seed7 e47 U2). Enabling live
+		// choose for loopIVPool==0 breaks seed2 e183 (GO nCtrl over-count).
 		if useArrayControl && !afterContFor {
 			// make_random_array_control + SafeOpFlags.
 			// postArrayFor multi-dim (e949): itemize U9 U8. Early e679: U1.

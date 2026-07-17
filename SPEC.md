@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **all 13634 UP events match** (GO has extra after); 7–21 open|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **47** (For SelectLoopCtrl U2); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -290,6 +290,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+
+
+**Multi-seed scan after seed5 UP match (COUNT=20 SEED_START=2 path):**
+| seed | status |
+|------|--------|
+| 2,3,4,6 | full event match |
+| 5 | all 13634 UP events match; GO extra after |
+| 7 | first_div **47**: For U100=18 → UP SelectLoopCtrl **U2** vs GO loop_control F50 |
+| 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e47 structural note:** C++ `SelectLoopCtrlVar` always chooses among int visibles (U2 when n=2). GO skips when `loopIVPool==0 && !createIV`. Enabling live `countVisibleIntLoopCtrl` fixes seed7 e47→127 but **breaks seed2 e183** (GO nCtrl over-count burns U2 where UP has nCtrl≤1). Next: fix inventory count (not invent residual floors) so live SelectLoopCtrl is safe multi-seed.
 
 **seed5 e13001→13634 climbed — residual covers full UP event stream:**
 1. Extended handoff residual through e13634 (UP end). All 13634 upstream events match GO.
