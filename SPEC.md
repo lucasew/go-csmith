@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7429** (invent ArrayOp free Expression Global; next open eFlexible ok_vars U51 vs U66 after expand+bitfields)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7433** (invent residual free Expression PL after Global U51; next open F50 U64 vs force create U14)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,17 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
-**seed5 e7426→7429 open — invent free Expression Global expand ok_vars U51:**
-1. Capture: e7426 UP/GO GlobalNonvolatiles U12 (pointer Assign residual Expression). e7429 UP choose_ok_var U51 vs GO U66 (simple free Expression after Assign residual).
-2. C++: later free Expression uses simple SelectLType default → SelectGlobal expand_struct_union (incl. bitfields) + eFlexible is_derivable; is_eligible / FactUnion nonreadable filters ok_vars to U51.
-3. GO: invent residual extras use simple int32_t; expand multi-level + bitfields + eFlexible; still U66 (under-filters eligibility). Seeds 2/4/6 held.
-4. Next: tighten is_eligible / nonreadable filters for expanded Global READ pool U66→U51.
+**seed5 e7429→7433 climbed — invent free Expression Global expand ok_vars U51:**
+1. Capture: e7429 UP choose_ok_var U51 vs GO U66/U49 under/over inventory.
+2. C++: free Expression simple SelectLType → SelectGlobal expand_struct_union (bitfields) + eFlexible; GlobalList includes residual CreateArray orphans; dual-emitted PL tops not on GlobalList.
+3. GO: invent residual pool = mergedGlobals + array/simple orphanGlobals expand, drop pointer matches, drop dual-emitted PL tops (keep fields), dedup expr → U51. Seeds 2/4/6 held.
+4. Next: e7433 after PL stack U1 — UP F50 U64 (empty residual / Constant) vs GO GenerateNewParentLocal retype U14.
 
 **seed5 e7411→7429 climbed — invent ArrayOp Lhs SelectDeref create residual + free Expression nest:**
 1. Capture: e7423 UP PL stack U1 vs GO sticky freeMultiIVForLhsExprContinue U2; then e7425 empty-params VS filter; e7426 live GlobalNonvolatiles U12.
 2. C++: after invent ArrayOp Lhs second-PP miss → SelectDeref create residual F80…U3 accept, free Expression nest (PL stack U1 sole, empty-params VariableSelectFilter → Global live U12) without PostNestLhs SelectDeref F80 ladder.
 3. GO: SecondPPMiss residual arm; residual PL intercept uses `parentStackPick` (not bare pick(2)); invent residual sticky empty-params VS + live Nonvolatiles choose; free Expression loop without PostNestLhs. Seeds 2/4/6 held.
-4. Next: e7429 UP Global eFlexible U51 (expanded ok_vars) vs GO expanded U66.
+4. Next: e7429 UP Global eFlexible U51 — climbed.
 
 **seed5 e6024→6046 climbed — post-NewArray PL choose U14 + PP multiphase U7/sole/U7:**
 1. Capture: e6024 UP choose_ok_var U14 vs GO sticky multiphase U13 (post-Return PL pn≥2).

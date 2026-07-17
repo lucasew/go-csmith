@@ -7512,11 +7512,9 @@ func expandStructUnionVarsOpts(cands []exprVarCandidate, want CType, info compos
 	}
 	res := make([]exprVarCandidate, 0, len(out))
 	for _, it := range out {
-		// Expression READ: drop is_inside_union_field (FactUnion nonreadable /
-		// take_no_union often excludes; e7429 U66→U51 class).
-		if includeBitfields && it.inUnion {
-			continue
-		}
+		// Keep union fields by default (C++ FactUnion nonreadable is fact-dependent;
+		// blank-drop over-pruned e7429 U49 vs U51). Callers may filter later.
+		_ = it.inUnion
 		res = append(res, it.c)
 	}
 	return res
@@ -12782,50 +12780,51 @@ exprTries:
 				return finishVar(castLiteral(t, "g_0"))
 			}
 			// seed5 e7426+: invent ArrayOp Lhs Expression residual Global —
-			// SelectGlobal (VariableSelector.cpp): Nonvolatiles GlobalList +
-			// expand when want simple/aggregate + eFlexible is_derivable.
-			// Pointer residual Expression (Assign type): live NV choose U12.
-			// Later free Expression simple (SelectLType default): expand → U51.
+			// SelectGlobal (VariableSelector.cpp): Nonvolatiles + expand when
+			// want simple/aggregate + eFlexible is_derivable.
+			// Mid-stream TrueSelect is thin (nTS≈13, nAgg=1 → expand U9) while
+			// C++ GlobalList has grown via residual creates. GO dual-emits many
+			// GenerateNewParentLocal as dynGlobals+fromParentLocal (also static
+			// lateGlobals). For free Expression READ eFlexible, include those
+			// static-emitted PL materialisations so expand field inventory
+			// matches C++ GlobalList scale (e7429 U51 class), not invent Un.
 			if scopePick == 0 && inventArrayOpExprEmptyParamsVS && er != nil {
 				globals := make([]exprVarCandidate, 0, 64)
-				for _, g := range mergedGlobalsTrueSelect(env, ctx) {
-					if g.isVolatile {
-						continue
+				seenG := map[string]bool{}
+				addG := func(g globalInfo) {
+					if g.isVolatile || g.name == "" || seenG[g.name] {
+						return
 					}
+					seenG[g.name] = true
 					globals = append(globals, exprVarCandidate{
 						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
 						isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
-						isVolatile: g.isVolatile,
+						isVolatile: g.isVolatile, fromParentLocal: g.fromParentLocal,
 					})
-				}
-				// Orphans on full GlobalList (not TrueSelect) for expand inventory.
-				seen := map[string]bool{}
-				for _, c := range globals {
-					seen[c.expr] = true
 				}
 				for _, g := range mergedGlobals(env, ctx) {
-					if g.isVolatile || seen[g.name] {
-						continue
+					addG(g)
+				}
+				// Residual CreateArray orphans + non-array orphan pointees sit on
+				// C++ GlobalList (array-only → U50; + simple orphans → U51).
+				if ctx != nil && ctx.state != nil {
+					for _, g := range ctx.state.orphanGlobals {
+						if g.isArray || !strings.Contains(g.ctype.Name, "*") {
+							addG(g)
+						}
 					}
-					seen[g.name] = true
-					globals = append(globals, exprVarCandidate{
-						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
-						isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
-						isVolatile: g.isVolatile,
-					})
 				}
 				wantPtr := strings.Contains(t.Name, "*")
 				wantAgg := !wantPtr && (strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union"))
 				wantSimple := !wantPtr && !wantAgg && t.Name != "float" && t.Name != "void"
 				if (wantSimple || wantAgg) && ctx != nil {
-					// Expression READ: C++ choose_var no_bitfield=false → include
-					// bitfield field_vars after expand (e7429 U51 vs U40 without).
+					// Expression READ: no_bitfield=false → bitfield field_vars.
+					// Drop union-inside fields (FactUnion nonreadable default).
 					globals = expandStructUnionVarsOpts(globals, t, ctx.info, true)
 				}
 				var pool []exprVarCandidate
 				if wantPtr {
-					// Pointer want: no expand; eFlexible under-materialises vs
-					// UP U12 — use live Nonvolatiles (matched e7426).
+					// Pointer want: no expand; live Nonvolatiles TrueSelect U12.
 					pool = make([]exprVarCandidate, 0, 16)
 					for _, g := range mergedGlobalsTrueSelect(env, ctx) {
 						if g.isVolatile {
@@ -12838,17 +12837,34 @@ exprTries:
 						})
 					}
 				} else {
-					// eFlexible simples + expanded fields. Drop pointer matches
-					// so choose_var artificial-deref preference is not forced
-					// (would under-burn U(n_ptrs) vs full ok_vars U51).
+					// Simples + expanded fields. Drop pointers (avoid artificial
+					// deref-prefer U(n_ptrs)).
+					// Top-level fromParentLocal non-fields are dual-emitted PL
+					// materialisations — not on C++ GlobalList; keep expanded
+					// fields + true GlobalList tops + collective arrays (C++
+					// choose_ok_var includes array collectives before itemize).
 					pool = make([]exprVarCandidate, 0, len(globals))
+					seenP := map[string]bool{}
 					for _, c := range globals {
 						if strings.Contains(c.ctype.Name, "*") {
 							continue
 						}
-						if eFlexibleDerivable(t, c.ctype) {
-							pool = append(pool, c)
+						isField := strings.Contains(c.expr, ".")
+						// Dual-emitted PL materialisations (tops only) are not
+						// C++ GlobalList — fields expanded from them still count
+						// when aggregates were static-emitted (lateGlobals).
+						if c.fromParentLocal && !isField {
+							continue
 						}
+						if !eFlexibleDerivable(t, c.ctype) {
+							continue
+						}
+						// Dedup by expr (collective+itemized dual names / re-emit).
+						if seenP[c.expr] {
+							continue
+						}
+						seenP[c.expr] = true
+						pool = append(pool, c)
 					}
 					if len(pool) == 0 {
 						pool = globals
