@@ -2810,7 +2810,15 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	if er == nil {
 		return 0
 	}
+	// C++ SelectParentLocal: rnd_upto(Function::stack.size()).
+	// Free For body with only {func, for} is blockStack==2 (seed7 e127 U2).
+	// When GO over-counts frames (seed2 e318 blockStack=3 vs UP U1), keep
+	// historical n=1 until deepStack/residual floors apply.
 	n := 1
+	if state != nil && !state.deepStack && state.multiDimArrays == 0 &&
+		!state.useSmallParentStack && state.blockStack == 2 {
+		n = 2
+	}
 	// seed5 e6175 / e6286: after post-Return NewArray residual + ArrayOp body,
 	// Function::stack.size()=3 (free multi-IV For + ArrayOp + body). Prefer over
 	// NewArrayVSDone U1 / ForBody U2. After ForBody arm from ArrayOp control.
@@ -6683,12 +6691,16 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		qferMode = 0
 	}
 	// make_random_param ExpressionVariable with formal qfer: GenerateNewParentLocal
-	// copies qfer (no random_qualifiers → F20 NewArray first). Arm after isParam
-	// array Global choose (paramExprCommaAllTypes / seed5 e251→e300). Early seed2
-	// isParam PL create still needs SE-free qfer F50 in some paths.
-	if ctx != nil && ctx.inParamExpr && ctx.state != nil &&
-		ctx.state.paramExprCommaAllTypes && qferMode > 0 {
-		qferMode = 0
+	// copies qfer (no random_qualifiers → F20 NewArray first).
+	// - paramExprCommaAllTypes era (seed5 e251→e300)
+	// - free For body Function-arg (blockStack==2): seed7 e129 F20 first
+	// Early seed2 isParam PL create still needs SE-free qfer F50 in some paths.
+	if ctx != nil && ctx.inParamExpr && qferMode > 0 {
+		if ctx.state != nil && (ctx.state.paramExprCommaAllTypes ||
+			(!ctx.state.deepStack && ctx.state.multiDimArrays == 0 &&
+				!ctx.state.useSmallParentStack && ctx.state.blockStack == 2)) {
+			qferMode = 0
+		}
 	}
 	if er == nil || er.fallback == nil || ctx == nil || ctx.state == nil {
 		return exprVarCandidate{}, false

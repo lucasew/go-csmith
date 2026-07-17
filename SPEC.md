@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **127** (was 47); 8–21 early fail|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **184** (was 127); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -297,14 +297,20 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **127** (was 47): climbed SelectLoopCtrl live + frozen effect_context |
+| 7 | first_div **184** (was 127): free For PL stack U2 + param formal-qfer create |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e127→184 climbed — free For ParentLocal stack + param formal qfer:**
+1. Capture: e127 UP stack U2 vs GO U1; then e129 UP F20 NewArray vs GO F50 qfer.
+2. C++ free For body `Function::stack.size()=2`; `SelectParentLocal` `rnd_upto(stack)`. Function-arg ExpressionVariable passes formal qfer → GenerateNewParentLocal skips `random_qualifiers` → F20 NewArray first.
+3. GO: `parentStackPick` uses n=2 when `blockStack==2` (free For, not deepStack/multi-dim); `inParamExpr` + free For forces create `qferMode=0`. Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e184; continue COUNT=20.
 
 **seed7 e47→127 climbed — live SelectLoopCtrl when `loopIVPool==0` + frozen effect_context:**
 1. Capture: e47 UP U2 SelectLoopCtrlVar vs GO F50 loop_control (skip when `loopIVPool==0`).
 2. C++ `SelectLoopCtrlVar` always runs; `choose_var(WRITE)` excludes vars in `effect_context` (`is_read_partially`). `effect_context` is fixed at function-body CGContext construction (caller context), not body-local reads.
 3. GO: live `countVisibleIntLoopCtrl` for `loopIVPool==0`; `effectContextFrozen` snapshot at `emitSingleFuncDefOnce` entry; Expression READ notes into running `effectContextRead` (not Lhs WRITE). Seed2 e183 sole (nCtrl=1, frozen g_8) holds; seeds 2/3/4/5/6 hold; seed5 still full UP match.
-4. Next: seed7 e127; continue COUNT=20.
+4. Next: seed7 e127→184 (see above).
 
 **seed5 e13001→13634 climbed — residual covers full UP event stream:**
 1. Extended handoff residual through e13634 (UP end). All 13634 upstream events match GO.
