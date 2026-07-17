@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~10930** (Function U16+VS+Constant residual + gaps; next F50 hex)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~11186** (stdfunc+CreateArray F80 U1 residual; next F80 gap+8)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -284,6 +284,11 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+
+
+**seed5 e10930→11186 climbed — stdfunc + CreateArray F80 U1 residual:**
+1. After Constant residual, UP continues F50 hex-class + stdfunc + Function create + CreateArray U99 + long F80 U1 F0 itemize multiphase (pool shrink U10→U4).
+2. UP depth gaps next31 +16/+2/+8. Integrity residual debt. Seeds 2/4/6 match.
 
 **seed5 e10781→10930 climbed — Function U16 + VS + Constant residual:**
 1. After stdfunc era, UP continues F50 U120 U16 Function + stdfunc + dual VS + create F50 F10 F20 + long Constant multiphase (hex-class depth gaps +2/+8/+16).
