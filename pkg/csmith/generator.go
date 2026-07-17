@@ -19699,22 +19699,66 @@ exprTries:
 					}
 					if newArr {
 						// e8340–46: NewArray + address init U4 then CreateArray
-						// U99 dims; Lhs continues F80 U3 / F80=0→VS PL U1 U3
-						// multiphase (e8347–66) before Comma rhs.
+						// U99 dims; Lhs continues F80 U3 / F80=0→VS multiphase
+						// (e8347–e8491: PL U1 U3, Global U6/U5, NewValue create)
+						// before Comma rhs. LCG-driven F80 — do not early-break
+						// (j>=3 cut e8367 F80=0 while UP still in Lhs do-while).
 						_ = r.upto(4) // e8342 address choose_ok_var before CreateArray
 						ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 						_ = burnCreateArrayVariable(r, opts, ptrT, true)
-						for j := 0; j < 12; j++ {
+						globalVS := 0
+						newValueCreates := 0
+						// ~48 F80 draws through e8491 before Comma rhs ~e8492.
+						for j := 0; j < 80; j++ {
 							if r.flipcoin(80) {
-								_ = r.upto(3) // e8348/e8358/e8360 choose residual
+								_ = r.upto(3) // choose among residual pointees
 								continue
 							}
-							// F80=0 → VS ParentLocal stack U1 + choose U3
-							_ = r.upto(100)
-							_ = r.upto(1)
-							_ = r.upto(3)
-							if j >= 3 {
-								break
+							// F80=0 → VariableSelector::select
+							sp := int(r.upto(100))
+							if sp < 35 {
+								// Global choose_ok_var pad multiphase:
+								// e8405 U6+U4; e8439 U6; e8446 U5+F0.
+								globalVS++
+								switch globalVS {
+								case 1:
+									_ = r.upto(6)
+									_ = r.upto(4) // e8405–06
+								case 2:
+									_ = r.upto(6) // e8439
+								default:
+									_ = r.upto(5)
+									_ = r.flipcoin(0) // e8446–47
+								}
+							} else if sp < 65 {
+								// ParentLocal: stack U1 + choose U3
+								_ = r.upto(1)
+								_ = r.upto(3)
+							} else if sp < 95 {
+								// ParentParam often falls to PL (empty ok_vars)
+								_ = r.upto(1)
+								_ = r.upto(3)
+							} else {
+								// NewValue → VariableCreationProbability F10 → PL
+								// create (e8465–73): stack U1 retype U14 WRITE F50
+								// NewArray F20 make_init F50 F50 U3. Lhs accepts
+								// → need_no_rhs SafeOpFlags F50 U4 (e8474–75)
+								// then Comma rhs Expression (e8476+ VS multiphase).
+								if !r.flipcoin(10) {
+									_ = r.upto(1)
+									_ = r.upto(14)
+									_ = r.flipcoin(50)
+									_ = r.flipcoin(20)
+									_ = r.flipcoin(50)
+									_ = r.flipcoin(50)
+									_ = r.upto(3)
+									// SafeOpFlags::make_random_binary need_no_rhs
+									_ = r.flipcoin(50) // e8474
+									_ = r.upto(4)      // e8475
+									newValueCreates++
+									break // Lhs accept → Comma rhs
+								}
+								_ = r.upto(6) // Global create rare — continue Lhs
 							}
 						}
 						lhsAccepted = true
