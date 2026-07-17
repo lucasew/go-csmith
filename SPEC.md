@@ -437,8 +437,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 **seed5 e9133→9186 climbed — live Expression handoff (not blank residual):**
 1. Capture: after second stdfunc U4, UP U120 + stdfunc cycles / choose_func / VS; GO residual ended → Statement U100.
 2. C++: free Expression::make_random continues under ArrayOp residual setup; VariableSelectFilter empty ParentParam; Function::stack.size()=3; choose_ok_var n=2 first PL.
-3. GO: hand off to live `randomTypedExpr` ×8 with dedicated flags (empty-params VS, PL stack U3, one-shot PL choose U2). **Prefer live Expression over invent residual packs** (§5.1.1). PL choose U2 is inventory debt (prefer materialise frame local_vars). Seeds 2/4/6 held.
-4. Next: e9186 U5 vs U4 PL choose (live inventory undercount).
+3. GO: hand off to live `randomTypedExpr` with dedicated flags (empty-params VS, PL stack U3, one-shot PL choose U2). **Prefer live Expression over invent residual packs** (§5.1.1). PL choose U2 is inventory debt (prefer materialise frame local_vars). Seeds 2/4/6 held.
+4. Next: e9186 — climbed.
+
+**seed5 e9186→9245 climbed — handoff PL/Global multiphase + derived_types:**
+1. Capture: e9186 PL choose U5 vs U4; e9196 Global U10 vs U41; e9215 ptr-cmp derived U26 vs U21; e9221 PL empty create F50 vs choose U4; e9237/e9241 Global choose undercount/overcount.
+2. C++: frame local_vars sizes; GlobalList choose_ok_var; Type::derived_types for ptr-cmp; empty GenerateNewParentLocal; visit_facts fail reselect.
+3. GO: handoff multiphase PL (U2/U5/create) + Global (U10 reselect/U4/U3 reselect); derived_types floor U26; extend free Expression count ×32. **Inventory residual debt** — prefer materialise. Seeds 2/4/6 held.
+4. Next: e9245 U120 tries=3 vs F50 after Global U3→PL reselect.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
