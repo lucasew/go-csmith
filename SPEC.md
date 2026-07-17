@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8027); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8035); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7979** (post invent residual multi-level Function-fail: free Assign Global choose U51 vs GO U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8027** (post invent residual Global U51 SelectDeref: free Expression U120 tries=1 vs GO tries=0)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e7979→8027 climbed — invent residual free Statement Global U51 SelectDeref create:**
+1. Capture: free Statement U100=30 (GO maps Return) → UP Global expand choose_ok_var U51 + SelectDeref empty create NewArray U99 + F0 F80 U6 multiphase; GO Return VS U100.
+2. C++: Assign-shaped Lhs Global expand + select_deref_pointer empty create_and_initialize (visit_facts F0 retries).
+3. GO: inventArrayOpPostNestBreakNextGlobalU51 residual on stmtReturn path (table maps 30→Return while stream is Assign Lhs); U51 + F80 create + F0 F80 U6 ladder. Seeds 2/4/6 held.
+4. Next: e8027 free Expression U120 tries=1 vs GO tries=0.
+
 **seed5 e7957→7979 climbed — invent residual SelectLType U23 + multi-level Function-fail PL + Lhs:**
 1. Capture: free Assign SelectLType F20=1 choose_random_pointer_type UP U23 vs GO U18 (same raw); then Function-fail EV for ** LType → GenerateNewParentLocal F50 F10×3 F20 F20 then Lhs F80 random_add…; GO under-noted derived_types + sole/F80-fail→VS.
 2. C++: Type::choose_random_pointer_type(derived_types.size()); find_pointer_type deepen; ExpressionFuncall fail → ExpressionVariable empty choose_var → GenerateNewParentLocal SE-free READ qfer; Lhs select_deref empty create random_add.
 3. GO: invent residual bare floor n=23 (no pad loop — noteDerivedPointer base-keyed no-ops hang); multi-level Function-fail PL create qfer levels=2 + skip address residual; LhsEmptyCreateN=11 F80 F10 F50 F20×2 F50 F20×2. Seeds 2/4/6 held.
-4. Next: e7979 free Assign Global choose U51 vs GO U100 (AssignOps/VS path).
+4. Next: e7979 Global U51 — climbed.
 
 **seed5 e7945→7957 climbed — invent residual Break free Assign Function-fail EV + Lhs:**
 1. Capture: next free Assign Function useExisting miss at max_funcs → ExpressionVariable PL U1 sole + Lhs empty create F80 F10 F50 F20 F20 U2; GO F30 FuncCreateAttr residual then wrong Lhs.

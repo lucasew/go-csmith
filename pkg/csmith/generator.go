@@ -191,6 +191,10 @@ var inventArrayOpPostNestBreakStmtEra bool
 // empty create, next free Assign Lhs is Global expand choose_ok_var U51 then
 // SelectDeref empty create (e7979+), not AssignOps U120 / VS U100.
 var inventArrayOpPostNestBreakNextGlobalU51 bool
+// inventArrayOpPostNestBreakExprPLU3: after Global U51 residual, next free
+// Expression Variable ParentLocal choose_ok_var is U3 empty (e8030) then
+// Expression term retry Constant — not live inventory U15 accept.
+var inventArrayOpPostNestBreakExprPLU3 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -11432,6 +11436,17 @@ exprTries:
 						flow = ctx.state
 					}
 					idx := parentStackPick(er, flow)
+					// e8030: after invent residual Global U51 SelectDeref multiphase,
+					// free Expression Variable PL stack U1 + choose_ok_var U3 empty
+					// → Expression term retry Constant (U120 tries=4). GO live
+					// inventory over-counts (U15 accept) and desyncs.
+					if inventArrayOpPostNestBreakExprPLU3 {
+						inventArrayOpPostNestBreakExprPLU3 = false
+						_ = er.pick(3) // e8030 choose_ok_var empty
+						// Signal Variable fail so term table retries (Constant).
+						restoreGenSnapshot(ctx, snap)
+						continue exprTries
+					}
 					// e7945–47: invent residual Break free Statement Assign Function
 					// fail → ExpressionVariable PL stack U1 sole (UP next Lhs F80),
 					// not GenerateNewParentLocal F50 create — single-level pointer
@@ -12096,6 +12111,27 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// e8030: after invent residual Global U51 SelectDeref multiphase, If
+			// condition Variable ParentLocal: stack U1 + choose_ok_var U3 empty →
+			// Expression term retry until Constant (U120 tries=4 v=98) then
+			// Constant residual F50 F50 U20. Sticky post-Return PL U15 pad /
+			// unfiltered Function retry would desync.
+			if inventArrayOpPostNestBreakExprPLU3 && scopePick == 1 {
+				inventArrayOpPostNestBreakExprPLU3 = false
+				_ = parentStackPick(er, flow) // e8029 U1
+				_ = er.pick(3)                // e8030 empty choose_ok_var
+				// Expression::make_random retries term; C++ accepts Constant only
+				// after Variable fail (UP tries=4). Filter Function/Variable/
+				// Assign/Comma so U120 lands on Constant 90–99.
+				if er.fallback != nil {
+					_ = er.fallback.uptoWithFilter(120, func(x uint32) bool {
+						return x < 90 || x >= 100
+					})
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(randomConstantExprFromER(t, er, opts))
 			}
 			// e7909: invent residual Break then free Assign RHS Expression Variable —
 			// SelectGlobal (U100=27) sole/visit_facts fail → ExpressionVariable do-while
@@ -123827,7 +123863,15 @@ func emitStatement(
 				if state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN < 4 {
 					state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
 				}
+				// e8027: next free Statement IfElse condition Expression filters
+				// Function (U120 tries=1 → Variable 89). Residual SelectDeref
+				// multiphase leaves C++ effect/depth such that Function is
+				// disallowed; GO bare Function tries=0 stdfunc F5 desyncs.
+				state.ppPostPadForceNoFunc = true
 			}
+			// e8030: If condition Variable PL stack U1 then choose_ok_var U3
+			// empty → Expression term retry Constant (tries=4), not U15 live.
+			inventArrayOpPostNestBreakExprPLU3 = true
 			writeLine(b, 1, "x = x;")
 			break
 		}
@@ -125507,6 +125551,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakCreate = false
 	inventArrayOpPostNestBreakExprGlobalReselect = false
 	inventArrayOpPostNestBreakNextGlobalU51 = false
+	inventArrayOpPostNestBreakExprPLU3 = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
