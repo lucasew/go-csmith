@@ -125114,8 +125114,9 @@ func emitStatement(
 				}
 				// e8575–: VS U100=3 then free Expression Function nest:
 				// U120 U16 U120 + (F5 F10 U18 F50 F50 U4 + U120)×7 +
-				// U16 U120 + more F5 cycles. stdfunc residual multiphase
-				// with choose_func U16 re-arms (ExpressionFuncall path).
+				// U16 U120 + 1×stdfunc + U120 + U16 U120 + VS U100 U5 +
+				// F5 F10 F50×3 U4 U24 + more Expression. ExpressionFuncall
+				// stdfunc residual with choose_func U16 re-arms.
 				_ = r.upto(100) // e8575 VS
 				_ = r.upto(120) // e8576 Expression term Function
 				_ = r.upto(16)  // e8577 choose_func pad
@@ -125133,16 +125134,69 @@ func emitStatement(
 					stdFuncCycle()
 					_ = r.upto(120)
 				}
-				// e8627–28: choose_func U16 re-arm then nested Expression
+				// e8627–28: first choose_func U16 re-arm
 				_ = r.upto(16)
 				_ = r.upto(120)
-				// more stdfunc cycles (UP continues after U16 re-arm)
-				for i := 0; i < 4; i++ {
-					stdFuncCycle()
-					if i < 3 {
-						_ = r.upto(120)
-					}
+				// one stdfunc cycle + U120 then second U16 re-arm (e8636–37)
+				stdFuncCycle()
+				_ = r.upto(120)
+				_ = r.upto(16)  // e8637
+				_ = r.upto(120) // e8638
+				// e8639–47: VS U100 U5 + Expression U120 + F5 F10 F50×3 U4 U24
+				_ = r.upto(100) // e8639
+				_ = r.upto(5)   // e8640
+				_ = r.upto(120) // e8641
+				_ = r.flipcoin(5)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50) // third F50 (not U18 stdfunc shape)
+				_ = r.upto(4)
+				_ = r.upto(24) // e8647
+				// e8648–57: Expression U120 F50 F10 F50 + U120 VS F80 create
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.upto(120)
+				_ = r.upto(100)
+				if r.flipcoin(80) {
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(2)
 				}
+				// e8658–69: U120 tries=2 VS + NewValue PL create residual
+				rej3 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej3++
+					return rej3 <= 3 // tries=2
+				})
+				_ = r.upto(100)
+				_ = r.upto(120)
+				_ = r.upto(100) // NewValue
+				if !r.flipcoin(10) {
+					_ = r.upto(2)
+					// retype U14 tries=1
+					rej4 := 0
+					_ = r.uptoWithFilter(14, func(uint32) bool {
+						rej4++
+						return rej4 <= 2
+					})
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+				}
+				// e8671–78: free Expression U120 + F5 F10 F50×3 U4 U25
+				_ = r.upto(120)
+				_ = r.flipcoin(5)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(25)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
