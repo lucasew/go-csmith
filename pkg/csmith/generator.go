@@ -12006,6 +12006,140 @@ exprTries:
 							_ = r.upto(4)
 							_ = r.upto(4)
 							_ = r.upto(100)
+							// e9401+ tail (match termVariable handoff residual)
+							_ = r.upto(120)
+							_ = r.upto(100)
+							_ = r.flipcoin(10)
+							_ = r.upto(4)
+							_ = r.upto(14)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							_ = r.upto(4)
+							_ = r.upto(100)
+							_ = r.upto(18)
+							_ = r.upto(2)
+							constT64c := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+							constT32 := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+							_ = randomConstantExprFromER(constT64c, er, opts)
+							_ = randomConstantExprFromER(constT32, er, opts)
+							_ = r.flipcoin(0)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(4)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(4)
+							_ = r.upto(4)
+							_ = r.upto(100)
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.upto(16)
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							rejVS3 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS3++
+								return rejVS3 <= 2
+							})
+							_ = r.upto(5)
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(0)
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(20)
+							_ = r.upto(100)
+							rejVS4 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS4++
+								return rejVS4 <= 2
+							})
+							_ = r.upto(10)
+							_ = r.flipcoin(0)
+							rejVS5 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS5++
+								return rejVS5 <= 3
+							})
+							_ = r.upto(9)
+							_ = r.flipcoin(0)
+							_ = r.upto(100)
+							_ = r.upto(6)
+							rejVS6 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS6++
+								return rejVS6 <= 2
+							})
+							_ = r.upto(100)
+							_ = r.upto(6)
+							_ = r.upto(14)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							rejVS7 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS7++
+								return rejVS7 <= 3
+							})
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(30)
+							_ = r.upto(3)
+							_ = r.upto(120)
+							_ = r.flipcoin(50)
+							rejVS8 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS8++
+								return rejVS8 <= 4
+							})
+							_ = r.upto(6)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.upto(11585)
+							_ = r.flipcoin(50)
+							_ = r.upto(2)
+							if !r.flipcoin(50) {
+								_ = r.upto(23170)
+								_ = r.upto(5792)
+							}
+							_ = r.flipcoin(50)
+							_ = r.upto(724)
+							_ = r.upto(2048)
+							for i := 0; i < 2; i++ {
+								if !r.flipcoin(50) {
+									for j := 0; j < 8; j++ {
+										_ = r.next31()
+									}
+								}
+							}
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							for i := 0; i < 2; i++ {
+								if !r.flipcoin(50) {
+									for j := 0; j < 8; j++ {
+										_ = r.next31()
+									}
+								}
+							}
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -13147,6 +13281,152 @@ exprTries:
 						_ = r.upto(4)      // e9398
 						_ = r.upto(4)      // e9399
 						_ = r.upto(100)    // e9400
+						// e9401–12: Variable → NewValue F10 PL create (U4 U14)
+						// + SafeOp U4 + Global U18 U2 + Constant F50×U20
+						// Residual debt — prefer live Expression after ArrayOp.
+						_ = r.upto(120)    // e9401 Variable
+						_ = r.upto(100)    // e9402 NewValue
+						_ = r.flipcoin(10) // e9403
+						_ = r.upto(4)      // e9404 stack
+						_ = r.upto(14)     // e9405 retype
+						_ = r.flipcoin(50) // e9406 qfer
+						_ = r.flipcoin(10) // e9407
+						_ = r.flipcoin(20) // e9408 NewArray
+						_ = r.flipcoin(50) // e9409
+						_ = r.flipcoin(50) // e9410
+						_ = r.upto(3)      // e9411
+						_ = r.upto(4)      // e9412
+						_ = r.upto(100)    // e9413 Global
+						_ = r.upto(18)     // e9414
+						_ = r.upto(2)      // e9415
+						// e9416–19: Constant int64 hex (F50=0 depth +16) then
+						// Constant small F50 F50 U20 (UP depth gap after first F50).
+						constT64b := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+						_ = randomConstantExprFromER(constT64b, er, opts)
+						_ = randomConstantExprFromER(constT, er, opts)
+						_ = r.flipcoin(0) // e9420
+						// e9421–28: more Constant F50s + U4s
+						_ = r.flipcoin(50) // e9421
+						_ = r.flipcoin(50) // e9422
+						_ = r.flipcoin(50) // e9423
+						_ = r.upto(4)      // e9424
+						_ = r.flipcoin(50) // e9425
+						_ = r.flipcoin(50) // e9426
+						_ = r.upto(4)      // e9427
+						_ = r.upto(4)      // e9428
+						_ = r.upto(100)    // e9429
+						// e9430–33: Expression F50 F20 U16 + Expression
+						_ = r.upto(120)    // e9430
+						_ = r.flipcoin(50) // e9431
+						_ = r.flipcoin(20) // e9432
+						_ = r.upto(16)     // e9433
+						_ = r.upto(120)    // e9434
+						_ = r.flipcoin(50) // e9435
+						// e9436–48: VS tries=1 U5 + Lhs F80 multiphase ×2
+						rejVS3 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS3++
+							return rejVS3 <= 2
+						})
+						_ = r.upto(5)      // e9437
+						_ = r.flipcoin(80) // e9438
+						_ = r.flipcoin(10) // e9439
+						_ = r.flipcoin(50) // e9440
+						_ = r.flipcoin(20) // e9441
+						_ = r.flipcoin(20) // e9442
+						_ = r.flipcoin(0)  // e9443
+						_ = r.flipcoin(80) // e9444
+						_ = r.flipcoin(10) // e9445
+						_ = r.flipcoin(50) // e9446
+						_ = r.flipcoin(20) // e9447
+						_ = r.flipcoin(20) // e9448
+						// e9449–61: VS multiphase Global U10 F0 reselect
+						_ = r.upto(100) // e9449
+						rejVS4 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS4++
+							return rejVS4 <= 2
+						})
+						_ = r.upto(10) // e9451
+						_ = r.flipcoin(0)
+						rejVS5 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS5++
+							return rejVS5 <= 3
+						})
+						_ = r.upto(9)
+						_ = r.flipcoin(0)
+						_ = r.upto(100) // e9456
+						_ = r.upto(6)
+						rejVS6 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS6++
+							return rejVS6 <= 2
+						})
+						_ = r.upto(100) // e9459
+						_ = r.upto(6)
+						_ = r.upto(14)
+						// e9462–67: create F50 F10 F20 F50 F50 U20
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
+						// e9468–79: VS tries=2 + Function F50 F30 + VS PL create
+						rejVS7 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS7++
+							return rejVS7 <= 3
+						})
+						_ = r.upto(120)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(30)
+						_ = r.upto(3)
+						_ = r.upto(120)
+						_ = r.flipcoin(50)
+						rejVS8 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS8++
+							return rejVS8 <= 4
+						})
+						_ = r.upto(6)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20)
+						// e9480–98: bitfield U11585 multiphase (e9092-class)
+						// After U2048: (F50=0 + hex×8)×2 + F50 F50 U3 +
+						// (F50=0 + hex×8)×2 + F50 F50 U20 (UP depth gaps).
+						_ = r.upto(11585)
+						_ = r.flipcoin(50)
+						_ = r.upto(2)
+						if !r.flipcoin(50) {
+							_ = r.upto(23170)
+							_ = r.upto(5792)
+						}
+						_ = r.flipcoin(50)
+						_ = r.upto(724)
+						_ = r.upto(2048)
+						for i := 0; i < 2; i++ {
+							if !r.flipcoin(50) {
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+							}
+						}
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(3)
+						for i := 0; i < 2; i++ {
+							if !r.flipcoin(50) {
+								for j := 0; j < 8; j++ {
+									_ = r.next31()
+								}
+							}
+						}
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
