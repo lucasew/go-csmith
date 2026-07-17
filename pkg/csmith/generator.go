@@ -125255,6 +125255,113 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.upto(4)
 				_ = r.upto(25)
+				// e8730–45: U120 tries=1 VS U100 tries=1 + multi-level qfer
+				// create (F50 F10×3 + NewArray F20×2 + nested F50 F20×2 +
+				// Constant F50×2 U3) + Expression U120 tries=10 F50 F50 U3.
+				// Integrity residual debt — invent multiphase ladder.
+				rej7 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej7++
+					return rej7 <= 2
+				})
+				rej8 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej8++
+					return rej8 <= 2
+				})
+				// multi-level create residual (UP exact flip sequence)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				// e8746–49: U120 tries=10 F50 F50 U3 F50
+				rej9 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej9++
+					return rej9 <= 11 // tries=10
+				})
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				_ = r.flipcoin(50)
+				// e8751–54: U120 tries=6 VS U100 U2 U5 F80
+				rej10 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej10++
+					return rej10 <= 7 // tries=6
+				})
+				_ = r.upto(100)
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.flipcoin(80)
+				// e8756–62: Expression U120 VS multiphase U100 tries=1 U2 U5
+				// U120 U100 U31 U120 tries=3
+				_ = r.upto(120)
+				rej11 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej11++
+					return rej11 <= 2
+				})
+				_ = r.upto(2)
+				_ = r.upto(5)
+				_ = r.upto(120)
+				_ = r.upto(100)
+				_ = r.upto(31)
+				rej12 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej12++
+					return rej12 <= 4 // tries=3
+				})
+				// e8764–69: U100 tries=1 U31 U120 tries=3 U100 tries=1 U4 F0
+				rej13 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej13++
+					return rej13 <= 2
+				})
+				_ = r.upto(31)
+				rej14 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej14++
+					return rej14 <= 4
+				})
+				rej15 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej15++
+					return rej15 <= 2
+				})
+				_ = r.upto(4)
+				_ = r.flipcoin(0)
+				// e8771–80: VS U100 U2 + Expression U120 tries=2 F50 F50 U3
+				// + U120 tries=2 F50 F50 U20
+				_ = r.upto(100)
+				_ = r.upto(2)
+				rej16 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej16++
+					return rej16 <= 3 // tries=2
+				})
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				rej17 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej17++
+					return rej17 <= 3
+				})
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(20)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true

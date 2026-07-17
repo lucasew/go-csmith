@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8730** (post U16 tries=1 + CreateArray nest residual; next U120 tries=1 U100 tries=1)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8781** (post multi-level create + VS multiphase residual; next U120 tries=7)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -372,7 +372,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after 7×stdfunc + first U16, one more F5 cycle then second U16 U120 + VS U100 U5 + F5 F10 F50×3 U4 U24 + F80 create + NewValue PL + F5 F50×3 U25; GO F5 after first U16 batch.
 2. C++: choose_func U16 re-arms; ExpressionVariable VS; stdfunc residual variants (U18 vs U24/U25 pool).
 3. GO: residual pattern U16 + 1×stdfunc + U16 + U100 U5 + F50×3 U24 + create + PL + F50×3 U25. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8679 U120 tries=1 U16 tries=1 mid-nest vs Statement U100.
+4. Next: e8679 — climbed.
+
+**seed5 e8679→8730 climbed — U120/U16 tries=1 + CreateArray + stdfunc residual:**
+1. Capture: after U25, UP U120 tries=1 U16 tries=1 U120 + stdfunc U18 + VS U2 F50 U32 + PL qfer create U99 + more Expression U120×3 stdfunc U16 + F5 F50×3 U25; GO Statement U100.
+2. C++: ExpressionFuncall choose_func filter tries=1; CreateArrayVariable; stdfunc residual.
+3. GO: extend ThenBodyEver residual through CreateArray U99 + Expression nest + second F50×3 U25. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8730 U120 tries=1 U100 tries=1 F50 F10 multiphase vs Statement U100.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
