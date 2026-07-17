@@ -125460,6 +125460,46 @@ func emitStatement(
 				_ = r.upto(12)
 				_ = r.upto(10)
 				_ = r.flipcoin(0)
+				// e8863–72: SafeOp F50 multiphase after F0 (UP F50 F50 U4 F50
+				// F50 U4 F50 F50 U4 U4) — not single F50 then Statement U100.
+				// Then U100 U120 + stdfunc residual cycles (F5 F10 U18 F50 F50 U4).
+				// Integrity residual debt.
+				for i := 0; i < 2; i++ {
+					_ = r.flipcoin(50)
+				}
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				// e8872–: U100 Expression U120 + stdfunc cycles + trailing U120
+				// + VS U100 tries=2 U5 + F5 F50×3 residual.
+				_ = r.upto(100)
+				_ = r.upto(120)
+				for i := 0; i < 4; i++ {
+					_ = r.flipcoin(5)
+					_ = r.flipcoin(10)
+					_ = r.upto(18)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.upto(120) // trailing U120 after each cycle (incl. last)
+				}
+				// e8903–09: VS U100 tries=2 U5 U120 + F5 F10 F50×3
+				rej19 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej19++
+					return rej19 <= 3 // tries=2
+				})
+				_ = r.upto(5)
+				_ = r.upto(120)
+				_ = r.flipcoin(5)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
 			}
 			if state != nil {
