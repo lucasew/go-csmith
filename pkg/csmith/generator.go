@@ -125619,6 +125619,73 @@ func emitStatement(
 				_ = r.upto(120)
 				_ = r.flipcoin(50)
 				_ = r.upto(100)
+				// e8996–: U3 + create F50 F10 F20 F50 F50 U3 + hex-gap F50s
+				// + F80 create + CreateArray + more F80 + stdfunc. Integrity debt.
+				_ = r.upto(3)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				// e9002–03: F50=0 hex gaps (next31×2 then next31×16)
+				if !r.flipcoin(50) {
+					for i := 0; i < 2; i++ {
+						_ = r.next31()
+					}
+				}
+				if !r.flipcoin(50) {
+					for i := 0; i < 16; i++ {
+						_ = r.next31()
+					}
+				}
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				// e9007–15: F80 F10 F50 F20 F20 CreateArray U99 U10 U1 U3 F0
+				if r.flipcoin(80) {
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(99)
+					_ = r.upto(10)
+					_ = r.upto(1)
+					_ = r.upto(3)
+					_ = r.flipcoin(0)
+				}
+				// e9017–26: F80 F10 F50 F20 F20 U2 U2 F50 F50 U3
+				if r.flipcoin(80) {
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(2)
+					_ = r.upto(2)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(3)
+				}
+				// e9027–36: F50=0 gap + U100 U120 U120 + stdfunc
+				if !r.flipcoin(50) {
+					for i := 0; i < 2; i++ {
+						_ = r.next31()
+					}
+				}
+				_ = r.upto(100)
+				_ = r.upto(120)
+				_ = r.upto(120)
+				for i := 0; i < 3; i++ {
+					_ = r.flipcoin(5)
+					_ = r.flipcoin(10)
+					_ = r.upto(18)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					if i < 2 {
+						_ = r.upto(120)
+					}
+				}
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
