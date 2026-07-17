@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8230** (post invent residual PP U4 visit-fail)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8238** (post invent residual Global U5 visit-fail)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -294,7 +294,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8220 UP U4 vs sticky post-Return invent pick(7) sole → Lhs F80; after U4, UP Expression U120 (visit fail) vs GO accept→Lhs.
 2. C++: ExpressionVariable ParentParam choose_ok_var then visit_facts miss → Expression do-while term retry U120.
 3. GO: clear post-Return invent residual at invent residual arm; termVariable PP burn U4 + restoreGenSnapshot continue exprTries. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8230 U5 vs GO U41 (choose inventory).
+4. Next: e8230 — climbed.
+
+**seed5 e8230→8238 climbed — invent residual Global U5 visit-fail VS reselect:**
+1. Capture: e8230 UP Global choose U5 then VS reselect U100 PP + U4 + Expression U120; GO live eFlexible GlobalList ~41 overcount accept→Lhs.
+2. C++: ExpressionVariable do-while after visit_facts miss reselects VariableSelector (U100) not term U120 first.
+3. GO: one-shot after invent residual PP path — burn U5 + VS reselect + PP U4 + continue exprTries. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8238 Lhs SelectDeref F80=1 empty→VS U100 vs GO U5 pointer choose.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

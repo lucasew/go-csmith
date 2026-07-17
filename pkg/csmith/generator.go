@@ -212,6 +212,10 @@ var inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 bool
 // then-body For body is active (e8106– until body ends).
 var inventArrayOpPostNestBreakThenBodyForBody bool
 var inventArrayOpPostNestBreakThenBodyEver bool // sticky after then-body arm
+// inventArrayOpPostNestBreakThenBodyGlobalU5Once: e8230 Global choose U5
+// visit-fail → VS reselect multiphase (one-shot after invent residual Ever).
+var inventArrayOpPostNestBreakThenBodyGlobalU5Once bool
+var inventArrayOpPostNestBreakThenBodyGlobalU5Done bool // arm at most once
 // inventArrayOpPostNestBreakThenBodyForGlobalN: multiphase free Expression
 // Variable Global under invent residual then-body For body:
 //   0 e8130 U5 + Lhs empty create F80 F10 F50 F20 F20
@@ -12237,6 +12241,28 @@ exprTries:
 			// retries term U120 (not accept sole → parent Lhs F80). Residual debt.
 			if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil {
 				_ = er.pick(4)
+				// Arm Global U5 multiphase once after first invent residual PP visit-fail.
+				if !inventArrayOpPostNestBreakThenBodyGlobalU5Done {
+					inventArrayOpPostNestBreakThenBodyGlobalU5Once = true
+					inventArrayOpPostNestBreakThenBodyGlobalU5Done = true
+				}
+				restoreGenSnapshot(ctx, snap)
+				continue exprTries
+			}
+			// e8230–33: invent residual then-body free Expression Global —
+			// UP choose_ok_var U5 then visit_facts miss → ExpressionVariable
+			// do-while VS reselect U100=65 PP + choose U4 then visit miss →
+			// Expression term U120. GO live GlobalList eFlexible ~41 overcounts.
+			// Residual debt: burn U5 + VS reselect multiphase (one-shot).
+			if inventArrayOpPostNestBreakThenBodyGlobalU5Once && scopePick == 0 && er != nil {
+				inventArrayOpPostNestBreakThenBodyGlobalU5Once = false
+				_ = er.pick(5) // e8230
+				// ExpressionVariable do-while: reselect VariableSelector (not term U120).
+				sp2 := variableScopePickFromER(er, opts, &scope) // e8231
+				if sp2 == 2 || sp2 == 1 || sp2 == 4 {
+					_ = er.pick(4) // e8232 PP/PL choose
+				}
+				// visit fail → Expression term retry U120 (e8233)
 				restoreGenSnapshot(ctx, snap)
 				continue exprTries
 			}
