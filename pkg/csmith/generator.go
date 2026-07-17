@@ -234,7 +234,10 @@ var inventArrayOpPostNestBreakThenBodyForLhsPPSole bool
 // One-shot: F80=1 empty fallthrough VS (no invent Un floor / create multiphase).
 var inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty bool
 // inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType: with empty→PP sole,
-// free Expression Comma after Lhs skips left AllTypes (e8240 F80 not U16).
+// free Expression Comma after Lhs skips left AllTypes and runs nested
+// ExpressionAssign need_no_rhs Lhs SelectDeref empty multiphase (e8240+ F80
+// not left term Function U120). C++ ExpressionComma left → Assign Lhs.cpp
+// do-while empty select_deref + create (VariableSelector.cpp:1266–1315).
 var inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
@@ -19569,6 +19572,172 @@ exprTries:
 			if ctx != nil {
 				ctx.lastExprWasVarSelect = false
 			}
+			// e8239–: invent residual free Expression Comma after empty SelectDeref
+			// PP sole — UP nested ExpressionAssign need_no_rhs Lhs SelectDeref
+			// empty multiphase (F80 empty→VS Global U8 → empty create F50 F10 F50
+			// F20 F20 U3…; Lhs.cpp do-while + VariableSelector create). Skip left
+			// AllTypes U16 + left term Function; burn Lhs residual then RHS.
+			if inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType &&
+				er != nil && er.fallback != nil {
+				inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
+				r := er.fallback
+				// e8240–41: F80=1 empty pure (no choose), F80=0 → VS
+				if r.flipcoin(80) {
+					// select_deref empty ok_vars — no U
+				}
+				if !r.flipcoin(80) {
+					_ = r.upto(100) // e8242 Global
+					_ = r.upto(8)   // e8243 choose_ok_var
+				}
+				// e8244–51: F80 empty create random_qualifiers WRITE F50 F10 F50
+				// + NewArray F20 init F20 + address U3 U3
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(3)
+					_ = r.upto(3)
+				}
+				// e8252–58: F80 empty create F50 F10 F50 F20 F20 U3
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(3)
+				}
+				// e8259–65: F80 empty create F50 F10 F50 F20 F20 U3
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(3)
+				}
+				// e8266–68: F80=0 → VS ParentLocal stack U1
+				if !r.flipcoin(80) {
+					_ = r.upto(100)
+					_ = r.upto(1)
+				}
+				// e8269–73: GenerateNewParentLocal WRITE F50 + NewArray F20 +
+				// make_init F50 F50 U3 (create residual after empty PL)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(3)
+				// e8274–75: F80=0 → VS U100 (visit miss / reselect)
+				if !r.flipcoin(80) {
+					_ = r.upto(100)
+				}
+				// e8276–83: F80 empty create F50 F10 F50 F20 F20 U4 U3
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(4)
+					_ = r.upto(3)
+				}
+				// e8284–90: F80 empty create F50 F10 F50 F20 F20 U4
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+					_ = r.upto(4)
+				}
+				// e8291–97: F80 empty create F50 F10 F50 F20 F20=1 visit F0
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					if r.flipcoin(20) {
+						_ = r.flipcoin(0)
+					}
+				}
+				// e8298+: further Lhs do-while empty create (F50 F10 F50 F20 F20).
+				// Address choose_ok_var among ~4 pointees (U4; e8304/e8311), not
+				// sticky U3 from e8250-era. F20=1 initNull → visit F0 (e8317–18).
+				// Global choose pad multiphase: e8243 U8 already burned above;
+				// later VS Global (e8335) is U7 among residual inventory.
+				// F80=0 → VS is Lhs do-while continue (e8333–36), not Comma rhs.
+				// Accept Lhs after NewArray CreateArray (e8340+) once.
+				lhsAccepted := false
+				for i := 0; i < 24 && !lhsAccepted; i++ {
+					if !r.flipcoin(80) {
+						// F80=0 → VS reselect multiphase then continue SelectDeref
+						sp := r.upto(100)
+						if sp < 35 {
+							_ = r.upto(7) // e8335 Global choose U7
+						} else if sp < 65 {
+							_ = r.upto(2)
+						} else if sp < 95 {
+							_ = r.upto(4)
+						} else {
+							_ = r.flipcoin(10)
+							_ = r.upto(2)
+							_ = r.flipcoin(20)
+						}
+						continue
+					}
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					newArr := r.flipcoin(20)
+					initNull := r.flipcoin(20)
+					if initNull {
+						_ = r.flipcoin(0) // opportunistic_validate null
+						continue
+					}
+					if newArr {
+						// e8340–46: NewArray + address init U4 then CreateArray
+						// U99 dims; Lhs continues F80 U3 / F80=0→VS PL U1 U3
+						// multiphase (e8347–66) before Comma rhs.
+						_ = r.upto(4) // e8342 address choose_ok_var before CreateArray
+						ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						_ = burnCreateArrayVariable(r, opts, ptrT, true)
+						for j := 0; j < 12; j++ {
+							if r.flipcoin(80) {
+								_ = r.upto(3) // e8348/e8358/e8360 choose residual
+								continue
+							}
+							// F80=0 → VS ParentLocal stack U1 + choose U3
+							_ = r.upto(100)
+							_ = r.upto(1)
+							_ = r.upto(3)
+							if j >= 3 {
+								break
+							}
+						}
+						lhsAccepted = true
+						break
+					}
+					_ = r.upto(4) // address choose_ok_var U4
+				}
+				// Comma rhs Expression (type t)
+				var prevSkip bool
+				var prevQfer []bool
+				if ctx != nil {
+					prevSkip = ctx.skipFuncRetQfer
+					prevQfer = ctx.incomingQferConsts
+					ctx.skipFuncRetQfer = false
+					ctx.incomingQferConsts = nil
+				}
+				rhs := randomTypedExprDepthFlags(t, er, opts, env, scope, depth+1, ctx, false, false)
+				if ctx != nil {
+					ctx.skipFuncRetQfer = prevSkip
+					ctx.incomingQferConsts = prevQfer
+				}
+				return castLiteral(t, fmt.Sprintf("((x), (%s))", rhs))
+			}
 			// seed4 e1791–92: after PP miss term→Comma, skip lhs type choose
 			// (UP U120 Function immediately; not AllTypes U14).
 			// seed5 e1376–77: after keep-expr residual (must_use U2 F75+VS), free
@@ -20716,12 +20885,8 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			flow.postAggLhsExprContinue = false
 		}
 		// e8238–40: after empty SelectDeref + PP sole, free Expression U120=118
-		// Comma → nested Assign Lhs F80 (not AllTypes U16). Arm only when
-		// re-armed from LhsDerefEmpty (e8163 first PPSole leaves this false).
-		if inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType {
-			inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
-			nullValidatePostResidualSkipCommaTypeOnce = true
-		}
+		// Comma → nested Assign Lhs F80 multiphase. Keep SkipCommaType until
+		// termComma residual (e8163 first PPSole leaves this false).
 		return lvalueInfo{expr: "p", ctype: target}, true, false
 	}
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&

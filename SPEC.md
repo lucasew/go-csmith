@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8240** (post invent residual Lhs empty SelectDeref → VS PP sole)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8367** (post invent residual free Comma Lhs SelectDeref empty multiphase)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -306,7 +306,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8237 F80=1 then UP U100=92 (VS) vs GO U5 pointer choose (same raw). UP empty ok_vars (no choose U, create skipped) → VS ParentParam sole → free Expression U120=118 Comma.
 2. C++: Lhs.cpp SelectDerefPointerProb then select_deref_pointer empty → VariableSelector::select; e8163-class PP sole (no PP→PL U2 create).
 3. GO: after Global U5 residual arm empty SelectDeref (no invent Un floor); re-arm LhsPPSole + SkipCommaType for free Comma left (skip AllTypes U16). **Integrity residual debt** — inventory overcount compensation. Seeds 2/4/6 held.
-4. Next: e8240 free Comma left Expression term U120=49 Function vs UP F80 nested Assign Lhs SelectDeref empty multiphase.
+4. Next: e8240 — climbed.
+
+**seed5 e8240→8367 climbed — invent residual free Comma nested Assign Lhs SelectDeref empty:**
+1. Capture: e8239 U120=118 Comma; UP nested Assign Lhs F80 empty multiphase (VS Global U8→U7, empty create F50 F10 F50 F20 F20 U3/U4, NewArray CreateArray U99, F80 U3 / VS PL U1 U3…) vs GO Comma left Function term.
+2. C++: ExpressionComma left ExpressionAssign need_no_rhs Lhs.cpp do-while select_deref empty + create (VariableSelector.cpp:1266–1315).
+3. GO: termComma invent residual SkipCommaType burns Lhs SelectDeref empty multiphase then Comma rhs. **Integrity residual debt** — multiphase residual pack. Seeds 2/4/6 held.
+4. Next: e8367 F80=0 Lhs continue vs GO Comma rhs Expression term U120.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
