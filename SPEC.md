@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **280** (was 278): isParam Global nested Constant hex width (short) |
+| 7 | first_div **316** (was 280): free For isParam Global SelectGlobal inventory before create |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e280→316 climbed — free For isParam Global SelectGlobal inventory-first:**
+1. Capture: after first formal-qfer Global create (e273–77), second isParam pointer Global — UP SelectGlobal sole/choose among matching pointers (e279 U100=2) then next Expression U100; GO force-create F20+ again over-created inventory.
+2. C++ `SelectGlobal` always `choose_var` first; only `GenerateNewGlobal` when empty (VariableSelector.cpp).
+3. GO: free For blockStack==2 isParam pointer Global — exact/`eFlexible` pointer filter on scoped candidates; sole when n==1; choose when n>1; create `skipRandomQfer` only when empty. Seeds 2/3/4/6 full match; seed5 still GO-extra after 13634.
+4. Next: seed7 e316 UP U1 vs GO U2 (PL stack/choose after Expression Variable); continue COUNT=20.
 
 **seed7 e278→280 climbed — nested address-of Constant hex4:**
 1. Capture: after Global create F20×3 F50, next Expression U100 — GO RandomHexDigits(8) for hardcoded int32_t* formals vs UP short formals hex4 (LCG gap 4 after F50).

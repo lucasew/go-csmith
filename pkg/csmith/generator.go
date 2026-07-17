@@ -27855,14 +27855,33 @@ exprTries:
 				}
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
-			// seed7 e273–77: after free For PL addressable accept, next isParam
-			// ExpressionVariable Global (U100=6) — C++ SelectGlobal empty for
-			// pointer formal → GenerateNewGlobal copies formal qfer (no
-			// random_qualifiers) then create_and_initialize F20… (seed7 e274+).
-			// GO live GlobalList would choose/soft-accept and desync.
+			// seed7 e273–77 / e280: free For isParam pointer Global —
+			// C++ SelectGlobal among matching pointers (sole when n==1; create
+			// only when empty). First hit empty → formal-qfer GenerateNewGlobal
+			// F20…; later hits accept inventory (seed7 e279 U100=2 Global sole
+			// then next Expression U100 — not second force create F20).
 			if scopePick == 0 && isParam && strings.Contains(t.Name, "*") &&
 				flow != nil && !flow.deepStack && flow.multiDimArrays == 0 &&
 				!flow.useSmallParentStack && flow.blockStack == 2 {
+				exactPtr := make([]exprVarCandidate, 0, len(candidates))
+				for _, c := range candidates {
+					if sameBaseType(c.ctype, t) ||
+						(strings.Contains(c.ctype.Name, "*") && eFlexibleDerivable(t, c.ctype)) {
+						exactPtr = append(exactPtr, c)
+					}
+				}
+				if len(exactPtr) == 1 {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, exactPtr[0].expr))
+				}
+				if len(exactPtr) > 1 {
+					if c, ok := selectExprVariableFromERGlobal(t, er, exactPtr, false); ok && c.expr != "" {
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, c.expr))
+					}
+				}
 				if g, ok := createOnDemandGlobalFromEROpts(er, opts, t, ctx, true); ok {
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
