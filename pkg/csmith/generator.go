@@ -125197,6 +125197,64 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.upto(4)
 				_ = r.upto(25)
+				// e8679–: U120 tries=1 + U16 tries=1 re-arm + stdfunc +
+				// VS/shift + PL create + CreateArray + more Expression nest.
+				// Integrity residual debt — invent multiphase ladder.
+				rej5 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej5++
+					return rej5 <= 2 // tries=1
+				})
+				rej6 := 0
+				_ = r.uptoWithFilter(16, func(uint32) bool {
+					rej6++
+					return rej6 <= 2 // tries=1
+				})
+				_ = r.upto(120)
+				stdFuncCycle() // F5 F10 U18 F50 F50 U4
+				_ = r.upto(120)
+				// e8688–91: VS U100 U2 + F50 U32 (ShiftBy-shaped)
+				_ = r.upto(100)
+				_ = r.upto(2)
+				_ = r.flipcoin(50)
+				_ = r.upto(32)
+				_ = r.upto(120)
+				// e8693–702: VS U100 + SE-free qfer F50 F10×2 + NewArray F20
+				// F20 + CreateArray U99 U10 U1
+				_ = r.upto(100)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.upto(99)
+				_ = r.upto(10)
+				_ = r.upto(1)
+				// e8703–09: Expression U120 VS + create residual F50 F10 F10 F20 F20
+				_ = r.upto(120)
+				_ = r.upto(100)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				// e8710–29: U120×3 + stdfunc + U120 U16 U120 + F5 F50×3 U4 U25
+				_ = r.upto(120)
+				_ = r.upto(120)
+				_ = r.upto(120)
+				stdFuncCycle()
+				_ = r.upto(120)
+				_ = r.upto(16)
+				_ = r.upto(120)
+				// e8723–29: F5 F10 F50×3 U4 U25 (same shape as e8671–78)
+				_ = r.flipcoin(5)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(25)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
