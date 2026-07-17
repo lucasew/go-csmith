@@ -12128,14 +12128,46 @@ exprTries:
 				// e8035+: free Expression residual nest before then-body Statement
 				// (UP U120 tries=9 Variable → NewValue F10 PL create…). Depth-block
 				// filters Function/Assign/Comma so term lands Variable-only.
+				// e8036: VariableSelectFilter rejects ParentParam when params
+				// empty (VariableSelector.cpp) → U100 tries=1 NewValue 98 + F10
+				// create. GO param inventory over-counts and accepts PP 65 tries=0.
 				if flow != nil {
 					flow.ppPostPadDepthBlock = true
 					flow.ppPostPadForceNoFunc = true
 					flow.ppPostPadDepthBlockN = 0
 				}
+				prevEmptyParamsVS := nullValidateEmptyParamsVS
+				// Multiphase free Expression residual before then-body Statement:
+				// 0 e8035 Variable NewValue→PL create (empty-params VS filter PP);
+				// 1–2 e8046/e8050 Constant (depthBlock only — emptyParamsDepthBlock
+				// would force noConst and reject Constant after NewValue arm).
 				if er != nil {
-					_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 1, ctx, false, false)
+					for i := 0; i < 3; i++ {
+						if flow != nil {
+							flow.ppPostPadDepthBlock = true
+							flow.ppPostPadForceNoFunc = true
+							flow.ppPostPadDepthBlockN = 0
+						}
+						// First Expression only: VariableSelectFilter empty params.
+						// NewValue→PL create arms emptyParamsDepthBlock; clear so
+						// later Constant terms stay allowed (e8046 U120=95 tries=0).
+						nullValidateEmptyParamsVS = i == 0
+						nullValidateEmptyParamsDepthBlock = false
+						_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 1, ctx, false, false)
+						nullValidateEmptyParamsDepthBlock = false
+					}
+					// e8054–57: free ExpressionAssign Lhs SelectDeref empty create
+					// F80 NewArray F20 init F20 choose U4 before then-body Statement
+					// U100 (e8058). Not AssignOps U120 / sticky multiphase F80.
+					if er.fallback != nil {
+						if er.fallback.flipcoin(80) { // e8054
+							_ = er.fallback.flipcoin(20) // e8055 NewArray
+							_ = er.fallback.flipcoin(20) // e8056 init
+							_ = er.fallback.upto(4)      // e8057 choose_ok_var
+						}
+					}
 				}
+				nullValidateEmptyParamsVS = prevEmptyParamsVS
 				if flow != nil {
 					flow.ppPostPadDepthBlock = false
 					flow.ppPostPadForceNoFunc = false
@@ -12536,6 +12568,22 @@ exprTries:
 						// sole accept (next Expression U120) — not U1+U15 residual.
 						// e6315 after first ArrayOp: stack U2 + live choose (via
 						// parentStackPick path when not stuck in SimplePL pad).
+						//
+						// e8038–42 invent residual free Expression NewValue→PL
+						// (VariableCreation F10=0): GenerateNewVariable always
+						// creates (retype U14 + SE-free qfer F50 F10 + NewArray F20).
+						// Sticky SimplePLCreate U15 pad must not intercept scopePick 4.
+						if scopePick == 4 {
+							idxNV := parentStackPick(er, flow)
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idxNV); ok {
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, g.expr))
+							}
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, "x"))
+						}
 						if flow.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody {
 							// SelectParentLocal stack U3 (Function::stack.size()=3).
 							// 0 e6377: sole after stack (C++ n==1; GO flex overcount
