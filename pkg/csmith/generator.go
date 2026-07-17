@@ -12140,6 +12140,64 @@ exprTries:
 							_ = r.flipcoin(50)
 							_ = r.flipcoin(50)
 							_ = r.upto(20)
+							// e9499+ Lhs F80 + ArrayOp + CreateArray residual
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(20)
+							_ = r.upto(100)
+							_ = r.flipcoin(5)
+							_ = r.upto(4)
+							_ = r.upto(12)
+							_ = r.upto(3)
+							_ = r.upto(12)
+							_ = r.upto(3)
+							_ = r.upto(12)
+							_ = r.upto(3)
+							_ = r.upto(19)
+							_ = r.upto(18)
+							_ = r.upto(4)
+							_ = r.upto(2)
+							constT64d := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+							_ = randomConstantExprFromER(constT64d, er, opts)
+							_ = r.flipcoin(50)
+							for i := 0; i < 2; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(0)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(4)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(4)
+							_ = r.upto(4)
+							rejVS9 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS9++
+								return rejVS9 <= 2
+							})
+							_ = r.upto(120)
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(80)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(20)
+							_ = r.upto(4)
+							_ = r.upto(99)
+							_ = r.upto(10)
+							_ = r.upto(4)
+							_ = r.flipcoin(20)
+							_ = r.upto(5)
+							_ = r.upto(3)
+							_ = r.flipcoin(20)
+							_ = r.upto(5)
+							_ = r.upto(9)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -13427,6 +13485,69 @@ exprTries:
 						_ = r.flipcoin(50)
 						_ = r.flipcoin(50)
 						_ = r.upto(20)
+						// e9499–528: Lhs F80 create + ArrayOp F5 multiphase +
+						// Constant + Lhs F80 CreateArray U99. Residual debt.
+						_ = r.flipcoin(80) // e9499 F80=1
+						_ = r.flipcoin(10) // e9500
+						_ = r.flipcoin(50) // e9501
+						_ = r.flipcoin(20) // e9502
+						_ = r.flipcoin(20) // e9503
+						_ = r.upto(100)    // e9504 ArrayOp / Statement
+						_ = r.flipcoin(5)  // e9505
+						_ = r.upto(4)      // e9506
+						// e9507–16: ArrayOp body U12 U3 ×3 + U19 U18 U4 U2
+						_ = r.upto(12)
+						_ = r.upto(3)
+						_ = r.upto(12)
+						_ = r.upto(3)
+						_ = r.upto(12)
+						_ = r.upto(3)
+						_ = r.upto(19)
+						_ = r.upto(18)
+						_ = r.upto(4)
+						_ = r.upto(2)
+						// e9517–28: Constant int64 hex (F50=0 depth+16) then F50 F0
+						// + Constant multiphase F50s U4. UP depth 12248→12265.
+						constT64c := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+						_ = randomConstantExprFromER(constT64c, er, opts)
+						_ = r.flipcoin(50) // e9518 after hex
+						for i := 0; i < 2; i++ {
+							_ = r.next31() // gap before F0 (depth +3)
+						}
+						_ = r.flipcoin(0) // e9519 F0
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
+						_ = r.upto(4)
+						// e9529–47: VS tries=1 + Lhs F80 CreateArray U99 multiphase
+						rejVS9 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS9++
+							return rejVS9 <= 2
+						})
+						_ = r.upto(120)
+						_ = r.flipcoin(80)
+						_ = r.flipcoin(80)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(20)
+						_ = r.upto(4)
+						_ = r.upto(99)
+						_ = r.upto(10)
+						_ = r.upto(4)
+						_ = r.flipcoin(20)
+						_ = r.upto(5)
+						_ = r.upto(3)
+						_ = r.flipcoin(20)
+						_ = r.upto(5)
+						_ = r.upto(9)
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
