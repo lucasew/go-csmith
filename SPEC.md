@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7437** (invent residual Statement ArrayOp fail-retry Break; next open U1 F20 create vs Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7449** (invent residual Break PL create; next open CreateArray init alt F50 vs initNum U120)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,11 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
-**seed5 e7433→7436 climbed — invent residual PL F50 U64 ends Expression nest:**
-1. Capture: e7433 UP F50 U64 vs GO GenerateNewParentLocal retype U14 after invent residual PL stack U1.
-2. C++: second invent free Expression PL after empty choose does not run full retype create; residual F50+U64 then Statement U100.
-3. GO: inventArrayOpExprPLN multiphase — 0 sole after stack; 1+ F50 U64 and clear invent nest (no sticky freeMultiIVExprPL force-create). Seeds 2/4/6 held.
-4. Next: e7436 StatementFilter U100 tries=1 (reject+retry) vs GO Statement body F5.
+**seed5 e7433→7437 climbed — invent residual PL F50 U64 + Statement ArrayOp fail-retry:**
+1. Capture: e7433 F50 U64 vs force create U14; e7436 ArrayOp F5 vs U100 tries=1 Break 40.
+2. C++: invent residual ends Expression nest; Statement ArrayOp (51) fails s==0 retry (Statement.cpp) without F5; second StatementProbability rejects Assign → Break under IN_LOOP.
+3. GO: inventArrayOpExprPLN F50 U64 ends nest; inventArrayOpPostNestArrayOpFailRetry re-picks Statement; reject Assign once. Seeds 2/4/6 held.
+4. Next: e7437 UP U1 F20 create residual vs GO Statement U100 Continue.
 
 **seed5 e7429→7433 climbed — invent free Expression Global expand ok_vars U51:**
 1. Capture: e7429 UP choose_ok_var U51 vs GO U66/U49 under/over inventory.

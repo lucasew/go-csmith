@@ -159,6 +159,15 @@ var inventArrayOpPostNestArrayOpFailRetry bool
 // under IN_LOOP (tries=1).
 var inventArrayOpPostNestRejectAssignOnce bool
 
+// inventArrayOpPostNestBreakEV: StatementBreak Expression::make_random forced
+// eVariable after invent residual (e7437+). PL stack U1 + empty create multiphase
+// (NewArray F20…) — not bare break then free Statement U100.
+var inventArrayOpPostNestBreakEV bool
+
+// inventArrayOpPostNestBreakCreate: during invent residual Break PL create,
+// NewArray path burns a second Constant residual before CreateArray (e7442–44).
+var inventArrayOpPostNestBreakCreate bool
+
 
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
@@ -7098,6 +7107,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			}
 		}
 		initLit = formatSimpleConstant(er.fallback, constTy)
+		// invent residual Break PL NewArray: second Constant residual before
+		// CreateArray (UP e7442–44 F50 F50 U20 then U99).
+		if inventArrayOpPostNestBreakCreate && newArray && er.fallback != nil {
+			_ = formatSimpleConstant(er.fallback, constTy)
+		}
 		// e6622: nest NewValue→PL simple create ends at Constant U20; UP continues
 		// F50 U8 residual before next Expression U120 (not free U120 immediately).
 		// e6956: after nest ArrayOp residual, no F50 U8 (UP free Expression tries=5).
@@ -122985,6 +122999,10 @@ func emitStatement(
 				state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce = true
 			}
 			st = chooseStmt()
+			if st == stmtBreak {
+				// StatementBreak Expression forced Variable residual (e7437+).
+				inventArrayOpPostNestBreakEV = true
+			}
 		} else {
 			inventArrayOpPostNestArrayOpFailRetry = false
 		}
@@ -123517,7 +123535,27 @@ func emitStatement(
 		// still match via bare break + next-stmt residual; free multi-IV
 		// need_no_rhs nested-For atMax Break (e5289) needs real EV burn:
 		// Global U100=19 + choose U4 + itemize U4.
-		if inLoop && r != nil && state != nil && state.freeMultiIVNeedNoRhsIfNestedFor {
+		// invent residual Break (e7437+): Expression Variable PL stack U1 +
+		// empty GenerateNewParentLocal NewArray F20… (not bare break + Statement).
+		if inventArrayOpPostNestBreakEV && r != nil && ctx != nil {
+			inventArrayOpPostNestBreakEV = false
+			breakT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+			er := newExprRand(r, exprDecisionBudget(opts))
+			_ = parentStackPick(er, state) // e7437 U1
+			// qferMode 0: NewArray F20 first (no random_qualifiers); retype false.
+			// Second Constant residual before CreateArray (e7442–44).
+			inventArrayOpPostNestBreakCreate = true
+			if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, breakT, ctx, 0, false, 0); ok {
+				_ = g
+			}
+			inventArrayOpPostNestBreakCreate = false
+			if state != nil {
+				// Break ends invent residual ArrayOp body slot — skip more free
+				// Statements that would steal U100 (UP stays in create residual).
+				state.skipNextBlockSize = true
+				state.lastStmtWasReturn = true // stop block statement loop
+			}
+		} else if inLoop && r != nil && state != nil && state.freeMultiIVNeedNoRhsIfNestedFor {
 			breakT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 			_ = randomReturnVariableExpr(breakT, r, opts, env, scope, ctx)
 		}
@@ -125088,6 +125126,8 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpExprPLN = 0
 	inventArrayOpPostNestArrayOpFailRetry = false
 	inventArrayOpPostNestRejectAssignOnce = false
+	inventArrayOpPostNestBreakEV = false
+	inventArrayOpPostNestBreakCreate = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
