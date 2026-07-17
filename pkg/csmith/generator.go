@@ -209,9 +209,19 @@ var inventArrayOpPostNestBreakThenBodyPLStackU1 bool
 // post-Return U27 / freeMultiIVNeedNoRhs U37 inventory overcount.
 var inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 bool
 // inventArrayOpPostNestBreakThenBodyForBody: sticky while invent residual
-// then-body For body is active (e8106–). First free Expression Global choose
-// is U5 (e8130 Function-fail → ExpressionVariable), not live undercount U3.
+// then-body For body is active (e8106– until body ends).
 var inventArrayOpPostNestBreakThenBodyForBody bool
+// inventArrayOpPostNestBreakThenBodyForGlobalN: multiphase free Expression
+// Variable Global under invent residual then-body For body:
+//   0 e8130 U5 + Lhs empty create F80 F10 F50 F20 F20
+//   1 e8157 U10 visit F0 fail → VS reselect U100 Global U9 accept → Lhs F80
+//   2+ live inventory
+var inventArrayOpPostNestBreakThenBodyForGlobalN int
+// inventArrayOpPostNestBreakThenBodyForLhsDerefU4: after e8157 Global residual
+// accept, Lhs SelectDeref choose_ok_var among ~4 pointers (e8162), not live U5.
+// Then VS ParentParam sole-accepts (e8163 U100=94), not sticky PP→PL U2 create.
+var inventArrayOpPostNestBreakThenBodyForLhsDerefU4 bool
+var inventArrayOpPostNestBreakThenBodyForLhsPPSole bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -2666,6 +2676,49 @@ func isConstOrVolatileStructUnionType(t CType, ctx *genContext) bool {
 		}
 	}
 	return false
+}
+
+// inventResidualThenBodyForGlobal handles multiphase free Expression Variable
+// Global under invent residual then-body For body (e8130 U5; e8157 U10 F0
+// reselect U9). Returns (expr, true) when residual path handled.
+func inventResidualThenBodyForGlobal(er *exprRand, opts Options, scope *scopeInfo, ctx *genContext) (string, bool) {
+	if !inventArrayOpPostNestBreakThenBodyForBody || er == nil {
+		return "", false
+	}
+	n := inventArrayOpPostNestBreakThenBodyForGlobalN
+	inventArrayOpPostNestBreakThenBodyForGlobalN++
+	switch n {
+	case 0:
+		// e8130 U5 + Lhs SelectDeref empty create F80 F10 F50 F20 F20.
+		_ = er.pick(5)
+		inventArrayOpPostNestBreakLhsEmptyCreate = true
+		inventArrayOpPostNestBreakLhsEmptyCreateN = 12
+		return "g_0", true
+	case 1:
+		// e8157–60: choose_ok_var U10, visit_facts F0 fail → ExpressionVariable
+		// do-while reselects VS Global U100 then choose_ok_var U9 accept.
+		// Parent Assign Lhs SelectDeref F80 U4 (e8161–62).
+		_ = er.pick(10) // e8157
+		if er.fallback != nil {
+			_ = er.fallback.flipcoin(0) // e8158 visit fail
+		}
+		sp2 := variableScopePickFromER(er, opts, scope) // e8159 U100
+		if sp2 == 0 {
+			_ = er.pick(9) // e8160
+		} else if sp2 == 1 || sp2 == 4 {
+			var flow *functionFlowState
+			if ctx != nil {
+				flow = ctx.state
+			}
+			_ = parentStackPick(er, flow)
+		}
+		inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = true
+		inventArrayOpPostNestBreakThenBodyForLhsPPSole = true
+		return "g_0", true
+	default:
+		// live inventory path
+		return "", false
+	}
 }
 
 // parentStackPick burns rnd_upto(func.stack.size()) for SelectParentLocal.
@@ -7669,15 +7722,6 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
 	}
-	// e8130: invent residual then-body For body free Expression Function-fail
-	// → ExpressionVariable Global choose_ok_var U5 (before any live-pool U3
-	// prefer/exact path). One-shot on first Global choose while ForBody sticky.
-	if inventArrayOpPostNestBreakThenBodyForBody && !forAssign &&
-		!selectVarLocalScope && er != nil {
-		inventArrayOpPostNestBreakThenBodyForBody = false
-		v := int(er.pick(5)) // e8130
-		return filtered[v%len(filtered)], true
-	}
 	// expand_struct_union_vars for free Expression READ eFlexible
 	// (choose_var default no_expand_struct=false). Lhs WRITE uses eDerefExact —
 	// skip expand to avoid seed2/4 Assign inventory skew.
@@ -9549,6 +9593,16 @@ func buildFunctionCallExpr(
 	} else {
 		useExisting = er.pick(2) == 0
 	}
+	// e8165–67: invent residual then-body For free Expression after Lhs PP
+	// sole — useExisting=0 burns FuncAttr-shaped F30 F0 then returns (UP next
+	// free Expression U120 Constant). Must run before max_funcs fallthrough
+	// to ExpressionVariable NewValue U100.
+	if !useExisting && inventArrayOpPostNestBreakThenBodyForBody && r != nil &&
+		state != nil && state.freeMultiIVForLhsExprContinue {
+		_ = r.flipcoin(30) // e8166
+		_ = r.flipcoin(0)  // e8167
+		return castLiteral(t, "0"), true
+	}
 
 	var callee funcInfo
 	calleeIdx := -1
@@ -9738,6 +9792,16 @@ func buildFunctionCallExpr(
 			// ExpressionVariable U100 (not SelectLType F30 residual).
 			if inventArrayOpPostNestBreakStmtEra {
 				return "", false
+			}
+			// e8166–67: invent residual then-body For free Expression after Lhs
+			// PP sole — Function useExisting=0 at max_funcs burns FuncAttr-shaped
+			// F30 F0 residual then returns (UP next free Expression U120 Constant).
+			// Without this, GO falls to ExpressionVariable NewValue U100.
+			if inventArrayOpPostNestBreakThenBodyForBody &&
+				state.freeMultiIVForLhsExprContinue && r != nil {
+				_ = r.flipcoin(30) // e8166
+				_ = r.flipcoin(0)  // e8167
+				return castLiteral(t, "0"), true
 			}
 			if state.freeMultiIVPostEAGlobalPadDone && r != nil &&
 				!state.freeMultiIVPostEAFuncCreateAttrDone {
@@ -10939,7 +11003,15 @@ exprTries:
 				// Exception: ptr-cmp operands are real pointer types
 				// (ExpressionFuncall.cpp:73–75 forces std_func=false → user F50;
 				// e3403 UP F50). Do not forceSimple under inPtrCmpExpr.
-				if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue &&
+				if inventArrayOpPostNestBreakThenBodyForBody &&
+					ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
+					// e8165: invent residual then-body For free Expression after
+					// Lhs PP sole — UP user Function CREATE F50 F30 F0 (not
+					// sticky e3045 / natural atMax stdfunc F5).
+					forceUserFunc = true
+					atMaxFuncs = false
+					forceStdFuncSimple = false
+				} else if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue &&
 					!ctx.state.inPtrCmpExpr &&
 					!ctx.state.freeMultiIVPostEAGlobalPadDone {
 					// e3045 era: force atMax stdfunc simple. After e3532–66 itemize
@@ -11403,19 +11475,14 @@ exprTries:
 					return castLiteral(t, c.expr)
 				}
 				scopePick := variableScopePickFromER(er, opts, &scope)
-				// e8130: invent residual then-body For body Function-fail →
-				// ExpressionVariable Global choose_ok_var U5 (not live U3).
-				// e8131–35: parent Assign Lhs SelectDeref empty create random_add
-				// F10 F50 NewArray F20 init F20 (not live pointer choose U5).
+				// invent residual then-body For body Function-fail → Global multiphase
+				// (e8130 U5+Lhs empty create; e8157 U10 F0 reselect U9).
 				if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
-					inventArrayOpPostNestBreakThenBodyForBody = false
-					_ = er.pick(5) // e8130
-					// n=12: empty create F80 F10 F50 F20 F20 only (no address U2).
-					inventArrayOpPostNestBreakLhsEmptyCreate = true
-					inventArrayOpPostNestBreakLhsEmptyCreateN = 12
-					bumpExprDepth(ctx)
-					markFuncEffect()
-					return castLiteral(t, "g_0")
+					if expr, ok := inventResidualThenBodyForGlobal(er, opts, &scope, ctx); ok {
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, expr)
+					}
 				}
 				// seed5 post-Return Function-fail → ExpressionVariable ParentParam:
 				// same multiphase as termVariable (0 e5765 U7; 1+ e5801–02 U1+U2).
@@ -12147,16 +12214,14 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
-			// e8130: invent residual then-body For body free Expression
-			// Function-fail → ExpressionVariable Global choose_ok_var U5
-			// (C++ GlobalList after residual). Live pool undercounts U3.
-			// Intercept at termVariable Global before any select path.
+			// invent residual then-body For body free Expression Variable Global
+			// multiphase (e8130 U5; e8157 U10 F0 reselect U9).
 			if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
-				inventArrayOpPostNestBreakThenBodyForBody = false
-				_ = er.pick(5) // e8130
-				bumpExprDepth(ctx)
-				markVarSelectEffect()
-				return finishVar(castLiteral(t, "g_0"))
+				if expr, ok := inventResidualThenBodyForGlobal(er, opts, &scope, ctx); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, expr))
+				}
 			}
 			// e8030–34: after invent residual Global U51 SelectDeref multiphase,
 			// If condition Variable ParentLocal: stack U1 + choose_ok_var U3 empty.
@@ -20562,6 +20627,20 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 	// (visit fail under no_signed_overflow → SelectDeref F80 U7…).
 	// seed5 e4572+: after Global U3/U2 dummy era, PP→PL empty ok_vars →
 	// GenerateNewParentLocal WRITE create (F50 F20 F50 F50 U20) not U5 choose.
+	// e8163: invent residual then-body For Lhs after SelectDeref U4 fail —
+	// VS ParentParam sole-accepts (UP U100=94 then free Expression U120);
+	// sticky e2935 PP→PL U2+U14 create desyncs.
+	// e8164+: after Lhs accept, free Expression nest (Function CREATE residual
+	// then Constant) before next Statement — arm freeMultiIVForLhsExprContinue.
+	if inventArrayOpPostNestBreakThenBodyForLhsPPSole && scopePick == 2 {
+		inventArrayOpPostNestBreakThenBodyForLhsPPSole = false
+		if flow != nil {
+			flow.freeMultiIVForLhsExprContinue = true
+			flow.freeMultiIVForLhsExprPLCreateOnce = true
+			flow.postAggLhsExprContinue = false
+		}
+		return lvalueInfo{expr: "p", ctype: target}, true, false
+	}
 	if scopePick == 2 && nullValidatePostResidualGlobalU21 &&
 		nullValidatePostResidualStmtLhsAddrCreateVSDone {
 		// seed5 e7317: invent ArrayOp-body multi-dim CreateArray F80=0 → first
@@ -119386,7 +119465,14 @@ commaF80MultiDone:
 				// Live choose_ok_var size. GO under-counts vs UP visible pool
 				// (e2351 U13 / e2377–79 U13 then U12). Pad toward ~13.
 				nChoose := len(ptrs)
-				if ctx != nil && ctx.state != nil {
+				// e8162: invent residual then-body For after Global U10 residual —
+				// Lhs SelectDeref among ~4 pointers (not live overcount U5).
+				forcedLhsU4 := false
+				if inventArrayOpPostNestBreakThenBodyForLhsDerefU4 {
+					inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = false
+					nChoose = 4
+					forcedLhsU4 = true
+				} else if ctx != nil && ctx.state != nil {
 					extra := 0
 					for _, g := range ctx.state.dynGlobals {
 						if strings.Contains(g.ctype.Name, "*") && !seen[g.name] {
@@ -119404,8 +119490,14 @@ commaF80MultiDone:
 						nChoose = 5
 					}
 				}
-				if nChoose < len(ptrs) {
+				if !forcedLhsU4 && nChoose < len(ptrs) {
 					nChoose = len(ptrs)
+				}
+				// e8162: invent residual then-body For Lhs after Global U10 residual —
+				// choose_ok_var U4 then visit miss → fall through VS U100 (no second F80).
+				if forcedLhsU4 {
+					_ = r.upto(4) // e8162
+					break         // fall through to VariableSelector (e8163 U100)
 				}
 				// e4336–70: after ParentParam→PL U5 U5, SelectDeref countdown:
 				// U11, U10+F0, U9, U8, U7+[9][4][7]F0, U7+F0, U6+[9][9][3]F0,
@@ -119787,6 +119879,12 @@ commaF80MultiDone:
 		// Assign Lhs SelectDeref — C++ live eDereference pool (U5; U4+U7
 		// itemize; U4 accept). GO inventory under-counts as empty → F10 create.
 		// One-shot per If then/else arm (LhsSelDone reset on arm entry).
+		// e8162: invent residual For Lhs U4 then VS (when ptrs empty / <2).
+		if inventArrayOpPostNestBreakThenBodyForLhsDerefU4 && r != nil {
+			inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = false
+			_ = r.upto(4) // e8162
+			break         // fall through to VariableSelector (e8163)
+		}
 		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsIfBody &&
 			!ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone {
 			ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone = true
@@ -122354,6 +122452,26 @@ commaF80MultiDone:
 						ctx.state.ppPostPadSkipParentExprN = 0
 						_ = randomTypedExpr(simpleT, r, opts, env, scope, ctx)
 					}
+				} else if inventArrayOpPostNestBreakThenBodyForBody &&
+					ctx.state.freeMultiIVForLhsExprContinue && r != nil {
+					// e8170–77: after free Expression Function CREATE residual +
+					// Constant, parent ExpressionAssign Lhs SelectDeref F80=0 →
+					// VS NewValue F10 → PL stack U2 + retype U14 create.
+					// GO was ending nest → next Statement U100.
+					if !r.flipcoin(80) { // e8170 F80=0
+						er := newExprRand(r, exprDecisionBudget(opts))
+						// e8171–72: VS U100 NewValue + F10 → ParentLocal CREATE
+						sp := variableScopePickFromER(er, opts, &scope)
+						if sp == 4 || sp == 1 {
+							_ = er.pick(2)  // e8173 stack U2
+							_ = er.pick(14) // e8174 retype
+							if er.fallback != nil {
+								_ = er.fallback.flipcoin(50) // e8175
+								_ = er.fallback.flipcoin(20) // e8176 NewArray
+								_ = er.fallback.flipcoin(50) // e8177 init/const
+							}
+						}
+					}
 				} else if ctx.state.freeMultiIVForLhsExprContinue && ctx.state.freeMultiIVForLhsExprPostNestLhs {
 					// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
 					// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
@@ -123876,9 +123994,9 @@ func emitStatement(
 			// (UP U10). Sticky post-Return U27 / need_no_rhs U37 over-burns.
 			inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
 			_ = r.upto(10)
-			// e8130: For body free Expression Function-fail → ExpressionVariable
-			// Global choose_ok_var U5 (sticky until first Global choose).
+			// e8130+: For body free Expression Global multiphase (U5 then U10…).
 			inventArrayOpPostNestBreakThenBodyForBody = true
+			inventArrayOpPostNestBreakThenBodyForGlobalN = 0
 		} else if postArrayFor {
 			// Nested array-loop For: C++ still uses full inventory, but early
 			// seed2 era pool size equals sticky loopIVPool (e370 U2).
@@ -124047,9 +124165,9 @@ func emitStatement(
 			state.freeMultiIVNeedNoRhsPostEAReturnForBody = false
 			state.freeMultiIVNeedNoRhsIfNestedFor = prevNeedNoRhsNestedFor
 		}
-		// Invent residual then-body For body ends (e8130 Global U5 one-shot
-		// should already have fired inside; clear leftover).
+		// Invent residual then-body For body ends.
 		inventArrayOpPostNestBreakThenBodyForBody = false
+		inventArrayOpPostNestBreakThenBodyForGlobalN = 0
 		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")
 	case stmtReturn:
@@ -125791,6 +125909,9 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakThenBodyPLStackU1 = false
 	inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
 	inventArrayOpPostNestBreakThenBodyForBody = false
+	inventArrayOpPostNestBreakThenBodyForGlobalN = 0
+	inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = false
+	inventArrayOpPostNestBreakThenBodyForLhsPPSole = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
