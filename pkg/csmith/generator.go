@@ -26918,8 +26918,12 @@ exprTries:
 					qferMode := 1
 					wantPtr := strings.Contains(t.Name, "*")
 					// isParam pointer ParentLocal:
-					// seed2/early: undercount → U3+U10+U4.
+					// seed2/early: undercount (1–2 exact) → U3+U10+U4 pad.
 					// seed4 e422 nested multiDim: U2 choose + U4 itemize.
+					// seed7 e341: exact empty on nested body frame — C++
+					// choose_var empty → GenerateNewParentLocal F20…; skip invent
+					// pad and force create (do not fall through to term retry).
+					nExactPtrPL := 0
 					if isParam && wantPtr {
 						exact := make([]exprVarCandidate, 0, 4)
 						for _, c := range localCands {
@@ -26927,6 +26931,7 @@ exprTries:
 								exact = append(exact, c)
 							}
 						}
+						nExactPtrPL = len(exact)
 						nb := 0
 						if ctx != nil && ctx.state != nil {
 							nb = ctx.state.nestedFuncBodies
@@ -26949,7 +26954,8 @@ exprTries:
 							bumpExprDepth(ctx)
 							return finishVar(castLiteral(t, c.expr))
 						}
-						if len(exact) < 3 {
+						// Only pad when under-counted live pointers (seed2 early).
+						if nExactPtrPL > 0 && nExactPtrPL < 3 {
 							idx := int(er.pick(3))
 							_ = er.pick(10)
 							_ = er.pick(4)
@@ -26991,15 +26997,20 @@ exprTries:
 					// body — UP empty-block create F20; GO may see caller locals.
 					// Only when nestedFuncBodies>0 (not early func_1 isParam e189).
 					// seed4 e1638: after pad-choose keep forceCreate false.
-					if isParam && !wantPtr && ctx.state != nil && !ctx.state.useSmallParentStack &&
+					// seed7 e341: isParam pointer + no exact pointer on frame.
+					if isParam && ctx.state != nil && !ctx.state.useSmallParentStack &&
 						ctx.state.nestedFuncBodies > 0 && !ctx.state.ppPLPadChooseDone {
-						nExactPL := 0
-						for _, c := range localCands {
-							if sameBaseType(c.ctype, t) {
-								nExactPL++
+						if !wantPtr {
+							nExactPL := 0
+							for _, c := range localCands {
+								if sameBaseType(c.ctype, t) {
+									nExactPL++
+								}
 							}
-						}
-						if nExactPL == 0 {
+							if nExactPL == 0 {
+								forceCreate = true
+							}
+						} else if nExactPtrPL == 0 {
 							forceCreate = true
 						}
 					}
