@@ -180,6 +180,11 @@ var inventArrayOpPostNestBreakExprGlobalReselect bool
 // (UP e7917 among ~3 pointees after * NewArray=0).
 var inventArrayOpPostNestBreakPLAddrU3 bool
 
+// inventArrayOpPostNestBreakLhsEmptyCreate: after invent residual Break Assign
+// RHS PL create, Statement Lhs SelectDeref empty create (F80 + random_add
+// F10 F50 + create_and_initialize) — not inventory sole / second F80=0→VS.
+var inventArrayOpPostNestBreakLhsEmptyCreate bool
+
 
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
@@ -6756,6 +6761,7 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// address choose_ok_var U3 (not sticky residual U2).
 			if inventArrayOpPostNestBreakPLAddrU3 && !newArray {
 				inventArrayOpPostNestBreakPLAddrU3 = false
+	inventArrayOpPostNestBreakLhsEmptyCreate = false
 				_ = er.fallback.upto(3)
 				goto afterAddrResidual
 			}
@@ -12072,6 +12078,8 @@ exprTries:
 					qfer := 1
 					retype := !strings.Contains(createT.Name, "*")
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, qfer, retype, idx); ok {
+						// Parent Assign Lhs: SelectDeref empty create random_add F10 F50…
+						inventArrayOpPostNestBreakLhsEmptyCreate = true
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, g.expr))
@@ -21615,6 +21623,58 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
+		// e7918–32: invent residual Break Assign Lhs SelectDeref empty create
+		// multiphase after RHS PL * create (VariableSelector.cpp:1266–1315).
+		// F80 + random_add F10 F50 + NewArray=0 initNull F0 fail → F80 +
+		// random_add F10 F50 + NewArray CreateArray (UP; not inventory F80=0→VS).
+		if inventArrayOpPostNestBreakLhsEmptyCreate && r != nil {
+			inventArrayOpPostNestBreakLhsEmptyCreate = false
+			if r.flipcoin(80) { // e7918
+				// random_add_qualifiers (!SE-free → const F10 + vol F50)
+				if opts.ConstPointers {
+					_ = r.flipcoin(10) // e7919
+				}
+				if opts.VolatilePointers {
+					_ = r.flipcoin(50) // e7920
+				}
+				_ = r.flipcoin(20) // e7921 NewArray
+				initNull := r.flipcoin(20) // e7922
+				if initNull {
+					_ = r.flipcoin(0) // e7923 visit fail
+				}
+				// Second SelectDeref empty create (Lhs do-while)
+				if r.flipcoin(80) { // e7924
+					if opts.ConstPointers {
+						_ = r.flipcoin(10) // e7925
+					}
+					if opts.VolatilePointers {
+						_ = r.flipcoin(50) // e7926
+					}
+					newArray2 := r.flipcoin(20) // e7927
+					initNull2 := r.flipcoin(20) // e7928
+					// find_pointer_type(LhsType, true): one more star for SelectDeref create
+					ptrType := targetType
+					if !strings.Contains(ptrType.Name, "*") {
+						ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+					} else {
+						ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+					}
+					if newArray2 {
+						// CreateArray for pointer var (alts make_init F20; sizes U99…)
+						burnCreateArrayPtrAltNestedCreate = true
+						_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+						burnCreateArrayPtrAltNestedCreate = false
+						emitOrphanArrayGlobal(ctx, ptrType, _arr)
+					} else if !initNull2 {
+						// address residual — optional choose
+						_ = r.upto(3)
+					}
+				}
+			}
+			lhsFromDeref = true
+			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			break
+		}
 		// e6686–: after e6586 residual Assign, next free Assign skips AssignOps
 		// / SelectLType. UP stream: Lhs VS Global U100=1 choose U13 itemize U4
 		// reselect U100=89 → Expression term U120=69 then Function residual
