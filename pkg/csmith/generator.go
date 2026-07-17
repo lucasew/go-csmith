@@ -125362,6 +125362,63 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(50)
 				_ = r.upto(20)
+				// e8781–: U120 tries=7 VS U100 U2 U4 + U100 U120 F50 F20 U16
+				// U120 F80 F50 F10 F50 F10 F50 F20 F20 + VS F40 U3 + ArrayOp
+				// F5 U4 U14 F50 U60 U6 + SafeOp residual + U100 F5…
+				// Integrity residual debt — invent multiphase ladder.
+				rej18 := 0
+				_ = r.uptoWithFilter(120, func(uint32) bool {
+					rej18++
+					return rej18 <= 8 // tries=7
+				})
+				_ = r.upto(100)
+				_ = r.upto(2)
+				_ = r.upto(4)
+				_ = r.upto(100)
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(20)
+				_ = r.upto(16)
+				_ = r.upto(120)
+				// e8790–97: Lhs F80 + multi-level qfer create F50 F10×3 F20 F20
+				if r.flipcoin(80) {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(10)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+				}
+				// e8798–804: VS U100 F40 U3 + Statement ArrayOp F5 U4 U14
+				_ = r.upto(100)
+				_ = r.flipcoin(40)
+				_ = r.upto(3)
+				_ = r.upto(100)
+				_ = r.flipcoin(5)
+				_ = r.upto(4)
+				_ = r.upto(14)
+				// e8805–17: F50 U60 U6 + SafeOp F50×3 U4 F50 F50 U4 F50 U4 U4
+				_ = r.flipcoin(50)
+				_ = r.upto(60)
+				_ = r.upto(6)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				// e8818–23: U100 F5 U4 U11 U3 U13
+				_ = r.upto(100)
+				_ = r.flipcoin(5)
+				_ = r.upto(4)
+				_ = r.upto(11)
+				_ = r.upto(3)
+				_ = r.upto(13)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
