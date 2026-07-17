@@ -297,14 +297,20 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **195** (was 194): free For PL empty-block retype create |
+| 7 | first_div **271** (was 218): free For NewValue→PL SE-free qfer (blockStack==2) |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
 
-**seed7 e194→195 climbed — free For SelectParentLocal empty-block create:**
-1. Capture: e194 UP U14 retype vs GO U120 (all-locals PL fallthrough after stack U2).
-2. C++ empty `stack[idx]->local_vars` → `random_type_from_type` U14 + GenerateNewParentLocal (even isParam formal qfer).
-3. GO: free For enables block-local inventory; empty → retype + qferMode 0 when inParamExpr. Seeds 2/3/4/5/6 hold.
-4. Next: seed7 e195; continue COUNT=20.
+**seed7 e218→271 climbed — free For free Expression NewValue→PL needQfer:**
+1. Capture: e218 after F10 PL U2 U14 — UP F50 F10 (null/wildcard SE-free qfer) vs GO F20 (qferMode 0).
+2. C++ free Expression NewValue→GenerateNewParentLocal uses null/wildcard qfer → random_qualifiers SE-free.
+3. GO: `!deepStack && multiDim==0 && !useSmallParentStack && blockStack==2` → needQfer (mode 1). Seeds 2/3/4/5/6 hold (seed5 still 13635 GO-extra).
+4. Next: seed7 e271 UP U2 vs GO F50 createOnDemandFromParentLocalPath; continue COUNT=20.
+
+**seed7 e194→218 climbed — free For SelectParentLocal empty-block create:**
+1. Capture: e194 UP U14 vs GO U120; e195 UP F50 qfer vs GO F20 (mode 0 over-force).
+2. C++ empty `stack[idx]->local_vars` → U14 retype + GenerateNewParentLocal; free Expression uses SE-free random_qualifiers F50 F10; isParam formal qfer skips them.
+3. GO: free For enables block-local inventory; empty always retypes; isParam→qferMode 0, free Expression→mode 1. Stop createOnDemand free-For force mode 0 (broke free Expression F50). Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e218; continue COUNT=20.
 
 **seed7 e185→194 climbed — free For Lhs address residual RandomHexDigits width:**
 1. Capture: e185 UP F20=0 vs GO F20=1 after F80 F80 (LCG desync from hex digit overburn).

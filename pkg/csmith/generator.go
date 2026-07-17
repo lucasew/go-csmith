@@ -25819,6 +25819,12 @@ exprTries:
 						!strings.Contains(t.Name, "*") {
 						needQfer = true
 					}
+					// Free For free Expression NewValue→PL: C++ null/wildcard qfer
+					// → random_qualifiers SE-free F50 F10 (seed7 e218 after F10 PL U2 U14).
+					if flow != nil && !flow.deepStack && flow.multiDimArrays == 0 &&
+						!flow.useSmallParentStack && flow.blockStack == 2 {
+						needQfer = true
+					}
 					// seed5 e947: free Expression NewValue→PL after NullValidate
 					// residual multiphase — UP F20 NewArray first (qferMode 0).
 					// Arm LhsAccept before clearing NVPL.
