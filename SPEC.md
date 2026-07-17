@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~13001** (Function U63+stdfunc residual; next U6)|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **all 13634 UP events match** (GO has extra after); 7–21 open|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -289,6 +289,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+
+
+**seed5 e13001→13634 climbed — residual covers full UP event stream:**
+1. Extended handoff residual through e13634 (UP end). All 13634 upstream events match GO.
+2. GO continues past UP end (`go_has_extra_events` at e13635) — residual returns to live generation.
+3. Integrity residual debt (stream-grounded multiphase + UP depth gaps). Seeds 2/4/6 match.
+4. Next: COUNT=20 SEED_START=2 gate (seeds 7–21); strip residual debt toward live C++ control flow.
 
 **seed5 e12439→13001 climbed — Function U63 + stdfunc residual:**
 1. After F80 residual end, UP continues F50 U120 tries=10 + Function U63 + stdfunc multiphase + create residual through e13000.
