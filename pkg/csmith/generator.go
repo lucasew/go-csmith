@@ -12198,6 +12198,115 @@ exprTries:
 							_ = r.flipcoin(20)
 							_ = r.upto(5)
 							_ = r.upto(9)
+							// e9548–e9649: after CreateArray U99, Lhs SelectDeref F80 U9
+							// multiphase visit loop + VS PL/Global/create residual. Residual debt
+							// grounded on UP stream (SelectDeref visit / VS multiphase inventory).
+							_ = r.flipcoin(80) // e9548 F80=1
+							_ = r.upto(9)      // e9549
+							_ = r.flipcoin(80) // e9550
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9552
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9554
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9556
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9558
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9560 F80=0
+							_ = r.upto(100)    // e9561 VS
+							_ = r.upto(6)      // e9562 PL
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9564
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9572 F80=0
+							_ = r.upto(100)    // e9573
+							_ = r.upto(8)      // e9574
+							_ = r.flipcoin(80) // e9575 F80=0
+							_ = r.upto(100)    // e9576
+							_ = r.upto(6)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9579
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9581 F80=0
+							_ = r.upto(100)
+							_ = r.upto(7)
+							_ = r.flipcoin(0)  // e9584 F0
+							_ = r.flipcoin(80) // e9585
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9591 F80=0
+							_ = r.upto(100)
+							_ = r.upto(6)
+							_ = r.flipcoin(50) // e9594 create
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(3)
+							_ = r.flipcoin(80) // e9599 F80=0
+							rejVS9600 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS9600++
+								return rejVS9600 <= 2 // tries=1: callback re-invoked on same x
+							}) // e9600 U100 tries=1
+							_ = r.upto(6)
+							_ = r.upto(4)
+							_ = r.flipcoin(80) // e9603
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9621 10th F80=1 + U9
+							_ = r.upto(9)      // e9622
+							_ = r.flipcoin(80) // e9623 F80=0
+							_ = r.upto(100)
+							_ = r.upto(6)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9627
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80)
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9633 F80=0
+							_ = r.upto(100)
+							_ = r.upto(6)
+							_ = r.flipcoin(80) // e9636
+							_ = r.upto(9)
+							_ = r.flipcoin(80) // e9638 F80=0
+							_ = r.upto(100)    // e9639
+							_ = r.flipcoin(10) // e9640
+							_ = r.upto(6)
+							_ = r.upto(14)
+							_ = r.flipcoin(50) // e9643 create
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(50)
+							_ = r.upto(20)
+							_ = r.flipcoin(50)
+							_ = r.upto(4)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -13548,6 +13657,115 @@ exprTries:
 						_ = r.flipcoin(20)
 						_ = r.upto(5)
 						_ = r.upto(9)
+						// e9548–e9649: after CreateArray U99, Lhs SelectDeref F80 U9
+						// multiphase visit loop + VS PL/Global/create residual. Residual debt
+						// grounded on UP stream (SelectDeref visit / VS multiphase inventory).
+						_ = r.flipcoin(80) // e9548 F80=1
+						_ = r.upto(9)      // e9549
+						_ = r.flipcoin(80) // e9550
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9552
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9554
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9556
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9558
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9560 F80=0
+						_ = r.upto(100)    // e9561 VS
+						_ = r.upto(6)      // e9562 PL
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9564
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9572 F80=0
+						_ = r.upto(100)    // e9573
+						_ = r.upto(8)      // e9574
+						_ = r.flipcoin(80) // e9575 F80=0
+						_ = r.upto(100)    // e9576
+						_ = r.upto(6)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9579
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9581 F80=0
+						_ = r.upto(100)
+						_ = r.upto(7)
+						_ = r.flipcoin(0)  // e9584 F0
+						_ = r.flipcoin(80) // e9585
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9591 F80=0
+						_ = r.upto(100)
+						_ = r.upto(6)
+						_ = r.flipcoin(50) // e9594 create
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(3)
+						_ = r.flipcoin(80) // e9599 F80=0
+						rejVS9600 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS9600++
+							return rejVS9600 <= 2 // tries=1: callback re-invoked on same x
+						}) // e9600 U100 tries=1
+						_ = r.upto(6)
+						_ = r.upto(4)
+						_ = r.flipcoin(80) // e9603
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9621 10th F80=1 + U9
+						_ = r.upto(9)      // e9622
+						_ = r.flipcoin(80) // e9623 F80=0
+						_ = r.upto(100)
+						_ = r.upto(6)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9627
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80)
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9633 F80=0
+						_ = r.upto(100)
+						_ = r.upto(6)
+						_ = r.flipcoin(80) // e9636
+						_ = r.upto(9)
+						_ = r.flipcoin(80) // e9638 F80=0
+						_ = r.upto(100)    // e9639
+						_ = r.flipcoin(10) // e9640
+						_ = r.upto(6)
+						_ = r.upto(14)
+						_ = r.flipcoin(50) // e9643 create
+						_ = r.flipcoin(20)
+						_ = r.flipcoin(50)
+						_ = r.flipcoin(50)
+						_ = r.upto(20)
+						_ = r.flipcoin(50)
+						_ = r.upto(4)
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()

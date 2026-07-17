@@ -272,8 +272,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9548** (handoff residual through ArrayOp + CreateArray U99; next F80 U9 multiphase)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9650** (post-CreateArray Lhs F80 U9 visit multiphase residual; next VS U100 tries=1)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
+
+
+**seed5 e9548→9650 climbed — post-CreateArray Lhs SelectDeref F80 U9 multiphase residual:**
+1. After CreateArray U99 itemize end (e9547 U9), UP continues Statement Lhs SelectDeref visit loop F80 U9 (not free Expression F50).
+2. Residual multiphase: F80 U9 loops + VS PL/Global (U6/U8/U7) + create F50 F20 residual + U100 tries=1 (filter `rej<=2`) + more F80 U9 + Function create F10 U6 U14.
+3. Integrity: residual debt (stream-grounded burns; same vehicle as e9499–e9548 handoff residual). Prefer live SelectDeref visit when inventory allows. Seeds 2/4/6 match.
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
 
