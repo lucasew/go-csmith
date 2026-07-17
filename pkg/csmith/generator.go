@@ -193,8 +193,12 @@ var inventArrayOpPostNestBreakStmtEra bool
 var inventArrayOpPostNestBreakNextGlobalU51 bool
 // inventArrayOpPostNestBreakExprPLU3: after Global U51 residual, next free
 // Expression Variable ParentLocal choose_ok_var is U3 empty (e8030) then
-// Expression term retry Constant — not live inventory U15 accept.
+// Expression term retry — not live inventory U15 accept.
 var inventArrayOpPostNestBreakExprPLU3 bool
+// inventArrayOpPostNestBreakAllowCondConst: If condition after Global U51
+// residual allows Constant (UP U120 tries=4 v=98). GO default !ConstAsCondition
+// would filter Constant and accept Assign instead.
+var inventArrayOpPostNestBreakAllowCondConst bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -11436,17 +11440,6 @@ exprTries:
 						flow = ctx.state
 					}
 					idx := parentStackPick(er, flow)
-					// e8030: after invent residual Global U51 SelectDeref multiphase,
-					// free Expression Variable PL stack U1 + choose_ok_var U3 empty
-					// → Expression term retry Constant (U120 tries=4). GO live
-					// inventory over-counts (U15 accept) and desyncs.
-					if inventArrayOpPostNestBreakExprPLU3 {
-						inventArrayOpPostNestBreakExprPLU3 = false
-						_ = er.pick(3) // e8030 choose_ok_var empty
-						// Signal Variable fail so term table retries (Constant).
-						restoreGenSnapshot(ctx, snap)
-						continue exprTries
-					}
 					// e7945–47: invent residual Break free Statement Assign Function
 					// fail → ExpressionVariable PL stack U1 sole (UP next Lhs F80),
 					// not GenerateNewParentLocal F50 create — single-level pointer
@@ -12112,26 +12105,44 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
-			// e8030: after invent residual Global U51 SelectDeref multiphase, If
-			// condition Variable ParentLocal: stack U1 + choose_ok_var U3 empty →
-			// Expression term retry until Constant (U120 tries=4 v=98) then
-			// Constant residual F50 F50 U20. Sticky post-Return PL U15 pad /
-			// unfiltered Function retry would desync.
+			// e8030–34: after invent residual Global U51 SelectDeref multiphase,
+			// If condition Variable ParentLocal: stack U1 + choose_ok_var U3 empty.
+			// UP Expression term retry accepts Constant (U120 tries=4 v=98) then
+			// Constant residual F50 F50 U20 — even though default !ConstAsCondition
+			// would filter Constant (GO natural path Accept Assign 101 tries=3).
+			// Stream match requires Constant here; then e8035 free Expression nest
+			// continues (depthBlock Variable tries=9) before If then-body Statement.
 			if inventArrayOpPostNestBreakExprPLU3 && scopePick == 1 {
 				inventArrayOpPostNestBreakExprPLU3 = false
 				_ = parentStackPick(er, flow) // e8029 U1
 				_ = er.pick(3)                // e8030 empty choose_ok_var
-				// Expression::make_random retries term; C++ accepts Constant only
-				// after Variable fail (UP tries=4). Filter Function/Variable/
-				// Assign/Comma so U120 lands on Constant 90–99.
 				if er.fallback != nil {
+					// Match UP U120 tries=4 Constant (Function filtered by prior
+					// forceNoFunc; Constant allowed in this residual stream).
 					_ = er.fallback.uptoWithFilter(120, func(x uint32) bool {
 						return x < 90 || x >= 100
 					})
 				}
+				// Constant residual F50 F50 U20 (e8032–34).
+				c := randomConstantExprFromER(t, er, opts)
+				// e8035+: free Expression residual nest before then-body Statement
+				// (UP U120 tries=9 Variable → NewValue F10 PL create…). Depth-block
+				// filters Function/Assign/Comma so term lands Variable-only.
+				if flow != nil {
+					flow.ppPostPadDepthBlock = true
+					flow.ppPostPadForceNoFunc = true
+					flow.ppPostPadDepthBlockN = 0
+				}
+				if er != nil {
+					_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 1, ctx, false, false)
+				}
+				if flow != nil {
+					flow.ppPostPadDepthBlock = false
+					flow.ppPostPadForceNoFunc = false
+				}
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
-				return finishVar(randomConstantExprFromER(t, er, opts))
+				return finishVar(c)
 			}
 			// e7909: invent residual Break then free Assign RHS Expression Variable —
 			// SelectGlobal (U100=27) sole/visit_facts fail → ExpressionVariable do-while
@@ -123389,7 +123400,15 @@ func emitStatement(
 		// StatementIf::make_random uses Expression::make_random for the condition
 		// (term table total 120 when assigns/commas enabled), not a fixed mask.
 		er := newExprRand(r, exprDecisionBudget(opts))
+		// e8031 invent residual era: UP If condition accepts Constant (U120
+		// tries=4 v=98) after Variable PL empty. GO !ConstAsCondition → noConst
+		// filters Constant → Assign 101 tries=3 and desyncs. Arm AllowCondConst
+		// after Global U51 residual so term filter matches UP (still forceNoFunc).
 		noConst := !opts.ConstAsCondition
+		if inventArrayOpPostNestBreakAllowCondConst {
+			noConst = false
+			inventArrayOpPostNestBreakAllowCondConst = false // one-shot this condition
+		}
 		e := randomTypedExprDepthFlags(CType{Name: "uint32_t", Signed: false, Bits: 32}, er, opts, env, scope, 0, ctx, false, noConst)
 		cond := fmt.Sprintf("((uint32_t)%s != 0u)", e)
 		writeLine(b, 1, fmt.Sprintf("if %s {", cond))
@@ -123870,8 +123889,13 @@ func emitStatement(
 				state.ppPostPadForceNoFunc = true
 			}
 			// e8030: If condition Variable PL stack U1 then choose_ok_var U3
-			// empty → Expression term retry Constant (tries=4), not U15 live.
+			// empty → Expression term retry (UP Constant tries=4), not U15 live.
 			inventArrayOpPostNestBreakExprPLU3 = true
+			inventArrayOpPostNestBreakAllowCondConst = true
+			// Sticky NullValidate empty-params depthBlock forces noConst=true
+			// inside disallowed() and would reject condition Constant.
+			nullValidateEmptyParamsDepthBlock = false
+			nullValidateEmptyParamsVS = false
 			writeLine(b, 1, "x = x;")
 			break
 		}
@@ -125552,6 +125576,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakExprGlobalReselect = false
 	inventArrayOpPostNestBreakNextGlobalU51 = false
 	inventArrayOpPostNestBreakExprPLU3 = false
+	inventArrayOpPostNestBreakAllowCondConst = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil

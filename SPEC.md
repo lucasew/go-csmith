@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8035); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8036); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8027** (post invent residual Global U51 SelectDeref: free Expression U120 tries=1 vs GO tries=0)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8035** (post invent residual If condition Constant: free Expression U120 tries=9 vs GO Statement U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e8027→8035 climbed — invent residual If condition forceNoFunc + PL U3 empty → Constant:**
+1. Capture: free Statement IfElse condition Expression UP U120 tries=1 Variable (Function filtered) then PL U1 U3 empty → Constant tries=4 F50 F50 U20; GO Function tries=0 stdfunc / U15 live PL.
+2. C++: residual SelectDeref multiphase leaves Function disallowed; PL choose_ok_var empty → Expression term retry Constant.
+3. GO: ppPostPadForceNoFunc after GlobalU51 residual; inventArrayOpPostNestBreakExprPLU3 burns U1 U3 then Constant-only term filter + Constant residual. Seeds 2/4/6 held.
+4. Next: e8035 free Expression U120 tries=9 vs GO Statement U100 (If condition ended early?).
+
 **seed5 e7979→8027 climbed — invent residual free Statement Global U51 SelectDeref create:**
 1. Capture: free Statement U100=30 (GO maps Return) → UP Global expand choose_ok_var U51 + SelectDeref empty create NewArray U99 + F0 F80 U6 multiphase; GO Return VS U100.
 2. C++: Assign-shaped Lhs Global expand + select_deref_pointer empty create_and_initialize (visit_facts F0 retries).
 3. GO: inventArrayOpPostNestBreakNextGlobalU51 residual on stmtReturn path (table maps 30→Return while stream is Assign Lhs); U51 + F80 create + F0 F80 U6 ladder. Seeds 2/4/6 held.
-4. Next: e8027 free Expression U120 tries=1 vs GO tries=0.
+4. Next: e8027 forceNoFunc — climbed.
 
 **seed5 e7957→7979 climbed — invent residual SelectLType U23 + multi-level Function-fail PL + Lhs:**
 1. Capture: free Assign SelectLType F20=1 choose_random_pointer_type UP U23 vs GO U18 (same raw); then Function-fail EV for ** LType → GenerateNewParentLocal F50 F10×3 F20 F20 then Lhs F80 random_add…; GO under-noted derived_types + sole/F80-fail→VS.
