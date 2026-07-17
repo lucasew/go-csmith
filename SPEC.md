@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8554** (post ArrayOp U1U4 + invent Expression nest multiphase through Global U51; next U120 vs Statement)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8637** (post ArrayOp Expression nest + stdfunc F5 multiphase + U16 re-arm; next U16 vs F5)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -353,8 +353,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 **seed5 e8511→8525 climbed — StatementReturn EV must_use U10 + VS multiphase + free Expression residual:**
 1. Capture: U100=33 Return; UP must_use itemize U10 F0 + VS Global U9 multiphase + free Expression U120 F50 hex-gap U120 tries=1 then Statement U100=51; GO sticky PostEA Return Global U2 U2 F50 F50 then ArrayOp F5.
 2. C++: ExpressionVariable.cpp:74–131 select_must_use_var → itemize_array + opportunistic_validate; select → choose_ok_var; free body continues after Return (not must_return halt).
-3. GO: invent residual FuncReturnU10 — skip sticky PostEA U2 residual; burn U10 F0 + VS U100 U9×2 U1 F0 U100 U9 + U120 F50 next31×4 U120 tries=1; skipNextBlockSize. **Integrity residual debt** — inventory under-model. Seeds 2/4/6 held.
-4. Next: e8525 ArrayOp U100=51 then UP U1 vs GO F5 array_loop.
+3. GO: invent residual FuncReturnU10 — skip sticky PostEA U2 residual; burn U10 F0 + VS U100 U9×2 U1 F0 U100 U9 + U120 F50 next31×4 U120 tries=1; skipNextBlockSize; arm ArrayOpU1U4. **Integrity residual debt** — inventory under-model. Seeds 2/4/6 held.
+4. Next: e8525 — climbed.
+
+**seed5 e8525→8554 climbed — ArrayOp U1U4 + invent free Expression nest multiphase:**
+1. Capture: ArrayOp U100=51; UP U1 U4 then Expression U120 tries=3 + VS multiphase + Lhs F80 create + Expression tries ladder + Global U51; GO F5 array_loop.
+2. C++: array-loop residual head stack/choose U1 U4 (e7210 family); body ExpressionVariable + Assign Lhs multiphase under depthBlock filter (tries on term U120).
+3. GO: arm freeMultiIVNeedNoRhsPostArrayOpArrayOpU1U4 after FuncReturnU10; under ThenBodyEver burn Expression nest residual (U120 tries + VS + F80 create + F50 hex gaps + U51). **Integrity residual debt** — invent multiphase ladder; prefer live depthBlock/For control later. Seeds 2/4/6 held.
+4. Next: e8554 U120 vs Statement U100 after Global U51 residual ends.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

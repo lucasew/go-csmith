@@ -125075,6 +125075,74 @@ func emitStatement(
 					return rej <= 2 // tries=1
 				})
 				_ = r.upto(51) // e8553 choose_ok_var expanded GlobalList
+				// e8554–65: after Global U51, UP free Expression U120 nest
+				// (not StatementProbability U100). SkipParentExprN from
+				// FuncF20U16 would dummy live Expression — burn residual.
+				// U120 → VS U100 tries=1 U1 U4 U4 → VS U100 → Expression
+				// U120 F50 F30 F0 → U120 F50 + F80=0 gap → VS U100 U2 U14…
+				// Integrity residual debt — Expression nest after ArrayOp U51.
+				_ = r.upto(120) // e8554
+				rej2 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej2++
+					return rej2 <= 2 // e8555 tries=1
+				})
+				_ = r.upto(1) // e8556
+				_ = r.upto(4) // e8557
+				_ = r.upto(4) // e8558
+				_ = r.upto(100) // e8559 VS
+				_ = r.upto(120) // e8560 Expression
+				_ = r.flipcoin(50) // e8561 SelectLType pointer
+				_ = r.flipcoin(30) // e8562 struct
+				_ = r.flipcoin(0)  // e8563 float
+				_ = r.upto(120)    // e8564 Expression
+				if !r.flipcoin(50) { // e8565 F50=0 hex gap before F80
+					// UP depth 11102→11111: next31×8 untraced
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+				if !r.flipcoin(80) { // e8565/66 F80=0 → VS
+					_ = r.upto(100) // e8566
+					_ = r.upto(2)   // e8567
+					_ = r.upto(14)  // e8568 retype
+					_ = r.flipcoin(50) // e8569 qfer/create
+					_ = r.flipcoin(20) // e8570 NewArray
+					_ = r.flipcoin(50) // e8571
+					_ = r.flipcoin(50) // e8572
+					_ = r.upto(20)     // e8573 Constant/choose
+				}
+				// e8575–: VS U100=3 then free Expression Function nest:
+				// U120 U16 U120 + (F5 F10 U18 F50 F50 U4 + U120)×7 +
+				// U16 U120 + more F5 cycles. stdfunc residual multiphase
+				// with choose_func U16 re-arms (ExpressionFuncall path).
+				_ = r.upto(100) // e8575 VS
+				_ = r.upto(120) // e8576 Expression term Function
+				_ = r.upto(16)  // e8577 choose_func pad
+				_ = r.upto(120) // e8578 param/nested Expression
+				stdFuncCycle := func() {
+					_ = r.flipcoin(5)
+					_ = r.flipcoin(10)
+					_ = r.upto(18)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+				}
+				// 7 stdfunc cycles each followed by Expression U120
+				for i := 0; i < 7; i++ {
+					stdFuncCycle()
+					_ = r.upto(120)
+				}
+				// e8627–28: choose_func U16 re-arm then nested Expression
+				_ = r.upto(16)
+				_ = r.upto(120)
+				// more stdfunc cycles (UP continues after U16 re-arm)
+				for i := 0; i < 4; i++ {
+					stdFuncCycle()
+					if i < 3 {
+						_ = r.upto(120)
+					}
+				}
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
