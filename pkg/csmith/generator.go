@@ -6637,6 +6637,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		} else if ctx.state.freeMultiIVNeedNoRhsPostEAGlobalU21 && isPtr && levels < 2 {
 			levels = 2
 		}
+		// e7962 invent residual Function-fail PL: UP ** SE-free READ qfer
+		// F50 F10×3 (2 levels + self). Sticky freeMultiIVForBodyU3 / LivePLCreate
+		// *** floors would burn F50 F10×4 and desync before NewArray F20.
+		if inventArrayOpPostNestBreakStmtEra && isPtr {
+			levels = 2
+		}
 		for i := 0; i < levels; i++ {
 			_ = er.fallback.flipcoin(50) // ptr-level vol
 			_ = er.fallback.flipcoin(10) // ptr-level const
@@ -6735,6 +6741,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// (NO_DANGLING) → no address choose residual; next is Lhs F80.
 		if ctx.state.postAggNestVSMisses >= 37 && !newArray &&
 			strings.Count(chosen.Name, "*") >= 3 {
+			doAddrResidual = false
+		}
+		// e7968–70 invent residual Function-fail ** PL: NewArray=0 initNull=0
+		// then parent Assign Lhs F80 (UP F20 F20 F80). Sticky freeMultiIV body
+		// address choose_ok_var U2 underburns.
+		if inventArrayOpPostNestBreakStmtEra && !newArray {
 			doAddrResidual = false
 		}
 		// e7383: after nest ArrayOp Lhs CreateArray residual era, PP→PL ** create
@@ -11418,8 +11430,26 @@ exprTries:
 					idx := parentStackPick(er, flow)
 					// e7945–47: invent residual Break free Statement Assign Function
 					// fail → ExpressionVariable PL stack U1 sole (UP next Lhs F80),
-					// not GenerateNewParentLocal F50 create.
+					// not GenerateNewParentLocal F50 create — single-level pointer
+					// LType (SelectLType F20=0 → int*) matches an existing local.
+					// e7962: Function-fail after SelectLType F20=1 multi-level
+					// pointer (find_pointer_type deepen) → choose_var empty →
+					// GenerateNewParentLocal SE-free READ qfer F50 F10×(levels+1)
+					// F20 F20; sole would jump to parent Lhs F80 and desync.
 					if inventArrayOpPostNestBreakStmtEra {
+						if strings.Count(t.Name, "*") >= 2 {
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
+								// Parent Assign Lhs SelectDeref empty create after
+								// multi-level PL: random_add F10 F50 NewArray/init
+								// F20 F20 then nested F50 F20 F20 (e7970–77), not
+								// F80 fail→VS (n=10 sole path is single-level only).
+								inventArrayOpPostNestBreakLhsEmptyCreate = true
+								inventArrayOpPostNestBreakLhsEmptyCreateN = 11
+								bumpExprDepth(ctx)
+								markFuncEffect()
+								return castLiteral(t, g.expr)
+							}
+						}
 						// Parent Assign Lhs: single empty create F80 F10 F50 F20 F20 U2
 						// (e7947–52), not full CreateArray multiphase.
 						inventArrayOpPostNestBreakLhsEmptyCreate = true
@@ -20982,7 +21012,14 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 				// U13 for choose_random_pointer_type; GO inventory under-counts.
 				// e6531: nest residual era ptr-cmp U16 (SelectLType may grow further).
 				// e7516: after keepExpr Lhs residual era, UP derived_types U18.
-				if ctx != nil && ctx.state != nil &&
+				// e7957: invent residual Lhs empty-create era — UP derived_types
+				// U23 for choose_random_pointer_type (SelectLType F20=1). GO under-notes
+				// find_pointer_type growth from residual SelectDeref creates.
+				// Bare floor only (no pad loop): noteDerivedPointer is base-keyed and
+				// no-ops once * /** /*** exist for a base, so a grow-until-N loop hangs.
+				if inventArrayOpPostNestBreakStmtEra && n < 23 {
+					n = 23
+				} else if ctx != nil && ctx.state != nil &&
 					(ctx.state.postAggNestArrayOpPLStackU4 || ctx.state.postAggNestArrayOpPLStackU3) &&
 					n < 18 {
 					n = 18
@@ -21015,8 +21052,11 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 					// mid indices at * while UP has ** (e4464 pick=5 ind=2).
 					// Floor to *** so PL create random_qualifiers is
 					// F50 F10 ×4 (3 levels + self) matching GenerateNewParentLocal.
+					// e7962 invent residual era: freeMultiIVForBodyU3 sticky still
+					// true inside the For, but UP choose_random_pointer_type index
+					// deepens to ** only (F50 F10×3), not the *** body floor.
 					needMultiLvlPtr := nullValidatePostResidualGlobalU21 ||
-						ctx.state.freeMultiIVForBodyU3
+						(ctx.state.freeMultiIVForBodyU3 && !inventArrayOpPostNestBreakStmtEra)
 					if needMultiLvlPtr {
 						if ptrStars < 5 {
 							ptrStars++
@@ -21025,9 +21065,19 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 							ptrStars = 3
 						}
 					}
+					// e7957 invent residual: Type.cpp F20 path find_pointer_type(t,true)
+					// deepens when ind < max. List under-model often leaves mid
+					// indices at * while UP has ** (e7962 F50 F10×3 = levels+self
+					// for **). Deepen only single-level entries so already-** list
+					// slots are not over-promoted to *** (extra F50 F10 pair).
+					if inventArrayOpPostNestBreakStmtEra && ptrStars == 1 {
+						ptrStars++
+					}
 					// e6108: UP qfer F50 F10×4 = levels3+self; list under-count
 					// often returns ** while UP has ***. Floor after nest VS.
-					if ctx.state.postAggNestVSMisses >= 37 && ptrStars < 3 {
+					// Skip invent residual (e7962 ** F50 F10×3, not ***).
+					if ctx.state.postAggNestVSMisses >= 37 && ptrStars < 3 &&
+						!inventArrayOpPostNestBreakStmtEra {
 						ptrStars = 3
 					}
 					noteDerivedPointer(ctx.state, "int32_t", ptrStars > 1 || ctx.state.derivedPtrTypes > 0)
@@ -21651,7 +21701,7 @@ lhsDerefLoop:
 		if inventArrayOpPostNestBreakLhsEmptyCreate && r != nil {
 			n := inventArrayOpPostNestBreakLhsEmptyCreateN
 			// n==10: Function-fail Assign Lhs single empty create + address U2 (e7947–52).
-		if n == 10 {
+			if n == 10 {
 				inventArrayOpPostNestBreakLhsEmptyCreate = false
 				inventArrayOpPostNestBreakLhsEmptyCreateN = 0
 				if r.flipcoin(80) { // e7947
@@ -21667,6 +21717,36 @@ lhsDerefLoop:
 				}
 				lhsFromDeref = true
 				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
+			// n==11: multi-level Function-fail PL then Lhs empty create (e7970–77):
+			// F80 random_add F10 F50 NewArray=0 init=0 nested F50 F20 F20 → free
+			// Statement U100 (no address U2; nested pointee create residual).
+			if n == 11 {
+				inventArrayOpPostNestBreakLhsEmptyCreate = false
+				inventArrayOpPostNestBreakLhsEmptyCreateN = 0
+				if r.flipcoin(80) { // e7970
+					if opts.ConstPointers {
+						_ = r.flipcoin(10) // e7971
+					}
+					if opts.VolatilePointers {
+						_ = r.flipcoin(50) // e7972
+					}
+					_ = r.flipcoin(20) // e7973 NewArray
+					_ = r.flipcoin(20) // e7974 init
+					// Nested pointee create residual F50 F20 F20 (e7975–77).
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(20)
+					_ = r.flipcoin(20)
+				}
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				if ctx != nil && ctx.state != nil {
+					if ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN < 4 {
+						ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
+					}
+					ctx.state.skipNextBlockSize = true
+				}
 				break
 			}
 			inventArrayOpPostNestBreakLhsEmptyCreateN = n + 1
