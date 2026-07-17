@@ -122460,15 +122460,44 @@ commaF80MultiDone:
 					// GO was ending nest → next Statement U100.
 					if !r.flipcoin(80) { // e8170 F80=0
 						er := newExprRand(r, exprDecisionBudget(opts))
-						// e8171–72: VS U100 NewValue + F10 → ParentLocal CREATE
+						// e8171–77: VS NewValue F10 → PL stack U2 + eSimple U14 +
+						// WRITE F50 + NewArray F20 + Constant (hex next31 by type).
+						var chosen CType
 						sp := variableScopePickFromER(er, opts, &scope)
 						if sp == 4 || sp == 1 {
-							_ = er.pick(2)  // e8173 stack U2
-							_ = er.pick(14) // e8174 retype
+							_ = er.pick(2) // e8173 stack U2
+							es := true
+							prevES := useESimpleRetypeSink
+							useESimpleRetypeSink = &es
+							chosen = pickSimpleNonVoid(er.fallback, opts) // e8174 U14
+							useESimpleRetypeSink = prevES
 							if er.fallback != nil {
-								_ = er.fallback.flipcoin(50) // e8175
-								_ = er.fallback.flipcoin(20) // e8176 NewArray
-								_ = er.fallback.flipcoin(50) // e8177 init/const
+								_ = er.fallback.flipcoin(50) // e8175 WRITE vol
+								newArr := er.fallback.flipcoin(20) // e8176 NewArray
+								if newArr {
+									_ = burnCreateArrayVariable(er.fallback, opts, chosen, true)
+								} else {
+									burnSimpleConstant(er.fallback, chosen) // e8177
+								}
+							}
+						}
+						// e8178–89: create visit fail → Lhs do-while continues:
+						// VS Global miss → NewValue F10 → PL stack U2 + NewArray
+						// F20 + two Constants (burnSimpleConstant ×2 with chosen type).
+						if er.fallback != nil {
+							_ = variableScopePickFromER(er, opts, &scope) // e8178
+							sp3 := variableScopePickFromER(er, opts, &scope) // e8179+F10
+							if sp3 == 4 || sp3 == 1 {
+								_ = er.pick(2)               // e8181 stack U2
+								_ = er.fallback.flipcoin(20) // e8182 NewArray
+								_ = er.fallback.flipcoin(50) // e8183 WRITE vol
+								if chosen.Name == "" {
+									chosen = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+								}
+								// e8184–86: Constant small F50 F50 U3
+								// e8187–89: second Constant F50 F50 U20
+								burnSimpleConstant(er.fallback, chosen)
+								burnSimpleConstant(er.fallback, chosen)
 							}
 						}
 					}

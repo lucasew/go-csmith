@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8178** (post invent residual For free-expr nest: Statement U100 raw desync)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8188** (post invent residual NewValue create Constant residual)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,23 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e8178→8188 climbed — invent residual NewValue PL create hex/LCG + multiphase:**
+1. Capture: after free Expression nest, Lhs F80=0 NewValue PL create; Constant hex next31 desynced LCG; second create visit-fail multiphase stack U2.
+2. C++: GenerateNewParentLocal eSimple retype + Constant RandomHexDigits; Lhs do-while continues after visit fail.
+3. GO: eSimple pickSimpleNonVoid + burnSimpleConstant (hex next31); second VS Global miss → NewValue stack U2 + Constants. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8188 second Constant F50 residual.
+
+**seed5 e8157→8178 climbed — invent residual For body Global multiphase + free Expression nest:**
+1. Capture: 2nd For-body Function-fail Global U10 F0 reselect U9; Lhs F80 U4 → VS PP sole; free Expression Function CREATE F50 F30 F0 + Constant; parent Lhs F80=0 NewValue PL create.
+2. C++: ExpressionVariable do-while visit fail; StatementAssign Lhs ParentParam; free Expression after Lhs; parent ExpressionAssign Lhs SelectDeref F80=0 → NewValue.
+3. GO: multiphase ForGlobalN (U5 then U10 F0 U9); LhsEmptyCreate / LhsDerefU4 / LhsPPSole; freeMultiIVForLhsExprContinue + user Function CREATE residual; post-nest F80=0 NewValue PL. **Integrity residual debt** — pads/floors. Seeds 2/4/6 held.
+4. Next: e8178 LCG/create residual — climbed.
+
 **seed5 e8130→8157 climbed — invent residual then-body For body Global U5 + Lhs empty create:**
 1. Capture: For body Assign Function-fail → ExpressionVariable Global UP choose U5 then Lhs SelectDeref empty create F80 F10 F50 F20 F20; GO live Global U3 then Lhs live pointer U5.
 2. C++: Function-fail ExpressionVariable SelectGlobal eFlexible ~5 GlobalList; Lhs empty create random_add (VariableSelector.cpp).
 3. GO: sticky ForBody first Global U5; arm LhsEmptyCreateN=12 (F80 F10 F50 F20 F20 only). **Integrity residual debt** — U5 pad. Seeds 2/4/6 held.
-4. Next: e8157 UP Global U10 vs GO Lhs F80.
+4. Next: e8157 Global multiphase — climbed.
 
 **seed5 e8106→8130 climbed — invent residual then-body Global residual ends Expression → Statement For:**
 1. Capture: after Global expand F50 U64 U4, UP StatementProbability For (U100=29) + SelectLoopCtrl U10 + loop_control; GO continued free Expression (binary Function wanted RHS).
