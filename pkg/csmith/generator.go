@@ -186,6 +186,7 @@ var inventArrayOpPostNestBreakPLAddrU3 bool
 var inventArrayOpPostNestBreakLhsEmptyCreate bool
 // inventArrayOpPostNestBreakLhsEmptyCreateN: multiphase (0 first two creates; 1+ third then VS).
 var inventArrayOpPostNestBreakLhsEmptyCreateN int
+var inventArrayOpPostNestBreakStmtEra bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -9680,6 +9681,12 @@ func buildFunctionCallExpr(
 			// GO residual free Expression term may land as Function useExisting=0
 			// at max_funcs; burn SelectLType coins then RHS+Lhs residual instead
 			// of ExpressionVariable U100 / sticky nest SelectDeref U12.
+			// e7945: invent residual Break free Statement Assign Function
+			// useExisting miss at max_funcs → ExpressionFuncall failed →
+			// ExpressionVariable U100 (not SelectLType F30 residual).
+			if inventArrayOpPostNestBreakStmtEra {
+				return "", false
+			}
 			if state.freeMultiIVPostEAGlobalPadDone && r != nil &&
 				!state.freeMultiIVPostEAFuncCreateAttrDone {
 				state.freeMultiIVPostEAFuncCreateAttrDone = true
@@ -11409,6 +11416,18 @@ exprTries:
 						flow = ctx.state
 					}
 					idx := parentStackPick(er, flow)
+					// e7945–47: invent residual Break free Statement Assign Function
+					// fail → ExpressionVariable PL stack U1 sole (UP next Lhs F80),
+					// not GenerateNewParentLocal F50 create.
+					if inventArrayOpPostNestBreakStmtEra {
+						// Parent Assign Lhs: single empty create F80 F10 F50 F20 F20 U2
+						// (e7947–52), not full CreateArray multiphase.
+						inventArrayOpPostNestBreakLhsEmptyCreate = true
+						inventArrayOpPostNestBreakLhsEmptyCreateN = 10
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "x")
+					}
 					useBlockLocal := ctx != nil && ctx.state != nil && ctx.state.multiDimArrays > 0
 					if useBlockLocal {
 						qferMode := 1
@@ -12081,6 +12100,7 @@ exprTries:
 						// Parent Assign Lhs: SelectDeref empty create random_add F10 F50…
 						inventArrayOpPostNestBreakLhsEmptyCreate = true
 						inventArrayOpPostNestBreakLhsEmptyCreateN = 0
+	inventArrayOpPostNestBreakStmtEra = false
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, g.expr))
@@ -21630,6 +21650,25 @@ lhsDerefLoop:
 		// Phase 1: visit fail → F80 random_add NewArray=0 address then VS U100.
 		if inventArrayOpPostNestBreakLhsEmptyCreate && r != nil {
 			n := inventArrayOpPostNestBreakLhsEmptyCreateN
+			// n==10: Function-fail Assign Lhs single empty create + address U2 (e7947–52).
+		if n == 10 {
+				inventArrayOpPostNestBreakLhsEmptyCreate = false
+				inventArrayOpPostNestBreakLhsEmptyCreateN = 0
+				if r.flipcoin(80) { // e7947
+					if opts.ConstPointers {
+						_ = r.flipcoin(10) // e7948
+					}
+					if opts.VolatilePointers {
+						_ = r.flipcoin(50) // e7949
+					}
+					_ = r.flipcoin(20) // e7950 NewArray
+					_ = r.flipcoin(20) // e7951 init address
+					_ = r.upto(2)      // e7952 choose_ok_var U2
+				}
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
 			inventArrayOpPostNestBreakLhsEmptyCreateN = n + 1
 			ptrType := targetType
 			if !strings.Contains(ptrType.Name, "*") {
@@ -21701,6 +21740,7 @@ lhsDerefLoop:
 					ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
 				}
 				ctx.state.skipNextBlockSize = true // NeedStmt emitOne without nested BlockSize U
+				inventArrayOpPostNestBreakStmtEra = true
 			}
 			break
 		}
