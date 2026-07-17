@@ -462,7 +462,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after second PL create, UP Variable Global U10 F0 reselect U9 F50 U32; Constant×2; Lhs F80 empty→create; Variable+Constant; Lhs F80 U2; Function F50 F30; NewValue create; bitfield U46340 U11585 F50×.
 2. C++: depthBlock free Expression; Lhs SelectDeref; bitfield pure_rnd_upto; Constant.
 3. GO: extend handoff residual multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e9358 F50 value desync in bitfield/Constant F50×U20 tail.
+4. Next: e9358 — climbed.
+
+**seed5 e9358→9401 climbed — bitfield next31 gaps + ArrayOp residual:**
+1. Capture: after U11585, UP F50 multiphase with pure_rnd next31 gaps (depth +2/+8); F50→F80 next31×2; Lhs F80; VS tries=2; ArrayOp F5 U4 U12…; Constant F50 F50 U20×.
+2. C++: bitfield GenerateRandomConstantInRange; Constant hex next31; Lhs SelectDeref; StatementArrayOp.
+3. GO: residual next31×2/×8 between F50s; F80 multiphase; ArrayOp head; Constant multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e9401 U120 vs F50 after residual U100.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
