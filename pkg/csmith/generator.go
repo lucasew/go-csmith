@@ -13197,6 +13197,24 @@ exprTries:
 					if inventArrayOpPostNestBreakThenBodyPLStackU1 && len(pool) > 51 {
 						pool = pool[:51]
 					}
+					// e8102–05 invent residual then-body Global expand: choose_ok_var
+					// U51 then residual F50 U64 U4 (not bare chooseOKVar itemize which
+					// orders U51 U64 without F50, and misses trailing U4). Stream
+					// family of e7433–34 invent residual F50 U64 after Global expand.
+					if inventArrayOpPostNestBreakThenBodyPLStackU1 {
+						c := pool[0]
+						if len(pool) > 1 {
+							c = pool[int(er.pick(uint32(len(pool))))%len(pool)]
+						}
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(50) // e8103
+						}
+						_ = er.pick(64) // e8104
+						_ = er.pick(4)  // e8105
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, c.expr))
+					}
 					if c, ok := chooseOKVarFromER(er, pool); ok && c.expr != "" {
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
