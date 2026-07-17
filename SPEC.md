@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **185** (was 184); 8–21 early fail|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **194** (was 185); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -297,8 +297,20 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **184** (was 127): free For PL stack U2 + param formal-qfer create |
+| 7 | first_div **194** (was 185): free For Lhs pointee hex width + sole fail |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e185→194 climbed — free For Lhs address residual RandomHexDigits width:**
+1. Capture: e185 UP F20=0 vs GO F20=1 after F80 F80 (LCG desync from hex digit overburn).
+2. C++ `RandomHexDigits(N)` for synthetic pointee follows type width (int16→4 untraced pure_rnd; UP depth gap).
+3. GO used historical hn=16; free For uses type Bits (≤16→4). Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e194; continue COUNT=20.
+
+**seed7 e184→185 climbed — free For ExpressionAssign Lhs SelectDeref sole fail-once:**
+1. Capture: e184 UP F80 vs GO F20 after first empty create residual F20×3 F50.
+2. C++ keeps created pointer on block locals; next SelectDeref choose_ok_var soles (no create RNG) then visit_facts fails → another F80 empty-creates.
+3. GO: after free For EA Lhs empty create accepts, arm one-shot sole fail (continue without create). Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e185→194 (hex width; see above).
 
 **seed7 e127→184 climbed — free For ParentLocal stack + param formal qfer:**
 1. Capture: e127 UP stack U2 vs GO U1; then e129 UP F20 NewArray vs GO F50 qfer.

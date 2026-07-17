@@ -30492,13 +30492,26 @@ exprTries:
 								_ = er.fallback.upto(20) // pure_rnd_upto(20) - 10
 							}
 						} else {
-							// Historical early path: 16 hex digits. Late useSmallParentStack
-							// e1181: char-width hex (2) then U120 (e1200 climb).
-							// seed5 e3438: free multi-IV residual EA Lhs address
-							// pointee is int32 → RandomHexDigits(8) not 16
-							// (silent pure_rnd desync → e3439 U120 raw).
+							// RandomHexDigits(N) for synthetic pointee Constant.
+							// N follows pointee type width (UP depth gaps untraced).
+							// Historical residual floors kept for pad eras.
+							// Free For (seed7 e185): Lhs int16 → 4 digits not 16
+							// (desynced NewArray F20 after F80 F80 sole fail).
 							hn := 16
-							if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
+							if ctx != nil && ctx.state != nil && !ctx.state.deepStack &&
+								ctx.state.multiDimArrays == 0 && !ctx.state.useSmallParentStack &&
+								ctx.state.blockStack == 2 {
+								switch {
+								case t.Bits > 0 && t.Bits <= 8:
+									hn = 2
+								case t.Bits <= 16:
+									hn = 4
+								case t.Bits <= 32:
+									hn = 8
+								default:
+									hn = 16
+								}
+							} else if ctx != nil && ctx.state != nil && ctx.state.useSmallParentStack {
 								hn = 2
 							} else if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
 								hn = 8
