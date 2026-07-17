@@ -149,6 +149,17 @@ var inventArrayOpExprEmptyParamsVS bool
 // Full GenerateNewParentLocal retype U14 over-burns vs UP F50 U64 → Statement.
 var inventArrayOpExprPLN int
 
+// inventArrayOpPostNestArrayOpFailRetry: after invent residual ends, Statement
+// ArrayOp (U100=51) fails like C++ s==0 retry (Statement.cpp: keep generating)
+// without burning F5 — next is StatementProbability U100 tries=1 (e7436).
+var inventArrayOpPostNestArrayOpFailRetry bool
+
+// inventArrayOpPostNestRejectAssignOnce: after ArrayOp fail-retry, next
+// StatementProbability rejects Assign (e7436 first draw 76) then Break 40
+// under IN_LOOP (tries=1).
+var inventArrayOpPostNestRejectAssignOnce bool
+
+
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -12275,12 +12286,11 @@ exprTries:
 							if n == 0 {
 								// e7423: sole after stack U1 (next Expression Global).
 								// Fall through to sole path below.
-							} else {
-								// e7433–34: after second invent residual PL stack U1,
-								// UP is F50 + U64 then Statement U100 — not empty
-								// GenerateNewParentLocal retype U14 + F50 F10 F20
-								// (GO sticky freeMultiIVExprPL force-create).
-								// Residual matches UP entropy; ends invent nest.
+							} else if n == 1 {
+								// e7433–34: second invent residual PL stack U1 —
+								// not GenerateNewParentLocal retype U14. Residual
+								// F50+U64 then Statement U100 (ends invent Expression
+								// nest). GO force-create U14 desyncs Statement stream.
 								if er.fallback != nil {
 									_ = er.fallback.flipcoin(50) // e7433
 								}
@@ -12290,10 +12300,16 @@ exprTries:
 								if flow != nil {
 									flow.freeMultiIVForLhsExprContinue = false
 								}
+								// e7435 ArrayOp selected then s==0 retry (e7436 U100).
+								inventArrayOpPostNestArrayOpFailRetry = true
 								bumpExprDepth(ctx)
 								markVarSelectEffect()
 								return finishVar(castLiteral(t, "x"))
 							}
+							// n>=2: sole after stack (no force-create U14)
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, "x"))
 						}
 					} else if needNoRhsIfPL {
 						// e5133–34: stack U5 + choose_ok_var U3 (live block locals).
@@ -122870,6 +122886,11 @@ func emitStatement(
 				if (k == stmtBreak || k == stmtContinue) && !effInLoop {
 					return true
 				}
+				// e7436: after invent residual ArrayOp fail-retry, reject Assign
+				// once so Break 40 accepts under IN_LOOP (UP tries=1).
+				if inventArrayOpPostNestRejectAssignOnce && k == stmtAssign {
+					return true
+				}
 				// StatementFilter: at max_blk_depth filter is_compound
 				// (Block/For/IfElse/ArrayOp). seed2 e2189 tries=2.
 				// seed4 e2356: postAgg if-then body needs atMax (U100 tries=2);
@@ -122932,6 +122953,7 @@ func emitStatement(
 			if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce {
 				state.freeMultiIVNeedNoRhsPostArrayOpStmtRejectContinueOnce = false
 			}
+			inventArrayOpPostNestRejectAssignOnce = false
 			return toKind(v)
 		}
 		return toKind(int(dec.pick(0, 100)))
@@ -122951,6 +122973,21 @@ func emitStatement(
 		st = stmtAssign
 	} else {
 		st = chooseStmt()
+		// e7435–36: invent residual ended → Statement U100=51 ArrayOp then
+		// C++ Statement::make_random retries when s==0 (Statement.cpp) without
+		// burning ArrayOp F5. Re-pick StatementProbability (e7436 U100 tries=1
+		// rejects Assign 76 → Break 40 IN_LOOP).
+		if inventArrayOpPostNestArrayOpFailRetry && st == stmtArrayOp {
+			inventArrayOpPostNestArrayOpFailRetry = false
+			inventArrayOpPostNestRejectAssignOnce = true
+			// Ensure Break/Continue legal (ArrayOp body still IN_LOOP).
+			if state != nil {
+				state.freeMultiIVNeedNoRhsPostArrayOpStmtInLoopOnce = true
+			}
+			st = chooseStmt()
+		} else {
+			inventArrayOpPostNestArrayOpFailRetry = false
+		}
 	}
 	// seed2 e948: after continue ends array-loop body, next parent stmt U100=68
 	// then U2 — For with postArrayFor (not Assign+U120). Flag survives body exit.
@@ -125049,6 +125086,8 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpExprPLStackU1 = false
 	inventArrayOpExprEmptyParamsVS = false
 	inventArrayOpExprPLN = 0
+	inventArrayOpPostNestArrayOpFailRetry = false
+	inventArrayOpPostNestRejectAssignOnce = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
