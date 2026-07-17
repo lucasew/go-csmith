@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~6691); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~7901); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7449** (invent residual Break PL create; next open CreateArray init alt F50 vs initNum U120)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7901** (invent residual Break S0 CreateArray; next UP itemize/choose U4 vs GO Statement U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
-**seed5 e7433→7437 climbed — invent residual PL F50 U64 + Statement ArrayOp fail-retry:**
-1. Capture: e7433 F50 U64 vs force create U14; e7436 ArrayOp F5 vs U100 tries=1 Break 40.
-2. C++: invent residual ends Expression nest; Statement ArrayOp (51) fails s==0 retry (Statement.cpp) without F5; second StatementProbability rejects Assign → Break under IN_LOOP.
-3. GO: inventArrayOpExprPLN F50 U64 ends nest; inventArrayOpPostNestArrayOpFailRetry re-picks Statement; reject Assign once. Seeds 2/4/6 held.
-4. Next: e7437 UP U1 F20 create residual vs GO Statement U100 Continue.
+**seed5 e7449→7901 climbed — invent residual Break CreateArray struct S0:**
+1. Capture: after CreateArray sizes, UP F50 field Constants then U120 init_num vs GO initNum U120 first (int32 element).
+2. C++: ArrayVariable::CreateArrayVariable — if aggregate, create_field_vars (per-field Constant::make_random) before pure_rnd_upto(total/2) init_num; alts Constant::make_random(type). Seed5 S0 = uint64_t + int8_t.
+3. GO: invent residual Break create type struct S0 (not int32); formatAggregate make_init; burnCreateFieldVarsConstants before init_num via isAgg path. Seeds 2/4/6 held.
+4. Next: e7901 UP U4 vs GO Statement U100 (same raw) after itemize.
+
+**seed5 e7433→7449 climbed — invent residual Break ExpressionVariable create:**
+1. Capture: after invent residual Break, UP U1 F20 Constant×2 CreateArray vs GO bare break + Statement.
+2. C++: StatementBreak Expression forced eVariable → PL stack U1 + empty GenerateNewParentLocal NewArray create multiphase.
+3. GO: inventArrayOpPostNestBreakEV parentStackPick U1 + create qferMode 0; stop block after Break. Seeds 2/4/6 held.
+4. Next: e7449 CreateArray create_field_vars — climbed via S0 type.
 
 **seed5 e7429→7433 climbed — invent free Expression Global expand ok_vars U51:**
 1. Capture: e7429 UP choose_ok_var U51 vs GO U66/U49 under/over inventory.

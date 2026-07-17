@@ -164,8 +164,10 @@ var inventArrayOpPostNestRejectAssignOnce bool
 // (NewArray F20…) — not bare break then free Statement U100.
 var inventArrayOpPostNestBreakEV bool
 
-// inventArrayOpPostNestBreakCreate: during invent residual Break PL create,
-// NewArray path burns a second Constant residual before CreateArray (e7442–44).
+// inventArrayOpPostNestBreakCreate: invent residual Break PL create uses
+// struct S0 NewArray (make_init field Constants + create_field_vars before
+// init_num). Forces formatAggregate make_init; simple path may burn a second
+// Constant residual.
 var inventArrayOpPostNestBreakCreate bool
 
 
@@ -7034,6 +7036,11 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// Early seed2 keeps historical bitfield-first residual (e432 inventory).
 		useAggFmt := ctx != nil && ctx.state != nil &&
 			(ctx.state.postAggU15StackU6CreateDone || ctx.state.globalSimpleESimpleDone)
+		// invent residual Break S0 NewArray: make_init is field Constants
+		// (ArrayVariable create path), not historical bitfield U181 residual.
+		if inventArrayOpPostNestBreakCreate {
+			useAggFmt = true
+		}
 		if useAggFmt {
 			initLit = formatAggregateOrSimpleConstant(er.fallback, chosen, ctx, opts)
 		} else {
@@ -7107,9 +7114,10 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			}
 		}
 		initLit = formatSimpleConstant(er.fallback, constTy)
-		// invent residual Break PL NewArray: second Constant residual before
-		// CreateArray (UP e7442–44 F50 F50 U20 then U99).
-		if inventArrayOpPostNestBreakCreate && newArray && er.fallback != nil {
+		// invent residual Break simple NewArray: second Constant before CreateArray.
+		// Struct S0 path uses formatAggregate make_init (both fields) — no extra.
+		if inventArrayOpPostNestBreakCreate && newArray && er.fallback != nil &&
+			!strings.HasPrefix(chosen.Name, "struct") && !strings.HasPrefix(chosen.Name, "union") {
 			_ = formatSimpleConstant(er.fallback, constTy)
 		}
 		// e6622: nest NewValue→PL simple create ends at Constant U20; UP continues
@@ -123539,11 +123547,15 @@ func emitStatement(
 		// empty GenerateNewParentLocal NewArray F20… (not bare break + Statement).
 		if inventArrayOpPostNestBreakEV && r != nil && ctx != nil {
 			inventArrayOpPostNestBreakEV = false
-			breakT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+			// e7449: UP CreateArray type is struct S0 (uint64 + int8), not int.
+			// make_init burns field Constants; create_field_vars before init_num
+			// (ArrayVariable.cpp); alts are struct Constants. int32 skipped field vars
+			// → GO initNum U120 vs UP F50 field Constant.
+			breakT := CType{Name: "struct S0", Signed: true, Bits: 32, HexDigits: 8}
 			er := newExprRand(r, exprDecisionBudget(opts))
 			_ = parentStackPick(er, state) // e7437 U1
-			// qferMode 0: NewArray F20 first (no random_qualifiers); retype false.
-			// Second Constant residual before CreateArray (e7442–44).
+			// qferMode 0: NewArray F20 first (no random_qualifiers); retype false
+			// keeps struct S0 (random_type_from_type keeps aggregate).
 			inventArrayOpPostNestBreakCreate = true
 			if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, breakT, ctx, 0, false, 0); ok {
 				_ = g
