@@ -187,6 +187,10 @@ var inventArrayOpPostNestBreakLhsEmptyCreate bool
 // inventArrayOpPostNestBreakLhsEmptyCreateN: multiphase (0 first two creates; 1+ third then VS).
 var inventArrayOpPostNestBreakLhsEmptyCreateN int
 var inventArrayOpPostNestBreakStmtEra bool
+// inventArrayOpPostNestBreakNextGlobalU51: after multi-level Function-fail Lhs
+// empty create, next free Assign Lhs is Global expand choose_ok_var U51 then
+// SelectDeref empty create (e7979+), not AssignOps U120 / VS U100.
+var inventArrayOpPostNestBreakNextGlobalU51 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -20927,6 +20931,40 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	// U120 + SelectLType F50 — C++ stream is Lhs VariableSelector U100…
 	// (UP U100=1 after Statement U100=61).
 	forcePostArrayOpLhsVS := false
+	if inventArrayOpPostNestBreakNextGlobalU51 && r != nil {
+		// e7979: free Assign after invent residual multi-level Function-fail Lhs.
+		// C++ Lhs VS Global expand choose_ok_var U51 (eFlexible GlobalList) then
+		// SelectDeref empty create NewArray path (F80 F20 F20 F0 F80 F20 F20 U99…).
+		// Skip AssignOps U120 / SelectLType / normal VS U100.
+		inventArrayOpPostNestBreakNextGlobalU51 = false
+		_ = r.upto(51) // e7979 choose_ok_var among expanded GlobalList
+		if r.flipcoin(80) { // e7980
+			_ = r.flipcoin(20) // e7981 NewArray
+			init2 := r.flipcoin(20) // e7982
+			if init2 {
+				_ = r.flipcoin(0) // e7983 visit fail
+			}
+			if r.flipcoin(80) { // e7984
+				newArr := r.flipcoin(20) // e7985
+				_ = r.flipcoin(20)       // e7986 init
+				if newArr {
+					ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+					_ = burnCreateArrayVariable(r, opts, ptrT, true) // e7987+ U99…
+				}
+			}
+			// Post-CreateArray visit_facts F0 then SelectDeref multiphase
+			// F80 choose U6 F0 until F80=0 (e7991+).
+			_ = r.flipcoin(0)
+			for i := 0; i < 16; i++ {
+				if !r.flipcoin(80) {
+					break
+				}
+				_ = r.upto(6)
+				_ = r.flipcoin(0)
+			}
+		}
+		return true
+	}
 	if ctx != nil && ctx.state != nil &&
 		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs {
 		ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpNextAssignLhs = false
@@ -21747,6 +21785,9 @@ lhsDerefLoop:
 					}
 					ctx.state.skipNextBlockSize = true
 				}
+				// Next free Assign: Global expand choose_ok_var U51 + SelectDeref
+				// empty create (e7979+), not AssignOps/VS U100.
+				inventArrayOpPostNestBreakNextGlobalU51 = true
 				break
 			}
 			inventArrayOpPostNestBreakLhsEmptyCreateN = n + 1
@@ -123748,6 +123789,48 @@ func emitStatement(
 	case stmtReturn:
 		// StatementReturn::make_random → ExpressionVariable::make_random
 		// (forced eVariable: must_use then VariableSelector::select U100…).
+		// e7979 invent residual: UP free Statement after multi-level Function-fail
+		// Lhs is Assign-shaped Global expand choose_ok_var U51 + SelectDeref empty
+		// create (F80 F20…), not Return VS U100. Statement table maps U100=30 to
+		// Return here while stream continues Assign Lhs — residual Assign path.
+		if inventArrayOpPostNestBreakNextGlobalU51 && r != nil {
+			inventArrayOpPostNestBreakNextGlobalU51 = false
+			_ = r.upto(51) // e7979 choose_ok_var expanded GlobalList
+			if r.flipcoin(80) { // e7980
+				_ = r.flipcoin(20) // e7981
+				init2 := r.flipcoin(20) // e7982
+				if init2 {
+					_ = r.flipcoin(0) // e7983
+				}
+				if r.flipcoin(80) { // e7984
+					newArr := r.flipcoin(20) // e7985
+					_ = r.flipcoin(20)       // e7986
+					if newArr {
+						ptrT := CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
+						_ = burnCreateArrayVariable(r, opts, ptrT, true)
+					}
+				}
+				// Post-CreateArray visit_facts F0 then SelectDeref multiphase
+				// F80 choose U6 F0 (e7991+) until F80=0.
+				_ = r.flipcoin(0) // e7991
+				for i := 0; i < 16; i++ {
+					if !r.flipcoin(80) {
+						break
+					}
+					_ = r.upto(6)
+					_ = r.flipcoin(0)
+				}
+			}
+			// Not must_return — Block continues free Statements (UP e8007+).
+			if state != nil {
+				state.skipNextBlockSize = true
+				if state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN < 4 {
+					state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
+				}
+			}
+			writeLine(b, 1, "x = x;")
+			break
+		}
 		retT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 		if state != nil && from >= 0 && from < len(state.funcs) {
 			retT = state.funcs[from].ret
@@ -125423,6 +125506,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakEV = false
 	inventArrayOpPostNestBreakCreate = false
 	inventArrayOpPostNestBreakExprGlobalReselect = false
+	inventArrayOpPostNestBreakNextGlobalU51 = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
