@@ -468,7 +468,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after U11585, UP F50 multiphase with pure_rnd next31 gaps (depth +2/+8); F50→F80 next31×2; Lhs F80; VS tries=2; ArrayOp F5 U4 U12…; Constant F50 F50 U20×.
 2. C++: bitfield GenerateRandomConstantInRange; Constant hex next31; Lhs SelectDeref; StatementArrayOp.
 3. GO: residual next31×2/×8 between F50s; F80 multiphase; ArrayOp head; Constant multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e9401 U120 vs F50 after residual U100.
+4. Next: e9401 — climbed.
+
+**seed5 e9401→9499 climbed — NewValue PL create + Lhs F80×2 + bitfield e9092:**
+1. Capture: after U100=6, UP Variable NewValue F10 U4 U14 create; Global U18; Constant int64 hex + small U20; Lhs F80×2; VS multiphase; Function F50 F30; bitfield U11585 U2 U23170 U5792 U724 U2048 + (F50 hex)×2 U3 + (F50 hex)×2 U20.
+2. C++: NewValue→PL; Constant RandomHexDigits; Lhs SelectDeref; bitfield pure_rnd_upto multiphase.
+3. GO: residual extend; int64 Constant for depth+16 hex after U2; e9092-class bitfield with dual hex pairs. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e9499 F80 vs F50 after U20.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
