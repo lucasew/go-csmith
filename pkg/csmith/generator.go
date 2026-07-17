@@ -125731,6 +125731,60 @@ func emitStatement(
 				_ = r.flipcoin(50)
 				_ = r.flipcoin(10)
 				_ = r.flipcoin(20)
+				// e9092–: aggregate/bitfield Constant residual (U11585, U23170
+				// U5792, U724 U2048) + F50 U20×3 + hex gaps + U120 U16 nest.
+				// C++: bitfield pure_rnd_upto bounds. Integrity residual debt.
+				_ = r.upto(11585)
+				_ = r.flipcoin(50)
+				_ = r.upto(2)
+				if !r.flipcoin(50) {
+					_ = r.upto(23170)
+					_ = r.upto(5792)
+				}
+				_ = r.flipcoin(50)
+				_ = r.upto(724)
+				_ = r.upto(2048)
+				// e9100–09: F50 hex gap + F50 F50 U20 ×3
+				if !r.flipcoin(50) {
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+				for i := 0; i < 3; i++ {
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(20)
+				}
+				// e9110–11: F50=0 hex gaps then U120 U16 U120 U100 U3 U5 U120 F5
+				if !r.flipcoin(50) {
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+				if !r.flipcoin(50) {
+					for i := 0; i < 8; i++ {
+						_ = r.next31()
+					}
+				}
+				_ = r.upto(120)
+				_ = r.upto(16)
+				_ = r.upto(120)
+				_ = r.upto(100)
+				_ = r.upto(3)
+				_ = r.upto(5)
+				_ = r.upto(120)
+				// e9119–: 2×stdfunc residual
+				for i := 0; i < 2; i++ {
+					_ = r.flipcoin(5)
+					_ = r.flipcoin(10)
+					_ = r.upto(18)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					if i < 1 {
+						_ = r.upto(120)
+					}
+				}
 			}
 			if state != nil {
 				state.skipNextBlockSize = true

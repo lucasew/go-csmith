@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9092** (post U16 re-arm + F80×3 + U16 tries=1 nest; next U11585 bitfield vs Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9133** (post bitfield Constant + stdfunc residual; next U120 vs Statement U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -420,7 +420,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after U100, UP U3 F50 F10 F20 F50 F50 U3 + F50 hex gaps (next31×2/×16) + F80 CreateArray U99 + F80 U2× + U100 U120×2 + 3×stdfunc; GO Statement U100.
 2. C++: Constant hex RandomHexDigits; Lhs SelectDeref CreateArray; ExpressionFuncall stdfunc.
 3. GO: extend ThenBodyEver residual with create/hex/CreateArray/stdfunc multiphase. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e9052 U120 U16 vs Statement U100 (same raw).
+4. Next: e9052 — climbed.
+
+**seed5 e9052→9092 climbed — U16 re-arm + F80×3 + U16 tries=1 nest:**
+1. Capture: after 3×stdfunc, UP U120 U16 U120 + 2×stdfunc + F50 U120×4 + U100 U3 U5 F80×3 F20 F20 F50 + U120 U16 tries=1 U120 F50 U100 tries=1 U3 F50 F10 F20; GO Statement U100.
+2. C++: choose_func U16; Expression Lhs F80 multiphase; choose_func filter tries=1.
+3. GO: extend ThenBodyEver residual with U16 + 2×stdfunc + F80×3 + U16 tries=1 create head. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e9092 U11585 bitfield Constant vs Statement U100 (same raw).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
