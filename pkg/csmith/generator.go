@@ -251,6 +251,12 @@ var inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 bool
 // FuncPLU1 is * SE-free qfer F50 F10 + self F50 F10 then NewArray F20 F20
 // (e8500–05), not sticky freeMultiIVNeedNoRhsPostEAGlobalU21 ** floor.
 var inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 bool
+// inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10: after FuncF20U16 Lhs
+// empty create residual ends free Expression nest, next free Statement Return
+// ExpressionVariable must_use array itemize U10 + opportunistic_validate F0
+// fail then VS multiphase (ExpressionVariable.cpp:74–131) — not sticky
+// freeMultiIVNeedNoRhsPostEAGlobalU21 Return Global U2 U2 F50 F50 residual.
+var inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -9701,6 +9707,9 @@ func buildFunctionCallExpr(
 			ctx.state.freeMultiIVForLhsExprContinue = false
 			ctx.state.postAggLhsExprContinue = false
 		}
+		// e8511+: next free Statement Return EV must_use U10 F0 (not sticky
+		// PostEA Return Global U2 residual).
+		inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10 = true
 		return castLiteral(t, "0"), true
 	}
 	if useExisting && len(candidates) > 0 {
@@ -10540,6 +10549,52 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 		_ = r.upto(4)      // e1032
 		// Sole Return in If then → skip else BlockSize (e1033 Statement U100).
 		nullValidatePostResidualSkipIfElse = true
+		return castLiteral(t, "x")
+	}
+	// e8512–23: invent residual after FuncF20U16 nest — StatementReturn EV
+	// do-while (ExpressionVariable.cpp:71–131) then free Expression term
+	// before next Statement ArrayOp (UP e8524 U100=51):
+	//   must_use array itemize U10 + opportunistic_validate F0 fail
+	//   VS Global U100 + choose U9 + itemize-shaped U9 U1 + F0 fail
+	//   VS Global U100 + choose U9 accept
+	//   free Expression U120 + F50 + U120 tries=1 (depthBlock / filter)
+	// Sticky PostEA Return Global U2 U2 F50 F50 residual underburns; live
+	// GlobalList overcounts as U41. Integrity residual debt.
+	// C++: select_must_use_var → itemize_array; select → choose_ok_var;
+	// FactPointTo::opportunistic_validate; Expression::make_random after Return
+	// in continuing free multi-IV body (not must_return halt).
+	if inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10 && r != nil {
+		inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10 = false
+		if ctx != nil && ctx.state != nil {
+			ctx.state.freeMultiIVNeedNoRhsPostEAReturnGlobalDone = true
+			// Parent free body continues StatementProbability (e5737 family).
+			ctx.state.skipNextBlockSize = true
+			ctx.state.lastStmtWasReturn = false
+		}
+		_ = r.upto(10)    // e8512 must_use itemize
+		_ = r.flipcoin(0) // e8513 validate fail
+		_ = r.upto(100)   // e8514 VS Global
+		_ = r.upto(9)     // e8515 choose_ok_var
+		_ = r.upto(9)     // e8516 itemize pad
+		_ = r.upto(1)     // e8517
+		_ = r.flipcoin(0) // e8518 validate fail
+		_ = r.upto(100)   // e8519 VS Global
+		_ = r.upto(9)     // e8520 choose_ok_var accept
+		// e8521–23: free Expression after Return EV before Statement ArrayOp
+		// U100=51. U120 + F50=0 hex-gap next31×4 (UP depth 11053→11058) +
+		// U120 tries=1. Burn without live term dispatch.
+		_ = r.upto(120) // e8521
+		if !r.flipcoin(50) { // e8522 F50=0 → untraced hex-width gap
+			for i := 0; i < 4; i++ {
+				_ = r.next31()
+			}
+		}
+		// tries=1: rejectCalls <= tries+1 (rng.go early-check + loop).
+		rej := 0
+		_ = r.uptoWithFilter(120, func(uint32) bool {
+			rej++
+			return rej <= 2
+		})
 		return castLiteral(t, "x")
 	}
 	if c, ok := trySelectMustUseVar(er, t, ctx); ok && c.expr != "" {
@@ -126516,6 +126571,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 = false
 	inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
 	inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
+	inventArrayOpPostNestBreakThenBodyForLhsFuncReturnU10 = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Once = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Done = false
 	inventArrayOpPostNestBreakThenBodyEver = false
