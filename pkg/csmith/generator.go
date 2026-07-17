@@ -125558,6 +125558,67 @@ func emitStatement(
 				})
 				_ = r.flipcoin(40)
 				_ = r.upto(8)
+				// e8951–: U1 U27 + VS U100 U120×2 + U100 tries=2 U6 U5 F80
+				// U2 + VS multiphase + ArrayOp F5 U4 U11 U3 U13 U10 F0 F50…
+				// Integrity residual debt.
+				_ = r.upto(1)
+				_ = r.upto(27)
+				_ = r.upto(100)
+				_ = r.upto(120)
+				_ = r.upto(120)
+				rej24 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej24++
+					return rej24 <= 3 // tries=2
+				})
+				_ = r.upto(6)
+				_ = r.upto(5)
+				if r.flipcoin(80) { // e8959 SelectDeref
+					_ = r.upto(2) // e8960 choose among pointees
+				}
+				// e8961–70: VS multiphase U100 U100 U6 U100 F5 U4 U11 U3 U13 U10 F0
+				_ = r.upto(100)
+				_ = r.upto(100)
+				_ = r.upto(6)
+				_ = r.upto(100)
+				_ = r.flipcoin(5)
+				_ = r.upto(4)
+				_ = r.upto(11)
+				_ = r.upto(3)
+				_ = r.upto(13)
+				_ = r.upto(10)
+				_ = r.flipcoin(0)
+				// e8971–82: SafeOp F50 multiphase
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(2)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(50)
+				_ = r.upto(4)
+				_ = r.upto(4)
+				// e8983–88: U100 U2 F75 U4 + NewValue U100 tries=1 U120
+				_ = r.upto(100)
+				_ = r.upto(2)
+				_ = r.flipcoin(75)
+				_ = r.upto(4)
+				rej25 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej25++
+					return rej25 <= 2
+				})
+				_ = r.upto(120)
+				// e8989–94: SelectLType F50 F30 U3 U120 F50 U100
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(30)
+				_ = r.upto(3)
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				_ = r.upto(100)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
