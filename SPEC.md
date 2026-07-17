@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **184** (was 127); 8–21 early fail|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **185** (was 184); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 

@@ -12,6 +12,9 @@ var multiDimArraySink *int
 
 // noteEffectReadSink records Effect context READs for SelectLoopCtrl WRITE.
 var noteEffectReadSink func(string)
+// freeForEALhsSelDerefSoleOnce: after free For ExpressionAssign Lhs empty
+// create accepts, next SelectDeref soles without create (seed7 e183–84).
+var freeForEALhsSelDerefSoleOnce bool
 var mustReadLiveSink *bool
 var postMustReadGlobalPicks *int
 var pointerGlobalPicksSink *int
@@ -29948,6 +29951,18 @@ exprTries:
 						}
 						continue // more SelectDeref F80
 					}
+					// seed7 e183–84: after free For ExpressionAssign Lhs empty create
+					// accepts, next Lhs SelectDeref soles the new pointer without
+					// create RNG (C++ choose_ok_var len==1). One-shot fail/sole
+					// before empty create (not invent residual F80 ladder).
+					if freeForEALhsSelDerefSoleOnce && ctx != nil && ctx.state != nil &&
+						!ctx.state.deepStack && ctx.state.multiDimArrays == 0 &&
+						!ctx.state.useSmallParentStack && ctx.state.blockStack == 2 {
+						// C++ choose sole then visit_facts fail (no create RNG);
+						// next F80 empty-creates (seed7 e183–84 F80 F80 F20…).
+						freeForEALhsSelDerefSoleOnce = false
+						continue
+					}
 					// select_deref_pointer: no pointer vars → find_pointer_type(add=true)
 					// then GenerateNewParentLocal/create_and_initialize.
 					// find_pointer_type grows derived_types even if create later fails
@@ -30564,7 +30579,14 @@ exprTries:
 						}
 						createdArrEA = true
 					}
-					// Pointer to valid var -> opportunistic_validate passes -> exit
+					// Pointer to valid var -> opportunistic_validate passes -> exit.
+					// Free For body: arm one-shot sole SelectDeref for next Lhs
+					// (C++ keeps created pointer on block->local_vars).
+					if ctx != nil && ctx.state != nil && !ctx.state.deepStack &&
+						ctx.state.multiDimArrays == 0 && !ctx.state.useSmallParentStack &&
+						ctx.state.blockStack == 2 {
+						freeForEALhsSelDerefSoleOnce = true
+					}
 					lhsFromDeref = true
 					break
 				}
