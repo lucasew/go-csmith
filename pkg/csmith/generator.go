@@ -5128,6 +5128,40 @@ func pointerAddrOfMatch(want, have CType) bool {
 	return strings.TrimSuffix(w, "*") == h
 }
 
+// eFlexibleDerivable mirrors Type::match(have, eFlexible) = is_derivable(have):
+// exact || is_convertable || is_dereferenced_from || (ptr_type == have).
+// VariableSelector.cpp choose_var uses this for Expression READ SelectGlobal.
+func eFlexibleDerivable(want, have CType) bool {
+	if want.Name == have.Name || sameBaseType(want, have) {
+		return true
+	}
+	if isConvertable(want, have) {
+		return true
+	}
+	// is_dereferenced_from(have): want is have after one+ peels of *.
+	if strings.Contains(have.Name, "*") {
+		h := normTypeName(have.Name)
+		for strings.HasSuffix(h, "*") {
+			h = strings.TrimSuffix(h, "*")
+			if h == normTypeName(want.Name) {
+				return true
+			}
+			// simple base compare by bits/sign when names differ (int vs int32_t)
+			if !strings.Contains(h, "*") && !strings.HasPrefix(h, "struct") &&
+				!strings.HasPrefix(h, "union") && sameBaseType(want, CType{
+				Name: h, Signed: have.Signed, Bits: have.Bits,
+			}) {
+				return true
+			}
+		}
+	}
+	// want.ptr_type == have (take address of have yields want)
+	if pointerAddrOfMatch(want, have) {
+		return true
+	}
+	return false
+}
+
 // isConvertable mirrors Type::is_convertable(want, have): can `have` convert to `want`?
 // Used by Function::choose_func (want = expression type, have = return type).
 func isConvertable(want, have CType) bool {
@@ -7390,7 +7424,15 @@ func selectExprVariable(t CType, r *rng, candidates []exprVarCandidate, forAssig
 // expandStructUnionVars mirrors VariableSelector::expand_struct_union_vars:
 // replace aggregate vars with field_vars when want type is simple/aggregate and
 // aggregate type ≠ want (seed5 e456: struct fields enter eFlexible Global choose).
+// C++ iterates with erase+insert so nested aggregates expand multi-level.
+// includeBitfields: C++ field_vars always include bitfields; choose_var default
+// no_bitfield=false keeps them for Expression READ. false preserves seed2
+// bitfield-only S0 → keep aggregate (U4 not U7 expand).
 func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeInfo) []exprVarCandidate {
+	return expandStructUnionVarsOpts(cands, want, info, false)
+}
+
+func expandStructUnionVarsOpts(cands []exprVarCandidate, want CType, info compositeInfo, includeBitfields bool) []exprVarCandidate {
 	// Pointer-to-struct (struct S1*) is NOT aggregate want — C++ expand only for
 	// simple/aggregate expression types. Treating S1* as wantAgg erased PL arrays
 	// of S1 into .fN fields (seed5 e6317: g_135[7] → g_135.f2, lost itemize U7).
@@ -7401,12 +7443,23 @@ func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeI
 	if !wantSimple && !wantAgg {
 		return cands
 	}
-	out := make([]exprVarCandidate, 0, len(cands)+8)
+	// Track whether each out entry is inside a union field (C++ is_inside_union_field).
+	type item struct {
+		c       exprVarCandidate
+		inUnion bool
+	}
+	out := make([]item, 0, len(cands)+16)
 	for _, c := range cands {
+		out = append(out, item{c: c})
+	}
+	// Multi-pass expand like C++ in-place erase+insert (nested structs/unions).
+	for i := 0; i < len(out); i++ {
+		it := out[i]
+		c := it.c
+		isUnion := strings.HasPrefix(c.ctype.Name, "union")
 		isAgg := !strings.Contains(c.ctype.Name, "*") &&
-			(strings.HasPrefix(c.ctype.Name, "struct") || strings.HasPrefix(c.ctype.Name, "union"))
+			(strings.HasPrefix(c.ctype.Name, "struct") || isUnion)
 		if !isAgg || sameBaseType(c.ctype, want) {
-			out = append(out, c)
 			continue
 		}
 		var fields []fieldInfo
@@ -7416,7 +7469,7 @@ func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeI
 				si >= 0 && si < len(info.structs) {
 				fields = info.structs[si].fields
 			}
-		} else if strings.HasPrefix(c.ctype.Name, "union") {
+		} else if isUnion {
 			var ui int
 			if _, err := fmt.Sscanf(c.ctype.Name, "union U%d", &ui); err == nil &&
 				ui >= 0 && ui < len(info.unions) {
@@ -7424,39 +7477,49 @@ func expandStructUnionVars(cands []exprVarCandidate, want CType, info compositeI
 			}
 		}
 		if len(fields) == 0 {
-			out = append(out, c)
 			continue
 		}
-		// Replace aggregate with fields (C++ erase + insert field_vars).
-		// Skip bitfields: Expression Variable often avoids them for READ match
-		// noise; seed2 S0 is all-bitfield — expand would overcount U7 vs U4.
-		// Non-bitfield fields (seed5 S0.f0 uint64 / f1 int8) feed eFlexible.
 		fi := 0
-		expanded := 0
+		var expanded []item
 		for _, f := range fields {
 			if f.bitfield {
 				if f.bitWidth <= 0 {
 					continue // unamed padding
 				}
-				fi++ // still advance field index for naming
-				continue
+				if !includeBitfields {
+					fi++
+					continue
+				}
 			}
-			out = append(out, exprVarCandidate{
-				expr:            fmt.Sprintf("%s.f%d", c.expr, fi),
-				ctype:           f.ctype,
-				assignable:      c.assignable,
-				isVolatile:      c.isVolatile,
-				fromParentLocal: c.fromParentLocal,
+			expanded = append(expanded, item{
+				c: exprVarCandidate{
+					expr:            fmt.Sprintf("%s.f%d", c.expr, fi),
+					ctype:           f.ctype,
+					assignable:      c.assignable,
+					isVolatile:      c.isVolatile,
+					fromParentLocal: c.fromParentLocal,
+				},
+				inUnion: it.inUnion || isUnion,
 			})
 			fi++
-			expanded++
 		}
-		if expanded == 0 {
-			// No non-bitfield fields — keep aggregate (e.g. seed2 bitfield-only S0).
-			out = append(out, c)
+		if len(expanded) == 0 {
+			continue
 		}
+		out = append(out[:i], out[i+1:]...)
+		out = append(out, expanded...)
+		i--
 	}
-	return out
+	res := make([]exprVarCandidate, 0, len(out))
+	for _, it := range out {
+		// Expression READ: drop is_inside_union_field (FactUnion nonreadable /
+		// take_no_union often excludes; e7429 U66→U51 class).
+		if includeBitfields && it.inUnion {
+			continue
+		}
+		res = append(res, it.c)
+	}
+	return res
 }
 
 // selectExprVariableFromERGlobal is an alias for GlobalList choose (pads on).
@@ -12719,10 +12782,12 @@ exprTries:
 				return finishVar(castLiteral(t, "g_0"))
 			}
 			// seed5 e7426+: invent ArrayOp Lhs Expression residual Global —
-			// SelectGlobal live GlobalNonvolatiles choose_ok_var (not empty
-			// GenerateNewGlobal F20 NewArray). Materialised inventory only.
+			// SelectGlobal (VariableSelector.cpp): Nonvolatiles GlobalList +
+			// expand when want simple/aggregate + eFlexible is_derivable.
+			// Pointer residual Expression (Assign type): live NV choose U12.
+			// Later free Expression simple (SelectLType default): expand → U51.
 			if scopePick == 0 && inventArrayOpExprEmptyParamsVS && er != nil {
-				globals := make([]exprVarCandidate, 0, 16)
+				globals := make([]exprVarCandidate, 0, 64)
 				for _, g := range mergedGlobalsTrueSelect(env, ctx) {
 					if g.isVolatile {
 						continue
@@ -12733,8 +12798,64 @@ exprTries:
 						isVolatile: g.isVolatile,
 					})
 				}
-				if len(globals) > 0 {
-					if c, ok := chooseOKVarFromER(er, globals); ok && c.expr != "" {
+				// Orphans on full GlobalList (not TrueSelect) for expand inventory.
+				seen := map[string]bool{}
+				for _, c := range globals {
+					seen[c.expr] = true
+				}
+				for _, g := range mergedGlobals(env, ctx) {
+					if g.isVolatile || seen[g.name] {
+						continue
+					}
+					seen[g.name] = true
+					globals = append(globals, exprVarCandidate{
+						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+						isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+						isVolatile: g.isVolatile,
+					})
+				}
+				wantPtr := strings.Contains(t.Name, "*")
+				wantAgg := !wantPtr && (strings.HasPrefix(t.Name, "struct") || strings.HasPrefix(t.Name, "union"))
+				wantSimple := !wantPtr && !wantAgg && t.Name != "float" && t.Name != "void"
+				if (wantSimple || wantAgg) && ctx != nil {
+					// Expression READ: C++ choose_var no_bitfield=false → include
+					// bitfield field_vars after expand (e7429 U51 vs U40 without).
+					globals = expandStructUnionVarsOpts(globals, t, ctx.info, true)
+				}
+				var pool []exprVarCandidate
+				if wantPtr {
+					// Pointer want: no expand; eFlexible under-materialises vs
+					// UP U12 — use live Nonvolatiles (matched e7426).
+					pool = make([]exprVarCandidate, 0, 16)
+					for _, g := range mergedGlobalsTrueSelect(env, ctx) {
+						if g.isVolatile {
+							continue
+						}
+						pool = append(pool, exprVarCandidate{
+							expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+							isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+							isVolatile: g.isVolatile,
+						})
+					}
+				} else {
+					// eFlexible simples + expanded fields. Drop pointer matches
+					// so choose_var artificial-deref preference is not forced
+					// (would under-burn U(n_ptrs) vs full ok_vars U51).
+					pool = make([]exprVarCandidate, 0, len(globals))
+					for _, c := range globals {
+						if strings.Contains(c.ctype.Name, "*") {
+							continue
+						}
+						if eFlexibleDerivable(t, c.ctype) {
+							pool = append(pool, c)
+						}
+					}
+					if len(pool) == 0 {
+						pool = globals
+					}
+				}
+				if len(pool) > 0 {
+					if c, ok := chooseOKVarFromER(er, pool); ok && c.expr != "" {
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, c.expr))
@@ -121579,11 +121700,16 @@ commaF80MultiDone:
 				_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
 				// invent ArrayOp Lhs residual (e7421+): more free Expressions only
 				// (e7427 U120…) — no PostNestLhs SelectDeref F80 ladder.
+				// First two Expressions used Assign targetType (pointer residual
+				// e7421 PL + e7424 Global U12). Further free Expressions use
+				// SelectLType default simple int (get_int_type) so SelectGlobal
+				// expands aggregates → eFlexible U51 (e7429), not sticky pointer.
 				if inventArrayOpExprEmptyParamsVS && ctx.state.freeMultiIVForLhsExprContinue {
+					simpleT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
 					for extra := 0; extra < 24 && ctx.state.freeMultiIVForLhsExprContinue; extra++ {
 						ctx.exprDepth = 0
 						ctx.state.ppPostPadSkipParentExprN = 0
-						_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+						_ = randomTypedExpr(simpleT, r, opts, env, scope, ctx)
 					}
 				} else if ctx.state.freeMultiIVForLhsExprContinue && ctx.state.freeMultiIVForLhsExprPostNestLhs {
 					// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
