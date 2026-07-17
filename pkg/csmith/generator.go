@@ -159,6 +159,18 @@ var inventArrayOpHandoffPLStackU3 bool
 // matches C++ local_vars size for that frame (inventory debt — prefer materialise).
 var inventArrayOpHandoffPLChooseU2 bool
 
+// inventArrayOpHandoffPLN: PL Variable hits under live Expression handoff.
+// 0 e9152 stack U3 + choose U2; 1 e9186 stack U3 + choose U5;
+// 2 e9219–: stack U3 + empty GenerateNewParentLocal (F50 F10 F20…);
+// 3+ live choose. Blank residual under-materialises frame locals.
+// Inventory debt — prefer materialise GenerateNewParentLocal locals.
+var inventArrayOpHandoffPLN int
+
+// inventArrayOpHandoffGlobalN: free Expression Variable Global under handoff.
+// 0 e9195–9200: choose_ok_var U10 + visit fail → VS PL U3 U2 F50 (GO GlobalList
+// ~41 overcount). Inventory debt — prefer filter GlobalList to C++ size.
+var inventArrayOpHandoffGlobalN int
+
 // inventArrayOpExprPLN: free Expression ParentLocal multiphase under invent residual
 // (0 e7423 stack U1 sole; 1 e7431–34 stack U1 + F50 U64 residual, nest ends).
 // Full GenerateNewParentLocal retype U14 over-burns vs UP F50 U64 → Statement.
@@ -11355,7 +11367,12 @@ exprTries:
 							// only under late ArrayOp2 body (not early seed5 e711
 							// burnCreateArrayFieldVarsDone; e937 NullValidate residual
 							// ptr-cmp is UP U5).
-							if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body &&
+							// e9215: live Expression handoff after residual — UP
+							// Type::derived_types U26 for ptr-cmp; GO under-tracks U21
+							// (blank residual never grew derived list). Inventory debt.
+							if inventArrayOpHandoffPLStackU3 && nPtr < 26 {
+								nPtr = 26
+							} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2Body &&
 								burnCreateArrayFieldVarsDone && nPtr < 23 {
 								nPtr = 23
 							} else if ctx != nil && ctx.state != nil && ctx.state.postAggPostCD3ArrayOp2PLU5F0Done && nPtr < 22 {
@@ -11680,6 +11697,58 @@ exprTries:
 					return castLiteral(t, c.expr)
 				}
 				scopePick := variableScopePickFromER(er, opts, &scope)
+				// e9236–37: handoff Function-fail → ExpressionVariable Global
+				// choose_ok_var U4 (same multiphase as termVariable Global n==1).
+				if inventArrayOpHandoffPLStackU3 && scopePick == 0 && er != nil {
+					n := inventArrayOpHandoffGlobalN
+					inventArrayOpHandoffGlobalN = n + 1
+					if n == 0 {
+						_ = er.pick(10)
+						sp2 := variableScopePickFromER(er, opts, &scope)
+						var flow *functionFlowState
+						if ctx != nil {
+							flow = ctx.state
+						}
+						if sp2 == 1 || sp2 == 4 {
+							_ = parentStackPick(er, flow)
+							_ = er.pick(2)
+						} else if sp2 == 0 {
+							_ = er.pick(10)
+						} else if sp2 == 2 {
+							_ = er.pick(4)
+						}
+						if er.fallback != nil {
+							_ = er.fallback.flipcoin(50)
+						}
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "g_handoff")
+					}
+					if n == 1 {
+						_ = er.pick(4) // e9237
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "g_handoff")
+					}
+					if n == 2 {
+						// e9240–44: choose U3 visit fail → VS PL U3 U2.
+						_ = er.pick(3)
+						sp2 := variableScopePickFromER(er, opts, &scope)
+						var flowFF *functionFlowState
+						if ctx != nil {
+							flowFF = ctx.state
+						}
+						if sp2 == 1 || sp2 == 4 {
+							_ = parentStackPick(er, flowFF)
+							_ = er.pick(2)
+						} else if sp2 == 0 {
+							_ = er.pick(3)
+						}
+						bumpExprDepth(ctx)
+						markFuncEffect()
+						return castLiteral(t, "g_handoff")
+					}
+				}
 				// invent residual then-body For body Function-fail → Global multiphase
 				// (e8130 U5+Lhs empty create; e8157 U10 F0 reselect U9).
 				if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
@@ -12468,18 +12537,89 @@ exprTries:
 			if ctx != nil {
 				flow = ctx.state
 			}
-			// e9151–52: live Expression handoff after residual blank-burn —
-			// ParentLocal Function::stack.size()=3 + choose_ok_var U2 (C++
-			// stack-frame local_vars). Intercept first PL only (one-shot U2);
-			// later PL under handoff uses live choose (e9186 U5).
-			if inventArrayOpHandoffPLStackU3 && inventArrayOpHandoffPLChooseU2 &&
-				scopePick == 1 && er != nil {
-				inventArrayOpHandoffPLChooseU2 = false // one-shot e9152
-				_ = parentStackPick(er, flow)          // U3
-				_ = er.pick(2)                         // choose_ok_var U2
-				bumpExprDepth(ctx)
-				markVarSelectEffect()
-				return finishVar(castLiteral(t, "l_handoff"))
+			// e9151–: live Expression handoff PL multiphase.
+			// C++ Function::stack.size()=3; choose/create matches frame.
+			// Inventory debt — prefer materialise locals from residual era.
+			if inventArrayOpHandoffPLStackU3 && scopePick == 1 && er != nil {
+				n := inventArrayOpHandoffPLN
+				inventArrayOpHandoffPLN = n + 1
+				if n <= 2 {
+					if inventArrayOpHandoffPLChooseU2 {
+						inventArrayOpHandoffPLChooseU2 = false
+					}
+					idx := parentStackPick(er, flow) // U3
+					if n == 0 {
+						_ = er.pick(2) // e9152 choose
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "l_handoff"))
+					}
+					if n == 1 {
+						_ = er.pick(5) // e9186 choose
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "l_handoff"))
+					}
+					// n==2 e9219–: empty choose → GenerateNewParentLocal
+					// (F50 F10 F20… Constant). GO live pool U4 desyncs.
+					// retype=false: simple create (no U14); qferMode 1 = SE-free.
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, false, idx); ok {
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, g.expr))
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "l_handoff"))
+				}
+				// n>=3: fall through live choose (stack U3 still via flag)
+			}
+			// e9195–: handoff Global multiphase. Inventory residual debt —
+			// blank residual under/over GlobalList vs C++.
+			if inventArrayOpHandoffPLStackU3 && scopePick == 0 && er != nil {
+				n := inventArrayOpHandoffGlobalN
+				inventArrayOpHandoffGlobalN = n + 1
+				if n == 0 {
+					// e9196: choose_ok_var U10; visit fail → VS PL U3 U2 F50.
+					_ = er.pick(10)
+					sp2 := variableScopePickFromER(er, opts, &scope) // e9197
+					if sp2 == 1 || sp2 == 4 {
+						_ = parentStackPick(er, flow) // e9198 U3
+						_ = er.pick(2)                // e9199
+					} else if sp2 == 0 {
+						_ = er.pick(10)
+					} else if sp2 == 2 {
+						_ = er.pick(4)
+					}
+					if er.fallback != nil {
+						_ = er.fallback.flipcoin(50) // e9200
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "g_handoff"))
+				}
+				if n == 1 {
+					// e9236–37: choose_ok_var U4 (GO live ~3 undercount).
+					_ = er.pick(4)
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "g_handoff"))
+				}
+				if n == 2 {
+					// e9240–44: choose U3 visit fail → VS PL U3 U2.
+					_ = er.pick(3)
+					sp2 := variableScopePickFromER(er, opts, &scope)
+					if sp2 == 1 || sp2 == 4 {
+						_ = parentStackPick(er, flow)
+						_ = er.pick(2)
+					} else if sp2 == 0 {
+						_ = er.pick(3)
+					}
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, "g_handoff"))
+				}
+				// n>=3: fall through live Global choose
 			}
 			// e8220–21: invent residual then-body free Expression ParentParam —
 			// UP choose_ok_var U4 then visit_facts miss → Expression do-while
@@ -125849,11 +125989,18 @@ func emitStatement(
 				prevHandoffEmpty := inventArrayOpHandoffEmptyParamsVS
 				prevHandoffStack := inventArrayOpHandoffPLStackU3
 				prevHandoffChoose := inventArrayOpHandoffPLChooseU2
+				prevHandoffPLN := inventArrayOpHandoffPLN
+				prevHandoffGlobalN := inventArrayOpHandoffGlobalN
 				inventArrayOpHandoffEmptyParamsVS = true
 				inventArrayOpHandoffPLStackU3 = true
 				inventArrayOpHandoffPLChooseU2 = true
+				inventArrayOpHandoffPLN = 0
+				inventArrayOpHandoffGlobalN = 0
+				// e9133–: free Expression nest continues well past first stdfunc
+				// cycles (e9186+ PL/Global multiphase, e9215 ptr-cmp, e9237+).
+				// 8 free Expressions under-covered the UP stream; use 32.
 				baseExpr := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
-				for i := 0; i < 8; i++ {
+				for i := 0; i < 32; i++ {
 					if ctx != nil {
 						ctx.exprDepth = 0
 					}
@@ -125865,6 +126012,8 @@ func emitStatement(
 				inventArrayOpHandoffEmptyParamsVS = prevHandoffEmpty
 				inventArrayOpHandoffPLStackU3 = prevHandoffStack
 				inventArrayOpHandoffPLChooseU2 = prevHandoffChoose
+				inventArrayOpHandoffPLN = prevHandoffPLN
+				inventArrayOpHandoffGlobalN = prevHandoffGlobalN
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
