@@ -65,6 +65,11 @@ var selectVarLocalScope bool
 // seed7 e366. Does NOT imply LocalScope (PP used Global pad rules historically).
 var selectVarParentParamScope bool
 
+// isParamShortPreferReject: formal name rejected by opportunistic_validate after
+// isParam short* prefer (ExpressionVariable.cpp:117–131; no fact → fail without
+// F0). Next prefer excludes it so choose is U(n-1). seed7 e366–368.
+var isParamShortPreferReject string
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
 
@@ -8369,6 +8374,9 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 					if c.expr == "" || seen[c.expr] {
 						continue
 					}
+					if isParamShortPreferReject != "" && c.expr == isParamShortPreferReject {
+						continue
+					}
 					if !strings.Contains(c.ctype.Name, "*") {
 						continue
 					}
@@ -8386,8 +8394,18 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 							ptrs = append(ptrs, c)
 						}
 					}
+					// First prefer among ≥3: pick then opportunistic_validate fails
+					// (param formals lack point-to facts → return 0, no F0).
+					// ExpressionVariable retries VS; second prefer is U2 (e367–368).
 					if len(ptrs) >= 3 {
 						idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
+						chosen := ptrs[idx]
+						isParamShortPreferReject = chosen.expr
+						return exprVarCandidate{expr: "", ctype: t, assignable: false}, true
+					}
+					if len(ptrs) >= 2 && isParamShortPreferReject != "" {
+						idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
+						isParamShortPreferReject = ""
 						return ptrs[idx], true
 					}
 				}
@@ -28551,7 +28569,8 @@ exprTries:
 					// (ExpressionVariable.cpp eFlexible). Do not gate on multiDim
 					// (seed5 e476: PP uchar want vs int param must accept, not PL).
 					// is_dereferenced_from: preferred * formals (seed7 e366).
-					if scopePick == 2 {
+					// Empty expr = opportunistic_validate miss → empty handler (e367).
+					if scopePick == 2 && c.expr != "" {
 						wantPtr := strings.Contains(t.Name, "*")
 						havePtr := strings.Contains(c.ctype.Name, "*")
 						compat := sameBaseType(c.ctype, t) ||
