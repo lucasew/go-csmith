@@ -122481,23 +122481,24 @@ commaF80MultiDone:
 								}
 							}
 						}
-						// e8178–89: create visit fail → Lhs do-while continues:
-						// VS Global miss → NewValue F10 → PL stack U2 + NewArray
-						// F20 + two Constants (burnSimpleConstant ×2 with chosen type).
+						// e8178–90: create visit fail → Lhs do-while continues:
+						// VS Global miss → NewValue F10 → PL stack U2 + NewArray F20
+						// + Constants (no WRITE vol F50 — qfer already set; vol would
+						// skip hex next31 and desync U3 raw at e8186).
+						// UP e8183 F50=0 depth 10694→10711 = 16 next31 =
+						// GenerateRandomLongLongConstant (Constant.cpp). Then two more
+						// Constants (e8184–86 small U3, e8187–89 small U20).
 						if er.fallback != nil {
 							_ = variableScopePickFromER(er, opts, &scope) // e8178
 							sp3 := variableScopePickFromER(er, opts, &scope) // e8179+F10
 							if sp3 == 4 || sp3 == 1 {
 								_ = er.pick(2)               // e8181 stack U2
 								_ = er.fallback.flipcoin(20) // e8182 NewArray
-								_ = er.fallback.flipcoin(50) // e8183 WRITE vol
-								if chosen.Name == "" {
-									chosen = CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
-								}
-								// e8184–86: Constant small F50 F50 U3
-								// e8187–89: second Constant F50 F50 U20
-								burnSimpleConstant(er.fallback, chosen)
-								burnSimpleConstant(er.fallback, chosen)
+								// eLongLong RandomHexDigits(16); small follow-ups width-agnostic.
+								ll := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+								burnSimpleConstant(er.fallback, ll) // e8183 hex + next31×16
+								burnSimpleConstant(er.fallback, ll) // e8184–86 small U3
+								burnSimpleConstant(er.fallback, ll) // e8187–89 small U20
 							}
 						}
 					}
