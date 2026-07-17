@@ -122499,6 +122499,18 @@ commaF80MultiDone:
 								burnSimpleConstant(er.fallback, ll) // e8183 hex + next31×16
 								burnSimpleConstant(er.fallback, ll) // e8184–86 small U3
 								burnSimpleConstant(er.fallback, ll) // e8187–89 small U20
+								// e8190 F50=0 depth 10717→10720 = eChar RandomHexDigits(2).
+								ch := CType{Name: "int8_t", Signed: true, Bits: 8, HexDigits: 2}
+								burnSimpleConstant(er.fallback, ch) // e8190 hex + next31×2
+								// e8191–96: visit fail Lhs continues — VS Global choose U2
+								// then another choose/create Constant small U3 (UP U100 U2 U2
+								// F50 F50 U3). No F80 between creates (same as e8178 gap).
+								_ = variableScopePickFromER(er, opts, &scope) // e8191 U100
+								_ = er.pick(2) // e8192 U2
+								_ = er.pick(2) // e8193 U2
+								burnSimpleConstant(er.fallback, ll) // e8194–96 small U3
+								// e8197 F50=0 + hn=2 char hex then more VS
+								burnSimpleConstant(er.fallback, ch) // e8197
 							}
 						}
 					}
