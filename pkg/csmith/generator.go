@@ -144,6 +144,11 @@ var inventArrayOpExprPLStackU1 bool
 // GO scope may still list params; sticky until freeMultiIVForLhsExprContinue ends.
 var inventArrayOpExprEmptyParamsVS bool
 
+// inventArrayOpExprPLN: free Expression ParentLocal multiphase under invent residual
+// (0 e7423 stack U1 sole; 1 e7431–34 stack U1 + F50 U64 residual, nest ends).
+// Full GenerateNewParentLocal retype U14 over-burns vs UP F50 U64 → Statement.
+var inventArrayOpExprPLN int
+
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -12263,6 +12268,33 @@ exprTries:
 						// e7423 U1 via invent residual / parentStackPick.
 						// Must use parentStackPick — bare pick(2) skipped U1 (e7423).
 						idx = parentStackPick(er, flow)
+						// invent ArrayOp free Expression PL multiphase.
+						if inventArrayOpExprEmptyParamsVS {
+							n := inventArrayOpExprPLN
+							inventArrayOpExprPLN = n + 1
+							if n == 0 {
+								// e7423: sole after stack U1 (next Expression Global).
+								// Fall through to sole path below.
+							} else {
+								// e7433–34: after second invent residual PL stack U1,
+								// UP is F50 + U64 then Statement U100 — not empty
+								// GenerateNewParentLocal retype U14 + F50 F10 F20
+								// (GO sticky freeMultiIVExprPL force-create).
+								// Residual matches UP entropy; ends invent nest.
+								if er.fallback != nil {
+									_ = er.fallback.flipcoin(50) // e7433
+								}
+								_ = er.pick(64) // e7434
+								inventArrayOpExprEmptyParamsVS = false
+								inventArrayOpExprPLN = 0
+								if flow != nil {
+									flow.freeMultiIVForLhsExprContinue = false
+								}
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, "x"))
+							}
+						}
 					} else if needNoRhsIfPL {
 						// e5133–34: stack U5 + choose_ok_var U3 (live block locals).
 						idx = int(er.pick(5))
@@ -121700,6 +121732,7 @@ commaF80MultiDone:
 			ctx.state.freeMultiIVForLhsExprContinue = false
 			ctx.state.freeMultiIVForLhsExprPostNestLhs = false
 			inventArrayOpExprEmptyParamsVS = false
+			inventArrayOpExprPLN = 0
 		} else {
 			ctx.state.ppPostPadSkipParentExprN = 0
 			// (1) e2989 U120=97 Constant
@@ -121759,6 +121792,7 @@ commaF80MultiDone:
 				}
 				ctx.state.freeMultiIVForLhsExprContinue = false
 				inventArrayOpExprEmptyParamsVS = false
+				inventArrayOpExprPLN = 0
 			}
 		}
 	}
@@ -125014,6 +125048,7 @@ func Generate(opts Options) (string, error) {
 	}
 	inventArrayOpExprPLStackU1 = false
 	inventArrayOpExprEmptyParamsVS = false
+	inventArrayOpExprPLN = 0
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
