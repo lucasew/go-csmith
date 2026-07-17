@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8082); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~8102); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8036** (post invent residual free Expression nest: VS U100 tries=1 NewValue vs GO PP/PL tries=0)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8082** (post invent residual free Expression nest: PL stack U1 vs GO U5 after VS U100)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e8036→8082 climbed — invent residual free Expression nest NewValue + multiphase Constant + Lhs F80:**
+1. Capture: after depthBlock Variable, UP VS empty-params NewValue F10 PL retype U14 qfer create; then Constant×2; Lhs SelectDeref F80 F20 F20 U4 before then-body Statement.
+2. C++: VariableSelectFilter rejects ParentParam when params empty; NewValue always creates (not sticky U15 choose); free Expression residual continues before then-body.
+3. GO: nullValidateEmptyParamsVS for first nest Expression only; postEAReturnPL scopePick=4 force create retype+qfer; multiphase Constant with emptyParamsDepthBlock cleared; Lhs F80 residual. Seeds 2/4/6 held.
+4. Next: e8082 PL stack U1 vs GO U5 after free Expression VS U100.
+
 **seed5 e8035→8036 climbed — invent residual free Expression nest after If condition Constant:**
 1. Capture: after condition Constant residual, UP free Expression U120 tries=9 Variable (depthBlock); GO jumped to then-body Statement U100.
 2. C++: residual SelectDeref / high expr depth continues free Expression before then-body Statements.
 3. GO: after invent residual Constant residual, arm depthBlock + forceNoFunc and burn nested randomTypedExprDepthFlags. Seeds 2/4/6 held.
-4. Next: e8036 VS U100 tries=1 (NewValue 98) vs GO tries=0 (PP 65).
+4. Next: e8036 empty-params NewValue — climbed.
 
 **seed5 e8027→8035 climbed — invent residual If condition forceNoFunc + PL U3 empty → Constant:**
 1. Capture: free Statement IfElse condition Expression UP U120 tries=1 Variable (Function filtered) then PL U1 U3 empty → Constant tries=4 F50 F50 U20; GO Function tries=0 stdfunc / U15 live PL.

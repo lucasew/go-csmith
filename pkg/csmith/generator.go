@@ -199,6 +199,10 @@ var inventArrayOpPostNestBreakExprPLU3 bool
 // residual allows Constant (UP U120 tries=4 v=98). GO default !ConstAsCondition
 // would filter Constant and accept Assign instead.
 var inventArrayOpPostNestBreakAllowCondConst bool
+// inventArrayOpPostNestBreakThenBodyPLStackU1: after invent residual free
+// Expression nest ends and If then-body runs, free Expression PL uses
+// Function::stack.size()=1 (e8082), not sticky freeMultiIVNeedNoRhsIfBody U5.
+var inventArrayOpPostNestBreakThenBodyPLStackU1 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -2688,6 +2692,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		if state != nil {
 			state.freeMultiIVForLhsExprPLStackU1Once = false
 		}
+		return int(er.pick(1))
+	}
+	// e8082: after invent residual free Expression nest + If then-body free
+	// Expression Variable PL — UP Function::stack.size()=1 (not sticky
+	// freeMultiIVNeedNoRhsIfBody U5). Priority above IfBody U5.
+	if inventArrayOpPostNestBreakThenBodyPLStackU1 {
 		return int(er.pick(1))
 	}
 	// e7409: after first PP residual done, invent ArrayOp-body PP→PL stack U4
@@ -12172,6 +12182,9 @@ exprTries:
 					flow.ppPostPadDepthBlock = false
 					flow.ppPostPadForceNoFunc = false
 				}
+				// e8082: subsequent free Expression PL in If then-body uses stack U1
+				// (not freeMultiIVNeedNoRhsIfBody U5 overcount).
+				inventArrayOpPostNestBreakThenBodyPLStackU1 = true
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(c)
@@ -12537,6 +12550,20 @@ exprTries:
 						}
 					} else if needNoRhsIfPL {
 						// e5133–34: stack U5 + choose_ok_var U3 (live block locals).
+						// e8082 invent residual free Expression nest done: free
+						// Expression PL in If then-body is stack U1 + empty create
+						// retype U14 + qfer F50 F10 F20 (not sticky IfBody U5 U3 sole).
+						if inventArrayOpPostNestBreakThenBodyPLStackU1 {
+							idx = int(er.pick(1)) // e8082 U1
+							if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, idx); ok {
+								bumpExprDepth(ctx)
+								markVarSelectEffect()
+								return finishVar(castLiteral(t, g.expr))
+							}
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, "x"))
+						}
 						idx = int(er.pick(5))
 						_ = er.pick(3)
 						bumpExprDepth(ctx)
@@ -125625,6 +125652,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakNextGlobalU51 = false
 	inventArrayOpPostNestBreakExprPLU3 = false
 	inventArrayOpPostNestBreakAllowCondConst = false
+	inventArrayOpPostNestBreakThenBodyPLStackU1 = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
