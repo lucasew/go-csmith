@@ -132741,9 +132741,24 @@ commaF80MultiDone:
 		if multiphaseFirstCreate {
 			skipVol = true
 		}
+		// select_deref_pointer create (VariableSelector.cpp:1267–69):
+		// Type::find_pointer_type(type, true) always deepens one level when
+		// under max_indirect_level — SelectLType int32_t* → create int32_t**
+		// (seed7 e406: UP WRITE qfer F50 F10×2 levels + self F50 then NewArray;
+		// GO only * → F50 F10 F50 F20 early).
 		ptrType := targetType
-		if !strings.Contains(ptrType.Name, "*") {
-			ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+		st := strings.Count(ptrType.Name, "*")
+		if st < 5 { // CGOptions::max_indirect_level default
+			if st == 0 {
+				// Simple Lhs: Type.cpp consolidates to int*; aggregates keep base.
+				base := "int32_t"
+				if strings.HasPrefix(targetType.Name, "struct") || strings.HasPrefix(targetType.Name, "union") {
+					base = targetType.Name
+				}
+				ptrType = CType{Name: base + "*", Signed: true, Bits: 32, HexDigits: 8}
+			} else {
+				ptrType = CType{Name: ptrType.Name + "*", Signed: ptrType.Signed, Bits: ptrType.Bits, HexDigits: ptrType.HexDigits}
+			}
 		}
 		// select_deref create (VariableSelector.cpp:1274–80):
 		// random_qualifiers WRITE only when !qfer || qfer->wildcard || !globals;

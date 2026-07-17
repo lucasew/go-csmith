@@ -161,6 +161,9 @@ func traceCaller() string {
 		fr, more := frames.Next()
 		name := fr.Function
 		if name != "" && name != "csmith/pkg/csmith.(*rng).upto" && name != "csmith/pkg/csmith.(*rng).uptoWithFilter" && name != "csmith/pkg/csmith.(*rng).flipcoin" {
+			if fr.Line > 0 {
+				return fmt.Sprintf("%s:%d", name, fr.Line)
+			}
 			return name
 		}
 		if !more {
