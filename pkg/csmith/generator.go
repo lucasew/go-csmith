@@ -144,6 +144,21 @@ var inventArrayOpExprPLStackU1 bool
 // GO scope may still list params; sticky until freeMultiIVForLhsExprContinue ends.
 var inventArrayOpExprEmptyParamsVS bool
 
+// inventArrayOpHandoffEmptyParamsVS: live Expression handoff after ThenBodyEver
+// residual blank-burn ends (e9133+). C++ Function under residual ArrayOp has
+// empty params → VariableSelectFilter rejects ParentParam (e9150 tries=1).
+// VS-filter only — does NOT force PL stack U1 (unlike inventArrayOpExprEmptyParamsVS).
+var inventArrayOpHandoffEmptyParamsVS bool
+
+// inventArrayOpHandoffPLStackU3: during e9133+ handoff, Function::stack.size()=3
+// (For+ArrayOp+body frame). C++ SelectParentLocal rnd_upto(stack.size()).
+var inventArrayOpHandoffPLStackU3 bool
+
+// inventArrayOpHandoffPLChooseU2: handoff PL choose_ok_var among 2 locals on
+// selected stack frame (e9152 U2). GO dynLocs overcount live frame; force bound
+// matches C++ local_vars size for that frame (inventory debt — prefer materialise).
+var inventArrayOpHandoffPLChooseU2 bool
+
 // inventArrayOpExprPLN: free Expression ParentLocal multiphase under invent residual
 // (0 e7423 stack U1 sole; 1 e7431–34 stack U1 + F50 U64 residual, nest ends).
 // Full GenerateNewParentLocal retype U14 over-burns vs UP F50 U64 → Statement.
@@ -2791,6 +2806,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 		}
 		return int(er.pick(1))
 	}
+	// e9151: live Expression handoff after residual — Function::stack.size()=3
+	// under residual ArrayOp nest (For+ArrayOp+body). Priority above sticky
+	// ThenBody PLStackU1 from earlier invent residual era.
+	if inventArrayOpHandoffPLStackU3 {
+		return int(er.pick(3))
+	}
 	// e8082: after invent residual free Expression nest + If then-body free
 	// Expression Variable PL — UP Function::stack.size()=1 (not sticky
 	// freeMultiIVNeedNoRhsIfBody U5). Priority above IfBody U5.
@@ -3167,6 +3188,13 @@ func chooseOKVarFromER(er *exprRand, ok []exprVarCandidate) (exprVarCandidate, b
 		return exprVarCandidate{}, false
 	}
 	c := ok[0]
+	// e9152: handoff PL choose_ok_var U2 — force bound even when GO inventory
+	// is sole (would skip choose and itemize U4) or overcount (U3/U4).
+	if inventArrayOpHandoffPLChooseU2 {
+		c = ok[int(er.pick(2))%len(ok)]
+		// Skip itemize — C++ n=2 non-array locals accept without size U.
+		return c, true
+	}
 	if len(ok) > 1 {
 		c = ok[int(er.pick(uint32(len(ok))))%len(ok)]
 	}
@@ -5670,7 +5698,7 @@ func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) i
 	// func has empty params → VariableSelectFilter rejects ParentParam.
 	// seed5 e7425: invent ArrayOp Lhs Expression residual same filter
 	// (GO param inventory overcount → bare ParentParam U100 without tries=1).
-	if nullValidateEmptyParamsVS || inventArrayOpExprEmptyParamsVS {
+	if nullValidateEmptyParamsVS || inventArrayOpExprEmptyParamsVS || inventArrayOpHandoffEmptyParamsVS {
 		paramsEmpty = true
 	}
 	reject := func(x uint32) bool {
@@ -9395,6 +9423,10 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.state != nil &&
 		burnCreateArrayCtxSink.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2
 	if len(exact) > 0 {
+		// e9152: handoff PL choose_ok_var U2 before sole/itemize paths.
+		if inventArrayOpHandoffPLChooseU2 && selectVarLocalScope && !forAssign {
+			return exact[int(er.pick(2))%len(exact)], true
+		}
 		if len(exact) == 1 && forceN <= 1 {
 			if plItemize && exact[0].isArray {
 				itemizeArrayCandidate(er, exact[0])
@@ -9486,6 +9518,10 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 		if forceN > chooseN {
 			chooseN = forceN
 		}
+		// e9152: handoff PL choose_ok_var U2 among eFlexible integers.
+		if inventArrayOpHandoffPLChooseU2 && selectVarLocalScope && !forAssign {
+			chooseN = 2
+		}
 		if chooseN > 1 {
 			c := integers[int(er.pick(uint32(chooseN)))%len(integers)]
 			// seed5 e1282: residual Global pad may select array → itemize.
@@ -9535,6 +9571,10 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	}
 	if forceN > 1 {
 		return filtered[int(er.pick(uint32(forceN)))%len(filtered)], true
+	}
+	// e9152: handoff PL choose_ok_var U2 (C++ stack-frame local_vars size).
+	if inventArrayOpHandoffPLChooseU2 && len(filtered) > 1 {
+		return filtered[int(er.pick(2))%len(filtered)], true
 	}
 	if !forAssign {
 		return filtered[0], true
@@ -12427,6 +12467,19 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// e9151–52: live Expression handoff after residual blank-burn —
+			// ParentLocal Function::stack.size()=3 + choose_ok_var U2 (C++
+			// stack-frame local_vars). Intercept first PL only (one-shot U2);
+			// later PL under handoff uses live choose (e9186 U5).
+			if inventArrayOpHandoffPLStackU3 && inventArrayOpHandoffPLChooseU2 &&
+				scopePick == 1 && er != nil {
+				inventArrayOpHandoffPLChooseU2 = false // one-shot e9152
+				_ = parentStackPick(er, flow)          // U3
+				_ = er.pick(2)                         // choose_ok_var U2
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "l_handoff"))
 			}
 			// e8220–21: invent residual then-body free Expression ParentParam —
 			// UP choose_ok_var U4 then visit_facts miss → Expression do-while
@@ -125785,6 +125838,33 @@ func emitStatement(
 						_ = r.upto(120)
 					}
 				}
+				// e9133+: residual blank-burn ends after second stdfunc U4.
+				// UP continues free Expression (U120 + stdfunc / choose_func).
+				// Hand off to live Expression::make_random rather than more
+				// invent residual packs (SPEC §5.1.1 / §5.2 ban). C++ path:
+				// Expression multiphase under ArrayOp residual body setup.
+				// e9150–52: empty-params VS filter + stack U3 + PL choose U2.
+				// Dedicated handoff flags (not inventArrayOpExprEmptyParamsVS
+				// which forces PL U1; not MultiLvlPLStackU3 multiphase table).
+				prevHandoffEmpty := inventArrayOpHandoffEmptyParamsVS
+				prevHandoffStack := inventArrayOpHandoffPLStackU3
+				prevHandoffChoose := inventArrayOpHandoffPLChooseU2
+				inventArrayOpHandoffEmptyParamsVS = true
+				inventArrayOpHandoffPLStackU3 = true
+				inventArrayOpHandoffPLChooseU2 = true
+				baseExpr := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+				for i := 0; i < 8; i++ {
+					if ctx != nil {
+						ctx.exprDepth = 0
+					}
+					if state != nil {
+						state.ppPostPadSkipParentExprN = 0
+					}
+					_ = randomTypedExpr(baseExpr, r, opts, env, scope, ctx)
+				}
+				inventArrayOpHandoffEmptyParamsVS = prevHandoffEmpty
+				inventArrayOpHandoffPLStackU3 = prevHandoffStack
+				inventArrayOpHandoffPLChooseU2 = prevHandoffChoose
 			}
 			if state != nil {
 				state.skipNextBlockSize = true

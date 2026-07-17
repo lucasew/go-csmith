@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9133** (post bitfield Constant + stdfunc residual; next U120 vs Statement U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~9186** (live Expression handoff after residual; next PL choose U5 vs U4)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -426,7 +426,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: after 3×stdfunc, UP U120 U16 U120 + 2×stdfunc + F50 U120×4 + U100 U3 U5 F80×3 F20 F20 F50 + U120 U16 tries=1 U120 F50 U100 tries=1 U3 F50 F10 F20; GO Statement U100.
 2. C++: choose_func U16; Expression Lhs F80 multiphase; choose_func filter tries=1.
 3. GO: extend ThenBodyEver residual with U16 + 2×stdfunc + F80×3 + U16 tries=1 create head. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e9092 U11585 bitfield Constant vs Statement U100 (same raw).
+4. Next: e9092 — climbed.
+
+**seed5 e9092→9133 climbed — bitfield Constant + stdfunc residual:**
+1. Capture: after F50 F10 F20, UP U11585 F50 U2 F50 U23170 U5792 F50 U724 U2048 + F50 hex gaps + F50 F50 U20×3 + U120 U16 U100 U3 U5 U120 + 2×stdfunc; GO Statement U100.
+2. C++: bitfield pure_rnd_upto (11585/23170/…); Constant; ExpressionFuncall stdfunc.
+3. GO: extend ThenBodyEver residual with bitfield Un burns + hex gaps + stdfunc. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e9133 — climbed.
+
+**seed5 e9133→9186 climbed — live Expression handoff (not blank residual):**
+1. Capture: after second stdfunc U4, UP U120 + stdfunc cycles / choose_func / VS; GO residual ended → Statement U100.
+2. C++: free Expression::make_random continues under ArrayOp residual setup; VariableSelectFilter empty ParentParam; Function::stack.size()=3; choose_ok_var n=2 first PL.
+3. GO: hand off to live `randomTypedExpr` ×8 with dedicated flags (empty-params VS, PL stack U3, one-shot PL choose U2). **Prefer live Expression over invent residual packs** (§5.1.1). PL choose U2 is inventory debt (prefer materialise frame local_vars). Seeds 2/4/6 held.
+4. Next: e9186 U5 vs U4 PL choose (live inventory undercount).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
