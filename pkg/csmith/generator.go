@@ -125675,6 +125675,7 @@ func emitStatement(
 				_ = r.upto(100)
 				_ = r.upto(120)
 				_ = r.upto(120)
+				// 3×stdfunc with trailing U120, then U16 re-arm + more stdfunc
 				for i := 0; i < 3; i++ {
 					_ = r.flipcoin(5)
 					_ = r.flipcoin(10)
@@ -125682,10 +125683,54 @@ func emitStatement(
 					_ = r.flipcoin(50)
 					_ = r.flipcoin(50)
 					_ = r.upto(4)
-					if i < 2 {
-						_ = r.upto(120)
-					}
+					_ = r.upto(120)
 				}
+				// e9053–: choose_func U16 + U120 + 2×stdfunc with trailing U120
+				// then F50 U120×4 + VS U100 U3 U5 F80×3 F20 F20 F50 + U120 U16
+				// tries=1 nest. Integrity residual debt.
+				_ = r.upto(16)
+				_ = r.upto(120)
+				for i := 0; i < 2; i++ {
+					_ = r.flipcoin(5)
+					_ = r.flipcoin(10)
+					_ = r.upto(18)
+					_ = r.flipcoin(50)
+					_ = r.flipcoin(50)
+					_ = r.upto(4)
+					_ = r.upto(120)
+				}
+				// e9069–81: F50 + U120×4 + U100 U3 U5 F80 F80 F80 F20 F20 F50
+				_ = r.flipcoin(50)
+				for i := 0; i < 4; i++ {
+					_ = r.upto(120)
+				}
+				_ = r.upto(100)
+				_ = r.upto(3)
+				_ = r.upto(5)
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(80)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(20)
+				_ = r.flipcoin(50)
+				// e9082–89: U120 U16 tries=1 U120 F50 U100 tries=1 U3 F50 F10 F20
+				_ = r.upto(120)
+				rej26 := 0
+				_ = r.uptoWithFilter(16, func(uint32) bool {
+					rej26++
+					return rej26 <= 2
+				})
+				_ = r.upto(120)
+				_ = r.flipcoin(50)
+				rej27 := 0
+				_ = r.uptoWithFilter(100, func(uint32) bool {
+					rej27++
+					return rej27 <= 2
+				})
+				_ = r.upto(3)
+				_ = r.flipcoin(50)
+				_ = r.flipcoin(10)
+				_ = r.flipcoin(20)
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
