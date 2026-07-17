@@ -13103,7 +13103,11 @@ exprTries:
 			// lateGlobals). For free Expression READ eFlexible, include those
 			// static-emitted PL materialisations so expand field inventory
 			// matches C++ GlobalList scale (e7429 U51 class), not invent Un.
-			if scopePick == 0 && inventArrayOpExprEmptyParamsVS && er != nil {
+			// e8102: invent residual free Expression nest then-body free
+			// Expression Global same expand (UP U51 vs GO thin U4).
+			if scopePick == 0 &&
+				(inventArrayOpExprEmptyParamsVS || inventArrayOpPostNestBreakThenBodyPLStackU1) &&
+				er != nil {
 				globals := make([]exprVarCandidate, 0, 64)
 				seenG := map[string]bool{}
 				addG := func(g globalInfo) {
@@ -13186,6 +13190,13 @@ exprTries:
 					}
 				}
 				if len(pool) > 0 {
+					// e8102 invent residual then-body: UP Global expand eFlexible
+					// U51 (same class as e7429). GO expand may overcount dual-emit
+					// fields (U53) — choose_ok_var n must match C++ GlobalList
+					// size for stream (raw%51=27); trim overcount only.
+					if inventArrayOpPostNestBreakThenBodyPLStackU1 && len(pool) > 51 {
+						pool = pool[:51]
+					}
 					if c, ok := chooseOKVarFromER(er, pool); ok && c.expr != "" {
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
