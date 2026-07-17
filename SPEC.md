@@ -284,7 +284,11 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8199 U100 tries=2 v=0 (raw 361144200) vs GO Statement AssignOps U120; intermediate raws 85/83 are ParentParam rejects.
 2. C++: VariableSelectFilter rejects ParentParam when params empty (VariableSelector.cpp); then Global choose U2 + further VS/stack U1 U4 ladder before free Assign e8209.
 3. GO: inventArrayOpExprEmptyParamsVS + variableScopePickFromER (tries=2) + U2 U100 U1 U4×… through e8208. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8220 U4 vs GO U7 (choose inventory size).
+4. Next: e8220 U4 vs GO U7 (live Global int16 pool after stripping permanent ParamU7 invent floor at invent residual arm).
+
+**Integrity — clear ParamU7 invent floor at invent residual then-body arm:**
+1. nullValidatePostResidualParamU7 sticky pick(7) from e1068 survived through invent residual (e8130+); permanent invent floor.
+2. Clear ParamU7 when invent residual then-body arms; e2050 era still has pad. first_div stays ~8220 (live U7≠U4). Seeds 2/4/6 held.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

@@ -12539,6 +12539,8 @@ exprTries:
 			// Intercept before any PP sole / miss path skips the choose.
 			// e1714+: after residual Assign Lhs era, pointer PP→PL is live U5
 			// create (not sticky U7). e2050: simple PP still ok_vars U7.
+			// ParamU7 is cleared when invent residual then-body arms (e8130+)
+			// so late PP uses live ok_vars (e8220 U4), not permanent invent floor.
 			if scopePick == 2 && nullValidatePostResidualParamU7 && er != nil &&
 				(!nullValidatePostResidualPPU7Done || !strings.Contains(t.Name, "*")) {
 				_ = er.pick(7)
@@ -124057,6 +124059,9 @@ func emitStatement(
 			_ = r.upto(10)
 			// e8130+: For body free Expression Global multiphase (U5 then U10…).
 			inventArrayOpPostNestBreakThenBodyForBody = true
+			// e8220: stop sticky nullValidate ParamU7 invent floor (e1068/e2050).
+			// Later ParentParam uses live ok_vars (UP U4), not permanent pick(7).
+			nullValidatePostResidualParamU7 = false
 			inventArrayOpPostNestBreakThenBodyForGlobalN = 0
 		} else if postArrayFor {
 			// Nested array-loop For: C++ still uses full inventory, but early
