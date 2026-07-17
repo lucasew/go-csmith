@@ -170,6 +170,16 @@ var inventArrayOpPostNestBreakEV bool
 // Constant residual.
 var inventArrayOpPostNestBreakCreate bool
 
+// inventArrayOpPostNestBreakExprGlobalReselect: after invent residual Break,
+// next free Expression Variable SelectGlobal sole/visit_facts fail → ExpressionVariable
+// do-while reselects VS (U100) then ParentParam→PL create (e7909–17), not empty
+// GenerateNewGlobal F20 (GO was stealing that raw).
+var inventArrayOpPostNestBreakExprGlobalReselect bool
+
+// inventArrayOpPostNestBreakPLAddrU3: PL create make_init address choose_ok_var U3
+// (UP e7917 among ~3 pointees after * NewArray=0).
+var inventArrayOpPostNestBreakPLAddrU3 bool
+
 
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
@@ -6742,6 +6752,13 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 			// Sometimes array itemize after choose (U2) then select_must_use F75
 			// (e2865–67); often sole U6 then Lhs F80 (e2884).
 			levels := strings.Count(chosen.Name, "*")
+			// e7917: invent residual Break Assign RHS PL * create NewArray=0
+			// address choose_ok_var U3 (not sticky residual U2).
+			if inventArrayOpPostNestBreakPLAddrU3 && !newArray {
+				inventArrayOpPostNestBreakPLAddrU3 = false
+				_ = er.fallback.upto(3)
+				goto afterAddrResidual
+			}
 			// seed5 e2974: free multi-IV For body PL address-of choose_ok_var U4
 			// then parent Assign Lhs F80 (no nested pointee CreateArray residual).
 			// seed5 e3422: free multi-IV residual Expression (post EA Lhs) PL
@@ -12020,6 +12037,49 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// e7909: invent residual Break then free Assign RHS Expression Variable —
+			// SelectGlobal (U100=27) sole/visit_facts fail → ExpressionVariable do-while
+			// reselects VariableSelectionProbability (U100=84 ParentParam) →
+			// SelectParentParam miss → SelectParentLocal stack U1 + GenerateNewParentLocal
+			// SE-free pointer qfer + make_init address (UP F50 F10×2 F20 F20 U3…).
+			// GO empty GenerateNewGlobal F20 desyncs. Mirror visit-fail reselect + PL create.
+			if inventArrayOpPostNestBreakExprGlobalReselect && scopePick == 0 && er != nil {
+				inventArrayOpPostNestBreakExprGlobalReselect = false
+	inventArrayOpPostNestBreakPLAddrU3 = false
+				scopePick2 := variableScopePickFromER(er, opts, &scope) // e7909 U100
+				if scopePick2 == 1 || scopePick2 == 2 || scopePick2 == 4 {
+					idx := parentStackPick(er, flow) // e7910 U1
+					// Pointer SelectLType (F20=0 + derived U16): single-level * —
+				// qfer F50 F10 + self F50 F10 then NewArray F20 (UP e7911–15).
+					// Sticky freeMultiIVNeedNoRhsPostEAGlobalU21 floors levels to **
+					// (extra F50 F10); arm QferLvl1 to force * for this create.
+					createT := t
+					if strings.Contains(t.Name, "*") {
+						base := strings.ReplaceAll(t.Name, "*", "")
+						if base == "" {
+							base = "int32_t"
+						}
+						createT = CType{Name: base + "*", Signed: true, Bits: 32, HexDigits: 8}
+						if strings.Contains(base, "uint") || strings.HasPrefix(base, "unsigned") {
+							createT.Signed = false
+						}
+					}
+					if flow != nil {
+						flow.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
+					}
+					inventArrayOpPostNestBreakPLAddrU3 = true
+					qfer := 1
+					retype := !strings.Contains(createT.Name, "*")
+					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, qfer, retype, idx); ok {
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, g.expr))
+					}
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
 			}
 			// seed5 post-Return free Expression ParentParam multiphase:
 			//   0 e5764–65: live choose_ok_var U7 accept → Expression U120
@@ -123573,6 +123633,8 @@ func emitStatement(
 			if r != nil {
 				_ = r.upto(4)
 			}
+			// Next free Assign Expression Variable: Global visit fail → VS reselect.
+			inventArrayOpPostNestBreakExprGlobalReselect = true
 			if state != nil {
 				// Break is not must_return — keep emitting free Statements.
 				state.skipNextBlockSize = false
@@ -125151,6 +125213,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestRejectAssignOnce = false
 	inventArrayOpPostNestBreakEV = false
 	inventArrayOpPostNestBreakCreate = false
+	inventArrayOpPostNestBreakExprGlobalReselect = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
