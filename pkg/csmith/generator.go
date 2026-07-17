@@ -239,6 +239,14 @@ var inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty bool
 // not left term Function U120). C++ ExpressionComma left → Assign Lhs.cpp
 // do-while empty select_deref + create (VariableSelector.cpp:1266–1315).
 var inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType bool
+// inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16: after Comma Lhs residual,
+// Comma rhs Function useExisting=1 but GO built-func inventory empty while UP
+// choose_func still has ok_funcs (F20 Builtin/pad + U16 choose then param
+// Expressions). One-shot residual (same class as nullValidateUserFuncChoosePad).
+var inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 bool
+// inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1: after nested Function fail
+// → ExpressionVariable PL, Function::stack.size()=1 (e8499), not sticky U2/U4.
+var inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -2777,6 +2785,12 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	// Expression Variable PL — UP Function::stack.size()=1 (not sticky
 	// freeMultiIVNeedNoRhsIfBody U5). Priority above IfBody U5.
 	if inventArrayOpPostNestBreakThenBodyPLStackU1 {
+		return int(er.pick(1))
+	}
+	// e8499: invent residual Comma rhs Function residual → nested Function
+	// fail → ExpressionVariable PL stack U1 (not sticky freeMultiIV U2/U4).
+	if inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
+		inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
 		return int(er.pick(1))
 	}
 	// e7409: after first PP residual done, invent ArrayOp-body PP→PL stack U4
@@ -9613,9 +9627,11 @@ func buildFunctionCallExpr(
 	// e8165–67: invent residual then-body For free Expression after Lhs PP
 	// sole — useExisting=0 burns FuncAttr-shaped F30 F0 then returns (UP next
 	// free Expression U120 Constant). Must run before max_funcs fallthrough
-	// to ExpressionVariable NewValue U100.
+	// to ExpressionVariable NewValue U100. Skip under nested user-func param
+	// Expression (e8497+ CREATE/Variable after Comma rhs Function residual).
 	if !useExisting && inventArrayOpPostNestBreakThenBodyForBody && r != nil &&
-		state != nil && state.freeMultiIVForLhsExprContinue {
+		state != nil && state.freeMultiIVForLhsExprContinue &&
+		!nullValidateUserFuncNest {
 		_ = r.flipcoin(30) // e8166
 		_ = r.flipcoin(0)  // e8167
 		return castLiteral(t, "0"), true
@@ -9623,6 +9639,31 @@ func buildFunctionCallExpr(
 
 	var callee funcInfo
 	calleeIdx := -1
+	// e8493–: invent residual Comma rhs Function useExisting=1. GO undercounts
+	// built ok_funcs (sole/empty) while UP choose_func still draws F20 + U16
+	// among ~16 then param Expressions. Prefer stream residual over live sole.
+	if useExisting && inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 && r != nil {
+		inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 = false
+		// Nested Function fail → Variable PL uses stack U1 (e8499).
+		inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = true
+		_ = r.flipcoin(20) // e8494 (BuiltinFunctionProb-shaped / choose pad)
+		_ = r.upto(16)     // e8495 choose_func among expanded ok_funcs
+		if er != nil {
+			prevDepth := 0
+			if ctx != nil {
+				prevDepth = ctx.exprDepth
+				ctx.exprDepth = 0
+			}
+			prevNest := nullValidateUserFuncNest
+			nullValidateUserFuncNest = true
+			_ = randomTypedExprDepthFlags(t, er, opts, env, scope, 0, ctx, false, false)
+			nullValidateUserFuncNest = prevNest
+			if ctx != nil {
+				ctx.exprDepth = prevDepth
+			}
+		}
+		return castLiteral(t, "0"), true
+	}
 	if useExisting && len(candidates) > 0 {
 		if opts.Builtins && r != nil {
 			_ = r.flipcoin(uint32(opts.BuiltinFunctionProb))
@@ -10483,20 +10524,28 @@ func randomReturnVariableExpr(t CType, r *rng, opts Options, env envInfo, scope 
 		return castLiteral(t, "x")
 	}
 	if scopePick == 2 {
-		n := len(scope.params)
-		if n == 0 {
-			// empty params → ParentLocal (VariableSelector.cpp:1052–53)
+		// e8498–99: invent residual Comma rhs Function residual → nested
+		// Function-fail ExpressionVariable ParentParam — UP empty ok_vars /
+		// miss → SelectParentLocal stack U1. GO param inventory over-accepts
+		// pick(n). Force fallthrough to PL (parentStackPick U1 residual).
+		if inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 {
 			scopePick = 1
 		} else {
-			chooseN := n
-			if postAggGlobalCreateN >= 0 && chooseN < 5 {
-				chooseN = 5
+			n := len(scope.params)
+			if n == 0 {
+				// empty params → ParentLocal (VariableSelector.cpp:1052–53)
+				scopePick = 1
+			} else {
+				chooseN := n
+				if postAggGlobalCreateN >= 0 && chooseN < 5 {
+					chooseN = 5
+				}
+				if chooseN > 1 {
+					idx := int(er.pick(uint32(chooseN))) % n // e2759 U5
+					return castLiteral(t, scope.params[idx].name)
+				}
+				return castLiteral(t, scope.params[0].name)
 			}
-			if chooseN > 1 {
-		idx := int(er.pick(uint32(chooseN))) % n // e2759 U5
-				return castLiteral(t, scope.params[idx].name)
-			}
-			return castLiteral(t, scope.params[0].name)
 		}
 	}
 	// SelectGlobal empty create with true GlobalList (no fromParentLocal): only
@@ -11512,7 +11561,9 @@ exprTries:
 				// free Expression Function-fail PP: first live U7 (e6010) then
 				// sole (e6013→U120). Sticky multiphase always-U7 under-burns.
 				// e8220 invent residual then-body: ParentParam live choose U4.
-				if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil {
+				// Skip under nested user-func param Expression (e8498+ PP→PL U1).
+				if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil &&
+					!nullValidateUserFuncNest {
 					_ = er.pick(4)
 					bumpExprDepth(ctx)
 					markFuncEffect()
@@ -12251,13 +12302,14 @@ exprTries:
 			// e8220–21: invent residual then-body free Expression ParentParam —
 			// UP choose_ok_var U4 then visit_facts miss → Expression do-while
 			// retries term U120 (not accept sole → parent Lhs F80). Residual debt.
-			if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil {
+			// One-shot: sticky PP pick(4)+continue every later PP desyncs e8498–99
+			// (UP PP→PL stack U1 after Comma rhs Function residual).
+			if inventArrayOpPostNestBreakThenBodyEver && scopePick == 2 && er != nil &&
+				!inventArrayOpPostNestBreakThenBodyGlobalU5Done {
 				_ = er.pick(4)
 				// Arm Global U5 multiphase once after first invent residual PP visit-fail.
-				if !inventArrayOpPostNestBreakThenBodyGlobalU5Done {
-					inventArrayOpPostNestBreakThenBodyGlobalU5Once = true
-					inventArrayOpPostNestBreakThenBodyGlobalU5Done = true
-				}
+				inventArrayOpPostNestBreakThenBodyGlobalU5Once = true
+				inventArrayOpPostNestBreakThenBodyGlobalU5Done = true
 				restoreGenSnapshot(ctx, snap)
 				continue exprTries
 			}
@@ -16027,6 +16079,22 @@ exprTries:
 				// stack pick, choose_var on that block, else any-depth
 				// dynLocs (inventory approx), else create.
 				if scopePick == 2 {
+					// e8498–99: invent residual Comma rhs Function residual → nested
+					// Function-fail ExpressionVariable ParentParam — UP miss → PL
+					// stack U1 + create qfer F50 F10… before VisitF0 stack U4.
+					if er != nil &&
+						(inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 || nullValidateUserFuncNest) {
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
+						_ = er.pick(1) // e8499 Function::stack.size()=1
+						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, 0); ok {
+							bumpExprDepth(ctx)
+							markVarSelectEffect()
+							return finishVar(castLiteral(t, g.expr))
+						}
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, "x"))
+					}
 					// e8485: first post-CD3 PP→PL fallthrough; later PP soles.
 					if flow != nil && flow.postAggNestArrayOpPostCD3 {
 						flow.postAggPostCD3PPFallThroughDone = true
@@ -16291,6 +16359,24 @@ exprTries:
 				}
 				candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 			}
+			// e8498–99: invent residual Comma rhs Function residual → nested
+			// Function-fail ExpressionVariable ParentParam — UP miss → PL stack U1
+			// + GenerateNewParentLocal qfer F50 F10… (e8500+). GO param inventory
+			// accepts choose U4. Intercept before candidates.
+			if scopePick == 2 && er != nil &&
+				(inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 || nullValidateUserFuncNest) {
+				inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
+				_ = er.pick(1) // e8499 Function::stack.size()=1
+				// qferMode 1: SE-free READ random_qualifiers F50 F10 per level
+				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, 1, true, 0); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "x"))
+			}
 			if len(candidates) > 0 {
 				// seed5 e1068: residual Assign RHS ParentParam ok_vars U7
 				// (UP expand_struct_union / multi-param; GO inventory sole).
@@ -16301,7 +16387,9 @@ exprTries:
 				// (live expand / multi-param). Sticky post-Return invent pick(7) is
 				// off; live inventory under-counts (often 1 param sole). Align choose
 				// width to UP U4 (same residual class as e1068 U7 pad, corrected size).
-				if scopePick == 2 && inventArrayOpPostNestBreakThenBodyEver {
+				// Skip under nested user-func param (e8498 PP miss → PL stack U1).
+				if scopePick == 2 && inventArrayOpPostNestBreakThenBodyEver &&
+					!nullValidateUserFuncNest {
 					selectVarForceChooseN = 4
 				}
 				// seed5 e1271+: residual free Expression GlobalList U18 pad
@@ -19580,6 +19668,8 @@ exprTries:
 			if inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType &&
 				er != nil && er.fallback != nil {
 				inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
+				// Comma rhs may hit Function useExisting with empty GO inventory.
+				inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 = true
 				r := er.fallback
 				// e8240–41: F80=1 empty pure (no choose), F80=0 → VS
 				if r.flipcoin(80) {
@@ -126349,6 +126439,8 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakThenBodyForLhsPPSole = false
 	inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty = false
 	inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
+	inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 = false
+	inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Once = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Done = false
 	inventArrayOpPostNestBreakThenBodyEver = false

@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8494** (post invent residual Comma Lhs VS multiphase → Function rhs)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8499** (post invent residual Comma rhs Function F20 U16 pad)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -324,7 +324,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8476 UP U100 VS ladder (PL empty reselect, tries=1/8, Global U12) vs GO Comma rhs term U120 same raw.
 2. C++: VariableSelector multiphase after create tail before free Expression term Function (e8492 U120=62).
 3. GO: sequential VS residual with scopePickTries (uptoWithFilter tries+1 call-path) then Comma rhs. **Integrity residual debt** — event-sequential multiphase. Seeds 2/4/6 held.
-4. Next: e8494 Function useExisting F50=1 then F20 vs GO Variable U100.
+4. Next: e8494 — climbed.
+
+**seed5 e8494→8499 climbed — Comma rhs Function useExisting inventory undercount F20 U16:**
+1. Capture: e8493 F50=1 useExisting; UP F20 + U16 choose_func then param Expression; GO sole/empty inventory skipped choose → Variable U100.
+2. C++: Function::choose_func BuiltinFunctionProb-shaped F20 + get_one_function U(n) among ok_funcs then build_invocation params.
+3. GO: invent residual FuncF20U16 residual on useExisting (even if GO candidates non-empty undercount); skip ThenBody F30 under nested userFuncNest. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8499 U1 PL stack after PP miss vs GO U4 (sticky ThenBodyEver PP choose / VisitF0 stack).
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
