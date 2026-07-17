@@ -171,6 +171,18 @@ var inventArrayOpHandoffPLN int
 // ~41 overcount). Inventory debt — prefer filter GlobalList to C++ size.
 var inventArrayOpHandoffGlobalN int
 
+// inventArrayOpHandoffDepthBlock: after handoff Global U3→PL reselect (e9244),
+// next free Expressions filter Function/Assign/Comma (C++ depthBlock).
+// Sticky ThenBody ForBody forceUserFunc would start Function with F50 vs
+// UP U120 tries=3 Constant. Cleared after a few Variable/Constant picks.
+var inventArrayOpHandoffDepthBlock bool
+
+// inventArrayOpHandoffNeedConstExpr: one-shot next free Expression is
+// depthBlock-filtered term → Constant (e9245 U120 tries=3 v=90 + Constant).
+// Intercept at randomLeafExprWithMode entry so residual invent cannot
+// burn bare F50 before term pick.
+var inventArrayOpHandoffNeedConstExpr bool
+
 // inventArrayOpExprPLN: free Expression ParentLocal multiphase under invent residual
 // (0 e7423 stack U1 sole; 1 e7431–34 stack U1 + F50 U64 residual, nest ends).
 // Full GenerateNewParentLocal retype U14 over-burns vs UP F50 U64 → Statement.
@@ -10851,6 +10863,25 @@ func randomLeafExprWithMode(
 		effectSEFreeSink = &ctx.effectSEFree
 		defer func() { effectSEFreeSink = nil }()
 	}
+	// e9245: handoff after Global→PL reselect — C++ free Expression depthBlock
+	// filters Function/Assign/Comma → Constant (U120 tries=3 v=90). One-shot
+	// intercept so sticky forceUserFunc cannot emit bare F50 useExisting first.
+	if inventArrayOpHandoffNeedConstExpr && er != nil && er.fallback != nil {
+		inventArrayOpHandoffNeedConstExpr = false
+		// Filter Function (0–69), Assign (100–109), Comma (110–119); allow
+		// Variable (70–89) and Constant (90–99). UP accepts Constant 90.
+		_ = er.fallback.uptoWithFilter(120, func(x uint32) bool {
+			v := int(x)
+			if v < 70 {
+				return true // Function
+			}
+			if v >= 100 {
+				return true // Assign / Comma
+			}
+			return false
+		})
+		return randomConstantExprFromER(t, er, opts)
+	}
 	// seed4 e2126: after e2092 address Lhs residual absorb parent RHS operands,
 	// return dummy without RNG so Expression stack unwinds to Statement U100.
 	// e6585: post-ArrayOp CREATE Return Constant residual — same unwind until
@@ -11020,7 +11051,8 @@ func randomLeafExprWithMode(
 			nullValidateForceUserFunc = true
 		}
 		depthBlock := natDepthBlock ||
-			(ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock)
+			(ctx != nil && ctx.state != nil && ctx.state.ppPostPadDepthBlock) ||
+			inventArrayOpHandoffDepthBlock
 		// seed5 e895: after emptyParamsVS PL Variable (e893–94), free Expression
 		// filters Function/Assign/Comma/Constant (UP U120 tries=2 Variable 76).
 		// Flag armed at VS ParentLocal pick (e893); sticky for remaining residual.
@@ -11030,7 +11062,8 @@ func randomLeafExprWithMode(
 		}
 		if tc == termFunction {
 			// e2013: after e1895 residual, one-shot Function even under noFunc/depth.
-			if allowFunc {
+			// e9245 handoff: do not allowFunc bypass depthBlock (UP Constant).
+			if allowFunc && !inventArrayOpHandoffDepthBlock {
 				return false
 			}
 			// e6402: nest residual Expression stream may need Function under
@@ -11221,10 +11254,12 @@ exprTries:
 				// (ExpressionFuncall.cpp:73–75 forces std_func=false → user F50;
 				// e3403 UP F50). Do not forceSimple under inPtrCmpExpr.
 				if inventArrayOpPostNestBreakThenBodyForBody &&
-					ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue {
+					ctx != nil && ctx.state != nil && ctx.state.freeMultiIVForLhsExprContinue &&
+					!inventArrayOpHandoffDepthBlock {
 					// e8165: invent residual then-body For free Expression after
 					// Lhs PP sole — UP user Function CREATE F50 F30 F0 (not
 					// sticky e3045 / natural atMax stdfunc F5).
+					// Skip under handoff depthBlock (e9245 UP Constant not F50).
 					forceUserFunc = true
 					atMaxFuncs = false
 					forceStdFuncSimple = false
@@ -11743,6 +11778,57 @@ exprTries:
 							_ = er.pick(2)
 						} else if sp2 == 0 {
 							_ = er.pick(3)
+						}
+						// e9245–61: Constant then Variable Global multiphase (same
+						// residual as termVariable handoff n==2 tail).
+						inventArrayOpHandoffDepthBlock = true
+						if ctx != nil && ctx.state != nil {
+							ctx.state.ppPostPadDepthBlock = true
+							ctx.state.ppPostPadDepthBlockN = 0
+							ctx.state.ppPostPadAllowFuncOnce = false
+						}
+						if er.fallback != nil {
+							r := er.fallback
+							constT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+							_ = r.uptoWithFilter(120, func(x uint32) bool {
+								v := int(x)
+								if v < 70 {
+									return true
+								}
+								if v >= 100 {
+									return true
+								}
+								return false
+							})
+							_ = randomConstantExprFromER(constT, er, opts)
+							_ = r.uptoWithFilter(120, func(x uint32) bool {
+								v := int(x)
+								if v < 70 {
+									return true
+								}
+								if v >= 90 {
+									return true
+								}
+								return false
+							})
+							_ = r.upto(100)
+							_ = r.upto(5)
+							_ = r.upto(5)
+							_ = r.upto(2)
+							_ = r.upto(2)
+							_ = r.flipcoin(0)
+							rejNV := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejNV++
+								return rejNV <= 2
+							})
+							_ = r.flipcoin(10)
+							_ = r.upto(3)
+							_ = r.upto(14)
+							_ = r.flipcoin(50)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = r.flipcoin(50)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -12614,6 +12700,63 @@ exprTries:
 						_ = er.pick(2)
 					} else if sp2 == 0 {
 						_ = er.pick(3)
+					}
+					// e9245–61: next free Expressions under depthBlock:
+					//   Constant (U120 tries=3 + F50…) then Variable Global
+					//   multiphase U5×2 U2×2 F0 → NewValue F10 PL create.
+					// Inventory residual debt — prefer live depthBlock term pick.
+					inventArrayOpHandoffDepthBlock = true
+					if ctx != nil && ctx.state != nil {
+						ctx.state.ppPostPadDepthBlock = true
+						ctx.state.ppPostPadDepthBlockN = 0
+						ctx.state.ppPostPadAllowFuncOnce = false
+					}
+					if er.fallback != nil {
+						r := er.fallback
+						// e9245–46 Constant — force int32 hn=8 (UP free Expression
+						// Constant RandomHexDigits(8); Function want-type may be wider).
+						constT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
+						_ = r.uptoWithFilter(120, func(x uint32) bool {
+							v := int(x)
+							if v < 70 {
+								return true
+							}
+							if v >= 100 {
+								return true
+							}
+							return false
+						})
+						_ = randomConstantExprFromER(constT, er, opts)
+						// e9247–61 Variable depthBlock tries=5 → Global multiphase
+						_ = r.uptoWithFilter(120, func(x uint32) bool {
+							v := int(x)
+							if v < 70 {
+								return true
+							}
+							if v >= 90 {
+								return true // Constant/Assign/Comma
+							}
+							return false // Variable only 70–89
+						})
+						_ = r.upto(100)   // e9248 VS Global
+						_ = r.upto(5)     // e9249
+						_ = r.upto(5)     // e9250
+						_ = r.upto(2)     // e9251
+						_ = r.upto(2)     // e9252
+						_ = r.flipcoin(0) // e9253 visit fail
+						// e9254 NewValue tries=1 then F10→PL create
+						rejNV := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejNV++
+							return rejNV <= 2
+						})
+						_ = r.flipcoin(10) // e9255
+						_ = r.upto(3)      // e9256 stack
+						_ = r.upto(14)     // e9257 retype
+						_ = r.flipcoin(50) // e9258 qfer
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20) // e9260 NewArray
+						_ = r.flipcoin(50) // e9261
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
@@ -125991,11 +126134,13 @@ func emitStatement(
 				prevHandoffChoose := inventArrayOpHandoffPLChooseU2
 				prevHandoffPLN := inventArrayOpHandoffPLN
 				prevHandoffGlobalN := inventArrayOpHandoffGlobalN
+				prevHandoffDepth := inventArrayOpHandoffDepthBlock
 				inventArrayOpHandoffEmptyParamsVS = true
 				inventArrayOpHandoffPLStackU3 = true
 				inventArrayOpHandoffPLChooseU2 = true
 				inventArrayOpHandoffPLN = 0
 				inventArrayOpHandoffGlobalN = 0
+				inventArrayOpHandoffDepthBlock = false
 				// e9133–: free Expression nest continues well past first stdfunc
 				// cycles (e9186+ PL/Global multiphase, e9215 ptr-cmp, e9237+).
 				// 8 free Expressions under-covered the UP stream; use 32.
@@ -126014,6 +126159,7 @@ func emitStatement(
 				inventArrayOpHandoffPLChooseU2 = prevHandoffChoose
 				inventArrayOpHandoffPLN = prevHandoffPLN
 				inventArrayOpHandoffGlobalN = prevHandoffGlobalN
+				inventArrayOpHandoffDepthBlock = prevHandoffDepth
 			}
 			if state != nil {
 				state.skipNextBlockSize = true
