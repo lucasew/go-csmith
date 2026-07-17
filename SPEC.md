@@ -444,7 +444,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e9186 PL choose U5 vs U4; e9196 Global U10 vs U41; e9215 ptr-cmp derived U26 vs U21; e9221 PL empty create F50 vs choose U4; e9237/e9241 Global choose undercount/overcount.
 2. C++: frame local_vars sizes; GlobalList choose_ok_var; Type::derived_types for ptr-cmp; empty GenerateNewParentLocal; visit_facts fail reselect.
 3. GO: handoff multiphase PL (U2/U5/create) + Global (U10 reselect/U4/U3 reselect); derived_types floor U26; extend free Expression count ×32. **Inventory residual debt** — prefer materialise. Seeds 2/4/6 held.
-4. Next: e9245 U120 tries=3 vs F50 after Global U3→PL reselect.
+4. Next: e9245 — climbed.
+
+**seed5 e9245→9262 climbed — depthBlock Constant + Variable Global multiphase:**
+1. Capture: after Global→PL reselect, UP U120 tries=3 Constant + Variable tries=5 Global U5×2 U2×2 F0 → NewValue F10 PL create; GO forceUserFunc F50 before term.
+2. C++: Expression depthBlock filters Function/Assign/Comma; Constant int32 hex hn=8; Variable Global visit_facts fail → NewValue→PL.
+3. GO: residual multiphase after handoff Global n==2 (Constant int32 + Variable Global ladder + PL create). **Integrity residual debt** — prefer live depthBlock term pick. Seeds 2/4/6 held.
+4. Next: e9262 U120 vs F50 after PL create tail.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
