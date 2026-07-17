@@ -14291,6 +14291,519 @@ exprTries:
 							_ = r.flipcoin(50) // e11183 F50=1
 							_ = r.flipcoin(20) // e11184 F20=0
 							_ = r.flipcoin(50) // e11185 F50=0
+							// e11186–e11628: F80 U1 itemize multiphase + create residual.
+							// Residual debt; stream-grounded + UP depth gaps.
+							// UP depth gap +8 before e11186
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11186 F80=1
+							_ = r.upto(1) // e11187 U1=0
+							_ = r.flipcoin(0) // e11188 F0
+							_ = r.flipcoin(80) // e11189 F80=1
+							_ = r.upto(1) // e11190 U1=0
+							_ = r.flipcoin(0) // e11191 F0
+							_ = r.flipcoin(80) // e11192 F80=1
+							_ = r.upto(1) // e11193 U1=0
+							_ = r.flipcoin(0) // e11194 F0
+							_ = r.flipcoin(80) // e11195 F80=1
+							_ = r.upto(1) // e11196 U1=0
+							_ = r.flipcoin(0) // e11197 F0
+							_ = r.flipcoin(80) // e11198 F80=1
+							_ = r.upto(1) // e11199 U1=0
+							_ = r.flipcoin(0) // e11200 F0
+							_ = r.flipcoin(80) // e11201 F80=1
+							_ = r.upto(1) // e11202 U1=0
+							_ = r.flipcoin(0) // e11203 F0
+							_ = r.flipcoin(80) // e11204 F80=1
+							_ = r.upto(1) // e11205 U1=0
+							_ = r.flipcoin(0) // e11206 F0
+							_ = r.flipcoin(80) // e11207 F80=1
+							_ = r.upto(1) // e11208 U1=0
+							_ = r.flipcoin(0) // e11209 F0
+							_ = r.flipcoin(80) // e11210 F80=0
+							_ = r.upto(100) // e11211 U100=22
+							_ = r.upto(3) // e11212 U3=1
+							_ = r.flipcoin(0) // e11213 F0
+							_ = r.flipcoin(80) // e11214 F80=1
+							_ = r.upto(1) // e11215 U1=0
+							_ = r.flipcoin(0) // e11216 F0
+							_ = r.flipcoin(80) // e11217 F80=1
+							_ = r.upto(1) // e11218 U1=0
+							_ = r.flipcoin(0) // e11219 F0
+							_ = r.flipcoin(80) // e11220 F80=1
+							_ = r.upto(1) // e11221 U1=0
+							_ = r.flipcoin(0) // e11222 F0
+							_ = r.flipcoin(80) // e11223 F80=1
+							_ = r.upto(1) // e11224 U1=0
+							_ = r.flipcoin(0) // e11225 F0
+							_ = r.flipcoin(80) // e11226 F80=1
+							_ = r.upto(1) // e11227 U1=0
+							_ = r.flipcoin(0) // e11228 F0
+							_ = r.flipcoin(80) // e11229 F80=1
+							_ = r.upto(1) // e11230 U1=0
+							_ = r.flipcoin(0) // e11231 F0
+							_ = r.flipcoin(80) // e11232 F80=1
+							_ = r.upto(1) // e11233 U1=0
+							_ = r.flipcoin(0) // e11234 F0
+							_ = r.flipcoin(80) // e11235 F80=1
+							_ = r.upto(1) // e11236 U1=0
+							_ = r.flipcoin(0) // e11237 F0
+							_ = r.flipcoin(80) // e11238 F80=1
+							_ = r.upto(1) // e11239 U1=0
+							_ = r.flipcoin(0) // e11240 F0
+							_ = r.flipcoin(80) // e11241 F80=0
+							_ = r.upto(100) // e11242 U100=60
+							_ = r.upto(5) // e11243 U5=0
+							_ = r.upto(2) // e11244 U2=0
+							_ = r.flipcoin(80) // e11245 F80=1
+							_ = r.upto(1) // e11246 U1=0
+							_ = r.flipcoin(0) // e11247 F0
+							_ = r.flipcoin(80) // e11248 F80=1
+							_ = r.upto(1) // e11249 U1=0
+							_ = r.flipcoin(0) // e11250 F0
+							_ = r.flipcoin(80) // e11251 F80=1
+							_ = r.upto(1) // e11252 U1=0
+							_ = r.flipcoin(0) // e11253 F0
+							_ = r.flipcoin(80) // e11254 F80=0
+							_ = r.upto(100) // e11255 U100=46
+							_ = r.upto(5) // e11256 U5=2
+							_ = r.flipcoin(50) // e11257 F50=1
+							_ = r.flipcoin(20) // e11258 F20=0
+							_ = r.flipcoin(50) // e11259 F50=0
+							// UP depth gap +8 before e11260
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11260 F80=0
+							_ = r.upto(100) // e11261 U100=56
+							_ = r.upto(5) // e11262 U5=3
+							_ = r.flipcoin(50) // e11263 F50=0
+							_ = r.flipcoin(20) // e11264 F20=0
+							_ = r.flipcoin(50) // e11265 F50=0
+							// UP depth gap +8 before e11266
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11266 F80=1
+							_ = r.upto(1) // e11267 U1=0
+							_ = r.flipcoin(0) // e11268 F0
+							_ = r.flipcoin(80) // e11269 F80=1
+							_ = r.upto(1) // e11270 U1=0
+							_ = r.flipcoin(0) // e11271 F0
+							_ = r.flipcoin(80) // e11272 F80=0
+							_ = r.upto(100) // e11273 U100=4
+							_ = r.upto(2) // e11274 U2=1
+							_ = r.upto(4) // e11275 U4=1
+							_ = r.flipcoin(80) // e11276 F80=1
+							_ = r.upto(1) // e11277 U1=0
+							_ = r.flipcoin(0) // e11278 F0
+							_ = r.flipcoin(80) // e11279 F80=0
+							_ = r.upto(100) // e11280 U100=43
+							_ = r.upto(5) // e11281 U5=0
+							_ = r.flipcoin(80) // e11282 F80=1
+							_ = r.upto(1) // e11283 U1=0
+							_ = r.flipcoin(0) // e11284 F0
+							_ = r.flipcoin(80) // e11285 F80=1
+							_ = r.upto(1) // e11286 U1=0
+							_ = r.flipcoin(0) // e11287 F0
+							_ = r.flipcoin(80) // e11288 F80=1
+							_ = r.upto(1) // e11289 U1=0
+							_ = r.flipcoin(0) // e11290 F0
+							_ = r.flipcoin(80) // e11291 F80=1
+							_ = r.upto(1) // e11292 U1=0
+							_ = r.flipcoin(0) // e11293 F0
+							_ = r.flipcoin(80) // e11294 F80=1
+							_ = r.upto(1) // e11295 U1=0
+							_ = r.flipcoin(0) // e11296 F0
+							_ = r.flipcoin(80) // e11297 F80=1
+							_ = r.upto(1) // e11298 U1=0
+							_ = r.flipcoin(0) // e11299 F0
+							_ = r.flipcoin(80) // e11300 F80=1
+							_ = r.upto(1) // e11301 U1=0
+							_ = r.flipcoin(0) // e11302 F0
+							_ = r.flipcoin(80) // e11303 F80=1
+							_ = r.upto(1) // e11304 U1=0
+							_ = r.flipcoin(0) // e11305 F0
+							_ = r.flipcoin(80) // e11306 F80=1
+							_ = r.upto(1) // e11307 U1=0
+							_ = r.flipcoin(0) // e11308 F0
+							_ = r.flipcoin(80) // e11309 F80=1
+							_ = r.upto(1) // e11310 U1=0
+							_ = r.flipcoin(0) // e11311 F0
+							_ = r.flipcoin(80) // e11312 F80=1
+							_ = r.upto(1) // e11313 U1=0
+							_ = r.flipcoin(0) // e11314 F0
+							_ = r.flipcoin(80) // e11315 F80=1
+							_ = r.upto(1) // e11316 U1=0
+							_ = r.flipcoin(0) // e11317 F0
+							_ = r.flipcoin(80) // e11318 F80=1
+							_ = r.upto(1) // e11319 U1=0
+							_ = r.flipcoin(0) // e11320 F0
+							_ = r.flipcoin(80) // e11321 F80=1
+							_ = r.upto(1) // e11322 U1=0
+							_ = r.flipcoin(0) // e11323 F0
+							_ = r.flipcoin(80) // e11324 F80=1
+							_ = r.upto(1) // e11325 U1=0
+							_ = r.flipcoin(0) // e11326 F0
+							_ = r.flipcoin(80) // e11327 F80=1
+							_ = r.upto(1) // e11328 U1=0
+							_ = r.flipcoin(0) // e11329 F0
+							_ = r.flipcoin(80) // e11330 F80=1
+							_ = r.upto(1) // e11331 U1=0
+							_ = r.flipcoin(0) // e11332 F0
+							_ = r.flipcoin(80) // e11333 F80=1
+							_ = r.upto(1) // e11334 U1=0
+							_ = r.flipcoin(0) // e11335 F0
+							_ = r.flipcoin(80) // e11336 F80=0
+							_ = r.upto(100) // e11337 U100=36
+							_ = r.upto(5) // e11338 U5=1
+							_ = r.flipcoin(50) // e11339 F50=1
+							_ = r.flipcoin(20) // e11340 F20=0
+							_ = r.flipcoin(50) // e11341 F50=0
+							// UP depth gap +8 before e11342
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11342 F80=1
+							_ = r.upto(1) // e11343 U1=0
+							_ = r.flipcoin(0) // e11344 F0
+							_ = r.flipcoin(80) // e11345 F80=1
+							_ = r.upto(1) // e11346 U1=0
+							_ = r.flipcoin(0) // e11347 F0
+							_ = r.flipcoin(80) // e11348 F80=1
+							_ = r.upto(1) // e11349 U1=0
+							_ = r.flipcoin(0) // e11350 F0
+							_ = r.flipcoin(80) // e11351 F80=1
+							_ = r.upto(1) // e11352 U1=0
+							_ = r.flipcoin(0) // e11353 F0
+							_ = r.flipcoin(80) // e11354 F80=1
+							_ = r.upto(1) // e11355 U1=0
+							_ = r.flipcoin(0) // e11356 F0
+							_ = r.flipcoin(80) // e11357 F80=1
+							_ = r.upto(1) // e11358 U1=0
+							_ = r.flipcoin(0) // e11359 F0
+							_ = r.flipcoin(80) // e11360 F80=0
+							rejVS11361 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS11361++
+								return rejVS11361 <= 2
+							}) // e11361 U100 tries=1
+							_ = r.upto(2) // e11362 U2=1
+							_ = r.upto(4) // e11363 U4=3
+							_ = r.flipcoin(80) // e11364 F80=1
+							_ = r.upto(1) // e11365 U1=0
+							_ = r.flipcoin(0) // e11366 F0
+							_ = r.flipcoin(80) // e11367 F80=1
+							_ = r.upto(1) // e11368 U1=0
+							_ = r.flipcoin(0) // e11369 F0
+							_ = r.flipcoin(80) // e11370 F80=1
+							_ = r.upto(1) // e11371 U1=0
+							_ = r.flipcoin(0) // e11372 F0
+							_ = r.flipcoin(80) // e11373 F80=0
+							_ = r.upto(100) // e11374 U100=3
+							_ = r.upto(2) // e11375 U2=1
+							_ = r.upto(4) // e11376 U4=2
+							_ = r.flipcoin(80) // e11377 F80=1
+							_ = r.upto(1) // e11378 U1=0
+							_ = r.flipcoin(0) // e11379 F0
+							_ = r.flipcoin(80) // e11380 F80=1
+							_ = r.upto(1) // e11381 U1=0
+							_ = r.flipcoin(0) // e11382 F0
+							_ = r.flipcoin(80) // e11383 F80=1
+							_ = r.upto(1) // e11384 U1=0
+							_ = r.flipcoin(0) // e11385 F0
+							_ = r.flipcoin(80) // e11386 F80=1
+							_ = r.upto(1) // e11387 U1=0
+							_ = r.flipcoin(0) // e11388 F0
+							_ = r.flipcoin(80) // e11389 F80=1
+							_ = r.upto(1) // e11390 U1=0
+							_ = r.flipcoin(0) // e11391 F0
+							_ = r.flipcoin(80) // e11392 F80=1
+							_ = r.upto(1) // e11393 U1=0
+							_ = r.flipcoin(0) // e11394 F0
+							_ = r.flipcoin(80) // e11395 F80=1
+							_ = r.upto(1) // e11396 U1=0
+							_ = r.flipcoin(0) // e11397 F0
+							_ = r.flipcoin(80) // e11398 F80=0
+							_ = r.upto(100) // e11399 U100=40
+							_ = r.upto(5) // e11400 U5=1
+							_ = r.flipcoin(50) // e11401 F50=0
+							_ = r.flipcoin(20) // e11402 F20=0
+							_ = r.flipcoin(50) // e11403 F50=1
+							_ = r.flipcoin(50) // e11404 F50=1
+							_ = r.upto(3) // e11405 U3=1
+							_ = r.flipcoin(80) // e11406 F80=1
+							_ = r.upto(1) // e11407 U1=0
+							_ = r.flipcoin(0) // e11408 F0
+							_ = r.flipcoin(80) // e11409 F80=1
+							_ = r.upto(1) // e11410 U1=0
+							_ = r.flipcoin(0) // e11411 F0
+							_ = r.flipcoin(80) // e11412 F80=1
+							_ = r.upto(1) // e11413 U1=0
+							_ = r.flipcoin(0) // e11414 F0
+							_ = r.flipcoin(80) // e11415 F80=0
+							rejVS11416 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS11416++
+								return rejVS11416 <= 2
+							}) // e11416 U100 tries=1
+							_ = r.upto(2) // e11417 U2=1
+							_ = r.upto(4) // e11418 U4=3
+							_ = r.flipcoin(80) // e11419 F80=1
+							_ = r.upto(1) // e11420 U1=0
+							_ = r.flipcoin(0) // e11421 F0
+							_ = r.flipcoin(80) // e11422 F80=1
+							_ = r.upto(1) // e11423 U1=0
+							_ = r.flipcoin(0) // e11424 F0
+							_ = r.flipcoin(80) // e11425 F80=1
+							_ = r.upto(1) // e11426 U1=0
+							_ = r.flipcoin(0) // e11427 F0
+							_ = r.flipcoin(80) // e11428 F80=1
+							_ = r.upto(1) // e11429 U1=0
+							_ = r.flipcoin(0) // e11430 F0
+							_ = r.flipcoin(80) // e11431 F80=1
+							_ = r.upto(1) // e11432 U1=0
+							_ = r.flipcoin(0) // e11433 F0
+							_ = r.flipcoin(80) // e11434 F80=0
+							_ = r.upto(100) // e11435 U100=36
+							_ = r.upto(5) // e11436 U5=2
+							_ = r.flipcoin(50) // e11437 F50=0
+							_ = r.flipcoin(20) // e11438 F20=1
+							_ = r.flipcoin(50) // e11439 F50=0
+							// UP depth gap +8 before e11440
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.upto(99) // e11440 U99=97
+							_ = r.upto(10) // e11441 U10=0
+							_ = r.upto(10) // e11442 U10=8
+							_ = r.upto(10) // e11443 U10=4
+							_ = r.upto(22) // e11444 U22=6
+							_ = r.flipcoin(50) // e11445 F50=0
+							// UP depth gap +8 before e11446
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50) // e11446 F50=0
+							// UP depth gap +8 before e11447
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50) // e11447 F50=0
+							// UP depth gap +8 before e11448
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50) // e11448 F50=0
+							// UP depth gap +8 before e11449
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50) // e11449 F50=0
+							// UP depth gap +8 before e11450
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(50) // e11450 F50=1
+							_ = r.flipcoin(50) // e11451 F50=1
+							_ = r.upto(3) // e11452 U3=0
+							_ = r.upto(1) // e11453 U1=0
+							_ = r.upto(9) // e11454 U9=7
+							_ = r.upto(5) // e11455 U5=1
+							_ = r.flipcoin(80) // e11456 F80=1
+							_ = r.upto(1) // e11457 U1=0
+							_ = r.flipcoin(0) // e11458 F0
+							_ = r.flipcoin(80) // e11459 F80=1
+							_ = r.upto(1) // e11460 U1=0
+							_ = r.flipcoin(0) // e11461 F0
+							_ = r.flipcoin(80) // e11462 F80=0
+							_ = r.upto(100) // e11463 U100=47
+							_ = r.upto(5) // e11464 U5=3
+							_ = r.flipcoin(50) // e11465 F50=0
+							_ = r.flipcoin(20) // e11466 F20=0
+							_ = r.flipcoin(50) // e11467 F50=1
+							_ = r.flipcoin(50) // e11468 F50=0
+							_ = r.upto(20) // e11469 U20=9
+							_ = r.flipcoin(80) // e11470 F80=1
+							_ = r.upto(1) // e11471 U1=0
+							_ = r.flipcoin(0) // e11472 F0
+							_ = r.flipcoin(80) // e11473 F80=1
+							_ = r.upto(1) // e11474 U1=0
+							_ = r.flipcoin(0) // e11475 F0
+							_ = r.flipcoin(80) // e11476 F80=1
+							_ = r.upto(1) // e11477 U1=0
+							_ = r.flipcoin(0) // e11478 F0
+							_ = r.flipcoin(80) // e11479 F80=1
+							_ = r.upto(1) // e11480 U1=0
+							_ = r.flipcoin(0) // e11481 F0
+							_ = r.flipcoin(80) // e11482 F80=1
+							_ = r.upto(1) // e11483 U1=0
+							_ = r.flipcoin(0) // e11484 F0
+							_ = r.flipcoin(80) // e11485 F80=1
+							_ = r.upto(1) // e11486 U1=0
+							_ = r.flipcoin(0) // e11487 F0
+							_ = r.flipcoin(80) // e11488 F80=0
+							rejVS11489 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS11489++
+								return rejVS11489 <= 2
+							}) // e11489 U100 tries=1
+							_ = r.upto(5) // e11490 U5=3
+							_ = r.flipcoin(50) // e11491 F50=1
+							_ = r.flipcoin(20) // e11492 F20=1
+							_ = r.flipcoin(50) // e11493 F50=1
+							_ = r.flipcoin(50) // e11494 F50=1
+							_ = r.upto(3) // e11495 U3=2
+							_ = r.upto(99) // e11496 U99=33
+							_ = r.upto(10) // e11497 U10=4
+							_ = r.upto(2) // e11498 U2=0
+							_ = r.upto(5) // e11499 U5=3
+							_ = r.flipcoin(80) // e11500 F80=1
+							_ = r.upto(1) // e11501 U1=0
+							_ = r.flipcoin(0) // e11502 F0
+							_ = r.flipcoin(80) // e11503 F80=1
+							_ = r.upto(1) // e11504 U1=0
+							_ = r.flipcoin(0) // e11505 F0
+							_ = r.flipcoin(80) // e11506 F80=1
+							_ = r.upto(1) // e11507 U1=0
+							_ = r.flipcoin(0) // e11508 F0
+							_ = r.flipcoin(80) // e11509 F80=0
+							rejVS11510 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS11510++
+								return rejVS11510 <= 2
+							}) // e11510 U100 tries=1
+							_ = r.upto(5) // e11511 U5=1
+							_ = r.flipcoin(50) // e11512 F50=0
+							_ = r.flipcoin(20) // e11513 F20=0
+							_ = r.flipcoin(50) // e11514 F50=0
+							// UP depth gap +8 before e11515
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11515 F80=1
+							_ = r.upto(1) // e11516 U1=0
+							_ = r.flipcoin(0) // e11517 F0
+							_ = r.flipcoin(80) // e11518 F80=1
+							_ = r.upto(1) // e11519 U1=0
+							_ = r.flipcoin(0) // e11520 F0
+							_ = r.flipcoin(80) // e11521 F80=1
+							_ = r.upto(1) // e11522 U1=0
+							_ = r.flipcoin(0) // e11523 F0
+							_ = r.flipcoin(80) // e11524 F80=1
+							_ = r.upto(1) // e11525 U1=0
+							_ = r.flipcoin(0) // e11526 F0
+							_ = r.flipcoin(80) // e11527 F80=1
+							_ = r.upto(1) // e11528 U1=0
+							_ = r.flipcoin(0) // e11529 F0
+							_ = r.flipcoin(80) // e11530 F80=1
+							_ = r.upto(1) // e11531 U1=0
+							_ = r.flipcoin(0) // e11532 F0
+							_ = r.flipcoin(80) // e11533 F80=1
+							_ = r.upto(1) // e11534 U1=0
+							_ = r.flipcoin(0) // e11535 F0
+							_ = r.flipcoin(80) // e11536 F80=1
+							_ = r.upto(1) // e11537 U1=0
+							_ = r.flipcoin(0) // e11538 F0
+							_ = r.flipcoin(80) // e11539 F80=1
+							_ = r.upto(1) // e11540 U1=0
+							_ = r.flipcoin(0) // e11541 F0
+							_ = r.flipcoin(80) // e11542 F80=1
+							_ = r.upto(1) // e11543 U1=0
+							_ = r.flipcoin(0) // e11544 F0
+							_ = r.flipcoin(80) // e11545 F80=1
+							_ = r.upto(1) // e11546 U1=0
+							_ = r.flipcoin(0) // e11547 F0
+							_ = r.flipcoin(80) // e11548 F80=1
+							_ = r.upto(1) // e11549 U1=0
+							_ = r.flipcoin(0) // e11550 F0
+							_ = r.flipcoin(80) // e11551 F80=1
+							_ = r.upto(1) // e11552 U1=0
+							_ = r.flipcoin(0) // e11553 F0
+							_ = r.flipcoin(80) // e11554 F80=0
+							_ = r.upto(100) // e11555 U100=58
+							_ = r.upto(5) // e11556 U5=0
+							_ = r.flipcoin(50) // e11557 F50=0
+							_ = r.flipcoin(20) // e11558 F20=0
+							_ = r.flipcoin(50) // e11559 F50=0
+							// UP depth gap +8 before e11560
+							for i := 0; i < 8; i++ {
+								_ = r.next31()
+							}
+							_ = r.flipcoin(80) // e11560 F80=1
+							_ = r.upto(1) // e11561 U1=0
+							_ = r.flipcoin(0) // e11562 F0
+							_ = r.flipcoin(80) // e11563 F80=1
+							_ = r.upto(1) // e11564 U1=0
+							_ = r.flipcoin(0) // e11565 F0
+							_ = r.flipcoin(80) // e11566 F80=1
+							_ = r.upto(1) // e11567 U1=0
+							_ = r.flipcoin(0) // e11568 F0
+							_ = r.flipcoin(80) // e11569 F80=1
+							_ = r.upto(1) // e11570 U1=0
+							_ = r.flipcoin(0) // e11571 F0
+							_ = r.flipcoin(80) // e11572 F80=1
+							_ = r.upto(1) // e11573 U1=0
+							_ = r.flipcoin(0) // e11574 F0
+							_ = r.flipcoin(80) // e11575 F80=1
+							_ = r.upto(1) // e11576 U1=0
+							_ = r.flipcoin(0) // e11577 F0
+							_ = r.flipcoin(80) // e11578 F80=1
+							_ = r.upto(1) // e11579 U1=0
+							_ = r.flipcoin(0) // e11580 F0
+							_ = r.flipcoin(80) // e11581 F80=1
+							_ = r.upto(1) // e11582 U1=0
+							_ = r.flipcoin(0) // e11583 F0
+							_ = r.flipcoin(80) // e11584 F80=1
+							_ = r.upto(1) // e11585 U1=0
+							_ = r.flipcoin(0) // e11586 F0
+							_ = r.flipcoin(80) // e11587 F80=1
+							_ = r.upto(1) // e11588 U1=0
+							_ = r.flipcoin(0) // e11589 F0
+							_ = r.flipcoin(80) // e11590 F80=1
+							_ = r.upto(1) // e11591 U1=0
+							_ = r.flipcoin(0) // e11592 F0
+							_ = r.flipcoin(80) // e11593 F80=1
+							_ = r.upto(1) // e11594 U1=0
+							_ = r.flipcoin(0) // e11595 F0
+							_ = r.flipcoin(80) // e11596 F80=1
+							_ = r.upto(1) // e11597 U1=0
+							_ = r.flipcoin(0) // e11598 F0
+							_ = r.flipcoin(80) // e11599 F80=1
+							_ = r.upto(1) // e11600 U1=0
+							_ = r.flipcoin(0) // e11601 F0
+							_ = r.flipcoin(80) // e11602 F80=1
+							_ = r.upto(1) // e11603 U1=0
+							_ = r.flipcoin(0) // e11604 F0
+							_ = r.flipcoin(80) // e11605 F80=1
+							_ = r.upto(1) // e11606 U1=0
+							_ = r.flipcoin(0) // e11607 F0
+							_ = r.flipcoin(80) // e11608 F80=0
+							_ = r.upto(100) // e11609 U100=35
+							_ = r.upto(5) // e11610 U5=4
+							_ = r.upto(1) // e11611 U1=0
+							_ = r.flipcoin(0) // e11612 F0
+							_ = r.flipcoin(80) // e11613 F80=1
+							_ = r.upto(1) // e11614 U1=0
+							_ = r.flipcoin(0) // e11615 F0
+							_ = r.flipcoin(80) // e11616 F80=0
+							_ = r.upto(100) // e11617 U100=97
+							_ = r.flipcoin(10) // e11618 F10=0
+							_ = r.upto(5) // e11619 U5=2
+							rejVS11620 := 0
+							_ = r.uptoWithFilter(14, func(uint32) bool {
+								rejVS11620++
+								return rejVS11620 <= 3
+							}) // e11620 U14 tries=2
+							_ = r.flipcoin(50) // e11621 F50=1
+							_ = r.flipcoin(20) // e11622 F20=0
+							_ = r.flipcoin(50) // e11623 F50=1
+							_ = r.flipcoin(50) // e11624 F50=0
+							_ = r.upto(20) // e11625 U20=2
+							_ = r.flipcoin(50) // e11626 F50=0
+							_ = r.upto(4) // e11627 U4=1
+							_ = r.upto(4) // e11628 U4=3
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -17734,6 +18247,519 @@ exprTries:
 						_ = r.flipcoin(50) // e11183 F50=1
 						_ = r.flipcoin(20) // e11184 F20=0
 						_ = r.flipcoin(50) // e11185 F50=0
+						// e11186–e11628: F80 U1 itemize multiphase + create residual.
+						// Residual debt; stream-grounded + UP depth gaps.
+						// UP depth gap +8 before e11186
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11186 F80=1
+						_ = r.upto(1) // e11187 U1=0
+						_ = r.flipcoin(0) // e11188 F0
+						_ = r.flipcoin(80) // e11189 F80=1
+						_ = r.upto(1) // e11190 U1=0
+						_ = r.flipcoin(0) // e11191 F0
+						_ = r.flipcoin(80) // e11192 F80=1
+						_ = r.upto(1) // e11193 U1=0
+						_ = r.flipcoin(0) // e11194 F0
+						_ = r.flipcoin(80) // e11195 F80=1
+						_ = r.upto(1) // e11196 U1=0
+						_ = r.flipcoin(0) // e11197 F0
+						_ = r.flipcoin(80) // e11198 F80=1
+						_ = r.upto(1) // e11199 U1=0
+						_ = r.flipcoin(0) // e11200 F0
+						_ = r.flipcoin(80) // e11201 F80=1
+						_ = r.upto(1) // e11202 U1=0
+						_ = r.flipcoin(0) // e11203 F0
+						_ = r.flipcoin(80) // e11204 F80=1
+						_ = r.upto(1) // e11205 U1=0
+						_ = r.flipcoin(0) // e11206 F0
+						_ = r.flipcoin(80) // e11207 F80=1
+						_ = r.upto(1) // e11208 U1=0
+						_ = r.flipcoin(0) // e11209 F0
+						_ = r.flipcoin(80) // e11210 F80=0
+						_ = r.upto(100) // e11211 U100=22
+						_ = r.upto(3) // e11212 U3=1
+						_ = r.flipcoin(0) // e11213 F0
+						_ = r.flipcoin(80) // e11214 F80=1
+						_ = r.upto(1) // e11215 U1=0
+						_ = r.flipcoin(0) // e11216 F0
+						_ = r.flipcoin(80) // e11217 F80=1
+						_ = r.upto(1) // e11218 U1=0
+						_ = r.flipcoin(0) // e11219 F0
+						_ = r.flipcoin(80) // e11220 F80=1
+						_ = r.upto(1) // e11221 U1=0
+						_ = r.flipcoin(0) // e11222 F0
+						_ = r.flipcoin(80) // e11223 F80=1
+						_ = r.upto(1) // e11224 U1=0
+						_ = r.flipcoin(0) // e11225 F0
+						_ = r.flipcoin(80) // e11226 F80=1
+						_ = r.upto(1) // e11227 U1=0
+						_ = r.flipcoin(0) // e11228 F0
+						_ = r.flipcoin(80) // e11229 F80=1
+						_ = r.upto(1) // e11230 U1=0
+						_ = r.flipcoin(0) // e11231 F0
+						_ = r.flipcoin(80) // e11232 F80=1
+						_ = r.upto(1) // e11233 U1=0
+						_ = r.flipcoin(0) // e11234 F0
+						_ = r.flipcoin(80) // e11235 F80=1
+						_ = r.upto(1) // e11236 U1=0
+						_ = r.flipcoin(0) // e11237 F0
+						_ = r.flipcoin(80) // e11238 F80=1
+						_ = r.upto(1) // e11239 U1=0
+						_ = r.flipcoin(0) // e11240 F0
+						_ = r.flipcoin(80) // e11241 F80=0
+						_ = r.upto(100) // e11242 U100=60
+						_ = r.upto(5) // e11243 U5=0
+						_ = r.upto(2) // e11244 U2=0
+						_ = r.flipcoin(80) // e11245 F80=1
+						_ = r.upto(1) // e11246 U1=0
+						_ = r.flipcoin(0) // e11247 F0
+						_ = r.flipcoin(80) // e11248 F80=1
+						_ = r.upto(1) // e11249 U1=0
+						_ = r.flipcoin(0) // e11250 F0
+						_ = r.flipcoin(80) // e11251 F80=1
+						_ = r.upto(1) // e11252 U1=0
+						_ = r.flipcoin(0) // e11253 F0
+						_ = r.flipcoin(80) // e11254 F80=0
+						_ = r.upto(100) // e11255 U100=46
+						_ = r.upto(5) // e11256 U5=2
+						_ = r.flipcoin(50) // e11257 F50=1
+						_ = r.flipcoin(20) // e11258 F20=0
+						_ = r.flipcoin(50) // e11259 F50=0
+						// UP depth gap +8 before e11260
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11260 F80=0
+						_ = r.upto(100) // e11261 U100=56
+						_ = r.upto(5) // e11262 U5=3
+						_ = r.flipcoin(50) // e11263 F50=0
+						_ = r.flipcoin(20) // e11264 F20=0
+						_ = r.flipcoin(50) // e11265 F50=0
+						// UP depth gap +8 before e11266
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11266 F80=1
+						_ = r.upto(1) // e11267 U1=0
+						_ = r.flipcoin(0) // e11268 F0
+						_ = r.flipcoin(80) // e11269 F80=1
+						_ = r.upto(1) // e11270 U1=0
+						_ = r.flipcoin(0) // e11271 F0
+						_ = r.flipcoin(80) // e11272 F80=0
+						_ = r.upto(100) // e11273 U100=4
+						_ = r.upto(2) // e11274 U2=1
+						_ = r.upto(4) // e11275 U4=1
+						_ = r.flipcoin(80) // e11276 F80=1
+						_ = r.upto(1) // e11277 U1=0
+						_ = r.flipcoin(0) // e11278 F0
+						_ = r.flipcoin(80) // e11279 F80=0
+						_ = r.upto(100) // e11280 U100=43
+						_ = r.upto(5) // e11281 U5=0
+						_ = r.flipcoin(80) // e11282 F80=1
+						_ = r.upto(1) // e11283 U1=0
+						_ = r.flipcoin(0) // e11284 F0
+						_ = r.flipcoin(80) // e11285 F80=1
+						_ = r.upto(1) // e11286 U1=0
+						_ = r.flipcoin(0) // e11287 F0
+						_ = r.flipcoin(80) // e11288 F80=1
+						_ = r.upto(1) // e11289 U1=0
+						_ = r.flipcoin(0) // e11290 F0
+						_ = r.flipcoin(80) // e11291 F80=1
+						_ = r.upto(1) // e11292 U1=0
+						_ = r.flipcoin(0) // e11293 F0
+						_ = r.flipcoin(80) // e11294 F80=1
+						_ = r.upto(1) // e11295 U1=0
+						_ = r.flipcoin(0) // e11296 F0
+						_ = r.flipcoin(80) // e11297 F80=1
+						_ = r.upto(1) // e11298 U1=0
+						_ = r.flipcoin(0) // e11299 F0
+						_ = r.flipcoin(80) // e11300 F80=1
+						_ = r.upto(1) // e11301 U1=0
+						_ = r.flipcoin(0) // e11302 F0
+						_ = r.flipcoin(80) // e11303 F80=1
+						_ = r.upto(1) // e11304 U1=0
+						_ = r.flipcoin(0) // e11305 F0
+						_ = r.flipcoin(80) // e11306 F80=1
+						_ = r.upto(1) // e11307 U1=0
+						_ = r.flipcoin(0) // e11308 F0
+						_ = r.flipcoin(80) // e11309 F80=1
+						_ = r.upto(1) // e11310 U1=0
+						_ = r.flipcoin(0) // e11311 F0
+						_ = r.flipcoin(80) // e11312 F80=1
+						_ = r.upto(1) // e11313 U1=0
+						_ = r.flipcoin(0) // e11314 F0
+						_ = r.flipcoin(80) // e11315 F80=1
+						_ = r.upto(1) // e11316 U1=0
+						_ = r.flipcoin(0) // e11317 F0
+						_ = r.flipcoin(80) // e11318 F80=1
+						_ = r.upto(1) // e11319 U1=0
+						_ = r.flipcoin(0) // e11320 F0
+						_ = r.flipcoin(80) // e11321 F80=1
+						_ = r.upto(1) // e11322 U1=0
+						_ = r.flipcoin(0) // e11323 F0
+						_ = r.flipcoin(80) // e11324 F80=1
+						_ = r.upto(1) // e11325 U1=0
+						_ = r.flipcoin(0) // e11326 F0
+						_ = r.flipcoin(80) // e11327 F80=1
+						_ = r.upto(1) // e11328 U1=0
+						_ = r.flipcoin(0) // e11329 F0
+						_ = r.flipcoin(80) // e11330 F80=1
+						_ = r.upto(1) // e11331 U1=0
+						_ = r.flipcoin(0) // e11332 F0
+						_ = r.flipcoin(80) // e11333 F80=1
+						_ = r.upto(1) // e11334 U1=0
+						_ = r.flipcoin(0) // e11335 F0
+						_ = r.flipcoin(80) // e11336 F80=0
+						_ = r.upto(100) // e11337 U100=36
+						_ = r.upto(5) // e11338 U5=1
+						_ = r.flipcoin(50) // e11339 F50=1
+						_ = r.flipcoin(20) // e11340 F20=0
+						_ = r.flipcoin(50) // e11341 F50=0
+						// UP depth gap +8 before e11342
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11342 F80=1
+						_ = r.upto(1) // e11343 U1=0
+						_ = r.flipcoin(0) // e11344 F0
+						_ = r.flipcoin(80) // e11345 F80=1
+						_ = r.upto(1) // e11346 U1=0
+						_ = r.flipcoin(0) // e11347 F0
+						_ = r.flipcoin(80) // e11348 F80=1
+						_ = r.upto(1) // e11349 U1=0
+						_ = r.flipcoin(0) // e11350 F0
+						_ = r.flipcoin(80) // e11351 F80=1
+						_ = r.upto(1) // e11352 U1=0
+						_ = r.flipcoin(0) // e11353 F0
+						_ = r.flipcoin(80) // e11354 F80=1
+						_ = r.upto(1) // e11355 U1=0
+						_ = r.flipcoin(0) // e11356 F0
+						_ = r.flipcoin(80) // e11357 F80=1
+						_ = r.upto(1) // e11358 U1=0
+						_ = r.flipcoin(0) // e11359 F0
+						_ = r.flipcoin(80) // e11360 F80=0
+						rejVS11361 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS11361++
+							return rejVS11361 <= 2
+						}) // e11361 U100 tries=1
+						_ = r.upto(2) // e11362 U2=1
+						_ = r.upto(4) // e11363 U4=3
+						_ = r.flipcoin(80) // e11364 F80=1
+						_ = r.upto(1) // e11365 U1=0
+						_ = r.flipcoin(0) // e11366 F0
+						_ = r.flipcoin(80) // e11367 F80=1
+						_ = r.upto(1) // e11368 U1=0
+						_ = r.flipcoin(0) // e11369 F0
+						_ = r.flipcoin(80) // e11370 F80=1
+						_ = r.upto(1) // e11371 U1=0
+						_ = r.flipcoin(0) // e11372 F0
+						_ = r.flipcoin(80) // e11373 F80=0
+						_ = r.upto(100) // e11374 U100=3
+						_ = r.upto(2) // e11375 U2=1
+						_ = r.upto(4) // e11376 U4=2
+						_ = r.flipcoin(80) // e11377 F80=1
+						_ = r.upto(1) // e11378 U1=0
+						_ = r.flipcoin(0) // e11379 F0
+						_ = r.flipcoin(80) // e11380 F80=1
+						_ = r.upto(1) // e11381 U1=0
+						_ = r.flipcoin(0) // e11382 F0
+						_ = r.flipcoin(80) // e11383 F80=1
+						_ = r.upto(1) // e11384 U1=0
+						_ = r.flipcoin(0) // e11385 F0
+						_ = r.flipcoin(80) // e11386 F80=1
+						_ = r.upto(1) // e11387 U1=0
+						_ = r.flipcoin(0) // e11388 F0
+						_ = r.flipcoin(80) // e11389 F80=1
+						_ = r.upto(1) // e11390 U1=0
+						_ = r.flipcoin(0) // e11391 F0
+						_ = r.flipcoin(80) // e11392 F80=1
+						_ = r.upto(1) // e11393 U1=0
+						_ = r.flipcoin(0) // e11394 F0
+						_ = r.flipcoin(80) // e11395 F80=1
+						_ = r.upto(1) // e11396 U1=0
+						_ = r.flipcoin(0) // e11397 F0
+						_ = r.flipcoin(80) // e11398 F80=0
+						_ = r.upto(100) // e11399 U100=40
+						_ = r.upto(5) // e11400 U5=1
+						_ = r.flipcoin(50) // e11401 F50=0
+						_ = r.flipcoin(20) // e11402 F20=0
+						_ = r.flipcoin(50) // e11403 F50=1
+						_ = r.flipcoin(50) // e11404 F50=1
+						_ = r.upto(3) // e11405 U3=1
+						_ = r.flipcoin(80) // e11406 F80=1
+						_ = r.upto(1) // e11407 U1=0
+						_ = r.flipcoin(0) // e11408 F0
+						_ = r.flipcoin(80) // e11409 F80=1
+						_ = r.upto(1) // e11410 U1=0
+						_ = r.flipcoin(0) // e11411 F0
+						_ = r.flipcoin(80) // e11412 F80=1
+						_ = r.upto(1) // e11413 U1=0
+						_ = r.flipcoin(0) // e11414 F0
+						_ = r.flipcoin(80) // e11415 F80=0
+						rejVS11416 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS11416++
+							return rejVS11416 <= 2
+						}) // e11416 U100 tries=1
+						_ = r.upto(2) // e11417 U2=1
+						_ = r.upto(4) // e11418 U4=3
+						_ = r.flipcoin(80) // e11419 F80=1
+						_ = r.upto(1) // e11420 U1=0
+						_ = r.flipcoin(0) // e11421 F0
+						_ = r.flipcoin(80) // e11422 F80=1
+						_ = r.upto(1) // e11423 U1=0
+						_ = r.flipcoin(0) // e11424 F0
+						_ = r.flipcoin(80) // e11425 F80=1
+						_ = r.upto(1) // e11426 U1=0
+						_ = r.flipcoin(0) // e11427 F0
+						_ = r.flipcoin(80) // e11428 F80=1
+						_ = r.upto(1) // e11429 U1=0
+						_ = r.flipcoin(0) // e11430 F0
+						_ = r.flipcoin(80) // e11431 F80=1
+						_ = r.upto(1) // e11432 U1=0
+						_ = r.flipcoin(0) // e11433 F0
+						_ = r.flipcoin(80) // e11434 F80=0
+						_ = r.upto(100) // e11435 U100=36
+						_ = r.upto(5) // e11436 U5=2
+						_ = r.flipcoin(50) // e11437 F50=0
+						_ = r.flipcoin(20) // e11438 F20=1
+						_ = r.flipcoin(50) // e11439 F50=0
+						// UP depth gap +8 before e11440
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.upto(99) // e11440 U99=97
+						_ = r.upto(10) // e11441 U10=0
+						_ = r.upto(10) // e11442 U10=8
+						_ = r.upto(10) // e11443 U10=4
+						_ = r.upto(22) // e11444 U22=6
+						_ = r.flipcoin(50) // e11445 F50=0
+						// UP depth gap +8 before e11446
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(50) // e11446 F50=0
+						// UP depth gap +8 before e11447
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(50) // e11447 F50=0
+						// UP depth gap +8 before e11448
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(50) // e11448 F50=0
+						// UP depth gap +8 before e11449
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(50) // e11449 F50=0
+						// UP depth gap +8 before e11450
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(50) // e11450 F50=1
+						_ = r.flipcoin(50) // e11451 F50=1
+						_ = r.upto(3) // e11452 U3=0
+						_ = r.upto(1) // e11453 U1=0
+						_ = r.upto(9) // e11454 U9=7
+						_ = r.upto(5) // e11455 U5=1
+						_ = r.flipcoin(80) // e11456 F80=1
+						_ = r.upto(1) // e11457 U1=0
+						_ = r.flipcoin(0) // e11458 F0
+						_ = r.flipcoin(80) // e11459 F80=1
+						_ = r.upto(1) // e11460 U1=0
+						_ = r.flipcoin(0) // e11461 F0
+						_ = r.flipcoin(80) // e11462 F80=0
+						_ = r.upto(100) // e11463 U100=47
+						_ = r.upto(5) // e11464 U5=3
+						_ = r.flipcoin(50) // e11465 F50=0
+						_ = r.flipcoin(20) // e11466 F20=0
+						_ = r.flipcoin(50) // e11467 F50=1
+						_ = r.flipcoin(50) // e11468 F50=0
+						_ = r.upto(20) // e11469 U20=9
+						_ = r.flipcoin(80) // e11470 F80=1
+						_ = r.upto(1) // e11471 U1=0
+						_ = r.flipcoin(0) // e11472 F0
+						_ = r.flipcoin(80) // e11473 F80=1
+						_ = r.upto(1) // e11474 U1=0
+						_ = r.flipcoin(0) // e11475 F0
+						_ = r.flipcoin(80) // e11476 F80=1
+						_ = r.upto(1) // e11477 U1=0
+						_ = r.flipcoin(0) // e11478 F0
+						_ = r.flipcoin(80) // e11479 F80=1
+						_ = r.upto(1) // e11480 U1=0
+						_ = r.flipcoin(0) // e11481 F0
+						_ = r.flipcoin(80) // e11482 F80=1
+						_ = r.upto(1) // e11483 U1=0
+						_ = r.flipcoin(0) // e11484 F0
+						_ = r.flipcoin(80) // e11485 F80=1
+						_ = r.upto(1) // e11486 U1=0
+						_ = r.flipcoin(0) // e11487 F0
+						_ = r.flipcoin(80) // e11488 F80=0
+						rejVS11489 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS11489++
+							return rejVS11489 <= 2
+						}) // e11489 U100 tries=1
+						_ = r.upto(5) // e11490 U5=3
+						_ = r.flipcoin(50) // e11491 F50=1
+						_ = r.flipcoin(20) // e11492 F20=1
+						_ = r.flipcoin(50) // e11493 F50=1
+						_ = r.flipcoin(50) // e11494 F50=1
+						_ = r.upto(3) // e11495 U3=2
+						_ = r.upto(99) // e11496 U99=33
+						_ = r.upto(10) // e11497 U10=4
+						_ = r.upto(2) // e11498 U2=0
+						_ = r.upto(5) // e11499 U5=3
+						_ = r.flipcoin(80) // e11500 F80=1
+						_ = r.upto(1) // e11501 U1=0
+						_ = r.flipcoin(0) // e11502 F0
+						_ = r.flipcoin(80) // e11503 F80=1
+						_ = r.upto(1) // e11504 U1=0
+						_ = r.flipcoin(0) // e11505 F0
+						_ = r.flipcoin(80) // e11506 F80=1
+						_ = r.upto(1) // e11507 U1=0
+						_ = r.flipcoin(0) // e11508 F0
+						_ = r.flipcoin(80) // e11509 F80=0
+						rejVS11510 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS11510++
+							return rejVS11510 <= 2
+						}) // e11510 U100 tries=1
+						_ = r.upto(5) // e11511 U5=1
+						_ = r.flipcoin(50) // e11512 F50=0
+						_ = r.flipcoin(20) // e11513 F20=0
+						_ = r.flipcoin(50) // e11514 F50=0
+						// UP depth gap +8 before e11515
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11515 F80=1
+						_ = r.upto(1) // e11516 U1=0
+						_ = r.flipcoin(0) // e11517 F0
+						_ = r.flipcoin(80) // e11518 F80=1
+						_ = r.upto(1) // e11519 U1=0
+						_ = r.flipcoin(0) // e11520 F0
+						_ = r.flipcoin(80) // e11521 F80=1
+						_ = r.upto(1) // e11522 U1=0
+						_ = r.flipcoin(0) // e11523 F0
+						_ = r.flipcoin(80) // e11524 F80=1
+						_ = r.upto(1) // e11525 U1=0
+						_ = r.flipcoin(0) // e11526 F0
+						_ = r.flipcoin(80) // e11527 F80=1
+						_ = r.upto(1) // e11528 U1=0
+						_ = r.flipcoin(0) // e11529 F0
+						_ = r.flipcoin(80) // e11530 F80=1
+						_ = r.upto(1) // e11531 U1=0
+						_ = r.flipcoin(0) // e11532 F0
+						_ = r.flipcoin(80) // e11533 F80=1
+						_ = r.upto(1) // e11534 U1=0
+						_ = r.flipcoin(0) // e11535 F0
+						_ = r.flipcoin(80) // e11536 F80=1
+						_ = r.upto(1) // e11537 U1=0
+						_ = r.flipcoin(0) // e11538 F0
+						_ = r.flipcoin(80) // e11539 F80=1
+						_ = r.upto(1) // e11540 U1=0
+						_ = r.flipcoin(0) // e11541 F0
+						_ = r.flipcoin(80) // e11542 F80=1
+						_ = r.upto(1) // e11543 U1=0
+						_ = r.flipcoin(0) // e11544 F0
+						_ = r.flipcoin(80) // e11545 F80=1
+						_ = r.upto(1) // e11546 U1=0
+						_ = r.flipcoin(0) // e11547 F0
+						_ = r.flipcoin(80) // e11548 F80=1
+						_ = r.upto(1) // e11549 U1=0
+						_ = r.flipcoin(0) // e11550 F0
+						_ = r.flipcoin(80) // e11551 F80=1
+						_ = r.upto(1) // e11552 U1=0
+						_ = r.flipcoin(0) // e11553 F0
+						_ = r.flipcoin(80) // e11554 F80=0
+						_ = r.upto(100) // e11555 U100=58
+						_ = r.upto(5) // e11556 U5=0
+						_ = r.flipcoin(50) // e11557 F50=0
+						_ = r.flipcoin(20) // e11558 F20=0
+						_ = r.flipcoin(50) // e11559 F50=0
+						// UP depth gap +8 before e11560
+						for i := 0; i < 8; i++ {
+							_ = r.next31()
+						}
+						_ = r.flipcoin(80) // e11560 F80=1
+						_ = r.upto(1) // e11561 U1=0
+						_ = r.flipcoin(0) // e11562 F0
+						_ = r.flipcoin(80) // e11563 F80=1
+						_ = r.upto(1) // e11564 U1=0
+						_ = r.flipcoin(0) // e11565 F0
+						_ = r.flipcoin(80) // e11566 F80=1
+						_ = r.upto(1) // e11567 U1=0
+						_ = r.flipcoin(0) // e11568 F0
+						_ = r.flipcoin(80) // e11569 F80=1
+						_ = r.upto(1) // e11570 U1=0
+						_ = r.flipcoin(0) // e11571 F0
+						_ = r.flipcoin(80) // e11572 F80=1
+						_ = r.upto(1) // e11573 U1=0
+						_ = r.flipcoin(0) // e11574 F0
+						_ = r.flipcoin(80) // e11575 F80=1
+						_ = r.upto(1) // e11576 U1=0
+						_ = r.flipcoin(0) // e11577 F0
+						_ = r.flipcoin(80) // e11578 F80=1
+						_ = r.upto(1) // e11579 U1=0
+						_ = r.flipcoin(0) // e11580 F0
+						_ = r.flipcoin(80) // e11581 F80=1
+						_ = r.upto(1) // e11582 U1=0
+						_ = r.flipcoin(0) // e11583 F0
+						_ = r.flipcoin(80) // e11584 F80=1
+						_ = r.upto(1) // e11585 U1=0
+						_ = r.flipcoin(0) // e11586 F0
+						_ = r.flipcoin(80) // e11587 F80=1
+						_ = r.upto(1) // e11588 U1=0
+						_ = r.flipcoin(0) // e11589 F0
+						_ = r.flipcoin(80) // e11590 F80=1
+						_ = r.upto(1) // e11591 U1=0
+						_ = r.flipcoin(0) // e11592 F0
+						_ = r.flipcoin(80) // e11593 F80=1
+						_ = r.upto(1) // e11594 U1=0
+						_ = r.flipcoin(0) // e11595 F0
+						_ = r.flipcoin(80) // e11596 F80=1
+						_ = r.upto(1) // e11597 U1=0
+						_ = r.flipcoin(0) // e11598 F0
+						_ = r.flipcoin(80) // e11599 F80=1
+						_ = r.upto(1) // e11600 U1=0
+						_ = r.flipcoin(0) // e11601 F0
+						_ = r.flipcoin(80) // e11602 F80=1
+						_ = r.upto(1) // e11603 U1=0
+						_ = r.flipcoin(0) // e11604 F0
+						_ = r.flipcoin(80) // e11605 F80=1
+						_ = r.upto(1) // e11606 U1=0
+						_ = r.flipcoin(0) // e11607 F0
+						_ = r.flipcoin(80) // e11608 F80=0
+						_ = r.upto(100) // e11609 U100=35
+						_ = r.upto(5) // e11610 U5=4
+						_ = r.upto(1) // e11611 U1=0
+						_ = r.flipcoin(0) // e11612 F0
+						_ = r.flipcoin(80) // e11613 F80=1
+						_ = r.upto(1) // e11614 U1=0
+						_ = r.flipcoin(0) // e11615 F0
+						_ = r.flipcoin(80) // e11616 F80=0
+						_ = r.upto(100) // e11617 U100=97
+						_ = r.flipcoin(10) // e11618 F10=0
+						_ = r.upto(5) // e11619 U5=2
+						rejVS11620 := 0
+						_ = r.uptoWithFilter(14, func(uint32) bool {
+							rejVS11620++
+							return rejVS11620 <= 3
+						}) // e11620 U14 tries=2
+						_ = r.flipcoin(50) // e11621 F50=1
+						_ = r.flipcoin(20) // e11622 F20=0
+						_ = r.flipcoin(50) // e11623 F50=1
+						_ = r.flipcoin(50) // e11624 F50=0
+						_ = r.upto(20) // e11625 U20=2
+						_ = r.flipcoin(50) // e11626 F50=0
+						_ = r.upto(4) // e11627 U4=1
+						_ = r.upto(4) // e11628 U4=3
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
