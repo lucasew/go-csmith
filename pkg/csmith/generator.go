@@ -247,6 +247,10 @@ var inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 bool
 // inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1: after nested Function fail
 // → ExpressionVariable PL, Function::stack.size()=1 (e8499), not sticky U2/U4.
 var inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 bool
+// inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1: PL create after
+// FuncPLU1 is * SE-free qfer F50 F10 + self F50 F10 then NewArray F20 F20
+// (e8500–05), not sticky freeMultiIVNeedNoRhsPostEAGlobalU21 ** floor.
+var inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -6740,7 +6744,12 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// self F50 F10 + NewArray F20 + bitfields, not forced ** qfer).
 		// seed5 e5707: live-PL multiphase empty create is *** !SE-free READ
 		// (mode 2): F50 F10×3 levels + self F10 only (UP 7 flips then F20).
-		if ctx.state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 && isPtr {
+		funcPLU1Star := inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 && isPtr
+		if funcPLU1Star {
+			// e8500–05 invent residual Comma FuncPLU1 PL create: * not **.
+			levels = 1
+			inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
+		} else if ctx.state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 && isPtr {
 			// e7222–25: * SE-free qfer F50 F10 + self F50 F10 then NewArray.
 			levels = 1
 			ctx.state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = false
@@ -6755,7 +6764,8 @@ func createOnDemandFromParentLocalPathEROpts(er *exprRand, opts Options, t CType
 		// e7962 invent residual Function-fail PL: UP ** SE-free READ qfer
 		// F50 F10×3 (2 levels + self). Sticky freeMultiIVForBodyU3 / LivePLCreate
 		// *** floors would burn F50 F10×4 and desync before NewArray F20.
-		if inventArrayOpPostNestBreakStmtEra && isPtr {
+		// Do not re-bump after FuncPLU1 * clamp.
+		if inventArrayOpPostNestBreakStmtEra && isPtr && !funcPLU1Star {
 			levels = 2
 		}
 		for i := 0; i < levels; i++ {
@@ -11898,11 +11908,14 @@ exprTries:
 						if !strings.Contains(createT.Name, "*") {
 							createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 						}
+						// * qfer not sticky GlobalU21 ** floor (e8500–05).
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = true
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 							bumpExprDepth(ctx)
 							markFuncEffect()
 							return castLiteral(t, g.expr)
 						}
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
 						bumpExprDepth(ctx)
 						markFuncEffect()
 						return castLiteral(t, "x")
@@ -16115,11 +16128,13 @@ exprTries:
 						if !strings.Contains(createT.Name, "*") {
 							createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 						}
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = true
 						if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 							bumpExprDepth(ctx)
 							markVarSelectEffect()
 							return finishVar(castLiteral(t, g.expr))
 						}
+						inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, "x"))
@@ -16396,11 +16411,13 @@ exprTries:
 				if !strings.Contains(createT.Name, "*") {
 					createT = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 				}
+				inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = true
 				if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, 1, false, 0); ok {
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
 					return finishVar(castLiteral(t, g.expr))
 				}
+				inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "x"))
@@ -126469,6 +126486,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
 	inventArrayOpPostNestBreakThenBodyForLhsFuncF20U16 = false
 	inventArrayOpPostNestBreakThenBodyForLhsFuncPLU1 = false
+	inventArrayOpPostNestBreakThenBodyForLhsFuncPLCreateLvl1 = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Once = false
 	inventArrayOpPostNestBreakThenBodyGlobalU5Done = false
 	inventArrayOpPostNestBreakThenBodyEver = false
