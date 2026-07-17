@@ -336,7 +336,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8498 U100=68 PP; UP empty miss → stack U1 + GenerateNewParentLocal * qfer F50 F10×2 F20 F20; GO sticky ThenBodyEver pick(4) on Function-fail path (paramCands non-empty).
 2. C++: SelectParentParam empty/miss → SelectParentLocal (VariableSelector.cpp:1052–59) stack + create.
 3. GO: Function-fail PP path — skip ThenBodyEver U4 when FuncPLU1; force stack U1 + create int* qferMode 1 retype=false. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8504 F20 NewArray vs GO extra F50 F10 (sticky ** levels floor in createOnDemand).
+4. Next: e8504 — climbed.
+
+**seed5 e8504→8506 climbed — FuncPLU1 PL create * levels clamp (not GlobalU21 **):**
+1. Capture: after U1, UP * qfer F50 F10 + self F50 F10 then NewArray F20 F20; GO sticky freeMultiIVNeedNoRhsPostEAGlobalU21 floored levels to 2 (extra F50 F10) then NewArray.
+2. C++: GenerateNewParentLocal for int* uses 1-level random_qualifiers + self then make_init NewArray.
+3. GO: invent residual FuncPLCreateLvl1 one-shot levels=1 before GlobalU21/StmtEra floors. **Integrity residual debt**. Seeds 2/4/6 held.
+4. Next: e8506 F80 F10 F50 F20 F20 residual after address init vs GO Expression U120.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.
