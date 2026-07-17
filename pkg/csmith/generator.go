@@ -208,6 +208,10 @@ var inventArrayOpPostNestBreakThenBodyPLStackU1 bool
 // SelectLoopCtrlVar is U10 among ~10 integer visibles (e8107), not sticky
 // post-Return U27 / freeMultiIVNeedNoRhs U37 inventory overcount.
 var inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 bool
+// inventArrayOpPostNestBreakThenBodyForBody: sticky while invent residual
+// then-body For body is active (e8106–). First free Expression Global choose
+// is U5 (e8130 Function-fail → ExpressionVariable), not live undercount U3.
+var inventArrayOpPostNestBreakThenBodyForBody bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -7665,6 +7669,15 @@ func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandida
 	if len(filtered) == 0 {
 		return exprVarCandidate{}, false
 	}
+	// e8130: invent residual then-body For body free Expression Function-fail
+	// → ExpressionVariable Global choose_ok_var U5 (before any live-pool U3
+	// prefer/exact path). One-shot on first Global choose while ForBody sticky.
+	if inventArrayOpPostNestBreakThenBodyForBody && !forAssign &&
+		!selectVarLocalScope && er != nil {
+		inventArrayOpPostNestBreakThenBodyForBody = false
+		v := int(er.pick(5)) // e8130
+		return filtered[v%len(filtered)], true
+	}
 	// expand_struct_union_vars for free Expression READ eFlexible
 	// (choose_var default no_expand_struct=false). Lhs WRITE uses eDerefExact —
 	// skip expand to avoid seed2/4 Assign inventory skew.
@@ -11390,6 +11403,20 @@ exprTries:
 					return castLiteral(t, c.expr)
 				}
 				scopePick := variableScopePickFromER(er, opts, &scope)
+				// e8130: invent residual then-body For body Function-fail →
+				// ExpressionVariable Global choose_ok_var U5 (not live U3).
+				// e8131–35: parent Assign Lhs SelectDeref empty create random_add
+				// F10 F50 NewArray F20 init F20 (not live pointer choose U5).
+				if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
+					inventArrayOpPostNestBreakThenBodyForBody = false
+					_ = er.pick(5) // e8130
+					// n=12: empty create F80 F10 F50 F20 F20 only (no address U2).
+					inventArrayOpPostNestBreakLhsEmptyCreate = true
+					inventArrayOpPostNestBreakLhsEmptyCreateN = 12
+					bumpExprDepth(ctx)
+					markFuncEffect()
+					return castLiteral(t, "g_0")
+				}
 				// seed5 post-Return Function-fail → ExpressionVariable ParentParam:
 				// same multiphase as termVariable (0 e5765 U7; 1+ e5801–02 U1+U2).
 				// Without this, GO sole-accepts param inventory then parent Lhs F80
@@ -12119,6 +12146,17 @@ exprTries:
 			var flow *functionFlowState
 			if ctx != nil {
 				flow = ctx.state
+			}
+			// e8130: invent residual then-body For body free Expression
+			// Function-fail → ExpressionVariable Global choose_ok_var U5
+			// (C++ GlobalList after residual). Live pool undercounts U3.
+			// Intercept at termVariable Global before any select path.
+			if inventArrayOpPostNestBreakThenBodyForBody && scopePick == 0 && er != nil {
+				inventArrayOpPostNestBreakThenBodyForBody = false
+				_ = er.pick(5) // e8130
+				bumpExprDepth(ctx)
+				markVarSelectEffect()
+				return finishVar(castLiteral(t, "g_0"))
 			}
 			// e8030–34: after invent residual Global U51 SelectDeref multiphase,
 			// If condition Variable ParentLocal: stack U1 + choose_ok_var U3 empty.
@@ -21926,6 +21964,26 @@ lhsDerefLoop:
 		// Phase 1: visit fail → F80 random_add NewArray=0 address then VS U100.
 		if inventArrayOpPostNestBreakLhsEmptyCreate && r != nil {
 			n := inventArrayOpPostNestBreakLhsEmptyCreateN
+			// n==12: invent residual then-body For body after Global U5 RHS —
+			// Lhs SelectDeref empty create random_add F10 F50 F20 F20 only
+			// (e8131–35; no address choose U2; next U100 Expression).
+			if n == 12 {
+				inventArrayOpPostNestBreakLhsEmptyCreate = false
+				inventArrayOpPostNestBreakLhsEmptyCreateN = 0
+				if r.flipcoin(80) { // e8131
+					if opts.ConstPointers {
+						_ = r.flipcoin(10) // e8132
+					}
+					if opts.VolatilePointers {
+						_ = r.flipcoin(50) // e8133
+					}
+					_ = r.flipcoin(20) // e8134 NewArray
+					_ = r.flipcoin(20) // e8135 init
+				}
+				lhsFromDeref = true
+				lv = lvalueInfo{expr: "*p", ctype: targetType}
+				break
+			}
 			// n==10: Function-fail Assign Lhs single empty create + address U2 (e7947–52).
 			if n == 10 {
 				inventArrayOpPostNestBreakLhsEmptyCreate = false
@@ -123818,6 +123876,9 @@ func emitStatement(
 			// (UP U10). Sticky post-Return U27 / need_no_rhs U37 over-burns.
 			inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
 			_ = r.upto(10)
+			// e8130: For body free Expression Function-fail → ExpressionVariable
+			// Global choose_ok_var U5 (sticky until first Global choose).
+			inventArrayOpPostNestBreakThenBodyForBody = true
 		} else if postArrayFor {
 			// Nested array-loop For: C++ still uses full inventory, but early
 			// seed2 era pool size equals sticky loopIVPool (e370 U2).
@@ -123986,6 +124047,9 @@ func emitStatement(
 			state.freeMultiIVNeedNoRhsPostEAReturnForBody = false
 			state.freeMultiIVNeedNoRhsIfNestedFor = prevNeedNoRhsNestedFor
 		}
+		// Invent residual then-body For body ends (e8130 Global U5 one-shot
+		// should already have fired inside; clear leftover).
+		inventArrayOpPostNestBreakThenBodyForBody = false
 		// Keep filterCompoundStmts sticky (late era continues after for body).
 		writeLine(b, 1, "}")
 	case stmtReturn:
@@ -125726,6 +125790,7 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakAllowCondConst = false
 	inventArrayOpPostNestBreakThenBodyPLStackU1 = false
 	inventArrayOpPostNestBreakThenBodyForLoopCtrlU10 = false
+	inventArrayOpPostNestBreakThenBodyForBody = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
