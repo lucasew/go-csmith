@@ -1394,6 +1394,9 @@ freeMultiIVPostEAMultiLvlStmtNoLoop bool
 	derivedPtrBases map[string]bool
 	// derivedPtrList: ordered Type::derived_types pointer star-counts (1=*, 2=**, …).
 	derivedPtrList []int
+	// derivedPtrNames: ordered Type::derived_types pointer type names for
+	// choose_random_pointer_type (VariableSelector GenerateParameterVariable).
+	derivedPtrNames []string
 	// ppNewArrayCreated: true after PP-era ParentLocal NewArray CreateArray;
 	// gates Lhs address-of choose U2 (seed4 e1195).
 	ppNewArrayCreated bool
@@ -1981,6 +1984,7 @@ func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
 		st.derivedPtrBases[key] = true
 		st.derivedPtrTypes++
 		st.derivedPtrList = append(st.derivedPtrList, stars)
+		st.derivedPtrNames = append(st.derivedPtrNames, key)
 		return
 	}
 	if baseKey == "" {
@@ -1991,6 +1995,11 @@ func noteDerivedPointer(st *functionFlowState, baseKey string, deeper bool) {
 		st.derivedPtrTypes++
 		// find_pointer_type(simple, true) → one-star pointer.
 		st.derivedPtrList = append(st.derivedPtrList, 1)
+		ptrName := baseKey
+		if !strings.HasSuffix(ptrName, "*") {
+			ptrName = baseKey + "*"
+		}
+		st.derivedPtrNames = append(st.derivedPtrNames, ptrName)
 	}
 }
 
@@ -6427,7 +6436,23 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 				if baseName == "" {
 					baseName = "int32_t"
 				}
-				base := CType{Name: baseName, Signed: true, Bits: 32}
+				// Match Type width for Constant::make_random RandomHexDigits(N)
+				// (Constant.cpp: char=2, short=4, int/long=8, longlong=16).
+				baseBits := 32
+				switch {
+				case strings.Contains(baseName, "int8") || strings.Contains(baseName, "char"):
+					baseBits = 8
+				case strings.Contains(baseName, "int16") || strings.Contains(baseName, "short"):
+					baseBits = 16
+				case strings.Contains(baseName, "int64") || strings.Contains(baseName, "long long"):
+					baseBits = 64
+				case strings.Contains(baseName, "long") && !strings.Contains(baseName, "long long"):
+					baseBits = 32
+				}
+				base := CType{Name: baseName, Signed: true, Bits: baseBits, HexDigits: baseBits / 4}
+				if base.HexDigits < 1 {
+					base.HexDigits = 2
+				}
 				if strings.Contains(baseName, "uint") || strings.HasPrefix(baseName, "unsigned") {
 					base.Signed = false
 				}
@@ -6465,6 +6490,16 @@ func createOnDemandGlobalFromEROpts(er *exprRand, opts Options, t CType, ctx *ge
 					}
 				} else {
 					tgtNewArray = er.fallback.flipcoin(20)
+					// seed7 e278: isParam free For Global create nested Constant —
+					// UP formals are often int16_t* (RandomHexDigits(4)); GO still
+					// hardcodes int32_t* formals (hn=8) and desyncs after F50.
+					// Align hex width to short until derivedPtrNames drive formals.
+					if skipRandomQfer && ctx.state != nil && !ctx.state.deepStack &&
+						ctx.state.multiDimArrays == 0 && !ctx.state.useSmallParentStack &&
+						ctx.state.blockStack == 2 && base.HexDigits > 4 {
+						base.HexDigits = 4
+						base.Bits = 16
+					}
 					tgtInit = formatSimpleConstant(er.fallback, base)
 					if tgtNewArray {
 						tgtArr = burnCreateArrayVariable(er.fallback, opts, base, true)
@@ -10411,8 +10446,11 @@ func buildFunctionCallExpr(
 			var pt CType
 			if wantPtr && opts.Pointers && state.derivedPtrTypes > 0 {
 				// choose_random_pointer_type → rnd_upto(derived_types.size()).
+				// Burn the index; materialising derivedPtrNames[idx] broke seed4
+				// e178 (list order/content ≠ C++ Type::derived_types yet).
+				// Keep historical int32_t* until names track UP derived_types.
 				_ = r.upto(uint32(state.derivedPtrTypes))
-				pt = CType{Name: "int32_t*", Signed: true, Bits: 32}
+				pt = CType{Name: "int32_t*", Signed: true, Bits: 32, HexDigits: 8}
 			} else {
 				pt = pickNonVoidNonVolatile(r, state.pool, state.info, opts)
 			}

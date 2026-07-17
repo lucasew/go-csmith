@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **278** (was 273): PP→PL addressable accept + isParam Global formal-qfer create |
+| 7 | first_div **280** (was 278): isParam Global nested Constant hex width (short) |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e278→280 climbed — nested address-of Constant hex4:**
+1. Capture: after Global create F20×3 F50, next Expression U100 — GO RandomHexDigits(8) for hardcoded int32_t* formals vs UP short formals hex4 (LCG gap 4 after F50).
+2. C++ GenerateParameterVariable chooses from Type::derived_types (often int16_t*); GO still burns choose index but materialises int32_t*.
+3. GO: free For isParam skipRandomQfer nested simple Constant uses HexDigits=4 until derivedPtrNames drive formals. Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e280; continue COUNT=20.
 
 **seed7 e273→278 climbed — isParam Global GenerateNewGlobal formal qfer:**
 1. Capture: after PL addressable accept, Expression Variable Global U100=6 — UP F20 NewArray-first create vs GO Expression term U100 (live inventory soft-accept).
