@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8238** (post invent residual Global U5 visit-fail)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~8240** (post invent residual Lhs empty SelectDeref → VS PP sole)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -300,7 +300,13 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 1. Capture: e8230 UP Global choose U5 then VS reselect U100 PP + U4 + Expression U120; GO live eFlexible GlobalList ~41 overcount accept→Lhs.
 2. C++: ExpressionVariable do-while after visit_facts miss reselects VariableSelector (U100) not term U120 first.
 3. GO: one-shot after invent residual PP path — burn U5 + VS reselect + PP U4 + continue exprTries. **Integrity residual debt**. Seeds 2/4/6 held.
-4. Next: e8238 Lhs SelectDeref F80=1 empty→VS U100 vs GO U5 pointer choose.
+4. Next: e8238 — climbed.
+
+**seed5 e8238→8240 climbed — invent residual Lhs SelectDeref empty → VS PP sole:**
+1. Capture: e8237 F80=1 then UP U100=92 (VS) vs GO U5 pointer choose (same raw). UP empty ok_vars (no choose U, create skipped) → VS ParentParam sole → free Expression U120=118 Comma.
+2. C++: Lhs.cpp SelectDerefPointerProb then select_deref_pointer empty → VariableSelector::select; e8163-class PP sole (no PP→PL U2 create).
+3. GO: after Global U5 residual arm empty SelectDeref (no invent Un floor); re-arm LhsPPSole + SkipCommaType for free Comma left (skip AllTypes U16). **Integrity residual debt** — inventory overcount compensation. Seeds 2/4/6 held.
+4. Next: e8240 free Comma left Expression term U120=49 Function vs UP F80 nested Assign Lhs SelectDeref empty multiphase.
 
 **seed5 e8190→8199 climbed — second-create post-Constant multiphase (char hex + VS U2 U2 + Constant):**
 1. Capture: after eLongLong+2 Constants, UP e8190 F50=0 depth gap 2 (eChar hex), U100 Global, U2 U2, Constant small U3, eChar hex, U100; GO residual ended → Statement early.

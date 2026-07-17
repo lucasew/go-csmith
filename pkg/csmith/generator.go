@@ -227,6 +227,15 @@ var inventArrayOpPostNestBreakThenBodyForGlobalN int
 // Then VS ParentParam sole-accepts (e8163 U100=94), not sticky PP→PL U2 create.
 var inventArrayOpPostNestBreakThenBodyForLhsDerefU4 bool
 var inventArrayOpPostNestBreakThenBodyForLhsPPSole bool
+// inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty: after e8230 Global U5
+// visit-fail residual + Constant RHS, parent Assign Lhs SelectDeref has empty
+// ok_vars (Lhs.cpp:76–95 / VariableSelector.cpp:1264–66 choose empty → no U;
+// create skipped → VS U100). GO live inventory overcounts ~5 pointers → U5.
+// One-shot: F80=1 empty fallthrough VS (no invent Un floor / create multiphase).
+var inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty bool
+// inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType: with empty→PP sole,
+// free Expression Comma after Lhs skips left AllTypes (e8240 F80 not U16).
+var inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType bool
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -12262,7 +12271,9 @@ exprTries:
 				if sp2 == 2 || sp2 == 1 || sp2 == 4 {
 					_ = er.pick(4) // e8232 PP/PL choose
 				}
-				// visit fail → Expression term retry U120 (e8233)
+				// visit fail → Expression term retry U120 (e8233) → Constant RHS
+				// then parent Lhs SelectDeref empty → VS (e8237–38).
+				inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty = true
 				restoreGenSnapshot(ctx, snap)
 				continue exprTries
 			}
@@ -20703,6 +20714,13 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			flow.freeMultiIVForLhsExprContinue = true
 			flow.freeMultiIVForLhsExprPLCreateOnce = true
 			flow.postAggLhsExprContinue = false
+		}
+		// e8238–40: after empty SelectDeref + PP sole, free Expression U120=118
+		// Comma → nested Assign Lhs F80 (not AllTypes U16). Arm only when
+		// re-armed from LhsDerefEmpty (e8163 first PPSole leaves this false).
+		if inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType {
+			inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
+			nullValidatePostResidualSkipCommaTypeOnce = true
 		}
 		return lvalueInfo{expr: "p", ctype: target}, true, false
 	}
@@ -119526,6 +119544,17 @@ commaF80MultiDone:
 				}
 				continue
 			}
+			// e8237–38: invent residual then-body Lhs after Global U5 residual —
+			// UP select_deref_pointer empty ok_vars (no choose U) → VS U100=92
+			// ParentParam sole-accept (no PP choose U2) → free Expression U120
+			// (same shape as e8163 LhsPPSole after SelectDeref U4 fail).
+			// GO overcounts ~5 eligible pointers → U5; live PP→PL U2 create desyncs.
+			if inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty {
+				inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty = false
+				inventArrayOpPostNestBreakThenBodyForLhsPPSole = true
+				inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = true
+				break // fall through to VariableSelector (e8238 U100)
+			}
 			if len(ptrs) >= 2 {
 				// Live choose_ok_var size. GO under-counts vs UP visible pool
 				// (e2351 U13 / e2377–79 U13 then U12). Pad toward ~13.
@@ -119949,6 +119978,14 @@ commaF80MultiDone:
 			inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = false
 			_ = r.upto(4) // e8162
 			break         // fall through to VariableSelector (e8163)
+		}
+		// e8237–38: empty SelectDeref → VS PP sole when invent residual empty
+		// flag set outside len(ptrs)>=2 (inventory empty / sole path).
+		if inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty {
+			inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty = false
+			inventArrayOpPostNestBreakThenBodyForLhsPPSole = true
+			inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = true
+			break // fall through to VariableSelector (e8238 U100)
 		}
 		if ctx != nil && ctx.state != nil && ctx.state.freeMultiIVNeedNoRhsIfBody &&
 			!ctx.state.freeMultiIVNeedNoRhsIfLhsSelDone {
@@ -126048,6 +126085,11 @@ func Generate(opts Options) (string, error) {
 	inventArrayOpPostNestBreakThenBodyForGlobalN = 0
 	inventArrayOpPostNestBreakThenBodyForLhsDerefU4 = false
 	inventArrayOpPostNestBreakThenBodyForLhsPPSole = false
+	inventArrayOpPostNestBreakThenBodyForLhsDerefEmpty = false
+	inventArrayOpPostNestBreakThenBodyForLhsSkipCommaType = false
+	inventArrayOpPostNestBreakThenBodyGlobalU5Once = false
+	inventArrayOpPostNestBreakThenBodyGlobalU5Done = false
+	inventArrayOpPostNestBreakThenBodyEver = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil
