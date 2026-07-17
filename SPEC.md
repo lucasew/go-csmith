@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **47** (For SelectLoopCtrl U2); 8–21 early fail|
+| Seeds 5,7–21 event | **PARTIAL** — seed5 **UP full match** (GO extra after); seed7 first_div **127** (was 47); 8–21 early fail|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
@@ -297,10 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **47**: For U100=18 → UP SelectLoopCtrl **U2** vs GO loop_control F50 |
+| 7 | first_div **127** (was 47): climbed SelectLoopCtrl live + frozen effect_context |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
 
-**seed7 e47 structural note:** C++ `SelectLoopCtrlVar` always chooses among int visibles (U2 when n=2). GO skips when `loopIVPool==0 && !createIV`. Enabling live `countVisibleIntLoopCtrl` fixes seed7 e47→127 but **breaks seed2 e183** (GO nCtrl over-count burns U2 where UP has nCtrl≤1). Next: fix inventory count (not invent residual floors) so live SelectLoopCtrl is safe multi-seed.
+**seed7 e47→127 climbed — live SelectLoopCtrl when `loopIVPool==0` + frozen effect_context:**
+1. Capture: e47 UP U2 SelectLoopCtrlVar vs GO F50 loop_control (skip when `loopIVPool==0`).
+2. C++ `SelectLoopCtrlVar` always runs; `choose_var(WRITE)` excludes vars in `effect_context` (`is_read_partially`). `effect_context` is fixed at function-body CGContext construction (caller context), not body-local reads.
+3. GO: live `countVisibleIntLoopCtrl` for `loopIVPool==0`; `effectContextFrozen` snapshot at `emitSingleFuncDefOnce` entry; Expression READ notes into running `effectContextRead` (not Lhs WRITE). Seed2 e183 sole (nCtrl=1, frozen g_8) holds; seeds 2/3/4/5/6 hold; seed5 still full UP match.
+4. Next: seed7 e127; continue COUNT=20.
 
 **seed5 e13001→13634 climbed — residual covers full UP event stream:**
 1. Extended handoff residual through e13634 (UP end). All 13634 upstream events match GO.

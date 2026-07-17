@@ -9,6 +9,9 @@ import (
 
 // multiDimArraySink is set during function generation to count multi-dim arrays.
 var multiDimArraySink *int
+
+// noteEffectReadSink records Effect context READs for SelectLoopCtrl WRITE.
+var noteEffectReadSink func(string)
 var mustReadLiveSink *bool
 var postMustReadGlobalPicks *int
 var pointerGlobalPicksSink *int
@@ -1262,6 +1265,11 @@ freeMultiIVPostEAMultiLvlStmtNoLoop bool
 	// select_must_use F75 is after multi-dim IV create (e565+); earlier
 	// array-loop ExpressionVariables have no F75 (e416).
 	multiDimArrays int
+	// effectContextRead: running Expression READs (caller-side accum).
+	effectContextRead map[string]bool
+	// effectContextFrozen: CGContext effect_context at function body entry.
+	// SelectLoopCtrl WRITE is_eligible uses frozen, not body-local reads.
+	effectContextFrozen map[string]bool
 	// mustReadLive: must_read set non-empty. Cleared on F75 erase (e717).
 	mustReadLive bool
 	// mustReadArrays / mustWriteArrays: rw_directive must_read_vars /
@@ -5504,6 +5512,10 @@ func countVisibleArrays(env envInfo, scope scopeInfo, ctx *genContext) int {
 // by name. Nest ArrayOp e6721 era; free For e2943 floors to U15 when GO
 // inventory under-materialises; need_no_rhs If-body For floors to U37 (e5147).
 func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int {
+	// Mirrors SelectLoopCtrlVar → choose_var(WRITE, eConvert, no_bitfield):
+	// find_all_non_array_visible_vars + drop non-int / pointer-union + expand
+	// int fields. WRITE rejects const and vars already read in effect_context
+	// (is_read_partially) — seed2 e183: prior Assign read p_20 → nCtrl=1.
 	isIntSimple := func(t CType) bool {
 		if strings.Contains(t.Name, "*") {
 			return false
@@ -5534,7 +5546,6 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		}
 		return nil
 	}
-	// has_int_field: simple int, or aggregate with at least one int-ish field.
 	hasIntField := func(t CType) bool {
 		if strings.Contains(t.Name, "*") {
 			return false
@@ -5544,7 +5555,6 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		}
 		fields := structFields(t)
 		if len(fields) == 0 {
-			// Unknown aggregate: treat as expandable int carrier (historical pad).
 			return strings.HasPrefix(t.Name, "struct")
 		}
 		for _, f := range fields {
@@ -5566,7 +5576,6 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		}
 		return false
 	}
-	// expand count: no_bitfield — skip bitfields; count int simple fields only.
 	expandCount := func(t CType) int {
 		if isIntSimple(t) {
 			return 1
@@ -5574,14 +5583,14 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		fields := structFields(t)
 		if len(fields) == 0 {
 			if strings.HasPrefix(t.Name, "struct") {
-				return 6 // fallback when struct metadata missing
+				return 6
 			}
 			return 0
 		}
 		n := 0
 		for _, f := range fields {
 			if f.bitfield {
-				continue // choose_var no_bitfield=true
+				continue
 			}
 			if isIntSimple(f.ctype) {
 				n++
@@ -5590,13 +5599,21 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		return n
 	}
 
+	effectRead := map[string]bool{}
+	if ctx != nil && ctx.state != nil && ctx.state.effectContextFrozen != nil {
+		effectRead = ctx.state.effectContextFrozen
+	}
+
 	seen := map[string]bool{}
 	n := 0
 	add := func(name string, t CType, arr, vol, cnst bool) {
-		// vol kept: choose_var is_eligible allows vol when side-effect-free
-		// (StatementFor clears effect_stm before SelectLoopCtrlVar).
 		_ = vol
 		if name == "" || arr || cnst || seen[name] {
+			return
+		}
+		// is_eligible WRITE: reject const (above) and vars already read
+		// in effect_context (seed2 e183 prior Assign read param).
+		if effectRead[name] {
 			return
 		}
 		if !hasIntField(t) || unionHasPointer(t) {
@@ -5605,31 +5622,26 @@ func countVisibleIntLoopCtrl(env envInfo, scope scopeInfo, ctx *genContext) int 
 		seen[name] = true
 		n += expandCount(t)
 	}
-	// GlobalList: include fromParentLocal entries that GO never mirrored into
-	// dynLocs (C++ GenerateNewParentLocal still sits on a parent block).
-	// Name-dedupe against locals below.
 	for _, g := range mergedGlobals(env, ctx) {
 		add(g.name, g.ctype, g.isArray, g.isVolatile, g.isConst)
 	}
-	// Residual address-of / create orphans may still be on C++ GlobalList.
 	if ctx != nil && ctx.state != nil {
 		for _, g := range ctx.state.orphanGlobals {
 			add(g.name, g.ctype, g.isArray, g.isVolatile, g.isConst)
 		}
 	}
-	// Locals on stack (incl. PL materialisations). Name-dedupe vs globals.
 	for _, l := range mergedLocals(scope, ctx) {
 		if l.name == "x" {
 			continue
 		}
 		add(l.name, l.ctype, l.isArray, l.isVol, l.isConst)
 	}
-	// Function params.
 	for _, p := range scope.params {
 		add(p.name, p.ctype, false, false, false)
 	}
 	return n
 }
+
 
 func buildExprCandidates(r *rng, env envInfo, scope scopeInfo, ctx *genContext) []exprVarCandidate {
 	candidates := make([]exprVarCandidate, 0, len(env.globals)+len(scope.params)+len(scope.locals)+len(env.pointers)+len(env.arrays))
@@ -7796,6 +7808,15 @@ func selectExprVariableFromERLocal(t CType, er *exprRand, candidates []exprVarCa
 var selectVarForceChooseN int
 
 func selectExprVariableFromER(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
+	c, ok := selectExprVariableFromERImpl(t, er, candidates, forAssign)
+	// Effect::read_var on Expression READ paths (not Lhs WRITE choose).
+	if ok && !forAssign && noteEffectReadSink != nil && c.expr != "" {
+		noteEffectReadSink(c.expr)
+	}
+	return c, ok
+}
+
+func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCandidate, forAssign bool) (exprVarCandidate, bool) {
 	filtered := make([]exprVarCandidate, 0, len(candidates))
 	// is_eligible_var: volatile forbidden when !effect_context.is_side_effect_free().
 	seFree := true
@@ -18168,6 +18189,25 @@ exprTries:
 					}
 				}
 			}
+			noteEffectRead := func(name string) {
+				if ctx == nil || ctx.state == nil || name == "" {
+					return
+				}
+				if ctx.state.effectContextRead == nil {
+					ctx.state.effectContextRead = map[string]bool{}
+				}
+				for _, tok := range strings.FieldsFunc(name, func(r rune) bool {
+					return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+						(r >= '0' && r <= '9') || r == '_')
+				}) {
+					if strings.HasPrefix(tok, "g_") || strings.HasPrefix(tok, "p_") ||
+						strings.HasPrefix(tok, "l_") {
+						ctx.state.effectContextRead[tok] = true
+					}
+				}
+			}
+			noteEffectReadSink = noteEffectRead
+			defer func() { noteEffectReadSink = nil }()
 			// e4271: after ForceDeref OuterLhsSoleBurn Constant, next Variable is
 			// free Expression then Lhs create (run Lhs in-Expression so parent
 			// continues e4330 U120). Do NOT set NeedLhs for StatementAssign.
@@ -136354,11 +136394,25 @@ func emitStatement(
 			if flooredU15 {
 				state.freeMultiIVForBodyU3 = true
 			}
+		} else if state != nil && state.loopIVPool == 0 {
+			// C++ SelectLoopCtrlVar always runs (choose among int visibles
+			// or create). WRITE eligibility excludes effect_context reads.
+			nCtrl := countVisibleIntLoopCtrl(env, scope, ctx)
+			if os.Getenv("CSMITH_DEBUG_LOOPCTRL") != "" {
+				rd := []string{}
+				if state.effectContextFrozen != nil {
+					for k := range state.effectContextFrozen {
+						rd = append(rd, k)
+					}
+				}
+				fmt.Fprintf(os.Stderr, "loopctrl LIVE nCtrl=%d frozen=%v\n", nCtrl, rd)
+			}
+			if nCtrl > 1 {
+				_ = r.upto(uint32(nCtrl))
+			} else if nCtrl == 0 {
+				burnSelectLoopCtrlVarCreate(r, opts)
+			}
 		}
-		// loopIVPool==0 (and not createIV): no SelectLoopCtrl choose.
-		// loopIVPool==1: reuse existing IV, no choose RNG (len==1).
-		// NOTE: C++ always SelectLoopCtrlVar (seed7 e47 U2). Enabling live
-		// choose for loopIVPool==0 breaks seed2 e183 (GO nCtrl over-count).
 		if useArrayControl && !afterContFor {
 			// make_random_array_control + SafeOpFlags.
 			// postArrayFor multi-dim (e949): itemize U9 U8. Early e679: U1.
@@ -138462,7 +138516,18 @@ func emitSingleFuncDefOnce(
 	info compositeInfo,
 	stmtBudget *int,
 ) string {
+	var prevEffectFrozen map[string]bool
 	if state != nil {
+		// Freeze caller's effect_context for this body (C++ CGContext ctor).
+		prevEffectFrozen = state.effectContextFrozen
+		fr := map[string]bool{}
+		for k, v := range state.effectContextRead {
+			if v {
+				fr[k] = true
+			}
+		}
+		state.effectContextFrozen = fr
+		defer func() { state.effectContextFrozen = prevEffectFrozen }()
 		// Nested CREATE callee body (not func_1): enable one-shot null prefer.
 		if idx > 0 {
 			state.nestedFuncBodies++
@@ -138891,7 +138956,9 @@ func emitFunctionsUpstreamFlow(b *strings.Builder, r *rng, opts Options, pool []
 		dynGlobals:   []globalInfo{},
 		nextGlobalID: env.nextID,
 		stmtBudget:   opts.StopByStmt,
-		blockStack:   1, // function body block
+		blockStack:         1, // function body block
+		effectContextRead:   map[string]bool{},
+		effectContextFrozen: map[string]bool{},
 	}
 	state.funcs = append(state.funcs, state.makeFuncSignature(r, 1))
 	state.built = append(state.built, false)
