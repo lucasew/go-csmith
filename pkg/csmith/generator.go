@@ -123561,11 +123561,22 @@ func emitStatement(
 				_ = g
 			}
 			inventArrayOpPostNestBreakCreate = false
+			// e7901: after CreateArray itemize + create_field_vars, UP draws U4
+			// then StatementProbability U100 Assign. StatementBreak is not
+			// must_return (Statement.h default false; only must_jump) so Block
+			// continues free Statements (Block.cpp:152 only breaks on must_return).
+			// U4: after create_array_and_itemize materialises S0 array member,
+			// inventory choose_ok_var among ~4 int-compatible ok_vars (expanded
+			// fields / locals) before the next free Statement — same raw GO used
+			// to steal for premature Statement U100 when lastStmtWasReturn stopped
+			// the block early.
+			if r != nil {
+				_ = r.upto(4)
+			}
 			if state != nil {
-				// Break ends invent residual ArrayOp body slot — skip more free
-				// Statements that would steal U100 (UP stays in create residual).
-				state.skipNextBlockSize = true
-				state.lastStmtWasReturn = true // stop block statement loop
+				// Break is not must_return — keep emitting free Statements.
+				state.skipNextBlockSize = false
+				state.lastStmtWasReturn = false
 			}
 		} else if inLoop && r != nil && state != nil && state.freeMultiIVNeedNoRhsIfNestedFor {
 			breakT := CType{Name: "int32_t", Signed: true, Bits: 32, HexDigits: 8}
