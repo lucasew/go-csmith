@@ -70,6 +70,11 @@ var selectVarParentParamScope bool
 // F0). Next prefer excludes it so choose is U(n-1). seed7 e366–368.
 var isParamShortPreferReject string
 
+// isParamShortPreferDone: true after the one-shot fail+accept cycle (U3 miss →
+// U2 accept). Later isParam short wants fall through to convertibles (UP U2 at
+// e387) instead of repeating sticky U3 prefer fails.
+var isParamShortPreferDone bool
+
 // isParamPPFallPicksSink: ParentParam→PL fallthrough count (seed4 e645 Global U4).
 var isParamPPFallPicksSink *int
 
@@ -4333,6 +4338,9 @@ type exprVarCandidate struct {
 	fromParentLocal bool
 	// alreadyItemized: see localInfo.alreadyItemized.
 	alreadyItemized bool
+	// isConst: param/global self-const (CVQualifiers). choose_var qfer match
+	// excludes const have when want is non-const (seed7 e387 U2 vs U3).
+	isConst bool
 }
 
 type genContext struct {
@@ -5947,7 +5955,18 @@ func buildScopedCandidatesFromER(er *exprRand, env envInfo, scope scopeInfo, sco
 		}
 	case 2:
 		for _, p := range scope.params {
-			out = append(out, exprVarCandidate{expr: p.name, ctype: p.ctype, assignable: true})
+			// Any const level (pointee or self) for qfer match filtering.
+			anyConst := false
+			for _, c := range p.constLevels {
+				if c {
+					anyConst = true
+					break
+				}
+			}
+			selfConst := len(p.constLevels) > 0 && p.constLevels[len(p.constLevels)-1]
+			out = append(out, exprVarCandidate{
+				expr: p.name, ctype: p.ctype, assignable: !selfConst, isConst: anyConst,
+			})
 		}
 	case 3, 4:
 		// NewValue create Global/ParentLocal — no existing-var inventory.
@@ -8199,6 +8218,23 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 		}
 		n := len(exact)
 		chooseN := n
+		// isParam ParentParam pointer exact: drop const formals (CVQualifiers).
+		// seed7 e387: 3 int16_t* formals, one const → UP choose_ok_var U2.
+		if selectVarParentParamScope &&
+			burnCreateArrayCtxSink != nil && burnCreateArrayCtxSink.inParamExpr {
+			filtered := make([]exprVarCandidate, 0, n)
+			for _, c := range exact {
+				if c.isConst {
+					continue
+				}
+				filtered = append(filtered, c)
+			}
+			if len(filtered) > 0 && len(filtered) < n {
+				exact = filtered
+				n = len(exact)
+				chooseN = n
+			}
+		}
 		// seed2 e865 real n=2; e892 U5; e905 U10; e1017 era keep U2 (useSmallParentStack).
 		smallStack := useSmallParentStackSink != nil && *useSmallParentStackSink
 		// seed5 e705: free Expression pointer Global overcounts exact pool
@@ -8369,7 +8405,10 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 					break
 				}
 			}
-			if hasShortPtr {
+			// One-shot prefer cycle only (seed7 e366–368). After done, leave
+			// uniq as convertibles so later isParam matches UP U2 (e387), not
+			// prefer-among-3 inflating n.
+			if hasShortPtr && (!isParamShortPreferDone || isParamShortPreferReject != "") {
 				for _, c := range filtered {
 					if c.expr == "" || seen[c.expr] {
 						continue
@@ -8394,10 +8433,9 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 							ptrs = append(ptrs, c)
 						}
 					}
-					// First prefer among ≥3: pick then opportunistic_validate fails
-					// (param formals lack point-to facts → return 0, no F0).
-					// ExpressionVariable retries VS; second prefer is U2 (e367–368).
-					if len(ptrs) >= 3 {
+					// U3 among 3 int16_t* → opportunistic_validate miss → VS retry →
+					// U2 among remaining (invalid_vars).
+					if !isParamShortPreferDone && len(ptrs) >= 3 {
 						idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
 						chosen := ptrs[idx]
 						isParamShortPreferReject = chosen.expr
@@ -8406,6 +8444,7 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 					if len(ptrs) >= 2 && isParamShortPreferReject != "" {
 						idx := int(er.pick(uint32(len(ptrs)))) % len(ptrs)
 						isParamShortPreferReject = ""
+						isParamShortPreferDone = true
 						return ptrs[idx], true
 					}
 				}
@@ -28903,7 +28942,16 @@ exprTries:
 							if len(candidates) == 0 {
 								candidates = buildExprCandidatesFromER(er, env, scope, ctx)
 							}
-							if c2, ok2 := selectExprVariableFromER(t, er, candidates, false); ok2 && c2.expr != "" {
+							var c2 exprVarCandidate
+							var ok2 bool
+							if scopePick == 2 {
+								// Keep SelectParentParam (prefer / invalid_vars) on
+								// ExpressionVariable visit miss retry (seed7 e367–68).
+								c2, ok2 = selectExprVariableFromERParentParam(t, er, candidates, false)
+							} else {
+								c2, ok2 = selectExprVariableFromER(t, er, candidates, false)
+							}
+							if ok2 && c2.expr != "" {
 								bumpExprDepth(ctx)
 								return finishVar(castLiteral(t, c2.expr))
 							}
