@@ -272,13 +272,18 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~10177** (nested CreateArray+itemize+stdfunc residual; next VS U100)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~10320** (Function/stdfunc residual after create; next VS U100 tries=1)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 
 
 
 
+
+
+**seed5 e10177→10320 climbed — Function F50 F20 U16 + stdfunc residual:**
+1. After Constant multiphase, UP continues VS U100 + Function F50 F20 U16 + create F80 F10 + Statement multiphase + long stdfunc F5 F10 U18 cycles through e10319.
+2. Integrity residual debt (stream-grounded). Seeds 2/4/6 match.
 
 **seed5 e10005→10177 climbed — nested CreateArray F80 U4 + Function residual:**
 1. After VS PL U6, UP continues F20 F20 CreateArray U99 + F80 U4 itemize multiphase + Function/stdfunc + must_use VS + create residual through Constant multiphase e10176.
