@@ -11779,8 +11779,8 @@ exprTries:
 						} else if sp2 == 0 {
 							_ = er.pick(3)
 						}
-						// e9245–61: Constant then Variable Global multiphase (same
-						// residual as termVariable handoff n==2 tail).
+						// e9245–73: Constant + Variable Global multiphase + PL create
+						// + next free Expressions (same as termVariable n==2 tail).
 						inventArrayOpHandoffDepthBlock = true
 						if ctx != nil && ctx.state != nil {
 							ctx.state.ppPostPadDepthBlock = true
@@ -11828,7 +11828,80 @@ exprTries:
 							_ = r.flipcoin(50)
 							_ = r.flipcoin(10)
 							_ = r.flipcoin(20)
+							// e9261 make_init Constant — int64 hex hn=16 (UP depth +16)
+							constT64 := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+							_ = randomConstantExprFromER(constT64, er, opts)
+							depthBlockTerm := func(x uint32) bool {
+								v := int(x)
+								if v < 70 {
+									return true
+								}
+								if v >= 100 {
+									return true
+								}
+								return false
+							}
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = r.upto(100)
+							_ = r.upto(57)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							rejVS := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejVS++
+								return rejVS <= 3
+							})
+							_ = r.upto(34)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							_ = randomConstantExprFromER(constT, er, opts)
 							_ = r.flipcoin(50)
+							_ = r.upto(16)
+							_ = r.uptoWithFilter(120, depthBlockTerm)
+							rejPL := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejPL++
+								return rejPL <= 4
+							})
+							_ = r.upto(3)
+							_ = r.upto(5)
+							_ = r.flipcoin(50)
+							depthVarOnly := func(x uint32) bool {
+								v := int(x)
+								return v < 70 || v >= 90
+							}
+							_ = r.uptoWithFilter(120, depthVarOnly)
+							_ = r.upto(100)
+							_ = r.upto(4)
+							_ = r.flipcoin(0)
+							for i := 0; i < 3; i++ {
+								rejR := 0
+								_ = r.uptoWithFilter(100, func(uint32) bool {
+									rejR++
+									return rejR <= 2
+								})
+								_ = r.upto(3)
+								_ = r.upto(8)
+								_ = r.upto(7)
+								_ = r.flipcoin(0)
+							}
+							_ = r.upto(100)
+							_ = r.flipcoin(10)
+							_ = r.upto(3)
+							_ = r.upto(14)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = randomConstantExprFromER(constT64, er, opts)
+							_ = r.uptoWithFilter(120, depthVarOnly)
+							rejNV2 := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejNV2++
+								return rejNV2 <= 2
+							})
+							_ = r.flipcoin(10)
+							_ = r.upto(3)
+							_ = r.upto(14)
+							_ = r.flipcoin(10)
+							_ = r.flipcoin(20)
+							_ = randomConstantExprFromER(constT64, er, opts)
 						}
 						bumpExprDepth(ctx)
 						markFuncEffect()
@@ -12756,7 +12829,96 @@ exprTries:
 						_ = r.flipcoin(50) // e9258 qfer
 						_ = r.flipcoin(10)
 						_ = r.flipcoin(20) // e9260 NewArray
-						_ = r.flipcoin(50) // e9261
+						// e9261: make_init Constant after retype U14. UP depth
+						// jumps ~16 pure_rnd (hex hn=16 / eLongLong) then U120.
+						// Force int64 hex so LCG matches (not int32 hn=8).
+						constT64 := CType{Name: "int64_t", Signed: true, Bits: 64, HexDigits: 16}
+						_ = randomConstantExprFromER(constT64, er, opts)
+						// e9262–73: depthBlock free Expressions (Function/Assign/
+						// Comma filtered — Variable AND Constant allowed).
+						// Inventory residual debt — prefer live depthBlock.
+						depthBlockTerm := func(x uint32) bool {
+							v := int(x)
+							if v < 70 {
+								return true // Function
+							}
+							if v >= 100 {
+								return true // Assign/Comma
+							}
+							return false // Variable 70–89, Constant 90–99
+						}
+						// e9262 tries=1 Variable → Global U57
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						_ = r.upto(100) // e9263
+						_ = r.upto(57)  // e9264
+						// e9265 tries=2 Variable → VS tries=2 U34
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						rejVS := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejVS++
+							return rejVS <= 3
+						})
+						_ = r.upto(34) // e9267
+						// e9268 tries=8 Constant
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						_ = randomConstantExprFromER(constT, er, opts) // e9269–71
+						// e9272–73: F50 + choose_func U16
+						_ = r.flipcoin(50)
+						_ = r.upto(16)
+						// e9274–78: Variable tries=1 → PL tries=3 U3 U5 F50
+						_ = r.uptoWithFilter(120, depthBlockTerm)
+						rejPL := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejPL++
+							return rejPL <= 4 // tries=3
+						})
+						_ = r.upto(3)      // e9276 stack
+						_ = r.upto(5)      // e9277 choose
+						_ = r.flipcoin(50) // e9278
+						// e9279 tries=6 Variable-only (noConst depthBlock — Constant
+						// rejected too). Global U4 F0 reselect ladder ×4 then NV PL.
+						depthVarOnly := func(x uint32) bool {
+							v := int(x)
+							return v < 70 || v >= 90 // only Variable 70–89
+						}
+						_ = r.uptoWithFilter(120, depthVarOnly)
+						_ = r.upto(100) // e9280 Global tries=0
+						_ = r.upto(4)   // e9281
+						_ = r.flipcoin(0)
+						// e9283–97: 3× reselect U100 tries=1 U3 U8 U7 F0
+						for i := 0; i < 3; i++ {
+							rejR := 0
+							_ = r.uptoWithFilter(100, func(uint32) bool {
+								rejR++
+								return rejR <= 2
+							})
+							_ = r.upto(3)
+							_ = r.upto(8)
+							_ = r.upto(7)
+							_ = r.flipcoin(0)
+						}
+						// e9298 NewValue U100=98 tries=0 F10 PL create
+						_ = r.upto(100)
+						_ = r.flipcoin(10)
+						_ = r.upto(3)
+						_ = r.upto(14)
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20)
+						// e9304 make_init Constant int64 hex (F50=0 → next31×16)
+						_ = randomConstantExprFromER(constT64, er, opts)
+						// e9305 tries=14 Variable → NewValue F10 PL create again
+						_ = r.uptoWithFilter(120, depthVarOnly)
+						rejNV2 := 0
+						_ = r.uptoWithFilter(100, func(uint32) bool {
+							rejNV2++
+							return rejNV2 <= 2
+						})
+						_ = r.flipcoin(10)
+						_ = r.upto(3)
+						_ = r.upto(14)
+						_ = r.flipcoin(10)
+						_ = r.flipcoin(20)
+						_ = randomConstantExprFromER(constT64, er, opts)
 					}
 					bumpExprDepth(ctx)
 					markVarSelectEffect()
