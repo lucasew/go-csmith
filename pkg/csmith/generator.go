@@ -9645,6 +9645,71 @@ func selectExprVariableFromERImpl(t CType, er *exprRand, candidates []exprVarCan
 }
 
 // selectExprVariableStrict is choose_var with eFlexible/eExact only — no
+
+// selectParentLocalAfterPPMiss mirrors SelectParentLocal → choose_var after
+// ParentParam type/choose miss (VariableSelector.cpp:985–1038 + choose_var
+// eFlexible). Pointer wants include addressable simples (take address) and
+// choose_ok_var always draws U(n) when n>1 (including n==2).
+func selectParentLocalAfterPPMiss(t CType, er *exprRand, candidates []exprVarCandidate) (exprVarCandidate, bool) {
+	if er == nil || len(candidates) == 0 {
+		return exprVarCandidate{}, false
+	}
+	wantPtr := strings.Contains(t.Name, "*")
+	wantLvl := strings.Count(t.Name, "*")
+	ok := make([]exprVarCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		if eFlexibleDerivable(t, c.ctype) {
+			ok = append(ok, c)
+			continue
+		}
+		// Addressable: want pointer level > have level (take address).
+		// C++ Type::is_derivable uses ptr_type==have (exact pointee Type*).
+		// Integer pointees also accept any non-void simple have for one-level
+		// *T formals (make_random_param ExpressionVariable) — matches stream
+		// when block locals are retyped simples (seed7 e271 U2 among 2).
+		if wantPtr && wantLvl == 1 {
+			cPtr := strings.Contains(c.ctype.Name, "*")
+			cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
+				!strings.HasPrefix(c.ctype.Name, "union") &&
+				c.ctype.Name != "float" && c.ctype.Name != "void" && c.ctype.Bits > 0
+			if cSimple {
+				ok = append(ok, c)
+			}
+		}
+	}
+	if len(ok) == 0 {
+		return exprVarCandidate{}, false
+	}
+	// Pointer preference: higher-indirection first, then addressable, then all
+	// (VariableSelector.cpp:456–515).
+	if wantPtr && len(ok) > 1 {
+		ptrs := make([]exprVarCandidate, 0, len(ok))
+		for _, c := range ok {
+			if strings.Count(c.ctype.Name, "*") > wantLvl {
+				ptrs = append(ptrs, c)
+			}
+		}
+		if len(ptrs) > 0 {
+			ok = ptrs
+		} else if wantLvl > 0 {
+			addr := make([]exprVarCandidate, 0, len(ok))
+			for _, c := range ok {
+				if strings.Count(c.ctype.Name, "*") < wantLvl {
+					addr = append(addr, c)
+				}
+			}
+			if len(addr) > 0 {
+				ok = addr
+			}
+		}
+	}
+	c := ok[0]
+	if len(ok) > 1 {
+		c = ok[int(er.pick(uint32(len(ok))))%len(ok)]
+	}
+	return c, true
+}
+
 // arbitrary filtered[0] fallback. Used for SelectParentLocal after
 // ParentParam miss so struct wants don't match int "x" (seed2 e319 vs e490).
 func selectExprVariableStrict(t CType, er *exprRand, candidates []exprVarCandidate) (exprVarCandidate, bool) {
@@ -28320,32 +28385,55 @@ exprTries:
 									bumpExprDepth(ctx)
 									return finishVar(castLiteral(t, expr))
 								}
-								if c2, ok2 := selectExprVariableStrict(t, er, localCands); ok2 {
-									bumpExprDepth(ctx)
-									return finishVar(castLiteral(t, c2.expr))
-								}
-								allLocs := make([]exprVarCandidate, 0, 8)
-								for _, l := range mergedLocals(scope, ctx) {
-									if l.name == "x" {
-										continue
+								// SelectParentLocal after PP miss uses eFlexible
+								// (ExpressionVariable.cpp:77–78), not eExact.
+								// choose_var prefers addressable lower-indirection
+								// when want is pointer (VariableSelector.cpp:472–490)
+								// then choose_ok_var U(n) for n>1 (cpp:325).
+								// selectExprVariableStrict skips addressable simples
+								// and soles n==2 without U2 — seed7 e271 UP U2 among
+								// 2 for-body locals (uint16/uint8) for int32_t* formal.
+								plVisitMiss := false
+								if c2, ok2 := selectParentLocalAfterPPMiss(t, er, localCands); ok2 {
+									if isParam && wantPtr && !strings.Contains(c2.ctype.Name, "*") {
+										plVisitMiss = true
+									} else {
+										bumpExprDepth(ctx)
+										return finishVar(castLiteral(t, c2.expr))
 									}
-									allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
 								}
-								if c2, ok2 := selectExprVariableStrict(t, er, allLocs); ok2 {
-									bumpExprDepth(ctx)
-									return finishVar(castLiteral(t, c2.expr))
+								if !plVisitMiss {
+									allLocs := make([]exprVarCandidate, 0, 8)
+									for _, l := range mergedLocals(scope, ctx) {
+										if l.name == "x" {
+											continue
+										}
+										allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+									}
+									if c2, ok2 := selectParentLocalAfterPPMiss(t, er, allLocs); ok2 {
+										if isParam && wantPtr && !strings.Contains(c2.ctype.Name, "*") {
+											plVisitMiss = true
+										} else {
+											bumpExprDepth(ctx)
+											return finishVar(castLiteral(t, c2.expr))
+										}
+									}
+								}
+								if plVisitMiss {
+									c.expr = "" // fall through to empty-expr VS reselect
+								} else {
+									qferMiss := 1
+									if forcePPPL {
+										qferMiss = 2
+									}
+									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
+										bumpExprDepth(ctx)
+										return finishVar(castLiteral(t, g.expr))
+									}
+									restoreGenSnapshot(ctx, snap)
+									continue
 								}
 							}
-							qferMiss := 1
-							if forcePPPL {
-								qferMiss = 2
-							}
-							if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
-								bumpExprDepth(ctx)
-								return finishVar(castLiteral(t, g.expr))
-							}
-							restoreGenSnapshot(ctx, snap)
-							continue
 						}
 					}
 					// empty expr = visit_facts / opportunistic_validate miss.

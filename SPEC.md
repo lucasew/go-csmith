@@ -297,8 +297,14 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **271** (was 218): free For NewValue→PL SE-free qfer (blockStack==2) |
+| 7 | first_div **273** (was 271): PP→PL eFlexible addressable choose + visit-miss VS |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e271→273 climbed — make_random_param PP→PL eFlexible addressable:**
+1. Capture: e270 stack U2; e271 UP U2 choose among 2 for-body simples vs GO F50 create (strict type miss on int32_t* formal).
+2. C++ SelectParentLocal after PP miss uses eFlexible choose_var + addressable preference (VariableSelector.cpp:472–490) then choose_ok_var U(n); isParam take-address of simple often visit_facts fails → VS reselect U100.
+3. GO: `selectParentLocalAfterPPMiss` (addressable simples for *T + U(n) for n>1); isParam pointer take-address of simple → empty expr VS reselect. Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e273 UP U100=6 vs GO U100=58; continue COUNT=20.
 
 **seed7 e218→271 climbed — free For free Expression NewValue→PL needQfer:**
 1. Capture: e218 after F10 PL U2 U14 — UP F50 F10 (null/wildcard SE-free qfer) vs GO F20 (qferMode 0).
