@@ -184,8 +184,8 @@ var inventArrayOpPostNestBreakPLAddrU3 bool
 // RHS PL create, Statement Lhs SelectDeref empty create (F80 + random_add
 // F10 F50 + create_and_initialize) — not inventory sole / second F80=0→VS.
 var inventArrayOpPostNestBreakLhsEmptyCreate bool
-
-
+// inventArrayOpPostNestBreakLhsEmptyCreateN: multiphase (0 first two creates; 1+ third then VS).
+var inventArrayOpPostNestBreakLhsEmptyCreateN int
 
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
@@ -12080,6 +12080,7 @@ exprTries:
 					if g, ok := createOnDemandFromParentLocalPathEROpts(er, opts, createT, ctx, qfer, retype, idx); ok {
 						// Parent Assign Lhs: SelectDeref empty create random_add F10 F50…
 						inventArrayOpPostNestBreakLhsEmptyCreate = true
+						inventArrayOpPostNestBreakLhsEmptyCreateN = 0
 						bumpExprDepth(ctx)
 						markVarSelectEffect()
 						return finishVar(castLiteral(t, g.expr))
@@ -21623,56 +21624,84 @@ func emitLValueAssignment(b *strings.Builder, r *rng, opts Options, env envInfo,
 	}
 lhsDerefLoop:
 	for !lhsFromDeref {
-		// e7918–32: invent residual Break Assign Lhs SelectDeref empty create
-		// multiphase after RHS PL * create (VariableSelector.cpp:1266–1315).
-		// F80 + random_add F10 F50 + NewArray=0 initNull F0 fail → F80 +
-		// random_add F10 F50 + NewArray CreateArray (UP; not inventory F80=0→VS).
+		// e7918–38: invent residual Break Assign Lhs SelectDeref empty create
+		// multiphase (VariableSelector.cpp:1266–1315). Phase 0: F80 random_add
+		// F10 F50 NewArray=0 initNull F0 → F80 random_add NewArray CreateArray.
+		// Phase 1: visit fail → F80 random_add NewArray=0 address then VS U100.
 		if inventArrayOpPostNestBreakLhsEmptyCreate && r != nil {
-			inventArrayOpPostNestBreakLhsEmptyCreate = false
-			if r.flipcoin(80) { // e7918
-				// random_add_qualifiers (!SE-free → const F10 + vol F50)
-				if opts.ConstPointers {
-					_ = r.flipcoin(10) // e7919
-				}
-				if opts.VolatilePointers {
-					_ = r.flipcoin(50) // e7920
-				}
-				_ = r.flipcoin(20) // e7921 NewArray
-				initNull := r.flipcoin(20) // e7922
-				if initNull {
-					_ = r.flipcoin(0) // e7923 visit fail
-				}
-				// Second SelectDeref empty create (Lhs do-while)
-				if r.flipcoin(80) { // e7924
+			n := inventArrayOpPostNestBreakLhsEmptyCreateN
+			inventArrayOpPostNestBreakLhsEmptyCreateN = n + 1
+			ptrType := targetType
+			if !strings.Contains(ptrType.Name, "*") {
+				ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+			} else {
+				ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+			}
+			if n == 0 {
+				if r.flipcoin(80) { // e7918
 					if opts.ConstPointers {
-						_ = r.flipcoin(10) // e7925
+						_ = r.flipcoin(10) // e7919
 					}
 					if opts.VolatilePointers {
-						_ = r.flipcoin(50) // e7926
+						_ = r.flipcoin(50) // e7920
 					}
-					newArray2 := r.flipcoin(20) // e7927
-					initNull2 := r.flipcoin(20) // e7928
-					// find_pointer_type(LhsType, true): one more star for SelectDeref create
-					ptrType := targetType
-					if !strings.Contains(ptrType.Name, "*") {
-						ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
-					} else {
-						ptrType = CType{Name: targetType.Name + "*", Signed: targetType.Signed, Bits: targetType.Bits, HexDigits: targetType.HexDigits}
+					_ = r.flipcoin(20) // e7921 NewArray
+					initNull := r.flipcoin(20) // e7922
+					if initNull {
+						_ = r.flipcoin(0) // e7923 visit fail
 					}
-					if newArray2 {
-						// CreateArray for pointer var (alts make_init F20; sizes U99…)
-						burnCreateArrayPtrAltNestedCreate = true
-						_arr := burnCreateArrayVariable(r, opts, ptrType, true)
-						burnCreateArrayPtrAltNestedCreate = false
-						emitOrphanArrayGlobal(ctx, ptrType, _arr)
-					} else if !initNull2 {
-						// address residual — optional choose
-						_ = r.upto(3)
+					if r.flipcoin(80) { // e7924
+						if opts.ConstPointers {
+							_ = r.flipcoin(10) // e7925
+						}
+						if opts.VolatilePointers {
+							_ = r.flipcoin(50) // e7926
+						}
+						newArray2 := r.flipcoin(20) // e7927
+						_ = r.flipcoin(20)       // e7928 init
+						if newArray2 {
+							burnCreateArrayPtrAltNestedCreate = true
+							_arr := burnCreateArrayVariable(r, opts, ptrType, true)
+							burnCreateArrayPtrAltNestedCreate = false
+							emitOrphanArrayGlobal(ctx, ptrType, _arr)
+						}
 					}
 				}
+				// visit_facts fail after CreateArray — phase 1
+				continue
+			}
+			// n >= 1: e7933 third empty create NewArray=0 address accepts Lhs.
+			// UP next is free StatementProbability U100 (e7938), not parent Expression.
+			inventArrayOpPostNestBreakLhsEmptyCreate = false
+			inventArrayOpPostNestBreakLhsEmptyCreateN = 0
+			if r.flipcoin(80) { // e7933
+				if opts.ConstPointers {
+					_ = r.flipcoin(10) // e7934
+				}
+				if opts.VolatilePointers {
+					_ = r.flipcoin(50) // e7935
+				}
+				_ = r.flipcoin(20) // e7936 NewArray
+				_ = r.flipcoin(20) // e7937 init address
 			}
 			lhsFromDeref = true
 			lv = lvalueInfo{expr: "*p", ctype: targetType}
+			if ctx != nil && ctx.state != nil {
+				// End invent residual Assign cleanly — next free Statement U100
+				// (e7938 Assign), not BlockSize U4 (stmtCount exhausted early).
+				ctx.state.freeMultiIVForLhsExprContinue = false
+				ctx.state.postAggLhsExprContinue = false
+				ctx.state.postAggNullValidateExprContinue = false
+				ctx.state.postAggNeedLhsAfterRhs = false
+				if ctx.state.ppPostPadSkipParentExprN < 8 {
+					ctx.state.ppPostPadSkipParentExprN = 8
+				}
+				// Drain more free Statements in this block (UP continues U100 Assign…).
+				if ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN < 4 {
+					ctx.state.freeMultiIVNeedNoRhsPostArrayOpNeedStmtN = 4
+				}
+				ctx.state.skipNextBlockSize = true // NeedStmt emitOne without nested BlockSize U
+			}
 			break
 		}
 		// e6686–: after e6586 residual Assign, next free Assign skips AssignOps

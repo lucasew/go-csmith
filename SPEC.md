@@ -258,7 +258,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 - Unit/smoke tests of isolated Go helpers as proof of parity — rejected in favor of instrumented stream + GDB on C++ state.
 - Stopping at a high seed5 `first_div` without COUNT=20 — rejected.
 
-**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~7933); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
+**Explicitly still open (not closed by grill):** seed5 full event stream (living first_div ~7945); seeds 7–21 events; seed2/4 **source** match; stripping legacy residual/`silenceTrace` debt already in tree; full flag parity (§4 phase C). Work continues under the closed rules above.
 
 
 ## 9. Progress (living)
@@ -272,7 +272,7 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7933** (post-Break Assign Lhs CreateArray then more SelectDeref F80 vs GO RHS Expression)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7945** (post-Break next Assign Function RHS; UP U100 VS vs GO F30 FuncAttr)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
@@ -280,11 +280,17 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 
 
 
+**seed5 e7933→7945 climbed — invent residual Break Lhs multiphase phase1 + free Statements:**
+1. Capture: after CreateArray Lhs, UP F80 random_add F10 F50 NewArray=0 address accept then Statement U100 Assign; GO accepted Lhs early then BlockSize U4 / Expression residual.
+2. C++: Lhs do-while third empty create accepts; Block continues free Statements (not must_return).
+3. GO: LhsEmptyCreateN phase 1 third create accept; NeedStmtN + skipNextBlockSize for more free Statements. Seeds 2/4/6 held.
+4. Next: e7945 Function RHS UP U100 VS vs GO F30 FuncAttr.
+
 **seed5 e7919→7933 climbed — invent residual Break Assign Lhs SelectDeref empty create:**
 1. Capture: after RHS PL * create, Lhs SelectDeref F80 empty → random_add F10 F50 + NewArray=0 initNull F0 fail → second F80 create NewArray CreateArray vs GO F80=0→VS.
 2. C++: select_deref_pointer empty (VariableSelector.cpp:1266–1315) random_add_qualifiers + create_and_initialize; Lhs do-while after visit fail.
 3. GO: inventArrayOpPostNestBreakLhsEmptyCreate multiphase after RHS PL create. Seeds 2/4/6 held.
-4. Next: e7933 more Lhs SelectDeref F80 after CreateArray vs GO Expression U120.
+4. Next: e7933 Lhs phase1 — climbed.
 
 **seed5 e7909→7919 climbed — invent residual Break Assign RHS Global visit-fail reselect:**
 1. Capture: Assign RHS Expression Variable Global U100 sole/visit fail → UP reselects U100 ParentParam→PL * create (F50 F10×2 F20 F20 U3) vs GO empty Global F20.
