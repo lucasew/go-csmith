@@ -9663,10 +9663,9 @@ func selectParentLocalAfterPPMiss(t CType, er *exprRand, candidates []exprVarCan
 			continue
 		}
 		// Addressable: want pointer level > have level (take address).
-		// C++ Type::is_derivable uses ptr_type==have (exact pointee Type*).
-		// Integer pointees also accept any non-void simple have for one-level
-		// *T formals (make_random_param ExpressionVariable) — matches stream
-		// when block locals are retyped simples (seed7 e271 U2 among 2).
+		// C++ choose_var eFlexible ok_vars then prefers addressable
+		// (VariableSelector.cpp:472–490). One-level *T formals match any
+		// non-void simple have after free For retyped PL creates (seed7 e271).
 		if wantPtr && wantLvl == 1 {
 			cPtr := strings.Contains(c.ctype.Name, "*")
 			cSimple := !cPtr && !strings.HasPrefix(c.ctype.Name, "struct") &&
@@ -27818,6 +27817,20 @@ exprTries:
 				}
 			}
 			candidates := buildScopedCandidatesFromER(er, env, scope, scopePick, ctx)
+			// seed7 e273–77: after free For PL addressable accept, next isParam
+			// ExpressionVariable Global (U100=6) — C++ SelectGlobal empty for
+			// pointer formal → GenerateNewGlobal copies formal qfer (no
+			// random_qualifiers) then create_and_initialize F20… (seed7 e274+).
+			// GO live GlobalList would choose/soft-accept and desync.
+			if scopePick == 0 && isParam && strings.Contains(t.Name, "*") &&
+				flow != nil && !flow.deepStack && flow.multiDimArrays == 0 &&
+				!flow.useSmallParentStack && flow.blockStack == 2 {
+				if g, ok := createOnDemandGlobalFromEROpts(er, opts, t, ctx, true); ok {
+					bumpExprDepth(ctx)
+					markVarSelectEffect()
+					return finishVar(castLiteral(t, g.expr))
+				}
+			}
 			// seed2 e1021: ParentParam + pointer want after useSmallParentStack —
 			// UP falls through to SelectParentLocal (U3 stack + create) even when
 			// GO param inventory is non-empty. Keep non-pointer param selects (e962).
@@ -28393,46 +28406,35 @@ exprTries:
 								// selectExprVariableStrict skips addressable simples
 								// and soles n==2 without U2 — seed7 e271 UP U2 among
 								// 2 for-body locals (uint16/uint8) for int32_t* formal.
-								plVisitMiss := false
+								// C++ addr_taken_of_locals default true: accept take-address
+								// of simple for isParam pointer (ExpressionVariable.cpp).
+								// Do not invent visit-miss — that desynced e272 VS vs next
+								// Expression term U100 (seed7 e273).
 								if c2, ok2 := selectParentLocalAfterPPMiss(t, er, localCands); ok2 {
-									if isParam && wantPtr && !strings.Contains(c2.ctype.Name, "*") {
-										plVisitMiss = true
-									} else {
-										bumpExprDepth(ctx)
-										return finishVar(castLiteral(t, c2.expr))
-									}
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, c2.expr))
 								}
-								if !plVisitMiss {
-									allLocs := make([]exprVarCandidate, 0, 8)
-									for _, l := range mergedLocals(scope, ctx) {
-										if l.name == "x" {
-											continue
-										}
-										allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
+								allLocs := make([]exprVarCandidate, 0, 8)
+								for _, l := range mergedLocals(scope, ctx) {
+									if l.name == "x" {
+										continue
 									}
-									if c2, ok2 := selectParentLocalAfterPPMiss(t, er, allLocs); ok2 {
-										if isParam && wantPtr && !strings.Contains(c2.ctype.Name, "*") {
-											plVisitMiss = true
-										} else {
-											bumpExprDepth(ctx)
-											return finishVar(castLiteral(t, c2.expr))
-										}
-									}
+									allLocs = append(allLocs, exprVarCandidate{expr: l.name, ctype: l.ctype, assignable: true})
 								}
-								if plVisitMiss {
-									c.expr = "" // fall through to empty-expr VS reselect
-								} else {
-									qferMiss := 1
-									if forcePPPL {
-										qferMiss = 2
-									}
-									if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
-										bumpExprDepth(ctx)
-										return finishVar(castLiteral(t, g.expr))
-									}
-									restoreGenSnapshot(ctx, snap)
-									continue
+								if c2, ok2 := selectParentLocalAfterPPMiss(t, er, allLocs); ok2 {
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, c2.expr))
 								}
+								qferMiss := 1
+								if forcePPPL {
+									qferMiss = 2
+								}
+								if g, ok2 := createOnDemandFromParentLocalPathEROpts(er, opts, t, ctx, qferMiss, true, idx); ok2 {
+									bumpExprDepth(ctx)
+									return finishVar(castLiteral(t, g.expr))
+								}
+								restoreGenSnapshot(ctx, snap)
+								continue
 							}
 						}
 					}

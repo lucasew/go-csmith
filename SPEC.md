@@ -297,14 +297,20 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 |------|--------|
 | 2,3,4,6 | full event match |
 | 5 | all 13634 UP events match; GO extra after |
-| 7 | first_div **273** (was 271): PP→PL eFlexible addressable choose + visit-miss VS |
+| 7 | first_div **278** (was 273): PP→PL addressable accept + isParam Global formal-qfer create |
 | 8–21 | early mismatch (e.g. 8@42, 17@9, 19@10) |
+
+**seed7 e273→278 climbed — isParam Global GenerateNewGlobal formal qfer:**
+1. Capture: after PL addressable accept, Expression Variable Global U100=6 — UP F20 NewArray-first create vs GO Expression term U100 (live inventory soft-accept).
+2. C++ make_random_param Global: SelectGlobal empty for pointer formal → GenerateNewGlobal copies formal qfer (skip random_qualifiers) → create_and_initialize F20….
+3. GO: free For blockStack==2 isParam pointer Global force `createOnDemandGlobalFromEROpts(..., skipRandomQfer=true)`. Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e278; continue COUNT=20.
 
 **seed7 e271→273 climbed — make_random_param PP→PL eFlexible addressable:**
 1. Capture: e270 stack U2; e271 UP U2 choose among 2 for-body simples vs GO F50 create (strict type miss on int32_t* formal).
-2. C++ SelectParentLocal after PP miss uses eFlexible choose_var + addressable preference (VariableSelector.cpp:472–490) then choose_ok_var U(n); isParam take-address of simple often visit_facts fails → VS reselect U100.
-3. GO: `selectParentLocalAfterPPMiss` (addressable simples for *T + U(n) for n>1); isParam pointer take-address of simple → empty expr VS reselect. Seeds 2/3/4/5/6 hold.
-4. Next: seed7 e273 UP U100=6 vs GO U100=58; continue COUNT=20.
+2. C++ SelectParentLocal after PP miss uses eFlexible choose_var + addressable preference (VariableSelector.cpp:472–490) then choose_ok_var U(n); addr_taken_of_locals default true accepts take-address.
+3. GO: `selectParentLocalAfterPPMiss` (addressable simples for *T + U(n) for n>1). Seeds 2/3/4/5/6 hold.
+4. Next: seed7 e273; continue COUNT=20.
 
 **seed7 e218→271 climbed — free For free Expression NewValue→PL needQfer:**
 1. Capture: e218 after F10 PL U2 U14 — UP F50 F10 (null/wildcard SE-free qfer) vs GO F20 (qferMode 0).
