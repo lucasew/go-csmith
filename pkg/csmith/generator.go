@@ -135,6 +135,16 @@ var burnCreateArrayCtxSink *genContext
 // for selectExprVariableFromER (may run when burnCreateArrayCtxSink is unset).
 var freeMultiIVNeedNoRhsEraSink *bool
 
+// inventArrayOpExprPLStackU1: package one-shot parentStackPick U1 after invent
+// ArrayOp Lhs accept Expression (e7423; sticky PLStackU2 would burn U2).
+var inventArrayOpExprPLStackU1 bool
+
+// inventArrayOpExprEmptyParamsVS: invent ArrayOp Lhs Expression residual —
+// VariableSelectFilter rejects ParentParam (e7425 U100 tries=1 → Global).
+// GO scope may still list params; sticky until freeMultiIVForLhsExprContinue ends.
+var inventArrayOpExprEmptyParamsVS bool
+
+
 // burnCreateArrayFieldVarsDone: set after CreateArray/itemize create_field_vars
 // (e10988 PL U2 U2 F0 residual era).
 var burnCreateArrayFieldVarsDone bool
@@ -914,6 +924,9 @@ type functionFlowState struct {
 	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS: after Global empty
 	// residual miss, next is VS try (e7408); not SelectDeref F80.
 	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS bool
+	// freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0SecondPPMiss: second PP U4 miss
+	// (e7409) → SelectDeref create residual F80 F20 F20 F0 then accept path.
+	freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0SecondPPMiss bool
 	// freeMultiIVNeedNoRhsPostEAReturnPostArrayOpInBodyPLN: free Expression
 	// ParentLocal hits inside second ArrayOp body (not Function-fail PL).
 	// 0: e6377 sole after stack U3; 1+: e6460 choose_ok_var U15 (live inventory
@@ -992,6 +1005,9 @@ type functionFlowState struct {
 	// is empty create (e3003 U2 + F50 F10 F20 NewArray). Later PL chooses among
 	// locals (e3058 U2 + U5, then parent Assign Lhs F80).
 	freeMultiIVForLhsExprPLCreateOnce bool
+	// freeMultiIVForLhsExprPLStackU1Once: one-shot stack U1 under ExprContinue
+	// (e7423 after invent ArrayOp Lhs accept; sticky ExprContinue U2 over-burns).
+	freeMultiIVForLhsExprPLStackU1Once bool
 	// freeMultiIVForLhsExprPLChooseU4Once: after null-alt CreateArray Lhs residual
 	// (e3161–74), next free Expression Variable PL choose is U4 (e3179) not sticky
 	// early residual U5 (e3058–59).
@@ -2605,6 +2621,18 @@ func parentStackPick(er *exprRand, state *functionFlowState) int {
 	if state != nil && state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 {
 		state.freeMultiIVNeedNoRhsPostArrayOpPLStackU1 = false
 		state.freeMultiIVNeedNoRhsPostArrayOpQferLvl1 = true
+		return int(er.pick(1))
+	}
+	// e7423 / e7432: invent ArrayOp Lhs Expression residual PL stack U1
+	// (before sticky freeMultiIVForLhsExprContinue U2). Sticky while
+	// inventArrayOpExprEmptyParamsVS; one-shot flags cover first hit if
+	// residual PL intercept bypasses parentStackPick.
+	if inventArrayOpExprEmptyParamsVS || inventArrayOpExprPLStackU1 ||
+		(state != nil && state.freeMultiIVForLhsExprPLStackU1Once) {
+		inventArrayOpExprPLStackU1 = false
+		if state != nil {
+			state.freeMultiIVForLhsExprPLStackU1Once = false
+		}
 		return int(er.pick(1))
 	}
 	// e7409: after first PP residual done, invent ArrayOp-body PP→PL stack U4
@@ -5438,7 +5466,9 @@ func variableScopePickFromEROpts(er *exprRand, opts Options, scope *scopeInfo) i
 	paramsEmpty := scope == nil || len(scope.params) == 0
 	// seed5 e893: after NullValidate nest *S1 PL create residual, UP current
 	// func has empty params → VariableSelectFilter rejects ParentParam.
-	if nullValidateEmptyParamsVS {
+	// seed5 e7425: invent ArrayOp Lhs Expression residual same filter
+	// (GO param inventory overcount → bare ParentParam U100 without tries=1).
+	if nullValidateEmptyParamsVS || inventArrayOpExprEmptyParamsVS {
 		paramsEmpty = true
 	}
 	reject := func(x uint32) bool {
@@ -12167,13 +12197,11 @@ exprTries:
 						!postEAReturnPL
 					forceU6Sole := forceU6Stack && scopePick == 1
 					if freeMultiIVExprPL {
-						// e3003/e3058/e3405: stack U2 during early residual Expression.
-						// e3549: after Global U16 itemize multiphase, For body depth U3.
-						if flow != nil && flow.freeMultiIVPostEAGlobalItemizePLStackU3 {
-							idx = int(er.pick(3)) // e3549
-						} else {
-							idx = int(er.pick(2)) // e3003/e3058 U2
-						}
+						// e3003/e3058/e3405: stack U2 under freeMultiIVForLhsExprContinue;
+						// e3549 U3 via freeMultiIVPostEAGlobalItemizePLStackU3;
+						// e7423 U1 via invent residual / parentStackPick.
+						// Must use parentStackPick — bare pick(2) skipped U1 (e7423).
+						idx = parentStackPick(er, flow)
 					} else if needNoRhsIfPL {
 						// e5133–34: stack U5 + choose_ok_var U3 (live block locals).
 						idx = int(er.pick(5))
@@ -12689,6 +12717,29 @@ exprTries:
 				bumpExprDepth(ctx)
 				markVarSelectEffect()
 				return finishVar(castLiteral(t, "g_0"))
+			}
+			// seed5 e7426+: invent ArrayOp Lhs Expression residual Global —
+			// SelectGlobal live GlobalNonvolatiles choose_ok_var (not empty
+			// GenerateNewGlobal F20 NewArray). Materialised inventory only.
+			if scopePick == 0 && inventArrayOpExprEmptyParamsVS && er != nil {
+				globals := make([]exprVarCandidate, 0, 16)
+				for _, g := range mergedGlobalsTrueSelect(env, ctx) {
+					if g.isVolatile {
+						continue
+					}
+					globals = append(globals, exprVarCandidate{
+						expr: g.name, ctype: g.ctype, assignable: !g.isConst,
+						isArray: g.isArray, arrayLen: g.arrayLen, arraySizes: g.arraySizes,
+						isVolatile: g.isVolatile,
+					})
+				}
+				if len(globals) > 0 {
+					if c, ok := chooseOKVarFromER(er, globals); ok && c.expr != "" {
+						bumpExprDepth(ctx)
+						markVarSelectEffect()
+						return finishVar(castLiteral(t, c.expr))
+					}
+				}
 			}
 			// seed5 e4378 / e4431 / e4452: after multi-level SelectDeref create
 			// ladder, free Expression Variable Global is live GlobalList —
@@ -19984,10 +20035,11 @@ func chooseLValueEx(r *rng, opts Options, target CType, env envInfo, scope scope
 			return lvalueInfo{}, false, false
 		}
 		// seed5 e7408–13: second PP after Global empty — stack/choose U4 miss
-		// → SelectDeref F80 F20 F20 F0 (not PL create F50 F10).
+		// → SelectDeref create residual (not PL create F50 F10).
 		if flow != nil && flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active &&
 			flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0PPDone && er != nil {
 			_ = er.pick(4) // e7409
+			flow.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0SecondPPMiss = true
 			return lvalueInfo{}, false, false
 		}
 		// seed5 e6174–79: after post-Return NewArray Global-miss SelectDeref
@@ -120666,8 +120718,7 @@ commaF80MultiDone:
 			picked, ok, createdGlobal := chooseLValueEx(r, opts, targetType, env, scope, ctx)
 			// seed5 e7322–7401: after first PP VS residual (NeedReItemize), F80
 			// re-itemize until F80=0→VS. After Global empty residual, continue
-			// VS (e7408 PP). After second PP U4 miss, fall through to SelectDeref
-			// create (e7410 F80 F20…) — do not continue VS.
+			// VS (e7408 PP). After second PP U4 miss, SelectDeref create residual.
 			if !ok && ctx != nil && ctx.state != nil &&
 				ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active && r != nil {
 				if ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0NeedReItemize &&
@@ -120687,7 +120738,47 @@ commaF80MultiDone:
 					ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0ContinueVS = false
 					continue // e7408 next VS after Global empty
 				}
-				// second PP U4 miss: fall through to SelectDeref create residual
+				if ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0SecondPPMiss {
+					// e7410–20: F80 F20 F20 F0 fail; F80 F20×3 F50 F50 U3 accept.
+					ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0SecondPPMiss = false
+					ctx.state.freeMultiIVNeedNoRhsPostArrayOpLhsVisitF0Active = false
+					if r.flipcoin(80) { // e7410
+						_ = r.flipcoin(20) // e7411 NewArray
+						_ = r.flipcoin(20) // e7412 init
+						_ = r.flipcoin(0)  // e7413 visit fail
+					}
+					if r.flipcoin(80) { // e7414
+						_ = r.flipcoin(20) // e7415
+						_ = r.flipcoin(20) // e7416
+						_ = r.flipcoin(20) // e7417
+						_ = r.flipcoin(50) // e7418
+						_ = r.flipcoin(50) // e7419
+						_ = r.upto(3)      // e7420
+						lv = lvalueInfo{expr: "*p", ctype: targetType}
+						lhsFromDeref = true
+						// e7421+: free Expression nest after Lhs accept.
+						// Clear NeedStmt so e6562 does not wipe ExprContinue;
+						// clear FuncCreateAttrDone so nest actually runs U120.
+						// depthBlock: first U120 is Variable tries=5 (e7421).
+						nullValidatePostResidualAddrCreateVSNeedStmt = false
+						ctx.state.freeMultiIVPostEAFuncCreateAttrDone = false
+						ctx.state.freeMultiIVForLhsExprContinue = true
+						// e7421+: free Expression nest only (PL U1, Global U12…);
+						// no PostNestLhs SelectDeref F80 (that was e3180 free multi-IV).
+						ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+						ctx.state.freeMultiIVForLhsExprPLStackU1Once = true
+						inventArrayOpExprPLStackU1 = true
+						inventArrayOpExprEmptyParamsVS = true
+						// Drop sticky PLStackU2 so e7423 Expression PL is U1 not U2.
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2 = false
+						ctx.state.freeMultiIVNeedNoRhsPostEAReturnPostArrayOpPLStackU2InBody = false
+						ctx.state.ppPostPadSkipParentExprN = 0
+						ctx.state.ppPostPadDepthBlock = true
+						ctx.state.ppPostPadDepthBlockN = 0
+						break
+					}
+					continue
+				}
 			}
 			if !ok && needNoRhs && createdGlobal {
 				// seed5 e4508–16: need_no_rhs NewValue→Global retype signed
@@ -121471,6 +121562,7 @@ commaF80MultiDone:
 		if ctx.state.freeMultiIVPostEAFuncCreateAttrDone {
 			ctx.state.freeMultiIVForLhsExprContinue = false
 			ctx.state.freeMultiIVForLhsExprPostNestLhs = false
+			inventArrayOpExprEmptyParamsVS = false
 		} else {
 			ctx.state.ppPostPadSkipParentExprN = 0
 			// (1) e2989 U120=97 Constant
@@ -121485,12 +121577,20 @@ commaF80MultiDone:
 				ctx.exprDepth = 0
 				ctx.state.ppPostPadSkipParentExprN = 0
 				_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
-				// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
-				// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
-				// F80=0 → VS U100…) then more free Expression (e3198 U120). StatementAssign
-				// order is RHS then Lhs — residual Expressions act as RHS of a parent
-				// ExpressionAssign whose Lhs runs after the nest.
-				if ctx.state.freeMultiIVForLhsExprContinue && ctx.state.freeMultiIVForLhsExprPostNestLhs {
+				// invent ArrayOp Lhs residual (e7421+): more free Expressions only
+				// (e7427 U120…) — no PostNestLhs SelectDeref F80 ladder.
+				if inventArrayOpExprEmptyParamsVS && ctx.state.freeMultiIVForLhsExprContinue {
+					for extra := 0; extra < 24 && ctx.state.freeMultiIVForLhsExprContinue; extra++ {
+						ctx.exprDepth = 0
+						ctx.state.ppPostPadSkipParentExprN = 0
+						_ = randomTypedExpr(targetType, r, opts, env, scope, ctx)
+					}
+				} else if ctx.state.freeMultiIVForLhsExprContinue && ctx.state.freeMultiIVForLhsExprPostNestLhs {
+					// After free multi-IV Expression nest (Comma) ends on Variable, C++ parent
+					// ExpressionAssign Lhs::make_random continues SelectDeref (e3180 F80 U2
+					// F80=0 → VS U100…) then more free Expression (e3198 U120). StatementAssign
+					// order is RHS then Lhs — residual Expressions act as RHS of a parent
+					// ExpressionAssign whose Lhs runs after the nest.
 					ctx.state.freeMultiIVForLhsExprPostNestLhs = false
 					er := newExprRand(r, exprDecisionBudget(opts))
 					base := targetType
@@ -121516,6 +121616,7 @@ commaF80MultiDone:
 					}
 				}
 				ctx.state.freeMultiIVForLhsExprContinue = false
+				inventArrayOpExprEmptyParamsVS = false
 			}
 		}
 	}
@@ -124769,6 +124870,8 @@ func Generate(opts Options) (string, error) {
 	if err := opts.validate(); err != nil {
 		return "", err
 	}
+	inventArrayOpExprPLStackU1 = false
+	inventArrayOpExprEmptyParamsVS = false
 	gen := createProgramGenerator(opts)
 	gen.initialize()
 	return gen.goGenerator(), nil

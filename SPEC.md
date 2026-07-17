@@ -272,13 +272,19 @@ Residual multiphase catalogs that only burn stream without a C++ counterpart are
 | Seed 3 event match | **PASS** — full **64/64** |
 | Seed 4 event match | **PASS** — full **106117/106117** (historical residual climb; integrity debt remains) |
 | Seed 6 event match | **PASS** — full **23/23** (SelectParentLocal empty create + Block max=0 append_return) |
-| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7411** (CreateArray F0 multiphase + VS PP/Global residual; next open SelectDeref create F20 vs F80 after second PP U4)|
+| Seeds 5,7–21 event | **FAIL** — seed5 first_div **~7429** (invent ArrayOp Lhs Expression residual; next open Global eFlexible U51 vs U12 after second free Expression Global)|
 | 20-seed gate | **OPEN** — COUNT=20 SEED_START=2; event-only seed2/3/4/**6** PASS |
 
 **Integrity:** reviewers **read the implementer diff** (no integrity scripts). Reject residual packs, event-indexed multiphase overfitting (§5.1.1), `silenceTrace`, seed hardcodes, event-only climbs, and **anything that looks like entropy discard** (§5.2 — blank `_ = r.…`, inventory floors/pads, multiphase residual ladders, untraced gap-fills). Appearance is enough to reject; same-hunk C++ discard cite required to keep a blank draw. Require call flow aligned with Csmith C++ **predicates + methods**, not seed event numbers; draws must be **used** or mirror documented upstream discard at the same site. `first_div` climb alone is **never** acceptance.
 
 
 
+
+**seed5 e7411→7429 climbed — invent ArrayOp Lhs SelectDeref create residual + free Expression nest:**
+1. Capture: e7423 UP PL stack U1 vs GO sticky freeMultiIVForLhsExprContinue U2; then e7425 empty-params VS filter; e7426 live GlobalNonvolatiles U12.
+2. C++: after invent ArrayOp Lhs second-PP miss → SelectDeref create residual F80…U3 accept, free Expression nest (PL stack U1 sole, empty-params VariableSelectFilter → Global live U12) without PostNestLhs SelectDeref F80 ladder.
+3. GO: SecondPPMiss residual arm; residual PL intercept uses `parentStackPick` (not bare pick(2)); invent residual sticky empty-params VS + live Nonvolatiles choose; free Expression loop without PostNestLhs. Seeds 2/4/6 held.
+4. Next: e7429 UP Global eFlexible U51 (expanded ok_vars) vs GO Nonvolatiles U12.
 
 **seed5 e6024→6046 climbed — post-NewArray PL choose U14 + PP multiphase U7/sole/U7:**
 1. Capture: e6024 UP choose_ok_var U14 vs GO sticky multiphase U13 (post-Return PL pn≥2).
