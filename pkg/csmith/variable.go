@@ -30,13 +30,22 @@ type Variable struct {
 	IsAccessOnce bool
 	// IsAddrTaken mirrors Variable::isAddrTaken (disables ACCESS_ONCE).
 	IsAddrTaken bool
+	// UseVolRVal mirrors wrap_volatiles path for VOL_RVAL emit.
+	UseVolRVal bool
 }
 
-// OutputC mirrors Variable::Output — ACCESS_ONCE wrap when marked (option gated at create).
-// Variable.cpp:689–700. VOL_RVAL deferred (wrap_volatiles default off).
+// OutputC mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name.
+// Variable.cpp:689–700.
 func (v *Variable) OutputC() string {
 	if v == nil {
 		return ""
+	}
+	if v.UseVolRVal && v.IsVolatile() {
+		ty := "int"
+		if v.Type != nil {
+			ty = v.Type.CName()
+		}
+		return "VOL_RVAL(" + v.Name + ", " + ty + ")"
 	}
 	if v.IsAccessOnce && !v.IsAddrTaken {
 		return "ACCESS_ONCE(" + v.Name + ")"

@@ -136,6 +136,25 @@ func (t *Type) IsVolatileStructUnion() bool {
 	return false
 }
 
+// StructDepth mirrors Type::get_struct_depth.
+// Type.cpp:1261–1275 — 0 if not struct; else 1 + max field depth.
+func (t *Type) StructDepth() int {
+	if t == nil || !t.IsStruct() {
+		return 0
+	}
+	depth := 1
+	maxField := 0
+	for _, f := range t.Fields {
+		if f.Type == nil {
+			continue
+		}
+		if d := f.Type.StructDepth(); d > maxField {
+			maxField = d
+		}
+	}
+	return depth + maxField
+}
+
 // Simple returns the eSimpleType (only meaningful if IsSimple).
 func (t *Type) Simple() ESimpleType {
 	if t == nil {

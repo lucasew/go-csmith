@@ -79,9 +79,14 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		if t.IsStruct() && !opts.ReturnStructs {
 			return true
 		}
+		if t.IsUnion() && !opts.ReturnUnions {
+			return true
+		}
 		if forFieldVar && t.IsStruct() {
-			// max_nested_struct_level — StructDepth not fully tracked; use 0 depth OK
-			// reject if nested too deep: count via recursive fields simplified skip
+			// Type.cpp:240–242 — reject when depth >= max_nested_struct_level
+			if t.StructDepth() >= opts.MaxNestedStructLevel {
+				return true
+			}
 		}
 		return false
 	})
@@ -193,24 +198,29 @@ func AssignOpWorksForFloat(op AssignOp) bool {
 // SelectLType mirrors Type::SelectLType.
 // Type.cpp:1603–1637.
 func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVolatile bool, op AssignOp) *Type {
-	_ = noVolatile
 	if r == nil {
 		return GetIntType()
 	}
 	// pointer as LType (simple assign only)
 	if op == AssignSimple && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
-		return env.MakeRandomPointerType(r, opts, probs)
-	}
-	// struct as LType when any structs exist (Type.cpp:1616–1622)
-	if op == AssignSimple && env != nil && len(env.StructTypes) > 0 {
-		if r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
-			return env.StructTypes[r.RndUpto(uint32(len(env.StructTypes)))]
+		if env != nil {
+			return env.MakeRandomPointerType(r, opts, probs)
 		}
+		return PointerTo(GetIntType())
 	}
-	// union as LType (UnionAsLTypeProb) when any unions exist
-	if op == AssignSimple && env != nil && len(env.UnionTypes) > 0 {
-		if r.RndFlipcoin(uint32(probs.Single(PUnionAsLTypeProb))) {
-			return env.UnionTypes[r.RndUpto(uint32(len(env.UnionTypes)))]
+	// struct/union as LType — get_all_ok_struct_union_types filtered (Type.cpp:1616–1622)
+	if op == AssignSimple && env != nil {
+		if len(env.StructTypes) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+			cands := okStructUnionLTypes(env, noVolatile, true, false)
+			if len(cands) > 0 {
+				return cands[r.RndUpto(uint32(len(cands)))]
+			}
+		}
+		if len(env.UnionTypes) > 0 && r.RndFlipcoin(uint32(probs.Single(PUnionAsLTypeProb))) {
+			cands := okStructUnionLTypes(env, noVolatile, false, true)
+			if len(cands) > 0 {
+				return cands[r.RndUpto(uint32(len(cands)))]
+			}
 		}
 	}
 
@@ -220,6 +230,38 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 			return GetSimpleType(EFloat)
 		}
 	}
-	// default integer
+	// default is any integer type → get_int_type()
 	return GetIntType()
+}
+
+// okStructUnionLTypes filters struct/union types for SelectLType (no_volatile etc.).
+// Type.cpp get_all_ok_struct_union_types subset.
+func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) []*Type {
+	if env == nil {
+		return nil
+	}
+	var out []*Type
+	if wantStruct {
+		for _, t := range env.StructTypes {
+			if t == nil {
+				continue
+			}
+			if noVolatile && t.IsVolatileStructUnion() {
+				continue
+			}
+			out = append(out, t)
+		}
+	}
+	if wantUnion {
+		for _, t := range env.UnionTypes {
+			if t == nil {
+				continue
+			}
+			if noVolatile && t.IsVolatileStructUnion() {
+				continue
+			}
+			out = append(out, t)
+		}
+	}
+	return out
 }

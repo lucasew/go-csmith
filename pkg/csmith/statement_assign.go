@@ -69,6 +69,10 @@ func MakeRandomAssign(
 		// Re-roll op for actual type (signed filter, float)
 		op = AssignOpsProbability(r, opts, assignTab, typ)
 	}
+	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
+	if typ != nil && typ.IsFloat() && !AssignOpWorksForFloat(op) {
+		op = AssignSimple
+	}
 
 	var rhs *Expression
 	if op.NeedNoRHS() {

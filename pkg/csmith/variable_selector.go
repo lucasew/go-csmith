@@ -139,6 +139,10 @@ func (vs *VariableSelector) createAndInitialize(
 	if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
 		v.IsAccessOnce = true
 	}
+	// wrap_volatiles → VOL_RVAL on Output
+	if vs.Opts.WrapVolatiles && v.IsVolatile() {
+		v.UseVolRVal = true
+	}
 	if blk != nil {
 		blk.LocalVars = append(blk.LocalVars, v)
 	}
