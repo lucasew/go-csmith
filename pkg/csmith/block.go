@@ -36,6 +36,11 @@ type Stmt struct {
 	GotoBack bool
 	// StmID mirrors Statement::stm_id for step_hash.
 	StmID int
+	// SafeFlags / Tmp1 / Tmp2 for compound assign safe-math OutputAsExpr.
+	// StatementAssign.cpp make_possible_compound_assign.
+	SafeFlags *SafeOpFlags
+	Tmp1      string
+	Tmp2      string
 }
 
 // nextStmID is Statement::sid allocator.
@@ -103,7 +108,7 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
-// Block.cpp:216–219.
+// Block.cpp:216–219 — gensym("t_"); fallback unique names when no GenSym.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	if b == nil {
 		return "t_0"
@@ -114,6 +119,9 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	name := "t_1"
 	if sym != nil {
 		name = sym.Next("t_")
+	} else {
+		// unique within block when session GenSym unavailable
+		name = "t_" + itoa(len(b.TmpVars)+1)
 	}
 	b.TmpVars[name] = st
 	return name
@@ -432,28 +440,11 @@ func (b *Block) Output(indent int) string {
 			}
 			sb.WriteString(";\n")
 		case StmtAssign:
-			lhs := ""
-			if st.ArrayAccess != "" {
-				// precomputed Lhs.Output (deref / VOL_LVAL)
-				lhs = st.ArrayAccess
-			} else if st.Lhs != nil {
-				// Lhs.cpp:207–218
-				lhs = st.Lhs.Output(st.LhsVar != nil && st.LhsVar.UseVolRVal)
-			} else if st.LhsVar != nil {
-				// Lhs::Output → VOL_LVAL / bare name
-				lhs = st.LhsVar.OutputLhsC()
-			}
-			if lhs != "" {
-				rhs := "0"
-				if st.Expr != nil {
-					rhs = st.Expr.Output()
-				}
-				// NeedNoRHS ops ignore rhs text
-				if st.AssignOp.NeedNoRHS() {
-					sb.WriteString(st.AssignOp.AssignOpC(lhs, "") + ";\n")
-				} else {
-					sb.WriteString(st.AssignOp.AssignOpC(lhs, rhs) + ";\n")
-				}
+			// StatementAssign::OutputAsExpr
+			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
+			asExpr := OutputAssignAsExpr(&st, wrap)
+			if asExpr != "" {
+				sb.WriteString(asExpr + ";\n")
 			} else {
 				sb.WriteString("/* assign */;\n")
 			}

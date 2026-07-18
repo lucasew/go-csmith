@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // NewAssignOpsTable mirrors StatementAssign::InitProbabilityTable.
 // StatementAssign.cpp:68–81.
 func NewAssignOpsTable(opts Options) *DistributionTable {
@@ -188,24 +190,156 @@ func MakeRandomAssign(
 
 	cg.MergeParamContext(lhsCG, true)
 
-	st := Stmt{Kind: StmtAssign, LhsVar: lhsVar, Expr: rhs, AssignOp: op, Lhs: lhs}
+	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
+	st := makePossibleCompoundAssign(cg, opts, probs, r, typ, lhs, op, rhs)
 	lhsIndir := 0
-	if lhs != nil {
-		lhsIndir = lhs.IndirectLevel()
-		if lhsIndir > 0 || (opts.WrapVolatiles && lhs.IsVolatile()) {
-			st.ArrayAccess = lhs.Output(opts.WrapVolatiles)
+	if st.Lhs != nil {
+		lhsIndir = st.Lhs.IndirectLevel()
+		if lhsIndir > 0 || (opts.WrapVolatiles && st.Lhs.IsVolatile()) {
+			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
 		}
 	}
 	// FactMgr::update_fact_for_assign
-	if cg.FM != nil && lhsVar != nil {
+	if cg.FM != nil && st.LhsVar != nil {
 		if lhsIndir == 0 {
-			cg.FM.UpdateFactForAssign(lhsVar, 0, rhs)
+			cg.FM.UpdateFactForAssign(st.LhsVar, 0, st.Expr)
 		}
-		cg.NoteWrite(lhsVar)
-	} else if lhsVar != nil {
-		cg.NoteWrite(lhsVar)
+		cg.NoteWrite(st.LhsVar)
+	} else if st.LhsVar != nil {
+		cg.NoteWrite(st.LhsVar)
 	}
 	return st
+}
+
+// MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
+// SafeOpFlags.cpp:61–63.
+func MakeDummyFlags() *SafeOpFlags {
+	return &SafeOpFlags{Op1Signed: false, Op2Signed: false, IsFunc: false, Size: SafeInt8}
+}
+
+// makePossibleCompoundAssign mirrors StatementAssign::make_possible_compound_assign.
+// StatementAssign.cpp:244–301 — attach SafeOpFlags + math_notmp temps for compound ops.
+func makePossibleCompoundAssign(
+	cg CGContext,
+	opts Options,
+	probs *Probabilities,
+	r *Rng,
+	typ *Type,
+	lhs *Lhs,
+	op AssignOp,
+	rhs *Expression,
+) Stmt {
+	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs}
+	if lhs != nil {
+		st.LhsVar = lhs.Var
+	}
+	if !opts.SafeMath {
+		return st
+	}
+	bop, ok := op.CompoundToBinaryOps()
+	if !ok {
+		// simple assign — no flags
+		return st
+	}
+	// SafeAssign bit ops use dummy flags (OutputAsExpr still uses simple form)
+	if SafeAssign(op) {
+		st.SafeFlags = MakeDummyFlags()
+		return st
+	}
+	// MakeRandomBinary for arithmetic/shift compound
+	lt := typ
+	if lhs != nil {
+		if t := lhs.GetType(); t != nil {
+			lt = t
+		}
+	}
+	flags := MakeRandomBinary(r, opts, probs, lt)
+	st.SafeFlags = flags
+	// math_notmp temps on current block
+	if opts.MathNoTmp && flags != nil {
+		if blk := cg.CurrentBlock(); blk != nil {
+			st1 := EInt
+			if t := flags.LHSType(); t != nil && t.IsSimple() {
+				st1 = t.Simple()
+			}
+			st2 := st1
+			if bop == BinLShift || bop == BinRShift {
+				if t := flags.RHSType(); t != nil && t.IsSimple() {
+					st2 = t.Simple()
+				}
+			}
+			var sym *GenSym
+			// gensym via VS not available; use nil → t_1 style falls back
+			_ = sym
+			st.Tmp1 = blk.CreateNewTmpVar(nil, st1)
+			st.Tmp2 = blk.CreateNewTmpVar(nil, st2)
+		}
+	}
+	return st
+}
+
+// OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
+// StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeMath.
+func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
+	if st == nil {
+		return ""
+	}
+	lhs := ""
+	if st.ArrayAccess != "" {
+		lhs = st.ArrayAccess
+	} else if st.Lhs != nil {
+		lhs = st.Lhs.Output(wrapVol)
+	} else if st.LhsVar != nil {
+		lhs = st.LhsVar.OutputLhsC()
+	}
+	if lhs == "" {
+		return ""
+	}
+	rhs := "0"
+	if st.Expr != nil {
+		rhs = st.Expr.Output()
+	}
+	// NeedNoRHS and simple path
+	if st.AssignOp.NeedNoRHS() {
+		// ++/-- with safe math for incr when SafeFlags set — for now simple
+		return st.AssignOp.AssignOpC(lhs, "")
+	}
+	// avoid_signed_overflow path (CGOptions::avoid_signed_overflow ≈ SafeMath)
+	if st.SafeFlags != nil && !SafeAssign(st.AssignOp) {
+		bop, ok := st.AssignOp.CompoundToBinaryOps()
+		if ok {
+			opStr := bop.BinaryOpC()
+			fname := st.SafeFlags.BinaryFuncName(opStr)
+			if fname != "" {
+				// lhs = fname([tmp1,] lhs, [tmp2,] rhs)
+				var b strings.Builder
+				b.WriteString(lhs)
+				b.WriteString(" = ")
+				b.WriteString(fname)
+				b.WriteString("(")
+				if st.Tmp1 != "" {
+					b.WriteString(st.Tmp1)
+					b.WriteString(", ")
+				}
+				b.WriteString(lhs)
+				b.WriteString(", ")
+				if st.Tmp2 != "" {
+					b.WriteString(st.Tmp2)
+					b.WriteString(", ")
+				}
+				// pre/post incr use 1
+				switch st.AssignOp {
+				case AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
+					b.WriteString("1")
+				default:
+					b.WriteString(rhs)
+				}
+				b.WriteString(")")
+				return b.String()
+			}
+		}
+	}
+	return st.AssignOp.AssignOpC(lhs, rhs)
 }
 
 // expressionQualifiers approximates Expression::get_qualifiers for qfer seed.

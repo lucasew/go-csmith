@@ -37,6 +37,14 @@ func MakeRandomIf(
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 
+	// StatementIf.cpp:80 — visit_facts on condition before branches (when FM set)
+	if cg.FM != nil && test != nil {
+		cgp := &cg
+		if !VisitFactsExpression(test, cgp, opts) {
+			// soft-fail: keep test, continue generation
+		}
+	}
+
 	thenEff := pre
 	thenCG := cg
 	thenCG.EffectAccum = &thenEff

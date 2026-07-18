@@ -466,23 +466,10 @@ func (e *Expression) outputBody() string {
 	case TermAssignment:
 		if e.Assign != nil {
 			// ExpressionAssign::Output → (assign as expr)
-			lhs := ""
-			if e.Assign.ArrayAccess != "" {
-				lhs = e.Assign.ArrayAccess
-			} else if e.Assign.Lhs != nil {
-				lhs = e.Assign.Lhs.Output(e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal)
-			} else if e.Assign.LhsVar != nil {
-				lhs = e.Assign.LhsVar.OutputLhsC()
-			}
-			rhs := "0"
-			if e.Assign.Expr != nil {
-				rhs = e.Assign.Expr.Output()
-			}
-			if lhs != "" {
-				if e.Assign.AssignOp.NeedNoRHS() {
-					return "(" + e.Assign.AssignOp.AssignOpC(lhs, "") + ")"
-				}
-				return "(" + e.Assign.AssignOp.AssignOpC(lhs, rhs) + ")"
+			wrap := e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal
+			as := OutputAssignAsExpr(e.Assign, wrap)
+			if as != "" {
+				return "(" + as + ")"
 			}
 		}
 	case TermCommaExpr:
