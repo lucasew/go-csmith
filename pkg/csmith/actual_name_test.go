@@ -57,6 +57,15 @@ func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {
 	}
 }
 
+func TestNewVariableSelectorProbsShares(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelectorProbs(opts, probs)
+	if vs.Probs != probs {
+		t.Fatal("must share, not invent")
+	}
+}
+
 func TestOutputGlobalsVolatileComment(t *testing.T) {
 	opts := Defaults()
 	g := NewProgramGenerator(opts)

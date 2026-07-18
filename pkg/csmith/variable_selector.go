@@ -22,10 +22,18 @@ type VariableSelector struct {
 }
 
 // NewVariableSelector constructs an empty selector with opts-derived probs.
+// Library/tests convenience; generation should use NewVariableSelectorProbs with
+// the session Probabilities singleton (no invent second NewProbabilities table).
 func NewVariableSelector(opts Options) *VariableSelector {
+	return NewVariableSelectorProbs(opts, NewProbabilities(opts))
+}
+
+// NewVariableSelectorProbs constructs a selector sharing session Probabilities
+// (C++ process singleton). probs may be nil; callers that need tables pass live ones.
+func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelector {
 	return &VariableSelector{
 		Opts:  opts,
-		Probs: NewProbabilities(opts),
+		Probs: probs,
 	}
 }
 
@@ -1817,11 +1825,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	// VariableSelector.cpp:1368 — AllVars
 	vs.AllVars = append(vs.AllVars, &av.Variable)
 	vs.Arrays = append(vs.Arrays, av)
-	// ArrayVariable.cpp:190–191 — CreateArrayVariable pushes GlobalList/local;
-	// Go CreateArrayVariable does not, so register here (same as C++ side effect)
-	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals
+	// ArrayVariable.cpp:190–191 — CreateArrayVariable already registered GlobalList/local
+	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals (not a second list push)
 	if asGlobal {
-		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		if !av.IsVolatile() {
 			vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
 		}
@@ -1832,7 +1838,6 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			cg.FM.AddNewVarFactAndUpdate(nil, &av.Variable)
 		}
 	} else if blk != nil {
-		blk.LocalVars = append(blk.LocalVars, &av.Variable)
 		if cg.FM != nil {
 			cg.FM.AddNewVarFactAndUpdate(blk, &av.Variable)
 		}

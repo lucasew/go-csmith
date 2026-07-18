@@ -160,6 +160,13 @@ func CreateArrayVariable(
 			av.ArrayInits = append(av.ArrayInits, val)
 		}
 	}
+	// ArrayVariable.cpp:190–191 — blk? local_vars : GetGlobalVariables()
+	// no soft invent skip registration (GenerateNewGlobal still pushes itemized member)
+	if blk != nil {
+		blk.LocalVars = append(blk.LocalVars, &av.Variable)
+	} else if vs != nil {
+		vs.GlobalList = append(vs.GlobalList, &av.Variable)
+	}
 	return av
 }
 

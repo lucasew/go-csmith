@@ -39,8 +39,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
 	probs := NewProbabilities(opts)
 	SetProcessProbabilities(probs)
-	vs := NewVariableSelector(opts)
-	vs.Probs = probs
+	// share session Probabilities with VS (no invent throwaway NewProbabilities then overwrite)
+	vs := NewVariableSelectorProbs(opts, probs)
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,
@@ -251,11 +251,17 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			arrayByName[av.Name] = av
 		}
 	}
+	// C++ GlobalList may hold collective + itemized member; emit array def once
+	emittedArray := map[string]bool{}
 	for _, v := range g.VS.GlobalList {
 		if v == nil || v.Type == nil {
 			continue
 		}
 		if av := arrayByName[v.Name]; av != nil {
+			if emittedArray[v.Name] {
+				continue
+			}
+			emittedArray[v.Name] = true
 			if g.Opts.ForceGlobalsStatic {
 				b.WriteString("static ")
 			}
