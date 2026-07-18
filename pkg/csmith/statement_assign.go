@@ -604,27 +604,34 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 }
 
 // VisitFactsStatementAssign mirrors StatementAssign::visit_facts.
-// StatementAssign.cpp:358–390 — RHS first, compound folds RHS into LHS context.
+// StatementAssign.cpp:358–390 — RHS first; compound folds RHS effect into LHS
+// context; write_var_set of RHS lhs_write_vars; update_fact_for_assign; map_stm_effect.
 func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtAssign {
 		return false
 	}
+	// StatementAssign.cpp:362–367 — RHS in its own accum context
 	runningEff := cg.EffectContext()
 	rhsAccum := EmptyEffect()
 	rhsCG := *cg
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
-	// clone EffectStm start clean for sub-context? use copy of current stm
 	rhsCG.EffectStm = cg.EffectStm
 
 	if st.Expr != nil && !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false
 	}
+	// StatementAssign.cpp:372–375 — compound: LHS sees RHS effect
 	if st.AssignOp != AssignSimple {
 		runningEff = runningEff.AddEffect(rhsAccum)
 	}
 	cg.MergeParamContext(rhsCG, true)
+	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
+	if lw := rhsAccum.LhsWriteVars(); len(lw) > 0 {
+		runningEff = runningEff.WriteVarSet(lw)
+	}
 
+	// StatementAssign.cpp:379–384 — LHS context
 	lhsAccum := EmptyEffect()
 	lhsCG := *cg
 	lhsCG.effectContext = runningEff
@@ -632,28 +639,28 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	lhsCG.EffectStm = rhsCG.EffectStm
 	lhsCG.CurrRHS = st.Expr
 
+	var lhsVar *Variable
+	indir := 0
 	if st.Lhs != nil {
 		if !lhsCG.VisitFactsLhs(st.Lhs, opts) {
 			return false
 		}
+		lhsVar = st.Lhs.Var
+		indir = st.Lhs.IndirectLevel()
 	} else if st.LhsVar != nil {
 		tmp := &Lhs{Var: st.LhsVar, Type: st.LhsVar.Type}
 		if !lhsCG.VisitFactsLhs(tmp, opts) {
 			return false
 		}
+		lhsVar = st.LhsVar
 	}
 	cg.MergeParamContext(lhsCG, true)
 
-	// FactMgr::update_fact_for_assign
-	if cg.FM != nil && st.LhsVar != nil {
-		indir := 0
-		if st.Lhs != nil {
-			indir = st.Lhs.IndirectLevel()
-		}
-		if indir == 0 {
-			cg.FM.UpdateFactForAssign(st.LhsVar, 0, st.Expr)
-		}
-		// FactMgr.cpp: map_stm_effect[this] = effect_stm
+	// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
+	// always (any indirection); merge_pointees handles *p LHS
+	if cg.FM != nil && lhsVar != nil {
+		cg.FM.UpdateFactForAssign(lhsVar, indir, st.Expr)
+		// StatementAssign.cpp:388–389 — map_stm_effect[this] = effect_stm
 		if st.StmID > 0 {
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)

@@ -302,15 +302,22 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 
 // AbstractFactForAssign mirrors FactPointTo::abstract_fact_for_assign.
 // FactPointTo.cpp:266–295 — merge_pointees of LHS; pointer assign or pointer fields.
+// lhsIndir peels Lhs::get_type() (var type after deref) for the pointer-typed branch.
 func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) []*FactPointTo {
 	if lhs == nil || lhs.Type == nil {
 		return nil
 	}
 	// find all pointed variables on LHS (merge_pointees of collective)
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, factsIn)
-	if lhsIndir == 0 && lhs.Type.ptrTo != nil {
-		// direct pointer store: LHS is the pointer var itself
-		if len(lvars) == 0 {
+	// FactPointTo.cpp:275–278 — if (lhs->get_type().eType == ePointer)
+	// Lhs type is var type after get_indirect_level peels; mirror by peeling ptrTo.
+	lhsTy := lhs.Type
+	for i := 0; i < lhsIndir && lhsTy != nil; i++ {
+		lhsTy = lhsTy.PtrType()
+	}
+	if lhsTy != nil && lhsTy.PtrType() != nil {
+		// pointer-valued store (possibly *p when p is multi-level pointer)
+		if len(lvars) == 0 && lhsIndir == 0 {
 			lvars = []*Variable{lhs.GetCollective()}
 		}
 		return RhsToLhsTransfer(factsIn, lvars, rhs)
