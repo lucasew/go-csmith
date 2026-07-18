@@ -3,7 +3,7 @@
 package csmith
 
 // MakeExpressionAssign mirrors ExpressionAssign::make_random.
-// ExpressionAssign.cpp:49–65 — StatementAssign::make_random then wrap.
+// ExpressionAssign.cpp:49–65 — StatementAssign::make_random; update_fact_for_assign; wrap.
 func MakeExpressionAssign(
 	r *Rng,
 	opts Options,
@@ -17,18 +17,35 @@ func MakeExpressionAssign(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	// WRITE qfer if nil — random_qualifiers WRITE no_volatile true
+	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)
 	if qfer == nil {
 		q := RandomQualifiersDefaultProbs(typ, AccessWrite, cg, true, opts, probs, r)
 		qfer = &q
 	}
+	_ = qfer // MakeRandomAssign derives LHS qfer from RHS; WRITE constraint via AccessWrite on Lhs
 	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, typ)
-	// Force non-const lhs already; attach qfer is implicit
-	_ = qfer
+	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
+	// (MakeRandomAssign already updates; re-apply ensures expr-assign path matches C++)
+	if cg.FM != nil && st.LhsVar != nil {
+		indir := 0
+		if st.Lhs != nil {
+			indir = st.Lhs.IndirectLevel()
+		}
+		cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.Expr)
+	}
+	// ExpressionAssign value type is LHS type (ExpressionAssign.h:get_type)
+	exprType := typ
+	if st.Lhs != nil {
+		if t := st.Lhs.GetType(); t != nil {
+			exprType = t
+		}
+	} else if st.LhsVar != nil && st.LhsVar.Type != nil {
+		exprType = st.LhsVar.Type
+	}
 	return &Expression{
-		Term:   TermAssignment,
-		Assign: &st,
-		// value of assignment expression is the LHS name (C semantics simplified)
-		Var: st.LhsVar,
+		Term:     TermAssignment,
+		Assign:   &st,
+		Var:      st.LhsVar,
+		ExprType: exprType,
 	}
 }

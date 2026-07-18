@@ -292,6 +292,12 @@ func (g *ProgramGenerator) OutputFunctions() string {
 // VariableSelector.cpp:1613–1615 — MapVariableList(GlobalList, HashVariable).
 // Uses GetLastCtrlVars for array index names (caller declares via OutputArrayCtrlVars).
 func HashGlobalVariables(vs *VariableSelector) string {
+	return HashGlobalVariablesWithUnionFacts(vs, nil)
+}
+
+// HashGlobalVariablesWithUnionFacts hashes globals with FactUnion field filtering.
+// Variable::hash uses FactUnion::is_field_readable when FactMgr global_facts present.
+func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
 	if vs == nil {
 		return ""
 	}
@@ -301,9 +307,23 @@ func HashGlobalVariables(vs *VariableSelector) string {
 		if v == nil {
 			continue
 		}
-		b.WriteString(v.hashOutput(ctrl, nil))
+		b.WriteString(v.hashOutput(ctrl, unionFacts))
 	}
 	return b.String()
+}
+
+// hashGlobals is HashGlobalVariables using first function's UnionFacts when available.
+func (g *ProgramGenerator) hashGlobals() string {
+	if g == nil {
+		return ""
+	}
+	var uf []*FactUnion
+	if g.FactMgrs != nil && len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
+		if fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0]); fm != nil {
+			uf = fm.UnionFacts
+		}
+	}
+	return HashGlobalVariablesWithUnionFacts(g.VS, uf)
 }
 
 // OutputMain mirrors OutputMgr::OutputMain (no extension).
@@ -349,9 +369,10 @@ func (g *ProgramGenerator) OutputMain() string {
 			b.WriteString(OutputPtrResets(f0.DeadGlobals, g.Opts))
 		}
 	}
+	// OutputMgr.cpp:141–145 — step_hash path invokes csmith_compute_hash; else inline HashGlobalVariables
+	// (guarded by compute_hash so crc_* are defined)
 	if g.Opts.ComputeHash {
 		if g.Opts.StepHashByStmt {
-			// OutputMgr.cpp:139–140 — call hash function instead of inline
 			b.WriteString("    csmith_compute_hash();\n")
 		} else {
 			// ensure ctrl vars exist when only arrays with brace init (no prior set)
@@ -359,8 +380,8 @@ func (g *ProgramGenerator) OutputMain() string {
 				ctrl := GetNewCtrlVars(g.Opts)
 				b.WriteString(OutputArrayCtrlVars(ctrl, GetMaxArrayDimension(g.VS.GlobalList), "    "))
 			}
-			// HashGlobalVariables inline
-			b.WriteString(HashGlobalVariables(g.VS))
+			// HashGlobalVariables with union readability when FactMgr present
+			b.WriteString(g.hashGlobals())
 		}
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
 	} else {
@@ -387,7 +408,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 		ctrl := GetNewCtrlVars(g.Opts)
 		b.WriteString(OutputArrayCtrlVars(ctrl, dimen, "    "))
 	}
-	b.WriteString(HashGlobalVariables(g.VS))
+	b.WriteString(g.hashGlobals())
 	b.WriteString("}\n")
 	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201
 	b.WriteString("\nvoid step_hash(int stmt_id)\n{\n")
