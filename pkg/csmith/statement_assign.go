@@ -261,7 +261,7 @@ func MakeRandomAssignQfer(
 	cg.MergeParamContext(lhsCG, true)
 
 	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
-	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs)
+	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs, gensymFromVS(vs))
 	lhsIndir := 0
 	if st.Lhs != nil {
 		lhsIndir = st.Lhs.IndirectLevel()
@@ -289,6 +289,7 @@ func MakeDummyFlags() *SafeOpFlags {
 
 // makePossibleCompoundAssign mirrors StatementAssign::make_possible_compound_assign.
 // StatementAssign.cpp:244–301 — attach SafeOpFlags + math_notmp temps for compound ops.
+// sym is the session GenSym (VS.Sym); nil uses package gensym like util.cpp.
 func makePossibleCompoundAssign(
 	cg CGContext,
 	opts Options,
@@ -298,6 +299,7 @@ func makePossibleCompoundAssign(
 	lhs *Lhs,
 	op AssignOp,
 	rhs *Expression,
+	sym *GenSym,
 ) Stmt {
 	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs}
 	if lhs != nil {
@@ -326,7 +328,7 @@ func makePossibleCompoundAssign(
 	}
 	flags := MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 	st.SafeFlags = flags
-	// math_notmp temps on current block
+	// StatementAssign.cpp:296–297 — blk->create_new_tmp_var (gensym "t_")
 	if opts.MathNoTmp && flags != nil {
 		if blk := cg.CurrentBlock(); blk != nil {
 			st1 := EInt
@@ -339,14 +341,19 @@ func makePossibleCompoundAssign(
 					st2 = t.Simple()
 				}
 			}
-			var sym *GenSym
-			// gensym via VS not available; use nil → t_1 style falls back
-			_ = sym
-			st.Tmp1 = blk.CreateNewTmpVar(nil, st1)
-			st.Tmp2 = blk.CreateNewTmpVar(nil, st2)
+			st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
+			st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
 		}
 	}
 	return st
+}
+
+// gensymFromVS returns &vs.Sym for create_new_tmp_var / gensym share with g_/l_.
+func gensymFromVS(vs *VariableSelector) *GenSym {
+	if vs == nil {
+		return nil
+	}
+	return &vs.Sym
 }
 
 // OutputAssignSimple mirrors StatementAssign::OutputSimple.

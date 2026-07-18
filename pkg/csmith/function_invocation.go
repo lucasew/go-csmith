@@ -809,6 +809,7 @@ func MakeBinary(
 		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
 			st = ty.Simple()
 		}
+		// FunctionInvocationBinary.cpp:70–75 — blk->create_new_tmp_var → gensym("t_")
 		if blk := currentBlock(cg); blk != nil {
 			inv.Tmp1 = blk.CreateNewTmpVar(nil, st)
 			st2 := st

@@ -92,7 +92,7 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	lhs := &Lhs{Var: CreateVariableScalars("g_1", GetIntType(), false, false), Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
-	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(2), GetIntType(), lhs, AssignAdd, rhs)
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(2), GetIntType(), lhs, AssignAdd, rhs, nil)
 	if st.SafeFlags == nil {
 		t.Fatal("flags")
 	}

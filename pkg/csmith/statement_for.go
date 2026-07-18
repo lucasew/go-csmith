@@ -331,7 +331,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 	} else {
 		// StatementAssign::make_possible_compound_assign
-		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr)
+		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr, gensymFromVS(vs))
 		if incrSt.StmID == 0 {
 			incrSt.StmID = AllocStmID()
 		}

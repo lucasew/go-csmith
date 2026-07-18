@@ -200,20 +200,21 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
-// Block.cpp:216–219 — gensym("t_"); fallback unique names when no GenSym.
+// Block.cpp:216–219 — always gensym("t_") (util.cpp global counter); no
+// len(TmpVars) soft names when GenSym is nil.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
-	if b == nil {
-		return "t_0"
-	}
-	if b.TmpVars == nil {
-		b.TmpVars = make(map[string]ESimpleType)
-	}
-	name := "t_1"
+	// Block.cpp:217 — const string var_name = gensym("t_");
+	name := ""
 	if sym != nil {
 		name = sym.Next("t_")
 	} else {
-		// unique within block when session GenSym unavailable
-		name = "t_" + itoa(len(b.TmpVars)+1)
+		name = Gensym("t_")
+	}
+	if b == nil {
+		return name
+	}
+	if b.TmpVars == nil {
+		b.TmpVars = make(map[string]ESimpleType)
 	}
 	b.TmpVars[name] = st
 	return name
