@@ -52,7 +52,7 @@ func TestMakeRandomParamNoConstant(t *testing.T) {
 	tables := NewExprTables(opts)
 	// force many picks — constant weight 0 + filtered
 	for seed := uint64(1); seed < 40; seed++ {
-		e := MakeRandomParam(NewRng(seed), opts, tables, vs, EmptyCGContext(), GetIntType(), nil, 0)
+		e := func() *Expression { c := EmptyCGContext(); return MakeRandomParam(NewRng(seed), opts, tables, vs, &c, GetIntType(), nil, 0) }()
 		if e != nil && e.Term == TermConstant {
 			t.Fatalf("constant param seed %d", seed)
 		}

@@ -129,9 +129,9 @@ func MakeRandomAssignQfer(
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
-		rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
+			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
 			SetError(ErrGeneric)
@@ -158,9 +158,9 @@ func MakeRandomAssignQfer(
 		}
 	} else {
 		// StatementAssign.cpp:168–181
-		rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
+			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
 			SetError(ErrGeneric)

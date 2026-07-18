@@ -11,7 +11,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := MakeExpressionComma(r, opts, probs, vs, tables, EmptyCGContext(), GetIntType(), nil)
+	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil) }()
 	if e == nil || e.Term != TermCommaExpr || e.CommaLHS == nil || e.CommaRHS == nil {
 		t.Fatalf("%+v", e)
 	}
@@ -32,7 +32,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
-	e := MakeExpressionComma(NewRng(11), opts, probs, vs, tables, EmptyCGContext(), GetIntType(), nil)
+	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(NewRng(11), opts, probs, vs, tables, &c, GetIntType(), nil) }()
 	if e.CommaLHS == nil {
 		t.Fatal("lhs")
 	}

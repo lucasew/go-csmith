@@ -32,7 +32,7 @@ func TestMakeRandomExpressionConstant(t *testing.T) {
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := MakeRandomExpression(r, opts, tables, nil, EmptyCGContext(), GetSimpleType(EInt), nil, false, false, TermConstant, 0)
+	e := func() *Expression { c := EmptyCGContext(); return MakeRandomExpression(r, opts, tables, nil, &c, GetSimpleType(EInt), nil, false, false, TermConstant, 0) }()
 	if e == nil || e.Term != TermConstant || e.Con == nil || e.Output() == "" {
 		t.Fatalf("%+v out=%q", e, e.Output())
 	}
@@ -44,7 +44,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	e := MakeRandomExpression(r, opts, tables, vs, EmptyCGContext(), GetSimpleType(EInt), &q, false, false, TermVariable, 0)
+	e := func() *Expression { c := EmptyCGContext(); return MakeRandomExpression(r, opts, tables, vs, &c, GetSimpleType(EInt), &q, false, false, TermVariable, 0) }()
 	if e == nil || e.Term != TermVariable || e.Var == nil {
 		t.Fatalf("%+v", e)
 	}
@@ -208,7 +208,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	// int want — float rejected then new var created (ScopeNewValue) or nil after tries
 	cg := EmptyCGContext()
 	cg.Types = vs.Types
-	ev := makeExpressionVariableFlags(NewRng(1), vs, cg, GetIntType(), nil, false, false)
+	ev := makeExpressionVariableFlags(NewRng(1), vs, &cg, GetIntType(), nil, false, false)
 	// either created a new non-float, or nil — must not return the float
 	if ev != nil && ev.Var == fv {
 		t.Fatal("must not use float for int want")
@@ -225,7 +225,7 @@ func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	vs.Opts = opts
 	cg := EmptyCGContext()
 	// want int, var int → indirect 0 → ExprType should be var.Type
-	ev := makeExpressionVariableFlags(NewRng(2), vs, cg, GetIntType(), nil, false, false)
+	ev := makeExpressionVariableFlags(NewRng(2), vs, &cg, GetIntType(), nil, false, false)
 	if ev == nil {
 		t.Fatal("nil")
 	}
@@ -238,6 +238,29 @@ func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	}
 	if ev.ExprType != v.Type {
 		t.Fatalf("ExprType %v want var.Type", ev.ExprType)
+	}
+}
+
+func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
+	// ExpressionVariable::make_random visit_facts must update caller's effect_accum /
+	// effect_stm so assign RHS merge_param_context and param effects see the read.
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	ev := makeExpressionVariableFlags(NewRng(2), vs, &cg, GetIntType(), nil, false, false)
+	if ev == nil || ev.Var == nil {
+		t.Skip("no expression variable")
+	}
+	if cg.EffectAccum != nil && !cg.EffectAccum.IsRead(ev.Var) && !cg.EffectStm.IsRead(ev.Var) {
+		t.Fatalf("expected read effect on var %s after visit_facts", ev.Var.Name)
 	}
 }
 
@@ -284,7 +307,7 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	cg := EmptyCGContext()
 	cg.Types = env
 	// force constant so we don't need VariableSelector
-	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, cg, nil, nil, true, false, TermConstant, 0)
+	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg, nil, nil, true, false, TermConstant, 0)
 	if e == nil || e.Term != TermConstant {
 		t.Fatalf("%+v", e)
 	}
@@ -312,7 +335,7 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	// many tries: result if any should not be pure std binary/unary alone when type is struct
 	// (user path may still fail → variable fallback)
 	for seed := uint64(1); seed < 20; seed++ {
-		e := makeExpressionFuncall(NewRng(seed), opts, vs, tables, cg, st, nil, list)
+		e := makeExpressionFuncall(NewRng(seed), opts, vs, tables, &cg, st, nil, list)
 		if e == nil {
 			continue
 		}
@@ -344,7 +367,7 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	// force failed user path: nil list / max funcs
 	list := &FunctionList{}
 	// std may succeed; use void type to force user and fail
-	e := makeExpressionFuncall(NewRng(1), opts, vs, NewExprTables(opts), cg, GetSimpleType(EVoid), nil, list)
+	e := makeExpressionFuncall(NewRng(1), opts, vs, NewExprTables(opts), &cg, GetSimpleType(EVoid), nil, list)
 	// facts should still be recoverable (either unchanged or restored)
 	if len(fm.GlobalFacts) != len(pre) {
 		// RestoreFacts may replace; ensure related fact still present

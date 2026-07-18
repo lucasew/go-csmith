@@ -479,12 +479,13 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 
 // MakeRandomParam mirrors Expression::make_random_param.
 // Expression.cpp:238–296 — param probability table; constants filtered out.
+// cg is *CGContext so visit_facts effects persist (C++ CGContext&).
 func MakeRandomParam(
 	r *Rng,
 	opts Options,
 	tables *ExprTables,
 	vs *VariableSelector,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 	exprDepth int,
@@ -526,12 +527,14 @@ func BumpsExprDepth(e *Expression) bool {
 
 // MakeRandomExpression mirrors Expression::make_random (const/var/funcall).
 // Expression.cpp:141–219.
+// cg is *CGContext so ExpressionVariable::visit_facts mutates the caller's
+// context (C++ CGContext&); by-value dropped EffectStm / merge_param updates.
 func MakeRandomExpression(
 	r *Rng,
 	opts Options,
 	tables *ExprTables,
 	vs *VariableSelector,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 	noFunc, noConst bool,
@@ -539,6 +542,9 @@ func MakeRandomExpression(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
+	if cg == nil {
+		return nil
+	}
 	var flist *FunctionList
 	if len(list) > 0 {
 		flist = list[0]
@@ -629,7 +635,8 @@ func MakeRandomExpression(
 
 // makeExpressionVariable — ExpressionVariable.cpp:56+ :
 // VariableSelector::select(READ, type, qfer, eFlexible); as_param / as_return filters.
-func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, qfer *CVQualifiers) *Expression {
+// cg is *CGContext (C++ CGContext&) so visit_facts writes stick for merge_param_context.
+func makeExpressionVariable(r *Rng, vs *VariableSelector, cg *CGContext, typ *Type, qfer *CVQualifiers) *Expression {
 	return makeExpressionVariableFlags(r, vs, cg, typ, qfer, false, false)
 }
 
@@ -637,12 +644,12 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 func makeExpressionVariableFlags(
 	r *Rng,
 	vs *VariableSelector,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 	asParam, asReturn bool,
 ) *Expression {
-	if vs == nil {
+	if vs == nil || cg == nil {
 		return nil
 	}
 	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore
@@ -656,10 +663,10 @@ func makeExpressionVariableFlags(
 	var dummy []*Variable
 	for tries := 0; tries < 24; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
-		v := vs.SelectMustUseVar(r, AccessRead, cg, typ, qfer)
+		v := vs.SelectMustUseVar(r, AccessRead, *cg, typ, qfer)
 		if v == nil {
 			// ExpressionVariable.cpp:77–78 — select(..., dummy, eFlexible)
-			v = vs.SelectWithInvalid(AccessRead, cg, typ, qfer, r, MatchFlexible, dummy)
+			v = vs.SelectWithInvalid(AccessRead, *cg, typ, qfer, r, MatchFlexible, dummy)
 		}
 		if v == nil {
 			// C++ continues the loop; we give up after tries
@@ -717,8 +724,7 @@ func makeExpressionVariableFlags(
 		// use ExpressionVariable(*var) when indirection==0 else (*var, type)
 		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
 		if cg.FM != nil {
-			cgp := &cg
-			if !cgp.VisitFactsExpressionVariable(probe, vs.Opts) {
+			if !cg.VisitFactsExpressionVariable(probe, vs.Opts) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -811,17 +817,18 @@ func (e *Expression) outputBody() string {
 
 // makeExpressionFuncall mirrors ExpressionFuncall::make_random.
 // ExpressionFuncall.cpp:66–102.
+// cg is *CGContext so failed-invoke EffectStm restore and var fallback visit_facts persist.
 func makeExpressionFuncall(
 	r *Rng,
 	opts Options,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Expression {
-	if r == nil {
+	if r == nil || cg == nil {
 		return nil
 	}
 	probs := NewProbabilities(opts)
@@ -840,7 +847,7 @@ func makeExpressionFuncall(
 	if cg.FM != nil {
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
+	fi := MakeRandomInvocation(r, opts, probs, vs, tables, *cg, list, typ, qfer, stdFunc)
 	if fi == nil || fi.Failed {
 		// ExpressionFuncall.cpp:84–91 — restore env; replace with simple var
 		if cg.EffectAccum != nil {

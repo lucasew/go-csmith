@@ -4,27 +4,31 @@ package csmith
 
 // MakeExpressionAssign mirrors ExpressionAssign::make_random.
 // ExpressionAssign.cpp:49–65 — StatementAssign::make_random; update_fact_for_assign; wrap.
+// cg is *CGContext (C++ CGContext&) so assign RHS/LHS visit_facts and fact updates stick.
 func MakeExpressionAssign(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 ) *Expression {
+	if cg == nil {
+		return nil
+	}
 	if typ == nil {
 		typ = GetIntType()
 	}
 	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)
 	if qfer == nil {
-		q := RandomQualifiersDefaultProbs(typ, AccessWrite, cg, true, opts, probs, r)
+		q := RandomQualifiersDefaultProbs(typ, AccessWrite, *cg, true, opts, probs, r)
 		qfer = &q
 	}
 	// ExpressionAssign.cpp:56 / 61 — StatementAssign::make_random(cg, type, qfer)
 	// forces match_exact_qualifiers while selecting LHS
-	st := MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, qfer)
+	st := MakeRandomAssignQfer(r, opts, probs, vs, tables, *cg, typ, qfer)
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
 	// (MakeRandomAssignQfer already updates; re-apply matches C++ double call)
 	if cg.FM != nil && st.LhsVar != nil {

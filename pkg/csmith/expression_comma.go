@@ -7,17 +7,19 @@ package csmith
 //
 //	lhs = make_random(ctx, nullptr, nullptr, false, true)  // no const
 //	rhs = make_random(ctx, type, qfer, false, false)
+//
+// cg is *CGContext (C++ CGContext&) so subexpr visit_facts persist.
 func MakeExpressionComma(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qfer *CVQualifiers,
 ) *Expression {
-	if r == nil {
+	if r == nil || cg == nil {
 		return nil
 	}
 	// Expression.cpp:213–218 — sibling depth after LHS leaf/user-call

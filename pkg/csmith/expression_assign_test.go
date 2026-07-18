@@ -11,7 +11,7 @@ func TestMakeExpressionAssign(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := MakeExpressionAssign(r, opts, probs, vs, tables, EmptyCGContext(), GetIntType(), nil)
+	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil) }()
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
 		t.Fatal(e)
 	}

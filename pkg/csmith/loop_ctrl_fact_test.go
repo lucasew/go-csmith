@@ -111,7 +111,7 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// many tries — should never return the local-pointing ptr when filter works
 	for seed := uint64(1); seed < 30; seed++ {
-		ev := makeExpressionVariableFlags(NewRng(seed), vs, cg, PointerTo(GetIntType()), nil, false, true)
+		ev := makeExpressionVariableFlags(NewRng(seed), vs, &cg, PointerTo(GetIntType()), nil, false, true)
 		if ev != nil && ev.Var == lp {
 			t.Fatalf("returned local-pointing ptr seed=%d", seed)
 		}

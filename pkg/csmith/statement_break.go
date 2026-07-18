@@ -20,9 +20,9 @@ func MakeRandomBreak(
 	// StatementBreak.cpp:76 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// Expression::make_random(..., true, true, eVariable)
-	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	expr := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {
-		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
+		expr = makeExpressionVariable(r, vs, &cg, GetIntType(), nil)
 	}
 	st.Expr = expr
 	if st.StmID == 0 {

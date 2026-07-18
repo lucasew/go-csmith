@@ -353,9 +353,9 @@ func MakeRandomGoto(
 	if cond == nil {
 		// library soft-fallback only when no fact maps (generation without DFA prep)
 		if cg.FM == nil || len(readVars) == 0 {
-			cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+			cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 			if cond == nil {
-				cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+				cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 			}
 		}
 		if cond == nil {
@@ -523,9 +523,9 @@ func makeForwardGotoOnly(
 	cg CGContext,
 	blk *Block,
 ) Stmt {
-	cond := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	cond := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if cond == nil {
-		cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+		cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 	}
 	label := "lbl_1"
 	if vs != nil {

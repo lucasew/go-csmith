@@ -334,9 +334,9 @@ func BuildUserInvocation(
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.ExprDepth = argDepth
-		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, argDepth, list)
+		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, argDepth, list)
 		if arg == nil {
-			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
+			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
 			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
@@ -435,9 +435,9 @@ func BuildInvocationAndFunction(
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
 		paramCG.ExprDepth = argDepth
-		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, argDepth, list)
+		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, argDepth, list)
 		if arg == nil {
-			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
+			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
 			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
@@ -577,9 +577,9 @@ func MakeRandomBinaryInvocation(
 	if cg.EffectAccum != nil {
 		preLeft = *cg.EffectAccum
 	}
-	left := MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, MaxTermTypes, d)
+	left := MakeRandomExpression(r, opts, tables, vs, &cg, lhsTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, TermConstant, d)
+		left = MakeRandomExpression(r, opts, tables, vs, &cg, lhsTy, nil, true, false, TermConstant, d)
 	}
 	if BumpsExprDepth(left) {
 		d++
@@ -607,9 +607,9 @@ func MakeRandomBinaryInvocation(
 			postLeft := *cg.EffectAccum
 			*cg.EffectAccum = preLeft
 			// ambient context stays pre-left (effect_context); ordered short-circuit
-			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
+			right = MakeRandomExpression(r, opts, tables, vs, &cg, rhsTy, nil, true, false, MaxTermTypes, d)
 			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
+				right = MakeRandomExpression(r, opts, tables, vs, &cg, rhsTy, nil, true, false, TermConstant, d)
 			}
 			*cg.EffectAccum = MergeEffects(postLeft, *cg.EffectAccum)
 		} else {
@@ -619,9 +619,9 @@ func MakeRandomBinaryInvocation(
 			if cg.EffectAccum != nil {
 				rhsCG.effectContext = *cg.EffectAccum
 			}
-			right = MakeRandomExpression(r, opts, tables, vs, rhsCG, rhsTy, nil, true, false, MaxTermTypes, d)
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, MaxTermTypes, d)
 			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, rhsCG, rhsTy, nil, true, false, TermConstant, d)
+				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, TermConstant, d)
 			}
 			// fold RHS accum into caller's accum
 			if cg.EffectAccum != nil && rhsCG.EffectAccum != nil && rhsCG.EffectAccum != cg.EffectAccum {
@@ -716,9 +716,9 @@ func MakeRandomBinaryPtrComparison(
 	lhsCG := cg
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
-	left := MakeRandomExpression(r, opts, tables, vs, lhsCG, ptrTy, nil, true, false, MaxTermTypes, d)
+	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, lhsCG, ptrTy, nil, true, false, TermVariable, d)
+		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, TermVariable, d)
 	}
 	cg.MergeParamContext(lhsCG, true)
 
@@ -733,9 +733,9 @@ func MakeRandomBinaryPtrComparison(
 	if IsOrderedBinary(op) {
 		oldFlags := cg.Flags
 		cg.Flags |= FlagNoDanglingPtr
-		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, d)
+		right = MakeRandomExpression(r, opts, tables, vs, &cg, ptrTy, nil, true, false, tt, d)
 		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+			right = MakeRandomExpression(r, opts, tables, vs, &cg, ptrTy, nil, true, false, TermVariable, d)
 		}
 		cg.Flags = oldFlags
 	} else {
@@ -744,9 +744,9 @@ func MakeRandomBinaryPtrComparison(
 		rhsCG.effectContext = cg.EffectContext().AddEffect(lhsAccum)
 		rhsCG.EffectAccum = &rhsAccum
 		rhsCG.Flags |= FlagNoDanglingPtr
-		right = MakeRandomExpression(r, opts, tables, vs, rhsCG, ptrTy, nil, true, false, tt, d)
+		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, d)
 		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, rhsCG, ptrTy, nil, true, false, TermVariable, d)
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, TermVariable, d)
 		}
 		cg.MergeParamContext(rhsCG, true)
 	}
@@ -851,9 +851,9 @@ func MakeRandomUnaryInvocation(
 	}
 	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary; operand under expr_depth
 	d := cg.ExprDepth
-	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, d)
+	arg := MakeRandomExpression(r, opts, tables, vs, &cg, argTy, nil, true, false, MaxTermTypes, d)
 	if arg == nil {
-		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, d)
+		arg = MakeRandomExpression(r, opts, tables, vs, &cg, argTy, nil, true, false, TermConstant, d)
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
 	inv.setOutOpts(opts)

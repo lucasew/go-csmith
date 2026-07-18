@@ -79,7 +79,7 @@ func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
-	e := MakeExpressionComma(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), EmptyCGContext(), GetIntType(), nil)
+	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType(), nil) }()
 	if e == nil || e.Term != TermCommaExpr {
 		t.Fatal(e)
 	}

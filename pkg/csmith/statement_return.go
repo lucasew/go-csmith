@@ -57,7 +57,7 @@ func MakeRandomReturn(
 		qfer = &q
 	}
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
-	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
+	ev := makeExpressionVariableFlags(r, vs, &cg, ret, qfer, false, true)
 	if ev == nil {
 		// last resort: constant of return type (not upstream, avoids empty return)
 		ev = &Expression{Term: TermConstant, Con: MakeRandom(ret, opts, r)}

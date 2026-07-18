@@ -27,15 +27,15 @@ func MakeRandomIf(
 	cg.EffectStm = EmptyEffect()
 	// Expression::make_random(..., get_int_type(), no_const = !const_as_condition)
 	noConst := !opts.ConstAsCondition
-	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
+	test := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
 	if test == nil {
-		test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, noConst, TermVariable, cg.ExprDepth)
+		test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, noConst, TermVariable, cg.ExprDepth)
 	}
 	if test == nil {
 		if !noConst {
-			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
+			test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
 		} else {
-			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+			test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 		}
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1

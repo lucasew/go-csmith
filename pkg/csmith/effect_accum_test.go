@@ -76,7 +76,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	cg := EmptyCGContext()
 	cg.Types = env
-	e := MakeExpressionComma(NewRng(3), opts, probs, vs, tables, cg, GetIntType(), nil)
+	e := MakeExpressionComma(NewRng(3), opts, probs, vs, tables, &cg, GetIntType(), nil)
 	if e == nil || e.Term != TermCommaExpr {
 		t.Fatal(e)
 	}
