@@ -23,6 +23,10 @@ type Invocation struct {
 	Args []*Expression
 	// Safe is set for std binary/unary under avoid_signed_overflow.
 	Safe *SafeOpFlags
+	// Tmp1/Tmp2 are math_notmp temporary names (FunctionInvocationBinary tmp_var1/2).
+	Tmp1, Tmp2 string
+	// MathNoTmp mirrors CGOptions::math_notmp for Output.
+	MathNoTmp bool
 }
 
 // Output C for the invocation.
@@ -58,6 +62,10 @@ func (fi *Invocation) Output() string {
 		}
 		if fi.IsUnary && len(fi.Args) >= 1 {
 			if fi.Unary == "-" && fi.Safe != nil {
+				// FunctionInvocationUnary::Output — math_notmp inserts tmp first
+				if fi.MathNoTmp && fi.Tmp1 != "" {
+					return fmt.Sprintf("(%s(%s, %s))", fi.Safe.UnaryMinusFuncName(), fi.Tmp1, a0)
+				}
 				return fmt.Sprintf("(%s(%s))", fi.Safe.UnaryMinusFuncName(), a0)
 			}
 			return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
@@ -65,6 +73,10 @@ func (fi *Invocation) Output() string {
 		if !fi.IsUnary && len(fi.Args) >= 2 {
 			if fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 				if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
+					// FunctionInvocationBinary::Output — math_notmp: fname(tmp1, a0, tmp2, a1)
+					if fi.MathNoTmp && fi.Tmp1 != "" && fi.Tmp2 != "" {
+						return fmt.Sprintf("(%s(%s, %s, %s, %s))", fname, fi.Tmp1, a0, fi.Tmp2, a1)
+					}
 					return fmt.Sprintf("(%s(%s, %s))", fname, a0, a1)
 				}
 			}
@@ -243,8 +255,39 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
+	// CreateFunctionInvocationBinary tmp vars when math_notmp (FunctionInvocationBinary.cpp:59–75)
+	if flags != nil && opts.MathNoTmp && SafeOpsBinary(opStr) {
+		inv.MathNoTmp = true
+		st := EInt
+		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
+			st = ty.Simple()
+		}
+		if blk := currentBlock(cg); blk != nil {
+			var sym *GenSym
+			if vs != nil {
+				sym = &vs.Sym
+			}
+			inv.Tmp1 = blk.CreateNewTmpVar(sym, st)
+			// shifts use op2 type for tmp2; else same as op1 (upstream)
+			st2 := st
+			if op == BinLShift || op == BinRShift {
+				if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
+					st2 = ty.Simple()
+				}
+			}
+			inv.Tmp2 = blk.CreateNewTmpVar(sym, st2)
+		}
+	}
 	_ = IsOrderedBinary
 	return inv
+}
+
+// currentBlock returns the top of Function::stack (current block for tmp vars).
+func currentBlock(cg CGContext) *Block {
+	if cg.CurrentFunc == nil || len(cg.CurrentFunc.Stack) == 0 {
+		return nil
+	}
+	return cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
 }
 
 // MakeRandomBinaryPtrComparison mirrors make_random_binary_ptr_comparison.
@@ -322,7 +365,22 @@ func MakeRandomUnaryInvocation(
 	if arg == nil {
 		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, d)
 	}
-	return &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
+	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
+	if flags != nil && opts.MathNoTmp && op == "-" {
+		inv.MathNoTmp = true
+		st := EInt
+		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
+			st = ty.Simple()
+		}
+		if blk := currentBlock(cg); blk != nil {
+			var sym *GenSym
+			if vs != nil {
+				sym = &vs.Sym
+			}
+			inv.Tmp1 = blk.CreateNewTmpVar(sym, st)
+		}
+	}
+	return inv
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.

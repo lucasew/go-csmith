@@ -17,12 +17,14 @@ const (
 	AccessWrite
 )
 
-// Effect is a minimal Effect.cpp stand-in (purity / SE-free + write set subset).
+// Effect is a minimal Effect.cpp stand-in (purity / SE-free + read/write sets).
 type Effect struct {
 	pure           bool
 	sideEffectFree bool
 	// written tracks variables written in this effect (Effect::write_vars subset).
 	written map[*Variable]bool
+	// read tracks variables read (Effect::read_vars subset).
+	read map[*Variable]bool
 }
 
 // EmptyEffect is Effect::empty_effect (pure, side-effect free).
@@ -62,9 +64,29 @@ func (e Effect) WriteVar(v *Variable) Effect {
 	return e
 }
 
+// ReadVar mirrors Effect::read_var — records a read (does not alone clear SE-free).
+// Effect.cpp read_var path (simplified).
+func (e Effect) ReadVar(v *Variable) Effect {
+	if v == nil {
+		return e
+	}
+	nr := make(map[*Variable]bool, len(e.read)+1)
+	for k, val := range e.read {
+		nr[k] = val
+	}
+	nr[v] = true
+	e.read = nr
+	return e
+}
+
 // IsWritten mirrors Effect::is_written (exact var).
 func (e Effect) IsWritten(v *Variable) bool {
 	return v != nil && e.written[v]
+}
+
+// IsRead mirrors Effect::is_read (exact var).
+func (e Effect) IsRead(v *Variable) bool {
+	return v != nil && e.read[v]
 }
 
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
@@ -74,7 +96,17 @@ func (e Effect) CommentOutput() string {
 	var b strings.Builder
 	b.WriteString("/*\n")
 	b.WriteString(" * reads :")
-	// read set not tracked yet
+	rnames := make([]string, 0, len(e.read))
+	for v := range e.read {
+		if v != nil && e.read[v] {
+			rnames = append(rnames, v.Name)
+		}
+	}
+	sort.Strings(rnames)
+	for _, n := range rnames {
+		b.WriteString(" ")
+		b.WriteString(n)
+	}
 	b.WriteString("\n")
 	b.WriteString(" * writes:")
 	names := make([]string, 0, len(e.written))

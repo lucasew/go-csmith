@@ -4,6 +4,7 @@ package csmith
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -277,10 +278,18 @@ func (b *Block) Output(indent int) string {
 	if b.EmitDepthProtect {
 		sb.WriteString(inner + "DEPTH++;\n")
 	}
-	// Block::OutputTmpVariableList
-	for name, st := range b.TmpVars {
-		sb.WriteString(inner)
-		sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
+	// Block::OutputTmpVariableList — sorted names for deterministic emit
+	if len(b.TmpVars) > 0 {
+		names := make([]string, 0, len(b.TmpVars))
+		for name := range b.TmpVars {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			st := b.TmpVars[name]
+			sb.WriteString(inner)
+			sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
+		}
 	}
 	// collect local arrays needing loop init (OutputVariableList order)
 	var loopInits []*ArrayVariable

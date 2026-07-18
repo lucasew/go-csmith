@@ -53,6 +53,19 @@ func (c CGContext) NoteWrite(v *Variable) {
 	}
 }
 
+// NoteRead records a variable read into EffectAccum and FEffect for globals.
+func (c CGContext) NoteRead(v *Variable) {
+	if v == nil {
+		return
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+	}
+	if c.CurrentFunc != nil && v.IsGlobal() {
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
+	}
+}
+
 // WithEffectContext returns a context with the given effect_context.
 func WithEffectContext(eff Effect) CGContext {
 	return CGContext{effectContext: eff}

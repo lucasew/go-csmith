@@ -313,11 +313,6 @@ func makeExpressionVariableFlags(
 			// !addr_taken_of_locals: forbid & of local/arg when desired is pointer-to-var
 			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) {
 				if typ.IndirectLevel() < v.Type.IndirectLevel() {
-					// taking address: var is pointee of typ... typ is pointer-to-v.type-ish
-					// is_dereferenced_from: typ is derived from var by *
-					// actually: var->type->is_dereferenced_from(type) means type is pointer chain to var
-					// ExpressionVariable: is_dereferenced_from(type) on var->type with desired type
-					// if desired is T* and var is T, indirection = -1 (address-of)
 					if v.Type.IndirectLevel()-typ.IndirectLevel() < 0 {
 						continue
 					}
@@ -325,6 +320,8 @@ func makeExpressionVariableFlags(
 			}
 			_ = asReturn // dead-ptr FactPointTo deferred
 		}
+		// Effect::read_var for selected variable
+		cg.NoteRead(v)
 		return &Expression{Term: TermVariable, Var: v, ExprType: typ}
 	}
 	return nil
