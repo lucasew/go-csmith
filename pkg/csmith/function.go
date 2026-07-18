@@ -380,8 +380,9 @@ func (f *Function) paramListC() string {
 }
 
 // OutputForwardDecl emits a C prototype.
+// Function.cpp:555–561 — builtins emit nothing (compiler-provided).
 func (f *Function) OutputForwardDecl() string {
-	if f == nil {
+	if f == nil || f.IsBuiltin {
 		return ""
 	}
 	s := f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ");"
@@ -389,8 +390,9 @@ func (f *Function) OutputForwardDecl() string {
 }
 
 // Output emits a C function definition (minimal statements).
+// Function.cpp:565–598 — builtins emit nothing.
 func (f *Function) Output() string {
-	if f == nil {
+	if f == nil || f.IsBuiltin {
 		return ""
 	}
 	s := ""

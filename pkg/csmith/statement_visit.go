@@ -16,11 +16,7 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	case StmtFor, StmtArrayOp:
 		return VisitFactsStatementFor(st, cg, opts)
 	case StmtReturn:
-		// StatementReturn::visit_facts — visit return expression
-		if st.Expr != nil {
-			return VisitFactsExpression(st.Expr, cg, opts)
-		}
-		return true
+		return VisitFactsStatementReturn(st, cg, opts)
 	case StmtBreak, StmtContinue, StmtGoto, StmtLabel:
 		// control transfer: condition expr if present
 		if st.Expr != nil {

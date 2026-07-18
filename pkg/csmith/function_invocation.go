@@ -380,16 +380,26 @@ func MakeRandomBinaryInvocation(
 			// RHS under pre-left context only; merge back (FunctionInvocation.cpp:222–226)
 			postLeft := *cg.EffectAccum
 			*cg.EffectAccum = preLeft
+			// ambient context stays pre-left (effect_context); ordered short-circuit
 			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
 			if right == nil {
 				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
 			}
 			*cg.EffectAccum = MergeEffects(postLeft, *cg.EffectAccum)
 		} else {
-			// unordered: RHS sees LHS effects via current EffectAccum
-			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
+			// unordered: RHS under original + LHS effects as effect_context
+			// FunctionInvocation.cpp:228–234
+			rhsCG := cg
+			if cg.EffectAccum != nil {
+				rhsCG.effectContext = *cg.EffectAccum
+			}
+			right = MakeRandomExpression(r, opts, tables, vs, rhsCG, rhsTy, nil, true, false, MaxTermTypes, d)
 			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
+				right = MakeRandomExpression(r, opts, tables, vs, rhsCG, rhsTy, nil, true, false, TermConstant, d)
+			}
+			// fold RHS accum into caller's accum
+			if cg.EffectAccum != nil && rhsCG.EffectAccum != nil && rhsCG.EffectAccum != cg.EffectAccum {
+				*cg.EffectAccum = cg.EffectAccum.AddEffect(*rhsCG.EffectAccum)
 			}
 		}
 	}

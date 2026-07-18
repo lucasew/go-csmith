@@ -54,12 +54,18 @@ func EmptyCGContext() CGContext {
 }
 
 // EffectContext mirrors CGContext::get_effect_context.
-// Prefers EffectAccum when set (running accum from statements in block).
+// CGContext.h:118 — ambient restriction context (not the accum).
 func (c CGContext) EffectContext() Effect {
+	return c.effectContext
+}
+
+// AccumEffect mirrors CGContext::get_accum_effect.
+// CGContext.h:121–123 — *effect_accum if set, else empty.
+func (c CGContext) AccumEffect() Effect {
 	if c.EffectAccum != nil {
 		return *c.EffectAccum
 	}
-	return c.effectContext
+	return EmptyEffect()
 }
 
 // NoteWrite records a variable write into EffectAccum if present.
@@ -768,15 +774,36 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
 }
 
-// VisitFactsLhs mirrors Lhs::visit_facts core checks (without index walk).
-// Lhs.cpp:301+ subset — check_write_var or write_pointed + deref volatile.
+// VisitFactsLhs mirrors Lhs::visit_facts.
+// Lhs.cpp:301–356 — compound read-first; curr_rhs overlap; write/write_pointed.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
 		return false
 	}
 	facts := c.pointToFacts()
-	deref := lhs.IndirectLevel()
 	v := lhs.Var
+	// compound assign: validate as read first (Lhs.cpp:307–311)
+	if lhs.CompoundAssign {
+		ev := &Expression{Term: TermVariable, Var: v, ExprType: lhs.GetType()}
+		if !c.VisitFactsExpressionVariable(ev, opts) {
+			return false
+		}
+	}
+	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
+	if c.CurrRHS != nil {
+		lhsExpr := LhsAsExpression(lhs)
+		for _, sub := range GetEvalToSubexps(c.CurrRHS) {
+			if sub == nil {
+				continue
+			}
+			if sub.Term == TermVariable || sub.Term == TermLhs {
+				if HaveOverlappingFields(sub, lhsExpr, facts) {
+					return false
+				}
+			}
+		}
+	}
+	deref := lhs.IndirectLevel()
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
 			return false

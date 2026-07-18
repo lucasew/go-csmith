@@ -114,9 +114,8 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	if !IsEligibleVar(a, 0, AccessRead, cg) {
 		t.Fatal("a readable under pre-left")
 	}
-	// under postLeft, a is written → not eligible for read
-	cg2 := EmptyCGContext()
-	cg2.EffectAccum = &postLeft
+	// under postLeft as ambient effect_context, a is written → not eligible for read
+	cg2 := WithEffectContext(postLeft)
 	if IsEligibleVar(a, 0, AccessRead, cg2) {
 		t.Fatal("a blocked after left write")
 	}

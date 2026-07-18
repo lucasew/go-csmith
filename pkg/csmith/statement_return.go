@@ -1,6 +1,37 @@
-// Upstream: StatementReturn.cpp (make_random, Output).
+// Upstream: StatementReturn.cpp (make_random, Output, visit_facts).
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
+
+// VisitFactsStatementReturn mirrors StatementReturn::visit_facts.
+// StatementReturn.cpp:76–97 — no_return_dead_ptr filter; var.visit_facts; update return.
+func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
+	if st == nil || cg == nil || st.Kind != StmtReturn {
+		return false
+	}
+	if st.Expr == nil {
+		return true
+	}
+	// no_return_dead_ptr: reject returning local-pointing ptrs
+	if opts.NoReturnDeadPointer && st.Expr.Term == TermVariable && st.Expr.Var != nil {
+		v := st.Expr.Var
+		ind := st.Expr.IndirectLevel()
+		facts := cg.pointToFacts()
+		if IsPointingToLocals(v, cg.CurrentBlock(), ind, facts) {
+			return false
+		}
+	}
+	if !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	// FactMgr::update_fact_for_return
+	if cg.FM != nil && cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
+		cg.FM.UpdateFactForReturn(cg.CurrentFunc.RV, st.Expr)
+	}
+	if cg.FM != nil && st.StmID > 0 {
+		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+	}
+	return true
+}
 
 // MakeRandomReturn mirrors StatementReturn::make_random.
 // StatementReturn.cpp:54–72 — ExpressionVariable only; visit_facts updates return facts.

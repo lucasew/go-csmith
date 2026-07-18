@@ -30,10 +30,11 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	cg2.EffectAccum = &eff
 	v := CreateVariableQfer("g_x", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg2.NoteWrite(v)
-	if cg2.EffectContext().IsSideEffectFree() {
+	// NoteWrite updates EffectAccum, not ambient EffectContext
+	if cg2.AccumEffect().IsSideEffectFree() {
 		t.Fatal("should not be SE-free after write")
 	}
-	if !cg2.EffectContext().IsWritten(v) {
+	if !cg2.AccumEffect().IsWritten(v) {
 		t.Fatal("not written")
 	}
 	_ = stmtTab
