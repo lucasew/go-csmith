@@ -16,12 +16,14 @@ type Constant struct {
 
 // MakeRandom mirrors Constant::make_random.
 // Constant.cpp:423–426 → GenerateRandomConstant; ERROR_GUARD(nullptr).
-func MakeRandom(typ *Type, opts Options, r *Rng) *Constant {
+// probs is the session Probabilities (C++ singleton); nil allowed for simple/pointer
+// only — aggregate constants need live probs (no invent NewProbabilities(opts)).
+func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
 	// Constant.cpp:312 — assert(st != eVoid) before simple emit
 	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
 		return nil
 	}
-	v := generateRandomConstant(typ, opts, r)
+	v := generateRandomConstant(typ, opts, probs, r)
 	// Constant.cpp:425 — ERROR_GUARD(nullptr)
 	if HasError() {
 		return nil
@@ -146,7 +148,7 @@ func splitConstFields(s string) []string {
 
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
-func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
+func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rng) string {
 	// Constant.cpp:296+ — uses process RNG; no soft invent NewRng(0) for nil
 	if r == nil {
 		return ""
@@ -160,13 +162,20 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 		return "0"
 	}
 	if typ.IsStruct() {
-		if c := MakeStructConstant(r, opts, NewProbabilities(opts), typ); c != nil {
+		// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+		if probs == nil {
+			return ""
+		}
+		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
 			return c.Value
 		}
 		return ""
 	}
 	if typ.IsUnion() {
-		if c := MakeUnionConstant(r, opts, NewProbabilities(opts), typ); c != nil {
+		if probs == nil {
+			return ""
+		}
+		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
 			return c.Value
 		}
 		return ""

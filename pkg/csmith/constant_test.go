@@ -5,7 +5,7 @@ import "testing"
 func TestMakeRandomPointerIsZero(t *testing.T) {
 	// Constant.cpp: pointer → "0", no RNG
 	r := NewRng(2)
-	c := MakeRandom(PointerTo(GetSimpleType(EInt)), Defaults(), r)
+	c := MakeRandom(PointerTo(GetSimpleType(EInt)), Defaults(), nil, r)
 	if c.Value != "0" {
 		t.Fatalf("pointer const: %q", c.Value)
 	}
@@ -16,7 +16,7 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 
 func TestMakeRandomVoidFailClosed(t *testing.T) {
 	// Constant.cpp:312 — assert(st != eVoid); dead switch "/* void */" not a soft invent path
-	c := MakeRandom(GetSimpleType(EVoid), Defaults(), NewRng(1))
+	c := MakeRandom(GetSimpleType(EVoid), Defaults(), nil, NewRng(1))
 	if c != nil {
 		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
@@ -37,7 +37,7 @@ func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 		hex := r.RandomHexDigits(8)
 		want := "0x" + hex + "L"
 		r2 := NewRng(seed)
-		c := MakeRandom(GetSimpleType(EInt), opts, r2)
+		c := MakeRandom(GetSimpleType(EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
 		}
@@ -62,7 +62,7 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 		}
 		want := formatSmallConstant(EInt, num, opts)
 		r2 := NewRng(seed)
-		c := MakeRandom(GetSimpleType(EInt), opts, r2)
+		c := MakeRandom(GetSimpleType(EInt), opts, nil, r2)
 		if c.Value != want {
 			t.Fatalf("seed %d: got %q want %q", seed, c.Value, want)
 		}

@@ -449,7 +449,8 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 	// Constant::make_random reads process CGOptions (binary_constant, longlong, …)
 	var init *Constant
 	if !typ.IsUnion() {
-		init = MakeRandom(typ, ProcessOptions(), nextCreateVarRng())
+		// ProcessOptions for CGOptions; nil probs — simple/pointer only (no invent tables)
+		init = MakeRandom(typ, ProcessOptions(), nil, nextCreateVarRng())
 	}
 	// Variable.cpp:397 — ERROR_GUARD_AND_DEL1(nullptr, var)
 	if HasError() {
@@ -1077,7 +1078,7 @@ func (v *Variable) CreateFieldVars() {
 		if top.Type == nil || !top.Type.IsUnion() {
 			// Variable.cpp:395 — Constant::make_random via process CGOptions + RNG
 			// no soft invent Defaults() when session options differ
-			init = MakeRandom(f.Type, ProcessOptions(), nextCreateVarRng())
+			init = MakeRandom(f.Type, ProcessOptions(), nil, nextCreateVarRng())
 		}
 		// Variable.cpp:397 — ERROR_GUARD during field CreateVariable
 		if HasError() {

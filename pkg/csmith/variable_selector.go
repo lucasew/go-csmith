@@ -583,7 +583,7 @@ func (vs *VariableSelector) MakeInitValue(
 		if t.IsSimple() && t.simple == EVoid {
 			return nil
 		}
-		c := MakeRandom(t, vs.Opts, r)
+		c := MakeRandom(t, vs.Opts, vs.Probs, r)
 		// VariableSelector.cpp:842 ERROR_GUARD after make_random
 		if c == nil || HasError() {
 			return nil
@@ -1115,7 +1115,7 @@ func (vs *VariableSelector) createAndInitialize(
 		var init *Constant
 		var ie *Expression
 		if vs.Opts.StrictConstArrays {
-			init = MakeRandom(t, vs.Opts, r)
+			init = MakeRandom(t, vs.Opts, vs.Probs, r)
 			if init != nil {
 				ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
 			}
@@ -1807,7 +1807,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	}
 	// VariableSelector.cpp:1362–1363 — qfer.add_qualifiers(false, false)
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
-	init := MakeRandom(elem, vs.Opts, r)
+	init := MakeRandom(elem, vs.Opts, vs.Probs, r)
 	av := CreateArrayVariable(r, vs.Opts, blk, name, elem, init, qfer)
 	if av == nil || HasError() {
 		return nil

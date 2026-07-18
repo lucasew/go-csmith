@@ -424,7 +424,7 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			}
 		} else if f.Type != nil {
 			// Constant.cpp:271 — GenerateRandomConstant(fields[i]); no soft invent "0"
-			if c := MakeRandom(f.Type, opts, r); c != nil {
+			if c := MakeRandom(f.Type, opts, probs, r); c != nil {
 				val = c.Value
 			}
 		}
@@ -666,7 +666,7 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 		}
 	} else if f0.Type != nil {
 		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
-		if c := MakeRandom(f0.Type, opts, r); c != nil {
+		if c := MakeRandom(f0.Type, opts, probs, r); c != nil {
 			val = c.Value
 		}
 	}

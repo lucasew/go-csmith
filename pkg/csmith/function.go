@@ -133,8 +133,9 @@ func MakeRandomSignature(
 	if r == nil {
 		return nil
 	}
+	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
 	if probs == nil {
-		probs = NewProbabilities(opts)
+		return nil
 	}
 	var env *TypeEnv
 	if list != nil {
@@ -267,8 +268,9 @@ func MakeFirst(
 	if r == nil {
 		return nil
 	}
+	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
 	if probs == nil {
-		probs = NewProbabilities(opts)
+		return nil
 	}
 	// Type::AllTypes is process-global in C++; session Types on list or vs
 	var env *TypeEnv
@@ -546,7 +548,8 @@ func (f *Function) MakeReturnConst(opts Options, r *Rng) {
 	if r == nil {
 		return
 	}
-	f.RetConst = MakeRandom(f.ReturnType, opts, r)
+	// nil probs: simple/pointer ret only; no invent NewProbabilities for aggregate ret_c
+	f.RetConst = MakeRandom(f.ReturnType, opts, nil, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error left for GenerateBody ERROR_RETURN; nil const is incomplete IR
 	if HasError() || f.RetConst == nil {

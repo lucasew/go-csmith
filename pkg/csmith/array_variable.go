@@ -114,7 +114,9 @@ func CreateArrayVariable(
 	half := uint32(total / 2)
 	initNum := int(r.RndUpto(half))
 	for i := 0; i < initNum; i++ {
-		c := MakeRandom(elem, opts, r)
+		// session probs not on CreateArrayVariable; simple/pointer only without invent tables
+		// aggregate element constants need probs via selector path (vs.Probs)
+		c := MakeRandom(elem, opts, nil, r)
 		// sticky ERROR_GUARD from Constant::make_random
 		if HasError() {
 			return nil

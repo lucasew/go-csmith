@@ -660,7 +660,7 @@ func MakeRandomExpression(
 		if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
 			return nil
 		}
-		e = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
+		e = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, probs, r)}
 	case TermVariable:
 		// ExpressionVariable::make_random
 		e = makeExpressionVariable(r, vs, cg, typ, qfer)

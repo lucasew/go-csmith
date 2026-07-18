@@ -69,7 +69,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	if st == nil || !st.IsStruct() {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRng(3), opts, nil, "g_s", st, MakeRandom(st, opts, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(3), opts, nil, "g_s", st, MakeRandom(st, opts, NewProbabilities(opts), NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
