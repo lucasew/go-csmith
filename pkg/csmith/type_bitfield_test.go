@@ -29,7 +29,14 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 60; seed++ {
 		var env TypeEnv
+		// Type.cpp AllTypes has simples before make_random_struct_type
+		env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 		st := MakeRandomStructType(NewRng(seed), opts, probs, &env, "S0")
+		if st == nil {
+			// ERROR_GUARD / empty field path fail closed — retry seed
+			ClearError()
+			continue
+		}
 		for _, f := range st.Fields {
 			if f.BitWidth >= 0 {
 				found = true
@@ -42,6 +49,23 @@ func TestMakeRandomStructTypeCanHaveBitfields(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected some bitfield field in seeds 1..59")
+	}
+}
+
+func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
+	// Type.cpp ERROR_RETURN / ERROR_GUARD — no soft invent nil-type fields
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	ClearError()
+	// empty AllTypes → MakeOneStructField fails; whole struct abort
+	st := MakeRandomStructType(NewRng(1), opts, probs, &TypeEnv{}, "Sempty")
+	if st != nil {
+		// only succeeds if full-bitfields path never needs ChooseRandom
+		for _, f := range st.Fields {
+			if f.Type == nil {
+				t.Fatal("must not invent field with nil type")
+			}
+		}
 	}
 }
 

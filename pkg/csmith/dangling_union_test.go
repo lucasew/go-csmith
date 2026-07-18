@@ -31,6 +31,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("need union with 2+ fields")
@@ -97,6 +98,7 @@ func TestLooseMatchUnion(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")

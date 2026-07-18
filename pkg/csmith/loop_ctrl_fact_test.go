@@ -16,7 +16,11 @@ func TestHasIntFieldAndContainPointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	if st == nil {
+		t.Fatal("struct")
+	}
 	_ = st.HasIntField() // may or may not
 }
 

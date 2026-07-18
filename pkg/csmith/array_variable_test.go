@@ -64,6 +64,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	opts := Defaults()
 	env := &TypeEnv{}
 	probs := NewProbabilities(opts)
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	if st == nil || !st.IsStruct() {
 		t.Skip("no struct")

@@ -36,6 +36,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(3), opts, probs, &env, "U0")
 	if ut == nil {
 		t.Skip("no union")
@@ -57,6 +58,7 @@ func TestIsNonreadableField(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(5), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
@@ -84,6 +86,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	ut := MakeRandomUnionType(NewRng(7), opts, probs, &env, "U0")
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union")

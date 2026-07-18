@@ -89,6 +89,7 @@ func TestFindPointerFields(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	// inject a pointer field if none
 	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))

@@ -23,6 +23,7 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 // MakeOneStructField mirrors Type::make_one_struct_field.
 // Type.cpp:683–697 + ChooseRandomTypeFilter depth gate (Type.cpp:240–242).
 // Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
+// On ERROR_RETURN / choose fail returns zero field (Type==nil); callers abort.
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
 	// Type.cpp:687–691 — ChooseRandomTypeFilter(for_field_var=true) over AllTypes
 	// (no soft invent 15% nested-struct path then simple-only)
@@ -31,13 +32,17 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 		ft = env.ChooseRandom(r, opts, probs, true)
 	}
 	// Type.cpp:687–691 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
-	if ft == nil {
-		return StructField{Name: fmt.Sprintf("f%d", fieldIdx), BitWidth: -1}
+	if ft == nil || HasError() {
+		return StructField{}
 	}
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	// Type.cpp:694 ERROR_RETURN after random_qualifiers
+	if HasError() {
+		return StructField{}
+	}
 	return StructField{
 		Name:     fmt.Sprintf("f%d", fieldIdx),
 		Type:     ft,
@@ -54,6 +59,9 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 		maxLen = 32
 	}
 	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
+	if HasError() {
+		return StructField{}
+	}
 	var ft *Type
 	if sign {
 		ft = GetIntType()
@@ -63,13 +71,22 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	if HasError() {
+		return StructField{}
+	}
 	length := int(r.RndUpto(uint32(maxLen)))
+	if HasError() {
+		return StructField{}
+	}
 	// force non-zero if first field or previous was zero-length
 	if length == 0 && prevZero {
 		if maxLen <= 2 {
 			length = 1
 		} else {
 			length = int(r.RndUpto(uint32(maxLen-1))) + 1
+			if HasError() {
+				return StructField{}
+			}
 		}
 	}
 	return StructField{
@@ -94,38 +111,71 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	if !opts.FixedStructFields {
 		fieldCnt = int(r.RndUpto(uint32(maxCnt))) + 1
 	}
+	// Type.cpp:1082 — ERROR_GUARD(nullptr) after field_cnt draw
+	if HasError() {
+		return nil
+	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
+	// Type.cpp:1086–1088 — ERROR_GUARD after flip
 	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
+	if HasError() {
+		return nil
+	}
 	fields := make([]StructField, 0, fieldCnt)
 	prevZero := true // first field cannot be zero-width
 	for i := 0; i < fieldCnt; i++ {
+		var f StructField
 		if fullBitfields {
 			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
 			if r.RndFlipcoin(uint32(probs.Single(PScalarFieldInFullBitFieldsProb))) {
-				fields = append(fields, MakeOneStructField(r, opts, probs, env, i))
+				if HasError() {
+					return nil
+				}
+				f = MakeOneStructField(r, opts, probs, env, i)
 				prevZero = false
 			} else {
-				f := MakeOneBitfield(r, opts, probs, i, prevZero)
-				prevZero = f.BitWidth == 0
-				fields = append(fields, f)
+				if HasError() {
+					return nil
+				}
+				f = MakeOneBitfield(r, opts, probs, i, prevZero)
+				prevZero = f.Type != nil && f.BitWidth == 0
 			}
-			continue
+		} else if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
+			// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
+			if HasError() {
+				return nil
+			}
+			f = MakeOneBitfield(r, opts, probs, i, prevZero)
+			prevZero = f.Type != nil && f.BitWidth == 0
+		} else {
+			if HasError() {
+				return nil
+			}
+			f = MakeOneStructField(r, opts, probs, env, i)
+			prevZero = false
 		}
-		// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
-		if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
-			f := MakeOneBitfield(r, opts, probs, i, prevZero)
-			prevZero = f.BitWidth == 0
-			fields = append(fields, f)
-			continue
+		// Type.cpp:1090 ERROR_GUARD after make_*_struct_fields; no soft invent nil-type field
+		if f.Type == nil || HasError() {
+			return nil
 		}
-		fields = append(fields, MakeOneStructField(r, opts, probs, env, i))
-		prevZero = false
+		fields = append(fields, f)
 	}
+	// Type.cpp:1100–1110 — packed_struct; ccomp skips when aggregate/longlong fields
 	packed := false
 	if opts.PackedStruct {
-		packed = r.RndFlipcoin(50)
+		if opts.CComp && (HasAggregateField(fields) || HasLongLongField(fields)) {
+			// leave packed false
+		} else {
+			packed = r.RndFlipcoin(50)
+			if HasError() {
+				return nil
+			}
+		}
 	}
 	hasAssign := IfStructWillHaveAssignOps(r, opts, probs)
+	if HasError() {
+		return nil
+	}
 	st := &Type{
 		isStruct:     true,
 		StructName:   tag,
@@ -182,8 +232,11 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	if opts.Structs {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
+			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
 			tag := fmt.Sprintf("S%d", len(env.StructTypes))
-			MakeRandomStructType(r, opts, probs, env, tag)
+			if MakeRandomStructType(r, opts, probs, env, tag) == nil || HasError() {
+				break
+			}
 			if len(env.StructTypes) > 20 {
 				break
 			}
@@ -192,7 +245,9 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if opts.Unions {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			tag := fmt.Sprintf("U%d", len(env.UnionTypes))
-			MakeRandomUnionType(r, opts, probs, env, tag)
+			if MakeRandomUnionType(r, opts, probs, env, tag) == nil || HasError() {
+				break
+			}
 			if len(env.UnionTypes) > 20 {
 				break
 			}
@@ -401,12 +456,15 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		break
 	}
 	// Type.cpp:755 — while (type == nullptr); no soft invent simple when pools empty
-	if ft == nil {
-		return StructField{Name: fmt.Sprintf("f%d", fieldIdx), BitWidth: -1}
+	if ft == nil || HasError() {
+		return StructField{}
 	}
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	if HasError() {
+		return StructField{}
+	}
 	return StructField{Name: fmt.Sprintf("f%d", fieldIdx), Type: ft, Qfer: q, BitWidth: -1}
 }
 
@@ -421,11 +479,28 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		maxCnt = 1
 	}
 	fieldCnt := int(r.RndUpto(uint32(maxCnt))) + 1
+	// Type.cpp:1136 — ERROR_GUARD after field_cnt
+	if HasError() {
+		return nil
+	}
 	fields := make([]StructField, 0, fieldCnt)
 	for i := 0; i < fieldCnt; i++ {
-		fields = append(fields, MakeOneUnionField(r, opts, probs, env, i))
+		f := MakeOneUnionField(r, opts, probs, env, i)
+		// Type.cpp:1140–1141 — make_one_union_field; assert no bitfields on last
+		// no soft invent nil-type union field
+		if f.Type == nil || HasError() {
+			return nil
+		}
+		if f.Type.HasBitfields() {
+			// C++ assert(!fields.back()->has_bitfields())
+			return nil
+		}
+		fields = append(fields, f)
 	}
 	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)
+	if HasError() {
+		return nil
+	}
 	ut := &Type{
 		isUnion:      true,
 		StructName:   tag,

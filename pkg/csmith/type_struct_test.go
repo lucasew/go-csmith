@@ -9,6 +9,8 @@ func TestMakeRandomStructType(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	// Type.cpp GenerateSimpleTypes before make_random_struct_type
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	r := NewRng(2)
 	st := MakeRandomStructType(r, opts, probs, &env, "S0")
 	if st == nil || !st.IsStruct() || len(st.Fields) < 1 {
@@ -16,6 +18,11 @@ func TestMakeRandomStructType(t *testing.T) {
 	}
 	if len(env.StructTypes) != 1 {
 		t.Fatal(env.StructTypes)
+	}
+	for _, f := range st.Fields {
+		if f.Type == nil {
+			t.Fatal("no nil-type field invent")
+		}
 	}
 	decl := st.OutputStructDecl()
 	if !strings.Contains(decl, "struct S0") || !strings.Contains(decl, "f0") {
@@ -53,7 +60,11 @@ func TestMakeStructConstant(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(3), opts, probs, &env, "S0")
+	if st == nil {
+		t.Fatal("struct")
+	}
 	c := MakeStructConstant(NewRng(4), opts, probs, st)
 	if c == nil || !strings.HasPrefix(c.Value, "{") {
 		t.Fatal(c)
