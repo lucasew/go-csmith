@@ -54,8 +54,10 @@ func MakeRandomExprStmt(
 		// Statement::make_random retries on null
 		return Stmt{}
 	}
+	// Statement base ctor always assigns stm_id (Statement.cpp:364–367)
 	return Stmt{
-		Kind: StmtInvoke,
-		Expr: &Expression{Term: TermFunction, Invoke: fi},
+		Kind:  StmtInvoke,
+		Expr:  &Expression{Term: TermFunction, Invoke: fi},
+		StmID: AllocStmID(),
 	}
 }

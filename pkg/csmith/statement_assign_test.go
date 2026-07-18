@@ -28,6 +28,27 @@ func TestAssignOpsProbabilitySignedFiltersIncr(t *testing.T) {
 	}
 }
 
+func TestMakeRandomAssignAllocatesStmID(t *testing.T) {
+	// Statement.cpp:364–367 — Statement ctor always assigns stm_id
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	for seed := uint64(1); seed < 40; seed++ {
+		c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+		st := MakeRandomAssign(NewRng(seed), opts, probs, vs, NewExprTables(opts), &c, GetIntType())
+		if !stmtOK(st) {
+			continue
+		}
+		if st.StmID == 0 {
+			t.Fatal("success assign must have stm_id from Statement ctor")
+		}
+		return
+	}
+	t.Fatal("no assign")
+}
+
 func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

@@ -120,6 +120,10 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		st := MakeRandomExprStmt(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
 		if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
+			// Statement.cpp:364–367 — Statement ctor always assigns stm_id
+			if st.StmID == 0 {
+				t.Fatal("success expr stmt must have stm_id")
+			}
 			return
 		}
 	}

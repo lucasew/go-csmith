@@ -361,16 +361,19 @@ func MakeRandomArrayInit(
 	innerBody := &Block{
 		Func: cg.CurrentFunc,
 		Stmts: []Stmt{{
+			// Statement base ctor always assigns stm_id (Statement.cpp:364–367)
 			Kind:        StmtAssign,
 			Expr:        rhs,
 			AssignOp:    AssignSimple,
 			ArrayAccess: access,
 			LhsVar:      &av.Variable,
+			StmID:       AllocStmID(),
 		}},
 	}
 	// nest fors: outermost first dim (StatementArrayOp::output_header)
 	if len(dims) == 0 {
-		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody}
+		// StatementArrayOp is a Statement; always has stm_id
+		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, StmID: AllocStmID()}
 	}
 	st := Stmt{
 		Kind:        StmtArrayOp,
