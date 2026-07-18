@@ -236,12 +236,17 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 	cg.EffectAccum = &eff
 	cg.IVBounds = map[*Variable]int{iv: 10}
 	facts := []*FactPointTo{}
+	FailedStm = nil
 	ok := StmVisitFacts(st, &facts, &cg, Defaults())
 	if ok {
 		t.Fatal("expected visit fail writing IV")
 	}
 	if !fm.MapVisited[77] {
 		t.Fatal("visited must be set even on fail")
+	}
+	// Statement.cpp:615–617 — failed_stm records non-compound failure
+	if FailedStm != st {
+		t.Fatal("FailedStm must be the failing assign")
 	}
 }
 

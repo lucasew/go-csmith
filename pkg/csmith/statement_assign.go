@@ -123,6 +123,12 @@ func MakeRandomAssignQfer(
 		qfer = *qf
 	}
 
+	// StatementAssign.cpp:145/168 — Expression::make_random(..., type, qf)
+	// pass caller's qf into RHS when set (ExpressionAssign path); else nullptr.
+	var rhsQf *CVQualifiers
+	if callerQf {
+		rhsQf = qf
+	}
 	if op.NeedNoRHS() {
 		// StatementAssign.cpp:138–144 — Constant::make_int(1); wildcard when no qf
 		rhs = &Expression{Term: TermConstant, Con: MakeInt(1)}
@@ -135,9 +141,9 @@ func MakeRandomAssignQfer(
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
-		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
+			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
 			SetError(ErrGeneric)
@@ -164,9 +170,9 @@ func MakeRandomAssignQfer(
 		}
 	} else {
 		// StatementAssign.cpp:168–181
-		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
+			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
 			SetError(ErrGeneric)

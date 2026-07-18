@@ -81,10 +81,14 @@ func TestGenerateCanEmitCompoundAssign(t *testing.T) {
 
 func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	// StatementAssign.cpp:190–203 — qf non-nil → match_exact during Lhs
+	// StatementAssign.cpp:145/168 — qf also passed to RHS Expression::make_random
 	opts := Defaults()
 	opts.MatchExactQualifiers = false
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	// seed a volatile global so volatile qfer can select
+	vq := NewCVQualifiers([]bool{false}, []bool{true})
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), &vq, NewRng(1))
 	// volatile-only WRITE qfer
 	q := NewCVQualifiers([]bool{false}, []bool{true})
 	cg := EmptyCGContext()
@@ -93,6 +97,10 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	// global option restored conceptually (opts is by-value); package default unchanged
 	if opts.MatchExactQualifiers {
 		t.Fatal("caller opts mutated")
+	}
+	// ExpressionAssign path: when successful, RHS was built under caller qfer
+	if st.LhsVar != nil && st.Expr == nil && !st.AssignOp.NeedNoRHS() {
+		t.Fatal("successful lhs with needing RHS must have expr")
 	}
 	_ = st
 }
