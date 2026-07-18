@@ -223,8 +223,27 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		IndexExprs: indexExprs,
 	}
 	item.AsArray = item
+	// ArrayVariable.cpp:372–375 — create_field_vars for aggregate element type
+	if item.Type != nil && item.Type.IsAggregate() {
+		item.CreateFieldVars()
+	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)
+	}
+	// ArrayVariable.cpp:376 — blk->local_vars.push_back when parent block set
+	if blk := cg.CurrentBlock(); blk != nil {
+		item.Block = blk
+		// itemized members tracked on block for is_variant / rnd_mutate
+		found := false
+		for _, lv := range blk.LocalVars {
+			if lv == &item.Variable {
+				found = true
+				break
+			}
+		}
+		if !found {
+			blk.LocalVars = append(blk.LocalVars, &item.Variable)
+		}
 	}
 	return item
 }

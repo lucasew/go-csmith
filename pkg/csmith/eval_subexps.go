@@ -15,13 +15,19 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 		// ExpressionComma.cpp:102–105 — only RHS evaluates to the value
 		return GetEvalToSubexps(e.CommaRHS)
 	case TermAssignment:
-		// ExpressionAssign — value is LHS
-		if e.Assign != nil && e.Assign.LhsVar != nil {
-			return []*Expression{{
-				Term:     TermVariable,
-				Var:      e.Assign.LhsVar,
-				ExprType: e.Assign.LhsVar.Type,
-			}}
+		// ExpressionAssign.cpp:107–111 — get_lhs()->get_eval_to_subexps (Lhs pushes self)
+		if e.Assign != nil {
+			if e.Assign.Lhs != nil {
+				return []*Expression{LhsAsExpression(e.Assign.Lhs)}
+			}
+			if e.Assign.LhsVar != nil {
+				ty := e.Assign.LhsVar.Type
+				return []*Expression{{
+					Term:     TermVariable,
+					Var:      e.Assign.LhsVar,
+					ExprType: ty,
+				}}
+			}
 		}
 		return nil
 	default:

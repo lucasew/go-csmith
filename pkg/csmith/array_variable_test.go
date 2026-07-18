@@ -148,3 +148,56 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
+	// ArrayVariable.cpp:261–264 — itemize expands field vars for aggregate element type
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: st, IsArray: true, ArraySizes: []int{3}},
+		Sizes:    []int{3},
+	}
+	av.AsArray = av
+	item := av.Itemize(NewRng(1))
+	if item == nil || item.Collective != av {
+		t.Fatal(item)
+	}
+	if len(item.FieldVars) != 2 {
+		t.Fatalf("field vars %d", len(item.FieldVars))
+	}
+	if item.FieldVars[0].Name != "g_a.f0" {
+		t.Fatal(item.FieldVars[0].Name)
+	}
+}
+
+func TestSizeInBytesArray(t *testing.T) {
+	av := &ArrayVariable{
+		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Sizes:    []int{2, 3},
+	}
+	want := GetIntType().SizeInBytes() * 2 * 3
+	if got := av.SizeInBytesArray(); got != want {
+		t.Fatalf("got %d want %d", got, want)
+	}
+}
+
+func TestContainsBackEdgeDestParentOnly(t *testing.T) {
+	// Block.cpp:491 — only dest->parent == this
+	b := &Block{StmID: 1}
+	other := &Block{StmID: 2}
+	fm := NewFactMgr(nil)
+	fm.CFGEdges = []*CFGEdge{
+		{BackLink: true, DestBlock: other, DestStmID: 10},
+		{BackLink: true, DestBlock: b, DestStmID: 11},
+	}
+	if !b.ContainsBackEdge(fm) {
+		t.Fatal("want edge with DestBlock==b")
+	}
+	// DestStmID alone must not count without DestBlock
+	fm.CFGEdges = []*CFGEdge{{BackLink: true, DestStmID: 99}}
+	if b.ContainsBackEdge(fm) {
+		t.Fatal("DestStmID without DestBlock must not match")
+	}
+}

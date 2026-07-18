@@ -352,7 +352,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 }
 
 // ContainsBackEdge mirrors Block::contains_back_edge.
-// Block.cpp:485–497 — CFG back_link whose dest parent is this block.
+// Block.cpp:485–496 — CFG back_link whose dest->parent == this.
 func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false
@@ -361,19 +361,9 @@ func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 		if e == nil || !e.BackLink {
 			continue
 		}
-		// dest statement's parent block is this
+		// Block.cpp:491 — edge->dest->parent == this
 		if e.DestBlock == b {
 			return true
-		}
-		// DestStmID: find parent via statement tree under this block
-		if e.DestStmID > 0 && blockHasStmtID(b, e.DestStmID) {
-			// parent of dest should be this for "inside this block not sub-blocks"
-			// approximate: dest is direct child statement of b
-			for i := range b.Stmts {
-				if b.Stmts[i].StmID == e.DestStmID {
-					return true
-				}
-			}
 		}
 	}
 	return false

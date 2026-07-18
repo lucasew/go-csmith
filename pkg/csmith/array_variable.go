@@ -423,9 +423,15 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	return b.String()
 }
 
-// Indices holds itemized index expressions (constant strings for now).
-// Collective is the parent array when this is an itemized member.
+// Itemize mirrors ArrayVariable::itemize(void).
+// ArrayVariable.cpp:249–278 — random const indices; AllVars; create_field_vars for aggregates.
 func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
+	return av.ItemizeInto(r, nil)
+}
+
+// ItemizeInto is Itemize with optional VariableSelector for AllVars registration.
+// ArrayVariable.cpp:251–252 — VariableSelector::AllVars.push_back(av).
+func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariable {
 	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
 	if av == nil || r == nil {
 		return nil
@@ -457,11 +463,34 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 		}
 		s := fmt.Sprintf("%d", idx)
 		item.Indices = append(item.Indices, s)
+		// ArrayVariable.cpp:257–258 — Constant(get_int_type(), int2str(index))
 		item.IndexExprs = append(item.IndexExprs, &Expression{
 			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
 		})
 	}
+	// ArrayVariable.cpp:261–264 — only expand struct/union for itemized member
+	if item.Type != nil && item.Type.IsAggregate() {
+		item.CreateFieldVars()
+	}
+	if vs != nil {
+		vs.AllVars = append(vs.AllVars, &item.Variable)
+	}
 	return item
+}
+
+// SizeInBytesArray mirrors ArrayVariable::size_in_bytes.
+// ArrayVariable.cpp:241–247 — elem size × product of dimensions.
+func (av *ArrayVariable) SizeInBytesArray() int {
+	if av == nil || av.Type == nil {
+		return 0
+	}
+	n := av.Type.SizeInBytes()
+	for _, sz := range av.Sizes {
+		if sz > 0 {
+			n *= sz
+		}
+	}
+	return n
 }
 
 // OutputAccess mirrors ArrayVariable::Output for itemized / collective emit.

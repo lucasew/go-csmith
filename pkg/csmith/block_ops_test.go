@@ -177,21 +177,23 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 }
 
 func TestContainsBackEdge(t *testing.T) {
+	// Block.cpp:491 — edge->back_link && edge->dest->parent == this
 	fm := NewFactMgr(nil)
 	b := &Block{StmID: 10, Stmts: []Stmt{{StmID: 1}, {StmID: 2}}}
 	if b.ContainsBackEdge(fm) {
 		t.Fatal("empty")
 	}
+	// DestStmID alone is insufficient without DestBlock parent
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
 		SrcID: 9, DestStmID: 1, BackLink: true,
 	})
-	if !b.ContainsBackEdge(fm) {
-		t.Fatal("direct dest")
+	if b.ContainsBackEdge(fm) {
+		t.Fatal("DestStmID without DestBlock must not match")
 	}
 	b2 := &Block{StmID: 20}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 8, DestBlock: b2, BackLink: true}}
 	if !b2.ContainsBackEdge(fm) {
-		t.Fatal("dest block")
+		t.Fatal("dest block parent")
 	}
 }
 
