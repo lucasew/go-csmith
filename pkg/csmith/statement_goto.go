@@ -255,7 +255,10 @@ func MakeRandomGoto(
 		tgt.StmID = AllocStmID()
 	}
 
-	st := Stmt{Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID()}
+	st := Stmt{
+		Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
+		GotoDestStmID: tgt.StmID,
+	}
 	if backEdge {
 		st.GotoBack = true
 		// jump from curr (blk) into okBlk → collect skipped locals

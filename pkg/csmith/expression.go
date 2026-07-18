@@ -140,11 +140,71 @@ func (e *Expression) GetType() *Type {
 }
 
 // EqualsInt mirrors Expression::equals(int) for constants.
+// Expression.h: equals default false; Constant overrides.
 func (e *Expression) EqualsInt(num int) bool {
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		return false
 	}
 	return e.Con.Equals(num)
+}
+
+// NotEquals mirrors Expression::not_equals(int).
+// Expression.h:139 — default false; Constant: !equals(num).
+func (e *Expression) NotEquals(num int) bool {
+	if e == nil || e.Term != TermConstant || e.Con == nil {
+		return false
+	}
+	return !e.Con.Equals(num)
+}
+
+// UseVar mirrors Expression::use_var.
+// Expression.h:143 default false; Variable/Funcall/Comma/Assign overrides.
+func (e *Expression) UseVar(v *Variable) bool {
+	if e == nil || v == nil {
+		return false
+	}
+	switch e.Term {
+	case TermVariable:
+		return e.Var == v || (e.Var != nil && e.Var.Match(v))
+	case TermFunction:
+		if e.Invoke == nil {
+			return false
+		}
+		for _, a := range e.Invoke.Args {
+			if a != nil && a.UseVar(v) {
+				return true
+			}
+		}
+		return false
+	case TermCommaExpr:
+		return e.CommaLHS.UseVar(v) || e.CommaRHS.UseVar(v)
+	case TermAssignment:
+		if e.Assign == nil {
+			return false
+		}
+		if e.Assign.LhsVar != nil && (e.Assign.LhsVar == v || e.Assign.LhsVar.Match(v)) {
+			return true
+		}
+		if e.Assign.Lhs != nil && e.Assign.Lhs.Var != nil &&
+			(e.Assign.Lhs.Var == v || e.Assign.Lhs.Var.Match(v)) {
+			return true
+		}
+		return e.Assign.Expr.UseVar(v)
+	case TermLhs:
+		// Lhs as expression term if ever used
+		return e.Var == v || (e.Var != nil && e.Var.Match(v))
+	default:
+		return false
+	}
+}
+
+// ToString mirrors Expression::to_string — Output without stream.
+// Expression.cpp:120–124.
+func (e *Expression) ToString() string {
+	if e == nil {
+		return ""
+	}
+	return e.Output()
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).

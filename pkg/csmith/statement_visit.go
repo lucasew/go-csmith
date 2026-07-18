@@ -19,10 +19,9 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		return VisitFactsStatementReturn(st, cg, opts)
 	case StmtBreak, StmtContinue:
 		return VisitFactsStatementJump(st, cg, opts)
-	case StmtGoto, StmtLabel:
-		if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
-			return false
-		}
+	case StmtGoto:
+		return VisitFactsStatementGoto(st, cg, opts)
+	case StmtLabel:
 		if cg.FM != nil && st.StmID > 0 {
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
@@ -50,6 +49,44 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	if cg.FM != nil && st.StmID > 0 {
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+	}
+	return true
+}
+
+// VisitFactsStatementGoto mirrors StatementGoto::visit_facts.
+// StatementGoto.cpp:364–402 — test; check_write skipped vars; subset re-analysis of dest.
+func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
+	if st == nil || cg == nil {
+		return true
+	}
+	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	// check write on skipped vars (re-init at dest)
+	facts := cg.pointToFacts()
+	for _, v := range st.InitSkippedVars {
+		if v != nil && !cg.CheckWriteVar(v, facts) {
+			return false
+		}
+	}
+	fm := cg.FM
+	if fm != nil && st.StmID > 0 {
+		// StatementGoto.cpp:390–398 — force dest re-analysis when current outs
+		// are proper subset of previous outs and neither visited this pass.
+		destID := st.GotoDestStmID
+		if destID > 0 {
+			visitedThis := fm.MapVisited != nil && fm.MapVisited[st.StmID]
+			visitedDest := fm.MapVisited != nil && fm.MapVisited[destID]
+			prevOut := fm.MapFactsOut[st.StmID]
+			cur := facts
+			if !visitedThis && !visitedDest &&
+				!SameFacts(cur, prevOut) &&
+				SubsetFacts(cur, prevOut) {
+				delete(fm.MapFactsIn, destID)
+				delete(fm.MapFactsOut, destID)
+			}
+		}
+		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	return true
 }

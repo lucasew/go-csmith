@@ -29,11 +29,8 @@ func (st Stmt) MustJump() bool {
 	}
 	switch st.Kind {
 	case StmtBreak, StmtContinue, StmtGoto:
-		// Expression::not_equals(0) — constants only in our model
-		if st.Expr != nil && st.Expr.Term == TermConstant && st.Expr.Con != nil {
-			return st.Expr.Con.Value != "0"
-		}
-		return false
+		// Expression::not_equals(0) — Constant only; other terms false
+		return st.Expr != nil && st.Expr.NotEquals(0)
 	case StmtIfElse:
 		t := st.Then != nil && st.Then.MustJump()
 		e := st.Else != nil && st.Else.MustJump()

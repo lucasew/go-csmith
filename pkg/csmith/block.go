@@ -39,6 +39,8 @@ type Stmt struct {
 	// InitSkippedVars mirrors StatementGoto::init_skipped_vars.
 	// StatementGoto.cpp:223 — locals whose inits are skipped by this jump.
 	InitSkippedVars []*Variable
+	// GotoDestStmID is the destination statement stm_id for goto (StatementGoto::dest).
+	GotoDestStmID int
 	// StmID mirrors Statement::stm_id for step_hash.
 	StmID int
 	// SafeFlags / Tmp1 / Tmp2 for compound assign safe-math OutputAsExpr.
