@@ -163,6 +163,32 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
 }
 
+// buildInitRecursive mirrors ArrayVariable::build_init_recursive.
+// ArrayVariable.cpp:439–461 — nested braces for multi-dim; pick from init_strings.
+func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {
+	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
+		return "0"
+	}
+	var b strings.Builder
+	b.WriteString("{")
+	for i := 0; i < av.Sizes[dimen]; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		if dimen == len(av.Sizes)-1 {
+			// magic index pick (ArrayVariable.cpp:448–452)
+			s := *seed
+			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
+			b.WriteString(initStrings[rnd])
+			*seed = s + 1
+		} else {
+			b.WriteString(av.buildInitRecursive(dimen+1, initStrings, seed))
+		}
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp OutputDef path — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
@@ -172,25 +198,33 @@ func (av *ArrayVariable) OutputDef() string {
 	var b strings.Builder
 	b.WriteString(av.CDeclType())
 	if av.NoLoopInitializer() && (av.Init != nil || len(av.InitValues) > 0) {
-		b.WriteString(" = {")
 		vals := make([]string, 0, 1+len(av.InitValues))
 		if av.Init != nil && av.Init.Value != "" {
 			vals = append(vals, av.Init.Value)
 		}
 		vals = append(vals, av.InitValues...)
-		maxEmit := av.TotalSize()
-		if maxEmit > 8 {
-			maxEmit = 8
+		if len(vals) == 0 {
+			vals = []string{"0"}
 		}
-		for i := 0; i < maxEmit && i < len(vals); i++ {
-			if i > 0 {
-				b.WriteString(", ")
+		// multi-dim or multi-value: recursive full initializer when total size small
+		if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
+			seed := uint32(0xABCDEF)
+			b.WriteString(" = ")
+			b.WriteString(av.buildInitRecursive(0, vals, &seed))
+		} else {
+			b.WriteString(" = {")
+			maxEmit := av.TotalSize()
+			if maxEmit > 8 {
+				maxEmit = 8
 			}
-			b.WriteString(vals[i])
+			for i := 0; i < maxEmit && i < len(vals); i++ {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				b.WriteString(vals[i])
+			}
+			b.WriteString("}")
 		}
-		b.WriteString("}")
-	} else if av.NoLoopInitializer() && av.Init != nil && av.Init.Value != "" {
-		// single init only case covered above
 	}
 	b.WriteString(";")
 	return b.String()

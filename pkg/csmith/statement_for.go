@@ -248,8 +248,22 @@ func MakeRandomFor(
 			lc.SafeIncr = true
 		}
 	}
+	// init writes the IV (StatementAssign init)
+	if lc.IV != nil {
+		cg.NoteWrite(lc.IV)
+	}
 	bodyCG := cg.WithFlags(FlagInLoop)
+	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
+	bodyEff := EmptyEffect()
+	if cg.EffectAccum != nil {
+		bodyEff = *cg.EffectAccum
+	}
+	bodyCG.EffectAccum = &bodyEff
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, bodyCG, true)
+	// merge body effect into parent (loop may execute 0+ times — keep parent SE if body writes)
+	if cg.EffectAccum != nil {
+		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)
+	}
 	return &Stmt{Kind: StmtFor, Loop: lc, Then: body}
 }
 

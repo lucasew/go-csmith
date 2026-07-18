@@ -61,3 +61,31 @@ func (e Effect) WriteVar(v *Variable) Effect {
 func (e Effect) IsWritten(v *Variable) bool {
 	return v != nil && e.written[v]
 }
+
+// MergeEffects combines two post-branch effects (union of writes; SE-free only if both are).
+// Approximates StatementIf fact/effect merge without FactMgr.
+func MergeEffects(a, b Effect) Effect {
+	out := Effect{
+		pure:           a.pure && b.pure,
+		sideEffectFree: a.sideEffectFree && b.sideEffectFree,
+	}
+	if len(a.written) == 0 && len(b.written) == 0 {
+		return out
+	}
+	out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
+	for k, v := range a.written {
+		if v {
+			out.written[k] = true
+		}
+	}
+	for k, v := range b.written {
+		if v {
+			out.written[k] = true
+		}
+	}
+	if len(out.written) > 0 {
+		out.pure = false
+		out.sideEffectFree = false
+	}
+	return out
+}
