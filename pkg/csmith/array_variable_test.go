@@ -201,3 +201,103 @@ func TestContainsBackEdgeDestParentOnly(t *testing.T) {
 		t.Fatal("DestStmID without DestBlock must not match")
 	}
 }
+
+func TestCountAndFindExprKeyVar(t *testing.T) {
+	// ArrayVariable.cpp:66–119
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
+	if CountExprKeyVar(ev) != 1 || FindExprKeyVar(ev) != iv {
+		t.Fatal("var")
+	}
+	c := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	if CountExprKeyVar(c) != 0 || FindExprKeyVar(c) != nil {
+		t.Fatal("const")
+	}
+	// i + 2 → one key var i
+	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, c}}
+	bin := &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
+	if CountExprKeyVar(bin) != 1 || FindExprKeyVar(bin) != iv {
+		t.Fatalf("bin count=%d key=%v", CountExprKeyVar(bin), FindExprKeyVar(bin))
+	}
+	// i + j → two keys
+	jv := CreateVariableScalars("j", GetIntType(), false, false)
+	ej := &Expression{Term: TermVariable, Var: jv, ExprType: GetIntType()}
+	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ej}}
+	bin2 := &Expression{Term: TermFunction, Invoke: fi2}
+	if CountExprKeyVar(bin2) != 2 || FindExprKeyVar(bin2) != nil {
+		t.Fatal("two vars")
+	}
+}
+
+func TestIsVariantKeyVars(t *testing.T) {
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:    []int{8},
+	}
+	parent.AsArray = parent
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
+	off := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	// a[i] and a[i+1] share key i
+	a1 := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes: []int{8}, Collective: parent,
+		IndexExprs: []*Expression{ev},
+	}
+	a1.AsArray = a1
+	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, off}}
+	a2 := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes: []int{8}, Collective: parent,
+		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}},
+	}
+	a2.AsArray = a2
+	if !a1.IsVariant(&a2.Variable) {
+		t.Fatal("same key i")
+	}
+	// a[j] different key
+	jv := CreateVariableScalars("j", GetIntType(), false, false)
+	a3 := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes: []int{8}, Collective: parent,
+		IndexExprs: []*Expression{{Term: TermVariable, Var: jv, ExprType: GetIntType()}},
+	}
+	a3.AsArray = a3
+	if a1.IsVariant(&a3.Variable) {
+		t.Fatal("different keys")
+	}
+}
+
+func TestItemizeConstIndices(t *testing.T) {
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Sizes:    []int{4, 5},
+	}
+	av.AsArray = av
+	item := av.ItemizeConstIndices([]int{1, 2}, nil)
+	if item == nil || len(item.Indices) != 2 || item.Indices[0] != "1" || item.Indices[1] != "2" {
+		t.Fatal(item)
+	}
+	if item.OutputAccess() != "g_a[1][2]" {
+		t.Fatal(item.OutputAccess())
+	}
+}
+
+func TestHasEligibleVolatileVarIncrements(t *testing.T) {
+	BookkeeperDoFinalization()
+	defer BookkeeperDoFinalization()
+	vol := CreateVariableScalars("g_v", GetIntType(), true, false)
+	vol.Qfer = NewCVQualifiers([]bool{false}, []bool{true})
+	// ensure IsVolatile true
+	if !vol.IsVolatile() {
+		// set storage volatile
+		vol.Qfer.IsVolatiles = []bool{true}
+	}
+	cg := EmptyCGContext()
+	if !HasEligibleVolatileVar([]*Variable{vol}, GetIntType(), AccessRead, cg) {
+		t.Fatal("eligible")
+	}
+	if VolatileAvailCount() != 1 {
+		t.Fatal(VolatileAvailCount())
+	}
+}

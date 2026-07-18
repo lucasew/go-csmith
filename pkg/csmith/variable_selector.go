@@ -705,7 +705,8 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 }
 
 // HasEligibleVolatileVar mirrors VariableSelector::has_eligible_volatile_var.
-// VariableSelector.cpp:294–316 — flexible match + eligible + is_volatile.
+// VariableSelector.cpp:294–316 — flexible match + eligible + is_volatile;
+// increments Bookkeeper::volatile_avail on first hit.
 func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGContext) bool {
 	for _, v := range vars {
 		if v == nil || v.Type == nil {
@@ -719,6 +720,8 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 			deref = v.Type.IndirectLevel() - typ.IndirectLevel()
 		}
 		if IsEligibleVar(v, deref, access, cg) && v.IsVolatile() {
+			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
+			RecordVolatileAvail()
 			return true
 		}
 	}

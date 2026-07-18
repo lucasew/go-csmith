@@ -168,10 +168,74 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
 }
 
+// CountExprKeyVar mirrors count_expr_key_var (ArrayVariable.cpp:66–90).
+// Variable: 1; Constant: 0; user call: 2; unary: recurse; binary: sum.
+func CountExprKeyVar(e *Expression) int {
+	if e == nil {
+		return 0
+	}
+	switch e.Term {
+	case TermVariable:
+		return 1
+	case TermConstant:
+		return 0
+	case TermFunction:
+		if e.Invoke == nil {
+			return 0
+		}
+		// user call → 2 (ArrayVariable.cpp:76–77)
+		if e.Invoke.User != nil && !e.Invoke.IsStd {
+			return 2
+		}
+		n := len(e.Invoke.Args)
+		if n == 1 {
+			return CountExprKeyVar(e.Invoke.Args[0])
+		}
+		if n >= 2 {
+			return CountExprKeyVar(e.Invoke.Args[0]) + CountExprKeyVar(e.Invoke.Args[1])
+		}
+		return 0
+	default:
+		return 0
+	}
+}
+
+// FindExprKeyVar mirrors find_expr_key_var (ArrayVariable.cpp:98–119).
+// Sole key variable of an index expression, or nil if none / ambiguous.
+func FindExprKeyVar(e *Expression) *Variable {
+	if e == nil {
+		return nil
+	}
+	switch e.Term {
+	case TermVariable:
+		return e.Var
+	case TermFunction:
+		if e.Invoke == nil || (e.Invoke.User != nil && !e.Invoke.IsStd) {
+			return nil
+		}
+		n := len(e.Invoke.Args)
+		if n == 1 {
+			return FindExprKeyVar(e.Invoke.Args[0])
+		}
+		if n >= 2 {
+			v0 := FindExprKeyVar(e.Invoke.Args[0])
+			v1 := FindExprKeyVar(e.Invoke.Args[1])
+			if v0 == nil && v1 != nil {
+				return v1
+			}
+			if v0 != nil && v1 == nil {
+				return v0
+			}
+			// two vars or none → nil
+			return nil
+		}
+	}
+	return nil
+}
+
 // IsVariant mirrors ArrayVariable::is_variant.
-// ArrayVariable.cpp:394–413 — same collective parent and matching key-var indices.
-// Indices are stored as strings; two itemized members are variants when they share
-// Collective and have equal index arity (key-var identity approximated by string equal).
+// ArrayVariable.cpp:394–412 — same collective; each dim has exactly one key var
+// and those key vars match across the two itemized members.
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av == nil || other == nil || !other.IsArray {
 		return false
@@ -187,20 +251,90 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av.Collective != ov.Collective {
 		return false
 	}
-	if len(av.Indices) != len(ov.Indices) {
+	// prefer IndexExprs (Expression*); fall back to Indices arity
+	n := len(av.IndexExprs)
+	if n == 0 {
+		n = len(av.Indices)
+	}
+	on := len(ov.IndexExprs)
+	if on == 0 {
+		on = len(ov.Indices)
+	}
+	if n == 0 || n != on {
 		return false
 	}
-	// upstream: single key-var per index expression and same key vars
-	// string indices: treat equal strings as same key expression
-	for i := range av.Indices {
-		if av.Indices[i] != ov.Indices[i] {
-			// different index expressions → not the same variant family key
-			// actually is_variant requires same key vars (e.g. both use i)
-			// equal string is sufficient approximation for constant indices
+	for i := 0; i < n; i++ {
+		var e, oe *Expression
+		if i < len(av.IndexExprs) {
+			e = av.IndexExprs[i]
+		}
+		if i < len(ov.IndexExprs) {
+			oe = ov.IndexExprs[i]
+		}
+		if e != nil && oe != nil {
+			// ArrayVariable.cpp:403–405 — Expression path
+			if CountExprKeyVar(e) != 1 || CountExprKeyVar(oe) != 1 {
+				return false
+			}
+			if FindExprKeyVar(e) != FindExprKeyVar(oe) {
+				return false
+			}
+			continue
+		}
+		// string-only Indices: equal strings share key identity (no Variable* handle)
+		si, sj := "", ""
+		if i < len(av.Indices) {
+			si = av.Indices[i]
+		}
+		if i < len(ov.Indices) {
+			sj = ov.Indices[i]
+		}
+		if si != sj {
 			return false
 		}
 	}
 	return true
+}
+
+// ItemizeConstIndices mirrors ArrayVariable::itemize(const vector<int>&).
+// ArrayVariable.cpp:280–295 — fixed const indices; create_field_vars for aggregates.
+func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
+	if av == nil || av.Collective != nil {
+		return nil
+	}
+	if len(constIndices) != len(av.Sizes) {
+		return nil
+	}
+	item := &ArrayVariable{
+		Variable: Variable{
+			Name:       av.Name,
+			Type:       av.Type,
+			Qfer:       av.Qfer,
+			IsArray:    true,
+			Init:       av.Init,
+			ArraySizes: av.Sizes,
+			ArrayInits: av.ArrayInits,
+		},
+		Sizes:      append([]int(nil), av.Sizes...),
+		InitValues: av.InitValues,
+		Block:      av.Block,
+		Collective: av,
+	}
+	item.AsArray = item
+	for _, idx := range constIndices {
+		s := fmt.Sprintf("%d", idx)
+		item.Indices = append(item.Indices, s)
+		item.IndexExprs = append(item.IndexExprs, &Expression{
+			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
+		})
+	}
+	if item.Type != nil && item.Type.IsAggregate() {
+		item.CreateFieldVars()
+	}
+	if vs != nil {
+		vs.AllVars = append(vs.AllVars, &item.Variable)
+	}
+	return item
 }
 
 // SetIndex mirrors ArrayVariable::set_index (string form for emit).

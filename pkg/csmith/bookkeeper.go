@@ -309,6 +309,13 @@ func RecordBackwardJump() { backwardJumpCnt++ }
 // VariableSelector.cpp:416–419.
 func RecordPointerAvailForDeref() { pointerAvailForDeref++ }
 
+// RecordVolatileAvail mirrors Bookkeeper::volatile_avail++.
+// VariableSelector.cpp:311 — has_eligible_volatile_var hit.
+func RecordVolatileAvail() { volatileAvail++ }
+
+// VolatileAvailCount returns volatile_avail (tests / statistics).
+func VolatileAvailCount() int { return volatileAvail }
+
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
 // plus sum of arg complexities; assign/comma nest.

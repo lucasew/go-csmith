@@ -411,6 +411,10 @@ func (v *Variable) IsGlobal() bool {
 	if v.FieldVarOf != nil {
 		return v.FieldVarOf.IsGlobal()
 	}
+	// ArrayVariable.cpp:414–415 — parent == 0 (no owning block)
+	if v.AsArray != nil {
+		return v.AsArray.Block == nil
+	}
 	return len(v.Name) >= 2 && v.Name[0] == 'g' && v.Name[1] == '_'
 }
 
@@ -599,8 +603,9 @@ func (v *Variable) IsVisible(blk *Block) bool {
 	return v.IsVisibleLocal(blk)
 }
 
-// IsVisibleLocal mirrors Variable::is_visible_local.
+// IsVisibleLocal mirrors Variable::is_visible_local / ArrayVariable override.
 // Variable.cpp:482–503 — params + block-chain locals; fields recurse parent.
+// ArrayVariable.cpp:419–429 — walk blk parents until array's parent block.
 func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	if v == nil {
 		return false
@@ -610,6 +615,15 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	}
 	if v.IsFieldVar() {
 		return v.FieldVarOf.IsVisibleLocal(blk)
+	}
+	// ArrayVariable.cpp:419–429 — parent block chain for array (collective or itemized)
+	if v.AsArray != nil && v.AsArray.Block != nil {
+		for b := blk; b != nil; b = b.Parent {
+			if b == v.AsArray.Block {
+				return true
+			}
+		}
+		// still check local_vars membership below for itemized push_back
 	}
 	// params of blk's function
 	f := blk.Func
