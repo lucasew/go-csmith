@@ -27,7 +27,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// size 8 so remain > 1 when bound is 0 → offset possible
-	av := CreateArrayVariable(NewRng(1), opts, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	// force size
 	if av == nil {
 		t.Fatal("nil av")
@@ -91,7 +91,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	av := CreateArrayVariable(NewRng(2), opts, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
 	// mark partially written → filtered → CreateRandomArray may still run

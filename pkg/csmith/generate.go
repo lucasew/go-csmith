@@ -33,11 +33,10 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
 	}
 	defer ClearPartialExpander()
-	// Attribute generators (Variable/Function/Label/Type Initialize*Attributes)
-	probs := NewProbabilities(opts)
-	InitAttrGenerators(opts, probs)
-	defer ClearAttrGenerators()
+	// Session Probabilities + attr gens: NewProgramGenerator (C++ singleton); no invent
+	// a second NewProbabilities(opts) here for InitAttrGenerators alone.
 	g := NewProgramGenerator(opts)
+	defer ClearAttrGenerators()
 	out := g.GoGenerator()
 	// sticky ERROR_RETURN / failed make_first → empty out (no soft invent success)
 	if HasError() {

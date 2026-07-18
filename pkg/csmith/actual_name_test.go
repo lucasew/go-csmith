@@ -45,6 +45,18 @@ func TestOutputAddrOf(t *testing.T) {
 	}
 }
 
+func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {
+	// C++ Probabilities singleton — generator and VS must share one table
+	opts := Defaults()
+	g := NewProgramGenerator(opts)
+	if g.Probs == nil || g.VS == nil || g.VS.Probs == nil {
+		t.Fatal("missing probs")
+	}
+	if g.Probs != g.VS.Probs {
+		t.Fatal("VS must share session Probs, not invent a second table")
+	}
+}
+
 func TestOutputGlobalsVolatileComment(t *testing.T) {
 	opts := Defaults()
 	g := NewProgramGenerator(opts)

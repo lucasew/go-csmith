@@ -49,8 +49,7 @@ func TestIsSeenName(t *testing.T) {
 func TestItemizeArrayWithIV(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	av := CreateArrayVariable(NewRng(1), opts, nil, "g_a", GetIntType(), MakeInt(0),
-		NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}

@@ -354,8 +354,7 @@ func TestGetDimension(t *testing.T) {
 		t.Fatal("scalar")
 	}
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(1), opts, nil, "g_a", GetIntType(), MakeInt(0),
-		NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
@@ -374,8 +373,7 @@ func TestGetDimension(t *testing.T) {
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(2), opts, nil, "g_m", GetIntType(), MakeInt(0),
-		NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_m", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	av.Sizes = []int{2, 3}
 	// via AsArray on Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}

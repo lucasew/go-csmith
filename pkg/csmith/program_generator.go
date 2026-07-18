@@ -32,8 +32,10 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	SetProcessOptions(opts)
 	seed := opts.Seed
 	r := NewRng(seed)
+	// C++ Probabilities is a process singleton — one session table for generator + VS
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	vs.Probs = probs // no invent second NewProbabilities(opts) on VS
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,

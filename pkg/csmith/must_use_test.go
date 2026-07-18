@@ -4,7 +4,7 @@ import "testing"
 
 func TestFindMustUseArrays(t *testing.T) {
 	opts := Defaults()
-	av := CreateArrayVariable(NewRng(2), opts, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	sc := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rw := &RWDirective{
 		MustReadVars:  []*Variable{&av.Variable, sc},
@@ -36,7 +36,7 @@ func TestSelectMustUseVar(t *testing.T) {
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	av := CreateArrayVariable(NewRng(3), opts, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

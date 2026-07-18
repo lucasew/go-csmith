@@ -9,7 +9,7 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	opts := Defaults()
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil || av.Dimension() < 1 {
 		t.Fatal(av)
 	}
@@ -30,16 +30,16 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	// ArrayVariable.cpp:127–133 — assert type/void; ERROR_GUARD after rnd_upto(99)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRng(1), opts, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
-	if CreateArrayVariable(NewRng(1), opts, nil, "g_n", nil, MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_n", nil, MakeInt(0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
 	ClearError()
 	SetError(ErrGeneric)
 	defer ClearError()
-	if CreateArrayVariable(NewRng(1), opts, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
 }
@@ -50,7 +50,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRng(1), opts, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -69,12 +69,31 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	if st == nil || !st.IsStruct() {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRng(3), opts, nil, "g_s", st, MakeRandom(st, opts, NewProbabilities(opts), NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(3), opts, probs, nil, "g_s", st, MakeRandom(st, opts, probs, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
 	if len(av.FieldVars) == 0 {
 		t.Fatal("aggregate array must expand field vars")
+	}
+}
+
+func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
+	// Constant::make_random needs live Probabilities for aggregates — no invent tables
+	opts := Defaults()
+	opts.MaxArrayDim = 1
+	opts.MaxArrayLenPerDim = 4
+	opts.MaxArrayLength = 4
+	st := &Type{isStruct: true, StructName: "SAlt", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	// large init_num path still must not invent aggregate alt values without probs
+	av := CreateArrayVariable(NewRng(1), opts, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("nil av")
+	}
+	if len(av.InitValues) != 0 {
+		t.Fatalf("nil probs must not invent aggregate alt inits, got %v", av.InitValues)
 	}
 }
 

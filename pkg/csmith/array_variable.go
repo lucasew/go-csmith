@@ -27,9 +27,11 @@ type ArrayVariable struct {
 
 // CreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
 // ArrayVariable.cpp:123–180 — dimension distribution and size caps.
+// probs is session Probabilities (C++ singleton); no invent NewProbabilities(opts).
 func CreateArrayVariable(
 	r *Rng,
 	opts Options,
+	probs *Probabilities,
 	blk *Block,
 	name string,
 	elem *Type,
@@ -114,13 +116,15 @@ func CreateArrayVariable(
 	half := uint32(total / 2)
 	initNum := int(r.RndUpto(half))
 	for i := 0; i < initNum; i++ {
-		// session probs not on CreateArrayVariable; simple/pointer only without invent tables
-		// aggregate element constants need probs via selector path (vs.Probs)
-		c := MakeRandom(elem, opts, nil, r)
+		// ArrayVariable.cpp:177–185 — Constant::make_random(type) when non-pointer
+		// or strict_const_arrays; else make_init_value (needs cg — not on this path yet).
+		// session probs for aggregates; nil → fail closed empty (no invent tables)
+		c := MakeRandom(elem, opts, probs, r)
 		// sticky ERROR_GUARD from Constant::make_random
 		if HasError() {
 			return nil
 		}
+		// ArrayVariable.cpp:185 — add_init_value(e); skip null (no invent "0" shell)
 		if c != nil {
 			av.InitValues = append(av.InitValues, c.Value)
 			av.ArrayInits = append(av.ArrayInits, c.Value)

@@ -46,7 +46,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	_ = GetNewCtrlVars(opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
-	av := CreateArrayVariable(NewRng(2), opts, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}

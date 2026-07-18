@@ -25,13 +25,13 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 func TestArrayNoLoopInitializer(t *testing.T) {
 	opts := Defaults()
 	// global → true
-	g := CreateArrayVariable(NewRng(2), opts, nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_1", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil || !g.NoLoopInitializer() {
 		t.Fatal("global must no-loop")
 	}
 	// local with no multi inits: force empty InitValues
 	blk := &Block{}
-	loc := CreateArrayVariable(NewRng(3), opts, blk, "l_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
+	loc := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), blk, "l_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))
 	if loc == nil {
 		t.Fatal("nil local")
 	}
