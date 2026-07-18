@@ -220,6 +220,13 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 			out = append(out, false)
 			continue
 		}
+		// CVQualifiers.cpp:390 — DEPTH_GUARD_BY_DEPTH_RETURN(1, consts)
+		if DepthGuardByDepth(opts, 1) == BadDepth {
+			for j := i; j < depth; j++ {
+				out = append(out, q.IsConsts[j])
+			}
+			return out
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PStricterConstProb)
@@ -251,6 +258,14 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 			out = append(out, false)
 			continue
 		}
+		// CVQualifiers.cpp:412 — DEPTH_GUARD_BY_DEPTH_RETURN(1, volatiles)
+		if DepthGuardByDepth(opts, 1) == BadDepth {
+			for j := i; j < depth; j++ {
+				out = append(out, q.IsVolatiles[j])
+			}
+			MakeScalarVolatiles(opts, out)
+			return out
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PRegularVolatileProb)
@@ -278,6 +293,13 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 			out = append(out, q.IsConsts[i])
 			continue
 		}
+		// CVQualifiers.cpp:432 — DEPTH_GUARD_BY_DEPTH_RETURN(1, consts)
+		if DepthGuardByDepth(opts, 1) == BadDepth {
+			for j := i; j < depth; j++ {
+				out = append(out, q.IsConsts[j])
+			}
+			return out
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PLooserConstProb)
@@ -303,6 +325,14 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 		if !q.IsVolatiles[i] || (i == 0 && depth > 1) || (depth-i > 2) {
 			out = append(out, q.IsVolatiles[i])
 			continue
+		}
+		// CVQualifiers.cpp:450 — DEPTH_GUARD_BY_DEPTH_RETURN(1, volatiles)
+		if DepthGuardByDepth(opts, 1) == BadDepth {
+			for j := i; j < depth; j++ {
+				out = append(out, q.IsVolatiles[j])
+			}
+			MakeScalarVolatiles(opts, out)
+			return out
 		}
 		p := 50
 		if probs != nil {
@@ -396,6 +426,14 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	out.IsVolatiles = append([]bool(nil), q.IsVolatiles...)
 	if opts.MatchExactQualifiers {
 		out.AddQualifiers(false, false)
+		return out
+	}
+	// CVQualifiers.cpp:474–476 — DEPTH_GUARD_BY_DEPTH_RETURN(1 or 2, qfer)
+	need := 1
+	if !noVolatile {
+		need = 2
+	}
+	if DepthGuardByDepth(opts, need) == BadDepth {
 		return out
 	}
 	isConst := false

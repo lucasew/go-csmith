@@ -26,6 +26,15 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	if len(got3) != 1 || got3[0] {
 		t.Fatal("non-const stays false", got3)
 	}
+	// CVQualifiers.cpp:390+ DEPTH_GUARD on flipcoin paths — random mode always GOOD
+	q4 := NewCVQualifiers([]bool{false, false}, []bool{false, false})
+	if len(q4.RandomStricterConsts(NewRng(3), opts, NewProbabilities(opts))) != 2 {
+		t.Fatal("stricter depth guard path")
+	}
+	added := q4.RandomAddQualifiers(NewRng(3), opts, NewProbabilities(opts), false)
+	if len(added.IsConsts) != 3 {
+		t.Fatalf("add level %d", len(added.IsConsts))
+	}
 }
 
 func TestRandomQualifiersFromNoVolatile(t *testing.T) {
