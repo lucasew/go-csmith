@@ -24,37 +24,18 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 // Type.cpp:683–697 + ChooseRandomTypeFilter depth gate (Type.cpp:240–242).
 // Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
+	// Type.cpp:687–691 — ChooseRandomTypeFilter(for_field_var=true) over AllTypes
+	// (no soft invent 15% nested-struct path then simple-only)
 	var ft *Type
-	// Prefer simple types; occasionally nested prior struct under depth limit
-	if env != nil && len(env.StructTypes) > 0 && r.RndFlipcoin(15) {
-		cands := make([]*Type, 0, len(env.StructTypes))
-		maxDepth := opts.MaxNestedStructLevel
-		if maxDepth < 1 {
-			maxDepth = 1
-		}
-		for _, s := range env.StructTypes {
-			if s == nil {
-				continue
-			}
-			// Type.cpp:241–242 — reject when get_struct_depth() >= max_nested
-			if s.StructDepth() >= maxDepth {
-				continue
-			}
-			// C++: struct without assign ops cannot be field of assign-ops parent (C++)
-			if opts.LangCPP && !s.HasAssignOps {
-				continue
-			}
-			cands = append(cands, s)
-		}
-		if len(cands) > 0 {
-			ft = cands[r.RndUpto(uint32(len(cands)))]
-		}
+	if env != nil {
+		ft = env.ChooseRandom(r, opts, probs, true)
 	}
 	if ft == nil {
+		// ERROR_RETURN when AllTypes empty; library tests may lack GenerateAllTypes
 		st := ChooseRandomNonvoidSimple(r, probs)
 		ft = GetSimpleType(st)
 	}
-	// FieldConstProb / FieldVolatileProb random_qualifiers
+	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)

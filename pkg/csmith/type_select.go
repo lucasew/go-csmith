@@ -132,14 +132,15 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 // Type.cpp:1206–1216 / ChooseRandomTypeFilter::filter (Type.cpp:223–244).
 // forFieldVar=false for return types.
 func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
-	if env == nil || len(env.AllTypes) == 0 {
-		st := ChooseRandomNonvoidSimple(r, probs)
-		return GetSimpleType(st)
-	}
 	if r == nil {
-		return env.AllTypes[0]
+		// Type.cpp always has RNG; no soft invent AllTypes[0]
+		return nil
 	}
-	// rnd_upto(AllTypes.size(), filter) — reject void-like simple weights 0, !return_structs
+	if env == nil || len(env.AllTypes) == 0 {
+		// before GenerateSimpleTypes; ERROR_GUARD would fail — simple fallback for empty env only
+		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+	}
+	// Type.cpp:1206–1216 — rnd_upto(AllTypes.size(), ChooseRandomTypeFilter)
 	filt := filterFunc(func(v uint32) bool {
 		i := int(v)
 		if i < 0 || i >= len(env.AllTypes) {
@@ -150,9 +151,10 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 			return true
 		}
 		if t.IsSimple() {
-			// SIMPLE_TYPES_PROB_FILTER
+			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
 			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
 		}
+		// Type.cpp:229–231 — !return_structs rejects structs
 		if t.IsStruct() && !opts.ReturnStructs {
 			return true
 		}

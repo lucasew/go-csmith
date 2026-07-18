@@ -56,8 +56,9 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	deep := &Type{isStruct: true, StructName: "Sdeep", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	// depth 1
+	// depth 1 — AllTypes is ChooseRandomTypeFilter pool (Type.cpp:687)
 	env.StructTypes = []*Type{deep}
+	env.AllTypes = []*Type{GetIntType(), deep}
 	// force nested pick: many trials with seed that might pick nest — with max 1, all rejected → simple
 	for seed := uint64(1); seed < 40; seed++ {
 		f := MakeOneStructField(NewRng(seed), opts, probs, env, 0)

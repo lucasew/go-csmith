@@ -89,9 +89,10 @@ func outputFactVar(v *Variable) string {
 		return ""
 	}
 	s := v.GetActualName(false)
-	// array of pointers: assert first element only
+	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
+	// no soft invent dim=1 when sizes empty
 	if v.IsArray || v.AsArray != nil {
-		dim := 1
+		dim := 0
 		if v.AsArray != nil {
 			dim = len(v.AsArray.Sizes)
 		} else if len(v.ArraySizes) > 0 {
