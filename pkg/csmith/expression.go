@@ -29,6 +29,9 @@ type Expression struct {
 	Invoke *Invocation
 	// Assign is set for TermAssignment (embedded StatementAssign).
 	Assign *Stmt
+	// CommaLHS / CommaRHS for TermCommaExpr.
+	CommaLHS *Expression
+	CommaRHS *Expression
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
@@ -122,8 +125,9 @@ func MakeRandomExpression(
 	}
 
 	if typ == nil {
-		// choose_random_nonvoid deferred — require type for now
-		typ = GetSimpleType(EInt)
+		// Expression.cpp:147–152 choose_random_nonvoid when type==nullptr
+		st := ChooseRandomNonvoidSimple(r, NewProbabilities(opts))
+		typ = GetSimpleType(st)
 	}
 	if tt == MaxTermTypes {
 		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, exprDepth)
@@ -153,8 +157,10 @@ func MakeRandomExpression(
 	case TermAssignment:
 		// ExpressionAssign::make_random
 		return MakeExpressionAssign(r, opts, NewProbabilities(opts), vs, tables, cg, typ, qfer)
+	case TermCommaExpr:
+		// ExpressionComma::make_random
+		return MakeExpressionComma(r, opts, NewProbabilities(opts), vs, tables, cg, typ, qfer)
 	default:
-		// Comma deferred
 		return nil
 	}
 }
@@ -227,7 +233,7 @@ func (e *Expression) Output() string {
 		}
 	case TermAssignment:
 		if e.Assign != nil {
-			// C comma-less assignment-as-expression: (lhs = rhs) or (lhs++)
+			// C assignment-as-expression: (lhs = rhs) or (lhs++)
 			lhs := ""
 			if e.Assign.ArrayAccess != "" {
 				lhs = e.Assign.ArrayAccess
@@ -242,6 +248,15 @@ func (e *Expression) Output() string {
 				return "(" + e.Assign.AssignOp.AssignOpC(lhs, rhs) + ")"
 			}
 		}
+	case TermCommaExpr:
+		l, r := "0", "0"
+		if e.CommaLHS != nil {
+			l = e.CommaLHS.Output()
+		}
+		if e.CommaRHS != nil {
+			r = e.CommaRHS.Output()
+		}
+		return "(" + l + ", " + r + ")"
 	}
 	return "/*expr*/"
 }
