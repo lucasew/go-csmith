@@ -2,7 +2,14 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
+import (
+	"strings"
+	"sync/atomic"
+)
+
+// createVarSeed advances CreateVariableScalars / CreateFieldVars init RNG
+// (C++ uses process-wide DefaultRndNumGenerator; NewRng(1) always was soft invent).
+var createVarSeed uint64
 
 // ctrl_vars pool mirrors Variable::ctrl_vars_vectors / ctrl_vars_count.
 // Variable.cpp:73–74, 747–776.
@@ -402,6 +409,12 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 	return v
 }
 
+// nextCreateVarRng returns a process-wide advancing Rng for CreateVariable init.
+func nextCreateVarRng() *Rng {
+	s := atomic.AddUint64(&createVarSeed, 1)
+	return NewRng(s)
+}
+
 // CreateVariableScalars mirrors
 // Variable::CreateVariable(name, type, isConst, isVolatile, …) for a scalar.
 // Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
@@ -414,7 +427,7 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 	// Variable.cpp:395 — non-union top: Constant::make_random(type); union top: 0
 	var init *Constant
 	if typ == nil || !typ.IsUnion() {
-		init = MakeRandom(typ, Defaults(), NewRng(1))
+		init = MakeRandom(typ, Defaults(), nextCreateVarRng())
 	}
 	v := &Variable{
 		Name: name,
@@ -487,17 +500,20 @@ func (v *Variable) IsValidVolatile() bool {
 		}
 		return uv.IsValidVolatile()
 	}
-	// non-const, or non-zero init, or non-pointer → valid
+	// Variable.cpp:1068 — assert(init); non-const / non-zero / non-pointer → valid
 	if !v.IsConst() {
 		return true
 	}
 	if v.Type == nil || !v.Type.IsPointerLike() {
 		return true
 	}
-	// const pointer: invalid only when init equals 0 (null)
+	// const pointer: invalid when init is null (equals 0)
+	// C++ assert(init) — missing init is broken IR, treat as invalid (no soft invent true)
+	if v.InitExpr != nil {
+		return v.InitExpr.NotEquals(0)
+	}
 	if v.Init == nil {
-		// no init expression — treat as valid (cannot prove null)
-		return true
+		return false
 	}
 	return v.Init.NotEqualsZero()
 }
@@ -938,7 +954,8 @@ func (v *Variable) CreateFieldVars() {
 		}
 		var init *Constant
 		if top.Type == nil || !top.Type.IsUnion() {
-			init = MakeRandom(f.Type, Defaults(), NewRng(1))
+			// Variable.cpp:395 — Constant::make_random via process RNG (not fixed seed)
+			init = MakeRandom(f.Type, Defaults(), nextCreateVarRng())
 		}
 		fv := &Variable{
 			Name:       fname,
