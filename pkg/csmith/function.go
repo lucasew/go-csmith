@@ -51,6 +51,13 @@ type Function struct {
 	ReferencedPtrs []*Variable
 	// UnionFieldRead mirrors Function::union_field_read.
 	UnionFieldRead bool
+	// FactChanged mirrors Function::fact_changed — points-to facts mutated.
+	// Function.h / FactMgr assign-return paths.
+	FactChanged bool
+	// VisitedCnt mirrors Function::visited_cnt (revisit count).
+	VisitedCnt int
+	// AccumEffContext mirrors Function::accum_eff_context across revisits.
+	AccumEffContext Effect
 }
 
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.

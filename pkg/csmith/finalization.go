@@ -13,6 +13,8 @@ func DoFinalization() {
 	ClearPointToAggregates()
 	// Attribute generators
 	ClearAttrGenerators()
+	// FunctionInvocationUser return-fact registry
+	InvocationReturnFactsDoFinalization()
 	// Statement sid
 	nextStmID = 0
 	// Error state

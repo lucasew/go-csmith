@@ -503,6 +503,10 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 			changed = true
 		}
 	}
+	// FactMgr.cpp:400 — assign that changes facts marks function fact_changed
+	if changed && fm.Func != nil {
+		fm.Func.FactChanged = true
+	}
 	return changed
 }
 
@@ -592,6 +596,7 @@ func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
 		return false
 	}
 	// abstract_fact_for_return = abstract_fact_for_assign(facts, Lhs(rv), expr)
+	// FactMgr.cpp:415 — fact_changed when return updates facts
 	return fm.UpdateFactForAssign(rv, 0, expr)
 }
 

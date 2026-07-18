@@ -398,8 +398,9 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 	}
 }
 
-// VisitFactsInvocation mirrors FunctionInvocation::visit_facts (ordered params).
-// FunctionInvocation.cpp:502–555 — param visit under running effect; then user revisit.
+// VisitFactsInvocation mirrors FunctionInvocation::visit_facts.
+// FunctionInvocation.cpp:502–555 — ordered params (unordered path available but
+// upstream sets unordered=false); then user revisit when NeedsRevisit.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if fi == nil || cg == nil {
 		return true
@@ -407,29 +408,62 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if fi.Failed {
 		return false
 	}
-	running := cg.EffectContext()
+	// upstream: bool unordered = false; // has_uncertain_call();
+	unordered := false
 	isFuncCall := fi.User != nil
-	for i, arg := range fi.Args {
-		paramAccum := EmptyEffect()
-		paramCG := *cg
-		paramCG.effectContext = running
-		paramCG.EffectAccum = &paramAccum
-		if arg != nil && !VisitFactsExpression(arg, &paramCG, opts) {
-			_ = i
+	if unordered {
+		var facts []*FactPointTo
+		if cg.FM != nil {
+			facts = CloneFactSlice(cg.FM.GlobalFacts)
+		}
+		if !fi.VisitUnorderedParams(&facts, cg, opts) {
 			return false
 		}
-		running = running.AddEffect(paramAccum)
-		// merge_param_context; include_lhs for std ops only
-		cg.MergeParamContext(paramCG, !isFuncCall)
+		if cg.FM != nil {
+			cg.FM.GlobalFacts = facts
+		}
+	} else {
+		running := cg.EffectContext()
+		for i, arg := range fi.Args {
+			paramAccum := EmptyEffect()
+			paramCG := *cg
+			paramCG.effectContext = running
+			paramCG.EffectAccum = &paramAccum
+			if arg != nil && !VisitFactsExpression(arg, &paramCG, opts) {
+				_ = i
+				return false
+			}
+			running = running.AddEffect(paramAccum)
+			// merge_param_context; include_lhs for std ops only
+			cg.MergeParamContext(paramCG, !isFuncCall)
+		}
 	}
-	// user function call: fold visible external effect of known callee
-	if isFuncCall && fi.User.IsEffectKnown() {
-		// FunctionInvocation.cpp:544–549 — add_visible_effect of revisit accum;
-		// we use stored FEffect (already computed summary).
-		if cg.InConflict(fi.User.FEffect) {
-			return false
+	if isFuncCall {
+		// FunctionInvocation.cpp:530–551 — revisit user callee when DFA needed
+		if fi.User.NeedsRevisit() && fi.User.Body != nil && cg.FM != nil {
+			facts := CloneFactSlice(cg.FM.GlobalFacts)
+			if !RevisitUserInvocation(fi, &facts, cg, opts) {
+				return false
+			}
+			cg.FM.GlobalFacts = facts
+			// fold feffect from accum during revisit
+			if cg.InConflict(fi.User.FEffect) {
+				return false
+			}
+			cg.AddVisibleEffect(fi.User.FEffect)
+		} else if fi.User.IsEffectKnown() {
+			// static effect path (no fact/pointer change)
+			if cg.InConflict(fi.User.FEffect) {
+				return false
+			}
+			cg.AddVisibleEffect(fi.User.FEffect)
+			// also add_external_effect of feffect
+			cg.AddExternalEffect(fi.User.FEffect)
 		}
-		cg.AddVisibleEffect(fi.User.FEffect)
+		// propagate fact_changed to caller (FunctionInvocation.cpp:96)
+		if cg.CurrentFunc != nil && fi.User.FactChanged {
+			cg.CurrentFunc.FactChanged = true
+		}
 	}
 	return true
 }
