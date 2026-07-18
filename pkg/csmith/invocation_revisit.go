@@ -11,10 +11,15 @@ var (
 )
 
 // AddReturnFactForInvocation mirrors add_return_fact_for_invocation.
-// FunctionInvocationUser.cpp:94–106.
+// FunctionInvocationUser.cpp:91–102 — assert(invocations.size() == return_facts.size()).
 func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 	if fi == nil || f == nil {
 		return
+	}
+	// keep parallel slices; desync is broken IR — reset rather than invent
+	if len(returnFactInvocations) != len(returnFactPoints) {
+		returnFactInvocations = nil
+		returnFactPoints = nil
 	}
 	for i, inv := range returnFactInvocations {
 		if inv == fi && returnFactPoints[i] != nil && returnFactPoints[i].Var == f.Var {
@@ -27,9 +32,12 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 }
 
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
-// FunctionInvocationUser.cpp:78–91.
+// FunctionInvocationUser.cpp:76–91 — assert parallel sizes.
 func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 	if fi == nil || v == nil {
+		return nil
+	}
+	if len(returnFactInvocations) != len(returnFactPoints) {
 		return nil
 	}
 	for i, inv := range returnFactInvocations {

@@ -15,6 +15,10 @@ func TestStr2Int(t *testing.T) {
 	if Str2Int("0x10") != 16 {
 		t.Fatal(Str2Int("0x10"))
 	}
+	// StringUtils.cpp:153 — assert close paren; no invent parse
+	if Str2Int("(7") != -1 {
+		t.Fatal("unbalanced paren must fail closed")
+	}
 }
 
 func TestChopEmptyEndWith(t *testing.T) {
@@ -40,6 +44,11 @@ func TestBreakupAssigns(t *testing.T) {
 	vs, vals := BreakupAssigns("a = 1; b=2;")
 	if len(vs) != 2 || vs[0] != "a" || vals[0] != "1" || vs[1] != "b" || vals[1] != "2" {
 		t.Fatal(vs, vals)
+	}
+	// StringUtils.cpp:222 assert(pair.size()==2); no soft invent skip
+	vs, vals = BreakupAssigns("a=1; broken; c=3")
+	if vs != nil || vals != nil {
+		t.Fatal("malformed assign must fail whole parse")
 	}
 }
 

@@ -751,3 +751,20 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 	}
 	return fmt.Sprintf("((%s) %% %d)", body, size)
 }
+
+// RndMutate mirrors ArrayVariable::rnd_mutate.
+// ArrayVariable.cpp:336–337 — assert(0 && "invalid call to rnd_mutate"); dead API.
+// Fail closed: always nil (no invent variant/offset mutation).
+func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
+	_ = r
+	return nil
+}
+
+// CreateMutatedArrayVar mirrors VariableSelector::create_mutated_array_var.
+// VariableSelector.cpp:1552–1554 — assert(0 && "invalid call…"); dead API.
+// Fail closed: always nil (no invent new itemized member from index rewrite).
+func CreateMutatedArrayVar(av *ArrayVariable, newIndices []*Expression) *ArrayVariable {
+	_ = av
+	_ = newIndices
+	return nil
+}

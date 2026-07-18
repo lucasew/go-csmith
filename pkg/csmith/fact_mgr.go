@@ -236,6 +236,12 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 	if factsOut == nil {
 		return
 	}
+	// FactMgr.cpp:427–428 — dest->func; assert(func)
+	// no soft invent dest facts without function (OOS walk needs f)
+	if f == nil {
+		*factsOut = nil
+		return
+	}
 	var oosVars []*Variable
 	seen := map[*Variable]bool{}
 	addOOS := func(v *Variable) {
@@ -253,11 +259,11 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		if isReturnVar(fact.Var) {
 			continue
 		}
-		if f != nil && f.IsVarOOS(fact.Var, destParent) {
+		if f.IsVarOOS(fact.Var, destParent) {
 			addOOS(fact.Var)
 		}
 		for _, p := range fact.PointTo {
-			if p != nil && !IsSpecialPtr(p) && f != nil && f.IsVarOOS(p, destParent) {
+			if p != nil && !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
 				addOOS(p)
 			}
 		}

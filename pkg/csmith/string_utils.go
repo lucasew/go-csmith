@@ -124,10 +124,13 @@ func Str2Int(s string) int {
 	if s == "" {
 		return -1
 	}
-	// strip surrounding parentheses
-	for len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
-		s = s[1 : len(s)-1]
-		s = strings.TrimSpace(s)
+	// StringUtils.cpp:152–155 — if starts '(' assert ends ')'; strip one layer at a time
+	for len(s) > 0 && s[0] == '(' {
+		// assert(s[s.length() - 1] == ')'); no soft invent parse without close
+		if len(s) < 2 || s[len(s)-1] != ')' {
+			return -1
+		}
+		s = strings.TrimSpace(s[1 : len(s)-1])
 	}
 	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
 		n, err := strconv.ParseInt(s[2:], 16, 64)
@@ -204,7 +207,8 @@ func SplitIntString(str, seps string) []int {
 }
 
 // BreakupAssigns mirrors StringUtils::breakup_assigns.
-// StringUtils.cpp:214+ — "a=1; b=2" → vars/values pairs (split on ';' then '=').
+// StringUtils.cpp:214–227 — "a=1; b=2" → vars/values pairs (split on ';' then '=').
+// StringUtils.cpp:222 — assert(pair.size() == 2); malformed stmt fails whole parse.
 func BreakupAssigns(assigns string) (vars, values []string) {
 	stmts := SplitString(assigns, ';')
 	for _, st := range stmts {
@@ -212,13 +216,14 @@ func BreakupAssigns(assigns string) (vars, values []string) {
 		if st == "" {
 			continue
 		}
-		// split on first '='
-		eq := strings.IndexByte(st, '=')
-		if eq < 0 {
-			continue
+		// C++ split_string on '='; assert exactly two parts
+		pair := SplitString(st, '=')
+		if len(pair) != 2 {
+			// fail closed — no soft invent skip of broken assignment
+			return nil, nil
 		}
-		vars = append(vars, Chop(st[:eq]))
-		values = append(values, Chop(st[eq+1:]))
+		vars = append(vars, Chop(pair[0]))
+		values = append(values, Chop(pair[1]))
 	}
 	return vars, values
 }
