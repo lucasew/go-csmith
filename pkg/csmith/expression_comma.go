@@ -20,37 +20,27 @@ func MakeExpressionComma(
 	if r == nil {
 		return nil
 	}
-	// LHS: ExpressionComma.cpp:58 — make_random(nullptr type) → choose_random_nonvoid
-	lhsType := GetIntType()
-	if cg.Types != nil {
-		lhsType = cg.Types.ChooseRandomNonvoid(r, opts, probs)
-	} else if probs != nil {
-		st := ChooseRandomNonvoidSimple(r, probs)
-		lhsType = GetSimpleType(st)
-	}
-	if lhsType == nil {
-		lhsType = GetIntType()
-	}
 	d := cg.ExprDepth + 1
-	// noFunc false, noConst true for lhs (ExpressionComma.cpp:58–59)
-	lhs := MakeRandomExpression(r, opts, tables, vs, cg, lhsType, nil, false, true, MaxTermTypes, d)
+	// ExpressionComma.cpp:58–59 — lhs type nullptr → Expression::make_random chooses nonvoid
+	// no_func=false, no_const=true
+	lhs := MakeRandomExpression(r, opts, tables, vs, cg, nil, nil, false, true, MaxTermTypes, d)
 	if lhs == nil {
-		lhs = MakeRandomExpression(r, opts, tables, vs, cg, lhsType, nil, true, true, TermVariable, d)
+		lhs = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, d)
 	}
-	if typ == nil {
-		typ = GetIntType()
-	}
+	// ExpressionComma.cpp:60–61 — rhs with requested type/qfer; no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, d)
 	if rhs == nil {
 		rhs = MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, true, false, TermConstant, d)
 	}
-	// ExpressionComma.cpp:48–53 cast_if_needed — null pointer constant gets cast_type
-	// (upstream gates on lang_cpp; still useful for typed null in C)
-	castIfNeeded(rhs)
+	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
+	if opts.LangCPP {
+		castIfNeeded(rhs)
+	}
 	return &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: lhs,
 		CommaRHS: rhs,
+		ExprType: typ,
 	}
 }
 

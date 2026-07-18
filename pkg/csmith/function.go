@@ -285,8 +285,9 @@ func MakeFirst(
 	return f
 }
 
-// GenerateBody mirrors Function::GenerateBody — body = Block::make_random.
-// Function.cpp:626–663 — Unbuilt→Building→Built; pointer param tbd facts.
+// GenerateBody mirrors Function::GenerateBody.
+// Function.cpp:626–663 — Unbuilt→Building→Built; pointer TBD; body/dummy;
+// get_referenced_ptrs via ComputeSummary; make_return_const.
 func (f *Function) GenerateBody(
 	r *Rng,
 	opts Options,
@@ -296,42 +297,95 @@ func (f *Function) GenerateBody(
 	stmtTab *ThresholdTable,
 	prev CGContext,
 ) {
+	f.generateBodyCore(r, opts, probs, vs, tables, stmtTab, prev, false)
+}
+
+// GenerateBodyWithKnownParams mirrors Function::generate_body_with_known_params.
+// Function.cpp:666–698 — inherits caller effect_context/accum, call chain,
+// external no-read/write RWDirective from reachable frame vars.
+func (f *Function) GenerateBodyWithKnownParams(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	prev CGContext,
+) {
+	f.generateBodyCore(r, opts, probs, vs, tables, stmtTab, prev, true)
+}
+
+// generateBodyCore shared path for GenerateBody / generate_body_with_known_params.
+func (f *Function) generateBodyCore(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	prev CGContext,
+	knownParams bool,
+) {
 	if f == nil {
 		return
 	}
-	// ignore regenerate if already building/built (Function.cpp:626–629)
+	// Function.cpp:626–629 / 668–671 — ignore regenerate
 	if f.BuildState != BuildUnbuilt {
 		return
 	}
 	f.BuildState = BuildBuilding
+
+	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)
+	bodyEff := EmptyEffect()
+	if prev.EffectAccum != nil {
+		// known-params path: caller already points EffectAccum at callee accum
+		bodyEff = *prev.EffectAccum
+	}
 	cg := prev
 	cg.CurrentFunc = f
+	cg.EffectAccum = &bodyEff
+	cg.Flags = 0
+	// Function.cpp:635 / 677 — extend_call_chain
+	cg.ExtendCallChain(prev)
 	if prev.Funcs != nil {
 		cg.Funcs = prev.Funcs
 	}
-	// ensure FactMgr when caller did not attach one
 	if cg.FM == nil {
 		cg.FM = NewFactMgr(f)
 	}
-	// pointer params → tbd (Function.cpp:637–641)
-	for _, p := range f.Param {
-		if p != nil && p.IsPointer() {
-			if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
-				cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, MakeFactPointTo(p, TBDPtr))
+
+	// Function.cpp:680–685 — inherit external no-reads/writes (known-params only)
+	if knownParams {
+		if rwd := prev.BuildCalleeRWDirective(cg.FM.GlobalFacts); rwd != nil {
+			cg.RW = rwd
+		}
+	}
+
+	// Function.cpp:637–641 — pointer params → tbd (GenerateBody; known-params already handed over)
+	if !knownParams {
+		for _, p := range f.Param {
+			if p != nil && p.IsPointer() {
+				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
+					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, MakeFactPointTo(p, TBDPtr))
+				}
 			}
 		}
 	}
-	bodyEff := EmptyEffect()
-	if cg.EffectAccum == nil {
-		cg.EffectAccum = &bodyEff
+
+	// Function.cpp:643–648 — builtin dummy vs make_random
+	if f.IsBuiltin {
+		f.Body = MakeDummyBlock(f)
 	} else {
-		bodyEff = *cg.EffectAccum
-		cg.EffectAccum = &bodyEff
+		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	}
-	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
+	// Function.cpp:650 / 690 — body->set_depth_protect(true)
+	if f.Body != nil {
+		f.Body.EmitDepthProtect = true
+	}
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
-	// mark_func_end: locals die after function
+
+	// mark_func_end: locals die after function (DFA cleanup)
 	if cg.FM != nil && len(f.Blocks) > 0 {
 		var locals []*Variable
 		for _, blk := range f.Blocks {
@@ -348,20 +402,42 @@ func (f *Function) GenerateBody(
 			cg.FM.FindDanglingGlobalPtrs(f)
 		}
 	}
-	if opts.DepthProtect && f.NeedReturnStmt() {
-		f.RetConst = MakeRandom(f.ReturnType, opts, r)
+
+	// Function.cpp:652–656 — get_referenced_ptrs + feffect from map_stm_effect[body]
+	// ComputeSummary collects ReferencedPtrs; prefer map_stm_effect[body] when set
+	summaryEff := bodyEff
+	if cg.FM != nil && f.Body != nil && f.Body.StmID > 0 {
+		if e := cg.FM.GetMapStmEffect(f.Body.StmID); !e.IsEmpty() {
+			summaryEff = e
+		}
 	}
-	// Function.cpp:691 — compute_summary after body
-	if cg.EffectAccum != nil {
-		f.ComputeSummary(*cg.EffectAccum)
-	} else {
-		f.ComputeSummary(bodyEff)
+	f.ComputeSummary(summaryEff)
+
+	// Function.cpp:658 / 694 — make_return_const
+	f.MakeReturnConst(opts, r)
+
+	// keep EffectAccum in sync for caller of known-params
+	if prev.EffectAccum != nil {
+		*prev.EffectAccum = bodyEff
 	}
-	// add_back_return_facts into global_facts (Function.cpp:470 path)
+
+	// add_back_return_facts into global_facts (Function.cpp:470 path / handoff)
 	if cg.FM != nil && f.Body != nil {
 		AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts)
 	}
 	f.markBuilt()
+}
+
+// MakeReturnConst mirrors Function::make_return_const.
+// Function.cpp:608–615 — depth_protect + need_return_stmt → random constant.
+func (f *Function) MakeReturnConst(opts Options, r *Rng) {
+	if f == nil || !opts.DepthProtect || !f.NeedReturnStmt() {
+		return
+	}
+	if f.ReturnType != nil && f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
+		return
+	}
+	f.RetConst = MakeRandom(f.ReturnType, opts, r)
 }
 
 // returnTypeC is qualified return type (from RV qfer when present).

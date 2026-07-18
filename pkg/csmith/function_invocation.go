@@ -356,16 +356,12 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
 	effectAccum := EmptyEffect()
 	bodyCG := cg
-	bodyCG.ExtendCallChain(cg)
 	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
 	bodyCG.Flags = 0
 	bodyCG.EffectAccum = &effectAccum
-	// Function.cpp:675–681 — inherit external no-read/write from caller
-	if rwd := cg.BuildCalleeRWDirective(calFM.GlobalFacts); rwd != nil {
-		bodyCG.RW = rwd
-	}
-	callee.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
+	// RWDirective + call chain set inside GenerateBodyWithKnownParams
+	callee.GenerateBodyWithKnownParams(r, opts, probs, vs, tables, stmtTab, bodyCG)
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts from body + add_back_return_facts
 	retFacts := []*FactPointTo{}
