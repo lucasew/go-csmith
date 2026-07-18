@@ -527,8 +527,12 @@ func makeRandomStmt(
 	if DepthGuardByTypeFlag(opts, DtStatement, int(MaxStatementType)) == BadDepth {
 		return Stmt{}
 	}
+	// Statement static ProbabilityTable always live; no soft invent NewStatementThresholdTable
 	if stmtTab == nil {
-		stmtTab = NewStatementThresholdTable(opts)
+		stmtTab = ProcessStmtTab()
+	}
+	if stmtTab == nil {
+		return Stmt{}
 	}
 	// StatementFilter (Statement.cpp:150–182)
 	f := filterFunc(func(v uint32) bool {

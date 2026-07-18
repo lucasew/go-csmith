@@ -37,12 +37,13 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	if typ != nil && (!typ.IsSimple() || typ.IsFloat()) {
 		return AssignSimple
 	}
-	// C++ always has RNG + assignOpsTable_; no soft invent simple without pick
+	// C++ always has RNG + assignOpsTable_; no soft invent table or simple without pick
 	if r == nil {
 		return AssignOp(-1)
 	}
 	if table == nil {
-		table = NewAssignOpsTable(opts)
+		// StatementAssign::InitProbabilityTable always live; fail closed invalid op
+		return AssignOp(-1)
 	}
 	f := NewVectorFilter(table)
 	// signed ints: filter out ++/-- (upstream avoids for signed)

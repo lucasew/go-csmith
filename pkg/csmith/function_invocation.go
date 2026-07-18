@@ -1040,7 +1040,12 @@ func MakeRandomInvocation(
 					return &Invocation{Failed: true}
 				}
 			}
-			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, NewStatementThresholdTable(opts), cg, list, sigType)
+			// Statement probability table is process/session singleton (no invent second table)
+			stmtTab := ProcessStmtTab()
+			if stmtTab == nil {
+				return &Invocation{Failed: true}
+			}
+			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, stmtTab, cg, list, sigType)
 			if fi != nil && !fi.Failed && cg.CurrentFunc != nil && fi.User != nil {
 				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
 			}

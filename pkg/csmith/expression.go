@@ -429,8 +429,9 @@ func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
 // PickTermType builds default filters for Expression::make_random when tt==MAX.
 // Expression.cpp:160–179 (subset: no_func, no_const, depth).
 func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
+	// Expression::InitProbabilityTables always live; no soft invent NewExprTables
 	if tables == nil {
-		tables = NewExprTables(opts)
+		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Expr)
 	if noFunc {
@@ -462,8 +463,9 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 // PickParamTermType mirrors Expression::make_random_param term selection.
 // Expression.cpp:244–260 — paramTable + always filter Constant.
 func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
+	// Expression::InitProbabilityTables always live; no soft invent NewExprTables
 	if tables == nil {
-		tables = NewExprTables(opts)
+		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Param)
 	// don't call functions with constant parameters

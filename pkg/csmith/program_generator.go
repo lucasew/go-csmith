@@ -41,6 +41,10 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	SetProcessProbabilities(probs)
 	// share session Probabilities with VS (no invent throwaway NewProbabilities then overwrite)
 	vs := NewVariableSelectorProbs(opts, probs)
+	stmtTab := NewStatementThresholdTable(opts)
+	// C++ Statement static ProbabilityTable — one session table for Block::make_random
+	// and nested GenerateBody via FunctionInvocation (no invent second table mid-call)
+	SetProcessStmtTab(stmtTab)
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,
@@ -48,7 +52,7 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 		Probs:    probs,
 		VS:       vs,
 		Tables:   NewExprTables(opts),
-		StmtTab:  NewStatementThresholdTable(opts),
+		StmtTab:  stmtTab,
 		FactMgrs: NewFactMgrMap(),
 	}
 	// Share gensym + derived_types across selector and generator.
@@ -64,6 +68,15 @@ func (g *ProgramGenerator) Initialize() {
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
 	// Finalization::doFinalization subset for a fresh generation.
 	DoFinalization()
+	// DoFinalization may clear process-wide session handles; re-install the
+	// generator's live singletons (CGOptions / RNG / Probabilities / Statement table).
+	// C++ statics survive between Finalization and the next draws of this run.
+	if g != nil {
+		SetProcessOptions(g.Opts)
+		SetProcessRng(g.Rng)
+		SetProcessProbabilities(g.Probs)
+		SetProcessStmtTab(g.StmtTab)
+	}
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).

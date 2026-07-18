@@ -25,11 +25,16 @@ import (
 // processRng mirrors DefaultRndNumGenerator process instance. CreateVariable
 // Constant::make_random burns the same stream as the rest of generation; nil
 // means library/test path without NewProgramGenerator (not NewRng(1) invent).
+//
+// processStmtTab mirrors Statement static ProbabilityTable (pStatementProb).
+// Block::make_random / nested GenerateBody share one session table; nil means
+// fail closed (no invent NewStatementThresholdTable mid-invocation).
 var (
-	processOptsMu sync.RWMutex
-	processOpts   = Defaults()
-	processProbs  *Probabilities
-	processRng    *Rng
+	processOptsMu  sync.RWMutex
+	processOpts    = Defaults()
+	processProbs   *Probabilities
+	processRng     *Rng
+	processStmtTab *ThresholdTable
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -79,6 +84,23 @@ func ProcessRng() *Rng {
 	processOptsMu.RLock()
 	defer processOptsMu.RUnlock()
 	return processRng
+}
+
+// SetProcessStmtTab installs the session statement probability table.
+// NewProgramGenerator sets this to the same StmtTab used for generation.
+func SetProcessStmtTab(t *ThresholdTable) {
+	processOptsMu.Lock()
+	processStmtTab = t
+	processOptsMu.Unlock()
+}
+
+// ProcessStmtTab returns the active statement ThresholdTable (may be nil).
+// C++ Statement probability table is always live after init; nil is fail-closed
+// for library paths without NewProgramGenerator.
+func ProcessStmtTab() *ThresholdTable {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processStmtTab
 }
 
 const defaultPlatformInfoPath = "platform.info"

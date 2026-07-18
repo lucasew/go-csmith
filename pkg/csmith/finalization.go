@@ -33,8 +33,9 @@ func DoFinalization() {
 	// util.cpp reset_gensym — process gensym_count (DFSProgramGenerator.cpp:92)
 	// DefaultProgramGenerator process is one-shot; library multi-Generate needs reset
 	ResetDefaultGensym()
-	// Probabilities::DestroyInstance — session Probs, no process singleton
-	// RandomNumber::doFinalization — session Rng
+	// Probabilities / Rng / StmtTab process handles are re-installed by
+	// ProgramGenerator.Initialize after this call (same generation run).
+	// Clearing them here would soft-break nested make_random mid-run.
 	// Error state
 	ClearError()
 }
