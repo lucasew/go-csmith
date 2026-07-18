@@ -138,6 +138,7 @@ func formattedOutputf(b *strings.Builder, msg string, num float64) {
 // RecordAddressTaken mirrors Bookkeeper::record_address_taken.
 // Bookkeeper.cpp:324–334.
 func RecordAddressTaken(v *Variable) {
+	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type)
 	if v == nil || v.Type == nil {
 		return
 	}
@@ -151,6 +152,7 @@ func RecordAddressTaken(v *Variable) {
 // RecordVolatileAccess mirrors Bookkeeper::record_volatile_access.
 // Bookkeeper.cpp:386–412.
 func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
+	// Bookkeeper.cpp:388 — assert(var)
 	if v == nil {
 		return
 	}
@@ -563,6 +565,10 @@ func outputPointerStatistics(b *strings.Builder) {
 		ptPtr, ptScalar, ptStruct := 0, 0, 0
 		for i, p := range ptrs {
 			if p == nil || p.Type == nil {
+				continue
+			}
+			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
+			if !p.Type.IsPointerLike() {
 				continue
 			}
 			if i < len(AllAliases) {

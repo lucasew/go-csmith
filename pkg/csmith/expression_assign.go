@@ -18,6 +18,10 @@ func MakeExpressionAssign(
 	if cg == nil {
 		return nil
 	}
+	// ExpressionAssign.cpp:56–57 / 61–62 — get_fact_mgr always live; no invent without FM
+	if cg.FM == nil {
+		return nil
+	}
 	// ExpressionAssign.cpp:49+ — type from Expression::make_random (may be non-null);
 	// StatementAssign::make_random SelectLType when type nullptr — pass through nil, no invent.
 	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)
@@ -34,7 +38,7 @@ func MakeExpressionAssign(
 	}
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
 	// uses get_rhs(); MakeRandomAssignQfer already updates; re-apply matches C++ double call
-	if cg.FM != nil && st.LhsVar != nil {
+	if st.LhsVar != nil {
 		indir := 0
 		if st.Lhs != nil {
 			indir = st.Lhs.IndirectLevel()

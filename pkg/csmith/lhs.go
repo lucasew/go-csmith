@@ -64,7 +64,13 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 	if l == nil || l.Var == nil {
 		return CVQualifiers{}
 	}
-	return l.Var.Qfer.IndirectQualifiers(l.IndirectLevel())
+	q := l.Var.Qfer.IndirectQualifiers(l.IndirectLevel())
+	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
+	// sticky error for ERROR_GUARD callers; no soft invent strip of const
+	if q.IsConst() {
+		SetError(ErrGeneric)
+	}
+	return q
 }
 
 // GetLvars mirrors Lhs::get_lvars.

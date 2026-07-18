@@ -97,6 +97,18 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 	}
 }
 
+func TestLhsGetQualifiersConstSetsError(t *testing.T) {
+	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip
+	ClearError()
+	v := CreateVariableScalars("g_c", GetIntType(), true, false)
+	lhs := &Lhs{Var: v, Type: GetIntType()}
+	_ = lhs.GetQualifiers()
+	if !HasError() {
+		t.Fatal("const LHS qfer must set sticky error")
+	}
+	ClearError()
+}
+
 func TestLhsVisitIndicesOK(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},

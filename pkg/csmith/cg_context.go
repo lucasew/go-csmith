@@ -902,6 +902,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 		return false
 	}
 	indirect := lhs.IndirectLevel()
+	// Lhs.cpp:243 — assert(indirect > 0); non-deref LHS is not this path
 	if indirect <= 0 {
 		return false
 	}

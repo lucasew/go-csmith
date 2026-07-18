@@ -122,7 +122,8 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	v := CreateVariableScalars("g_z", GetIntType(), false, false)
-	cg := WithFunc(f, EmptyEffect())
+	// FactMgr required when condition may build ExpressionAssign
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg.Types = vs.Types
 	cg.EffectStm = EmptyEffect().WriteVar(v)
 	st := MakeRandomIf(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)

@@ -11,13 +11,29 @@ func TestMakeExpressionAssign(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil) }()
+	// ExpressionAssign.cpp:56–62 — get_fact_mgr always live
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
+	e := func() *Expression {
+		c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		return MakeExpressionAssign(r, opts, probs, vs, tables, &c, GetIntType(), nil)
+	}()
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
 		t.Fatal(e)
 	}
 	out := e.Output()
 	if !strings.Contains(out, "=") && !strings.Contains(out, "++") && !strings.Contains(out, "--") {
 		t.Fatal(out)
+	}
+}
+
+func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
+	// no soft invent ExpressionAssign without FactMgr
+	opts := Defaults()
+	c := EmptyCGContext()
+	e := MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil)
+	if e != nil {
+		t.Fatal("nil FM must fail closed")
 	}
 }
 

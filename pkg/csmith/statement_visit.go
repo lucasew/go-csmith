@@ -256,12 +256,17 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	eff := cg.EffectStm.Clone()
 
 	iv := st.Loop.IV
-	// StatementFor.cpp:437–443 — scalar IV; not outer loop IV (assert upstream)
+	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple)
+	if iv.Type == nil || !iv.Type.IsSimple() {
+		return false
+	}
+	// StatementFor.cpp:441 — assert(iv_bounds.find(iv) == end); no soft invent re-bind
 	if cg.IVBounds != nil {
 		if _, ok := cg.IVBounds[iv]; ok {
-			// outer IV — upstream asserts; still track for body reject
+			return false
 		}
 	}
+	// StatementFor.cpp:443 — arbitrary bound 0
 	cg.AddIVBound(iv, 0)
 	defer cg.RemoveIVBound(iv)
 	// StatementFor.cpp:445–449 — body under IN_LOOP (body uses shared accum)
