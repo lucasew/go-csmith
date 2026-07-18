@@ -61,6 +61,7 @@ func SafeAssign(op AssignOp) bool {
 
 // MakeRandomAssign mirrors StatementAssign::make_random.
 // StatementAssign.cpp:111–231 — RHS then LHS contexts; merge effects; facts update.
+// MakeRandomAssign mirrors StatementAssign::make_random(cg, type, qf=nullptr).
 func MakeRandomAssign(
 	r *Rng,
 	opts Options,
@@ -69,6 +70,21 @@ func MakeRandomAssign(
 	tables *ExprTables,
 	cg CGContext,
 	typ *Type,
+) Stmt {
+	return MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, nil)
+}
+
+// MakeRandomAssignQfer mirrors StatementAssign::make_random with optional qf.
+// StatementAssign.cpp:111–231 — when qf non-nil, force match_exact_qualifiers for Lhs.
+func MakeRandomAssignQfer(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	cg CGContext,
+	typ *Type,
+	qf *CVQualifiers,
 ) Stmt {
 	ClearError()
 	assignTab := NewAssignOpsTable(opts)
@@ -96,10 +112,17 @@ func MakeRandomAssign(
 	// StatementAssign.cpp:147–148 — qfer from caller or derived from RHS
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	qfer.Wildcard = true
+	callerQf := qf != nil
+	if callerQf {
+		qfer = *qf
+	}
 
 	if op.NeedNoRHS() {
 		// StatementAssign.cpp:138–144 — Constant::make_int(1); wildcard when no qf
 		rhs = &Expression{Term: TermConstant, Con: MakeInt(1)}
+		if !callerQf {
+			qfer.Wildcard = true
+		}
 	} else if opts.StrictVolatileRule {
 		// StatementAssign.cpp:145–167
 		if typ != nil && typ.IsVolatileStructUnion() {
@@ -114,19 +137,23 @@ func MakeRandomAssign(
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
-		if q := expressionQualifiers(rhs); q != nil {
-			qfer = *q
-			// StatementAssign.cpp:154–155 — accept_stricter; LHS not const
-			qfer.AcceptStricter = true
-			qfer.SetConst(false, 0)
+		if !callerQf {
+			if q := expressionQualifiers(rhs); q != nil {
+				qfer = *q
+				// StatementAssign.cpp:154–155 — accept_stricter; LHS not const
+				qfer.AcceptStricter = true
+				qfer.SetConst(false, 0)
+			}
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
-			qfer.SetVolatile(false, 0)
+			if !callerQf {
+				qfer.SetVolatile(false, 0)
+			}
 		}
 		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
-		if qfer.IsVolatile() {
+		if !callerQf && qfer.IsVolatile() {
 			qfer.SetVolatile(false, 0)
 		}
 	} else {
@@ -139,15 +166,19 @@ func MakeRandomAssign(
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
-		if q := expressionQualifiers(rhs); q != nil {
-			qfer = *q
-			// StatementAssign.cpp:172–174
-			qfer.AcceptStricter = true
-			qfer.SetConst(false, 0)
+		if !callerQf {
+			if q := expressionQualifiers(rhs); q != nil {
+				qfer = *q
+				// StatementAssign.cpp:172–174
+				qfer.AcceptStricter = true
+				qfer.SetConst(false, 0)
+			}
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
-			qfer.SetVolatile(false, 0)
+			if !callerQf {
+				qfer.SetVolatile(false, 0)
+			}
 		}
 	}
 	// merge RHS effects into caller
@@ -166,8 +197,11 @@ func MakeRandomAssign(
 	lhsCG.EffectStm = rhsCG.EffectStm
 	lhsCG.CurrRHS = rhs
 
-	// StatementAssign.cpp:190–200 — match_exact_qualifiers when qf provided (ExpressionAssign path)
-	// Library path typically qf==nil; still pass derived qfer to Lhs.
+	// StatementAssign.cpp:190–203 — match_exact_qualifiers when qf provided
+	prevExact := opts.MatchExactQualifiers
+	if callerQf {
+		opts.MatchExactQualifiers = true
+	}
 	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs
 	lhsType := typ
 	if opts.StrictFloat && rhs != nil {
@@ -177,6 +211,9 @@ func MakeRandomAssign(
 	}
 	compound := op != AssignSimple
 	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, lhsType, compound, op.NeedNoRHS(), &qfer)
+	if callerQf {
+		opts.MatchExactQualifiers = prevExact
+	}
 	var lhsVar *Variable
 	if lhs != nil {
 		lhsVar = lhs.Var
@@ -209,15 +246,10 @@ func MakeRandomAssign(
 		}
 	}
 
-	// StatementAssign.cpp:218 — CompatibleChecker::compatible_check(e, lhs)
+	// StatementAssign.cpp:218–223 — CompatibleChecker → nullptr
 	if CompatibleCheckExprs(opts, rhs, LhsAsExpression(lhs)) {
 		SetError(ErrCompatibleCheck)
-		// regenerate RHS once as constant (practical recovery vs hard fail)
-		rhs = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
-		if rhs.Con != nil {
-			rhs.CheckAndSetCastOpts(typ, opts)
-		}
-		ClearError()
+		return Stmt{Kind: StmtAssign}
 	}
 
 	cg.MergeParamContext(lhsCG, true)
@@ -231,11 +263,9 @@ func MakeRandomAssign(
 			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
 		}
 	}
-	// FactMgr::update_fact_for_assign
+	// FactMgr::update_fact_for_assign(sa) — full indirection
 	if cg.FM != nil && st.LhsVar != nil {
-		if lhsIndir == 0 {
-			cg.FM.UpdateFactForAssign(st.LhsVar, 0, st.Expr)
-		}
+		cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.Expr)
 		cg.NoteWrite(st.LhsVar)
 	} else if st.LhsVar != nil {
 		cg.NoteWrite(st.LhsVar)

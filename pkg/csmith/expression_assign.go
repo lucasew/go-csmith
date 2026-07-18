@@ -22,10 +22,11 @@ func MakeExpressionAssign(
 		q := RandomQualifiersDefaultProbs(typ, AccessWrite, cg, true, opts, probs, r)
 		qfer = &q
 	}
-	_ = qfer // MakeRandomAssign derives LHS qfer from RHS; WRITE constraint via AccessWrite on Lhs
-	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, typ)
+	// ExpressionAssign.cpp:56 / 61 — StatementAssign::make_random(cg, type, qfer)
+	// forces match_exact_qualifiers while selecting LHS
+	st := MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, qfer)
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
-	// (MakeRandomAssign already updates; re-apply ensures expr-assign path matches C++)
+	// (MakeRandomAssignQfer already updates; re-apply matches C++ double call)
 	if cg.FM != nil && st.LhsVar != nil {
 		indir := 0
 		if st.Lhs != nil {
