@@ -266,6 +266,15 @@ func MakeDummyStaticVariable(name string) *Variable {
 	return &Variable{Name: name, Type: nil}
 }
 
+// GetCollective mirrors Variable::get_collective — array items → parent array.
+func (v *Variable) GetCollective() *Variable {
+	if v == nil {
+		return nil
+	}
+	// ArrayVariable itemized: Collective non-nil on wrapper — walk FieldVarOf only
+	return v
+}
+
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {

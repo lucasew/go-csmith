@@ -34,6 +34,24 @@ func MakeInt(v int) *Constant {
 	return &Constant{Type: GetSimpleType(EInt), Value: strconv.Itoa(v)}
 }
 
+// Equals mirrors Constant::equals(int).
+// Constant.cpp:509–510.
+func (c *Constant) Equals(num int) bool {
+	if c == nil {
+		return false
+	}
+	n, err := strconv.Atoi(c.Value)
+	if err != nil {
+		// try 0x hex
+		if len(c.Value) > 2 && (c.Value[0:2] == "0x" || c.Value[0:2] == "0X") {
+			u, e2 := strconv.ParseUint(c.Value[2:], 16, 64)
+			return e2 == nil && int(u) == num
+		}
+		return false
+	}
+	return n == num
+}
+
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
 func generateRandomConstant(typ *Type, opts Options, r *Rng) string {

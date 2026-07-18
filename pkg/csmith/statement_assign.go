@@ -106,8 +106,10 @@ func MakeRandomAssign(
 	}
 	st := Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
 	// if LHS is a pointer to be dereferenced, emit (*p) via ArrayAccess-style text
+	lhsIndir := 0
 	if lhs != nil && exprTy != nil && lhs.Type != nil {
 		ind := lhs.Type.IndirectLevel() - exprTy.IndirectLevel()
+		lhsIndir = ind
 		if ind > 0 {
 			stars := ""
 			for i := 0; i < ind; i++ {
@@ -115,6 +117,16 @@ func MakeRandomAssign(
 			}
 			st.ArrayAccess = "(" + stars + lhs.Name + ")"
 		}
+	}
+	// FactMgr::update_fact_for_assign when points-to env present
+	if cg.FM != nil && lhs != nil {
+		// store into pointer var itself when exprTy is the pointer type (indir 0)
+		if lhsIndir == 0 {
+			cg.FM.UpdateFactForAssign(lhs, 0, rhs)
+		}
+		cg.NoteWrite(lhs)
+	} else if lhs != nil {
+		cg.NoteWrite(lhs)
 	}
 	return st
 }

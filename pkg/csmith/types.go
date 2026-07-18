@@ -174,6 +174,11 @@ func (t *Type) IsInt() bool {
 	return t.IsNonVoidSimple()
 }
 
+// IsPointerLike is true for ePointer types (ptrTo set).
+func (t *Type) IsPointerLike() bool {
+	return t != nil && t.ptrTo != nil
+}
+
 // HasIntField mirrors Type::has_int_field.
 // Type.cpp:471–480 — self is int or any field has_int_field.
 func (t *Type) HasIntField() bool {
@@ -506,4 +511,3 @@ func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 // GetIntType mirrors get_int_type() → eInt.
 // Type.cpp:408.
 func GetIntType() *Type { return GetSimpleType(EInt) }
-

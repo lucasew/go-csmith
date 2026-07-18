@@ -148,6 +148,113 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 	return ret
 }
 
+// MakeFactsPointTo mirrors FactPointTo::make_facts(vars, point_to).
+// FactPointTo.cpp:340–348.
+func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
+	var out []*FactPointTo
+	for _, v := range lvars {
+		if v == nil || v.Type == nil {
+			continue
+		}
+		out = append(out, MakeFactPointTo(v, pointTo))
+	}
+	return out
+}
+
+// MakeFactsPointToSet mirrors FactPointTo::make_facts(vars, set).
+func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
+	var out []*FactPointTo
+	for _, v := range lvars {
+		if v == nil || v.Type == nil {
+			continue
+		}
+		out = append(out, MakeFactPointToSet(v, set))
+	}
+	return out
+}
+
+// RhsToLhsTransfer mirrors FactPointTo::rhs_to_lhs_transfer for common cases.
+// FactPointTo.cpp:158–227 subset — const/null/garbage, &var, pointer copy.
+func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
+	if len(lvars) == 0 {
+		return nil
+	}
+	if rhs == nil {
+		return MakeFactsPointTo(lvars, GarbagePtr)
+	}
+	rt := rhs.GetType()
+	// non-pointer, non-union RHS
+	if rt == nil || (!rt.IsPointerLike() && !rt.IsUnion()) {
+		// equals(0) and size >= 8 → null else garbage
+		if rhs.EqualsInt(0) && rt != nil && rt.SizeInBytes() >= 8 {
+			return MakeFactsPointTo(lvars, NullPtr)
+		}
+		return MakeFactsPointTo(lvars, GarbagePtr)
+	}
+	switch rhs.Term {
+	case TermConstant:
+		if rt.ptrTo != nil {
+			if rhs.EqualsInt(0) {
+				return MakeFactsPointTo(lvars, NullPtr)
+			}
+			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
+		return MakeFactsPointTo(lvars, GarbagePtr)
+	case TermVariable:
+		if rhs.Var == nil {
+			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
+		indirect := rhs.IndirectLevel()
+		if indirect < 0 {
+			// taking address: point to the var itself (collective)
+			return MakeFactsPointTo(lvars, rhs.Var.GetCollective())
+		}
+		// copy pointees of RHS pointer (indirect+1 merge simplified to fact set)
+		src := FindRelatedPointTo(facts, rhs.Var.GetCollective())
+		if src == nil {
+			// unknown → garbage
+			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
+		return MakeFactsPointToSet(lvars, src.PointTo)
+	default:
+		// function/assign/comma — conservative garbage
+		return MakeFactsPointTo(lvars, GarbagePtr)
+	}
+}
+
+// AbstractFactForAssign mirrors FactPointTo::abstract_fact_for_assign (pointer LHS).
+// FactPointTo.cpp:266–277 — direct pointer assign only (union fields deferred).
+func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) []*FactPointTo {
+	if lhs == nil || lhs.Type == nil {
+		return nil
+	}
+	// only when LHS expression type is pointer (indir 0 on a pointer var)
+	// Lhs with *p (indir>0) updates pointees — deferred; handle indir==0 pointer store
+	if lhsIndir != 0 {
+		return nil
+	}
+	if lhs.Type.ptrTo == nil {
+		return nil
+	}
+	lvars := []*Variable{lhs.GetCollective()}
+	return RhsToLhsTransfer(factsIn, lvars, rhs)
+}
+
+// MergeFactInto replaces or appends a related FactPointTo in facts (merge_fact subset).
+func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
+	if f == nil {
+		return facts
+	}
+	for i, old := range facts {
+		if old != nil && old.Var == f.Var {
+			// replace (strong update)
+			facts[i] = f
+			return facts
+		}
+	}
+	return append(facts, f)
+}
+
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals (indirection≥0 subset).
 // FactPointTo.cpp:487–526 — indirection -1 → IsVisibleLocal; 0 → fact pointees local.
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {

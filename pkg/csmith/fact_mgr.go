@@ -70,3 +70,19 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	_ = blk
 	fm.AddNewVarFact(v)
 }
+
+// UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts).
+// FactMgr.cpp:370–395 subset — apply AbstractFactForAssign into GlobalFacts.
+func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
+	if fm == nil || lhs == nil {
+		return false
+	}
+	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
+	if len(newFacts) == 0 {
+		return false
+	}
+	for _, f := range newFacts {
+		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+	}
+	return true
+}

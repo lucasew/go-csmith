@@ -107,6 +107,48 @@ func (e *Expression) IndirectLevel() int {
 	return e.Var.Type.IndirectLevel() - want.IndirectLevel()
 }
 
+// GetType mirrors Expression::get_type approximate.
+func (e *Expression) GetType() *Type {
+	if e == nil {
+		return nil
+	}
+	if e.CastType != nil {
+		return e.CastType
+	}
+	switch e.Term {
+	case TermConstant:
+		if e.Con != nil {
+			return e.Con.Type
+		}
+	case TermVariable:
+		if e.ExprType != nil {
+			return e.ExprType
+		}
+		if e.Var != nil {
+			return e.Var.Type
+		}
+	case TermFunction:
+		if e.Invoke != nil && e.Invoke.User != nil {
+			return e.Invoke.User.ReturnType
+		}
+	case TermCommaExpr:
+		return e.CommaRHS.GetType()
+	case TermAssignment:
+		if e.Assign != nil && e.Assign.LhsVar != nil {
+			return e.Assign.LhsVar.Type
+		}
+	}
+	return nil
+}
+
+// EqualsInt mirrors Expression::equals(int) for constants.
+func (e *Expression) EqualsInt(num int) bool {
+	if e == nil || e.Term != TermConstant || e.Con == nil {
+		return false
+	}
+	return e.Con.Equals(num)
+}
+
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
 type ExprTables struct {
 	Expr  DistributionTable
