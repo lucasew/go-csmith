@@ -26,6 +26,11 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 	}
 	// Type::SizeInBytes uses platform integer/pointer sizes
 	SetPlatformSizes(opts.IntSize, opts.PointerSize)
+	// PartialExpander from CGOptions::partial_expand
+	if !InitPartialExpanderFromOptions(opts) {
+		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
+	}
+	defer ClearPartialExpander()
 	g := NewProgramGenerator(opts)
 	out := g.GoGenerator()
 	if out == "" {

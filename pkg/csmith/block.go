@@ -447,6 +447,10 @@ func makeRandomStmt(
 	// StatementFilter (Statement.cpp:150–182)
 	f := filterFunc(func(v uint32) bool {
 		k := NumberToType(stmtTab, v)
+		// Statement.cpp:158–160 — PartialExpander::expand_check
+		if !ExpandCheck(k) {
+			return true
+		}
 		if k == StmtBlock {
 			return true
 		}

@@ -15,6 +15,8 @@ func DoFinalization() {
 	ClearAttrGenerators()
 	// FunctionInvocationUser return-fact registry
 	InvocationReturnFactsDoFinalization()
+	// PartialExpander
+	ClearPartialExpander()
 	// Statement sid
 	nextStmID = 0
 	// Error state

@@ -17,17 +17,18 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		return VisitFactsStatementFor(st, cg, opts)
 	case StmtReturn:
 		return VisitFactsStatementReturn(st, cg, opts)
-	case StmtBreak, StmtContinue, StmtGoto, StmtLabel:
-		// control transfer: condition expr if present
-		if st.Expr != nil {
-			return VisitFactsExpression(st.Expr, cg, opts)
+	case StmtBreak, StmtContinue:
+		return VisitFactsStatementJump(st, cg, opts)
+	case StmtGoto, StmtLabel:
+		if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+			return false
+		}
+		if cg.FM != nil && st.StmID > 0 {
+			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
 		return true
 	case StmtInvoke:
-		if st.Expr != nil {
-			return VisitFactsExpression(st.Expr, cg, opts)
-		}
-		return true
+		return VisitFactsStatementExpr(st, cg, opts)
 	case StmtBlock:
 		if st.Then != nil {
 			return VisitFactsBlock(st.Then, cg, opts)
@@ -36,6 +37,36 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	default:
 		return true
 	}
+}
+
+// VisitFactsStatementJump mirrors StatementBreak/Continue::visit_facts.
+// StatementBreak.cpp:126–134 / StatementContinue.cpp:125–133 — test then effect_stm.
+func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
+	if st == nil || cg == nil {
+		return true
+	}
+	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	if cg.FM != nil && st.StmID > 0 {
+		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+	}
+	return true
+}
+
+// VisitFactsStatementExpr mirrors StatementExpr::visit_facts.
+// StatementExpr.cpp:104–110 — expr.visit_facts; store effect_stm.
+func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
+	if st == nil || cg == nil {
+		return true
+	}
+	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	if cg.FM != nil && st.StmID > 0 {
+		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+	}
+	return true
 }
 
 // VisitFactsBlock mirrors Block::visit_facts via find_fixed_point.
