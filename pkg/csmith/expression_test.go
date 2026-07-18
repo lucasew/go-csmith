@@ -73,6 +73,96 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	}
 }
 
+func TestExpressionGetQualifiersIndirect(t *testing.T) {
+	// ExpressionVariable.cpp:194–196 — qfer.indirect_qualifiers(deref)
+	// Layout [ptr_level, storage]; deref pops storage (Lhs test: remaining [false])
+	pt := PointerTo(GetIntType())
+	q := NewCVQualifiers([]bool{false, true}, []bool{false, false})
+	v := CreateVariableQfer("g_p", pt, q)
+	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	gq := e.GetQualifiers()
+	if len(gq.IsConsts) != 1 {
+		t.Fatalf("after deref: %+v", gq)
+	}
+	// bare pointer type → indirect 0 → full two-level qfer
+	e2 := &Expression{Term: TermVariable, Var: v, ExprType: pt}
+	gq2 := e2.GetQualifiers()
+	if len(gq2.IsConsts) != 2 || !gq2.IsConsts[1] {
+		t.Fatalf("no deref: %+v", gq2)
+	}
+	// assign uses Lhs quals
+	lhs := &Lhs{Var: v, Type: GetIntType()}
+	st := &Stmt{Kind: StmtAssign, Lhs: lhs, LhsVar: v, AssignOp: AssignSimple}
+	ea := &Expression{Term: TermAssignment, Assign: st}
+	if len(ea.GetQualifiers().IsConsts) != 1 {
+		t.Fatalf("assign: %+v", ea.GetQualifiers())
+	}
+}
+
+func TestExpressionLessThanAndIs0Or1(t *testing.T) {
+	if !(&Expression{Term: TermConstant, Con: MakeInt(3)}).LessThan(5) {
+		t.Fatal("3 < 5")
+	}
+	if (&Expression{Term: TermConstant, Con: MakeInt(7)}).LessThan(5) {
+		t.Fatal("7 < 5")
+	}
+	// FunctionInvocationUnary::is_0_or_1 — eNot only
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "!"}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	if !e.Is0Or1() {
+		t.Fatal("unary not")
+	}
+	// binary comparison also 0/1
+	fi2 := &Invocation{IsStd: true, Binary: "==", Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeInt(2)},
+	}}
+	if !(&Expression{Term: TermFunction, Invoke: fi2}).Is0Or1() {
+		t.Fatal("cmp")
+	}
+	// simple assign of !x
+	st := &Stmt{
+		Kind: StmtAssign, AssignOp: AssignSimple,
+		Expr: e,
+	}
+	ea := &Expression{Term: TermAssignment, Assign: st}
+	if !ea.Is0Or1() {
+		t.Fatal("assign peel")
+	}
+}
+
+func TestExpressionComplexityFuncArgs(t *testing.T) {
+	// ExpressionFuncall.cpp:131–143 — call + sum(args)
+	inner := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	fi := &Invocation{
+		User: &Function{Name: "f"}, IsStd: false,
+		Args: []*Expression{inner, inner},
+	}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	// 1 (call) + 0 + 0
+	if ExpressionComplexity(e) != 1 {
+		t.Fatal(ExpressionComplexity(e))
+	}
+	// nested call arg
+	nested := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "g"}, Args: nil}}
+	fi2 := &Invocation{User: &Function{Name: "f"}, Args: []*Expression{nested}}
+	e2 := &Expression{Term: TermFunction, Invoke: fi2}
+	if ExpressionComplexity(e2) != 2 {
+		t.Fatal(ExpressionComplexity(e2))
+	}
+}
+
+func TestConstantGetField(t *testing.T) {
+	// Constant.cpp:513–522
+	c := &Constant{Value: "{0, 1, 2}"}
+	if c.GetField(0) != "0" || c.GetField(1) != "1" || c.GetField(2) != "2" {
+		t.Fatal(c.GetField(0), c.GetField(1), c.GetField(2))
+	}
+	if c.GetField(9) != "" {
+		t.Fatal("oob")
+	}
+}
+
 func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
 	// Expression.cpp:104–105 — direct_expand_check(eInvoke) → eFunction
 	ClearPartialExpander()

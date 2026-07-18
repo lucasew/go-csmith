@@ -435,24 +435,18 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	return OutputAssignSimple(st, wrapVol)
 }
 
-// expressionQualifiers approximates Expression::get_qualifiers for qfer seed.
+// expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.
+// Uses Expression.GetQualifiers (ExpressionVariable/Assign/Funcall/Comma).
 func expressionQualifiers(e *Expression) *CVQualifiers {
 	if e == nil {
 		return nil
 	}
-	switch e.Term {
-	case TermVariable:
-		if e.Var != nil {
-			q := e.Var.Qfer
-			return &q
-		}
-	case TermAssignment:
-		if e.Assign != nil && e.Assign.LhsVar != nil {
-			q := e.Assign.LhsVar.Qfer
-			return &q
-		}
+	q := e.GetQualifiers()
+	// empty vectors → treat as no seed (match prior nil for bare constants)
+	if len(q.IsConsts) == 0 && len(q.IsVolatiles) == 0 && !q.Wildcard {
+		return nil
 	}
-	return nil
+	return &q
 }
 
 // VisitFactsExpression mirrors Expression::visit_facts dispatch by term.

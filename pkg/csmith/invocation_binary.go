@@ -52,11 +52,16 @@ func GetBinopString(op BinaryOp) string {
 	return op.BinaryOpC()
 }
 
-// Is0Or1 mirrors FunctionInvocationBinary::is_0_or_1.
+// Is0Or1 mirrors FunctionInvocationBinary::is_0_or_1 and Unary eNot.
 // FunctionInvocationBinary.cpp:179–181 — comparison ops yield 0/1.
+// FunctionInvocationUnary.h:67 — eNot only.
 func (fi *Invocation) Is0Or1() bool {
-	if fi == nil || fi.IsUnary || !fi.IsStd {
+	if fi == nil || !fi.IsStd {
 		return false
+	}
+	if fi.IsUnary {
+		// UnaryOps eNot → "!"
+		return fi.Unary == "!"
 	}
 	op, ok := BinaryOpFromString(fi.Binary)
 	if !ok {

@@ -310,8 +310,9 @@ func RecordForwardJump() { forwardJumpCnt++ }
 // RecordBackwardJump mirrors Bookkeeper::backward_jump_cnt++.
 func RecordBackwardJump() { backwardJumpCnt++ }
 
-// ExpressionComplexity mirrors Expression::get_complexity (lightweight).
-// Expression.cpp — constants/vars 0; binary-ish nest +1.
+// ExpressionComplexity mirrors Expression::get_complexity.
+// ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
+// plus sum of arg complexities; assign/comma nest.
 func ExpressionComplexity(e *Expression) int {
 	if e == nil {
 		return 0
@@ -320,7 +321,19 @@ func ExpressionComplexity(e *Expression) int {
 	case TermConstant, TermVariable:
 		return 0
 	case TermFunction:
-		return 1
+		// ExpressionFuncall::get_complexity
+		comp := 0
+		if e.Invoke != nil {
+			if e.Invoke.User != nil && !e.Invoke.IsStd {
+				comp++ // function call itself
+			}
+			for _, a := range e.Invoke.Args {
+				comp += ExpressionComplexity(a)
+			}
+		} else {
+			comp = 1
+		}
+		return comp
 	case TermAssignment:
 		c := 1
 		if e.Assign != nil && e.Assign.Expr != nil {

@@ -5,6 +5,7 @@ package csmith
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Constant mirrors Constant : Expression for literal values (value string only for now).
@@ -55,6 +56,72 @@ func (c *Constant) Equals(num int) bool {
 // NotEqualsZero mirrors Constant/Expression not_equals(0).
 func (c *Constant) NotEqualsZero() bool {
 	return c != nil && !c.Equals(0)
+}
+
+// NotEquals mirrors Constant::not_equals(int).
+// Constant.cpp:505–507.
+func (c *Constant) NotEquals(num int) bool {
+	return c != nil && !c.Equals(num)
+}
+
+// LessThan mirrors Constant::less_than(int).
+// Constant.cpp:501–503 — str2int(value) < num.
+func (c *Constant) LessThan(num int) bool {
+	if c == nil {
+		return false
+	}
+	n, err := strconv.Atoi(c.Value)
+	if err != nil {
+		if len(c.Value) > 2 && (c.Value[0:2] == "0x" || c.Value[0:2] == "0X") {
+			u, e2 := strconv.ParseUint(c.Value[2:], 16, 64)
+			if e2 != nil {
+				return false
+			}
+			return int(u) < num
+		}
+		return false
+	}
+	return n < num
+}
+
+// GetField mirrors Constant::get_field.
+// Constant.cpp:513–522 — split union/struct brace init by "{}," pick field fid.
+func (c *Constant) GetField(fid int) string {
+	if c == nil || fid < 0 {
+		return ""
+	}
+	// StringUtils::split_string(value, fields, "{},")
+	fields := splitConstFields(c.Value)
+	if fid < len(fields) {
+		return fields[fid]
+	}
+	return ""
+}
+
+// splitConstFields mirrors StringUtils::split_string with separators { } ,
+func splitConstFields(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	var cur strings.Builder
+	flush := func() {
+		t := strings.TrimSpace(cur.String())
+		cur.Reset()
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '{', '}', ',':
+			flush()
+		default:
+			cur.WriteByte(s[i])
+		}
+	}
+	flush()
+	return out
 }
 
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).

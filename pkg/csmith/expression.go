@@ -139,6 +139,41 @@ func (e *Expression) GetType() *Type {
 	return nil
 }
 
+// GetQualifiers mirrors Expression::get_qualifiers.
+// ExpressionVariable.cpp:194–196; ExpressionAssign.cpp:85–86;
+// ExpressionFuncall.cpp:187–188; ExpressionComma / Constant default empty.
+func (e *Expression) GetQualifiers() CVQualifiers {
+	if e == nil {
+		return CVQualifiers{}
+	}
+	switch e.Term {
+	case TermVariable:
+		if e.Var == nil {
+			return CVQualifiers{}
+		}
+		// ExpressionVariable::get_qualifiers — qfer.indirect_qualifiers(indirect)
+		return e.Var.Qfer.IndirectQualifiers(e.IndirectLevel())
+	case TermAssignment:
+		if e.Assign != nil && e.Assign.Lhs != nil {
+			return e.Assign.Lhs.GetQualifiers()
+		}
+		if e.Assign != nil && e.Assign.LhsVar != nil {
+			return e.Assign.LhsVar.Qfer
+		}
+	case TermFunction:
+		if e.Invoke != nil {
+			return e.Invoke.GetQualifiers()
+		}
+	case TermCommaExpr:
+		// ExpressionComma has no override in header → default empty-ish;
+		// value type is RHS — use RHS qualifiers when present.
+		if e.CommaRHS != nil {
+			return e.CommaRHS.GetQualifiers()
+		}
+	}
+	return CVQualifiers{}
+}
+
 // EqualsInt mirrors Expression::equals(int).
 // Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
 func (e *Expression) EqualsInt(num int) bool {
@@ -154,8 +189,8 @@ func (e *Expression) EqualsInt(num int) bool {
 		// comma value is RHS
 		return e.CommaRHS.EqualsInt(num)
 	case TermAssignment:
-		// assign value is RHS of assign
-		if e.Assign != nil {
+		// ExpressionAssign::equals — simple assign && expr.equals(num)
+		if e.Assign != nil && e.Assign.AssignOp == AssignSimple {
 			return e.Assign.Expr.EqualsInt(num)
 		}
 	}
@@ -168,7 +203,36 @@ func (e *Expression) NotEquals(num int) bool {
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		return false
 	}
-	return !e.Con.Equals(num)
+	return e.Con.NotEquals(num)
+}
+
+// LessThan mirrors Expression::less_than(int).
+// Expression.h default false; Constant.cpp:501–502.
+func (e *Expression) LessThan(num int) bool {
+	if e == nil || e.Term != TermConstant || e.Con == nil {
+		return false
+	}
+	return e.Con.LessThan(num)
+}
+
+// Is0Or1 mirrors Expression::is_0_or_1.
+// ExpressionFuncall → invoke; ExpressionComma → rhs; ExpressionAssign → simple+rhs.
+func (e *Expression) Is0Or1() bool {
+	if e == nil {
+		return false
+	}
+	switch e.Term {
+	case TermFunction:
+		return e.Invoke != nil && e.Invoke.Is0Or1()
+	case TermCommaExpr:
+		return e.CommaRHS != nil && e.CommaRHS.Is0Or1()
+	case TermAssignment:
+		// ExpressionAssign.cpp:103–104
+		if e.Assign != nil && e.Assign.AssignOp == AssignSimple {
+			return e.Assign.Expr != nil && e.Assign.Expr.Is0Or1()
+		}
+	}
+	return false
 }
 
 // UseVar mirrors Expression::use_var.

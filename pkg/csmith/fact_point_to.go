@@ -205,7 +205,11 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			lv0 := lvars[0]
 			if lv0 != nil && lv0.FieldVarOf != nil && lv0.FieldVarOf.Type != nil &&
 				lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
-				if rhs.EqualsInt(0) || (rhs.Con != nil && rhs.Con.Value == "0") {
+				// Constant::get_field(0) == "0"
+				if rhs.Con != nil && rhs.Con.GetField(0) == "0" {
+					return MakeFactsPointTo(lvars, NullPtr)
+				}
+				if rhs.EqualsInt(0) {
 					return MakeFactsPointTo(lvars, NullPtr)
 				}
 			}
