@@ -49,12 +49,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	SetProcessStmtTab(stmtTab)
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
 	InitScopeTable(opts)
-	// Expression session tables (same instance as ProcessExprTables)
+	// Expression session tables from InitSessionProbabilityTables (no invent mid-ctor)
 	exprTables := ProcessExprTables()
-	if exprTables == nil {
-		exprTables = NewExprTables(opts)
-		SetProcessExprTables(exprTables)
-	}
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,

@@ -22,15 +22,10 @@ type VariableSelector struct {
 }
 
 // NewVariableSelector constructs an empty selector sharing process Probabilities
-// when live (C++ singleton). Library/tests without NewProgramGenerator get a
-// one-off table only when process probs are unset — prefer NewVariableSelectorProbs
-// with an explicit session table during generation.
+// (C++ Probabilities singleton). No invent second NewProbabilities(opts) when
+// process unset — Probs may be nil (fail closed on draws that need tables).
 func NewVariableSelector(opts Options) *VariableSelector {
-	if p := ProcessProbabilities(); p != nil {
-		return NewVariableSelectorProbs(opts, p)
-	}
-	// library path only — not a second table during NewProgramGenerator sessions
-	return NewVariableSelectorProbs(opts, NewProbabilities(opts))
+	return NewVariableSelectorProbs(opts, ProcessProbabilities())
 }
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities

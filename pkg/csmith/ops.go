@@ -107,11 +107,15 @@ func (op BinaryOp) CmpOpC() string {
 	}
 }
 
-// BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER from opts defaults only.
-// Prefer Probabilities.BinaryOpsFilter via ProcessProbabilities (session singleton).
-// Kept for library tests that build a one-off filter without process probs.
+// BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER via process Probabilities.
+// No invent NewProbabilities(opts) one-off table when process unset — reject-all.
 func BinaryOpsFilter(opts Options) Filter {
-	return NewProbabilities(opts).BinaryOpsFilter()
+	_ = opts
+	if p := ProcessProbabilities(); p != nil {
+		return p.BinaryOpsFilter()
+	}
+	// C++ GetInstance always live; fail closed reject every op
+	return filterFunc(func(v uint32) bool { return true })
 }
 
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
@@ -189,10 +193,14 @@ func (op UnaryOp) UnaryOpC() string {
 	}
 }
 
-// UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER from opts defaults only.
-// Prefer Probabilities.UnaryOpsFilter via ProcessProbabilities.
+// UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER via process Probabilities.
+// No invent NewProbabilities(opts) when process unset — reject-all.
 func UnaryOpsFilter(opts Options) Filter {
-	return NewProbabilities(opts).UnaryOpsFilter()
+	_ = opts
+	if p := ProcessProbabilities(); p != nil {
+		return p.UnaryOpsFilter()
+	}
+	return filterFunc(func(v uint32) bool { return true })
 }
 
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).

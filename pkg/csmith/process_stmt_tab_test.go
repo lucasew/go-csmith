@@ -99,3 +99,31 @@ func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
 	}
 	ClearAttrGenerators()
 }
+
+func TestNewVariableSelectorNoInventProbs(t *testing.T) {
+	// C++ VariableSelector uses process Probabilities; no invent second table
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
+	vs := NewVariableSelector(Defaults())
+	if vs.Probs != nil {
+		t.Fatal("must not invent NewProbabilities when process unset")
+	}
+	p := NewProbabilities(Defaults())
+	SetProcessProbabilities(p)
+	vs2 := NewVariableSelector(Defaults())
+	if vs2.Probs != p {
+		t.Fatal("must share process Probabilities")
+	}
+}
+
+func TestBinaryOpsFilterNoInventProbs(t *testing.T) {
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
+	// reject-all when process unset (no invent NewProbabilities(opts))
+	f := BinaryOpsFilter(Defaults())
+	if !f.Filter(0) {
+		t.Fatal("nil process must reject-all")
+	}
+}
