@@ -374,6 +374,56 @@ func (t *Type) IsDerivable(other *Type) bool {
 	return t.IsConvertable(other) || t.IsDereferencedFrom(other) || t.ptrTo == other
 }
 
+// IsEquivalent mirrors Type::is_equivalent — same size and signedness for simples.
+// Type.cpp:1455–1464.
+func (t *Type) IsEquivalent(other *Type) bool {
+	if t == nil || other == nil {
+		return t == other
+	}
+	if t == other {
+		return true
+	}
+	if t.IsSimple() && other.IsSimple() {
+		return t.IsSigned() == other.IsSigned() && t.SizeInBytes() == other.SizeInBytes()
+	}
+	return false
+}
+
+// BaseType walks pointers to the ultimate pointee (Type::get_base_type).
+func (t *Type) BaseType() *Type {
+	for t != nil && t.ptrTo != nil {
+		t = t.ptrTo
+	}
+	return t
+}
+
+// NeedsCast mirrors Type::needs_cast — pointer with inequivalent base.
+// Type.cpp:1466–1469.
+func (t *Type) NeedsCast(other *Type) bool {
+	if t == nil || other == nil {
+		return false
+	}
+	return t.PtrType() != nil && other.PtrType() != nil &&
+		!t.BaseType().IsEquivalent(other.BaseType())
+}
+
+// HasBitfields mirrors Type::has_bitfields.
+// Type.cpp:1290–1301.
+func (t *Type) HasBitfields() bool {
+	if t == nil {
+		return false
+	}
+	for _, f := range t.Fields {
+		if f.BitWidth >= 0 {
+			return true
+		}
+		if f.Type != nil && f.Type.IsStruct() && f.Type.HasBitfields() {
+			return true
+		}
+	}
+	return false
+}
+
 // ChooseRandomNonvoidSimple mirrors Type::choose_random_nonvoid_simple.
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	if r == nil || probs == nil {

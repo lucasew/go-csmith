@@ -37,6 +37,35 @@ type Expression struct {
 	// CommaLHS / CommaRHS for TermCommaExpr.
 	CommaLHS *Expression
 	CommaRHS *Expression
+	// CastType is Expression::cast_type (optional C cast prefix).
+	CastType *Type
+}
+
+// CheckAndSetCast mirrors Expression::check_and_set_cast.
+// Expression.cpp:222–226 — lang_cpp or needs_cast; we apply when desired type needs cast.
+func (e *Expression) CheckAndSetCast(desired *Type) {
+	if e == nil || desired == nil {
+		return
+	}
+	// Source type from var / const / invoke approximate
+	var src *Type
+	switch e.Term {
+	case TermVariable:
+		if e.ExprType != nil {
+			src = e.ExprType
+		} else if e.Var != nil {
+			src = e.Var.Type
+		}
+	case TermConstant:
+		if e.Con != nil {
+			src = e.Con.Type
+		}
+	default:
+		return
+	}
+	if src != nil && desired.NeedsCast(src) {
+		e.CastType = desired
+	}
 }
 
 // IndirectLevel mirrors ExpressionVariable::get_indirect_level.
@@ -301,8 +330,19 @@ func makeExpressionVariableFlags(
 	return nil
 }
 
-// Output is a minimal C fragment for tests (not full Expression::Output).
+// Output is a minimal C fragment (Expression::Output + optional cast).
 func (e *Expression) Output() string {
+	if e == nil {
+		return ""
+	}
+	body := e.outputBody()
+	if e.CastType != nil {
+		return "(" + e.CastType.CName() + ")" + body
+	}
+	return body
+}
+
+func (e *Expression) outputBody() string {
 	if e == nil {
 		return ""
 	}
@@ -334,18 +374,21 @@ func (e *Expression) Output() string {
 		}
 	case TermAssignment:
 		if e.Assign != nil {
-			// C assignment-as-expression: (lhs = rhs) or (lhs++)
+			// ExpressionAssign::Output → (assign as expr)
 			lhs := ""
 			if e.Assign.ArrayAccess != "" {
 				lhs = e.Assign.ArrayAccess
 			} else if e.Assign.LhsVar != nil {
-				lhs = e.Assign.LhsVar.Name
+				lhs = e.Assign.LhsVar.OutputLhsC()
 			}
 			rhs := "0"
 			if e.Assign.Expr != nil {
 				rhs = e.Assign.Expr.Output()
 			}
 			if lhs != "" {
+				if e.Assign.AssignOp.NeedNoRHS() {
+					return "(" + e.Assign.AssignOp.AssignOpC(lhs, "") + ")"
+				}
 				return "(" + e.Assign.AssignOp.AssignOpC(lhs, rhs) + ")"
 			}
 		}

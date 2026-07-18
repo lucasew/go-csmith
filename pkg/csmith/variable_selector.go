@@ -190,7 +190,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 
 // SelectGlobal mirrors VariableSelector::SelectGlobal.
 // VariableSelector.cpp:669–695 — choose_var(GlobalList, …, eFlexible); else GenerateNewGlobal.
-// expand_struct / random_type_from_type deferred (create with requested t).
+// random_type_from_type applied on create path; expand_struct not enabled by default.
 func (vs *VariableSelector) SelectGlobal(
 	access Access,
 	cg CGContext,

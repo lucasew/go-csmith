@@ -31,6 +31,12 @@ func MakeRandomReturn(
 		// last resort: constant of return type (not upstream, avoids empty return)
 		ev = &Expression{Term: TermConstant, Con: MakeRandom(ret, opts, r)}
 	}
+	// typecast if needed (StatementReturn.cpp:60 check_and_set_cast)
+	ev.CheckAndSetCast(ret)
+	// ccomp + bitfield return cast (StatementAssign.cpp similar path)
+	if opts.CComp && ev.Var != nil && ev.Var.IsBitfield {
+		ev.CastType = ret
+	}
 	st.Expr = ev
 	return st
 }

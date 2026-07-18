@@ -87,6 +87,15 @@ func MakeRandomAssign(
 	// Lhs::make_random — SelectDerefPointerProb / local+global WRITE
 	compound := op != AssignSimple
 	lhs, exprTy := MakeRandomLhs(r, opts, probs, vs, cg, typ, compound)
+	// RHS cast to L type when needed (StatementAssign.cpp:207–208)
+	if rhs != nil && typ != nil {
+		rhs.CheckAndSetCast(typ)
+	}
+	if opts.CComp && lhs != nil && lhs.IsBitfield {
+		if rhs != nil {
+			rhs.CastType = typ
+		}
+	}
 	st := Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
 	// if LHS is a pointer to be dereferenced, emit (*p) via ArrayAccess-style text
 	if lhs != nil && exprTy != nil && lhs.Type != nil {
