@@ -305,6 +305,10 @@ func RecordForwardJump() { forwardJumpCnt++ }
 // RecordBackwardJump mirrors Bookkeeper::backward_jump_cnt++.
 func RecordBackwardJump() { backwardJumpCnt++ }
 
+// RecordPointerAvailForDeref mirrors Bookkeeper::pointer_avail_for_dereference++.
+// VariableSelector.cpp:416–419.
+func RecordPointerAvailForDeref() { pointerAvailForDeref++ }
+
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
 // plus sum of arg complexities; assign/comma nest.

@@ -292,7 +292,7 @@ func HashGlobalVariables(vs *VariableSelector) string {
 		if v == nil {
 			continue
 		}
-		b.WriteString(v.hashOutput(ctrl))
+		b.WriteString(v.hashOutput(ctrl, nil))
 	}
 	return b.String()
 }

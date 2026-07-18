@@ -498,7 +498,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 }
 
 // ChooseVar mirrors VariableSelector::choose_var type+eligibility filter.
-// VariableSelector.cpp:394–447 subset — expand, match, qfer match_indirect, eligible.
+// VariableSelector.cpp:394–447.
 func ChooseVar(
 	r *Rng,
 	vars []*Variable,
@@ -520,28 +520,65 @@ func ChooseVarQfer(
 	qfer *CVQualifiers,
 	mt MatchType,
 ) *Variable {
+	return ChooseVarFull(r, vars, access, cg, want, qfer, mt, nil, false, false, false)
+}
+
+// ChooseVarFull mirrors VariableSelector::choose_var full signature.
+// VariableSelector.cpp:394–447 — expand_struct, invalid_vars, no_bitfield, no_union.
+func ChooseVarFull(
+	r *Rng,
+	vars []*Variable,
+	access Access,
+	cg CGContext,
+	want *Type,
+	qfer *CVQualifiers,
+	mt MatchType,
+	invalidVars []*Variable,
+	noBitfield, noExpandStructUnion, noUnion bool,
+) *Variable {
 	if want == nil {
 		var ok []*Variable
 		for _, v := range vars {
-			if v != nil && IsEligibleVar(v, 0, access, cg) {
+			if v == nil {
+				continue
+			}
+			if IsVariableInSet(invalidVars, v) {
+				continue
+			}
+			if noBitfield && v.IsBitfield {
+				continue
+			}
+			if noUnion && v.IsInsideUnionField() {
+				continue
+			}
+			if IsEligibleVar(v, 0, access, cg) {
 				ok = append(ok, v)
 			}
 		}
 		return ChooseOKVar(r, ok)
 	}
 	cands := vars
-	if want.IsSimple() || want.IsAggregate() {
+	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
+	if !noExpandStructUnion && (want.IsSimple() || want.IsAggregate()) {
 		cands = ExpandStructUnionVars(vars, want)
 	}
 	_ = HasEligibleVolatileVar(cands, want, access, cg)
-	if cg.FM != nil {
-		_ = HasDereferenceableVar(cands, want, cg, Options{})
+	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
+	opts := Defaults()
+	if HasDereferenceableVar(cands, want, cg, opts) {
+		RecordPointerAvailForDeref()
 	}
 	matchExact := false
-	// if opts available via nothing — use false; MatchExactQualifiers on opts later
 	var ok []*Variable
 	for _, x := range cands {
 		if x == nil || x.Type == nil {
+			continue
+		}
+		// VariableSelector.cpp:424–429
+		if noBitfield && x.IsBitfield {
+			continue
+		}
+		if noUnion && x.IsInsideUnionField() {
 			continue
 		}
 		if !want.Match(x.Type, mt) {
@@ -551,6 +588,9 @@ func ChooseVarQfer(
 			if !qfer.MatchIndirect(x.Qfer, matchExact) {
 				continue
 			}
+		}
+		if IsVariableInSet(invalidVars, x) {
+			continue
 		}
 		deref := x.Type.IndirectLevel() - want.IndirectLevel()
 		if !IsEligibleVar(x, deref, access, cg) {

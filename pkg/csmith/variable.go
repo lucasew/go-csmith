@@ -882,24 +882,35 @@ func (v *Variable) CollectExpandable() []*Variable {
 // HashOutput mirrors Variable::hash for compute_hash path.
 // Variable.cpp:889–923 — aggregates recurse fields; simple transparent_crc;
 // float uses transparent_crc_bytes; pointers emit nothing.
-// FactUnion readability omitted (hash all union fields).
 // Standalone path allocates temporary letter ctrl names (i,j,…) without
 // mutating the package ctrl-var pool when no last set exists.
+// unionFacts nil → hash all union fields (no FactMgr); non-nil → IsFieldReadable.
 func (v *Variable) HashOutput() string {
-	return v.hashOutput(nil)
+	return v.hashOutput(nil, nil)
 }
 
-func (v *Variable) hashOutput(ctrl []*Variable) string {
+// HashOutputWithUnionFacts is HashOutput with FactUnion last-write filtering.
+func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
+	return v.hashOutput(nil, unionFacts)
+}
+
+func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
 	if v == nil || v.Type == nil {
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
-		return hashArrayVariable(v, ctrl)
+		return hashArrayVariable(v, ctrl, unionFacts)
 	}
 	if v.Type.IsAggregate() {
 		var b strings.Builder
-		for _, f := range v.FieldVars {
-			b.WriteString(f.hashOutput(ctrl))
+		for i, f := range v.FieldVars {
+			// Variable.cpp:893–898 — skip unreadable union fields
+			if v.Type.IsUnion() && unionFacts != nil {
+				if !IsFieldReadable(v, i, unionFacts) {
+					continue
+				}
+			}
+			b.WriteString(f.hashOutput(ctrl, unionFacts))
 		}
 		return b.String()
 	}
@@ -938,10 +949,12 @@ func hashArrayHasPayload(v *Variable) bool {
 }
 
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
-// ArrayVariable.cpp:735–820 — uses get_last_ctrl_vars names (i,j,k…); no FactUnion exclude.
+// ArrayVariable.cpp:735–820 — uses get_last_ctrl_vars names (i,j,k…).
+// Union array elements: exclude unreadable fields when unionFacts non-nil
+// (ArrayVariable.cpp:741–752).
 // Skips arrays with no hashable payload (e.g. pointer element type).
 // ctrl nil → synthesize letter names for standalone HashOutput.
-func hashArrayVariable(v *Variable, ctrl []*Variable) string {
+func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
 	if v == nil || len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
 		return ""
 	}
@@ -974,8 +987,13 @@ func hashArrayVariable(v *Variable, ctrl []*Variable) string {
 	}
 	if v.Type != nil && v.Type.IsAggregate() {
 		j := 0
-		for _, f := range v.Type.Fields {
+		for i, f := range v.Type.Fields {
 			if f.Type == nil || f.BitWidth == 0 {
+				continue
+			}
+			// ArrayVariable.cpp:741–752 — skip unreadable union fields
+			if v.Type.IsUnion() && unionFacts != nil && !IsFieldReadable(v, i, unionFacts) {
+				j++
 				continue
 			}
 			if f.Type.IsSimple() && !f.Type.IsFloat() {
