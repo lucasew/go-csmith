@@ -1567,6 +1567,10 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	if v := ChooseVarFull(r, filtered, AccessWrite, cg, ty, nil, MatchConvert, invalidSlice, true, false, false); v != nil {
 		return v
 	}
+	// VariableSelector.cpp:1170 ERROR_GUARD after choose_var
+	if HasError() {
+		return nil
+	}
 	// VariableSelector.cpp:1172–1178 — create global or parent local
 	if vs.Opts.GlobalVariables {
 		return vs.GenerateNewGlobal(AccessWrite, cg, ty, nil, r)

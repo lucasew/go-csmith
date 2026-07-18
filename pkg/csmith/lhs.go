@@ -441,6 +441,10 @@ func selectDerefPointerInv(
 	if typ == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); no invent
+	if qfer == nil || !qfer.SanityCheck(typ) {
+		return nil
+	}
 	// VariableSelector.cpp:1252–1266 — GlobalNonvolatilesList only (no GlobalList soft-fallback)
 	var cands []*Variable
 	if vs != nil {
@@ -461,7 +465,7 @@ func selectDerefPointerInv(
 		return v
 	}
 
-	// create pointer to typ if under max indirect
+	// VariableSelector.cpp:1268–1272 — create ptr if under max_indirect_level
 	if typ.IndirectLevel() >= opts.MaxPointerDepth {
 		return nil
 	}
@@ -474,46 +478,70 @@ func selectDerefPointerInv(
 	if ptrType == nil {
 		return nil
 	}
-	// VariableSelector.cpp:1275–1287 — ptr_qfer
+	// VariableSelector.cpp:1274–1285 — ptr_qfer
 	var pq CVQualifiers
-	if qfer == nil || qfer.Wildcard || !opts.GlobalVariables {
+	if qfer.Wildcard || !opts.GlobalVariables {
 		pq = RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
 	} else {
 		// random_add_qualifiers(!SE-free)
 		noVol := !cg.EffectContext().IsSideEffectFree()
 		pq = qfer.RandomAddQualifiers(r, opts, probs, noVol)
 	}
+	// VariableSelector.cpp:1281 ERROR_GUARD after random_add/random_qualifiers
+	if HasError() {
+		return nil
+	}
 	pq.AcceptStricter = false
 	if access == AccessWrite {
-		// CVQualifiers::set_const(false, 1) — index len-pos-1 from end
-		// CVQualifiers.cpp:588–592
-		if n := len(pq.IsConsts); n > 0 {
-			idx := n - 1 - 1 // pos = 1
-			if idx >= 0 {
-				pq.IsConsts[idx] = false
-			}
-		}
-	}
-	// VariableSelector.cpp:1288–1314 — volatile → global; else local
-	if vs != nil && vs.Opts.ExpandStruct {
-		if pq.IsVolatile() {
-			if v := vs.EagerCreateGlobalStruct(access, cg, ptrType, &pq, r, MatchDereference); v != nil {
-				return v
-			}
-		} else if blk != nil {
-			if v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, &pq, r, MatchDereference); v != nil {
-				return v
-			}
-		}
+		// VariableSelector.cpp:1283–1285 — set_const(false, 1)
+		pq.SetConst(false, 1)
 	}
 	if vs == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1286–1316 — expand_struct fail → Error::set_error, no Generate fallthrough
+	if vs.Opts.ExpandStruct {
+		if pq.IsVolatile() {
+			v := vs.EagerCreateGlobalStruct(access, cg, ptrType, &pq, r, MatchDereference, invalidVars)
+			if HasError() {
+				return nil
+			}
+			if v != nil {
+				return v
+			}
+			SetError(ErrGeneric)
+			return nil
+		}
+		if blk == nil {
+			// C++ GenerateNewParentLocal(*block) with null block — fail closed
+			return nil
+		}
+		v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, &pq, r, MatchDereference, invalidVars)
+		if HasError() {
+			return nil
+		}
+		if v != nil {
+			return v
+		}
+		SetError(ErrGeneric)
+		return nil
+	}
+	// VariableSelector.cpp:1286–1315 non-expand: volatile global else parent local
 	if pq.IsVolatile() {
-		return vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
+		v := vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
+		if HasError() {
+			return nil
+		}
+		return v
 	}
-	if blk != nil {
-		return vs.GenerateNewParentLocal(blk, access, cg, ptrType, &pq, r)
+	if blk == nil {
+		// no soft invent global when current block missing
+		return nil
 	}
-	return vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
+	v := vs.GenerateNewParentLocal(blk, access, cg, ptrType, &pq, r)
+	// VariableSelector.cpp:1318 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
+	return v
 }

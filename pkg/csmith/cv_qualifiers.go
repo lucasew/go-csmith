@@ -499,54 +499,59 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 	return q.Match(other.IndirectQualifiers(deref), matchExact)
 }
 
-// SetConst mirrors CVQualifiers::set_const — pos defaults to 0 (storage / first vector slot).
-// CVQualifiers.cpp:588–593. pos is index from the start of is_consts.
+// SetConst mirrors CVQualifiers::set_const.
+// CVQualifiers.cpp:588–593 — is_consts[len - pos - 1] = is_const; pos default 0
+// is storage (last). No soft invent grow when empty or pos OOB.
 func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 	if q == nil {
 		return
 	}
-	if pos < 0 {
-		pos = 0
-	}
-	for len(q.IsConsts) <= pos {
-		q.IsConsts = append(q.IsConsts, false)
-	}
-	q.IsConsts[pos] = isConst
-}
-
-// SetVolatile mirrors CVQualifiers::set_volatile.
-// CVQualifiers.cpp:595–600.
-func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
-	if q == nil {
+	n := len(q.IsConsts)
+	if n == 0 {
 		return
 	}
 	if pos < 0 {
 		pos = 0
 	}
-	for len(q.IsVolatiles) <= pos {
-		q.IsVolatiles = append(q.IsVolatiles, false)
+	idx := n - pos - 1
+	if idx < 0 || idx >= n {
+		return
 	}
-	q.IsVolatiles[pos] = isVol
+	q.IsConsts[idx] = isConst
+}
+
+// SetVolatile mirrors CVQualifiers::set_volatile.
+// CVQualifiers.cpp:595–600 — is_volatiles[len - pos - 1]; no invent grow.
+func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
+	if q == nil {
+		return
+	}
+	n := len(q.IsVolatiles)
+	if n == 0 {
+		return
+	}
+	if pos < 0 {
+		pos = 0
+	}
+	idx := n - pos - 1
+	if idx < 0 || idx >= n {
+		return
+	}
+	q.IsVolatiles[idx] = isVol
 }
 
 // Restrict mirrors CVQualifiers::restrict.
-// CVQualifiers.cpp:602–609 — WRITE clears const; non-SE-free clears volatile.
+// CVQualifiers.cpp:602–609 — WRITE → set_const(false); non-SE-free → set_volatile(false).
+// Only storage slot (pos=0 → last); no dual-clear invent of first+last.
 func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if q == nil || q.Wildcard {
 		return
 	}
 	if access == AccessWrite {
 		q.SetConst(false, 0)
-		// also clear last storage const if multi-level (storage often last)
-		if n := len(q.IsConsts); n > 1 {
-			q.IsConsts[n-1] = false
-		}
 	}
 	if !cg.EffectContext().IsSideEffectFree() {
 		q.SetVolatile(false, 0)
-		if n := len(q.IsVolatiles); n > 1 {
-			q.IsVolatiles[n-1] = false
-		}
 	}
 }
 
