@@ -72,6 +72,25 @@ func TestExpandWithinRanges(t *testing.T) {
 	if len(got) != 4 {
 		t.Fatal(len(got))
 	}
+	// util.cpp product: (0,0)(0,1)(1,0)(1,1)
+	if got[0][0] != 0 || got[0][1] != 0 || got[3][0] != 1 || got[3][1] != 1 {
+		t.Fatalf("order %v", got)
+	}
+	// util.cpp: zero size → empty expansion (no soft invent n=1)
+	if expandWithinRanges([]int{2, 0}) != nil {
+		t.Fatal("zero dim must not invent size 1")
+	}
+	if expandWithinRanges([]int{-1}) != nil {
+		t.Fatal("negative dim must not invent size 1")
+	}
+	if expandWithinRanges(nil) != nil {
+		t.Fatal("empty sizes")
+	}
+	// 1×3
+	g13 := expandWithinRanges([]int{1, 3})
+	if len(g13) != 3 || g13[2][0] != 0 || g13[2][1] != 2 {
+		t.Fatalf("%v", g13)
+	}
 }
 
 func TestBlindCheckGlobalMain(t *testing.T) {

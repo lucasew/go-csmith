@@ -1204,28 +1204,37 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 	return b.String()
 }
 
-// expandWithinRanges mirrors expand_within_ranges — all index vectors in [0,size).
+// expandWithinRanges mirrors util.cpp expand_within_ranges — all index vectors
+// in [0,size) for each dimension. util.cpp:111–137: product of sizes; a zero
+// (or empty) dimension yields empty out. No soft invent size 1 for n < 1.
 func expandWithinRanges(sizes []int) [][]int {
 	if len(sizes) == 0 {
 		return nil
 	}
-	var out [][]int
-	var rec func(prefix []int, dim int)
-	rec = func(prefix []int, dim int) {
-		if dim == len(sizes) {
-			cp := append([]int(nil), prefix...)
-			out = append(out, cp)
-			return
-		}
-		n := sizes[dim]
+	// util.cpp: unsigned sizes; product 0 → empty expansion (no invent).
+	for _, n := range sizes {
 		if n < 1 {
-			n = 1
-		}
-		for i := 0; i < n; i++ {
-			rec(append(prefix, i), dim+1)
+			return nil
 		}
 	}
-	rec(nil, 0)
+	// util.cpp: limits[dim-1] = in[dim-1]; limits[i] = limits[i+1]*in[i]
+	dim := len(sizes)
+	limits := make([]int, dim)
+	limits[dim-1] = sizes[dim-1]
+	for i := dim - 2; i >= 0; i-- {
+		limits[i] = limits[i+1] * sizes[i]
+	}
+	out := make([][]int, 0, limits[0])
+	for i := 0; i < limits[0]; i++ {
+		tmp := make([]int, 0, dim)
+		num := i
+		for j := 0; j < dim-1; j++ {
+			tmp = append(tmp, num/limits[j+1])
+			num = num % limits[j+1]
+		}
+		tmp = append(tmp, num)
+		out = append(out, tmp)
+	}
 	return out
 }
 

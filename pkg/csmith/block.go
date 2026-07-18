@@ -617,8 +617,9 @@ func makeRandomStmtKind(
 	b *Block,
 	kind StatementType,
 ) Stmt {
+	// Statement.cpp always has live CGContext; nil → fail closed (no invent shell)
 	if cg == nil {
-		return Stmt{Kind: kind}
+		return Stmt{}
 	}
 	switch kind {
 	case StmtReturn:
@@ -638,20 +639,29 @@ func makeRandomStmtKind(
 		if st := MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
 			return *st
 		}
-		return Stmt{Kind: StmtIfElse}
+		// null factory → re-pick (Statement.cpp:314); incomplete shell fails stmtOK
+		return Stmt{}
 	case StmtFor:
 		if st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
 			return *st
 		}
-		return Stmt{Kind: StmtFor}
+		return Stmt{}
 	case StmtArrayOp:
 		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtGoto:
 		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 	case StmtInvoke:
 		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
+	case StmtBlock:
+		// Statement.cpp:281–282 — Block::make_random; filter usually drops eBlock
+		if nested := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false); nested != nil {
+			return Stmt{Kind: StmtBlock, Then: nested, StmID: nested.StmID}
+		}
+		return Stmt{}
 	default:
-		return Stmt{Kind: kind}
+		// Statement.cpp:275–277 — assert(!"unknown Statement type"); fail closed
+		SetError(ErrGeneric)
+		return Stmt{}
 	}
 }
 
@@ -668,7 +678,8 @@ func stmtOK(st Stmt) bool {
 		return st.Label != ""
 	case StmtReturn:
 		return st.Expr != nil
-	case StmtIfElse:
+	case StmtIfElse, StmtBlock:
+		// nested Block::make_random / if-then both require live Then body
 		return st.Then != nil
 	case StmtContinue, StmtBreak:
 		// factories always set test expr; Expr-less marks nullptr reject (e.g. continue first-stmt)

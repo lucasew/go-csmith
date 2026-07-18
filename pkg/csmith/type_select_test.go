@@ -17,6 +17,16 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 	}
 }
 
+func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
+	// Type.cpp:523 assert(sz > 0) — empty ok_types must not invent a type
+	if ChooseRandomStructUnionType(NewRng(1), nil) != nil {
+		t.Fatal("empty pool")
+	}
+	if ChooseRandomStructUnionType(nil, []*Type{GetIntType()}) != nil {
+		t.Fatal("nil rng")
+	}
+}
+
 func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

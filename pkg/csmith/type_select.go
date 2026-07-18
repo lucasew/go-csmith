@@ -93,10 +93,10 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 // ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
+	// Type.cpp:523 — assert(sz > 0); empty pool is broken caller / no invent
 	if r == nil || len(ok) == 0 {
 		return nil
 	}
-	// Type.cpp:523 — assert(sz > 0)
 	rv := ok[r.RndUpto(uint32(len(ok)))]
 	// Type.cpp:526 — ERROR_GUARD(0)
 	if HasError() {

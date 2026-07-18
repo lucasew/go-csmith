@@ -33,3 +33,37 @@ func TestIsCompound(t *testing.T) {
 		t.Fatal("is_compound")
 	}
 }
+
+func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
+	// Statement.cpp:275–277 — assert(!"unknown Statement type"); no invent shell
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	st := makeRandomStmtKind(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts),
+		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, MaxStatementType)
+	if stmtOK(st) {
+		t.Fatal("unknown kind must not invent usable stmt")
+	}
+	if !HasError() {
+		t.Fatal("unknown kind must set sticky error like assert")
+	}
+	ClearError()
+	// nil CGContext — no invent Kind-only shell
+	st2 := makeRandomStmtKind(NewRng(1), opts, nil, nil, nil, nil, nil, nil, StmtAssign)
+	if stmtOK(st2) || st2.Kind != 0 {
+		t.Fatalf("nil cg soft invent %#v", st2)
+	}
+}
+
+func TestStmtOKBlockRequiresThen(t *testing.T) {
+	if stmtOK(Stmt{Kind: StmtBlock}) {
+		t.Fatal("StmtBlock without Then must fail stmtOK")
+	}
+	if !stmtOK(Stmt{Kind: StmtBlock, Then: &Block{}}) {
+		t.Fatal("StmtBlock with Then is usable")
+	}
+}
