@@ -234,8 +234,42 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	return ShortcutOK
 }
 
-// ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts skeleton.
-// Statement.cpp:577+ — try shortcut; else visit_facts and record maps.
+// StmVisitFacts mirrors Statement::stm_visit_facts.
+// Statement.cpp:609–626 — clear effect_stm; visit_facts; remove_rv_facts;
+// always record map_accum_effect and map_visited (even on failure).
+func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
+	if st == nil || facts == nil || cg == nil {
+		return true
+	}
+	// Statement.cpp:611 — get_effect_stm().clear()
+	cg.ClearEffectStm()
+	// Statement.cpp:612 — curr_blk = parent (stack top is current block in Go)
+	if cg.FM != nil {
+		cg.FM.GlobalFacts = *facts
+	}
+	ok := VisitFactsStmt(st, cg, opts)
+	// Statement.cpp:615–617 — failed_stm = this when !ok && !is_compound (debug only)
+	if cg.FM != nil {
+		// Statement.cpp:621–624 — remove_rv; accum; visited always set
+		*facts = CloneFactSlice(cg.FM.GlobalFacts)
+		cg.FM.RemoveRVFacts(facts)
+		cg.FM.GlobalFacts = *facts
+		if st.StmID > 0 {
+			if cg.FM.MapAccumEffect == nil {
+				cg.FM.MapAccumEffect = make(map[int]Effect)
+			}
+			cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+			if cg.FM.MapVisited == nil {
+				cg.FM.MapVisited = make(map[int]bool)
+			}
+			cg.FM.MapVisited[st.StmID] = true
+		}
+	}
+	return ok
+}
+
+// ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
+// Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.
 func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
 	if st == nil || facts == nil || cg == nil {
 		return true
@@ -255,29 +289,15 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	case ShortcutConflict:
 		return false
 	}
-	// full visit
-	if cg.FM != nil && st.StmID > 0 {
-		cg.FM.SetMapFactsIn(st.StmID, *facts)
-	}
-	cg.ClearEffectStm()
-	ok := VisitFactsStmt(st, cg, opts)
-	if !ok {
+	// Statement.cpp:600–605 — copy pre-visit inputs; stm_visit; set in/out only on success
+	inputsCopy := CloneFactSlice(*facts)
+	if !StmVisitFacts(st, facts, cg, opts) {
 		return false
 	}
-	if cg.FM != nil {
-		*facts = CloneFactSlice(cg.FM.GlobalFacts)
-		if st.StmID > 0 {
-			cg.FM.SetMapFactsOutForStmt(st, *facts, blk)
-			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
-			if cg.FM.MapAccumEffect == nil {
-				cg.FM.MapAccumEffect = make(map[int]Effect)
-			}
-			cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
-			if cg.FM.MapVisited == nil {
-				cg.FM.MapVisited = make(map[int]bool)
-			}
-			cg.FM.MapVisited[st.StmID] = true
-		}
+	if cg.FM != nil && st.StmID > 0 {
+		// Statement.cpp:604–605 — set_fact_in(pre); set_fact_out(post)
+		cg.FM.SetMapFactsIn(st.StmID, inputsCopy)
+		cg.FM.SetMapFactsOutForStmt(st, *facts, blk)
 	}
 	return true
 }

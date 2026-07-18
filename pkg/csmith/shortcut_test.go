@@ -171,3 +171,76 @@ func TestContainsStmt(t *testing.T) {
 		t.Fatal("contains")
 	}
 }
+
+func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
+	// Statement.cpp:609–626 — remove_rv_facts; map_visited even when visit fails
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	f.RV.Name = "func_1_rv"
+	otherRV := CreateVariableScalars("func_2_rv", GetIntType(), false, false)
+	otherRV.Name = "func_2_rv"
+	// mark as RVs via naming convention used by IsRV
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(f)
+	// inject foreign RV into working facts
+	facts := []*FactPointTo{
+		MakeFactPointTo(otherRV, GarbagePtr),
+		MakeFactPointTo(f.RV, v),
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
+		t.Fatal("visit assign should ok")
+	}
+	if !fm.MapVisited[42] {
+		t.Fatal("always visited")
+	}
+	// foreign RV dropped; own RV kept
+	for _, pt := range facts {
+		if pt != nil && pt.Var != nil && pt.Var.Name == "func_2_rv" {
+			t.Fatal("foreign rv must be removed")
+		}
+	}
+	// validate sets fact_in from pre-visit copy
+	pre := []*FactPointTo{MakeFactPointTo(v, GarbagePtr)}
+	st2 := &Stmt{
+		Kind: StmtAssign, StmID: 43, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
+	}
+	work := CloneFactSlice(pre)
+	if !ValidateAndUpdateFacts(st2, &work, &cg, Defaults(), nil) {
+		t.Fatal("validate")
+	}
+	in := fm.MapFactsIn[43]
+	if len(in) != 1 || in[0] == nil || in[0].Var != v {
+		t.Fatalf("fact_in should be pre-visit copy: %+v", in)
+	}
+}
+
+func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
+	// visit fail (write IV) still marks visited per C++ stm_visit_facts
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 77, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	cg.IVBounds = map[*Variable]int{iv: 10}
+	facts := []*FactPointTo{}
+	ok := StmVisitFacts(st, &facts, &cg, Defaults())
+	if ok {
+		t.Fatal("expected visit fail writing IV")
+	}
+	if !fm.MapVisited[77] {
+		t.Fatal("visited must be set even on fail")
+	}
+}
