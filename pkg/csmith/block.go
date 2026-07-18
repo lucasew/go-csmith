@@ -850,13 +850,12 @@ func (b *Block) Output(indent int) string {
 			}
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
+			// no soft invent /* invoke */ when expr missing (stmtOK rejects null)
 			if st.Expr != nil {
 				sb.WriteString(st.Expr.Output() + ";\n")
-			} else {
-				sb.WriteString("/* invoke */;\n")
 			}
 		default:
-			sb.WriteString("/* stmt */;\n")
+			// incomplete IR — no soft invent comment stub
 		}
 		// Statement::post_output — paranoid fact assertions (Statement.cpp:919–924)
 		if b.EmitParanoid && b.EmitFM != nil {

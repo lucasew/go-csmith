@@ -150,9 +150,7 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	// non-SE-free context
 	cg := WithFunc(f, EmptyEffect().WriteVar(CreateVariableScalars("g_x", GetIntType(), true, false)))
 	cg.Types = vs.Types
-	// should still return something (int fallback after retries) without hang
+	// VariableSelector.cpp — no soft invent int elem; nil OK when AcceptType rejects
 	av := vs.CreateRandomArray(NewRng(3), cg)
-	if av == nil {
-		t.Fatal("nil")
-	}
+	_ = av // may be nil when no acceptable element type
 }

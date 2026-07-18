@@ -22,7 +22,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	// may fail if max funcs / no list — with list should often succeed
 	if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
 		out := st.Expr.Output()
-		if out == "" || out == "/*bad_call*/" {
+		if out == "" || out == "/*bad_call*/" || out == "/*invoke*/" {
 			t.Fatal(out)
 		}
 	}

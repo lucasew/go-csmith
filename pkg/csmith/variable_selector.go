@@ -1354,21 +1354,19 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 			t = vs.Types.MakeRandomPointerType(r, vs.Opts, vs.Probs)
 		}
 	} else if vs.Types != nil && len(vs.Types.AllTypes) > 0 {
-		// Type::choose_random_nonvoid_nonvolatile
+		// Type::choose_random_nonvoid_nonvolatile (filters arg_structs/arg_unions)
 		t = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
 	} else {
 		st := ChooseRandomNonvoidSimple(r, vs.Probs)
 		t = GetSimpleType(st)
 	}
+	// VariableSelector.cpp:973–976 — ERROR_RETURN on null; assert non-void simple
+	// no soft invent GetIntType (arg_structs filter is in NonVoidNonVolatileTypeFilter)
 	if t == nil {
-		t = GetIntType()
+		return nil
 	}
-	// Function.cpp OutputFormalParam asserts — reject struct/union params when disabled
-	if t.IsStruct() && !vs.Opts.ArgStructs {
-		t = GetIntType()
-	}
-	if t.IsUnion() && !vs.Opts.ArgUnions {
-		t = GetIntType()
+	if t.IsSimple() && t.Simple() == EVoid {
+		return nil
 	}
 	// CVQualifiers::random_qualifiers(t) — no context
 	qfer := RandomQualifiersNoContextNoVolatile(t, vs.Opts, vs.Probs, r)
@@ -1582,8 +1580,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		}
 		break
 	}
+	// VariableSelector.cpp:1351–1361 — no soft invent int element after failed picks
 	if elem == nil {
-		elem = GetIntType()
+		return nil
 	}
 	// VariableSelector.cpp:1362–1363 — non-const non-vol storage qfer
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})

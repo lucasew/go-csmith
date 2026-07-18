@@ -170,8 +170,11 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 		t.Fatalf("op %s", fi.Binary)
 	}
 	out := fi.Output()
-	if out == "/*invoke*/" || out == "" {
-		t.Fatal(out)
+	if out == "" {
+		t.Fatal("empty ptr cmp output")
+	}
+	if out == "/*invoke*/" || out == "/*bad_call*/" {
+		t.Fatal("no soft invent comments", out)
 	}
 	// top-level is ==/!= (operands may contain safe_* from nested exprs)
 	if !strings.Contains(out, "==") && !strings.Contains(out, "!=") {

@@ -57,8 +57,10 @@ func (fi *Invocation) wrapperOpts() Options {
 // FunctionInvocationUnary::Output / FunctionInvocationBinary::Output —
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
 func (fi *Invocation) Output() string {
+	// Failed invocations are not emitted (ExpressionFuncall replaces with var).
+	// No soft invent /*bad_call*/ / /*invoke*/ comments.
 	if fi == nil || fi.Failed {
-		return "/*bad_call*/"
+		return ""
 	}
 	if fi.User != nil {
 		var b strings.Builder
@@ -92,7 +94,7 @@ func (fi *Invocation) Output() string {
 			return fi.outputBinary(a0, a1)
 		}
 	}
-	return "/*invoke*/"
+	return ""
 }
 
 // outputUnary mirrors FunctionInvocationUnary::Output.
@@ -538,9 +540,7 @@ func MakeRandomBinaryInvocation(
 	if DepthGuardByType(opts, DtFunctionInvocationRandomBinary) == BadDepth {
 		return nil
 	}
-	if typ == nil {
-		typ = GetIntType()
-	}
+	// FunctionInvocation.cpp:171+ — type may be nullptr (StatementExpr); no GetIntType invent
 	// FunctionInvocation.cpp:174–177 — 10% pointer comparison when derived exist
 	if r.RndFlipcoin(10) {
 		var env *TypeEnv
@@ -558,7 +558,7 @@ func MakeRandomBinaryInvocation(
 	}
 	op := PickBinaryOp(r, opts)
 	// float filter if we ever pass float types
-	if typ.IsSimple() && typ.Simple() == EFloat && !BinaryOpWorksForFloat(op) {
+	if typ != nil && typ.IsSimple() && typ.Simple() == EFloat && !BinaryOpWorksForFloat(op) {
 		op = PickBinaryOp(r, opts)
 	}
 	opStr := op.BinaryOpC()
