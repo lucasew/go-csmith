@@ -1,3 +1,6 @@
+// Upstream: CGOptions.h / CGOptions.cpp (set_default_settings and option fields).
+// Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
+// MaxGlobals is a Go-only limit until full GlobalList modeling lands; not a C++ pad for RNG.
 package csmith
 
 import (

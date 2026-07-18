@@ -388,10 +388,12 @@ Superseding integrity text that banned residual while still logging residual cli
 
 | Item | Status |
 |------|--------|
-| SPEC fair-rewrite lock | **Done** (this document) |
-| Rewrite branch + delete residual-era `pkg/csmith` mass | **Not started** (follow-up) |
-| Bottom-up layer 1 (RNG 1:1 tests) | **Not started** |
-| ProgramGenerator + source gates | **Blocked** on fair spine |
-| CLI drop-in | **Last** |
+| SPEC fair-rewrite lock | **Done** |
+| Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
+| Layer 1: `Rng` (AbsRndNumGenerator + DefaultRndNumGenerator) | **Done** — `rng.go` + `rng_test.go` 1:1 vectors |
+| `CGOptions` defaults (`options.go`) | **Carried** — cite header; re-verify field-by-field later |
+| `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` until spine |
+| Type → … → ProgramGenerator | **Not started** |
+| CLI drop-in | **Last** (CLI still calls `Generate`, errors clearly) |
 
-Do not re-list residual event climbs here. Progress rows are **functions/modules ported + tests**, or explicit rewrite milestones.
+Progress rows are **functions/modules ported + tests**, not event tallies.

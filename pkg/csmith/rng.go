@@ -1,174 +1,192 @@
+// Upstream: AbsRndNumGenerator.cpp (seedrand/genrand via srand48/lrand48),
+// DefaultRndNumGenerator.cpp (rnd_upto, rnd_flipcoin, RandomHexDigits, RandomDigits),
+// random.cpp (rnd_upto / rnd_flipcoin wrappers).
+// Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934 (csmith 2.4.0 self-report).
 package csmith
 
 import (
 	"fmt"
+	"io"
 	"os"
-	"runtime"
 )
 
+// glibc srand48/lrand48 LCG parameters (AbsRndNumGenerator::genrand → lrand48).
 const (
 	lcgA    uint64 = 0x5DEECE66D
 	lcgC    uint64 = 0xB
 	lcgMask uint64 = (1 << 48) - 1
 )
 
-// rng is compatible with the libc srand48/lrand48 core recurrence used by Csmith.
-type rng struct {
+// Filter mirrors Filter::filter — true means reject this candidate.
+// DefaultRndNumGenerator.cpp rnd_upto / rnd_flipcoin.
+type Filter interface {
+	Filter(v uint32) bool
+}
+
+// Rng is the default random-number generator used by Csmith (random-based mode).
+// Mirrors DefaultRndNumGenerator + AbsRndNumGenerator genrand.
+type Rng struct {
 	state     uint64
-	trace     bool
-	traceSite bool
-	traceRaw  bool
-	traceFile string
-	tracePos  uint64
-	// silent: after RNG parity residual exhausts the upstream stream, stop
-	// tracing further events so GO event count matches upstream.
-	silent bool
+	randDepth uint64
+
+	trace   bool
+	traceTo io.Writer
 }
 
-// silenceTrace stops appending RNG events (generation may continue untraced).
-func (r *rng) eventPos() uint64 { if r==nil { return 0 }; return r.tracePos }
-func (r *rng) silenceTrace() {
-	if r != nil {
-		r.silent = true
+// NewRng seeds like AbsRndNumGenerator::seedrand → srand48(seed).
+// srand48: X0 = (seed << 16) + 0x330E (48-bit).
+func NewRng(seed uint64) *Rng {
+	r := &Rng{
+		state: ((seed << 16) + 0x330E) & lcgMask,
 	}
-}
-
-func newRNG(seed uint64) *rng {
-	// srand48 semantics.
-	r := &rng{state: ((seed << 16) + 0x330E) & lcgMask}
-	if os.Getenv("CSMITH_TRACE_RNG") != "" {
+	if os.Getenv("CSMITH_TRACE_RNG") != "" && os.Getenv("CSMITH_TRACE_RNG") != "0" {
 		r.trace = true
-		r.traceSite = os.Getenv("CSMITH_TRACE_RNG_SITE") != ""
-		r.traceRaw = os.Getenv("CSMITH_TRACE_RNG_RAW") != ""
-		r.traceFile = os.Getenv("CSMITH_TRACE_RNG_FILE")
-		if r.traceFile == "" {
-			r.traceFile = "/tmp/csmith-rng.trace"
+		path := os.Getenv("CSMITH_TRACE_RNG_FILE")
+		if path == "" {
+			path = "/tmp/csmith-rng.trace"
 		}
-		_ = os.WriteFile(r.traceFile, []byte(fmt.Sprintf("# seed=%d\n", seed)), 0644)
+		f, err := os.Create(path)
+		if err == nil {
+			_, _ = fmt.Fprintf(f, "# seed=%d\n", seed)
+			r.traceTo = f
+		}
 	}
 	return r
 }
 
-func (r *rng) next31() uint32 {
-	// e6585: absorb mid-leaf Expression after CREATE Return residual without
-	// advancing LCG so the next free StatementProbability U100 matches UP.
-	if postArrayOpUnwindExpr {
+// Genrand returns the next 31-bit value.
+// AbsRndNumGenerator::genrand → lrand48: (X >> 17) after LCG step.
+func (r *Rng) Genrand() uint32 {
+	if r == nil {
 		return 0
 	}
 	r.state = (lcgA*r.state + lcgC) & lcgMask
 	return uint32(r.state >> 17)
 }
 
-func (r *rng) upto(n uint32) uint32 {
-	if n == 0 {
+// RandDepth is DefaultRndNumGenerator::rand_depth_ (count of rnd_upto/rnd_flipcoin/hex digit steps).
+func (r *Rng) RandDepth() uint64 {
+	if r == nil {
 		return 0
 	}
-	if postArrayOpUnwindExpr {
-		return 0
-	}
-	raw := r.next31()
-	x := raw % n
-	r.traceU(n, x, 0, raw)
-	return x
+	return r.randDepth
 }
 
-func (r *rng) uptoWithFilter(n uint32, reject func(uint32) bool) uint32 {
-	if n == 0 {
-		return 0
-	}
-	if postArrayOpUnwindExpr {
-		return 0
-	}
-	raw := r.next31()
-	x := raw % n
-	if reject == nil || !reject(x) {
-		r.traceU(n, x, 0, raw)
-		return x
-	}
-	var tries uint32
-	// Safety guard: avoid pathological infinite loops when all candidates are rejected.
-	// Keep this large enough to preserve normal behavior while guaranteeing progress.
-	const maxRejectRetries uint32 = 1 << 16
-	for reject != nil && reject(x) && tries < maxRejectRetries {
-		raw = r.next31()
-		x = raw % n
-		tries++
-	}
-	if reject != nil && reject(x) {
-		panic(fmt.Sprintf("rng.uptoWithFilter: exceeded retry limit (n=%d tries=%d raw=%d)", n, tries, raw))
-	}
-	r.traceU(n, x, tries, raw)
-	return x
+// RndUpto returns v in [0, n). n must be > 0.
+// DefaultRndNumGenerator::rnd_upto (no Filter* → no reject loop).
+func (r *Rng) RndUpto(n uint32) uint32 {
+	return r.RndUptoFilter(n, nil)
 }
 
-func (r *rng) traceU(n uint32, x uint32, tries uint32, raw uint32) {
-	if r.trace && !r.silent {
-		r.tracePos++
-		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-		if err == nil {
-			if r.traceSite && r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d @%s\n", r.tracePos, n, x, tries, raw, traceCaller())
-			} else if r.traceSite {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d @%s\n", r.tracePos, n, x, traceCaller())
-			} else if r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d tries=%d raw=%d\n", r.tracePos, n, x, tries, raw)
-			} else {
-				_, _ = fmt.Fprintf(f, "%d U %d -> %d\n", r.tracePos, n, x)
-			}
-			_ = f.Close()
+// RndUptoFilter is DefaultRndNumGenerator::rnd_upto with optional Filter.
+// On reject: re-genrand, keep rand_depth_ as local_depth+1 (does not double-count tries).
+func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
+	if r == nil || n == 0 {
+		return 0
+	}
+	raw := r.Genrand()
+	v := raw % n
+	localDepth := r.randDepth
+	r.randDepth++
+	tries := uint32(0)
+	if f != nil {
+		for f.Filter(v) {
+			// DefaultRndNumGenerator.cpp: roll back rand_depth_ to local_depth+1
+			r.randDepth = localDepth + 1
+			raw = r.Genrand()
+			v = raw % n
+			tries++
 		}
 	}
+	if r.trace && r.traceTo != nil {
+		_, _ = fmt.Fprintf(r.traceTo, "U depth=%d n=%d v=%d tries=%d raw=%d\n", localDepth, n, v, tries, raw)
+	}
+	return v
 }
 
-func (r *rng) flipcoin(p uint32) bool {
+// RndFlipcoin returns true with probability p% (p clamped to 100).
+// DefaultRndNumGenerator::rnd_flipcoin.
+func (r *Rng) RndFlipcoin(p uint32) bool {
+	return r.RndFlipcoinFilter(p, nil)
+}
+
+// RndFlipcoinFilter is DefaultRndNumGenerator::rnd_flipcoin with optional Filter.
+// If filter rejects 0 → true without genrand; rejects 1 → false without genrand.
+func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
+	if r == nil {
+		return false
+	}
 	if p > 100 {
 		p = 100
 	}
-	if postArrayOpUnwindExpr {
-		return false
-	}
-	raw := r.next31()
-	v := raw % 100
-	ok := v < p
-	if r.trace && !r.silent {
-		r.tracePos++
-		f, err := os.OpenFile(r.traceFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-		if err == nil {
-			var b uint32
-			if ok {
-				b = 1
+	localDepth := r.randDepth
+	r.randDepth++
+	if f != nil {
+		if f.Filter(0) {
+			if r.trace && r.traceTo != nil {
+				_, _ = fmt.Fprintf(r.traceTo, "F depth=%d p=%d v=1\n", localDepth, p)
 			}
-			if r.traceSite && r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d raw=%d @%s\n", r.tracePos, p, b, raw, traceCaller())
-			} else if r.traceSite {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d @%s\n", r.tracePos, p, b, traceCaller())
-			} else if r.traceRaw {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d raw=%d\n", r.tracePos, p, b, raw)
-			} else {
-				_, _ = fmt.Fprintf(f, "%d F %d -> %d\n", r.tracePos, p, b)
-			}
-			_ = f.Close()
+			return true
 		}
+		if f.Filter(1) {
+			if r.trace && r.traceTo != nil {
+				_, _ = fmt.Fprintf(r.traceTo, "F depth=%d p=%d v=0\n", localDepth, p)
+			}
+			return false
+		}
+	}
+	raw := r.Genrand()
+	ok := (raw % 100) < p
+	if r.trace && r.traceTo != nil {
+		b := 0
+		if ok {
+			b = 1
+		}
+		_, _ = fmt.Fprintf(r.traceTo, "F depth=%d p=%d v=%d\n", localDepth, p, b)
 	}
 	return ok
 }
 
-func traceCaller() string {
-	var pcs [12]uintptr
-	n := runtime.Callers(3, pcs[:])
-	frames := runtime.CallersFrames(pcs[:n])
-	for {
-		fr, more := frames.Next()
-		name := fr.Function
-		if name != "" && name != "csmith/pkg/csmith.(*rng).upto" && name != "csmith/pkg/csmith.(*rng).uptoWithFilter" && name != "csmith/pkg/csmith.(*rng).flipcoin" {
-			if fr.Line > 0 {
-				return fmt.Sprintf("%s:%d", name, fr.Line)
-			}
-			return name
-		}
-		if !more {
-			break
-		}
+// RandomHexDigits is DefaultRndNumGenerator::RandomHexDigits when CGOptions::is_random().
+// Each digit: genrand()%16; increments rand_depth_ per digit.
+func (r *Rng) RandomHexDigits(num int) string {
+	if r == nil || num <= 0 {
+		return ""
 	}
-	return "unknown"
+	const hex1 = "0123456789abcdef"
+	b := make([]byte, 0, num)
+	for i := 0; i < num; i++ {
+		x := r.Genrand() % 16
+		b = append(b, hex1[x])
+		r.randDepth++
+	}
+	return string(b)
 }
+
+// RandomDigits is DefaultRndNumGenerator::RandomDigits when CGOptions::is_random().
+func (r *Rng) RandomDigits(num int) string {
+	if r == nil || num <= 0 {
+		return ""
+	}
+	const dec1 = "0123456789"
+	b := make([]byte, 0, num)
+	for i := 0; i < num; i++ {
+		x := r.Genrand() % 10
+		b = append(b, dec1[x])
+		r.randDepth++
+	}
+	return string(b)
+}
+
+// filterFunc adapts a function to Filter.
+type filterFunc func(uint32) bool
+
+func (f filterFunc) Filter(v uint32) bool { return f(v) }
+
+// RejectEQ rejects a single value (test/helper; C++ Filter subclasses vary).
+func RejectEQ(bad uint32) Filter {
+	return filterFunc(func(v uint32) bool { return v == bad })
+}
+
+// legacy names used by older call sites if any remain during transition.
+func newRNG(seed uint64) *Rng { return NewRng(seed) }
