@@ -173,6 +173,16 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 		return nil
 	}
 	var ok []*Variable
+	addIf := func(v *Variable) {
+		if v == nil {
+			return
+		}
+		for _, x := range v.CollectExpandable() {
+			if x != nil && x.Type != nil && typ != nil && typ.Match(x.Type, MatchFlexible) {
+				ok = append(ok, x)
+			}
+		}
+	}
 	// Locals on current function stack (prefer before globals when present).
 	if cg.CurrentFunc != nil {
 		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
@@ -181,21 +191,15 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 				continue
 			}
 			for _, v := range blk.LocalVars {
-				if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
-					ok = append(ok, v)
-				}
+				addIf(v)
 			}
 		}
 		for _, v := range cg.CurrentFunc.Param {
-			if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
-				ok = append(ok, v)
-			}
+			addIf(v)
 		}
 	}
 	for _, v := range vs.GlobalList {
-		if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
-			ok = append(ok, v)
-		}
+		addIf(v)
 	}
 	var v *Variable
 	if len(ok) > 0 {

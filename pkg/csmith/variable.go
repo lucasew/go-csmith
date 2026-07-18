@@ -19,6 +19,8 @@ type Variable struct {
 	ArrayInits []string
 	// FieldVarOf is field_var_of (nil if not a field).
 	FieldVarOf *Variable
+	// FieldVars are expanded aggregate members (.f0, .f1, …).
+	FieldVars []*Variable
 
 	// Init mirrors Variable::init (Expression*); Constant only for now.
 	Init *Constant
@@ -33,11 +35,13 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 		// Upstream asserts non-void simple; refuse quietly for Go.
 		return nil
 	}
-	return &Variable{
+	v := &Variable{
 		Name: name,
 		Type: typ,
 		Qfer: qfer,
 	}
+	v.CreateFieldVars()
+	return v
 }
 
 // CreateVariableScalars mirrors
@@ -93,4 +97,74 @@ func (v *Variable) IsVolatile() bool {
 // IsPointer mirrors Variable::is_pointer.
 func (v *Variable) IsPointer() bool {
 	return v != nil && v.Type != nil && v.Type.PtrType() != nil
+}
+
+// CreateFieldVars mirrors Variable::create_field_vars for structs.
+// Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
+func (v *Variable) CreateFieldVars() {
+	if v == nil || v.Type == nil || !v.Type.IsStruct() {
+		return
+	}
+	if len(v.FieldVars) > 0 {
+		return
+	}
+	isVol := v.IsVolatile()
+	isConst := v.IsConst()
+	j := 0
+	for _, f := range v.Type.Fields {
+		if f.Type == nil {
+			continue
+		}
+		// skip unnamed padding later
+		fname := v.Name + ".f" + itoa(j)
+		j++
+		consts := append([]bool(nil), f.Qfer.IsConsts...)
+		vols := append([]bool(nil), f.Qfer.IsVolatiles...)
+		if len(consts) == 0 {
+			consts = []bool{false}
+		}
+		if len(vols) == 0 {
+			vols = []bool{false}
+		}
+		// quals.set_const(is_const_var || quals.is_const()) on storage (last)
+		if isConst {
+			consts[len(consts)-1] = true
+		}
+		if isVol {
+			vols[len(vols)-1] = true
+		}
+		fv := &Variable{
+			Name:       fname,
+			Type:       f.Type,
+			Qfer:       NewCVQualifiers(consts, vols),
+			FieldVarOf: v,
+		}
+		// recursive expand nested structs
+		fv.CreateFieldVars()
+		v.FieldVars = append(v.FieldVars, fv)
+	}
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var d []byte
+	for n > 0 {
+		d = append([]byte{byte('0' + n%10)}, d...)
+		n /= 10
+	}
+	return string(d)
+}
+
+// CollectExpandable returns v plus all field_vars recursively (expand_struct_union_vars-ish).
+func (v *Variable) CollectExpandable() []*Variable {
+	if v == nil {
+		return nil
+	}
+	out := []*Variable{v}
+	for _, f := range v.FieldVars {
+		out = append(out, f.CollectExpandable()...)
+	}
+	return out
 }
