@@ -57,6 +57,45 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	}
 }
 
+func TestGetSeqNum(t *testing.T) {
+	// Variable.cpp:261–265 — assert '_' present
+	v := CreateVariableScalars("g_42", GetIntType(), false, false)
+	if v.GetSeqNum() != 42 {
+		t.Fatal(v.GetSeqNum())
+	}
+	if (&Variable{Name: "badname"}).GetSeqNum() != -1 {
+		t.Fatal("no underscore fail closed")
+	}
+}
+
+func TestGetCollectiveArrayField(t *testing.T) {
+	// Variable.cpp:583–612 — field of itemized array maps to collective field
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		}}, IsArray: true, ArraySizes: []int{2}},
+		Sizes: []int{2},
+	}
+	parent.AsArray = parent
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) == 0 {
+		t.Fatal("fields")
+	}
+	item := parent.ItemizeConstIndices([]int{1}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	item.CreateFieldVars()
+	if len(item.FieldVars) == 0 {
+		t.Fatal("item fields")
+	}
+	// itemized field collective should be parent field
+	got := item.FieldVars[0].GetCollective()
+	if got != parent.FieldVars[0] {
+		t.Fatalf("want parent field, got %v", got)
+	}
+}
+
 func TestIsArrayField(t *testing.T) {
 	arr := CreateVariableScalars("g_a", GetIntType(), true, false)
 	arr.IsArray = true

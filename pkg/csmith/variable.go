@@ -169,7 +169,9 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 		}
 		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
-	if v.IsAccessOnce && !v.IsAddrTaken {
+	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
+	// assert(access_once enabled); no invent ACCESS_ONCE wrap when option off
+	if ProcessOptions().AccessOnce && v.IsAccessOnce && !v.IsAddrTaken {
 		return "ACCESS_ONCE(" + name + ")"
 	}
 	return name
@@ -741,17 +743,22 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 	if v.Qfer.IsConstAfterDeref(derefLevel) {
 		return true
 	}
+	if v.Type == nil {
+		return false
+	}
 	t := v.Type
-	for i := 0; i < derefLevel && t != nil; i++ {
+	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
+		// Variable.cpp:535 assert(t); broken peel → fail closed not const invent
+		if t == nil {
+			return false
+		}
 	}
-	if t != nil {
-		return t.IsConstStructUnion()
-	}
-	return false
+	return t.IsConstStructUnion()
 }
 
-// IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref (qfer path).
+// IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref.
+// Variable.cpp:561–578 — qfer then peel type; assert(t) after peel.
 func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 	if v == nil || derefLevel < 0 {
 		return false
@@ -759,7 +766,18 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
 		return true
 	}
-	return v.IsVolatile() && derefLevel == 0
+	if v.Type == nil {
+		return false
+	}
+	t := v.Type
+	for i := 0; i < derefLevel; i++ {
+		t = t.PtrType()
+		// Variable.cpp:575 assert(t); OOB peel → fail closed not volatile invent
+		if t == nil {
+			return false
+		}
+	}
+	return t.IsVolatileStructUnion()
 }
 
 // IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
@@ -772,14 +790,18 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
 		return false
 	}
+	if v.Type == nil {
+		return false
+	}
 	t := v.Type
-	for i := 0; i < derefLevel && t != nil; i++ {
+	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
+		// Variable.cpp:555 assert(t)
+		if t == nil {
+			return false
+		}
 	}
-	if t != nil {
-		return t.IsVolatileStructUnion()
-	}
-	return false
+	return t.IsVolatileStructUnion()
 }
 
 // Compatible mirrors Variable::compatible.
@@ -837,15 +859,65 @@ func MakeDummyStaticVariable(name string) *Variable {
 	return &Variable{Name: name, Type: nil}
 }
 
-// GetCollective mirrors Variable::get_collective — array items → parent array.
+// GetCollective mirrors Variable::get_collective.
+// Variable.cpp:581–615 — itemized array → parent; array field maps onto collective fields.
 func (v *Variable) GetCollective() *Variable {
 	if v == nil {
 		return nil
 	}
+	// special handling for array fields (Variable.cpp:583–612)
+	if v.IsArrayField() {
+		// find top-level array ancestor
+		parent := v.FieldVarOf
+		for parent != nil && !parent.IsArray && parent.AsArray == nil {
+			parent = parent.FieldVarOf
+		}
+		// Variable.cpp:589 assert(parent)
+		if parent == nil {
+			return v
+		}
+		// if parent is already collective parent, this field is on collective
+		if parent.GetCollective() == parent {
+			return v
+		}
+		// map field path onto coll parent's fields (Variable.cpp:596–611)
+		coll := parent.GetCollective()
+		if coll == nil {
+			return v
+		}
+		// build field index path from array ancestor down to v
+		var path []int
+		for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
+			path = append([]int{cur.GetFieldID()}, path...)
+		}
+		for _, idx := range path {
+			// Variable.cpp:608 assert(index < coll->field_vars.size())
+			if coll == nil || idx < 0 || idx >= len(coll.FieldVars) {
+				return v
+			}
+			coll = coll.FieldVars[idx]
+		}
+		return coll
+	}
+	// non-field: itemized array member → collective parent
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		return &v.AsArray.Collective.Variable
 	}
 	return v
+}
+
+// GetSeqNum mirrors Variable::get_seq_num — digits after first '_'.
+// Variable.cpp:261–265 — assert('_' present); no invent 0 on missing separator.
+func (v *Variable) GetSeqNum() int {
+	if v == nil {
+		return -1
+	}
+	idx := strings.IndexByte(v.Name, '_')
+	// assert(index != npos)
+	if idx < 0 || idx+1 >= len(v.Name) {
+		return -1
+	}
+	return Str2Int(v.Name[idx+1:])
 }
 
 // Match mirrors Variable::match — identity, or aggregate has field.

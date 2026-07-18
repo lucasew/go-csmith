@@ -8,6 +8,10 @@ import (
 func TestAccessOnceMarking(t *testing.T) {
 	opts := Defaults()
 	opts.AccessOnce = true
+	// Variable.cpp:694 — CGOptions::access_once() process option for Output wrap
+	prev := ProcessOptions()
+	SetProcessOptions(opts)
+	defer SetProcessOptions(prev)
 	vs := NewVariableSelector(opts)
 	vs.Probs = NewProbabilities(opts)
 	// force many creates until AccessOnce set
@@ -29,6 +33,20 @@ func TestAccessOnceMarking(t *testing.T) {
 	}
 	if !found {
 		t.Log("AccessOnce rare at 20% — ok if unlucky")
+	}
+}
+
+func TestAccessOnceWrapRequiresOption(t *testing.T) {
+	// Variable.cpp:694–695 — no invent ACCESS_ONCE when option disabled
+	prev := ProcessOptions()
+	opts := Defaults()
+	opts.AccessOnce = false
+	SetProcessOptions(opts)
+	defer SetProcessOptions(prev)
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v.IsAccessOnce = true
+	if strings.Contains(v.OutputC(), "ACCESS_ONCE") {
+		t.Fatal("option off must not wrap")
 	}
 }
 
