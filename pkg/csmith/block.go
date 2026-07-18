@@ -169,8 +169,10 @@ func makeRandomStmt(
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
 		return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
-	case StmtBreak, StmtContinue:
-		// bare
+	case StmtBreak:
+		return MakeRandomBreak(r, opts, vs, tables, cg)
+	case StmtContinue:
+		return MakeRandomContinue(r, opts, vs, tables, cg, b)
 	case StmtIfElse:
 		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtFor:
@@ -263,9 +265,25 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString("/* assign */;\n")
 			}
 		case StmtBreak:
-			sb.WriteString("break;\n")
+			// StatementBreak::Output — if (test)\n    break;
+			sb.WriteString("if (")
+			if st.Expr != nil {
+				sb.WriteString(st.Expr.Output())
+			} else {
+				sb.WriteString("1")
+			}
+			sb.WriteString(")\n")
+			sb.WriteString(inner + "    break;\n")
 		case StmtContinue:
-			sb.WriteString("continue;\n")
+			// StatementContinue::Output — if (test)\n    continue;
+			sb.WriteString("if (")
+			if st.Expr != nil {
+				sb.WriteString(st.Expr.Output())
+			} else {
+				sb.WriteString("1")
+			}
+			sb.WriteString(")\n")
+			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			if st.Loop != nil && st.Loop.IV != nil {
 				iv := st.Loop.IV.Name

@@ -114,3 +114,28 @@ func TestGenerateNewParentLocal(t *testing.T) {
 		t.Fatalf("%+v", v)
 	}
 }
+
+func TestMakeRandomBinaryPtrComparison(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	_ = env.FindPointerType(GetIntType(), true)
+	vs.Types = env
+	tables := NewExprTables(opts)
+	fi := MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, EmptyCGContext(), env)
+	if fi == nil || !fi.IsStd {
+		t.Fatalf("%+v", fi)
+	}
+	if fi.Binary != "==" && fi.Binary != "!=" {
+		t.Fatalf("op %s", fi.Binary)
+	}
+	out := fi.Output()
+	if out == "/*invoke*/" || out == "" {
+		t.Fatal(out)
+	}
+	// no safe_ for ptr cmp
+	if strings.Contains(out, "safe_") {
+		t.Fatalf("ptr cmp should not use safe math: %s", out)
+	}
+}

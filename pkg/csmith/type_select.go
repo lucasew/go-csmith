@@ -42,6 +42,15 @@ func (env *TypeEnv) HasPointerType() bool {
 	return env != nil && len(env.DerivedTypes) > 0
 }
 
+// ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
+// Type.cpp:536–539 — rnd_upto(derived_types.size()).
+func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
+	if env == nil || len(env.DerivedTypes) == 0 || r == nil {
+		return nil
+	}
+	return env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
+}
+
 // MakeRandomPointerType mirrors Type::make_random_pointer_type.
 // Type.cpp:1141–1166.
 func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabilities) *Type {

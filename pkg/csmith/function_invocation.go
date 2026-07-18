@@ -167,7 +167,21 @@ func MakeRandomBinaryInvocation(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	// skip make_random_binary_ptr_comparison (10% when pointers exist) for now
+	// FunctionInvocation.cpp:174–177 — 10% pointer comparison when derived exist
+	if r.RndFlipcoin(10) {
+		var env *TypeEnv
+		if vs != nil {
+			env = vs.Types
+		}
+		if env == nil {
+			env = cg.Types
+		}
+		if env != nil && env.HasPointerType() {
+			if fi := MakeRandomBinaryPtrComparison(r, opts, probs, vs, tables, cg, env); fi != nil {
+				return fi
+			}
+		}
+	}
 	op := PickBinaryOp(r, opts)
 	// float filter if we ever pass float types
 	if typ.IsSimple() && typ.Simple() == EFloat && !BinaryOpWorksForFloat(op) {
@@ -211,6 +225,50 @@ func MakeRandomBinaryInvocation(
 	}
 	_ = IsOrderedBinary // cite path; effect merge deferred
 	return inv
+}
+
+// MakeRandomBinaryPtrComparison mirrors make_random_binary_ptr_comparison.
+// FunctionInvocation.cpp:294–360 — == or != on random pointer type operands.
+func MakeRandomBinaryPtrComparison(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	cg CGContext,
+	env *TypeEnv,
+) *Invocation {
+	if r == nil || env == nil || !env.HasPointerType() {
+		return nil
+	}
+	// eCmpEq or eCmpNe
+	op := BinCmpEq
+	if r.RndFlipcoin(50) {
+		op = BinCmpNe
+	}
+	opStr := op.BinaryOpC()
+	// Type::choose_random_pointer_type
+	ptrTy := env.ChooseRandomPointerType(r)
+	if ptrTy == nil {
+		return nil
+	}
+	d := cg.ExprDepth + 1
+	// no_func on both sides (true); const ok on LHS
+	left := MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, MaxTermTypes, d)
+	if left == nil {
+		left = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+	}
+	tt := MaxTermTypes
+	if left != nil && left.Term == TermConstant {
+		tt = TermVariable
+	}
+	right := MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, d)
+	if right == nil {
+		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+	}
+	_ = probs
+	// pointer comparisons do not use safe math wrappers
+	return &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}}
 }
 
 // MakeRandomUnaryInvocation mirrors make_random_unary.

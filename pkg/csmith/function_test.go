@@ -84,12 +84,19 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	if !strings.Contains(out, f.Name) || !strings.Contains(out, "{") {
 		t.Fatalf("output %q", out)
 	}
-	// body should have max_block_size statements unless early return
+	// body should have max_block_size statements unless early return;
+	// forward-goto StmtLabel markers may inflate len(Stmts) beyond MaxBlockSize.
 	if len(f.Body.Stmts) < 1 {
 		t.Fatal("empty stmts")
 	}
-	if len(f.Body.Stmts) > opts.MaxBlockSize {
-		t.Fatalf("too many stmts %d", len(f.Body.Stmts))
+	n := 0
+	for _, s := range f.Body.Stmts {
+		if s.Kind != StmtLabel {
+			n++
+		}
+	}
+	if n > opts.MaxBlockSize {
+		t.Fatalf("too many real stmts %d (raw %d)", n, len(f.Body.Stmts))
 	}
 }
 
