@@ -66,7 +66,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
-	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt

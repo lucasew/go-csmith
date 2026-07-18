@@ -44,7 +44,7 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	if f == nil {
 		t.Fatal("nil")
 	}

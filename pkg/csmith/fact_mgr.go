@@ -44,7 +44,7 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 }
 
 // AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to init.
-// FactMgr.cpp:118–131 + FactPointTo default garbage for pointers.
+// FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init (pointer init).
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -59,6 +59,17 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 	if FindRelatedPointTo(fm.GlobalFacts, v) != nil {
 		return
+	}
+	// Fact.cpp:85–95 — abstract assign from init when present
+	if v.Init != nil {
+		rhs := &Expression{Term: TermConstant, Con: v.Init}
+		newFacts := AbstractFactForAssign(nil, v, 0, rhs)
+		if len(newFacts) > 0 {
+			for _, f := range newFacts {
+				fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+			}
+			return
+		}
 	}
 	fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
 }
@@ -85,6 +96,16 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
 	}
 	return true
+}
+
+// UpdateFactForReturn mirrors FactMgr::update_fact_for_return.
+// FactMgr.cpp:406–418 + Fact::abstract_fact_for_return — assign expr into func.rv.
+func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
+	if fm == nil || rv == nil {
+		return false
+	}
+	// abstract_fact_for_return = abstract_fact_for_assign(facts, Lhs(rv), expr)
+	return fm.UpdateFactForAssign(rv, 0, expr)
 }
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.

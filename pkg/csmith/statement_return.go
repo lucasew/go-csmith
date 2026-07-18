@@ -3,8 +3,7 @@
 package csmith
 
 // MakeRandomReturn mirrors StatementReturn::make_random.
-// StatementReturn.cpp:54–72 — ExpressionVariable only (not free Expression::make_random).
-// FactPointTo / dead-ptr checks deferred.
+// StatementReturn.cpp:54–72 — ExpressionVariable only; visit_facts updates return facts.
 func MakeRandomReturn(
 	r *Rng,
 	opts Options,
@@ -38,5 +37,9 @@ func MakeRandomReturn(
 		ev.CastType = ret
 	}
 	st.Expr = ev
+	// FactMgr::update_fact_for_return — assign into rv (Fact.cpp:76–82)
+	if cg.FM != nil && cg.CurrentFunc.RV != nil {
+		cg.FM.UpdateFactForReturn(cg.CurrentFunc.RV, ev)
+	}
 	return st
 }

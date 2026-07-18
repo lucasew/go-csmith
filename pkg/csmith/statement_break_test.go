@@ -12,7 +12,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
-	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2 // IN_LOOP
 	st := MakeRandomBreak(NewRng(9), opts, vs, tables, cg)
@@ -59,7 +59,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	probs := NewProbabilities(opts)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2
 	blk := &Block{Stmts: []Stmt{{Kind: StmtAssign}}}

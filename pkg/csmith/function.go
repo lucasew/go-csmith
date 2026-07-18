@@ -109,6 +109,10 @@ func MakeRandomSignature(
 	for i := uint32(0); i <= max; i++ {
 		vs.GenerateParameterVariable(f, r)
 	}
+	// Function.cpp:422 — FMList.push_back(new FactMgr(f))
+	if cg.FM == nil {
+		// attach when map provided via FuncList path later
+	}
 	// inline flip if enabled
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
@@ -119,9 +123,8 @@ func MakeRandomSignature(
 	return f
 }
 
-// MakeFirst mirrors Function::make_first without ExtensionMgr params and without DFA.
-// Function.cpp:443–477 — RandomReturnType, rv qfer via random_qualifiers(ty) no-context,
-// empty param list when extension null, GenerateBody.
+// MakeFirst mirrors Function::make_first.
+// Function.cpp:443–477 — FactMgr, empty params (no ExtensionMgr), GenerateBody.
 func MakeFirst(
 	r *Rng,
 	opts Options,
@@ -131,6 +134,7 @@ func MakeFirst(
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
 	list *FunctionList,
+	fmMap *FactMgrMap,
 ) *Function {
 	if r == nil {
 		r = NewRng(0)
@@ -148,9 +152,22 @@ func MakeFirst(
 	// CVQualifiers::random_qualifiers(ty) — no context, no_volatile
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
+	// FactMgr for this function (Function.cpp:457–458)
+	var fm *FactMgr
+	if fmMap != nil {
+		fm = fmMap.ForFunc(f)
+	} else {
+		fm = NewFactMgr(f)
+	}
+	// seed existing globals
+	if vs != nil {
+		for _, gv := range vs.GlobalList {
+			fm.AddNewVarFact(gv)
+		}
+	}
 	// ExtensionMgr null → no params
 	// GenerateBody
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if list != nil {
 		cg = cg.WithFuncList(list)
 		if list.Types != nil {
@@ -168,6 +185,22 @@ func MakeFirst(
 	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
+	// mark pointees that were locals as dead after function (mark_func_end subset)
+	if f.Body != nil {
+		var locals []*Variable
+		for _, blk := range f.Blocks {
+			if blk != nil {
+				locals = append(locals, blk.LocalVars...)
+			}
+		}
+		if len(locals) > 0 {
+			for i, fact := range fm.GlobalFacts {
+				if nf := fact.MarkFuncEndLocals(locals); nf != nil {
+					fm.GlobalFacts[i] = nf
+				}
+			}
+		}
+	}
 	// Function::make_return_const — Function.cpp:608–615
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
@@ -175,7 +208,6 @@ func MakeFirst(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	// f already registered on list before body generation
 	return f
 }
 
@@ -197,10 +229,28 @@ func (f *Function) GenerateBody(
 	if prev.Funcs != nil {
 		cg.Funcs = prev.Funcs
 	}
+	// ensure FactMgr when caller did not attach one
+	if cg.FM == nil {
+		cg.FM = NewFactMgr(f)
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
+	// mark_func_end: locals die after function
+	if cg.FM != nil && len(f.Blocks) > 0 {
+		var locals []*Variable
+		for _, blk := range f.Blocks {
+			if blk != nil {
+				locals = append(locals, blk.LocalVars...)
+			}
+		}
+		for i, fact := range cg.FM.GlobalFacts {
+			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
+				cg.FM.GlobalFacts[i] = nf
+			}
+		}
+	}
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
 	}

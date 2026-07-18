@@ -39,7 +39,7 @@ func TestForSafeIncrEmit(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
-	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	st := MakeRandomFor(NewRng(5), opts, probs, vs, tables, stmtTab, cg)
 	if st == nil || st.Loop == nil {

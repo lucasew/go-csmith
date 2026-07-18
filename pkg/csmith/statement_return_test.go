@@ -12,7 +12,7 @@ func TestMakeRandomReturnIsVariableOrConst(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
-	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
+	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	st := MakeRandomReturn(NewRng(5), opts, vs, cg)
 	if st.Kind != StmtReturn {

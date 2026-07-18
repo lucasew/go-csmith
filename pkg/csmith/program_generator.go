@@ -17,6 +17,8 @@ type ProgramGenerator struct {
 	Tables  *ExprTables
 	StmtTab *ThresholdTable
 	Funcs   FunctionList
+	// FactMgrs mirrors Function::FMList (per-function FactMgr).
+	FactMgrs *FactMgrMap
 	// Argv are CLI args for the Options: header line (excluding argv[0] typically).
 	Argv []string
 	// Types holds derived pointer types (Type::derived_types).
@@ -31,13 +33,14 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	g := &ProgramGenerator{
-		Opts:    opts,
-		Seed:    seed,
-		Rng:     r,
-		Probs:   probs,
-		VS:      vs,
-		Tables:  NewExprTables(opts),
-		StmtTab: NewStatementThresholdTable(opts),
+		Opts:     opts,
+		Seed:     seed,
+		Rng:      r,
+		Probs:    probs,
+		VS:       vs,
+		Tables:   NewExprTables(opts),
+		StmtTab:  NewStatementThresholdTable(opts),
+		FactMgrs: NewFactMgrMap(),
 	}
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types
@@ -56,15 +59,18 @@ func (g *ProgramGenerator) GenerateAllTypes() {
 	GenerateAllTypesEnv(g.Rng, g.Opts, g.Probs, &g.Types)
 }
 
-// GenerateFunctions mirrors Function.cpp GenerateFunctions (no builtins / FactMgr).
-// make_first then GenerateBody for any unbuilt (none if make_first builds body).
+// GenerateFunctions mirrors Function.cpp GenerateFunctions.
+// Function.cpp:790–807 — make_first then GenerateBody; FactMgr per function.
 func (g *ProgramGenerator) GenerateFunctions() {
 	if g == nil {
 		return
 	}
+	if g.FactMgrs == nil {
+		g.FactMgrs = NewFactMgrMap()
+	}
 	g.Funcs.Types = &g.Types
-	// Function::make_first
-	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs)
+	// Function::make_first — creates FactMgr for func_1
+	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
 	// Create body of each function until no new unbuilt remain (Function.cpp:801–807).
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
@@ -72,6 +78,13 @@ func (g *ProgramGenerator) GenerateFunctions() {
 			cg := EmptyCGContext().WithFuncList(&g.Funcs)
 			cg.CurrentFunc = f
 			cg.Types = &g.Types
+			if fm := g.FactMgrs.ForFunc(f); fm != nil {
+				// seed global pointer facts already known
+				for _, gv := range g.VS.GlobalList {
+					fm.AddNewVarFact(gv)
+				}
+				cg = cg.WithFactMgr(fm)
+			}
 			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		}
 	}
