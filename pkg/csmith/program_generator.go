@@ -402,12 +402,8 @@ func (g *ProgramGenerator) OutputMain() string {
 		if g.Opts.StepHashByStmt {
 			b.WriteString("    csmith_compute_hash();\n")
 		} else {
-			// ensure ctrl vars exist when only arrays with brace init (no prior set)
-			if GetLastCtrlVars() == nil && GetMaxArrayDimension(g.VS.GlobalList) > 0 {
-				ctrl := GetNewCtrlVars(g.Opts)
-				b.WriteString(OutputArrayCtrlVars(ctrl, GetMaxArrayDimension(g.VS.GlobalList), "    "))
-			}
-			// HashGlobalVariables with union readability when FactMgr present
+			// OutputMgr.cpp:142 — HashGlobalVariables after OutputArrayInitializers
+			// (ctrl vars from that path via get_last_ctrl_vars; no soft GetNew here)
 			b.WriteString(g.hashGlobals())
 		}
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")

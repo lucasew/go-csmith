@@ -171,8 +171,8 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 // Statement.cpp:905–917 — if goto target emit "label:" [attrs]; else output_hash.
 // isGotoTarget true means step_hash was not emitted (C++ returns 1 after label).
 //
-// Label resolution: FindJumpLabel from CFG (find_jump_sources), else SourceLabel
-// set at generation (library path when edges incomplete).
+// Label resolution: Statement.cpp:908–914 — find_jump_sources only (gotos[0]->label).
+// SourceLabel is generation-side dest mirror used when FactMgr is absent (no CFG).
 func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
 	if st == nil {
 		return "", false
@@ -189,8 +189,10 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 				}
 			}
 		}
-	}
-	if label == "" {
+		// with FactMgr: do not fall back to SourceLabel without jump sources
+		// (C++ only labels when find_jump_sources non-empty)
+	} else if st.SourceLabel != "" {
+		// no DFA / no FM: emit generation-time dest label
 		label = st.SourceLabel
 	}
 	if label != "" {
