@@ -246,6 +246,18 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 	c.AddExternalEffect(e)
 }
 
+// AddEffect mirrors CGContext::add_effect — fold into accum and effect_stm.
+// CGContext.cpp:382–388.
+func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
+	if c == nil {
+		return
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
+	}
+	c.EffectStm = c.EffectStm.AddEffectOpts(e, includeLHS)
+}
+
 // MergeParamContext mirrors CGContext::merge_param_context.
 // CGContext.cpp:390–394 — fold param accum into this; copy expr_depth.
 func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {

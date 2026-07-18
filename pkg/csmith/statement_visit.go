@@ -39,7 +39,7 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 // VisitFactsBlock mirrors Block::visit_facts simplified (no full fixed-point).
-// Block.cpp:466–479 — sequential statement walk; updates facts in place via FM.
+// Block.cpp:466–479 — sequential statement walk; validate_and_update_facts per stmt.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
 		return true
@@ -53,20 +53,18 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			}
 		}()
 	}
+	var facts []*FactPointTo
+	if cg.FM != nil {
+		facts = CloneFactSlice(cg.FM.GlobalFacts)
+	}
 	for i := range b.Stmts {
 		st := &b.Stmts[i]
-		// record facts_in before visit
-		if cg.FM != nil && st.StmID > 0 {
-			cg.FM.SetMapFactsIn(st.StmID, cg.FM.GlobalFacts)
-		}
-		// clear effect_stm for each statement (Statement::pre_output path)
-		cg.ClearEffectStm()
-		if !VisitFactsStmt(st, cg, opts) {
+		// Statement::validate_and_update_facts (with shortcut)
+		if !ValidateAndUpdateFacts(st, &facts, cg, opts, b) {
 			return false
 		}
-		if cg.FM != nil && st.StmID > 0 {
-			cg.FM.SetMapFactsOutForStmt(st, cg.FM.GlobalFacts, b)
-			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+		if cg.FM != nil {
+			cg.FM.GlobalFacts = facts
 		}
 	}
 	return true

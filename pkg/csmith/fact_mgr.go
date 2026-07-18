@@ -20,15 +20,21 @@ type FactMgr struct {
 	// FactMgr.h:161–163.
 	MapFactsIn  map[int][]*FactPointTo
 	MapFactsOut map[int][]*FactPointTo
+	// MapAccumEffect mirrors map_accum_effect — accum after each statement.
+	MapAccumEffect map[int]Effect
+	// MapVisited mirrors map_visited — statement analyzed this pass.
+	MapVisited map[int]bool
 }
 
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
 func NewFactMgr(f *Function) *FactMgr {
 	return &FactMgr{
-		Func:         f,
-		MapStmEffect: make(map[int]Effect),
-		MapFactsIn:   make(map[int][]*FactPointTo),
-		MapFactsOut:  make(map[int][]*FactPointTo),
+		Func:           f,
+		MapStmEffect:   make(map[int]Effect),
+		MapFactsIn:     make(map[int][]*FactPointTo),
+		MapFactsOut:    make(map[int][]*FactPointTo),
+		MapAccumEffect: make(map[int]Effect),
+		MapVisited:     make(map[int]bool),
 	}
 }
 
