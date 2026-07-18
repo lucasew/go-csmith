@@ -112,3 +112,38 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 		t.Fatal("nil rng must fail closed")
 	}
 }
+
+func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
+	// Constant.cpp:207–223 — RandomHexDigits(1) + flipcoin ±1; no invent from num%
+	// positive num
+	s := generateSmallRandomFloatHexConstant(2, NewRng(1))
+	if !strings.HasPrefix(s, "0x2.") || !strings.Contains(s, "p") {
+		t.Fatalf("got %q", s)
+	}
+	// negative num → -0x…
+	s = generateSmallRandomFloatHexConstant(-3, NewRng(2))
+	if !strings.HasPrefix(s, "-0x3.") {
+		t.Fatalf("neg got %q", s)
+	}
+	// both p+1 and p-1 across seeds
+	sawP, sawM := false, false
+	for seed := uint64(1); seed < 30; seed++ {
+		s = generateSmallRandomFloatHexConstant(1, NewRng(seed))
+		if strings.HasSuffix(s, "p+1") {
+			sawP = true
+		}
+		if strings.HasSuffix(s, "p-1") {
+			sawM = true
+		}
+	}
+	if !sawP || !sawM {
+		t.Fatalf("need both p±1, +1=%v -1=%v", sawP, sawM)
+	}
+	if generateSmallRandomFloatHexConstant(0, nil) != "" {
+		t.Fatal("nil rng fail closed")
+	}
+	// formatSmallConstant must not invent float without RNG
+	if formatSmallConstant(EFloat, 1, Defaults()) != "" {
+		t.Fatal("formatSmallConstant float invent")
+	}
+}

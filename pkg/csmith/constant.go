@@ -191,12 +191,16 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 
 	// pure_rnd_flipcoin(50) — in random mode == rnd_flipcoin(50)
 	if r.RndFlipcoin(50) {
-		// small integer path
+		// small integer / small float path (Constant.cpp:318–361)
 		var num int
 		if r.RndFlipcoin(50) {
 			num = int(r.RndUpto(3)) - 1
 		} else {
 			num = int(r.RndUpto(20)) - 10
+		}
+		// Constant.cpp:346–348 — eFloat → GenerateSmallRandomFloatHexConstant(num)
+		if st == EFloat {
+			return generateSmallRandomFloatHexConstant(num, r)
 		}
 		return formatSmallConstant(st, num, opts)
 	}
@@ -222,28 +226,34 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 	}
 }
 
+// generateSmallRandomFloatHexConstant mirrors GenerateSmallRandomFloatHexConstant.
+// Constant.cpp:207–223 — ±0x{num}.{RandomHexDigits(1)}p±1 via pure_rnd_flipcoin(50).
+func generateSmallRandomFloatHexConstant(num int, r *Rng) string {
+	if r == nil {
+		// C++ always has RNG; no invent fixed float literal
+		return ""
+	}
+	sign := ""
+	abs := num
+	if abs < 0 {
+		sign = "-"
+		abs = -abs
+	}
+	pm := "+1"
+	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
+	if !r.RndFlipcoin(50) {
+		pm = "-1"
+	}
+	// Constant.cpp:215 — num << "." << RandomHexDigits(1)
+	return sign + "0x" + strconv.Itoa(abs) + "." + r.RandomHexDigits(1) + "p" + pm
+}
+
 func formatSmallConstant(st ESimpleType, num int, opts Options) string {
-	// Constant.cpp:329–361 cast + L/UL suffix
+	// Constant.cpp:329–361 cast + L/UL suffix (non-float only; float uses
+	// generateSmallRandomFloatHexConstant with live RNG)
 	if st == EFloat {
-		// GenerateSmallRandomFloatHexConstant — Constant.cpp:207–223
-		// uses num from small path; format 0xN.Hp±1
-		abs := num
-		sign := ""
-		if abs < 0 {
-			sign = "-"
-			abs = -abs
-		}
-		// RandomHexDigits(1) needs RNG — formatSmallConstant has no r; use hex digit from abs
-		h := "0"
-		if abs > 0 {
-			hex := "0123456789abcdef"
-			h = string(hex[abs%16])
-		}
-		pm := "+1"
-		if abs%2 == 0 {
-			pm = "-1"
-		}
-		return sign + "0x" + strconv.Itoa(abs) + "." + h + "p" + pm
+		// broken call path — float must not invent digit/sign from num alone
+		return ""
 	}
 	var body string
 	switch st {
