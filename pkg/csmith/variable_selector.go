@@ -1067,19 +1067,28 @@ func (vs *VariableSelector) createAndInitialize(
 		return nil
 	}
 	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize
-	if vs.Opts.Arrays && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
+	if vs.Opts.Arrays && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
+		// VariableSelector.cpp:526–529 — strict_const → Constant::make_random; else make_init_value
+		// no soft invent MakeRandom when make_init fails or is non-constant Expression
 		var init *Constant
+		var ie *Expression
 		if vs.Opts.StrictConstArrays {
 			init = MakeRandom(t, vs.Opts, r)
+			if init != nil {
+				ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
+			}
 		} else {
-			if ie := vs.MakeInitValue(access, cg, t, &qfer, blk, r); ie != nil && ie.Term == TermConstant {
+			ie = vs.MakeInitValue(access, cg, t, &qfer, blk, r)
+			if ie != nil && ie.Term == TermConstant {
 				init = ie.Con
-			} else {
-				init = MakeRandom(t, vs.Opts, r)
 			}
 		}
 		av := CreateArrayVariable(r, vs.Opts, blk, name, t, init, qfer)
 		if av != nil {
+			// ArrayVariable.cpp / create_array_and_itemize — Expression* init (const or &var)
+			if ie != nil {
+				av.InitExpr = ie
+			}
 			vs.AllVars = append(vs.AllVars, &av.Variable)
 			if blk != nil {
 				blk.LocalVars = append(blk.LocalVars, &av.Variable)

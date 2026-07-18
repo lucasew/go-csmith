@@ -99,8 +99,8 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 // StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
 // returns adjusted IV bound (out-param `bound` in C++).
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
-	// StatementFor.cpp:128+ — pure_rnd_* with valid bound; no soft invent fixed loop params
-	if r == nil || bound < 1 {
+	// StatementFor.cpp:128+ — pure_rnd_*; bound is unsigned in C++ (0 allowed after --size)
+	if r == nil || bound < 0 {
 		return 0, 0, 0, 0, 0, 0
 	}
 	// StatementFor.cpp:133 — pure_rnd_flipcoin(array_oob_prob) (random mode == rnd)
@@ -122,6 +122,7 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		} else if r.RndFlipcoin(50) {
 			init = 0
 		} else {
+			// pure_rnd_upto(bound/2); RndUpto(0) returns 0 (no soft invent skip)
 			half := bound / 2
 			if half < 1 {
 				init = 0
@@ -134,12 +135,15 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		if r.RndFlipcoin(50) {
 			incr = 1
 		} else {
+			// pure_rnd_upto(bound/4); no soft invent q=1 when bound/4==0
 			q := bound / 4
 			if q < 1 {
-				q = 1
+				incr = 0
+			} else {
+				incr = int(r.RndUpto(uint32(q)))
 			}
-			incr = int(r.RndUpto(uint32(q)))
 		}
+		// StatementFor.cpp:144–145 — if (incr == 0) incr = 1
 		if incr == 0 {
 			incr = 1
 		}
@@ -150,6 +154,7 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		if r.RndFlipcoin(50) {
 			init = bound
 		} else {
+			// pure_rnd_upto(bound/2); no soft invent skip rng when 0
 			off := 0
 			if bound/2 > 0 {
 				off = int(r.RndUpto(uint32(bound / 2)))
@@ -171,9 +176,10 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		} else {
 			q := bound / 4
 			if q < 1 {
-				q = 1
+				incr = 0
+			} else {
+				incr = int(r.RndUpto(uint32(q)))
 			}
-			incr = int(r.RndUpto(uint32(q)))
 		}
 		if incr == 0 {
 			incr = 1
@@ -252,12 +258,13 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 	}
 	// StatementFor.cpp:218–227 — array_control adjusts bound; else INVALID_BOUND stays
+	// StatementFor.cpp:218 — if (bound != INVALID_BOUND) even when size is 1 (--bound may be 0)
 	arrayBound := bound != InvalidIVBound && bound > 0
 	if arrayBound {
-		// StatementFor.cpp:220–221 — make_random_array_control(--bound, …)
+		// StatementFor.cpp:220–221 — make_random_array_control(--bound, …); no soft invent b=1
 		b := bound - 1
-		if b < 1 {
-			b = 1
+		if b < 0 {
+			b = 0
 		}
 		oob := 0
 		if probs != nil {

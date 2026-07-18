@@ -55,11 +55,9 @@ func CreateArrayVariable(
 		}
 		num -= step
 	}
+	// ArrayVariable.cpp:142–144 — clamp max only; no soft invent dimension=1 when max is 0
 	if dimension > opts.MaxArrayDim {
 		dimension = opts.MaxArrayDim
-	}
-	if dimension < 1 {
-		dimension = 1
 	}
 	sizes := make([]int, 0, dimension)
 	total := 1
