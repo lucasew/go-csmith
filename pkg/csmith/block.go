@@ -19,6 +19,8 @@ type Stmt struct {
 	Else *Block
 	// Loop holds for-loop control (init/test/incr).
 	Loop *LoopControl
+	// AssignOp for StmtAssign (default simple).
+	AssignOp AssignOp
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -29,9 +31,29 @@ type Block struct {
 	Stmts     []Stmt
 	Looping   bool
 	blockSize int // CGOptions::max_block_size at creation
+	// TmpVars mirrors macro_tmp_vars (gensym t_ for safe math).
+	TmpVars map[string]ESimpleType
+}
+
+// CreateNewTmpVar mirrors Block::create_new_tmp_var.
+// Block.cpp:216–219.
+func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
+	if b == nil {
+		return "t_0"
+	}
+	if b.TmpVars == nil {
+		b.TmpVars = make(map[string]ESimpleType)
+	}
+	name := "t_1"
+	if sym != nil {
+		name = sym.Next("t_")
+	}
+	b.TmpVars[name] = st
+	return name
 }
 
 // BlockProbability mirrors Block.cpp BlockProbability.
+
 // Keep-filter on {block_size-1} forces return value max_block_size-1.
 // Block.cpp:88–94.
 func BlockProbability(blockSize int, r *Rng) int {
@@ -138,16 +160,7 @@ func makeRandomStmt(
 			}
 		}
 	case StmtAssign:
-		// Lhs: SelectGlobal WRITE; RHS expression
-		ty := GetIntType()
-		if vs != nil {
-			q := NewCVQualifiers([]bool{false}, []bool{false})
-			st.LhsVar = vs.SelectGlobal(AccessWrite, cg, ty, &q, r)
-			st.Expr = MakeRandomExpression(r, opts, tables, vs, cg, ty, nil, false, false, MaxTermTypes, cg.ExprDepth)
-			if st.Expr == nil {
-				st.Expr = MakeRandomExpression(r, opts, tables, vs, cg, ty, nil, true, false, TermConstant, cg.ExprDepth)
-			}
-		}
+		return MakeRandomAssign(r, opts, probs, vs, tables, cg, GetIntType())
 	case StmtBreak, StmtContinue:
 		// bare
 	case StmtIfElse:
@@ -172,6 +185,11 @@ func (b *Block) Output(indent int) string {
 	inner := strings.Repeat("    ", indent+1)
 	var sb strings.Builder
 	sb.WriteString(pad + "{\n")
+	// Block::OutputTmpVariableList
+	for name, st := range b.TmpVars {
+		sb.WriteString(inner)
+		sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
+	}
 	for _, lv := range b.LocalVars {
 		if lv == nil || lv.Type == nil {
 			continue
@@ -199,8 +217,12 @@ func (b *Block) Output(indent int) string {
 			}
 			sb.WriteString(";\n")
 		case StmtAssign:
-			if st.LhsVar != nil && st.Expr != nil {
-				sb.WriteString(st.LhsVar.Name + " = " + st.Expr.Output() + ";\n")
+			if st.LhsVar != nil {
+				rhs := "0"
+				if st.Expr != nil {
+					rhs = st.Expr.Output()
+				}
+				sb.WriteString(st.AssignOp.AssignOpC(st.LhsVar.Name, rhs) + ";\n")
 			} else {
 				sb.WriteString("/* assign */;\n")
 			}

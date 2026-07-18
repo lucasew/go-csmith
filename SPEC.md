@@ -408,9 +408,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 9b: `StatementIf` / `StatementFor` | **Partial** |
 | SelectLoopCtrlVar / ParentLocal | **Partial** |
 | Layer 8b: `ExpressionFuncall` + std binary/unary | **Partial** |
-| Layer 8c: `SafeOpFlags` binary/unary names | **Partial** — size/sign random; emit safe_*_func; no tmp vars / math_notmp |
-| Multi-func GenerateFunctions loop | **Partial** |
-| ArrayVariable / Assign compound / goto | **Not started** |
+| Layer 8c: `SafeOpFlags` binary/unary names | **Partial** |
+| Layer 9c: `StatementAssign` ops table | **Partial** — simple/bit/incr; SelectLType deferred; no Lhs full |
+| Block tmp vars map | **Partial** — create_new_tmp_var + emit (math_notmp not wired yet) |
+| ArrayVariable / goto / SelectLType | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
