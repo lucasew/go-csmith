@@ -42,7 +42,7 @@ func TestFindGoodJumpBlock(t *testing.T) {
 }
 
 func TestOutputPtrResetsArray(t *testing.T) {
-	// OutputMgr uses get_last_ctrl_vars — seed pool like OutputArrayInitializers
+	// OutputMgr.cpp:326–340 — get_last_ctrl_vars + output_init(&zero); no invent "0"
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	// ArrayVariable.cpp:179 — pointer alt-inits need make_init_value; strict_const
@@ -54,8 +54,23 @@ func TestOutputPtrResetsArray(t *testing.T) {
 		t.Fatal("av")
 	}
 	out := OutputPtrResets([]*Variable{&av.Variable}, opts)
-	if !strings.Contains(out, "g_a") || !strings.Contains(out, "0") || !strings.Contains(out, "for (i = 0") {
+	if !strings.Contains(out, "g_a") || !strings.Contains(out, " = 0;") || !strings.Contains(out, "for (i = 0") {
 		t.Fatal(out)
+	}
+	// ArrayVariable.cpp:649 — missing init fails closed (no invent "0" shell)
+	av2 := &ArrayVariable{
+		Variable: Variable{Name: "g_b", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av2.AsArray = av2
+	if got := outputArrayInitForced(av2, "    ", []string{"i"}, true); got != "" {
+		t.Fatalf("nil init must fail closed, got %q", got)
+	}
+	// post_incr_operator false → "i = i + 1" (ArrayVariable.cpp:640–645)
+	opts.PostIncrOperator = false
+	out2 := OutputPtrResets([]*Variable{&av.Variable}, opts)
+	if !strings.Contains(out2, "i = i + 1") {
+		t.Fatal(out2)
 	}
 	CtrlVarsDoFinalization()
 }

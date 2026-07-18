@@ -471,7 +471,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 }
 
 // OutputPtrResets mirrors OutputMgr::OutputPtrResets.
-// OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init zero.
+// OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init(&zero).
 func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	if len(ptrs) == 0 {
 		return ""
@@ -479,6 +479,8 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	// OutputMgr.cpp:332 — Variable::get_last_ctrl_vars() (no GetNew soft-fallback)
 	ctrl := GetLastCtrlVars()
 	names := CtrlVarNames(ctrl)
+	// OutputMgr.cpp:331 — Constant zero(get_int_type(), "0"); always live Expression*
+	zero := MakeInt(0)
 	var b strings.Builder
 	for _, v := range ptrs {
 		if v == nil {
@@ -494,19 +496,19 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
 				continue
 			}
-			// ArrayVariable::output_init with Constant zero (always loop form)
+			// ArrayVariable::output_init(out, &zero, ctrl_vars, 1) — always loop form
 			if av == nil {
 				av = &ArrayVariable{
 					Variable: *v,
 					Sizes:    sizes,
 				}
 			}
-			// force loop even if NoLoopInitializer (globals)
-			saved := av.Init
-			av.Init = MakeInt(0)
-			// temporary: override NoLoopInitializer by calling force form
-			b.WriteString(outputArrayInitForced(av, "    ", names))
-			av.Init = saved
+			// force loop even if NoLoopInitializer (globals); pass live zero, not invent
+			savedInit, savedExpr := av.Init, av.InitExpr
+			av.Init = zero
+			av.InitExpr = nil
+			b.WriteString(outputArrayInitForced(av, "    ", names, opts.PostIncrOperator))
+			av.Init, av.InitExpr = savedInit, savedExpr
 			continue
 		}
 		b.WriteString("    " + v.OutputC() + " = 0;\n")
@@ -516,9 +518,13 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 
 // outputArrayInitForced is OutputInit without NoLoopInitializer early-out.
 // Used by OutputPtrResets (upstream always loops for array dead_globals).
-// ArrayVariable.cpp:619–655 — cvs names only (no letter-name soft invent).
-func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) string {
+// ArrayVariable.cpp:619–655 — init->Output only; no invent "0" when init missing.
+func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
 	if av == nil {
+		return ""
+	}
+	// ArrayVariable.cpp:622–623 — collective itemized members skip
+	if av.Collective != nil {
 		return ""
 	}
 	if len(ctrl) < len(av.Sizes) {
@@ -529,15 +535,25 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) stri
 			return ""
 		}
 	}
-	initVal := "0"
-	if av.Init != nil && av.Init.Value != "" {
+	// ArrayVariable.cpp:649 — init->Output; always live Expression* (no invent "0")
+	var initVal string
+	if av.InitExpr != nil {
+		initVal = av.InitExpr.Output()
+	} else if av.Init != nil {
 		initVal = av.Init.Value
+	}
+	if initVal == "" {
+		return ""
 	}
 	var b strings.Builder
 	pad := indent
 	for i, sz := range av.Sizes {
 		iv := ctrl[i]
-		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		incr := iv + "++"
+		if !postIncr {
+			incr = iv + " = " + iv + " + 1"
+		}
+		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + incr + ")\n")
 		if i+1 < len(av.Sizes) {
 			b.WriteString(pad + "{\n")
 			pad += "    "
