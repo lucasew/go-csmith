@@ -22,6 +22,10 @@ func MakeRandomContinue(
 		return st
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	// StatementContinue.cpp:71 — assert(b); no soft invent continue without looping block
+	if loop == nil {
+		return Stmt{Kind: StmtContinue}
+	}
 	// StatementContinue.cpp:72 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
@@ -34,7 +38,7 @@ func MakeRandomContinue(
 		st.StmID = AllocStmID()
 	}
 	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
-	if loop != nil && cg.FM != nil {
+	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)
 	}
 	return st

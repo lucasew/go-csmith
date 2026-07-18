@@ -17,6 +17,10 @@ func MakeRandomBreak(
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	// StatementBreak.cpp:72 — assert(b); no soft invent break without looping block
+	if loop == nil {
+		return Stmt{Kind: StmtBreak}
+	}
 	// StatementBreak.cpp:76 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// StatementBreak.cpp:77–79 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
@@ -30,12 +34,10 @@ func MakeRandomBreak(
 		st.StmID = AllocStmID()
 	}
 	// Block::break_stms.push_back (StatementBreak.cpp:81)
-	if loop != nil {
-		loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)
-		// break exits to after loop — post_dest true, back_link false (common shape)
-		if cg.FM != nil {
-			cg.FM.CreateCFGEdge(st.StmID, loop, true, false)
-		}
+	loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)
+	// break exits to after loop — post_dest true, back_link false (common shape)
+	if cg.FM != nil {
+		cg.FM.CreateCFGEdge(st.StmID, loop, true, false)
 	}
 	return st
 }

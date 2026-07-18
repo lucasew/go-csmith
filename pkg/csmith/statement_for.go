@@ -2,7 +2,10 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // LoopControl holds IR for a counting for-loop (init/test/incr).
 // StatementFor.cpp make_iteration — numeric params plus full assign/test IR.
@@ -474,6 +477,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 
 // forHeaderOutput emits "for (init; test; incr)" using full IR when present.
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
+// Not used for StatementArrayOp (that uses arrayOpHeaderOutput with numeric inits).
 func forHeaderOutput(lc *LoopControl) string {
 	// StatementFor always has init/test/incr IR; incomplete → empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
@@ -483,6 +487,44 @@ func forHeaderOutput(lc *LoopControl) string {
 	test := forTestOutput(lc)
 	incr := forIncrOutput(lc)
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
+}
+
+// arrayOpHeaderOutput mirrors StatementArrayOp::output_header one dimension.
+// StatementArrayOp.cpp:194–220 — for (cv = init; cv < size; cv += incr)
+// (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).
+func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
+	if lc == nil || lc.IV == nil {
+		return ""
+	}
+	iv := lc.IV.OutputC()
+	var b strings.Builder
+	b.WriteString("for (")
+	b.WriteString(iv)
+	b.WriteString(" = ")
+	b.WriteString(itoa(lc.InitN))
+	b.WriteString("; ")
+	b.WriteString(iv)
+	// StatementArrayOp.cpp:207–208 — incr>0 → cv < size; else cv >= 0
+	if lc.IncrN > 0 {
+		b.WriteString(" < ")
+		b.WriteString(itoa(lc.LimitN))
+	} else {
+		b.WriteString(" >= 0")
+	}
+	b.WriteString("; ")
+	b.WriteString(iv)
+	if opts.CComp {
+		// StatementArrayOp.cpp:211–215 — avoid volatile += 
+		b.WriteString(" = ")
+		b.WriteString(iv)
+		b.WriteString(" + ")
+		b.WriteString(itoa(lc.IncrN))
+	} else {
+		b.WriteString(" += ")
+		b.WriteString(itoa(lc.IncrN))
+	}
+	b.WriteString(")")
+	return b.String()
 }
 
 func forInitOutput(lc *LoopControl) string {

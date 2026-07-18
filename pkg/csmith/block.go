@@ -834,9 +834,10 @@ func (b *Block) Output(indent int) string {
 			}
 			// incomplete goto IR — no soft invent /* goto-stub */
 		case StmtArrayOp:
-			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
+			// StatementArrayOp::output_header — numeric for (cv=init; cv<size; cv+=incr)
+			// not StatementFor StatementAssign IR (InitStmt empty on array dims)
 			if st.Loop != nil && st.Loop.IV != nil {
-				sb.WriteString(forHeaderOutput(st.Loop) + "\n")
+				sb.WriteString(arrayOpHeaderOutput(st.Loop, ProcessOptions()) + "\n")
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
 				} else {

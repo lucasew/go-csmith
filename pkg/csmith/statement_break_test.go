@@ -16,6 +16,9 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2 // IN_LOOP
+	// StatementBreak.cpp:72 — assert(looping parent); put live loop on stack
+	loop := &Block{Func: f, Looping: true}
+	f.Stack = []*Block{loop}
 	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
 	pre := CreateVariableScalars("g_pre", GetIntType(), false, false)
 	cg.EffectStm = EmptyEffect().WriteVar(pre)
@@ -48,6 +51,41 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 	}
 }
 
+func TestMakeRandomBreakRequiresLoop(t *testing.T) {
+	// StatementBreak.cpp:72 assert(b) — no soft invent break without looping parent
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// non-looping block only
+	blk := &Block{Func: f, Looping: false}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	cg.Flags |= FlagInLoop // flag alone is not enough without Looping parent
+	st := MakeRandomBreak(NewRng(1), opts, vs, NewExprTables(opts), &cg)
+	if st.Expr != nil {
+		t.Fatal("no expr without looping block")
+	}
+	if stmtOK(st) {
+		t.Fatal("stmtOK rejects incomplete break")
+	}
+}
+
+func TestArrayOpHeaderNumeric(t *testing.T) {
+	// StatementArrayOp::output_header uses numeric init/limit/incr (not InitStmt)
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1}
+	opts := Defaults()
+	out := arrayOpHeaderOutput(lc, opts)
+	if out != "for (i = 0; i < 10; i += 1)" {
+		t.Fatal(out)
+	}
+	opts.CComp = true
+	out = arrayOpHeaderOutput(lc, opts)
+	if out != "for (i = 0; i < 10; i = i + 1)" {
+		t.Fatal(out)
+	}
+}
+
 func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
@@ -73,8 +111,9 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2
-	blk := &Block{Stmts: []Stmt{{Kind: StmtAssign}}}
-	st := MakeRandomContinue(NewRng(11), opts, vs, tables, &cg, blk)
+	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
+	f.Stack = []*Block{loop}
+	st := MakeRandomContinue(NewRng(11), opts, vs, tables, &cg, loop)
 	if st.Kind != StmtContinue {
 		t.Fatalf("got %v", st.Kind)
 	}
