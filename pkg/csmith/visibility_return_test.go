@@ -1,0 +1,97 @@
+package csmith
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestFunctionIsVarOnStack(t *testing.T) {
+	f := &Function{Name: "f"}
+	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	f.Param = []*Variable{p}
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
+	if !f.IsVarOnStack(p, blk) || !f.IsVarOnStack(loc, blk) {
+		t.Fatal("stack")
+	}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if f.IsVarOnStack(g, blk) {
+		t.Fatal("global")
+	}
+	if !f.IsVarVisible(g, blk) {
+		t.Fatal("global visible")
+	}
+}
+
+func TestFunctionIsVarOOS(t *testing.T) {
+	f := &Function{Name: "f"}
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	inner := &Block{Func: f, LocalVars: []*Variable{loc}}
+	// at function body root with empty parent chain, loc not on stack
+	if !f.IsVarOOS(loc, nil) {
+		// need loc in Blocks
+		f.Blocks = []*Block{inner}
+		if !f.IsVarOOS(loc, nil) {
+			t.Fatal("oos")
+		}
+	}
+	// visible when parent is inner
+	if f.IsVarOOS(loc, inner) {
+		t.Fatal("visible not oos")
+	}
+}
+
+func TestAddBackReturnFacts(t *testing.T) {
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	retFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	st := Stmt{Kind: StmtReturn, StmID: 42}
+	fm.SetMapFactsOut(42, retFacts)
+	body := &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1},
+		st,
+	}}
+	var facts []*FactPointTo
+	AddBackReturnFacts(body, fm, &facts)
+	if len(facts) != 1 || facts[0].Var != p {
+		t.Fatal(facts)
+	}
+}
+
+func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	facts := []*FactPointTo{
+		MakeFactPointTo(p, loc),
+		MakeFactPointTo(CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false), NullPtr),
+	}
+	// second fact subject is l_p local-named — Match with l_1? no
+	lp := facts[1].Var
+	UpdateFactsForOOSVars([]*Variable{loc, lp}, &facts)
+	// fact for lp subject removed; p fact remains but pointee loc marked dead
+	if len(facts) != 1 || facts[0].Var != p {
+		t.Fatal(facts)
+	}
+	if !facts[0].IsDead() {
+		t.Fatal("should mark dead pointee")
+	}
+}
+
+func TestOutputCommentLine(t *testing.T) {
+	s := OutputCommentLine("hello", false, false)
+	if s != "/* hello */\n" {
+		t.Fatal(s)
+	}
+	if OutputCommentLine("x", true, false) != "\n" {
+		t.Fatal("quiet")
+	}
+}
+
+func TestFunctionOutputSeparator(t *testing.T) {
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	out := f.Output()
+	if !strings.Contains(out, "/* ------------------------------------------ */") {
+		t.Fatal(out)
+	}
+}

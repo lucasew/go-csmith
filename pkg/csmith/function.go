@@ -267,6 +267,10 @@ func MakeFirst(
 	}
 	// Function.cpp:652–658 / compute_summary — referenced ptrs + external effect
 	f.ComputeSummary(bodyEff)
+	// Function.cpp:470 — body->add_back_return_facts
+	if fm != nil && f.Body != nil {
+		AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts)
+	}
 	f.markBuilt()
 	return f
 }
@@ -342,6 +346,10 @@ func (f *Function) GenerateBody(
 		f.ComputeSummary(*cg.EffectAccum)
 	} else {
 		f.ComputeSummary(bodyEff)
+	}
+	// add_back_return_facts into global_facts (Function.cpp:470 path)
+	if cg.FM != nil && f.Body != nil {
+		AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts)
 	}
 	f.markBuilt()
 }
@@ -420,6 +428,8 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		return ""
 	}
 	s := ""
+	// Function.cpp:567 — output_comment_line separator
+	s += OutputCommentLine("------------------------------------------", false, f.EmitConcise)
 	// Function.cpp:568–570 — feffect.Output when !concise
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
