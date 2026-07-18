@@ -14,12 +14,44 @@ func TestMakeRandomGotoHasLabel(t *testing.T) {
 	r := NewRng(2)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, cg)
+	// empty block → forward edge (no back-edge candidates yet)
+	blk := &Block{}
+	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, cg, blk)
 	if st.Kind != StmtGoto || st.Label == "" {
 		t.Fatalf("%+v", st)
 	}
-	if len(f.Labels) < 1 {
-		t.Fatal("label not registered")
+	if !st.GotoForward && !st.GotoBack {
+		t.Fatal("expected GotoForward or GotoBack")
+	}
+}
+
+func TestMakeRandomGotoBackEdge(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	// minimal func + one assign target (no full MakeFirst body noise)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{Stmts: []Stmt{{Kind: StmtAssign, AssignOp: AssignSimple}}}
+	f.Blocks = []*Block{blk}
+	f.Body = blk
+	cg := WithFunc(f, EmptyEffect())
+	var st Stmt
+	for seed := uint64(1); seed < 40; seed++ {
+		blk.Stmts[0].SourceLabel = ""
+		st = MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, cg, blk)
+		if st.GotoBack {
+			break
+		}
+	}
+	if !st.GotoBack {
+		t.Skip("no back-edge in seed sample")
+	}
+	if st.Label == "" || blk.Stmts[0].SourceLabel == "" {
+		t.Fatalf("back edge label missing: st=%+v src=%q", st, blk.Stmts[0].SourceLabel)
+	}
+	if st.Label != blk.Stmts[0].SourceLabel {
+		t.Fatalf("label mismatch goto=%q target=%q", st.Label, blk.Stmts[0].SourceLabel)
 	}
 }
 

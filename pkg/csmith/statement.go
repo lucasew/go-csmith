@@ -21,6 +21,9 @@ const (
 // MaxStatementType mirrors MAX_STATEMENT_TYPE.
 const MaxStatementType StatementType = StmtArrayOp + 1
 
+// StmtLabel is a Go-only labeled no-op marker for forward goto targets (not in Csmith enum).
+const StmtLabel StatementType = 100
+
 // NewStatementThresholdTable builds ProbabilityTable for pStatementProb
 // from set_default_statement_prob thresholds (unequal group).
 // Probabilities.cpp:748–774; keys are cumulative cutoffs, values are statement kinds.

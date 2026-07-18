@@ -23,8 +23,14 @@ type Stmt struct {
 	AssignOp AssignOp
 	// ArrayAccess if set, used as LHS text (itemized array).
 	ArrayAccess string
-	// Label for goto target name (StmtGoto) or labeled stmt.
+	// Label for goto target name (StmtGoto).
 	Label string
+	// SourceLabel is emitted before this statement (back-edge target).
+	SourceLabel string
+	// GotoForward: after this goto, insert a labeled no-op in the block.
+	GotoForward bool
+	// GotoBack: label lives on an earlier statement (SourceLabel).
+	GotoBack bool
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -105,6 +111,10 @@ func MakeRandomBlock(
 	for i := 0; i <= max; i++ {
 		st := makeRandomStmt(r, opts, probs, vs, tables, stmtTab, cg, b)
 		b.Stmts = append(b.Stmts, st)
+		// Forward goto: place labeled no-op after (simplified good forward target).
+		if st.Kind == StmtGoto && st.GotoForward && st.Label != "" {
+			b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: st.Label})
+		}
 		if st.Kind == StmtReturn {
 			break
 		}
@@ -174,7 +184,7 @@ func makeRandomStmt(
 	case StmtArrayOp:
 		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtGoto:
-		return MakeRandomGoto(r, opts, probs, vs, tables, cg)
+		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 	case StmtInvoke:
 		// still stubs
 	default:
@@ -222,6 +232,13 @@ func (b *Block) Output(indent int) string {
 		sb.WriteString(";\n")
 	}
 	for _, st := range b.Stmts {
+		if st.SourceLabel != "" {
+			sb.WriteString(inner + st.SourceLabel + ":\n")
+		}
+		if st.Kind == StmtLabel {
+			sb.WriteString(inner + "    ;\n")
+			continue
+		}
 		sb.WriteString(inner)
 		switch st.Kind {
 		case StmtReturn:

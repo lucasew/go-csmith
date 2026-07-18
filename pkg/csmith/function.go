@@ -230,19 +230,8 @@ func (f *Function) Output() string {
 	s += ")\n"
 	if f.Body != nil {
 		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
-		body := f.Body.Output(0)
-		// inject labels before closing brace of body
-		if len(f.Labels) > 0 {
-			// body ends with "}\n" — insert labels before last brace
-			if len(body) >= 2 && body[len(body)-2] == '}' {
-				ins := ""
-				for _, lbl := range f.Labels {
-					ins += "    " + lbl + ":\n        ;\n"
-				}
-				body = body[:len(body)-2] + ins + "}\n"
-			}
-		}
-		s += body
+		// Labels now live on statements (back-edge) or StmtLabel markers (forward).
+		s += f.Body.Output(0)
 	} else {
 		s += "{\n}\n"
 	}
