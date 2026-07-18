@@ -85,7 +85,8 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 		t.Fatalf("output %q", out)
 	}
 	// body should have max_block_size statements unless early return;
-	// forward-goto StmtLabel markers may inflate len(Stmts) beyond MaxBlockSize.
+	// forward-goto StmtLabel markers may inflate len(Stmts); trailing append_return
+	// may add one more (Block.cpp:734).
 	if len(f.Body.Stmts) < 1 {
 		t.Fatal("empty stmts")
 	}
@@ -95,7 +96,7 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 			n++
 		}
 	}
-	if n > opts.MaxBlockSize {
+	if n > opts.MaxBlockSize+1 {
 		t.Fatalf("too many real stmts %d (raw %d)", n, len(f.Body.Stmts))
 	}
 }

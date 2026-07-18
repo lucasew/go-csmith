@@ -233,16 +233,27 @@ func (g *ProgramGenerator) OutputFunctions() string {
 
 // HashGlobalVariables mirrors VariableSelector::HashGlobalVariables.
 // VariableSelector.cpp:1613–1615 — MapVariableList(GlobalList, HashVariable).
+// Declares max-dimension index vars once (OutputArrayCtrlVars-ish).
 func HashGlobalVariables(vs *VariableSelector) string {
 	if vs == nil {
 		return ""
 	}
+	maxDim := 0
+	for _, v := range vs.GlobalList {
+		if v != nil && v.IsArray && hashArrayHasPayload(v) && len(v.ArraySizes) > maxDim {
+			maxDim = len(v.ArraySizes)
+		}
+	}
 	var b strings.Builder
+	for i := 0; i < maxDim; i++ {
+		b.WriteString("    int i" + itoa(i) + ";\n")
+	}
 	for _, v := range vs.GlobalList {
 		if v == nil {
 			continue
 		}
-		b.WriteString(v.HashOutput())
+		// declareIdx=false — indices shared above
+		b.WriteString(v.hashOutput(false))
 	}
 	return b.String()
 }

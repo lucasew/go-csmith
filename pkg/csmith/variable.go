@@ -178,17 +178,23 @@ func (v *Variable) CollectExpandable() []*Variable {
 // Variable.cpp:889–923 — aggregates recurse fields; simple transparent_crc;
 // float uses transparent_crc_bytes; pointers emit nothing.
 // FactUnion readability omitted (hash all union fields).
+// declareIdx: if true, emit int iN decls (standalone use); HashGlobalVariables
+// declares shared index vars once.
 func (v *Variable) HashOutput() string {
+	return v.hashOutput(true)
+}
+
+func (v *Variable) hashOutput(declareIdx bool) string {
 	if v == nil || v.Type == nil {
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
-		return hashArrayVariable(v)
+		return hashArrayVariable(v, declareIdx)
 	}
 	if v.Type.IsAggregate() {
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			b.WriteString(f.HashOutput())
+			b.WriteString(f.hashOutput(declareIdx))
 		}
 		return b.String()
 	}
@@ -202,18 +208,42 @@ func (v *Variable) HashOutput() string {
 	return ""
 }
 
+// hashArrayHasPayload reports whether array hashing would emit any transparent_crc.
+func hashArrayHasPayload(v *Variable) bool {
+	if v == nil || v.Type == nil {
+		return false
+	}
+	if v.Type.IsSimple() {
+		return true
+	}
+	if v.Type.IsAggregate() {
+		j := 0
+		for _, f := range v.Type.Fields {
+			if f.Type == nil || f.BitWidth == 0 {
+				continue
+			}
+			if f.Type.IsSimple() {
+				return true
+			}
+			j++
+		}
+	}
+	return false
+}
+
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
-// ArrayVariable.cpp:735+ simplified — int index vars i0..; no FactUnion exclude.
-func hashArrayVariable(v *Variable) string {
-	if v == nil || len(v.ArraySizes) == 0 {
+// ArrayVariable.cpp:735+ simplified — index vars i0..; no FactUnion exclude.
+// Skips arrays with no hashable payload (e.g. pointer element type).
+func hashArrayVariable(v *Variable, declareIdx bool) string {
+	if v == nil || len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
 		return ""
 	}
 	var b strings.Builder
-	// declare index vars
-	for i := range v.ArraySizes {
-		b.WriteString("    int i" + itoa(i) + ";\n")
+	if declareIdx {
+		for i := range v.ArraySizes {
+			b.WriteString("    int i" + itoa(i) + ";\n")
+		}
 	}
-	// nested for loops
 	indent := "    "
 	for i, sz := range v.ArraySizes {
 		iv := "i" + itoa(i)
@@ -221,17 +251,13 @@ func hashArrayVariable(v *Variable) string {
 		b.WriteString(indent + "{\n")
 		indent += "    "
 	}
-	// element access g_1[i0][i1]
 	access := v.Name
 	nameStr := v.Name
 	for i := range v.ArraySizes {
 		access += "[i" + itoa(i) + "]"
 		nameStr += "[i" + itoa(i) + "]"
 	}
-	// subfields for aggregate elements
 	if v.Type != nil && v.Type.IsAggregate() {
-		// use field vars naming: Name.f0 — but array field vars may not exist;
-		// emit int subfields from type.Fields
 		j := 0
 		for _, f := range v.Type.Fields {
 			if f.Type == nil || f.BitWidth == 0 {
@@ -240,6 +266,9 @@ func hashArrayVariable(v *Variable) string {
 			if f.Type.IsSimple() && !f.Type.IsFloat() {
 				fn := ".f" + itoa(j)
 				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
+			} else if f.Type.IsSimple() && f.Type.IsFloat() {
+				fn := ".f" + itoa(j)
+				b.WriteString(indent + "transparent_crc_bytes (&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
 			}
 			j++
 		}
@@ -250,7 +279,6 @@ func hashArrayVariable(v *Variable) string {
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
 	}
-	// close braces
 	for range v.ArraySizes {
 		indent = indent[:len(indent)-4]
 		b.WriteString(indent + "}\n")

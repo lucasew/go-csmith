@@ -115,9 +115,15 @@ func MakeRandomBlock(
 		if st.Kind == StmtGoto && st.GotoForward && st.Label != "" {
 			b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: st.Label})
 		}
-		if st.Kind == StmtReturn {
+		// Block.cpp:152 — stop when statement must_return (not only bare Return kind)
+		if st.MustReturn() {
 			break
 		}
+	}
+	// Block.cpp:734–737 — top-level function body: append return if required and missing
+	// (still on stack so ExpressionVariable can see locals)
+	if parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
+		b.Stmts = append(b.Stmts, MakeRandomReturn(r, opts, vs, cg))
 	}
 	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
