@@ -555,10 +555,21 @@ func MakeRandomBinaryInvocation(
 			}
 		}
 	}
+	// FunctionInvocation.cpp:179–183 — do { pick } while (type->is_float() && !works)
+	// FunctionInvocation.cpp:185 — assert(type); nil type allowed only for non-float paths (library)
 	op := PickBinaryOp(r, opts)
-	// float filter if we ever pass float types
-	if typ != nil && typ.IsSimple() && typ.Simple() == EFloat && !BinaryOpWorksForFloat(op) {
-		op = PickBinaryOp(r, opts)
+	if typ != nil && typ.IsFloat() {
+		validB := false
+		for tries := 0; tries < 64; tries++ {
+			if BinaryOpWorksForFloat(op) {
+				validB = true
+				break
+			}
+			op = PickBinaryOp(r, opts)
+		}
+		if !validB {
+			return nil
+		}
 	}
 	opStr := op.BinaryOpC()
 	// FunctionInvocation.cpp:188–207 — always SafeOpFlags::make_random_binary; operands use get_lhs/rhs_type
@@ -566,6 +577,10 @@ func MakeRandomBinaryInvocation(
 	lhsTy, rhsTy := typ, typ
 	// C++ always builds flags; CreateFunctionInvocationBinary only allocates tmps for safe_ops
 	flags = MakeRandomBinaryKind(r, opts, probs, typ, typ, typ, SafeOpBinary, op)
+	if flags == nil {
+		// SafeOpFlags DEPTH_GUARD / ERROR_GUARD
+		return nil
+	}
 	if flags != nil {
 		lhsTy = flags.LHSType()
 		rhsTy = flags.RHSType()
@@ -854,14 +869,18 @@ func MakeRandomUnaryInvocation(
 	if typ == nil {
 		return nil
 	}
-	// FunctionInvocation.cpp:146–149 — pick unary op (reject float-invalid when float type)
+	// FunctionInvocation.cpp:146–149 — do { pick } while (float && !works); no soft invent invalid
 	var uop UnaryOp
-	for tries := 0; tries < 16; tries++ {
+	validU := false
+	for tries := 0; tries < 64; tries++ {
 		uop = PickUnaryOp(r, opts)
-		if typ.IsFloat() && !UnaryOpWorksForFloat(uop) {
-			continue
+		if !typ.IsFloat() || UnaryOpWorksForFloat(uop) {
+			validU = true
+			break
 		}
-		break
+	}
+	if !validU {
+		return nil
 	}
 	op := uop.UnaryOpC()
 	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
