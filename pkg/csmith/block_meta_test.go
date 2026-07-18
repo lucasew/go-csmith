@@ -121,12 +121,50 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 }
 
 func TestMustBreakOrReturn(t *testing.T) {
-	// break with constant true test is must_jump
+	// Block.cpp:342–357 — last must_return (break alone is not enough)
 	b := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
 	}}}
+	if b.MustBreakOrReturn() {
+		t.Fatal("break is not must_return")
+	}
+	b.Stmts = []Stmt{{
+		Kind: StmtReturn,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+	}}
 	if !b.MustBreakOrReturn() {
-		t.Fatal("break")
+		t.Fatal("return must_break_or_return")
+	}
+}
+
+func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
+	// Block.cpp:313–331 — break_stms nonempty → not must_return
+	ret := Stmt{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	b := &Block{StmID: 1, Stmts: []Stmt{ret}, BreakStmIDs: []int{9}}
+	if b.MustReturn() {
+		t.Fatal("break_stms blocks must_return")
+	}
+	b.BreakStmIDs = nil
+	if !b.MustReturn() {
+		t.Fatal("return last")
+	}
+	// continue edge into block escapes
+	fm := NewFactMgr(nil)
+	b.EmitFM = fm
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestBlock: b, BackLink: true}}
+	if b.MustReturn() {
+		t.Fatal("back edge escapes")
+	}
+	// MustJump also requires empty break_stms
+	b2 := &Block{Stmts: []Stmt{{
+		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}}, BreakStmIDs: []int{1}}
+	if b2.MustJump() {
+		t.Fatal("break_stms nonempty")
+	}
+	b2.BreakStmIDs = nil
+	if !b2.MustJump() {
+		t.Fatal("true break must_jump")
 	}
 }

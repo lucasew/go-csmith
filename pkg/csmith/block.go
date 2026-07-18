@@ -165,13 +165,11 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	return blks[r.RndUpto(uint32(len(blks)))]
 }
 
-// MustBreakOrReturn mirrors Block::must_break_or_return light — last must_jump.
+// MustBreakOrReturn mirrors Block::must_break_or_return without FactMgr.
+// Block.cpp:342–357 — last must_return (not must_jump) unless escape back-edge.
+// Prefer MustBreakOrReturnFull(fm) when CFG is available.
 func (b *Block) MustBreakOrReturn() bool {
-	if b == nil {
-		return false
-	}
-	s := b.GetLastStm()
-	return s != nil && s.MustJump()
+	return b.MustBreakOrReturnFull(b.EmitFM)
 }
 
 // IsVarOnStack mirrors Block::is_var_on_stack.

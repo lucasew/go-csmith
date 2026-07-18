@@ -4,6 +4,7 @@ package csmith
 
 // MustBreakOrReturnFull mirrors Block::must_break_or_return.
 // Block.cpp:342–357 — last must_return unless continue-like back edge from outside.
+// Note: unlike must_return, does not require break_stms empty.
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	if b == nil || len(b.Stmts) == 0 {
 		return false
@@ -12,26 +13,8 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	if last == nil || !last.MustReturn() {
 		return false
 	}
-	if fm == nil || b.StmID == 0 {
-		return true
-	}
-	// if back edge into block from a statement that is not the block itself, can escape return
-	edges := fm.FindEdgesInToBlock(b, false, true)
-	// also edges with DestStmID pointing at first stmt?
-	for _, e := range edges {
-		if e != nil && e.SrcID != b.StmID {
-			return false
-		}
-	}
-	// DestStmID == first statement of block
-	if len(b.Stmts) > 0 && b.Stmts[0].StmID > 0 {
-		for _, e := range fm.FindEdgesIn(b.Stmts[0].StmID, false, true) {
-			if e != nil && e.SrcID != b.StmID {
-				return false
-			}
-		}
-	}
-	return true
+	// Block.cpp:345–353 — same back-edge escape check as must_return
+	return !b.hasEscapeBackEdge(fm)
 }
 
 // NeedNestedLoop mirrors Block::need_nested_loop.

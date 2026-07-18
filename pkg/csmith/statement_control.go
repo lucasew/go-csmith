@@ -42,33 +42,62 @@ func (st Stmt) MustJump() bool {
 	}
 }
 
-// MustReturn mirrors Block::must_return — last statement must return.
-// Block.cpp:313–316.
+// MustReturn mirrors Block::must_return.
+// Block.cpp:313–331 — last must_return, no break_stms, no escape via back edges.
+// Uses b.EmitFM for CFG when set; prefer MustReturnWithFM during DFA.
 func (b *Block) MustReturn() bool {
+	return b.MustReturnWithFM(b.EmitFM)
+}
+
+// MustReturnWithFM is must_return with an explicit FactMgr for back-edge checks.
+func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 	if b == nil || len(b.Stmts) == 0 {
 		return false
 	}
-	// skip trailing StmtLabel markers
-	for i := len(b.Stmts) - 1; i >= 0; i-- {
-		if b.Stmts[i].Kind == StmtLabel {
-			continue
-		}
-		return b.Stmts[i].MustReturn()
+	// StatementBreak.cpp push → break_stms; any break means can leave without return
+	if len(b.BreakStmIDs) > 0 {
+		return false
 	}
-	return false
+	last := b.GetLastStm()
+	if last == nil || !last.MustReturn() {
+		return false
+	}
+	// Block.cpp:318–326 — back edges into block (continue) can skip end return
+	return !b.hasEscapeBackEdge(fm)
 }
 
 // MustJump mirrors Block::must_jump.
-// Block.cpp:334–337.
+// Block.cpp:336–341 — last must_jump and break_stms empty.
 func (b *Block) MustJump() bool {
 	if b == nil || len(b.Stmts) == 0 {
 		return false
 	}
-	for i := len(b.Stmts) - 1; i >= 0; i-- {
-		if b.Stmts[i].Kind == StmtLabel {
-			continue
+	if len(b.BreakStmIDs) > 0 {
+		return false
+	}
+	last := b.GetLastStm()
+	return last != nil && last.MustJump()
+}
+
+// hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.
+// Block.cpp:318–326 / 346–353 — continue into loop body can bypass end return.
+func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
+	if b == nil || fm == nil {
+		return false
+	}
+	// edges targeting the block as DestBlock
+	for _, e := range fm.FindEdgesInToBlock(b, false, true) {
+		if e != nil && e.SrcID != b.StmID {
+			return true
 		}
-		return b.Stmts[i].MustJump()
+	}
+	// edges targeting block stm_id
+	if b.StmID > 0 {
+		for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
+			if e != nil && e.SrcID != b.StmID {
+				return true
+			}
+		}
 	}
 	return false
 }
