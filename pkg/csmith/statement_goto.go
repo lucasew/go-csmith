@@ -227,12 +227,16 @@ func MakeRandomGoto(
 		if cg.FM != nil {
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, true)
 		}
+		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
+		RecordBackwardJump()
 	} else {
 		st.GotoForward = true
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
 		if cg.FM != nil {
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, false)
 		}
+		// StatementGoto.cpp:211 — Bookkeeper::forward_jump_cnt++
+		RecordForwardJump()
 	}
 	return st
 }
@@ -258,5 +262,7 @@ func makeForwardGotoOnly(
 	if cg.FM != nil && blk != nil {
 		cg.FM.CreateCFGEdgeTo(st.StmID, blk, 0, false, false)
 	}
+	// StatementGoto.cpp:211 — forward_jump_cnt
+	RecordForwardJump()
 	return st
 }

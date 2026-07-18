@@ -130,6 +130,8 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		Packed:     packed,
 		Used:       true,
 	}
+	// Type.cpp:126 / Bookkeeper::record_type_with_bitfields
+	RecordTypeWithBitfields(st)
 	if env != nil {
 		env.StructTypes = append(env.StructTypes, st)
 		env.AllTypes = append(env.AllTypes, st)
@@ -361,6 +363,8 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		Fields:     fields,
 		Used:       true,
 	}
+	// Type.cpp:180 — record_type_with_bitfields for unions
+	RecordTypeWithBitfields(ut)
 	if env != nil {
 		env.UnionTypes = append(env.UnionTypes, ut)
 		env.AllTypes = append(env.AllTypes, ut)

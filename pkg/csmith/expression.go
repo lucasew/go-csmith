@@ -449,7 +449,8 @@ func (e *Expression) outputBody() string {
 		}
 		if ind < 0 {
 			// address-of: mark addr taken; &name not ACCESS_ONCE
-			e.Var.IsAddrTaken = true
+			// ExpressionVariable.cpp:140 — Bookkeeper::record_address_taken
+			RecordAddressTaken(e.Var)
 			return "&" + e.Var.Name
 		}
 		return e.Var.OutputC()

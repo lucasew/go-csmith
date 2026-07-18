@@ -55,6 +55,8 @@ func (g *ProgramGenerator) Initialize() {
 	CtrlVarsDoFinalization()
 	// Statement::sid starts over for a new program (process-local in upstream).
 	nextStmID = 0
+	// Bookkeeper::doFinalization — counters for OutputTail statistics.
+	BookkeeperDoFinalization()
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).
@@ -443,8 +445,8 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) stri
 	return b.String()
 }
 
-// GoGenerator mirrors DefaultProgramGenerator::goGenerator.
-// DefaultProgramGenerator.cpp:67–72.
+// GoGenerator mirrors DefaultProgramGenerator::goGenerator / DefaultOutputMgr::Output.
+// DefaultProgramGenerator.cpp:67–72; DefaultOutputMgr.cpp:175–195.
 func (g *ProgramGenerator) GoGenerator() string {
 	g.Initialize()
 	var b strings.Builder
@@ -456,5 +458,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	b.WriteString(g.OutputFunctions())
 	b.WriteString(g.OutputHashFuncDef())
 	b.WriteString(g.OutputMain())
+	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
+	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
 	return b.String()
 }

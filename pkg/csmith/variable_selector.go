@@ -537,6 +537,8 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
+	// VariableSelector.cpp:1230–1236 — use_new_var + struct depth / union stats
+	RecordVarCreated(v)
 	return v
 }
 
@@ -555,6 +557,8 @@ func (vs *VariableSelector) SelectGlobal(
 	// choose_var with eFlexible + is_eligible_var
 	v := ChooseVar(r, vs.GlobalList, access, cg, t, MatchFlexible)
 	if v != nil {
+		// VariableSelector.cpp:1237–1238 — use_old_var_cnt
+		RecordVarReused()
 		return v
 	}
 	// VariableSelector.cpp:677–684 — expand_struct eager path
