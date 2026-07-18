@@ -496,3 +496,37 @@ func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {
 		t.Fatal("never saw low values — still inventing max?")
 	}
 }
+
+func TestAppendNestedLoopERRORGuard(t *testing.T) {
+	// Block.cpp:425 ERROR_GUARD after make for
+	ClearError()
+	opts := Defaults()
+	b := &Block{Looping: true}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	b.Func = f
+	f.Stack = []*Block{b}
+	cg := WithFunc(f, EmptyEffect())
+	SetError(ErrGeneric)
+	if b.AppendNestedLoop(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+		t.Fatal("sticky error must not append nested for")
+	}
+	ClearError()
+}
+
+func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
+	// StatementAssign.cpp:124 assert(!is_const_struct_union)
+	ClearError()
+	opts := Defaults()
+	cq := NewCVQualifiers([]bool{true}, []bool{false})
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: cq},
+	}}
+	if !st.IsConstStructUnion() {
+		t.Fatal("fixture not const struct")
+	}
+	cg := EmptyCGContext()
+	got := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, st)
+	if stmtOK(got) {
+		t.Fatal("const struct assign must fail closed")
+	}
+}

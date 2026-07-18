@@ -104,7 +104,15 @@ func MakeRandomAssignQfer(
 		// Type::SelectLType(!SE-free, op)
 		noVol := !cg.EffectContext().IsSideEffectFree()
 		typ = SelectLType(r, opts, probs, cg.Types, noVol, op)
+		// ERROR_GUARD after SelectLType RNG paths
+		if HasError() || typ == nil {
+			return Stmt{Kind: StmtAssign}
+		}
 		op = AssignOpsProbability(r, opts, assignTab, typ)
+	}
+	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()); fail closed
+	if typ != nil && typ.IsConstStructUnion() {
+		return Stmt{Kind: StmtAssign}
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
 	if typ != nil && typ.IsFloat() && !AssignOpWorksForFloat(op) {

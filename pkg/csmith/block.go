@@ -359,6 +359,11 @@ func MakeRandomBlock(
 	// Block.cpp:164–166 — nested loop for must-use multi-dim arrays
 	if b.NeedNestedLoop(*cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
+		// append_nested_loop ERROR_GUARD(nullptr) on for make fail
+		if HasError() {
+			abortBlockMake(f, b)
+			return nil
+		}
 	}
 	// Block::post_creation_analysis (Block.cpp:682–742)
 	// Upstream appends return only inside post_creation when still missing.

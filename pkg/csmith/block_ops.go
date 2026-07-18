@@ -426,8 +426,9 @@ func (b *Block) AppendNestedLoop(
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	cg.ClearEffectStm()
+	// Block.cpp:424 — Statement::make_random(eFor); ERROR_GUARD(nullptr)
 	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
-	if st == nil {
+	if st == nil || HasError() || !stmtOK(*st) {
 		return nil
 	}
 	if st.StmID == 0 {
