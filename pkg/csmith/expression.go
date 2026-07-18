@@ -508,8 +508,24 @@ func MakeRandomParam(
 	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, exprDepth, list...)
 }
 
+// BumpsExprDepth reports whether this expression increments cg_context.expr_depth.
+// Expression.cpp:213–218 — Constant, Variable, or user FunctionInvocation.
+func BumpsExprDepth(e *Expression) bool {
+	if e == nil {
+		return false
+	}
+	switch e.Term {
+	case TermConstant, TermVariable:
+		return true
+	case TermFunction:
+		return e.Invoke != nil && e.Invoke.User != nil && !e.Invoke.IsStd
+	default:
+		return false
+	}
+}
+
 // MakeRandomExpression mirrors Expression::make_random (const/var/funcall).
-// Expression.cpp:141–204.
+// Expression.cpp:141–219.
 func MakeRandomExpression(
 	r *Rng,
 	opts Options,
@@ -531,10 +547,44 @@ func MakeRandomExpression(
 		flist = cg.Funcs
 	}
 
+	probs := NewProbabilities(opts)
+	if vs != nil && vs.Probs != nil {
+		probs = vs.Probs
+	}
+	env := cg.Types
+	if env == nil && vs != nil {
+		env = vs.Types
+	}
+
+	// Expression.cpp:147–153 — type==nullptr → choose_random_nonvoid(_nonvolatile)
+	// based on effect_context purity; re-roll if struct + Constant want.
 	if typ == nil {
-		// Expression.cpp:147–152 choose_random_nonvoid when type==nullptr
-		st := ChooseRandomNonvoidSimple(r, NewProbabilities(opts))
-		typ = GetSimpleType(st)
+		seFree := cg.EffectContext().IsSideEffectFree()
+		for tries := 0; tries < 16; tries++ {
+			if env != nil && len(env.AllTypes) > 0 {
+				if seFree {
+					typ = env.ChooseRandomNonvoid(r, opts, probs)
+				} else {
+					typ = env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
+				}
+			} else {
+				typ = GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+			}
+			// Expression.cpp:151–152 — constant structs not as subexpression
+			if typ != nil && typ.IsStruct() && tt == TermConstant {
+				continue
+			}
+			if typ != nil {
+				break
+			}
+		}
+		if typ == nil {
+			typ = GetIntType()
+		}
+	}
+	// Expression.cpp:155 — constant struct not allowed as term type
+	if typ.IsStruct() && tt == TermConstant {
+		tt = TermVariable
 	}
 	if tt == MaxTermTypes {
 		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, exprDepth)
@@ -551,25 +601,30 @@ func MakeRandomExpression(
 			}
 		}
 	}
+	var e *Expression
 	switch tt {
 	case TermConstant:
 		// Expression.cpp:185–188
-		return &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
+		e = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
 	case TermVariable:
-		// ExpressionVariable::make_random simplified — SelectGlobal flexible
-		return makeExpressionVariable(r, vs, cg, typ, qfer)
+		// ExpressionVariable::make_random
+		e = makeExpressionVariable(r, vs, cg, typ, qfer)
 	case TermFunction:
 		// ExpressionFuncall::make_random
-		return makeExpressionFuncall(r, opts, vs, tables, cg, typ, qfer, flist)
+		e = makeExpressionFuncall(r, opts, vs, tables, cg, typ, qfer, flist)
 	case TermAssignment:
 		// ExpressionAssign::make_random
-		return MakeExpressionAssign(r, opts, NewProbabilities(opts), vs, tables, cg, typ, qfer)
+		e = MakeExpressionAssign(r, opts, probs, vs, tables, cg, typ, qfer)
 	case TermCommaExpr:
 		// ExpressionComma::make_random
-		return MakeExpressionComma(r, opts, NewProbabilities(opts), vs, tables, cg, typ, qfer)
+		e = MakeExpressionComma(r, opts, probs, vs, tables, cg, typ, qfer)
 	default:
 		return nil
 	}
+	// Expression.cpp:213–218 — depth++ for leaves / user calls
+	// (callers that share exprDepth across siblings should also use BumpsExprDepth)
+	_ = BumpsExprDepth(e)
+	return e
 }
 
 // makeExpressionVariable — ExpressionVariable.cpp:56+ :

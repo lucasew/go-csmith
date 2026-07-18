@@ -255,3 +255,41 @@ func TestSelectWithInvalidExcludesDummy(t *testing.T) {
 		t.Fatal("invalid_vars must exclude a")
 	}
 }
+
+func TestBumpsExprDepth(t *testing.T) {
+	// Expression.cpp:213–218
+	if !BumpsExprDepth(&Expression{Term: TermConstant, Con: MakeInt(1)}) {
+		t.Fatal("const")
+	}
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	if !BumpsExprDepth(&Expression{Term: TermVariable, Var: v}) {
+		t.Fatal("var")
+	}
+	if !BumpsExprDepth(&Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "f"}}}) {
+		t.Fatal("user call")
+	}
+	if BumpsExprDepth(&Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}) {
+		t.Fatal("std binary no bump")
+	}
+	if BumpsExprDepth(&Expression{Term: TermCommaExpr}) {
+		t.Fatal("comma no bump")
+	}
+}
+
+func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
+	// Expression.cpp:147–152 — nil type from choose_random_nonvoid when SE-free
+	opts := Defaults()
+	env := &TypeEnv{}
+	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort)}
+	cg := EmptyCGContext()
+	cg.Types = env
+	// force constant so we don't need VariableSelector
+	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, cg, nil, nil, true, false, TermConstant, 0)
+	if e == nil || e.Term != TermConstant {
+		t.Fatalf("%+v", e)
+	}
+	// type was chosen from env (not stuck on void)
+	if e.Con == nil || e.Con.Type == nil {
+		t.Fatal("const type")
+	}
+}

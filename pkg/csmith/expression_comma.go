@@ -20,12 +20,16 @@ func MakeExpressionComma(
 	if r == nil {
 		return nil
 	}
-	d := cg.ExprDepth + 1
+	// Expression.cpp:213–218 — sibling depth after LHS leaf/user-call
+	d := cg.ExprDepth
 	// ExpressionComma.cpp:58–59 — lhs type nullptr → Expression::make_random chooses nonvoid
 	// no_func=false, no_const=true
 	lhs := MakeRandomExpression(r, opts, tables, vs, cg, nil, nil, false, true, MaxTermTypes, d)
 	if lhs == nil {
 		lhs = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, d)
+	}
+	if BumpsExprDepth(lhs) {
+		d++
 	}
 	// ExpressionComma.cpp:60–61 — rhs with requested type/qfer; no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, d)

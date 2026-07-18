@@ -312,6 +312,8 @@ func BuildUserInvocation(
 	fi := &Invocation{User: callee}
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
+	// Expression.cpp:213–218 — leaf/user-call args bump depth for subsequent params
+	argDepth := cg.ExprDepth
 	for _, p := range callee.Param {
 		ty := GetIntType()
 		var qfer *CVQualifiers
@@ -326,14 +328,17 @@ func BuildUserInvocation(
 		paramCG := cg
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
-		paramCG.ExprDepth = cg.ExprDepth + 1
-		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, paramCG.ExprDepth, list)
+		paramCG.ExprDepth = argDepth
+		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, argDepth, list)
 		if arg == nil {
 			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
 			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
 			arg.CheckAndSetCastOpts(ty, opts)
+			if BumpsExprDepth(arg) {
+				argDepth++
+			}
 		}
 		fi.Args = append(fi.Args, arg)
 		cg.MergeParamContext(paramCG, true)
@@ -409,6 +414,7 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:181–197 — build all parameters before body
 	fi := &Invocation{User: callee}
 	running := cg.EffectContext()
+	argDepth := cg.ExprDepth
 	for _, p := range callee.Param {
 		ty := GetIntType()
 		var qfer *CVQualifiers
@@ -423,14 +429,17 @@ func BuildInvocationAndFunction(
 		paramCG := cg
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
-		paramCG.ExprDepth = cg.ExprDepth + 1
-		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, paramCG.ExprDepth, list)
+		paramCG.ExprDepth = argDepth
+		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, argDepth, list)
 		if arg == nil {
 			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
 			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
 			arg.CheckAndSetCastOpts(ty, opts)
+			if BumpsExprDepth(arg) {
+				argDepth++
+			}
 		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:195–196
@@ -557,7 +566,8 @@ func MakeRandomBinaryInvocation(
 	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
 	// FunctionInvocation.cpp:208–261 — ordered (&&/||) RHS under original effect context;
 	// unordered RHS under original + LHS accum.
-	d := cg.ExprDepth + 1
+	// Expression.cpp:213–218 — each leaf/user-call bumps depth for subsequent siblings
+	d := cg.ExprDepth
 	preLeft := EmptyEffect()
 	if cg.EffectAccum != nil {
 		preLeft = *cg.EffectAccum
@@ -565,6 +575,9 @@ func MakeRandomBinaryInvocation(
 	left := MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
 		left = MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, TermConstant, d)
+	}
+	if BumpsExprDepth(left) {
+		d++
 	}
 	var right *Expression
 	if op == BinLShift || op == BinRShift {
@@ -579,6 +592,8 @@ func MakeRandomBinaryInvocation(
 				}
 			}
 			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(bits, r)}
+			// constant bumps depth (Expression.cpp:213–218)
+			d++
 		}
 	}
 	if right == nil {
@@ -829,8 +844,8 @@ func MakeRandomUnaryInvocation(
 	if flags != nil {
 		argTy = flags.LHSType()
 	}
-	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary
-	d := cg.ExprDepth + 1
+	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary; operand under expr_depth
+	d := cg.ExprDepth
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, d)
 	if arg == nil {
 		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, d)
