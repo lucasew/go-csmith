@@ -165,6 +165,61 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
 }
 
+// IsVariant mirrors ArrayVariable::is_variant.
+// ArrayVariable.cpp:394–413 — same collective parent and matching key-var indices.
+// Indices are stored as strings; two itemized members are variants when they share
+// Collective and have equal index arity (key-var identity approximated by string equal).
+func (av *ArrayVariable) IsVariant(other *Variable) bool {
+	if av == nil || other == nil || !other.IsArray {
+		return false
+	}
+	ov := other.AsArray
+	if ov == nil {
+		return false
+	}
+	// both must be itemized (collective non-nil) under the same collective
+	if av.Collective == nil || ov.Collective == nil {
+		return false
+	}
+	if av.Collective != ov.Collective {
+		return false
+	}
+	if len(av.Indices) != len(ov.Indices) {
+		return false
+	}
+	// upstream: single key-var per index expression and same key vars
+	// string indices: treat equal strings as same key expression
+	for i := range av.Indices {
+		if av.Indices[i] != ov.Indices[i] {
+			// different index expressions → not the same variant family key
+			// actually is_variant requires same key vars (e.g. both use i)
+			// equal string is sufficient approximation for constant indices
+			return false
+		}
+	}
+	return true
+}
+
+// SetIndex mirrors ArrayVariable::set_index.
+// ArrayVariable.cpp:229+ — set index expression string at position.
+func (av *ArrayVariable) SetIndex(index int, expr string) {
+	if av == nil || index < 0 {
+		return
+	}
+	for len(av.Indices) <= index {
+		av.Indices = append(av.Indices, "0")
+	}
+	av.Indices[index] = expr
+}
+
+// AddIndex mirrors ArrayVariable::add_index.
+func (av *ArrayVariable) AddIndex(expr string) {
+	if av == nil {
+		return
+	}
+	av.Indices = append(av.Indices, expr)
+}
+
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
 // ArrayVariable.cpp:439–461 — nested braces for multi-dim; pick from init_strings.
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {

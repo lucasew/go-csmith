@@ -99,6 +99,41 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	}
 }
 
+// AddFactOut mirrors FactMgr::add_fact_out.
+// FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
+// drop non-globals on return; drop loop-invisible on break/continue.
+func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
+	if fm == nil || st == nil || fact == nil || fact.Var == nil || st.StmID <= 0 {
+		return
+	}
+	f := fm.Func
+	if f != nil && !f.IsVarVisible(fact.Var, stParent) {
+		return
+	}
+	switch st.Kind {
+	case StmtReturn:
+		if !fact.Var.IsGlobal() {
+			return
+		}
+	case StmtBreak, StmtContinue:
+		// find enclosing loop block
+		b := stParent
+		for b != nil && !b.Looping {
+			b = b.Parent
+		}
+		if f != nil && !f.IsVarVisible(fact.Var, b) {
+			return
+		}
+	case StmtGoto:
+		// dest visibility: without dest parent, keep if visible at parent
+		// full dest check when GotoDest known is deferred
+	}
+	if fm.MapFactsOut == nil {
+		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	}
+	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], fact.Clone())
+}
+
 // UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
 // FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
 func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
