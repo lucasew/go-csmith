@@ -13,8 +13,10 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		return VisitFactsStatementAssign(st, cg, opts)
 	case StmtIfElse:
 		return VisitFactsStatementIf(st, cg, opts)
-	case StmtFor, StmtArrayOp:
+	case StmtFor:
 		return VisitFactsStatementFor(st, cg, opts)
+	case StmtArrayOp:
+		return VisitFactsStatementArrayOp(st, cg, opts)
 	case StmtReturn:
 		return VisitFactsStatementReturn(st, cg, opts)
 	case StmtBreak, StmtContinue:
@@ -271,4 +273,119 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 	return true
+}
+
+// VisitFactsStatementArrayOp mirrors StatementArrayOp::visit_facts.
+// StatementArrayOp.cpp:268–318 — write each IV; body or init_value assign path.
+func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
+	if st == nil || cg == nil {
+		return false
+	}
+	// collect IVs from nested ArrayOp Loop chain
+	var ivs []*Variable
+	for cur := st; cur != nil && cur.Kind == StmtArrayOp; {
+		if cur.Loop != nil && cur.Loop.IV != nil {
+			ivs = append(ivs, cur.Loop.IV)
+		}
+		// nested: Then may hold next ArrayOp as first stmt
+		if cur.Then == nil || len(cur.Then.Stmts) == 0 {
+			break
+		}
+		next := &cur.Then.Stmts[0]
+		if next.Kind != StmtArrayOp {
+			break
+		}
+		cur = next
+	}
+	// StatementArrayOp.cpp:270–275 — check_write_var each ctrl var
+	facts := cg.pointToFacts()
+	for _, iv := range ivs {
+		if !cg.CheckWriteVar(iv, facts) {
+			return false
+		}
+		facts = cg.pointToFacts()
+	}
+
+	// find innermost body assign (array init) or nested block body
+	inner := findArrayOpInnermost(st)
+	if inner == nil {
+		return true
+	}
+
+	// body path: nested fors around a Block of statements (array loop)
+	// init path: Then is a block whose first stmt is assign with ArrayAccess
+	if inner.Then != nil && isArrayInitBody(inner.Then) {
+		// StatementArrayOp.cpp:299–316 — init_value + lhs visit + update_fact_for_assign
+		asg := &inner.Then.Stmts[0]
+		if asg.Expr != nil && !VisitFactsExpression(asg.Expr, cg, opts) {
+			return false
+		}
+		lhs := &Lhs{Var: asg.LhsVar, Type: nil}
+		if asg.LhsVar != nil {
+			lhs.Type = asg.LhsVar.Type
+		}
+		if lhs.Var != nil && !cg.VisitFactsLhs(lhs, opts) {
+			return false
+		}
+		if cg.FM != nil && asg.LhsVar != nil {
+			cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
+			if st.StmID > 0 {
+				cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
+			}
+		}
+		return true
+	}
+
+	// body path — reuse for visit_facts style on innermost Then as loop body
+	// StatementArrayOp.cpp:277–297
+	preFacts := CloneFactSlice(cg.pointToFacts())
+	preStm := cg.EffectStm.Clone()
+	bodyCG := *cg
+	bodyCG.Flags |= FlagInLoop
+	// add all IVs as bounds
+	for _, iv := range ivs {
+		bodyCG.AddIVBound(iv, 0)
+		defer bodyCG.RemoveIVBound(iv)
+	}
+	if inner.Then != nil {
+		if !VisitFactsBlock(inner.Then, &bodyCG, opts) {
+			return false
+		}
+		if cg.FM != nil {
+			if inner.Then.MustReturn() {
+				cg.FM.GlobalFacts = preFacts
+			} else if in, ok := cg.FM.MapFactsIn[inner.Then.StmID]; ok {
+				cg.FM.GlobalFacts = CloneFactSlice(in)
+			}
+			for _, e := range cg.FM.FindEdgesInToBlock(inner.Then, true, false) {
+				if e == nil {
+					continue
+				}
+				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
+					MergeJumpFacts(&cg.FM.GlobalFacts, out)
+				}
+			}
+			SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, cg, preStm)
+		}
+	}
+	return true
+}
+
+func findArrayOpInnermost(st *Stmt) *Stmt {
+	if st == nil {
+		return nil
+	}
+	cur := st
+	for cur.Then != nil && len(cur.Then.Stmts) == 1 && cur.Then.Stmts[0].Kind == StmtArrayOp {
+		cur = &cur.Then.Stmts[0]
+	}
+	return cur
+}
+
+func isArrayInitBody(b *Block) bool {
+	if b == nil || len(b.Stmts) != 1 {
+		return false
+	}
+	s := &b.Stmts[0]
+	return s.Kind == StmtAssign && s.ArrayAccess != ""
 }

@@ -68,9 +68,15 @@ func MakeRandomReturn(
 		ev.CastType = ret
 	}
 	st.Expr = ev
-	// FactMgr::update_fact_for_return — assign into rv (Fact.cpp:76–82)
-	if cg.FM != nil && cg.CurrentFunc.RV != nil {
-		cg.FM.UpdateFactForReturn(cg.CurrentFunc.RV, ev)
+	if st.StmID == 0 {
+		st.StmID = AllocStmID()
+	}
+	// StatementReturn.cpp make_random does not update facts — visit_facts does
+	// (StatementReturn.cpp:76–97). Optional eager visit when FM present for
+	// generation-time analysis consistency with other stmt factories.
+	if cg.FM != nil {
+		cgp := &cg
+		_ = VisitFactsStatementReturn(&st, cgp, opts)
 	}
 	return st
 }

@@ -670,12 +670,27 @@ func (b *Block) Output(indent int) string {
 		sb.WriteString(inner)
 		switch st.Kind {
 		case StmtReturn:
+			// StatementReturn.cpp:125–134 — DEPTH-- before return when depth_protect
+			if b.EmitDepthProtect {
+				sb.WriteString("DEPTH--;\n")
+				sb.WriteString(inner)
+			}
 			sb.WriteString("return")
 			if st.Expr != nil {
 				sb.WriteString(" " + st.Expr.Output())
 			}
 			sb.WriteString(";\n")
 		case StmtAssign:
+			// StatementArrayOp init body: aggregate constant needs tmp
+			// StatementArrayOp.cpp:237–248
+			if st.ArrayAccess != "" && st.Expr != nil &&
+				st.Expr.Term == TermConstant && st.LhsVar != nil &&
+				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
+				ty := st.LhsVar.Type.CName()
+				sb.WriteString(ty + " tmp = " + st.Expr.Output() + ";\n")
+				sb.WriteString(inner + st.ArrayAccess + " = tmp;\n")
+				break
+			}
 			// StatementAssign::OutputAsExpr
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
 			// use block emit options when available
@@ -684,6 +699,9 @@ func (b *Block) Output(indent int) string {
 			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
 			if asExpr != "" {
 				sb.WriteString(asExpr + ";\n")
+			} else if st.ArrayAccess != "" && st.Expr != nil {
+				// array_init simple: a[i] = expr
+				sb.WriteString(st.ArrayAccess + " = " + st.Expr.Output() + ";\n")
 			} else {
 				sb.WriteString("/* assign */;\n")
 			}
