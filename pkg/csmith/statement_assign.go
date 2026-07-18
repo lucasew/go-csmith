@@ -489,12 +489,19 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 // VisitFactsInvocation mirrors FunctionInvocation::visit_facts.
 // FunctionInvocation.cpp:502–555 — ordered params (unordered path available but
 // upstream sets unordered=false); then user revisit when NeedsRevisit.
+// Binary &&/|| use FunctionInvocationBinary::visit_facts short-circuit merge.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if fi == nil || cg == nil {
 		return true
 	}
 	if fi.Failed {
 		return false
+	}
+	// FunctionInvocationBinary.cpp:487–490 — ordered standard ops
+	if fi.IsStd && !fi.IsUnary {
+		if op, ok := BinaryOpFromString(fi.Binary); ok && IsOrderedBinary(op) {
+			return VisitFactsBinaryOrdered(fi, cg, opts)
+		}
 	}
 	// upstream: bool unordered = false; // has_uncertain_call();
 	unordered := false

@@ -139,13 +139,27 @@ func (e *Expression) GetType() *Type {
 	return nil
 }
 
-// EqualsInt mirrors Expression::equals(int) for constants.
-// Expression.h: equals default false; Constant overrides.
+// EqualsInt mirrors Expression::equals(int).
+// Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
 func (e *Expression) EqualsInt(num int) bool {
-	if e == nil || e.Term != TermConstant || e.Con == nil {
+	if e == nil {
 		return false
 	}
-	return e.Con.Equals(num)
+	switch e.Term {
+	case TermConstant:
+		return e.Con != nil && e.Con.Equals(num)
+	case TermFunction:
+		return e.Invoke != nil && e.Invoke.EqualsInt(num)
+	case TermCommaExpr:
+		// comma value is RHS
+		return e.CommaRHS.EqualsInt(num)
+	case TermAssignment:
+		// assign value is RHS of assign
+		if e.Assign != nil {
+			return e.Assign.Expr.EqualsInt(num)
+		}
+	}
+	return false
 }
 
 // NotEquals mirrors Expression::not_equals(int).
