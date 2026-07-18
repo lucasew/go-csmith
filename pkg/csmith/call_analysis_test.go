@@ -144,7 +144,7 @@ func TestPostCreationAssignFacts(t *testing.T) {
 	// pointer assign from variable of type int won't abstract well; use Null
 	st.Expr = &Expression{Term: TermConstant, Con: MakeInt(0)}
 	pre := CloneFactSlice(fm.GlobalFacts)
-	PostCreationAnalysis(st, pre, EmptyEffect(), &cg)
+	PostCreationAnalysis(st, pre, EmptyEffect(), &cg, Defaults())
 	if !fm.MapVisited[3] {
 		t.Fatal("visited")
 	}
@@ -178,7 +178,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 	if !HasUncertainCallRecursiveStmt(st) {
 		t.Fatal("expect uncertain")
 	}
-	PostCreationAnalysis(st, nil, EmptyEffect(), &cg)
+	PostCreationAnalysis(st, nil, EmptyEffect(), &cg, Defaults())
 	if !fm.MapVisited[9] {
 		t.Fatal("visited")
 	}

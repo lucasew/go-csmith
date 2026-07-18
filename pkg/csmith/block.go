@@ -562,7 +562,7 @@ func makeRandomStmt(
 		}
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
-			PostCreationAnalysis(&st, preFacts, preEffect, cg)
+			PostCreationAnalysis(&st, preFacts, preEffect, cg, opts)
 			return st
 		}
 		// s == 0 without error — re-pick type (Statement.cpp:314–316)

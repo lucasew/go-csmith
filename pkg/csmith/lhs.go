@@ -89,16 +89,18 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 // Lhs.cpp:264–284 — visit array IndexExprs under RHS effect context
 // (effect_context + effect_stm, null accum).
 func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
+	// Lhs.cpp:264+ — get_var()->get_array may be null → true without using cg
 	if l == nil || l.Var == nil {
-		return true
+		return false
 	}
 	av := l.Var.AsArray
 	if av == nil || len(av.IndexExprs) == 0 {
-		// string-only indices or collective array → no Expression walk
+		// Lhs.cpp:267–268 — av == 0 → true (non-array / string-only Indices)
 		return true
 	}
+	// need cg to visit Expression indices
 	if cg == nil {
-		return true
+		return false
 	}
 	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
 	eff := cg.EffectContext().AddEffect(cg.EffectStm)
@@ -116,8 +118,9 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		CallChain:     cg.CallChain,
 	}
 	for _, e := range av.IndexExprs {
+		// Lhs.cpp:278–280 — get_indices()[i] always live Expression*
 		if e == nil {
-			continue
+			return false
 		}
 		if !VisitFactsExpression(e, &rhsCG, opts) {
 			return false

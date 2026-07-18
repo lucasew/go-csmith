@@ -139,7 +139,8 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 // PostCreationAnalysis mirrors Statement::post_creation_analysis.
 // Statement.cpp:844–900 — combine branches / makeup; effect; assign/return facts;
 // func_1 uncertain-call revalidate; set in/out/visited.
-func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext) {
+// opts is the session Options (CGOptions); no soft invent Defaults().
+func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext, opts Options) {
 	if st == nil || cg == nil || cg.FM == nil {
 		return
 	}
@@ -163,7 +164,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 			}
-			if ValidateAndUpdateFacts(st, &outputs, cg, Defaults(), cg.CurrentBlock()) {
+			if ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock()) {
 				fm.GlobalFacts = outputs
 				specialHandled = true
 			}

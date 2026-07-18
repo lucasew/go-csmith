@@ -282,8 +282,10 @@ var FailedStm *Stmt
 // Statement.cpp:609–626 — clear effect_stm; visit_facts; remove_rv_facts;
 // always record map_accum_effect and map_visited (even on failure).
 func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
+	// Statement.cpp:609+ — always live Statement* + inputs + cg_context
+	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
-		return true
+		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
 	cg.ClearEffectStm()
@@ -318,8 +320,10 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 // ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
 // Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.
 func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
+	// Statement.cpp:574+ — always live this + inputs + cg_context
+	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
-		return true
+		return false
 	}
 	// sync FM global facts with working set
 	if cg.FM != nil {
