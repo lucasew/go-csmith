@@ -22,14 +22,23 @@ type FactUnion struct {
 }
 
 // MakeFactUnion mirrors FactUnion::make_fact(v, fid).
-// FactUnion.cpp:162–167 — default fid 0 when omitted in C++.
+// FactUnion.cpp:162–167 — assert(v==null || union type); default fid 0 when omitted.
 func MakeFactUnion(v *Variable, fid int) *FactUnion {
+	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion)
+	// no soft invent FactUnion on scalar/struct vars
+	if v != nil && (v.Type == nil || !v.Type.IsUnion()) {
+		return nil
+	}
 	return &FactUnion{Var: v, LastWrittenFID: fid}
 }
 
 // MakeFactUnionTop mirrors make_fact(v) with TOP.
 func MakeFactUnionTop(v *Variable) *FactUnion {
-	return &FactUnion{Var: v, LastWrittenFID: FactUnionTop}
+	f := MakeFactUnion(v, FactUnionTop)
+	if f == nil {
+		return nil
+	}
+	return f
 }
 
 // MakeFactUnions mirrors FactUnion::make_facts.
@@ -37,7 +46,9 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
-		out = append(out, MakeFactUnion(v, fid))
+		if f := MakeFactUnion(v, fid); f != nil {
+			out = append(out, f)
+		}
 	}
 	return out
 }
@@ -134,7 +145,12 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 	if f == nil || f.Var == nil || f.IsTop() || f.IsBottom() {
 		return nil
 	}
+	// FactUnion.cpp:65 — assert(var->type && eUnion); fail closed nil if not union
+	if f.Var.Type == nil || !f.Var.Type.IsUnion() {
+		return nil
+	}
 	fid := f.LastWrittenFID
+	// FactUnion.cpp:68–69 — assert fid in [0, field_vars.size())
 	if fid < 0 || fid >= len(f.Var.FieldVars) {
 		return nil
 	}
@@ -164,6 +180,9 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 		return false
 	}
 	tmp := MakeFactUnion(v, fid)
+	if tmp == nil {
+		return false
+	}
 	fu := FindRelatedUnion(facts, v)
 	return fu != nil && tmp.Imply(fu)
 }
@@ -180,16 +199,22 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 		return false
 	}
 	// walk to the union field variable
+	// FactUnion.cpp:181–184 — for (; !is_union_field(); field_var_of); assert(is_union_field)
 	uf := v
 	for uf != nil && !uf.IsUnionField() {
 		uf = uf.FieldVarOf
 	}
+	// broken IR (no union field in ancestry) — fail closed nonreadable (no invent readable)
 	if uf == nil || uf.FieldVarOf == nil {
-		return false
+		return true
 	}
 	parent := uf.FieldVarOf
 	fid := uf.GetFieldID()
 	tmp := MakeFactUnion(parent, fid)
+	if tmp == nil {
+		// parent not union type — fail closed nonreadable
+		return true
+	}
 	fu := FindRelatedUnion(facts, parent)
 	if fu == nil || !tmp.Imply(fu) {
 		// no fact or last write was a different field → nonreadable

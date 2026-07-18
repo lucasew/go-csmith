@@ -13,9 +13,17 @@ func TestFactUnionLatticeConstants(t *testing.T) {
 }
 
 func TestFactUnionJoinAndImply(t *testing.T) {
-	uv := &Variable{Name: "g_u"}
+	// FactUnion.cpp:163 — make_fact requires union type
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := &Variable{Name: "g_u", Type: ut}
 	a := MakeFactUnion(uv, 0)
 	b := MakeFactUnion(uv, 1)
+	if a == nil || b == nil {
+		t.Fatal("make fact")
+	}
 	if a.Imply(b) {
 		t.Fatal("0 does not imply 1")
 	}
@@ -60,22 +68,56 @@ func TestIsFieldReadable(t *testing.T) {
 }
 
 func TestFactUnionOutput(t *testing.T) {
-	uv := CreateVariableScalars("g_u", GetIntType(), true, false)
+	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	uv := &Variable{Name: "g_u", Type: ut}
 	f := MakeFactUnion(uv, 2)
+	if f == nil {
+		t.Fatal("make")
+	}
 	s := f.Output()
 	if !strings.Contains(s, "g_u") || !strings.Contains(s, "2") {
 		t.Fatal(s)
 	}
 }
 
+func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
+	// FactUnion.cpp:163 assert union type — no invent FactUnion on int
+	v := CreateVariableScalars("g_i", GetIntType(), true, false)
+	if MakeFactUnion(v, 0) != nil {
+		t.Fatal("non-union must not invent FactUnion")
+	}
+	if len(MakeFactUnions([]*Variable{v}, 0)) != 0 {
+		t.Fatal("make_facts non-union")
+	}
+}
+
 func TestJoinVarFactsUnion(t *testing.T) {
-	u1 := &Variable{Name: "g_u1"}
+	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	u1 := &Variable{Name: "g_u1", Type: ut}
 	facts := []*FactUnion{MakeFactUnion(u1, 0), MakeFactUnion(u1, 1)}
 	// same var twice with different fids — FindRelated finds first only
 	// join list with one var
 	j := JoinVarFactsUnion(facts, []*Variable{u1})
 	if j == nil || j.LastWrittenFID != 0 {
 		t.Fatal(j)
+	}
+}
+
+func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
+	// FactUnion.cpp:65 assert union; OOB fid fail closed
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := &Variable{Name: "g_u", Type: ut, FieldVars: []*Variable{
+		{Name: "g_u.f0", Type: GetIntType()},
+	}}
+	f := MakeFactUnion(uv, 0)
+	if f.GetLastWrittenType() != GetIntType() {
+		t.Fatal("field0 type")
+	}
+	f.LastWrittenFID = 99
+	if f.GetLastWrittenType() != nil {
+		t.Fatal("OOB fid")
 	}
 }
 
