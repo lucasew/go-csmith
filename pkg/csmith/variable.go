@@ -13,6 +13,10 @@ type Variable struct {
 	IsRegister bool
 	IsBitfield bool
 	IsArray    bool
+	// ArraySizes set when IsArray (element Type is Type field).
+	ArraySizes []int
+	// ArrayInits optional brace values for emit.
+	ArrayInits []string
 	// FieldVarOf is field_var_of (nil if not a field).
 	FieldVarOf *Variable
 

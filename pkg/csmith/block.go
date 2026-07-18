@@ -195,6 +195,12 @@ func (b *Block) Output(indent int) string {
 			continue
 		}
 		sb.WriteString(inner)
+		if lv.IsArray && len(lv.ArraySizes) > 0 {
+			av := &ArrayVariable{Variable: *lv, Sizes: lv.ArraySizes, InitValues: lv.ArrayInits}
+			sb.WriteString(av.OutputDef())
+			sb.WriteString("\n")
+			continue
+		}
 		if lv.IsConst() {
 			sb.WriteString("const ")
 		}

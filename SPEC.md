@@ -410,10 +410,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 8b: `ExpressionFuncall` + std binary/unary | **Partial** |
 | Layer 8c: `SafeOpFlags` binary/unary names | **Partial** |
 | Layer 9c: `StatementAssign` ops table | **Partial** |
-| Layer 4c: `SelectLType` + `make_random_pointer_type` | **Partial** — int* consolidation; no struct LType |
-| TypeEnv derived_types | **Partial** — shared via ProgramGenerator / VS |
-| Block tmp vars / math_notmp | **Partial** |
-| ArrayVariable / goto | **Not started** |
+| Layer 4c: `SelectLType` + pointer types | **Partial** |
+| Layer 6b: `ArrayVariable::CreateArrayVariable` | **Partial** — dims/sizes/init alts; itemize deferred |
+| create_and_initialize NewArray flip | **Partial** — globals/locals |
+| ArrayVariable / itemize / select_array / goto | **Partial** / not started |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

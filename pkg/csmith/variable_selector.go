@@ -17,6 +17,8 @@ type VariableSelector struct {
 	VarCreated bool
 	// Types is session Type::derived_types (optional).
 	Types *TypeEnv
+	// Arrays tracks ArrayVariables for emission.
+	Arrays []*ArrayVariable
 }
 
 // NewVariableSelector constructs an empty selector with opts-derived probs.
@@ -83,6 +85,49 @@ func typesMatchExact(a, b *Type) bool {
 	return a.Match(b, MatchExact)
 }
 
+
+// createAndInitialize mirrors VariableSelector::create_and_initialize.
+// VariableSelector.cpp:518+ — NewArrayVariableProb flip → CreateArrayVariable.
+func (vs *VariableSelector) createAndInitialize(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer CVQualifiers,
+	blk *Block,
+	name string,
+	r *Rng,
+) *Variable {
+	if vs == nil || t == nil || r == nil {
+		return nil
+	}
+	// rnd_flipcoin(NewArrayVariableProb()) when arrays enabled
+	if vs.Opts.Arrays && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
+		init := MakeRandom(t, vs.Opts, r)
+		av := CreateArrayVariable(r, vs.Opts, blk, name, t, init, qfer)
+		if av != nil {
+			vs.AllVars = append(vs.AllVars, &av.Variable)
+			if blk != nil {
+				blk.LocalVars = append(blk.LocalVars, &av.Variable)
+			}
+			// store full array on a side list for emission
+			vs.Arrays = append(vs.Arrays, av)
+			vs.VarCreated = true
+			return &av.Variable
+		}
+	}
+	v := CreateVariableQfer(name, t, qfer)
+	if v == nil {
+		return nil
+	}
+	v.Init = MakeRandom(t, vs.Opts, r)
+	if blk != nil {
+		blk.LocalVars = append(blk.LocalVars, v)
+	}
+	vs.AllVars = append(vs.AllVars, v)
+	vs.VarCreated = true
+	return v
+}
+
 // GenerateNewGlobal mirrors VariableSelector::GenerateNewGlobal for simple types:
 // random_qualifiers (or copy qfer), RandomGlobalName, CreateVariable, push GlobalList.
 // create_and_initialize / FactMgr / access_once deferred.
@@ -109,19 +154,14 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	}
 	name := vs.RandomGlobalName()
 	vs.TmpCount++
-	// create_and_initialize → CreateVariable with init; init nil until Constant.
-	v := CreateVariableQfer(name, t, varQfer)
+	v := vs.createAndInitialize(access, cg, t, varQfer, nil, name, r)
 	if v == nil {
 		return nil
 	}
-	// create_and_initialize → Constant::make_random for simple non-union (Variable.cpp CreateVariable path)
-	v.Init = MakeRandom(t, vs.Opts, r)
 	vs.GlobalList = append(vs.GlobalList, v)
-	vs.AllVars = append(vs.AllVars, v)
 	if !varQfer.IsVolatile() {
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
 	}
-	vs.VarCreated = true
 	return v
 }
 
@@ -269,13 +309,6 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		varQfer.IsVolatiles[len(varQfer.IsVolatiles)-1] = false
 	}
 	name := vs.RandomLocalName()
-	v := CreateVariableQfer(name, t, varQfer)
-	if v == nil {
-		return nil
-	}
-	v.Init = MakeRandom(t, vs.Opts, r)
-	block.LocalVars = append(block.LocalVars, v)
-	vs.AllVars = append(vs.AllVars, v)
-	vs.VarCreated = true
+	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
 	return v
 }

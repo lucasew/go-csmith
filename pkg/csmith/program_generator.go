@@ -142,8 +142,22 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	}
 	var b strings.Builder
 	b.WriteString("/* --- GLOBAL VARIABLES --- */\n\n")
+	arrayByName := map[string]*ArrayVariable{}
+	for _, av := range g.VS.Arrays {
+		if av != nil {
+			arrayByName[av.Name] = av
+		}
+	}
 	for _, v := range g.VS.GlobalList {
 		if v == nil || v.Type == nil {
+			continue
+		}
+		if av := arrayByName[v.Name]; av != nil {
+			if g.Opts.ForceGlobalsStatic {
+				b.WriteString("static ")
+			}
+			b.WriteString(av.OutputDef())
+			b.WriteString("\n")
 			continue
 		}
 		// force_globals_static default true
