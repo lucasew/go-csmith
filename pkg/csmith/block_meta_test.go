@@ -168,3 +168,23 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 		t.Fatal("true break must_jump")
 	}
 }
+
+func TestBlockOutputBlockIDComment(t *testing.T) {
+	// Block.cpp:250–253 — "{ " + /* block id: N */
+	b := &Block{StmID: 42, Stmts: []Stmt{{
+		Kind: StmtAssign, StmID: 1,
+		LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),
+		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		AssignOp: AssignSimple,
+	}}}
+	out := b.Output(0)
+	if !strings.Contains(out, "/* block id: 42 */") {
+		t.Fatal(out)
+	}
+	// concise skips comment body of OutputCommentLine when we gate EmitConcise
+	b.EmitConcise = true
+	out2 := b.Output(0)
+	if strings.Contains(out2, "block id:") {
+		t.Fatal("concise should skip block id", out2)
+	}
+}

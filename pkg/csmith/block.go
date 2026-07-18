@@ -592,7 +592,14 @@ func (b *Block) Output(indent int) string {
 	pad := strings.Repeat("    ", indent)
 	inner := strings.Repeat("    ", indent+1)
 	var sb strings.Builder
-	sb.WriteString(pad + "{\n")
+	// Block.cpp:250–253 — "{ " + /* block id: stm_id */
+	sb.WriteString(pad + "{ ")
+	if b.EmitConcise {
+		sb.WriteString("\n")
+	} else {
+		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
+		sb.WriteString(OutputCommentLine("block id: "+Int2Str(b.StmID), false, false))
+	}
 	// Block.cpp:255–257
 	if b.EmitDepthProtect {
 		sb.WriteString(inner + "DEPTH++;\n")
