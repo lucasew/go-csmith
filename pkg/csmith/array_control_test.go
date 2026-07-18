@@ -8,7 +8,7 @@ import (
 func TestMakeRandomArrayControlLe(t *testing.T) {
 	r := NewRng(2)
 	// force Le by unsigned
-	init, limit, incr, testOp, incrOp := MakeRandomArrayControl(r, 10, false, 0)
+	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(r, 10, false, 0)
 	if testOp != BinCmpLe {
 		t.Fatalf("unsigned want Le got %v", testOp)
 	}
@@ -21,7 +21,27 @@ func TestMakeRandomArrayControlLe(t *testing.T) {
 	if limit != 10 {
 		t.Fatalf("limit %d", limit)
 	}
+	// StatementFor.cpp:145 — outBound = ((bound-init)/incr)*incr + init
+	if outBound < 0 {
+		t.Fatal(outBound)
+	}
 	_ = init
+}
+
+func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
+	// StatementFor.cpp:157–158 — oob_cnt when oob flip hits
+	BookkeeperDoFinalization()
+	defer BookkeeperDoFinalization()
+	// 100% OOB
+	_, _, _, _, _, _ = MakeRandomArrayControl(NewRng(1), 8, false, 100)
+	if OOBCount() != 1 {
+		t.Fatalf("oob %d", OOBCount())
+	}
+	// 0% OOB
+	_, _, _, _, _, _ = MakeRandomArrayControl(NewRng(2), 8, false, 0)
+	if OOBCount() != 1 {
+		t.Fatalf("still 1 after no-oob %d", OOBCount())
+	}
 }
 
 func TestMakeIterationUsesMustUseArrays(t *testing.T) {

@@ -96,27 +96,36 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 }
 
 // MakeRandomArrayControl mirrors make_random_array_control.
-// StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb.
-func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
+// StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
+// returns adjusted IV bound (out-param `bound` in C++).
+func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
 	if r == nil || bound < 1 {
-		return 0, 1, 1, BinCmpLt, AssignAdd
+		return 0, 1, 1, BinCmpLt, AssignAdd, 1
 	}
+	// StatementFor.cpp:133 — pure_rnd_flipcoin(array_oob_prob) (random mode == rnd)
 	oob := r.RndFlipcoin(uint32(oobProb))
-	// signed: Le or Ge; unsigned: Le
+	if oob {
+		// StatementFor.cpp:157–158 — Bookkeeper::oob_cnt++
+		RecordOOB()
+	}
+	// StatementFor.cpp:134 — signed: rnd_flipcoin Le/Ge; unsigned: always Le
 	if isSigned && r.RndFlipcoin(50) {
 		testOp = BinCmpGe
 	} else {
 		testOp = BinCmpLe
 	}
 	if testOp == BinCmpLe {
+		// StatementFor.cpp:135–146 — increment from near 0
 		if oob {
 			init = -1000
 		} else if r.RndFlipcoin(50) {
 			init = 0
 		} else {
-			init = int(r.RndUpto(uint32(bound / 2)))
-			if bound/2 == 0 {
+			half := bound / 2
+			if half < 1 {
 				init = 0
+			} else {
+				init = int(r.RndUpto(uint32(half)))
 			}
 		}
 		limit = bound
@@ -133,8 +142,10 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		if incr == 0 {
 			incr = 1
 		}
+		// StatementFor.cpp:145 — bound = ((bound-init)/incr)*incr + init
+		outBound = ((bound-init)/incr)*incr + init
 	} else {
-		// decrement from near end
+		// StatementFor.cpp:147–156 — decrement from near last index
 		if r.RndFlipcoin(50) {
 			init = bound
 		} else {
@@ -166,8 +177,13 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		if incr == 0 {
 			incr = 1
 		}
+		// StatementFor.cpp:156 — bound = init
+		outBound = init
 	}
-	return init, limit, incr, testOp, incrOp
+	if outBound < 0 {
+		outBound = 0
+	}
+	return init, limit, incr, testOp, incrOp, outBound
 }
 
 // MakeIteration mirrors StatementFor::make_iteration.
@@ -234,7 +250,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	arrayBound := bound != InvalidIVBound && bound > 0
 	if arrayBound {
-		// make_random_array_control(--bound, ...)
+		// StatementFor.cpp:220–221 — make_random_array_control(--bound, …)
 		b := bound - 1
 		if b < 1 {
 			b = 1
@@ -245,7 +261,10 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		} else {
 			oob = opts.ArrayOOBProb
 		}
-		initN, limitN, incrN, testOp, incrOp = MakeRandomArrayControl(r, b, signed, oob)
+		var outBound int
+		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControl(r, b, signed, oob)
+		// C++ replaces bound with adjusted return value for IV bounds
+		bound = outBound
 	} else {
 		bound = 0
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)

@@ -316,6 +316,13 @@ func RecordVolatileAvail() { volatileAvail++ }
 // VolatileAvailCount returns volatile_avail (tests / statistics).
 func VolatileAvailCount() int { return volatileAvail }
 
+// RecordOOB mirrors Bookkeeper::oob_cnt++ when array_oob_prob fires.
+// StatementFor.cpp:157–158 — make_random_array_control.
+func RecordOOB() { oobCnt++ }
+
+// OOBCount returns oob_cnt (tests / statistics).
+func OOBCount() int { return oobCnt }
+
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
 // plus sum of arg complexities; assign/comma nest.
