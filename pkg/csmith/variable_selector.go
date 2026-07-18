@@ -371,8 +371,8 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	return arrayVars[r.RndUpto(uint32(n))]
 }
 
-// CreateRandomArray mirrors VariableSelector::create_random_array (simplified).
-// VariableSelector.cpp:1347–1379.
+// CreateRandomArray mirrors VariableSelector::create_random_array.
+// VariableSelector.cpp:1340–1379 — choose_random_nonvoid (global) / nonvoid_nonvolatile (local).
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
 		return nil
@@ -389,9 +389,33 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			blk = cg.CurrentFunc.Stack[idx]
 		}
 	}
-	// type: nonvoid simple
-	st := ChooseRandomNonvoidSimple(r, vs.Probs)
-	elem := GetSimpleType(st)
+	// Type::choose_random_nonvoid / nonvoid_nonvolatile; skip const aggregates
+	var elem *Type
+	for tries := 0; tries < 16; tries++ {
+		if asGlobal {
+			if vs.Types != nil {
+				elem = vs.Types.ChooseRandomNonvoid(r, vs.Opts, vs.Probs)
+			} else {
+				elem = GetSimpleType(ChooseRandomNonvoidSimple(r, vs.Probs))
+			}
+		} else {
+			if vs.Types != nil {
+				elem = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
+			} else {
+				elem = GetSimpleType(ChooseRandomNonvoidSimple(r, vs.Probs))
+			}
+		}
+		if elem == nil {
+			continue
+		}
+		if elem.IsConstStructUnion() {
+			continue
+		}
+		break
+	}
+	if elem == nil {
+		elem = GetIntType()
+	}
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	init := MakeRandom(elem, vs.Opts, r)
 	av := CreateArrayVariable(r, vs.Opts, blk, name, elem, init, qfer)

@@ -50,10 +50,9 @@ func (g *ProgramGenerator) Initialize() {
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
 }
 
-// GenerateAllTypes mirrors GenerateAllTypes for non-dfs mode without structs/unions yet.
-// Type.cpp:1179–1202 — GenerateSimpleTypes; struct/union deferred (MoreTypesProbability loop).
+// GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).
+// Type.cpp:1179–1202 — simples + structs/unions via MoreTypesProbability.
 func (g *ProgramGenerator) GenerateAllTypes() {
-	// Type.cpp GenerateAllTypes — simples + optional structs via MoreTypesProbability.
 	GenerateAllTypesEnv(g.Rng, g.Opts, g.Probs, &g.Types)
 }
 

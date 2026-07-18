@@ -108,17 +108,30 @@ func MakeRandomBlock(
 	}
 	max := BlockProbability(b.blockSize, r)
 	cg.BlkDepth++
+	// Forward goto: prefer labeling the next real statement; no-op if goto is last.
+	pendingFwd := ""
 	for i := 0; i <= max; i++ {
 		st := makeRandomStmt(r, opts, probs, vs, tables, stmtTab, cg, b)
-		b.Stmts = append(b.Stmts, st)
-		// Forward goto: place labeled no-op after (simplified good forward target).
-		if st.Kind == StmtGoto && st.GotoForward && st.Label != "" {
-			b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: st.Label})
+		if pendingFwd != "" {
+			if st.SourceLabel == "" {
+				st.SourceLabel = pendingFwd
+			} else {
+				// already labeled — keep pending as no-op marker after previous
+				b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd})
+			}
+			pendingFwd = ""
 		}
-		// Block.cpp:152 — stop when statement must_return (not only bare Return kind)
+		b.Stmts = append(b.Stmts, st)
+		if st.Kind == StmtGoto && st.GotoForward && st.Label != "" {
+			pendingFwd = st.Label
+		}
+		// Block.cpp:152 — stop when statement must_return
 		if st.MustReturn() {
 			break
 		}
+	}
+	if pendingFwd != "" {
+		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd})
 	}
 	// Block.cpp:734–737 — top-level function body: append return if required and missing
 	// (still on stack so ExpressionVariable can see locals)

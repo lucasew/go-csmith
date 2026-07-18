@@ -12,11 +12,12 @@ const (
 	AccessWrite
 )
 
-// Effect is a minimal Effect.cpp stand-in (purity / SE-free only for now).
-// Full read/write var sets land with Variable ports.
+// Effect is a minimal Effect.cpp stand-in (purity / SE-free + write set subset).
 type Effect struct {
 	pure           bool
 	sideEffectFree bool
+	// written tracks variables written in this effect (Effect::write_vars subset).
+	written map[*Variable]bool
 }
 
 // EmptyEffect is Effect::empty_effect (pure, side-effect free).
@@ -34,4 +35,29 @@ func (e Effect) IsSideEffectFree() bool { return e.sideEffectFree }
 // WithSideEffects returns a non-SE-free effect (for tests / context).
 func WithSideEffects() Effect {
 	return Effect{pure: false, sideEffectFree: false}
+}
+
+// WriteVar mirrors Effect::write_var — marks impure and records write.
+// Effect.cpp write_var path (simplified, no partial/field).
+func (e Effect) WriteVar(v *Variable) Effect {
+	e.pure = false
+	e.sideEffectFree = false
+	if v != nil {
+		if e.written == nil {
+			e.written = make(map[*Variable]bool)
+		}
+		// copy-on-write for value semantics
+		nw := make(map[*Variable]bool, len(e.written)+1)
+		for k, val := range e.written {
+			nw[k] = val
+		}
+		nw[v] = true
+		e.written = nw
+	}
+	return e
+}
+
+// IsWritten mirrors Effect::is_written (exact var).
+func (e Effect) IsWritten(v *Variable) bool {
+	return v != nil && e.written[v]
 }

@@ -127,6 +127,17 @@ func RandomTypeFromType(
 // ChooseRandomNonvoid mirrors Type::choose_random_nonvoid.
 // Type.cpp:1218–1227 — NonVoidTypeFilter rejects void.
 func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabilities) *Type {
+	return env.chooseRandomFiltered(r, opts, probs, false)
+}
+
+// ChooseRandomNonvoidNonvolatile mirrors Type::choose_random_nonvoid_nonvolatile.
+// Type.cpp:1229+ / NonVoidNonVolatileTypeFilter — also reject volatile aggregates.
+func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *Probabilities) *Type {
+	return env.chooseRandomFiltered(r, opts, probs, true)
+}
+
+// chooseRandomFiltered shared filter for nonvoid (+ optional nonvolatile aggregate).
+func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilities, noVolatileAgg bool) *Type {
 	if env == nil || len(env.AllTypes) == 0 {
 		st := ChooseRandomNonvoidSimple(r, probs)
 		return GetSimpleType(st)
@@ -143,11 +154,19 @@ func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabiliti
 		if t.IsSimple() && t.Simple() == EVoid {
 			return true
 		}
-		// also honor simple type disable weights
 		if t.IsSimple() && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
 			return true
 		}
-		_ = opts
+		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnion() {
+			return true
+		}
+		// arg_structs / arg_unions gates (used for local array element types)
+		if t.IsStruct() && !opts.ArgStructs {
+			return true
+		}
+		if t.IsUnion() && !opts.ArgUnions {
+			return true
+		}
 		return false
 	})
 	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
