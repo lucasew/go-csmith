@@ -5,39 +5,47 @@ import (
 	"testing"
 )
 
-func TestMakeRandomGotoHasLabel(t *testing.T) {
+func TestMakeRandomGotoEmptyBlockReturnsNull(t *testing.T) {
+	// StatementGoto.cpp:86–87 / 130–132 — no soft makeForwardGotoOnly
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	stmtTab := NewStatementThresholdTable(opts)
-	r := NewRng(2)
-	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
-	// empty block → forward edge (no back-edge candidates yet)
-	blk := &Block{}
+	blk := &Block{Func: f}
+	f.Blocks = []*Block{blk}
 	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, &cg, blk)
-	if st.Kind != StmtGoto || st.Label == "" {
-		t.Fatalf("%+v", st)
+	if st.Label != "" || st.Expr != nil {
+		t.Fatalf("want nullptr-style empty goto, got %+v", st)
 	}
-	if !st.GotoForward && !st.GotoBack {
-		t.Fatal("expected GotoForward or GotoBack")
+	if stmtOK(st) {
+		t.Fatal("stmtOK must reject null goto")
 	}
 }
 
 func TestMakeRandomGotoBackEdge(t *testing.T) {
+	// StatementGoto.cpp:138–150 — back-edge with choose_visible_read_var
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	// minimal func + one assign target (no full MakeFirst body noise)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	blk := &Block{Stmts: []Stmt{{Kind: StmtAssign, AssignOp: AssignSimple}}}
+	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	vs.AllVars = []*Variable{g}
+	vs.GlobalList = []*Variable{g}
+	// target stmt for back-edge
+	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
+	blk := &Block{Func: f, Stmts: []Stmt{tgt, {Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}}}
 	f.Blocks = []*Block{blk}
 	f.Body = blk
-	cg := WithFunc(f, EmptyEffect())
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	eff := EmptyEffect().ReadVar(g)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
 	var st Stmt
-	for seed := uint64(1); seed < 40; seed++ {
+	for seed := uint64(1); seed < 60; seed++ {
 		blk.Stmts[0].SourceLabel = ""
 		st = MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, blk)
 		if st.GotoBack {
@@ -52,6 +60,9 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	}
 	if st.Label != blk.Stmts[0].SourceLabel {
 		t.Fatalf("label mismatch goto=%q target=%q", st.Label, blk.Stmts[0].SourceLabel)
+	}
+	if st.Expr == nil || st.Expr.Var != g {
+		t.Fatalf("cond must be visible read var g_c: %+v", st.Expr)
 	}
 }
 

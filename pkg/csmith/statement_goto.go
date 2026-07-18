@@ -287,8 +287,8 @@ func MakeRandomGoto(
 		okBlk = FindGoodJumpBlock(r, blocks, blk, false)
 	}
 	if okBlk == nil {
-		// C++ returns nullptr; library soft-fallback for emission coverage
-		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
+		// StatementGoto.cpp:86–87 — return nullptr
+		return makeGotoFailed()
 	}
 
 	// StatementGoto.cpp:89–92 — stm is curr_blk->stms.back() (jump dest for forward)
@@ -314,7 +314,8 @@ func MakeRandomGoto(
 		okStms = append(okStms, i)
 	}
 	if len(okStms) == 0 {
-		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
+		// StatementGoto.cpp:109–212 — empty ok_stms → fall through to nullptr
+		return makeGotoFailed()
 	}
 	ti := okStms[r.RndUpto(uint32(len(okStms)))]
 	other := &okBlk.Stmts[ti]
@@ -350,18 +351,9 @@ func MakeRandomGoto(
 			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		}
 	}
-	// StatementGoto.cpp:130–132 — nullptr when cond_var missing
+	// StatementGoto.cpp:130–132 — return nullptr when cond_var missing
 	if cond == nil {
-		// library soft-fallback only when no fact maps (generation without DFA prep)
-		if cg.FM == nil || len(readVars) == 0 {
-			cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
-			if cond == nil {
-				cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
-			}
-		}
-		if cond == nil {
-			return makeGotoFailed()
-		}
+		return makeGotoFailed()
 	}
 
 	nextLab := func() string {
@@ -402,7 +394,8 @@ func MakeRandomGoto(
 	// Dest is last stmt of curr; goto is inserted after other_stm in okBlk.
 	// C++ returns nullptr after insert (side-effect only); stmtOK rejects empty label.
 	if dest == nil {
-		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
+		// no stm in curr_blk yet — cannot form forward dest
+		return makeGotoFailed()
 	}
 	if dest.StmID == 0 {
 		dest.StmID = AllocStmID()
@@ -514,32 +507,4 @@ func MakeRandomGoto(
 	return makeGotoFailed()
 }
 
-// makeForwardGotoOnly is the fall-back: label placed after goto in current block.
-// Used when C++ would return nullptr but library generation still needs a goto.
-func makeForwardGotoOnly(
-	r *Rng,
-	opts Options,
-	vs *VariableSelector,
-	tables *ExprTables,
-	cg *CGContext,
-	blk *Block,
-) Stmt {
-	if cg == nil {
-		return makeGotoFailed()
-	}
-	cond := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
-	if cond == nil {
-		cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
-	}
-	label := "lbl_1"
-	if vs != nil {
-		label = vs.Sym.Next("lbl_")
-	}
-	st := Stmt{Kind: StmtGoto, Expr: cond, Label: label, GotoForward: true, StmID: AllocStmID()}
-	if cg.FM != nil && blk != nil {
-		cg.FM.CreateCFGEdgeTo(st.StmID, blk, 0, false, false)
-	}
-	// StatementGoto.cpp:211 — forward_jump_cnt
-	RecordForwardJump()
-	return st
-}
+

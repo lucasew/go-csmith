@@ -64,17 +64,38 @@ func TestClearEffectStm(t *testing.T) {
 }
 
 func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
+	// StatementGoto.cpp:117–132 — cond from choose_visible_read_var only
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	b1 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
+	// two stmts so dest (last) != other candidate
+	b1 := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: AllocStmID()},
+		{Kind: StmtAssign, StmID: AllocStmID()},
+	}}
 	f.Blocks = []*Block{b1}
 	f.Stack = []*Block{b1}
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
-	st := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
+	g := vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
+	eff := EmptyEffect().ReadVar(g)
+	cg.EffectAccum = &eff
+	for i := range b1.Stmts {
+		fm.MapAccumEffect[b1.Stmts[i].StmID] = eff
+		fm.SetMapFactsIn(b1.Stmts[i].StmID, nil)
+		fm.SetMapFactsOut(b1.Stmts[i].StmID, nil)
+	}
+	var st Stmt
+	for seed := uint64(1); seed < 40; seed++ {
+		st = MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
+		if st.GotoBack || (st.Label == "" && !stmtOK(st)) {
+			// success back-edge or fair null after forward insert
+			if st.GotoBack {
+				break
+			}
+		}
+	}
 	if st.Kind != StmtGoto {
 		t.Fatal(st.Kind)
 	}
