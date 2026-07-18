@@ -317,10 +317,10 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			if st.Loop != nil && st.Loop.IV != nil {
-				iv := st.Loop.IV.Name
+				iv := st.Loop.IV.OutputC()
 				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
 				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
-				incr := st.Loop.IncrOp.AssignOpC(iv, fmt.Sprintf("%d", st.Loop.IncrN))
+				incr := forIncrOutput(st.Loop)
 				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
@@ -365,10 +365,10 @@ func (b *Block) Output(indent int) string {
 		case StmtArrayOp:
 			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
 			if st.Loop != nil && st.Loop.IV != nil {
-				iv := st.Loop.IV.Name
+				iv := st.Loop.IV.OutputC()
 				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
 				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
-				incr := st.Loop.IncrOp.AssignOpC(iv, fmt.Sprintf("%d", st.Loop.IncrN))
+				incr := forIncrOutput(st.Loop)
 				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))

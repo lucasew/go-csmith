@@ -26,6 +26,22 @@ type Variable struct {
 
 	// Init mirrors Variable::init (Expression*); Constant only for now.
 	Init *Constant
+	// IsAccessOnce mirrors Variable::isAccessOnce (ACCESS_ONCE wrap).
+	IsAccessOnce bool
+	// IsAddrTaken mirrors Variable::isAddrTaken (disables ACCESS_ONCE).
+	IsAddrTaken bool
+}
+
+// OutputC mirrors Variable::Output — ACCESS_ONCE wrap when marked (option gated at create).
+// Variable.cpp:689–700. VOL_RVAL deferred (wrap_volatiles default off).
+func (v *Variable) OutputC() string {
+	if v == nil {
+		return ""
+	}
+	if v.IsAccessOnce && !v.IsAddrTaken {
+		return "ACCESS_ONCE(" + v.Name + ")"
+	}
+	return v.Name
 }
 
 // CreateVariableQfer mirrors

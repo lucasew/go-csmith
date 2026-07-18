@@ -135,6 +135,10 @@ func (vs *VariableSelector) createAndInitialize(
 		return nil
 	}
 	v.Init = MakeRandom(t, vs.Opts, r)
+	// VariableSelector.cpp:568–569 — access_once flip
+	if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
+		v.IsAccessOnce = true
+	}
 	if blk != nil {
 		blk.LocalVars = append(blk.LocalVars, v)
 	}

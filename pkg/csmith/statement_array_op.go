@@ -99,12 +99,13 @@ func MakeRandomArrayInit(
 		_, _ = MakeRandomIterCtrl(r, av.Sizes[i])
 	}
 	lc := &LoopControl{
-		IV:     iv,
-		InitN:  init,
-		LimitN: size,
-		IncrN:  incr,
-		TestOp: BinCmpLt,
-		IncrOp: AssignAdd,
+		IV:       iv,
+		InitN:    init,
+		LimitN:   size,
+		IncrN:    incr,
+		TestOp:   BinCmpLt,
+		IncrOp:   AssignAdd,
+		SafeIncr: opts.SafeMath,
 	}
 	bodyCG := cg
 	bodyCG.Flags |= 2 // IN_LOOP

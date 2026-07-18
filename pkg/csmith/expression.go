@@ -179,7 +179,11 @@ func MakeRandomParam(
 			tt = TermVariable
 		}
 	}
-	// no_func=false, no_const=true for sub make paths that re-pick
+	// ExpressionVariable::make_random(..., as_param=true)
+	if tt == TermVariable {
+		return makeExpressionVariableFlags(r, vs, cg, typ, qfer, true, false)
+	}
+	// no_func=false, no_const=true for other terms
 	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, exprDepth, list...)
 }
 
@@ -249,17 +253,52 @@ func MakeRandomExpression(
 
 
 // makeExpressionVariable — ExpressionVariable.cpp:56+ :
-// VariableSelector::select(READ, type, qfer, eFlexible).
+// VariableSelector::select(READ, type, qfer, eFlexible); as_param / as_return filters.
 func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, qfer *CVQualifiers) *Expression {
+	return makeExpressionVariableFlags(r, vs, cg, typ, qfer, false, false)
+}
+
+// makeExpressionVariableFlags adds as_param / as_return restrictions (ExpressionVariable.cpp:99–117).
+func makeExpressionVariableFlags(
+	r *Rng,
+	vs *VariableSelector,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	asParam, asReturn bool,
+) *Expression {
 	if vs == nil {
 		return nil
 	}
-	v := vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
-	if v == nil {
-		return nil
+	// try several selects if filtered
+	for tries := 0; tries < 8; tries++ {
+		v := vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
+		if v == nil {
+			return nil
+		}
+		if typ != nil && v.Type != nil {
+			// as_param: forbid address-of argument (is_dereferenced_from desired type)
+			if asParam && v.IsArgument() && typ.PtrType() != nil && typ.Match(v.Type, MatchDereference) {
+				continue
+			}
+			// !addr_taken_of_locals: forbid & of local/arg when desired is pointer-to-var
+			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) {
+				if typ.IndirectLevel() < v.Type.IndirectLevel() {
+					// taking address: var is pointee of typ... typ is pointer-to-v.type-ish
+					// is_dereferenced_from: typ is derived from var by *
+					// actually: var->type->is_dereferenced_from(type) means type is pointer chain to var
+					// ExpressionVariable: is_dereferenced_from(type) on var->type with desired type
+					// if desired is T* and var is T, indirection = -1 (address-of)
+					if v.Type.IndirectLevel()-typ.IndirectLevel() < 0 {
+						continue
+					}
+				}
+			}
+			_ = asReturn // dead-ptr FactPointTo deferred
+		}
+		return &Expression{Term: TermVariable, Var: v, ExprType: typ}
 	}
-	// ExpressionVariable(var, type) — desired type may imply * or &
-	return &Expression{Term: TermVariable, Var: v, ExprType: typ}
+	return nil
 }
 
 // Output is a minimal C fragment for tests (not full Expression::Output).
@@ -278,16 +317,17 @@ func (e *Expression) Output() string {
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
 		ind := e.IndirectLevel()
-		name := e.Var.Name
 		if ind > 0 {
+			// deref uses actual name inside * (Variable::Output style)
 			stars := strings.Repeat("*", ind)
-			return "(" + stars + name + ")"
+			return "(" + stars + e.Var.Name + ")"
 		}
 		if ind < 0 {
-			// only -1 supported upstream (address-of)
-			return "&" + name
+			// address-of: mark addr taken; &name not ACCESS_ONCE
+			e.Var.IsAddrTaken = true
+			return "&" + e.Var.Name
 		}
-		return name
+		return e.Var.OutputC()
 	case TermFunction:
 		if e.Invoke != nil {
 			return e.Invoke.Output()

@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "fmt"
+
 // LoopControl holds IR for a counting for-loop (init/test/incr).
 type LoopControl struct {
 	IV     *Variable
@@ -10,6 +12,8 @@ type LoopControl struct {
 	IncrN  int
 	TestOp BinaryOp
 	IncrOp AssignOp
+	// SafeIncr: emit safe_add/sub rewrite for increment (avoid_signed_overflow).
+	SafeIncr bool
 }
 
 // MakeRandomLoopControl mirrors make_random_loop_control.
@@ -131,8 +135,52 @@ func MakeRandomFor(
 	if lc == nil {
 		return &Stmt{Kind: StmtFor}
 	}
+	// when SafeMath and compound add/sub incr, attach dummy flags for emit
+	if opts.SafeMath && lc != nil {
+		switch lc.IncrOp {
+		case AssignAdd, AssignSub, AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
+			// flags created at emit from IV type; mark via LoopControl.SafeIncr
+			lc.SafeIncr = true
+		}
+	}
 	bodyCG := cg
 	bodyCG.Flags |= 2 // IN_LOOP
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, bodyCG, true)
 	return &Stmt{Kind: StmtFor, Loop: lc, Then: body}
+}
+
+// forIncrOutput emits for-loop increment (plain or safe_add rewrite).
+// StatementAssign::OutputAsExpr safe path for eAddAssign / ePreIncr-ish.
+func forIncrOutput(lc *LoopControl) string {
+	if lc == nil || lc.IV == nil {
+		return ""
+	}
+	iv := lc.IV.OutputC()
+	n := fmt.Sprintf("%d", lc.IncrN)
+	if !lc.SafeIncr {
+		return lc.IncrOp.AssignOpC(iv, n)
+	}
+	// safe rewrite: iv = safe_add/sub(iv, n) for +=/-= / ++/--
+	op := "+"
+	switch lc.IncrOp {
+	case AssignSub, AssignPreDecr, AssignPostDecr:
+		op = "-"
+	case AssignPreIncr, AssignPostIncr:
+		n = "1"
+	case AssignAdd:
+		// n already
+	default:
+		return lc.IncrOp.AssignOpC(iv, n)
+	}
+	// SafeOpFlags default int32 s_s for loop IV
+	flags := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
+	if lc.IV.Type != nil && !lc.IV.Type.IsSigned() {
+		flags.Op1Signed = false
+		flags.Op2Signed = false
+	}
+	fname := flags.BinaryFuncName(op)
+	if fname == "" {
+		return lc.IncrOp.AssignOpC(iv, n)
+	}
+	return iv + " = " + fname + "(" + iv + ", " + n + ")"
 }

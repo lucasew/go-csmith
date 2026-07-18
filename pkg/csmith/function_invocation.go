@@ -146,10 +146,10 @@ func BuildUserInvocation(
 			q := p.Qfer
 			qfer = &q
 		}
-		// make_random_param (param table: no constant args)
+		// make_random_param (param table: no constant args; as_param=true)
 		arg := MakeRandomParam(r, opts, tables, vs, cg, ty, qfer, cg.ExprDepth+1, list)
 		if arg == nil {
-			arg = MakeRandomExpression(r, opts, tables, vs, cg, ty, qfer, true, true, TermVariable, cg.ExprDepth+1, list)
+			arg = makeExpressionVariableFlags(r, vs, cg, ty, qfer, true, false)
 		}
 		fi.Args = append(fi.Args, arg)
 	}
