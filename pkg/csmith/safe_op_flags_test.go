@@ -32,11 +32,16 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	// force constants as operands via depth
-	r := NewRng(3)
-	fi := MakeRandomBinaryInvocation(r, opts, probs, vs, tables, EmptyCGContext(), GetIntType())
-	if fi.Safe == nil {
-		t.Fatal("expected Safe flags when SafeMath")
+	// Full eBinaryOps includes cmp/logic; only arithmetic/shift get Safe flags.
+	var fi *Invocation
+	for seed := uint64(1); seed < 80; seed++ {
+		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		if fi != nil && fi.Safe != nil {
+			break
+		}
+	}
+	if fi == nil || fi.Safe == nil {
+		t.Fatal("expected Safe flags when SafeMath on arithmetic/shift op")
 	}
 	out := fi.Output()
 	if !strings.Contains(out, "safe_") {

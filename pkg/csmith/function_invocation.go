@@ -152,8 +152,9 @@ func BuildUserInvocation(
 	return fi
 }
 
-// MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary (arithmetic subset).
-// Uses simple ops without SafeOpFlags wrappers yet.
+// MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary.
+// FunctionInvocation.cpp:171–288 — full eBinaryOps via BINARY_OPS_PROB_FILTER;
+// pointer-comparison branch and FactMgr omitted.
 func MakeRandomBinaryInvocation(
 	r *Rng,
 	opts Options,
@@ -166,33 +167,49 @@ func MakeRandomBinaryInvocation(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	// skip pointer comparison path for now
-	ops := []string{"+", "-", "*", "/"}
-	if !opts.Muls {
-		ops = []string{"+", "-", "/"}
+	// skip make_random_binary_ptr_comparison (10% when pointers exist) for now
+	op := PickBinaryOp(r, opts)
+	// float filter if we ever pass float types
+	if typ.IsSimple() && typ.Simple() == EFloat && !BinaryOpWorksForFloat(op) {
+		op = PickBinaryOp(r, opts)
 	}
-	if !opts.Divs {
-		ops = []string{"+", "-"}
-		if opts.Muls {
-			ops = []string{"+", "-", "*"}
-		}
-	}
-	op := ops[r.RndUpto(uint32(len(ops)))]
+	opStr := op.BinaryOpC()
 	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
 	d := cg.ExprDepth + 1
 	left := MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
 	if left == nil {
 		left = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
 	}
-	right := MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
-	if right == nil {
-		right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
+	var right *Expression
+	if op == BinLShift || op == BinRShift {
+		// prefer constant shift amount (FunctionInvocation.cpp:236–244 simplified)
+		// ShiftByNonConstantProb default ~50 → flipcoin for non-constant
+		if !r.RndFlipcoin(50) {
+			// Constant::make_random_upto(SizeInBytes*8); int → 32 bits
+			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(32, r)}
+		}
 	}
-	inv := &Invocation{IsStd: true, Binary: op, Args: []*Expression{left, right}}
-	// CGOptions::avoid_signed_overflow → SafeMath
-	if opts.SafeMath && SafeOpsBinary(op) {
+	if right == nil {
+		// ordered ops (&& ||) could use original effect context; we omit FactMgr merge
+		right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
+		if right == nil {
+			right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
+		}
+	}
+	// avoid div/mod by zero-ish constant: re-pick op excluding div/mod/shift
+	if (op == BinMod || op == BinDiv) && right != nil && right.Term == TermConstant && right.Con != nil {
+		if right.Con.Value == "0" || right.Con.Value == "1" {
+			// VectorFilter out mod/div/shifts — simplified re-pick arithmetic
+			op = BinAdd
+			opStr = op.BinaryOpC()
+		}
+	}
+	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}}
+	// CGOptions::avoid_signed_overflow → SafeMath for safe_ops subset
+	if opts.SafeMath && SafeOpsBinary(opStr) {
 		inv.Safe = MakeRandomBinary(r, opts, probs, typ)
 	}
+	_ = IsOrderedBinary // cite path; effect merge deferred
 	return inv
 }
 
@@ -228,6 +245,7 @@ func MakeRandomUnaryInvocation(
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.
 // FunctionInvocation.cpp:78–120.
+// typ may be nil (StatementExpr) — choose_func ignores return type; new funcs use RandomReturnType.
 func MakeRandomInvocation(
 	r *Rng,
 	opts Options,
@@ -241,11 +259,15 @@ func MakeRandomInvocation(
 	stdFunc bool,
 ) *Invocation {
 	_ = qfer
-	if typ == nil {
-		typ = GetIntType()
+	// Match type for choose_func: nil means any return type (C++ type=0).
+	matchType := typ
+	// Concrete type for std ops / new signatures.
+	workType := typ
+	if workType == nil {
+		workType = GetIntType()
 	}
 	// non-simple / void → force user path (std_func false)
-	if typ.PtrType() != nil || (typ.IsSimple() && typ.Simple() == EVoid) {
+	if workType.PtrType() != nil || (workType.IsSimple() && workType.Simple() == EVoid) {
 		stdFunc = false
 	}
 
@@ -253,13 +275,17 @@ func MakeRandomInvocation(
 	if !stdFunc {
 		var callee *Function
 		if r.RndFlipcoin(50) && list != nil {
-			callee = ChooseFunc(r, list.Funcs, typ, cg.CurrentFunc)
+			callee = ChooseFunc(r, list.Funcs, matchType, cg.CurrentFunc)
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
 		} else if list != nil && !ReachMaxFunctions(list, opts) {
 			// build_invocation_and_function → make_random_signature only (body later)
-			callee = MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, typ, nil, list)
+			sigType := workType
+			if typ == nil {
+				sigType = RandomReturnType(r, probs)
+			}
+			callee = MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, sigType, nil, list)
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
 		} else {
 			return &Invocation{Failed: true}
@@ -268,9 +294,9 @@ func MakeRandomInvocation(
 	if fi == nil {
 		// std unary/binary
 		if r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
-			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, typ)
+			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, workType)
 		} else {
-			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, typ)
+			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, workType)
 		}
 	}
 	return fi

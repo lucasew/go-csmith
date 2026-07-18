@@ -94,13 +94,14 @@ func (f *SafeOpFlags) SizeToken() string {
 	return b.String()
 }
 
-// BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for + - * / %.
+// BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
 // SafeOpFlags.cpp:285–320.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	if f == nil {
 		return ""
 	}
 	var prefix string
+	shift := false
 	switch op {
 	case "+":
 		prefix = "safe_add_"
@@ -112,10 +113,16 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 		prefix = "safe_div_"
 	case "%":
 		prefix = "safe_mod_"
+	case "<<":
+		prefix = "safe_lshift_"
+		shift = true
+	case ">>":
+		prefix = "safe_rshift_"
+		shift = true
 	default:
 		return ""
 	}
-	// safe_add_func_int32_t_s_s
+	// safe_add_func_int32_t_s_s  /  safe_lshift_func_int32_t_s_u
 	var b strings.Builder
 	b.WriteString(prefix)
 	if f.IsFunc {
@@ -129,8 +136,14 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	} else {
 		b.WriteString("_u")
 	}
-	// non-shift: second sign == first
-	if f.Op1Signed {
+	// shifts use Op2 sign; other ops repeat Op1 (SafeOpFlags.cpp:318)
+	if shift {
+		if f.Op2Signed {
+			b.WriteString("_s")
+		} else {
+			b.WriteString("_u")
+		}
+	} else if f.Op1Signed {
 		b.WriteString("_s")
 	} else {
 		b.WriteString("_u")

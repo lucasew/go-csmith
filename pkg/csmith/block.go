@@ -186,7 +186,7 @@ func makeRandomStmt(
 	case StmtGoto:
 		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 	case StmtInvoke:
-		// still stubs
+		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
 	default:
 	}
 	_ = b
@@ -331,7 +331,12 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString("/* arrayop-stub */;\n")
 			}
 		case StmtInvoke:
-			sb.WriteString("/* invoke-stub */;\n")
+			// StatementExpr::Output — expr.Output(); ";"
+			if st.Expr != nil {
+				sb.WriteString(st.Expr.Output() + ";\n")
+			} else {
+				sb.WriteString("/* invoke */;\n")
+			}
 		default:
 			sb.WriteString("/* stmt */;\n")
 		}

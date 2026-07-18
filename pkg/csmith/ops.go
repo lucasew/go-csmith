@@ -2,17 +2,32 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// BinaryOp mirrors eBinaryOps (comparison subset used by for-loop tests).
+// BinaryOp mirrors eBinaryOps (FunctionInvocation.h order).
 type BinaryOp int
 
 const (
-	BinCmpLt BinaryOp = iota
-	BinCmpLe
+	BinAdd BinaryOp = iota
+	BinSub
+	BinMul
+	BinDiv
+	BinMod
 	BinCmpGt
+	BinCmpLt
 	BinCmpGe
+	BinCmpLe
 	BinCmpEq
 	BinCmpNe
+	BinAnd
+	BinOr
+	BinBitXor
+	BinBitAnd
+	BinBitOr
+	BinRShift
+	BinLShift
 )
+
+// MaxBinaryOp mirrors MAX_BINARY_OP.
+const MaxBinaryOp = int(BinLShift) + 1
 
 // AssignOp mirrors eAssignOps (StatementAssign.h order).
 type AssignOp int
@@ -35,23 +50,102 @@ const (
 	AssignPostDecr
 )
 
-// CmpOpC returns the C operator string for a comparison.
-func (op BinaryOp) CmpOpC() string {
+// BinaryOpC returns the C operator token for eBinaryOps.
+// FunctionInvocationBinary::Output / GetOpString subset.
+func (op BinaryOp) BinaryOpC() string {
 	switch op {
-	case BinCmpLt:
-		return "<"
-	case BinCmpLe:
-		return "<="
+	case BinAdd:
+		return "+"
+	case BinSub:
+		return "-"
+	case BinMul:
+		return "*"
+	case BinDiv:
+		return "/"
+	case BinMod:
+		return "%"
 	case BinCmpGt:
 		return ">"
+	case BinCmpLt:
+		return "<"
 	case BinCmpGe:
 		return ">="
+	case BinCmpLe:
+		return "<="
 	case BinCmpEq:
 		return "=="
 	case BinCmpNe:
 		return "!="
+	case BinAnd:
+		return "&&"
+	case BinOr:
+		return "||"
+	case BinBitXor:
+		return "^"
+	case BinBitAnd:
+		return "&"
+	case BinBitOr:
+		return "|"
+	case BinRShift:
+		return ">>"
+	case BinLShift:
+		return "<<"
+	default:
+		return "+"
+	}
+}
+
+// CmpOpC returns the C operator string for a comparison (for-loop tests).
+func (op BinaryOp) CmpOpC() string {
+	switch op {
+	case BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe:
+		return op.BinaryOpC()
 	default:
 		return "<"
+	}
+}
+
+// BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER — reject zero-weight ops.
+// Probabilities.cpp set_default_binary_ops_prob (equal group, weight 0/1).
+func BinaryOpsFilter(opts Options) Filter {
+	w := make([]int, MaxBinaryOp)
+	for i := range w {
+		w[i] = 1
+	}
+	if !opts.Muls {
+		w[BinMul] = 0
+	}
+	if !opts.Divs {
+		w[BinDiv] = 0
+	}
+	return filterFunc(func(v uint32) bool {
+		i := int(v)
+		return i < 0 || i >= len(w) || w[i] == 0
+	})
+}
+
+// PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
+// FunctionInvocation.cpp:179–183.
+func PickBinaryOp(r *Rng, opts Options) BinaryOp {
+	if r == nil {
+		return BinAdd
+	}
+	return BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), BinaryOpsFilter(opts)))
+}
+
+// IsOrderedBinary mirrors FunctionInvocation::IsOrderedStandardFunc (&& / ||).
+func IsOrderedBinary(op BinaryOp) bool {
+	return op == BinAnd || op == BinOr
+}
+
+// BinaryOpWorksForFloat mirrors FunctionInvocation::BinaryOpWorksForFloat.
+func BinaryOpWorksForFloat(op BinaryOp) bool {
+	switch op {
+	case BinAdd, BinSub, BinMul, BinDiv,
+		BinCmpGt, BinCmpLt, BinCmpGe, BinCmpLe, BinCmpEq, BinCmpNe:
+		return true
+	default:
+		return false
 	}
 }
 
