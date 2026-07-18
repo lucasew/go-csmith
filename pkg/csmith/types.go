@@ -3,6 +3,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // ESimpleType mirrors Type.h enum class eSimpleType (declaration order = integer value).
 type ESimpleType int
 
@@ -520,3 +522,209 @@ func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 // GetIntType mirrors get_int_type() → eInt.
 // Type.cpp:408.
 func GetIntType() *Type { return GetSimpleType(EInt) }
+
+// SignedOverflowPossible mirrors Type::signed_overflow_possible.
+// Type.cpp:482–484 — signed simple with size >= int_size.
+func (t *Type) SignedOverflowPossible(intSize int) bool {
+	if t == nil || !t.IsSimple() || !t.IsSigned() {
+		return false
+	}
+	if intSize < 1 {
+		intSize = platformIntSize
+	}
+	return t.SizeInBytes() >= intSize
+}
+
+// GetTypeFromString mirrors Type::get_type_from_string.
+// Type.cpp:370–402 — builtin name → simple type.
+func GetTypeFromString(typeString string) *Type {
+	switch typeString {
+	case "Void":
+		return GetSimpleType(EVoid)
+	case "Char":
+		return GetSimpleType(EChar)
+	case "UChar":
+		return GetSimpleType(EUChar)
+	case "Short":
+		return GetSimpleType(EShort)
+	case "UShort":
+		return GetSimpleType(EUShort)
+	case "Int":
+		return GetSimpleType(EInt)
+	case "UInt":
+		return GetSimpleType(EUInt)
+	case "Long":
+		return GetSimpleType(ELong)
+	case "ULong":
+		return GetSimpleType(EULong)
+	case "Longlong", "LongLong":
+		return GetSimpleType(ELongLong)
+	case "ULonglong", "ULongLong":
+		return GetSimpleType(EULongLong)
+	case "Float":
+		return GetSimpleType(EFloat)
+	case "Int128":
+		return GetSimpleType(EInt128)
+	case "UInt128":
+		return GetSimpleType(EUInt128)
+	default:
+		return nil
+	}
+}
+
+// TypeNameString is the reverse of get_type_from_string for simple types.
+func (t *Type) TypeNameString() string {
+	if t == nil {
+		return ""
+	}
+	if t.ptrTo != nil {
+		return "Pointer"
+	}
+	if t.IsStruct() {
+		return t.StructName
+	}
+	if t.IsUnion() {
+		return t.StructName
+	}
+	switch t.simple {
+	case EVoid:
+		return "Void"
+	case EChar:
+		return "Char"
+	case EUChar:
+		return "UChar"
+	case EShort:
+		return "Short"
+	case EUShort:
+		return "UShort"
+	case EInt:
+		return "Int"
+	case EUInt:
+		return "UInt"
+	case ELong:
+		return "Long"
+	case EULong:
+		return "ULong"
+	case ELongLong:
+		return "Longlong"
+	case EULongLong:
+		return "ULonglong"
+	case EFloat:
+		return "Float"
+	case EInt128:
+		return "Int128"
+	case EUInt128:
+		return "UInt128"
+	default:
+		return ""
+	}
+}
+
+// PrintfDirective mirrors Type::printf_directive.
+// Type.cpp:1932–1957.
+func (t *Type) PrintfDirective() string {
+	if t == nil {
+		return ""
+	}
+	if t.ptrTo != nil {
+		return "0x%0x"
+	}
+	if t.IsAggregate() {
+		var b strings.Builder
+		b.WriteString("{")
+		for i, f := range t.Fields {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			if f.Type != nil {
+				b.WriteString(f.Type.PrintfDirective())
+			}
+		}
+		b.WriteString("}")
+		return b.String()
+	}
+	if t.IsSimple() {
+		if t.SizeInBytes() >= 8 {
+			if t.IsSigned() {
+				return "%lld"
+			}
+			return "%llu"
+		}
+		if t.IsSigned() {
+			return "%d"
+		}
+		return "%u"
+	}
+	return ""
+}
+
+// SizeofString mirrors Type::get_type_sizeof_string.
+// Type.cpp:1708–1714.
+func (t *Type) SizeofString() string {
+	if t == nil {
+		return "sizeof(void)"
+	}
+	return "sizeof(" + t.CName() + ")"
+}
+
+// HasAggregateField mirrors Type::has_aggregate_field.
+// Type.cpp:1057–1064.
+func HasAggregateField(fields []StructField) bool {
+	for _, f := range fields {
+		if f.Type != nil && f.Type.IsAggregate() {
+			return true
+		}
+	}
+	return false
+}
+
+// HasLongLongField mirrors Type::has_longlong_field.
+// Type.cpp:1066–1073.
+func HasLongLongField(fields []StructField) bool {
+	for _, f := range fields {
+		if f.Type == nil {
+			continue
+		}
+		if f.Type.IsSimple() && (f.Type.simple == ELongLong || f.Type.simple == EULongLong) {
+			return true
+		}
+		if f.Type.IsAggregate() && HasLongLongField(f.Type.Fields) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsUnnamedPadding mirrors Type::is_unamed_padding.
+// Type.cpp:1280+ — zero-width bitfield without a name used as padding.
+// Our StructField always has names; treat BitWidth==0 as unnamed padding candidate.
+func (t *Type) IsUnnamedPadding(index int) bool {
+	if t == nil || index < 0 || index >= len(t.Fields) {
+		return false
+	}
+	f := t.Fields[index]
+	// zero-length bitfield is padding
+	return f.BitWidth == 0
+}
+
+// IfStructWillHaveAssignOps mirrors Type::if_struct_will_have_assign_ops.
+// Type.cpp:505–510 — C++ only; flipcoin RegularVolatileProb.
+func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool {
+	if !opts.LangCPP {
+		return false
+	}
+	p := 50
+	if probs != nil {
+		p = probs.Single(PRegularVolatileProb)
+	}
+	if r == nil {
+		return false
+	}
+	return r.RndFlipcoin(uint32(p))
+}
+
+// IfUnionWillHaveAssignOps mirrors Type::if_union_will_have_assign_ops.
+// Type.cpp:514–519.
+func IfUnionWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool {
+	return IfStructWillHaveAssignOps(r, opts, probs)
+}

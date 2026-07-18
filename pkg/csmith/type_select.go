@@ -42,6 +42,77 @@ func (env *TypeEnv) HasPointerType() bool {
 	return env != nil && len(env.DerivedTypes) > 0
 }
 
+// FindType mirrors Type::find_type — pointer identity in AllTypes.
+// Type.cpp:410–417.
+func (env *TypeEnv) FindType(t *Type) *Type {
+	if env == nil || t == nil {
+		return nil
+	}
+	for _, x := range env.AllTypes {
+		if x == t {
+			return x
+		}
+	}
+	return nil
+}
+
+// GetAllOKStructUnionTypes mirrors Type::get_all_ok_struct_union_types.
+// Type.cpp:487–503 — filter const/volatile aggregates and optional int field.
+func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, wantStruct bool) []*Type {
+	if env == nil {
+		return nil
+	}
+	var ok []*Type
+	for _, t := range env.AllTypes {
+		if t == nil {
+			continue
+		}
+		if wantStruct {
+			if !t.IsStruct() {
+				continue
+			}
+		} else {
+			if !t.IsUnion() {
+				continue
+			}
+		}
+		if noConst && t.IsConstStructUnion() {
+			continue
+		}
+		if noVolatile && t.IsVolatileStructUnion() {
+			continue
+		}
+		if needIntField && !t.HasIntField() {
+			continue
+		}
+		ok = append(ok, t)
+	}
+	return ok
+}
+
+// ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
+// Type.cpp:521–533 — rnd_upto(ok_types).
+func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
+	if r == nil || len(ok) == 0 {
+		return nil
+	}
+	return ok[r.RndUpto(uint32(len(ok)))]
+}
+
+// ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
+// Type.cpp:570–586 — if type is struct return it; else random from env.
+func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
+	if typ != nil && typ.IsStruct() {
+		if noVolatile && typ.IsVolatileStructUnion() {
+			// fall through to pick another
+		} else {
+			return typ
+		}
+	}
+	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
+	return ChooseRandomStructUnionType(r, ok)
+}
+
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
 // Type.cpp:536–539 — rnd_upto(derived_types.size()).
 func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
