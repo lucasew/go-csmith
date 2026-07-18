@@ -30,14 +30,15 @@ func TestMatchIndirect(t *testing.T) {
 
 func TestIndirectQualifiers(t *testing.T) {
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
-	// address
+	// address — push_back false,false
 	addr := q.IndirectQualifiers(-1)
 	if len(addr.IsConsts) != 3 {
 		t.Fatal(len(addr.IsConsts))
 	}
-	// deref 1
+	// deref 1 — pop_back (upstream remove_qualifiers)
+	// [true, false] → [true]
 	d := q.IndirectQualifiers(1)
-	if len(d.IsConsts) != 1 || d.IsConsts[0] != false {
+	if len(d.IsConsts) != 1 || d.IsConsts[0] != true {
 		t.Fatalf("%v", d.IsConsts)
 	}
 }

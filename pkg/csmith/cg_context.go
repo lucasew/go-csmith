@@ -830,6 +830,10 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 			return false
 		}
 	}
+	// Lhs.cpp:313–315 — visit array indices
+	if !lhs.VisitIndices(c, opts) {
+		return false
+	}
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
 	if c.CurrRHS != nil {
 		lhsExpr := LhsAsExpression(lhs)

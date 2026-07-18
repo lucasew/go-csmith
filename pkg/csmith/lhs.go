@@ -50,12 +50,60 @@ func (l *Lhs) GetType() *Type {
 }
 
 // IsVolatile mirrors Lhs::is_volatile.
-// Lhs.cpp:220–222.
+// Lhs.cpp:220–222 — volatile after deref of indirect level.
 func (l *Lhs) IsVolatile() bool {
 	if l == nil || l.Var == nil {
 		return false
 	}
-	return l.Var.IsVolatile()
+	return l.Var.IsVolatileAfterDeref(l.IndirectLevel())
+}
+
+// GetQualifiers mirrors Lhs::get_qualifiers.
+// Lhs.cpp:197–202 — var.qfer.indirect_qualifiers(indirect).
+func (l *Lhs) GetQualifiers() CVQualifiers {
+	if l == nil || l.Var == nil {
+		return CVQualifiers{}
+	}
+	return l.Var.Qfer.IndirectQualifiers(l.IndirectLevel())
+}
+
+// GetLvars mirrors Lhs::get_lvars.
+// Lhs.cpp:181–185 — merge pointees of var at indirect level.
+func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
+	if l == nil || l.Var == nil {
+		return nil
+	}
+	return MergePointeesOfPointer(l.Var.GetCollective(), l.IndirectLevel(), facts)
+}
+
+// GetReferencedPtrs mirrors Lhs::get_referenced_ptrs.
+// Lhs.cpp:234–238 — pointer vars only.
+func (l *Lhs) GetReferencedPtrs() []*Variable {
+	if l == nil || l.Var == nil || !l.Var.IsPointer() {
+		return nil
+	}
+	return []*Variable{l.Var}
+}
+
+// VisitIndices mirrors Lhs::visit_indices.
+// Lhs.cpp:264–284 — visit array index expressions under RHS effect context.
+// Indices stored as strings (no Expression tree) → constant indices always OK.
+func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
+	if l == nil || l.Var == nil {
+		return true
+	}
+	av := l.Var.AsArray
+	if av == nil && l.Var.IsArray {
+		// bare array variable without itemized indices
+		return true
+	}
+	if av == nil || len(av.Indices) == 0 {
+		return true
+	}
+	// string indices have no sub-expressions to analyze
+	_ = cg
+	_ = opts
+	return true
 }
 
 // CompatibleVar mirrors Lhs::compatible(Variable*).

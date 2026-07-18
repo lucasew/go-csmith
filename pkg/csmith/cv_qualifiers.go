@@ -135,29 +135,124 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 	return other.StricterThan(q)
 }
 
+// AddQualifiers mirrors CVQualifiers::add_qualifiers — push one level.
+// CVQualifiers.cpp:460–463.
+func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
+	if q == nil {
+		return
+	}
+	q.IsConsts = append(q.IsConsts, isConst)
+	q.IsVolatiles = append(q.IsVolatiles, isVolatile)
+}
+
+// RemoveQualifiers mirrors CVQualifiers::remove_qualifiers — pop_back len times.
+// CVQualifiers.cpp:497–502.
+func (q *CVQualifiers) RemoveQualifiers(length int) {
+	if q == nil || length <= 0 {
+		return
+	}
+	for i := 0; i < length; i++ {
+		if len(q.IsConsts) == 0 {
+			break
+		}
+		q.IsConsts = q.IsConsts[:len(q.IsConsts)-1]
+		if len(q.IsVolatiles) > 0 {
+			q.IsVolatiles = q.IsVolatiles[:len(q.IsVolatiles)-1]
+		}
+	}
+}
+
 // IndirectQualifiers mirrors CVQualifiers::indirect_qualifiers.
-// CVQualifiers.cpp:504–521 — level<0 address; level>0 strip deref levels.
+// CVQualifiers.cpp:504–521 — level<0 address (add); level>0 deref (remove_qualifiers).
 func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 	if level == 0 || q.Wildcard {
 		return q
 	}
 	if level < 0 {
-		// address-of: add one false,false level
-		out := NewCVQualifiers(
-			append(append([]bool(nil), q.IsConsts...), false),
-			append(append([]bool(nil), q.IsVolatiles...), false),
-		)
-		out.Wildcard = q.Wildcard
-		out.AcceptStricter = q.AcceptStricter
+		// address-of: add one false,false level (push_back)
+		out := q
+		out.IsConsts = append(append([]bool(nil), q.IsConsts...), false)
+		out.IsVolatiles = append(append([]bool(nil), q.IsVolatiles...), false)
 		return out
 	}
-	// dereference: remove `level` outermost entries from front? Upstream remove_qualifiers
-	// removes from the start of the vector (outer pointers)
-	if level >= len(q.IsConsts) {
-		return NewCVQualifiers(nil, nil)
-	}
-	out := NewCVQualifiers(q.IsConsts[level:], q.IsVolatiles[level:])
+	// dereference: pop_back `level` times
+	out := NewCVQualifiers(
+		append([]bool(nil), q.IsConsts...),
+		append([]bool(nil), q.IsVolatiles...),
+	)
 	out.AcceptStricter = q.AcceptStricter
+	out.RemoveQualifiers(level)
+	return out
+}
+
+// SanityCheck mirrors CVQualifiers::sanity_check.
+// CVQualifiers.cpp:526–531 — qualifier depth == type indirect level + 1.
+func (q CVQualifiers) SanityCheck(t *Type) bool {
+	if t == nil {
+		return false
+	}
+	if q.Wildcard {
+		return true
+	}
+	level := t.IndirectLevel()
+	if level < 0 {
+		return false
+	}
+	return len(q.IsConsts) == len(q.IsVolatiles) &&
+		len(q.IsConsts) == level+1
+}
+
+// RandomAddQualifiers mirrors CVQualifiers::random_add_qualifiers.
+// CVQualifiers.cpp:467–494 — append one pointer level with const/volatile probs.
+func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabilities, noVolatile bool) CVQualifiers {
+	out := q
+	out.IsConsts = append([]bool(nil), q.IsConsts...)
+	out.IsVolatiles = append([]bool(nil), q.IsVolatiles...)
+	if opts.MatchExactQualifiers {
+		out.AddQualifiers(false, false)
+		return out
+	}
+	isConst := false
+	if opts.ConstPointers && probs != nil && r != nil {
+		isConst = r.RndFlipcoin(uint32(probs.Single(PRegularConstProb)))
+	}
+	isVol := false
+	if !noVolatile && opts.VolatilePointers && probs != nil && r != nil {
+		isVol = r.RndFlipcoin(uint32(probs.Single(PRegularVolatileProb)))
+	}
+	out.AddQualifiers(isConst, isVol)
+	return out
+}
+
+// OutputFirstQuals mirrors CVQualifiers::OutputFirstQuals.
+// CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
+func (q CVQualifiers) OutputFirstQuals() string {
+	var b strings.Builder
+	if len(q.IsConsts) > 0 && q.IsConsts[0] {
+		b.WriteString("const ")
+	}
+	if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
+		b.WriteString("volatile ")
+	}
+	return b.String()
+}
+
+// GetAllQualifiers mirrors CVQualifiers::get_all_qualifiers.
+// CVQualifiers.cpp:617–637 — enumerate all const×volatile combos for one level.
+// Probabilities are ignored for enumeration (upstream uses them only for enumerator filter).
+func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
+	_ = constProb
+	_ = volatileProb
+	// full boolean product: (false,false), (true,false), (false,true), (true,true)
+	// when prob is 0, still include false for that axis only if we followed
+	// enumerator — upstream always enumerates both when elems added.
+	// Fair port: always all four combinations (exhaustive).
+	var out []CVQualifiers
+	for _, c := range []bool{false, true} {
+		for _, v := range []bool{false, true} {
+			out = append(out, NewCVQualifiers([]bool{c}, []bool{v}))
+		}
+	}
 	return out
 }
 
