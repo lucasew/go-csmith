@@ -478,6 +478,7 @@ func (f *Function) returnTypeC() string {
 }
 
 // paramListC emits parameter list with qualified types.
+// Function.cpp:501–512 — empty → void.
 func (f *Function) paramListC() string {
 	if f == nil || len(f.Param) == 0 {
 		return "void"
@@ -496,6 +497,31 @@ func (f *Function) paramListC() string {
 	return b.String()
 }
 
+// OutputHeader mirrors Function::OutputHeader.
+// Function.cpp:516–531 — optional inline/static + qualified return + name(params).
+func (f *Function) OutputHeader(forceStatic bool) string {
+	if f == nil {
+		return ""
+	}
+	var b strings.Builder
+	// Function.cpp:521–522
+	if f.IsInlined {
+		b.WriteString("inline ")
+	}
+	// Function.cpp:524–526 — force_globals_static
+	if forceStatic {
+		b.WriteString("static ")
+	}
+	// Function.cpp:527–530
+	b.WriteString(f.returnTypeC())
+	b.WriteString(" ")
+	b.WriteString(f.Name)
+	b.WriteString("(")
+	b.WriteString(f.paramListC())
+	b.WriteString(")")
+	return b.String()
+}
+
 // OutputForwardDecl emits a C prototype.
 // Function.cpp:555–561 — builtins emit nothing (compiler-provided).
 func (f *Function) OutputForwardDecl() string {
@@ -503,32 +529,23 @@ func (f *Function) OutputForwardDecl() string {
 }
 
 // OutputForwardDeclOpts adds optional func __attribute__ and force_static.
-// Function.cpp:516–561.
+// Function.cpp:547–553 — OutputHeader + attrs + ";".
 func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
-	var b strings.Builder
-	if forceStatic {
-		b.WriteString("static ")
-	}
-	b.WriteString(f.returnTypeC())
-	b.WriteString(" ")
-	b.WriteString(f.Name)
-	b.WriteString("(")
-	b.WriteString(f.paramListC())
-	b.WriteString(")")
+	s := f.OutputHeader(forceStatic)
 	if withAttrs && r != nil {
-		b.WriteString(EnsureFuncAttrGenerator().Output(r))
+		s += EnsureFuncAttrGenerator().Output(r)
 	}
-	b.WriteString(";")
-	return b.String()
+	s += ";"
+	return s
 }
 
-// OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
-// Function.cpp:533–557 — alias_name with __attribute__((alias("name"))).
-func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
-	if f == nil || f.IsBuiltin {
+// OutputHeaderAlias mirrors Function::OutputHeaderAlias.
+// Function.cpp:533–541 — static? + type alias_name(params) __attribute__((alias("name"))).
+func (f *Function) OutputHeaderAlias(forceStatic bool) string {
+	if f == nil {
 		return ""
 	}
 	alias := f.AliasName
@@ -539,7 +556,6 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	if forceStatic {
 		b.WriteString("static ")
 	}
-	// Function.cpp:536–540
 	b.WriteString(f.returnTypeC())
 	b.WriteString(" ")
 	b.WriteString(alias)
@@ -547,8 +563,17 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	b.WriteString(f.paramListC())
 	b.WriteString(") __attribute__((alias(\"")
 	b.WriteString(f.Name)
-	b.WriteString("\")));")
+	b.WriteString("\")))")
 	return b.String()
+}
+
+// OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
+// Function.cpp:555–559 — OutputHeaderAlias + ";".
+func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
+	if f == nil || f.IsBuiltin {
+		return ""
+	}
+	return f.OutputHeaderAlias(forceStatic) + ";"
 }
 
 // Output emits a C function definition (minimal statements).
@@ -569,14 +594,8 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
 	}
-	if f.IsInlined {
-		s += "inline "
-	}
-	if forceStatic {
-		s += "static "
-	}
-	// Function.cpp:528 — get_prefixed_name(name); default random returns name
-	s += f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ")"
+	// Function.cpp:572 — OutputHeader
+	s += f.OutputHeader(forceStatic)
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
 	}

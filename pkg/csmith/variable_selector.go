@@ -1294,7 +1294,8 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 }
 
 // GenerateParameterVariable mirrors VariableSelector::GenerateParameterVariable(Function&).
-// VariableSelector.cpp:963–979 — 40% pointer when derived exist; else nonvoid simple.
+// VariableSelector.cpp:963–979 — 40% pointer when derived exist; else nonvoid nonvolatile;
+// CGOptions arg_structs / arg_unions gates.
 func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Variable {
 	if vs == nil || f == nil || r == nil {
 		return nil
@@ -1302,14 +1303,29 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	var t *Type
 	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
 	if vs.Types != nil && vs.Types.HasPointerType() && r.RndFlipcoin(40) {
-		// Type::choose_random_pointer_type → pick derived or make new
-		t = vs.Types.MakeRandomPointerType(r, vs.Opts, vs.Probs)
+		// Type::choose_random_pointer_type — pick existing derived pointer
+		t = vs.Types.ChooseRandomPointerType(r)
+		if t == nil {
+			t = vs.Types.MakeRandomPointerType(r, vs.Opts, vs.Probs)
+		}
+	} else if vs.Types != nil && len(vs.Types.AllTypes) > 0 {
+		// Type::choose_random_nonvoid_nonvolatile
+		t = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
 	} else {
-		// Type::choose_random_nonvoid_nonvolatile ≈ nonvoid simple under no structs
 		st := ChooseRandomNonvoidSimple(r, vs.Probs)
 		t = GetSimpleType(st)
 	}
-	// CVQualifiers::random_qualifiers(t) — READ empty no_volatile path
+	if t == nil {
+		t = GetIntType()
+	}
+	// Function.cpp OutputFormalParam asserts — reject struct/union params when disabled
+	if t.IsStruct() && !vs.Opts.ArgStructs {
+		t = GetIntType()
+	}
+	if t.IsUnion() && !vs.Opts.ArgUnions {
+		t = GetIntType()
+	}
+	// CVQualifiers::random_qualifiers(t) — no context
 	qfer := RandomQualifiersNoContextNoVolatile(t, vs.Opts, vs.Probs, r)
 	v := vs.GenerateParameterVariableTyped(t, qfer)
 	if v != nil {
