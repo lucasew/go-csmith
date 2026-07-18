@@ -39,10 +39,12 @@ func MakeRandomArrayOp(
 	if r.RndFlipcoin(5) {
 		return MakeRandomArrayInit(r, opts, probs, vs, tables, stmtTab, cg)
 	}
-	// StatementFor::make_random_array_loop — select arrays then MakeRandomFor
-	// (must_read/write directives deferred; still a real IN_LOOP for body)
-	_ = MakeRandomArrayLoopSetup(r, opts, vs, cg)
-	return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+	// StatementFor::make_random_array_loop — select arrays, attach must-use, then for
+	// StatementFor.cpp:314–347
+	avs := MakeRandomArrayLoopSetup(r, opts, vs, cg)
+	loopCG := cg
+	loopCG.MustUseArrays = avs
+	return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
 }
 
 // MakeRandomArrayLoopSetup mirrors make_random_array_loop array selection (side effects).

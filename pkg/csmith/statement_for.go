@@ -85,6 +85,81 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 	return init, limit, incr, testOp, incrOp
 }
 
+// MakeRandomArrayControl mirrors make_random_array_control.
+// StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb.
+func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
+	if r == nil || bound < 1 {
+		return 0, 1, 1, BinCmpLt, AssignAdd
+	}
+	oob := r.RndFlipcoin(uint32(oobProb))
+	// signed: Le or Ge; unsigned: Le
+	if isSigned && r.RndFlipcoin(50) {
+		testOp = BinCmpGe
+	} else {
+		testOp = BinCmpLe
+	}
+	if testOp == BinCmpLe {
+		if oob {
+			init = -1000
+		} else if r.RndFlipcoin(50) {
+			init = 0
+		} else {
+			init = int(r.RndUpto(uint32(bound / 2)))
+			if bound/2 == 0 {
+				init = 0
+			}
+		}
+		limit = bound
+		incrOp = AssignAdd
+		if r.RndFlipcoin(50) {
+			incr = 1
+		} else {
+			q := bound / 4
+			if q < 1 {
+				q = 1
+			}
+			incr = int(r.RndUpto(uint32(q)))
+		}
+		if incr == 0 {
+			incr = 1
+		}
+	} else {
+		// decrement from near end
+		if r.RndFlipcoin(50) {
+			init = bound
+		} else {
+			off := 0
+			if bound/2 > 0 {
+				off = int(r.RndUpto(uint32(bound / 2)))
+			}
+			init = bound - off
+		}
+		if oob {
+			limit = -1000
+		} else if r.RndFlipcoin(50) {
+			limit = 0
+		} else {
+			if bound/2 > 0 {
+				limit = int(r.RndUpto(uint32(bound / 2)))
+			}
+		}
+		incrOp = AssignSub
+		if r.RndFlipcoin(50) {
+			incr = 1
+		} else {
+			q := bound / 4
+			if q < 1 {
+				q = 1
+			}
+			incr = int(r.RndUpto(uint32(q)))
+		}
+		if incr == 0 {
+			incr = 1
+		}
+	}
+	return init, limit, incr, testOp, incrOp
+}
+
 // MakeIteration mirrors StatementFor::make_iteration without SafeOpFlags/visit_facts.
 // StatementFor.cpp:164–283.
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg CGContext) *LoopControl {
@@ -108,7 +183,37 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		return nil
 	}
 	signed := iv.Type == nil || iv.Type.IsSigned()
-	initN, limitN, incrN, testOp, incrOp := MakeRandomLoopControl(r, opts, signed)
+	var initN, limitN, incrN int
+	var testOp BinaryOp
+	var incrOp AssignOp
+	// array-loop path: must-use arrays from make_random_array_loop (StatementFor.cpp:205–220)
+	bound := -1
+	for _, av := range cg.MustUseArrays {
+		if av == nil {
+			continue
+		}
+		for _, sz := range av.Sizes {
+			if bound < 0 || sz < bound {
+				bound = sz
+			}
+		}
+	}
+	if bound > 0 {
+		// make_random_array_control(--bound, ...)
+		b := bound - 1
+		if b < 1 {
+			b = 1
+		}
+		oob := 0
+		if probs != nil {
+			oob = probs.Single(PArrayOOBProb)
+		} else {
+			oob = opts.ArrayOOBProb
+		}
+		initN, limitN, incrN, testOp, incrOp = MakeRandomArrayControl(r, b, signed, oob)
+	} else {
+		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
+	}
 	_ = probs
 	return &LoopControl{
 		IV:     iv,

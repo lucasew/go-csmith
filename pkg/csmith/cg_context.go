@@ -18,6 +18,9 @@ type CGContext struct {
 	Funcs *FunctionList
 	// Types is session derived_types.
 	Types *TypeEnv
+	// MustUseArrays mirrors rw_directive must-use arrays for array-loop for-control.
+	// StatementFor::make_iteration when find_must_use_arrays nonempty.
+	MustUseArrays []*ArrayVariable
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
