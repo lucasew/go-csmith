@@ -75,10 +75,30 @@ func (fi *Invocation) Is0Or1() bool {
 	}
 }
 
-// EqualsInt mirrors FunctionInvocationBinary::equals for constant folding.
-// FunctionInvocationBinary.cpp:154–177.
+// EqualsInt mirrors FunctionInvocationBinary::equals / FunctionInvocationUnary::equals.
+// FunctionInvocationBinary.cpp:154–177; FunctionInvocationUnary.cpp:144–156.
 func (fi *Invocation) EqualsInt(num int) bool {
-	if fi == nil || !fi.IsStd || fi.IsUnary || len(fi.Args) < 2 {
+	if fi == nil || !fi.IsStd {
+		return false
+	}
+	// FunctionInvocationUnary.cpp:144–156
+	if fi.IsUnary {
+		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			return false
+		}
+		a0 := fi.Args[0]
+		if num == 0 && fi.Unary == "!" && a0.NotEquals(0) {
+			return true
+		}
+		if num == 1 && fi.Unary == "!" && a0.EqualsInt(0) {
+			return true
+		}
+		if fi.Unary == "-" && a0.EqualsInt(-num) {
+			return true
+		}
+		return false
+	}
+	if len(fi.Args) < 2 {
 		return false
 	}
 	a0, a1 := fi.Args[0], fi.Args[1]

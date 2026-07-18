@@ -24,19 +24,21 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	r := NewRng(2)
-	fi := MakeRandomBinaryInvocation(r, opts, probs, vs, tables, EmptyCGContext(), GetIntType())
-	if fi == nil || !fi.IsStd || fi.Output() == "/*invoke*/" {
-		t.Fatalf("%+v out=%s", fi, fi.Output())
+	// C++ always sets SafeOpFlags; Output uses safe_* only for arith/shift + SafeMath.
+	var fi *Invocation
+	for seed := uint64(1); seed < 100; seed++ {
+		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		if fi != nil && fi.IsStd && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
+			break
+		}
+		fi = nil
+	}
+	if fi == nil {
+		t.Fatal("no safe-ops binary in sample")
 	}
 	out := fi.Output()
-	// With SafeMath default, expect safe_* wrapper; otherwise infix op.
-	if fi.Safe != nil {
-		if !strings.Contains(out, "safe_") {
-			t.Fatalf("safe wrapper missing: %s", out)
-		}
-	} else if !strings.Contains(out, fi.Binary) {
-		t.Fatal(out)
+	if !strings.Contains(out, "safe_") {
+		t.Fatalf("safe wrapper missing: %s", out)
 	}
 }
 
@@ -138,8 +140,8 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	if !strings.Contains(out, "==") && !strings.Contains(out, "!=") {
 		t.Fatalf("expected cmp op in %s", out)
 	}
-	// Invocation itself must not wrap the comparison in safe_*
-	if fi.Safe != nil {
-		t.Fatal("ptr cmp must not set Safe flags")
+	// C++ sets SafeOpFlags for ptr cmp but Output uses standard ==/!= (not safe_ops)
+	if strings.HasPrefix(out, "(safe_") {
+		t.Fatalf("ptr cmp must not use safe wrapper: %s", out)
 	}
 }

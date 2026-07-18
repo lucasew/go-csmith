@@ -90,6 +90,107 @@ func TestBinaryFuncNameFloat(t *testing.T) {
 	}
 }
 
+func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {
+	// FunctionInvocationUnary.cpp:220–223 — float size → standard minus
+	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	fi := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "-",
+		Args:        []*Expression{arg},
+		Safe:        &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
+		OutSafeMath: true,
+	}
+	out := fi.Output()
+	if strings.Contains(out, "safe_") {
+		t.Fatalf("float unary must not use safe: %s", out)
+	}
+	if !strings.Contains(out, "-") {
+		t.Fatal(out)
+	}
+}
+
+func TestUnaryMinusOutputSafeAndIdentify(t *testing.T) {
+	ClearSafeOpWrapperNames()
+	defer ClearSafeOpWrapperNames()
+	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	fi := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "-",
+		Args:                []*Expression{arg},
+		Safe:                &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32},
+		OutSafeMath:         true,
+		OutIdentifyWrappers: true,
+	}
+	out := fi.Output()
+	if !strings.Contains(out, "safe_unary_minus_func_int32_t_s") {
+		t.Fatal(out)
+	}
+	// identify_wrappers appends , id
+	if !strings.Contains(out, ", ") {
+		t.Fatalf("expected wrapper id arg: %s", out)
+	}
+}
+
+func TestUnaryMinusOutputWrapperFilter(t *testing.T) {
+	ClearSafeOpWrapperNames()
+	defer ClearSafeOpWrapperNames()
+	// pre-register so id is known; filter only id 1 — deny if id != 1
+	fname := "safe_unary_minus_func_int32_t_s"
+	id := SafeOpFlagsToID(fname)
+	arg := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	fi := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "-",
+		Args:                []*Expression{arg},
+		Safe:                &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32},
+		OutSafeMath:         true,
+		OutSafeMathWrappers: "99999", // deny all real ids
+	}
+	_ = id
+	out := fi.Output()
+	if strings.Contains(out, "safe_") {
+		t.Fatalf("wrapper denied should cast: %s", out)
+	}
+	if !strings.Contains(out, "int32_t") {
+		t.Fatal(out)
+	}
+}
+
+func TestBinaryOutputIdentifyWrappers(t *testing.T) {
+	ClearSafeOpWrapperNames()
+	defer ClearSafeOpWrapperNames()
+	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	a1 := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	fi := &Invocation{
+		IsStd: true, Binary: "+",
+		Args:                []*Expression{a0, a1},
+		Safe:                &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32},
+		OutSafeMath:         true,
+		OutIdentifyWrappers: true,
+	}
+	out := fi.Output()
+	if !strings.Contains(out, "safe_add_func_int32_t_s_s") {
+		t.Fatal(out)
+	}
+	if !strings.Contains(out, ", ") {
+		t.Fatalf("expected id: %s", out)
+	}
+}
+
+func TestUnaryEqualsIntFold(t *testing.T) {
+	zero := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	five := &Expression{Term: TermConstant, Con: MakeInt(5)}
+	not0 := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{five}}
+	if !not0.EqualsInt(0) {
+		t.Fatal("!nonzero equals 0")
+	}
+	not1 := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{zero}}
+	if !not1.EqualsInt(1) {
+		t.Fatal("!0 equals 1")
+	}
+	neg := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{five}}
+	if !neg.EqualsInt(-5) {
+		t.Fatal("-5 equals -5")
+	}
+}
+
 func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
 	opts := Defaults()
 	opts.EnableFloat = false

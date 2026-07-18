@@ -27,13 +27,35 @@ type Invocation struct {
 	Tmp1, Tmp2 string
 	// MathNoTmp mirrors CGOptions::math_notmp for Output.
 	MathNoTmp bool
+	// OutSafeMath mirrors CGOptions::avoid_signed_overflow at emit time.
+	OutSafeMath bool
+	// OutIdentifyWrappers mirrors CGOptions::identify_wrappers.
+	OutIdentifyWrappers bool
+	// OutSafeMathWrappers is --safe-math-wrapper id list (empty = all allowed).
+	OutSafeMathWrappers string
 	// PtrCmp mirrors FunctionInvocation::ptr_cmp — pointer ==/!= operands.
 	// FunctionInvocation.cpp:355.
 	PtrCmp bool
 }
 
+// setOutOpts snapshots CGOptions bits needed by Output (no live Options at emit).
+func (fi *Invocation) setOutOpts(opts Options) {
+	if fi == nil {
+		return
+	}
+	fi.OutSafeMath = opts.SafeMath
+	fi.OutIdentifyWrappers = opts.IdentifyWrappers
+	fi.OutSafeMathWrappers = opts.SafeMathWrappers
+}
+
+// wrapperOpts reconstructs Options for SafeMathWrapperAllowed checks.
+func (fi *Invocation) wrapperOpts() Options {
+	return Options{SafeMathWrappers: fi.OutSafeMathWrappers}
+}
+
 // Output C for the invocation.
-// FunctionInvocationBinary::Output — safe_*_func when Safe set (avoid_signed_overflow).
+// FunctionInvocationUnary::Output / FunctionInvocationBinary::Output —
+// safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
 func (fi *Invocation) Output() string {
 	if fi == nil || fi.Failed {
 		return "/*bad_call*/"
@@ -64,29 +86,103 @@ func (fi *Invocation) Output() string {
 			a1 = fi.Args[1].Output()
 		}
 		if fi.IsUnary && len(fi.Args) >= 1 {
-			if fi.Unary == "-" && fi.Safe != nil {
-				// FunctionInvocationUnary::Output — math_notmp inserts tmp first
-				if fi.MathNoTmp && fi.Tmp1 != "" {
-					return fmt.Sprintf("(%s(%s, %s))", fi.Safe.UnaryMinusFuncName(), fi.Tmp1, a0)
-				}
-				return fmt.Sprintf("(%s(%s))", fi.Safe.UnaryMinusFuncName(), a0)
-			}
-			return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
+			return fi.outputUnary(a0)
 		}
 		if !fi.IsUnary && len(fi.Args) >= 2 {
-			if fi.Safe != nil && SafeOpsBinary(fi.Binary) {
-				if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
-					// FunctionInvocationBinary::Output — math_notmp: fname(tmp1, a0, tmp2, a1)
-					if fi.MathNoTmp && fi.Tmp1 != "" && fi.Tmp2 != "" {
-						return fmt.Sprintf("(%s(%s, %s, %s, %s))", fname, fi.Tmp1, a0, fi.Tmp2, a1)
-					}
-					return fmt.Sprintf("(%s(%s, %s))", fname, a0, a1)
-				}
-			}
-			return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
+			return fi.outputBinary(a0, a1)
 		}
 	}
 	return "/*invoke*/"
+}
+
+// outputUnary mirrors FunctionInvocationUnary::Output.
+// FunctionInvocationUnary.cpp:192–243.
+func (fi *Invocation) outputUnary(a0 string) string {
+	// FunctionInvocationUnary.cpp:200–224 — eMinus + avoid_signed_overflow
+	if fi.Unary == "-" && fi.Safe != nil && fi.OutSafeMath {
+		// float size: standard minus (no safe unary float func)
+		// FunctionInvocationUnary.cpp:203 / 220–223
+		if fi.Safe.Size == SafeFloat {
+			return fmt.Sprintf("(-%s)", a0)
+		}
+		fname := fi.Safe.UnaryMinusFuncName()
+		id := SafeOpFlagsToID(fname)
+		// FunctionInvocationUnary.cpp:208–218 — safe_math_wrapper filter
+		if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
+			var b strings.Builder
+			b.WriteString("(")
+			b.WriteString(fname)
+			b.WriteString("(")
+			if fi.MathNoTmp && fi.Tmp1 != "" {
+				b.WriteString(fi.Tmp1)
+				b.WriteString(", ")
+			}
+			b.WriteString(a0)
+			if fi.OutIdentifyWrappers {
+				b.WriteString(", ")
+				b.WriteString(Int2Str(id))
+			}
+			b.WriteString("))")
+			return b.String()
+		}
+		// wrapper denied → cast + standard (need_cast fallthrough)
+		// FunctionInvocationUnary.cpp:226–239
+		return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+	}
+	// FunctionInvocationUnary.cpp:229–240 — ePlus/eNot/eBitNot or non-safe minus
+	if fi.Unary == "-" && fi.Safe != nil && !fi.OutSafeMath {
+		// need_cast when Safe flags exist but avoid_signed_overflow off
+		return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+	}
+	return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
+}
+
+// outputBinary mirrors FunctionInvocationBinary::Output.
+// FunctionInvocationBinary.cpp:350–426.
+func (fi *Invocation) outputBinary(a0, a1 string) string {
+	// FunctionInvocationBinary.cpp:357–361 — mutated array subscript add without flags
+	if fi.Binary == "+" && fi.Safe == nil {
+		return fmt.Sprintf("(%s + %s)", a0, a1)
+	}
+	// FunctionInvocationBinary.cpp:363–399 — arith/shift + avoid_signed_overflow
+	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
+		if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
+			id := SafeOpFlagsToID(fname)
+			if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
+				var b strings.Builder
+				b.WriteString("(")
+				b.WriteString(fname)
+				b.WriteString("(")
+				if fi.MathNoTmp && fi.Tmp1 != "" {
+					b.WriteString(fi.Tmp1)
+					b.WriteString(", ")
+				}
+				b.WriteString(a0)
+				b.WriteString(", ")
+				if fi.MathNoTmp && fi.Tmp2 != "" {
+					b.WriteString(fi.Tmp2)
+					b.WriteString(", ")
+				}
+				b.WriteString(a1)
+				if fi.OutIdentifyWrappers {
+					b.WriteString(", ")
+					b.WriteString(Int2Str(id))
+				}
+				b.WriteString("))")
+				return b.String()
+			}
+			// wrapper denied → cast both operands (need_cast fallthrough)
+			// FunctionInvocationBinary.cpp:400–414
+			cast := fi.Safe.SizeToken()
+			return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, fi.Binary, cast, a1)
+		}
+	}
+	// need_cast when Safe present but SafeMath off for arith/shift
+	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && !fi.OutSafeMath {
+		cast := fi.Safe.SizeToken()
+		return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, fi.Binary, cast, a1)
+	}
+	return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
 }
 
 // ReachMaxFunctions mirrors Function::reach_max_functions_cnt.
@@ -443,15 +539,18 @@ func MakeRandomBinaryInvocation(
 		op = PickBinaryOp(r, opts)
 	}
 	opStr := op.BinaryOpC()
-	// FunctionInvocation.cpp:188–207 — SafeOpFlags first; operands use get_lhs/rhs_type
+	// FunctionInvocation.cpp:188–207 — always SafeOpFlags::make_random_binary; operands use get_lhs/rhs_type
 	var flags *SafeOpFlags
 	lhsTy, rhsTy := typ, typ
-	if opts.SafeMath && SafeOpsBinary(opStr) {
-		flags = MakeRandomBinary(r, opts, probs, typ)
-		if flags != nil {
-			lhsTy = flags.LHSType()
-			rhsTy = flags.RHSType()
-		}
+	// C++ always builds flags; CreateFunctionInvocationBinary only allocates tmps for safe_ops
+	flags = MakeRandomBinaryKind(r, opts, probs, typ, typ, typ, SafeOpBinary, op)
+	if flags != nil {
+		lhsTy = flags.LHSType()
+		rhsTy = flags.RHSType()
+	}
+	// non-arith/shift: keep flags for typing but Output ignores safe path (SafeOpsBinary filter)
+	if !SafeOpsBinary(opStr) {
+		// still keep flags (C++ does); Output uses standard tokens
 	}
 	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
 	// FunctionInvocation.cpp:208–261 — ordered (&&/||) RHS under original effect context;
@@ -524,8 +623,10 @@ func MakeRandomBinaryInvocation(
 		right = &Expression{Term: TermConstant, Con: MakeInt(1)}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
+	inv.setOutOpts(opts)
 	// CreateFunctionInvocationBinary tmp vars when math_notmp (FunctionInvocationBinary.cpp:59–75)
-	if flags != nil && opts.MathNoTmp && SafeOpsBinary(opStr) {
+	// C++ always creates tmps for safe_ops; we allocate only when MathNoTmp will emit them.
+	if flags != nil && opts.MathNoTmp && SafeOpsBinary(opStr) && flags.Size != SafeFloat {
 		inv.MathNoTmp = true
 		st := EInt
 		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
@@ -634,17 +735,22 @@ func MakeRandomBinaryPtrComparison(
 	right.CheckAndSetCast(left.GetType())
 	// FunctionInvocation.cpp:358 — bookkeeping
 	RecordPointerComparisons(left, right)
-	return &Invocation{
+	// FunctionInvocation.cpp:297–302 — flags always; Output uses standard ==/!= (not safe_ops)
+	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, op)
+	inv := &Invocation{
 		IsStd:  true,
 		Binary: opStr,
 		Args:   []*Expression{left, right},
+		Safe:   flags,
 		PtrCmp: true,
 	}
+	inv.setOutOpts(opts)
+	return inv
 }
 
 // MakeRandomUnaryInvocation mirrors make_random_unary.
 // FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER;
-// SafeOpFlags::make_random_unary; operand of get_lhs_type.
+// always SafeOpFlags::make_random_unary; operand of get_lhs_type.
 func MakeRandomUnaryInvocation(
 	r *Rng,
 	opts Options,
@@ -666,32 +772,26 @@ func MakeRandomUnaryInvocation(
 		break
 	}
 	op := uop.UnaryOpC()
-	// FunctionInvocation.cpp:151–155 — make_random_unary then operand type from flags
-	argTy := typ
-	var flags *SafeOpFlags
-	if opts.SafeMath && op == "-" {
-		probs := NewProbabilities(opts)
-		if vs != nil && vs.Probs != nil {
-			probs = vs.Probs
-		}
-		flags = MakeRandomUnary(r, opts, probs, typ, nil, uop)
-		if flags != nil {
-			// no float unary safe func — force int size path for naming
-			if flags.Size == SafeFloat {
-				flags.Size = SafeInt32
-				flags.Op1Signed = true
-				flags.Op2Signed = true
-			}
-			argTy = flags.LHSType()
-		}
+	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
+	probs := NewProbabilities(opts)
+	if vs != nil && vs.Probs != nil {
+		probs = vs.Probs
 	}
+	flags := MakeRandomUnary(r, opts, probs, typ, nil, uop)
+	argTy := typ
+	if flags != nil {
+		argTy = flags.LHSType()
+	}
+	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary
 	d := cg.ExprDepth + 1
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, d)
 	if arg == nil {
 		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, d)
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
-	if flags != nil && opts.MathNoTmp && op == "-" {
+	inv.setOutOpts(opts)
+	// FunctionInvocationUnary.cpp:51–60 — tmp when flags (we only emit when MathNoTmp + minus non-float)
+	if flags != nil && opts.MathNoTmp && op == "-" && flags.Size != SafeFloat {
 		inv.MathNoTmp = true
 		st := EInt
 		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {

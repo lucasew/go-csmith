@@ -32,16 +32,17 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	// Full eBinaryOps includes cmp/logic; only arithmetic/shift get Safe flags.
+	// Full eBinaryOps includes cmp/logic; Output uses safe_* only for arith/shift.
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
 		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
-		if fi != nil && fi.Safe != nil {
+		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}
+		fi = nil
 	}
-	if fi == nil || fi.Safe == nil {
-		t.Fatal("expected Safe flags when SafeMath on arithmetic/shift op")
+	if fi == nil {
+		t.Fatal("expected Safe flags + arith/shift op")
 	}
 	out := fi.Output()
 	if !strings.Contains(out, "safe_") {
@@ -55,9 +56,15 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
+	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
 	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
-	if fi.Safe != nil {
-		t.Fatal("no flags when SafeMath off")
+	if fi == nil {
+		t.Fatal("nil inv")
+	}
+	if !fi.OutSafeMath {
+		// ok
+	} else {
+		t.Fatal("OutSafeMath should mirror opts.SafeMath=false")
 	}
 	out := fi.Output()
 	if strings.Contains(out, "safe_") {
