@@ -29,8 +29,14 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	if fi == nil || !fi.IsStd || fi.Output() == "/*invoke*/" {
 		t.Fatalf("%+v out=%s", fi, fi.Output())
 	}
-	if !strings.Contains(fi.Output(), fi.Binary) {
-		t.Fatal(fi.Output())
+	out := fi.Output()
+	// With SafeMath default, expect safe_* wrapper; otherwise infix op.
+	if fi.Safe != nil {
+		if !strings.Contains(out, "safe_") {
+			t.Fatalf("safe wrapper missing: %s", out)
+		}
+	} else if !strings.Contains(out, fi.Binary) {
+		t.Fatal(out)
 	}
 }
 

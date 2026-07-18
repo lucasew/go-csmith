@@ -21,9 +21,12 @@ type Invocation struct {
 	Binary   string // "+", "-", etc.
 	// Args are parameter expressions (operands).
 	Args []*Expression
+	// Safe is set for std binary/unary under avoid_signed_overflow.
+	Safe *SafeOpFlags
 }
 
 // Output C for the invocation.
+// FunctionInvocationBinary::Output — safe_*_func when Safe set (avoid_signed_overflow).
 func (fi *Invocation) Output() string {
 	if fi == nil || fi.Failed {
 		return "/*bad_call*/"
@@ -46,11 +49,26 @@ func (fi *Invocation) Output() string {
 		return b.String()
 	}
 	if fi.IsStd {
+		a0, a1 := "0", "0"
+		if len(fi.Args) >= 1 && fi.Args[0] != nil {
+			a0 = fi.Args[0].Output()
+		}
+		if len(fi.Args) >= 2 && fi.Args[1] != nil {
+			a1 = fi.Args[1].Output()
+		}
 		if fi.IsUnary && len(fi.Args) >= 1 {
-			return fmt.Sprintf("(%s(%s))", fi.Unary, fi.Args[0].Output())
+			if fi.Unary == "-" && fi.Safe != nil {
+				return fmt.Sprintf("(%s(%s))", fi.Safe.UnaryMinusFuncName(), a0)
+			}
+			return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
 		}
 		if !fi.IsUnary && len(fi.Args) >= 2 {
-			return fmt.Sprintf("(%s %s %s)", fi.Args[0].Output(), fi.Binary, fi.Args[1].Output())
+			if fi.Safe != nil && SafeOpsBinary(fi.Binary) {
+				if fname := fi.Safe.BinaryFuncName(fi.Binary); fname != "" {
+					return fmt.Sprintf("(%s(%s, %s))", fname, a0, a1)
+				}
+			}
+			return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
 		}
 	}
 	return "/*invoke*/"
@@ -72,10 +90,10 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 
 // ChooseFunc mirrors Function::choose_func — filter by return type convert, then choose_ok style.
 // Function.cpp:279+ simplified: match return type with eConvert.
-func ChooseFunc(r *Rng, funcs []*Function, ret *Type) *Function {
+func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Function {
 	var ok []*Function
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin {
+		if f == nil || f.IsBuiltin || f == exclude {
 			continue
 		}
 		if ret == nil || f.ReturnType == nil || ret.Match(f.ReturnType, MatchConvert) {
@@ -170,8 +188,12 @@ func MakeRandomBinaryInvocation(
 	if right == nil {
 		right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
 	}
-	_ = probs
-	return &Invocation{IsStd: true, Binary: op, Args: []*Expression{left, right}}
+	inv := &Invocation{IsStd: true, Binary: op, Args: []*Expression{left, right}}
+	// CGOptions::avoid_signed_overflow → SafeMath
+	if opts.SafeMath && SafeOpsBinary(op) {
+		inv.Safe = MakeRandomBinary(r, opts, probs, typ)
+	}
+	return inv
 }
 
 // MakeRandomUnaryInvocation mirrors make_random_unary subset: + - ~ !
@@ -196,7 +218,12 @@ func MakeRandomUnaryInvocation(
 	if arg == nil {
 		arg = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
 	}
-	return &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}}
+	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}}
+	if opts.SafeMath && op == "-" {
+		inv.Safe = MakeRandomBinary(r, opts, NewProbabilities(opts), typ)
+		// unary only needs op1; re-roll size/sign via same helper is OK
+	}
+	return inv
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.
@@ -226,7 +253,7 @@ func MakeRandomInvocation(
 	if !stdFunc {
 		var callee *Function
 		if r.RndFlipcoin(50) && list != nil {
-			callee = ChooseFunc(r, list.Funcs, typ)
+			callee = ChooseFunc(r, list.Funcs, typ, cg.CurrentFunc)
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
