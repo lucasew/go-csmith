@@ -154,7 +154,7 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 // RandomParentBlock mirrors Block::random_parent_block.
 // Block.cpp:353–370 — self and ancestors; optional nil global if GlobalVariables.
 func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
-	// Block.cpp:295–307 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
+	// Block.cpp:353–370 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
 	if r == nil || b == nil {
 		return nil
 	}
@@ -168,7 +168,12 @@ func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	if len(blks) == 0 {
 		return nil
 	}
-	return blks[r.RndUpto(uint32(len(blks)))]
+	idx := r.RndUpto(uint32(len(blks)))
+	// Block.cpp:368 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
+	return blks[idx]
 }
 
 // MustBreakOrReturn mirrors Block::must_break_or_return without FactMgr.

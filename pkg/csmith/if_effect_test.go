@@ -66,3 +66,45 @@ func TestArrayBuildInitRecursive(t *testing.T) {
 		t.Fatal("want nested braces", out)
 	}
 }
+
+func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
+	// StatementIf.cpp:94/99 ERROR_GUARD after Block::make_random branches
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 0
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.Types = vs.Types
+	f.Stack = []*Block{{Func: f}}
+	// sticky error after condition would abort; set after a successful path component
+	st := MakeRandomIf(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	// may succeed with empty blocks (max size 0)
+	if HasError() {
+		if st != nil {
+			t.Fatal("sticky error must fail closed")
+		}
+	}
+	ClearError()
+	SetError(ErrGeneric)
+	st2 := MakeRandomIf(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	if st2 != nil {
+		t.Fatal("ERROR_GUARD after flip path: want nil")
+	}
+	ClearError()
+}
+
+func TestRandomParentBlockERRORGuard(t *testing.T) {
+	ClearError()
+	b := &Block{}
+	SetError(ErrGeneric)
+	if b.RandomParentBlock(NewRng(1), true) != nil {
+		t.Fatal("ERROR_GUARD")
+	}
+	ClearError()
+}

@@ -76,11 +76,13 @@ func MakeRandomIf(
 	thenCG := *cg
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
-	var thenFacts []*FactPointTo
+	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
+	if HasError() {
+		return nil
+	}
+
+	// StatementIf.cpp:97–98 — else starts from map_facts_in[if_true]
 	if cg.FM != nil {
-		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		// StatementIf.cpp:98 — else branch starts from map_facts_in[if_true]
-		// (entry facts of true block == pre-branch after condition)
 		if thenB != nil && thenB.StmID > 0 {
 			if in, ok := cg.FM.MapFactsIn[thenB.StmID]; ok {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
@@ -96,31 +98,19 @@ func MakeRandomIf(
 	elseCG := *cg
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
-	var elseFacts []*FactPointTo
-	if cg.FM != nil {
-		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		// StatementIf.cpp:185–200 — merge branch outputs into GlobalFacts
-		trueMust := thenB != nil && thenB.MustReturn()
-		falseMust := elseB != nil && elseB.MustReturn()
-		switch {
-		case trueMust && falseMust:
-			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
-		case trueMust:
-			cg.FM.GlobalFacts = elseFacts
-		case falseMust:
-			cg.FM.GlobalFacts = thenFacts
-		default:
-			cg.FM.GlobalFacts = thenFacts
-			MergeFacts(&cg.FM.GlobalFacts, elseFacts)
-		}
+	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
+	if HasError() {
+		return nil
 	}
+	// StatementIf.cpp:101–107 — construct StatementIf; do not merge branch facts here
+	// (combine_branch_facts runs in post_creation_analysis / visit_facts)
 
 	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmID()}
-	// StatementIf.cpp:105–106 — set_accumulated_effect_after_block(eff, branch)
+	// StatementIf.cpp:105–106 — set_accumulated_effect_after_block(eff, each branch)
 	SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, cg, condEff)
 	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, condEff)
 
-	// Merge branch effects into parent accum
+	// branch accumulators still observed on parent (generation-time effect merge)
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(thenEff, elseEff)
 	}
