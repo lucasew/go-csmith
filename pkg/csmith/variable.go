@@ -462,6 +462,20 @@ func (v *Variable) IsValidVolatile() bool {
 	return v.Init.NotEqualsZero()
 }
 
+// IsPackedAggregateFieldVar mirrors Variable::is_packed_aggregate_field_var.
+// Variable.cpp:307–312 — any ancestor field_var_of has packed aggregate type.
+func (v *Variable) IsPackedAggregateFieldVar() bool {
+	if v == nil {
+		return false
+	}
+	for p := v.FieldVarOf; p != nil; p = p.FieldVarOf {
+		if p.Type != nil && p.Type.Packed {
+			return true
+		}
+	}
+	return false
+}
+
 // IsPackedAfterBitfield mirrors Variable::is_packed_after_bitfield.
 // Variable.cpp:1240–1258 — packed struct field after a bitfield has unstable offset.
 func (v *Variable) IsPackedAfterBitfield() bool {

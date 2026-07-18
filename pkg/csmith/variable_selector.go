@@ -3,8 +3,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "fmt"
-
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	AllVars                []*Variable
@@ -116,8 +114,13 @@ func (vs *VariableSelector) DoFinalization() {
 	vs.VarCreated = false
 }
 
+// InvalidIVBound mirrors ArrayVariable.h INVALID_BOUND (0xFFFFFFFF).
+// Stored as -1 in IVBounds maps when the bound is unknown/unusable.
+const InvalidIVBound = -1
+
 // ItemizeArray mirrors VariableSelector::itemize_array.
-// VariableSelector.cpp:1440–1500 — pick IVs in bounds per dimension; optional offset.
+// VariableSelector.cpp:1440–1500 — per-dim IV in bounds (sorted by name);
+// optional +offset as FunctionInvocationBinary eAdd.
 func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable) *ArrayVariable {
 	if av == nil || r == nil {
 		return nil
@@ -129,65 +132,72 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 	if dims == 0 {
 		return nil
 	}
+	// VariableSelector.cpp:1442 — need at least one IV entry per dimension
 	if len(cg.IVBounds) < dims {
-		// not enough induction variables
 		return nil
-	}
-	// collect IVs sorted by name for deterministic order
-	type ivPair struct {
-		v     *Variable
-		bound int
-	}
-	var all []ivPair
-	for iv, bound := range cg.IVBounds {
-		if iv == nil || bound < 0 {
-			continue
-		}
-		if iv.Type != nil && iv.Type.IsFloat() {
-			continue
-		}
-		// skip signed char index when option off
-		if !cgHasSignedCharIndex(vs) && iv.Type != nil && iv.Type.IsSimple() &&
-			iv.Type.Simple() == EChar && iv.Type.IsSigned() {
-			continue
-		}
-		all = append(all, ivPair{iv, bound})
-	}
-	// sort by name
-	for i := 0; i < len(all); i++ {
-		for j := i + 1; j < len(all); j++ {
-			if all[j].v.Name < all[i].v.Name {
-				all[i], all[j] = all[j], all[i]
-			}
-		}
 	}
 	indices := make([]string, 0, dims)
 	indexExprs := make([]*Expression, 0, dims)
 	for d := 0; d < dims; d++ {
 		dimenLen := av.Sizes[d]
+		// VariableSelector.cpp:1448–1476 — ok_ivs sorted by name insert
 		var ok []*Variable
 		boundOf := map[*Variable]int{}
-		for _, p := range all {
-			if p.bound < dimenLen {
-				ok = append(ok, p.v)
-				boundOf[p.v] = p.bound
+		for iv, bound := range cg.IVBounds {
+			if iv == nil || bound == InvalidIVBound {
+				continue
 			}
+			// iter->second != INVALID && bound < dimen_len
+			if bound < 0 || bound >= dimenLen {
+				continue
+			}
+			if iv.Type != nil && iv.Type.IsFloat() {
+				continue
+			}
+			// VariableSelector.cpp:1455–1456 — signed char index option
+			if !cgHasSignedCharIndex(vs) && iv.Type != nil && iv.Type.IsSignedChar() {
+				continue
+			}
+			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
+			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVar() {
+				continue
+			}
+			// insert sorted by name for platform-stable order
+			inserted := false
+			for j := 0; j < len(ok); j++ {
+				if ok[j].Name > iv.Name {
+					ok = append(ok[:j], append([]*Variable{iv}, ok[j:]...)...)
+					inserted = true
+					break
+				}
+			}
+			if !inserted {
+				ok = append(ok, iv)
+			}
+			boundOf[iv] = bound
 		}
 		v := ChooseOKVar(r, ok)
 		if v == nil {
 			return nil
 		}
-		// Index as ExpressionVariable (ArrayVariable.cpp set_index with Expression*)
+		// ExpressionVariable(*v) then optional (v + offset)
 		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		idx := v.Name
-		// offset within remaining range — string form for emit; expr stays bare IV
-		// (offset as binary not required for read_indices UseVar of IV)
+		// VariableSelector.cpp:1488–1497
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
 			off := int(r.RndUpto(uint32(remain)))
 			if off > 0 {
-				idx = fmt.Sprintf("(%s + %d)", v.Name, off)
-				// keep Variable term so UseVar(i) still holds for DFA
+				offExpr := &Expression{
+					Term: TermConstant, Con: MakeInt(off), ExprType: GetIntType(),
+				}
+				fi := &Invocation{
+					IsStd:  true,
+					Binary: BinAdd.BinaryOpC(),
+					Args:   []*Expression{idxExpr, offExpr},
+				}
+				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
+				idx = idxExpr.Output()
 			}
 		}
 		indices = append(indices, idx)
@@ -716,7 +726,8 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 }
 
 // SelectMustUseVar mirrors VariableSelector::select_must_use_var.
-// VariableSelector.cpp:1504–1560 — from must_read/must_write; 75% erase after use.
+// VariableSelector.cpp:1504–1560 — must_read eFlexible / must_write eDerefExact;
+// itemize arrays; 75% erase after use.
 func (vs *VariableSelector) SelectMustUseVar(
 	r *Rng,
 	access Access,
@@ -733,13 +744,11 @@ func (vs *VariableSelector) SelectMustUseVar(
 	} else {
 		list = &cg.RW.MustWriteVars
 	}
+	// VariableSelector.cpp:1514–1516
 	mt := MatchFlexible
 	if access == AccessWrite {
-		mt = MatchDereference // eDerefExact ≈ dereference match for LHS
+		mt = MatchDerefExact
 	}
-	// eDerefExact is not in our enum; use MatchFlexible for write itemize path
-	// Upstream WRITE uses eDerefExact; we approximate with Flexible after expand.
-	_ = mt
 	blk := cg.CurrentBlock()
 	for i := 0; i < len(*list); i++ {
 		v := (*list)[i]
@@ -750,35 +759,28 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if !v.IsVisible(blk) {
 			continue
 		}
-		if v.Type == nil || !typ.Match(v.Type, MatchFlexible) {
+		if v.Type == nil || !typ.Match(v.Type, mt) {
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
-			// qfer->match(v->qfer) exact-ish
+			// qfer->match(v->qfer)
 			if !qfer.Match(v.Qfer, false) {
 				continue
 			}
 		}
-		deref := 0
-		if v.Type != nil {
-			deref = v.Type.IndirectLevel() - typ.IndirectLevel()
-		}
+		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
+		// VariableSelector.cpp:1529–1532 — WRITE rejects const after deref
 		if access == AccessWrite && v.Qfer.IsConstAfterDeref(deref) {
 			continue
 		}
 		var out *Variable
 		if v.IsArray && v.AsArray != nil && r != nil {
-			// prefer IV-based itemize when enough bounds (VariableSelector.cpp:1545–1546)
-			var item *ArrayVariable
-			if len(cg.IVBounds) >= len(v.AsArray.Sizes) {
-				item = vs.ItemizeArray(r, cg, v.AsArray)
-			}
-			if item == nil {
-				item = v.AsArray.Itemize(r)
-			}
+			// VariableSelector.cpp:1545–1546 — itemize_array only (no random fallback)
+			item := vs.ItemizeArray(r, cg, v.AsArray)
 			if item != nil {
 				out = &item.Variable
 			}
+			// if itemize fails, try next must-use entry (do not fall back to bare array)
 		} else {
 			out = v
 		}
@@ -1398,23 +1400,54 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 
 // SelectArray mirrors VariableSelector::select_array.
 // VariableSelector.cpp:1384–1436 — visible non-itemized arrays; else create_random_array.
+// SelectArray mirrors VariableSelector::select_array.
+// VariableSelector.cpp:1384–1436 — visible collective arrays with effect filters.
 func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
 		return nil
 	}
+	blk := cg.CurrentBlock()
+	vars := vs.FindAllVisibleVars(blk)
+	// also include Arrays list members that may not be on GlobalList yet
+	seen := map[*ArrayVariable]bool{}
 	var arrayVars []*ArrayVariable
-	// From tracked Arrays list (collectives only)
-	for _, av := range vs.Arrays {
-		if av == nil || av.Collective != nil {
-			continue
+	add := func(av *ArrayVariable) {
+		if av == nil || av.Collective != nil || seen[av] {
+			return
 		}
-		if av.IsConst() {
-			continue
+		// VariableSelector.cpp:1393–1412
+		if cg.EffectContext().IsReadPartially(&av.Variable) ||
+			cg.EffectContext().IsWrittenPartially(&av.Variable) {
+			return
 		}
 		if !cg.EffectContext().IsSideEffectFree() && av.IsVolatile() {
+			return
+		}
+		if av.IsConst() {
+			return
+		}
+		if cg.IsNonWritable(&av.Variable) {
+			return
+		}
+		if av.Type != nil && av.Type.IsConstStructUnion() {
+			return
+		}
+		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
+			return
+		}
+		seen[av] = true
+		arrayVars = append(arrayVars, av)
+	}
+	for _, v := range vars {
+		if v == nil || !v.IsArray {
 			continue
 		}
-		arrayVars = append(arrayVars, av)
+		if v.AsArray != nil {
+			add(v.AsArray)
+		}
+	}
+	for _, av := range vs.Arrays {
+		add(av)
 	}
 	n := len(arrayVars)
 	if n == 0 {

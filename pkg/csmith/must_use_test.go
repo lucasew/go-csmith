@@ -40,16 +40,17 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	rw := &RWDirective{MustReadVars: []*Variable{&av.Variable}}
 	cg := WithFunc(f, EmptyEffect()).WithRW(rw)
+	// VariableSelector.cpp:1442 — need IV bounds for itemize_array
+	cg.IVBounds = map[*Variable]int{iv: 0}
 	v := vs.SelectMustUseVar(NewRng(5), AccessRead, cg, GetIntType(), nil)
 	if v == nil {
 		t.Fatal("nil")
 	}
-	// itemized has Collective set
-	if v.AsArray != nil && v.AsArray.Collective == nil && v == &av.Variable {
-		// returned collective without itemize if flip failed path
-		t.Log("collective")
+	if v.AsArray == nil || v.AsArray.Collective != av {
+		t.Fatalf("want itemized member, got %v asArray=%v", v, v.AsArray)
 	}
 }
 
