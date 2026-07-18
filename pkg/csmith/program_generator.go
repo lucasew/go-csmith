@@ -51,12 +51,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 func (g *ProgramGenerator) Initialize() {
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
-	// Clear ctrl-var pool so each generation starts fresh (Variable::doFinalization).
-	CtrlVarsDoFinalization()
-	// Statement::sid starts over for a new program (process-local in upstream).
-	nextStmID = 0
-	// Bookkeeper::doFinalization — counters for OutputTail statistics.
-	BookkeeperDoFinalization()
+	// Finalization::doFinalization subset for a fresh generation.
+	DoFinalization()
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).

@@ -101,23 +101,47 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 }
 
 // ChooseFunc mirrors Function::choose_func — filter by return type convert, then choose_ok style.
-// Function.cpp:279+ — skip unbuilt (is_effect_known false) and builtins.
+// Function.cpp:279+ — skip unbuilt, builtins, effect conflict with context.
+// cg may be nil (no conflict filter).
 func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Function {
+	return ChooseFuncContext(r, funcs, ret, exclude, nil, Options{})
+}
+
+// ChooseFuncContext is ChooseFunc with CGContext for in_conflict / strict_volatile.
+// Function.cpp:279–330.
+func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options) *Function {
 	var ok []*Function
 	for _, f := range funcs {
 		if f == nil || f.IsBuiltin || f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
-		if ret == nil || f.ReturnType == nil || ret.Match(f.ReturnType, MatchConvert) {
-			ok = append(ok, f)
+		if ret != nil && f.ReturnType != nil && !ret.Match(f.ReturnType, MatchConvert) {
+			continue
 		}
+		if ret != nil && f.ReturnType == nil {
+			continue
+		}
+		// Function.cpp:303–306 — in_conflict with callee feffect
+		if cg != nil && cg.InConflict(f.FEffect) {
+			continue
+		}
+		// Function.cpp:307–313 — strict_volatile_rule
+		if opts.StrictVolatileRule && cg != nil {
+			if !f.FEffect.IsSideEffectFree() && !cg.EffectContext().IsSideEffectFree() {
+				continue
+			}
+		}
+		ok = append(ok, f)
 	}
 	n := len(ok)
 	if n == 0 {
 		return nil
 	}
 	if n == 1 {
+		return ok[0]
+	}
+	if r == nil {
 		return ok[0]
 	}
 	return ok[r.RndUpto(uint32(n))]
@@ -510,7 +534,9 @@ func MakeRandomInvocation(
 	if !stdFunc {
 		var callee *Function
 		if r.RndFlipcoin(50) && list != nil {
-			callee = ChooseFunc(r, list.Funcs, matchType, cg.CurrentFunc)
+			// Function.cpp:choose_func with in_conflict / strict_volatile
+			cgp := &cg
+			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cgp, opts)
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)

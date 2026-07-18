@@ -577,6 +577,101 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	return c.CheckReadVar(v, facts)
 }
 
+// AllowVolatile mirrors CGContext::allow_volatile.
+// CGContext.cpp:517–518 — only when effect_context is side-effect free.
+func (c CGContext) AllowVolatile() bool {
+	return c.EffectContext().IsSideEffectFree()
+}
+
+// AllowConst mirrors CGContext::allow_const — const only for non-WRITE access.
+// CGContext.cpp:521–523.
+func (c CGContext) AllowConst(access Access) bool {
+	return access != AccessWrite
+}
+
+// AcceptType mirrors CGContext::accept_type.
+// CGContext.cpp:525–528 — reject volatile aggregates when not SE-free.
+func (c CGContext) AcceptType(t *Type) bool {
+	if t == nil {
+		return true
+	}
+	return c.EffectContext().IsSideEffectFree() || !t.IsVolatileStructUnion()
+}
+
+// InConflict mirrors CGContext::in_conflict — callee effect vs current context.
+// CGContext.cpp:531–564.
+func (c CGContext) InConflict(eff Effect) bool {
+	for _, v := range eff.ReadVars() {
+		if v == nil {
+			continue
+		}
+		if c.IsNonReadable(v) {
+			return true
+		}
+		if c.EffectContext().IsWrittenPartially(v) {
+			return true
+		}
+		if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+			return true
+		}
+	}
+	for _, v := range eff.WrittenVars() {
+		if v == nil {
+			continue
+		}
+		if c.IsNonWritable(v) || v.IsConst() {
+			return true
+		}
+		ctx := c.EffectContext()
+		if ctx.IsWrittenPartially(v) || ctx.IsReadPartially(v) {
+			return true
+		}
+		if v.IsVolatile() && !ctx.IsSideEffectFree() {
+			return true
+		}
+	}
+	return false
+}
+
+// IsFrameVar mirrors CGContext::is_frame_var — visible local in current/call_chain.
+// CGContext.cpp:492–504.
+func (c CGContext) IsFrameVar(v *Variable) bool {
+	if v == nil {
+		return false
+	}
+	if b := c.CurrentBlock(); b != nil && v.IsVisibleLocal(b) {
+		return true
+	}
+	for _, b := range c.CallChain {
+		if b != nil && v.IsVisibleLocal(b) {
+			return true
+		}
+	}
+	return false
+}
+
+// FindReachableFrameVars mirrors CGContext::find_reachable_frame_vars.
+// CGContext.cpp:566–578 — pointees that are frame locals.
+func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
+	var out []*Variable
+	seen := map[*Variable]bool{}
+	for _, f := range facts {
+		if f == nil {
+			continue
+		}
+		for _, p := range f.PointTo {
+			if p == nil || IsSpecialPtr(p) || seen[p] {
+				continue
+			}
+			if c.IsFrameVar(p) {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
+
 // VisitFactsLhs mirrors Lhs::visit_facts core checks (without index walk).
 // Lhs.cpp:301+ subset — check_write_var or write_pointed + deref volatile.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {

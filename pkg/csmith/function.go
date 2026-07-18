@@ -47,6 +47,10 @@ type Function struct {
 	DeadGlobals []*Variable
 	// NewGlobals mirrors Function::new_globals created during this function's generation.
 	NewGlobals []*Variable
+	// ReferencedPtrs mirrors Function::referenced_ptrs (static pointer uses).
+	ReferencedPtrs []*Variable
+	// UnionFieldRead mirrors Function::union_field_read.
+	UnionFieldRead bool
 }
 
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.
@@ -228,6 +232,9 @@ func MakeFirst(
 			}
 		}
 	}
+	// body effect accum for compute_summary / feffect
+	bodyEff := EmptyEffect()
+	cg.EffectAccum = &bodyEff
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
@@ -258,6 +265,8 @@ func MakeFirst(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
+	// Function.cpp:652–658 / compute_summary — referenced ptrs + external effect
+	f.ComputeSummary(bodyEff)
 	f.markBuilt()
 	return f
 }
@@ -298,6 +307,13 @@ func (f *Function) GenerateBody(
 			}
 		}
 	}
+	bodyEff := EmptyEffect()
+	if cg.EffectAccum == nil {
+		cg.EffectAccum = &bodyEff
+	} else {
+		bodyEff = *cg.EffectAccum
+		cg.EffectAccum = &bodyEff
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
@@ -320,6 +336,12 @@ func (f *Function) GenerateBody(
 	}
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
+	}
+	// Function.cpp:691 — compute_summary after body
+	if cg.EffectAccum != nil {
+		f.ComputeSummary(*cg.EffectAccum)
+	} else {
+		f.ComputeSummary(bodyEff)
 	}
 	f.markBuilt()
 }
