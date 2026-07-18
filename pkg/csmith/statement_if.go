@@ -4,6 +4,7 @@ package csmith
 
 // MakeRandomIf mirrors StatementIf::make_random.
 // StatementIf.cpp:57–111 — shared pre-branch env; visit_facts merge (cpp:162–202).
+// cg is *CGContext (C++ CGContext&) so effect_stm clear and branch merges stick.
 func MakeRandomIf(
 	r *Rng,
 	opts Options,
@@ -11,8 +12,11 @@ func MakeRandomIf(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) *Stmt {
+	if cg == nil {
+		return nil
+	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
 	var func1PreFacts []*FactPointTo
 	var func1PreEffect Effect
@@ -27,15 +31,15 @@ func MakeRandomIf(
 	cg.EffectStm = EmptyEffect()
 	// Expression::make_random(..., get_int_type(), no_const = !const_as_condition)
 	noConst := !opts.ConstAsCondition
-	test := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
+	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
 	if test == nil {
-		test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, noConst, TermVariable, cg.ExprDepth)
+		test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, noConst, TermVariable, cg.ExprDepth)
 	}
 	if test == nil {
 		if !noConst {
-			test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
+			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
 		} else {
-			test = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 		}
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
@@ -46,7 +50,7 @@ func MakeRandomIf(
 		}
 		preWork := CloneFactSlice(func1PreFacts)
 		cg.FM.GlobalFacts = preWork
-		if VisitFactsExpression(test, &cg, opts) {
+		if VisitFactsExpression(test, cg, opts) {
 			// ok — keep facts from re-visit
 		} else {
 			cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
@@ -66,8 +70,7 @@ func MakeRandomIf(
 	// StatementIf.cpp:80 — visit_facts on condition before branches (when FM set)
 	// (skipped when already re-analyzed under func_1 uncertain path)
 	if cg.FM != nil && test != nil && !(func1Hack && HasUncertainCallRecursiveExpr(test)) {
-		cgp := &cg
-		if !VisitFactsExpression(test, cgp, opts) {
+		if !VisitFactsExpression(test, cg, opts) {
 			// soft-fail: keep test, continue generation
 		}
 	}
@@ -80,7 +83,7 @@ func MakeRandomIf(
 	}
 
 	thenEff := pre
-	thenCG := cg
+	thenCG := *cg
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, thenCG, false)
 	var thenFacts []*FactPointTo
@@ -100,7 +103,7 @@ func MakeRandomIf(
 	}
 
 	elseEff := pre
-	elseCG := cg
+	elseCG := *cg
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, elseCG, false)
 	var elseFacts []*FactPointTo
@@ -124,8 +127,8 @@ func MakeRandomIf(
 
 	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmID()}
 	// StatementIf.cpp:105–106 — set_accumulated_effect_after_block(eff, branch)
-	SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, &cg, condEff)
-	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, &cg, condEff)
+	SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, cg, condEff)
+	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, condEff)
 
 	// Merge branch effects into parent accum
 	if cg.EffectAccum != nil {

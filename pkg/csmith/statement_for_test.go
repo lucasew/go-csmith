@@ -32,7 +32,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	// force if generation
 	r2 := NewRng(11)
-	st := MakeRandomIf(r2, opts, probs, vs, tables, stmtTab, cg)
+	st := MakeRandomIf(r2, opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtIfElse || st.Then == nil || st.Else == nil {
 		t.Fatalf("%+v", st)
 	}

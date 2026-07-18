@@ -9,7 +9,7 @@ func MakeRandomContinue(
 	opts Options,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	blk *Block,
 ) Stmt {
 	// StatementContinue.cpp:63–66 — don't generate continue as first stmt (prev_stm==0)
@@ -18,15 +18,15 @@ func MakeRandomContinue(
 		return Stmt{Kind: StmtContinue}
 	}
 	st := Stmt{Kind: StmtContinue}
-	if r == nil {
+	if r == nil || cg == nil {
 		return st
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:72 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
-	expr := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {
-		expr = makeExpressionVariable(r, vs, &cg, GetIntType(), nil)
+		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
 	}
 	st.Expr = expr
 	if st.StmID == 0 {

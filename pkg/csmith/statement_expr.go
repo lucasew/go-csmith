@@ -11,9 +11,9 @@ func MakeRandomExprStmt(
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 ) Stmt {
-	if r == nil {
+	if r == nil || cg == nil {
 		return Stmt{Kind: StmtInvoke}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
@@ -27,7 +27,7 @@ func MakeRandomExprStmt(
 	}
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)
-	fi := MakeRandomInvocation(r, opts, probs, vs, tables, &cg, list, nil, nil, false)
+	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, nil, nil, false)
 	if fi == nil || fi.Failed {
 		// StatementExpr.cpp:62–66 — reset_effect_accum + restore_facts
 		if cg.EffectAccum != nil {

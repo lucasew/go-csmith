@@ -330,7 +330,7 @@ func MakeRandomBlock(
 	// Upstream appends return only inside post_creation when still missing.
 	// Without FactMgr, append return here so function bodies stay valid C.
 	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
-		ret := MakeRandomReturn(r, opts, vs, cg)
+		ret := MakeRandomReturn(r, opts, vs, &cg)
 		if ret.StmID == 0 {
 			ret.StmID = AllocStmID()
 		}
@@ -534,7 +534,7 @@ func makeRandomStmtKind(
 ) Stmt {
 	switch kind {
 	case StmtReturn:
-		return MakeRandomReturn(r, opts, vs, cg)
+		return MakeRandomReturn(r, opts, vs, &cg)
 	case StmtAssign:
 		st := MakeRandomAssign(r, opts, probs, vs, tables, &cg, nil)
 		// Effect::write_var on LHS (CGContext effect_accum)
@@ -543,11 +543,11 @@ func makeRandomStmtKind(
 		}
 		return st
 	case StmtBreak:
-		return MakeRandomBreak(r, opts, vs, tables, cg)
+		return MakeRandomBreak(r, opts, vs, tables, &cg)
 	case StmtContinue:
-		return MakeRandomContinue(r, opts, vs, tables, cg, b)
+		return MakeRandomContinue(r, opts, vs, tables, &cg, b)
 	case StmtIfElse:
-		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
+		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, &cg)
 	case StmtFor:
 		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtArrayOp:
@@ -555,7 +555,7 @@ func makeRandomStmtKind(
 	case StmtGoto:
 		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 	case StmtInvoke:
-		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
+		return MakeRandomExprStmt(r, opts, probs, vs, tables, &cg)
 	default:
 		return Stmt{Kind: kind}
 	}

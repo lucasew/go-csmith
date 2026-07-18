@@ -81,7 +81,7 @@ func TestMakeRandomReturnVisitFactsNotOnlyEager(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
-	st := MakeRandomReturn(NewRng(3), opts, vs, cg)
+	st := MakeRandomReturn(NewRng(3), opts, vs, &cg)
 	if st.Kind != StmtReturn || st.Expr == nil {
 		t.Fatal(st)
 	}

@@ -57,7 +57,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	// need globals for break test expr
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
-	br := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), cg)
+	br := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), &cg)
 	if br.Kind != StmtBreak || br.StmID == 0 {
 		t.Fatal("break")
 	}
@@ -76,7 +76,7 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 	inner.Stmts = []Stmt{{Kind: StmtAssign}}
 	f.Stack = []*Block{loop, inner}
 	_ = vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRng(4))
-	cont := MakeRandomContinue(NewRng(5), opts, vs, NewExprTables(opts), cg2, inner)
+	cont := MakeRandomContinue(NewRng(5), opts, vs, NewExprTables(opts), &cg2, inner)
 	if cont.Kind != StmtContinue {
 		t.Fatal("cont")
 	}
@@ -137,7 +137,7 @@ func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
 	empty := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{empty}
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), cg, empty)
+	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), &cg, empty)
 	if st.Expr != nil {
 		t.Fatal("first-stmt continue must not produce expr")
 	}
@@ -146,7 +146,7 @@ func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
 	}
 	// non-empty block accepts continue
 	empty.Stmts = []Stmt{{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 1}}
-	st2 := MakeRandomContinue(NewRng(2), opts, vs, NewExprTables(opts), cg, empty)
+	st2 := MakeRandomContinue(NewRng(2), opts, vs, NewExprTables(opts), &cg, empty)
 	if st2.Kind != StmtContinue || st2.Expr == nil {
 		t.Fatalf("%+v", st2)
 	}

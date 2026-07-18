@@ -76,7 +76,7 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	cg.EffectAccum = &eff
 	vs := NewVariableSelector(opts)
 	st := MakeRandomIf(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts),
-		NewStatementThresholdTable(opts), cg)
+		NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}

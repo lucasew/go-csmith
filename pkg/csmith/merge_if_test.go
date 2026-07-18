@@ -87,7 +87,7 @@ func TestIfMergesFacts(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	f.Stack = []*Block{{Func: f}}
 	// generate if — may or may not change facts; ensure no panic and FM restored/merged
-	st := MakeRandomIf(NewRng(11), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomIf(NewRng(11), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal("if")
 	}

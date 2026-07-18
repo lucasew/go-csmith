@@ -14,7 +14,7 @@ func TestMakeRandomReturnIsVariableOrConst(t *testing.T) {
 	r := NewRng(2)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomReturn(NewRng(5), opts, vs, cg)
+	st := MakeRandomReturn(NewRng(5), opts, vs, &cg)
 	if st.Kind != StmtReturn {
 		t.Fatalf("%v", st.Kind)
 	}

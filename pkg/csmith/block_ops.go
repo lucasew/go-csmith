@@ -468,7 +468,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		preFacts = CloneFactSlice(fm.GlobalFacts)
 	}
 	cg.ClearEffectStm()
-	ret := MakeRandomReturn(r, opts, vs, *cg)
+	ret := MakeRandomReturn(r, opts, vs, cg)
 	if ret.StmID == 0 {
 		ret.StmID = AllocStmID()
 	}

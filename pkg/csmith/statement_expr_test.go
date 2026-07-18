@@ -15,7 +15,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	var list FunctionList
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	cg := WithFunc(f, EmptyEffect()).WithFuncList(&list)
-	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, cg)
+	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, &cg)
 	if st.Kind != StmtInvoke {
 		t.Fatalf("kind %v", st.Kind)
 	}
@@ -65,7 +65,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	preEff := eff.Clone()
 	preFacts := CloneFactSlice(fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, state restored
-	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), cg)
+	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg)
 	if st.Kind != StmtInvoke {
 		t.Fatal(st.Kind)
 	}
@@ -113,7 +113,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	cg.EffectAccum = &eff
 	// try several seeds for a successful invoke stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st := MakeRandomExprStmt(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg)
+		st := MakeRandomExprStmt(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
 		if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
 			return
 		}

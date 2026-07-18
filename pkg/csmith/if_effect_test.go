@@ -23,7 +23,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	// plant a known global
 	g1 := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.GlobalList = []*Variable{g1}
-	st := MakeRandomIf(NewRng(7), opts, probs, vs, tables, tab, cg)
+	st := MakeRandomIf(NewRng(7), opts, probs, vs, tables, tab, &cg)
 	if st == nil || st.Then == nil || st.Else == nil {
 		t.Fatal("if")
 	}

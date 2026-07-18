@@ -15,7 +15,10 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2 // IN_LOOP
-	st := MakeRandomBreak(NewRng(9), opts, vs, tables, cg)
+	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
+	pre := CreateVariableScalars("g_pre", GetIntType(), false, false)
+	cg.EffectStm = EmptyEffect().WriteVar(pre)
+	st := MakeRandomBreak(NewRng(9), opts, vs, tables, &cg)
 	if st.Kind != StmtBreak {
 		t.Fatalf("%v", st.Kind)
 	}
@@ -24,6 +27,9 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 		if st.Expr != nil && st.Expr.Term == TermFunction {
 			t.Fatal("break test must be variable")
 		}
+	}
+	if cg.EffectStm.IsWritten(pre) {
+		t.Fatal("break must clear pre-seed effect_stm write on *CGContext")
 	}
 }
 
@@ -47,7 +53,7 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	tables := NewExprTables(opts)
 	// empty block → nullptr (Expr-less continue; stmtOK rejects)
 	blk := &Block{}
-	st := MakeRandomContinue(NewRng(3), opts, vs, tables, EmptyCGContext(), blk)
+	st := MakeRandomContinue(NewRng(3), opts, vs, tables, func() *CGContext { c := EmptyCGContext(); return &c }(), blk)
 	if st.Kind != StmtContinue || st.Expr != nil {
 		t.Fatalf("want null continue, got %+v", st)
 	}
@@ -66,7 +72,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2
 	blk := &Block{Stmts: []Stmt{{Kind: StmtAssign}}}
-	st := MakeRandomContinue(NewRng(11), opts, vs, tables, cg, blk)
+	st := MakeRandomContinue(NewRng(11), opts, vs, tables, &cg, blk)
 	if st.Kind != StmtContinue {
 		t.Fatalf("got %v", st.Kind)
 	}

@@ -88,6 +88,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 }
 
 func TestMakeRandomIfClearsEffectStm(t *testing.T) {
+	// StatementIf.cpp:69 — get_effect_stm().clear() on CGContext& before condition
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
@@ -99,11 +100,15 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	v := CreateVariableScalars("g_z", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())
 	cg.EffectStm = EmptyEffect().WriteVar(v)
-	st := MakeRandomIf(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomIf(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}
 	if st.Then == nil || st.Else == nil {
 		t.Fatal("branches")
+	}
+	// StatementIf.cpp:69 clear on CGContext& — pre-seed write must not survive on caller
+	if cg.EffectStm.IsWritten(v) {
+		t.Fatal("effect_stm clear on *CGContext must drop pre-seed write")
 	}
 }

@@ -40,10 +40,10 @@ func MakeRandomReturn(
 	r *Rng,
 	opts Options,
 	vs *VariableSelector,
-	cg CGContext,
+	cg *CGContext,
 ) Stmt {
 	st := Stmt{Kind: StmtReturn}
-	if r == nil || cg.CurrentFunc == nil {
+	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return st
 	}
 	ret := cg.CurrentFunc.ReturnType
@@ -57,7 +57,7 @@ func MakeRandomReturn(
 		qfer = &q
 	}
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
-	ev := makeExpressionVariableFlags(r, vs, &cg, ret, qfer, false, true)
+	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
 	if ev == nil {
 		// last resort: constant of return type (not upstream, avoids empty return)
 		ev = &Expression{Term: TermConstant, Con: MakeRandom(ret, opts, r)}
@@ -76,8 +76,7 @@ func MakeRandomReturn(
 	// (StatementReturn.cpp:76–97). Optional eager visit when FM present for
 	// generation-time analysis consistency with other stmt factories.
 	if cg.FM != nil {
-		cgp := &cg
-		_ = VisitFactsStatementReturn(&st, cgp, opts)
+		_ = VisitFactsStatementReturn(&st, cg, opts)
 	}
 	return st
 }
