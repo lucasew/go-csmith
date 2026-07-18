@@ -222,6 +222,7 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		return
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
+	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed (no invent counts)
 	if lt == nil || rt == nil || !lt.IsPointerLike() || !rt.IsPointerLike() {
 		return
 	}

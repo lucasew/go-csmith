@@ -246,8 +246,16 @@ func RhsToLhsTransferUnion(
 	lvars []*Variable,
 	rhs *Expression,
 ) []*FactUnion {
+	// FactUnion.cpp:82 — assert(rhs != nullptr)
 	if rhs == nil || len(lvars) == 0 {
 		return nil
+	}
+	// FactUnion.cpp:80–81 — assert all possible LHS are unions
+	for _, v := range lvars {
+		if v == nil || v.Type == nil || !v.Type.IsUnion() {
+			// fail closed — no soft invent transfer onto non-union
+			return nil
+		}
 	}
 	switch rhs.Term {
 	case TermConstant:
@@ -257,8 +265,9 @@ func RhsToLhsTransferUnion(
 			return nil
 		}
 		indirect := rhs.IndirectLevel()
+		// FactUnion.cpp:89 — assert(indirect >= 0); no soft invent clamp to 0 for &
 		if indirect < 0 {
-			indirect = 0
+			return nil
 		}
 		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
@@ -268,7 +277,7 @@ func RhsToLhsTransferUnion(
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
 	case TermFunction:
 		// FactUnion.cpp:99–109 — return fact for invocation RV (union category).
-		// Use Invoke.User.RV when a related union fact is known; else empty.
+		// assert(rv_fact) when FIU present — fail closed if missing (no invent fid 0)
 		if rhs.Invoke == nil || rhs.Invoke.User == nil || rhs.Invoke.User.RV == nil {
 			return nil
 		}
@@ -276,6 +285,7 @@ func RhsToLhsTransferUnion(
 		if uf := FindRelatedUnion(unionFacts, rv); uf != nil {
 			return MakeFactUnions(lvars, uf.LastWrittenFID)
 		}
+		// FactUnion.cpp:107 assert(rv_fact) — no soft invent empty transfer success
 		return nil
 	case TermAssignment:
 		if rhs.Assign == nil {

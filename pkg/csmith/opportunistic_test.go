@@ -52,6 +52,7 @@ func TestVariableCompatible(t *testing.T) {
 }
 
 func TestCompatibleCheckerDisabled(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
@@ -59,8 +60,15 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 		t.Fatal("disabled")
 	}
 	opts.CompatibleCheck = true
+	// CompatibleChecker.cpp:49 assert(0) — Variable* overload always rejects when enabled
 	if !CompatibleCheckExprVar(opts, a, e) {
-		t.Fatal("self assign rejected")
+		t.Fatal("enabled Variable* overload must fail closed reject")
+	}
+	// unrelated var still rejected (assert(0), not invent compatible)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	eb := &Expression{Term: TermVariable, Var: b}
+	if !CompatibleCheckExprVar(opts, a, eb) {
+		t.Fatal("enabled Variable* overload always rejects")
 	}
 }
 
