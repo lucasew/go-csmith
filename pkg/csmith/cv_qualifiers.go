@@ -810,14 +810,16 @@ func RandomQualifiersDefaultProbs(
 	probs *Probabilities,
 	r *Rng,
 ) CVQualifiers {
-	if probs == nil {
-		probs = NewProbabilities(opts)
+	// C++ Probabilities singleton always live; nil probs → 0% (no invent NewProbabilities)
+	constP, volP := uint32(0), uint32(0)
+	if probs != nil {
+		constP = uint32(probs.Single(PRegularConstProb))
+		volP = uint32(probs.Single(PRegularVolatileProb))
 	}
 	// RegularConstProb() / RegularVolatileProb() → single probs
 	return RandomQualifiersForType(
 		t, access, cg, noVolatile,
-		uint32(probs.Single(PRegularConstProb)),
-		uint32(probs.Single(PRegularVolatileProb)),
+		constP, volP,
 		opts, r,
 	)
 }

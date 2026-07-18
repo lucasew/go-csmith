@@ -476,12 +476,9 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
 	}
-	// pre/post incr without safe flags
-	if st.AssignOp.NeedNoRHS() && st.SafeFlags == nil {
-		return st.AssignOp.AssignOpC(lhs, "")
-	}
-	// avoid_signed_overflow path when SafeFlags present (StatementAssign.cpp:543+)
-	if st.SafeFlags != nil {
+	// StatementAssign.cpp:543 — if (avoid_signed_overflow() && op_flags)
+	// no soft invent safe rewrite when SafeMath off or flags missing
+	if opts.SafeMath && st.SafeFlags != nil {
 		switch st.AssignOp {
 		case AssignSimple, AssignBitAnd, AssignBitXor, AssignBitOr:
 			// StatementAssign.cpp:546–565 — simple/bit compounds
@@ -503,16 +500,22 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 		case AssignAdd, AssignSub:
 			bop, ok := st.AssignOp.CompoundToBinaryOps()
 			if !ok {
-				break
+				// incomplete IR — no invent OutputSimple for broken compound map
+				return ""
 			}
 			fname := st.SafeFlags.BinaryFuncName(bop.BinaryOpC())
 			if fname == "" {
-				break
+				// SafeOpFlags.cpp assert empty name — fail closed no invent bare +=
+				return ""
 			}
 			id := SafeOpFlagsToID(fname)
 			// don't use wrapper if filtered out by --safe-math-wrapper
 			if !SafeMathWrapperAllowed(opts, id) {
 				return OutputAssignSimple(st, wrapVol)
+			}
+			// StatementAssign.cpp:595–598 — expr.Output always (live Expression*)
+			if rhs == "" && !st.AssignOp.NeedNoRHS() {
+				return ""
 			}
 			var b strings.Builder
 			b.WriteString(lhs)
@@ -538,9 +541,8 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			b.WriteString(")")
 			return b.String()
 		default:
-			// StatementAssign.cpp:618–619 — assert(false) for other ops with op_flags
-			// (assign table only simple/bit/incr; no soft invent safe_* for *= etc.)
-			// library: fall through to OutputSimple
+			// StatementAssign.cpp:618–619 — assert(false); no soft invent OutputSimple
+			return ""
 		}
 	}
 	return OutputAssignSimple(st, wrapVol)

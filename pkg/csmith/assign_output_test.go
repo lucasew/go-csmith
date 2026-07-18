@@ -141,3 +141,51 @@ func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 		}
 	}
 }
+
+func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
+	// StatementAssign.cpp:543 — avoid_signed_overflow() && op_flags
+	// no soft invent safe_* when SafeMath off despite flags present
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		SafeFlags: flags,
+	}
+	opts := Defaults()
+	opts.SafeMath = false
+	out := OutputAssignAsExprOpts(st, false, opts)
+	if strings.Contains(out, "safe_") {
+		t.Fatal("SafeMath off must not invent wrapper", out)
+	}
+	if !strings.Contains(out, "+=") && !strings.Contains(out, "g_1") {
+		t.Fatal(out)
+	}
+}
+
+func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
+	// StatementAssign.cpp:618–619 assert(false); no invent OutputSimple for *= with flags
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, AssignOp: AssignMul,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)},
+		SafeFlags: MakeDummyFlags(),
+	}
+	opts := Defaults()
+	opts.SafeMath = true
+	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
+		t.Fatalf("unknown op with flags must fail closed, got %q", out)
+	}
+}
+
+func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
+	// nil probs → 0% const/vol (no invent NewProbabilities from Defaults)
+	opts := Defaults()
+	opts.Consts = true
+	opts.Volatiles = true
+	// with real probs, may get bits; with nil, always non-const/non-vol under Regular*
+	q := RandomQualifiersDefaultProbs(GetIntType(), AccessWrite, EmptyCGContext(), false, opts, nil, NewRng(1))
+	if q.IsConst() || q.IsVolatile() {
+		t.Fatal("nil probs must not invent non-zero regular const/vol")
+	}
+}
