@@ -475,6 +475,141 @@ func GetAllLocalVars(b *Block) []*Variable {
 	return vars
 }
 
+// GetAllArrayVars mirrors VariableSelector::get_all_array_vars.
+// VariableSelector.cpp:737–745 — collect array globals (invalid for ccomp pointer init).
+func (vs *VariableSelector) GetAllArrayVars() []*Variable {
+	var out []*Variable
+	if vs == nil {
+		return out
+	}
+	for _, v := range vs.GlobalList {
+		if v != nil && v.IsArray {
+			out = append(out, v)
+		}
+	}
+	// Arrays list may hold collectives not yet on GlobalList
+	for _, av := range vs.Arrays {
+		if av == nil {
+			continue
+		}
+		if av.IsGlobal() && av.Collective == nil {
+			if !IsVariableInSet(out, &av.Variable) {
+				out = append(out, &av.Variable)
+			}
+		}
+	}
+	return out
+}
+
+// MakeInitValue mirrors VariableSelector::make_init_value.
+// VariableSelector.cpp:824–912 — non-pointer (or 20% flip) → Constant;
+// pointer → choose exact pointee / create & take address.
+func (vs *VariableSelector) MakeInitValue(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qf *CVQualifiers,
+	b *Block,
+	r *Rng,
+) *Expression {
+	if vs == nil || t == nil || r == nil {
+		return nil
+	}
+	// assert qf sanity: allow nil → empty non-wildcard
+	var qfer CVQualifiers
+	if qf != nil {
+		qfer = *qf
+	} else {
+		qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	}
+	// VariableSelector.cpp:833 — initializer must not be stricter than var
+	qfer.AcceptStricter = false
+
+	// VariableSelector.cpp:836–841 — non-pointer or 20% chance → constant
+	if !t.IsPointerLike() || r.RndFlipcoin(20) {
+		if t.IsSimple() && t.simple == EVoid {
+			return nil
+		}
+		c := MakeRandom(t, vs.Opts, r)
+		if c == nil {
+			return nil
+		}
+		return &Expression{Term: TermConstant, Con: c, ExprType: t}
+	}
+
+	// pointer path: select visible var of pointee type
+	pointee := t.PtrType()
+	if pointee == nil {
+		return nil
+	}
+	vars := vs.FindAllVisibleVars(b)
+	noUnion := !vs.Opts.TakeUnionFieldAddr
+	var invalid []*Variable
+	var chosen *Variable
+	// VariableSelector.cpp:853–862
+	if b == nil && vs.Opts.CComp {
+		invalid = vs.GetAllArrayVars()
+		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
+			invalid, true, true, noUnion)
+	} else {
+		if !vs.Opts.AddrTakenOfLocals {
+			invalid = GetAllLocalVars(b)
+		}
+		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
+			invalid, true, false, noUnion)
+	}
+
+	if chosen == nil {
+		// VariableSelector.cpp:866–904 — create suitable addressable
+		if DepthGuardByType(vs.Opts, DtInitPointerValue) == BadDepth {
+			return nil
+		}
+		noVolatile := false
+		if vs.Opts.StrictVolatileRule {
+			noVolatile = !cg.EffectContext().IsSideEffectFree()
+		}
+		qferDeref := qfer.RandomLooseQualifiers(noVolatile, access, cg, vs.Opts, vs.Probs, r)
+		qferDeref.RemoveQualifiers(1)
+		qferDeref.AcceptStricter = false
+		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
+		useLocal := !vs.Opts.GlobalVariables ||
+			(b != nil && pointee.IsPointerLike() && !qferDeref.IsVolatile())
+		var tt *Type
+		if useLocal {
+			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, true)
+		} else {
+			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, false)
+		}
+		if tt == nil {
+			return nil
+		}
+		if vs.Opts.AddrTakenOfLocals && useLocal && b != nil {
+			chosen = vs.GenerateNewParentLocal(b, AccessRead, cg, tt, &qferDeref, r)
+			if chosen != nil && chosen.Type != nil {
+				RecordVolatileAccess(chosen, chosen.Type.IndirectLevel()-tt.IndirectLevel(), false)
+			}
+		} else {
+			if vs.Opts.CComp {
+				chosen = vs.GenerateNewNonArrayGlobal(AccessRead, cg, tt, &qferDeref, r)
+			} else {
+				chosen = vs.GenerateNewGlobal(AccessRead, cg, tt, &qferDeref, r)
+			}
+		}
+		if chosen == nil {
+			return nil
+		}
+		RecordAddressTaken(chosen)
+	} else if chosen.Type != nil {
+		// VariableSelector.cpp:905–909
+		derefLevel := chosen.Type.IndirectLevel() - t.IndirectLevel()
+		if derefLevel < 0 {
+			RecordAddressTaken(chosen)
+		}
+	}
+	// ExpressionVariable(*var, t) — desired type is pointer being inited
+	return &Expression{Term: TermVariable, Var: chosen, ExprType: t}
+}
+
 // IsEligibleVar mirrors VariableSelector::is_eligible_var (core effect rules).
 // VariableSelector.cpp:216–290 — itemized collective: read_indices first;
 // then effect/const/volatile/FactUnion nonreadable checks on collective.
@@ -862,8 +997,19 @@ func typesMatchExact(a, b *Type) bool {
 	return a.Match(b, MatchExact)
 }
 
+// applyInitExpr stores make_init_value result on Variable (Constant and/or full expr).
+func applyInitExpr(v *Variable, init *Expression) {
+	if v == nil || init == nil {
+		return
+	}
+	v.InitExpr = init
+	if init.Term == TermConstant && init.Con != nil {
+		v.Init = init.Con
+	}
+}
+
 // createAndInitialize mirrors VariableSelector::create_and_initialize.
-// VariableSelector.cpp:518+ — NewArrayVariableProb flip → CreateArrayVariable.
+// VariableSelector.cpp:518–536 — array flip or scalar; make_init_value for init.
 func (vs *VariableSelector) createAndInitialize(
 	access Access,
 	cg CGContext,
@@ -876,9 +1022,18 @@ func (vs *VariableSelector) createAndInitialize(
 	if vs == nil || t == nil || r == nil {
 		return nil
 	}
-	// rnd_flipcoin(NewArrayVariableProb()) when arrays enabled
+	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize
 	if vs.Opts.Arrays && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
-		init := MakeRandom(t, vs.Opts, r)
+		var init *Constant
+		if vs.Opts.StrictConstArrays {
+			init = MakeRandom(t, vs.Opts, r)
+		} else {
+			if ie := vs.MakeInitValue(access, cg, t, &qfer, blk, r); ie != nil && ie.Term == TermConstant {
+				init = ie.Con
+			} else {
+				init = MakeRandom(t, vs.Opts, r)
+			}
+		}
 		av := CreateArrayVariable(r, vs.Opts, blk, name, t, init, qfer)
 		if av != nil {
 			vs.AllVars = append(vs.AllVars, &av.Variable)
@@ -895,8 +1050,10 @@ func (vs *VariableSelector) createAndInitialize(
 	if v == nil {
 		return nil
 	}
-	v.Init = MakeRandom(t, vs.Opts, r)
-	// VariableSelector.cpp:568–569 — access_once flip
+	// VariableSelector.cpp:532–534 — make_init_value
+	applyInitExpr(v, vs.MakeInitValue(access, cg, t, &qfer, blk, r))
+	// VariableSelector.cpp:568–569 — access_once flip (on GenerateNewGlobal path;
+	// keep for create_and_initialize parity when used from local/global create)
 	if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
 		v.IsAccessOnce = true
 	}
@@ -911,6 +1068,50 @@ func (vs *VariableSelector) createAndInitialize(
 	// FactMgr::add_new_var_fact_and_update_inout_maps when FM present
 	if cg.FM != nil {
 		cg.FM.AddNewVarFactAndUpdate(blk, v)
+	}
+	vs.VarCreated = true
+	return v
+}
+
+// GenerateNewNonArrayGlobal mirrors VariableSelector::GenerateNewNonArrayGlobal.
+// VariableSelector.cpp:578–606 — force scalar global (no array flip).
+func (vs *VariableSelector) GenerateNewNonArrayGlobal(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+) *Variable {
+	if vs == nil || t == nil || r == nil {
+		return nil
+	}
+	if !vs.Opts.GlobalVariables {
+		return nil
+	}
+	var varQfer CVQualifiers
+	if qfer == nil || qfer.Wildcard {
+		varQfer = RandomQualifiersDefaultProbs(t, access, cg, false, vs.Opts, vs.Probs, r)
+	} else {
+		varQfer = *qfer
+	}
+	name := vs.RandomGlobalName()
+	vs.TmpCount++
+	// always non-array: make_init + new_variable (skip array flip)
+	v := CreateVariableQfer(name, t, varQfer)
+	if v == nil {
+		return nil
+	}
+	applyInitExpr(v, vs.MakeInitValue(access, cg, t, &varQfer, nil, r))
+	vs.AllVars = append(vs.AllVars, v)
+	vs.GlobalList = append(vs.GlobalList, v)
+	if !varQfer.IsVolatile() {
+		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
+	}
+	if cg.CurrentFunc != nil {
+		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
+	}
+	if cg.FM != nil {
+		cg.FM.AddNewVarFactAndUpdate(nil, v)
 	}
 	vs.VarCreated = true
 	return v

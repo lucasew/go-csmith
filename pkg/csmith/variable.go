@@ -31,8 +31,11 @@ type Variable struct {
 	// FieldVars are expanded aggregate members (.f0, .f1, …).
 	FieldVars []*Variable
 
-	// Init mirrors Variable::init (Expression*); Constant only for now.
+	// Init mirrors Variable::init when the expression is a Constant.
 	Init *Constant
+	// InitExpr is full Variable::init (Expression*) when non-constant (e.g. &x).
+	// OutputDef prefers InitExpr over Init when set.
+	InitExpr *Expression
 	// IsAccessOnce mirrors Variable::isAccessOnce (ACCESS_ONCE wrap).
 	IsAccessOnce bool
 	// IsAddrTaken mirrors Variable::isAddrTaken (disables ACCESS_ONCE).
@@ -109,7 +112,13 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	if withAttrs && r != nil {
 		b.WriteString(EnsureVarAttrGenerator().Output(r))
 	}
-	if v.Init != nil && v.Init.Value != "" {
+	// Variable.cpp:656 — init->Output when present
+	if v.InitExpr != nil {
+		if s := v.InitExpr.Output(); s != "" {
+			b.WriteString(" = ")
+			b.WriteString(s)
+		}
+	} else if v.Init != nil && v.Init.Value != "" {
 		b.WriteString(" = ")
 		b.WriteString(v.Init.Value)
 	}

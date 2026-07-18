@@ -547,7 +547,9 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		return nil, nil
 	}
 	var rhs *Expression
-	if v.Init != nil {
+	if v.InitExpr != nil {
+		rhs = v.InitExpr
+	} else if v.Init != nil {
 		rhs = &Expression{Term: TermConstant, Con: v.Init, ExprType: v.Type}
 	}
 	if v.Type.IsUnion() {

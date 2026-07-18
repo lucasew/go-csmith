@@ -46,6 +46,7 @@ const (
 	DtSelectParentLocal      = "dtSelectParentLocal"
 	DtGenerateNewParentLocal = "dtGenerateNewParentLocal"
 	DtSelectDerefPointer     = "dtSelectDerefPointer"
+	DtInitPointerValue       = "dtInitPointerValue"
 )
 
 // MinimalDepth returns DepthSpec::*minimal_depth for a dType name.
@@ -105,6 +106,9 @@ func MinimalDepth(dType string, flag int) int {
 			return 2
 		}
 		return 3
+	case DtInitPointerValue:
+		// DepthSpec: init pointer may recurse into create local/global
+		return 1
 	case DtGenerateNewGlobal:
 		return 1 + 1 // 1 + init
 	case DtSelectGlobal:
