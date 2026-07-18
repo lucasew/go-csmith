@@ -74,24 +74,11 @@ func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 }
 
 func typesMatchExact(a, b *Type) bool {
+	// Type::match eExact is pointer identity (cached simple/pointer types).
 	if a == nil || b == nil {
 		return a == b
 	}
-	// Both pointers: same depth and pointee simple.
-	for a != nil && b != nil && a.PtrType() != nil && b.PtrType() != nil {
-		a = a.PtrType()
-		b = b.PtrType()
-	}
-	if (a == nil) != (b == nil) {
-		return false
-	}
-	if a == nil {
-		return true
-	}
-	if a.PtrType() != nil || b.PtrType() != nil {
-		return false
-	}
-	return a.Simple() == b.Simple()
+	return a.Match(b, MatchExact)
 }
 
 // GenerateNewGlobal mirrors VariableSelector::GenerateNewGlobal for simple types:
@@ -125,6 +112,8 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if v == nil {
 		return nil
 	}
+	// create_and_initialize → Constant::make_random for simple non-union (Variable.cpp CreateVariable path)
+	v.Init = MakeRandom(t, vs.Opts, r)
 	vs.GlobalList = append(vs.GlobalList, v)
 	vs.AllVars = append(vs.AllVars, v)
 	if !varQfer.IsVolatile() {

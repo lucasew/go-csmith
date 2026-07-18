@@ -100,13 +100,31 @@ func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 }
 
 func TestGenerateNewGlobalRandomQferConsumesRNG(t *testing.T) {
-	// Wildcard/nil qfer → random_qualifiers for simple int: 2 flipcoins (vol, const) when SE-free READ.
+	// nil qfer → random_qualifiers (2 flips) + Constant::make_random (more draws).
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetSimpleType(EInt), nil, r)
-	// After two flipcoins for storage, depth should be 2
-	if r.RandDepth() != 2 {
-		t.Fatalf("rand_depth after simple random_qualifiers: %d want 2", r.RandDepth())
+	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetSimpleType(EInt), nil, r)
+	if v == nil || v.Init == nil || v.Init.Value == "" {
+		t.Fatalf("init missing: %+v", v)
+	}
+	if r.RandDepth() < 2 {
+		t.Fatalf("expected qfer+const RNG, depth=%d", r.RandDepth())
+	}
+}
+
+func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	r := NewRng(2)
+	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetSimpleType(EInt), &q, r)
+	if v.Init == nil {
+		t.Fatal("MakeRandom init")
+	}
+	// pointer create
+	vp := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), PointerTo(GetSimpleType(EInt)), &q, r)
+	if vp.Init == nil || vp.Init.Value != "0" {
+		t.Fatalf("pointer init: %+v", vp.Init)
 	}
 }

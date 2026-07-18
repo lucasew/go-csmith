@@ -16,8 +16,8 @@ type Variable struct {
 	// FieldVarOf is field_var_of (nil if not a field).
 	FieldVarOf *Variable
 
-	// Init is Expression* — not ported; nil means no init expression yet.
-	// CreateVariable with type vectors may Constant::make_random later.
+	// Init mirrors Variable::init (Expression*); Constant only for now.
+	Init *Constant
 }
 
 // CreateVariableQfer mirrors
