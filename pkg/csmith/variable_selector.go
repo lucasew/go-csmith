@@ -21,10 +21,15 @@ type VariableSelector struct {
 	Arrays []*ArrayVariable
 }
 
-// NewVariableSelector constructs an empty selector with opts-derived probs.
-// Library/tests convenience; generation should use NewVariableSelectorProbs with
-// the session Probabilities singleton (no invent second NewProbabilities table).
+// NewVariableSelector constructs an empty selector sharing process Probabilities
+// when live (C++ singleton). Library/tests without NewProgramGenerator get a
+// one-off table only when process probs are unset — prefer NewVariableSelectorProbs
+// with an explicit session table during generation.
 func NewVariableSelector(opts Options) *VariableSelector {
+	if p := ProcessProbabilities(); p != nil {
+		return NewVariableSelectorProbs(opts, p)
+	}
+	// library path only — not a second table during NewProgramGenerator sessions
 	return NewVariableSelectorProbs(opts, NewProbabilities(opts))
 }
 

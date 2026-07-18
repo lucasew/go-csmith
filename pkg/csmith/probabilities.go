@@ -55,6 +55,9 @@ type Probabilities struct {
 	binaryOpWeight []int
 	// unaryOpWeight mirrors pUnaryOpsProb equal group (set_default_unary_ops_prob).
 	unaryOpWeight []int
+	// safeOpsSizeWeight mirrors pSafeOpsSizeProb equal group (set_default_safe_ops_size_prob).
+	// Indices: SafeInt8..SafeInt64 (float excluded from draw).
+	safeOpsSizeWeight []int
 }
 
 // NewProbabilities builds tables from opts like Probabilities::initialize
@@ -67,6 +70,7 @@ func NewProbabilities(opts Options) *Probabilities {
 	p.initSimpleTypes(opts)
 	p.initBinaryOps(opts)
 	p.initUnaryOps(opts)
+	p.initSafeOpsSize(opts)
 	return p
 }
 
@@ -258,4 +262,35 @@ func (p *Probabilities) initUnaryOps(opts Options) {
 	w[int(UnNot)] = 1
 	w[int(UnBitNot)] = 1
 	p.unaryOpWeight = w
+}
+
+// initSafeOpsSize — Probabilities::set_default_safe_ops_size_prob (equal group).
+// Probabilities.cpp:588–609 — Int8 if int8&uint8; Int16/32 always; Int64 if allow_int64.
+func (p *Probabilities) initSafeOpsSize(opts Options) {
+	w := make([]int, MaxSafeOpSizeNonFloat)
+	if opts.Int8 && opts.UInt8 {
+		w[int(SafeInt8)] = 1
+	}
+	w[int(SafeInt16)] = 1
+	w[int(SafeInt32)] = 1
+	if opts.AllowInt64() {
+		w[int(SafeInt64)] = 1
+	}
+	p.safeOpsSizeWeight = w
+}
+
+// SafeOpsSizeWeight returns equal-group weight for SafeOpSize index (int sizes only).
+func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
+	if p == nil || sizeIdx < 0 || sizeIdx >= len(p.safeOpsSizeWeight) {
+		return 0
+	}
+	return p.safeOpsSizeWeight[sizeIdx]
+}
+
+// SafeOpsSizeFilter rejects SafeOpSize indices with weight 0 (SAFE_OPS_SIZE_PROB_FILTER).
+// Probabilities.cpp set_default_safe_ops_size_prob + set_prob_filter.
+func (p *Probabilities) SafeOpsSizeFilter() Filter {
+	return filterFunc(func(v uint32) bool {
+		return p.SafeOpsSizeWeight(int(v)) == 0
+	})
 }

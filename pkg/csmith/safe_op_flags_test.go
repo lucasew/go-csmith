@@ -101,3 +101,34 @@ func TestGenerateUsesSafeMathByDefault(t *testing.T) {
 		t.Fatal("expected safe_*_func in some default seed")
 	}
 }
+
+func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
+	// SafeOpFlags.cpp:164 — SAFE_OPS_SIZE_PROB_FILTER from Probabilities group
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
+	// nil probs arg + nil process → fail closed
+	if _, ok := pickSafeOpSize(NewRng(1), nil); ok {
+		t.Fatal("nil probs must fail closed")
+	}
+	// explicit probs works
+	sz, ok := pickSafeOpSize(NewRng(2), probs)
+	if !ok || int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat {
+		t.Fatalf("got %v ok=%v", sz, ok)
+	}
+	// Int8 gated
+	opts.Int8 = false
+	opts.UInt8 = false
+	probs2 := NewProbabilities(opts)
+	for i := 0; i < 100; i++ {
+		sz, ok := pickSafeOpSize(NewRng(uint64(i+1)), probs2)
+		if !ok {
+			t.Fatal("want size")
+		}
+		if sz == SafeInt8 {
+			t.Fatal("Int8 disabled")
+		}
+	}
+}

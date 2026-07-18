@@ -157,7 +157,11 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 	if rvFloat {
 		f.Size = SafeFloat
 	} else {
-		f.Size = pickSafeOpSize(r, opts)
+		sz, ok := pickSafeOpSize(r, probs)
+		if !ok {
+			return nil
+		}
+		f.Size = sz
 	}
 	return f
 }
@@ -211,29 +215,38 @@ func MakeRandomBinaryKind(
 	if rvFloat {
 		f.Size = SafeFloat
 	} else {
-		f.Size = pickSafeOpSize(r, opts)
+		sz, ok := pickSafeOpSize(r, probs)
+		if !ok {
+			return nil
+		}
+		f.Size = sz
 	}
 	return f
 }
 
 // pickSafeOpSize mirrors rnd_upto(MAX_SAFE_OP_SIZE-1, SAFE_OPS_SIZE_PROB_FILTER).
-func pickSafeOpSize(r *Rng, opts Options) SafeOpSize {
-	// weights: Int8 if int8&uint8, Int16, Int32, Int64 if allow_int64
-	w := make([]int, MaxSafeOpSizeNonFloat)
-	if opts.Int8 && opts.UInt8 {
-		w[SafeInt8] = 1
+// SafeOpFlags.cpp:164 / 212 — filter from Probabilities pSafeOpsSizeProb.
+// No invent opts-only weight table when probs missing.
+func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
+	if r == nil {
+		return 0, false
 	}
-	w[SafeInt16] = 1
-	w[SafeInt32] = 1
-	if opts.AllowInt64() {
-		w[SafeInt64] = 1
+	if probs == nil {
+		probs = ProcessProbabilities()
 	}
-	filt := filterFunc(func(v uint32) bool {
-		i := int(v)
-		return i < 0 || i >= len(w) || w[i] == 0
-	})
-	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), filt)
-	return SafeOpSize(v)
+	if probs == nil {
+		// Probabilities singleton always live in C++; fail closed
+		return 0, false
+	}
+	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())
+	if HasError() {
+		return 0, false
+	}
+	sz := SafeOpSize(v)
+	if int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat || probs.SafeOpsSizeWeight(int(sz)) == 0 {
+		return 0, false
+	}
+	return sz, true
 }
 
 // SizeToken mirrors OutputSize (without leading 'u' for unsigned).
