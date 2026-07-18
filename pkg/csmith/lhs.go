@@ -37,14 +37,19 @@ func MakeRandomLhs(
 		}
 	}
 
-	// select WRITE among locals/params/globals matching type (flexible)
-	if v := selectWritable(r, vs, cg, typ, compoundAssign); v != nil {
+	// Lhs.cpp:106+ — VariableSelector::select(WRITE, …, eDerefExact) simplified to eFlexible
+	v := vs.Select(AccessWrite, cg, typ, &q, r, MatchFlexible)
+	if v != nil && compoundAssign && v.IsVolatile() {
+		// compound assigns avoid volatile LHS (StatementAssign non-vol preference)
+		if nv := selectWritable(r, vs, cg, typ, true); nv != nil {
+			return nv, typ
+		}
+	}
+	if v != nil {
 		return v, typ
 	}
-
-	// VariableSelector::select → create new global
-	v := vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
-	return v, typ
+	// last resort create global
+	return vs.SelectGlobal(AccessWrite, cg, typ, &q, r), typ
 }
 
 // selectWritable gathers non-const matching variables from stack, params, globals.

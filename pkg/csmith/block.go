@@ -210,15 +210,28 @@ func (b *Block) Output(indent int) string {
 		sb.WriteString(inner)
 		sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
 	}
+	// collect local arrays needing loop init (OutputVariableList order)
+	var loopInits []*ArrayVariable
+	maxDim := 0
 	for _, lv := range b.LocalVars {
 		if lv == nil || lv.Type == nil {
 			continue
 		}
 		sb.WriteString(inner)
 		if lv.IsArray && len(lv.ArraySizes) > 0 {
-			av := &ArrayVariable{Variable: *lv, Sizes: lv.ArraySizes, InitValues: lv.ArrayInits}
+			av := &ArrayVariable{
+				Variable:   *lv,
+				Sizes:      lv.ArraySizes,
+				InitValues: lv.ArrayInits,
+			}
 			sb.WriteString(av.OutputDef())
 			sb.WriteString("\n")
+			if !av.NoLoopInitializer() {
+				loopInits = append(loopInits, av)
+				if len(av.Sizes) > maxDim {
+					maxDim = len(av.Sizes)
+				}
+			}
 			continue
 		}
 		if lv.IsConst() {
@@ -232,6 +245,18 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(" = " + lv.Init.Value)
 		}
 		sb.WriteString(";\n")
+	}
+	// OutputArrayInitializers for locals without brace init
+	// Variable.cpp:829–841
+	if len(loopInits) > 0 {
+		ctrl := make([]string, maxDim)
+		for i := 0; i < maxDim; i++ {
+			ctrl[i] = "i" + itoa(i)
+			sb.WriteString(inner + "int " + ctrl[i] + ";\n")
+		}
+		for _, av := range loopInits {
+			sb.WriteString(av.OutputInit(inner, ctrl))
+		}
 	}
 	for _, st := range b.Stmts {
 		if st.SourceLabel != "" {

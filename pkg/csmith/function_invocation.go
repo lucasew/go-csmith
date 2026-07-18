@@ -89,11 +89,12 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 }
 
 // ChooseFunc mirrors Function::choose_func — filter by return type convert, then choose_ok style.
-// Function.cpp:279+ simplified: match return type with eConvert.
+// Function.cpp:279+ — skip unbuilt (is_effect_known false) and builtins.
 func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Function {
 	var ok []*Function
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin || f == exclude {
+		if f == nil || f.IsBuiltin || f == exclude || !f.IsBuilt {
+			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
 		if ret == nil || f.ReturnType == nil || ret.Match(f.ReturnType, MatchConvert) {

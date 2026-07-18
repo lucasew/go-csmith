@@ -154,24 +154,30 @@ func (av *ArrayVariable) CDeclType() string {
 	return b.String()
 }
 
-// OutputDef emits a definition with optional brace initializer (first + alts simplified).
+// NoLoopInitializer mirrors ArrayVariable::no_loop_initializer.
+// ArrayVariable.cpp:429–435 — struct/union, const, global, or multi init_values.
+func (av *ArrayVariable) NoLoopInitializer() bool {
+	if av == nil || av.Type == nil {
+		return true
+	}
+	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
+}
+
+// OutputDef emits a definition with brace initializer when no_loop_initializer.
+// ArrayVariable.cpp OutputDef path — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
 	if av == nil {
 		return ""
 	}
 	var b strings.Builder
-	if av.IsGlobal() {
-		// force_globals_static handled by caller for consistency
-	}
 	b.WriteString(av.CDeclType())
-	if av.Init != nil || len(av.InitValues) > 0 {
+	if av.NoLoopInitializer() && (av.Init != nil || len(av.InitValues) > 0) {
 		b.WriteString(" = {")
 		vals := make([]string, 0, 1+len(av.InitValues))
 		if av.Init != nil && av.Init.Value != "" {
 			vals = append(vals, av.Init.Value)
 		}
 		vals = append(vals, av.InitValues...)
-		// cap emit length
 		maxEmit := av.TotalSize()
 		if maxEmit > 8 {
 			maxEmit = 8
@@ -183,8 +189,53 @@ func (av *ArrayVariable) OutputDef() string {
 			b.WriteString(vals[i])
 		}
 		b.WriteString("}")
+	} else if av.NoLoopInitializer() && av.Init != nil && av.Init.Value != "" {
+		// single init only case covered above
 	}
 	b.WriteString(";")
+	return b.String()
+}
+
+// OutputInit mirrors ArrayVariable::output_init — nested for loops assigning init.
+// ArrayVariable.cpp:619–655. ctrl names are index var names (i0, i1, …).
+func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
+	if av == nil || av.NoLoopInitializer() {
+		return ""
+	}
+	initVal := "0"
+	if av.Init != nil && av.Init.Value != "" {
+		initVal = av.Init.Value
+	}
+	var b strings.Builder
+	// nested fors for each dimension
+	pad := indent
+	for i, sz := range av.Sizes {
+		iv := "i0"
+		if i < len(ctrl) {
+			iv = ctrl[i]
+		} else {
+			iv = "i" + itoa(i)
+		}
+		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		if i+1 < len(av.Sizes) {
+			b.WriteString(pad + "{\n")
+			pad += "    "
+		}
+	}
+	// a[i0][i1] = init;
+	access := av.Name
+	for i := range av.Sizes {
+		iv := "i" + itoa(i)
+		if i < len(ctrl) {
+			iv = ctrl[i]
+		}
+		access += "[" + iv + "]"
+	}
+	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
+	for i := len(av.Sizes) - 1; i >= 1; i-- {
+		pad = pad[:len(pad)-4]
+		b.WriteString(pad + "}\n")
+	}
 	return b.String()
 }
 
