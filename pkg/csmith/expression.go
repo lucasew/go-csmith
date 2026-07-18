@@ -653,7 +653,15 @@ func MakeRandomExpression(
 	}
 	// Expression.cpp:213–218 — depth++ for Constant, Variable, or user FuncCall
 	// so siblings (comma/binary/params) see raised expr_depth via same CGContext&.
-	if e != nil && BumpsExprDepth(e) {
+	// Expression.cpp:217 — ERROR_GUARD(nullptr) before return
+	if HasError() {
+		return nil
+	}
+	if e == nil {
+		// C++ would crash on e->term_type; factories return null only with error
+		return nil
+	}
+	if BumpsExprDepth(e) {
 		cg.ExprDepth++
 	}
 	return e

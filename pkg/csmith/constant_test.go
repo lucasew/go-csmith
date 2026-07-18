@@ -14,6 +14,14 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 	}
 }
 
+func TestMakeRandomVoidIsComment(t *testing.T) {
+	// Constant.cpp:364–367 — eVoid → "/* void */" (not invent "0")
+	c := MakeRandom(GetSimpleType(EVoid), Defaults(), NewRng(1))
+	if c == nil || c.Value != "/* void */" {
+		t.Fatalf("got %+v", c)
+	}
+}
+
 func TestMakeRandomIntHexPathSeed2(t *testing.T) {
 	// Defaults BinaryConstant=false, LongLong=true.
 	// pure_rnd_flipcoin(50) false → hex path GenerateRandomIntConstant → 0x + 8 hex + L

@@ -149,8 +149,12 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 		}
 		return ""
 	}
-	if !typ.IsSimple() || typ.Simple() == EVoid {
+	// Constant.cpp:364–367 — eVoid emits "/* void */"; non-simple other than pointer/struct/union already handled
+	if !typ.IsSimple() {
 		return "0"
+	}
+	if typ.Simple() == EVoid {
+		return "/* void */"
 	}
 	st := typ.Simple()
 

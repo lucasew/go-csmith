@@ -28,6 +28,10 @@ func MakeExpressionAssign(
 	// ExpressionAssign.cpp:56 / 61 — StatementAssign::make_random(cg, type, qfer)
 	// forces match_exact_qualifiers while selecting LHS
 	st := MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, qfer)
+	// StatementAssign nullptr / ERROR_GUARD → no soft invent empty ExpressionAssign
+	if HasError() || !stmtOK(st) {
+		return nil
+	}
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
 	// (MakeRandomAssignQfer already updates; re-apply matches C++ double call)
 	if cg.FM != nil && st.LhsVar != nil {
