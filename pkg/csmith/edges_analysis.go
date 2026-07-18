@@ -158,11 +158,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 
 // FindFixedPointBlock is a light Block::find_fixed_point (one or two passes).
 // Block.cpp:513+ — sequential analyze_with_edges_in; optional second pass for loops.
-func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) ([]*FactPointTo, bool) {
+// failIndex is the statement index that failed analyze_with_edges_in, or -1.
+func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) (facts []*FactPointTo, failIndex int, ok bool) {
 	if b == nil || cg == nil {
-		return inputs, true
+		return inputs, -1, true
 	}
-	facts := CloneFactSlice(inputs)
+	facts = CloneFactSlice(inputs)
 	// push block
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
@@ -172,18 +173,18 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}()
 	}
-	pass := func() bool {
+	pass := func() (int, bool) {
 		cur := CloneFactSlice(facts)
 		for i := range b.Stmts {
 			if !AnalyzeWithEdgesIn(&b.Stmts[i], &cur, cg, opts, b) {
-				return false
+				return i, false
 			}
 		}
 		facts = cur
-		return true
+		return -1, true
 	}
-	if !pass() {
-		return facts, false
+	if idx, passOK := pass(); !passOK {
+		return facts, idx, false
 	}
 	// loop body or back edges: second pass
 	needSecond := b.Looping || visitOnce
@@ -196,13 +197,17 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 	}
 	if needSecond {
-		// clear visited for re-analysis of body stmts? keep visited for shortcut
-		if !pass() {
-			return facts, false
+		if idx, passOK := pass(); !passOK {
+			return facts, idx, false
 		}
 	}
 	if cg.FM != nil {
+		if b.StmID > 0 {
+			cg.FM.SetMapFactsIn(b.StmID, inputs)
+			cg.FM.SetMapFactsOut(b.StmID, facts)
+		}
 		cg.FM.GlobalFacts = facts
+		b.SetAccumulatedEffect(cg.FM)
 	}
-	return facts, true
+	return facts, -1, true
 }

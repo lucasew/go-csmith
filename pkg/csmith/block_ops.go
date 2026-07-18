@@ -203,6 +203,20 @@ func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 	}
 }
 
+// ResetBlockFactMaps mirrors FactMgr::reset_stm_fact_maps(Block*).
+// FactMgr.cpp:553–567 — clear in/out for all statements under block.
+func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
+	if fm == nil || b == nil {
+		return
+	}
+	ids := map[int]bool{}
+	collectBlockStmIDs(b, ids)
+	for id := range ids {
+		delete(fm.MapFactsIn, id)
+		delete(fm.MapFactsOut, id)
+	}
+}
+
 func collectBlockStmIDs(b *Block, ids map[int]bool) {
 	if b == nil {
 		return

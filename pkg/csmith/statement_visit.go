@@ -48,7 +48,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		inputs = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	_, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
+	_, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
 	return ok
 }
 

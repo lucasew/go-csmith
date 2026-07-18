@@ -90,7 +90,7 @@ func TestFindFixedPointBlock(t *testing.T) {
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	out, ok := FindFixedPointBlock(b, nil, &cg, Defaults(), false)
+	out, _, ok := FindFixedPointBlock(b, nil, &cg, Defaults(), false)
 	if !ok {
 		t.Fatal("fp")
 	}

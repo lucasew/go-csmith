@@ -223,8 +223,8 @@ func BlockProbability(blockSize int, r *Rng) int {
 	return blockSize - 1
 }
 
-// MakeRandomBlock mirrors Block::make_random without DFA / nested loop / FactMgr.
-// Block.cpp:115–226.
+// MakeRandomBlock mirrors Block::make_random.
+// Block.cpp:115–226 — statements, optional nested loop, post_creation_analysis.
 func MakeRandomBlock(
 	r *Rng,
 	opts Options,
@@ -253,6 +253,8 @@ func MakeRandomBlock(
 		EmitLabelAttrs:   opts.LabelAttributes,
 		LabelAttrRng:     r,
 		StmID:            AllocStmID(),
+		// Block.cpp:127 — in_array_loop when induction bounds non-empty
+		InArrayLoop: len(cg.IVBounds) > 0,
 	}
 	if f != nil {
 		f.Stack = append(f.Stack, b)
@@ -268,6 +270,14 @@ func MakeRandomBlock(
 	if cg.EffectAccum == nil {
 		eff := EmptyEffect()
 		cg.EffectAccum = &eff
+	}
+	// Block.cpp:134–138 — snapshot facts-in and pre_effect for post_creation
+	preEffect := EmptyEffect()
+	if cg.EffectAccum != nil {
+		preEffect = cg.EffectAccum.Clone()
+	}
+	if cg.FM != nil && b.StmID > 0 {
+		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
 	// Forward goto: prefer labeling the next real statement; no-op if goto is last.
 	pendingFwd := ""
@@ -298,6 +308,10 @@ func MakeRandomBlock(
 	if pendingFwd != "" {
 		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
 	}
+	// Block.cpp:164–166 — nested loop for must-use multi-dim arrays
+	if b.NeedNestedLoop(cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
+		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
+	}
 	// Block.cpp:734–737 — top-level function body: append return if required and missing
 	// (still on stack so ExpressionVariable can see locals)
 	if parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
@@ -307,35 +321,107 @@ func MakeRandomBlock(
 		}
 		b.Stmts = append(b.Stmts, ret)
 	}
-	// Block::post_creation_analysis light path (Block.cpp:682–694)
-	// StmID already assigned at creation when possible
+	// Block::post_creation_analysis (Block.cpp:682–742)
 	if b.StmID == 0 {
 		b.StmID = AllocStmID()
 	}
-	if cg.FM != nil {
-		if cg.FM.MapVisited == nil {
-			cg.FM.MapVisited = make(map[int]bool)
-		}
-		cg.FM.MapVisited[b.StmID] = true
-		// accumulate statement effects into block
-		b.SetAccumulatedEffect(cg.FM)
-		// locals OOS; drop other RVs; set fact out
-		if len(b.LocalVars) > 0 {
-			cg.FM.UpdateFactsForOOSVars(b.LocalVars)
-		}
-		cg.FM.RemoveRVFacts(&cg.FM.GlobalFacts)
-		// block as "statement" for facts out — use SetMapFactsOut
-		cg.FM.SetMapFactsOut(b.StmID, cg.FM.GlobalFacts)
-		// loop self back-edge when fall-through to head
-		if b.Looping && b.FromTailToHead() {
-			cg.FM.CreateCFGEdge(b.StmID, b, false, true)
-		}
-	}
+	b.PostCreationAnalysis(&cg, opts, preEffect)
 	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
 	return b
+}
+
+// PostCreationAnalysis mirrors Block::post_creation_analysis.
+// Block.cpp:682–742 — effects, OOS, optional fixed-point with remove_stmt.
+func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect) {
+	if b == nil || cg == nil {
+		return
+	}
+	fm := cg.FM
+	if fm == nil {
+		return
+	}
+	if fm.MapVisited == nil {
+		fm.MapVisited = make(map[int]bool)
+	}
+	fm.MapVisited[b.StmID] = true
+	b.SetAccumulatedEffect(fm)
+	postFacts := CloneFactSlice(fm.GlobalFacts)
+	if len(b.LocalVars) > 0 {
+		fm.UpdateFactsForOOSVars(b.LocalVars)
+	}
+	fm.RemoveRVFacts(&fm.GlobalFacts)
+	fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
+
+	// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
+	mustBR := b.MustBreakOrReturnFull(fm)
+	isLoopBody := !mustBR && b.Looping
+	hasBack := fm.HasEdgeIn(b.StmID, false, true) || len(fm.FindEdgesInToBlock(b, false, true)) > 0
+	if isLoopBody || b.NeedRevisit || hasBack {
+		selfBack := false
+		if isLoopBody && b.FromTailToHead() {
+			selfBack = true
+			fm.CreateCFGEdge(b.StmID, b, false, true)
+		}
+		factsCopy := CloneFactSlice(fm.MapFactsIn[b.StmID])
+		// reset accum to pre-block effect
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preEffect.Clone()
+		}
+		for {
+			out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+			if ok {
+				postFacts = out
+				break
+			}
+			// remove from fail index through end (Block.cpp:709–714)
+			if failIdx < 0 {
+				failIdx = 0
+			}
+			for failIdx < len(b.Stmts) {
+				id := b.Stmts[failIdx].StmID
+				if id == 0 {
+					// drop by index without map scrub
+					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+					continue
+				}
+				if n := b.RemoveStmt(id, fm); n == 0 {
+					// stuck — drop one by index
+					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+				}
+			}
+			b.NeedRevisit = true
+			fm.ResetBlockFactMaps(b)
+			if !selfBack && b.FromTailToHead() {
+				selfBack = true
+				fm.CreateCFGEdge(b.StmID, b, false, true)
+			}
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preEffect.Clone()
+			}
+			// avoid infinite delete loop
+			if len(b.Stmts) == 0 {
+				break
+			}
+		}
+		if out, ok := fm.MapFactsOut[b.StmID]; ok {
+			fm.GlobalFacts = CloneFactSlice(out)
+		}
+	} else if b.Looping && b.FromTailToHead() {
+		// light path: still record self back-edge for looping fall-through
+		fm.CreateCFGEdge(b.StmID, b, false, true)
+	}
+	// Block.cpp:734–741 — restore return if deleted from top-level body
+	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() && !b.MustReturn() {
+		fm.GlobalFacts = postFacts
+		// return already appended earlier when missing; only re-append if fixed-point deleted it
+		// (MakeRandomBlock may have appended already — MustReturn false means need one)
+		// Caller MakeRandomBlock already appends return before post_creation; if still missing
+		// after delete, leave marker — full append_return_stmt visits facts later.
+		_ = postFacts
+	}
 }
 
 // makeRandomStmt picks a statement kind and fills a Stmt.

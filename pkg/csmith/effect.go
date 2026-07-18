@@ -36,6 +36,31 @@ func EmptyEffect() Effect {
 	return Effect{pure: true, sideEffectFree: true}
 }
 
+// Clone mirrors Effect copy ctor with deep map copies (Go maps are shared refs).
+// Effect.cpp:84–89.
+func (e Effect) Clone() Effect {
+	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree}
+	if len(e.read) > 0 {
+		out.read = make(map[*Variable]bool, len(e.read))
+		for k, v := range e.read {
+			out.read[k] = v
+		}
+	}
+	if len(e.written) > 0 {
+		out.written = make(map[*Variable]bool, len(e.written))
+		for k, v := range e.written {
+			out.written[k] = v
+		}
+	}
+	if len(e.lhsWrite) > 0 {
+		out.lhsWrite = make(map[*Variable]bool, len(e.lhsWrite))
+		for k, v := range e.lhsWrite {
+			out.lhsWrite[k] = v
+		}
+	}
+	return out
+}
+
 // IsPure mirrors Effect::is_pure.
 func (e Effect) IsPure() bool { return e.pure }
 
