@@ -16,6 +16,10 @@ type ArrayVariable struct {
 	InitValues []string
 	// Block is the owning block for locals (nil if global).
 	Block *Block
+	// Collective is non-nil for itemized members (points at parent array).
+	Collective *ArrayVariable
+	// Indices are constant index strings for itemized access.
+	Indices []string
 }
 
 // CreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
@@ -181,5 +185,59 @@ func (av *ArrayVariable) OutputDef() string {
 		b.WriteString("}")
 	}
 	b.WriteString(";")
+	return b.String()
+}
+
+// Indices holds itemized index expressions (constant strings for now).
+// Collective is the parent array when this is an itemized member.
+func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
+	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
+	if av == nil || r == nil {
+		return nil
+	}
+	if av.Collective != nil {
+		// already itemized
+		return av
+	}
+	item := &ArrayVariable{
+		Variable: Variable{
+			Name:       av.Name,
+			Type:       av.Type,
+			Qfer:       av.Qfer,
+			IsArray:    true,
+			Init:       av.Init,
+			ArraySizes: av.Sizes,
+			ArrayInits: av.ArrayInits,
+		},
+		Sizes:      av.Sizes,
+		InitValues: av.InitValues,
+		Block:      av.Block,
+		Collective: av,
+	}
+	for _, sz := range av.Sizes {
+		idx := 0
+		if sz > 0 {
+			idx = int(r.RndUpto(uint32(sz)))
+		}
+		item.Indices = append(item.Indices, fmt.Sprintf("%d", idx))
+	}
+	return item
+}
+
+// OutputAccess emits name[i0][i1]… for itemized, or bare name for collective.
+func (av *ArrayVariable) OutputAccess() string {
+	if av == nil {
+		return ""
+	}
+	if av.Collective == nil || len(av.Indices) == 0 {
+		return av.Name
+	}
+	var b strings.Builder
+	b.WriteString(av.Name)
+	for _, ix := range av.Indices {
+		b.WriteString("[")
+		b.WriteString(ix)
+		b.WriteString("]")
+	}
 	return b.String()
 }

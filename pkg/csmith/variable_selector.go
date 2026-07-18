@@ -312,3 +312,74 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
 	return v
 }
+
+// SelectArray mirrors VariableSelector::select_array.
+// VariableSelector.cpp:1384–1436 — visible non-itemized arrays; else create_random_array.
+func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
+	if vs == nil || r == nil {
+		return nil
+	}
+	var arrayVars []*ArrayVariable
+	// From tracked Arrays list (collectives only)
+	for _, av := range vs.Arrays {
+		if av == nil || av.Collective != nil {
+			continue
+		}
+		if av.IsConst() {
+			continue
+		}
+		if !cg.EffectContext().IsSideEffectFree() && av.IsVolatile() {
+			continue
+		}
+		arrayVars = append(arrayVars, av)
+	}
+	n := len(arrayVars)
+	if n == 0 {
+		return vs.CreateRandomArray(r, cg)
+	}
+	if n == 1 {
+		return arrayVars[0]
+	}
+	return arrayVars[r.RndUpto(uint32(n))]
+}
+
+// CreateRandomArray mirrors VariableSelector::create_random_array (simplified).
+// VariableSelector.cpp:1347–1379.
+func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
+	if vs == nil || r == nil {
+		return nil
+	}
+	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoin(25)
+	var name string
+	var blk *Block
+	if asGlobal {
+		name = vs.RandomGlobalName()
+	} else {
+		name = vs.RandomLocalName()
+		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
+			idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
+			blk = cg.CurrentFunc.Stack[idx]
+		}
+	}
+	// type: nonvoid simple
+	st := ChooseRandomNonvoidSimple(r, vs.Probs)
+	elem := GetSimpleType(st)
+	qfer := NewCVQualifiers([]bool{false}, []bool{false})
+	init := MakeRandom(elem, vs.Opts, r)
+	av := CreateArrayVariable(r, vs.Opts, blk, name, elem, init, qfer)
+	if av == nil {
+		return nil
+	}
+	vs.AllVars = append(vs.AllVars, &av.Variable)
+	vs.Arrays = append(vs.Arrays, av)
+	if asGlobal {
+		vs.GlobalList = append(vs.GlobalList, &av.Variable)
+		if !av.IsVolatile() {
+			vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
+		}
+	} else if blk != nil {
+		blk.LocalVars = append(blk.LocalVars, &av.Variable)
+	}
+	vs.VarCreated = true
+	return av
+}

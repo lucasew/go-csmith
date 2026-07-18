@@ -411,9 +411,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 8c: `SafeOpFlags` binary/unary names | **Partial** |
 | Layer 9c: `StatementAssign` ops table | **Partial** |
 | Layer 4c: `SelectLType` + pointer types | **Partial** |
-| Layer 6b: `ArrayVariable::CreateArrayVariable` | **Partial** — dims/sizes/init alts; itemize deferred |
-| create_and_initialize NewArray flip | **Partial** — globals/locals |
-| ArrayVariable / itemize / select_array / goto | **Partial** / not started |
+| Layer 6b: `ArrayVariable` create + itemize | **Partial** — const indices itemize |
+| select_array / create_random_array | **Partial** |
+| StatementArrayOp | **Partial** — for-loop write to itemized element |
+| goto / full array mutate / iv_bounds itemize | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

@@ -21,6 +21,8 @@ type Stmt struct {
 	Loop *LoopControl
 	// AssignOp for StmtAssign (default simple).
 	AssignOp AssignOp
+	// ArrayAccess if set, used as LHS text (itemized array).
+	ArrayAccess string
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -167,7 +169,9 @@ func makeRandomStmt(
 		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtFor:
 		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
-	case StmtGoto, StmtArrayOp, StmtInvoke:
+	case StmtArrayOp:
+		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
+	case StmtGoto, StmtInvoke:
 		// still stubs
 	default:
 	}
@@ -223,12 +227,18 @@ func (b *Block) Output(indent int) string {
 			}
 			sb.WriteString(";\n")
 		case StmtAssign:
-			if st.LhsVar != nil {
+			lhs := ""
+			if st.ArrayAccess != "" {
+				lhs = st.ArrayAccess
+			} else if st.LhsVar != nil {
+				lhs = st.LhsVar.Name
+			}
+			if lhs != "" {
 				rhs := "0"
 				if st.Expr != nil {
 					rhs = st.Expr.Output()
 				}
-				sb.WriteString(st.AssignOp.AssignOpC(st.LhsVar.Name, rhs) + ";\n")
+				sb.WriteString(st.AssignOp.AssignOpC(lhs, rhs) + ";\n")
 			} else {
 				sb.WriteString("/* assign */;\n")
 			}
@@ -273,7 +283,21 @@ func (b *Block) Output(indent int) string {
 		case StmtGoto:
 			sb.WriteString("/* goto-stub */;\n")
 		case StmtArrayOp:
-			sb.WriteString("/* arrayop-stub */;\n")
+			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
+			if st.Loop != nil && st.Loop.IV != nil {
+				iv := st.Loop.IV.Name
+				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
+				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
+				incr := st.Loop.IncrOp.AssignOpC(iv, fmt.Sprintf("%d", st.Loop.IncrN))
+				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
+				if st.Then != nil {
+					sb.WriteString(st.Then.Output(indent + 1))
+				} else {
+					sb.WriteString(inner + "{\n" + inner + "}\n")
+				}
+			} else {
+				sb.WriteString("/* arrayop-stub */;\n")
+			}
 		case StmtInvoke:
 			sb.WriteString("/* invoke-stub */;\n")
 		default:
