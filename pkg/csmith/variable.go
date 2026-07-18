@@ -185,6 +185,8 @@ func (v *Variable) CreateFieldVars() {
 			Type:       f.Type,
 			Qfer:       NewCVQualifiers(consts, vols),
 			FieldVarOf: v,
+			// bitfields_length_[i] >= 0 → isBitfield (Type::is_bitfield)
+			IsBitfield: f.BitWidth >= 0,
 		}
 		// recursive expand nested structs
 		fv.CreateFieldVars()

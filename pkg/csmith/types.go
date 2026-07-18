@@ -187,14 +187,30 @@ func (t *Type) IsSigned() bool {
 	}
 }
 
-// SizeInBytes mirrors Type::SizeInBytes for simple types (Type.cpp).
+// platform sizes from Options / platform.info (set by Generate via SetPlatformSizes).
+var (
+	platformIntSize = 4
+	platformPtrSize = 8
+)
+
+// SetPlatformSizes mirrors host/platform.info integer and pointer sizes for SizeInBytes.
+func SetPlatformSizes(intSize, ptrSize int) {
+	if intSize > 0 {
+		platformIntSize = intSize
+	}
+	if ptrSize > 0 {
+		platformPtrSize = ptrSize
+	}
+}
+
+// SizeInBytes mirrors Type::SizeInBytes for simple/pointer types (Type.cpp).
+// Integer/pointer sizes come from platform (CGOptions / platform.info).
 func (t *Type) SizeInBytes() int {
 	if t == nil {
 		return 0
 	}
 	if t.ptrTo != nil {
-		// Platform pointer size not modeled here; LP64-ish 8 is not asserted yet.
-		return 8
+		return platformPtrSize
 	}
 	switch t.simple {
 	case EVoid:
@@ -203,12 +219,20 @@ func (t *Type) SizeInBytes() int {
 		return 1
 	case EShort, EUShort:
 		return 2
-	case EInt, EUInt, ELong, EULong, EFloat:
+	case EInt, EUInt:
+		return platformIntSize
+	case ELong, EULong:
+		// LP64: long == pointer; ILP32: long == int
+		if platformPtrSize > platformIntSize {
+			return platformPtrSize
+		}
+		return platformIntSize
+	case EFloat:
 		return 4
 	case ELongLong, EULongLong, EInt128, EUInt128:
 		return 8
 	default:
-		return 4
+		return platformIntSize
 	}
 }
 

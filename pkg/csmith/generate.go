@@ -24,6 +24,8 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 			opts = resolved
 		}
 	}
+	// Type::SizeInBytes uses platform integer/pointer sizes
+	SetPlatformSizes(opts.IntSize, opts.PointerSize)
 	g := NewProgramGenerator(opts)
 	out := g.GoGenerator()
 	if out == "" {

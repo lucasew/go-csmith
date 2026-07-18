@@ -207,6 +207,35 @@ func (op AssignOp) NeedNoRHS() bool {
 	return op == AssignPreIncr || op == AssignPreDecr || op == AssignPostIncr || op == AssignPostDecr
 }
 
+// CompoundToBinaryOps mirrors StatementAssign::compound_to_binary_ops.
+// StatementAssign.cpp:306+ — maps compound assign to eBinaryOps; MAX when none.
+func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
+	switch op {
+	case AssignAdd, AssignPreIncr, AssignPostIncr:
+		return BinAdd, true
+	case AssignSub, AssignPreDecr, AssignPostDecr:
+		return BinSub, true
+	case AssignMul:
+		return BinMul, true
+	case AssignDiv:
+		return BinDiv, true
+	case AssignRem:
+		return BinMod, true
+	case AssignBitAnd:
+		return BinBitAnd, true
+	case AssignBitXor:
+		return BinBitXor, true
+	case AssignBitOr:
+		return BinBitOr, true
+	case AssignLShift:
+		return BinLShift, true
+	case AssignRShift:
+		return BinRShift, true
+	default:
+		return BinAdd, false
+	}
+}
+
 // AssignOpC formats an assignment for a variable name and optional RHS.
 func (op AssignOp) AssignOpC(name, rhs string) string {
 	switch op {
