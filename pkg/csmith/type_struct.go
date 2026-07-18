@@ -126,13 +126,16 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	if opts.PackedStruct {
 		packed = r.RndFlipcoin(50)
 	}
+	hasAssign := IfStructWillHaveAssignOps(r, opts, probs)
 	st := &Type{
 		isStruct:     true,
 		StructName:   tag,
 		Fields:       fields,
 		Packed:       packed,
 		Used:         true,
-		HasAssignOps: IfStructWillHaveAssignOps(r, opts, probs),
+		HasAssignOps: hasAssign,
+		// Type.cpp:1094–1096 — hasAssignOps || checkImplicitNontrivialAssignOps(fields)
+		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
 	}
 	// Type.cpp:126 / Bookkeeper::record_type_with_bitfields
 	RecordTypeWithBitfields(st)
@@ -141,6 +144,20 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		env.AllTypes = append(env.AllTypes, st)
 	}
 	return st
+}
+
+// CheckImplicitNontrivialAssignOps mirrors Type.cpp checkImplicitNontrivialAssignOps.
+// Type.cpp:259–269 — true if any field has_implicit_nontrivial_assign_ops (C++ only).
+func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
+	if !opts.LangCPP {
+		return false
+	}
+	for _, f := range fields {
+		if f.Type != nil && f.Type.HasImplicitNontrivialAssignOps {
+			return true
+		}
+	}
+	return false
 }
 
 // GenerateAllTypesEnv mirrors GenerateAllTypes for random mode with structs.
@@ -274,7 +291,8 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
 	if st == nil || !st.isStruct {
-		return MakeInt(0)
+		// Constant.cpp assert(type); no soft invent MakeInt(0)
+		return nil
 	}
 	var b strings.Builder
 	b.WriteString("{")
@@ -293,19 +311,20 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 			// bitfield: GenerateRandomConstantInRange
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
 		} else if f.Type != nil && f.Type.IsStruct() {
-			val = MakeStructConstant(r, opts, probs, f.Type).Value
-		} else if f.Type != nil && f.Type.IsUnion() {
-			val = MakeUnionConstant(r, opts, probs, f.Type).Value
-		} else if f.Type != nil {
-			c := MakeRandom(f.Type, opts, r)
-			if c != nil {
+			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
-			} else {
-				val = "0"
 			}
-		} else {
-			val = "0"
+		} else if f.Type != nil && f.Type.IsUnion() {
+			if c := MakeUnionConstant(r, opts, probs, f.Type); c != nil {
+				val = c.Value
+			}
+		} else if f.Type != nil {
+			// Constant.cpp:271 — GenerateRandomConstant(fields[i]); no soft invent "0"
+			if c := MakeRandom(f.Type, opts, r); c != nil {
+				val = c.Value
+			}
 		}
+		// nil field type / failed GenerateRandomConstant — empty (no invent "0")
 		b.WriteString(val)
 	}
 	b.WriteString("}")
@@ -347,11 +366,8 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			if t.HasBitfields() {
 				continue
 			}
-			// Type.cpp:730–731 — assign-ops filter (C++)
-			if opts.LangCPP && t.HasAssignOps {
-				// has_implicit_nontrivial_assign_ops — use HasAssignOps as stand-in
-				// only reject when HasAssignOps true for nested with nontrivial ops
-				// fair: skip structs with assign ops under LangCPP like filter
+			// Type.cpp:730–731 — has_implicit_nontrivial_assign_ops() (not mere has_assign_ops)
+			if t.HasImplicitNontrivialAssignOps {
 				continue
 			}
 			if t.IsStruct() {
@@ -360,41 +376,31 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			// Type.cpp:736–737 — no union in union
 		}
 	}
-	// if AllTypes empty, seed simples
-	if len(nonStruct) == 0 {
-		for st := EChar; int(st) < MaxSimpleTypes; st++ {
-			if st == EVoid {
-				continue
-			}
-			if st == EFloat && !opts.EnableFloat {
-				continue
-			}
-			nonStruct = append(nonStruct, GetSimpleType(st))
-		}
-	}
+	// Type.cpp does not soft-seed simples when AllTypes empty (ERROR would fail)
 	var ft *Type
-	// Type.cpp:742–755 — 15% struct field
-	if len(structTypes) > 0 && r.RndFlipcoin(15) {
-		ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
-	} else if len(nonStruct) > 0 {
-		// pick until simple filter accepts (Type.cpp:747–752)
-		for tries := 0; tries < 32; tries++ {
-			cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
-			if cand.IsSimple() && probs != nil {
-				// SIMPLE_TYPES_PROB_FILTER style: weight 0 types rejected
-				// ChooseRandomNonvoidSimple already respects filter; for AllTypes
-				// re-check float and void only
-				if cand.Simple() == EVoid {
-					continue
-				}
-			}
-			ft = cand
+	// Type.cpp:742–755 — do { 15% struct else nonstruct } while (type == nullptr)
+	for tries := 0; tries < 64; tries++ {
+		if len(structTypes) > 0 && r.RndFlipcoin(15) {
+			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
 			break
 		}
+		if len(nonStruct) == 0 {
+			break
+		}
+		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
+		// Type.cpp:747–752 — SIMPLE_TYPES_PROB_FILTER reject
+		if cand.IsSimple() && probs != nil && probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
+			continue
+		}
+		if cand.IsSimple() && cand.Simple() == EVoid {
+			continue
+		}
+		ft = cand
+		break
 	}
+	// Type.cpp:755 — while (type == nullptr); no soft invent simple when pools empty
 	if ft == nil {
-		st := ChooseRandomNonvoidSimple(r, probs)
-		ft = GetSimpleType(st)
+		return StructField{Name: fmt.Sprintf("f%d", fieldIdx), BitWidth: -1}
 	}
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
@@ -417,12 +423,15 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	for i := 0; i < fieldCnt; i++ {
 		fields = append(fields, MakeOneUnionField(r, opts, probs, env, i))
 	}
+	hasAssign := IfUnionWillHaveAssignOps(r, opts, probs)
 	ut := &Type{
 		isUnion:      true,
 		StructName:   tag,
 		Fields:       fields,
 		Used:         true,
-		HasAssignOps: IfUnionWillHaveAssignOps(r, opts, probs),
+		HasAssignOps: hasAssign,
+		// Type.cpp:1146–1148 — hasAssignOps || checkImplicitNontrivialAssignOps
+		HasImplicitNontrivialAssignOps: hasAssign || CheckImplicitNontrivialAssignOps(opts, fields),
 	}
 	// Type.cpp:180 — record_type_with_bitfields for unions
 	RecordTypeWithBitfields(ut)
@@ -478,24 +487,25 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 // MakeUnionConstant mirrors GenerateRandomUnionConstant — initialize first field only.
 // Constant.cpp:288–294.
 func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
+	// Constant.cpp:289–291 — assert union with fields; no soft invent MakeInt(0)
 	if ut == nil || !ut.isUnion || len(ut.Fields) == 0 {
-		return MakeInt(0)
+		return nil
 	}
 	f0 := ut.Fields[0]
 	var val string
 	if f0.Type != nil && f0.Type.IsStruct() {
-		val = MakeStructConstant(r, opts, probs, f0.Type).Value
-	} else if f0.Type != nil && f0.Type.IsUnion() {
-		val = MakeUnionConstant(r, opts, probs, f0.Type).Value
-	} else if f0.Type != nil {
-		c := MakeRandom(f0.Type, opts, r)
-		if c != nil {
+		if c := MakeStructConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
-		} else {
-			val = "0"
 		}
-	} else {
-		val = "0"
+	} else if f0.Type != nil && f0.Type.IsUnion() {
+		if c := MakeUnionConstant(r, opts, probs, f0.Type); c != nil {
+			val = c.Value
+		}
+	} else if f0.Type != nil {
+		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
+		if c := MakeRandom(f0.Type, opts, r); c != nil {
+			val = c.Value
+		}
 	}
 	return &Constant{Type: ut, Value: "{" + val + "}"}
 }

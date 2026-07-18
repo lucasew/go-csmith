@@ -58,6 +58,9 @@ type Type struct {
 	Used bool
 	// HasAssignOps mirrors Type::has_assign_ops_ (C++ struct/union assign ops).
 	HasAssignOps bool
+	// HasImplicitNontrivialAssignOps mirrors Type::has_implicit_nontrivial_assign_ops_
+	// (true when this type or a nested field needs nontrivial assign ops).
+	HasImplicitNontrivialAssignOps bool
 }
 
 // StructField is one struct member.

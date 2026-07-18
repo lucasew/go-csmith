@@ -138,12 +138,16 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 		return "0"
 	}
 	if typ.IsStruct() {
-		c := MakeStructConstant(r, opts, NewProbabilities(opts), typ)
-		return c.Value
+		if c := MakeStructConstant(r, opts, NewProbabilities(opts), typ); c != nil {
+			return c.Value
+		}
+		return ""
 	}
 	if typ.IsUnion() {
-		c := MakeUnionConstant(r, opts, NewProbabilities(opts), typ)
-		return c.Value
+		if c := MakeUnionConstant(r, opts, NewProbabilities(opts), typ); c != nil {
+			return c.Value
+		}
+		return ""
 	}
 	if !typ.IsSimple() || typ.Simple() == EVoid {
 		return "0"
