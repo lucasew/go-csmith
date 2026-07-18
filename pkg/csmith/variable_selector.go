@@ -270,6 +270,167 @@ func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
 	return vars
 }
 
+// rootBlock walks to the outermost parent block.
+func rootBlock(b *Block) *Block {
+	for b != nil && b.Parent != nil {
+		b = b.Parent
+	}
+	return b
+}
+
+// findParentOfStmIDInTree returns the block that directly owns stmID under root.
+func findParentOfStmIDInTree(root *Block, stmID int) *Block {
+	if root == nil || stmID <= 0 {
+		return nil
+	}
+	var walk func(b *Block) *Block
+	walk = func(b *Block) *Block {
+		if b == nil {
+			return nil
+		}
+		for i := range b.Stmts {
+			st := &b.Stmts[i]
+			if st.StmID == stmID {
+				return b
+			}
+			if p := walk(st.Then); p != nil {
+				return p
+			}
+			if p := walk(st.Else); p != nil {
+				return p
+			}
+		}
+		return nil
+	}
+	return walk(root)
+}
+
+// findStmtByIDInTree finds a statement by stm_id under root (self + nested blocks).
+func findStmtByIDInTree(root *Block, stmID int) *Stmt {
+	if root == nil || stmID <= 0 {
+		return nil
+	}
+	var walk func(b *Block) *Stmt
+	walk = func(b *Block) *Stmt {
+		if b == nil {
+			return nil
+		}
+		for i := range b.Stmts {
+			st := &b.Stmts[i]
+			if st.StmID == stmID {
+				return st
+			}
+			if s := walk(st.Then); s != nil {
+				return s
+			}
+			if s := walk(st.Else); s != nil {
+				return s
+			}
+		}
+		return nil
+	}
+	return walk(root)
+}
+
+// BlockContainsStmID mirrors Block::contains_stmt for a statement id.
+// Statement.cpp:684–705 — parent chain of s includes this block.
+func BlockContainsStmID(b *Block, stmID int) bool {
+	if b == nil || stmID <= 0 {
+		return false
+	}
+	if b.StmID == stmID {
+		return true
+	}
+	root := rootBlock(b)
+	p := findParentOfStmIDInTree(root, stmID)
+	for cur := p; cur != nil; cur = cur.Parent {
+		if cur == b {
+			return true
+		}
+	}
+	return false
+}
+
+// ExpandBlockForGoto mirrors VariableSelector::expand_block_for_goto.
+// VariableSelector.cpp:765–787 — climb parents so new locals are visible at
+// both a goto dest inside b and the goto source outside b.
+func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
+	if b == nil {
+		return nil
+	}
+	fm := cg.FM
+	if fm == nil {
+		return b
+	}
+	root := rootBlock(b)
+	for {
+		expanded := false
+		for _, e := range fm.CFGEdges {
+			if e == nil || e.SrcID <= 0 {
+				continue
+			}
+			src := findStmtByIDInTree(root, e.SrcID)
+			if src == nil || src.Kind != StmtGoto {
+				continue
+			}
+			destID := e.DestStmID
+			if destID <= 0 && e.DestBlock != nil {
+				destID = e.DestBlock.StmID
+			}
+			if destID <= 0 {
+				// StatementGoto dest may be stored only on the goto stmt
+				if src.GotoDestStmID > 0 {
+					destID = src.GotoDestStmID
+				}
+			}
+			if destID <= 0 {
+				continue
+			}
+			// VariableSelector.cpp:773–779
+			if BlockContainsStmID(b, destID) && !BlockContainsStmID(b, e.SrcID) {
+				for b != nil && !BlockContainsStmID(b, e.SrcID) {
+					b = b.Parent
+				}
+				if b == nil {
+					// should not happen if src is in the function tree
+					return root
+				}
+				root = rootBlock(b)
+				expanded = true
+				break
+			}
+		}
+		if !expanded {
+			break
+		}
+	}
+	return b
+}
+
+// LowerBlockForVars mirrors VariableSelector::lower_block_for_vars.
+// VariableSelector.cpp:793–815 — return first block in blks that covers all
+// vars as locals; remaining uncovered vars returned for callers.
+func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
+	remaining = append([]*Variable(nil), vars...)
+	for _, b := range blks {
+		if b == nil {
+			continue
+		}
+		var next []*Variable
+		for _, v := range remaining {
+			if !IsVariableInSet(b.LocalVars, v) {
+				next = append(next, v)
+			}
+		}
+		remaining = next
+		if len(remaining) == 0 {
+			return b, remaining
+		}
+	}
+	// globals/params only → nil block
+	return nil, remaining
+}
+
 // FindAllNonArrayVisibleVars mirrors find_all_non_array_visible_vars.
 // VariableSelector.cpp:713–735 — non-array globals, params, non-array locals.
 func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
@@ -992,7 +1153,8 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 }
 
 // GenerateNewParentLocal mirrors VariableSelector::GenerateNewParentLocal.
-// VariableSelector.cpp:915–947 — local name, random_qualifiers no_volatile-ish, push block.local_vars.
+// VariableSelector.cpp:915–947 — volatile aggregate → global; expand_block_for_goto;
+// random_qualifiers no_volatile; create_and_initialize into enlarged block.
 func (vs *VariableSelector) GenerateNewParentLocal(
 	block *Block,
 	access Access,
@@ -1002,6 +1164,15 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	r *Rng,
 ) *Variable {
 	if vs == nil || block == nil || t == nil || r == nil {
+		return nil
+	}
+	// VariableSelector.cpp:920–923 — volatile struct/union field(s) → global
+	if t.IsAggregate() && t.IsVolatileStructUnion() {
+		return vs.GenerateNewGlobal(access, cg, t, qfer, r)
+	}
+	// VariableSelector.cpp:924–928 — enlarge for goto visibility
+	block = ExpandBlockForGoto(block, cg)
+	if block == nil {
 		return nil
 	}
 	var varQfer CVQualifiers
@@ -1070,6 +1241,8 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
 			blk = cg.CurrentFunc.Stack[idx]
+			// VariableSelector.cpp:1351 — expand_block_for_goto
+			blk = ExpandBlockForGoto(blk, cg)
 		}
 	}
 	// Type::choose_random_nonvoid / nonvoid_nonvolatile; skip const aggregates
