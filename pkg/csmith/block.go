@@ -578,6 +578,9 @@ func stmtOK(st Stmt) bool {
 		return st.Expr != nil
 	case StmtIfElse:
 		return st.Then != nil
+	case StmtContinue, StmtBreak:
+		// factories always set test expr; Expr-less marks nullptr reject (e.g. continue first-stmt)
+		return st.Expr != nil
 	default:
 		return true
 	}

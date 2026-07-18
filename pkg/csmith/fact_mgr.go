@@ -851,15 +851,27 @@ func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	}
 }
 
-// UpdateFactForReturn mirrors FactMgr::update_fact_for_return.
-// FactMgr.cpp:406–418 + Fact::abstract_fact_for_return — assign expr into func.rv.
+// UpdateFactForReturn mirrors FactMgr::update_fact_for_return without set_fact_out.
+// Prefer UpdateFactForReturnStmt when the return Statement is available.
 func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
+	return fm.UpdateFactForReturnStmt(nil, rv, expr)
+}
+
+// UpdateFactForReturnStmt mirrors FactMgr::update_fact_for_return.
+// FactMgr.cpp:406–421 — abstract_fact_for_return into global_facts; set_fact_out(sr).
+func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Expression) bool {
 	if fm == nil || rv == nil {
 		return false
 	}
-	// abstract_fact_for_return = abstract_fact_for_assign(facts, Lhs(rv), expr)
-	// FactMgr.cpp:415 — fact_changed when return updates facts
-	return fm.UpdateFactForAssign(rv, 0, expr)
+	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)
+	// FactMgr.cpp:408–416 — merge into inputs; fact_changed on merge
+	changed := fm.UpdateFactForAssign(rv, 0, expr)
+	// FactMgr.cpp:418–420 — incorporate current facts into return outs
+	if st != nil {
+		// set_fact_out for return drops function-locals (FactMgr.cpp:270–272)
+		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, nil)
+	}
+	return changed
 }
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.

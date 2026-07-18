@@ -128,3 +128,26 @@ func TestIsPointingToLocalsMultiLevel(t *testing.T) {
 		t.Fatal("2-level")
 	}
 }
+
+func TestMakeRandomContinueRejectsFirstStmt(t *testing.T) {
+	// StatementContinue.cpp:63–66 — first stmt → nullptr
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	empty := &Block{Func: f, Looping: true}
+	f.Stack = []*Block{empty}
+	cg := WithFunc(f, EmptyEffect())
+	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), cg, empty)
+	if st.Expr != nil {
+		t.Fatal("first-stmt continue must not produce expr")
+	}
+	if stmtOK(st) {
+		t.Fatal("stmtOK must reject null continue")
+	}
+	// non-empty block accepts continue
+	empty.Stmts = []Stmt{{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 1}}
+	st2 := MakeRandomContinue(NewRng(2), opts, vs, NewExprTables(opts), cg, empty)
+	if st2.Kind != StmtContinue || st2.Expr == nil {
+		t.Fatalf("%+v", st2)
+	}
+}

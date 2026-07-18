@@ -23,10 +23,11 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
-	// FactMgr::update_fact_for_return
+	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94
 	if cg.FM != nil && cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
-		cg.FM.UpdateFactForReturn(cg.CurrentFunc.RV, st.Expr)
+		cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 	}
+	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
 	if cg.FM != nil && st.StmID > 0 {
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}

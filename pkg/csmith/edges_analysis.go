@@ -182,7 +182,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			}
 		case StmtReturn:
 			if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
-				fm.UpdateFactForReturn(cg.CurrentFunc.RV, st.Expr)
+				fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 			}
 		}
 	}

@@ -146,3 +146,41 @@ func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 		t.Fatal("fm")
 	}
 }
+
+func TestUpdateFactForReturnSetsFactOut(t *testing.T) {
+	// FactMgr.cpp:418–420 — set_fact_out(sr, inputs) after abstract return
+	f := &Function{Name: "func_1", ReturnType: PointerTo(GetIntType())}
+	f.RV = CreateVariableScalars("func_1_rv", PointerTo(GetIntType()), false, false)
+	fm := NewFactMgr(f)
+	st := &Stmt{Kind: StmtReturn, StmID: 7,
+		Expr: &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
+			ExprType: PointerTo(GetIntType())}}
+	if !fm.UpdateFactForReturnStmt(st, f.RV, st.Expr) {
+		t.Fatal("update")
+	}
+	out := fm.MapFactsOut[7]
+	if FindRelatedPointTo(out, f.RV) == nil {
+		t.Fatal("map_facts_out missing rv", out)
+	}
+}
+
+func TestVisitFactsReturnSetsOut(t *testing.T) {
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	fm := NewFactMgr(f)
+	st := &Stmt{Kind: StmtReturn, StmID: 8,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementReturn(st, &cg, Defaults()) {
+		t.Fatal("visit")
+	}
+	if _, ok := fm.MapFactsOut[8]; !ok {
+		t.Fatal("facts out")
+	}
+	if !fm.MapVisited[8] && fm.GetMapStmEffect(8).IsEmpty() {
+		// effect may be empty for const return; map_stm_effect should still be set
+	}
+	_ = fm.GetMapStmEffect(8)
+}

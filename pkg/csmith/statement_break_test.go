@@ -45,11 +45,14 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	// empty block → fallback assign
+	// empty block → nullptr (Expr-less continue; stmtOK rejects)
 	blk := &Block{}
 	st := MakeRandomContinue(NewRng(3), opts, vs, tables, EmptyCGContext(), blk)
-	if st.Kind == StmtContinue {
-		t.Fatal("continue must not be first stmt")
+	if st.Kind != StmtContinue || st.Expr != nil {
+		t.Fatalf("want null continue, got %+v", st)
+	}
+	if stmtOK(st) {
+		t.Fatal("stmtOK must reject first-stmt continue")
 	}
 }
 

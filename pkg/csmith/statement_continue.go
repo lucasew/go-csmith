@@ -12,10 +12,10 @@ func MakeRandomContinue(
 	cg CGContext,
 	blk *Block,
 ) Stmt {
-	// don't generate continue as the first statement in a block
-	if blk != nil && len(blk.Stmts) == 0 {
-		// upstream returns null → Statement::make_random retries; we fall back to assign
-		return MakeRandomAssign(r, opts, NewProbabilities(opts), vs, tables, cg, nil)
+	// StatementContinue.cpp:63–66 — don't generate continue as first stmt (prev_stm==0)
+	// get_last_stm() empty → return nullptr (stmtOK rejects Expr-less continue)
+	if blk != nil && blk.GetLastStm() == nil {
+		return Stmt{Kind: StmtContinue}
 	}
 	st := Stmt{Kind: StmtContinue}
 	if r == nil {
