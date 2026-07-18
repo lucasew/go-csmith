@@ -24,9 +24,10 @@ func MakeRandomContinue(
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:72 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
+	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
-	if expr == nil {
-		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
+	if expr == nil || HasError() {
+		return Stmt{Kind: StmtContinue}
 	}
 	st.Expr = expr
 	if st.StmID == 0 {

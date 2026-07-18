@@ -19,10 +19,11 @@ func MakeRandomBreak(
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementBreak.cpp:76 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
-	// Expression::make_random(..., true, true, eVariable)
+	// StatementBreak.cpp:77–79 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
-	if expr == nil {
-		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
+	if expr == nil || HasError() {
+		// StatementBreak.cpp:79 — ERROR_GUARD(nullptr)
+		return Stmt{Kind: StmtBreak}
 	}
 	st.Expr = expr
 	if st.StmID == 0 {

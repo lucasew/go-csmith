@@ -141,12 +141,9 @@ func MakeRandomAssignQfer(
 			// StatementAssign.cpp:145–146 — return nullptr (no set_error)
 			return Stmt{Kind: StmtAssign}
 		}
+		// StatementAssign.cpp:148 — Expression::make_random; ERROR_GUARD (no const soft-fallback)
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
-		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
-		}
-		if rhs == nil {
-			// ERROR_GUARD path when Expression::make_random already set error
+		if rhs == nil || HasError() {
 			return Stmt{Kind: StmtAssign}
 		}
 		if !callerQf {
@@ -171,10 +168,7 @@ func MakeRandomAssignQfer(
 	} else {
 		// StatementAssign.cpp:168–181
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
-		if rhs == nil {
-			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
-		}
-		if rhs == nil {
+		if rhs == nil || HasError() {
 			return Stmt{Kind: StmtAssign}
 		}
 		if !callerQf {
