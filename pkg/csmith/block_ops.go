@@ -584,31 +584,11 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 }
 
 // AddNewVarFactTo mirrors FactMgr::add_new_var_fact into a fact vector.
-// FactMgr.cpp:118–131 subset for pointer init into outputs (find_fixed_point).
+// FactMgr.cpp:118–131 / Block.cpp:546–549 — abstract_fact_for_var_init only.
+// No invent NewFactPointTo garbage when init abstract fails or InitExpr is the RHS.
 func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
-	if v == nil || facts == nil {
-		return
-	}
-	if !v.IsPointer() {
-		for _, f := range v.FieldVars {
-			AddNewVarFactTo(f, facts)
-		}
-		return
-	}
-	if FindRelatedPointTo(*facts, v) != nil {
-		return
-	}
-	if v.Init != nil {
-		rhs := &Expression{Term: TermConstant, Con: v.Init}
-		newFacts := AbstractFactForAssign(nil, v, 0, rhs)
-		for _, f := range newFacts {
-			*facts = MergeFactInto(*facts, f)
-		}
-		if len(newFacts) > 0 {
-			return
-		}
-	}
-	*facts = append(*facts, NewFactPointTo(v))
+	// same path as MakeupNewVarFacts / AddNewVarFactInto
+	AddNewVarFactInto(v, facts)
 }
 
 // ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.

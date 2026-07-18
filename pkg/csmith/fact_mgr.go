@@ -1019,25 +1019,23 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 }
 
 // AddParamFacts mirrors FactMgr::add_param_facts.
-// FactMgr.cpp:108–116 — assign each param from arg expression into facts.
+// FactMgr.cpp:108–116 — update_fact_for_assign each param from arg expression.
+// No invent NewFactPointTo when arg missing: nil rhs goes through abstract
+// (FactPointTo.cpp:168–169 → garbage for pointers), same as C++ nullptr value.
 func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	if fm == nil || fm.Func == nil || facts == nil {
 		return
 	}
 	for i, p := range fm.Func.Param {
-		if p == nil || !p.IsPointer() {
+		if p == nil {
 			continue
 		}
 		var arg *Expression
 		if i < len(args) {
 			arg = args[i]
 		}
-		// update_fact_for_assign(param, arg)
-		if arg != nil {
-			fm.UpdateFactForAssignInto(p, 0, arg, facts)
-		} else {
-			*facts = MergeFactInto(*facts, NewFactPointTo(p))
-		}
+		// FactMgr.cpp:113–114 — always update_fact_for_assign (all params, not pointer-only)
+		fm.UpdateFactForAssignInto(p, 0, arg, facts)
 	}
 }
 

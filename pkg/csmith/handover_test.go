@@ -34,10 +34,13 @@ func TestCallerToCalleeHandoverKeepsGlobals(t *testing.T) {
 	}
 	// loc subject not in facts initially as subject; g points to loc so if there was a fact for loc as subject...
 	// only subjects kept: g and p (after param facts)
-	// after AddParamFacts with nil args, p gets NewFactPointTo
+	// FactMgr.cpp:108–114 — nil arg → abstract nullptr rhs → garbage for pointer param
+	// (no invent NewFactPointTo outside abstract path)
 	if FindRelatedPointTo(facts, p) == nil {
-		// param might be added as garbage
-		t.Log("param fact", facts)
+		t.Fatal("nil-arg param must get abstract garbage fact", facts)
+	}
+	if !FindRelatedPointTo(facts, p).IsDead() {
+		t.Fatal("nil arg → garbage, not invent other pointee")
 	}
 }
 
@@ -88,21 +91,30 @@ func TestOutputTab(t *testing.T) {
 }
 
 func TestAddParamFacts(t *testing.T) {
+	// FactMgr.cpp:108–114 — update_fact_for_assign; null const → null fact
+	// (not invent NewFactPointTo garbage when abstract succeeds)
 	callee := &Function{Name: "c"}
 	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p}
 	fm := NewFactMgr(callee)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	arg := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
-	// &g_t would be better; assign arg as pointing
-	// AbstractFactForAssign with variable RHS of pointer type copies
 	facts := []*FactPointTo{}
-	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	_ = gp
-	// use null const
-	arg = &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())}
 	fm.AddParamFacts([]*Expression{arg}, &facts)
-	if FindRelatedPointTo(facts, p) == nil {
+	got := FindRelatedPointTo(facts, p)
+	if got == nil {
 		t.Fatal("param fact", facts)
+	}
+	if got.IsDead() {
+		t.Fatal("null arg must not invent garbage")
+	}
+	if !got.IsNull() {
+		t.Fatalf("want null, got %+v", got.PointTo)
+	}
+	// missing arg → nullptr rhs → garbage via abstract
+	facts2 := []*FactPointTo{}
+	fm.AddParamFacts(nil, &facts2)
+	got2 := FindRelatedPointTo(facts2, p)
+	if got2 == nil || !got2.IsDead() {
+		t.Fatal("nil args → garbage via abstract", facts2)
 	}
 }

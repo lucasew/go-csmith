@@ -221,19 +221,43 @@ func TestMakeDummyBlockCG(t *testing.T) {
 }
 
 func TestAddNewVarFactTo(t *testing.T) {
-	p := CreateVariableScalars("p", GetIntType(), false, false)
-	// make pointer type
-	p.Type = PointerTo(GetIntType())
+	// Block.cpp:546–549 / FactMgr.cpp:118–131 — abstract_fact_for_var_init;
+	// no invent NewFactPointTo garbage for null-init pointer.
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
+	if p == nil || p.Init == nil {
+		t.Fatal("pointer init")
+	}
 	var facts []*FactPointTo
 	AddNewVarFactTo(p, &facts)
-	if len(facts) != 1 || facts[0].Var != p {
+	got := FindRelatedPointTo(facts, p)
+	if got == nil {
 		t.Fatal(facts)
+	}
+	if got.IsDead() {
+		t.Fatal("must not invent garbage for null-init pointer")
+	}
+	if !got.IsNull() {
+		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
 	AddNewVarFactTo(p, &facts)
 	if len(facts) != 1 {
 		t.Fatal(len(facts))
 	}
+	// no Init/InitExpr → C++ v->init nullptr → garbage via abstract; empty abstract
+	// when meta off fails closed without invent
+	ClearMetaFacts()
+	metaFactPointToEnabled = false
+	var empty []*FactPointTo
+	AddNewVarFactTo(p, &empty)
+	if len(empty) != 0 {
+		t.Fatal("meta off must not invent", empty)
+	}
+	ClearMetaFacts()
 }
 
 func TestFindFixedPointShortcut(t *testing.T) {
