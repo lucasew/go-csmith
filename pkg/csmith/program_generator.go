@@ -60,11 +60,13 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	}
 	// Function::make_first
 	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs)
-	// Build any still-unbuilt functions (created later by invokes — none yet).
+	// Create body of each function until no new unbuilt remain (Function.cpp:801–807).
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
 		if f != nil && !f.IsBuilt {
-			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, EmptyCGContext())
+			cg := EmptyCGContext().WithFuncList(&g.Funcs)
+			cg.CurrentFunc = f
+			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		}
 	}
 }

@@ -25,6 +25,8 @@ type Expression struct {
 	Con *Constant
 	// Var is set for TermVariable (the selected variable).
 	Var *Variable
+	// Invoke is set for TermFunction.
+	Invoke *Invocation
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
@@ -94,9 +96,8 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	return ExpressionTypeProbability(r, f)
 }
 
-// MakeRandomExpression mirrors Expression::make_random for Constant and Variable only.
-// Function/Assign/Comma return nil term with false ok until those ports land.
-// Expression.cpp:141–204.
+// MakeRandomExpression mirrors Expression::make_random (const/var/funcall).
+// Assign/Comma still deferred. Expression.cpp:141–204.
 func MakeRandomExpression(
 	r *Rng,
 	opts Options,
@@ -108,13 +109,34 @@ func MakeRandomExpression(
 	noFunc, noConst bool,
 	tt TermType,
 	exprDepth int,
+	list ...*FunctionList,
 ) *Expression {
+	var flist *FunctionList
+	if len(list) > 0 {
+		flist = list[0]
+	}
+	if flist == nil {
+		flist = cg.Funcs
+	}
+
 	if typ == nil {
 		// choose_random_nonvoid deferred — require type for now
 		typ = GetSimpleType(EInt)
 	}
 	if tt == MaxTermTypes {
 		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, exprDepth)
+	}
+	// Hard depth cap: never nest Function/Assign/Comma when near max_expr_depth
+	// (mirrors Expression.cpp:177–178 filter; prevents unbounded recursion).
+	if exprDepth+2 > opts.MaxExprComplexity {
+		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
+			if noConst {
+				tt = TermVariable
+			} else {
+				// prefer constant leaf
+				tt = TermConstant
+			}
+		}
 	}
 	switch tt {
 	case TermConstant:
@@ -123,11 +145,15 @@ func MakeRandomExpression(
 	case TermVariable:
 		// ExpressionVariable::make_random simplified — SelectGlobal flexible
 		return makeExpressionVariable(r, vs, cg, typ, qfer)
+	case TermFunction:
+		// ExpressionFuncall::make_random
+		return makeExpressionFuncall(r, opts, vs, tables, cg, typ, qfer, flist)
 	default:
-		// Not yet: Function, Assignment, Comma
+		// Assignment, Comma deferred
 		return nil
 	}
 }
+
 
 // makeExpressionVariable — ExpressionVariable.cpp:56+ simplified:
 // VariableSelector::select → SelectGlobal with MatchFlexible (globals only).
@@ -135,8 +161,26 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 	if vs == nil {
 		return nil
 	}
-	// Prefer choose among existing globals with flexible match; else create.
 	var ok []*Variable
+	// Locals on current function stack (prefer before globals when present).
+	if cg.CurrentFunc != nil {
+		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
+			blk := cg.CurrentFunc.Stack[i]
+			if blk == nil {
+				continue
+			}
+			for _, v := range blk.LocalVars {
+				if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
+					ok = append(ok, v)
+				}
+			}
+		}
+		for _, v := range cg.CurrentFunc.Param {
+			if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
+				ok = append(ok, v)
+			}
+		}
+	}
 	for _, v := range vs.GlobalList {
 		if v != nil && v.Type != nil && typ != nil && typ.Match(v.Type, MatchFlexible) {
 			ok = append(ok, v)
@@ -145,6 +189,10 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 	var v *Variable
 	if len(ok) > 0 {
 		v = ChooseOKVar(r, ok)
+	} else if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
+		// GenerateNewParentLocal on current block
+		blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
+		v = vs.GenerateNewParentLocal(blk, AccessRead, cg, typ, qfer, r)
 	} else {
 		v = vs.GenerateNewGlobal(AccessRead, cg, typ, qfer, r)
 	}
@@ -168,6 +216,36 @@ func (e *Expression) Output() string {
 		if e.Var != nil {
 			return e.Var.Name
 		}
+	case TermFunction:
+		if e.Invoke != nil {
+			return e.Invoke.Output()
+		}
 	}
 	return "/*expr*/"
+}
+
+// makeExpressionFuncall mirrors ExpressionFuncall::make_random.
+// ExpressionFuncall.cpp:66–102.
+func makeExpressionFuncall(
+	r *Rng,
+	opts Options,
+	vs *VariableSelector,
+	tables *ExprTables,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	list *FunctionList,
+) *Expression {
+	if r == nil {
+		return nil
+	}
+	probs := NewProbabilities(opts)
+	stdFunc := ExpressionFunctionProbability(r, list, opts)
+	// non-simple/void forces !std
+	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
+	if fi == nil || fi.Failed {
+		// replace with variable
+		return makeExpressionVariable(r, vs, cg, typ, qfer)
+	}
+	return &Expression{Term: TermFunction, Invoke: fi}
 }

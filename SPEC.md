@@ -405,9 +405,11 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 10: `Function` signature + `make_first` | **Partial** |
 | Layer 10b: `Block::make_random` | **Partial** |
 | Layer 12: `DefaultProgramGenerator` + `Generate` | **Partial** |
-| Layer 9b: `StatementIf` / `StatementFor` | **Partial** — real then/else and for control+body; no FactMgr/SafeOpFlags |
-| SelectLoopCtrlVar | **Partial** — globals/params/stack ints |
-| ArrayVariable / multi-func / SafeOp | **Not started** |
+| Layer 9b: `StatementIf` / `StatementFor` | **Partial** |
+| SelectLoopCtrlVar / ParentLocal | **Partial** |
+| Layer 8b: `ExpressionFuncall` + std binary/unary | **Partial** — user create/choose + simple ops; no SafeOp wrappers |
+| Multi-func GenerateFunctions loop | **Partial** — builds unbuilt signatures after make_first |
+| ArrayVariable / SafeOp / Assign compound | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

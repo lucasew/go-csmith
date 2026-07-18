@@ -14,6 +14,8 @@ type CGContext struct {
 	Flags uint
 	// ExprDepth mirrors expr_depth.
 	ExprDepth int
+	// Funcs is the session FuncList for choose_func / create.
+	Funcs *FunctionList
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -35,6 +37,13 @@ func WithEffectContext(eff Effect) CGContext {
 func WithFunc(f *Function, eff Effect) CGContext {
 	return CGContext{effectContext: eff, CurrentFunc: f}
 }
+
+// WithFuncList attaches the session function list.
+func (c CGContext) WithFuncList(list *FunctionList) CGContext {
+	c.Funcs = list
+	return c
+}
+
 
 // InLoop is true when flags include IN_LOOP (2).
 func (c CGContext) InLoop() bool { return c.Flags&2 != 0 }

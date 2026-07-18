@@ -73,8 +73,12 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	if len(f.Param) != 0 {
 		t.Fatalf("make_first default extension null → no params, got %d", len(f.Param))
 	}
-	if len(list.Funcs) != 1 {
-		t.Fatal("func list")
+	if len(list.Funcs) < 1 {
+		t.Fatal("func list empty")
+	}
+	// Body may create additional function signatures (ExpressionFuncall).
+	if list.Funcs[0] != f {
+		t.Fatal("first func not registered first")
 	}
 	out := f.Output()
 	if !strings.Contains(out, f.Name) || !strings.Contains(out, "{") {

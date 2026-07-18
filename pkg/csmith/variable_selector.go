@@ -236,3 +236,43 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	}
 	return nil
 }
+
+// GenerateNewParentLocal mirrors VariableSelector::GenerateNewParentLocal.
+// VariableSelector.cpp:915–947 — local name, random_qualifiers no_volatile-ish, push block.local_vars.
+func (vs *VariableSelector) GenerateNewParentLocal(
+	block *Block,
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+) *Variable {
+	if vs == nil || block == nil || t == nil || r == nil {
+		return nil
+	}
+	var varQfer CVQualifiers
+	if qfer == nil || qfer.Wildcard {
+		// random_qualifiers(t, access, cg, true) — no_volatile true for locals path in some call sites;
+		// GenerateNewParentLocal uses random_qualifiers(t, access, cg, true) — third bool is no_volatile.
+		varQfer = RandomQualifiersDefaultProbs(t, access, cg, true, vs.Opts, vs.Probs, r)
+	} else {
+		varQfer = *qfer
+	}
+	// restrict(access, cg): WRITE clears const; non-SE-free clears vol
+	if access == AccessWrite && len(varQfer.IsConsts) > 0 {
+		varQfer.IsConsts[len(varQfer.IsConsts)-1] = false
+	}
+	if !cg.EffectContext().IsSideEffectFree() && len(varQfer.IsVolatiles) > 0 {
+		varQfer.IsVolatiles[len(varQfer.IsVolatiles)-1] = false
+	}
+	name := vs.RandomLocalName()
+	v := CreateVariableQfer(name, t, varQfer)
+	if v == nil {
+		return nil
+	}
+	v.Init = MakeRandom(t, vs.Opts, r)
+	block.LocalVars = append(block.LocalVars, v)
+	vs.AllVars = append(vs.AllVars, v)
+	vs.VarCreated = true
+	return v
+}

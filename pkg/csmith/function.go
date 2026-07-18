@@ -127,14 +127,19 @@ func MakeFirst(
 	// ExtensionMgr null → no params
 	// GenerateBody
 	cg := WithFunc(f, EmptyEffect())
+	if list != nil {
+		cg = cg.WithFuncList(list)
+	}
+	// register f before body so recursive choose_func can see it
+	if list != nil {
+		list.Funcs = append(list.Funcs, f)
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	if list != nil {
-		list.Funcs = append(list.Funcs, f)
-	}
+	// f already registered on list before body generation
 	return f
 }
 
@@ -153,6 +158,9 @@ func (f *Function) GenerateBody(
 	}
 	cg := prev
 	cg.CurrentFunc = f
+	if prev.Funcs != nil {
+		cg.Funcs = prev.Funcs
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
 }
