@@ -255,6 +255,93 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	return append(facts, f)
 }
 
+// MarkDeadVar mirrors FactPointTo::mark_dead_var.
+// FactPointTo.cpp:106–123 — replace/remove pointee v with garbage_ptr.
+func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
+	if f == nil || v == nil {
+		return nil
+	}
+	set := append([]*Variable(nil), f.PointTo...)
+	pos := -1
+	for i, p := range set {
+		if p == v || (p != nil && v.HasFieldVar(p)) || (p != nil && p.FieldVarOf != nil && isAncestorField(p, v)) {
+			pos = i
+			break
+		}
+	}
+	if pos < 0 {
+		return nil
+	}
+	hasGarbage := false
+	for _, p := range set {
+		if p == GarbagePtr {
+			hasGarbage = true
+			break
+		}
+	}
+	if hasGarbage {
+		set = append(set[:pos], set[pos+1:]...)
+	} else {
+		set[pos] = GarbagePtr
+	}
+	return MakeFactPointToSet(f.Var, set)
+}
+
+// isAncestorField reports whether field is under root via FieldVarOf chain.
+func isAncestorField(field, root *Variable) bool {
+	for field != nil {
+		if field == root {
+			return true
+		}
+		field = field.FieldVarOf
+	}
+	return false
+}
+
+// MarkFuncEndLocals marks any pointee in locals as dead (mark_func_end subset).
+// FactPointTo.cpp:130–152 without Statement — locals list is the out-of-scope set.
+func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
+	if f == nil || len(locals) == 0 {
+		return nil
+	}
+	localSet := make(map[*Variable]bool, len(locals))
+	for _, l := range locals {
+		if l != nil {
+			localSet[l] = true
+			for _, fv := range l.CollectExpandable() {
+				localSet[fv] = true
+			}
+		}
+	}
+	set := append([]*Variable(nil), f.PointTo...)
+	hasGarbage := false
+	for _, p := range set {
+		if p == GarbagePtr {
+			hasGarbage = true
+			break
+		}
+	}
+	changed := false
+	for i := 0; i < len(set); i++ {
+		p := set[i]
+		if p == nil || IsSpecialPtr(p) || !localSet[p] {
+			continue
+		}
+		if hasGarbage {
+			set = append(set[:i], set[i+1:]...)
+			i--
+		} else {
+			set[i] = GarbagePtr
+			hasGarbage = true
+		}
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return MakeFactPointToSet(f.Var, set)
+}
+
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals (indirection≥0 subset).
 // FactPointTo.cpp:487–526 — indirection -1 → IsVisibleLocal; 0 → fact pointees local.
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {

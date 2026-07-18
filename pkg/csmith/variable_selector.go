@@ -45,21 +45,30 @@ func (vs *VariableSelector) RandomParamName() string {
 }
 
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
-// len==0 → nil; len==1 → sole; len>1 → rnd_upto(len).
-// Array itemize deferred (no ArrayVariable yet).
-// VariableSelector.cpp:318–337.
+// VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	n := len(vars)
 	if n == 0 {
 		return nil
 	}
+	var v *Variable
 	if n == 1 {
-		return vars[0]
+		v = vars[0]
+	} else {
+		// DepthSpec::depth_guard_by_depth(1) for multi-choice — random mode always GOOD
+		_ = DepthGuardByDepth(Options{}, 1)
+		if r == nil {
+			return vars[0]
+		}
+		v = vars[r.RndUpto(uint32(n))]
 	}
-	// DepthSpec::depth_guard_by_depth(1) for multi-choice — random mode always GOOD
-	_ = DepthGuardByDepth(Options{}, 1)
-	idx := r.RndUpto(uint32(n))
-	return vars[idx]
+	// if collective array, return itemized member (VariableSelector.cpp:332–337)
+	if v != nil && v.IsArray && v.AsArray != nil && v.AsArray.Collective == nil && r != nil {
+		if item := v.AsArray.Itemize(r); item != nil {
+			return &item.Variable
+		}
+	}
+	return v
 }
 
 // ChooseOKVarExactType filters vars whose Type matches want with eExact.

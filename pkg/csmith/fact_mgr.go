@@ -86,3 +86,42 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	}
 	return true
 }
+
+// UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
+// FactMgr.cpp:141–172 — drop facts for oos vars; mark pointees garbage.
+func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
+	if fm == nil || len(vars) == 0 {
+		return
+	}
+	// remove facts whose subject matches an oos var
+	out := fm.GlobalFacts[:0]
+	for _, f := range fm.GlobalFacts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		drop := false
+		for _, v := range vars {
+			if v != nil && v.Match(f.Var) {
+				drop = true
+				break
+			}
+		}
+		if !drop {
+			out = append(out, f)
+		}
+	}
+	fm.GlobalFacts = out
+	// mark remaining facts that point into oos vars as dead
+	for i, f := range fm.GlobalFacts {
+		if f == nil {
+			continue
+		}
+		cur := f
+		for _, v := range vars {
+			if nf := cur.MarkDeadVar(v); nf != nil {
+				cur = nf
+			}
+		}
+		fm.GlobalFacts[i] = cur
+	}
+}

@@ -32,6 +32,8 @@ type Variable struct {
 	IsAddrTaken bool
 	// UseVolRVal mirrors wrap_volatiles path for VOL_RVAL emit.
 	UseVolRVal bool
+	// AsArray points to the ArrayVariable wrapper when this is an array collective.
+	AsArray *ArrayVariable
 }
 
 // OutputC mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name.
@@ -271,8 +273,41 @@ func (v *Variable) GetCollective() *Variable {
 	if v == nil {
 		return nil
 	}
-	// ArrayVariable itemized: Collective non-nil on wrapper — walk FieldVarOf only
+	if v.AsArray != nil && v.AsArray.Collective != nil {
+		return &v.AsArray.Collective.Variable
+	}
 	return v
+}
+
+// Match mirrors Variable::match — identity, or aggregate has field.
+// Variable.cpp:254–258.
+func (v *Variable) Match(other *Variable) bool {
+	if v == nil || other == nil {
+		return false
+	}
+	if v == other {
+		return true
+	}
+	if v.Type != nil && v.Type.IsAggregate() {
+		return v.HasFieldVar(other)
+	}
+	return false
+}
+
+// HasFieldVar mirrors Variable::has_field_var — other is this or nested field.
+func (v *Variable) HasFieldVar(other *Variable) bool {
+	if v == nil || other == nil {
+		return false
+	}
+	if v == other {
+		return true
+	}
+	for _, f := range v.FieldVars {
+		if f.HasFieldVar(other) {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateFieldVars mirrors Variable::create_field_vars for structs.

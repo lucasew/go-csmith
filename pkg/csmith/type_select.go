@@ -110,8 +110,10 @@ func RandomTypeFromType(
 ) *Type {
 	if typ == nil {
 		if env != nil && len(env.AllTypes) > 0 {
-			// nonvolatile path deferred to same nonvoid choose for now
-			_ = noVolatile
+			// Type.cpp:594–595 — no_volatile → nonvoid_nonvolatile
+			if noVolatile {
+				return env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
+			}
 			return env.ChooseRandomNonvoid(r, opts, probs)
 		}
 		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))

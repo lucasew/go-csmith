@@ -151,6 +151,10 @@ func MakeRandomBlock(
 	if parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
 		b.Stmts = append(b.Stmts, MakeRandomReturn(r, opts, vs, cg))
 	}
+	// FactMgr::update_facts_for_oos_vars when leaving block (locals go out of scope)
+	if cg.FM != nil && len(b.LocalVars) > 0 {
+		cg.FM.UpdateFactsForOOSVars(b.LocalVars)
+	}
 	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]

@@ -88,6 +88,8 @@ func CreateArrayVariable(
 		Sizes: sizes,
 		Block: blk,
 	}
+	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
+	av.AsArray = av
 	// init_num = pure_rnd_upto(total_size/2); alt constants
 	// ArrayVariable.cpp:166
 	half := total / 2
@@ -299,6 +301,7 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 		Block:      av.Block,
 		Collective: av,
 	}
+	item.AsArray = item
 	for _, sz := range av.Sizes {
 		idx := 0
 		if sz > 0 {
