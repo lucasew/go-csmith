@@ -86,23 +86,43 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 }
 
 // VisitIndices mirrors Lhs::visit_indices.
-// Lhs.cpp:264–284 — visit array index expressions under RHS effect context.
-// Indices stored as strings (no Expression tree) → constant indices always OK.
+// Lhs.cpp:264–284 — visit array IndexExprs under RHS effect context
+// (effect_context + effect_stm, null accum).
 func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	if l == nil || l.Var == nil {
 		return true
 	}
 	av := l.Var.AsArray
-	if av == nil && l.Var.IsArray {
-		// bare array variable without itemized indices
+	if av == nil || len(av.IndexExprs) == 0 {
+		// string-only indices or collective array → no Expression walk
 		return true
 	}
-	if av == nil || len(av.Indices) == 0 {
+	if cg == nil {
 		return true
 	}
-	// string indices have no sub-expressions to analyze
-	_ = cg
-	_ = opts
+	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
+	eff := cg.EffectContext().AddEffect(cg.EffectStm)
+	rhsCG := CGContext{
+		effectContext: eff,
+		CurrentFunc:   cg.CurrentFunc,
+		BlkDepth:      cg.BlkDepth,
+		Flags:         cg.Flags,
+		ExprDepth:     cg.ExprDepth,
+		Funcs:         cg.Funcs,
+		Types:         cg.Types,
+		FM:            cg.FM,
+		RW:            cg.RW,
+		IVBounds:      cg.IVBounds,
+		CallChain:     cg.CallChain,
+	}
+	for _, e := range av.IndexExprs {
+		if e == nil {
+			continue
+		}
+		if !VisitFactsExpression(e, &rhsCG, opts) {
+			return false
+		}
+	}
 	return true
 }
 

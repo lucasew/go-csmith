@@ -588,9 +588,18 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 			continue
 		}
 		var modified []int
-		for k, exp := range av.Indices {
-			if indexExprUsesVar(exp, indexVar) {
-				modified = append(modified, k)
+		// prefer IndexExprs UseVar (FactPointTo.cpp:726–730); fall back to string
+		if len(av.IndexExprs) > 0 {
+			for k, exp := range av.IndexExprs {
+				if exp != nil && exp.UseVar(indexVar) {
+					modified = append(modified, k)
+				}
+			}
+		} else {
+			for k, exp := range av.Indices {
+				if indexExprUsesVar(exp, indexVar) {
+					modified = append(modified, k)
+				}
 			}
 		}
 		if len(modified) == 0 {
@@ -604,6 +613,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 			Block:      av.Block,
 			Collective: av.Collective,
 			Indices:    append([]string(nil), av.Indices...),
+			IndexExprs: append([]*Expression(nil), av.IndexExprs...),
 		}
 		newAV.IsArray = true
 		newAV.AsArray = newAV

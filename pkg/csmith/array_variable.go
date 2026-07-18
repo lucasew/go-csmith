@@ -18,8 +18,11 @@ type ArrayVariable struct {
 	Block *Block
 	// Collective is non-nil for itemized members (points at parent array).
 	Collective *ArrayVariable
-	// Indices are constant index strings for itemized access.
+	// Indices are constant index strings for itemized access (emit / name form).
 	Indices []string
+	// IndexExprs mirrors ArrayVariable::indices (Expression* per dimension).
+	// Used by CGContext::read_indices / Lhs::visit_indices / modified-index DFA.
+	IndexExprs []*Expression
 }
 
 // CreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
@@ -200,7 +203,7 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	return true
 }
 
-// SetIndex mirrors ArrayVariable::set_index.
+// SetIndex mirrors ArrayVariable::set_index (string form for emit).
 // ArrayVariable.cpp:229+ — set index expression string at position.
 func (av *ArrayVariable) SetIndex(index int, expr string) {
 	if av == nil || index < 0 {
@@ -210,6 +213,38 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 		av.Indices = append(av.Indices, "0")
 	}
 	av.Indices[index] = expr
+	// keep IndexExprs in sync: constant string → TermConstant; "-1" any-member
+	for len(av.IndexExprs) <= index {
+		av.IndexExprs = append(av.IndexExprs, &Expression{
+			Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType(),
+		})
+	}
+	av.IndexExprs[index] = &Expression{
+		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+	}
+}
+
+// SetIndexExpr mirrors ArrayVariable::set_index(size_t, const Expression*).
+// ArrayVariable.cpp:229 — stores Expression* and updates emit string.
+func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
+	if av == nil || index < 0 {
+		return
+	}
+	for len(av.IndexExprs) <= index {
+		av.IndexExprs = append(av.IndexExprs, nil)
+	}
+	av.IndexExprs[index] = e
+	s := "0"
+	if e != nil {
+		s = e.Output()
+		if s == "" {
+			s = "0"
+		}
+	}
+	for len(av.Indices) <= index {
+		av.Indices = append(av.Indices, "0")
+	}
+	av.Indices[index] = s
 }
 
 // AddIndex mirrors ArrayVariable::add_index.
@@ -218,6 +253,25 @@ func (av *ArrayVariable) AddIndex(expr string) {
 		return
 	}
 	av.Indices = append(av.Indices, expr)
+	av.IndexExprs = append(av.IndexExprs, &Expression{
+		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+	})
+}
+
+// AddIndexExpr appends an index Expression (ArrayVariable::add_index).
+func (av *ArrayVariable) AddIndexExpr(e *Expression) {
+	if av == nil {
+		return
+	}
+	av.IndexExprs = append(av.IndexExprs, e)
+	s := "0"
+	if e != nil {
+		s = e.Output()
+		if s == "" {
+			s = "0"
+		}
+	}
+	av.Indices = append(av.Indices, s)
 }
 
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
@@ -401,7 +455,11 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 		if sz > 0 {
 			idx = int(r.RndUpto(uint32(sz)))
 		}
-		item.Indices = append(item.Indices, fmt.Sprintf("%d", idx))
+		s := fmt.Sprintf("%d", idx)
+		item.Indices = append(item.Indices, s)
+		item.IndexExprs = append(item.IndexExprs, &Expression{
+			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
+		})
 	}
 	return item
 }

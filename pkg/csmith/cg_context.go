@@ -415,14 +415,45 @@ func IsVariableInSet(set []*Variable, v *Variable) bool {
 }
 
 // ReadIndices mirrors CGContext::read_indices for array subscript expressions.
-// CGContext.cpp:352–380 — no Indices on our ArrayVariable → always true for now.
+// CGContext.cpp:352–380 — visit IndexExprs on itemized arrays; walk field_var_of;
+// array fields walk to parent array.
 func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
-	_ = c
-	_ = facts
-	if v == nil {
+	if c == nil || v == nil {
 		return true
 	}
-	// ArrayVariable indices as Expressions not yet stored; skip walk.
+	if v.IsArray || v.AsArray != nil {
+		av := v.AsArray
+		if av == nil {
+			return true
+		}
+		opts := Defaults()
+		// CGContext.cpp:356–363 — visit each index expression with facts copy
+		for _, e := range av.IndexExprs {
+			if e == nil {
+				continue
+			}
+			// work on a context copy so index visits don't clobber caller stm incorrectly
+			// (upstream mutates facts_copy; VisitFactsExpression uses GlobalFacts on FM)
+			if !VisitFactsExpression(e, c, opts) {
+				return false
+			}
+		}
+		if av.FieldVarOf != nil {
+			return c.ReadIndices(av.FieldVarOf, facts)
+		}
+		return true
+	}
+	if v.IsArrayField() {
+		// CGContext.cpp:368–374 — walk to parent array
+		p := v
+		for p != nil && !p.IsArray && p.AsArray == nil {
+			p = p.FieldVarOf
+		}
+		if p == nil {
+			return true
+		}
+		return c.ReadIndices(p, facts)
+	}
 	return true
 }
 

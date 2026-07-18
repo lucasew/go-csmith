@@ -162,6 +162,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		}
 	}
 	indices := make([]string, 0, dims)
+	indexExprs := make([]*Expression, 0, dims)
 	for d := 0; d < dims; d++ {
 		dimenLen := av.Sizes[d]
 		var ok []*Variable
@@ -176,16 +177,21 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		if v == nil {
 			return nil
 		}
+		// Index as ExpressionVariable (ArrayVariable.cpp set_index with Expression*)
+		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		idx := v.Name
-		// offset within remaining range
+		// offset within remaining range — string form for emit; expr stays bare IV
+		// (offset as binary not required for read_indices UseVar of IV)
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
 			off := int(r.RndUpto(uint32(remain)))
 			if off > 0 {
 				idx = fmt.Sprintf("(%s + %d)", v.Name, off)
+				// keep Variable term so UseVar(i) still holds for DFA
 			}
 		}
 		indices = append(indices, idx)
+		indexExprs = append(indexExprs, idxExpr)
 	}
 	item := &ArrayVariable{
 		Variable: Variable{
@@ -202,6 +208,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		Block:      cg.CurrentBlock(),
 		Collective: av,
 		Indices:    indices,
+		IndexExprs: indexExprs,
 	}
 	item.AsArray = item
 	if vs != nil {
@@ -308,11 +315,26 @@ func GetAllLocalVars(b *Block) []*Variable {
 }
 
 // IsEligibleVar mirrors VariableSelector::is_eligible_var (core effect rules).
-// VariableSelector.cpp:216–290 — collective/FactUnion deferred.
+// VariableSelector.cpp:216–290 — itemized collective: read_indices first;
+// then effect/const/volatile/FactUnion nonreadable checks on collective.
 func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) bool {
 	if v == nil {
 		return false
 	}
+	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
+	coll := v.GetCollective()
+	if coll != v {
+		cgp := cg
+		var facts []*FactPointTo
+		if cg.FM != nil {
+			facts = cg.FM.GlobalFacts
+		}
+		if !cgp.ReadIndices(v, facts) {
+			return false
+		}
+		v = coll
+	}
+
 	// VariableSelector.cpp:232–234 — partial volatile through pointer
 	if derefLevel > 0 && v.IsPartialVolatileAfterDeref(derefLevel) {
 		return false

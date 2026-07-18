@@ -127,3 +127,102 @@ func TestAccessDerefVolatile(t *testing.T) {
 		t.Fatal("non-strict")
 	}
 }
+
+func TestReadIndicesConstantOK(t *testing.T) {
+	// CGContext.cpp:352–380 — constant index expressions always visit OK
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:      []int{4},
+		Collective: parent,
+		Indices:    []string{"1"},
+		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	cg := EmptyCGContext()
+	if !cg.ReadIndices(&item.Variable, nil) {
+		t.Fatal("const index")
+	}
+}
+
+func TestReadIndicesVarRecordsRead(t *testing.T) {
+	// Variable index: visit_facts records read of IV
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:      []int{4},
+		Collective: parent,
+		Indices:    []string{"g_i"},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	eff := EmptyEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &eff
+	if !cg.ReadIndices(&item.Variable, nil) {
+		t.Fatal("var index")
+	}
+	if !eff.IsRead(iv) {
+		t.Fatal("IV should be read via index")
+	}
+}
+
+func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:      []int{2},
+		Collective: parent,
+		Indices:    []string{"0"},
+		IndexExprs: []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	field := &Variable{Name: "g_a[0].f0", Type: GetIntType(), FieldVarOf: &item.Variable}
+	cg := EmptyCGContext()
+	if !cg.ReadIndices(field, nil) {
+		t.Fatal("array field")
+	}
+}
+
+func TestVisitIndicesEffectContext(t *testing.T) {
+	// Lhs.cpp:273–284 — IV ok under empty RHS context
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
+		Sizes:    []int{3},
+	}
+	parent.AsArray = parent
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
+		Sizes:      []int{3},
+		Collective: parent,
+		Indices:    []string{"g_i"},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	lhs := &Lhs{Var: &item.Variable, Type: GetIntType()}
+	cg := EmptyCGContext()
+	if !lhs.VisitIndices(&cg, Defaults()) {
+		t.Fatal("visit indices")
+	}
+	// IV written in ambient context → VisitFacts on index should fail CheckReadVar
+	cg2 := WithEffectContext(EmptyEffect().WriteVar(iv))
+	if lhs.VisitIndices(&cg2, Defaults()) {
+		// may still pass if VisitFactsExpressionVariable is lenient — require failure when written partially
+		// CheckReadVar rejects IsWrittenPartially
+		t.Fatal("want reject when IV written in context")
+	}
+}

@@ -89,6 +89,38 @@ func TestChooseVarSkipsIneligible(t *testing.T) {
 	}
 }
 
+func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
+	// VariableSelector.cpp:221–227 — itemized uses collective after read_indices
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:      []int{4},
+		Collective: parent,
+		Indices:    []string{"g_i"},
+		IndexExprs: []*Expression{{Term: TermVariable, Var: iv, ExprType: GetIntType()}},
+	}
+	item.AsArray = item
+	// eligible under empty context
+	if !IsEligibleVar(&item.Variable, 0, AccessRead, EmptyCGContext()) {
+		t.Fatal("itemized read")
+	}
+	// IV written in context → read_indices fails → not eligible
+	cg := WithEffectContext(EmptyEffect().WriteVar(iv))
+	if IsEligibleVar(&item.Variable, 0, AccessRead, cg) {
+		t.Fatal("want reject when index IV written")
+	}
+	// collective itself written → reject after coll switch
+	cg2 := WithEffectContext(EmptyEffect().WriteVar(&parent.Variable))
+	if IsEligibleVar(&item.Variable, 0, AccessRead, cg2) {
+		t.Fatal("collective written")
+	}
+}
+
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
