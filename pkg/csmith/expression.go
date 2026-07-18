@@ -27,6 +27,8 @@ type Expression struct {
 	Var *Variable
 	// Invoke is set for TermFunction.
 	Invoke *Invocation
+	// Assign is set for TermAssignment (embedded StatementAssign).
+	Assign *Stmt
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
@@ -148,8 +150,11 @@ func MakeRandomExpression(
 	case TermFunction:
 		// ExpressionFuncall::make_random
 		return makeExpressionFuncall(r, opts, vs, tables, cg, typ, qfer, flist)
+	case TermAssignment:
+		// ExpressionAssign::make_random
+		return MakeExpressionAssign(r, opts, NewProbabilities(opts), vs, tables, cg, typ, qfer)
 	default:
-		// Assignment, Comma deferred
+		// Comma deferred
 		return nil
 	}
 }
@@ -219,6 +224,23 @@ func (e *Expression) Output() string {
 	case TermFunction:
 		if e.Invoke != nil {
 			return e.Invoke.Output()
+		}
+	case TermAssignment:
+		if e.Assign != nil {
+			// C comma-less assignment-as-expression: (lhs = rhs) or (lhs++)
+			lhs := ""
+			if e.Assign.ArrayAccess != "" {
+				lhs = e.Assign.ArrayAccess
+			} else if e.Assign.LhsVar != nil {
+				lhs = e.Assign.LhsVar.Name
+			}
+			rhs := "0"
+			if e.Assign.Expr != nil {
+				rhs = e.Assign.Expr.Output()
+			}
+			if lhs != "" {
+				return "(" + e.Assign.AssignOp.AssignOpC(lhs, rhs) + ")"
+			}
 		}
 	}
 	return "/*expr*/"

@@ -23,6 +23,8 @@ type Stmt struct {
 	AssignOp AssignOp
 	// ArrayAccess if set, used as LHS text (itemized array).
 	ArrayAccess string
+	// Label for goto target name (StmtGoto) or labeled stmt.
+	Label string
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -171,7 +173,9 @@ func makeRandomStmt(
 		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtArrayOp:
 		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
-	case StmtGoto, StmtInvoke:
+	case StmtGoto:
+		return MakeRandomGoto(r, opts, probs, vs, tables, cg)
+	case StmtInvoke:
 		// still stubs
 	default:
 	}
@@ -281,7 +285,18 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString(inner + "{\n" + inner + "}\n")
 			}
 		case StmtGoto:
-			sb.WriteString("/* goto-stub */;\n")
+			if st.Label != "" {
+				sb.WriteString("if (")
+				if st.Expr != nil {
+					sb.WriteString(st.Expr.Output())
+				} else {
+					sb.WriteString("0")
+				}
+				sb.WriteString(")\n")
+				sb.WriteString(inner + "    goto " + st.Label + ";\n")
+			} else {
+				sb.WriteString("/* goto-stub */;\n")
+			}
 		case StmtArrayOp:
 			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
 			if st.Loop != nil && st.Loop.IV != nil {

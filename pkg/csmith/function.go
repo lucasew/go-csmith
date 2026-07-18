@@ -15,6 +15,8 @@ type Function struct {
 	IsInlined  bool
 	IsBuiltin  bool
 	IsBuilt    bool // BuildState::Built after GenerateBody/make_first
+	// Labels are goto targets emitted at end of body (simplified CFG).
+	Labels []string
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -228,7 +230,19 @@ func (f *Function) Output() string {
 	s += ")\n"
 	if f.Body != nil {
 		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
-		s += f.Body.Output(0)
+		body := f.Body.Output(0)
+		// inject labels before closing brace of body
+		if len(f.Labels) > 0 {
+			// body ends with "}\n" — insert labels before last brace
+			if len(body) >= 2 && body[len(body)-2] == '}' {
+				ins := ""
+				for _, lbl := range f.Labels {
+					ins += "    " + lbl + ":\n        ;\n"
+				}
+				body = body[:len(body)-2] + ins + "}\n"
+			}
+		}
+		s += body
 	} else {
 		s += "{\n}\n"
 	}

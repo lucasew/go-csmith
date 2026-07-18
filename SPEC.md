@@ -411,10 +411,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 8c: `SafeOpFlags` binary/unary names | **Partial** |
 | Layer 9c: `StatementAssign` ops table | **Partial** |
 | Layer 4c: `SelectLType` + pointer types | **Partial** |
-| Layer 6b: `ArrayVariable` create + itemize | **Partial** — const indices itemize |
-| select_array / create_random_array | **Partial** |
-| StatementArrayOp | **Partial** — for-loop write to itemized element |
-| goto / full array mutate / iv_bounds itemize | **Not started** |
+| Arrays select/itemize/array-op | **Partial** |
+| Layer 8d: `ExpressionAssign` | **Partial** — wraps MakeRandomAssign |
+| Layer 9d: `StatementGoto` | **Partial** — if(cond) goto lbl; labels at func end; no CFG/DFA |
+| Comma expr / iv_bounds itemize / structs | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
