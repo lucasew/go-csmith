@@ -642,16 +642,31 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		return nil, nil
 	}
 	if av := v.AsArray; av != nil {
-		for _, s := range av.InitValues {
-			if s == "" {
-				continue
+		// Fact.cpp:100–106 — get_more_init_values() Expression*; no invent Constant
+		// from to_string() (make_init_value may be &var, not a literal).
+		if len(av.InitExprs) > 0 {
+			for _, e := range av.InitExprs {
+				if e == nil {
+					continue
+				}
+				more := AbstractFactForAssign(nil, v, 0, e)
+				for _, f := range more {
+					pt = MergeFactInto(pt, f)
+				}
 			}
-			moreRHS := &Expression{
-				Term: TermConstant, Con: &Constant{Value: s, Type: v.Type}, ExprType: v.Type,
-			}
-			more := AbstractFactForAssign(nil, v, 0, moreRHS)
-			for _, f := range more {
-				pt = MergeFactInto(pt, f)
+		} else {
+			// legacy tests that only fill InitValues string list as constants
+			for _, s := range av.InitValues {
+				if s == "" {
+					continue
+				}
+				moreRHS := &Expression{
+					Term: TermConstant, Con: &Constant{Value: s, Type: v.Type}, ExprType: v.Type,
+				}
+				more := AbstractFactForAssign(nil, v, 0, moreRHS)
+				for _, f := range more {
+					pt = MergeFactInto(pt, f)
+				}
 			}
 		}
 	}

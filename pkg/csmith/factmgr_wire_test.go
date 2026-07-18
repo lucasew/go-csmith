@@ -1,6 +1,9 @@
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	opts := Defaults()
@@ -106,6 +109,50 @@ func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("%+v", pt)
+	}
+}
+
+func TestAbstractFactForVarInitPointerArrayInitExprs(t *testing.T) {
+	// Fact.cpp:100–106 — Expression* alts; no invent Constant from to_string of &g_x
+	ptType := PointerTo(GetIntType())
+	tgt := CreateVariableScalars("g_x", GetIntType(), false, false)
+	// ExpressionVariable: Var=int, ExprType=int* → &g_x (indirect -1)
+	addr := &Expression{
+		Term: TermVariable, Var: tgt, ExprType: ptType,
+	}
+	// sanity: emit is &g_x, not inventable as Constant "0"
+	if !strings.Contains(addr.Output(), "g_x") || !strings.Contains(addr.Output(), "&") {
+		t.Fatalf("addr output %q", addr.Output())
+	}
+	parent := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_ap", Type: ptType, IsArray: true, ArraySizes: []int{2},
+			Init: &Constant{Type: ptType, Value: "0"},
+		},
+		Sizes:     []int{2},
+		InitExprs: []*Expression{addr},
+		// invent-prone string list deliberately wrong if used alone
+		InitValues: []string{"0"},
+	}
+	parent.AsArray = parent
+	facts, _ := AbstractFactForVarInit(&parent.Variable)
+	if len(facts) == 0 {
+		t.Fatal("want facts")
+	}
+	// must include pointee g_x from InitExprs, not only null from string invent
+	sawTgt := false
+	for _, f := range facts {
+		if f == nil || f.Var != &parent.Variable {
+			continue
+		}
+		for _, p := range f.PointTo {
+			if p == tgt {
+				sawTgt = true
+			}
+		}
+	}
+	if !sawTgt {
+		t.Fatalf("InitExprs &g_x must transfer pointee, got %+v", facts)
 	}
 }
 

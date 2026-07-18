@@ -12,7 +12,11 @@ type ArrayVariable struct {
 	Variable
 	// Sizes is the per-dimension lengths (ArrayVariable::sizes).
 	Sizes []int
-	// InitValues are alternative initializers (simplified: string constants).
+	// InitExprs mirrors ArrayVariable::init_values (Expression* alt inits).
+	// Fact abstraction and emit use these; no invent Constant-from-string for
+	// make_init_value results (e.g. &g_x).
+	InitExprs []*Expression
+	// InitValues are to_string() of InitExprs for brace emit / legacy tests.
 	InitValues []string
 	// Block is the owning block for locals (nil if global).
 	Block *Block
@@ -124,14 +128,14 @@ func CreateArrayVariable(
 		// ArrayVariable.cpp:177–185
 		// if (!pointer || strict_const_arrays) Constant::make_random
 		// else VariableSelector::make_init_value
-		var val string
+		var e *Expression
 		if !elem.IsPointerLike() || opts.StrictConstArrays {
 			c := MakeRandom(elem, opts, probs, r)
 			if HasError() {
 				return nil
 			}
 			if c != nil {
-				val = c.Value
+				e = &Expression{Term: TermConstant, Con: c, ExprType: elem}
 			}
 		} else {
 			// make_init_value needs live VS + CGContext (C++ always has both)
@@ -140,17 +144,18 @@ func CreateArrayVariable(
 				return nil
 			}
 			qf := qfer
-			e := vs.MakeInitValue(AccessRead, *cg, elem, &qf, blk, r)
+			e = vs.MakeInitValue(AccessRead, *cg, elem, &qf, blk, r)
 			if HasError() {
 				return nil
 			}
-			if e != nil {
-				// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for emit
-				val = e.Output()
-			}
 		}
 		// ArrayVariable.cpp:185 — add_init_value(e); skip null (no invent shell)
-		if val != "" {
+		if e == nil {
+			continue
+		}
+		av.InitExprs = append(av.InitExprs, e)
+		// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for brace emit
+		if val := e.Output(); val != "" {
 			av.InitValues = append(av.InitValues, val)
 			av.ArrayInits = append(av.ArrayInits, val)
 		}
@@ -365,10 +370,12 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 			Qfer:       av.Qfer,
 			IsArray:    true,
 			Init:       av.Init,
+			InitExpr:   av.InitExpr,
 			ArraySizes: av.Sizes,
 			ArrayInits: av.ArrayInits,
 		},
 		Sizes:      append([]int(nil), av.Sizes...),
+		InitExprs:  append([]*Expression(nil), av.InitExprs...),
 		InitValues: av.InitValues,
 		Block:      av.Block,
 		Collective: av,
@@ -660,10 +667,12 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 			Qfer:       av.Qfer,
 			IsArray:    true,
 			Init:       av.Init,
+			InitExpr:   av.InitExpr,
 			ArraySizes: av.Sizes,
 			ArrayInits: av.ArrayInits,
 		},
 		Sizes:      av.Sizes,
+		InitExprs:  append([]*Expression(nil), av.InitExprs...),
 		InitValues: av.InitValues,
 		Block:      av.Block,
 		Collective: av,

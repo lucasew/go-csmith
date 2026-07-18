@@ -783,6 +783,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		newAV := &ArrayVariable{
 			Variable:   av.Variable,
 			Sizes:      append([]int(nil), av.Sizes...),
+			InitExprs:  append([]*Expression(nil), av.InitExprs...),
 			InitValues: av.InitValues,
 			Block:      av.Block,
 			Collective: av.Collective,
