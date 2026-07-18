@@ -67,27 +67,48 @@ func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 	return ChooseOKVarMatch(r, vars, want, MatchExact, false)
 }
 
+// ExpandStructUnionVars mirrors VariableSelector::expand_struct_union_vars.
+// VariableSelector.cpp:156–173 — replace non-matching aggregates with field_vars.
+func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
+	out := append([]*Variable(nil), vars...)
+	for i := 0; i < len(out); i++ {
+		v := out[i]
+		if v == nil || v.IsVirtual() {
+			continue
+		}
+		// don't break up a struct if it matches the given type
+		if v.Type != nil && v.Type.IsAggregate() && v.Type != want {
+			// erase i, append field_vars at end (upstream insert end + i--)
+			fields := v.FieldVars
+			out = append(out[:i], out[i+1:]...)
+			out = append(out, fields...)
+			i--
+		}
+	}
+	return out
+}
+
 // ChooseOKVarMatch mirrors choose_var type filter + choose_ok_var.
-// VariableSelector.cpp choose_var — expand aggregates; Type::match(mt); optional skip const.
+// VariableSelector.cpp choose_var — expand_struct_union_vars; Type::match(mt); optional skip const.
 func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
 	if want == nil {
 		return ChooseOKVar(r, vars)
 	}
+	// expand aggregates when want is simple or aggregate (choose_var:403–406)
+	cands := vars
+	if want.IsSimple() || want.IsAggregate() {
+		cands = ExpandStructUnionVars(vars, want)
+	}
 	var ok []*Variable
-	for _, v := range vars {
-		if v == nil {
+	for _, x := range cands {
+		if x == nil || x.Type == nil {
 			continue
 		}
-		for _, x := range v.CollectExpandable() {
-			if x == nil || x.Type == nil {
-				continue
-			}
-			if skipConst && x.IsConst() {
-				continue
-			}
-			if want.Match(x.Type, mt) {
-				ok = append(ok, x)
-			}
+		if skipConst && x.IsConst() {
+			continue
+		}
+		if want.Match(x.Type, mt) {
+			ok = append(ok, x)
 		}
 	}
 	return ChooseOKVar(r, ok)
@@ -222,6 +243,23 @@ func (vs *VariableSelector) SelectGlobal(
 	return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 }
 
+// chooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
+// Type.cpp:570–586 — if ok structs exist pick one; else return original type.
+func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng) *Type {
+	if typ == nil || r == nil {
+		return typ
+	}
+	cands := okStructUnionLTypes(env, noVolatile, true, true)
+	if len(cands) == 0 {
+		return typ
+	}
+	st := cands[r.RndUpto(uint32(len(cands)))]
+	if st == nil {
+		return typ
+	}
+	return st
+}
+
 // EagerCreateGlobalStruct mirrors VariableSelector::eager_create_global_struct.
 // VariableSelector.cpp:607–633 — create a random ok struct global, then choose_var field.
 func (vs *VariableSelector) EagerCreateGlobalStruct(
@@ -232,19 +270,14 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	r *Rng,
 	mt MatchType,
 ) *Variable {
-	if vs == nil || typ == nil || r == nil || vs.Types == nil {
+	if vs == nil || typ == nil || r == nil {
 		return nil
 	}
 	level := typ.IndirectLevel()
 	if level > 1 {
 		return nil
 	}
-	// Type::choose_random_struct_from_type — pick any ok struct/union
-	cands := okStructUnionLTypes(vs.Types, false, true, true)
-	if len(cands) == 0 {
-		return nil
-	}
-	st := cands[r.RndUpto(uint32(len(cands)))]
+	st := chooseRandomStructFromType(vs.Types, typ, false, r)
 	if st == nil {
 		return nil
 	}
@@ -253,6 +286,34 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	// choose_var(GlobalList, …) for field matching desired type
 	skipConst := access == AccessWrite
 	return ChooseOKVarMatch(r, vs.GlobalList, typ, mt, skipConst)
+}
+
+// EagerCreateLocalStruct mirrors VariableSelector::eager_create_local_struct.
+// VariableSelector.cpp:635–666 — create struct local on block, choose_var field.
+func (vs *VariableSelector) EagerCreateLocalStruct(
+	block *Block,
+	access Access,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+) *Variable {
+	if vs == nil || block == nil || typ == nil || r == nil {
+		return nil
+	}
+	level := typ.IndirectLevel()
+	if level > 1 {
+		return nil
+	}
+	// choose_random_struct_from_type(type, true) — no_volatile for locals
+	st := chooseRandomStructFromType(vs.Types, typ, true, r)
+	if st == nil {
+		return nil
+	}
+	_ = vs.GenerateNewParentLocal(block, access, cg, st, qfer, r)
+	skipConst := access == AccessWrite
+	return ChooseOKVarMatch(r, block.LocalVars, typ, mt, skipConst)
 }
 
 // GenerateParameterVariableTyped mirrors
@@ -520,9 +581,9 @@ func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
 }
 
 // VariableCreationProbability mirrors VariableCreationProbability.
-// VariableSelector.cpp:1063–1070 — 50% global if allowed else local.
+// VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
 func VariableCreationProbability(r *Rng, opts Options) VariableScope {
-	if opts.GlobalVariables && r != nil && r.RndFlipcoin(50) {
+	if opts.GlobalVariables && r != nil && r.RndFlipcoin(10) {
 		return ScopeGlobal
 	}
 	return ScopeParentLocal
@@ -563,8 +624,8 @@ func (vs *VariableSelector) Select(
 	return v
 }
 
-// SelectParentLocal mirrors VariableSelector::SelectParentLocal simplified.
-// choose among stack locals with match; else GenerateNewParentLocal.
+// SelectParentLocal mirrors VariableSelector::SelectParentLocal.
+// VariableSelector.cpp:987–1041 — rnd stack block; expand_struct on empty; choose_var or create.
 func (vs *VariableSelector) SelectParentLocal(
 	access Access,
 	cg CGContext,
@@ -573,26 +634,46 @@ func (vs *VariableSelector) SelectParentLocal(
 	r *Rng,
 	mt MatchType,
 ) *Variable {
-	if vs == nil || cg.CurrentFunc == nil {
+	if vs == nil || cg.CurrentFunc == nil || r == nil {
 		return nil
 	}
-	var locals []*Variable
-	for _, blk := range cg.CurrentFunc.Stack {
-		if blk == nil {
-			continue
+	stack := cg.CurrentFunc.Stack
+	if len(stack) == 0 {
+		return nil
+	}
+	// VariableSelector.cpp:1001–1004 — pick one block on the stack
+	blk := stack[r.RndUpto(uint32(len(stack)))]
+	if blk == nil {
+		return nil
+	}
+	// empty locals: expand_struct eager then GenerateNewParentLocal
+	if len(blk.LocalVars) == 0 {
+		if vs.Opts.ExpandStruct {
+			if v := vs.EagerCreateLocalStruct(blk, access, cg, t, qfer, r, mt); v != nil {
+				return v
+			}
 		}
-		locals = append(locals, blk.LocalVars...)
+		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+		if t2 == nil {
+			t2 = t
+		}
+		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+	}
+	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type
+	matchT := t
+	if t != nil && t.IsSimple() && t.Simple() != EVoid {
+		matchT = GetIntType()
+	} else {
+		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+		if matchT == nil {
+			matchT = t
+		}
 	}
 	skipConst := access == AccessWrite
-	if v := ChooseOKVarMatch(r, locals, t, mt, skipConst); v != nil {
+	if v := ChooseOKVarMatch(r, blk.LocalVars, matchT, mt, skipConst); v != nil {
 		return v
 	}
-	// create on current block
-	if len(cg.CurrentFunc.Stack) == 0 {
-		return nil
-	}
-	blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
-	return vs.GenerateNewParentLocal(blk, access, cg, t, qfer, r)
+	return vs.GenerateNewParentLocal(blk, access, cg, matchT, qfer, r)
 }
 
 // SelectParentParam mirrors VariableSelector::SelectParentParam.

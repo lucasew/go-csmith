@@ -66,3 +66,97 @@ func TestFactMgrForFunc(t *testing.T) {
 		t.Fatal("reuse")
 	}
 }
+
+func TestExpandStructUnionVars(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	if len(sv.FieldVars) == 0 {
+		t.Fatal("no fields")
+	}
+	got := ExpandStructUnionVars([]*Variable{sv}, GetIntType())
+	// parent removed when want is not the struct type itself
+	for _, v := range got {
+		if v == sv {
+			t.Fatal("parent should expand away")
+		}
+	}
+	if len(got) == 0 {
+		t.Fatal("empty after expand")
+	}
+	// want exact struct type → keep parent
+	keep := ExpandStructUnionVars([]*Variable{sv}, st)
+	if len(keep) != 1 || keep[0] != sv {
+		t.Fatalf("keep aggregate: %+v", keep)
+	}
+}
+
+func TestEagerCreateLocalStruct(t *testing.T) {
+	opts := Defaults()
+	opts.ExpandStruct = true
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(4), opts, probs, env)
+	vs.Types = env
+	vs.Probs = probs
+	vs.Opts = opts
+	if len(env.StructTypes) == 0 {
+		t.Skip("no structs")
+	}
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{}
+	f.Stack = []*Block{blk}
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	v := vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(9), MatchFlexible)
+	if len(blk.LocalVars) == 0 {
+		t.Fatal("no local created")
+	}
+	if v != nil && v.Type != nil && !GetIntType().Match(v.Type, MatchFlexible) {
+		t.Log("field", v.Name, v.Type.CName())
+	}
+}
+
+func TestSelectParentLocalExpandStruct(t *testing.T) {
+	opts := Defaults()
+	opts.ExpandStruct = true
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(6), opts, probs, env)
+	vs.Types = env
+	vs.Probs = probs
+	vs.Opts = opts
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{}
+	f.Stack = []*Block{blk}
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	cg := WithFunc(f, EmptyEffect())
+	v := vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(11), MatchFlexible)
+	if v == nil {
+		t.Fatal("nil")
+	}
+}
+
+func TestVariableCreationProbability10(t *testing.T) {
+	// flipcoin(10): seed scan for at least one global and mostly local
+	opts := Defaults()
+	opts.GlobalVariables = true
+	var nG, nL int
+	for seed := uint64(1); seed <= 200; seed++ {
+		if VariableCreationProbability(NewRng(seed), opts) == ScopeGlobal {
+			nG++
+		} else {
+			nL++
+		}
+	}
+	if nG == 0 || nL == 0 {
+		t.Fatalf("expected mix global/local got g=%d l=%d", nG, nL)
+	}
+	// ~10% global: allow wide band
+	if nG > 60 {
+		t.Fatalf("too many global %d/200", nG)
+	}
+}

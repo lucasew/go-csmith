@@ -143,6 +143,22 @@ func (v *Variable) IsPointer() bool {
 	return v != nil && v.Type != nil && v.Type.PtrType() != nil
 }
 
+// IsVirtual mirrors Variable::is_virtual — dummy statics (null/garbage/tbd) have nil Type.
+func (v *Variable) IsVirtual() bool {
+	return v != nil && v.Type == nil
+}
+
+// IsAggregate mirrors Variable::is_aggregate.
+func (v *Variable) IsAggregate() bool {
+	return v != nil && v.Type != nil && v.Type.IsAggregate()
+}
+
+// MakeDummyStaticVariable mirrors VariableSelector::make_dummy_static_variable.
+// VariableSelector.cpp:1565–1568 — name only, type null.
+func MakeDummyStaticVariable(name string) *Variable {
+	return &Variable{Name: name, Type: nil}
+}
+
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {

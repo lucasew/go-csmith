@@ -3,12 +3,12 @@
 package csmith
 
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps (stubs).
-// Full point-to / union field analysis not ported; holds placeholders for call sites.
+// Full assign/transfer analysis not ported; GlobalFacts holds FactPointTo.
 type FactMgr struct {
 	// Func is the owning function (FactMgr.cpp constructor).
 	Func *Function
-	// GlobalFacts mirrors global_facts (vector of facts; opaque for now).
-	GlobalFacts []any
+	// GlobalFacts mirrors global_facts (FactPointTo subset).
+	GlobalFacts []*FactPointTo
 }
 
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
