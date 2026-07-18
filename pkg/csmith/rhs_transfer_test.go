@@ -50,12 +50,17 @@ func TestRhsToLhsTransferCopy(t *testing.T) {
 
 func TestUpdateFactForAssign(t *testing.T) {
 	fm := NewFactMgr(nil)
+	// Variable.cpp:395 — pointer Constant::make_random is "0" → null on AddNewVarFact
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
-	if !FindRelatedPointTo(fm.GlobalFacts, p).IsDead() {
-		t.Fatal("init")
+	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
+		t.Fatal("init null")
 	}
-	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
+	// assign to non-null target expression
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	rhs := &Expression{Term: TermVariable, Var: a, ExprType: PointerTo(GetIntType())}
+	// take address form for pointee
+	rhs = &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	if !fm.UpdateFactForAssign(p, 0, rhs) {
 		t.Fatal("update")
 	}

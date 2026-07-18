@@ -77,10 +77,12 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
+	// Variable.cpp:395 — pointer init Constant::make_random → "0" → null fact
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
-	if !FindRelatedPointTo(fm.GlobalFacts, p).IsDead() {
-		t.Fatal("init garbage")
+	fp := FindRelatedPointTo(fm.GlobalFacts, p)
+	if fp == nil || !fp.IsNull() {
+		t.Fatalf("init null from make_random pointer, got %+v", fp)
 	}
 	// idempotent
 	fm.AddNewVarFact(p)

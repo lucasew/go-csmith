@@ -112,16 +112,15 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	if withAttrs && r != nil {
 		b.WriteString(EnsureVarAttrGenerator().Output(r))
 	}
-	// Variable.cpp:656 — init->Output when present
+	// Variable.cpp:656–660 — out << " = "; assert(init); init->Output
+	// no soft skip of "= value" when init missing
+	b.WriteString(" = ")
 	if v.InitExpr != nil {
-		if s := v.InitExpr.Output(); s != "" {
-			b.WriteString(" = ")
-			b.WriteString(s)
-		}
-	} else if v.Init != nil && v.Init.Value != "" {
-		b.WriteString(" = ")
+		b.WriteString(v.InitExpr.Output())
+	} else if v.Init != nil {
 		b.WriteString(v.Init.Value)
 	}
+	// C++ assert(init) for OutputDef; empty RHS only for broken IR (union field init null)
 	b.WriteString(";")
 	// Variable.cpp:658–661 — volatile global comment on same line path uses comment helper
 	if v.IsGlobal() && v.IsVolatile() {
@@ -380,11 +379,15 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 	return b.String()
 }
 
-// CreateVariableQfer mirrors
-// Variable::CreateVariable(name, type, init, qfer) without aggregate field expansion
-// and without forcing Constant::make_random (init left nil until Constant port).
-// Variable.cpp:405–421.
+// CreateVariableQfer mirrors Variable::CreateVariable(name, type, init, qfer).
+// Variable.cpp:405–421 — caller supplies init (may be nil); expand aggregates.
 func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
+	return CreateVariableWithInit(name, typ, nil, qfer)
+}
+
+// CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
+// Variable.cpp:405–421.
+func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
 	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
 		// Upstream asserts non-void simple; refuse quietly for Go.
 		return nil
@@ -393,6 +396,7 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 		Name: name,
 		Type: typ,
 		Qfer: qfer,
+		Init: init,
 	}
 	v.CreateFieldVars()
 	return v
@@ -400,9 +404,26 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 
 // CreateVariableScalars mirrors
 // Variable::CreateVariable(name, type, isConst, isVolatile, …) for a scalar.
-// Variable.cpp:368–378 → vectors of one bool each.
+// Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
+// unless outermost container is union (Variable.cpp:395).
 func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
-	return CreateVariableQfer(name, typ, NewCVQualifiers([]bool{isConst}, []bool{isVolatile}))
+	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
+	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+		return nil
+	}
+	// Variable.cpp:395 — non-union top: Constant::make_random(type); union top: 0
+	var init *Constant
+	if typ == nil || !typ.IsUnion() {
+		init = MakeRandom(typ, Defaults(), NewRng(1))
+	}
+	v := &Variable{
+		Name: name,
+		Type: typ,
+		Qfer: qfer,
+		Init: init,
+	}
+	v.CreateFieldVars()
+	return v
 }
 
 // IsGlobal mirrors Variable::is_global — name prefix "g_" (or field of global).
@@ -909,6 +930,16 @@ func (v *Variable) CreateFieldVars() {
 		if isVol {
 			vols[len(vols)-1] = true
 		}
+		// Variable.cpp:360–363 / 395 — CreateVariable; init = Constant::make_random
+		// unless outermost container is union.
+		top := v
+		for top.FieldVarOf != nil {
+			top = top.FieldVarOf
+		}
+		var init *Constant
+		if top.Type == nil || !top.Type.IsUnion() {
+			init = MakeRandom(f.Type, Defaults(), NewRng(1))
+		}
 		fv := &Variable{
 			Name:       fname,
 			Type:       f.Type,
@@ -916,6 +947,7 @@ func (v *Variable) CreateFieldVars() {
 			FieldVarOf: v,
 			// bitfields_length_[i] >= 0 → isBitfield (Type::is_bitfield)
 			IsBitfield: f.BitWidth >= 0,
+			Init:       init,
 		}
 		// recursive expand nested structs
 		fv.CreateFieldVars()

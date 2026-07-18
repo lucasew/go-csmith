@@ -114,10 +114,15 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 }
 
 func TestVariableInitOutput(t *testing.T) {
-	// StatementGoto.cpp:271 — assert(v->init); no soft invent "0"
-	v := CreateVariableScalars("l_1", GetIntType(), false, false)
+	// StatementGoto.cpp:271 — assert(v->init); no soft invent "0" when missing
+	v := CreateVariableWithInit("l_1", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	if variableInitOutput(v) != "" {
-		t.Fatal("no init must not invent 0", variableInitOutput(v))
+		t.Fatal("nil init must not invent 0", variableInitOutput(v))
+	}
+	// Variable.cpp:395 — CreateVariableScalars always Constant::make_random
+	v2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	if variableInitOutput(v2) == "" {
+		t.Fatal("scalars path always has init")
 	}
 	v.Init = MakeInt(5)
 	if variableInitOutput(v) != "5" {
