@@ -71,3 +71,84 @@ func TestAbstractFactNonPointerLHS(t *testing.T) {
 		t.Fatal("non-ptr")
 	}
 }
+
+func TestRhsToLhsTransferCommaPeel(t *testing.T) {
+	// FactPointTo.cpp:259–261 — comma uses RHS of comma
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	rhs := &Expression{
+		Term:     TermCommaExpr,
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		CommaRHS: &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())},
+		ExprType: PointerTo(GetIntType()),
+	}
+	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || !facts[0].IsNull() {
+		t.Fatalf("%+v", facts)
+	}
+}
+
+func TestRhsToLhsTransferAssignPeel(t *testing.T) {
+	// FactPointTo.cpp:256–258 — embedded assign peels to assign RHS
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	assign := &Stmt{
+		Kind: StmtAssign, LhsVar: q, Lhs: &Lhs{Var: q, Type: PointerTo(GetIntType())},
+		Expr:     &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())},
+		AssignOp: AssignSimple,
+	}
+	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: PointerTo(GetIntType())}
+	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || !facts[0].IsNull() {
+		t.Fatalf("%+v", facts)
+	}
+}
+
+func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
+	// FactPointTo.cpp:247–253 — RV return fact copied to LHS
+	InvocationReturnFactsDoFinalization()
+	defer InvocationReturnFactsDoFinalization()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
+	fn.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fi := &Invocation{User: fn}
+	AddReturnFactForInvocation(fi, MakeFactPointTo(fn.RV, tgt))
+	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
+	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if len(facts) != 1 || len(facts[0].PointTo) != 1 || facts[0].PointTo[0] != tgt {
+		t.Fatalf("%+v", facts)
+	}
+}
+
+func TestRhsToLhsTransferUnionAggregateFields(t *testing.T) {
+	// FactPointTo.cpp:172 + 210–224 — only pointer/union pass early type gate;
+	// union RHS maps pointer fields pairwise (struct RHS is garbage early).
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
+	}}
+	uv := &Variable{Name: "g_u", Type: ut}
+	pf := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: uv}
+	uv.FieldVars = []*Variable{pf}
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	lhsP := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	in := []*FactPointTo{MakeFactPointTo(pf, tgt)}
+	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
+	facts := RhsToLhsTransfer(in, []*Variable{lhsP}, rhs)
+	if len(facts) != 1 || len(facts[0].PointTo) != 1 || facts[0].PointTo[0] != tgt {
+		t.Fatalf("%+v", facts)
+	}
+}
+
+func TestRhsToLhsTransferStructIsGarbage(t *testing.T) {
+	// FactPointTo.cpp:172–178 — struct type fails pointer/union gate → garbage
+	st := &Type{isStruct: true, Fields: []StructField{
+		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
+	}}
+	sv := &Variable{Name: "g_s", Type: st}
+	lhsP := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	rhs := &Expression{Term: TermVariable, Var: sv, ExprType: st}
+	facts := RhsToLhsTransfer(nil, []*Variable{lhsP}, rhs)
+	if len(facts) != 1 || !facts[0].IsDead() {
+		t.Fatalf("%+v", facts)
+	}
+}

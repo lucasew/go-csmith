@@ -173,8 +173,9 @@ func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 	return out
 }
 
-// RhsToLhsTransfer mirrors FactPointTo::rhs_to_lhs_transfer for common cases.
-// FactPointTo.cpp:158–227 subset — const/null/garbage, &var, pointer copy.
+// RhsToLhsTransfer mirrors FactPointTo::rhs_to_lhs_transfer.
+// FactPointTo.cpp:158–263 — const/null/garbage, &var, pointer copy,
+// aggregate field transfer, function return facts, assign/comma peel.
 func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
 	if len(lvars) == 0 {
 		return nil
@@ -183,7 +184,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		return MakeFactsPointTo(lvars, GarbagePtr)
 	}
 	rt := rhs.GetType()
-	// non-pointer, non-union RHS
+	// non-pointer, non-union RHS (FactPointTo.cpp:172–178)
 	if rt == nil || (!rt.IsPointerLike() && !rt.IsUnion()) {
 		// equals(0) and size >= 8 → null else garbage
 		if rhs.EqualsInt(0) && rt != nil && rt.SizeInBytes() >= 8 {
@@ -199,6 +200,16 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
+		// FactPointTo.cpp:186–193 — union constant field0 "0" → null on field0 pointers
+		if rt.IsUnion() && len(lvars) > 0 {
+			lv0 := lvars[0]
+			if lv0 != nil && lv0.FieldVarOf != nil && lv0.FieldVarOf.Type != nil &&
+				lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
+				if rhs.EqualsInt(0) || (rhs.Con != nil && rhs.Con.Value == "0") {
+					return MakeFactsPointTo(lvars, NullPtr)
+				}
+			}
+		}
 		return MakeFactsPointTo(lvars, GarbagePtr)
 	case TermVariable:
 		if rhs.Var == nil {
@@ -209,15 +220,79 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			// taking address: point to the var itself (collective)
 			return MakeFactsPointTo(lvars, rhs.Var.GetCollective())
 		}
-		// FactPointTo.cpp:223–226 — merge_pointees(collective, indirect+1)
+		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
+		if rt.IsAggregate() {
+			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
+			var ret []*FactPointTo
+			for _, vv := range vars {
+				if vv == nil {
+					continue
+				}
+				ptrs := vv.FindPointerFields()
+				n := len(lvars)
+				if len(ptrs) < n {
+					n = len(ptrs)
+				}
+				for j := 0; j < n; j++ {
+					set := MergePointeesOfPointer(ptrs[j], 1, facts)
+					if len(set) == 0 {
+						ret = append(ret, MakeFactPointTo(lvars[j], GarbagePtr))
+					} else {
+						ret = append(ret, MakeFactPointToSet(lvars[j], set))
+					}
+				}
+			}
+			return ret
+		}
+		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
 		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
 		if len(set) == 0 {
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
 		return MakeFactsPointToSet(lvars, set)
+	case TermFunction:
+		// FactPointTo.cpp:230–255 — user call return fact for RV / pointer fields
+		if rhs.Invoke == nil || rhs.Invoke.User == nil {
+			return nil
+		}
+		fi := rhs.Invoke
+		fn := fi.User
+		if fn.RV != nil && fn.RV.Type != nil && fn.RV.Type.IsAggregate() {
+			ptrs := fn.RV.FindPointerFields()
+			var ret []*FactPointTo
+			n := len(lvars)
+			if len(ptrs) < n {
+				n = len(ptrs)
+			}
+			for i := 0; i < n; i++ {
+				rvFact := GetReturnFactForInvocation(fi, ptrs[i])
+				if rvFact == nil {
+					ret = append(ret, MakeFactPointTo(lvars[i], GarbagePtr))
+					continue
+				}
+				ret = append(ret, MakeFactPointToSet(lvars[i], rvFact.PointTo))
+			}
+			return ret
+		}
+		if fn.RV == nil {
+			return nil
+		}
+		rvFact := GetReturnFactForInvocation(fi, fn.RV)
+		if rvFact == nil {
+			return nil
+		}
+		return MakeFactsPointToSet(lvars, rvFact.PointTo)
+	case TermAssignment:
+		// FactPointTo.cpp:256–258 — peel embedded assign RHS
+		if rhs.Assign == nil {
+			return nil
+		}
+		return RhsToLhsTransfer(facts, lvars, rhs.Assign.Expr)
+	case TermCommaExpr:
+		// FactPointTo.cpp:259–261 — peel comma RHS
+		return RhsToLhsTransfer(facts, lvars, rhs.CommaRHS)
 	default:
-		// function/assign/comma — conservative garbage
-		return MakeFactsPointTo(lvars, GarbagePtr)
+		return nil
 	}
 }
 
