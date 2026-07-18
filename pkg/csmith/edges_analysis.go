@@ -134,18 +134,18 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 	}
 }
 
-// PostCreationAnalysis mirrors Statement::post_creation_analysis light path.
-// Statement.cpp:845–870 — makeup new var facts; save simple stmt effect.
+// PostCreationAnalysis mirrors Statement::post_creation_analysis.
+// Statement.cpp:844–900 — combine branches / makeup; effect; assign/return facts;
+// func_1 uncertain-call revalidate; set in/out/visited.
 func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext) {
 	if st == nil || cg == nil || cg.FM == nil {
 		return
 	}
 	fm := cg.FM
 	if st.Kind == StmtIfElse {
-		// combine_branch_facts already done during make_random / visit
+		CombineBranchFacts(st, preFacts, fm)
 	} else {
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
-		_ = preFacts
 	}
 	// simple statements: save effect_stm
 	if !IsCompound(st.Kind) {
@@ -153,7 +153,52 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			fm.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
 	}
-	_ = preEffect
+	specialHandled := false
+	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
+	if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop() {
+		if HasUncertainCallRecursiveStmt(st) {
+			outputs := CloneFactSlice(preFacts)
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preEffect.Clone()
+			}
+			if ValidateAndUpdateFacts(st, &outputs, cg, Defaults(), cg.CurrentBlock()) {
+				fm.GlobalFacts = outputs
+				specialHandled = true
+			}
+		}
+	}
+	if !specialHandled {
+		switch st.Kind {
+		case StmtAssign:
+			// abstract assign into global_facts (RHS calls already handled at gen)
+			lhs := st.LhsVar
+			indir := 0
+			if st.Lhs != nil {
+				lhs = st.Lhs.Var
+				indir = st.Lhs.IndirectLevel()
+			}
+			if lhs != nil {
+				fm.UpdateFactForAssign(lhs, indir, st.Expr)
+			}
+		case StmtReturn:
+			if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
+				fm.UpdateFactForReturn(cg.CurrentFunc.RV, st.Expr)
+			}
+		}
+	}
+	fm.RemoveRVFacts(&fm.GlobalFacts)
+	if st.StmID > 0 {
+		fm.SetMapFactsIn(st.StmID, preFacts)
+		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
+		if fm.MapAccumEffect == nil {
+			fm.MapAccumEffect = make(map[int]Effect)
+		}
+		fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		if fm.MapVisited == nil {
+			fm.MapVisited = make(map[int]bool)
+		}
+		fm.MapVisited[st.StmID] = true
+	}
 }
 
 // FindFixedPointBlock mirrors Block::find_fixed_point.
