@@ -89,10 +89,10 @@ func MakeRandomAssignQfer(
 	qf *CVQualifiers,
 ) Stmt {
 	if cg == nil {
-		SetError(ErrGeneric)
 		return Stmt{Kind: StmtAssign}
 	}
-	ClearError()
+	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
+	// after Statement::make_random (Statement.cpp:309)
 	assignTab := NewAssignOpsTable(opts)
 	op := AssignOpsProbability(r, opts, assignTab, typ)
 	if typ == nil {
@@ -138,7 +138,7 @@ func MakeRandomAssignQfer(
 	} else if opts.StrictVolatileRule {
 		// StatementAssign.cpp:145–167
 		if typ != nil && typ.IsVolatileStructUnion() {
-			SetError(ErrGeneric)
+			// StatementAssign.cpp:145–146 — return nullptr (no set_error)
 			return Stmt{Kind: StmtAssign}
 		}
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
@@ -146,7 +146,7 @@ func MakeRandomAssignQfer(
 			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
-			SetError(ErrGeneric)
+			// ERROR_GUARD path when Expression::make_random already set error
 			return Stmt{Kind: StmtAssign}
 		}
 		if !callerQf {
@@ -175,7 +175,6 @@ func MakeRandomAssignQfer(
 			rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, true, false, TermConstant, rhsCG.ExprDepth)
 		}
 		if rhs == nil {
-			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
 		if !callerQf {
@@ -231,7 +230,7 @@ func MakeRandomAssignQfer(
 		lhsVar = lhs.Var
 	}
 	if lhs == nil {
-		SetError(ErrGeneric)
+		// Lhs::make_random null — re-pick unless sticky error already set
 		return Stmt{Kind: StmtAssign}
 	}
 

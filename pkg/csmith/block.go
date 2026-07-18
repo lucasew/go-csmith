@@ -277,9 +277,15 @@ func MakeRandomBlock(
 	}
 	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
 	if DepthGuardByType(opts, "dtBlock") == BadDepth {
+		abortBlockMake(f, b)
 		return nil
 	}
 	max := BlockProbability(b.blockSize, r)
+	// Block.cpp:136–140 — ERROR after BlockProbability → delete block
+	if HasError() {
+		abortBlockMake(f, b)
+		return nil
+	}
 	// Note: blk_depth is bumped in Statement::make_random for compound stmts
 	// (Statement.cpp:267–269), not when entering Block::make_random.
 	// Running effect accum for this block (side-effect / no_volatile for SelectLType)
@@ -328,6 +334,11 @@ func MakeRandomBlock(
 	if pendingFwd != "" {
 		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
 	}
+	// Block.cpp:157–161 — ERROR after stmt loop → delete block
+	if HasError() {
+		abortBlockMake(f, b)
+		return nil
+	}
 	// Block.cpp:164–166 — nested loop for must-use multi-dim arrays
 	if b.NeedNestedLoop(*cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
@@ -348,10 +359,33 @@ func MakeRandomBlock(
 		b.StmID = AllocStmID()
 	}
 	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
+	if HasError() {
+		// Block.cpp:170–174 — ERROR after post_creation → delete
+		abortBlockMake(f, b)
+		return nil
+	}
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
+	// Block.cpp:187 — Error::set_error(SUCCESS)
+	ClearError()
 	return b
+}
+
+// abortBlockMake pops stack and unregisters a failed Block::make_random (C++ delete b).
+func abortBlockMake(f *Function, b *Block) {
+	if f == nil || b == nil {
+		return
+	}
+	if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
+		f.Stack = f.Stack[:n-1]
+	}
+	for i, x := range f.Blocks {
+		if x == b {
+			f.Blocks = append(f.Blocks[:i], f.Blocks[i+1:]...)
+			break
+		}
+	}
 }
 
 // PostCreationAnalysis mirrors Block::post_creation_analysis.
@@ -488,7 +522,7 @@ func makeRandomStmt(
 		return false
 	})
 	// retry failed factories (null Statement* upstream) — Statement.cpp:314–316
-	// C++: if (s == 0) return make_random(cg_context); re-pick type, no forced assign.
+	// C++: ERROR_GUARD after factory; if s==0 (no error) return make_random re-pick.
 	for tries := 0; tries < 32; tries++ {
 		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
 		cg.EffectStm = EmptyEffect()
@@ -515,11 +549,16 @@ func makeRandomStmt(
 		if IsCompound(kind) {
 			cg.BlkDepth--
 		}
+		// Statement.cpp:309 — ERROR_GUARD(nullptr): sticky error aborts without re-pick
+		if HasError() {
+			return Stmt{}
+		}
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
 			PostCreationAnalysis(&st, preFacts, preEffect, cg)
 			return st
 		}
+		// s == 0 without error — re-pick type (Statement.cpp:314–316)
 	}
 	// bounded library limit (C++ recurses forever); empty stmt is not appended usable
 	return Stmt{}

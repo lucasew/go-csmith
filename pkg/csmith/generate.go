@@ -24,6 +24,8 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 			opts = resolved
 		}
 	}
+	// Error::set_error(SUCCESS) for a clean generation run
+	ClearError()
 	// Type::SizeInBytes uses platform integer/pointer sizes
 	SetPlatformSizes(opts.IntSize, opts.PointerSize)
 	// PartialExpander from CGOptions::partial_expand
