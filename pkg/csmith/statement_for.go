@@ -279,31 +279,55 @@ func MakeRandomFor(
 		bodyCG.RemoveIVBound(lc.IV)
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
+	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
 	if cg.FM != nil {
-		postLoopAnalysis(cg.FM, body, preFacts)
+		postLoopAnalysis(cg.FM, st, body, preFacts, &cg)
 	}
 	// merge body effect into parent (loop may execute 0+ times — keep parent SE if body writes)
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)
 	}
-	return &Stmt{Kind: StmtFor, Loop: lc, Then: body}
+	return st
 }
 
 // postLoopAnalysis mirrors StatementFor::post_loop_analysis.
-// StatementFor.cpp:350–370 — must-return body restores pre; else merge; break edges already recorded.
-func postLoopAnalysis(fm *FactMgr, body *Block, preFacts []*FactPointTo) {
+// StatementFor.cpp:350–370 — body entry facts; must_return restores pre;
+// break edges + merge_jump_facts; set_accumulated_effect_after_block.
+func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPointTo, cg *CGContext) {
 	if fm == nil {
 		return
 	}
-	if body != nil && body.MustReturn() {
-		// loop never entered for exit purposes
-		fm.GlobalFacts = CloneFactSlice(preFacts)
-		return
+	// start from body entry facts when recorded (0-iteration fall-through base)
+	if body != nil && body.StmID > 0 {
+		if in, ok := fm.MapFactsIn[body.StmID]; ok {
+			fm.GlobalFacts = CloneFactSlice(in)
+		}
 	}
-	// 0+ iterations: merge pre-loop with post-body facts
-	post := CloneFactSlice(fm.GlobalFacts)
-	fm.GlobalFacts = CloneFactSlice(preFacts)
-	MergeFacts(&fm.GlobalFacts, post)
+	if body != nil && body.MustReturn() {
+		// StatementFor.cpp:358–360 — loop never entered; restore pre-loop
+		fm.RestoreFacts(preFacts)
+	}
+	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
+	if body != nil && forSt != nil {
+		for _, breakID := range body.BreakStmIDs {
+			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
+			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
+			if out, ok := fm.MapFactsOut[breakID]; ok {
+				MergeJumpFacts(&fm.GlobalFacts, out)
+			}
+		}
+	}
+	// StatementFor.cpp:369 — set_accumulated_effect_after_block
+	if cg != nil && forSt != nil && body != nil {
+		bodyEff := fm.GetMapStmEffect(body.StmID)
+		preEff := EmptyEffect()
+		if cg.EffectAccum != nil {
+			// pre_effect was snapshot before body; use current minus body as approx
+			// callers pass body effect via SetAccumulatedEffectAfterBlock with pre
+			_ = preEff
+		}
+		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, EmptyEffect())
+	}
 }
 
 // forIncrOutput emits for-loop increment (plain or safe_add rewrite).

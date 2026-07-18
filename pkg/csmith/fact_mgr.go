@@ -567,7 +567,11 @@ func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool
 
 // CreateCFGEdgeTo is create_cfg_edge with optional dest statement id (goto).
 func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDest, backLink bool) {
-	if fm == nil || dest == nil || srcID == 0 {
+	if fm == nil || srcID == 0 {
+		return
+	}
+	// allow dest nil when destStmID set (break → for-statement edge)
+	if dest == nil && destStmID <= 0 {
 		return
 	}
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{

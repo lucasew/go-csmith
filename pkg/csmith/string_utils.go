@@ -101,3 +101,124 @@ func FirstNonSpaceChar(s string) byte {
 func Int2Str(n int) string {
 	return strconv.Itoa(n)
 }
+
+// EmptyLine mirrors StringUtils::empty_line.
+// StringUtils.cpp:39–44.
+func EmptyLine(line string) bool {
+	if line == "" {
+		return true
+	}
+	return strings.TrimSpace(line) == ""
+}
+
+// IsSpaceChar mirrors StringUtils::is_space.
+// StringUtils.cpp:46–48.
+func IsSpaceChar(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n'
+}
+
+// Str2Int mirrors StringUtils::str2int — strip outer parens; hex 0x prefix.
+// StringUtils.cpp:151–165.
+func Str2Int(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return -1
+	}
+	// strip surrounding parentheses
+	for len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
+		s = s[1 : len(s)-1]
+		s = strings.TrimSpace(s)
+	}
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		n, err := strconv.ParseInt(s[2:], 16, 64)
+		if err != nil {
+			return -1
+		}
+		return int(n)
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return -1
+	}
+	return n
+}
+
+// Str2Int64 mirrors StringUtils::str2longlong.
+// StringUtils.cpp:173–193.
+func Str2Int64(s string) int64 {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		var i int64
+		for j := 2; j < len(s); j++ {
+			c := s[j]
+			var v int64
+			switch {
+			case c >= '0' && c <= '9':
+				v = int64(c - '0')
+			case c >= 'A' && c <= 'F':
+				v = 10 + int64(c-'A')
+			case c >= 'a' && c <= 'f':
+				v = 10 + int64(c-'a')
+			default:
+				return i
+			}
+			i = i*16 + v
+		}
+		return i
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// Int642Str mirrors StringUtils::longlong2str.
+func Int642Str(n int64) string {
+	return strconv.FormatInt(n, 10)
+}
+
+// Chop mirrors StringUtils::chop — trim leading/trailing spaces and tabs.
+// StringUtils.cpp:200–208.
+func Chop(str string) string {
+	return strings.Trim(str, " \t")
+}
+
+// EndWith mirrors StringUtils::end_with.
+func EndWith(s, tail string) bool {
+	return strings.HasSuffix(s, tail)
+}
+
+// SplitIntString mirrors StringUtils::split_int_string.
+// StringUtils.cpp:133–148.
+func SplitIntString(str, seps string) []int {
+	parts := SplitStringAny(str, seps)
+	out := make([]int, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, Str2Int(p))
+	}
+	return out
+}
+
+// BreakupAssigns mirrors StringUtils::breakup_assigns.
+// StringUtils.cpp:214+ — "a=1; b=2" → vars/values pairs (split on ';' then '=').
+func BreakupAssigns(assigns string) (vars, values []string) {
+	stmts := SplitString(assigns, ';')
+	for _, st := range stmts {
+		st = Chop(st)
+		if st == "" {
+			continue
+		}
+		// split on first '='
+		eq := strings.IndexByte(st, '=')
+		if eq < 0 {
+			continue
+		}
+		vars = append(vars, Chop(st[:eq]))
+		values = append(values, Chop(st[eq+1:]))
+	}
+	return vars, values
+}

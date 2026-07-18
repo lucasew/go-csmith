@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // goodGotoTarget reports statements that may receive a label (not jump/return-ish).
 // StatementGoto.cpp:99–109 — disallow break/continue/goto/return as targets.
 func goodGotoTarget(st Stmt) bool {
@@ -16,21 +18,54 @@ func goodGotoTarget(st Stmt) bool {
 // HasInitSkippedVars mirrors StatementGoto::has_init_skipped_vars.
 // StatementGoto.cpp:281–306 — jump into/out would skip locals of intermediate blocks.
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
+	return len(CollectInitSkippedVars(src, destParent)) > 0
+}
+
+// CollectInitSkippedVars collects locals whose initialization is skipped by a jump.
+// StatementGoto.cpp:281–306 — walk dest parent chain until src.
+func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
-		return false
+		return nil
 	}
-	// walk dest ancestors until src; any local not visible in src → skipped
+	var skipped []*Variable
+	// walk dest ancestors until src
 	for b := destParent; b != nil && b != src; b = b.Parent {
 		for _, v := range b.LocalVars {
 			if v == nil {
 				continue
 			}
+			// b==src handled by loop exit; all locals in intermediate blocks skipped
+			// when not visible in src
 			if src == nil || !v.IsVisibleLocal(src) {
-				return true
+				skipped = append(skipped, v)
 			}
 		}
 	}
-	return false
+	return skipped
+}
+
+// OutputSkippedVarInits mirrors StatementGoto::output_skipped_var_inits.
+// StatementGoto.cpp:264–275 — re-init skipped locals at destination label.
+func OutputSkippedVarInits(st *Stmt, indent string) string {
+	if st == nil || len(st.InitSkippedVars) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, v := range st.InitSkippedVars {
+		if v == nil {
+			continue
+		}
+		b.WriteString(indent)
+		b.WriteString(v.GetActualName(false))
+		b.WriteString(" = ")
+		if v.Init != nil {
+			b.WriteString(v.Init.Value)
+		} else {
+			b.WriteString("0")
+		}
+		b.WriteString(";\n")
+	}
+	return b.String()
 }
 
 // FindGoodJumpBlock mirrors StatementGoto::find_good_jump_block.
@@ -223,6 +258,8 @@ func MakeRandomGoto(
 	st := Stmt{Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID()}
 	if backEdge {
 		st.GotoBack = true
+		// jump from curr (blk) into okBlk → collect skipped locals
+		st.InitSkippedVars = CollectInitSkippedVars(blk, okBlk)
 		// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm, false, true)
 		if cg.FM != nil {
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, true)
@@ -231,6 +268,8 @@ func MakeRandomGoto(
 		RecordBackwardJump()
 	} else {
 		st.GotoForward = true
+		// jump from okBlk into curr (blk)
+		st.InitSkippedVars = CollectInitSkippedVars(okBlk, blk)
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
 		if cg.FM != nil {
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, false)

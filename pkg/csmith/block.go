@@ -36,6 +36,9 @@ type Stmt struct {
 	GotoForward bool
 	// GotoBack: label lives on an earlier statement (SourceLabel).
 	GotoBack bool
+	// InitSkippedVars mirrors StatementGoto::init_skipped_vars.
+	// StatementGoto.cpp:223 — locals whose inits are skipped by this jump.
+	InitSkippedVars []*Variable
 	// StmID mirrors Statement::stm_id for step_hash.
 	StmID int
 	// SafeFlags / Tmp1 / Tmp2 for compound assign safe-math OutputAsExpr.
@@ -633,6 +636,14 @@ func (b *Block) Output(indent int) string {
 				lab += attr
 			}
 			sb.WriteString(inner + lab + "\n")
+			// StatementGoto::output_skipped_var_inits after dest label
+			// StatementGoto.cpp:264–275 / pre_output comment path
+			for i := range b.Stmts {
+				g := &b.Stmts[i]
+				if g.Kind == StmtGoto && g.Label == st.SourceLabel && len(g.InitSkippedVars) > 0 {
+					sb.WriteString(OutputSkippedVarInits(g, inner))
+				}
+			}
 		}
 		if st.Kind == StmtLabel {
 			sb.WriteString(inner + "    ;\n")

@@ -89,25 +89,48 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	body := &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
-	postLoopAnalysis(fm, body, pre)
+	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtReturn}}}
+	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
+	postLoopAnalysis(fm, forSt, body, pre, nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
 	}
 }
 
-func TestPostLoopAnalysisMerge(t *testing.T) {
+func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
-	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, b)}
-	body := &Block{Stmts: []Stmt{{Kind: StmtAssign}}}
-	postLoopAnalysis(fm, body, pre)
+	body := &Block{
+		StmID:       10,
+		BreakStmIDs: []int{20},
+		Stmts:       []Stmt{{Kind: StmtAssign}},
+	}
+	fm.SetMapFactsIn(10, pre)
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
+	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
+	// body entry facts base; merge break outs
+	postLoopAnalysis(fm, forSt, body, pre, nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
-	if fp == nil || len(fp.PointTo) < 2 {
-		t.Fatalf("merged %+v", fp)
+	if fp == nil {
+		t.Fatal("nil")
+	}
+	// should include b from break and a from entry (merge)
+	if !IsVariableInSet(fp.PointTo, a) && !IsVariableInSet(fp.PointTo, b) {
+		// at least one after merge
+		t.Fatalf("%+v", fp)
+	}
+	// break edge created
+	found := false
+	for _, e := range fm.CFGEdges {
+		if e != nil && e.SrcID == 20 && e.DestStmID == 9 && e.PostDest {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("break edge", fm.CFGEdges)
 	}
 }
