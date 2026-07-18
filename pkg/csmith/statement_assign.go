@@ -93,15 +93,16 @@ func MakeRandomAssign(
 	rhsCG.EffectStm = EmptyEffect()
 
 	var rhs *Expression
+	// StatementAssign.cpp:147–148 — qfer from caller or derived from RHS
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	qfer.Wildcard = true
 
 	if op.NeedNoRHS() {
+		// StatementAssign.cpp:138–144 — Constant::make_int(1); wildcard when no qf
 		rhs = &Expression{Term: TermConstant, Con: MakeInt(1)}
-		// standalone ++/--: any qualifier fits (wildcard)
-	} else {
-		// strict_volatile: skip volatile struct/union LHS types
-		if opts.StrictVolatileRule && typ != nil && typ.IsVolatileStructUnion() {
+	} else if opts.StrictVolatileRule {
+		// StatementAssign.cpp:145–167
+		if typ != nil && typ.IsVolatileStructUnion() {
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
@@ -113,28 +114,40 @@ func MakeRandomAssign(
 			SetError(ErrGeneric)
 			return Stmt{Kind: StmtAssign}
 		}
-		// derive qfer from expression (non-const for LHS)
 		if q := expressionQualifiers(rhs); q != nil {
 			qfer = *q
-			// lhs should not be const
-			if len(qfer.IsConsts) > 0 {
-				qfer.IsConsts[0] = false
-			}
+			// StatementAssign.cpp:154–155 — accept_stricter; LHS not const
+			qfer.AcceptStricter = true
+			qfer.SetConst(false, 0)
 		}
-		// compound: fold RHS effects into running context; force non-vol LHS
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
-			if len(qfer.IsVolatiles) > 0 {
-				qfer.IsVolatiles[0] = false
-			}
+			qfer.SetVolatile(false, 0)
 		}
-		if opts.StrictVolatileRule {
+		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
+		runningEff = runningEff.AddEffect(rhsAccum)
+		if qfer.IsVolatile() {
+			qfer.SetVolatile(false, 0)
+		}
+	} else {
+		// StatementAssign.cpp:168–181
+		rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+		if rhs == nil {
+			rhs = MakeRandomExpression(r, opts, tables, vs, rhsCG, typ, nil, true, false, TermConstant, rhsCG.ExprDepth)
+		}
+		if rhs == nil {
+			SetError(ErrGeneric)
+			return Stmt{Kind: StmtAssign}
+		}
+		if q := expressionQualifiers(rhs); q != nil {
+			qfer = *q
+			// StatementAssign.cpp:172–174
+			qfer.AcceptStricter = true
+			qfer.SetConst(false, 0)
+		}
+		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
-			if qfer.IsVolatile() {
-				if len(qfer.IsVolatiles) > 0 {
-					qfer.IsVolatiles[0] = false
-				}
-			}
+			qfer.SetVolatile(false, 0)
 		}
 	}
 	// merge RHS effects into caller
@@ -153,9 +166,17 @@ func MakeRandomAssign(
 	lhsCG.EffectStm = rhsCG.EffectStm
 	lhsCG.CurrRHS = rhs
 
-	// StatementAssign.cpp:195–200 — compound_assign = (op != simple); no_signed_overflow = need_no_rhs(op)
+	// StatementAssign.cpp:190–200 — match_exact_qualifiers when qf provided (ExpressionAssign path)
+	// Library path typically qf==nil; still pass derived qfer to Lhs.
+	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs
+	lhsType := typ
+	if opts.StrictFloat && rhs != nil {
+		if rt := rhs.GetType(); rt != nil {
+			lhsType = rt
+		}
+	}
 	compound := op != AssignSimple
-	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, typ, compound, op.NeedNoRHS())
+	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, lhsType, compound, op.NeedNoRHS(), &qfer)
 	var lhsVar *Variable
 	if lhs != nil {
 		lhsVar = lhs.Var
@@ -174,16 +195,22 @@ func MakeRandomAssign(
 			rhs.CastType = typ
 		}
 	}
-	// float op downgrade
-	if lhsVar != nil && lhsVar.Type != nil && lhsVar.Type.IsFloat() && !AssignOpWorksForFloat(op) {
-		op = AssignSimple
+	// StatementAssign.cpp:211–216 — float base forces simple op
+	if lhsVar != nil && lhsVar.Type != nil {
+		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+			op = AssignSimple
+		}
 	}
-	if rhs != nil && rhs.GetType() != nil && rhs.GetType().IsFloat() && !AssignOpWorksForFloat(op) {
-		op = AssignSimple
+	if rhs != nil {
+		if rt := rhs.GetType(); rt != nil {
+			if bt := rt.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+				op = AssignSimple
+			}
+		}
 	}
 
-	// StatementAssign.cpp:218–223 — CompatibleChecker
-	if CompatibleCheckExprVar(opts, lhsVar, rhs) {
+	// StatementAssign.cpp:218 — CompatibleChecker::compatible_check(e, lhs)
+	if CompatibleCheckExprs(opts, rhs, LhsAsExpression(lhs)) {
 		SetError(ErrCompatibleCheck)
 		// regenerate RHS once as constant (practical recovery vs hard fail)
 		rhs = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}

@@ -190,7 +190,8 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 // MakeRandomLhs mirrors Lhs::make_random.
 // Lhs.cpp:58–143 — must_use / select_deref_pointer / select(eDerefExact) with dummy
 // invalid_vars; no_signed_overflow, ccomp bitfield, float filters; visit_facts.
-// noSignedOverflow is StatementAssign::need_no_rhs(op) at call sites (Lhs.cpp param name).
+// qfer is StatementAssign-built qualifiers (may be wildcard); nil → non-const WRITE base.
+// noSignedOverflow is StatementAssign::need_no_rhs(op) at call sites.
 func MakeRandomLhs(
 	r *Rng,
 	opts Options,
@@ -200,6 +201,7 @@ func MakeRandomLhs(
 	typ *Type,
 	compoundAssign bool,
 	noSignedOverflow bool,
+	qfer *CVQualifiers,
 ) *Lhs {
 	if typ == nil {
 		typ = GetIntType()
@@ -207,8 +209,11 @@ func MakeRandomLhs(
 	if r == nil || vs == nil {
 		return nil
 	}
-	// base WRITE qfer (StatementAssign builds non-const; restrict on select path)
+	// Lhs.cpp:qfer from caller; default non-const non-vol storage
 	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if qfer != nil {
+		q = *qfer
+	}
 
 	// Lhs.cpp:67–69 — save effects for visit_facts backtrack
 	var accumSave *Effect
@@ -244,6 +249,7 @@ func MakeRandomLhs(
 		// Lhs.cpp:89–100 — select(WRITE, restricted qfer, dummy, eDerefExact)
 		if v == nil {
 			newQ := q
+			// Lhs.cpp:90–93 — restrict unless wildcard
 			if !newQ.Wildcard {
 				newQ.Restrict(AccessWrite, cg)
 			}
