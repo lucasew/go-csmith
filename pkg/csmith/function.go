@@ -399,7 +399,7 @@ func (f *Function) generateBodyCore(
 	if f.IsBuiltin {
 		f.Body = MakeDummyBlock(f)
 	} else {
-		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
+		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 	}
 	// Function.cpp:650 / 690 — body->set_depth_protect(true)
 	if f.Body != nil {

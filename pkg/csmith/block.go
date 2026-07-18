@@ -235,6 +235,8 @@ func BlockProbability(blockSize int, r *Rng) int {
 
 // MakeRandomBlock mirrors Block::make_random.
 // Block.cpp:115–226 — statements, optional nested loop, post_creation_analysis.
+// cg is *CGContext (C++ CGContext&) so stmt effect_stm/expr_depth and
+// post_creation_analysis mutate the caller's context.
 func MakeRandomBlock(
 	r *Rng,
 	opts Options,
@@ -242,10 +244,10 @@ func MakeRandomBlock(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 	looping bool,
 ) *Block {
-	if r == nil {
+	if r == nil || cg == nil {
 		return nil
 	}
 	f := cg.CurrentFunc
@@ -323,14 +325,14 @@ func MakeRandomBlock(
 		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
 	}
 	// Block.cpp:164–166 — nested loop for must-use multi-dim arrays
-	if b.NeedNestedLoop(cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
+	if b.NeedNestedLoop(*cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
 	}
 	// Block::post_creation_analysis (Block.cpp:682–742)
 	// Upstream appends return only inside post_creation when still missing.
 	// Without FactMgr, append return here so function bodies stay valid C.
 	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
-		ret := MakeRandomReturn(r, opts, vs, &cg)
+		ret := MakeRandomReturn(r, opts, vs, cg)
 		if ret.StmID == 0 {
 			ret.StmID = AllocStmID()
 		}
@@ -339,7 +341,7 @@ func MakeRandomBlock(
 	if b.StmID == 0 {
 		b.StmID = AllocStmID()
 	}
-	b.PostCreationAnalysis(&cg, opts, preEffect, r, vs)
+	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
@@ -440,9 +442,12 @@ func makeRandomStmt(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 	b *Block,
 ) Stmt {
+	if cg == nil {
+		return Stmt{}
+	}
 	if stmtTab == nil {
 		stmtTab = NewStatementThresholdTable(opts)
 	}
@@ -505,19 +510,19 @@ func makeRandomStmt(
 		}
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
-			PostCreationAnalysis(&st, preFacts, preEffect, &cg)
+			PostCreationAnalysis(&st, preFacts, preEffect, cg)
 			return st
 		}
 	}
 	// last resort: assignment (always producible)
 	cg.EffectStm = EmptyEffect()
 	cg.ExprDepth = 0
-	st := MakeRandomAssign(r, opts, probs, vs, tables, &cg, nil)
+	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
 		preEffect = cg.EffectAccum.Clone()
 	}
-	PostCreationAnalysis(&st, nil, preEffect, &cg)
+	PostCreationAnalysis(&st, nil, preEffect, cg)
 	return st
 }
 
@@ -528,34 +533,37 @@ func makeRandomStmtKind(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 	b *Block,
 	kind StatementType,
 ) Stmt {
+	if cg == nil {
+		return Stmt{Kind: kind}
+	}
 	switch kind {
 	case StmtReturn:
-		return MakeRandomReturn(r, opts, vs, &cg)
+		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
-		st := MakeRandomAssign(r, opts, probs, vs, tables, &cg, nil)
+		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
 		// Effect::write_var on LHS (CGContext effect_accum)
 		if st.LhsVar != nil {
 			cg.NoteWrite(st.LhsVar)
 		}
 		return st
 	case StmtBreak:
-		return MakeRandomBreak(r, opts, vs, tables, &cg)
+		return MakeRandomBreak(r, opts, vs, tables, cg)
 	case StmtContinue:
-		return MakeRandomContinue(r, opts, vs, tables, &cg, b)
+		return MakeRandomContinue(r, opts, vs, tables, cg, b)
 	case StmtIfElse:
-		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, &cg)
+		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtFor:
-		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &cg)
+		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtArrayOp:
-		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, &cg)
+		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtGoto:
-		return MakeRandomGoto(r, opts, probs, vs, tables, &cg, b)
+		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
 	case StmtInvoke:
-		return MakeRandomExprStmt(r, opts, probs, vs, tables, &cg)
+		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
 	default:
 		return Stmt{Kind: kind}
 	}

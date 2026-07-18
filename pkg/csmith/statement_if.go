@@ -85,7 +85,7 @@ func MakeRandomIf(
 	thenEff := pre
 	thenCG := *cg
 	thenCG.EffectAccum = &thenEff
-	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, thenCG, false)
+	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -105,7 +105,7 @@ func MakeRandomIf(
 	elseEff := pre
 	elseCG := *cg
 	elseCG.EffectAccum = &elseEff
-	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, elseCG, false)
+	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
 	var elseFacts []*FactPointTo
 	if cg.FM != nil {
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)

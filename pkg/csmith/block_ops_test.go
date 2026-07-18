@@ -145,7 +145,7 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())
 	cg.IVBounds = map[*Variable]int{iv: 10}
-	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), cg, false)
+	b := MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil || !b.InArrayLoop {
 		t.Fatal("InArrayLoop", b)
 	}
@@ -272,7 +272,7 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	b := MakeRandomBlock(NewRng(7), opts, NewProbabilities(opts), NewVariableSelector(opts),
-		NewExprTables(opts), NewStatementThresholdTable(opts), cg, false)
+		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
 	}

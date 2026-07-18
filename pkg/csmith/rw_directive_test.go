@@ -59,7 +59,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	// reset sid for stable-ish ids
 	nextStmID = 0
-	b := MakeRandomBlock(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg, false)
+	b := MakeRandomBlock(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil block")
 	}

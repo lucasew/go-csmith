@@ -410,7 +410,7 @@ func MakeRandomFor(
 		bodyEff = *cg.EffectAccum
 	}
 	bodyCG.EffectAccum = &bodyEff
-	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, bodyCG, true)
+	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:447,470 — erase iv_bounds after body
 	if lc.IV != nil {
 		bodyCG.RemoveIVBound(lc.IV)

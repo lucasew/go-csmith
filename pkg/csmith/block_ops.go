@@ -416,9 +416,9 @@ func (b *Block) AppendNestedLoop(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) *Stmt {
-	if b == nil {
+	if b == nil || cg == nil {
 		return nil
 	}
 	var preFacts []*FactPointTo
@@ -426,7 +426,7 @@ func (b *Block) AppendNestedLoop(
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	cg.ClearEffectStm()
-	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &cg)
+	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
 	if st == nil {
 		return nil
 	}

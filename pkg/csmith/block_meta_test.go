@@ -102,7 +102,7 @@ func TestLoopSelfBackEdgeOnPostCreation(t *testing.T) {
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// make a small looping block
-	b := MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), cg, true)
+	b := MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, true)
 	if b == nil {
 		t.Fatal("nil")
 	}

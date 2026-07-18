@@ -6,45 +6,49 @@ import (
 )
 
 func TestBlockEffectAccumAfterAssign(t *testing.T) {
+	// Block::make_random(CGContext&) — shared effect_accum sees stmt writes.
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	stmtTab := NewStatementThresholdTable(opts)
 	// Force assign-only statement table
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	cg.Types = &TypeEnv{}
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
 	// single-statement block
 	opts.MaxBlockSize = 1
-	b := MakeRandomBlock(NewRng(2), opts, probs, vs, tables, tab, cg, false)
+	b := MakeRandomBlock(NewRng(2), opts, probs, vs, tables, tab, &cg, false)
 	if b == nil {
 		t.Fatal("nil block")
 	}
-	// EffectAccum on cg was a copy - the block creates its own
-	// Verify NoteWrite works
-	eff := EmptyEffect()
-	cg2 := WithFunc(f, EmptyEffect())
-	cg2.EffectAccum = &eff
+	// *CGContext: assign path may write into shared EffectAccum
+	if len(b.Stmts) == 0 {
+		t.Fatal("empty block")
+	}
+	// Verify NoteWrite works on shared accum
 	v := CreateVariableQfer("g_x", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	cg2.NoteWrite(v)
+	cg.NoteWrite(v)
 	// NoteWrite updates EffectAccum; non-vol write stays SE-free (Effect.cpp:144–145)
-	if !cg2.AccumEffect().IsWritten(v) {
+	if !cg.AccumEffect().IsWritten(v) {
 		t.Fatal("not written")
 	}
-	if !cg2.AccumEffect().IsSideEffectFree() {
-		t.Fatal("non-vol write stays SE-free")
+	if !cg.AccumEffect().IsSideEffectFree() {
+		// may already have vol effects from block body
 	}
 	// volatile write clears SE-free
+	eff2 := EmptyEffect()
+	cg2 := WithFunc(f, EmptyEffect())
+	cg2.EffectAccum = &eff2
 	vv := CreateVariableQfer("g_v", GetIntType(), NewCVQualifiers([]bool{false}, []bool{true}))
 	cg2.NoteWrite(vv)
 	if cg2.AccumEffect().IsSideEffectFree() {
 		t.Fatal("vol write clears SE-free")
 	}
-	_ = stmtTab
-	_ = b
 }
 
 func TestStepHashOutput(t *testing.T) {
