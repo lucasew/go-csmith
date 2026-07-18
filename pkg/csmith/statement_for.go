@@ -303,18 +303,21 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
 	}
 
-	// --- build IR: init assign (StatementFor.cpp:229–245) ---
+	// --- build IR: init attach flags for incr (StatementFor.cpp:229–245) ---
 	lhs := &Lhs{Var: iv, Type: iv.Type}
 	cInit := MakeInt(initN)
+	// StatementFor.cpp:229–230 — Constant::make_int; ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
-	// StatementFor.cpp:237–239 — ERROR_GUARD if flags null
-	incrBop, hasBop := incrOp.CompoundToBinaryOps()
-	_ = hasBop
-	flags1 := MakeRandomBinary(r, opts, probs, iv.Type)
+	// StatementFor.cpp:236–239 — not MakeRandomBinary (sOpBinary/BinAdd soft invent)
+	incrBop, _ := incrOp.CompoundToBinaryOps()
+	// when no compound map, incrBop is MaxBinaryOp (C++ MAX_BINARY_OP)
+	flags1 := MakeRandomBinaryKind(r, opts, probs, iv.Type, iv.Type, iv.Type, SafeOpAssign, incrBop)
 	if flags1 == nil || HasError() {
 		return nil
 	}
-	_ = incrBop
 	initSt := &Stmt{
 		Kind:      StmtAssign,
 		LhsVar:    iv,
@@ -331,6 +334,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			return nil
 		}
 	} else {
+		// library tests without FactMgr still need write effect for later steps
 		cg.NoteWrite(iv)
 	}
 

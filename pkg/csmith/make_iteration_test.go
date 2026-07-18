@@ -80,6 +80,10 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	if lc.InitStmt.AssignOp != AssignSimple {
 		t.Fatal("init must be simple assign")
 	}
+	// StatementFor.cpp:236–239 — SafeOpFlags sOpAssign for incr compound map (not bare sOpBinary)
+	if lc.InitStmt.SafeFlags == nil {
+		t.Fatal("init SafeFlags from make_random_binary(sOpAssign, compound_to_binary(incr))")
+	}
 	if lc.TestExpr == nil || lc.TestExpr.Term != TermFunction {
 		t.Fatal("test expr")
 	}
