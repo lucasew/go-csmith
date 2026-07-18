@@ -54,13 +54,20 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 // MakeOneBitfield mirrors Type::make_one_bitfield.
 // Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
 func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
+	// Type.cpp:641 — CGOptions::int_size()*8; no soft invent 32 when size is 0
+	// empty StructField uses BitWidth -1 (not a bitfield) so callers can detect fail
+	fail := StructField{BitWidth: -1}
 	maxLen := opts.IntSize * 8
 	if maxLen < 1 {
-		maxLen = 32
+		// broken options IR — empty field (no invent maxLen=32)
+		return fail
+	}
+	if r == nil || probs == nil {
+		return fail
 	}
 	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
 	if HasError() {
-		return StructField{}
+		return fail
 	}
 	var ft *Type
 	if sign {
@@ -72,11 +79,11 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
 	if HasError() {
-		return StructField{}
+		return fail
 	}
 	length := int(r.RndUpto(uint32(maxLen)))
 	if HasError() {
-		return StructField{}
+		return fail
 	}
 	// force non-zero if first field or previous was zero-length
 	if length == 0 && prevZero {
@@ -85,7 +92,7 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 		} else {
 			length = int(r.RndUpto(uint32(maxLen-1))) + 1
 			if HasError() {
-				return StructField{}
+				return fail
 			}
 		}
 	}
@@ -103,13 +110,19 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	if r == nil {
 		return nil
 	}
+	// Type.cpp:1077–1081 — max_struct_fields as-is; no soft invent maxCnt=1
 	maxCnt := opts.MaxStructFields
-	if maxCnt < 1 {
-		maxCnt = 1
+	if maxCnt < 0 {
+		maxCnt = 0
 	}
 	fieldCnt := maxCnt
 	if !opts.FixedStructFields {
+		// rnd_upto(max_cnt)+1; max 0 → RndUpto(0)+1 = 1 (matches C++ when max is 0)
 		fieldCnt = int(r.RndUpto(uint32(maxCnt))) + 1
+	}
+	if fieldCnt < 1 {
+		// fixed + max 0 → empty type IR; fail closed
+		return nil
 	}
 	// Type.cpp:1082 — ERROR_GUARD(nullptr) after field_cnt draw
 	if HasError() {
@@ -370,8 +383,9 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 		exp = 30
 	}
 	bmax := uint32(1) << uint(exp)
+	// Constant.cpp: pure_rnd_upto(b); no invent bmax=1 when shift underflows (exp clamped)
 	if bmax == 0 {
-		bmax = 1
+		return ""
 	}
 	num := int(r.RndUpto(bmax))
 	// Constant.cpp:226–235 — eInt may negate; eUInt stays non-negative
@@ -515,13 +529,17 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if r == nil {
 		return nil
 	}
+	// Type.cpp:1133–1135 — max_union_fields as-is; no soft invent maxCnt=1
 	maxCnt := opts.MaxUnionFields
-	if maxCnt < 1 {
-		maxCnt = 1
+	if maxCnt < 0 {
+		maxCnt = 0
 	}
 	fieldCnt := int(r.RndUpto(uint32(maxCnt))) + 1
 	// Type.cpp:1136 — ERROR_GUARD after field_cnt
 	if HasError() {
+		return nil
+	}
+	if fieldCnt < 1 {
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)

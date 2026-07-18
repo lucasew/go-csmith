@@ -82,11 +82,12 @@ func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
 		return ""
 	}
+	// Attribute.cpp:82–84 — 1 << rnd_upto(alignment); alignment from ctor (no invent 1)
 	n := a.Alignment
 	if n < 1 {
-		n = 1
+		// broken Attribute IR — emit nothing (no soft invent alignment=1)
+		return ""
 	}
-	// Attribute.cpp:82–84 — 1 << rnd_upto(alignment)
 	exp := int(r.RndUpto(uint32(n)))
 	if exp < 0 {
 		exp = 0

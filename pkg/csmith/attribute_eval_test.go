@@ -53,6 +53,11 @@ func TestAlignedAttribute(t *testing.T) {
 	if err != nil || n < 1 || (n&(n-1)) != 0 {
 		t.Fatal("want power of 2", s)
 	}
+	// no soft invent alignment=1 when ctor left Alignment 0
+	a0 := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 0}
+	if a0.MakeRandom(NewRng(1)) != "" {
+		t.Fatal("Alignment 0 must not invent aligned(1)")
+	}
 }
 
 func TestSectionAttribute(t *testing.T) {

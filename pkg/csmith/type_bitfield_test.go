@@ -111,3 +111,33 @@ func TestGenerateEmitsBitfieldSyntax(t *testing.T) {
 		t.Log("bitfield syntax rare in 1..39")
 	}
 }
+
+func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
+	// Type.cpp:641 — int_size()*8; IntSize 0 must not invent maxLen=32
+	opts := Defaults()
+	opts.IntSize = 0
+	probs := NewProbabilities(opts)
+	f := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
+	if f.Type != nil || f.BitWidth >= 0 {
+		t.Fatalf("IntSize 0 must fail closed, got %+v", f)
+	}
+	// normal IntSize still works
+	opts.IntSize = 4
+	f2 := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
+	if f2.Type == nil || f2.BitWidth < 1 || f2.BitWidth > 32 {
+		t.Fatalf("want live bitfield, got %+v", f2)
+	}
+}
+
+func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
+	// Type.cpp:1077 — max_struct_fields as-is; fixed+0 → nullptr not invent 1 field
+	opts := Defaults()
+	opts.MaxStructFields = 0
+	opts.FixedStructFields = true
+	opts.Bitfields = false
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	if st := MakeRandomStructType(NewRng(1), opts, probs, env, "S0"); st != nil {
+		t.Fatalf("fixed max 0 must not invent struct, got %d fields", len(st.Fields))
+	}
+}
