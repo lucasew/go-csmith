@@ -608,12 +608,23 @@ func (t *Type) HasBitfields() bool {
 }
 
 // IsBitfieldIndex mirrors Type::is_bitfield(index).
-// Type.cpp:1286+ — field at index has BitWidth >= 0.
+// Type.cpp:1286–1288 — assert(index < bitfields_length_.size()); BitWidth >= 0.
 func (t *Type) IsBitfieldIndex(index int) bool {
+	// OOB is assert path — fail closed false (not invent non-bitfield)
 	if t == nil || index < 0 || index >= len(t.Fields) {
 		return false
 	}
 	return t.Fields[index].BitWidth >= 0
+}
+
+// IsUnamedPadding mirrors Type::is_unamed_padding.
+// Type.cpp:1278–1283 — assert(index < sz); bitfields_length_[index] == 0.
+func (t *Type) IsUnamedPadding(index int) bool {
+	if t == nil || index < 0 || index >= len(t.Fields) {
+		return false
+	}
+	// only bitfield slots can be zero-width padding
+	return t.Fields[index].BitWidth == 0
 }
 
 // HasPadding mirrors Type::has_padding.

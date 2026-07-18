@@ -218,8 +218,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		return nil
 	}
 	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
-	// library: nil FM allowed for tests without facts; block required for generation
-	if cg.CurrentBlock() == nil {
+	// no soft invent iteration without FactMgr / current block
+	if cg.FM == nil || cg.CurrentBlock() == nil {
 		return nil
 	}
 	// StatementFor.cpp:176 — clear effect_stm before select
@@ -345,14 +345,9 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		StmID:     AllocStmID(),
 	}
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited)
-	if cg.FM != nil {
-		if !VisitFactsStatementAssign(initSt, cg, opts) {
-			// C++ assert(visited); treat as make_iteration failure
-			return nil
-		}
-	} else {
-		// library tests without FactMgr still need write effect for later steps
-		cg.NoteWrite(iv)
+	if !VisitFactsStatementAssign(initSt, cg, opts) {
+		// C++ assert(visited); treat as make_iteration failure
+		return nil
 	}
 
 	// Bookkeeper::record_volatile_access read+write on IV (StatementFor.cpp:249–253)

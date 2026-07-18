@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func TestMakeIterationRequiresFactMgr(t *testing.T) {
+	// StatementFor.cpp:170 assert(fm); no soft invent without FactMgr
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	cg := WithFunc(f, EmptyEffect())
+	if MakeIteration(NewRng(1), opts, NewProbabilities(opts), vs, &cg) != nil {
+		t.Fatal("nil FM must fail closed")
+	}
+}
+
 func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	// StatementFor.cpp:244–245 — assert(visited); failed init visit → no loop IR
 	opts := Defaults()
@@ -41,7 +56,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// no must-use arrays → free loop control
 	var lc *LoopControl
 	for seed := uint64(1); seed < 30; seed++ {
@@ -68,8 +83,8 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	// seed an int global as potential IV
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(1))
-	cg := WithFunc(f, EmptyEffect())
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), &q, NewRng(1))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil || lc.IV == nil {
 		t.Fatal("nil iteration")
@@ -108,8 +123,8 @@ func TestMakeIterationArrayBoundPath(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(3))
-	cg := WithFunc(f, EmptyEffect())
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(3))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg.MustUseArrays = []*ArrayVariable{av}
 	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
@@ -132,8 +147,8 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(2))
-	cg := WithFunc(f, EmptyEffect())
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(2))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	st := MakeRandomFor(NewRng(9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")

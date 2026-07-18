@@ -63,7 +63,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg.MustUseArrays = []*ArrayVariable{av}
 	lc := MakeIteration(NewRng(5), opts, probs, vs, &cg)
 	if lc == nil {
@@ -92,7 +92,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// force non-init path by calling setup+for
 	avs := MakeRandomArrayLoopSetup(NewRng(3), opts, vs, cg)
 	cg.MustUseArrays = avs
@@ -126,7 +126,7 @@ func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
 	vs.Arrays = nil
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	// empty stack → CreateRandomArray cannot invent local array
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	ClearError()
 	st := MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
@@ -159,7 +159,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// force non-array_init path: call MakeRandomArrayLoop directly
 	foundSplit := false
 	for seed := uint64(1); seed < 60; seed++ {
@@ -203,9 +203,9 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(2))
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(2))
 	v := CreateVariableScalars("g_x", GetIntType(), false, false)
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVar(v)
 	st := MakeRandomFor(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)

@@ -261,12 +261,15 @@ func (t *Type) OutputStructDecl() string {
 }
 
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
+// Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
+	// Type.cpp:1838 — assert(type->is_aggregate())
 	if t == nil || !t.isStruct {
 		return ""
 	}
 	var b strings.Builder
 	if t.Packed {
+		// Type.cpp:1849–1854 — pack pragmas
 		b.WriteString("#pragma pack(push, 1)\n")
 	}
 	b.WriteString("struct ")
@@ -275,27 +278,62 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		b.WriteString(attrs.Output(r))
 	}
 	b.WriteString(" {\n")
-	for _, f := range t.Fields {
-		b.WriteString("   ")
-		if f.Qfer.IsConst() {
-			b.WriteString(" const")
-		}
-		if f.Qfer.IsVolatile() {
-			b.WriteString(" volatile")
-		}
-		b.WriteString(" ")
-		if f.Type != nil {
-			b.WriteString(f.Type.CName())
-		} else {
-			b.WriteString("int")
-		}
-		b.WriteString(" ")
-		b.WriteString(f.Name)
+	j := 0
+	for i, f := range t.Fields {
+		// Type.cpp:1866+ — bitfield fields: signed/unsigned only, not invent "int"
 		if f.BitWidth >= 0 {
-			// bitfield: "int f0 : 3;" (width 0 allowed as padding after first)
-			b.WriteString(fmt.Sprintf(" : %d", f.BitWidth))
+			if f.Type == nil || !f.Type.IsSimple() {
+				// Type.cpp:1866 assert(eSimple); fail closed whole decl
+				return ""
+			}
+			st := f.Type.Simple()
+			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0)
+			var signedKW string
+			switch st {
+			case EInt:
+				signedKW = "signed"
+			case EUInt:
+				signedKW = "unsigned"
+			default:
+				return ""
+			}
+			b.WriteString("   ")
+			// Type.cpp:1867 — OutputFirstQuals
+			if f.Qfer.IsConst() {
+				b.WriteString("const ")
+			}
+			if f.Qfer.IsVolatile() {
+				b.WriteString("volatile ")
+			}
+			b.WriteString(signedKW)
+			// Type.cpp:1875 assert(length >= 0); 0 → padding " : 0;"
+			if f.BitWidth == 0 {
+				b.WriteString(" : ")
+				b.WriteString(fmt.Sprintf("%d", f.BitWidth))
+			} else {
+				b.WriteString(fmt.Sprintf(" f%d : %d", j, f.BitWidth))
+				j++
+			}
+			b.WriteString(";\n")
+			_ = i
+			continue
 		}
+		// non-bitfield: qualified type + fN
+		if f.Type == nil {
+			// Type.cpp always has field type; no soft invent "int"
+			return ""
+		}
+		b.WriteString("   ")
+		b.WriteString(f.Qfer.OutputQualifiedType(f.Type))
+		// Type.cpp uses f0,f1…; field Name may already be fN from make_one
+		name := f.Name
+		if name == "" {
+			name = fmt.Sprintf("f%d", j)
+		}
+		b.WriteString(" ")
+		b.WriteString(name)
 		b.WriteString(";\n")
+		j++
 	}
 	b.WriteString("};")
 	if t.Packed {
@@ -528,6 +566,7 @@ func (t *Type) OutputUnionDecl() string {
 }
 
 // OutputUnionDeclOpts optionally emits type attributes.
+// Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isUnion {
 		return ""
@@ -539,26 +578,52 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		b.WriteString(attrs.Output(r))
 	}
 	b.WriteString(" {\n")
+	j := 0
 	for _, f := range t.Fields {
-		b.WriteString("   ")
-		if f.Qfer.IsConst() {
-			b.WriteString(" const")
-		}
-		if f.Qfer.IsVolatile() {
-			b.WriteString(" volatile")
-		}
-		b.WriteString(" ")
-		if f.Type != nil {
-			b.WriteString(f.Type.CName())
-		} else {
-			b.WriteString("int")
-		}
-		b.WriteString(" ")
-		b.WriteString(f.Name)
 		if f.BitWidth >= 0 {
-			b.WriteString(fmt.Sprintf(" : %d", f.BitWidth))
+			// unions rarely have bitfields; same assert rules as struct
+			if f.Type == nil || !f.Type.IsSimple() {
+				return ""
+			}
+			st := f.Type.Simple()
+			var signedKW string
+			switch st {
+			case EInt:
+				signedKW = "signed"
+			case EUInt:
+				signedKW = "unsigned"
+			default:
+				return ""
+			}
+			b.WriteString("   ")
+			if f.Qfer.IsConst() {
+				b.WriteString("const ")
+			}
+			if f.Qfer.IsVolatile() {
+				b.WriteString("volatile ")
+			}
+			b.WriteString(signedKW)
+			if f.BitWidth == 0 {
+				b.WriteString(fmt.Sprintf(" : %d;\n", f.BitWidth))
+			} else {
+				b.WriteString(fmt.Sprintf(" f%d : %d;\n", j, f.BitWidth))
+				j++
+			}
+			continue
 		}
+		if f.Type == nil {
+			return ""
+		}
+		b.WriteString("   ")
+		b.WriteString(f.Qfer.OutputQualifiedType(f.Type))
+		name := f.Name
+		if name == "" {
+			name = fmt.Sprintf("f%d", j)
+		}
+		b.WriteString(" ")
+		b.WriteString(name)
 		b.WriteString(";\n")
+		j++
 	}
 	b.WriteString("};\n")
 	return b.String()

@@ -74,7 +74,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	// StatementFor.cpp:172 assert(blk) — parent on stack for array_loop → for
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
