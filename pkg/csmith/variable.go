@@ -529,6 +529,22 @@ func (v *Variable) IsArrayField() bool {
 	return p.IsArrayField()
 }
 
+// GetDimension mirrors Variable::get_dimension (default 0) / ArrayVariable override.
+// Variable.h:88 — virtual size_t get_dimension() const { return 0; }
+// ArrayVariable — sizes.size().
+func (v *Variable) GetDimension() int {
+	if v == nil {
+		return 0
+	}
+	if v.AsArray != nil {
+		return v.AsArray.Dimension()
+	}
+	if v.IsArray {
+		return len(v.ArraySizes)
+	}
+	return 0
+}
+
 // MatchVarName mirrors Variable::match_var_name.
 // Variable.cpp:1205–1222 — name match, array Output text, or field recurse.
 func (v *Variable) MatchVarName(vname string) *Variable {

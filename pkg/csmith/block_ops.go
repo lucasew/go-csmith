@@ -34,13 +34,14 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	if cg.IVBounds != nil {
 		ivDepth = len(cg.IVBounds)
 	}
+	// Block.cpp:399–414 — must_read/write vars use get_dimension()
 	check := func(v *Variable) bool {
-		if v == nil || !v.IsArray {
+		if v == nil {
 			return false
 		}
-		dimen := len(v.ArraySizes)
-		if v.AsArray != nil && len(v.AsArray.Sizes) > dimen {
-			dimen = len(v.AsArray.Sizes)
+		dimen := v.GetDimension()
+		if dimen == 0 {
+			return false
 		}
 		if dimen > ivDepth {
 			return true
@@ -342,15 +343,13 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
-		// visit_facts on return
-		ok := VisitFactsStatementReturn(st, cg, opts)
-		if !ok {
-			// still keep statement; upstream asserts visited
-			_ = ok
-		}
+		// Block.cpp:383 — sr->visit_facts(global_facts, …) (assert visited upstream)
+		_ = VisitFactsStatementReturn(st, cg, opts)
 		if st.StmID > 0 {
+			// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
 			fm.SetMapFactsIn(st.StmID, preFacts)
-			fm.SetMapFactsOut(st.StmID, fm.GlobalFacts)
+			// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
+			fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)
 			if fm.MapAccumEffect == nil {
 				fm.MapAccumEffect = make(map[int]Effect)
 			}
@@ -359,6 +358,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 				fm.MapVisited = make(map[int]bool)
 			}
 			fm.MapVisited[st.StmID] = true
+			// Block.cpp:391–392 — map_accum_effect[block]; map_stm_effect[block] += return
 			be := fm.GetMapStmEffect(b.StmID)
 			fm.SetMapStmEffect(b.StmID, be.AddEffect(fm.GetMapStmEffect(st.StmID)))
 			fm.MapAccumEffect[b.StmID] = cg.AccumEffect()

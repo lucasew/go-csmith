@@ -346,3 +346,71 @@ func TestFindStmtByID(t *testing.T) {
 		t.Fatal("missing")
 	}
 }
+
+func TestGetDimension(t *testing.T) {
+	// Variable.h default 0; ArrayVariable sizes
+	sc := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if sc.GetDimension() != 0 {
+		t.Fatal("scalar")
+	}
+	opts := Defaults()
+	av := CreateArrayVariable(NewRng(1), opts, nil, "g_a", GetIntType(), MakeInt(0),
+		NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("av")
+	}
+	av.Sizes = []int{2, 3, 4}
+	if av.Variable.GetDimension() != 3 {
+		t.Fatal(av.Variable.GetDimension())
+	}
+	// IsArray without AsArray
+	v := CreateVariableScalars("g_b", GetIntType(), false, false)
+	v.IsArray = true
+	v.ArraySizes = []int{5, 6}
+	if v.GetDimension() != 2 {
+		t.Fatal(v.GetDimension())
+	}
+}
+
+func TestNeedNestedLoopUsesGetDimension(t *testing.T) {
+	opts := Defaults()
+	av := CreateArrayVariable(NewRng(2), opts, nil, "g_m", GetIntType(), MakeInt(0),
+		NewCVQualifiers([]bool{false}, []bool{false}))
+	av.Sizes = []int{2, 3}
+	// via AsArray on Variable
+	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
+	rw := &RWDirective{MustWriteVars: []*Variable{&av.Variable}}
+	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}}
+	if !b.NeedNestedLoop(cg, NewRng(1)) {
+		t.Fatal("dim 2 > iv 0 via GetDimension")
+	}
+}
+
+func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
+	// FactMgr::set_fact_out on return drops function-locals
+	opts := Defaults()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	loc.Name = "l_1"
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{
+		MakeFactPointTo(loc, NullPtr),
+		MakeFactPointTo(f.RV, NullPtr),
+	}
+	body := &Block{Func: f, StmID: AllocStmID(), LocalVars: []*Variable{loc}}
+	f.Body = body
+	f.Blocks = []*Block{body}
+	f.Stack = []*Block{body}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	st := body.AppendReturnStmt(NewRng(3), opts, NewVariableSelector(opts), &cg)
+	if st == nil || st.Kind != StmtReturn {
+		t.Fatal(st)
+	}
+	out := fm.MapFactsOut[st.StmID]
+	if FindRelatedPointTo(out, loc) != nil {
+		t.Fatal("local fact must drop on return out", out)
+	}
+}
