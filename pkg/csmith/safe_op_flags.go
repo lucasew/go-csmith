@@ -72,6 +72,41 @@ func (f *SafeOpFlags) Clone() *SafeOpFlags {
 	return &cp
 }
 
+// wrapperNames is SafeOpFlags::wrapper_names for to_id.
+var wrapperNames []string
+
+// SafeOpFlagsToID mirrors SafeOpFlags::to_id.
+// SafeOpFlags.cpp:343–352 — assign stable id to wrapper fname (1-based).
+func SafeOpFlagsToID(fname string) int {
+	for i, n := range wrapperNames {
+		if n == fname {
+			return i + 1
+		}
+	}
+	wrapperNames = append(wrapperNames, fname)
+	return len(wrapperNames)
+}
+
+// ClearSafeOpWrapperNames resets to_id registry (finalization/tests).
+func ClearSafeOpWrapperNames() {
+	wrapperNames = nil
+}
+
+// SafeMathWrapperAllowed mirrors CGOptions::safe_math_wrapper(id).
+// CGOptions.cpp:597–602 — empty list means all allowed.
+func SafeMathWrapperAllowed(opts Options, id int) bool {
+	if opts.SafeMathWrappers == "" {
+		return true
+	}
+	ids := SplitIntString(opts.SafeMathWrappers, ",")
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
 // MakeRandomBinary mirrors SafeOpFlags::make_random_binary for integer ops.
 // SafeOpFlags.cpp:169–215 (float path omitted unless EnableFloat).
 func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *SafeOpFlags {

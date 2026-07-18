@@ -285,20 +285,13 @@ func makePossibleCompoundAssign(
 	return st
 }
 
-// OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
-// StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeMath.
-func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
+// OutputAssignSimple mirrors StatementAssign::OutputSimple.
+// StatementAssign.cpp:515–537 — lhs op rhs or pre/post incr forms.
+func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 	if st == nil {
 		return ""
 	}
-	lhs := ""
-	if st.ArrayAccess != "" {
-		lhs = st.ArrayAccess
-	} else if st.Lhs != nil {
-		lhs = st.Lhs.Output(wrapVol)
-	} else if st.LhsVar != nil {
-		lhs = st.LhsVar.OutputLhsC()
-	}
+	lhs := assignLhsText(st, wrapVol)
 	if lhs == "" {
 		return ""
 	}
@@ -306,47 +299,140 @@ func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
 	}
-	// NeedNoRHS and simple path
-	if st.AssignOp.NeedNoRHS() {
-		// ++/-- with safe math for incr when SafeFlags set — for now simple
+	return st.AssignOp.AssignOpC(lhs, rhs)
+}
+
+func assignLhsText(st *Stmt, wrapVol bool) string {
+	if st == nil {
+		return ""
+	}
+	if st.ArrayAccess != "" {
+		return st.ArrayAccess
+	}
+	if st.Lhs != nil {
+		return st.Lhs.Output(wrapVol)
+	}
+	if st.LhsVar != nil {
+		return st.LhsVar.OutputLhsC()
+	}
+	return ""
+}
+
+// OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
+// StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeFlags set.
+func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
+	return OutputAssignAsExprOpts(st, wrapVol, Defaults())
+}
+
+// OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.
+func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
+	if st == nil {
+		return ""
+	}
+	lhs := assignLhsText(st, wrapVol)
+	if lhs == "" {
+		return ""
+	}
+	rhs := "0"
+	if st.Expr != nil {
+		rhs = st.Expr.Output()
+	}
+	// pre/post incr without safe flags
+	if st.AssignOp.NeedNoRHS() && st.SafeFlags == nil {
 		return st.AssignOp.AssignOpC(lhs, "")
 	}
-	// avoid_signed_overflow path (CGOptions::avoid_signed_overflow ≈ SafeMath)
-	if st.SafeFlags != nil && !SafeAssign(st.AssignOp) {
-		bop, ok := st.AssignOp.CompoundToBinaryOps()
-		if ok {
-			opStr := bop.BinaryOpC()
-			fname := st.SafeFlags.BinaryFuncName(opStr)
-			if fname != "" {
-				// lhs = fname([tmp1,] lhs, [tmp2,] rhs)
-				var b strings.Builder
-				b.WriteString(lhs)
-				b.WriteString(" = ")
-				b.WriteString(fname)
-				b.WriteString("(")
-				if st.Tmp1 != "" {
-					b.WriteString(st.Tmp1)
-					b.WriteString(", ")
-				}
-				b.WriteString(lhs)
+	// avoid_signed_overflow path when SafeFlags present
+	if st.SafeFlags != nil {
+		switch st.AssignOp {
+		case AssignSimple, AssignBitAnd, AssignBitXor, AssignBitOr:
+			// safe_assign ops / simple — OutputSimple form
+			return OutputAssignSimple(st, wrapVol)
+		case AssignPreIncr:
+			return "++" + lhs
+		case AssignPreDecr:
+			return "--" + lhs
+		case AssignPostIncr:
+			return lhs + "++"
+		case AssignPostDecr:
+			return lhs + "--"
+		case AssignAdd, AssignSub:
+			bop, ok := st.AssignOp.CompoundToBinaryOps()
+			if !ok {
+				break
+			}
+			fname := st.SafeFlags.BinaryFuncName(bop.BinaryOpC())
+			if fname == "" {
+				break
+			}
+			id := SafeOpFlagsToID(fname)
+			// don't use wrapper if filtered out by --safe-math-wrapper
+			if !SafeMathWrapperAllowed(opts, id) {
+				return OutputAssignSimple(st, wrapVol)
+			}
+			var b strings.Builder
+			b.WriteString(lhs)
+			b.WriteString(" = ")
+			b.WriteString(fname)
+			b.WriteString("(")
+			if st.Tmp1 != "" {
+				b.WriteString(st.Tmp1)
 				b.WriteString(", ")
-				if st.Tmp2 != "" {
-					b.WriteString(st.Tmp2)
-					b.WriteString(", ")
+			}
+			b.WriteString(lhs)
+			b.WriteString(", ")
+			if st.Tmp2 != "" {
+				b.WriteString(st.Tmp2)
+				b.WriteString(", ")
+			}
+			b.WriteString(rhs)
+			if opts.IdentifyWrappers {
+				b.WriteString(", ")
+				b.WriteString(Int2Str(id))
+			}
+			b.WriteString(")")
+			return b.String()
+		default:
+			// other compound: try generic safe rewrite
+			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok {
+				opStr := bop.BinaryOpC()
+				fname := st.SafeFlags.BinaryFuncName(opStr)
+				if fname != "" {
+					id := SafeOpFlagsToID(fname)
+					if !SafeMathWrapperAllowed(opts, id) {
+						return OutputAssignSimple(st, wrapVol)
+					}
+					var b strings.Builder
+					b.WriteString(lhs)
+					b.WriteString(" = ")
+					b.WriteString(fname)
+					b.WriteString("(")
+					if st.Tmp1 != "" {
+						b.WriteString(st.Tmp1 + ", ")
+					}
+					b.WriteString(lhs + ", ")
+					if st.Tmp2 != "" {
+						b.WriteString(st.Tmp2 + ", ")
+					}
+					switch st.AssignOp {
+					case AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
+						if opts.MarkMutableConst {
+							b.WriteString("(1)")
+						} else {
+							b.WriteString("1")
+						}
+					default:
+						b.WriteString(rhs)
+					}
+					if opts.IdentifyWrappers {
+						b.WriteString(", " + Int2Str(id))
+					}
+					b.WriteString(")")
+					return b.String()
 				}
-				// pre/post incr use 1
-				switch st.AssignOp {
-				case AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
-					b.WriteString("1")
-				default:
-					b.WriteString(rhs)
-				}
-				b.WriteString(")")
-				return b.String()
 			}
 		}
 	}
-	return st.AssignOp.AssignOpC(lhs, rhs)
+	return OutputAssignSimple(st, wrapVol)
 }
 
 // expressionQualifiers approximates Expression::get_qualifiers for qfer seed.

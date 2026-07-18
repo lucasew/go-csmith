@@ -17,6 +17,8 @@ func DoFinalization() {
 	InvocationReturnFactsDoFinalization()
 	// PartialExpander
 	ClearPartialExpander()
+	// SafeOpFlags wrapper name registry
+	ClearSafeOpWrapperNames()
 	// Statement sid
 	nextStmID = 0
 	// Error state

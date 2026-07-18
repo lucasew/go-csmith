@@ -476,6 +476,10 @@ func makeRandomStmt(
 	// retry failed factories (null Statement* upstream)
 	for tries := 0; tries < 6; tries++ {
 		kind := StatementProbabilityFilter(r, stmtTab, f)
+		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
+		if opts.StopByStmt >= 0 && nextStmID >= opts.StopByStmt {
+			kind = StmtReturn
+		}
 		// Statement.cpp: pre_facts / pre_effect snapshot before make
 		var preFacts []*FactPointTo
 		if cg.FM != nil {
@@ -671,7 +675,10 @@ func (b *Block) Output(indent int) string {
 		case StmtAssign:
 			// StatementAssign::OutputAsExpr
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
-			asExpr := OutputAssignAsExpr(&st, wrap)
+			// use block emit options when available
+			opts := Defaults()
+			opts.IdentifyWrappers = false
+			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
 			if asExpr != "" {
 				sb.WriteString(asExpr + ";\n")
 			} else {
