@@ -252,6 +252,11 @@ func MakeRandomFor(
 	if lc.IV != nil {
 		cg.NoteWrite(lc.IV)
 	}
+	// pre-loop facts (StatementFor.cpp:299–300)
+	var preFacts []*FactPointTo
+	if cg.FM != nil {
+		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+	}
 	bodyCG := cg.WithFlags(FlagInLoop)
 	// StatementFor.cpp:441–443 — iv_bounds so body cannot assign the IV
 	if lc.IV != nil {
@@ -268,11 +273,32 @@ func MakeRandomFor(
 	if lc.IV != nil {
 		bodyCG.RemoveIVBound(lc.IV)
 	}
+	// post_loop_analysis (StatementFor.cpp:350–370)
+	if cg.FM != nil {
+		postLoopAnalysis(cg.FM, body, preFacts)
+	}
 	// merge body effect into parent (loop may execute 0+ times — keep parent SE if body writes)
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)
 	}
 	return &Stmt{Kind: StmtFor, Loop: lc, Then: body}
+}
+
+// postLoopAnalysis mirrors StatementFor::post_loop_analysis.
+// StatementFor.cpp:350–370 — must-return body restores pre; else merge; break edges already recorded.
+func postLoopAnalysis(fm *FactMgr, body *Block, preFacts []*FactPointTo) {
+	if fm == nil {
+		return
+	}
+	if body != nil && body.MustReturn() {
+		// loop never entered for exit purposes
+		fm.GlobalFacts = CloneFactSlice(preFacts)
+		return
+	}
+	// 0+ iterations: merge pre-loop with post-body facts
+	post := CloneFactSlice(fm.GlobalFacts)
+	fm.GlobalFacts = CloneFactSlice(preFacts)
+	MergeFacts(&fm.GlobalFacts, post)
 }
 
 // forIncrOutput emits for-loop increment (plain or safe_add rewrite).

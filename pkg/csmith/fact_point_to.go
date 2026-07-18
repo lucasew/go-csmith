@@ -221,22 +221,51 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	}
 }
 
-// AbstractFactForAssign mirrors FactPointTo::abstract_fact_for_assign (pointer LHS).
-// FactPointTo.cpp:266–277 — direct pointer assign only (union fields deferred).
+// AbstractFactForAssign mirrors FactPointTo::abstract_fact_for_assign.
+// FactPointTo.cpp:266–295 — merge_pointees of LHS; pointer assign or pointer fields.
 func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) []*FactPointTo {
 	if lhs == nil || lhs.Type == nil {
 		return nil
 	}
-	// only when LHS expression type is pointer (indir 0 on a pointer var)
-	// Lhs with *p (indir>0) updates pointees — deferred; handle indir==0 pointer store
-	if lhsIndir != 0 {
-		return nil
+	// find all pointed variables on LHS (merge_pointees of collective)
+	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, factsIn)
+	if lhsIndir == 0 && lhs.Type.ptrTo != nil {
+		// direct pointer store: LHS is the pointer var itself
+		if len(lvars) == 0 {
+			lvars = []*Variable{lhs.GetCollective()}
+		}
+		return RhsToLhsTransfer(factsIn, lvars, rhs)
 	}
-	if lhs.Type.ptrTo == nil {
-		return nil
+	// when assigning through *p (indir>0) or to aggregate, transfer to pointer fields
+	if len(lvars) == 0 && lhsIndir == 0 {
+		// non-pointer scalar LHS
+		if !lhs.IsAggregate() {
+			return nil
+		}
+		lvars = []*Variable{lhs}
 	}
-	lvars := []*Variable{lhs.GetCollective()}
-	return RhsToLhsTransfer(factsIn, lvars, rhs)
+	var out []*FactPointTo
+	for _, v := range lvars {
+		if v == nil {
+			continue
+		}
+		// walk to union container for union field path (simplified: pointer fields only)
+		ptrs := v.FindPointerFields()
+		if v.IsPointer() && lhsIndir > 0 {
+			// assigning *p = rhs updates pointees as if they were written — garbage if unknown
+			// for pointer-typed *p result, use transfer onto pointees that are pointers
+			for _, p := range MergePointeesOfPointer(v, 1, factsIn) {
+				if p != nil && p.IsPointer() {
+					ptrs = append(ptrs, p)
+				}
+			}
+		}
+		if len(ptrs) == 0 {
+			continue
+		}
+		out = append(out, RhsToLhsTransfer(factsIn, ptrs, rhs)...)
+	}
+	return out
 }
 
 // Equal reports same var and same points-to set.

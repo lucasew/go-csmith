@@ -76,6 +76,105 @@ func MakeScalarConsts(opts Options, consts []bool) {
 	}
 }
 
+// boolsEqual compares two bool slices.
+func boolsEqual(a, b []bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// StricterThan mirrors CVQualifiers::stricter_than (const/vol depth match).
+// CVQualifiers.cpp:95–120 subset — const: no looser const; multi-level ** special.
+func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
+	if len(q.IsConsts) != len(other.IsConsts) || len(q.IsVolatiles) != len(other.IsVolatiles) {
+		return false
+	}
+	depth := len(q.IsConsts)
+	for i := 0; i < depth; i++ {
+		// levels followed by two * must match const exactly
+		if depth-i > 2 && q.IsConsts[i] != other.IsConsts[i] {
+			return false
+		}
+		// other has const where we don't → we are not stricter
+		if other.IsConsts[i] && !q.IsConsts[i] {
+			return false
+		}
+	}
+	for i := 0; i < depth; i++ {
+		if other.IsVolatiles[i] && !q.IsVolatiles[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Match mirrors CVQualifiers::match.
+// CVQualifiers.cpp:137–152.
+func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
+	if q.Wildcard {
+		return true
+	}
+	if matchExact {
+		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
+	}
+	// both non-pointer (one level) → true
+	if len(q.IsConsts) == len(other.IsConsts) && len(q.IsConsts) == 1 {
+		return true
+	}
+	if !q.AcceptStricter {
+		return q.StricterThan(other)
+	}
+	return other.StricterThan(q)
+}
+
+// IndirectQualifiers mirrors CVQualifiers::indirect_qualifiers.
+// CVQualifiers.cpp:504–521 — level<0 address; level>0 strip deref levels.
+func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
+	if level == 0 || q.Wildcard {
+		return q
+	}
+	if level < 0 {
+		// address-of: add one false,false level
+		out := NewCVQualifiers(
+			append(append([]bool(nil), q.IsConsts...), false),
+			append(append([]bool(nil), q.IsVolatiles...), false),
+		)
+		out.Wildcard = q.Wildcard
+		out.AcceptStricter = q.AcceptStricter
+		return out
+	}
+	// dereference: remove `level` outermost entries from front? Upstream remove_qualifiers
+	// removes from the start of the vector (outer pointers)
+	if level >= len(q.IsConsts) {
+		return NewCVQualifiers(nil, nil)
+	}
+	out := NewCVQualifiers(q.IsConsts[level:], q.IsVolatiles[level:])
+	out.AcceptStricter = q.AcceptStricter
+	return out
+}
+
+// MatchIndirect mirrors CVQualifiers::match_indirect.
+// CVQualifiers.cpp:155–166.
+func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
+	if q.Wildcard {
+		return true
+	}
+	if len(q.IsConsts) == len(other.IsConsts) {
+		return q.Match(other, matchExact)
+	}
+	deref := len(other.IsConsts) - len(q.IsConsts)
+	if deref < -1 {
+		return false
+	}
+	return q.Match(other.IndirectQualifiers(deref), matchExact)
+}
+
 // isVolatileOKOnOneLevel mirrors is_volatile_ok_on_one_level (CVQualifiers.cpp).
 // For non-C++ and non-struct/union types, always true. Struct/union path deferred.
 func isVolatileOKOnOneLevel(opts Options, t *Type) bool {

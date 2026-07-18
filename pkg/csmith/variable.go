@@ -366,6 +366,26 @@ func (v *Variable) GetFieldID() int {
 	return -1
 }
 
+// FindPointerFields mirrors Variable::find_pointer_fields.
+// Variable.cpp:1228–1235 — recursive pointer fields of aggregates.
+func (v *Variable) FindPointerFields() []*Variable {
+	if v == nil {
+		return nil
+	}
+	var out []*Variable
+	for _, f := range v.FieldVars {
+		if f == nil {
+			continue
+		}
+		if f.IsPointer() {
+			out = append(out, f)
+		} else if f.IsAggregate() {
+			out = append(out, f.FindPointerFields()...)
+		}
+	}
+	return out
+}
+
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {
