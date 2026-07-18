@@ -2,6 +2,15 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+// RWDirective mirrors CGContext.h RWDirective — must/no read/write sets.
+// Directs VariableSelector without changing language semantics alone.
+type RWDirective struct {
+	NoReadVars    []*Variable
+	NoWriteVars   []*Variable
+	MustReadVars  []*Variable
+	MustWriteVars []*Variable
+}
+
 // CGContext is a minimal CGContext for paths that only need effect_context.
 // Function/block/fact fields land with later ports.
 type CGContext struct {
@@ -25,6 +34,11 @@ type CGContext struct {
 	EffectAccum *Effect
 	// FM is optional FactMgr for the current function (get_fact_mgr).
 	FM *FactMgr
+	// RW mirrors rw_directive (optional).
+	RW *RWDirective
+	// IVBounds mirrors iv_bounds — loop induction variables must not be written.
+	// Value is bound (unused for eligibility; presence matters).
+	IVBounds map[*Variable]int
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -116,4 +130,65 @@ func (c CGContext) NoDanglingPtr() bool { return c.Flags&FlagNoDanglingPtr != 0 
 func (c CGContext) WithFlags(f uint) CGContext {
 	c.Flags |= f
 	return c
+}
+
+// WithRW attaches an RWDirective.
+func (c CGContext) WithRW(rw *RWDirective) CGContext {
+	c.RW = rw
+	return c
+}
+
+// IsNonReadable mirrors CGContext::is_nonreadable.
+// CGContext.cpp:118–128 — match against no_read_vars.
+func (c CGContext) IsNonReadable(v *Variable) bool {
+	if c.RW == nil || v == nil {
+		return false
+	}
+	for _, nr := range c.RW.NoReadVars {
+		if nr != nil && nr.Match(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsNonWritable mirrors CGContext::is_nonwritable.
+// CGContext.cpp:133–149 — loose_match no_write_vars; IV bounds.
+func (c CGContext) IsNonWritable(v *Variable) bool {
+	if v == nil {
+		return false
+	}
+	if c.RW != nil {
+		for _, nw := range c.RW.NoWriteVars {
+			if nw != nil && (nw.LooseMatch(v) || v.LooseMatch(nw)) {
+				return true
+			}
+		}
+	}
+	// not writing to loop IVs (avoid infinite loops)
+	for iv := range c.IVBounds {
+		if iv != nil && v.LooseMatch(iv) {
+			return true
+		}
+	}
+	return false
+}
+
+// AddIVBound records a loop induction variable (StatementFor.cpp:441–443).
+func (c *CGContext) AddIVBound(iv *Variable, bound int) {
+	if c == nil || iv == nil {
+		return
+	}
+	if c.IVBounds == nil {
+		c.IVBounds = make(map[*Variable]int)
+	}
+	c.IVBounds[iv] = bound
+}
+
+// RemoveIVBound clears a loop induction variable (StatementFor.cpp:447, 470).
+func (c *CGContext) RemoveIVBound(iv *Variable) {
+	if c == nil || c.IVBounds == nil || iv == nil {
+		return
+	}
+	delete(c.IVBounds, iv)
 }

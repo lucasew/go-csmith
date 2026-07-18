@@ -166,6 +166,13 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	if access == AccessWrite && isConst {
 		return false
 	}
+	// VariableSelector.cpp:277–287 — nonreadable / nonwritable from context
+	if access == AccessRead && cg.IsNonReadable(v) {
+		return false
+	}
+	if access == AccessWrite && cg.IsNonWritable(v) {
+		return false
+	}
 	return true
 }
 

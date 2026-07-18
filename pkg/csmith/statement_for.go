@@ -253,6 +253,10 @@ func MakeRandomFor(
 		cg.NoteWrite(lc.IV)
 	}
 	bodyCG := cg.WithFlags(FlagInLoop)
+	// StatementFor.cpp:441–443 — iv_bounds so body cannot assign the IV
+	if lc.IV != nil {
+		bodyCG.AddIVBound(lc.IV, lc.LimitN)
+	}
 	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
 	bodyEff := EmptyEffect()
 	if cg.EffectAccum != nil {
@@ -260,6 +264,10 @@ func MakeRandomFor(
 	}
 	bodyCG.EffectAccum = &bodyEff
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, bodyCG, true)
+	// StatementFor.cpp:447,470 — erase iv_bounds after body
+	if lc.IV != nil {
+		bodyCG.RemoveIVBound(lc.IV)
+	}
 	// merge body effect into parent (loop may execute 0+ times — keep parent SE if body writes)
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)

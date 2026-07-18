@@ -32,6 +32,17 @@ type Stmt struct {
 	GotoForward bool
 	// GotoBack: label lives on an earlier statement (SourceLabel).
 	GotoBack bool
+	// StmID mirrors Statement::stm_id for step_hash.
+	StmID int
+}
+
+// nextStmID is Statement::sid allocator.
+var nextStmID int
+
+// AllocStmID mirrors Statement constructor stm_id = ++sid.
+func AllocStmID() int {
+	nextStmID++
+	return nextStmID
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -46,6 +57,8 @@ type Block struct {
 	TmpVars map[string]ESimpleType
 	// EmitDepthProtect: emit DEPTH++/-- when CGOptions::depth_protect (Block.cpp:255–267).
 	EmitDepthProtect bool
+	// EmitStepHash: emit step_hash(stm_id) before each stmt (CGOptions::step_hash_by_stmt).
+	EmitStepHash bool
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
@@ -105,6 +118,7 @@ func MakeRandomBlock(
 		Looping:          looping,
 		blockSize:        opts.MaxBlockSize,
 		EmitDepthProtect: opts.DepthProtect,
+		EmitStepHash:     opts.StepHashByStmt,
 	}
 	if f != nil {
 		f.Stack = append(f.Stack, b)
@@ -125,12 +139,16 @@ func MakeRandomBlock(
 	pendingFwd := ""
 	for i := 0; i <= max; i++ {
 		st := makeRandomStmt(r, opts, probs, vs, tables, stmtTab, cg, b)
+		if st.StmID == 0 {
+			st.StmID = AllocStmID()
+		}
 		if pendingFwd != "" {
 			if st.SourceLabel == "" {
 				st.SourceLabel = pendingFwd
 			} else {
 				// already labeled — keep pending as no-op marker after previous
-				b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd})
+				lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()}
+				b.Stmts = append(b.Stmts, lab)
 			}
 			pendingFwd = ""
 		}
@@ -144,12 +162,16 @@ func MakeRandomBlock(
 		}
 	}
 	if pendingFwd != "" {
-		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd})
+		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmID()})
 	}
 	// Block.cpp:734–737 — top-level function body: append return if required and missing
 	// (still on stack so ExpressionVariable can see locals)
 	if parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
-		b.Stmts = append(b.Stmts, MakeRandomReturn(r, opts, vs, cg))
+		ret := MakeRandomReturn(r, opts, vs, cg)
+		if ret.StmID == 0 {
+			ret.StmID = AllocStmID()
+		}
+		b.Stmts = append(b.Stmts, ret)
 	}
 	// FactMgr::update_facts_for_oos_vars when leaving block (locals go out of scope)
 	if cg.FM != nil && len(b.LocalVars) > 0 {
@@ -350,6 +372,11 @@ func (b *Block) Output(indent int) string {
 		if st.Kind == StmtLabel {
 			sb.WriteString(inner + "    ;\n")
 			continue
+		}
+		// Statement::pre_output / output_hash — step_hash(stm_id)
+		// Statement.cpp:927–931 / OutputMgr.cpp:161–167
+		if b.EmitStepHash && st.StmID > 0 {
+			sb.WriteString(inner + fmt.Sprintf("step_hash(%d);\n", st.StmID))
 		}
 		sb.WriteString(inner)
 		switch st.Kind {
