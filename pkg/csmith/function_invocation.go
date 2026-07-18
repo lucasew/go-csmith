@@ -105,7 +105,7 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Function {
 	var ok []*Function
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin || f == exclude || !f.IsBuilt {
+		if f == nil || f.IsBuiltin || f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}

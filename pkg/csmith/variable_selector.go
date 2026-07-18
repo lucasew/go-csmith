@@ -288,8 +288,8 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if v == nil {
 			continue
 		}
-		// is_visible: on stack or global
-		if blk != nil && !v.IsGlobal() && !v.IsVisibleLocal(blk) && !blk.IsVarOnStack(v) {
+		// is_visible (VariableSelector.cpp:1523)
+		if !v.IsVisible(blk) {
 			continue
 		}
 		if v.Type == nil || !typ.Match(v.Type, MatchFlexible) {

@@ -3,7 +3,20 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// Function mirrors Function (signature + body block; DFA/facts deferred).
+// BuildState mirrors Function::BuildState.
+// Function.h:158–163.
+type BuildState int
+
+const (
+	// BuildUnbuilt is BuildState::Unbuilt.
+	BuildUnbuilt BuildState = iota
+	// BuildBuilding is BuildState::Building.
+	BuildBuilding
+	// BuildBuilt is BuildState::Built.
+	BuildBuilt
+)
+
+// Function mirrors Function (signature + body block).
 type Function struct {
 	Name       string
 	ReturnType *Type
@@ -14,7 +27,10 @@ type Function struct {
 	Blocks     []*Block // Function::blocks
 	IsInlined  bool
 	IsBuiltin  bool
-	IsBuilt    bool // BuildState::Built after GenerateBody/make_first
+	// BuildState is Unbuilt/Building/Built (preferred over IsBuilt).
+	BuildState BuildState
+	// IsBuilt is true when BuildState==Built (compat).
+	IsBuilt bool
 	// Labels legacy end-of-body targets (superseded by Stmt SourceLabel / StmtLabel).
 	Labels []string
 	// RetConst is Function::ret_c for depth_protect else-return (Function.cpp:608–615).
@@ -27,6 +43,21 @@ type Function struct {
 	EmitConcise bool
 	// DeadGlobals mirrors Function::dead_globals (dangling global pointers at exit).
 	DeadGlobals []*Variable
+}
+
+// IsEffectKnown mirrors Function::is_effect_known — true only when Built.
+// Function.h:96–97.
+func (f *Function) IsEffectKnown() bool {
+	return f != nil && f.BuildState == BuildBuilt
+}
+
+// markBuilt sets Built state and IsBuilt flag.
+func (f *Function) markBuilt() {
+	if f == nil {
+		return
+	}
+	f.BuildState = BuildBuilt
+	f.IsBuilt = true
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -183,8 +214,17 @@ func MakeFirst(
 	if list != nil {
 		list.Funcs = append(list.Funcs, f)
 	}
+	// Function.cpp:631 — Building while generating body
+	f.BuildState = BuildBuilding
+	// pointer params start as tbd (Function.cpp:637–641)
+	for _, p := range f.Param {
+		if p != nil && p.IsPointer() {
+			if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+				fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(p, TBDPtr))
+			}
+		}
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
-	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
 	// mark pointees that were locals as dead after function (mark_func_end subset)
@@ -214,10 +254,12 @@ func MakeFirst(
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
+	f.markBuilt()
 	return f
 }
 
 // GenerateBody mirrors Function::GenerateBody — body = Block::make_random.
+// Function.cpp:626–663 — Unbuilt→Building→Built; pointer param tbd facts.
 func (f *Function) GenerateBody(
 	r *Rng,
 	opts Options,
@@ -230,6 +272,11 @@ func (f *Function) GenerateBody(
 	if f == nil {
 		return
 	}
+	// ignore regenerate if already building/built (Function.cpp:626–629)
+	if f.BuildState != BuildUnbuilt {
+		return
+	}
+	f.BuildState = BuildBuilding
 	cg := prev
 	cg.CurrentFunc = f
 	if prev.Funcs != nil {
@@ -239,8 +286,15 @@ func (f *Function) GenerateBody(
 	if cg.FM == nil {
 		cg.FM = NewFactMgr(f)
 	}
+	// pointer params → tbd (Function.cpp:637–641)
+	for _, p := range f.Param {
+		if p != nil && p.IsPointer() {
+			if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
+				cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, MakeFactPointTo(p, TBDPtr))
+			}
+		}
+	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
-	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
 	// mark_func_end: locals die after function
@@ -263,6 +317,7 @@ func (f *Function) GenerateBody(
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
 	}
+	f.markBuilt()
 }
 
 // OutputForwardDecl emits a C prototype.

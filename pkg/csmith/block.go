@@ -238,8 +238,7 @@ func makeRandomStmt(
 	if stmtTab == nil {
 		stmtTab = NewStatementThresholdTable(opts)
 	}
-	// StatementFilter subset: reject Block; reject Continue/Break unless IN_LOOP;
-	// reject compound when blk_depth >= max.
+	// StatementFilter (Statement.cpp:150–182)
 	f := filterFunc(func(v uint32) bool {
 		k := NumberToType(stmtTab, v)
 		if k == StmtBlock {
@@ -254,6 +253,10 @@ func makeRandomStmt(
 		// void return type → reject Return
 		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil &&
 			cg.CurrentFunc.ReturnType.IsSimple() && cg.CurrentFunc.ReturnType.Simple() == EVoid {
+			return true
+		}
+		// Statement.cpp:172–178 — at max funcs, filter out Invoke (no new calls)
+		if k == StmtInvoke && ReachMaxFunctions(cg.Funcs, opts) {
 			return true
 		}
 		return false

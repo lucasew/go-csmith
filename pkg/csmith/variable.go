@@ -145,6 +145,18 @@ func (v *Variable) IsFieldVar() bool {
 	return v != nil && v.FieldVarOf != nil
 }
 
+// IsVisible mirrors Variable::is_visible — global or is_visible_local.
+// Variable.h / usage in select_must_use_var.
+func (v *Variable) IsVisible(blk *Block) bool {
+	if v == nil {
+		return false
+	}
+	if v.IsGlobal() {
+		return true
+	}
+	return v.IsVisibleLocal(blk)
+}
+
 // IsVisibleLocal mirrors Variable::is_visible_local.
 // Variable.cpp:482–503 — params + block-chain locals; fields recurse parent.
 func (v *Variable) IsVisibleLocal(blk *Block) bool {
