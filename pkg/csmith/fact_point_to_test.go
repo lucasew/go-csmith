@@ -16,8 +16,37 @@ func TestFactPointToNullDead(t *testing.T) {
 	if !IsSpecialPtr(NullPtr) || !IsSpecialPtr(GarbagePtr) || !IsSpecialPtr(TBDPtr) {
 		t.Fatal("special")
 	}
-	if !NullPtr.IsVirtual() {
-		t.Fatal("virtual")
+	// Variable.cpp:280–288 — is_virtual is array collective parent, not dummy specials
+	if NullPtr.Type != nil {
+		t.Fatal("dummy null type")
+	}
+	if NullPtr.IsVirtual() {
+		t.Fatal("special ptr is not array is_virtual")
+	}
+}
+
+func TestArrayIsVirtualCollectiveParent(t *testing.T) {
+	// Variable.cpp:285–286 — collective==0 → virtual; itemized → not
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	if !parent.IsVirtual() {
+		t.Fatal("parent collective must be virtual")
+	}
+	item := parent.Itemize(NewRng(1))
+	if item == nil || item.IsVirtual() {
+		t.Fatal("itemized member must not be virtual")
+	}
+	// field of parent array is virtual via recurse
+	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) == 0 {
+		t.Skip("no fields")
+	}
+	if !parent.FieldVars[0].IsVirtual() {
+		t.Fatal("field of virtual array must be virtual")
 	}
 }
 

@@ -805,9 +805,25 @@ func (v *Variable) IsPointer() bool {
 	return v != nil && v.Type != nil && v.Type.PtrType() != nil
 }
 
-// IsVirtual mirrors Variable::is_virtual — dummy statics (null/garbage/tbd) have nil Type.
+// IsVirtual mirrors Variable::is_virtual.
+// Variable.cpp:280–288 — field recurses; array is virtual when collective==0
+// (parent array, not itemized member). Dummy null/garbage/tbd use IsSpecialPtr / Type==nil.
 func (v *Variable) IsVirtual() bool {
-	return v != nil && v.Type == nil
+	if v == nil {
+		return false
+	}
+	if v.FieldVarOf != nil {
+		return v.FieldVarOf.IsVirtual()
+	}
+	if v.AsArray != nil {
+		// ArrayVariable::collective == 0 → parent / non-itemized
+		return v.AsArray.Collective == nil
+	}
+	if v.IsArray {
+		// array flag without AsArray — treat as parent collective
+		return true
+	}
+	return false
 }
 
 // IsAggregate mirrors Variable::is_aggregate.
@@ -1028,11 +1044,13 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 	if v == nil || v.Type == nil {
 		return ""
 	}
-	// virtual array collective → expand all indices (Variable.cpp:1175–1183)
-	if v.IsArray && len(v.ArraySizes) > 0 {
-		if v.AsArray != nil && v.AsArray.Collective != nil {
-			// already itemized member — treat as scalar element access
-		} else {
+	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
+	if v.IsVirtual() {
+		// field of virtual array is broken IR for this path
+		if v.IsFieldVar() {
+			return ""
+		}
+		if v.IsArray || (v.AsArray != nil && len(v.AsArray.Sizes) > 0) {
 			return outputValueDumpArray(v, prefix, indent, unionFacts)
 		}
 	}
