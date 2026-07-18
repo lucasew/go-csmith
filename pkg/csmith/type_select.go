@@ -91,12 +91,23 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 }
 
 // ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
-// Type.cpp:521–533 — rnd_upto(ok_types).
+// Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 	if r == nil || len(ok) == 0 {
 		return nil
 	}
-	return ok[r.RndUpto(uint32(len(ok)))]
+	// Type.cpp:523 — assert(sz > 0)
+	rv := ok[r.RndUpto(uint32(len(ok)))]
+	// Type.cpp:526 — ERROR_GUARD(0)
+	if HasError() {
+		return nil
+	}
+	if rv != nil && !rv.Used {
+		// Type.cpp:528–531
+		RecordTypeWithBitfields(rv)
+		rv.Used = true
+	}
+	return rv
 }
 
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
@@ -121,12 +132,17 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 }
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
-// Type.cpp:536–539 — rnd_upto(derived_types.size()).
+// Type.cpp:536–539 — rnd_upto(derived_types.size()); ERROR_GUARD(nullptr).
 func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 	if env == nil || len(env.DerivedTypes) == 0 || r == nil {
 		return nil
 	}
-	return env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
+	p := env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
+	// Type.cpp:538 — ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
+	return p
 }
 
 // ChooseRandom mirrors Type::choose_random via ChooseRandomTypeFilter.
@@ -171,9 +187,17 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		return false
 	})
 	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	// Type.cpp:1208–1209 — ERROR_GUARD(nullptr) after rnd_upto
+	if HasError() {
+		return nil
+	}
 	t := env.AllTypes[idx]
 	if t != nil {
-		t.Used = true
+		// Type.cpp:1211–1214 — record bitfields + mark used
+		if !t.Used {
+			RecordTypeWithBitfields(t)
+			t.Used = true
+		}
 	}
 	return t
 }
@@ -279,8 +303,17 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		return false
 	})
 	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	// Type.cpp:1221–1224 — ERROR_GUARD(nullptr); assert(typ)
+	if HasError() {
+		return nil
+	}
 	t := env.AllTypes[idx]
-	if t != nil {
+	if t == nil {
+		// C++ assert(typ) after ERROR_GUARD
+		return nil
+	}
+	if !t.Used {
+		RecordTypeWithBitfields(t)
 		t.Used = true
 	}
 	return t
@@ -333,25 +366,44 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 		return nil
 	}
 	var typ *Type
-	// Type.cpp:1609–1612 — pointer as LType (simple assign only)
+	// Type.cpp:1609–1614 — pointer as LType (simple assign only); ERROR_GUARD after flip + make
 	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
+		// Type.cpp:1610 — ERROR_GUARD(nullptr) after flipcoin
+		if HasError() {
+			return nil
+		}
 		if env != nil {
 			typ = env.MakeRandomPointerType(r, opts, probs)
 		}
 		// no soft invent PointerTo(int) when env missing
+	}
+	// Type.cpp:1613 — ERROR_GUARD(nullptr) always after pointer branch (before default int)
+	// sticky error must not soft invent get_int_type()
+	if HasError() {
+		return nil
 	}
 	// Type.cpp:1616–1625 — struct as LType only (bStruct=true); no union soft path
 	if typ == nil && op == AssignSimple && env != nil && probs != nil {
 		// Type.cpp:1617–1618 — get_all_ok_struct_union_types(ok, no_const=true, no_volatile, need_int=false, bStruct=true)
 		cands := env.GetAllOKStructUnionTypes(true, noVolatile, false, true)
 		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+			if HasError() {
+				return nil
+			}
 			typ = ChooseRandomStructUnionType(r, cands)
+			// Type.cpp:526 ERROR_GUARD inside choose_random_struct_union_type
+			if HasError() {
+				return nil
+			}
 		}
 	}
 
 	// Type.cpp:1628–1633 — float as LType
 	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
 		r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {
+		if HasError() {
+			return nil
+		}
 		if opts.EnableFloat {
 			typ = GetSimpleType(EFloat)
 		}

@@ -77,6 +77,37 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 	}
 }
 
+func TestSelectLTypeErrorGuard(t *testing.T) {
+	// Type.cpp:1613 — ERROR_GUARD after pointer branch always; no soft invent get_int_type
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	if SelectLType(NewRng(1), opts, probs, env, false, AssignSimple) != nil {
+		t.Fatal("sticky error must not invent LType (not soft fall through to int)")
+	}
+	// also compound assign: same ERROR_GUARD before default int
+	if SelectLType(NewRng(2), opts, probs, env, false, AssignBitAnd) != nil {
+		t.Fatal("sticky error on compound must not invent int LType")
+	}
+}
+
+func TestChooseRandomErrorGuard(t *testing.T) {
+	// Type.cpp:1208 — ERROR_GUARD after rnd_upto(AllTypes)
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetIntType(), GetSimpleType(EShort)}}
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
+		t.Fatal("sticky error must fail ChooseRandom")
+	}
+}
+
 func TestSelectLTypeCanBePointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

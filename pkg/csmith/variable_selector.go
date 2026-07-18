@@ -1349,10 +1349,14 @@ func (vs *VariableSelector) SelectGlobalMT(
 	// VariableSelector.cpp:690 — random_type_from_type(type, no_volatile) defaults strict_simple=false
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol, false)
 	// VariableSelector.cpp:691–693 — ERROR_GUARD(nullptr); no soft invent keep original type
-	if t2 == nil {
+	if t2 == nil || HasError() {
 		return nil
 	}
-	return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+	v = vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+	if v == nil || HasError() {
+		return nil
+	}
+	return v
 }
 
 // chooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
