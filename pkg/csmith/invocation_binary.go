@@ -65,17 +65,16 @@ func (fi *Invocation) IsReturnTypeFloat() bool {
 // FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
 // FunctionInvocationUser.cpp:380 — return type.
 func (fi *Invocation) GetType() *Type {
+	// C++ FunctionInvocation always non-null; incomplete IR → nil (no invent int)
 	if fi == nil {
-		return GetIntType()
+		return nil
 	}
 	if fi.User != nil {
-		if fi.User.ReturnType != nil {
-			return fi.User.ReturnType
-		}
-		return GetIntType()
+		// FunctionInvocationUser.cpp:380 — return func->return_type
+		return fi.User.ReturnType
 	}
 	if !fi.IsStd {
-		return GetIntType()
+		return nil
 	}
 	if fi.IsUnary {
 		return fi.getTypeUnary()
@@ -95,7 +94,8 @@ func (fi *Invocation) getTypeUnary() *Type {
 			return t
 		}
 	}
-	return GetIntType()
+	// C++ uses param_value[0]->get_type(); missing operand → incomplete IR
+	return nil
 }
 
 // getTypeBinary mirrors FunctionInvocationBinary::get_type.

@@ -66,6 +66,26 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	}
 }
 
+func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
+	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1 / [0]
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	av := CreateArrayVariable(NewRng(2), opts, nil, "g_empty", GetIntType(), MakeInt(0), q)
+	av.Sizes = nil
+	vs.Arrays = []*ArrayVariable{av}
+	vs.GlobalList = []*Variable{&av.Variable}
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	st := MakeRandomArrayInit(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	// empty dims → fail (no soft invent size [1] or access[0])
+	if st.Loop != nil || st.Then != nil {
+		t.Fatal("empty sizes must not soft-succeed")
+	}
+}
+
 func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	opts := Defaults()
 	// no float types in simple select — just ensure no panic with empty filter path

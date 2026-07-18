@@ -294,17 +294,19 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 }
 
 // LHSType mirrors SafeOpFlags::get_lhs_type.
+// SafeOpFlags.cpp:98–102 — flags_to_type(op1_, op_size_); nil flags → nil (no invent).
 func (f *SafeOpFlags) LHSType() *Type {
 	if f == nil {
-		return GetIntType()
+		return nil
 	}
 	return FlagsToType(f.Op1Signed, f.Size)
 }
 
 // RHSType mirrors SafeOpFlags::get_rhs_type.
+// SafeOpFlags.cpp:104–108 — flags_to_type(op2_, op_size_); nil flags → nil.
 func (f *SafeOpFlags) RHSType() *Type {
 	if f == nil {
-		return GetIntType()
+		return nil
 	}
 	return FlagsToType(f.Op2Signed, f.Size)
 }

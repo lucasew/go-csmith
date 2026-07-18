@@ -187,13 +187,14 @@ func MakeRandomArrayInit(
 	if av == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
+	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1
 	if len(av.Sizes) == 0 {
-		av.Sizes = []int{1}
+		return Stmt{Kind: StmtArrayOp}
 	}
 	// StatementArrayOp.cpp:92–93, 100 — clear effect_stm
 	cg.EffectStm = EmptyEffect()
 
-	// StatementArrayOp.cpp:103–136 — per-dimension ctrl vars
+	// StatementArrayOp.cpp:103–136 — per-dimension ctrl vars (do-while SelectLoopCtrlVar)
 	var dims []*LoopControl
 	invalid := map[*Variable]bool{}
 	volCount := 0
@@ -208,12 +209,12 @@ func MakeRandomArrayInit(
 		// StatementArrayOp.cpp:106–107 — inits 0, incrs 1 (not random iter_ctrl)
 		initN, incrN := 0, 1
 		var iv *Variable
+		// StatementArrayOp.cpp:110–126 — do { SelectLoopCtrlVar } while filters
+		// SelectLoopCtrlVar creates global/local on miss (no second soft invent here)
 		for tries := 0; tries < 32; tries++ {
 			iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
 			if iv == nil {
-				iv = vs.GenerateNewGlobal(AccessWrite, *cg, GetIntType(), nil, r)
-			}
-			if iv == nil {
+				// C++ SelectLoopCtrlVar rarely null after create; no soft GenerateNewGlobal
 				break
 			}
 			// float IV rejected (StatementArrayOp.cpp:112–115)
@@ -233,14 +234,16 @@ func MakeRandomArrayInit(
 			}
 			break
 		}
-		if iv != nil {
-			invalid[iv] = true
-			// StatementArrayOp.cpp:129–131 — read_indices + write_var
-			_ = cg.ReadIndices(iv, facts)
-			cg.WriteVar(iv)
-			// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
-			cg.AddIVBound(iv, size)
+		// StatementArrayOp.cpp:128 — cvs.push_back(cv); cv must be live
+		if iv == nil {
+			return Stmt{Kind: StmtArrayOp}
 		}
+		invalid[iv] = true
+		// StatementArrayOp.cpp:129–131 — read_indices + write_var
+		_ = cg.ReadIndices(iv, facts)
+		cg.WriteVar(iv)
+		// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
+		cg.AddIVBound(iv, size)
 		_ = di
 		dims = append(dims, &LoopControl{
 			IV:       iv,
@@ -255,14 +258,11 @@ func MakeRandomArrayInit(
 	// StatementArrayOp.cpp:137 — write_var(av)
 	cg.WriteVar(&av.Variable)
 
-	// access with ctrl vars: a[i0][i1]…
+	// access with ctrl vars: a[i0][i1]… (C++ always has cvs[i])
 	access := av.Name
 	for _, d := range dims {
-		if d != nil && d.IV != nil {
-			access += "[" + d.IV.Name + "]"
-		} else {
-			access += "[0]"
-		}
+		// no soft invent "[0]" for missing IV
+		access += "[" + d.IV.Name + "]"
 	}
 
 	// StatementArrayOp.cpp:141–143 — make_init_value in random parent block
