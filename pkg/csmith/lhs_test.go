@@ -12,14 +12,14 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	vs.Types = &TypeEnv{}
 	r := NewRng(3)
 	cg := EmptyCGContext()
-	lhs, ty := MakeRandomLhs(r, opts, probs, vs, cg, GetIntType(), false)
-	if lhs == nil {
+	lhs := MakeRandomLhs(r, opts, probs, vs, cg, GetIntType(), false)
+	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil lhs")
 	}
-	if ty == nil {
+	if lhs.GetType() == nil {
 		t.Fatal("nil type")
 	}
-	if lhs.Name == "" {
+	if lhs.Var.Name == "" {
 		t.Fatal("empty name")
 	}
 }
@@ -38,11 +38,10 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 		t.Fatal("no ptr global")
 	}
 	// force high deref probability by trying many seeds
-	var got *Variable
-	var et *Type
+	var got *Lhs
 	for seed := uint64(1); seed < 100; seed++ {
-		got, et = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false)
-		if got != nil && got.Type != nil && got.Type.IndirectLevel() == 1 && et != nil && et.IndirectLevel() == 0 {
+		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false)
+		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevel() == 1 && got.IndirectLevel() == 1 {
 			break
 		}
 		got = nil
@@ -50,12 +49,31 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	if got == nil {
 		t.Skip("deref path rare")
 	}
-	// emit
-	ind := got.Type.IndirectLevel() - et.IndirectLevel()
-	if ind != 1 {
-		t.Fatalf("ind=%d", ind)
+	out := got.Output(false)
+	if !strings.Contains(out, "*") {
+		t.Fatal(out)
 	}
-	_ = strings.Contains
+}
+
+func TestLhsOutputVolLval(t *testing.T) {
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	lhs := &Lhs{Var: v, Type: GetIntType()}
+	out := lhs.Output(true)
+	if !strings.Contains(out, "VOL_LVAL(g_v") {
+		t.Fatal(out)
+	}
+}
+
+func TestLhsIndirectLevel(t *testing.T) {
+	p := PointerTo(GetIntType())
+	v := CreateVariableQfer("g_p", p, NewCVQualifiers([]bool{false}, []bool{false}))
+	lhs := &Lhs{Var: v, Type: GetIntType()}
+	if lhs.IndirectLevel() != 1 {
+		t.Fatal(lhs.IndirectLevel())
+	}
+	if lhs.Output(false) != "(*g_p)" {
+		t.Fatal(lhs.Output(false))
+	}
 }
 
 func TestPickUnaryOp(t *testing.T) {
@@ -84,5 +102,35 @@ func TestExpressionVariableDerefOutput(t *testing.T) {
 	out := e.Output()
 	if out != "(*g_1)" {
 		t.Fatalf("%q", out)
+	}
+}
+
+func TestExpressionVariableAddrOutput(t *testing.T) {
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
+	// ind = 0 - 1 = -1
+	out := e.Output()
+	if out != "&g_1" {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestLhsBookkeepingWriteDeref(t *testing.T) {
+	BookkeeperDoFinalization()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	vs.Types = env
+	p := env.FindPointerType(GetIntType(), true)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), p, &q, NewRng(1))
+	// bump deref prob
+	probs.single[PSelectDerefPointerProb] = 100
+	for seed := uint64(1); seed < 80; seed++ {
+		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false)
+	}
+	if CalcTotal(writeDereferenceCnts) == 0 && writeVolatileCnt+writeNonVolatileCnt == 0 {
+		t.Fatal("expected some write bookkeeping")
 	}
 }

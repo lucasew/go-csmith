@@ -61,8 +61,8 @@ func TestMakeRandomLhsMustUse(t *testing.T) {
 	rw := &RWDirective{MustWriteVars: []*Variable{g}}
 	// force only must-use by empty globals after? keep g
 	cg := EmptyCGContext().WithRW(rw)
-	lhs, _ := MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, cg, GetIntType(), false)
-	if lhs == nil {
+	lhs := MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, cg, GetIntType(), false)
+	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil")
 	}
 }

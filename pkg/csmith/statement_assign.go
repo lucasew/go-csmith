@@ -86,47 +86,46 @@ func MakeRandomAssign(
 
 	// Lhs::make_random — SelectDerefPointerProb / local+global WRITE
 	compound := op != AssignSimple
-	lhs, exprTy := MakeRandomLhs(r, opts, probs, vs, cg, typ, compound)
+	lhs := MakeRandomLhs(r, opts, probs, vs, cg, typ, compound)
+	var lhsVar *Variable
+	if lhs != nil {
+		lhsVar = lhs.Var
+	}
 	// RHS cast to L type when needed (StatementAssign.cpp:207–208)
 	if rhs != nil && typ != nil {
 		rhs.CheckAndSetCast(typ)
 	}
-	if opts.CComp && lhs != nil && lhs.IsBitfield {
+	if opts.CComp && lhsVar != nil && lhsVar.IsBitfield {
 		if rhs != nil {
 			rhs.CastType = typ
 		}
 	}
 	// StatementAssign.cpp:218–223 — CompatibleChecker rejects self-compatible assign
-	if CompatibleCheckExprVar(opts, lhs, rhs) {
+	if CompatibleCheckExprVar(opts, lhsVar, rhs) {
 		// regenerate RHS once as constant to avoid COMPATIBLE_CHECK_ERROR path
 		rhs = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
 		if rhs.Con != nil {
 			rhs.CheckAndSetCast(typ)
 		}
 	}
-	st := Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
-	// if LHS is a pointer to be dereferenced, emit (*p) via ArrayAccess-style text
+	st := Stmt{Kind: StmtAssign, LhsVar: lhsVar, Expr: rhs, AssignOp: op, Lhs: lhs}
+	// if LHS is a pointer to be dereferenced, emit via Lhs.Output shape
 	lhsIndir := 0
-	if lhs != nil && exprTy != nil && lhs.Type != nil {
-		ind := lhs.Type.IndirectLevel() - exprTy.IndirectLevel()
-		lhsIndir = ind
-		if ind > 0 {
-			stars := ""
-			for i := 0; i < ind; i++ {
-				stars += "*"
-			}
-			st.ArrayAccess = "(" + stars + lhs.Name + ")"
+	if lhs != nil {
+		lhsIndir = lhs.IndirectLevel()
+		if lhsIndir > 0 || (opts.WrapVolatiles && lhs.IsVolatile()) {
+			st.ArrayAccess = lhs.Output(opts.WrapVolatiles)
 		}
 	}
 	// FactMgr::update_fact_for_assign when points-to env present
-	if cg.FM != nil && lhs != nil {
+	if cg.FM != nil && lhsVar != nil {
 		// store into pointer var itself when exprTy is the pointer type (indir 0)
 		if lhsIndir == 0 {
-			cg.FM.UpdateFactForAssign(lhs, 0, rhs)
+			cg.FM.UpdateFactForAssign(lhsVar, 0, rhs)
 		}
-		cg.NoteWrite(lhs)
-	} else if lhs != nil {
-		cg.NoteWrite(lhs)
+		cg.NoteWrite(lhsVar)
+	} else if lhsVar != nil {
+		cg.NoteWrite(lhsVar)
 	}
 	return st
 }

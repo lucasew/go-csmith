@@ -3,8 +3,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
-
 // TermType mirrors eTermType.
 type TermType int
 
@@ -410,7 +408,17 @@ func makeExpressionVariableFlags(
 		}
 		// Effect::read_var for selected variable
 		cg.NoteRead(v)
-		return &Expression{Term: TermVariable, Var: v, ExprType: typ}
+		ev := &Expression{Term: TermVariable, Var: v, ExprType: typ}
+		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
+		deref := ev.IndirectLevel()
+		if deref > 0 {
+			IncrCounter(&readDereferenceCnts, deref)
+		} else if deref < 0 {
+			// address-of: mark at generation time (not emit)
+			RecordAddressTaken(v)
+		}
+		RecordVolatileAccess(v, deref, false)
+		return ev
 	}
 	return nil
 }
@@ -441,19 +449,8 @@ func (e *Expression) outputBody() string {
 			return ""
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
-		ind := e.IndirectLevel()
-		if ind > 0 {
-			// deref uses actual name inside * (Variable::Output style)
-			stars := strings.Repeat("*", ind)
-			return "(" + stars + e.Var.Name + ")"
-		}
-		if ind < 0 {
-			// address-of: mark addr taken; &name not ACCESS_ONCE
-			// ExpressionVariable.cpp:140 — Bookkeeper::record_address_taken
-			RecordAddressTaken(e.Var)
-			return "&" + e.Var.Name
-		}
-		return e.Var.OutputC()
+		// ExpressionVariable.cpp:202–219 — base is Variable::Output (VOL_RVAL/ACCESS_ONCE).
+		return outputExpressionVariable(e.Var, e.ExprType)
 	case TermFunction:
 		if e.Invoke != nil {
 			return e.Invoke.Output()
@@ -464,6 +461,8 @@ func (e *Expression) outputBody() string {
 			lhs := ""
 			if e.Assign.ArrayAccess != "" {
 				lhs = e.Assign.ArrayAccess
+			} else if e.Assign.Lhs != nil {
+				lhs = e.Assign.Lhs.Output(e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal)
 			} else if e.Assign.LhsVar != nil {
 				lhs = e.Assign.LhsVar.OutputLhsC()
 			}

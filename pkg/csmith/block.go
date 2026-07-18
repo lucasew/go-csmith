@@ -15,6 +15,8 @@ type Stmt struct {
 	Expr *Expression
 	// LhsVar is assign target when Kind==StmtAssign.
 	LhsVar *Variable
+	// Lhs is full Lhs (var + desired type) when available for Output.
+	Lhs *Lhs
 	// Then/Else for if; Then is for-body for for.
 	Then *Block
 	Else *Block
@@ -432,7 +434,11 @@ func (b *Block) Output(indent int) string {
 		case StmtAssign:
 			lhs := ""
 			if st.ArrayAccess != "" {
+				// precomputed Lhs.Output (deref / VOL_LVAL)
 				lhs = st.ArrayAccess
+			} else if st.Lhs != nil {
+				// Lhs.cpp:207–218
+				lhs = st.Lhs.Output(st.LhsVar != nil && st.LhsVar.UseVolRVal)
 			} else if st.LhsVar != nil {
 				// Lhs::Output → VOL_LVAL / bare name
 				lhs = st.LhsVar.OutputLhsC()
