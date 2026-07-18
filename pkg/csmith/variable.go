@@ -53,6 +53,23 @@ func (v *Variable) OutputC() string {
 	return v.Name
 }
 
+// OutputLhsC mirrors Lhs::Output — VOL_LVAL when wrap_volatiles.
+// Lhs.cpp:207–218.
+func (v *Variable) OutputLhsC() string {
+	if v == nil {
+		return ""
+	}
+	if v.UseVolRVal && v.IsVolatile() {
+		ty := "int"
+		if v.Type != nil {
+			ty = v.Type.CName()
+		}
+		return "VOL_LVAL(" + v.Name + ", " + ty + ")"
+	}
+	// ACCESS_ONCE not used for write LHS (upstream ExpressionVariable only on Lhs via Output)
+	return v.Name
+}
+
 // CreateVariableQfer mirrors
 // Variable::CreateVariable(name, type, init, qfer) without aggregate field expansion
 // and without forcing Constant::make_random (init left nil until Constant port).

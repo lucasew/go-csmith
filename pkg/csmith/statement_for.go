@@ -143,8 +143,7 @@ func MakeRandomFor(
 			lc.SafeIncr = true
 		}
 	}
-	bodyCG := cg
-	bodyCG.Flags |= 2 // IN_LOOP
+	bodyCG := cg.WithFlags(FlagInLoop)
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, bodyCG, true)
 	return &Stmt{Kind: StmtFor, Loop: lc, Then: body}
 }

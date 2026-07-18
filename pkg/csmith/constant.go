@@ -95,8 +95,25 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 func formatSmallConstant(st ESimpleType, num int, opts Options) string {
 	// Constant.cpp:329–361 cast + L/UL suffix
 	if st == EFloat {
-		// GenerateSmallRandomFloatHexConstant deferred
-		return "0x0.0p+0"
+		// GenerateSmallRandomFloatHexConstant — Constant.cpp:207–223
+		// uses num from small path; format 0xN.Hp±1
+		abs := num
+		sign := ""
+		if abs < 0 {
+			sign = "-"
+			abs = -abs
+		}
+		// RandomHexDigits(1) needs RNG — formatSmallConstant has no r; use hex digit from abs
+		h := "0"
+		if abs > 0 {
+			hex := "0123456789abcdef"
+			h = string(hex[abs%16])
+		}
+		pm := "+1"
+		if abs%2 == 0 {
+			pm = "-1"
+		}
+		return sign + "0x" + strconv.Itoa(abs) + "." + h + "p" + pm
 	}
 	var body string
 	switch st {

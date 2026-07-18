@@ -132,6 +132,17 @@ func (g *ProgramGenerator) OutputHeader() string {
 	if g.Opts.DepthProtect {
 		b.WriteString("#define MAX_DEPTH (5)\nint32_t DEPTH = 0;\n\n")
 	}
+	// OutputMgr.cpp:301–305 — optional wrappers
+	if g.Opts.WrapVolatiles {
+		b.WriteString("/* To use wrapper functions, compile this program with -DWRAP_VOLATILES=1. */\n")
+		b.WriteString("#include \"volatile_runtime.h\"\n\n")
+	}
+	if g.Opts.AccessOnce {
+		// OutputMgr.cpp:64–67 access_once_macro
+		b.WriteString("#ifndef ACCESS_ONCE\n")
+		b.WriteString("#define ACCESS_ONCE(v) (*(volatile typeof(v) *)&(v))\n")
+		b.WriteString("#endif\n\n")
+	}
 	return b.String()
 }
 

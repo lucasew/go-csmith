@@ -108,8 +108,7 @@ func MakeRandomArrayInit(
 			SafeIncr: opts.SafeMath,
 		})
 	}
-	bodyCG := cg
-	bodyCG.Flags |= 2 // IN_LOOP
+	bodyCG := cg.WithFlags(FlagInLoop)
 	// access with ctrl vars: a[i0][i1]… (not constant itemize)
 	access := av.Name
 	for _, d := range dims {

@@ -330,8 +330,8 @@ func (b *Block) Output(indent int) string {
 			if st.ArrayAccess != "" {
 				lhs = st.ArrayAccess
 			} else if st.LhsVar != nil {
-				// Lhs::Output → ExpressionVariable / VOL_LVAL-ish via OutputC
-				lhs = st.LhsVar.OutputC()
+				// Lhs::Output → VOL_LVAL / bare name
+				lhs = st.LhsVar.OutputLhsC()
 			}
 			if lhs != "" {
 				rhs := "0"

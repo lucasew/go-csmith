@@ -273,18 +273,20 @@ func MakeRandomBinaryPtrComparison(
 		return nil
 	}
 	d := cg.ExprDepth + 1
+	// FunctionInvocation.cpp:311 — NO_DANGLING_PTR on operand contexts
+	pcg := cg.WithFlags(FlagNoDanglingPtr)
 	// no_func on both sides (true); const ok on LHS
-	left := MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, MaxTermTypes, d)
+	left := MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+		left = MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, TermVariable, d)
 	}
 	tt := MaxTermTypes
 	if left != nil && left.Term == TermConstant {
 		tt = TermVariable
 	}
-	right := MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, d)
+	right := MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, tt, d)
 	if right == nil {
-		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+		right = MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, TermVariable, d)
 	}
 	_ = probs
 	// pointer comparisons do not use safe math wrappers

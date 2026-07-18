@@ -47,6 +47,23 @@ func (c CGContext) WithFuncList(list *FunctionList) CGContext {
 }
 
 
+// CGContext flag bits (CGContext.h).
+const (
+	// FlagInLoop is IN_LOOP.
+	FlagInLoop uint = 2
+	// FlagNoDanglingPtr is NO_DANGLING_PTR.
+	FlagNoDanglingPtr uint = 8
+)
+
 // InLoop is true when flags include IN_LOOP (2).
-func (c CGContext) InLoop() bool { return c.Flags&2 != 0 }
+func (c CGContext) InLoop() bool { return c.Flags&FlagInLoop != 0 }
+
+// NoDanglingPtr is true when flags include NO_DANGLING_PTR (8).
+func (c CGContext) NoDanglingPtr() bool { return c.Flags&FlagNoDanglingPtr != 0 }
+
+// WithFlags returns a copy with additional flags OR'd in.
+func (c CGContext) WithFlags(f uint) CGContext {
+	c.Flags |= f
+	return c
+}
 
