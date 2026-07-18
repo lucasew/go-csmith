@@ -414,3 +414,64 @@ func TestAppendReturnStmtFiltersLocalOut(t *testing.T) {
 		t.Fatal("local fact must drop on return out", out)
 	}
 }
+
+func TestRemoveStmtCascadesGotoSource(t *testing.T) {
+	// Block.cpp:641–646 — removing dest also removes goto that jumps to it
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	// outer has goto → dest assign; dest will be removed
+	destID := 10
+	gotoID := 20
+	body := &Block{Func: f, StmID: 1, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: destID},
+		{Kind: StmtGoto, StmID: gotoID, Label: "lbl", GotoDestStmID: destID},
+		{Kind: StmtAssign, StmID: 30},
+	}}
+	// label on dest
+	body.Stmts[0].SourceLabel = "lbl"
+	f.Blocks = []*Block{body}
+	f.Body = body
+	fm.CFGEdges = []*CFGEdge{{SrcID: gotoID, DestStmID: destID}}
+	n := body.RemoveStmt(destID, fm)
+	if n < 1 {
+		t.Fatal("removed dest")
+	}
+	// goto should be gone too
+	for _, s := range body.Stmts {
+		if s.StmID == destID || s.StmID == gotoID {
+			t.Fatalf("still present: %+v", s)
+		}
+	}
+	if len(body.Stmts) != 1 || body.Stmts[0].StmID != 30 {
+		t.Fatalf("stmts %+v", body.Stmts)
+	}
+	for _, e := range fm.CFGEdges {
+		if e != nil && (e.SrcID == gotoID || e.DestStmID == destID) {
+			t.Fatal("edge remains")
+		}
+	}
+}
+
+func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
+	// Block.cpp:655–663 — nested Then block dropped from Function.Blocks
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	inner := &Block{Func: f, StmID: 5, Stmts: []Stmt{{Kind: StmtAssign, StmID: 6}}}
+	ifSt := Stmt{Kind: StmtIfElse, StmID: 4, Then: inner}
+	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{ifSt, {Kind: StmtAssign, StmID: 7}}}
+	inner.Parent = outer
+	f.Blocks = []*Block{outer, inner}
+	f.Body = outer
+	n := outer.RemoveStmt(4, fm)
+	if n != 1 {
+		t.Fatal(n)
+	}
+	for _, b := range f.Blocks {
+		if b == inner {
+			t.Fatal("inner block should be scrubbed from Func.Blocks")
+		}
+	}
+	if len(outer.Stmts) != 1 || outer.Stmts[0].StmID != 7 {
+		t.Fatal(outer.Stmts)
+	}
+}

@@ -65,27 +65,25 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 }
 
 // RemoveStmt mirrors Block::remove_stmt by StmID.
-// Block.cpp:586+ — remove from stms; drop CFG edges involving it; scrub break list.
-// Returns number of statements removed from this block.
+// Block.cpp:586–652 — scrub break_stms; drop CFG edges from control stmts inside s;
+// drop edges into s and recursively remove goto sources; drop contained blocks
+// from Function.Blocks; erase s from stms.
+// Returns number of statements removed from this block (including cascaded gotos).
 func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	if b == nil || stmID <= 0 {
 		return 0
 	}
-	// collect IDs inside removed tree
 	var removed *Stmt
 	idx := -1
 	for i := range b.Stmts {
-		if b.Stmts[i].StmID == stmID || stmtTreeContainsID(&b.Stmts[i], stmID) {
-			// only remove top-level match by exact id, or containing tree if root matches
-			if b.Stmts[i].StmID == stmID {
-				removed = &b.Stmts[i]
-				idx = i
-				break
-			}
+		if b.Stmts[i].StmID == stmID {
+			removed = &b.Stmts[i]
+			idx = i
+			break
 		}
 	}
 	if idx < 0 {
-		// search nested blocks
+		// search nested Then/Else blocks
 		for i := range b.Stmts {
 			if b.Stmts[i].Then != nil {
 				if n := b.Stmts[i].Then.RemoveStmt(stmID, fm); n > 0 {
@@ -102,34 +100,100 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	}
 	ids := map[int]bool{}
 	collectStmIDs(removed, ids)
-	// scrub break_stms on enclosing loop
+	// also collect nested block stm ids for Func.Blocks scrub
+	if removed.Then != nil {
+		collectBlockStmIDs(removed.Then, ids)
+	}
+	if removed.Else != nil {
+		collectBlockStmIDs(removed.Else, ids)
+	}
+
+	// Statement.cpp find_typed_stmts: continue/break/goto inside s
+	cfgIDs := map[int]bool{}
+	collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs)
+
+	// Block.cpp:602–616 — scrub break_stms on enclosing loop
 	loop := b
 	for loop != nil && !loop.Looping {
 		loop = loop.Parent
 	}
-	if loop != nil {
+	if loop != nil && len(cfgIDs) > 0 {
 		nb := loop.BreakStmIDs[:0]
 		for _, id := range loop.BreakStmIDs {
-			if !ids[id] {
+			if !cfgIDs[id] {
 				nb = append(nb, id)
 			}
 		}
 		loop.BreakStmIDs = nb
 	}
-	// remove CFG edges with src or dest in removed set
+
+	var gotoSrcIDs []int
 	if fm != nil {
+		// Block.cpp:617–629 — remove edges with control stmt inside s as src
 		ne := fm.CFGEdges[:0]
 		for _, e := range fm.CFGEdges {
 			if e == nil {
 				continue
 			}
-			if ids[e.SrcID] || ids[e.DestStmID] {
+			if cfgIDs[e.SrcID] {
 				continue
 			}
 			ne = append(ne, e)
 		}
 		fm.CFGEdges = ne
-		// clear fact maps for removed ids
+
+		// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
+		ne = fm.CFGEdges[:0]
+		for _, e := range fm.CFGEdges {
+			if e == nil {
+				continue
+			}
+			destIn := e.DestStmID > 0 && ids[e.DestStmID]
+			if !destIn && e.DestBlock != nil {
+				// dest block nested under removed stmt
+				destIn = blockUnderStmt(removed, e.DestBlock)
+			}
+			if destIn {
+				// Block.cpp:641–646 — if src is goto, remove_stmt(src)
+				if e.SrcID > 0 && !ids[e.SrcID] {
+					isGoto := true
+					if fm.Func != nil {
+						if src := FindStmtByID(fm.Func, e.SrcID); src != nil {
+							isGoto = src.Kind == StmtGoto
+						}
+					}
+					if isGoto {
+						gotoSrcIDs = append(gotoSrcIDs, e.SrcID)
+					}
+				}
+				continue
+			}
+			ne = append(ne, e)
+		}
+		fm.CFGEdges = ne
+	}
+
+	// Block.cpp:655–663 — delete blocks inside s from Function.Blocks
+	f := b.Func
+	if f == nil && fm != nil {
+		f = fm.Func
+	}
+	if f != nil {
+		nb := f.Blocks[:0]
+		for _, blk := range f.Blocks {
+			if blk == nil {
+				continue
+			}
+			if blockUnderStmt(removed, blk) {
+				continue
+			}
+			nb = append(nb, blk)
+		}
+		f.Blocks = nb
+	}
+
+	// clear fact maps for removed tree
+	if fm != nil {
 		for id := range ids {
 			delete(fm.MapFactsIn, id)
 			delete(fm.MapFactsOut, id)
@@ -138,9 +202,78 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 			delete(fm.MapVisited, id)
 		}
 	}
-	// erase from stms
+
+	// Block.cpp:664–671 — erase s itself
 	b.Stmts = append(b.Stmts[:idx], b.Stmts[idx+1:]...)
-	return 1
+	cnt := 1
+
+	// cascade-remove goto sources (may live in this or other blocks)
+	seenGoto := map[int]bool{}
+	for _, gid := range gotoSrcIDs {
+		if gid <= 0 || seenGoto[gid] || ids[gid] {
+			continue
+		}
+		seenGoto[gid] = true
+		parent := b
+		if fm != nil && fm.Func != nil {
+			if p := FindParentBlockOfStmID(fm.Func, gid); p != nil {
+				parent = p
+			}
+		}
+		n := parent.RemoveStmt(gid, fm)
+		if parent == b {
+			cnt += n
+		}
+	}
+	return cnt
+}
+
+// collectTypedStmIDs collects stm_ids of given kinds under st (find_typed_stmts light).
+func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) {
+	if st == nil || ids == nil {
+		return
+	}
+	for _, k := range kinds {
+		if st.Kind == k && st.StmID > 0 {
+			ids[st.StmID] = true
+			break
+		}
+	}
+	if st.Then != nil {
+		for i := range st.Then.Stmts {
+			collectTypedStmIDs(&st.Then.Stmts[i], kinds, ids)
+		}
+	}
+	if st.Else != nil {
+		for i := range st.Else.Stmts {
+			collectTypedStmIDs(&st.Else.Stmts[i], kinds, ids)
+		}
+	}
+}
+
+// blockUnderStmt reports whether blk is the Then/Else of st or nested under them.
+func blockUnderStmt(st *Stmt, blk *Block) bool {
+	if st == nil || blk == nil {
+		return false
+	}
+	if st.Then == blk || st.Else == blk {
+		return true
+	}
+	if st.Then != nil {
+		for i := range st.Then.Stmts {
+			if blockUnderStmt(&st.Then.Stmts[i], blk) {
+				return true
+			}
+		}
+	}
+	if st.Else != nil {
+		for i := range st.Else.Stmts {
+			if blockUnderStmt(&st.Else.Stmts[i], blk) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func stmtTreeContainsID(st *Stmt, id int) bool {
