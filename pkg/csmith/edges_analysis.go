@@ -87,8 +87,10 @@ func (fm *FactMgr) HasEdgeIn(destStmID int, postDest, backLink bool) bool {
 // AnalyzeWithEdgesIn mirrors Statement::analyze_with_edges_in.
 // Statement.cpp:808–834 — merge visited jump sources then validate_and_update.
 func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
+	// Statement.cpp:808+ — always live Statement* + inputs + cg_context
+	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
-		return true
+		return false
 	}
 	fm := cg.FM
 	if fm != nil && st.StmID > 0 {
@@ -225,12 +227,8 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
 		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
 			if cnt++; cnt > 7 {
-				// upstream asserts; treat as converged with last outs
-				if out, has := fm.MapFactsOut[b.StmID]; has {
-					fm.GlobalFacts = CloneFactSlice(out)
-					return out, -1, true
-				}
-				return currentInputs, -1, true
+				// Block.cpp:526–530 — assert(0) when too many iterations; no soft invent success
+				return currentInputs, -1, false
 			}
 			for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
 				if e == nil {

@@ -791,6 +791,10 @@ func MakeRandomBinaryPtrComparison(
 	RecordPointerComparisons(left, right)
 	// FunctionInvocation.cpp:297–302 — flags always; Output uses standard ==/!= (not safe_ops)
 	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, op)
+	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
+	if flags == nil {
+		return nil
+	}
 	inv := &Invocation{
 		IsStd:  true,
 		Binary: opStr,
@@ -823,6 +827,10 @@ func MakeBinary(
 	lt, rt := lhs.GetType(), rhs.GetType()
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
 	flags := MakeRandomBinaryKind(r, opts, probs, nil, lt, rt, SafeOpBinary, op)
+	// FunctionInvocation.cpp:568 — ERROR_GUARD; no soft invent binary without flags
+	if flags == nil {
+		return nil
+	}
 	inv := &Invocation{
 		IsStd:  true,
 		Binary: op.BinaryOpC(),
