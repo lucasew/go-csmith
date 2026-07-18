@@ -26,7 +26,8 @@ func TestOutputValueDumpStructFields(t *testing.T) {
 	if !strings.Contains(out, "g_s.f0") || !strings.Contains(out, "g_s.f1") {
 		t.Fatal(out)
 	}
-	if !strings.Contains(out, "%u") {
+	// unsigned int may be %u or %llu depending on SizeInBytes
+	if !strings.Contains(out, "%u") && !strings.Contains(out, "%llu") {
 		t.Fatal("uint directive", out)
 	}
 }
