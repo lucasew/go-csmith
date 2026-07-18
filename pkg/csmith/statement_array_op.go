@@ -44,7 +44,12 @@ func MakeRandomArrayOp(
 	avs := MakeRandomArrayLoopSetup(r, opts, vs, cg)
 	loopCG := cg
 	loopCG.MustUseArrays = avs
-	return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
+	st := *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
+	// mark body as in_array_loop (Block::in_array_loop) for goto restrictions
+	if st.Then != nil {
+		st.Then.InArrayLoop = true
+	}
+	return st
 }
 
 // MakeRandomArrayLoopSetup mirrors make_random_array_loop array selection (side effects).

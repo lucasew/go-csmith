@@ -32,6 +32,8 @@ type CGContext struct {
 	MustUseArrays []*ArrayVariable
 	// EffectAccum is optional mutable effect (Effect::effect_accum) for write tracking.
 	EffectAccum *Effect
+	// EffectStm mirrors effect_stm_ — per-statement effect (cleared before new stmts).
+	EffectStm Effect
 	// FM is optional FactMgr for the current function (get_fact_mgr).
 	FM *FactMgr
 	// RW mirrors rw_directive (optional).
@@ -136,6 +138,14 @@ func (c CGContext) WithFlags(f uint) CGContext {
 func (c CGContext) WithRW(rw *RWDirective) CGContext {
 	c.RW = rw
 	return c
+}
+
+// ClearEffectStm mirrors get_effect_stm().clear().
+func (c *CGContext) ClearEffectStm() {
+	if c == nil {
+		return
+	}
+	c.EffectStm = EmptyEffect()
 }
 
 // IsNonReadable mirrors CGContext::is_nonreadable.

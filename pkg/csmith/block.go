@@ -61,6 +61,16 @@ type Block struct {
 	EmitStepHash bool
 	// BreakStmIDs mirrors Block::break_stms (stm_id list).
 	BreakStmIDs []int
+	// InArrayLoop mirrors Block::in_array_loop — disallow goto in/out.
+	InArrayLoop bool
+}
+
+// GetLastStm mirrors Block::get_last_stm — last statement, or nil.
+func (b *Block) GetLastStm() *Stmt {
+	if b == nil || len(b.Stmts) == 0 {
+		return nil
+	}
+	return &b.Stmts[len(b.Stmts)-1]
 }
 
 // IsVarOnStack mirrors Block::is_var_on_stack.

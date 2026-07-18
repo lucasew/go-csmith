@@ -372,7 +372,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 }
 
 // OutputPtrResets mirrors OutputMgr::OutputPtrResets.
-// OutputMgr.cpp:326–340 — assign 0 to dangling global pointers (arrays deferred).
+// OutputMgr.cpp:326–340 — scalar = 0; arrays nested for = 0 (always loop form).
 func OutputPtrResets(ptrs []*Variable) string {
 	if len(ptrs) == 0 {
 		return ""
@@ -382,8 +382,33 @@ func OutputPtrResets(ptrs []*Variable) string {
 		if v == nil {
 			continue
 		}
-		if v.IsArray {
-			// array reset via output_init deferred — skip multi-dim for now
+		sizes := v.ArraySizes
+		if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
+			sizes = v.AsArray.Sizes
+		}
+		if v.IsArray && len(sizes) > 0 {
+			// force nested for zeroing (globals skip OutputInit via no_loop_initializer)
+			b.WriteString("    {\n")
+			pad := "    "
+			for i, sz := range sizes {
+				iv := "i" + itoa(i)
+				b.WriteString(pad + "int " + iv + ";\n")
+				b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+				if i+1 < len(sizes) {
+					b.WriteString(pad + "{\n")
+					pad += "    "
+				}
+			}
+			access := v.Name
+			for i := range sizes {
+				access += "[i" + itoa(i) + "]"
+			}
+			b.WriteString(pad + "    " + access + " = 0;\n")
+			for i := len(sizes) - 1; i >= 1; i-- {
+				pad = pad[:len(pad)-4]
+				b.WriteString(pad + "}\n")
+			}
+			b.WriteString("    }\n")
 			continue
 		}
 		b.WriteString("    " + v.OutputC() + " = 0;\n")
