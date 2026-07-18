@@ -169,6 +169,24 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 	return nil
 }
 
+// FindStmtByID returns the statement with stm_id in f's block tree.
+// Complements FindParentBlockOfStmID for CFG edge source resolution.
+func FindStmtByID(f *Function, stmID int) *Stmt {
+	if f == nil || stmID <= 0 {
+		return nil
+	}
+	b := FindParentBlockOfStmID(f, stmID)
+	if b == nil {
+		return nil
+	}
+	for i := range b.Stmts {
+		if b.Stmts[i].StmID == stmID {
+			return &b.Stmts[i]
+		}
+	}
+	return nil
+}
+
 // AddFactOut mirrors FactMgr::add_fact_out.
 // FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
 // drop non-globals on return; drop loop-invisible on break/continue.

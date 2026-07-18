@@ -236,8 +236,9 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) {
 }
 
 // FindJumpSources mirrors Statement::find_jump_sources.
-// Statement.cpp:492–506 — CFG edges with dest=stm and src kind goto.
+// Statement.cpp:492–506 — CFG edges with dest=stm and src eType==eGoto.
 // Returns source StmIDs of gotos targeting destStmID.
+// When fm.Func is set, non-goto sources (e.g. break→for) are excluded.
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || destStmID <= 0 {
 		return nil
@@ -247,11 +248,46 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 		if e == nil {
 			continue
 		}
-		if e.DestStmID == destStmID && e.SrcID > 0 {
-			srcs = append(srcs, e.SrcID)
+		if e.DestStmID != destStmID || e.SrcID <= 0 {
+			continue
 		}
+		// Statement.cpp:501 — e->src->eType == eGoto
+		if fm.Func != nil {
+			src := FindStmtByID(fm.Func, e.SrcID)
+			if src == nil || src.Kind != StmtGoto {
+				continue
+			}
+		}
+		srcs = append(srcs, e.SrcID)
 	}
 	return srcs
+}
+
+// FindJumpLabel mirrors Statement::find_jump_label.
+// Statement.cpp:473–487 — label of first goto that jumps to destStmID.
+func FindJumpLabel(fm *FactMgr, destStmID int) string {
+	if fm == nil || destStmID <= 0 {
+		return ""
+	}
+	for _, e := range fm.CFGEdges {
+		if e == nil || e.DestStmID != destStmID || e.SrcID <= 0 {
+			continue
+		}
+		if fm.Func != nil {
+			src := FindStmtByID(fm.Func, e.SrcID)
+			if src == nil || src.Kind != StmtGoto {
+				continue
+			}
+			if src.Label != "" {
+				return src.Label
+			}
+		}
+	}
+	// stm_labels registry when edge/func incomplete
+	if lab, ok := stmLabels[destStmID]; ok {
+		return lab
+	}
+	return ""
 }
 
 // AppendNestedLoop mirrors Block::append_nested_loop.

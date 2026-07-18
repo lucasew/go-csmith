@@ -174,37 +174,47 @@ func GetDirectInvocation(st *Stmt) *Invocation {
 	return nil
 }
 
-// FindContainedLabels mirrors Statement::find_contained_labels.
-// Statement.cpp:707–724 — SourceLabel / Goto label + nested blocks.
+// FindContainedLabels mirrors Statement::find_contained_labels without FactMgr.
+// Uses SourceLabel (set at generation when dest is labeled).
 func FindContainedLabels(st *Stmt) []string {
+	return FindContainedLabelsFM(st, nil)
+}
+
+// FindContainedLabelsFM mirrors Statement::find_contained_labels.
+// Statement.cpp:706–720 — find_jump_label (CFG goto) then nested blocks.
+// When fm is nil, falls back to SourceLabel set during generation.
+func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
 		return nil
 	}
 	var labels []string
-	findContainedLabels(st, &labels)
+	findContainedLabels(st, &labels, fm)
 	return labels
 }
 
-func findContainedLabels(st *Stmt, labels *[]string) {
+func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) {
 	if st == nil || labels == nil {
 		return
 	}
-	// find_jump_label: SourceLabel on target or Label on goto
-	if st.SourceLabel != "" {
-		*labels = append(*labels, st.SourceLabel)
+	// Statement.cpp:707–710 — find_jump_label()
+	lab := ""
+	if fm != nil && st.StmID > 0 {
+		lab = FindJumpLabel(fm, st.StmID)
 	}
-	if st.Kind == StmtGoto && st.Label != "" {
-		// goto has the label name but contained labels are destinations;
-		// upstream find_jump_label on goto may return empty — keep SourceLabel path
+	if lab == "" {
+		lab = st.SourceLabel
+	}
+	if lab != "" {
+		*labels = append(*labels, lab)
 	}
 	if st.Then != nil {
 		for i := range st.Then.Stmts {
-			findContainedLabels(&st.Then.Stmts[i], labels)
+			findContainedLabels(&st.Then.Stmts[i], labels, fm)
 		}
 	}
 	if st.Else != nil {
 		for i := range st.Else.Stmts {
-			findContainedLabels(&st.Else.Stmts[i], labels)
+			findContainedLabels(&st.Else.Stmts[i], labels, fm)
 		}
 	}
 }

@@ -183,3 +183,25 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 		t.Fatal("visited")
 	}
 }
+
+func TestFindContainedLabelsFM(t *testing.T) {
+	f := &Function{Name: "f"}
+	thenB := &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 2},
+		{Kind: StmtGoto, StmID: 3, Label: "lbl_cfg", GotoDestStmID: 2},
+	}}
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	f.Blocks = []*Block{thenB}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}}
+	labs := FindContainedLabelsFM(st, fm)
+	found := false
+	for _, l := range labs {
+		if l == "lbl_cfg" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal(labs)
+	}
+}

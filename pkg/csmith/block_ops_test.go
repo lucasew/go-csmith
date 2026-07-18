@@ -280,3 +280,69 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 		t.Fatal("missing return after post_creation", b.Output(0))
 	}
 }
+
+func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
+	// Statement.cpp:501 — only eGoto sources; break→for must not count
+	f := &Function{Name: "func_1"}
+	// for stm 50; break 40 targets for; goto 30 targets assign 10
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl_t"},
+		{Kind: StmtBreak, StmID: 40},
+		{Kind: StmtGoto, StmID: 30, Label: "lbl_t", GotoDestStmID: 10},
+		{Kind: StmtFor, StmID: 50},
+	}}
+	f.Blocks = []*Block{body}
+	f.Body = body
+	fm := NewFactMgr(f)
+	// break edge into for (DestStmID=50) and goto edge into assign
+	fm.CFGEdges = []*CFGEdge{
+		{SrcID: 40, DestStmID: 50, PostDest: true}, // break
+		{SrcID: 30, DestStmID: 10},                  // goto
+		{SrcID: 99, DestStmID: 10},                  // dangling non-goto id
+	}
+	// assign 10: only real goto 30
+	srcs := fm.FindJumpSources(10)
+	if len(srcs) != 1 || srcs[0] != 30 {
+		t.Fatalf("goto only: %v", srcs)
+	}
+	// for 50: break filtered out
+	if len(fm.FindJumpSources(50)) != 0 {
+		t.Fatal("break must not be jump source")
+	}
+}
+
+func TestFindJumpLabel(t *testing.T) {
+	GotoLabelsDoFinalization()
+	defer GotoLabelsDoFinalization()
+	f := &Function{Name: "f"}
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 7},
+		{Kind: StmtGoto, StmID: 8, Label: "lbl_from_goto", GotoDestStmID: 7},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 8, DestStmID: 7}}
+	if got := FindJumpLabel(fm, 7); got != "lbl_from_goto" {
+		t.Fatal(got)
+	}
+	// registry fallback when no matching edge
+	_ = LabelForGotoDest(99, func() string { return "lbl_reg" })
+	if got := FindJumpLabel(fm, 99); got != "lbl_reg" {
+		t.Fatal(got)
+	}
+}
+
+func TestFindStmtByID(t *testing.T) {
+	f := &Function{Name: "f"}
+	inner := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
+	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner}}}
+	inner.Parent = outer
+	f.Blocks = []*Block{outer, inner}
+	st := FindStmtByID(f, 3)
+	if st == nil || st.Kind != StmtAssign {
+		t.Fatalf("%+v", st)
+	}
+	if FindStmtByID(f, 999) != nil {
+		t.Fatal("missing")
+	}
+}
