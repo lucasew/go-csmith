@@ -15,9 +15,24 @@ type Constant struct {
 }
 
 // MakeRandom mirrors Constant::make_random.
-// Constant.cpp:423–426 → GenerateRandomConstant.
+// Constant.cpp:423–426 → GenerateRandomConstant; ERROR_GUARD(nullptr).
 func MakeRandom(typ *Type, opts Options, r *Rng) *Constant {
+	// Constant.cpp:312 — assert(st != eVoid) before simple emit
+	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+		return nil
+	}
 	v := generateRandomConstant(typ, opts, r)
+	// Constant.cpp:425 — ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
+	// assert fail-closed paths yield ""; do not invent Constant{"", …}
+	if v == "" && typ != nil && !typ.IsStruct() && !typ.IsUnion() {
+		// pointer always "0"; simple non-void always non-empty on success
+		if typ.PtrType() == nil {
+			return nil
+		}
+	}
 	return &Constant{Type: typ, Value: v}
 }
 
@@ -28,6 +43,10 @@ func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 		return nil
 	}
 	n := r.RndUpto(limit)
+	// Constant.cpp:432 — ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
 	return &Constant{Type: GetSimpleType(EUInt), Value: strconv.FormatUint(uint64(n), 10)}
 }
 
@@ -156,8 +175,10 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 	if !typ.IsSimple() {
 		return ""
 	}
+	// Constant.cpp:312 — assert(st != eVoid); switch eVoid→"/* void */" is dead after assert
+	// no soft invent comment literal
 	if typ.Simple() == EVoid {
-		return "/* void */"
+		return ""
 	}
 	st := typ.Simple()
 
@@ -189,7 +210,8 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 	case EFloat:
 		return generateRandomFloatHexConstant(r)
 	default:
-		return generateRandomIntConstant(opts, r)
+		// Constant.cpp:407 — assert(0 && "Unsupported type!"); no soft invent int
+		return ""
 	}
 }
 

@@ -14,11 +14,11 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 	}
 }
 
-func TestMakeRandomVoidIsComment(t *testing.T) {
-	// Constant.cpp:364–367 — eVoid → "/* void */" (not invent "0")
+func TestMakeRandomVoidFailClosed(t *testing.T) {
+	// Constant.cpp:312 — assert(st != eVoid); dead switch "/* void */" not a soft invent path
 	c := MakeRandom(GetSimpleType(EVoid), Defaults(), NewRng(1))
-	if c == nil || c.Value != "/* void */" {
-		t.Fatalf("got %+v", c)
+	if c != nil {
+		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
 }
 
