@@ -537,35 +537,76 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 	return fm
 }
 
-// AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to init.
-// FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init (pointer init).
+// AbstractFactForVarInit mirrors Fact::abstract_fact_for_var_init.
+// Fact.cpp:85–112 — pointer/union only; assign from init; array alt inits merge.
+func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
+	if v == nil || v.Type == nil {
+		return nil, nil
+	}
+	if !v.IsPointer() && !v.Type.IsUnion() {
+		return nil, nil
+	}
+	var rhs *Expression
+	if v.Init != nil {
+		rhs = &Expression{Term: TermConstant, Con: v.Init, ExprType: v.Type}
+	}
+	if v.Type.IsUnion() {
+		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, rhs)
+		return nil, un
+	}
+	// pointer (Fact.cpp:94–95)
+	pt = AbstractFactForAssign(nil, v, 0, rhs)
+	// Fact.cpp:97–109 — more init values on array of pointers
+	if av := v.AsArray; av != nil {
+		for _, s := range av.InitValues {
+			if s == "" {
+				continue
+			}
+			moreRHS := &Expression{
+				Term: TermConstant, Con: &Constant{Value: s, Type: v.Type}, ExprType: v.Type,
+			}
+			more := AbstractFactForAssign(nil, v, 0, moreRHS)
+			for _, f := range more {
+				pt = MergeFactInto(pt, f)
+			}
+		}
+	}
+	return pt, nil
+}
+
+// AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to/union init.
+// FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init.
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		return
 	}
-	// only pointer vars get FactPointTo in this skeleton
-	if !v.IsPointer() {
-		// aggregates: add field pointer facts
+	// recurse into aggregate fields (pointer members)
+	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
 		for _, f := range v.FieldVars {
 			fm.AddNewVarFact(f)
 		}
 		return
 	}
-	if FindRelatedPointTo(fm.GlobalFacts, v) != nil {
+	if v.IsPointer() && FindRelatedPointTo(fm.GlobalFacts, v) != nil {
 		return
 	}
-	// Fact.cpp:85–95 — abstract assign from init when present
-	if v.Init != nil {
-		rhs := &Expression{Term: TermConstant, Con: v.Init}
-		newFacts := AbstractFactForAssign(nil, v, 0, rhs)
-		if len(newFacts) > 0 {
-			for _, f := range newFacts {
-				fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
-			}
-			return
-		}
+	if v.Type != nil && v.Type.IsUnion() && FindRelatedUnion(fm.UnionFacts, v) != nil {
+		return
 	}
-	fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
+	pt, un := AbstractFactForVarInit(v)
+	for _, f := range pt {
+		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+	}
+	for _, uf := range un {
+		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+	}
+	if len(pt) == 0 && v.IsPointer() {
+		fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
+	}
+	if len(un) == 0 && v.Type != nil && v.Type.IsUnion() {
+		// no init → top (no write known)
+		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnionTop(v))
+	}
 }
 
 // AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps
@@ -576,30 +617,60 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	fm.AddNewVarFact(v)
 }
 
+// lhsAssignPointees mirrors merge_pointees_of_pointer used by abstract_fact_for_assign.
+// Used to decide renew (lvar_cnt==1) vs merge (may-point-to).
+func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
+	if lhs == nil {
+		return nil
+	}
+	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, facts)
+	if lhsIndir == 0 && lhs.Type != nil && lhs.Type.ptrTo != nil && len(lvars) == 0 {
+		lvars = []*Variable{lhs.GetCollective()}
+	}
+	return lvars
+}
+
+// applyPointToAssignFacts applies point-to facts from abstract_fact_for_assign.
+// FactMgr.cpp:376–388 — renew when definitive single non-array LHS; else merge.
+func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) bool {
+	if facts == nil || len(newFacts) == 0 {
+		return false
+	}
+	lvarCnt := len(lhsAssignPointees(*facts, lhs, lhsIndir))
+	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
+	if lvarCnt == 0 && lhs != nil && lhsIndir == 0 && lhs.IsPointer() {
+		lvarCnt = 1
+	}
+	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
+		// definitive assignment — renew (strong replace)
+		_ = RenewFact(facts, newFacts[0])
+		for j := 1; j < len(newFacts); j++ {
+			*facts = MergeFactInto(*facts, newFacts[j])
+		}
+		return true
+	}
+	for _, f := range newFacts {
+		*facts = MergeFactInto(*facts, f)
+	}
+	return true
+}
+
 // UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts).
-// FactMgr.cpp:370–395 subset — apply AbstractFactForAssign into GlobalFacts.
+// FactMgr.cpp:370–395 — renew vs merge; FactUnion abstract_fact_for_assign.
 func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
 	if fm == nil || lhs == nil {
 		return false
 	}
 	changed := false
 	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
-	for _, f := range newFacts {
-		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+	if applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts) {
 		changed = true
 	}
-	// FactUnion: writing a union field records last_written_fid
-	if lhsIndir == 0 && lhs.IsInsideUnionField() {
-		uf := lhs
-		for uf != nil && !uf.IsUnionField() {
-			uf = uf.FieldVarOf
-		}
-		if uf != nil && uf.FieldVarOf != nil {
-			parent := uf.FieldVarOf
-			fid := uf.GetFieldID()
-			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnion(parent, fid))
-			changed = true
-		}
+	// FactUnion::abstract_fact_for_assign (meta_facts loop)
+	ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
+	for _, uf := range ufacts {
+		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+		changed = true
 	}
 	// FactMgr.cpp:400 — assign that changes facts marks function fact_changed
 	if changed && fm.Func != nil {
@@ -765,15 +836,25 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 }
 
 // UpdateFactForAssignInto is UpdateFactForAssign writing into a fact slice.
+// FactMgr.cpp:370–395 — same renew/merge rules as UpdateFactForAssign.
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
 	if facts == nil || lhs == nil {
 		return false
 	}
 	changed := false
 	newFacts := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
-	for _, f := range newFacts {
-		*facts = MergeFactInto(*facts, f)
+	if applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts) {
 		changed = true
+	}
+	if fm != nil {
+		ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
+		for _, uf := range ufacts {
+			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+			changed = true
+		}
+		if changed && fm.Func != nil {
+			fm.Func.FactChanged = true
+		}
 	}
 	return changed
 }
