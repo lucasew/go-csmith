@@ -174,8 +174,47 @@ func MakeRandomSignature(
 	return f
 }
 
+// MakeRandomFunction mirrors Function::make_random.
+// Function.cpp:431–438 — make_random_signature + GenerateBody.
+func MakeRandomFunction(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	sym *GenSym,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	cg CGContext,
+	retType *Type,
+	qfer *CVQualifiers,
+	list *FunctionList,
+) *Function {
+	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
+	if f == nil {
+		return nil
+	}
+	// attach FactMgr if not already from map
+	if cg.FM == nil || cg.FM.Func != f {
+		cg.FM = NewFactMgr(f)
+		if vs != nil {
+			for _, gv := range vs.GlobalList {
+				cg.FM.AddNewVarFact(gv)
+			}
+		}
+	}
+	bodyCG := cg
+	bodyCG.CurrentFunc = f
+	bodyCG.FM = cg.FM
+	if list != nil {
+		bodyCG = bodyCG.WithFuncList(list)
+	}
+	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
+	return f
+}
+
 // MakeFirst mirrors Function::make_first.
-// Function.cpp:443–477 — FactMgr, empty params (no ExtensionMgr), GenerateBody.
+// Function.cpp:443–477 — FactMgr, empty params (no ExtensionMgr), GenerateBody,
+// setup_in_out_maps, exit facts, dangling globals, InitializeAttributes.
 func MakeFirst(
 	r *Rng,
 	opts Options,
@@ -197,91 +236,75 @@ func MakeFirst(
 	if list != nil {
 		env = list.Types
 	}
+	// Function.cpp:444–454
 	ty := RandomReturnType(r, probs, env, opts)
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
-	// CVQualifiers::random_qualifiers(ty) — no context, no_volatile
+	// CVQualifiers::random_qualifiers(ty) — no context
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
-	// FactMgr for this function (Function.cpp:457–458)
+
+	// Function.cpp:457–458 — FactMgr with empty global facts
 	var fm *FactMgr
 	if fmMap != nil {
 		fm = fmMap.ForFunc(f)
 	} else {
 		fm = NewFactMgr(f)
 	}
-	// seed existing globals
+	// seed existing globals so first function sees them (generation convenience)
 	if vs != nil {
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 		}
 	}
-	// ExtensionMgr null → no params
-	// GenerateBody
+
+	// Function.cpp:460 — ExtensionMgr::GenerateFirstParameterList (null → no params)
+
+	// register before body so recursive choose_func can see it
+	if list != nil {
+		list.Funcs = append(list.Funcs, f)
+		if list.Types != nil {
+			env = list.Types
+		}
+	}
+
+	// Function.cpp:463 — GenerateBody(empty context)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	if list != nil {
 		cg = cg.WithFuncList(list)
-		if list.Types != nil {
-			cg.Types = list.Types
-		}
 	}
 	if env != nil {
 		cg.Types = env
 	}
-	// register f before body so recursive choose_func can see it
-	if list != nil {
-		list.Funcs = append(list.Funcs, f)
-	}
-	// Function.cpp:631 — Building while generating body
-	f.BuildState = BuildBuilding
-	// pointer params start as tbd (Function.cpp:637–641)
-	for _, p := range f.Param {
-		if p != nil && p.IsPointer() {
-			if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
-				fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(p, TBDPtr))
-			}
-		}
-	}
-	// body effect accum for compute_summary / feffect
-	bodyEff := EmptyEffect()
-	cg.EffectAccum = &bodyEff
-	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
-	f.DepthProtect = opts.DepthProtect
-	f.EmitConcise = opts.Concise
-	// mark pointees that were locals as dead after function (mark_func_end subset)
-	if f.Body != nil {
-		var locals []*Variable
-		for _, blk := range f.Blocks {
-			if blk != nil {
-				locals = append(locals, blk.LocalVars...)
-			}
-		}
-		if len(locals) > 0 {
-			for i, fact := range fm.GlobalFacts {
-				if nf := fact.MarkFuncEndLocals(locals); nf != nil {
-					fm.GlobalFacts[i] = nf
-				}
-			}
-		}
-	}
-	// FactMgr::find_dangling_global_ptrs (Function.cpp:472–473)
-	if opts.DanglingGlobalPointers {
-		fm.FindDanglingGlobalPtrs(f)
-	}
-	// Function::make_return_const — Function.cpp:608–615
-	if opts.DepthProtect && f.NeedReturnStmt() {
-		f.RetConst = MakeRandom(f.ReturnType, opts, r)
-	}
+	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
+
+	// Function.cpp:464–465 — inline flip after body
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
-	// Function.cpp:652–658 / compute_summary — referenced ptrs + external effect
-	f.ComputeSummary(bodyEff)
-	// Function.cpp:470 — body->add_back_return_facts
-	if fm != nil && f.Body != nil {
+
+	// Function.cpp:466 — setup_in_out_maps(true)
+	fm.SetupInOutMaps(true)
+
+	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
+	if f.Body != nil && f.Body.StmID > 0 {
+		if out, ok := fm.MapFactsOut[f.Body.StmID]; ok {
+			fm.GlobalFacts = CloneFactSlice(out)
+		}
 		AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts)
 	}
-	f.markBuilt()
+
+	// Function.cpp:472–473 — dangling global pointers
+	if opts.DanglingGlobalPointers {
+		fm.FindDanglingGlobalPtrs(f)
+	}
+
+	// Function.cpp:475 — InitializeAttributes (package generators already cover emission;
+	// ensure func attr generator is ready when function attributes enabled)
+	if opts.FunctionAttributes {
+		_ = EnsureFuncAttrGenerator()
+	}
+
 	return f
 }
 
