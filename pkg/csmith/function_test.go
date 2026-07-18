@@ -177,3 +177,36 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
+	// Function.cpp:591 body->Output; 595 ret_c->Output — no invent empty braces / "0"
+	f := &Function{
+		Name: "func_x", ReturnType: GetIntType(),
+		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
+		DepthProtect: true,
+	}
+	// empty Param path: OutputHeader needs params string; use void params via empty Param + void type
+	// OutputHeaderOpts with process defaults: paramListC for nil params emits "void"
+	out := f.Output()
+	if strings.Contains(out, "{\n}\n") {
+		t.Fatal("nil Body must not invent empty braces", out)
+	}
+	if strings.Contains(out, "return 0") {
+		t.Fatal("nil RetConst must not invent return 0", out)
+	}
+	// with RetConst only — else branch present, still no invent body
+	f.RetConst = MakeInt(42)
+	out = f.Output()
+	if !strings.Contains(out, "return 42") {
+		t.Fatal(out)
+	}
+	if strings.Contains(out, "{\n}\n") {
+		t.Fatal("still no invent body", out)
+	}
+	// live body
+	f.Body = &Block{Func: f}
+	out = f.Output()
+	if !strings.Contains(out, "{") {
+		t.Fatal("want body braces", out)
+	}
+}

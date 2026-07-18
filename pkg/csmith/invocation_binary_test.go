@@ -237,3 +237,26 @@ func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {
 		t.Fatal("user")
 	}
 }
+
+func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
+	// FunctionInvocationBinary.cpp:208–209 — param_value[0/1]->get_type always
+	// no soft invent signed=true → eInt when operands missing
+	fi := &Invocation{IsStd: true, Binary: "+"}
+	if fi.GetType() != nil {
+		t.Fatal("add without args must not invent eInt")
+	}
+	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}}
+	if fi.GetType() != nil {
+		t.Fatal("add with one arg")
+	}
+	// shift needs left only
+	fi = &Invocation{IsStd: true, Binary: "<<"}
+	if fi.GetType() != nil {
+		t.Fatal("shift without left must not invent eInt")
+	}
+	// cmp still returns int without consulting operands (C++ switch arm)
+	fi = &Invocation{IsStd: true, Binary: "=="}
+	if fi.GetType() != GetIntType() {
+		t.Fatal("cmp")
+	}
+}

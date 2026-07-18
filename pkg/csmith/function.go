@@ -736,21 +736,19 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if f.DepthProtect {
 		s += "if (DEPTH < MAX_DEPTH) \n"
 	}
+	// Function.cpp:591 — body->Output always; no soft invent empty "{}" when Body missing
 	if f.Body != nil {
 		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 		s += f.Body.Output(0)
-	} else {
-		s += "{\n}\n"
 	}
 	if f.DepthProtect {
-		s += "else\n"
-		s += "return "
+		// Function.cpp:593–597 — else; ret_c->Output; no soft invent "0" when ret_c null
 		if f.RetConst != nil {
+			s += "else\n"
+			s += "return "
 			s += f.RetConst.Value
-		} else {
-			s += "0"
+			s += ";\n"
 		}
-		s += ";\n"
 	}
 	return s
 }

@@ -116,32 +116,34 @@ func (fi *Invocation) getTypeBinary() *Type {
 	}
 	switch op {
 	case BinAdd, BinSub, BinMul, BinDiv, BinMod, BinBitXor, BinBitAnd, BinBitOr:
-		// FunctionInvocationBinary.cpp:208–224 — both signed → int else uint
-		ls, rs := true, true
-		if len(fi.Args) >= 1 && fi.Args[0] != nil {
-			if t := fi.Args[0].GetType(); t != nil {
-				ls = t.IsSigned()
-			}
+		// FunctionInvocationBinary.cpp:208–224 — param_value[0/1]->get_type always live
+		// missing operands → incomplete IR (no invent signed=true → eInt)
+		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
+			return nil
 		}
-		if len(fi.Args) >= 2 && fi.Args[1] != nil {
-			if t := fi.Args[1].GetType(); t != nil {
-				rs = t.IsSigned()
-			}
+		lt, rt := fi.Args[0].GetType(), fi.Args[1].GetType()
+		if lt == nil || rt == nil {
+			return nil
 		}
-		if ls && rs {
+		if lt.IsSigned() && rt.IsSigned() {
 			return GetSimpleType(EInt)
 		}
 		return GetSimpleType(EUInt)
 	case BinCmpGt, BinCmpLt, BinCmpGe, BinCmpLe, BinCmpEq, BinCmpNe, BinAnd, BinOr:
 		return GetIntType()
 	case BinLShift, BinRShift:
-		// FunctionInvocationBinary.cpp:229–238 — follow left signedness
-		if len(fi.Args) >= 1 && fi.Args[0] != nil {
-			if t := fi.Args[0].GetType(); t != nil && !t.IsSigned() {
-				return GetSimpleType(EUInt)
-			}
+		// FunctionInvocationBinary.cpp:229–238 — param_value[0]->get_type always
+		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			return nil
 		}
-		return GetSimpleType(EInt)
+		lt := fi.Args[0].GetType()
+		if lt == nil {
+			return nil
+		}
+		if lt.IsSigned() {
+			return GetSimpleType(EInt)
+		}
+		return GetSimpleType(EUInt)
 	default:
 		// FunctionInvocationBinary.cpp:240–241 — assert(0); no soft invent eInt
 		return nil
