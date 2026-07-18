@@ -109,6 +109,40 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	if st.Tmp1 == st.Tmp2 {
 		t.Fatal("same tmp")
 	}
+	// StatementAssign.cpp:269–271 — ExpressionFuncall canonized rhs (get_rhs)
+	if st.Rhs == nil || st.Rhs.Term != TermFunction || st.Rhs.Invoke == nil {
+		t.Fatal("want ExpressionFuncall get_rhs", st.Rhs)
+	}
+	if len(st.Rhs.Invoke.Args) != 2 || st.Rhs.Invoke.Args[0] == nil || st.Rhs.Invoke.Args[0].Var != lhs.Var {
+		t.Fatal("lhs operand", st.Rhs.Invoke.Args)
+	}
+	if st.GetAssignRhs() != st.Rhs {
+		t.Fatal("GetAssignRhs")
+	}
+	// expr (get_expr) remains original RHS
+	if st.Expr != rhs {
+		t.Fatal("expr should stay original")
+	}
+}
+
+func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
+	// make_possible_compound_assign is not gated on avoid_signed_overflow
+	opts := Defaults()
+	opts.SafeMath = false
+	probs := NewProbabilities(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	lhs := &Lhs{Var: CreateVariableScalars("g_1", GetIntType(), false, false), Type: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(3), GetIntType(), lhs, AssignBitAnd, rhs, nil)
+	if st.SafeFlags == nil {
+		t.Fatal("dummy flags for safe_assign bit op")
+	}
+	if st.Rhs == nil || st.Rhs.Term != TermFunction {
+		t.Fatal("bit compound still ExpressionFuncall", st.Rhs)
+	}
 }
 
 func TestVisitFactsBlockSequential(t *testing.T) {

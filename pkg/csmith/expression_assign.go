@@ -33,13 +33,13 @@ func MakeExpressionAssign(
 		return nil
 	}
 	// ExpressionAssign.cpp:57–58 / 61–62 — FactMgr::update_fact_for_assign(sa, global_facts)
-	// (MakeRandomAssignQfer already updates; re-apply matches C++ double call)
+	// uses get_rhs(); MakeRandomAssignQfer already updates; re-apply matches C++ double call
 	if cg.FM != nil && st.LhsVar != nil {
 		indir := 0
 		if st.Lhs != nil {
 			indir = st.Lhs.IndirectLevel()
 		}
-		cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.Expr)
+		cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
 	}
 	// ExpressionAssign value type is LHS type (ExpressionAssign.h:get_type)
 	exprType := typ

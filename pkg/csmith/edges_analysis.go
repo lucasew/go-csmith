@@ -181,7 +181,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				indir = st.Lhs.IndirectLevel()
 			}
 			if lhs != nil {
-				fm.UpdateFactForAssign(lhs, indir, st.Expr)
+				// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
+				fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
 			}
 		case StmtReturn:
 			if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {

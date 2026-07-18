@@ -50,6 +50,11 @@ type Stmt struct {
 	SafeFlags *SafeOpFlags
 	Tmp1      string
 	Tmp2      string
+	// Rhs mirrors StatementAssign::rhs — canonized compound form
+	// (ExpressionFuncall for "i += e" → i + e). FactMgr::update_fact_for_assign
+	// uses get_rhs(); OutputAsExpr still uses expr (get_expr).
+	// StatementAssign.h:149–151.
+	Rhs *Expression
 }
 
 // nextStmID is Statement::sid allocator.

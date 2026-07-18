@@ -274,9 +274,9 @@ func MakeRandomAssignQfer(
 			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
 		}
 	}
-	// FactMgr::update_fact_for_assign(sa) — full indirection
+	// FactMgr::update_fact_for_assign(sa) — get_rhs() (canonized ExpressionFuncall)
 	if cg.FM != nil && st.LhsVar != nil {
-		cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.Expr)
+		cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.GetAssignRhs())
 		cg.NoteWrite(st.LhsVar)
 	} else if st.LhsVar != nil {
 		cg.NoteWrite(st.LhsVar)
@@ -293,7 +293,10 @@ func MakeDummyFlags() *SafeOpFlags {
 }
 
 // makePossibleCompoundAssign mirrors StatementAssign::make_possible_compound_assign.
-// StatementAssign.cpp:244–301 — attach SafeOpFlags + math_notmp temps for compound ops.
+// StatementAssign.cpp:244–301 — for compound ops: SafeOpFlags + FunctionInvocationBinary
+// operands (ExpressionVariable(lhs), e.clone()) wrapped as ExpressionFuncall rhs;
+// CreateFunctionInvocationBinary always allocates t_ temps for safe_ops.
+// Not gated on avoid_signed_overflow (SafeMath only affects OutputAsExpr).
 // sym is the session GenSym (VS.Sym); nil uses package gensym like util.cpp.
 func makePossibleCompoundAssign(
 	cg CGContext,
@@ -306,57 +309,86 @@ func makePossibleCompoundAssign(
 	rhs *Expression,
 	sym *GenSym,
 ) Stmt {
-	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs}
+	st := Stmt{Kind: StmtAssign, AssignOp: op, Expr: rhs, Lhs: lhs, Rhs: rhs}
 	if lhs != nil {
 		st.LhsVar = lhs.Var
 	}
-	if !opts.SafeMath {
-		return st
-	}
 	bop, ok := op.CompoundToBinaryOps()
 	if !ok {
-		// simple assign — no flags
+		// simple assign — StatementAssign ctor rhs(&expr)
 		return st
 	}
-	// SafeAssign bit ops use dummy flags (OutputAsExpr still uses simple form)
-	if SafeAssign(op) {
-		st.SafeFlags = MakeDummyFlags()
-		return st
-	}
-	// MakeRandomBinary for arithmetic/shift compound (sOpAssign)
-	// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
 	lt := typ
 	if lhs != nil {
 		if t := lhs.GetType(); t != nil {
 			lt = t
 		}
 	}
-	flags := MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
-	// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
-	if flags == nil {
-		return Stmt{Kind: StmtAssign}
-	}
-	st.SafeFlags = flags
-	// StatementAssign.cpp:263–266 — CreateFunctionInvocationBinary always allocates
-	// tmp_var1/2 for safe_ops (math_notmp only affects OutputAsExpr).
-	// FunctionInvocationBinary.cpp:59–75; no soft invent skip on !MathNoTmp.
-	if SafeOpsBinary(bop.BinaryOpC()) {
-		if blk := cg.CurrentBlock(); blk != nil {
-			st1 := EInt
-			if t := flags.LHSType(); t != nil && t.IsSimple() {
-				st1 = t.Simple()
-			}
-			st2 := st1
-			if bop == BinLShift || bop == BinRShift {
-				if t := flags.RHSType(); t != nil && t.IsSimple() {
-					st2 = t.Simple()
+	var flags *SafeOpFlags
+	var inv *Invocation
+	if SafeAssign(op) {
+		// StatementAssign.cpp:256–259 — dummy flags + FunctionInvocationBinary(bop, local_fs)
+		flags = MakeDummyFlags()
+		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
+		inv.setOutOpts(opts)
+	} else {
+		// StatementAssign.cpp:260–266 — make_random_binary + CreateFunctionInvocationBinary
+		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
+		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
+		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
+		if flags == nil {
+			return Stmt{Kind: StmtAssign}
+		}
+		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
+		inv.setOutOpts(opts)
+		// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
+		if SafeOpsBinary(bop.BinaryOpC()) {
+			if blk := cg.CurrentBlock(); blk != nil {
+				st1 := EInt
+				if t := flags.LHSType(); t != nil && t.IsSimple() {
+					st1 = t.Simple()
 				}
+				st2 := st1
+				if bop == BinLShift || bop == BinRShift {
+					if t := flags.RHSType(); t != nil && t.IsSimple() {
+						st2 = t.Simple()
+					}
+				}
+				st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
+				st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
+				inv.Tmp1, inv.Tmp2 = st.Tmp1, st.Tmp2
 			}
-			st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
-			st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
 		}
 	}
+	st.SafeFlags = flags
+	// StatementAssign.cpp:269–271 — add_operand ExpressionVariable(lhs); e.clone(); ExpressionFuncall
+	lhsExpr := LhsAsExpression(lhs)
+	if lhsExpr == nil {
+		// C++ always has live Lhs; incomplete IR → empty assign (ERROR path)
+		return Stmt{Kind: StmtAssign}
+	}
+	// e.clone() — Expression is value-like; shallow copy of the root is enough
+	// (operands of the original expr are shared by pointer, as clone shares subtrees).
+	var rhsClone *Expression
+	if rhs != nil {
+		cp := *rhs
+		rhsClone = &cp
+	}
+	inv.Args = []*Expression{lhsExpr, rhsClone}
+	st.Rhs = &Expression{Term: TermFunction, Invoke: inv, ExprType: lt}
 	return st
+}
+
+// GetAssignRhs mirrors StatementAssign::get_rhs — canonized compound form when set.
+// StatementAssign.h:109; FactMgr::update_fact_for_assign(sa) uses get_rhs().
+func (st *Stmt) GetAssignRhs() *Expression {
+	if st == nil {
+		return nil
+	}
+	if st.Rhs != nil {
+		return st.Rhs
+	}
+	return st.Expr
 }
 
 // gensymFromVS returns &vs.Sym for create_new_tmp_var / gensym share with g_/l_.
@@ -732,9 +764,9 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	cg.MergeParamContext(lhsCG, true)
 
 	// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
-	// always (any indirection); merge_pointees handles *p LHS
+	// uses get_rhs() (canonized ExpressionFuncall for compounds)
 	if cg.FM != nil && lhsVar != nil {
-		cg.FM.UpdateFactForAssign(lhsVar, indir, st.Expr)
+		cg.FM.UpdateFactForAssign(lhsVar, indir, st.GetAssignRhs())
 		// StatementAssign.cpp:388–389 — map_stm_effect[this] = effect_stm
 		if st.StmID > 0 {
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
