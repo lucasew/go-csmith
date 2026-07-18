@@ -113,6 +113,54 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 	}
 }
 
+func TestHexToBinary(t *testing.T) {
+	// Constant.cpp:85–97
+	if HexToBinary("0") != "0000" || HexToBinary("f") != "1111" || HexToBinary("A") != "1010" {
+		t.Fatalf("nibbles: 0=%q f=%q A=%q", HexToBinary("0"), HexToBinary("f"), HexToBinary("A"))
+	}
+	if HexToBinary("0f") != "00001111" {
+		t.Fatalf("0f=%q", HexToBinary("0f"))
+	}
+	if HexToBinary("g") != "" || HexToBinary("") != "" {
+		t.Fatal("invalid / empty")
+	}
+}
+
+func TestBinaryConstantPath(t *testing.T) {
+	// Constant.cpp:102–103 — binary_constant && flipcoin → 0b…; no invent hex when selected
+	opts := Defaults()
+	opts.BinaryConstant = true
+	// force BinaryConstProb 100% via process probs
+	probs := NewProbabilities(opts)
+	probs.single[PBinaryConstProb] = 100
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(probs)
+	defer SetProcessProbabilities(prev)
+	s := generateRandomIntConstant(opts, NewRng(1))
+	if !strings.HasPrefix(s, "0b") {
+		t.Fatalf("want binary int, got %q", s)
+	}
+	// only 0/1 after 0b
+	for _, c := range s[2:] {
+		if c != '0' && c != '1' {
+			t.Fatalf("non-binary digit in %q", s)
+		}
+	}
+	// long long binary includes LL
+	sll := generateRandomLongLongConstant(opts, NewRng(1))
+	if !strings.HasPrefix(sll, "0b") || !strings.HasSuffix(sll, "LL") {
+		t.Fatalf("ll binary %q", sll)
+	}
+	// BinaryConstant off → never invent 0b
+	opts.BinaryConstant = false
+	for seed := uint64(1); seed < 20; seed++ {
+		s = generateRandomIntConstant(opts, NewRng(seed))
+		if strings.HasPrefix(s, "0b") {
+			t.Fatalf("binary off invent %q", s)
+		}
+	}
+}
+
 func TestMarkMutableConstWrapsSimple(t *testing.T) {
 	// Constant.cpp:413–415 — simple + mark_mutable_const → "(" + v + ")"
 	// no soft invent ignore of MarkMutableConst

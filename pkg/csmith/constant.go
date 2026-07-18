@@ -297,10 +297,63 @@ func formatSmallConstant(st ESimpleType, num int, opts Options) string {
 	return body + "UL"
 }
 
+// HexToBinary mirrors Constant.cpp HexToBinary.
+// Constant.cpp:85–97 — each hex digit → 4-bit nibble string.
+func HexToBinary(val string) string {
+	const toBin = "0000000100100011010001010110011110001001101010111100110111101111"
+	var b strings.Builder
+	b.Grow(len(val) * 4)
+	for i := 0; i < len(val); i++ {
+		c := val[i]
+		var idx int
+		switch {
+		case c >= '0' && c <= '9':
+			idx = int(c - '0')
+		case c >= 'A' && c <= 'F':
+			idx = int(c - 'A' + 10)
+		case c >= 'a' && c <= 'f':
+			idx = int(c - 'a' + 10)
+		default:
+			// broken hex IR — fail closed empty (C++ OOB ToBinary)
+			return ""
+		}
+		b.WriteString(toBin[idx*4 : idx*4+4])
+	}
+	return b.String()
+}
+
+// binaryConstProb mirrors BinaryConstProb() (Probabilities singleton; default 3).
+func binaryConstProb() uint32 {
+	if p := ProcessProbabilities(); p != nil {
+		if v := p.Single(PBinaryConstProb); v >= 0 {
+			return uint32(v)
+		}
+	}
+	return 3
+}
+
+// maybeBinaryConstant is binary_constant && rnd_flipcoin(BinaryConstProb).
+// On hit returns "0b"+HexToBinary(...)+suffix; ok=true means binary branch taken
+// (including empty fail-closed). No invent hex fallback when binary was selected.
+func maybeBinaryConstant(opts Options, r *Rng, nHex int, suffix string) (string, bool) {
+	if r == nil || !opts.BinaryConstant {
+		return "", false
+	}
+	if !r.RndFlipcoin(binaryConstProb()) {
+		return "", false
+	}
+	hex := r.RandomHexDigits(nHex)
+	bin := HexToBinary(hex)
+	if bin == "" {
+		return "", true
+	}
+	return "0b" + bin + suffix, true
+}
+
 // generateRandomCharConstant — Constant.cpp:100–108
 func generateRandomCharConstant(opts Options, r *Rng) string {
-	if opts.BinaryConstant && r.RndFlipcoin(uint32(3)) { // BinaryConstProb default 3
-		// binary path uses HexToBinary(RandomHexDigits(2)) — port hex only for now if binary off (defaults)
+	if s, ok := maybeBinaryConstant(opts, r, 2, ""); ok {
+		return s
 	}
 	hex := r.RandomHexDigits(2)
 	if opts.CComp || !opts.LongLong {
@@ -310,6 +363,10 @@ func generateRandomCharConstant(opts Options, r *Rng) string {
 }
 
 func generateRandomIntConstant(opts Options, r *Rng) string {
+	// Constant.cpp:112–122
+	if s, ok := maybeBinaryConstant(opts, r, 8, ""); ok {
+		return s
+	}
 	hex := r.RandomHexDigits(8)
 	if opts.CComp || !opts.LongLong {
 		return "0x" + hex
@@ -318,6 +375,10 @@ func generateRandomIntConstant(opts Options, r *Rng) string {
 }
 
 func generateRandomShortConstant(opts Options, r *Rng) string {
+	// Constant.cpp:136–146
+	if s, ok := maybeBinaryConstant(opts, r, 4, ""); ok {
+		return s
+	}
 	hex := r.RandomHexDigits(4)
 	if opts.CComp || !opts.LongLong {
 		return "0x" + hex
@@ -326,6 +387,10 @@ func generateRandomShortConstant(opts Options, r *Rng) string {
 }
 
 func generateRandomLongConstant(opts Options, r *Rng) string {
+	// Constant.cpp:150–160 — !longlong → no L; else L
+	if s, ok := maybeBinaryConstant(opts, r, 8, ""); ok {
+		return s
+	}
 	hex := r.RandomHexDigits(8)
 	if !opts.LongLong {
 		return "0x" + hex
@@ -334,12 +399,19 @@ func generateRandomLongConstant(opts Options, r *Rng) string {
 }
 
 func generateRandomLongLongConstant(opts Options, r *Rng) string {
+	// Constant.cpp:164–171 — binary path includes "LL"
+	if s, ok := maybeBinaryConstant(opts, r, 16, "LL"); ok {
+		return s
+	}
 	hex := r.RandomHexDigits(16)
 	return "0x" + hex + "LL"
 }
 
 func generateRandomInt128Constant(opts Options, r *Rng) string {
-	_ = opts
+	// Constant.cpp:126–133
+	if s, ok := maybeBinaryConstant(opts, r, 16, ""); ok {
+		return s
+	}
 	hex := r.RandomHexDigits(16)
 	return "0x" + hex
 }
