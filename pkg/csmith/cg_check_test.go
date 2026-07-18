@@ -68,6 +68,29 @@ func TestCheckWriteVarPartialConflict(t *testing.T) {
 	}
 }
 
+func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
+	// FactPointTo.cpp:476–482 — is_dangling when dead && dead_pointer_dereference_prob==0
+	// no invent hardcode deadProb=0 ignoring CGOptions
+	prev := ProcessOptions()
+	defer SetProcessOptions(prev)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	facts := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	cg := EmptyCGContext()
+	// default dead prob 0 → dangling reject
+	opts := Defaults()
+	opts.DanglingPtrDerefProb = 0
+	SetProcessOptions(opts)
+	if cg.CheckReadVar(p, facts) {
+		t.Fatal("dead ptr with deadProb 0 must fail")
+	}
+	// dead_pointer_dereference_prob > 0 → is_dangling_ptr false; read allowed
+	opts.DanglingPtrDerefProb = 50
+	SetProcessOptions(opts)
+	if !cg.CheckReadVar(p, facts) {
+		t.Fatal("dead ptr with deadProb>0 must not invent always-reject")
+	}
+}
+
 func TestVisitFactsLhsScalar(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}

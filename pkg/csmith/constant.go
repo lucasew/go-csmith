@@ -325,10 +325,18 @@ func generateRandomInt128Constant(opts Options, r *Rng) string {
 	return "0x" + hex
 }
 
-// generateRandomFloatHexConstant — Constant.cpp:187+ simplified
+// generateRandomFloatHexConstant mirrors GenerateRandomFloatHexConstant.
+// Constant.cpp:187–199 — pure_rnd_upto(100); hex; pure_rnd_flipcoin(50) for +/− exp.
 func generateRandomFloatHexConstant(r *Rng) string {
-	// pure_rnd_upto(100) for exp; RandomHexDigits(1)+"."+RandomHexDigits(6)+"p"+/-
+	if r == nil {
+		// C++ always has RNG; no invent fixed literal
+		return ""
+	}
 	exp := int(r.RndUpto(100))
-	// sign of exp: not fully ported; use + for positive half
-	return fmt.Sprintf("0x%s.%sp+%d", r.RandomHexDigits(1), r.RandomHexDigits(6), exp)
+	sign := "+"
+	// pure_rnd_flipcoin(50) — random mode == rnd_flipcoin(50)
+	if !r.RndFlipcoin(50) {
+		sign = "-"
+	}
+	return fmt.Sprintf("0x%s.%sp%s%d", r.RandomHexDigits(1), r.RandomHexDigits(6), sign, exp)
 }

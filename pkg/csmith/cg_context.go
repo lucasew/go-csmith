@@ -587,7 +587,9 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
 		return false
 	}
-	if v.IsPointer() && IsDanglingPtr(v, facts, 0) {
+	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
+	// no invent hardcode deadProb=0 ignoring session option
+	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DanglingPtrDerefProb) {
 		return false
 	}
 	c.ReadVar(v)
@@ -614,7 +616,8 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if v.IsVolatile() && !eff.IsSideEffectFree() {
 		return false
 	}
-	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, 0) {
+	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
+	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DanglingPtrDerefProb) {
 		return false
 	}
 	c.WriteVar(v)

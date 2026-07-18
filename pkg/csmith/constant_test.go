@@ -1,6 +1,9 @@
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMakeRandomPointerIsZero(t *testing.T) {
 	// Constant.cpp: pointer → "0", no RNG
@@ -84,5 +87,28 @@ func TestMakeInt(t *testing.T) {
 	c := MakeInt(42)
 	if c.Value != "42" || c.Type != GetSimpleType(EInt) {
 		t.Fatalf("%+v", c)
+	}
+}
+
+func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
+	// Constant.cpp:192–196 — pure_rnd_flipcoin(50) chooses + or − exp; no invent always +
+	sawPlus, sawMinus := false, false
+	for seed := uint64(1); seed < 40; seed++ {
+		s := generateRandomFloatHexConstant(NewRng(seed))
+		if s == "" {
+			t.Fatal("nil rng invent empty")
+		}
+		if strings.Contains(s, "p+") {
+			sawPlus = true
+		}
+		if strings.Contains(s, "p-") {
+			sawMinus = true
+		}
+	}
+	if !sawPlus || !sawMinus {
+		t.Fatalf("need both exp signs, plus=%v minus=%v", sawPlus, sawMinus)
+	}
+	if generateRandomFloatHexConstant(nil) != "" {
+		t.Fatal("nil rng must fail closed")
 	}
 }
