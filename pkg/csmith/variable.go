@@ -1048,14 +1048,22 @@ func lastDot(s string) int {
 	return -1
 }
 
+// itoa formats n in decimal (including negative for sizes[i]-1 upper bounds).
 func itoa(n int) string {
 	if n == 0 {
 		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
 	}
 	var d []byte
 	for n > 0 {
 		d = append([]byte{byte('0' + n%10)}, d...)
 		n /= 10
+	}
+	if neg {
+		d = append([]byte{'-'}, d...)
 	}
 	return string(d)
 }

@@ -146,6 +146,38 @@ func TestOutputUpperBoundArray(t *testing.T) {
 	if got := av.Variable.OutputUpperBound(false); got != "g_a[3][4]" {
 		t.Fatal(got)
 	}
+	// ArrayVariable.cpp:575 — always sizes[i]-1 (no soft "0" for empty dim)
+	z := &ArrayVariable{
+		Variable: Variable{Name: "g_z", Type: GetIntType(), IsArray: true, ArraySizes: []int{0}},
+		Sizes:    []int{0},
+	}
+	z.AsArray = z
+	if got := z.OutputUpperBoundArray(); got != "g_z[-1]" {
+		t.Fatalf("want sizes[i]-1, got %q", got)
+	}
+}
+
+func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
+	// ArrayVariable.cpp:703–711 — cvs[i] only; no soft i/j/k invent
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Sizes:    []int{2, 3},
+	}
+	av.AsArray = av
+	if got := av.OutputWithIndices([]string{"i", "j"}); got != "g_a[i][j]" {
+		t.Fatal(got)
+	}
+	// undersized / empty ctrl: empty slots, not invent letters
+	if got := av.OutputWithIndices(nil); got != "g_a[][]" {
+		t.Fatalf("no letter invent, got %q", got)
+	}
+	// OutputInit without full ctrl aborts (no soft letters)
+	if got := av.OutputInit("    ", nil); got != "" {
+		t.Fatalf("want empty init without ctrl, got %q", got)
+	}
+	if got := av.OutputInit("    ", []string{"i"}); got != "" {
+		t.Fatalf("want empty when ctrl short, got %q", got)
+	}
 }
 
 func TestToUnsignedSimple(t *testing.T) {

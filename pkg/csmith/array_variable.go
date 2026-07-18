@@ -495,7 +495,7 @@ func (av *ArrayVariable) OutputLowerBound() string {
 }
 
 // OutputWithIndices mirrors ArrayVariable::output_with_indices.
-// ArrayVariable.cpp:703–711.
+// ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).
 func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 	if av == nil {
 		return ""
@@ -504,10 +504,9 @@ func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 	b.WriteString(av.GetActualName(false))
 	for i := range av.Sizes {
 		b.WriteString("[")
-		if i < len(ctrl) && ctrl[i] != "" {
+		// ArrayVariable.cpp:708–709 — cvs[i]->Output(out); no soft i/j/k
+		if i < len(ctrl) {
 			b.WriteString(ctrl[i])
-		} else {
-			b.WriteString(string([]byte{byte('i' + i)}))
 		}
 		b.WriteString("]")
 	}
@@ -522,9 +521,19 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 }
 
 // OutputInitOpts is OutputInit with post_incr_operator control.
+// ArrayVariable.cpp:619–655 — cvs[i] names only (no letter-name soft invent).
 func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr bool) string {
 	if av == nil || av.NoLoopInitializer() {
 		return ""
+	}
+	// C++ requires cvs sized for get_dimension(); undersized → no invent i/j/k
+	if len(ctrl) < len(av.Sizes) {
+		return ""
+	}
+	for i := range av.Sizes {
+		if ctrl[i] == "" {
+			return ""
+		}
 	}
 	initVal := "0"
 	if av.Init != nil && av.Init.Value != "" {
@@ -534,10 +543,7 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	// nested fors for each dimension
 	pad := indent
 	for i, sz := range av.Sizes {
-		iv := string([]byte{byte('i' + i)})
-		if i < len(ctrl) && ctrl[i] != "" {
-			iv = ctrl[i]
-		}
+		iv := ctrl[i]
 		incr := iv + "++"
 		if !postIncr {
 			incr = iv + " = " + iv + " + 1"
@@ -666,7 +672,7 @@ func (av *ArrayVariable) OutputAccess() string {
 }
 
 // OutputUpperBoundArray mirrors ArrayVariable::OutputUpperBound — name[size-1]….
-// ArrayVariable.cpp:572–577.
+// ArrayVariable.cpp:572–577 — always (sizes[i] - 1); no soft invent "0" for empty dims.
 func (av *ArrayVariable) OutputUpperBoundArray() string {
 	if av == nil {
 		return ""
@@ -674,13 +680,8 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 	var b strings.Builder
 	b.WriteString(av.GetActualName(false))
 	for _, sz := range av.Sizes {
-		b.WriteString("[")
-		if sz > 0 {
-			b.WriteString(itoa(sz - 1))
-		} else {
-			b.WriteString("0")
-		}
-		b.WriteString("]")
+		// ArrayVariable.cpp:575 — out << "[" << (sizes[i] - 1) << "]"
+		b.WriteString("[" + itoa(sz-1) + "]")
 	}
 	return b.String()
 }

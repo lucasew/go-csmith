@@ -493,9 +493,18 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 
 // outputArrayInitForced is OutputInit without NoLoopInitializer early-out.
 // Used by OutputPtrResets (upstream always loops for array dead_globals).
+// ArrayVariable.cpp:619–655 — cvs names only (no letter-name soft invent).
 func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) string {
 	if av == nil {
 		return ""
+	}
+	if len(ctrl) < len(av.Sizes) {
+		return ""
+	}
+	for i := range av.Sizes {
+		if ctrl[i] == "" {
+			return ""
+		}
 	}
 	initVal := "0"
 	if av.Init != nil && av.Init.Value != "" {
@@ -504,24 +513,15 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) stri
 	var b strings.Builder
 	pad := indent
 	for i, sz := range av.Sizes {
-		iv := string([]byte{byte('i' + i)})
-		if i < len(ctrl) && ctrl[i] != "" {
-			iv = ctrl[i]
-		}
+		iv := ctrl[i]
 		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
 		if i+1 < len(av.Sizes) {
 			b.WriteString(pad + "{\n")
 			pad += "    "
 		}
 	}
-	access := av.GetActualName(false)
-	for i := range av.Sizes {
-		iv := string([]byte{byte('i' + i)})
-		if i < len(ctrl) && ctrl[i] != "" {
-			iv = ctrl[i]
-		}
-		access += "[" + iv + "]"
-	}
+	// ArrayVariable::output_with_indices
+	access := av.OutputWithIndices(ctrl)
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
 	for i := len(av.Sizes) - 1; i >= 1; i-- {
 		pad = pad[:len(pad)-4]
