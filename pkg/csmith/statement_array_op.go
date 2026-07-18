@@ -44,6 +44,26 @@ func MakeRandomArrayOp(
 	avs := MakeRandomArrayLoopSetup(r, opts, vs, cg)
 	loopCG := cg
 	loopCG.MustUseArrays = avs
+	// also populate RWDirective must sets for select_must_use_var (StatementFor.cpp:331–345)
+	var mustVars []*Variable
+	for _, av := range avs {
+		if av != nil {
+			mustVars = append(mustVars, &av.Variable)
+		}
+	}
+	if len(mustVars) > 0 {
+		rw := &RWDirective{
+			MustReadVars:  append([]*Variable(nil), mustVars...),
+			MustWriteVars: append([]*Variable(nil), mustVars...),
+		}
+		if loopCG.RW != nil {
+			rw.NoReadVars = loopCG.RW.NoReadVars
+			rw.NoWriteVars = loopCG.RW.NoWriteVars
+			rw.MustReadVars = append(rw.MustReadVars, loopCG.RW.MustReadVars...)
+			rw.MustWriteVars = append(rw.MustWriteVars, loopCG.RW.MustWriteVars...)
+		}
+		loopCG.RW = rw
+	}
 	st := *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
 	// mark body as in_array_loop (Block::in_array_loop) for goto restrictions
 	if st.Then != nil {

@@ -23,6 +23,13 @@ func MakeRandomLhs(
 	// non-const WRITE qualifiers
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 
+	// Lhs.cpp:73–76 — try must_use WRITE first
+	if v := vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q); v != nil {
+		if !compoundAssign || !v.IsVolatile() {
+			return v, typ
+		}
+	}
+
 	// Lhs.cpp:84–96 — flipcoin SelectDerefPointerProb
 	derefProb := 0
 	if probs != nil {

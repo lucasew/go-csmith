@@ -369,7 +369,11 @@ func makeExpressionVariableFlags(
 	}
 	// try several selects if filtered
 	for tries := 0; tries < 8; tries++ {
-		v := vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
+		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
+		v := vs.SelectMustUseVar(r, AccessRead, cg, typ, qfer)
+		if v == nil {
+			v = vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
+		}
 		if v == nil {
 			return nil
 		}

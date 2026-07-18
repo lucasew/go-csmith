@@ -148,6 +148,32 @@ func (c *CGContext) ClearEffectStm() {
 	c.EffectStm = EmptyEffect()
 }
 
+// FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
+// CGContext.cpp:610–624 — unique arrays from must_read and must_write.
+func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
+	if rw == nil {
+		return nil
+	}
+	var out []*ArrayVariable
+	seen := make(map[*Variable]bool)
+	add := func(v *Variable) {
+		if v == nil || !v.IsArray || seen[v] {
+			return
+		}
+		seen[v] = true
+		if v.AsArray != nil {
+			out = append(out, v.AsArray)
+		}
+	}
+	for _, v := range rw.MustReadVars {
+		add(v)
+	}
+	for _, v := range rw.MustWriteVars {
+		add(v)
+	}
+	return out
+}
+
 // IsNonReadable mirrors CGContext::is_nonreadable.
 // CGContext.cpp:118–128 — match against no_read_vars.
 func (c CGContext) IsNonReadable(v *Variable) bool {

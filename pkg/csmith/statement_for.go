@@ -186,9 +186,14 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var initN, limitN, incrN int
 	var testOp BinaryOp
 	var incrOp AssignOp
-	// array-loop path: must-use arrays from make_random_array_loop (StatementFor.cpp:205–220)
+	// array-loop path: must-use arrays (StatementFor.cpp:205–220)
+	// Prefer MustUseArrays on context; also RWDirective.find_must_use_arrays
+	mustArr := cg.MustUseArrays
+	if len(mustArr) == 0 && cg.RW != nil {
+		mustArr = cg.RW.FindMustUseArrays()
+	}
 	bound := -1
-	for _, av := range cg.MustUseArrays {
+	for _, av := range mustArr {
 		if av == nil {
 			continue
 		}

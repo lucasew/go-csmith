@@ -257,9 +257,78 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 	return false
 }
 
+// SelectMustUseVar mirrors VariableSelector::select_must_use_var.
+// VariableSelector.cpp:1504–1560 — from must_read/must_write; 75% erase after use.
+func (vs *VariableSelector) SelectMustUseVar(
+	r *Rng,
+	access Access,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+) *Variable {
+	if vs == nil || cg.RW == nil || typ == nil {
+		return nil
+	}
+	var list *[]*Variable
+	if access == AccessRead {
+		list = &cg.RW.MustReadVars
+	} else {
+		list = &cg.RW.MustWriteVars
+	}
+	mt := MatchFlexible
+	if access == AccessWrite {
+		mt = MatchDereference // eDerefExact ≈ dereference match for LHS
+	}
+	// eDerefExact is not in our enum; use MatchFlexible for write itemize path
+	// Upstream WRITE uses eDerefExact; we approximate with Flexible after expand.
+	_ = mt
+	blk := cg.CurrentBlock()
+	for i := 0; i < len(*list); i++ {
+		v := (*list)[i]
+		if v == nil {
+			continue
+		}
+		// is_visible: on stack or global
+		if blk != nil && !v.IsGlobal() && !v.IsVisibleLocal(blk) && !blk.IsVarOnStack(v) {
+			continue
+		}
+		if v.Type == nil || !typ.Match(v.Type, MatchFlexible) {
+			continue
+		}
+		if qfer != nil && !qfer.Wildcard {
+			// qfer->match(v->qfer) exact-ish
+			if !qfer.Match(v.Qfer, false) {
+				continue
+			}
+		}
+		deref := 0
+		if v.Type != nil {
+			deref = v.Type.IndirectLevel() - typ.IndirectLevel()
+		}
+		if access == AccessWrite && v.Qfer.IsConstAfterDeref(deref) {
+			continue
+		}
+		var out *Variable
+		if v.IsArray && v.AsArray != nil && r != nil {
+			if item := v.AsArray.Itemize(r); item != nil {
+				out = &item.Variable
+			}
+		} else {
+			out = v
+		}
+		if out != nil {
+			// 75% erase from must-use list (VariableSelector.cpp:1552–1555)
+			if r != nil && r.RndFlipcoin(75) {
+				*list = append((*list)[:i], (*list)[i+1:]...)
+			}
+			return out
+		}
+	}
+	return nil
+}
+
 // ChooseVar mirrors VariableSelector::choose_var type+eligibility filter.
-// VariableSelector.cpp:394–447 subset — expand, match, is_eligible_var;
-// has_eligible_volatile_var bookkeeping (no Bookkeeper).
+// VariableSelector.cpp:394–447 subset — expand, match, qfer match_indirect, eligible.
 func ChooseVar(
 	r *Rng,
 	vars []*Variable,
@@ -268,8 +337,20 @@ func ChooseVar(
 	want *Type,
 	mt MatchType,
 ) *Variable {
+	return ChooseVarQfer(r, vars, access, cg, want, nil, mt)
+}
+
+// ChooseVarQfer is choose_var with optional CVQualifiers filter.
+func ChooseVarQfer(
+	r *Rng,
+	vars []*Variable,
+	access Access,
+	cg CGContext,
+	want *Type,
+	qfer *CVQualifiers,
+	mt MatchType,
+) *Variable {
 	if want == nil {
-		// still filter eligibility on raw list
 		var ok []*Variable
 		for _, v := range vars {
 			if v != nil && IsEligibleVar(v, 0, access, cg) {
@@ -282,12 +363,12 @@ func ChooseVar(
 	if want.IsSimple() || want.IsAggregate() {
 		cands = ExpandStructUnionVars(vars, want)
 	}
-	// VariableSelector.cpp:410–415 — probe volatile availability (side table only)
 	_ = HasEligibleVolatileVar(cands, want, access, cg)
-	// VariableSelector.cpp:410 — has_dereferenceable_var bookkeeping
 	if cg.FM != nil {
 		_ = HasDereferenceableVar(cands, want, cg, Options{})
 	}
+	matchExact := false
+	// if opts available via nothing — use false; MatchExactQualifiers on opts later
 	var ok []*Variable
 	for _, x := range cands {
 		if x == nil || x.Type == nil {
@@ -296,10 +377,12 @@ func ChooseVar(
 		if !want.Match(x.Type, mt) {
 			continue
 		}
-		deref := 0
-		if x.Type != nil {
-			deref = x.Type.IndirectLevel() - want.IndirectLevel()
+		if qfer != nil && !qfer.Wildcard {
+			if !qfer.MatchIndirect(x.Qfer, matchExact) {
+				continue
+			}
 		}
+		deref := x.Type.IndirectLevel() - want.IndirectLevel()
 		if !IsEligibleVar(x, deref, access, cg) {
 			continue
 		}
