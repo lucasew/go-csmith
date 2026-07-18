@@ -138,6 +138,41 @@ func (v *Variable) IsVolatile() bool {
 	return v.Qfer.IsVolatile()
 }
 
+// IsFieldVar mirrors Variable::is_field_var.
+func (v *Variable) IsFieldVar() bool {
+	return v != nil && v.FieldVarOf != nil
+}
+
+// IsConstAfterDeref mirrors Variable::is_const_after_deref.
+// Variable.cpp:521–538.
+func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
+	if v == nil || derefLevel < 0 {
+		return false
+	}
+	if v.Qfer.IsConstAfterDeref(derefLevel) {
+		return true
+	}
+	t := v.Type
+	for i := 0; i < derefLevel && t != nil; i++ {
+		t = t.PtrType()
+	}
+	if t != nil {
+		return t.IsConstStructUnion()
+	}
+	return false
+}
+
+// IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref (qfer path).
+func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
+	if v == nil || derefLevel < 0 {
+		return false
+	}
+	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
+		return true
+	}
+	return v.IsVolatile() && derefLevel == 0
+}
+
 // IsPointer mirrors Variable::is_pointer.
 func (v *Variable) IsPointer() bool {
 	return v != nil && v.Type != nil && v.Type.PtrType() != nil

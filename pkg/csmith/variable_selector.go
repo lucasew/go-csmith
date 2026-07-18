@@ -67,6 +67,139 @@ func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 	return ChooseOKVarMatch(r, vars, want, MatchExact, false)
 }
 
+// FindAllVisibleVars mirrors VariableSelector::find_all_visible_vars.
+// VariableSelector.cpp:752–759 — GlobalList + block chain locals (no params).
+func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
+	var vars []*Variable
+	if vs != nil {
+		vars = append(vars, vs.GlobalList...)
+	}
+	for b != nil {
+		vars = append(vars, b.LocalVars...)
+		b = b.Parent
+	}
+	return vars
+}
+
+// FindAllNonArrayVisibleVars mirrors find_all_non_array_visible_vars.
+// VariableSelector.cpp:713–735 — non-array globals, params, non-array locals.
+func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
+	var vars []*Variable
+	if vs != nil {
+		for _, v := range vs.GlobalList {
+			if v != nil && !v.IsArray {
+				vars = append(vars, v)
+			}
+		}
+	}
+	// resolve func via block or parents (inner blocks may leave Func nil)
+	var f *Function
+	for bb := b; bb != nil; bb = bb.Parent {
+		if bb.Func != nil {
+			f = bb.Func
+			break
+		}
+	}
+	if f != nil {
+		vars = append(vars, f.Param...)
+	}
+	for b != nil {
+		for _, v := range b.LocalVars {
+			if v != nil && !v.IsArray {
+				vars = append(vars, v)
+			}
+		}
+		b = b.Parent
+	}
+	return vars
+}
+
+// GetAllLocalVars mirrors VariableSelector::get_all_local_vars.
+// VariableSelector.cpp:747–751.
+func GetAllLocalVars(b *Block) []*Variable {
+	var vars []*Variable
+	for b != nil {
+		vars = append(vars, b.LocalVars...)
+		b = b.Parent
+	}
+	return vars
+}
+
+// IsEligibleVar mirrors VariableSelector::is_eligible_var (core effect rules).
+// VariableSelector.cpp:216–290 — collective/FactUnion deferred.
+func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) bool {
+	if v == nil {
+		return false
+	}
+	eff := cg.EffectContext()
+	isConst := v.IsConstAfterDeref(derefLevel)
+	isVol := v.IsVolatileAfterDeref(derefLevel) || v.IsVolatile()
+
+	// volatile + non-SE-free context → reject
+	if isVol && !eff.IsSideEffectFree() {
+		return false
+	}
+	// cannot read/write a var being written in context
+	if access == AccessRead || access == AccessWrite {
+		if eff.IsWrittenPartially(v) {
+			return false
+		}
+	}
+	// cannot write a var being read (deref_level==0)
+	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartially(v) {
+		return false
+	}
+	// cannot write const
+	if access == AccessWrite && isConst {
+		return false
+	}
+	return true
+}
+
+// ChooseVar mirrors VariableSelector::choose_var type+eligibility filter.
+// VariableSelector.cpp:394–447 subset — expand, match, is_eligible_var.
+func ChooseVar(
+	r *Rng,
+	vars []*Variable,
+	access Access,
+	cg CGContext,
+	want *Type,
+	mt MatchType,
+) *Variable {
+	if want == nil {
+		// still filter eligibility on raw list
+		var ok []*Variable
+		for _, v := range vars {
+			if v != nil && IsEligibleVar(v, 0, access, cg) {
+				ok = append(ok, v)
+			}
+		}
+		return ChooseOKVar(r, ok)
+	}
+	cands := vars
+	if want.IsSimple() || want.IsAggregate() {
+		cands = ExpandStructUnionVars(vars, want)
+	}
+	var ok []*Variable
+	for _, x := range cands {
+		if x == nil || x.Type == nil {
+			continue
+		}
+		if !want.Match(x.Type, mt) {
+			continue
+		}
+		deref := 0
+		if x.Type != nil {
+			deref = x.Type.IndirectLevel() - want.IndirectLevel()
+		}
+		if !IsEligibleVar(x, deref, access, cg) {
+			continue
+		}
+		ok = append(ok, x)
+	}
+	return ChooseOKVar(r, ok)
+}
+
 // ExpandStructUnionVars mirrors VariableSelector::expand_struct_union_vars.
 // VariableSelector.cpp:156–173 — replace non-matching aggregates with field_vars.
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
@@ -222,9 +355,8 @@ func (vs *VariableSelector) SelectGlobal(
 	if vs == nil {
 		return nil
 	}
-	// choose_var with eFlexible + expand field_vars; WRITE skips const
-	skipConst := access == AccessWrite
-	v := ChooseOKVarMatch(r, vs.GlobalList, t, MatchFlexible, skipConst)
+	// choose_var with eFlexible + is_eligible_var
+	v := ChooseVar(r, vs.GlobalList, access, cg, t, MatchFlexible)
 	if v != nil {
 		return v
 	}
@@ -283,9 +415,7 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	}
 	// level 0: create struct; level 1: still create struct (fields may match *T after expand)
 	_ = vs.GenerateNewGlobal(access, cg, st, qfer, r)
-	// choose_var(GlobalList, …) for field matching desired type
-	skipConst := access == AccessWrite
-	return ChooseOKVarMatch(r, vs.GlobalList, typ, mt, skipConst)
+	return ChooseVar(r, vs.GlobalList, access, cg, typ, mt)
 }
 
 // EagerCreateLocalStruct mirrors VariableSelector::eager_create_local_struct.
@@ -312,8 +442,7 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 		return nil
 	}
 	_ = vs.GenerateNewParentLocal(block, access, cg, st, qfer, r)
-	skipConst := access == AccessWrite
-	return ChooseOKVarMatch(r, block.LocalVars, typ, mt, skipConst)
+	return ChooseVar(r, block.LocalVars, access, cg, typ, mt)
 }
 
 // GenerateParameterVariableTyped mirrors
@@ -669,15 +798,14 @@ func (vs *VariableSelector) SelectParentLocal(
 			matchT = t
 		}
 	}
-	skipConst := access == AccessWrite
-	if v := ChooseOKVarMatch(r, blk.LocalVars, matchT, mt, skipConst); v != nil {
+	if v := ChooseVar(r, blk.LocalVars, access, cg, matchT, mt); v != nil {
 		return v
 	}
 	return vs.GenerateNewParentLocal(blk, access, cg, matchT, qfer, r)
 }
 
 // SelectParentParam mirrors VariableSelector::SelectParentParam.
-// choose among function parameters with match.
+// VariableSelector.cpp:1074–1087 — choose param; empty/miss → SelectParentLocal.
 func (vs *VariableSelector) SelectParentParam(
 	access Access,
 	cg CGContext,
@@ -686,12 +814,16 @@ func (vs *VariableSelector) SelectParentParam(
 	r *Rng,
 	mt MatchType,
 ) *Variable {
-	_ = qfer
 	if cg.CurrentFunc == nil {
 		return nil
 	}
-	skipConst := access == AccessWrite
-	return ChooseOKVarMatch(r, cg.CurrentFunc.Param, t, mt, skipConst)
+	if len(cg.CurrentFunc.Param) == 0 {
+		return vs.SelectParentLocal(access, cg, t, qfer, r, mt)
+	}
+	if v := ChooseVar(r, cg.CurrentFunc.Param, access, cg, t, mt); v != nil {
+		return v
+	}
+	return vs.SelectParentLocal(access, cg, t, qfer, r, mt)
 }
 
 // GenerateNewVariable mirrors VariableSelector::GenerateNewVariable.

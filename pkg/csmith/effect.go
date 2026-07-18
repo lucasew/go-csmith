@@ -79,14 +79,76 @@ func (e Effect) ReadVar(v *Variable) Effect {
 	return e
 }
 
-// IsWritten mirrors Effect::is_written (exact var).
+// IsWritten mirrors Effect::is_written — exact or parent field_var_of.
+// Effect.cpp:333–345.
 func (e Effect) IsWritten(v *Variable) bool {
-	return v != nil && e.written[v]
+	if v == nil {
+		return false
+	}
+	if e.written[v] {
+		return true
+	}
+	// if we write a struct/union, all fields are written too
+	if v.FieldVarOf != nil {
+		return e.IsWritten(v.FieldVarOf)
+	}
+	return false
 }
 
-// IsRead mirrors Effect::is_read (exact var).
+// IsRead mirrors Effect::is_read — exact or struct parent (not union).
+// Effect.cpp:276–289.
 func (e Effect) IsRead(v *Variable) bool {
-	return v != nil && e.read[v]
+	if v == nil {
+		return false
+	}
+	if e.read[v] {
+		return true
+	}
+	// struct fields inherit parent read; unions do not
+	if v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsStruct() {
+		return e.IsRead(v.FieldVarOf)
+	}
+	return false
+}
+
+// FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
+// Effect.cpp:389–399.
+func (e Effect) FieldIsRead(v *Variable) bool {
+	if v == nil || !v.IsAggregate() {
+		return false
+	}
+	for _, f := range v.FieldVars {
+		if e.IsRead(f) || e.FieldIsRead(f) {
+			return true
+		}
+	}
+	return false
+}
+
+// FieldIsWritten mirrors Effect::field_is_written.
+// Effect.cpp:404–414.
+func (e Effect) FieldIsWritten(v *Variable) bool {
+	if v == nil || !v.IsAggregate() {
+		return false
+	}
+	for _, f := range v.FieldVars {
+		if e.IsWritten(f) || e.FieldIsWritten(f) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsReadPartially mirrors Effect::is_read_partially (sibling-union deferred).
+// Effect.cpp:444–446.
+func (e Effect) IsReadPartially(v *Variable) bool {
+	return e.IsRead(v) || e.FieldIsRead(v)
+}
+
+// IsWrittenPartially mirrors Effect::is_written_partially (sibling-union deferred).
+// Effect.cpp:448–451.
+func (e Effect) IsWrittenPartially(v *Variable) bool {
+	return e.IsWritten(v) || e.FieldIsWritten(v)
 }
 
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.

@@ -97,8 +97,8 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 	return ChooseOKVar(r, ok)
 }
 
-// selectDerefPointer mirrors VariableSelector::select_deref_pointer simplified.
-// VariableSelector.cpp:1246–1318 — collect visible vars; MatchDereference; else new pointer.
+// selectDerefPointer mirrors VariableSelector::select_deref_pointer.
+// VariableSelector.cpp:1246–1318 — visible vars + MatchDereference + eligibility; else new ptr.
 func selectDerefPointer(
 	r *Rng,
 	opts Options,
@@ -112,40 +112,28 @@ func selectDerefPointer(
 	if typ == nil || r == nil {
 		return nil
 	}
-	// candidates: globals (nonvol for simplicity) + locals + params
+	// VariableSelector.cpp:1252–1266 — nonvol globals + block locals + params
 	var cands []*Variable
-	addAll := func(list []*Variable) {
-		for _, v := range list {
-			if v == nil || v.Type == nil {
-				continue
-			}
-			// eDereference: var is pointer-to-typ (one extra indirection)
-			if v.Type.IndirectLevel() == typ.IndirectLevel()+1 {
-				// pointee match flexible
-				if pt := v.Type.PtrType(); pt != nil && typ.Match(pt, MatchFlexible) {
-					if access == AccessWrite && v.IsConst() {
-						continue
-					}
-					cands = append(cands, v)
-				}
-			}
-		}
-	}
 	if vs != nil {
-		addAll(vs.GlobalNonvolatilesList)
-		if len(vs.GlobalNonvolatilesList) == 0 {
-			addAll(vs.GlobalList)
+		if len(vs.GlobalNonvolatilesList) > 0 {
+			cands = append(cands, vs.GlobalNonvolatilesList...)
+		} else {
+			cands = append(cands, vs.GlobalList...)
 		}
 	}
+	var blk *Block
 	if cg.CurrentFunc != nil {
-		for _, blk := range cg.CurrentFunc.Stack {
-			if blk != nil {
-				addAll(blk.LocalVars)
-			}
+		if len(cg.CurrentFunc.Stack) > 0 {
+			blk = cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
 		}
-		addAll(cg.CurrentFunc.Param)
+		// walk parent chain for locals
+		for b := blk; b != nil; b = b.Parent {
+			cands = append(cands, b.LocalVars...)
+		}
+		cands = append(cands, cg.CurrentFunc.Param...)
 	}
-	if v := ChooseOKVar(r, cands); v != nil {
+	// choose_var with eDereference
+	if v := ChooseVar(r, cands, access, cg, typ, MatchDereference); v != nil {
 		return v
 	}
 
@@ -162,16 +150,32 @@ func selectDerefPointer(
 	if ptrType == nil {
 		return nil
 	}
+	// expand_struct on create path (VariableSelector.cpp:1288–1310)
+	// volatile qfer → global eager; else local eager
+	if vs != nil && vs.Opts.ExpandStruct {
+		vol := qfer != nil && qfer.IsVolatile()
+		if vol {
+			if v := vs.EagerCreateGlobalStruct(access, cg, ptrType, qfer, r, MatchDereference); v != nil {
+				return v
+			}
+		} else if blk != nil {
+			if v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, qfer, r, MatchDereference); v != nil {
+				return v
+			}
+		}
+	}
 	// new local non-volatile preferred; else global
-	if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-		blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
+	if vs != nil && cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
+		b := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
 		pq := RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
 		if access == AccessWrite {
-			// set_const(false, 1) on pointer level — simplified: no const
 			pq = NewCVQualifiers([]bool{false}, []bool{false})
 		}
-		return vs.GenerateNewParentLocal(blk, access, cg, ptrType, &pq, r)
+		return vs.GenerateNewParentLocal(b, access, cg, ptrType, &pq, r)
 	}
 	pq := NewCVQualifiers([]bool{false}, []bool{false})
+	if vs == nil {
+		return nil
+	}
 	return vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
 }
