@@ -30,10 +30,9 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	if env != nil {
 		ft = env.ChooseRandom(r, opts, probs, true)
 	}
+	// Type.cpp:687–691 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
 	if ft == nil {
-		// ERROR_RETURN when AllTypes empty; library tests may lack GenerateAllTypes
-		st := ChooseRandomNonvoidSimple(r, probs)
-		ft = GetSimpleType(st)
+		return StructField{Name: fmt.Sprintf("f%d", fieldIdx), BitWidth: -1}
 	}
 	// Type.cpp:692–694 — FieldConstProb / FieldVolatileProb random_qualifiers
 	constP := uint32(probs.Single(PFieldConstProb))
@@ -379,7 +378,8 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	// Type.cpp does not soft-seed simples when AllTypes empty (ERROR would fail)
 	var ft *Type
 	// Type.cpp:742–755 — do { 15% struct else nonstruct } while (type == nullptr)
-	for tries := 0; tries < 64; tries++ {
+	// C++ loops until type set; cap high (no soft invent simple early)
+	for tries := 0; tries < 256; tries++ {
 		if len(structTypes) > 0 && r.RndFlipcoin(15) {
 			ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
 			break

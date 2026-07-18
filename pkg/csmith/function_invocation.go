@@ -560,7 +560,8 @@ func MakeRandomBinaryInvocation(
 	op := PickBinaryOp(r, opts)
 	if typ != nil && typ.IsFloat() {
 		validB := false
-		for tries := 0; tries < 64; tries++ {
+		// C++ unbounded do-while; cap high (no soft invent invalid float op)
+		for tries := 0; tries < 256; tries++ {
 			if BinaryOpWorksForFloat(op) {
 				validB = true
 				break
@@ -581,9 +582,11 @@ func MakeRandomBinaryInvocation(
 		// SafeOpFlags DEPTH_GUARD / ERROR_GUARD
 		return nil
 	}
-	if flags != nil {
-		lhsTy = flags.LHSType()
-		rhsTy = flags.RHSType()
+	// FunctionInvocation.cpp:219–221 — assert(lhs_type && rhs_type)
+	lhsTy = flags.LHSType()
+	rhsTy = flags.RHSType()
+	if lhsTy == nil || rhsTy == nil {
+		return nil
 	}
 	// non-arith/shift: keep flags for typing but Output ignores safe path (SafeOpsBinary filter)
 	if !SafeOpsBinary(opStr) {
@@ -872,7 +875,8 @@ func MakeRandomUnaryInvocation(
 	// FunctionInvocation.cpp:146–149 — do { pick } while (float && !works); no soft invent invalid
 	var uop UnaryOp
 	validU := false
-	for tries := 0; tries < 64; tries++ {
+	// C++ unbounded do-while; cap high (no soft invent invalid float op)
+	for tries := 0; tries < 256; tries++ {
 		uop = PickUnaryOp(r, opts)
 		if !typ.IsFloat() || UnaryOpWorksForFloat(uop) {
 			validU = true
@@ -889,9 +893,13 @@ func MakeRandomUnaryInvocation(
 		probs = vs.Probs
 	}
 	flags := MakeRandomUnary(r, opts, probs, typ, nil, uop)
-	argTy := typ
-	if flags != nil {
-		argTy = flags.LHSType()
+	// FunctionInvocation.cpp:152–154 — ERROR_GUARD; type = flags->get_lhs_type(); assert(type)
+	if flags == nil {
+		return nil
+	}
+	argTy := flags.LHSType()
+	if argTy == nil {
+		return nil
 	}
 	// FunctionInvocation.cpp:157–159 — Expression::make_random(cg, type) — no_func=false
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, false, false, MaxTermTypes, cg.ExprDepth)

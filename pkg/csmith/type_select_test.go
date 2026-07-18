@@ -18,9 +18,11 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 }
 
 func TestMakeRandomPointerTypeIntStar(t *testing.T) {
-	var env TypeEnv
 	opts := Defaults()
 	probs := NewProbabilities(opts)
+	// Type.cpp GenerateSimpleTypes seeds AllTypes before make_random_pointer_type
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	// Force non-20% path often; result should be int* when simple base consolidated
 	r := NewRng(2)
 	// first flip 20% for double ptr — seed2 first flipcoin(20)
@@ -78,11 +80,13 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 func TestSelectLTypeCanBePointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
+	// Type.cpp always has AllTypes after GenerateSimpleTypes / GenerateAllTypes
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
 		r := NewRng(seed)
-		ty := SelectLType(r, opts, probs, &env, false, AssignSimple)
+		ty := SelectLType(r, opts, probs, env, false, AssignSimple)
 		if ty != nil && ty.PtrType() != nil {
 			found = true
 			break

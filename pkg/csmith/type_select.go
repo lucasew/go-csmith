@@ -137,8 +137,8 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {
-		// before GenerateSimpleTypes; ERROR_GUARD would fail — simple fallback for empty env only
-		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+		// Type.cpp:1208–1209 — rnd_upto(AllTypes.size()) + ERROR_GUARD(nullptr); no soft invent simple
+		return nil
 	}
 	// Type.cpp:1206–1216 — rnd_upto(AllTypes.size(), ChooseRandomTypeFilter)
 	filt := filterFunc(func(v uint32) bool {

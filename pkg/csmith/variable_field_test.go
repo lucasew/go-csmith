@@ -8,8 +8,10 @@ import (
 func TestCreateFieldVars(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	// Type.cpp GenerateSimpleTypes before make_random_struct_type / field choose
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	v := CreateVariableQfer("g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil || len(v.FieldVars) != len(st.Fields) {
 		t.Fatalf("fields %d want %d", len(v.FieldVars), len(st.Fields))
@@ -31,8 +33,9 @@ func TestCreateFieldVars(t *testing.T) {
 func TestCollectExpandable(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
-	st := MakeRandomStructType(NewRng(5), opts, probs, &env, "S0")
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	st := MakeRandomStructType(NewRng(5), opts, probs, env, "S0")
 	v := CreateVariableQfer("g_2", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	all := v.CollectExpandable()
 	if len(all) < 1+len(st.Fields) {
@@ -43,8 +46,9 @@ func TestCollectExpandable(t *testing.T) {
 func TestFieldVolatileOrFromParent(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	var env TypeEnv
-	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
+	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	// parent volatile
 	v := CreateVariableQfer("g_3", st, NewCVQualifiers([]bool{false}, []bool{true}))
 	for _, f := range v.FieldVars {
