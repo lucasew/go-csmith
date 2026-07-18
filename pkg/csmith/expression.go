@@ -70,10 +70,12 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 // ExpressionVariable.cpp:276–282 — exp.compatible(&var);
 // ExpressionFuncall.cpp:210–212 — always false for Expression*.
 func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
+	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR
 	if e == nil || other == nil {
 		return false
 	}
 	// Variable / Lhs → other.compatible(this.var)
+	// ExpressionVariable.cpp:289 — assert(v) on Variable* overload via CompatibleWithVar
 	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var != nil {
 		return other.CompatibleWithVar(e.Var, expandStruct)
 	}

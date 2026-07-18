@@ -113,6 +113,18 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	if v == nil {
 		return ""
 	}
+	// Variable.cpp:659 — assert(init); no soft invent empty "= ;" RHS
+	var initOut string
+	if v.InitExpr != nil {
+		initOut = v.InitExpr.Output()
+	} else if v.Init != nil {
+		initOut = v.Init.Value
+	}
+	if initOut == "" {
+		// missing init is broken IR (union-field CreateVariable uses null init
+		// and those fields are not OutputDef'd as standalone defs)
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(v.OutputDeclOpts(forceStatic, prefixName))
 	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
@@ -120,14 +132,8 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 		b.WriteString(EnsureVarAttrGenerator().Output(r))
 	}
 	// Variable.cpp:656–660 — out << " = "; assert(init); init->Output
-	// no soft skip of "= value" when init missing
 	b.WriteString(" = ")
-	if v.InitExpr != nil {
-		b.WriteString(v.InitExpr.Output())
-	} else if v.Init != nil {
-		b.WriteString(v.Init.Value)
-	}
-	// C++ assert(init) for OutputDef; empty RHS only for broken IR (union field init null)
+	b.WriteString(initOut)
 	b.WriteString(";")
 	// Variable.cpp:658–661 — volatile global comment on same line path uses comment helper
 	if v.IsGlobal() && v.IsVolatile() {
@@ -936,18 +942,21 @@ func (v *Variable) FindPointerFields() []*Variable {
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {
+	// Variable.cpp:338 — assert(type->is_aggregate())
 	if v == nil || v.Type == nil || !v.Type.IsAggregate() {
 		return
 	}
 	if len(v.FieldVars) > 0 {
 		return
 	}
+	// Variable.cpp:340 — assert(fields.size() == qfers_.size()); Go fields embed qfer
 	isVol := v.IsVolatile()
 	isConst := v.IsConst()
 	j := 0
 	for _, f := range v.Type.Fields {
 		if f.Type == nil {
-			continue
+			// incomplete type IR — fail closed stop (no invent field types)
+			return
 		}
 		// Type::is_unamed_padding — zero-length bitfield skipped (Variable.cpp:351–352)
 		if f.BitWidth == 0 {
@@ -986,10 +995,16 @@ func (v *Variable) CreateFieldVars() {
 		if HasError() {
 			return
 		}
+		qfer := NewCVQualifiers(consts, vols)
+		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
+		if !qfer.SanityCheck(f.Type) {
+			// fail closed — no soft invent bad-qfer field var
+			return
+		}
 		fv := &Variable{
 			Name:       fname,
 			Type:       f.Type,
-			Qfer:       NewCVQualifiers(consts, vols),
+			Qfer:       qfer,
 			FieldVarOf: v,
 			// bitfields_length_[i] >= 0 → isBitfield (Type::is_bitfield)
 			IsBitfield: f.BitWidth >= 0,

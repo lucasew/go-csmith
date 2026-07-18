@@ -117,6 +117,14 @@ func TestVariableOutputDef(t *testing.T) {
 	}
 }
 
+func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
+	// Variable.cpp:659 — assert(init); no soft invent "= ;"
+	v := &Variable{Name: "g_u", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if v.OutputDef(true) != "" {
+		t.Fatal("missing init must fail closed")
+	}
+}
+
 func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2

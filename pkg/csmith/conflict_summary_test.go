@@ -93,6 +93,12 @@ func TestIsFrameVar(t *testing.T) {
 	if cg.IsFrameVar(g) {
 		t.Fatal("global not frame")
 	}
+	// CGContext.cpp:494 — assert(b); no invent frame without curr_blk
+	cg2 := EmptyCGContext()
+	cg2.CallChain = []*Block{blk}
+	if cg2.IsFrameVar(loc) {
+		t.Fatal("nil curr_blk must fail closed, not invent via call_chain only")
+	}
 }
 
 func TestDoFinalization(t *testing.T) {

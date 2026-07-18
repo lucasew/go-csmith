@@ -184,7 +184,11 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		return "(" + strings.Repeat("*", ind) + base + ")"
 	}
 	if ind < 0 {
-		// only -1 is valid for address-of
+		// ExpressionVariable.cpp:210–212 — assert(indirect_level == -1)
+		// multi-level & is broken IR; no soft invent single &
+		if ind != -1 {
+			return ""
+		}
 		return "&" + v.GetActualName(false)
 	}
 	return base

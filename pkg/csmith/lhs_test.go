@@ -115,6 +115,19 @@ func TestExpressionVariableAddrOutput(t *testing.T) {
 	}
 }
 
+func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
+	// ExpressionVariable.cpp:211 — assert(indirect_level == -1); no invent single &
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(PointerTo(GetIntType()))}
+	// ind = 0 - 2 = -2
+	if e.IndirectLevel() != -2 {
+		t.Fatalf("indir %d", e.IndirectLevel())
+	}
+	if out := e.Output(); out != "" {
+		t.Fatalf("multi-level & must fail closed, got %q", out)
+	}
+}
+
 func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	BookkeeperDoFinalization()
 	opts := Defaults()

@@ -812,11 +812,17 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	if v == nil {
 		return false
 	}
-	if b := c.CurrentBlock(); b != nil && v.IsVisibleLocal(b) {
+	// CGContext.cpp:493–494 — get_current_block(); assert(b)
+	// no soft invent frame via call_chain only when curr_blk missing
+	b := c.CurrentBlock()
+	if b == nil {
+		return false
+	}
+	if v.IsVisibleLocal(b) {
 		return true
 	}
-	for _, b := range c.CallChain {
-		if b != nil && v.IsVisibleLocal(b) {
+	for _, cb := range c.CallChain {
+		if cb != nil && v.IsVisibleLocal(cb) {
 			return true
 		}
 	}
