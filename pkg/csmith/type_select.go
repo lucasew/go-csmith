@@ -51,6 +51,82 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 	return env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
 }
 
+// ChooseRandom mirrors Type::choose_random via ChooseRandomTypeFilter.
+// Type.cpp:1206–1216 / ChooseRandomTypeFilter::filter (Type.cpp:223–244).
+// forFieldVar=false for return types.
+func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
+	if env == nil || len(env.AllTypes) == 0 {
+		st := ChooseRandomNonvoidSimple(r, probs)
+		return GetSimpleType(st)
+	}
+	if r == nil {
+		return env.AllTypes[0]
+	}
+	// rnd_upto(AllTypes.size(), filter) — reject void-like simple weights 0, !return_structs
+	filt := filterFunc(func(v uint32) bool {
+		i := int(v)
+		if i < 0 || i >= len(env.AllTypes) {
+			return true
+		}
+		t := env.AllTypes[i]
+		if t == nil {
+			return true
+		}
+		if t.IsSimple() {
+			// SIMPLE_TYPES_PROB_FILTER
+			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
+		}
+		if t.IsStruct() && !opts.ReturnStructs {
+			return true
+		}
+		if forFieldVar && t.IsStruct() {
+			// max_nested_struct_level — StructDepth not fully tracked; use 0 depth OK
+			// reject if nested too deep: count via recursive fields simplified skip
+		}
+		return false
+	})
+	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	t := env.AllTypes[idx]
+	if t != nil {
+		t.Used = true
+	}
+	return t
+}
+
+// ChooseRandomNonvoid mirrors Type::choose_random_nonvoid.
+// Type.cpp:1218–1227 — NonVoidTypeFilter rejects void.
+func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabilities) *Type {
+	if env == nil || len(env.AllTypes) == 0 {
+		st := ChooseRandomNonvoidSimple(r, probs)
+		return GetSimpleType(st)
+	}
+	filt := filterFunc(func(v uint32) bool {
+		i := int(v)
+		if i < 0 || i >= len(env.AllTypes) {
+			return true
+		}
+		t := env.AllTypes[i]
+		if t == nil {
+			return true
+		}
+		if t.IsSimple() && t.Simple() == EVoid {
+			return true
+		}
+		// also honor simple type disable weights
+		if t.IsSimple() && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
+			return true
+		}
+		_ = opts
+		return false
+	})
+	idx := r.RndUptoFilter(uint32(len(env.AllTypes)), filt)
+	t := env.AllTypes[idx]
+	if t != nil {
+		t.Used = true
+	}
+	return t
+}
+
 // MakeRandomPointerType mirrors Type::make_random_pointer_type.
 // Type.cpp:1141–1166.
 func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabilities) *Type {

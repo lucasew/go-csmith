@@ -119,8 +119,8 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 	return r.RndFlipcoin(80)
 }
 
-// BuildUserInvocation builds args for callee via Expression::make_random_param-ish (variable/const).
-// FunctionInvocationUser::build_invocation simplified — one expr per param.
+// BuildUserInvocation mirrors FunctionInvocationUser::build_invocation arg loop.
+// FunctionInvocationUser.cpp:188 — Expression::make_random_param(param type, param qfer).
 func BuildUserInvocation(
 	r *Rng,
 	opts Options,
@@ -137,18 +137,22 @@ func BuildUserInvocation(
 	fi := &Invocation{User: callee}
 	for _, p := range callee.Param {
 		ty := GetIntType()
-		if p != nil && p.Type != nil {
-			ty = p.Type
+		var qfer *CVQualifiers
+		if p != nil {
+			if p.Type != nil {
+				ty = p.Type
+			}
+			q := p.Qfer
+			qfer = &q
 		}
-		// make_random_param: no nested user-func explosion — variable preferred, no const.
-		arg := MakeRandomExpression(r, opts, tables, vs, cg, ty, nil, true, true, MaxTermTypes, cg.ExprDepth+1)
+		// make_random_param (param table: no constant args)
+		arg := MakeRandomParam(r, opts, tables, vs, cg, ty, qfer, cg.ExprDepth+1, list)
 		if arg == nil {
-			arg = MakeRandomExpression(r, opts, tables, vs, cg, ty, nil, true, false, TermVariable, cg.ExprDepth+1)
+			arg = MakeRandomExpression(r, opts, tables, vs, cg, ty, qfer, true, true, TermVariable, cg.ExprDepth+1, list)
 		}
 		fi.Args = append(fi.Args, arg)
 	}
 	_ = probs
-	_ = list
 	return fi
 }
 
@@ -338,7 +342,14 @@ func MakeRandomInvocation(
 			// build_invocation_and_function → make_random_signature only (body later)
 			sigType := workType
 			if typ == nil {
-				sigType = RandomReturnType(r, probs)
+				var env *TypeEnv
+				if list != nil {
+					env = list.Types
+				}
+				if env == nil {
+					env = cg.Types
+				}
+				sigType = RandomReturnType(r, probs, env, opts)
 			}
 			callee = MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, sigType, nil, list)
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)

@@ -130,8 +130,61 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	return ExpressionTypeProbability(r, f)
 }
 
+// PickParamTermType mirrors Expression::make_random_param term selection.
+// Expression.cpp:244–260 — paramTable + always filter Constant.
+func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
+	if tables == nil {
+		tables = NewExprTables(opts)
+	}
+	f := NewVectorFilter(&tables.Param)
+	// don't call functions with constant parameters
+	f.Add(int(TermConstant))
+	if typ != nil {
+		if typ.IsStruct() && !opts.ReturnStructs {
+			f.Add(int(TermFunction))
+		}
+		if typ.IsUnion() && !opts.ReturnUnions {
+			f.Add(int(TermFunction))
+		}
+		if typ.IsConstStructUnion() {
+			f.Add(int(TermAssignment))
+		}
+	}
+	if exprDepth+2 > opts.MaxExprComplexity {
+		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
+	}
+	return ExpressionTypeProbability(r, f)
+}
+
+// MakeRandomParam mirrors Expression::make_random_param.
+// Expression.cpp:238–296 — param probability table; constants filtered out.
+func MakeRandomParam(
+	r *Rng,
+	opts Options,
+	tables *ExprTables,
+	vs *VariableSelector,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	exprDepth int,
+	list ...*FunctionList,
+) *Expression {
+	if typ == nil {
+		typ = GetIntType()
+	}
+	tt := PickParamTermType(r, tables, opts, typ, exprDepth)
+	// hard depth cap
+	if exprDepth+2 > opts.MaxExprComplexity {
+		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
+			tt = TermVariable
+		}
+	}
+	// no_func=false, no_const=true for sub make paths that re-pick
+	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, exprDepth, list...)
+}
+
 // MakeRandomExpression mirrors Expression::make_random (const/var/funcall).
-// Assign/Comma still deferred. Expression.cpp:141–204.
+// Expression.cpp:141–204.
 func MakeRandomExpression(
 	r *Rng,
 	opts Options,

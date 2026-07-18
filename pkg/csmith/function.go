@@ -35,9 +35,11 @@ func RandomFunctionName(sym *GenSym) string {
 }
 
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.
-// Until AllTypes/struct generation exists, use choose_random_nonvoid_simple.
-// Type.cpp:1206–1216 vs choose_random_simple path.
-func RandomReturnType(r *Rng, probs *Probabilities) *Type {
+// Function.cpp:256–259. When env is nil/empty, fall back to nonvoid simple.
+func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) *Type {
+	if env != nil && len(env.AllTypes) > 0 {
+		return env.ChooseRandom(r, opts, probs, false)
+	}
 	st := ChooseRandomNonvoidSimple(r, probs)
 	return GetSimpleType(st)
 }
@@ -73,8 +75,15 @@ func MakeRandomSignature(
 	if probs == nil {
 		probs = NewProbabilities(opts)
 	}
+	var env *TypeEnv
+	if list != nil {
+		env = list.Types
+	}
+	if env == nil {
+		env = cg.Types
+	}
 	if retType == nil {
-		retType = RandomReturnType(r, probs)
+		retType = RandomReturnType(r, probs, env, opts)
 	}
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, ReturnType: retType}
@@ -121,7 +130,11 @@ func MakeFirst(
 	if probs == nil {
 		probs = NewProbabilities(opts)
 	}
-	ty := RandomReturnType(r, probs)
+	var env *TypeEnv
+	if list != nil {
+		env = list.Types
+	}
+	ty := RandomReturnType(r, probs, env, opts)
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, ReturnType: ty}
 	// CVQualifiers::random_qualifiers(ty) — no context, no_volatile
@@ -135,6 +148,9 @@ func MakeFirst(
 		if list.Types != nil {
 			cg.Types = list.Types
 		}
+	}
+	if env != nil {
+		cg.Types = env
 	}
 	// register f before body so recursive choose_func can see it
 	if list != nil {
