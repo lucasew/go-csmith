@@ -457,11 +457,8 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	if len(ptrs) == 0 {
 		return ""
 	}
+	// OutputMgr.cpp:332 — Variable::get_last_ctrl_vars() (no GetNew soft-fallback)
 	ctrl := GetLastCtrlVars()
-	if ctrl == nil {
-		// generation-time fallback when no prior OutputArrayInitializers
-		ctrl = GetNewCtrlVars(opts)
-	}
 	names := CtrlVarNames(ctrl)
 	var b strings.Builder
 	for _, v := range ptrs {
@@ -474,6 +471,10 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			sizes = av.Sizes
 		}
 		if v.IsArray && len(sizes) > 0 {
+			if len(names) == 0 {
+				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
+				continue
+			}
 			// ArrayVariable::output_init with Constant zero (always loop form)
 			if av == nil {
 				av = &ArrayVariable{

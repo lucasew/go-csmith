@@ -494,9 +494,14 @@ func MakeRandomParam(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	tt := PickParamTermType(r, tables, opts, typ, exprDepth)
+	// Expression.cpp:258 — use cg_context.expr_depth (exprDepth param kept for API)
+	depth := exprDepth
+	if cg != nil {
+		depth = cg.ExprDepth
+	}
+	tt := PickParamTermType(r, tables, opts, typ, depth)
 	// hard depth cap
-	if exprDepth+2 > opts.MaxExprComplexity {
+	if depth+2 > opts.MaxExprComplexity {
 		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
 			tt = TermVariable
 		}
@@ -511,7 +516,7 @@ func MakeRandomParam(
 		return e
 	}
 	// no_func=false, no_const=true for other terms (MakeRandomExpression bumps depth)
-	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, exprDepth, list...)
+	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, depth, list...)
 }
 
 // BumpsExprDepth reports whether this expression increments cg_context.expr_depth.
@@ -597,12 +602,15 @@ func MakeRandomExpression(
 	if typ.IsStruct() && tt == TermConstant {
 		tt = TermVariable
 	}
+	// Expression.cpp:176–178 / 213 — always cg_context.expr_depth (not a separate local)
+	_ = exprDepth
+	depth := cg.ExprDepth
 	if tt == MaxTermTypes {
-		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, exprDepth)
+		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, depth)
 	}
 	// Hard depth cap: never nest Function/Assign/Comma when near max_expr_depth
 	// (mirrors Expression.cpp:177–178 filter; prevents unbounded recursion).
-	if exprDepth+2 > opts.MaxExprComplexity {
+	if depth+2 > opts.MaxExprComplexity {
 		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
 			if noConst {
 				tt = TermVariable

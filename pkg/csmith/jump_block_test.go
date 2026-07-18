@@ -42,8 +42,10 @@ func TestFindGoodJumpBlock(t *testing.T) {
 }
 
 func TestOutputPtrResetsArray(t *testing.T) {
+	// OutputMgr uses get_last_ctrl_vars — seed pool like OutputArrayInitializers
 	CtrlVarsDoFinalization()
 	opts := Defaults()
+	_ = GetNewCtrlVars(opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
 	av := CreateArrayVariable(NewRng(2), opts, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
@@ -52,6 +54,7 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	if !strings.Contains(out, "g_a") || !strings.Contains(out, "0") || !strings.Contains(out, "for (i = 0") {
 		t.Fatal(out)
 	}
+	CtrlVarsDoFinalization()
 }
 
 func TestClearEffectStm(t *testing.T) {

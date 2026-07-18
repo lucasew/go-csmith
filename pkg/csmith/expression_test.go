@@ -361,6 +361,24 @@ func TestMakeRandomExpressionBumpsCallerExprDepth(t *testing.T) {
 	}
 }
 
+func TestMakeRandomExpressionUsesCGExprDepthNotStaleArg(t *testing.T) {
+	// Expression.cpp:176 — filter uses cg_context.expr_depth, not a separate caller local
+	opts := Defaults()
+	opts.MaxExprComplexity = 3
+	cg := EmptyCGContext()
+	cg.ExprDepth = 2 // near max: 2+2 > 3 → force leaf terms
+	// pass stale exprDepth=0 that would allow Function if used; force Constant leaf
+	e := MakeRandomExpression(NewRng(5), opts, NewExprTables(opts), nil, &cg, GetIntType(), nil, true, false, TermConstant, 0)
+	if e == nil || e.Term != TermConstant {
+		t.Fatalf("%+v", e)
+	}
+	// with high cg.ExprDepth, complex MaxTermTypes must not pick Function via stale 0
+	e2 := MakeRandomExpression(NewRng(5), opts, NewExprTables(opts), nil, &cg, GetIntType(), nil, false, false, MaxTermTypes, 0)
+	if e2 != nil && (e2.Term == TermFunction || e2.Term == TermAssignment || e2.Term == TermCommaExpr) {
+		t.Fatalf("stale depth arg must not allow complex term: %v", e2.Term)
+	}
+}
+
 func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	// Expression.cpp:147–152 — nil type from choose_random_nonvoid when SE-free
 	opts := Defaults()
