@@ -32,10 +32,16 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
+	// FunctionInvocationBinary.cpp:68 assert(blk) for safe_ops temps
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	// Full eBinaryOps includes cmp/logic; Output uses safe_* only for arith/shift.
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
-		fi = func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType()) }()
+		ClearError()
+		cg := WithFunc(f, EmptyEffect())
+		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}
@@ -56,8 +62,12 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
-	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &c, GetIntType()) }()
+	cg := WithFunc(f, EmptyEffect())
+	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &cg, GetIntType())
 	if fi == nil {
 		t.Fatal("nil inv")
 	}

@@ -3,7 +3,11 @@ package csmith
 import "testing"
 
 func TestEffectHasGlobalAndUnionRead(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	if g == nil {
+		t.Fatal("global")
+	}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
 	e := EmptyEffect().ReadVar(loc)

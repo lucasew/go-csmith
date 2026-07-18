@@ -24,10 +24,16 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
+	// FunctionInvocationBinary.cpp:68 assert(blk) — need live block for safe_ops temps
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	// C++ always sets SafeOpFlags; Output uses safe_* only for arith/shift + SafeMath.
 	var fi *Invocation
 	for seed := uint64(1); seed < 100; seed++ {
-		fi = func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType()) }()
+		ClearError()
+		cg := WithFunc(f, EmptyEffect())
+		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
 		if fi != nil && fi.IsStd && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
 			break
 		}

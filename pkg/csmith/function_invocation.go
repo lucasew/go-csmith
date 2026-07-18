@@ -682,6 +682,10 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocationBinary.cpp:59–75 — CreateFunctionInvocationBinary always creates
 	// tmps for safe_ops when flags; math_notmp only affects Output.
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(*cg, vs, flags, op)
+	// assert(blk): safe_ops require live block temps — fail closed, no invent bare ops
+	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
+		return nil
+	}
 	return inv
 }
 
@@ -822,6 +826,9 @@ func MakeBinary(
 	inv.setOutOpts(opts)
 	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
+	if flags != nil && SafeOpsBinary(op.BinaryOpC()) && inv.Tmp1 == "" {
+		return nil
+	}
 	return inv
 }
 
@@ -888,6 +895,10 @@ func MakeRandomUnaryInvocation(
 	// FunctionInvocationUnary.cpp:51–60 — CreateFunctionInvocationUnary always creates
 	// tmp when flags; math_notmp only affects Output (eMinus path).
 	inv.Tmp1 = createUnarySafeTmp(*cg, vs, flags)
+	// FunctionInvocationUnary.cpp:57 assert(blk) — fail closed when flags but no tmp
+	if flags != nil && inv.Tmp1 == "" {
+		return nil
+	}
 	return inv
 }
 
@@ -899,13 +910,16 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		return "", ""
 	}
 	blk := currentBlock(cg)
+	// FunctionInvocationBinary.cpp:68 — assert(blk); no soft invent safe_ops without temps
 	if blk == nil {
 		return "", ""
 	}
-	st := EInt
-	if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
-		st = ty.Simple()
+	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield a simple type
+	ty1 := flags.LHSType()
+	if ty1 == nil || !ty1.IsSimple() {
+		return "", ""
 	}
+	st := ty1.Simple()
 	var sym *GenSym
 	if vs != nil {
 		sym = &vs.Sym
@@ -928,18 +942,19 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 		return ""
 	}
 	blk := currentBlock(cg)
+	// FunctionInvocationUnary.cpp:57 — assert(blk); no soft invent unary safe without tmp
 	if blk == nil {
 		return ""
 	}
-	st := EInt
-	if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
-		st = ty.Simple()
+	ty := flags.LHSType()
+	if ty == nil || !ty.IsSimple() {
+		return ""
 	}
 	var sym *GenSym
 	if vs != nil {
 		sym = &vs.Sym
 	}
-	return blk.CreateNewTmpVar(sym, st)
+	return blk.CreateNewTmpVar(sym, ty.Simple())
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.

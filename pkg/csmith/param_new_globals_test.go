@@ -138,14 +138,18 @@ func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
 
 func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	// FunctionInvocation.cpp:157–159 — operand make_random mutates cg.expr_depth
+	// FunctionInvocationUnary.cpp:57 assert(blk) — need stack for safe tmp
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	var fi *Invocation
 	var cg CGContext
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearError()
-		cg = EmptyCGContext()
+		cg = WithFunc(f, EmptyEffect())
 		cg.ExprDepth = 1
 		fi = MakeRandomUnaryInvocation(NewRng(seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
 		if fi != nil && fi.IsUnary {

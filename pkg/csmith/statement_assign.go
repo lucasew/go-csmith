@@ -356,22 +356,26 @@ func makePossibleCompoundAssign(
 		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
 		inv.setOutOpts(opts)
 		// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
+		// assert(blk) when safe_ops — no soft invent compound without temps
 		if SafeOpsBinary(bop.BinaryOpC()) {
-			if blk := cg.CurrentBlock(); blk != nil {
-				st1 := EInt
-				if t := flags.LHSType(); t != nil && t.IsSimple() {
-					st1 = t.Simple()
-				}
-				st2 := st1
-				if bop == BinLShift || bop == BinRShift {
-					if t := flags.RHSType(); t != nil && t.IsSimple() {
-						st2 = t.Simple()
-					}
-				}
-				st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
-				st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
-				inv.Tmp1, inv.Tmp2 = st.Tmp1, st.Tmp2
+			blk := cg.CurrentBlock()
+			if blk == nil {
+				// FunctionInvocationBinary.cpp:68 assert(blk)
+				return Stmt{Kind: StmtAssign}
 			}
+			st1 := EInt
+			if t := flags.LHSType(); t != nil && t.IsSimple() {
+				st1 = t.Simple()
+			}
+			st2 := st1
+			if bop == BinLShift || bop == BinRShift {
+				if t := flags.RHSType(); t != nil && t.IsSimple() {
+					st2 = t.Simple()
+				}
+			}
+			st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
+			st.Tmp2 = blk.CreateNewTmpVar(sym, st2)
+			inv.Tmp1, inv.Tmp2 = st.Tmp1, st.Tmp2
 		}
 	}
 	st.SafeFlags = flags

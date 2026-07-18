@@ -139,7 +139,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	// force array_init path by calling MakeRandomArrayInit directly
 	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtArrayOp || st.Loop == nil {

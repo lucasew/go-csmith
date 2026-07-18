@@ -196,11 +196,16 @@ func MakeRandomArrayInit(
 		return Stmt{Kind: StmtArrayOp}
 	}
 	av := vs.SelectArray(r, *cg)
-	if av == nil {
+	// StatementArrayOp.cpp:90–91 — ERROR_GUARD after select_array
+	if av == nil || HasError() {
 		return Stmt{Kind: StmtArrayOp}
 	}
 	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1
 	if len(av.Sizes) == 0 {
+		return Stmt{Kind: StmtArrayOp}
+	}
+	// StatementArrayOp.cpp:100 — get_fact_mgr always live for visit/update
+	if cg.FM == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
 	// StatementArrayOp.cpp:92–93, 100 — clear effect_stm

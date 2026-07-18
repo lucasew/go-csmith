@@ -119,8 +119,12 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 
 func TestLhsCompatibleExpr(t *testing.T) {
 	// Lhs.cpp:359–362
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	if a == nil || b == nil {
+		t.Fatal("vars")
+	}
 	lhs := &Lhs{Var: a, Type: GetIntType()}
 	ea := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
 	eb := &Expression{Term: TermVariable, Var: b, ExprType: GetIntType()}
@@ -134,7 +138,11 @@ func TestLhsCompatibleExpr(t *testing.T) {
 
 func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	// ExpressionFuncall.cpp:206–207 — unary invoke compatible via operand
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	if v == nil {
+		t.Fatal("var")
+	}
 	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
@@ -156,11 +164,15 @@ func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	// VariableSelector.cpp:301–303 — match_indirect; scalar non-exact Match is always true
 	// (CVQualifiers.cpp both len==1). Filter matters when level counts differ.
+	ClearError()
 	BookkeeperDoFinalization()
 	defer BookkeeperDoFinalization()
 	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
 	pt := PointerTo(GetIntType())
 	vol := CreateVariableScalars("g_p", pt, true, false)
+	if vol == nil {
+		t.Fatal("vol ptr")
+	}
 	vol.Qfer = NewCVQualifiers([]bool{false, false}, []bool{true, true}) // vol at both levels
 	// request only storage-level volatile (len 1) — match_indirect via indirect_qualifiers
 	// deref = 2-1 = 1 → other.IndirectQualifiers(1) → should still allow if eligible

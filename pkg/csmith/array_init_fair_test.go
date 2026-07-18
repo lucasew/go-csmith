@@ -27,7 +27,8 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// force SelectArray to return our av by only having one
 	st := MakeRandomArrayInit(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
@@ -78,7 +79,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	st := MakeRandomArrayInit(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	// empty dims → fail (no soft invent size [1] or access[0])
 	if st.Loop != nil || st.Then != nil {
@@ -100,7 +101,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	cg := WithFunc(f, EmptyEffect())
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	st := MakeRandomArrayInit(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Loop == nil && st.Then == nil {
 		t.Fatal("empty")
