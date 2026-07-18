@@ -398,10 +398,12 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 5b: `CVQualifiers::random_qualifiers` | **Partial** — type-based path + scalar make_* |
 | Layer 6: `Variable` + `gensym` | **Partial** — CreateVariable, is_global/local/arg |
 | Layer 7: `VariableSelector` | **Partial** — choose_ok_var, GenerateNewGlobal (+init), SelectGlobal |
-| Layer 7b: `Constant::make_random` | **Partial** — simple + pointer; binary-const/float incomplete |
-| Layer 4b: `Type::match` / cache | **Partial** — eExact identity, convert, dereference |
-| `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` |
-| ArrayVariable / create_and_initialize NewArray | **Not started** |
+| Layer 7b: `Constant::make_random` | **Partial** — simple + pointer |
+| Layer 4b: `Type::match` / cache | **Partial** |
+| Layer 8: `Expression` term pick + const/var | **Partial** — DistributionTable, VectorFilter, make_random const/var |
+| Layer 9: `Statement` probability | **Partial** — threshold table + U100 pick; no emit |
+| `Generate` / ProgramGenerator | **Stub** |
+| Function/Block/ArrayVariable | **Not started** |
 | CLI drop-in | **Last** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
