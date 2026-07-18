@@ -221,30 +221,79 @@ func (t *Type) OutputStructDecl() string {
 	return b.String()
 }
 
-// MakeStructConstant mirrors GenerateRandomStructConstant simplified.
+// GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
+// Constant.cpp:225–250 — small random value within ~2^(bound/2).
+func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
+	if r == nil {
+		r = NewRng(0)
+	}
+	if bound <= 0 {
+		return "0"
+	}
+	// b = 2^(bound/2); clamp
+	exp := bound / 2
+	if exp < 0 {
+		exp = 0
+	}
+	if exp > 30 {
+		exp = 30
+	}
+	bmax := uint32(1) << uint(exp)
+	if bmax == 0 {
+		bmax = 1
+	}
+	num := int(r.RndUpto(bmax))
+	signed := typ != nil && typ.IsSimple() && typ.IsSigned()
+	if signed && r.RndFlipcoin(50) {
+		num = -num
+	}
+	// format as small constant for field type
+	if typ != nil && typ.IsSimple() {
+		return formatSmallConstant(typ.Simple(), num, opts)
+	}
+	if num < 0 {
+		return fmt.Sprintf("%d", num)
+	}
+	return fmt.Sprintf("%d", num)
+}
+
+// MakeStructConstant mirrors GenerateRandomStructConstant.
+// Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
 	if st == nil || !st.isStruct {
 		return MakeInt(0)
 	}
 	var b strings.Builder
 	b.WriteString("{")
-	for i, f := range st.Fields {
-		if i > 0 {
+	first := true
+	for _, f := range st.Fields {
+		// Type::is_unamed_padding / bound==0 → skip (Constant.cpp:265–267)
+		if f.BitWidth == 0 {
+			continue
+		}
+		if !first {
 			b.WriteString(", ")
 		}
-		if f.Type != nil && f.Type.IsStruct() {
-			c := MakeStructConstant(r, opts, probs, f.Type)
-			b.WriteString(c.Value)
+		first = false
+		var val string
+		if f.BitWidth > 0 {
+			// bitfield: GenerateRandomConstantInRange
+			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
+		} else if f.Type != nil && f.Type.IsStruct() {
+			val = MakeStructConstant(r, opts, probs, f.Type).Value
+		} else if f.Type != nil && f.Type.IsUnion() {
+			val = MakeUnionConstant(r, opts, probs, f.Type).Value
 		} else if f.Type != nil {
 			c := MakeRandom(f.Type, opts, r)
 			if c != nil {
-				b.WriteString(c.Value)
+				val = c.Value
 			} else {
-				b.WriteString("0")
+				val = "0"
 			}
 		} else {
-			b.WriteString("0")
+			val = "0"
 		}
+		b.WriteString(val)
 	}
 	b.WriteString("}")
 	return &Constant{Type: st, Value: b.String()}

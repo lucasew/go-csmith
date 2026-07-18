@@ -61,17 +61,32 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	return vars[idx]
 }
 
-// ChooseOKVarExactType filters vars whose Type is the same simple/pointer pointer chain
-// as want (pointer equality of *Type is not required — match simple kind + indirect level).
-// Full choose_var / Type::match deferred; this is a minimal exact filter for tests.
+// ChooseOKVarExactType filters vars whose Type matches want with eExact.
 func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
+	return ChooseOKVarMatch(r, vars, want, MatchExact, false)
+}
+
+// ChooseOKVarMatch mirrors choose_var type filter + choose_ok_var.
+// VariableSelector.cpp choose_var — expand aggregates; Type::match(mt); optional skip const.
+func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipConst bool) *Variable {
 	if want == nil {
 		return ChooseOKVar(r, vars)
 	}
 	var ok []*Variable
 	for _, v := range vars {
-		if v != nil && typesMatchExact(v.Type, want) {
-			ok = append(ok, v)
+		if v == nil {
+			continue
+		}
+		for _, x := range v.CollectExpandable() {
+			if x == nil || x.Type == nil {
+				continue
+			}
+			if skipConst && x.IsConst() {
+				continue
+			}
+			if want.Match(x.Type, mt) {
+				ok = append(ok, x)
+			}
 		}
 	}
 	return ChooseOKVar(r, ok)
@@ -165,10 +180,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	return v
 }
 
-// SelectGlobal mirrors VariableSelector::SelectGlobal simplified:
-// choose among GlobalList by exact type; if empty/miss → GenerateNewGlobal
-// (skips expand_struct / random_type_from_type retype for now — uses t as given).
-// VariableSelector.cpp:669–695.
+// SelectGlobal mirrors VariableSelector::SelectGlobal.
+// VariableSelector.cpp:669–695 — choose_var(GlobalList, …, eFlexible); else GenerateNewGlobal.
+// expand_struct / random_type_from_type deferred (create with requested t).
 func (vs *VariableSelector) SelectGlobal(
 	access Access,
 	cg CGContext,
@@ -179,12 +193,13 @@ func (vs *VariableSelector) SelectGlobal(
 	if vs == nil {
 		return nil
 	}
-	// choose_var(GlobalList, …) simplified → exact type match + choose_ok_var
-	v := ChooseOKVarExactType(r, vs.GlobalList, t)
+	// choose_var with eFlexible + expand field_vars; WRITE skips const
+	skipConst := access == AccessWrite
+	v := ChooseOKVarMatch(r, vs.GlobalList, t, MatchFlexible, skipConst)
 	if v != nil {
 		return v
 	}
-	// Empty / no match → GenerateNewGlobal (expand_struct skipped when ExpandStruct false).
+	// Empty / no match → GenerateNewGlobal
 	return vs.GenerateNewGlobal(access, cg, t, qfer, r)
 }
 
