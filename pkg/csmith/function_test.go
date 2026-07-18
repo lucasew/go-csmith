@@ -138,3 +138,42 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 		t.Log("no early return in seeds 1..49 (ok if filters reduce return rate)")
 	}
 }
+
+func TestMakeRandomSignatureERRORGuard(t *testing.T) {
+	// Function.cpp:408/419 ERROR_GUARD after depth / random_qualifiers
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	SetError(ErrGeneric)
+	f := MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
+	if f != nil {
+		t.Fatal("sticky error must fail closed")
+	}
+	ClearError()
+}
+
+func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
+	// StatementFor.cpp:304 ERROR_GUARD after body
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 0
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.Types = vs.Types
+	f.Stack = []*Block{{Func: f}}
+	// sticky error before make fails early
+	SetError(ErrGeneric)
+	st := MakeRandomFor(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	if st != nil && st.Loop != nil && st.Then != nil {
+		t.Fatal("sticky error should not complete for")
+	}
+	ClearError()
+}

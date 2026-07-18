@@ -56,13 +56,17 @@ func MakeRandomArrayOp(
 	if vs == nil || r == nil || cg == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
-	// rnd_flipcoin(5) → make_random_array_init
-	if r.RndFlipcoin(5) {
+	// StatementArrayOp.cpp:77–80 — rnd_flipcoin(5); ERROR_GUARD
+	aryInit := r.RndFlipcoin(5)
+	if HasError() {
+		return Stmt{Kind: StmtArrayOp}
+	}
+	if aryInit {
 		return MakeRandomArrayInit(r, opts, probs, vs, tables, stmtTab, cg)
 	}
 	// StatementFor::make_random_array_loop
 	st := MakeRandomArrayLoop(r, opts, probs, vs, tables, stmtTab, cg)
-	if st == nil {
+	if st == nil || HasError() {
 		return Stmt{Kind: StmtArrayOp}
 	}
 	return *st
@@ -90,10 +94,17 @@ func MakeRandomArrayLoop(
 		maxN = 0
 	}
 	n := int(r.RndUpto(uint32(maxN)))
+	if HasError() {
+		return nil
+	}
 	var mustReads, mustWrites []*Variable
 	var avs []*ArrayVariable
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, *cg)
+		// select_array may ERROR_GUARD
+		if HasError() {
+			return nil
+		}
 		if av == nil {
 			// still burn access RNG for stream parity when select returns nil? upstream always gets av
 			_ = r.RndUpto(3)

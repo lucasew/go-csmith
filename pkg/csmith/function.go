@@ -146,12 +146,16 @@ func MakeRandomSignature(
 	if retType == nil {
 		retType = RandomReturnType(r, probs, env, opts)
 		// Function.cpp:404–408 — ERROR_GUARD after RandomReturnType / DEPTH_GUARD
-		if retType == nil {
+		if retType == nil || HasError() {
 			return nil
 		}
 	}
 	// Function.cpp:407 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunction, nullptr)
 	if DepthGuardByType(opts, DtFunction) == BadDepth {
+		return nil
+	}
+	// Function.cpp:408 ERROR_GUARD after DEPTH_GUARD
+	if HasError() {
 		return nil
 	}
 	name := RandomFunctionName(sym)
@@ -164,11 +168,22 @@ func MakeRandomSignature(
 	} else {
 		retQ = qfer.RandomQualifiersFrom(true, AccessRead, cg, opts, probs, r)
 	}
+	// Function.cpp:419 ERROR_GUARD after random_qualifiers
+	if HasError() {
+		return nil
+	}
 	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
 	// GenerateParameterList: for i=0; i<=max; i++
 	max := ParamListProbability(r, opts)
+	if HasError() {
+		return nil
+	}
 	for i := uint32(0); i <= max; i++ {
 		vs.GenerateParameterVariable(f, r)
+		// ERROR_RETURN style from GenerateParameterVariable
+		if HasError() {
+			return nil
+		}
 	}
 	// Function.cpp:422 — FMList.push_back(new FactMgr(f))
 	if cg.FM == nil {
@@ -177,6 +192,9 @@ func MakeRandomSignature(
 	// inline flip if enabled
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
+	}
+	if HasError() {
+		return nil
 	}
 	if list != nil {
 		list.Funcs = append(list.Funcs, f)
@@ -200,7 +218,8 @@ func MakeRandomFunction(
 	list *FunctionList,
 ) *Function {
 	f := MakeRandomSignature(r, opts, probs, vs, sym, cg, retType, qfer, list)
-	if f == nil {
+	// Function.cpp:434 ERROR_GUARD after signature
+	if f == nil || HasError() {
 		return nil
 	}
 	// attach FactMgr if not already from map
@@ -219,6 +238,10 @@ func MakeRandomFunction(
 		bodyCG = bodyCG.WithFuncList(list)
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
+	// Function.cpp:436 ERROR_GUARD after GenerateBody
+	if HasError() {
+		return nil
+	}
 	return f
 }
 

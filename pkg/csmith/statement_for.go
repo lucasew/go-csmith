@@ -407,7 +407,8 @@ func MakeRandomFor(
 	cg.EffectStm = EmptyEffect()
 
 	lc := MakeIteration(r, opts, probs, vs, cg)
-	if lc == nil {
+	// StatementFor.cpp:293–296 — make_iteration null / ERROR_GUARD
+	if lc == nil || HasError() {
 		return &Stmt{Kind: StmtFor}
 	}
 	// when SafeMath and compound add/sub incr, attach dummy flags for emit
@@ -437,6 +438,13 @@ func MakeRandomFor(
 	}
 	bodyCG.EffectAccum = &bodyEff
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
+	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
+	if HasError() {
+		if lc.IV != nil {
+			bodyCG.RemoveIVBound(lc.IV)
+		}
+		return &Stmt{Kind: StmtFor}
+	}
 	// StatementFor.cpp:447,470 — erase iv_bounds after body
 	if lc.IV != nil {
 		bodyCG.RemoveIVBound(lc.IV)
