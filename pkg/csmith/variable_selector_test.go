@@ -133,8 +133,10 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 	if v == nil || (v.Init == nil && v.InitExpr == nil) {
 		t.Fatal("MakeInitValue init")
 	}
+	// pointer qfer must be depth 2 (indirect_level+1); make_init asserts sanity_check
+	qPtr := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// pointer: make_init_value → Constant "0" (20%) or &visible Expression
-	vp := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), PointerTo(GetSimpleType(EInt)), &q, r)
+	vp := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), PointerTo(GetSimpleType(EInt)), &qPtr, r)
 	if vp == nil || (vp.Init == nil && vp.InitExpr == nil) {
 		t.Fatalf("pointer init: Init=%+v InitExpr=%+v", vp.Init, vp.InitExpr)
 	}

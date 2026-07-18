@@ -50,7 +50,7 @@ func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 	if f := MakeRandomBinaryKind(NewRng(1), opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f == nil {
 		t.Fatal("binary flags")
 	}
-	if t2 := RandomTypeFromType(NewRng(1), nil, opts, probs, GetIntType(), false); t2 == nil {
+	if t2 := RandomTypeFromType(NewRng(1), nil, opts, probs, GetIntType(), false, false); t2 == nil {
 		t.Fatal("random type from simple")
 	}
 }

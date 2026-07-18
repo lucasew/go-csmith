@@ -10,7 +10,7 @@ func TestRandomTypeFromTypeNil(t *testing.T) {
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
-	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, false)
+	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, false, false)
 	if ty == nil || (ty.IsSimple() && ty.Simple() == EVoid) {
 		t.Fatalf("%v", ty)
 	}
@@ -19,11 +19,11 @@ func TestRandomTypeFromTypeNil(t *testing.T) {
 func TestRandomTypeFromTypeSimpleRerolls(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	// requesting int may yield another simple
+	// requesting int may yield another simple when strict_simple_type=false
 	seen := map[ESimpleType]bool{}
 	r := NewRng(5)
 	for i := 0; i < 40; i++ {
-		ty := RandomTypeFromType(r, nil, opts, probs, GetIntType(), false)
+		ty := RandomTypeFromType(r, nil, opts, probs, GetIntType(), false, false)
 		if ty == nil || !ty.IsSimple() {
 			t.Fatalf("%v", ty)
 		}
@@ -34,11 +34,24 @@ func TestRandomTypeFromTypeSimpleRerolls(t *testing.T) {
 	}
 }
 
+func TestRandomTypeFromTypeStrictSimpleKeeps(t *testing.T) {
+	// Type.cpp:599 — strict_simple_type skips choose_random_simple re-roll
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	want := GetIntType()
+	for seed := uint64(1); seed < 20; seed++ {
+		ty := RandomTypeFromType(NewRng(seed), nil, opts, probs, want, false, true)
+		if ty != want {
+			t.Fatalf("strict simple seed %d: got %v want int", seed, ty)
+		}
+	}
+}
+
 func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	st := &Type{isStruct: true, StructName: "S9"}
-	ty := RandomTypeFromType(NewRng(1), nil, opts, probs, st, false)
+	ty := RandomTypeFromType(NewRng(1), nil, opts, probs, st, false, false)
 	if ty != st {
 		t.Fatal("struct should pass through")
 	}

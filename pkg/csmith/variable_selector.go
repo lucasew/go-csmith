@@ -554,30 +554,39 @@ func (vs *VariableSelector) MakeInitValue(
 	if vs == nil || t == nil || r == nil {
 		return nil
 	}
-	// assert qf sanity: allow nil → empty non-wildcard
-	var qfer CVQualifiers
-	if qf != nil {
-		qfer = *qf
-	} else {
-		qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	// VariableSelector.cpp:830 — assert(qf && qf->sanity_check(t)); no invent empty qfer
+	if qf == nil || !qf.SanityCheck(t) {
+		return nil
 	}
+	qfer := *qf
 	// VariableSelector.cpp:833 — initializer must not be stricter than var
 	qfer.AcceptStricter = false
 
 	// VariableSelector.cpp:836–841 — non-pointer or 20% chance → constant
 	if !t.IsPointerLike() || r.RndFlipcoin(20) {
+		// VariableSelector.cpp:837 ERROR_GUARD
+		if HasError() {
+			return nil
+		}
+		// VariableSelector.cpp:838–839 — assert simple != void
 		if t.IsSimple() && t.simple == EVoid {
 			return nil
 		}
 		c := MakeRandom(t, vs.Opts, r)
-		if c == nil {
+		// VariableSelector.cpp:842 ERROR_GUARD after make_random
+		if c == nil || HasError() {
 			return nil
 		}
 		return &Expression{Term: TermConstant, Con: c, ExprType: t}
 	}
 
+	// VariableSelector.cpp:842 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
 	// pointer path: select visible var of pointee type
 	pointee := t.PtrType()
+	// VariableSelector.cpp:845 assert(type)
 	if pointee == nil {
 		return nil
 	}
@@ -597,6 +606,10 @@ func (vs *VariableSelector) MakeInitValue(
 		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
 			invalid, true, false, noUnion)
 	}
+	// VariableSelector.cpp:864 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
 
 	if chosen == nil {
 		// VariableSelector.cpp:866–904 — create suitable addressable
@@ -613,18 +626,24 @@ func (vs *VariableSelector) MakeInitValue(
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
 		useLocal := !vs.Opts.GlobalVariables ||
 			(b != nil && pointee.IsPointerLike() && !qferDeref.IsVolatile())
+		// VariableSelector.cpp:882–883 — strict_simple_type=true (no simple re-roll)
 		var tt *Type
 		if useLocal {
-			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, true)
+			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, true, true)
 		} else {
-			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, false)
+			tt = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, pointee, false, true)
 		}
-		if tt == nil {
+		// VariableSelector.cpp:884 ERROR_GUARD
+		if tt == nil || HasError() {
 			return nil
 		}
 		if vs.Opts.AddrTakenOfLocals && useLocal && b != nil {
 			chosen = vs.GenerateNewParentLocal(b, AccessRead, cg, tt, &qferDeref, r)
-			if chosen != nil && chosen.Type != nil {
+			// VariableSelector.cpp:890 ERROR_GUARD
+			if chosen == nil || HasError() {
+				return nil
+			}
+			if chosen.Type != nil {
 				RecordVolatileAccess(chosen, chosen.Type.IndirectLevel()-tt.IndirectLevel(), false)
 			}
 		} else {
@@ -633,9 +652,10 @@ func (vs *VariableSelector) MakeInitValue(
 			} else {
 				chosen = vs.GenerateNewGlobal(AccessRead, cg, tt, &qferDeref, r)
 			}
-		}
-		if chosen == nil {
-			return nil
+			// VariableSelector.cpp:901 ERROR_GUARD
+			if chosen == nil || HasError() {
+				return nil
+			}
 		}
 		RecordAddressTaken(chosen)
 	} else if chosen.Type != nil {
@@ -644,6 +664,10 @@ func (vs *VariableSelector) MakeInitValue(
 		if derefLevel < 0 {
 			RecordAddressTaken(chosen)
 		}
+	}
+	// VariableSelector.cpp:910 assert(var)
+	if chosen == nil {
+		return nil
 	}
 	// ExpressionVariable(*var, t) — desired type is pointer being inited
 	return &Expression{Term: TermVariable, Var: chosen, ExprType: t}
@@ -1153,7 +1177,12 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if vs == nil || t == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:129 assert global_variables; library → nil
 	if !vs.Opts.GlobalVariables {
+		return nil
+	}
+	// VariableSelector.cpp:580 ERROR_GUARD
+	if HasError() {
 		return nil
 	}
 	var varQfer CVQualifiers
@@ -1162,24 +1191,37 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	} else {
 		varQfer = *qfer
 	}
+	// VariableSelector.cpp:585 ERROR_GUARD after random_qualifiers
+	if HasError() {
+		return nil
+	}
 	name := vs.RandomGlobalName()
 	vs.TmpCount++
-	// always non-array: make_init + new_variable (skip array flip)
+	// VariableSelector.cpp:589–592 — make_init then new_variable (skip array flip)
+	// use &varQfer (C++ may pass original qfer; assert requires non-null qf)
+	ie := vs.MakeInitValue(access, cg, t, &varQfer, nil, r)
+	if HasError() {
+		return nil
+	}
 	v := CreateVariableQfer(name, t, varQfer)
 	if v == nil {
 		return nil
 	}
-	applyInitExpr(v, vs.MakeInitValue(access, cg, t, &varQfer, nil, r))
+	applyInitExpr(v, ie)
+	// VariableSelector.cpp:147–149 new_variable → AllVars
 	vs.AllVars = append(vs.AllVars, v)
 	vs.GlobalList = append(vs.GlobalList, v)
-	if !varQfer.IsVolatile() {
-		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
+	// VariableSelector.cpp:596–597 — FM on collective
+	if cg.FM != nil {
+		cg.FM.AddNewVarFactAndUpdate(nil, varCollective(v))
 	}
+	// VariableSelector.cpp:598 — current_func new_globals
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
-	if cg.FM != nil {
-		cg.FM.AddNewVarFactAndUpdate(nil, v)
+	// VariableSelector.cpp:600–602 — no access_once on NonArray path
+	if !varQfer.IsVolatile() {
+		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
 	}
 	vs.VarCreated = true
 	return v
@@ -1293,7 +1335,8 @@ func (vs *VariableSelector) SelectGlobalMT(
 	}
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
 	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
-	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
+	// VariableSelector.cpp:690 — random_type_from_type(type, no_volatile) defaults strict_simple=false
+	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol, false)
 	// VariableSelector.cpp:691–693 — ERROR_GUARD(nullptr); no soft invent keep original type
 	if t2 == nil {
 		return nil
@@ -1548,7 +1591,11 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	if vs == nil || block == nil || t == nil || r == nil {
 		return nil
 	}
-	// VariableSelector.cpp:920–923 — volatile struct/union field(s) → global
+	// VariableSelector.cpp:920 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:921 assert(t); 920–923 — volatile struct/union field(s) → global
 	if t.IsAggregate() && t.IsVolatileStructUnion() {
 		return vs.GenerateNewGlobal(access, cg, t, qfer, r)
 	}
@@ -1559,11 +1606,14 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	}
 	var varQfer CVQualifiers
 	if qfer == nil || qfer.Wildcard {
-		// random_qualifiers(t, access, cg, true) — no_volatile true for locals path in some call sites;
-		// GenerateNewParentLocal uses random_qualifiers(t, access, cg, true) — third bool is no_volatile.
+		// random_qualifiers(t, access, cg, true) — no_volatile true for locals
 		varQfer = RandomQualifiersDefaultProbs(t, access, cg, true, vs.Opts, vs.Probs, r)
 	} else {
 		varQfer = *qfer
+	}
+	// VariableSelector.cpp:937 ERROR_GUARD after random_qualifiers
+	if HasError() {
+		return nil
 	}
 	// VariableSelector.cpp:938 — restrict(access, cg_context)
 	varQfer.Restrict(access, cg)
@@ -1932,8 +1982,8 @@ func (vs *VariableSelector) SelectParentLocalInv(
 				return v
 			}
 		}
-		// VariableSelector.cpp:1011–1013 — random_type_from_type + ERROR_GUARD; no soft invent keep type
-		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+		// VariableSelector.cpp:1013 — random_type_from_type(type, true, false)
+		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
 		if t2 == nil {
 			return nil
 		}
@@ -1944,7 +1994,8 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	if t != nil && t.IsSimple() && t.Simple() != EVoid {
 		matchT = GetIntType()
 	} else {
-		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+		// VariableSelector.cpp:1021 — random_type_from_type(type, true, false)
+		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
 		// VariableSelector.cpp:1023–1024 — ERROR_GUARD(nullptr); no soft invent keep type
 		if matchT == nil {
 			return nil
@@ -2018,8 +2069,8 @@ func (vs *VariableSelector) GenerateNewVariable(
 		if DepthGuardByType(vs.Opts, DtGenerateNewGlobal) == BadDepth {
 			return nil
 		}
-		// VariableSelector.cpp:1105–1107 — random_type_from_type + ERROR_GUARD; no soft invent keep type
-		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
+		// VariableSelector.cpp:1108 — random_type_from_type(type) defaults
+		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false, false)
 		if t2 == nil {
 			return nil
 		}
@@ -2035,8 +2086,8 @@ func (vs *VariableSelector) GenerateNewVariable(
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			// VariableSelector.cpp:1118 — rnd_upto(func.stack.size())
 			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
-			// VariableSelector.cpp:1129–1130 — random_type_from_type + ERROR_GUARD; no soft invent keep type
-			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+			// VariableSelector.cpp:1126 — random_type_from_type(type, true, false)
+			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
 			if t2 == nil {
 				return nil
 			}

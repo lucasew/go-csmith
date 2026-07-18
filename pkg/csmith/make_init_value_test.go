@@ -8,9 +8,14 @@ import (
 func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	e := vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1))
+	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	e := vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), &q, nil, NewRng(1))
 	if e == nil || e.Term != TermConstant || e.Con == nil {
 		t.Fatalf("want constant, got %#v", e)
+	}
+	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
+		t.Fatal("nil qfer must fail closed")
 	}
 }
 
@@ -19,17 +24,19 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	// force pointer path: RndFlipcoin(20) never true if we retry until address form
 	vs := NewVariableSelector(opts)
 	// pre-create int global to take address of
-	q := NewCVQualifiers([]bool{false}, []bool{false})
-	iv := CreateVariableQfer("g_i", GetIntType(), q)
+	qInt := NewCVQualifiers([]bool{false}, []bool{false})
+	iv := CreateVariableQfer("g_i", GetIntType(), qInt)
 	iv.Init = MakeInt(0)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
 
 	pt := PointerTo(GetIntType())
+	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
+	qPtr := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// seed scan until we get ExpressionVariable &path (not constant 20% path)
 	var e *Expression
 	for seed := uint64(1); seed < 80; seed++ {
-		e = vs.MakeInitValue(AccessRead, EmptyCGContext(), pt, &q, nil, NewRng(seed))
+		e = vs.MakeInitValue(AccessRead, EmptyCGContext(), pt, &qPtr, nil, NewRng(seed))
 		if e != nil && e.Term == TermVariable && e.Var != nil {
 			break
 		}
@@ -111,7 +118,7 @@ func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// empty GlobalList — pointer init must create addressable
 	pt := PointerTo(GetIntType())
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	// force pointer branch across seeds
 	found := false
 	for seed := uint64(1); seed < 100; seed++ {

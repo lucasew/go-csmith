@@ -179,7 +179,8 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 }
 
 // RandomTypeFromType mirrors Type::random_type_from_type.
-// Type.cpp:589–606 — nil → choose nonvoid; simple → re-roll choose_random_simple.
+// Type.cpp:589–606 — nil → choose nonvoid; simple && !strict_simple_type → re-roll.
+// Defaults in Type.h: no_volatile=false, strict_simple_type=false.
 func RandomTypeFromType(
 	r *Rng,
 	env *TypeEnv,
@@ -187,6 +188,7 @@ func RandomTypeFromType(
 	probs *Probabilities,
 	typ *Type,
 	noVolatile bool,
+	strictSimple bool,
 ) *Type {
 	// Type.cpp:592 — DEPTH_GUARD_BY_TYPE_RETURN(dtRandomTypeFromType, nullptr)
 	if DepthGuardByType(opts, DtRandomTypeFromType) == BadDepth {
@@ -202,9 +204,10 @@ func RandomTypeFromType(
 		}
 		return env.ChooseRandomNonvoid(r, opts, probs)
 	}
-	// simple + !strict_simple_type → choose_random_simple (always for our callers)
-	// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
-	if typ.IsSimple() {
+	// Type.cpp:599–601 — eSimple && !strict_simple_type → choose_random_simple
+	// no soft invent re-roll when strict_simple_type (make_init_value pointer create)
+	if typ.IsSimple() && !strictSimple {
+		// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
 		if DepthGuardByType(opts, DtTypeChooseSimple) == BadDepth {
 			return nil
 		}
@@ -214,6 +217,10 @@ func RandomTypeFromType(
 			return nil
 		}
 		return GetSimpleType(st)
+	}
+	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple)
+	if typ.IsSimple() && typ.Simple() == EVoid {
+		return nil
 	}
 	return typ
 }

@@ -66,7 +66,7 @@ func TestRandomTypeFromTypeNoVolatile(t *testing.T) {
 	env := &TypeEnv{}
 	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	// should not panic; with noVolatile prefer nonvol path
-	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, true)
+	ty := RandomTypeFromType(NewRng(3), env, opts, probs, nil, true, false)
 	if ty == nil {
 		t.Fatal("nil")
 	}
