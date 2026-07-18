@@ -192,12 +192,15 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 // invalid_vars; no_signed_overflow, ccomp bitfield, float filters; visit_facts.
 // qfer is StatementAssign-built qualifiers (may be wildcard); nil → non-const WRITE base.
 // noSignedOverflow is StatementAssign::need_no_rhs(op) at call sites.
+// MakeRandomLhs mirrors Lhs::make_random.
+// Pass *CGContext so visit_facts mutations (effect_stm / accum) persist for the caller
+// (StatementAssign merges lhs context after selection).
 func MakeRandomLhs(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	compoundAssign bool,
 	noSignedOverflow bool,
@@ -206,7 +209,7 @@ func MakeRandomLhs(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	if r == nil || vs == nil {
+	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
 	// Lhs.cpp:qfer from caller; default non-const non-vol storage
@@ -224,6 +227,7 @@ func MakeRandomLhs(
 	stmSave := cg.EffectStm
 
 	restore := func() {
+		// Lhs.cpp:135–139 — reset_effect_accum + reset_effect_stm
 		if accumSave != nil && cg.EffectAccum != nil {
 			*cg.EffectAccum = *accumSave
 		}
@@ -235,7 +239,7 @@ func MakeRandomLhs(
 	for tries := 0; tries < 32; tries++ {
 		var v *Variable
 		// Lhs.cpp:73–76 — try must_use WRITE first
-		v = vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q)
+		v = vs.SelectMustUseVar(r, AccessWrite, *cg, typ, &q)
 		// Lhs.cpp:77–87 — flipcoin SelectDerefPointerProb
 		if v == nil {
 			derefProb := 0
@@ -243,7 +247,7 @@ func MakeRandomLhs(
 				derefProb = probs.Single(PSelectDerefPointerProb)
 			}
 			if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
-				v = selectDerefPointerInv(r, opts, probs, vs, cg, typ, &q, AccessWrite, dummy)
+				v = selectDerefPointerInv(r, opts, probs, vs, *cg, typ, &q, AccessWrite, dummy)
 			}
 		}
 		// Lhs.cpp:89–100 — select(WRITE, restricted qfer, dummy, eDerefExact)
@@ -251,13 +255,13 @@ func MakeRandomLhs(
 			newQ := q
 			// Lhs.cpp:90–93 — restrict unless wildcard
 			if !newQ.Wildcard {
-				newQ.Restrict(AccessWrite, cg)
+				newQ.Restrict(AccessWrite, *cg)
 			}
-			v = vs.SelectWithInvalid(AccessWrite, cg, typ, &newQ, r, MatchDerefExact, dummy)
+			v = vs.SelectWithInvalid(AccessWrite, *cg, typ, &newQ, r, MatchDerefExact, dummy)
 		}
 		if v == nil {
 			// last resort create global (practical; C++ loops forever)
-			v = vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
+			v = vs.SelectGlobal(AccessWrite, *cg, typ, &q, r)
 		}
 		if v == nil {
 			restore()
@@ -320,15 +324,14 @@ func MakeRandomLhs(
 
 // finishLhs builds Lhs, optional visit_facts, records write dereference / volatile access.
 // Lhs.cpp:106–140 — visit_facts then bookkeeping.
-func finishLhs(v *Variable, typ *Type, compound bool, cg CGContext, opts Options) *Lhs {
-	if v == nil {
+func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Options) *Lhs {
+	if v == nil || cg == nil {
 		return nil
 	}
 	lhs := &Lhs{Var: v, Type: typ, CompoundAssign: compound}
 	// Lhs.cpp:122–140 — visit_facts when FactMgr present; fail → caller retries
 	if cg.FM != nil {
-		cgp := &cg
-		if !cgp.VisitFactsLhs(lhs, opts) {
+		if !cg.VisitFactsLhs(lhs, opts) {
 			return nil
 		}
 	}

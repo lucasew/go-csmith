@@ -210,7 +210,7 @@ func MakeRandomAssignQfer(
 		}
 	}
 	compound := op != AssignSimple
-	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, lhsType, compound, op.NeedNoRHS(), &qfer)
+	lhs := MakeRandomLhs(r, opts, probs, vs, &lhsCG, lhsType, compound, op.NeedNoRHS(), &qfer)
 	if callerQf {
 		opts.MatchExactQualifiers = prevExact
 	}

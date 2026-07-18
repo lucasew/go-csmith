@@ -12,7 +12,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	vs.Types = &TypeEnv{}
 	r := NewRng(3)
 	cg := EmptyCGContext()
-	lhs := MakeRandomLhs(r, opts, probs, vs, cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(r, opts, probs, vs, &cg, GetIntType(), false, false, nil)
 	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil lhs")
 	}
@@ -40,7 +40,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	// force high deref probability by trying many seeds
 	var got *Lhs
 	for seed := uint64(1); seed < 100; seed++ {
-		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false, false, nil)
+		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, nil)
 		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevel() == 1 && got.IndirectLevel() == 1 {
 			break
 		}
@@ -128,7 +128,7 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	// bump deref prob
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
-		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false, false, nil)
+		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, nil)
 	}
 	if CalcTotal(writeDereferenceCnts) == 0 && writeVolatileCnt+writeNonVolatileCnt == 0 {
 		t.Fatal("expected some write bookkeeping")
@@ -148,7 +148,7 @@ func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
 	// with only signed available and noSignedOverflow, must not return signed
 	foundSigned := false
 	for seed := uint64(1); seed < 15; seed++ {
-		lhs := MakeRandomLhs(NewRng(seed), opts, NewProbabilities(opts), vs, EmptyCGContext(), GetIntType(), true, true, nil)
+		lhs := MakeRandomLhs(NewRng(seed), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), true, true, nil)
 		if lhs == nil {
 			continue
 		}
@@ -177,7 +177,7 @@ func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
 	cg := EmptyCGContext()
 	cg.EffectStm = EmptyEffect().WriteVar(g)
 	// with only g written in stm, make may create another var or fail
-	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, cg, GetIntType(), false, false, nil)
+	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
 	if lhs != nil && lhs.Var == g {
 		t.Fatal("must not select var already written in effect_stm")
 	}
@@ -193,8 +193,32 @@ func TestMakeRandomLhsUsesProvidedQferWildcard(t *testing.T) {
 	vs.Opts = opts
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	q.Wildcard = true
-	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, EmptyCGContext(), GetIntType(), false, false, &q)
+	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, &q)
 	if lhs == nil {
 		t.Fatal("nil")
+	}
+}
+
+func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
+	// Lhs::make_random visit_facts must update caller's effect_accum / effect_stm
+	// so StatementAssign can merge_param_context(lhs_cg).
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	lhs := MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil)
+	if lhs == nil || lhs.Var == nil {
+		t.Skip("no lhs")
+	}
+	// successful make records write on accum and/or stm
+	if cg.EffectAccum != nil && !cg.EffectAccum.IsWritten(lhs.Var) && !cg.EffectStm.IsWritten(lhs.Var) {
+		// VisitFactsLhs CheckWriteVar writes to accum and stm
+		t.Fatalf("expected write effect on lhs var %s", lhs.Var.Name)
 	}
 }
