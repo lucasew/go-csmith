@@ -465,6 +465,10 @@ func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetSimpleType(EVoid), nil, false, false, TermConstant, 0) != nil {
 		t.Fatal("void Constant must fail closed")
 	}
+	// Expression.cpp:188 + ERROR_GUARD — MakeRandom nil → no invent TermConstant shell
+	if e := MakeRandomExpression(nil, opts, tables, nil, &cg, GetIntType(), nil, true, false, TermConstant, 0); e != nil {
+		t.Fatal("nil RNG must not invent TermConstant shell", e)
+	}
 }
 
 func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {

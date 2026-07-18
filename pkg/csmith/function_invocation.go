@@ -655,9 +655,12 @@ func MakeRandomBinaryInvocation(
 					bits = uint32(sb * 8)
 				}
 			}
-			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(bits, r)}
-			// Expression.cpp:213–218 — constant bumps expr_depth on caller context
-			cg.ExprDepth++
+			// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
+			if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
+				right = &Expression{Term: TermConstant, Con: c}
+				// Expression.cpp:213–218 — constant bumps expr_depth on caller context
+				cg.ExprDepth++
+			}
 		}
 	}
 	if right == nil {

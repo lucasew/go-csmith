@@ -677,7 +677,13 @@ func MakeRandomExpression(
 		if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
 			return nil
 		}
-		e = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, probs, r)}
+		// Expression.cpp:188 — Constant::make_random; ERROR_GUARD after
+		// no invent TermConstant shell with nil Con when make_random fails
+		con := MakeRandom(typ, opts, probs, r)
+		if con == nil || HasError() {
+			return nil
+		}
+		e = &Expression{Term: TermConstant, Con: con}
 	case TermVariable:
 		// ExpressionVariable::make_random
 		e = makeExpressionVariable(r, vs, cg, typ, qfer)
