@@ -244,7 +244,8 @@ func BuildUserInvocation(
 }
 
 // BuildInvocationAndFunction mirrors build_invocation_and_function.
-// FunctionInvocationUser.cpp:170–250 subset — signature + generate body + effect handoff.
+// FunctionInvocationUser.cpp:173–241 — signature, params first, handover with args,
+// generate_body_with_known_params, return facts, renew_facts, effect handoff.
 func BuildInvocationAndFunction(
 	r *Rng,
 	opts Options,
@@ -259,58 +260,115 @@ func BuildInvocationAndFunction(
 	if list == nil || ReachMaxFunctions(list, opts) {
 		return &Invocation{Failed: true}
 	}
+	if retType == nil {
+		retType = GetIntType()
+	}
+	// FunctionInvocationUser.cpp:179 — make_random_signature
 	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, retType, nil, list)
 	if callee == nil {
 		return &Invocation{Failed: true}
 	}
-	// FactMgr for callee; inherit caller global facts
+
+	// FunctionInvocationUser.cpp:181–197 — build all parameters before body
+	fi := &Invocation{User: callee}
+	running := cg.EffectContext()
+	for _, p := range callee.Param {
+		ty := GetIntType()
+		var qfer *CVQualifiers
+		if p != nil {
+			if p.Type != nil {
+				ty = p.Type
+			}
+			q := p.Qfer
+			qfer = &q
+		}
+		paramAccum := EmptyEffect()
+		paramCG := cg
+		paramCG.effectContext = running
+		paramCG.EffectAccum = &paramAccum
+		paramCG.ExprDepth = cg.ExprDepth + 1
+		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, paramCG.ExprDepth, list)
+		if arg == nil {
+			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
+		}
+		if arg != nil {
+			arg.CheckAndSetCast(ty)
+		}
+		fi.Args = append(fi.Args, arg)
+		// FunctionInvocationUser.cpp:195–196
+		cg.MergeParamContext(paramCG, true)
+		running = running.AddEffect(paramAccum)
+	}
+
+	// FunctionInvocationUser.cpp:203–206 — hand-over from caller to callee with args
 	var callerFM *FactMgr
 	if cg.FM != nil {
 		callerFM = cg.FM
 	}
 	calFM := NewFactMgr(callee)
-	// build args first for handover? generate_body_with_known_params uses caller facts;
-	// FunctionInvocationUser.cpp:205 — caller_to_callee_handover before body.
 	facts := []*FactPointTo{}
 	if callerFM != nil {
 		facts = CloneFactSlice(callerFM.GlobalFacts)
 	}
-	// provisional empty args for signature-only; real args after body in BuildUserInvocation
-	// For new function creation, params get TBD at GenerateBody start; still run handover keep filter
-	calFM.CallerToCalleeHandover(nil, &facts)
+	calFM.CallerToCalleeHandover(fi.Args, &facts)
 	calFM.GlobalFacts = facts
-	// generate body with call chain (Function.cpp:668–697)
+
+	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
+	effectAccum := EmptyEffect()
 	bodyCG := cg
 	bodyCG.ExtendCallChain(cg)
 	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
-	bodyCG.Flags = 0 // fresh flags for callee
+	bodyCG.Flags = 0
+	bodyCG.EffectAccum = &effectAccum
 	// Function.cpp:675–681 — inherit external no-read/write from caller
 	if rwd := cg.BuildCalleeRWDirective(calFM.GlobalFacts); rwd != nil {
 		bodyCG.RW = rwd
 	}
-	// FactMgrMap if list generation has one is not here — local calFM only
 	callee.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
-	// hand-over: merge ret/callee effects into caller
-	if callerFM != nil {
-		// renew points-to from callee global facts (globals only)
-		for _, f := range calFM.GlobalFacts {
-			if f != nil && f.Var != nil && f.Var.IsGlobal() {
-				callerFM.GlobalFacts = MergeFactInto(callerFM.GlobalFacts, f)
-			}
+
+	// FunctionInvocationUser.cpp:212–215 — ret_facts from body + add_back_return_facts
+	retFacts := []*FactPointTo{}
+	if callee.Body != nil && callee.Body.StmID > 0 {
+		if out, ok := calFM.MapFactsOut[callee.Body.StmID]; ok {
+			retFacts = CloneFactSlice(out)
 		}
-		// facts for new globals created in callee (FunctionInvocationUser.cpp:247–252)
+	}
+	if len(retFacts) == 0 {
+		retFacts = CloneFactSlice(calFM.GlobalFacts)
+	}
+	if callee.Body != nil {
+		AddBackReturnFacts(callee.Body, calFM, &retFacts)
+	}
+	fi.SaveReturnFacts(retFacts)
+
+	// FunctionInvocationUser.cpp:219 — setup_in_out_maps(true)
+	calFM.SetupInOutMaps(true)
+
+	// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts)
+	if callerFM != nil {
+		RenewFacts(&callerFM.GlobalFacts, retFacts)
+		// FunctionInvocationUser.cpp:234–238 — new globals facts
 		for _, v := range callee.NewGlobals {
 			callerFM.AddNewVarFactAndUpdate(nil, v)
 		}
 	}
-	// new_globals hand-over to caller (FunctionInvocationUser.cpp:242–245)
+
+	// FunctionInvocationUser.cpp:223–228 — effect hand-over
+	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffect(cg.EffectContext())
+	// feffect.add_external_effect(effect_accum, call_chain)
+	callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+	// also keep ComputeSummary body effect already applied in GenerateBody
+	cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
+
+	// FunctionInvocationUser.cpp:230–233 — new_globals hand-over
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, callee.NewGlobals...)
 	}
-	// FunctionInvocationUser.cpp:226 — add_visible_effect(..., get_current_block())
-	cg.AddVisibleEffectAt(callee.FEffect, cg.CurrentBlock())
-	return BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
+
+	// FunctionInvocationUser.cpp:240
+	callee.VisitedCnt = 1
+	return fi
 }
 
 // MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary.
