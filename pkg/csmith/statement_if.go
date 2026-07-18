@@ -29,21 +29,12 @@ func MakeRandomIf(
 	}
 	// StatementIf.cpp:69 — clear per-statement effect before condition
 	cg.EffectStm = EmptyEffect()
-	// Expression::make_random(..., get_int_type(), no_const = !const_as_condition)
+	// StatementIf.cpp:70–72 — Expression::make_random(int, nullptr, false, !const_as_condition)
+	// no soft TermVariable/TermConstant retries (ERROR_GUARD on null)
 	noConst := !opts.ConstAsCondition
 	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
-	if test == nil {
-		test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, noConst, TermVariable, cg.ExprDepth)
-	}
-	if test == nil {
-		if !noConst {
-			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
-		} else {
-			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
-		}
-	}
-	// StatementIf.cpp:69–72 — ERROR_GUARD(nullptr) if condition make_random failed
-	if test == nil {
+	// StatementIf.cpp:72 — ERROR_GUARD(nullptr)
+	if test == nil || HasError() {
 		return nil
 	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1

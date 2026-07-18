@@ -274,17 +274,16 @@ func MakeRandomArrayInit(
 		}
 	}
 	qfer := av.Qfer
+	// StatementArrayOp.cpp:141–143 — make_init_value; assert(visit_facts) (no const soft-fallback)
 	rhs := vs.MakeInitValue(AccessRead, *cg, av.Type, &qfer, parent, r)
 	if rhs == nil {
-		// fallback constant
-		c := MakeRandom(av.Type, opts, r)
-		if c != nil {
-			rhs = &Expression{Term: TermConstant, Con: c, ExprType: av.Type}
-		}
+		return Stmt{Kind: StmtArrayOp}
 	}
-	// StatementArrayOp.cpp:144 — init->visit_facts
-	if cg.FM != nil && rhs != nil {
-		_ = VisitFactsExpression(rhs, cg, opts)
+	// StatementArrayOp.cpp:144 — assert(init->visit_facts(...))
+	if cg.FM != nil {
+		if !VisitFactsExpression(rhs, cg, opts) {
+			return Stmt{Kind: StmtArrayOp}
+		}
 	}
 
 	// StatementArrayOp.cpp:145–150 — StatementArrayOp + update_fact_for_assign

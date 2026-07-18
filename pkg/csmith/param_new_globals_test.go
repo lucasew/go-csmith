@@ -33,6 +33,7 @@ func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
 }
 
 func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.MaxBlockSize = 2
 	opts.MaxFuncs = 5
@@ -45,7 +46,17 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	// force globals enabled so body can create
-	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	var fi *Invocation
+	for seed := uint64(7); seed < 40; seed++ {
+		ClearError()
+		list.Funcs = []*Function{caller}
+		caller.NewGlobals = nil
+		fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+		if fi != nil && !fi.Failed {
+			break
+		}
+		fi = nil
+	}
 	if fi == nil || fi.Failed {
 		t.Fatal("fail")
 	}

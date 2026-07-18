@@ -23,16 +23,13 @@ func MakeExpressionComma(
 		return nil
 	}
 	// ExpressionComma.cpp:58–61 — same CGContext&; make_random bumps expr_depth for siblings
-	// ExpressionComma.cpp:58–59 — lhs type nullptr → Expression::make_random chooses nonvoid
-	// no_func=false, no_const=true
+	// ExpressionComma.cpp:58–59 — lhs type nullptr, no_func=false, no_const=true
 	lhs := MakeRandomExpression(r, opts, tables, vs, cg, nil, nil, false, true, MaxTermTypes, cg.ExprDepth)
-	if lhs == nil {
-		lhs = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
-	}
-	// ExpressionComma.cpp:60–61 — rhs with requested type/qfer; no_func=false, no_const=false
+	// ExpressionComma.cpp:60–61 — rhs type/qfer, no_func=false, no_const=false
 	rhs := MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, false, MaxTermTypes, cg.ExprDepth)
-	if rhs == nil {
-		rhs = MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, true, false, TermConstant, cg.ExprDepth)
+	// no soft TermVariable/TermConstant retries (C++ uses results directly)
+	if lhs == nil || rhs == nil || HasError() {
+		return nil
 	}
 	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
 	if opts.LangCPP {
