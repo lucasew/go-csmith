@@ -185,6 +185,24 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 	c.AddExternalEffect(e)
 }
 
+// MergeParamContext mirrors CGContext::merge_param_context.
+// CGContext.cpp:390–394 — fold param accum into this; copy expr_depth.
+func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
+	if c == nil {
+		return
+	}
+	_ = includeLHS
+	if param.EffectAccum != nil {
+		if c.EffectAccum != nil {
+			*c.EffectAccum = c.EffectAccum.AddEffect(*param.EffectAccum)
+		} else {
+			// fold into effect_context via EffectStm
+			c.EffectStm = c.EffectStm.AddEffect(*param.EffectAccum)
+		}
+	}
+	c.ExprDepth = param.ExprDepth
+}
+
 // FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
 // CGContext.cpp:610–624 — unique arrays from must_read and must_write.
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {

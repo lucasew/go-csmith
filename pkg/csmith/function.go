@@ -43,6 +43,8 @@ type Function struct {
 	EmitConcise bool
 	// DeadGlobals mirrors Function::dead_globals (dangling global pointers at exit).
 	DeadGlobals []*Variable
+	// NewGlobals mirrors Function::new_globals created during this function's generation.
+	NewGlobals []*Variable
 }
 
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.

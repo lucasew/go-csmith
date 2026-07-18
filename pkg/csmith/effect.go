@@ -45,16 +45,16 @@ func WithSideEffects() Effect {
 }
 
 // AddExternalEffect mirrors Effect::add_external_effect — only global reads/writes.
-// Effect.cpp:192–215.
+// Effect.cpp:192–215. Uses sorted name order for determinism (Go map range is random).
 func (e Effect) AddExternalEffect(other Effect) Effect {
 	out := e
-	for v, ok := range other.read {
-		if ok && v != nil && v.IsGlobal() {
+	for _, v := range other.ReadVars() {
+		if v != nil && v.IsGlobal() {
 			out = out.ReadVar(v)
 		}
 	}
-	for v, ok := range other.written {
-		if ok && v != nil && v.IsGlobal() {
+	for _, v := range other.WrittenVars() {
+		if v != nil && v.IsGlobal() {
 			out = out.WriteVar(v)
 			out.pure = false
 		}

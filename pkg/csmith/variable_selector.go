@@ -533,6 +533,10 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if !varQfer.IsVolatile() {
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
 	}
+	// VariableSelector.cpp:565 — current_func()->new_globals
+	if cg.CurrentFunc != nil {
+		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
+	}
 	return v
 }
 
@@ -848,6 +852,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		if !av.IsVolatile() {
 			vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
+		}
+		if cg.CurrentFunc != nil {
+			cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, &av.Variable)
 		}
 	} else if blk != nil {
 		blk.LocalVars = append(blk.LocalVars, &av.Variable)

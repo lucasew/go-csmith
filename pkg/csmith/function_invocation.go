@@ -160,21 +160,23 @@ func BuildUserInvocation(
 			q := p.Qfer
 			qfer = &q
 		}
-		// param under combined running context
+		// each param gets its own accum under running context
+		paramAccum := EmptyEffect()
 		paramCG := cg
-		if cg.EffectAccum != nil {
-			// eligibility sees running; reads still go to parent accum
-			_ = running
-		}
-		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, cg.ExprDepth+1, list)
+		paramCG.effectContext = running
+		paramCG.EffectAccum = &paramAccum
+		paramCG.ExprDepth = cg.ExprDepth + 1
+		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, paramCG.ExprDepth, list)
 		if arg == nil {
 			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
-		fi.Args = append(fi.Args, arg)
-		// Update running from parent accum if present
-		if cg.EffectAccum != nil {
-			running = running.AddEffect(*cg.EffectAccum)
+		if arg != nil {
+			arg.CheckAndSetCast(ty)
 		}
+		fi.Args = append(fi.Args, arg)
+		// merge_param_context (CGContext.cpp:390–394)
+		cg.MergeParamContext(paramCG, true)
+		running = running.AddEffect(paramAccum)
 	}
 	// hand-over effects from built callee (FunctionInvocationUser.cpp:236–240)
 	if callee.IsEffectKnown() {
@@ -229,6 +231,14 @@ func BuildInvocationAndFunction(
 				callerFM.GlobalFacts = MergeFactInto(callerFM.GlobalFacts, f)
 			}
 		}
+		// facts for new globals created in callee (FunctionInvocationUser.cpp:247–252)
+		for _, v := range callee.NewGlobals {
+			callerFM.AddNewVarFactAndUpdate(nil, v)
+		}
+	}
+	// new_globals hand-over to caller (FunctionInvocationUser.cpp:242–245)
+	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
+		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, callee.NewGlobals...)
 	}
 	cg.AddVisibleEffect(callee.FEffect)
 	return BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
