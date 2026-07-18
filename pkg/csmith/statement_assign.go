@@ -384,11 +384,49 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 		}
 		return VisitFactsStatementAssign(e.Assign, cg, opts)
 	case TermFunction:
-		// invocation facts deferred — accept for now
+		if e.Invoke != nil {
+			return VisitFactsInvocation(e.Invoke, cg, opts)
+		}
 		return true
 	default:
 		return true
 	}
+}
+
+// VisitFactsInvocation mirrors FunctionInvocation::visit_facts (ordered params).
+// FunctionInvocation.cpp:502–555 — param visit under running effect; then user revisit.
+func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
+	if fi == nil || cg == nil {
+		return true
+	}
+	if fi.Failed {
+		return false
+	}
+	running := cg.EffectContext()
+	isFuncCall := fi.User != nil
+	for i, arg := range fi.Args {
+		paramAccum := EmptyEffect()
+		paramCG := *cg
+		paramCG.effectContext = running
+		paramCG.EffectAccum = &paramAccum
+		if arg != nil && !VisitFactsExpression(arg, &paramCG, opts) {
+			_ = i
+			return false
+		}
+		running = running.AddEffect(paramAccum)
+		// merge_param_context; include_lhs for std ops only
+		cg.MergeParamContext(paramCG, !isFuncCall)
+	}
+	// user function call: fold visible external effect of known callee
+	if isFuncCall && fi.User.IsEffectKnown() {
+		// FunctionInvocation.cpp:544–549 — add_visible_effect of revisit accum;
+		// we use stored FEffect (already computed summary).
+		if cg.InConflict(fi.User.FEffect) {
+			return false
+		}
+		cg.AddVisibleEffect(fi.User.FEffect)
+	}
+	return true
 }
 
 // VisitFactsStatementAssign mirrors StatementAssign::visit_facts.
@@ -440,6 +478,11 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		if indir == 0 {
 			cg.FM.UpdateFactForAssign(st.LhsVar, 0, st.Expr)
+		}
+		// FactMgr.cpp: map_stm_effect[this] = effect_stm
+		if st.StmID > 0 {
+			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
 		}
 	}
 	return true

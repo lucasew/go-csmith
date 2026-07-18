@@ -245,6 +245,10 @@ func BuildInvocationAndFunction(
 	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
 	bodyCG.Flags = 0 // fresh flags for callee
+	// Function.cpp:675–681 — inherit external no-read/write from caller
+	if rwd := cg.BuildCalleeRWDirective(calFM.GlobalFacts); rwd != nil {
+		bodyCG.RW = rwd
+	}
 	// FactMgrMap if list generation has one is not here — local calFM only
 	callee.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
 	// hand-over: merge ret/callee effects into caller

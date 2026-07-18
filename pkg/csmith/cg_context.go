@@ -672,6 +672,50 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	return out
 }
 
+// GetExternalNoReadsWrites mirrors CGContext::get_external_no_reads_writes.
+// CGContext.cpp:581–607 — globals + frame_vars from RW + global IVs as no-write.
+func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noWrites []*Variable) {
+	inFrame := func(v *Variable) bool {
+		if v == nil {
+			return false
+		}
+		if v.IsGlobal() {
+			return true
+		}
+		return IsVariableInSet(frameVars, v)
+	}
+	if c.RW != nil {
+		for _, v := range c.RW.NoReadVars {
+			if inFrame(v) {
+				noReads = append(noReads, v)
+			}
+		}
+		for _, v := range c.RW.NoWriteVars {
+			if inFrame(v) {
+				noWrites = append(noWrites, v)
+			}
+		}
+	}
+	// convert global / frame IVs into non-writables
+	for iv := range c.IVBounds {
+		if inFrame(iv) {
+			noWrites = append(noWrites, iv)
+		}
+	}
+	return noReads, noWrites
+}
+
+// BuildCalleeRWDirective builds RW for generate_body_with_known_params path.
+// Function.cpp:675–681 — inherit external no-read/write from caller.
+func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
+	frame := c.FindReachableFrameVars(facts)
+	nr, nw := c.GetExternalNoReadsWrites(frame)
+	if len(nr) == 0 && len(nw) == 0 {
+		return nil
+	}
+	return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
+}
+
 // VisitFactsLhs mirrors Lhs::visit_facts core checks (without index walk).
 // Lhs.cpp:301+ subset — check_write_var or write_pointed + deref volatile.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {

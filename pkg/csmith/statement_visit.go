@@ -58,8 +58,19 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		}()
 	}
 	for i := range b.Stmts {
-		if !VisitFactsStmt(&b.Stmts[i], cg, opts) {
+		st := &b.Stmts[i]
+		// record facts_in before visit
+		if cg.FM != nil && st.StmID > 0 {
+			cg.FM.SetMapFactsIn(st.StmID, cg.FM.GlobalFacts)
+		}
+		// clear effect_stm for each statement (Statement::pre_output path)
+		cg.ClearEffectStm()
+		if !VisitFactsStmt(st, cg, opts) {
 			return false
+		}
+		if cg.FM != nil && st.StmID > 0 {
+			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
+			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
 	}
 	return true

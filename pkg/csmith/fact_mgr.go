@@ -2,7 +2,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// FactMgr mirrors FactMgr for a function — global_facts + stm maps (stubs).
+// FactMgr mirrors FactMgr for a function — global_facts + stm maps.
 // GlobalFacts holds FactPointTo; UnionFacts holds FactUnion.
 type FactMgr struct {
 	// Func is the owning function (FactMgr.cpp constructor).
@@ -13,11 +13,67 @@ type FactMgr struct {
 	UnionFacts []*FactUnion
 	// CFGEdges mirrors cfg_edges.
 	CFGEdges []*CFGEdge
+	// MapStmEffect mirrors map_stm_effect — keyed by Statement::stm_id.
+	// FactMgr.h:165.
+	MapStmEffect map[int]Effect
+	// MapFactsIn / MapFactsOut mirror map_facts_in/out (point-to slices by stm_id).
+	// FactMgr.h:161–163.
+	MapFactsIn  map[int][]*FactPointTo
+	MapFactsOut map[int][]*FactPointTo
 }
 
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
 func NewFactMgr(f *Function) *FactMgr {
-	return &FactMgr{Func: f}
+	return &FactMgr{
+		Func:         f,
+		MapStmEffect: make(map[int]Effect),
+		MapFactsIn:   make(map[int][]*FactPointTo),
+		MapFactsOut:  make(map[int][]*FactPointTo),
+	}
+}
+
+// SetMapFactsIn records pre-statement facts (FactMgr::map_facts_in[s] = facts).
+func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
+	if fm == nil || stmID <= 0 {
+		return
+	}
+	if fm.MapFactsIn == nil {
+		fm.MapFactsIn = make(map[int][]*FactPointTo)
+	}
+	fm.MapFactsIn[stmID] = CloneFactSlice(facts)
+}
+
+// SetMapFactsOut records post-statement facts.
+func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
+	if fm == nil || stmID <= 0 {
+		return
+	}
+	if fm.MapFactsOut == nil {
+		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	}
+	fm.MapFactsOut[stmID] = CloneFactSlice(facts)
+}
+
+// SetMapStmEffect records effect for a statement (map_stm_effect).
+func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
+	if fm == nil || stmID <= 0 {
+		return
+	}
+	if fm.MapStmEffect == nil {
+		fm.MapStmEffect = make(map[int]Effect)
+	}
+	fm.MapStmEffect[stmID] = eff
+}
+
+// GetMapStmEffect returns stored effect or empty.
+func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
+	if fm == nil || fm.MapStmEffect == nil {
+		return EmptyEffect()
+	}
+	if e, ok := fm.MapStmEffect[stmID]; ok {
+		return e
+	}
+	return EmptyEffect()
 }
 
 // FactMgrMap is Function::FMList session map (func → FactMgr).
