@@ -401,27 +401,32 @@ func StatExprDepths(funcs []*Function) {
 	}
 }
 
-// StatBlkDepths mirrors Bookkeeper::stat_blk_depths — count non-block stmts by nest depth.
-// Bookkeeper.cpp:128–152 simplified (depth from nesting of Then/Else).
+// StatBlkDepths mirrors Bookkeeper::stat_blk_depths.
+// Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
 func StatBlkDepths(funcs []*Function) int {
 	blkDepthCnts = nil
 	cnt := 0
-	var walk func(st *Stmt, depth int)
-	walk = func(st *Stmt, depth int) {
+	// Bookkeeper.cpp:128–140 — stat_blk_depths_for_stmt
+	var walk func(st *Stmt, parent *Block)
+	walk = func(st *Stmt, parent *Block) {
 		if st == nil {
 			return
 		}
-		// non-block statements: our Stmt kinds are never eBlock containers as Stmt
+		// eType != eBlock: our Stmt kinds are never pure Block statements
+		// incr_counter(blk_depth_cnts, s->get_blk_depth() - 1)
+		depth := GetBlkDepth(parent)
+		if depth > 0 {
+			depth--
+		}
 		IncrCounter(&blkDepthCnts, depth)
 		cnt++
-		if st.Then != nil {
-			for i := range st.Then.Stmts {
-				walk(&st.Then.Stmts[i], depth+1)
+		// get_blocks → recurse into Then/Else stmts with that block as parent
+		for _, blk := range GetBlocksStmt(st) {
+			if blk == nil {
+				continue
 			}
-		}
-		if st.Else != nil {
-			for i := range st.Else.Stmts {
-				walk(&st.Else.Stmts[i], depth+1)
+			for i := range blk.Stmts {
+				walk(&blk.Stmts[i], blk)
 			}
 		}
 	}
@@ -429,8 +434,9 @@ func StatBlkDepths(funcs []*Function) int {
 		if f == nil || f.IsBuiltin || f.Body == nil {
 			continue
 		}
+		// body is a Block; count its statements with parent=body
 		for i := range f.Body.Stmts {
-			walk(&f.Body.Stmts[i], 0)
+			walk(&f.Body.Stmts[i], f.Body)
 		}
 	}
 	return cnt

@@ -152,3 +152,52 @@ func TestRhsToLhsTransferStructIsGarbage(t *testing.T) {
 		t.Fatalf("%+v", facts)
 	}
 }
+
+func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
+	// FactPointTo.cpp:280–293 — non-pointer LHS inside union walks to container
+	// and transfers into all pointer fields of that union.
+	// Build union: { int x; int *p0; int *p1; }
+	ut := &Type{
+		isUnion:    true,
+		StructName: "U_mix",
+		Fields: []StructField{
+			{Name: "x", Type: GetIntType(), BitWidth: -1},
+			{Name: "p0", Type: PointerTo(GetIntType()), BitWidth: -1},
+			{Name: "p1", Type: PointerTo(GetIntType()), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if len(uv.FieldVars) == 0 {
+		uv.CreateFieldVars()
+	}
+	if len(uv.FieldVars) < 3 {
+		t.Skip("need 3 fields")
+	}
+	// find int field and pointer fields
+	var xField, p0, p1 *Variable
+	for _, f := range uv.FieldVars {
+		if f == nil {
+			continue
+		}
+		if f.IsPointer() {
+			if p0 == nil {
+				p0 = f
+			} else if p1 == nil {
+				p1 = f
+			}
+		} else if xField == nil {
+			xField = f
+		}
+	}
+	if xField == nil || p0 == nil || p1 == nil {
+		t.Skip("missing field kinds")
+	}
+	// assign non-pointer field x = 0 → union path updates p0 and p1
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
+	facts := AbstractFactForAssign(nil, xField, 0, rhs)
+	got0 := FindRelatedPointTo(facts, p0)
+	got1 := FindRelatedPointTo(facts, p1)
+	if got0 == nil || got1 == nil {
+		t.Fatalf("union walk should yield ptr field facts: %+v", facts)
+	}
+}

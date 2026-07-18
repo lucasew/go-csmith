@@ -323,16 +323,32 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		}
 		lvars = []*Variable{lhs}
 	}
+	// FactPointTo.cpp:280–293 — union field assign: walk to container union, then
+	// find_pointer_fields on that union (all pointer fields share storage).
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
 			continue
 		}
-		// walk to union container for union field path (simplified: pointer fields only)
-		ptrs := v.FindPointerFields()
+		// FactPointTo.cpp:283–288 — is_inside_union_field → walk to eUnion container
+		u := v
+		if u.IsInsideUnionField() {
+			if cu := u.GetContainerUnion(); cu != nil {
+				u = cu
+			} else {
+				// walk FieldVarOf until Type is union
+				for cur := u; cur != nil; cur = cur.FieldVarOf {
+					if cur.Type != nil && cur.Type.IsUnion() {
+						u = cur
+						break
+					}
+				}
+			}
+		}
+		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
+		ptrs := u.FindPointerFields()
 		if v.IsPointer() && lhsIndir > 0 {
-			// assigning *p = rhs updates pointees as if they were written — garbage if unknown
-			// for pointer-typed *p result, use transfer onto pointees that are pointers
+			// assigning *p = rhs: also update pointer pointees
 			for _, p := range MergePointeesOfPointer(v, 1, factsIn) {
 				if p != nil && p.IsPointer() {
 					ptrs = append(ptrs, p)
