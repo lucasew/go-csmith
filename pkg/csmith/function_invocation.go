@@ -336,17 +336,13 @@ func BuildUserInvocation(
 		paramCG.EffectStm = EmptyEffect()
 		// Expression::make_random_param bumps paramCG.ExprDepth; merge copies it
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
+		// FunctionInvocationUser.cpp:257–258 — ERROR_GUARD(false) on null param
 		if arg == nil {
-			// library soft path when make_random_param fails (C++ ERROR_GUARD)
-			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
-			if arg != nil && BumpsExprDepth(arg) {
-				paramCG.ExprDepth++
-			}
+			fi.Failed = true
+			return fi
 		}
-		if arg != nil {
-			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
-			arg.CheckAndSetCastOpts(ty, opts)
-		}
+		// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
+		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:268 — merge_param_context (default include_lhs=false)
 		// keep includeLHS true: matches prior Go assign-style merge used by callers
@@ -441,16 +437,13 @@ func BuildInvocationAndFunction(
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
+		// FunctionInvocationUser.cpp:186–187 — make_random_param must succeed (null = fail)
 		if arg == nil {
-			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
-			if arg != nil && BumpsExprDepth(arg) {
-				paramCG.ExprDepth++
-			}
+			fi.Failed = true
+			return fi
 		}
-		if arg != nil {
-			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
-			arg.CheckAndSetCastOpts(ty, opts)
-		}
+		// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
+		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:195–196 — merge_param_context
 		cg.MergeParamContext(paramCG, true)

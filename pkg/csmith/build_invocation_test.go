@@ -95,6 +95,35 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	}
 }
 
+func TestBuildUserInvocationParamFailHard(t *testing.T) {
+	// FunctionInvocationUser.cpp:257–258 — ERROR_GUARD(false) when make_random_param null
+	opts := Defaults()
+	// force param term → Variable only; empty selector cannot select → null
+	opts.MaxExprComplexity = 0
+	vs := NewVariableSelector(opts)
+	// no globals; Select may still create — zero MaxExpr still uses variable path
+	// with empty AllVars and ScopeNewValue false-ish: leave no creation path
+	vs.GlobalList = nil
+	vs.AllVars = nil
+	callee := &Function{
+		Name:       "g_1",
+		ReturnType: GetIntType(),
+		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		BuildState: BuildBuilt,
+		IsBuilt:    true,
+	}
+	caller := &Function{Name: "func_1"}
+	cg := WithFunc(caller, EmptyEffect())
+	// nil vs forces ExpressionVariable fail regardless of term choice
+	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), nil, NewExprTables(opts), &cg, nil, callee)
+	if fi == nil || !fi.Failed {
+		t.Fatal("want Failed on null param")
+	}
+	if len(fi.Args) != 0 {
+		t.Fatalf("must not append partial args: %d", len(fi.Args))
+	}
+}
+
 func TestGetFirstFunction(t *testing.T) {
 	if GetFirstFunction(nil) != nil {
 		t.Fatal("nil list")
