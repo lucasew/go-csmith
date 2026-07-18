@@ -38,36 +38,18 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 }
 
-// VisitFactsBlock mirrors Block::visit_facts simplified (no full fixed-point).
-// Block.cpp:466–479 — sequential statement walk; validate_and_update_facts per stmt.
+// VisitFactsBlock mirrors Block::visit_facts via find_fixed_point.
+// Block.cpp:466–479.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
 		return true
 	}
-	// push block on stack if function present
-	if cg.CurrentFunc != nil {
-		cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
-		defer func() {
-			if f := cg.CurrentFunc; f != nil && len(f.Stack) > 0 {
-				f.Stack = f.Stack[:len(f.Stack)-1]
-			}
-		}()
-	}
-	var facts []*FactPointTo
+	var inputs []*FactPointTo
 	if cg.FM != nil {
-		facts = CloneFactSlice(cg.FM.GlobalFacts)
+		inputs = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	for i := range b.Stmts {
-		st := &b.Stmts[i]
-		// Statement::validate_and_update_facts (with shortcut)
-		if !ValidateAndUpdateFacts(st, &facts, cg, opts, b) {
-			return false
-		}
-		if cg.FM != nil {
-			cg.FM.GlobalFacts = facts
-		}
-	}
-	return true
+	_, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
+	return ok
 }
 
 // VisitFactsStatementIf mirrors StatementIf::visit_facts.
@@ -77,6 +59,7 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// evaluate condition first
+	preStm := cg.EffectStm
 	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
@@ -137,6 +120,14 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(thenEff, elseEff)
 	}
+	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block for both arms
+	if st.Then != nil {
+		SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, cg, preStm)
+	}
+	if st.Else != nil {
+		// re-merge with else effect
+		SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, preStm.AddEffect(thenCG.EffectStm))
+	}
 	return true
 }
 
@@ -192,6 +183,17 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			post := CloneFactSlice(cg.FM.GlobalFacts)
 			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
 			MergeFacts(&cg.FM.GlobalFacts, post)
+		}
+		// StatementFor.cpp:460–466 — merge break edges into inputs
+		if st.Then != nil {
+			for _, e := range cg.FM.FindEdgesInToBlock(st.Then, true, false) {
+				if e == nil {
+					continue
+				}
+				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
+					MergeJumpFacts(&cg.FM.GlobalFacts, out)
+				}
+			}
 		}
 	}
 	return true
