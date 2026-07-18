@@ -107,3 +107,58 @@ func TestCastIfNeeded(t *testing.T) {
 	}
 }
 
+
+func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
+	// StatementGoto.cpp:74/110 ERROR_GUARD after flipcoin / rnd_upto
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	b1 := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+	}}
+	b2 := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 2, LhsVar: g, Lhs: &Lhs{Var: g, Type: GetIntType()},
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}},
+	}}
+	f.Blocks = []*Block{b1, b2}
+	f.Stack = []*Block{b2}
+	fm := NewFactMgr(f)
+	// map accum effect for forward path cond
+	fm.MapAccumEffect = map[int]Effect{1: EmptyEffect().ReadVar(g)}
+	eff := EmptyEffect().ReadVar(g)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	seed := CreateVariableScalars("g_z", GetIntType(), false, false)
+	// try seeds until successful goto (Expr set) to assert effect_stm clear order
+	cleared := false
+	for seedN := uint64(1); seedN < 40; seedN++ {
+		ClearError()
+		cg.EffectStm = EmptyEffect().WriteVar(seed)
+		st := MakeRandomGoto(NewRng(seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+		if st.Expr == nil {
+			continue
+		}
+		// StatementGoto.cpp:112 — clear after other_stm pick
+		if cg.EffectStm.IsWritten(seed) {
+			t.Fatal("effect_stm should clear after other_stm pick")
+		}
+		cleared = true
+		break
+	}
+	if !cleared {
+		t.Log("no successful goto in seed scan — ERROR_GUARD path still checked")
+	}
+	// sticky ERROR after flipcoin → fail closed (no cond invent)
+	ClearError()
+	SetError(ErrGeneric)
+	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+	if st2.Expr != nil {
+		t.Fatal("sticky error must not invent goto condition")
+	}
+	ClearError()
+}

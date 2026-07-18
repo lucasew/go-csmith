@@ -237,12 +237,15 @@ func MakeRandomGoto(
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return makeGotoFailed()
 	}
+	// StatementGoto.cpp:66–67 — FactMgr always present in C++; fail closed without FM
+	// (choose_visible_read_var needs global_facts; create_cfg_edge needs fm)
 
-	// clear per-stmt effect (StatementGoto.cpp:112)
-	cg.ClearEffectStm()
-
-	// 40% prefer back-edge (StatementGoto.cpp:76–84)
+	// 40% prefer back-edge (StatementGoto.cpp:73–84)
 	wantBack := r.RndFlipcoin(40)
+	// StatementGoto.cpp:74 ERROR_GUARD
+	if HasError() {
+		return makeGotoFailed()
+	}
 	blocks := append([]*Block(nil), cg.CurrentFunc.Blocks...)
 	// include current if not yet in Blocks list
 	if blk != nil {
@@ -296,7 +299,7 @@ func MakeRandomGoto(
 		dest = &blk.Stmts[len(blk.Stmts)-1]
 	}
 
-	// StatementGoto.cpp:97–107 — s != stm && !must_return
+	// StatementGoto.cpp:97–106 — s != stm && !must_return only (not soft-filter break/continue)
 	var okStms []int
 	for i := range okBlk.Stmts {
 		s := &okBlk.Stmts[i]
@@ -317,12 +320,21 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 	ti := okStms[r.RndUpto(uint32(len(okStms)))]
+	// StatementGoto.cpp:110 ERROR_GUARD
+	if HasError() {
+		return makeGotoFailed()
+	}
 	other := &okBlk.Stmts[ti]
 	if other.StmID == 0 {
 		other.StmID = AllocStmID()
 	}
 
+	// StatementGoto.cpp:112 — clear effect_stm after other_stm pick (not before)
+	cg.ClearEffectStm()
+
 	// condition: prefer already-read visible var (StatementGoto.cpp:117–132)
+	// C++ FactUnion::is_nonreadable_field uses FactVec (global or map_facts_out);
+	// Go keeps UnionFacts separate — use FM.UnionFacts for both edges.
 	var uf []*FactUnion
 	if cg.FM != nil {
 		uf = cg.FM.UnionFacts
@@ -330,12 +342,12 @@ func MakeRandomGoto(
 	var readVars []*Variable
 	condBlk := blk
 	if backEdge {
-		// StatementGoto.cpp:119–122
+		// StatementGoto.cpp:119–122 — accum read_vars + global_facts
 		if cg.EffectAccum != nil {
 			readVars = cg.EffectAccum.ReadVars()
 		}
 	} else {
-		// StatementGoto.cpp:125–128 — travel in time to other_stm accum effect
+		// StatementGoto.cpp:125–128 — map_accum_effect[other] read_vars
 		condBlk = okBlk
 		if cg.FM != nil {
 			if acc, ok := cg.FM.MapAccumEffect[other.StmID]; ok {

@@ -52,12 +52,14 @@ func MakeRandomReturn(
 	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
 		return st
 	}
-	// StatementReturn.cpp:56–62 — curr_func->return_type (assert curr_func); no invent
+	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)
+	// library: no FactMgr invent; still allow expr build (visit_facts later needs FM)
+	// StatementReturn.cpp:56–62 — curr_func->return_type; no invent
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
 		return st
 	}
-	// rv->qfer for return dummy when present
+	// StatementReturn.cpp:61–62 — &curr_func->rv->qfer (assert rv present in C++)
 	var qfer *CVQualifiers
 	if cg.CurrentFunc.RV != nil {
 		q := cg.CurrentFunc.RV.Qfer
@@ -65,8 +67,8 @@ func MakeRandomReturn(
 	}
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
 	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
-	if ev == nil {
-		// StatementReturn.cpp:66 — ERROR_GUARD(nullptr); stmtOK rejects Expr-less return
+	// StatementReturn.cpp:66 ERROR_GUARD after make_random + cast setup
+	if ev == nil || HasError() {
 		return st
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
