@@ -328,6 +328,55 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 	return changed
 }
 
+// JoinVisits mirrors FactPointTo::join_visits.
+// FactPointTo.cpp:584–605 — merge across revisits; ignore TBD-only other;
+// clear TBD-only self before absorbing concrete pointees.
+func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
+	if f == nil || other == nil || f.Var != other.Var {
+		return false
+	}
+	if other.IsTBDOnly() {
+		return false
+	}
+	if f.IsTBDOnly() {
+		f.PointTo = nil
+	}
+	return f.Join(other)
+}
+
+// JoinVisitsInto merges newFacts into facts with join_visits semantics.
+// Used when combining results of multiple visits to the same function.
+func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	if facts == nil {
+		return false
+	}
+	changed := false
+	for _, nf := range newFacts {
+		if nf == nil || nf.Var == nil {
+			continue
+		}
+		cur := FindRelatedPointTo(*facts, nf.Var)
+		if cur == nil {
+			*facts = append(*facts, nf.Clone())
+			changed = true
+			continue
+		}
+		// join into clone then replace
+		cp := cur.Clone()
+		if cp.JoinVisits(nf) {
+			// replace in slice
+			for i, f := range *facts {
+				if f != nil && f.Var == nf.Var {
+					(*facts)[i] = cp
+					break
+				}
+			}
+			changed = true
+		}
+	}
+	return changed
+}
+
 // Clone shallow-copies the fact (new PointTo slice).
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {

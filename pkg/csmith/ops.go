@@ -149,6 +149,17 @@ func BinaryOpWorksForFloat(op BinaryOp) bool {
 	}
 }
 
+// UnaryOpWorksForFloat mirrors FunctionInvocation::UnaryOpWorksForFloat.
+// FunctionInvocation.cpp:646–654 — +, -, ! only.
+func UnaryOpWorksForFloat(op UnaryOp) bool {
+	switch op {
+	case UnPlus, UnMinus, UnNot:
+		return true
+	default:
+		return false
+	}
+}
+
 // UnaryOp mirrors eUnaryOps (FunctionInvocation.h order).
 type UnaryOp int
 

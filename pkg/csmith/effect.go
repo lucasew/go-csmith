@@ -422,6 +422,94 @@ func (e Effect) IsWrittenPartially(v *Variable) bool {
 	return e.IsWritten(v) || e.FieldIsWritten(v) || e.SiblingUnionFieldIsWritten(v)
 }
 
+// HasGlobalEffect mirrors Effect::has_global_effect.
+// Effect.cpp:543–562 — any global in read or write sets.
+func (e Effect) HasGlobalEffect() bool {
+	for v := range e.read {
+		if v != nil && e.read[v] && v.IsGlobal() {
+			return true
+		}
+	}
+	for v := range e.written {
+		if v != nil && e.written[v] && v.IsGlobal() {
+			return true
+		}
+	}
+	return false
+}
+
+// UpdatePurity mirrors Effect::update_purity.
+// Effect.cpp:535–538 — pure cleared when has_global_effect.
+func (e *Effect) UpdatePurity() {
+	if e == nil {
+		return
+	}
+	if e.HasGlobalEffect() {
+		e.pure = false
+	}
+}
+
+// UnionFieldIsRead mirrors Effect::union_field_is_read.
+// Effect.cpp:565–572 — any read var is_inside_union_field.
+func (e Effect) UnionFieldIsRead() bool {
+	for v := range e.read {
+		if v != nil && e.read[v] && v.IsInsideUnionField() {
+			return true
+		}
+	}
+	return false
+}
+
+// Consolidate mirrors Effect::consolidate.
+// Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
+func (e *Effect) Consolidate() {
+	if e == nil {
+		return
+	}
+	// remove field reads when parent is also read
+	for v := range e.read {
+		if v == nil || !e.read[v] || !v.IsFieldVar() {
+			continue
+		}
+		parent := v.FieldVarOf
+		if parent != nil && e.IsRead(parent) {
+			delete(e.read, v)
+		}
+	}
+	// remove field writes when parent is also written
+	for v := range e.written {
+		if v == nil || !e.written[v] || !v.IsFieldVar() {
+			continue
+		}
+		parent := v.FieldVarOf
+		if parent != nil && e.IsWritten(parent) {
+			delete(e.written, v)
+		}
+	}
+}
+
+// IsReadByName mirrors Effect::is_read(string).
+// Effect.cpp:295–308.
+func (e Effect) IsReadByName(name string) bool {
+	for v := range e.read {
+		if v != nil && e.read[v] && v.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// IsWrittenByName mirrors Effect::is_written(string).
+// Effect.cpp:351–364.
+func (e Effect) IsWrittenByName(name string) bool {
+	for v := range e.written {
+		if v != nil && e.written[v] && v.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
 // Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
 // Write names sorted for deterministic emit (Go map iteration is random).

@@ -26,6 +26,52 @@ type SafeOpFlags struct {
 	Size      SafeOpSize
 }
 
+// ReturnFloatTypeBinary mirrors SafeOpFlags::return_float_type for binary.
+// SafeOpFlags.cpp:113–124.
+func ReturnFloatTypeBinary(opts Options, rv, op1, op2 *Type, bop BinaryOp) bool {
+	if !opts.EnableFloat {
+		return false
+	}
+	if rv != nil && rv.IsFloat() {
+		return true
+	}
+	if (op1 != nil && op1.IsFloat()) || (op2 != nil && op2.IsFloat()) {
+		return true
+	}
+	if !BinaryOpWorksForFloat(bop) {
+		return false
+	}
+	return false
+}
+
+// ReturnFloatTypeUnary mirrors SafeOpFlags::return_float_type for unary.
+// SafeOpFlags.cpp:126–136.
+func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
+	if !opts.EnableFloat {
+		return false
+	}
+	if rv != nil && rv.IsFloat() {
+		return true
+	}
+	if op1 != nil && op1.IsFloat() {
+		return true
+	}
+	if !UnaryOpWorksForFloat(uop) {
+		return false
+	}
+	return false
+}
+
+// Clone mirrors SafeOpFlags::clone.
+// SafeOpFlags.cpp:217.
+func (f *SafeOpFlags) Clone() *SafeOpFlags {
+	if f == nil {
+		return nil
+	}
+	cp := *f
+	return &cp
+}
+
 // MakeRandomBinary mirrors SafeOpFlags::make_random_binary for integer ops.
 // SafeOpFlags.cpp:169–215 (float path omitted unless EnableFloat).
 func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *SafeOpFlags {

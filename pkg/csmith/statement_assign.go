@@ -218,6 +218,8 @@ func MakeRandomAssign(
 
 // MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
 // SafeOpFlags.cpp:61–63.
+// MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
+// SafeOpFlags.cpp:61–63 — unsigned int8, is_func false.
 func MakeDummyFlags() *SafeOpFlags {
 	return &SafeOpFlags{Op1Signed: false, Op2Signed: false, IsFunc: false, Size: SafeInt8}
 }
