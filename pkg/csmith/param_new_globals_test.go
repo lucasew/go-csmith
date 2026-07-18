@@ -89,13 +89,25 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	// FunctionInvocation.cpp:157–159 — operand make_random mutates cg.expr_depth
 	opts := Defaults()
-	cg := EmptyCGContext()
-	cg.ExprDepth = 1
-	fi := MakeRandomUnaryInvocation(NewRng(2), opts, NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	vs := NewVariableSelector(opts)
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	var fi *Invocation
+	var cg CGContext
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		cg = EmptyCGContext()
+		cg.ExprDepth = 1
+		fi = MakeRandomUnaryInvocation(NewRng(seed), opts, vs, NewExprTables(opts), &cg, GetIntType())
+		if fi != nil && fi.IsUnary {
+			break
+		}
+		fi = nil
+	}
 	if fi == nil || !fi.IsUnary {
 		t.Fatal("unary")
 	}
 	if cg.ExprDepth < 2 {
 		t.Fatalf("ExprDepth=%d want ≥2 after operand leaf", cg.ExprDepth)
 	}
+	ClearError()
 }

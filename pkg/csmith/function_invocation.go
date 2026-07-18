@@ -577,10 +577,11 @@ func MakeRandomBinaryInvocation(
 	lhsCG.effectContext = cg.EffectContext()
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
-	// no_func=true on operands avoids exponential recursion (library depth bias)
-	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
-	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, true, false, TermConstant, lhsCG.ExprDepth)
+	// FunctionInvocation.cpp:216 — Expression::make_random(lhs_cg, lhs_type) — no_func=false
+	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, false, false, MaxTermTypes, lhsCG.ExprDepth)
+	// FunctionInvocation.cpp:217 — ERROR_GUARD_AND_DEL1(nullptr, fi)
+	if left == nil || HasError() {
+		return nil
 	}
 	// FunctionInvocation.cpp:221 — merge_param_context(lhs) (effects + expr_depth)
 	cg.MergeParamContext(lhsCG, true)
@@ -609,10 +610,7 @@ func MakeRandomBinaryInvocation(
 	if right == nil {
 		if IsOrderedBinary(op) {
 			// FunctionInvocation.cpp:224–226 — RHS under original cg_context
-			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, cg.ExprDepth)
-			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, cg.ExprDepth)
-			}
+			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
 		} else {
 			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
 			rhsAccum := EmptyEffect()
@@ -620,16 +618,17 @@ func MakeRandomBinaryInvocation(
 			rhsCG.effectContext = cg.EffectContext().AddEffectOpts(lhsAccum, true)
 			rhsCG.EffectAccum = &rhsAccum
 			rhsCG.EffectStm = EmptyEffect()
-			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, MaxTermTypes, rhsCG.ExprDepth)
-			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, TermConstant, rhsCG.ExprDepth)
-			}
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
 			cg.MergeParamContext(rhsCG, true)
 		}
 	}
+	// FunctionInvocation.cpp:257 — ERROR_GUARD_AND_DEL2
+	if right == nil || HasError() {
+		return nil
+	}
 	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or 0/1 constant
-	if (op == BinMod || op == BinDiv) && right != nil && right.Term == TermConstant && right.Con != nil {
+	if (op == BinMod || op == BinDiv) && right.Term == TermConstant && right.Con != nil {
 		if right.Con.Value == "0" || right.Con.Value == "1" {
 			if lhsTy == nil || !lhsTy.IsFloat() {
 				op = BinAdd
@@ -717,23 +716,24 @@ func MakeRandomBinaryPtrComparison(
 	if ptrTy == nil {
 		return nil
 	}
-	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func
+	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func=true
 	lhsAccum := EmptyEffect()
 	lhsCG := *cg
 	lhsCG.effectContext = cg.EffectContext()
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = EmptyEffect()
+	// make_random(lhs_cg, type, 0, true) — no_func true
 	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
-	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, TermVariable, lhsCG.ExprDepth)
+	if left == nil || HasError() {
+		return nil
 	}
 	// FunctionInvocation.cpp:313 — merge_param_context(lhs)
 	cg.MergeParamContext(lhsCG, true)
 
 	// FunctionInvocation.cpp:317–320 — if LHS const, force RHS variable
 	tt := MaxTermTypes
-	if left != nil && left.Term == TermConstant {
+	if left.Term == TermConstant {
 		tt = TermVariable
 	}
 	var right *Expression
@@ -742,10 +742,8 @@ func MakeRandomBinaryPtrComparison(
 	if IsOrderedBinary(op) {
 		oldFlags := cg.Flags
 		cg.Flags |= FlagNoDanglingPtr
+		// make_random(..., true, false, tt) — no_func true
 		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, cg.ExprDepth)
-		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, cg.ExprDepth)
-		}
 		cg.Flags = oldFlags
 	} else {
 		rhsAccum := EmptyEffect()
@@ -756,13 +754,10 @@ func MakeRandomBinaryPtrComparison(
 		rhsCG.EffectStm = EmptyEffect()
 		rhsCG.Flags |= FlagNoDanglingPtr
 		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
-		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, TermVariable, rhsCG.ExprDepth)
-		}
 		// FunctionInvocation.cpp:345
 		cg.MergeParamContext(rhsCG, true)
 	}
-	if left == nil || right == nil {
+	if right == nil || HasError() {
 		return nil
 	}
 	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed (lang_cpp)
@@ -865,10 +860,11 @@ func MakeRandomUnaryInvocation(
 	if flags != nil {
 		argTy = flags.LHSType()
 	}
-	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary; operand under expr_depth
-	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, cg.ExprDepth)
-	if arg == nil {
-		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, cg.ExprDepth)
+	// FunctionInvocation.cpp:157–159 — Expression::make_random(cg, type) — no_func=false
+	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
+	// FunctionInvocation.cpp:158 — ERROR_GUARD_AND_DEL1
+	if arg == nil || HasError() {
+		return nil
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
 	inv.setOutOpts(opts)
