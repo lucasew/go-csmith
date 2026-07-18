@@ -2,6 +2,68 @@ package csmith
 
 import "testing"
 
+func TestIsVolatileOKOnOneLevelCPP(t *testing.T) {
+	// CVQualifiers.cpp:269–293
+	opts := Defaults()
+	opts.LangCPP = true
+	// non-aggregate always OK
+	if !isVolatileOKOnOneLevel(opts, GetIntType()) {
+		t.Fatal("simple")
+	}
+	// struct without assign ops → false
+	st := &Type{isStruct: true, HasAssignOps: false}
+	if isVolatileOKOnOneLevel(opts, st) {
+		t.Fatal("no assign ops")
+	}
+	st.HasAssignOps = true
+	if !isVolatileOKOnOneLevel(opts, st) {
+		t.Fatal("struct with assign ops")
+	}
+	// union with nested struct → false
+	nested := &Type{isStruct: true, HasAssignOps: true}
+	ut := &Type{isUnion: true, HasAssignOps: true, Fields: []StructField{
+		{Name: "f0", Type: nested, BitWidth: -1},
+	}}
+	if isVolatileOKOnOneLevel(opts, ut) {
+		t.Fatal("union+struct")
+	}
+	// union of simples OK
+	ut2 := &Type{isUnion: true, HasAssignOps: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	if !isVolatileOKOnOneLevel(opts, ut2) {
+		t.Fatal("union simples")
+	}
+	// C mode always OK even without assign ops
+	optsC := Defaults()
+	optsC.LangCPP = false
+	if !isVolatileOKOnOneLevel(optsC, st) {
+		t.Fatal("C mode")
+	}
+}
+
+func TestHasPadding(t *testing.T) {
+	// unpacked struct always pads
+	st := &Type{isStruct: true, Packed: false}
+	if !st.HasPadding() {
+		t.Fatal("unpacked")
+	}
+	// packed without bitfields → no
+	st2 := &Type{isStruct: true, Packed: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	if st2.HasPadding() {
+		t.Fatal("packed no bitfield")
+	}
+	// packed with bitfield → yes
+	st3 := &Type{isStruct: true, Packed: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: 3},
+	}}
+	if !st3.HasPadding() {
+		t.Fatal("bitfield")
+	}
+}
+
 func TestRandomQualifiersSimpleNoVolatile(t *testing.T) {
 	// CVQualifiers::random_qualifiers(t) — READ, empty ctx, no_volatile.
 	// Only const flipcoin(RegularConstProb=10); vol forced false.

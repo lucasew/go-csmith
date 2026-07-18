@@ -384,15 +384,32 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 }
 
 // isVolatileOKOnOneLevel mirrors is_volatile_ok_on_one_level (CVQualifiers.cpp).
-// For non-C++ and non-struct/union types, always true. Struct/union path deferred.
+// CVQualifiers.cpp:269–293 — non-C++ always OK; struct/union need has_assign_ops;
+// union with struct field (or nested bad union) forbids volatile.
 func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
-	if opts.LangCPP {
-		// Struct/union assign-ops rules not ported; simple types OK.
-		if t != nil && t.IsSimple() {
-			return true
-		}
-		// Until struct/union Types exist, treat non-simple as OK for C mode only.
+	if !opts.LangCPP {
 		return true
+	}
+	if t == nil || (!t.IsStruct() && !t.IsUnion()) {
+		return true
+	}
+	if !t.HasAssignOps {
+		return false
+	}
+	if t.IsStruct() {
+		return true
+	}
+	// Union: nested struct field blocks volatile; nested unions recurse.
+	for _, f := range t.Fields {
+		if f.Type == nil {
+			continue
+		}
+		if f.Type.IsStruct() {
+			return false
+		}
+		if f.Type.IsUnion() && !isVolatileOKOnOneLevel(opts, f.Type) {
+			return false
+		}
 	}
 	return true
 }

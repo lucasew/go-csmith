@@ -236,3 +236,102 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	}
 	return append(facts, nf.Clone())
 }
+
+// RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
+// FactUnion.cpp:74–118 — constant→fid 0; variable→join RHS union facts;
+// assign/comma peel to RHS; function return uses registry when available.
+func RhsToLhsTransferUnion(
+	unionFacts []*FactUnion,
+	ptFacts []*FactPointTo,
+	lvars []*Variable,
+	rhs *Expression,
+) []*FactUnion {
+	if rhs == nil || len(lvars) == 0 {
+		return nil
+	}
+	switch rhs.Term {
+	case TermConstant:
+		return MakeFactUnions(lvars, 0)
+	case TermVariable:
+		if rhs.Var == nil {
+			return nil
+		}
+		indirect := rhs.IndirectLevel()
+		if indirect < 0 {
+			indirect = 0
+		}
+		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
+		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
+		if rhsFact == nil {
+			return nil
+		}
+		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
+	case TermFunction:
+		// FactUnion.cpp:99–109 — return fact for invocation RV (union category).
+		// Use Invoke.User.RV when a related union fact is known; else empty.
+		if rhs.Invoke == nil || rhs.Invoke.User == nil || rhs.Invoke.User.RV == nil {
+			return nil
+		}
+		rv := rhs.Invoke.User.RV
+		if uf := FindRelatedUnion(unionFacts, rv); uf != nil {
+			return MakeFactUnions(lvars, uf.LastWrittenFID)
+		}
+		return nil
+	case TermAssignment:
+		if rhs.Assign == nil {
+			return nil
+		}
+		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.Assign.Expr)
+	case TermCommaExpr:
+		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.CommaRHS)
+	default:
+		return nil
+	}
+}
+
+// AbstractFactUnionForAssign mirrors FactUnion::abstract_fact_for_assign.
+// FactUnion.cpp:121–154 — union-typed LHS transfers fid; union-field write
+// records parent fid; padding/packed-after-bitfield → BOTTOM on container.
+// Returns (factsOut, lvarCount).
+func AbstractFactUnionForAssign(
+	unionFacts []*FactUnion,
+	ptFacts []*FactPointTo,
+	lhs *Variable,
+	lhsIndir int,
+	rhs *Expression,
+) (out []*FactUnion, lvarCnt int) {
+	if lhs == nil {
+		return nil, 0
+	}
+	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, ptFacts)
+	lvarCnt = len(lvars)
+	if lhs.Type != nil && lhs.Type.IsUnion() {
+		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs), lvarCnt
+	}
+	if rhs == nil {
+		return nil, lvarCnt
+	}
+	for _, v := range lvars {
+		if v == nil {
+			continue
+		}
+		var fu *FactUnion
+		if v.IsUnionField() {
+			// FactUnion.cpp:141–143
+			fu = MakeFactUnion(v.FieldVarOf, v.GetFieldID())
+		} else if v.IsInsideUnionField() {
+			// FactUnion.cpp:144–146 — padding or packed-after-bitfield → BOTTOM
+			typ := v.Type
+			if (typ != nil && typ.HasPadding()) || v.IsPackedAfterBitfield() {
+				cu := v.GetContainerUnion()
+				if cu != nil {
+					fu = MakeFactUnion(cu, FactUnionBottom)
+				}
+			}
+		}
+		if fu != nil {
+			out = append(out, fu)
+		}
+	}
+	return out, lvarCnt
+}

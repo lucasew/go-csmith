@@ -124,11 +124,12 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		packed = r.RndFlipcoin(50)
 	}
 	st := &Type{
-		isStruct:   true,
-		StructName: tag,
-		Fields:     fields,
-		Packed:     packed,
-		Used:       true,
+		isStruct:     true,
+		StructName:   tag,
+		Fields:       fields,
+		Packed:       packed,
+		Used:         true,
+		HasAssignOps: IfStructWillHaveAssignOps(r, opts, probs),
 	}
 	// Type.cpp:126 / Bookkeeper::record_type_with_bitfields
 	RecordTypeWithBitfields(st)
@@ -358,10 +359,11 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		fields = append(fields, MakeOneUnionField(r, opts, probs, env, i))
 	}
 	ut := &Type{
-		isUnion:    true,
-		StructName: tag,
-		Fields:     fields,
-		Used:       true,
+		isUnion:      true,
+		StructName:   tag,
+		Fields:       fields,
+		Used:         true,
+		HasAssignOps: IfUnionWillHaveAssignOps(r, opts, probs),
 	}
 	// Type.cpp:180 — record_type_with_bitfields for unions
 	RecordTypeWithBitfields(ut)

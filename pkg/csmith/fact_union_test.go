@@ -78,3 +78,80 @@ func TestJoinVarFactsUnion(t *testing.T) {
 		t.Fatal(j)
 	}
 }
+
+func TestRhsToLhsTransferUnionConstant(t *testing.T) {
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	lhs := &Variable{Name: "g_u", Type: ut}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	out := RhsToLhsTransferUnion(nil, nil, []*Variable{lhs}, rhs)
+	if len(out) != 1 || out[0].LastWrittenFID != 0 || out[0].Var != lhs {
+		t.Fatalf("%+v", out)
+	}
+}
+
+func TestRhsToLhsTransferUnionVariable(t *testing.T) {
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	src := &Variable{Name: "g_src", Type: ut}
+	dst := &Variable{Name: "g_dst", Type: ut}
+	ufacts := []*FactUnion{MakeFactUnion(src, 1)}
+	rhs := &Expression{Term: TermVariable, Var: src, ExprType: ut}
+	out := RhsToLhsTransferUnion(ufacts, nil, []*Variable{dst}, rhs)
+	if len(out) != 1 || out[0].LastWrittenFID != 1 || out[0].Var != dst {
+		t.Fatalf("%+v", out)
+	}
+}
+
+func TestAbstractFactUnionForAssignField(t *testing.T) {
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := &Variable{Name: "g_u", Type: ut}
+	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent.FieldVars = []*Variable{f0, {Name: "g_u.f1", Type: GetIntType(), FieldVarOf: parent}}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
+	out, n := AbstractFactUnionForAssign(nil, nil, f0, 0, rhs)
+	if n != 1 || len(out) != 1 || out[0].Var != parent || out[0].LastWrittenFID != 0 {
+		t.Fatalf("n=%d out=%+v", n, out)
+	}
+}
+
+func TestAbstractFactUnionForAssignUnionTypedLHS(t *testing.T) {
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	lhs := &Variable{Name: "g_u", Type: ut}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	out, n := AbstractFactUnionForAssign(nil, nil, lhs, 0, rhs)
+	if n != 1 || len(out) != 1 || out[0].LastWrittenFID != 0 {
+		t.Fatalf("n=%d out=%+v", n, out)
+	}
+}
+
+func TestAbstractFactUnionPaddingBottom(t *testing.T) {
+	// FactUnion.cpp:144–146 — inside union field with type padding → BOTTOM
+	// Assigning to a padded struct that is a union field (not the direct union field fid path).
+	st := &Type{isStruct: true, Packed: false, Fields: []StructField{
+		{Name: "x", Type: GetIntType(), BitWidth: -1},
+	}}
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: st, BitWidth: -1},
+	}}
+	parent := &Variable{Name: "g_u", Type: ut}
+	ufield := &Variable{Name: "g_u.f0", Type: st, FieldVarOf: parent}
+	// nested struct field of the union field: is_inside_union_field, type has padding via walk?
+	// C++ checks v->type->has_padding() on the LHS var itself — use padded struct type on nested root.
+	// Direct union field uses IsUnionField path (fid), so use a child of ufield with padded type.
+	nested := &Variable{Name: "g_u.f0.sub", Type: st, FieldVarOf: ufield}
+	parent.FieldVars = []*Variable{ufield}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	out, _ := AbstractFactUnionForAssign(nil, nil, nested, 0, rhs)
+	if len(out) != 1 || out[0].Var != parent || !out[0].IsBottom() {
+		t.Fatalf("%+v", out)
+	}
+}

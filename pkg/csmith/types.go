@@ -56,6 +56,8 @@ type Type struct {
 	Packed bool
 	// Used mirrors Type::used.
 	Used bool
+	// HasAssignOps mirrors Type::has_assign_ops_ (C++ struct/union assign ops).
+	HasAssignOps bool
 }
 
 // StructField is one struct member.
@@ -504,6 +506,26 @@ func (t *Type) IsBitfieldIndex(index int) bool {
 		return false
 	}
 	return t.Fields[index].BitWidth >= 0
+}
+
+// HasPadding mirrors Type::has_padding.
+// Type.cpp:1305–1314 — unpacked struct, bitfield member, or nested padding.
+func (t *Type) HasPadding() bool {
+	if t == nil {
+		return false
+	}
+	if t.IsStruct() && !t.Packed {
+		return true
+	}
+	for i, f := range t.Fields {
+		if t.IsBitfieldIndex(i) {
+			return true
+		}
+		if f.Type != nil && f.Type.HasPadding() {
+			return true
+		}
+	}
+	return false
 }
 
 // ChooseRandomNonvoidSimple mirrors Type::choose_random_nonvoid_simple.

@@ -121,6 +121,38 @@ func TestValidateAndUpdateFacts(t *testing.T) {
 	}
 }
 
+func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
+	// Statement.cpp:580–595 — shortcut reuse marks gotos inside tree visited
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
+	// for-like compound with nested goto
+	loop := &Stmt{
+		Kind: StmtFor, StmID: 10,
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{Stmts: []Stmt{gotoSt}},
+	}
+	fm := NewFactMgr(nil)
+	// seed maps so shortcut fires
+	fm.SetMapFactsIn(10, nil)
+	fm.SetMapFactsOut(10, nil)
+	fm.SetMapStmEffect(10, EmptyEffect())
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10, BackLink: true}}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{}
+	if !ValidateAndUpdateFacts(loop, &facts, &cg, Defaults(), nil) {
+		t.Fatal("shortcut validate")
+	}
+	if !fm.MapVisited[20] {
+		t.Fatal("goto inside for should be marked visited on shortcut")
+	}
+	if !fm.MapVisited[10] {
+		t.Fatal("loop itself visited")
+	}
+}
+
 func TestCGContextAddEffect(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext()

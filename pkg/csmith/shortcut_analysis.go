@@ -77,24 +77,53 @@ func ContainsStmt(root, target *Stmt) bool {
 	if root == nil || target == nil {
 		return false
 	}
-	if root.StmID != 0 && root.StmID == target.StmID {
-		return true
+	return FindStmtInTree(root, target.StmID) != nil
+}
+
+// FindStmtInTree finds a statement by stm_id inside root's tree (self + nested blocks).
+func FindStmtInTree(root *Stmt, stmID int) *Stmt {
+	if root == nil || stmID <= 0 {
+		return nil
+	}
+	if root.StmID == stmID {
+		return root
 	}
 	if root.Then != nil {
 		for i := range root.Then.Stmts {
-			if ContainsStmt(&root.Then.Stmts[i], target) {
-				return true
+			if s := FindStmtInTree(&root.Then.Stmts[i], stmID); s != nil {
+				return s
 			}
 		}
 	}
 	if root.Else != nil {
 		for i := range root.Else.Stmts {
-			if ContainsStmt(&root.Else.Stmts[i], target) {
-				return true
+			if s := FindStmtInTree(&root.Else.Stmts[i], stmID); s != nil {
+				return s
 			}
 		}
 	}
-	return false
+	return nil
+}
+
+// MarkContainedGotosVisited mirrors validate_and_update_facts shortcut==0 path.
+// Statement.cpp:580–595 — mark goto edges sourced inside this statement visited
+// so fixed-point can feed goto outputs into the label target.
+func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
+	if root == nil || fm == nil {
+		return
+	}
+	if fm.MapVisited == nil {
+		fm.MapVisited = make(map[int]bool)
+	}
+	for _, e := range fm.CFGEdges {
+		if e == nil || e.SrcID <= 0 {
+			continue
+		}
+		s := FindStmtInTree(root, e.SrcID)
+		if s != nil && s.Kind == StmtGoto {
+			fm.MapVisited[e.SrcID] = true
+		}
+	}
 }
 
 // BlockContainsStmt walks a block for target stm_id.
@@ -218,6 +247,10 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	sc := ShortcutAnalysis(st, facts, cg, opts)
 	switch sc {
 	case ShortcutOK:
+		// Statement.cpp:580–595 — mark contained gotos visited on shortcut reuse
+		if cg.FM != nil {
+			MarkContainedGotosVisited(st, cg.FM)
+		}
 		return true
 	case ShortcutConflict:
 		return false
