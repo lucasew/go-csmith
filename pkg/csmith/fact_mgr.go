@@ -20,6 +20,10 @@ type FactMgr struct {
 	// FactMgr.h:161–163.
 	MapFactsIn  map[int][]*FactPointTo
 	MapFactsOut map[int][]*FactPointTo
+	// MapFactsInFinal / MapFactsOutFinal mirror map_facts_in/out_final.
+	// FactMgr.h — combined across revisits via setup_in_out_maps.
+	MapFactsInFinal  map[int][]*FactPointTo
+	MapFactsOutFinal map[int][]*FactPointTo
 	// MapAccumEffect mirrors map_accum_effect — accum after each statement.
 	MapAccumEffect map[int]Effect
 	// MapVisited mirrors map_visited — statement analyzed this pass.
@@ -29,12 +33,14 @@ type FactMgr struct {
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
 func NewFactMgr(f *Function) *FactMgr {
 	return &FactMgr{
-		Func:           f,
-		MapStmEffect:   make(map[int]Effect),
-		MapFactsIn:     make(map[int][]*FactPointTo),
-		MapFactsOut:    make(map[int][]*FactPointTo),
-		MapAccumEffect: make(map[int]Effect),
-		MapVisited:     make(map[int]bool),
+		Func:             f,
+		MapStmEffect:     make(map[int]Effect),
+		MapFactsIn:       make(map[int][]*FactPointTo),
+		MapFactsOut:      make(map[int][]*FactPointTo),
+		MapFactsInFinal:  make(map[int][]*FactPointTo),
+		MapFactsOutFinal: make(map[int][]*FactPointTo),
+		MapAccumEffect:   make(map[int]Effect),
+		MapVisited:       make(map[int]bool),
 	}
 }
 
@@ -61,8 +67,14 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 }
 
 // SetMapFactsOutForStmt mirrors FactMgr::set_fact_out with jump/return filtering.
-// FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return.
+// FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return/goto.
+// destParent is the goto destination's parent block when Kind==StmtGoto (optional).
 func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Block) {
+	fm.SetMapFactsOutForStmtDest(st, facts, blk, nil)
+}
+
+// SetMapFactsOutForStmtDest is set_fact_out with optional goto dest parent.
+func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk, destParent *Block) {
 	if fm == nil || st == nil {
 		return
 	}
@@ -73,12 +85,245 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 	case StmtReturn:
 		cp = RemoveFunctionLocalFacts(cp, fm.Func)
 	case StmtGoto:
-		// full dest update deferred; drop function-locals as approximation for far jumps
-		cp = RemoveFunctionLocalFacts(cp, fm.Func)
+		if destParent != nil && fm.Func != nil {
+			out := []*FactPointTo{}
+			UpdateFactsForDest(cp, &out, fm.Func, destParent)
+			cp = out
+		} else {
+			// approximation when dest unknown: drop function-locals
+			cp = RemoveFunctionLocalFacts(cp, fm.Func)
+		}
 	}
 	if st.StmID > 0 {
 		fm.SetMapFactsOut(st.StmID, cp)
 	}
+}
+
+// UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
+// FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
+func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
+	if factsOut == nil {
+		return
+	}
+	var oosVars []*Variable
+	seen := map[*Variable]bool{}
+	addOOS := func(v *Variable) {
+		if v == nil || seen[v] || IsSpecialPtr(v) {
+			return
+		}
+		seen[v] = true
+		oosVars = append(oosVars, v)
+	}
+	for _, fact := range factsIn {
+		if fact == nil || fact.Var == nil {
+			continue
+		}
+		// skip return variables
+		if isReturnVar(fact.Var) {
+			continue
+		}
+		if f != nil && f.IsVarOOS(fact.Var, destParent) {
+			addOOS(fact.Var)
+		}
+		for _, p := range fact.PointTo {
+			if p != nil && !IsSpecialPtr(p) && f != nil && f.IsVarOOS(p, destParent) {
+				addOOS(p)
+			}
+		}
+		*factsOut = MergeFactInto(*factsOut, fact)
+	}
+	UpdateFactsForOOSVars(oosVars, factsOut)
+}
+
+// ClearMapVisited mirrors FactMgr::clear_map_visited.
+// FactMgr.cpp:510–514 — set all visited flags false (keep keys).
+func (fm *FactMgr) ClearMapVisited() {
+	if fm == nil || fm.MapVisited == nil {
+		return
+	}
+	for k := range fm.MapVisited {
+		fm.MapVisited[k] = false
+	}
+}
+
+// RestoreFacts mirrors FactMgr::restore_facts.
+// FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
+func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
+	if fm == nil {
+		return
+	}
+	cp := CloneFactSlice(oldFacts)
+	MakeupNewVarFacts(&cp, fm.GlobalFacts)
+	fm.GlobalFacts = cp
+}
+
+// SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
+// FactMgr.cpp:208–246 — first_time clones into final; else combine.
+func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
+	if fm == nil {
+		return
+	}
+	if fm.MapFactsInFinal == nil {
+		fm.MapFactsInFinal = make(map[int][]*FactPointTo)
+	}
+	if fm.MapFactsOutFinal == nil {
+		fm.MapFactsOutFinal = make(map[int][]*FactPointTo)
+	}
+	if firstTime {
+		for id, facts := range fm.MapFactsIn {
+			fm.MapFactsInFinal[id] = CloneFactSlice(facts)
+		}
+		for id, facts := range fm.MapFactsOut {
+			fm.MapFactsOutFinal[id] = CloneFactSlice(facts)
+		}
+		return
+	}
+	// combine current maps into final
+	for id, facts2 := range fm.MapFactsIn {
+		facts1 := fm.MapFactsInFinal[id]
+		MergeFacts(&facts1, facts2)
+		fm.MapFactsInFinal[id] = facts1
+	}
+	for id, facts2 := range fm.MapFactsOut {
+		facts1 := fm.MapFactsOutFinal[id]
+		MergeFacts(&facts1, facts2)
+		fm.MapFactsOutFinal[id] = facts1
+	}
+}
+
+// BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
+// FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
+func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
+	if fm == nil || st == nil {
+		return
+	}
+	if factsIn == nil || factsOut == nil {
+		return
+	}
+	if st.Then != nil {
+		fm.backupBlockFactMaps(st.Then, factsIn, factsOut)
+	}
+	if st.Else != nil {
+		fm.backupBlockFactMaps(st.Else, factsIn, factsOut)
+	}
+	if st.StmID > 0 {
+		if in, ok := fm.MapFactsIn[st.StmID]; ok {
+			factsIn[st.StmID] = CloneFactSlice(in)
+		}
+		if out, ok := fm.MapFactsOut[st.StmID]; ok {
+			factsOut[st.StmID] = CloneFactSlice(out)
+		}
+	}
+}
+
+func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
+	if b == nil {
+		return
+	}
+	if b.StmID > 0 {
+		if in, ok := fm.MapFactsIn[b.StmID]; ok {
+			factsIn[b.StmID] = CloneFactSlice(in)
+		}
+		if out, ok := fm.MapFactsOut[b.StmID]; ok {
+			factsOut[b.StmID] = CloneFactSlice(out)
+		}
+	}
+	for i := range b.Stmts {
+		fm.BackupStmFactMaps(&b.Stmts[i], factsIn, factsOut)
+	}
+}
+
+// RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
+// FactMgr.cpp:533–548.
+func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
+	if fm == nil || st == nil {
+		return
+	}
+	if st.Then != nil {
+		fm.restoreBlockFactMaps(st.Then, factsIn, factsOut)
+	}
+	if st.Else != nil {
+		fm.restoreBlockFactMaps(st.Else, factsIn, factsOut)
+	}
+	if st.StmID > 0 {
+		if in, ok := factsIn[st.StmID]; ok {
+			fm.MapFactsIn[st.StmID] = CloneFactSlice(in)
+		} else {
+			delete(fm.MapFactsIn, st.StmID)
+		}
+		if out, ok := factsOut[st.StmID]; ok {
+			fm.MapFactsOut[st.StmID] = CloneFactSlice(out)
+		} else {
+			delete(fm.MapFactsOut, st.StmID)
+		}
+	}
+}
+
+func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
+	if b == nil {
+		return
+	}
+	if b.StmID > 0 {
+		if in, ok := factsIn[b.StmID]; ok {
+			fm.MapFactsIn[b.StmID] = CloneFactSlice(in)
+		} else {
+			delete(fm.MapFactsIn, b.StmID)
+		}
+		if out, ok := factsOut[b.StmID]; ok {
+			fm.MapFactsOut[b.StmID] = CloneFactSlice(out)
+		} else {
+			delete(fm.MapFactsOut, b.StmID)
+		}
+	}
+	for i := range b.Stmts {
+		fm.RestoreStmFactMaps(&b.Stmts[i], factsIn, factsOut)
+	}
+}
+
+// FindUpdatedFacts mirrors FactMgr::find_updated_facts.
+// FactMgr.cpp:652–665 — facts_out that differ from related facts_in.
+func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
+	if fm == nil || stmID <= 0 {
+		return nil
+	}
+	in := fm.MapFactsIn[stmID]
+	out := fm.MapFactsOut[stmID]
+	var updated []*FactPointTo
+	for _, f := range out {
+		if f == nil {
+			continue
+		}
+		prev := FindRelatedPointTo(in, f.Var)
+		if prev == nil || !f.Equal(prev) {
+			updated = append(updated, f)
+		}
+	}
+	return updated
+}
+
+// FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
+// FactMgr.cpp:667–686 — final maps; always include rv facts.
+func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
+	if fm == nil || stmID <= 0 {
+		return nil
+	}
+	in := fm.MapFactsInFinal[stmID]
+	out := fm.MapFactsOutFinal[stmID]
+	var updated []*FactPointTo
+	for _, f := range out {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
+			updated = append(updated, f)
+			continue
+		}
+		prev := FindRelatedPointTo(in, f.Var)
+		if prev == nil || !f.Equal(prev) {
+			updated = append(updated, f)
+		}
+	}
+	return updated
 }
 
 // RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts.

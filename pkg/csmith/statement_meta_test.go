@@ -1,0 +1,96 @@
+package csmith
+
+import "testing"
+
+func TestGetBlkDepthAndInBlock(t *testing.T) {
+	outer := &Block{}
+	inner := &Block{Parent: outer}
+	if GetBlkDepth(inner) != 2 {
+		t.Fatal(GetBlkDepth(inner))
+	}
+	if !StmtInBlock(inner, outer) {
+		t.Fatal("inner in outer")
+	}
+	if StmtInBlock(outer, inner) {
+		t.Fatal("outer not in inner")
+	}
+}
+
+func TestIs1stStm(t *testing.T) {
+	b := &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1},
+		{Kind: StmtAssign, StmID: 2},
+	}}
+	if !Is1stStm(&b.Stmts[0], b) {
+		t.Fatal("first")
+	}
+	if Is1stStm(&b.Stmts[1], b) {
+		t.Fatal("second")
+	}
+}
+
+func TestFindContainerAndDominate(t *testing.T) {
+	body := &Block{StmID: 20}
+	ifSt := Stmt{Kind: StmtIfElse, StmID: 10, Then: body}
+	outer := &Block{Stmts: []Stmt{ifSt, {Kind: StmtAssign, StmID: 11}}}
+	body.Parent = outer
+	// fix Then pointer to outer.Stmts[0].Then
+	outer.Stmts[0].Then = body
+	c := FindContainerStm(body)
+	if c == nil || c.StmID != 10 {
+		t.Fatal(c)
+	}
+	// if dominates stmt inside then
+	inner := &Stmt{Kind: StmtAssign, StmID: 21}
+	body.Stmts = []Stmt{*inner}
+	if !Dominate(&outer.Stmts[0], outer, &body.Stmts[0], body) {
+		t.Fatal("if dominates then body stmt")
+	}
+	// earlier dominates later same block
+	if !Dominate(&outer.Stmts[0], outer, &outer.Stmts[1], outer) {
+		t.Fatal("10 dominates 11")
+	}
+	if Dominate(&outer.Stmts[1], outer, &outer.Stmts[0], outer) {
+		t.Fatal("11 does not dominate 10")
+	}
+}
+
+func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
+	fm := NewFactMgr(nil)
+	destParent := &Block{Stmts: []Stmt{{StmID: 5}}}
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 5}}
+	if !IsJumpTargetFromOtherBlocks(5, destParent, fm, nil) {
+		t.Fatal("external goto")
+	}
+	// sibling source
+	destParent.Stmts = append(destParent.Stmts, Stmt{StmID: 99, Kind: StmtGoto})
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 5}}
+	if IsJumpTargetFromOtherBlocks(5, destParent, fm, nil) {
+		t.Fatal("sibling not other block")
+	}
+}
+
+func TestIsPtrUsed(t *testing.T) {
+	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
+	st := &Stmt{Kind: StmtAssign, LhsVar: p, Expr: &Expression{Term: TermVariable, Var: p}}
+	if !IsPtrUsed(st) {
+		t.Fatal("ptr")
+	}
+	st2 := &Stmt{Kind: StmtAssign, LhsVar: CreateVariableScalars("i", GetIntType(), false, false),
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	if IsPtrUsed(st2) {
+		t.Fatal("no ptr")
+	}
+}
+
+func TestContainsStmtTree(t *testing.T) {
+	inner := Stmt{Kind: StmtAssign, StmID: 2}
+	thenB := &Block{Stmts: []Stmt{inner}}
+	root := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	if !ContainsStmtTree(root, root) {
+		t.Fatal("self")
+	}
+	if !ContainsStmtTree(root, &thenB.Stmts[0]) {
+		t.Fatal("nested")
+	}
+}
