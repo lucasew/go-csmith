@@ -43,6 +43,23 @@ type Type struct {
 	simple ESimpleType
 	// ptrTo non-nil ⇒ pointer type (Type::ptr_type).
 	ptrTo *Type
+	// Struct fields when isStruct (Type eStruct).
+	isStruct bool
+	// StructName is C tag, e.g. "S0".
+	StructName string
+	// Fields are struct/union members (simple or nested struct).
+	Fields []StructField
+	// Packed mirrors Type::packed_ for structs.
+	Packed bool
+	// Used mirrors Type::used.
+	Used bool
+}
+
+// StructField is one struct member.
+type StructField struct {
+	Name string
+	Type *Type
+	Qfer CVQualifiers
 }
 
 // simpleTypes mirrors Type::simple_types[MAX_SIMPLE_TYPES] cache.
@@ -64,7 +81,17 @@ func GetSimpleType(st ESimpleType) *Type {
 
 // IsSimple reports eType == eSimple.
 func (t *Type) IsSimple() bool {
-	return t != nil && t.ptrTo == nil
+	return t != nil && t.ptrTo == nil && !t.isStruct
+}
+
+// IsStruct reports eType == eStruct.
+func (t *Type) IsStruct() bool {
+	return t != nil && t.isStruct
+}
+
+// IsAggregate mirrors Type::is_aggregate (struct/union).
+func (t *Type) IsAggregate() bool {
+	return t != nil && t.isStruct
 }
 
 // Simple returns the eSimpleType (only meaningful if IsSimple).
@@ -131,6 +158,12 @@ func (t *Type) CName() string {
 	}
 	if t.ptrTo != nil {
 		return t.ptrTo.CName() + "*"
+	}
+	if t.isStruct {
+		if t.StructName != "" {
+			return "struct " + t.StructName
+		}
+		return "struct"
 	}
 	switch t.simple {
 	case EVoid:

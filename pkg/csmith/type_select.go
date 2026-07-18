@@ -6,6 +6,10 @@ package csmith
 type TypeEnv struct {
 	// DerivedTypes mirrors Type::derived_types (pointer types created so far).
 	DerivedTypes []*Type
+	// AllTypes mirrors Type::AllTypes (simples + aggregates available for fields).
+	AllTypes []*Type
+	// StructTypes are created struct types (subset of AllTypes).
+	StructTypes []*Type
 }
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).
@@ -79,8 +83,12 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	if op == AssignSimple && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
 		return env.MakeRandomPointerType(r, opts, probs)
 	}
-	// struct as LType — no structs yet; still burn StructAsLTypeProb? only if ok_struct_types.size()>0
-	// skip without RNG when empty (matches short-circuit)
+	// struct as LType when any structs exist (Type.cpp:1616–1622)
+	if op == AssignSimple && env != nil && len(env.StructTypes) > 0 {
+		if r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+			return env.StructTypes[r.RndUpto(uint32(len(env.StructTypes)))]
+		}
+	}
 
 	// float as LType
 	if AssignOpWorksForFloat(op) && r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {

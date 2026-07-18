@@ -47,6 +47,10 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 	if typ.PtrType() != nil {
 		return "0"
 	}
+	if typ.IsStruct() {
+		c := MakeStructConstant(r, opts, NewProbabilities(opts), typ)
+		return c.Value
+	}
 	if !typ.IsSimple() || typ.Simple() == EVoid {
 		return "0"
 	}

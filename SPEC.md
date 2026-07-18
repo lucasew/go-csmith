@@ -412,9 +412,9 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 9c: `StatementAssign` ops table | **Partial** |
 | Layer 4c: `SelectLType` + pointer types | **Partial** |
 | Arrays select/itemize/array-op | **Partial** |
-| ExpressionAssign / StatementGoto | **Partial** |
-| Layer 8e: `ExpressionComma` | **Partial** — lhs no-const + rhs typed; no C++ cast_if_needed |
-| iv_bounds itemize / structs / CFG back-edge | **Not started** |
+| ExpressionComma / Assign / Goto | **Partial** |
+| Layer 4d: struct types | **Partial** — make_random_struct (no real bitfields), GenerateAllTypes, SelectLType struct, decls |
+| iv_bounds itemize / unions / CFG back-edge | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

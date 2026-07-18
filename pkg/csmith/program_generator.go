@@ -53,7 +53,8 @@ func (g *ProgramGenerator) Initialize() {
 // GenerateAllTypes mirrors GenerateAllTypes for non-dfs mode without structs/unions yet.
 // Type.cpp:1179–1202 — GenerateSimpleTypes; struct/union deferred (MoreTypesProbability loop).
 func (g *ProgramGenerator) GenerateAllTypes() {
-	// Simple types are pre-cached. Struct/union generation not ported.
+	// Type.cpp GenerateAllTypes — simples + optional structs via MoreTypesProbability.
+	GenerateAllTypesEnv(g.Rng, g.Opts, g.Probs, &g.Types)
 }
 
 // GenerateFunctions mirrors Function.cpp GenerateFunctions (no builtins / FactMgr).
@@ -131,6 +132,22 @@ func (g *ProgramGenerator) OutputHeader() string {
 	b.WriteString("static long __undefined;\n\n")
 	if g.Opts.DepthProtect {
 		b.WriteString("#define MAX_DEPTH (5)\nint32_t DEPTH = 0;\n\n")
+	}
+	return b.String()
+}
+
+// OutputStructTypes emits struct definitions (before globals/functions).
+func (g *ProgramGenerator) OutputStructTypes() string {
+	if g == nil || len(g.Types.StructTypes) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("/* --- STRUCT TYPES --- */\n\n")
+	for _, st := range g.Types.StructTypes {
+		if st != nil {
+			b.WriteString(st.OutputStructDecl())
+			b.WriteString("\n")
+		}
 	}
 	return b.String()
 }
@@ -260,6 +277,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
 	g.GenerateAllTypes()
+	b.WriteString(g.OutputStructTypes())
 	g.GenerateFunctions()
 	b.WriteString(g.OutputGlobals())
 	b.WriteString(g.OutputFunctions())
