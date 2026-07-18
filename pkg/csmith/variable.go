@@ -337,6 +337,35 @@ func (v *Variable) LooseMatch(other *Variable) bool {
 	return meU != nil && youU != nil && meU == youU
 }
 
+// IsUnionField mirrors Variable::is_union_field — direct field of a union.
+func (v *Variable) IsUnionField() bool {
+	return v != nil && v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsUnion()
+}
+
+// IsInsideUnionField mirrors Variable::is_inside_union_field.
+func (v *Variable) IsInsideUnionField() bool {
+	for p := v; p != nil; p = p.FieldVarOf {
+		if p.IsUnionField() {
+			return true
+		}
+	}
+	return false
+}
+
+// GetFieldID mirrors Variable::get_field_id — index in parent FieldVars, or -1.
+// Variable.cpp:323–333.
+func (v *Variable) GetFieldID() int {
+	if v == nil || v.FieldVarOf == nil {
+		return -1
+	}
+	for i, f := range v.FieldVarOf.FieldVars {
+		if f == v {
+			return i
+		}
+	}
+	return -1
+}
+
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {

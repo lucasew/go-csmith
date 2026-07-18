@@ -216,7 +216,13 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
+	// FunctionInvocation.cpp:208–261 — ordered (&&/||) RHS under original effect context;
+	// unordered RHS under original + LHS accum.
 	d := cg.ExprDepth + 1
+	preLeft := EmptyEffect()
+	if cg.EffectAccum != nil {
+		preLeft = *cg.EffectAccum
+	}
 	left := MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
 		left = MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, TermConstant, d)
@@ -237,10 +243,21 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 	if right == nil {
-		// ordered ops (&& ||) use original effect context; FactMgr merge deferred
-		right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
-		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
+		if IsOrderedBinary(op) && cg.EffectAccum != nil {
+			// RHS under pre-left context only; merge back (FunctionInvocation.cpp:222–226)
+			postLeft := *cg.EffectAccum
+			*cg.EffectAccum = preLeft
+			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
+			if right == nil {
+				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
+			}
+			*cg.EffectAccum = MergeEffects(postLeft, *cg.EffectAccum)
+		} else {
+			// unordered: RHS sees LHS effects via current EffectAccum
+			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
+			if right == nil {
+				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
+			}
 		}
 	}
 	// avoid div/mod by zero-ish constant: re-pick op excluding div/mod/shift
@@ -253,6 +270,10 @@ func MakeRandomBinaryInvocation(
 				flags = nil
 			}
 		}
+	}
+	// CompatibleChecker on binary operands when enabled
+	if CompatibleCheckExprs(opts, left, right) {
+		right = &Expression{Term: TermConstant, Con: MakeInt(1)}
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
 	// CreateFunctionInvocationBinary tmp vars when math_notmp (FunctionInvocationBinary.cpp:59–75)
@@ -278,7 +299,6 @@ func MakeRandomBinaryInvocation(
 			inv.Tmp2 = blk.CreateNewTmpVar(sym, st2)
 		}
 	}
-	_ = IsOrderedBinary
 	return inv
 }
 

@@ -44,6 +44,45 @@ func WithSideEffects() Effect {
 	return Effect{pure: false, sideEffectFree: false}
 }
 
+// AddEffect mirrors Effect::add_effect — union of reads/writes; pure/SE-free AND.
+// Effect.cpp:157–186 (lhs_write_vars omitted).
+func (e Effect) AddEffect(other Effect) Effect {
+	out := e
+	if other.read != nil {
+		if out.read == nil {
+			out.read = make(map[*Variable]bool)
+		}
+		nr := make(map[*Variable]bool, len(out.read)+len(other.read))
+		for k, v := range out.read {
+			nr[k] = v
+		}
+		for k, v := range other.read {
+			if v {
+				nr[k] = true
+			}
+		}
+		out.read = nr
+	}
+	if other.written != nil {
+		if out.written == nil {
+			out.written = make(map[*Variable]bool)
+		}
+		nw := make(map[*Variable]bool, len(out.written)+len(other.written))
+		for k, v := range out.written {
+			nw[k] = v
+		}
+		for k, v := range other.written {
+			if v {
+				nw[k] = true
+			}
+		}
+		out.written = nw
+	}
+	out.pure = e.pure && other.pure
+	out.sideEffectFree = e.sideEffectFree && other.sideEffectFree
+	return out
+}
+
 // WriteVar mirrors Effect::write_var — marks impure and records write.
 // Effect.cpp write_var path (simplified, no partial/field).
 func (e Effect) WriteVar(v *Variable) Effect {

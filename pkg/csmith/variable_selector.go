@@ -173,6 +173,12 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	if access == AccessWrite && cg.IsNonWritable(v) {
 		return false
 	}
+	// FactUnion::is_nonreadable_field on READ (VariableSelector.cpp:279–280)
+	if access == AccessRead && cg.FM != nil {
+		if IsNonreadableField(v, cg.FM.UnionFacts) {
+			return false
+		}
+	}
 	return true
 }
 

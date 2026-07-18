@@ -3,12 +3,14 @@
 package csmith
 
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps (stubs).
-// Full assign/transfer analysis not ported; GlobalFacts holds FactPointTo.
+// GlobalFacts holds FactPointTo; UnionFacts holds FactUnion.
 type FactMgr struct {
 	// Func is the owning function (FactMgr.cpp constructor).
 	Func *Function
 	// GlobalFacts mirrors global_facts (FactPointTo subset).
 	GlobalFacts []*FactPointTo
+	// UnionFacts is FactUnion subset of global_facts.
+	UnionFacts []*FactUnion
 }
 
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
@@ -88,14 +90,40 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	if fm == nil || lhs == nil {
 		return false
 	}
+	changed := false
 	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
-	if len(newFacts) == 0 {
-		return false
-	}
 	for _, f := range newFacts {
 		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+		changed = true
 	}
-	return true
+	// FactUnion: writing a union field records last_written_fid
+	if lhsIndir == 0 && lhs.IsInsideUnionField() {
+		uf := lhs
+		for uf != nil && !uf.IsUnionField() {
+			uf = uf.FieldVarOf
+		}
+		if uf != nil && uf.FieldVarOf != nil {
+			parent := uf.FieldVarOf
+			fid := uf.GetFieldID()
+			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnion(parent, fid))
+			changed = true
+		}
+	}
+	return changed
+}
+
+// MergeUnionFact replaces or appends FactUnion for the same union var.
+func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
+	if f == nil {
+		return facts
+	}
+	for i, old := range facts {
+		if old != nil && old.Var == f.Var {
+			facts[i] = f
+			return facts
+		}
+	}
+	return append(facts, f)
 }
 
 // FindDanglingGlobalPtrs mirrors FactMgr::find_dangling_global_ptrs.
