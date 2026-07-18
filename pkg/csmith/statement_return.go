@@ -53,27 +53,27 @@ func MakeRandomReturn(
 	vs *VariableSelector,
 	cg *CGContext,
 ) Stmt {
-	st := Stmt{Kind: StmtReturn}
+	// StatementReturn.cpp nullptr — empty Stmt (no invent Kind-only return shell)
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
-		return st
+		return Stmt{}
 	}
 	// StatementReturn.cpp:55 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementReturn, nullptr)
 	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
-		return st
+		return Stmt{}
 	}
 	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)
 	// fail closed without FactMgr invent (C++ get_fact_mgr always live)
 	if cg.FM == nil {
-		return st
+		return Stmt{}
 	}
 	// StatementReturn.cpp:56–62 — curr_func->return_type; no invent
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
-		return st
+		return Stmt{}
 	}
 	// StatementReturn.cpp:61–62 — &curr_func->rv->qfer (assert rv present in C++)
 	if cg.CurrentFunc.RV == nil {
-		return st
+		return Stmt{}
 	}
 	q := cg.CurrentFunc.RV.Qfer
 	qfer := &q
@@ -81,7 +81,7 @@ func MakeRandomReturn(
 	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
 	// StatementReturn.cpp:66 ERROR_GUARD after make_random + cast setup
 	if ev == nil || HasError() {
-		return st
+		return Stmt{}
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
 	ev.CheckAndSetCastOpts(ret, opts)
@@ -89,10 +89,6 @@ func MakeRandomReturn(
 	if opts.CComp && ev.Var != nil && ev.Var.IsBitfield {
 		ev.CastType = ret
 	}
-	st.Expr = ev
-	if st.StmID == 0 {
-		st.StmID = AllocStmID()
-	}
 	// StatementReturn.cpp make_random does not visit_facts — stm_visit / append_return does
-	return st
+	return Stmt{Kind: StmtReturn, Expr: ev, StmID: AllocStmID()}
 }

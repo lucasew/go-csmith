@@ -13,30 +13,26 @@ func MakeRandomContinue(
 	blk *Block,
 ) Stmt {
 	// StatementContinue.cpp:63–66 — don't generate continue as first stmt (prev_stm==0)
-	// get_last_stm() empty → return nullptr (stmtOK rejects Expr-less continue)
+	// get_last_stm() empty → return nullptr (empty Stmt, not Kind shell)
 	if blk != nil && blk.GetLastStm() == nil {
-		return Stmt{Kind: StmtContinue}
+		return Stmt{}
 	}
-	st := Stmt{Kind: StmtContinue}
 	if r == nil || cg == nil {
-		return st
+		return Stmt{}
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b); no soft invent continue without looping block
 	if loop == nil {
-		return Stmt{Kind: StmtContinue}
+		return Stmt{}
 	}
 	// StatementContinue.cpp:72 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
 	// StatementContinue.cpp:73–75 — make_random(int, 0, true, true, eVariable); ERROR_GUARD
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil || HasError() {
-		return Stmt{Kind: StmtContinue}
+		return Stmt{}
 	}
-	st.Expr = expr
-	if st.StmID == 0 {
-		st.StmID = AllocStmID()
-	}
+	st := Stmt{Kind: StmtContinue, Expr: expr, StmID: AllocStmID()}
 	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
 	if cg.FM != nil {
 		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)

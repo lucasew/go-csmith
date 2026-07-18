@@ -11,15 +11,15 @@ func MakeRandomBreak(
 	tables *ExprTables,
 	cg *CGContext,
 ) Stmt {
-	st := Stmt{Kind: StmtBreak}
+	// StatementBreak.cpp nullptr — empty Stmt (no invent Kind-only shell)
 	if r == nil || cg == nil {
-		return st
+		return Stmt{}
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementBreak.cpp:72 — assert(b); no soft invent break without looping block
 	if loop == nil {
-		return Stmt{Kind: StmtBreak}
+		return Stmt{}
 	}
 	// StatementBreak.cpp:76 — clear effect_stm before condition
 	cg.EffectStm = EmptyEffect()
@@ -27,12 +27,9 @@ func MakeRandomBreak(
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil || HasError() {
 		// StatementBreak.cpp:79 — ERROR_GUARD(nullptr)
-		return Stmt{Kind: StmtBreak}
+		return Stmt{}
 	}
-	st.Expr = expr
-	if st.StmID == 0 {
-		st.StmID = AllocStmID()
-	}
+	st := Stmt{Kind: StmtBreak, Expr: expr, StmID: AllocStmID()}
 	// StatementBreak.cpp:81 — b->break_stms.push_back only
 	// CFG edges created in StatementFor::post_loop_analysis (for-stmt dest), not here
 	loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)

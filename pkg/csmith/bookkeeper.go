@@ -255,31 +255,35 @@ func RecordVarsWithBitfields(t *Type) {
 }
 
 // RecordTypeWithBitfields mirrors Bookkeeper::record_type_with_bitfields.
-// Bookkeeper.cpp:480–520 subset — count bitfield members when defining a type.
+// Bookkeeper.cpp:476–499 — only when has_bitfields; count bitfield members.
 func RecordTypeWithBitfields(t *Type) {
 	if t == nil || !t.IsAggregate() {
 		return
 	}
-	hasBF := false
+	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
+	if !t.HasBitfields() {
+		return
+	}
+	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth
+	// incomplete field IR (nil types) fail closed stop — no invent zero counts past gaps
+	structsWithBitfields++
 	for _, f := range t.Fields {
-		if f.BitWidth == 0 {
-			unamedBitfieldsInTotal++
-			hasBF = true
+		// Bookkeeper.cpp:485 — if (!is_bitfield(i)) continue
+		if f.BitWidth < 0 {
 			continue
 		}
-		if f.BitWidth > 0 {
-			bitfieldsInTotal++
-			hasBF = true
-			if f.Qfer.IsConst() {
-				constBitfieldsInTotal++
-			}
-			if f.Qfer.IsVolatile() {
-				volatileBitfieldsInTotal++
-			}
+		// Bookkeeper.cpp:488–489 — bitfields_in_total++; zero width → unamed
+		bitfieldsInTotal++
+		if f.BitWidth == 0 {
+			unamedBitfieldsInTotal++
 		}
-	}
-	if hasBF {
-		structsWithBitfields++
+		// Bookkeeper.cpp:491–495 — qfers_[i] const/volatile
+		if f.Qfer.IsConst() {
+			constBitfieldsInTotal++
+		}
+		if f.Qfer.IsVolatile() {
+			volatileBitfieldsInTotal++
+		}
 	}
 }
 

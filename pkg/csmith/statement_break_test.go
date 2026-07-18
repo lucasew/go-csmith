@@ -90,10 +90,10 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
-	// empty block → nullptr (Expr-less continue; stmtOK rejects)
+	// empty block → nullptr (empty Stmt; no Kind shell invent)
 	blk := &Block{}
 	st := MakeRandomContinue(NewRng(3), opts, vs, tables, func() *CGContext { c := EmptyCGContext(); return &c }(), blk)
-	if st.Kind != StmtContinue || st.Expr != nil {
+	if st.Kind != 0 || st.Expr != nil {
 		t.Fatalf("want null continue, got %+v", st)
 	}
 	if stmtOK(st) {

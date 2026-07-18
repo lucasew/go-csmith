@@ -13,12 +13,13 @@ func MakeRandomExprStmt(
 	tables *ExprTables,
 	cg *CGContext,
 ) Stmt {
+	// StatementExpr.cpp nullptr factory — empty Stmt (no invent Kind-only shell)
 	if r == nil || cg == nil {
-		return Stmt{Kind: StmtInvoke}
+		return Stmt{}
 	}
 	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
 	if DepthGuardByType(opts, DtStatementExpr) == BadDepth {
-		return Stmt{Kind: StmtInvoke}
+		return Stmt{}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
 	var preEffect Effect
@@ -40,18 +41,18 @@ func MakeRandomExprStmt(
 		if cg.FM != nil {
 			cg.FM.RestoreFacts(factsCopy)
 		}
-		return Stmt{Kind: StmtInvoke}
+		return Stmt{}
 	}
 	if fi == nil || fi.Failed {
-		// StatementExpr.cpp:62–66 — reset_effect_accum + restore_facts
+		// StatementExpr.cpp:62–66 — reset_effect_accum + restore_facts; return 0
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect
 		}
 		if cg.FM != nil {
 			cg.FM.RestoreFacts(factsCopy)
 		}
-		// Statement::make_random retries on null; empty invoke for retry
-		return Stmt{Kind: StmtInvoke}
+		// Statement::make_random retries on null
+		return Stmt{}
 	}
 	return Stmt{
 		Kind: StmtInvoke,

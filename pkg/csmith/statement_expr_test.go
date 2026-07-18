@@ -17,15 +17,19 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	cg := WithFunc(f, EmptyEffect()).WithFuncList(&list)
 	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, &cg)
-	if st.Kind != StmtInvoke {
-		t.Fatalf("kind %v", st.Kind)
-	}
-	// may fail if max funcs / no list — with list should often succeed
-	if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
-		out := st.Expr.Output()
-		if out == "" || out == "/*bad_call*/" || out == "/*invoke*/" {
-			t.Fatal(out)
+	// success → Kind Invoke + expr; fail → empty (nullptr), not Kind-only shell
+	if st.Expr != nil {
+		if st.Kind != StmtInvoke {
+			t.Fatalf("kind %v", st.Kind)
 		}
+		if st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
+			out := st.Expr.Output()
+			if out == "" || out == "/*bad_call*/" || out == "/*invoke*/" {
+				t.Fatal(out)
+			}
+		}
+	} else if st.Kind != 0 {
+		t.Fatalf("fail must be empty Stmt, got %#v", st)
 	}
 }
 
@@ -65,13 +69,13 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// snapshot
 	preEff := eff.Clone()
 	preFacts := CloneFactSlice(fm.GlobalFacts)
-	// invoke may fail or succeed; if fail, state restored
+	// invoke may fail or succeed; if fail, empty Stmt + state restored
 	st := MakeRandomExprStmt(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg)
-	if st.Kind != StmtInvoke {
-		t.Fatal(st.Kind)
-	}
-	if st.Expr == nil || st.Expr.Invoke == nil || st.Expr.Invoke.Failed {
-		// rollback path
+	if !stmtOK(st) {
+		// rollback path (nullptr factory)
+		if st.Kind != 0 {
+			t.Fatalf("fail invents Kind shell %#v", st)
+		}
 		if !cg.EffectAccum.IsWritten(p) {
 			t.Fatal("effect should still have pre write after restore or no change")
 		}
@@ -121,4 +125,12 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	}
 	// acceptable if generation never picks invoke with available funcs under constraints
 	t.Log("no success under constraints (ok if max-func / choose filters)")
+}
+
+func TestMakeRandomExprStmtNilCGFailClosed(t *testing.T) {
+	// StatementExpr.cpp always has CGContext; nil → nullptr not Kind shell
+	st := MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil)
+	if st.Kind != 0 || stmtOK(st) {
+		t.Fatalf("nil cg invent %#v", st)
+	}
 }
