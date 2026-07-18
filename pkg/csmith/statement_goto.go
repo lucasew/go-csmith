@@ -4,6 +4,34 @@ package csmith
 
 import "strings"
 
+// stmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
+// StatementGoto.cpp:55, 224–229.
+var stmLabels = map[int]string{}
+
+// LabelForGotoDest returns existing or new gensym label for a jump destination.
+// StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present.
+func LabelForGotoDest(destStmID int, nextLabel func() string) string {
+	if destStmID > 0 {
+		if lab, ok := stmLabels[destStmID]; ok && lab != "" {
+			return lab
+		}
+	}
+	lab := "lbl_1"
+	if nextLabel != nil {
+		lab = nextLabel()
+	}
+	if destStmID > 0 {
+		stmLabels[destStmID] = lab
+	}
+	return lab
+}
+
+// GotoLabelsDoFinalization mirrors StatementGoto::doFinalization.
+// StatementGoto.cpp:404 — stm_labels.clear().
+func GotoLabelsDoFinalization() {
+	stmLabels = map[int]string{}
+}
+
 // goodGotoTarget reports statements that may receive a label (not jump/return-ish).
 // StatementGoto.cpp:99–109 — disallow break/continue/goto/return as targets.
 func goodGotoTarget(st Stmt) bool {
@@ -12,6 +40,44 @@ func goodGotoTarget(st Stmt) bool {
 		return false
 	default:
 		return true
+	}
+}
+
+// ContainsStmt reports whether b (or nested Then/Else blocks) holds st.
+// Block::contains_stmt light — used for NeedRevisit LCA on back-edge goto.
+func (b *Block) ContainsStmt(st *Stmt) bool {
+	if b == nil || st == nil {
+		return false
+	}
+	for i := range b.Stmts {
+		s := &b.Stmts[i]
+		if s == st {
+			return true
+		}
+		if st.StmID > 0 && s.StmID == st.StmID {
+			return true
+		}
+		if s.Then != nil && s.Then.ContainsStmt(st) {
+			return true
+		}
+		if s.Else != nil && s.Else.ContainsStmt(st) {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkNeedRevisitLCA sets NeedRevisit on the least incomplete ancestor of curr
+// that contains dest (StatementGoto.cpp:141–147).
+func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
+	for b := curr; b != nil; b = b.Parent {
+		if b.ContainsStmt(dest) {
+			b.NeedRevisit = true
+			return
+		}
+	}
+	if curr != nil {
+		curr.NeedRevisit = true
 	}
 }
 
@@ -222,19 +288,48 @@ func MakeRandomGoto(
 	}
 	ti := okStms[r.RndUpto(uint32(len(okStms)))]
 	tgt := &okBlk.Stmts[ti]
+	if tgt.StmID == 0 {
+		tgt.StmID = AllocStmID()
+	}
 
-	// condition: prefer already-read visible var
+	// condition: prefer already-read visible var (StatementGoto.cpp:117–132)
+	// back: curr_blk + effect_accum reads; forward: ok_blk + map_accum_effect[dest]
 	var cond *Expression
-	if cg.EffectAccum != nil {
-		var uf []*FactUnion
-		if cg.FM != nil {
-			uf = cg.FM.UnionFacts
+	var uf []*FactUnion
+	if cg.FM != nil {
+		uf = cg.FM.UnionFacts
+	}
+	var readVars []*Variable
+	condBlk := blk
+	if backEdge {
+		// StatementGoto.cpp:119–122
+		if cg.EffectAccum != nil {
+			readVars = cg.EffectAccum.ReadVars()
 		}
-		if v := ChooseVisibleReadVar(r, blk, cg.EffectAccum.ReadVars(), GetIntType(), uf); v != nil {
+	} else {
+		// StatementGoto.cpp:125–128 — travel in time to other_stm accum effect
+		condBlk = okBlk
+		if cg.FM != nil {
+			if acc, ok := cg.FM.MapAccumEffect[tgt.StmID]; ok {
+				readVars = acc.ReadVars()
+			}
+			// prefer union facts from dest out when available
+			if out, ok := cg.FM.MapFactsOut[tgt.StmID]; ok && len(out) > 0 {
+				// map_facts_out used for nonreadable filter via uf only; point-to list not required here
+				_ = out
+			}
+		}
+		if len(readVars) == 0 && cg.EffectAccum != nil {
+			readVars = cg.EffectAccum.ReadVars()
+		}
+	}
+	if len(readVars) > 0 {
+		if v := ChooseVisibleReadVar(r, condBlk, readVars, GetIntType(), uf); v != nil {
 			cg.NoteRead(v)
 			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		}
 	}
+	// C++ returns nullptr when cond_var missing; we soft-fallback for library generation
 	if cond == nil {
 		cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 		if cond == nil {
@@ -242,17 +337,22 @@ func MakeRandomGoto(
 		}
 	}
 
-	label := "lbl_1"
-	if vs != nil {
-		label = vs.Sym.Next("lbl_")
+	// StatementGoto.cpp:224–229 — stm_labels[dest]
+	nextLab := func() string {
+		if vs != nil {
+			return vs.Sym.Next("lbl_")
+		}
+		return "lbl_1"
 	}
-	if tgt.SourceLabel == "" {
+	label := tgt.SourceLabel
+	if label == "" {
+		label = LabelForGotoDest(tgt.StmID, nextLab)
 		tgt.SourceLabel = label
 	} else {
-		label = tgt.SourceLabel
-	}
-	if tgt.StmID == 0 {
-		tgt.StmID = AllocStmID()
+		// keep SourceLabel; ensure registry knows it
+		if tgt.StmID > 0 {
+			stmLabels[tgt.StmID] = label
+		}
 	}
 
 	st := Stmt{
@@ -268,6 +368,8 @@ func MakeRandomGoto(
 		if cg.FM != nil {
 			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, true)
 		}
+		// StatementGoto.cpp:141–147 — LCA need_revisit
+		MarkNeedRevisitLCA(blk, tgt)
 		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
 		RecordBackwardJump()
 	} else {

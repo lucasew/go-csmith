@@ -748,6 +748,51 @@ func MakeRandomBinaryPtrComparison(
 	return inv
 }
 
+// MakeBinary mirrors FunctionInvocation::make_binary.
+// FunctionInvocation.cpp:561–579 — SafeOpFlags from lhs/rhs types; attach operands.
+// Used by StatementFor test expressions (and array mutate paths).
+func MakeBinary(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	cg CGContext,
+	op BinaryOp,
+	lhs, rhs *Expression,
+) *Invocation {
+	if lhs == nil || rhs == nil {
+		return nil
+	}
+	lt, rt := lhs.GetType(), rhs.GetType()
+	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
+	flags := MakeRandomBinaryKind(r, opts, probs, nil, lt, rt, SafeOpBinary, op)
+	inv := &Invocation{
+		IsStd:  true,
+		Binary: op.BinaryOpC(),
+		Args:   []*Expression{lhs, rhs},
+		Safe:   flags,
+	}
+	inv.setOutOpts(opts)
+	// CreateFunctionInvocationBinary tmps when math_notmp + safe_ops
+	if flags != nil && opts.MathNoTmp && SafeOpsBinary(op.BinaryOpC()) && flags.Size != SafeFloat {
+		inv.MathNoTmp = true
+		st := EInt
+		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
+			st = ty.Simple()
+		}
+		if blk := currentBlock(cg); blk != nil {
+			inv.Tmp1 = blk.CreateNewTmpVar(nil, st)
+			st2 := st
+			if op == BinLShift || op == BinRShift {
+				if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
+					st2 = ty.Simple()
+				}
+			}
+			inv.Tmp2 = blk.CreateNewTmpVar(nil, st2)
+		}
+	}
+	return inv
+}
+
 // MakeRandomUnaryInvocation mirrors make_random_unary.
 // FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER;
 // always SafeOpFlags::make_random_unary; operand of get_lhs_type.

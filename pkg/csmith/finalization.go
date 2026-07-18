@@ -21,6 +21,8 @@ func DoFinalization() {
 	ClearPartialExpander()
 	// SafeOpFlags wrapper name registry
 	ClearSafeOpWrapperNames()
+	// StatementGoto::stm_labels
+	GotoLabelsDoFinalization()
 	// Statement sid
 	nextStmID = 0
 	// Error state

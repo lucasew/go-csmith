@@ -293,16 +293,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// StatementFor.cpp:255–263
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
 	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
-	testFi := &Invocation{
-		IsStd:  true,
-		Binary: testOp.BinaryOpC(),
-		Args:   []*Expression{vExpr, cLimit},
+	testFi := MakeBinary(r, opts, probs, cg, testOp, vExpr, cLimit)
+	if testFi == nil {
+		testFi = &Invocation{IsStd: true, Binary: testOp.BinaryOpC(), Args: []*Expression{vExpr, cLimit}}
+		testFi.setOutOpts(opts)
 	}
-	// safe flags on compare when SafeMath
-	if opts.SafeMath {
-		testFi.Safe = MakeRandomBinary(r, opts, probs, iv.Type)
-	}
-	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: GetIntType()}
+	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testFi.GetType()}
 
 	// incr assign (StatementFor.cpp:273–281)
 	lhs1 := &Lhs{Var: iv, Type: iv.Type}
