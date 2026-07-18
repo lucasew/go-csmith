@@ -21,6 +21,7 @@ func TestMergeParamContext(t *testing.T) {
 }
 
 func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {
+	ClearError() // ERROR_GUARD on GenerateNewGlobal must not see prior test sticky error
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}

@@ -123,17 +123,22 @@ func TestGenerateNewGlobalRandomQferConsumesRNG(t *testing.T) {
 }
 
 func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
+	// Scalar create_and_initialize path (not array itemize): make_init_value applied.
 	opts := Defaults()
+	opts.Arrays = false
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	r := NewRng(2)
 	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetSimpleType(EInt), &q, r)
-	if v.Init == nil {
-		t.Fatal("MakeRandom init")
+	if v == nil || (v.Init == nil && v.InitExpr == nil) {
+		t.Fatal("MakeInitValue init")
 	}
-	// pointer create
+	// pointer: make_init_value → Constant "0" (20%) or &visible Expression
 	vp := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), PointerTo(GetSimpleType(EInt)), &q, r)
-	if vp.Init == nil || vp.Init.Value != "0" {
-		t.Fatalf("pointer init: %+v", vp.Init)
+	if vp == nil || (vp.Init == nil && vp.InitExpr == nil) {
+		t.Fatalf("pointer init: Init=%+v InitExpr=%+v", vp.Init, vp.InitExpr)
+	}
+	if vp.Init != nil && vp.Init.Value != "0" {
+		t.Fatalf("pointer constant init want 0 got %+v", vp.Init)
 	}
 }

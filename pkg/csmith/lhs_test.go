@@ -216,9 +216,13 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	if lhs == nil || lhs.Var == nil {
 		t.Skip("no lhs")
 	}
-	// successful make records write on accum and/or stm
-	if cg.EffectAccum != nil && !cg.EffectAccum.IsWritten(lhs.Var) && !cg.EffectStm.IsWritten(lhs.Var) {
-		// VisitFactsLhs CheckWriteVar writes to accum and stm
-		t.Fatalf("expected write effect on lhs var %s", lhs.Var.Name)
+	// Scalar WRITE → IsWritten(lhs.Var); *p WRITE → WritePointed records pointees,
+	// not the pointer itself (Lhs.cpp:337–346 / CheckWriteVar).
+	hasWrite := false
+	if cg.EffectAccum != nil {
+		hasWrite = len(cg.EffectAccum.WrittenVars()) > 0 || len(cg.EffectAccum.LhsWriteVars()) > 0
+	}
+	if !hasWrite && len(cg.EffectStm.WrittenVars()) == 0 {
+		t.Fatalf("expected write effect after lhs make (var %s indir=%d)", lhs.Var.Name, lhs.IndirectLevel())
 	}
 }

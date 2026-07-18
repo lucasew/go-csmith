@@ -1059,7 +1059,9 @@ func applyInitExpr(v *Variable, init *Expression) {
 }
 
 // createAndInitialize mirrors VariableSelector::create_and_initialize.
-// VariableSelector.cpp:518–536 — array flip or scalar; make_init_value for init.
+// VariableSelector.cpp:518–536 — array flip → create_array_and_itemize (returns itemize());
+// else make_init_value + new_variable. Does NOT push GlobalList/LocalVars/FM/access_once
+// (callers GenerateNewGlobal / GenerateNewParentLocal do).
 func (vs *VariableSelector) createAndInitialize(
 	access Access,
 	cg CGContext,
@@ -1075,7 +1077,6 @@ func (vs *VariableSelector) createAndInitialize(
 	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize
 	if vs.Opts.Arrays && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
 		// VariableSelector.cpp:526–529 — strict_const → Constant::make_random; else make_init_value
-		// no soft invent MakeRandom when make_init fails or is non-constant Expression
 		var init *Constant
 		var ie *Expression
 		if vs.Opts.StrictConstArrays {
@@ -1088,48 +1089,56 @@ func (vs *VariableSelector) createAndInitialize(
 			if ie != nil && ie.Term == TermConstant {
 				init = ie.Con
 			}
+			// Expression init may be non-constant; still store on array InitExpr
+		}
+		// VariableSelector.cpp:1325–1333 — CreateArrayVariable; AllVars; return itemize()
+		// no soft invent scalar fallback when array create fails after flip
+		if HasError() {
+			return nil
 		}
 		av := CreateArrayVariable(r, vs.Opts, blk, name, t, init, qfer)
-		if av != nil {
-			// ArrayVariable.cpp / create_array_and_itemize — Expression* init (const or &var)
-			if ie != nil {
-				av.InitExpr = ie
-			}
-			vs.AllVars = append(vs.AllVars, &av.Variable)
-			if blk != nil {
-				blk.LocalVars = append(blk.LocalVars, &av.Variable)
-			}
-			// store full array on a side list for emission
-			vs.Arrays = append(vs.Arrays, av)
-			vs.VarCreated = true
-			return &av.Variable
+		if av == nil || HasError() {
+			return nil
 		}
+		if ie != nil {
+			av.InitExpr = ie
+		}
+		vs.AllVars = append(vs.AllVars, &av.Variable)
+		vs.Arrays = append(vs.Arrays, av)
+		// ArrayVariable.cpp:249–275 — itemize() random indices; AllVars; field_vars
+		item := av.ItemizeInto(r, vs)
+		if item == nil {
+			return nil
+		}
+		// VariableSelector.cpp:535 — assert(var); return itemized member
+		vs.VarCreated = true
+		return &item.Variable
+	}
+	// VariableSelector.cpp:531–533 — make_init_value + new_variable
+	ie := vs.MakeInitValue(access, cg, t, &qfer, blk, r)
+	if HasError() {
+		return nil
 	}
 	v := CreateVariableQfer(name, t, qfer)
 	if v == nil {
+		// VariableSelector.cpp:535 assert(var)
 		return nil
 	}
-	// VariableSelector.cpp:532–534 — make_init_value
-	applyInitExpr(v, vs.MakeInitValue(access, cg, t, &qfer, blk, r))
-	// VariableSelector.cpp:568–569 — access_once flip (on GenerateNewGlobal path;
-	// keep for create_and_initialize parity when used from local/global create)
-	if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
-		v.IsAccessOnce = true
-	}
-	// wrap_volatiles → VOL_RVAL on Output
-	if vs.Opts.WrapVolatiles && v.IsVolatile() {
-		v.UseVolRVal = true
-	}
-	if blk != nil {
-		blk.LocalVars = append(blk.LocalVars, v)
-	}
+	applyInitExpr(v, ie)
 	vs.AllVars = append(vs.AllVars, v)
-	// FactMgr::add_new_var_fact_and_update_inout_maps when FM present
-	if cg.FM != nil {
-		cg.FM.AddNewVarFactAndUpdate(blk, v)
-	}
 	vs.VarCreated = true
 	return v
+}
+
+// varCollective returns get_collective() for FM (itemized array → parent collective).
+func varCollective(v *Variable) *Variable {
+	if v == nil {
+		return nil
+	}
+	if v.AsArray != nil && v.AsArray.Collective != nil {
+		return &v.AsArray.Collective.Variable
+	}
+	return v.GetCollective()
 }
 
 // GenerateNewNonArrayGlobal mirrors VariableSelector::GenerateNewNonArrayGlobal.
@@ -1177,7 +1186,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 }
 
 // GenerateNewGlobal mirrors VariableSelector::GenerateNewGlobal for simple types:
-// random_qualifiers (or copy qfer), RandomGlobalName, CreateVariable, push GlobalList.
+// random_qualifiers (or copy qfer), RandomGlobalName, create_and_initialize, GlobalList.
 // VariableSelector.cpp:546–575.
 func (vs *VariableSelector) GenerateNewGlobal(
 	access Access,
@@ -1186,10 +1195,14 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
-	if vs == nil || t == nil {
+	if vs == nil || t == nil || r == nil {
 		return nil
 	}
 	if !vs.Opts.GlobalVariables {
+		return nil
+	}
+	// VariableSelector.cpp:550 ERROR_GUARD
+	if HasError() {
 		return nil
 	}
 	var varQfer CVQualifiers
@@ -1199,21 +1212,39 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	} else {
 		varQfer = *qfer
 	}
+	// VariableSelector.cpp:555 ERROR_GUARD after random_qualifiers
+	if HasError() {
+		return nil
+	}
 	name := vs.RandomGlobalName()
 	vs.TmpCount++
 	v := vs.createAndInitialize(access, cg, t, varQfer, nil, name, r)
-	if v == nil {
+	if v == nil || HasError() {
 		return nil
 	}
+	// VariableSelector.cpp:561 — GlobalList (itemized array member when array path)
 	vs.GlobalList = append(vs.GlobalList, v)
-	if !varQfer.IsVolatile() {
-		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
+	// VariableSelector.cpp:563–564 — FM on collective
+	if cg.FM != nil {
+		cg.FM.AddNewVarFactAndUpdate(nil, varCollective(v))
 	}
 	// VariableSelector.cpp:565 — current_func()->new_globals
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
-	// VariableSelector.cpp:1230–1236 — use_new_var + struct depth / union stats
+	// VariableSelector.cpp:567–572 — access_once only for non-volatile globals
+	if !varQfer.IsVolatile() {
+		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
+			v.IsAccessOnce = true
+		}
+		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
+	}
+	// wrap_volatiles → VOL_RVAL on Output
+	if vs.Opts.WrapVolatiles && v.IsVolatile() {
+		v.UseVolRVal = true
+	}
+	vs.VarCreated = true
+	// VariableSelector.cpp:1230–1236 — use_new_var stats
 	RecordVarCreated(v)
 	return v
 }
@@ -1542,6 +1573,21 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	}
 	name := vs.RandomLocalName()
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
+	if v == nil || HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:944 — blk->local_vars.push_back(var)
+	// create_and_initialize does not push locals (fair with C++)
+	block.LocalVars = append(block.LocalVars, v)
+	// VariableSelector.cpp:945–946 — FM on collective
+	if cg.FM != nil {
+		cg.FM.AddNewVarFactAndUpdate(block, varCollective(v))
+	}
+	// wrap_volatiles for Output
+	if vs.Opts.WrapVolatiles && v.IsVolatile() {
+		v.UseVolRVal = true
+	}
+	vs.VarCreated = true
 	return v
 }
 
