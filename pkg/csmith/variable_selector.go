@@ -524,7 +524,8 @@ func ChooseVarQfer(
 }
 
 // ChooseVarFull mirrors VariableSelector::choose_var full signature.
-// VariableSelector.cpp:394–447 — expand_struct, invalid_vars, no_bitfield, no_union.
+// VariableSelector.cpp:394–516 — expand_struct, invalid_vars, no_bitfield, no_union,
+// then artificial bias toward dereference / address-of among ok_vars.
 func ChooseVarFull(
 	r *Rng,
 	vars []*Variable,
@@ -597,6 +598,50 @@ func ChooseVarFull(
 			continue
 		}
 		ok = append(ok, x)
+	}
+	return chooseVarFromOK(r, want, ok, opts)
+}
+
+// chooseVarFromOK mirrors VariableSelector::choose_var post-filter bias.
+// VariableSelector.cpp:459–516 — prefer deref of higher-indirection vars, then
+// address-of lower-indirection (respecting take_union_field_addr); else uniform.
+// Volatile bias block is disabled upstream (if (0)).
+func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
+	// VariableSelector.cpp:459–471 — artificially increase odds of dereferencing
+	if want != nil && len(ok) > 1 {
+		var ptrs []*Variable
+		wantInd := want.IndirectLevel()
+		for _, vv := range ok {
+			if vv == nil || vv.Type == nil {
+				continue
+			}
+			if wantInd < vv.Type.IndirectLevel() {
+				ptrs = append(ptrs, vv)
+			}
+		}
+		if v := ChooseOKVar(r, ptrs); v != nil {
+			return v
+		}
+	}
+	// VariableSelector.cpp:484–514 — artificially increase odds of taking address
+	if want != nil && want.IsPointerLike() && len(ok) > 1 {
+		var addressable []*Variable
+		wantInd := want.IndirectLevel()
+		for _, vv := range ok {
+			if vv == nil || vv.Type == nil {
+				continue
+			}
+			if wantInd > vv.Type.IndirectLevel() {
+				// VariableSelector.cpp:490–494
+				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
+					continue
+				}
+				addressable = append(addressable, vv)
+			}
+		}
+		if v := ChooseOKVar(r, addressable); v != nil {
+			return v
+		}
 	}
 	return ChooseOKVar(r, ok)
 }

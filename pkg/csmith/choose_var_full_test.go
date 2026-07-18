@@ -106,3 +106,73 @@ func TestRecordPointerAvailForDeref(t *testing.T) {
 		t.Fatalf("got %d want %d", pointerAvailForDeref, before+1)
 	}
 }
+
+func TestChooseVarFromOKPreferDeref(t *testing.T) {
+	// VariableSelector.cpp:459–471 — among ok with size>1, prefer higher indirection
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	opts := Defaults()
+	// multiple seeds: always prefer pointer when both match want int
+	for seed := uint64(1); seed < 20; seed++ {
+		got := chooseVarFromOK(NewRng(seed), GetIntType(), []*Variable{iv, pv}, opts)
+		if got != pv {
+			t.Fatalf("seed %d: got %v want ptr", seed, got)
+		}
+	}
+}
+
+func TestChooseVarFromOKPreferAddressOf(t *testing.T) {
+	// VariableSelector.cpp:484–514 — want pointer, prefer lower-indirection (take address)
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	want := PointerTo(GetIntType())
+	opts := Defaults()
+	for seed := uint64(1); seed < 20; seed++ {
+		got := chooseVarFromOK(NewRng(seed), want, []*Variable{iv, pv}, opts)
+		if got != iv {
+			t.Fatalf("seed %d: got %v want addressable int", seed, got)
+		}
+	}
+}
+
+func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
+	// take_union_field_addr off → skip union fields in addressable bias
+	ut := &Type{
+		isUnion:    true,
+		StructName: "U0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if len(uv.FieldVars) < 1 {
+		t.Fatal("fields")
+	}
+	f0 := uv.FieldVars[0]
+	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	want := PointerTo(GetIntType())
+	opts := Defaults()
+	opts.TakeUnionFieldAddr = false
+	// only union field is lower-indirection; bias empty → fall back to any ok
+	got := chooseVarFromOK(NewRng(1), want, []*Variable{f0, pv}, opts)
+	if got != f0 && got != pv {
+		t.Fatalf("unexpected %v", got)
+	}
+	// with take_union_field_addr on, bias prefers f0 every time
+	opts.TakeUnionFieldAddr = true
+	for seed := uint64(1); seed < 20; seed++ {
+		got = chooseVarFromOK(NewRng(seed), want, []*Variable{f0, pv}, opts)
+		if got != f0 {
+			t.Fatalf("seed %d: want union field, got %v", seed, got)
+		}
+	}
+}
+
+func TestChooseVarFromOKSingleNoBias(t *testing.T) {
+	// size==1 skips bias paths
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	got := chooseVarFromOK(NewRng(1), GetIntType(), []*Variable{iv}, Defaults())
+	if got != iv {
+		t.Fatal(got)
+	}
+}
