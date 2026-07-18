@@ -403,6 +403,32 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	}
 }
 
+func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
+	// Expression.cpp:154–157, 186–187 — asserts; no soft invent rewrite/emit
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	cg := EmptyCGContext()
+	// no_const && eConstant
+	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, false, true, TermConstant, 0) != nil {
+		t.Fatal("no_const + Constant must fail closed")
+	}
+	// no_func && eFunction
+	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, true, false, TermFunction, 0) != nil {
+		t.Fatal("no_func + Function must fail closed")
+	}
+	// struct + eConstant (was soft invent TermVariable)
+	st := &Type{isStruct: true, StructName: "SAssert", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, st, nil, false, false, TermConstant, 0) != nil {
+		t.Fatal("struct + Constant must fail closed, not rewrite to Variable")
+	}
+	// void simple constant
+	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetSimpleType(EVoid), nil, false, false, TermConstant, 0) != nil {
+		t.Fatal("void Constant must fail closed")
+	}
+}
+
 func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	// ExpressionFuncall.cpp:71–73 — struct/union never std unary/binary
 	opts := Defaults()

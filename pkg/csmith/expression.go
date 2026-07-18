@@ -507,6 +507,10 @@ func MakeRandomParam(
 		depth = cg.ExprDepth
 	}
 	tt := PickParamTermType(r, tables, opts, typ, depth)
+	// Expression.cpp:264 — ERROR_GUARD(nullptr) after ExpressionTypeProbability
+	if HasError() {
+		return nil
+	}
 	// Expression.cpp:258–260 — depth filtered only in PickParamTermType; no soft invent leaf
 	if tt == MaxTermTypes {
 		return nil
@@ -515,6 +519,10 @@ func MakeRandomParam(
 	if tt == TermVariable {
 		// Expression.cpp:291–294 — depth++ for variable (make_random_param path)
 		e := makeExpressionVariableFlags(r, vs, cg, typ, qfer, true, false)
+		// Expression.cpp:293 — ERROR_GUARD before return
+		if HasError() {
+			return nil
+		}
 		if e != nil && cg != nil && BumpsExprDepth(e) {
 			cg.ExprDepth++
 		}
@@ -611,15 +619,27 @@ func MakeRandomExpression(
 			return nil
 		}
 	}
-	// Expression.cpp:155 — constant struct not allowed as term type
-	if typ.IsStruct() && tt == TermConstant {
-		tt = TermVariable
+	// Expression.cpp:154–157 — asserts on illegal term/type; fail closed (no soft invent rewrite)
+	// no_func && eFunction / no_const && eConstant / struct && eConstant
+	if noFunc && tt == TermFunction {
+		return nil
+	}
+	if noConst && tt == TermConstant {
+		return nil
+	}
+	if typ != nil && typ.IsStruct() && tt == TermConstant {
+		// was soft invent TermVariable — C++ assert, not rewrite
+		return nil
 	}
 	// Expression.cpp:176–178 / 213 — always cg_context.expr_depth (not a separate local)
 	_ = exprDepth
 	depth := cg.ExprDepth
 	if tt == MaxTermTypes {
 		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, depth)
+	}
+	// Expression.cpp:182 — ERROR_GUARD(nullptr) after term pick
+	if HasError() {
+		return nil
 	}
 	// Expression.cpp:177–178 — depth only via filter in PickTermType; ERROR_GUARD if MAX
 	// no soft invent TermVariable/Constant leaf when depth high
@@ -629,7 +649,10 @@ func MakeRandomExpression(
 	var e *Expression
 	switch tt {
 	case TermConstant:
-		// Expression.cpp:185–188
+		// Expression.cpp:185–188 — assert simple != eVoid
+		if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+			return nil
+		}
 		e = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
 	case TermVariable:
 		// ExpressionVariable::make_random
