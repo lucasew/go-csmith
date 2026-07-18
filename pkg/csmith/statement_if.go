@@ -42,42 +42,37 @@ func MakeRandomIf(
 			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 		}
 	}
+	// StatementIf.cpp:69–72 — ERROR_GUARD(nullptr) if condition make_random failed
+	if test == nil {
+		return nil
+	}
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
-	if func1Hack && cg.FM != nil && test != nil && HasUncertainCallRecursiveExpr(test) {
+	if func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test) {
+		// makeup_new_var_facts(pre_facts, global); reset accum; visit(pre_facts)
 		MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts)
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = func1PreEffect.Clone()
 		}
-		preWork := CloneFactSlice(func1PreFacts)
-		cg.FM.GlobalFacts = preWork
-		if VisitFactsExpression(test, cg, opts) {
-			// ok — keep facts from re-visit
-		} else {
-			cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
+		cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
+		if !VisitFactsExpression(test, cg, opts) {
+			// StatementIf.cpp:84–88 — assert(ok); treat as make_random failure
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = func1PreEffect.Clone()
+			}
+			return nil
 		}
+		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit)
 	}
 	// Snapshot pre-branch effect; each arm runs from the same pre-state (StatementIf.cpp:96–99).
+	// Condition effects come from Expression::make_random visit_facts (not a second visit).
 	pre := EmptyEffect()
 	if cg.EffectAccum != nil {
 		pre = *cg.EffectAccum
 	}
-	// Snapshot pre-branch facts for else arm (StatementIf.cpp:96–99 map_facts_in)
-	var preFacts []*FactPointTo
-	if cg.FM != nil {
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-	}
-
-	// StatementIf.cpp:80 — visit_facts on condition before branches (when FM set)
-	// (skipped when already re-analyzed under func_1 uncertain path)
-	if cg.FM != nil && test != nil && !(func1Hack && HasUncertainCallRecursiveExpr(test)) {
-		if !VisitFactsExpression(test, cg, opts) {
-			// soft-fail: keep test, continue generation
-		}
-	}
-
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
-	// re-snapshot facts after condition as pre-branch env
+	// Snapshot pre-branch facts for else arm (map_facts_in[if_true] after true block)
+	var preFacts []*FactPointTo
 	if cg.FM != nil {
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}

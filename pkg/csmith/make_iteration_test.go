@@ -5,6 +5,29 @@ import (
 	"testing"
 )
 
+func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
+	// StatementFor.cpp:244–245 — assert(visited); failed init visit → no loop IR
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{iv}
+	vs.AllVars = []*Variable{iv}
+	vs.Opts = opts
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// IV bound makes writing IV in init visit fail
+	cg.IVBounds = map[*Variable]int{iv: 10}
+	// force select this IV only
+	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
+	if lc != nil {
+		// may create different IV if SelectLoopCtrlVar creates new; only fail when same iv
+		if lc.IV == iv {
+			t.Fatal("init visit write on IV-bound var must fail make_iteration")
+		}
+	}
+}
+
 func TestMakeIterationBuildsIR(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

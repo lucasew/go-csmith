@@ -294,10 +294,11 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		SafeFlags: flags1,
 		StmID:    AllocStmID(),
 	}
-	// init->visit_facts (StatementFor.cpp:244–245)
+	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited)
 	if cg.FM != nil {
 		if !VisitFactsStatementAssign(initSt, cg, opts) {
-			// upstream asserts visited; soft-fail: keep IR without fact update
+			// C++ assert(visited); treat as make_iteration failure
+			return nil
 		}
 	} else {
 		cg.NoteWrite(iv)

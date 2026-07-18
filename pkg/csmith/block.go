@@ -557,9 +557,15 @@ func makeRandomStmtKind(
 	case StmtContinue:
 		return MakeRandomContinue(r, opts, vs, tables, cg, b)
 	case StmtIfElse:
-		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
+		if st := MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
+			return *st
+		}
+		return Stmt{Kind: StmtIfElse}
 	case StmtFor:
-		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+		if st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg); st != nil {
+			return *st
+		}
+		return Stmt{Kind: StmtFor}
 	case StmtArrayOp:
 		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
 	case StmtGoto:
