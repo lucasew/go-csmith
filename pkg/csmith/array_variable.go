@@ -189,6 +189,7 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 // Variable: 1; Constant: 0; user call: 2; unary: recurse; binary: sum.
 func CountExprKeyVar(e *Expression) int {
 	if e == nil {
+		// ArrayVariable.cpp:89 assert(0) for unexpected; nil is broken IR
 		return 0
 	}
 	switch e.Term {
@@ -208,11 +209,14 @@ func CountExprKeyVar(e *Expression) int {
 		if n == 1 {
 			return CountExprKeyVar(e.Invoke.Args[0])
 		}
-		if n >= 2 {
+		// ArrayVariable.cpp:84 — assert(param_value.size() == 2) for binary
+		if n == 2 {
 			return CountExprKeyVar(e.Invoke.Args[0]) + CountExprKeyVar(e.Invoke.Args[1])
 		}
+		// wrong arity — fail closed 0 (no invent sum of first two)
 		return 0
 	default:
+		// ArrayVariable.cpp:89 assert(0)
 		return 0
 	}
 }
@@ -234,7 +238,8 @@ func FindExprKeyVar(e *Expression) *Variable {
 		if n == 1 {
 			return FindExprKeyVar(e.Invoke.Args[0])
 		}
-		if n >= 2 {
+		// ArrayVariable.cpp:110 — assert(param_value.size() == 2)
+		if n == 2 {
 			v0 := FindExprKeyVar(e.Invoke.Args[0])
 			v1 := FindExprKeyVar(e.Invoke.Args[1])
 			if v0 == nil && v1 != nil {
@@ -448,41 +453,55 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 }
 
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
-// ArrayVariable.cpp OutputDef path — brace for globals/const/multi; bare decl for loop-init locals.
+// ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
 	if av == nil {
 		return ""
 	}
+	// ArrayVariable.cpp:493 — only collective (parent) arrays emit def
+	if av.Collective != nil {
+		return ""
+	}
 	var b strings.Builder
+	if !av.NoLoopInitializer() {
+		// ArrayVariable.cpp:494–498 — OutputDecl + ";" (loop fills body)
+		b.WriteString(av.CDeclType())
+		b.WriteString(";")
+		return b.String()
+	}
+	// ArrayVariable.cpp:500–507 — string initializer; assert(init)
+	vals := make([]string, 0, 1+len(av.InitValues))
+	if av.Init != nil && av.Init.Value != "" {
+		vals = append(vals, av.Init.Value)
+	} else if av.InitExpr != nil {
+		if s := av.InitExpr.Output(); s != "" {
+			vals = append(vals, s)
+		}
+	}
+	vals = append(vals, av.InitValues...)
+	// assert(init) — no soft invent "0" brace list
+	if len(vals) == 0 {
+		return ""
+	}
 	b.WriteString(av.CDeclType())
-	if av.NoLoopInitializer() && (av.Init != nil || len(av.InitValues) > 0) {
-		vals := make([]string, 0, 1+len(av.InitValues))
-		if av.Init != nil && av.Init.Value != "" {
-			vals = append(vals, av.Init.Value)
+	// multi-dim or multi-value: recursive full initializer when total size small
+	if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
+		seed := uint32(0xABCDEF)
+		b.WriteString(" = ")
+		b.WriteString(av.buildInitRecursive(0, vals, &seed))
+	} else {
+		b.WriteString(" = {")
+		maxEmit := av.TotalSize()
+		if maxEmit > 8 {
+			maxEmit = 8
 		}
-		vals = append(vals, av.InitValues...)
-		if len(vals) == 0 {
-			vals = []string{"0"}
-		}
-		// multi-dim or multi-value: recursive full initializer when total size small
-		if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
-			seed := uint32(0xABCDEF)
-			b.WriteString(" = ")
-			b.WriteString(av.buildInitRecursive(0, vals, &seed))
-		} else {
-			b.WriteString(" = {")
-			maxEmit := av.TotalSize()
-			if maxEmit > 8 {
-				maxEmit = 8
+		for i := 0; i < maxEmit && i < len(vals); i++ {
+			if i > 0 {
+				b.WriteString(", ")
 			}
-			for i := 0; i < maxEmit && i < len(vals); i++ {
-				if i > 0 {
-					b.WriteString(", ")
-				}
-				b.WriteString(vals[i])
-			}
-			b.WriteString("}")
+			b.WriteString(vals[i])
 		}
+		b.WriteString("}")
 	}
 	b.WriteString(";")
 	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
@@ -539,6 +558,10 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	if av == nil || av.NoLoopInitializer() {
 		return ""
 	}
+	// ArrayVariable.cpp:622–623 — collective itemized members skip output_init
+	if av.Collective != nil {
+		return ""
+	}
 	// C++ requires cvs sized for get_dimension(); undersized → no invent i/j/k
 	if len(ctrl) < len(av.Sizes) {
 		return ""
@@ -548,9 +571,15 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 			return ""
 		}
 	}
-	initVal := "0"
-	if av.Init != nil && av.Init.Value != "" {
+	// ArrayVariable.cpp:649 — init->Output; always live Expression* (no invent "0")
+	var initVal string
+	if av.InitExpr != nil {
+		initVal = av.InitExpr.Output()
+	} else if av.Init != nil {
 		initVal = av.Init.Value
+	}
+	if initVal == "" {
+		return ""
 	}
 	var b strings.Builder
 	// nested fors for each dimension
@@ -589,9 +618,9 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 	if av == nil || r == nil {
 		return nil
 	}
+	// ArrayVariable.cpp:250 — assert(collective == 0); no soft invent re-itemize self
 	if av.Collective != nil {
-		// already itemized
-		return av
+		return nil
 	}
 	item := &ArrayVariable{
 		Variable: Variable{
@@ -661,7 +690,8 @@ func (av *ArrayVariable) OutputAccess() string {
 	// ArrayVariable.cpp:544–545 — assert(!indices.empty())
 	// IndexExprs preferred (Expression::Output); Indices is const-itemize string form.
 	if len(av.IndexExprs) == 0 && len(av.Indices) == 0 {
-		return name
+		// fail closed — no soft invent bare collective name for broken itemized IR
+		return ""
 	}
 	var b strings.Builder
 	b.WriteString(name)
@@ -669,6 +699,7 @@ func (av *ArrayVariable) OutputAccess() string {
 		for _, e := range av.IndexExprs {
 			b.WriteString("[")
 			// ArrayVariable.cpp:548–552 — indices[i]->Output (if (1) path)
+			// nil index Expression* is broken IR — empty bracket fail closed
 			if e != nil {
 				b.WriteString(e.Output())
 			}

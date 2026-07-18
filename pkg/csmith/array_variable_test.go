@@ -163,7 +163,7 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 }
 
 func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
-	// ArrayVariable.cpp:544–545 — assert(!indices.empty()); no invent from sizes
+	// ArrayVariable.cpp:544–545 — assert(!indices.empty()); no invent from sizes / bare name
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
 		Sizes:    []int{4, 5},
@@ -175,14 +175,46 @@ func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
 		Collective: parent,
 	}
 	item.AsArray = item
-	out := item.OutputAccess()
-	if out != "g_a" {
-		t.Fatalf("want bare name without soft [0]…, got %q", out)
+	if out := item.OutputAccess(); out != "" {
+		t.Fatalf("empty indices must fail closed, got %q", out)
 	}
 	// Indices string path (ItemizeConstIndices) still works without IndexExprs
 	item.Indices = []string{"1", "2"}
 	if got := item.OutputAccess(); got != "g_a[1][2]" {
 		t.Fatal(got)
+	}
+}
+
+func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
+	// ArrayVariable.cpp:250 — assert(collective == 0) on the receiver
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	item := parent.Itemize(NewRng(1))
+	if item == nil || item.Collective != parent {
+		t.Fatal("first itemize")
+	}
+	// collective parent may be itemized again (new member); itemized member must not
+	if parent.Itemize(NewRng(2)) == nil {
+		t.Fatal("parent collective may itemize again")
+	}
+	if item.Itemize(NewRng(3)) != nil {
+		t.Fatal("re-itemize of itemized must fail closed")
+	}
+}
+
+func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
+	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	// global → NoLoopInitializer; no Init
+	if av.OutputDef() != "" {
+		t.Fatal("missing init on brace path must fail closed")
 	}
 }
 
