@@ -826,10 +826,30 @@ func makeExpressionFuncall(
 	}
 	probs := NewProbabilities(opts)
 	stdFunc := ExpressionFunctionProbability(r, list, opts)
-	// non-simple/void forces !std
+	// ExpressionFuncall.cpp:71–73 — unary/binary only for non-void simple types
+	if typ != nil && (!typ.IsSimple() || typ.Simple() == EVoid) {
+		stdFunc = false
+	}
+	// ExpressionFuncall.cpp:75–78 — snapshot effects and facts for failed invocation
+	var preAccum Effect
+	if cg.EffectAccum != nil {
+		preAccum = cg.EffectAccum.Clone()
+	}
+	preStm := cg.EffectStm.Clone()
+	var factsCopy []*FactPointTo
+	if cg.FM != nil {
+		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+	}
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	if fi == nil || fi.Failed {
-		// replace with variable
+		// ExpressionFuncall.cpp:84–91 — restore env; replace with simple var
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preAccum
+		}
+		cg.EffectStm = preStm
+		if cg.FM != nil {
+			cg.FM.RestoreFacts(factsCopy)
+		}
 		return makeExpressionVariable(r, vs, cg, typ, qfer)
 	}
 	return &Expression{Term: TermFunction, Invoke: fi}

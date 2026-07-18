@@ -1372,7 +1372,8 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 }
 
 // SelectLoopCtrlVar mirrors VariableSelector::SelectLoopCtrlVar.
-// VariableSelector.cpp:1146–1179 — non-array visible, has_int_field, drop union+ptr; WRITE eConvert.
+// VariableSelector.cpp:1146–1179 — non-array visible, has_int_field, drop union+ptr;
+// choose_var(WRITE, eConvert, invalid, no_bitfield=true).
 func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[*Variable]bool) *Variable {
 	if vs == nil || r == nil {
 		return nil
@@ -1380,10 +1381,15 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	ty := GetIntType()
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
-	// remove no-int-field and union-with-pointer (VariableSelector.cpp:1155–1168)
+	// VariableSelector.cpp:1155–1168 — remove no-int-field and union-with-pointer
 	var filtered []*Variable
+	var invalidSlice []*Variable
 	for _, v := range vars {
-		if v == nil || v.Type == nil || invalid[v] {
+		if v == nil || v.Type == nil {
+			continue
+		}
+		if invalid[v] {
+			invalidSlice = append(invalidSlice, v)
 			continue
 		}
 		if !v.Type.HasIntField() {
@@ -1394,23 +1400,17 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 		}
 		filtered = append(filtered, v)
 	}
-	// choose_var WRITE eConvert; no_bitfield true (loop IV not bitfield)
-	var ok []*Variable
-	for _, x := range ExpandStructUnionVars(filtered, ty) {
-		if x == nil || x.Type == nil || x.IsBitfield {
-			continue
+	// also pass invalid map entries not already in filtered pool
+	for v := range invalid {
+		if v != nil && !IsVariableInSet(invalidSlice, v) {
+			invalidSlice = append(invalidSlice, v)
 		}
-		if !ty.Match(x.Type, MatchConvert) {
-			continue
-		}
-		if !IsEligibleVar(x, x.Type.IndirectLevel()-ty.IndirectLevel(), AccessWrite, cg) {
-			continue
-		}
-		ok = append(ok, x)
 	}
-	if v := ChooseOKVar(r, ok); v != nil {
+	// VariableSelector.cpp:1169–1170 — choose_var(..., eConvert, invalid_vars, no_bitfield=true)
+	if v := ChooseVarFull(r, filtered, AccessWrite, cg, ty, nil, MatchConvert, invalidSlice, true, false, false); v != nil {
 		return v
 	}
+	// VariableSelector.cpp:1172–1178 — create global or parent local
 	if vs.Opts.GlobalVariables {
 		return vs.GenerateNewGlobal(AccessWrite, cg, ty, nil, r)
 	}

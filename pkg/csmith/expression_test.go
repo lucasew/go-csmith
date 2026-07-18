@@ -293,3 +293,64 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 		t.Fatal("const type")
 	}
 }
+
+func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
+	// ExpressionFuncall.cpp:71–73 — struct/union never std unary/binary
+	opts := Defaults()
+	opts.MaxFuncs = 4
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	env := &TypeEnv{AllTypes: []*Type{st, GetIntType()}}
+	vs.Types = env
+	list := &FunctionList{Types: env}
+	cg := EmptyCGContext()
+	cg.Types = env
+	cg.Funcs = list
+	// many tries: result if any should not be pure std binary/unary alone when type is struct
+	// (user path may still fail → variable fallback)
+	for seed := uint64(1); seed < 20; seed++ {
+		e := makeExpressionFuncall(NewRng(seed), opts, vs, tables, cg, st, nil, list)
+		if e == nil {
+			continue
+		}
+		if e.Term == TermFunction && e.Invoke != nil && e.Invoke.IsStd {
+			t.Fatalf("struct type must not use std op: %s", e.Invoke.Binary+e.Invoke.Unary)
+		}
+	}
+}
+
+func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
+	// ExpressionFuncall.cpp:84–90 — restore facts when invocation failed
+	opts := Defaults()
+	opts.MaxFuncs = 0 // force failure to create user funcs; may still get std
+	vs := NewVariableSelector(opts)
+	// seed globals for variable fallback
+	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	eff := EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	// mark as written so restore is observable if accum mutates
+	pre := CloneFactSlice(fm.GlobalFacts)
+	// force failed user path: nil list / max funcs
+	list := &FunctionList{}
+	// std may succeed; use void type to force user and fail
+	e := makeExpressionFuncall(NewRng(1), opts, vs, NewExprTables(opts), cg, GetSimpleType(EVoid), nil, list)
+	// facts should still be recoverable (either unchanged or restored)
+	if len(fm.GlobalFacts) != len(pre) {
+		// RestoreFacts may replace; ensure related fact still present
+		if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+			t.Fatal("facts lost")
+		}
+	}
+	_ = e
+}
