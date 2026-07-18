@@ -17,6 +17,10 @@ type Function struct {
 	IsBuilt    bool // BuildState::Built after GenerateBody/make_first
 	// Labels legacy end-of-body targets (superseded by Stmt SourceLabel / StmtLabel).
 	Labels []string
+	// RetConst is Function::ret_c for depth_protect else-return (Function.cpp:608–615).
+	RetConst *Constant
+	// DepthProtect mirrors body depth_protect / CGOptions for emit.
+	DepthProtect bool
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -158,6 +162,11 @@ func MakeFirst(
 	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
+	f.DepthProtect = opts.DepthProtect
+	// Function::make_return_const — Function.cpp:608–615
+	if opts.DepthProtect && f.NeedReturnStmt() {
+		f.RetConst = MakeRandom(f.ReturnType, opts, r)
+	}
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
@@ -185,6 +194,10 @@ func (f *Function) GenerateBody(
 	}
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
+	f.DepthProtect = opts.DepthProtect
+	if opts.DepthProtect && f.NeedReturnStmt() {
+		f.RetConst = MakeRandom(f.ReturnType, opts, r)
+	}
 }
 
 // OutputForwardDecl emits a C prototype.
@@ -244,12 +257,25 @@ func (f *Function) Output() string {
 		s += "void"
 	}
 	s += ")\n"
+	// Function.cpp:575–598 — depth_protect wraps body
+	if f.DepthProtect {
+		s += "if (DEPTH < MAX_DEPTH) \n"
+	}
 	if f.Body != nil {
 		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
-		// Labels now live on statements (back-edge) or StmtLabel markers (forward).
 		s += f.Body.Output(0)
 	} else {
 		s += "{\n}\n"
+	}
+	if f.DepthProtect {
+		s += "else\n"
+		s += "return "
+		if f.RetConst != nil {
+			s += f.RetConst.Value
+		} else {
+			s += "0"
+		}
+		s += ";\n"
 	}
 	return s
 }

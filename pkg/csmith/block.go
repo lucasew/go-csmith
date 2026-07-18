@@ -43,6 +43,8 @@ type Block struct {
 	blockSize int // CGOptions::max_block_size at creation
 	// TmpVars mirrors macro_tmp_vars (gensym t_ for safe math).
 	TmpVars map[string]ESimpleType
+	// EmitDepthProtect: emit DEPTH++/-- when CGOptions::depth_protect (Block.cpp:255–267).
+	EmitDepthProtect bool
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
@@ -97,10 +99,11 @@ func MakeRandomBlock(
 		parent = f.Stack[len(f.Stack)-1]
 	}
 	b := &Block{
-		Parent:    parent,
-		Func:      f,
-		Looping:   looping,
-		blockSize: opts.MaxBlockSize,
+		Parent:           parent,
+		Func:             f,
+		Looping:          looping,
+		blockSize:        opts.MaxBlockSize,
+		EmitDepthProtect: opts.DepthProtect,
 	}
 	if f != nil {
 		f.Stack = append(f.Stack, b)
@@ -266,6 +269,10 @@ func (b *Block) Output(indent int) string {
 	inner := strings.Repeat("    ", indent+1)
 	var sb strings.Builder
 	sb.WriteString(pad + "{\n")
+	// Block.cpp:255–257
+	if b.EmitDepthProtect {
+		sb.WriteString(inner + "DEPTH++;\n")
+	}
 	// Block::OutputTmpVariableList
 	for name, st := range b.TmpVars {
 		sb.WriteString(inner)
@@ -450,6 +457,10 @@ func (b *Block) Output(indent int) string {
 		default:
 			sb.WriteString("/* stmt */;\n")
 		}
+	}
+	// Block.cpp:266–267
+	if b.EmitDepthProtect {
+		sb.WriteString(inner + "DEPTH--;\n")
 	}
 	sb.WriteString(pad + "}\n")
 	return sb.String()
