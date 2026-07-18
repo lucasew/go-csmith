@@ -420,10 +420,21 @@ func (f *Function) generateBodyCore(
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 	}
-	// Function.cpp:650 / 690 — body->set_depth_protect(true)
-	if f.Body != nil {
-		f.Body.EmitDepthProtect = true
+	// Function.cpp:647 / 689 — ERROR_RETURN(); body->set_depth_protect
+	// sticky error aborts; null body without error would crash C++ on body->
+	if HasError() {
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
 	}
+	if f.Body == nil {
+		// no soft invent markBuilt without body
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
+	}
+	// Function.cpp:650 / 690 — body->set_depth_protect(true)
+	f.Body.EmitDepthProtect = true
 	f.DepthProtect = opts.DepthProtect
 	f.EmitConcise = opts.Concise
 

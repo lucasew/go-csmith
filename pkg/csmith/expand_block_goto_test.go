@@ -53,6 +53,22 @@ func TestExpandBlockForGotoNilFM(t *testing.T) {
 	}
 }
 
+func TestExpandBlockForGotoAssertB(t *testing.T) {
+	// VariableSelector.cpp:778 assert(b) — no soft invent root when climb fails
+	f := &Function{Name: "f"}
+	// dest in orphan block; src in unrelated block (not ancestor)
+	destBlk := &Block{Func: f, StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 10}}}
+	srcBlk := &Block{Func: f, StmID: 2, Stmts: []Stmt{{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}}
+	f.Blocks = []*Block{destBlk, srcBlk}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// climb from destBlk cannot reach src (no parent link)
+	if ExpandBlockForGoto(destBlk, cg) != nil {
+		t.Fatal("want nil when assert(b) would fire")
+	}
+}
+
 func TestLowerBlockForVars(t *testing.T) {
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	b := CreateVariableScalars("l_b", GetIntType(), false, false)

@@ -398,14 +398,18 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if fm == nil {
 		return b
 	}
-	root := rootBlock(b)
+	// C++ edge->src is a live Statement*; look up via function tree (not only root of b)
 	for {
 		expanded := false
 		for _, e := range fm.CFGEdges {
 			if e == nil || e.SrcID <= 0 {
 				continue
 			}
-			src := findStmtByIDInTree(root, e.SrcID)
+			// VariableSelector.cpp:773 — edge->src->eType == eGoto
+			src := FindStmtByID(fm.Func, e.SrcID)
+			if src == nil {
+				src = findStmtByIDInTree(rootBlock(b), e.SrcID)
+			}
 			if src == nil || src.Kind != StmtGoto {
 				continue
 			}
@@ -427,11 +431,10 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 				for b != nil && !BlockContainsStmID(b, e.SrcID) {
 					b = b.Parent
 				}
+				// VariableSelector.cpp:778 — assert(b); no soft invent return root
 				if b == nil {
-					// should not happen if src is in the function tree
-					return root
+					return nil
 				}
-				root = rootBlock(b)
 				expanded = true
 				break
 			}
@@ -1559,12 +1562,21 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	if asGlobal {
 		name = vs.RandomGlobalName()
 	} else {
+		// VariableSelector.cpp:1348–1354 — RandomLocalName + rnd_upto(stack.size())
+		// empty stack: C++ OOB / ERROR; no soft invent blk=nil local array
+		if cg.CurrentFunc == nil || len(cg.CurrentFunc.Stack) == 0 {
+			return nil
+		}
 		name = vs.RandomLocalName()
-		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-			idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
-			blk = cg.CurrentFunc.Stack[idx]
-			// VariableSelector.cpp:1353–1354 — expand_block_for_goto
-			blk = ExpandBlockForGoto(blk, cg)
+		idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
+		if HasError() {
+			return nil
+		}
+		blk = cg.CurrentFunc.Stack[idx]
+		// VariableSelector.cpp:1353–1354 — expand_block_for_goto
+		blk = ExpandBlockForGoto(blk, cg)
+		if blk == nil {
+			return nil
 		}
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
