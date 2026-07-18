@@ -623,6 +623,7 @@ func (t *Type) HasPadding() bool {
 }
 
 // ChooseRandomNonvoidSimple mirrors Type::choose_random_nonvoid_simple.
+// Type.cpp:1242–1247 — filter excludes void (assert(ty != eVoid) upstream).
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	if r == nil || probs == nil {
 		return EInt

@@ -32,6 +32,7 @@ const (
 	DtFunctionGenerateBody         = "dtFunctionGenerateBody"
 	DtGenerateParamList            = "dtGenerateParamList"
 	DtTypeChooseSimple             = "dtTypeChooseSimple"
+	DtRandomTypeFromType           = "dtRandomTypeFromType"
 	DtSelectVariable               = "dtSelectVariable"
 	DtSelectLValue                 = "dtSelectLValue"
 	DtConstant                     = "dtConstant"

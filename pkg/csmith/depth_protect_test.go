@@ -34,6 +34,27 @@ func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
 	}
 }
 
+func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
+	// Type.cpp / SafeOpFlags.cpp DEPTH_GUARD wired; random mode always GOOD
+	opts := Defaults()
+	if DepthGuardByType(opts, DtRandomTypeFromType) != GoodDepth {
+		t.Fatal("dtRandomTypeFromType")
+	}
+	if DepthGuardByType(opts, DtTypeChooseSimple) != GoodDepth {
+		t.Fatal("dtTypeChooseSimple")
+	}
+	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(SafeOpBinary)) != GoodDepth {
+		t.Fatal("dtSafeOpFlags")
+	}
+	probs := NewProbabilities(opts)
+	if f := MakeRandomBinaryKind(NewRng(1), opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f == nil {
+		t.Fatal("binary flags")
+	}
+	if t2 := RandomTypeFromType(NewRng(1), nil, opts, probs, GetIntType(), false); t2 == nil {
+		t.Fatal("random type from simple")
+	}
+}
+
 func TestDepthProtectEmit(t *testing.T) {
 	opts := Defaults()
 	opts.DepthProtect = true

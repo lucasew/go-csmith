@@ -110,6 +110,12 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 		}
 	}
 	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
+	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
+	if len(ok) > 0 {
+		if DepthGuardByDepth(Defaults(), 1) == BadDepth {
+			return nil
+		}
+	}
 	return ChooseRandomStructUnionType(r, ok)
 }
 
@@ -179,6 +185,10 @@ func RandomTypeFromType(
 	typ *Type,
 	noVolatile bool,
 ) *Type {
+	// Type.cpp:592 — DEPTH_GUARD_BY_TYPE_RETURN(dtRandomTypeFromType, nullptr)
+	if DepthGuardByType(opts, DtRandomTypeFromType) == BadDepth {
+		return nil
+	}
 	if typ == nil {
 		if env != nil && len(env.AllTypes) > 0 {
 			// Type.cpp:594–595 — no_volatile → nonvoid_nonvolatile
@@ -190,7 +200,11 @@ func RandomTypeFromType(
 		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
 	}
 	// simple + !strict_simple_type → choose_random_simple (always for our callers)
+	// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
 	if typ.IsSimple() {
+		if DepthGuardByType(opts, DtTypeChooseSimple) == BadDepth {
+			return nil
+		}
 		st := ChooseRandomNonvoidSimple(r, probs)
 		return GetSimpleType(st)
 	}
@@ -200,12 +214,20 @@ func RandomTypeFromType(
 // ChooseRandomNonvoid mirrors Type::choose_random_nonvoid.
 // Type.cpp:1218–1227 — NonVoidTypeFilter rejects void.
 func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabilities) *Type {
+	// Type.cpp:1219 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
+	if DepthGuardByDepth(opts, 1) == BadDepth {
+		return nil
+	}
 	return env.chooseRandomFiltered(r, opts, probs, false)
 }
 
 // ChooseRandomNonvoidNonvolatile mirrors Type::choose_random_nonvoid_nonvolatile.
 // Type.cpp:1229+ / NonVoidNonVolatileTypeFilter — also reject volatile aggregates.
 func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *Probabilities) *Type {
+	// Type.cpp:1230 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
+	if DepthGuardByDepth(opts, 1) == BadDepth {
+		return nil
+	}
 	return env.chooseRandomFiltered(r, opts, probs, true)
 }
 

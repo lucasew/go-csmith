@@ -171,6 +171,10 @@ func MakeRandomBinaryKind(
 	opKind SafeOpKind,
 	bop BinaryOp,
 ) *SafeOpFlags {
+	// SafeOpFlags.cpp:174–175 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSafeOpFlags, op_kind, nullptr)
+	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(opKind)) == BadDepth {
+		return nil
+	}
 	if r == nil {
 		return &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
 	}
