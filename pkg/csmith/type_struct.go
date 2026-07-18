@@ -20,15 +20,37 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	return r.RndFlipcoin(uint32(p))
 }
 
-// MakeOneStructField mirrors Type::make_one_struct_field for simple fields only
-// (no nested struct selection until fields can reference prior structs).
-// Type.cpp:683–697 — pick from AllTypes with filter; we pick nonvoid simple.
+// MakeOneStructField mirrors Type::make_one_struct_field.
+// Type.cpp:683–697 + ChooseRandomTypeFilter depth gate (Type.cpp:240–242).
+// Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
-	// Prefer simple types; occasionally nested prior struct if env has any
 	var ft *Type
+	// Prefer simple types; occasionally nested prior struct under depth limit
 	if env != nil && len(env.StructTypes) > 0 && r.RndFlipcoin(15) {
-		ft = env.StructTypes[r.RndUpto(uint32(len(env.StructTypes)))]
-	} else {
+		cands := make([]*Type, 0, len(env.StructTypes))
+		maxDepth := opts.MaxNestedStructLevel
+		if maxDepth < 1 {
+			maxDepth = 1
+		}
+		for _, s := range env.StructTypes {
+			if s == nil {
+				continue
+			}
+			// Type.cpp:241–242 — reject when get_struct_depth() >= max_nested
+			if s.StructDepth() >= maxDepth {
+				continue
+			}
+			// C++: struct without assign ops cannot be field of assign-ops parent (C++)
+			if opts.LangCPP && !s.HasAssignOps {
+				continue
+			}
+			cands = append(cands, s)
+		}
+		if len(cands) > 0 {
+			ft = cands[r.RndUpto(uint32(len(cands)))]
+		}
+	}
+	if ft == nil {
 		st := ChooseRandomNonvoidSimple(r, probs)
 		ft = GetSimpleType(st)
 	}

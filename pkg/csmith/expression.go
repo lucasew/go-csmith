@@ -585,6 +585,12 @@ func (e *Expression) Output() string {
 	return body
 }
 
+// IndentedOutput mirrors Expression::indented_output.
+// Expression.cpp:133–136 — output_tab(indent) + Output.
+func (e *Expression) IndentedOutput(indent int) string {
+	return OutputTab(indent) + e.Output()
+}
+
 func (e *Expression) outputBody() string {
 	if e == nil {
 		return ""

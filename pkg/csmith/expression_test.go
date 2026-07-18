@@ -152,6 +152,14 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	}
 }
 
+func TestExpressionIndentedOutput(t *testing.T) {
+	e := &Expression{Term: TermConstant, Con: MakeInt(7)}
+	got := e.IndentedOutput(2)
+	if got != "        7" { // OutputTab 4 spaces per level
+		t.Fatalf("%q", got)
+	}
+}
+
 func TestConstantGetField(t *testing.T) {
 	// Constant.cpp:513–522
 	c := &Constant{Value: "{0, 1, 2}"}

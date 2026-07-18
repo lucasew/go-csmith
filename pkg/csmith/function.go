@@ -21,6 +21,9 @@ const (
 // Function mirrors Function (signature + body block).
 type Function struct {
 	Name       string
+	// AliasName mirrors Function::alias_name (name + "_alias").
+	// Function.cpp:414 / 451 — used with FunctionAttributes forward alias decls.
+	AliasName  string
 	ReturnType *Type
 	Param      []*Variable
 	RV         *Variable // dummy return variable name_rv
@@ -142,7 +145,7 @@ func MakeRandomSignature(
 		retType = RandomReturnType(r, probs, env, opts)
 	}
 	name := RandomFunctionName(sym)
-	f := &Function{Name: name, ReturnType: retType}
+	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType}
 	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil;
 	// else qfer->random_qualifiers(true, READ, cg) (Function.cpp:416–418).
 	var retQ CVQualifiers
@@ -196,7 +199,7 @@ func MakeFirst(
 	}
 	ty := RandomReturnType(r, probs, env, opts)
 	name := RandomFunctionName(sym)
-	f := &Function{Name: name, ReturnType: ty}
+	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
 	// CVQualifiers::random_qualifiers(ty) — no context, no_volatile
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
@@ -420,6 +423,32 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 		b.WriteString(EnsureFuncAttrGenerator().Output(r))
 	}
 	b.WriteString(";")
+	return b.String()
+}
+
+// OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
+// Function.cpp:533–557 — alias_name with __attribute__((alias("name"))).
+func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
+	if f == nil || f.IsBuiltin {
+		return ""
+	}
+	alias := f.AliasName
+	if alias == "" {
+		alias = f.Name + "_alias"
+	}
+	var b strings.Builder
+	if forceStatic {
+		b.WriteString("static ")
+	}
+	// Function.cpp:536–540
+	b.WriteString(f.returnTypeC())
+	b.WriteString(" ")
+	b.WriteString(alias)
+	b.WriteString("(")
+	b.WriteString(f.paramListC())
+	b.WriteString(") __attribute__((alias(\"")
+	b.WriteString(f.Name)
+	b.WriteString("\")));")
 	return b.String()
 }
 

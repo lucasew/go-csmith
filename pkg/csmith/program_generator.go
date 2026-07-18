@@ -246,6 +246,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 }
 
 // OutputFunctions mirrors OutputForwardDeclarations + OutputFunctions.
+// Function.cpp:812–830 — optional FORWARD ALIAS DECLARATIONS when func_attr_flag.
 func (g *ProgramGenerator) OutputFunctions() string {
 	var b strings.Builder
 	b.WriteString("\n\n/* --- FORWARD DECLARATIONS --- */\n")
@@ -255,6 +256,17 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		}
 		b.WriteString(f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes))
 		b.WriteString("\n")
+	}
+	// Function.cpp:820–826 — alias decls when FunctionAttributes
+	if g.Opts.FunctionAttributes {
+		b.WriteString("\n\n/* --- FORWARD ALIAS DECLARATIONS --- */\n")
+		for _, f := range g.Funcs.Funcs {
+			if f == nil || f.IsBuiltin {
+				continue
+			}
+			b.WriteString(f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic))
+			b.WriteString("\n")
+		}
 	}
 	b.WriteString("\n\n/* --- FUNCTIONS --- */\n")
 	for _, f := range g.Funcs.Funcs {
