@@ -1525,11 +1525,13 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 }
 
 // CreateRandomArray mirrors VariableSelector::create_random_array.
-// VariableSelector.cpp:1340–1379 — choose_random_nonvoid (global) / nonvoid_nonvolatile (local).
+// VariableSelector.cpp:1340–1379 — global 25%; choose_random_nonvoid(_nonvolatile);
+// skip const struct/union and !accept_type; DFA new-var facts.
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1341 — global_variables && rnd_flipcoin(25)
 	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoin(25)
 	var name string
 	var blk *Block
@@ -1540,11 +1542,11 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			idx := r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))
 			blk = cg.CurrentFunc.Stack[idx]
-			// VariableSelector.cpp:1351 — expand_block_for_goto
+			// VariableSelector.cpp:1353–1354 — expand_block_for_goto
 			blk = ExpandBlockForGoto(blk, cg)
 		}
 	}
-	// Type::choose_random_nonvoid / nonvoid_nonvolatile; skip const aggregates
+	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
 	var elem *Type
 	for tries := 0; tries < 16; tries++ {
 		if asGlobal {
@@ -1566,19 +1568,26 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if elem.IsConstStructUnion() {
 			continue
 		}
+		// VariableSelector.cpp:1361 — cg_context.accept_type(type)
+		if !cg.AcceptType(elem) {
+			continue
+		}
 		break
 	}
 	if elem == nil {
 		elem = GetIntType()
 	}
+	// VariableSelector.cpp:1362–1363 — non-const non-vol storage qfer
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	init := MakeRandom(elem, vs.Opts, r)
 	av := CreateArrayVariable(r, vs.Opts, blk, name, elem, init, qfer)
 	if av == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1368 — AllVars
 	vs.AllVars = append(vs.AllVars, &av.Variable)
 	vs.Arrays = append(vs.Arrays, av)
+	// VariableSelector.cpp:1371–1377 — DFA facts + inventory
 	if asGlobal {
 		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		if !av.IsVolatile() {
@@ -1587,8 +1596,16 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if cg.CurrentFunc != nil {
 			cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, &av.Variable)
 		}
+		if cg.FM != nil {
+			// VariableSelector.cpp:1373–1374
+			cg.FM.AddNewVarFactAndUpdate(nil, &av.Variable)
+		}
 	} else if blk != nil {
 		blk.LocalVars = append(blk.LocalVars, &av.Variable)
+		if cg.FM != nil {
+			// VariableSelector.cpp:1376–1377
+			cg.FM.AddNewVarFactAndUpdate(blk, &av.Variable)
+		}
 	}
 	vs.VarCreated = true
 	return av

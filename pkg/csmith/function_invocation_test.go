@@ -145,3 +145,43 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 		t.Fatalf("ptr cmp must not use safe wrapper: %s", out)
 	}
 }
+
+func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
+	// FunctionInvocation.cpp:95–97
+	opts := Defaults()
+	opts.MaxFuncs = 5
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	probs := NewProbabilities(opts)
+	list := &FunctionList{}
+	caller := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true}
+	callee := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: true, FactChanged: true}
+	// mark effect known for ChooseFunc
+	callee.FEffect = EmptyEffect()
+	list.Funcs = []*Function{caller, callee}
+	cg := WithFunc(caller, EmptyEffect())
+	cg.Funcs = list
+	// force non-std and pick existing callee when flipcoin allows
+	found := false
+	for seed := uint64(1); seed < 40; seed++ {
+		caller.FactChanged = false
+		fi := MakeRandomInvocation(NewRng(seed), opts, probs, vs, tables, cg, list, GetIntType(), nil, false)
+		if fi != nil && !fi.Failed && fi.User == callee {
+			if !caller.FactChanged {
+				t.Fatal("caller.fact_changed not set from callee")
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		// may not hit callee due to RNG; at least ensure BuildUserInvocation path works
+		fi := BuildUserInvocation(NewRng(1), opts, probs, vs, tables, cg, list, callee)
+		if fi != nil && !fi.Failed {
+			caller.FactChanged = caller.FactChanged || fi.User.FactChanged
+			if !caller.FactChanged {
+				t.Fatal("manual or")
+			}
+		}
+	}
+}

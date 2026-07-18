@@ -901,6 +901,7 @@ func MakeRandomInvocation(
 	var fi *Invocation
 	if !stdFunc {
 		var callee *Function
+		// FunctionInvocation.cpp:87 — pure_rnd_flipcoin(50) (random mode == rnd)
 		if r.RndFlipcoin(50) && list != nil {
 			// Function.cpp:choose_func with in_conflict / strict_volatile
 			cgp := &cg
@@ -908,6 +909,10 @@ func MakeRandomInvocation(
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
+			// FunctionInvocation.cpp:95–97 — caller.fact_changed |= callee.fact_changed
+			if fi != nil && !fi.Failed && cg.CurrentFunc != nil && fi.User != nil {
+				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
+			}
 		} else if list != nil && !ReachMaxFunctions(list, opts) {
 			// build_invocation_and_function (FunctionInvocationUser.cpp:170+)
 			sigType := workType
@@ -922,12 +927,16 @@ func MakeRandomInvocation(
 				sigType = RandomReturnType(r, probs, env, opts)
 			}
 			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, NewStatementThresholdTable(opts), cg, list, sigType)
+			if fi != nil && !fi.Failed && cg.CurrentFunc != nil && fi.User != nil {
+				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
+			}
 		} else {
+			// FunctionInvocation.cpp:102–106 — failed when at max funcs
 			return &Invocation{Failed: true}
 		}
 	}
 	if fi == nil {
-		// std unary/binary
+		// FunctionInvocation.cpp:111–118 — StdUnaryFuncProb → unary else binary
 		if r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
 			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, workType)
 		} else {
