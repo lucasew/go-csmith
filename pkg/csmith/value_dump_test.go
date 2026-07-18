@@ -8,7 +8,8 @@ import (
 func TestOutputValueDumpSimple(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	out := v.OutputValueDump("checksum ", 1, nil)
-	if !strings.Contains(out, `printf("checksum g_1 = %d\n", g_1);`) {
+	// int may be %d or %lld depending on platform SizeInBytes
+	if !strings.Contains(out, "checksum g_1 = %") || !strings.Contains(out, ", g_1);") {
 		t.Fatal(out)
 	}
 }
