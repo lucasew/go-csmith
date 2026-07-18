@@ -510,7 +510,7 @@ func (f *Function) generateBodyCore(
 	f.ComputeSummary(summaryEff)
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
-	f.MakeReturnConst(opts, r)
+	f.MakeReturnConst(opts, probs, r)
 	if HasError() {
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
@@ -532,7 +532,8 @@ func (f *Function) generateBodyCore(
 
 // MakeReturnConst mirrors Function::make_return_const.
 // Function.cpp:608–615 — depth_protect + need_return_stmt → random constant.
-func (f *Function) MakeReturnConst(opts Options, r *Rng) {
+// probs is session Probabilities (C++ singleton); no invent NewProbabilities(opts).
+func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	if f == nil || !opts.DepthProtect || !f.NeedReturnStmt() {
 		return
 	}
@@ -548,8 +549,8 @@ func (f *Function) MakeReturnConst(opts Options, r *Rng) {
 	if r == nil {
 		return
 	}
-	// nil probs: simple/pointer ret only; no invent NewProbabilities for aggregate ret_c
-	f.RetConst = MakeRandom(f.ReturnType, opts, nil, r)
+	// session probs; aggregate ret_c needs live tables (nil → fail closed, no invent)
+	f.RetConst = MakeRandom(f.ReturnType, opts, probs, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error left for GenerateBody ERROR_RETURN; nil const is incomplete IR
 	if HasError() || f.RetConst == nil {

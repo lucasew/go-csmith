@@ -423,6 +423,24 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	}
 }
 
+func TestMakeRandomExpressionNoInventSessionProbs(t *testing.T) {
+	// C++ Probabilities singleton; no invent NewProbabilities(opts) when vs.Probs nil
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	cg := EmptyCGContext()
+	// nil vs: simple constant still ok (MakeRandom allows nil probs for simple)
+	e := MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, true, false, TermConstant, 0)
+	if e == nil || e.Term != TermConstant {
+		t.Fatalf("simple const without vs: %+v", e)
+	}
+	// vs with nil Probs: same simple path; must not invent session tables
+	vs := &VariableSelector{Opts: opts}
+	e2 := MakeRandomExpression(NewRng(1), opts, tables, vs, &cg, GetIntType(), nil, true, false, TermConstant, 0)
+	if e2 == nil || e2.Term != TermConstant {
+		t.Fatalf("simple const with nil vs.Probs: %+v", e2)
+	}
+}
+
 func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
 	// Expression.cpp:154–157, 186–187 — asserts; no soft invent rewrite/emit
 	opts := Defaults()

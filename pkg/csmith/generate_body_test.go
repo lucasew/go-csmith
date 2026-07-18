@@ -62,16 +62,26 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 func TestMakeReturnConst(t *testing.T) {
 	opts := Defaults()
 	opts.DepthProtect = true
+	probs := NewProbabilities(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.MakeReturnConst(opts, NewRng(1))
+	f.MakeReturnConst(opts, probs, NewRng(1))
 	if f.RetConst == nil {
 		t.Fatal("want ret const")
 	}
 	// void — no
 	f2 := &Function{Name: "v", ReturnType: GetSimpleType(EVoid)}
-	f2.MakeReturnConst(opts, NewRng(1))
+	f2.MakeReturnConst(opts, probs, NewRng(1))
 	if f2.RetConst != nil {
 		t.Fatal("void no const")
+	}
+	// aggregate ret + nil probs — no invent NewProbabilities(opts)
+	st := &Type{isStruct: true, StructName: "SRet", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	f3 := &Function{Name: "s", ReturnType: st}
+	f3.MakeReturnConst(opts, nil, NewRng(1))
+	if f3.RetConst != nil {
+		t.Fatal("nil probs must not invent aggregate ret_c")
 	}
 }
 

@@ -891,8 +891,9 @@ func MakeRandomUnaryInvocation(
 	}
 	op := uop.UnaryOpC()
 	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
-	probs := NewProbabilities(opts)
-	if vs != nil && vs.Probs != nil {
+	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+	var probs *Probabilities
+	if vs != nil {
 		probs = vs.Probs
 	}
 	flags := MakeRandomUnary(r, opts, probs, typ, nil, uop)

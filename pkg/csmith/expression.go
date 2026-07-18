@@ -587,8 +587,9 @@ func MakeRandomExpression(
 		flist = cg.Funcs
 	}
 
-	probs := NewProbabilities(opts)
-	if vs != nil && vs.Probs != nil {
+	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+	var probs *Probabilities
+	if vs != nil {
 		probs = vs.Probs
 	}
 	env := cg.Types
@@ -910,9 +911,9 @@ func makeExpressionFuncall(
 		return nil
 	}
 	// ExpressionFuncall.cpp:66+ — no DEPTH_GUARD here (guard is on Expression::make_random)
-	// session probs when VS owns tables (no invent NewProbabilities from opts alone)
-	probs := NewProbabilities(opts)
-	if vs != nil && vs.Probs != nil {
+	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+	var probs *Probabilities
+	if vs != nil {
 		probs = vs.Probs
 	}
 	stdFunc := ExpressionFunctionProbability(r, list, opts)

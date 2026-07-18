@@ -28,12 +28,10 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 	if HasError() {
 		return nil
 	}
-	// assert fail-closed paths yield ""; do not invent Constant{"", …}
-	if v == "" && typ != nil && !typ.IsStruct() && !typ.IsUnion() {
-		// pointer always "0"; simple non-void always non-empty on success
-		if typ.PtrType() == nil {
-			return nil
-		}
+	// assert / nil-probs / field fail paths yield ""; do not invent Constant{"", …}
+	// success: simple non-void non-empty, pointer "0", aggregate at least "{}"
+	if v == "" {
+		return nil
 	}
 	return &Constant{Type: typ, Value: v}
 }
