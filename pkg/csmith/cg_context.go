@@ -43,6 +43,9 @@ type CGContext struct {
 	IVBounds map[*Variable]int
 	// CallChain mirrors call_chain — caller blocks for external effect tracking.
 	CallChain []*Block
+	// CurrRHS mirrors curr_rhs — RHS expression when validating LHS (assign).
+	// CGContext.h:178.
+	CurrRHS *Expression
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
