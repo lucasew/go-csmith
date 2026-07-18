@@ -15,7 +15,9 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
-	cg := WithFunc(f, EmptyEffect())
+	// StatementReturn.cpp:58–59 assert(fm) — session FactMgr required
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	st := MakeRandomReturn(NewRng(5), opts, vs, &cg)
 	if st.Kind != StmtReturn {
 		t.Fatalf("%v", st.Kind)
@@ -38,7 +40,8 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
-	cg := WithFunc(f, EmptyEffect())
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	// nil vs → ExpressionVariable::make_random cannot select → nullptr
 	st := MakeRandomReturn(NewRng(1), opts, nil, &cg)
 	if st.Expr != nil {
@@ -46,6 +49,18 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	}
 	if stmtOK(st) {
 		t.Fatal("stmtOK must reject")
+	}
+}
+
+func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
+	// StatementReturn.cpp:58–59 — assert(fm); no invent return without FactMgr
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	cg := WithFunc(f, EmptyEffect())
+	st := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg)
+	if st.Expr != nil {
+		t.Fatal("nil FM must fail closed empty return")
 	}
 }
 

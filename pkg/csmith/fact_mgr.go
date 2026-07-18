@@ -424,8 +424,13 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 		if f == nil {
 			continue
 		}
+		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
+		// no soft invent "new out-only fact" as updated
 		prev := FindRelatedPointTo(in, f.Var)
-		if prev == nil || !f.Equal(prev) {
+		if prev == nil {
+			continue
+		}
+		if !f.Equal(prev) {
 			updated = append(updated, f)
 		}
 	}
@@ -445,12 +450,17 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 		if f == nil || f.Var == nil {
 			continue
 		}
+		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
 		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
 			updated = append(updated, f)
 			continue
 		}
+		// FactMgr.cpp:679–682 — assert(prev_f); no soft invent missing prev as change
 		prev := FindRelatedPointTo(in, f.Var)
-		if prev == nil || !f.Equal(prev) {
+		if prev == nil {
+			continue
+		}
+		if !f.Equal(prev) {
 			updated = append(updated, f)
 		}
 	}
@@ -614,8 +624,17 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		return nil, un
 	}
 	// pointer (Fact.cpp:94–95)
+	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
 	pt = AbstractFactForAssign(nil, v, 0, rhs)
+	if len(pt) != 1 {
+		// fail closed — no soft invent multi/zero LHS init facts
+		return nil, nil
+	}
 	// Fact.cpp:97–109 — more init values on array of pointers
+	// Fact.cpp:99 — assert(av) when isArray (AsArray set)
+	if v.IsArray && v.AsArray == nil {
+		return nil, nil
+	}
 	if av := v.AsArray; av != nil {
 		for _, s := range av.InitValues {
 			if s == "" {
@@ -660,21 +679,16 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 	pt, un := AbstractFactForVarInit(v)
 	if wantPT {
+		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
 		for _, f := range pt {
 			fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
-		}
-		if len(pt) == 0 && v.IsPointer() {
-			fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
 		}
 	}
 	if wantUn {
 		for _, uf := range un {
 			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
 		}
-		if len(un) == 0 && v.Type != nil && v.Type.IsUnion() {
-			// no init → top (no write known)
-			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnionTop(v))
-		}
+		// union abstract returns fact(s) when valid; no invent TOP on empty/fail
 	}
 }
 

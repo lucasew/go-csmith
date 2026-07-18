@@ -30,6 +30,8 @@ func TestAddInterestedFactsGates(t *testing.T) {
 	if FindRelatedPointTo(fm2.GlobalFacts, p) != nil {
 		t.Fatal("pt disabled")
 	}
+	// FactUnion.cpp:82 assert(rhs); Constant init → fid 0 (no invent TOP on nil init)
+	uv.Init = MakeInt(0)
 	fm2.AddNewVarFact(uv)
 	if FindRelatedUnion(fm2.UnionFacts, uv) == nil {
 		t.Fatal("want union fact")

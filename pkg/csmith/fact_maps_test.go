@@ -101,6 +101,12 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("no change")
 	}
+	// FactMgr.cpp:660 assert(prev_f) — out-only fact without in match is not updated
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(q, NullPtr)})
+	if len(fm.FindUpdatedFacts(1)) != 0 {
+		t.Fatal("missing prev must fail closed, not invent as updated")
+	}
 }
 
 func TestRestoreFacts(t *testing.T) {

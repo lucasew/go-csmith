@@ -14,10 +14,15 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// no_return_dead_ptr: reject returning local-pointing ptrs
 	if opts.NoReturnDeadPointer && st.Expr.Term == TermVariable && st.Expr.Var != nil {
+		// StatementReturn.cpp:83–84 — assert(b); curr_blk required for local check
+		b := cg.CurrentBlock()
+		if b == nil {
+			return false
+		}
 		v := st.Expr.Var
 		ind := st.Expr.IndirectLevel()
 		facts := cg.pointToFacts()
-		if IsPointingToLocals(v, cg.CurrentBlock(), ind, facts) {
+		if IsPointingToLocals(v, b, ind, facts) {
 			return false
 		}
 	}
@@ -25,11 +30,15 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94
-	if cg.FM != nil && cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
+	// get_fact_mgr always present in C++; fail closed without inventing FM
+	if cg.FM == nil {
+		return false
+	}
+	if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
 		cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 	}
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
-	if cg.FM != nil && st.StmID > 0 {
+	if st.StmID > 0 {
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	return true
@@ -53,18 +62,21 @@ func MakeRandomReturn(
 		return st
 	}
 	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)
-	// library: no FactMgr invent; still allow expr build (visit_facts later needs FM)
+	// fail closed without FactMgr invent (C++ get_fact_mgr always live)
+	if cg.FM == nil {
+		return st
+	}
 	// StatementReturn.cpp:56–62 — curr_func->return_type; no invent
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
 		return st
 	}
 	// StatementReturn.cpp:61–62 — &curr_func->rv->qfer (assert rv present in C++)
-	var qfer *CVQualifiers
-	if cg.CurrentFunc.RV != nil {
-		q := cg.CurrentFunc.RV.Qfer
-		qfer = &q
+	if cg.CurrentFunc.RV == nil {
+		return st
 	}
+	q := cg.CurrentFunc.RV.Qfer
+	qfer := &q
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
 	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
 	// StatementReturn.cpp:66 ERROR_GUARD after make_random + cast setup
