@@ -189,8 +189,17 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 	return r.RndFlipcoin(80)
 }
 
-// BuildUserInvocation mirrors FunctionInvocationUser::build_invocation arg loop.
-// FunctionInvocationUser.cpp:188+ — params; merge callee external effects when known.
+// GetFirstFunction mirrors GetFirstFunction — first entry in FuncList / func_1.
+// Function.cpp / FunctionInvocationUser.cpp:274.
+func GetFirstFunction(list *FunctionList) *Function {
+	if list == nil || len(list.Funcs) == 0 {
+		return nil
+	}
+	return list.Funcs[0]
+}
+
+// BuildUserInvocation mirrors FunctionInvocationUser::build_invocation.
+// FunctionInvocationUser.cpp:246–303 — params; then revisit or add_external_effect.
 func BuildUserInvocation(
 	r *Rng,
 	opts Options,
@@ -205,7 +214,7 @@ func BuildUserInvocation(
 		return &Invocation{Failed: true}
 	}
 	fi := &Invocation{User: callee}
-	// running effect context across params (FunctionInvocationUser.cpp:200–216)
+	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
 	for _, p := range callee.Param {
 		ty := GetIntType()
@@ -217,7 +226,6 @@ func BuildUserInvocation(
 			q := p.Qfer
 			qfer = &q
 		}
-		// each param gets its own accum under running context
 		paramAccum := EmptyEffect()
 		paramCG := cg
 		paramCG.effectContext = running
@@ -231,15 +239,47 @@ func BuildUserInvocation(
 			arg.CheckAndSetCast(ty)
 		}
 		fi.Args = append(fi.Args, arg)
-		// merge_param_context (CGContext.cpp:390–394)
 		cg.MergeParamContext(paramCG, true)
 		running = running.AddEffect(paramAccum)
 	}
-	// hand-over effects from built callee (FunctionInvocationUser.cpp:236–240)
-	if callee.IsEffectKnown() {
-		cg.AddVisibleEffectAt(callee.FEffect, cg.CurrentBlock())
+
+	// FunctionInvocationUser.cpp:272–301
+	fi.Failed = false
+	first := GetFirstFunction(list)
+	// skip revisit for first function (func_1) — no params, single call, DFA hack
+	if callee != first && callee.NeedsRevisit() {
+		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
+		effectAccum := EmptyEffect()
+		effectContext := cg.EffectContext().AddEffect(callee.AccumEffContext)
+		newCG := cg
+		newCG.effectContext = effectContext
+		newCG.EffectAccum = &effectAccum
+		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
+		var facts []*FactPointTo
+		if cg.FM != nil {
+			facts = CloneFactSlice(cg.FM.GlobalFacts)
+		}
+		ok := RevisitUserInvocation(fi, &facts, &newCG, opts)
+		fi.Failed = !ok
+		if ok {
+			// FunctionInvocationUser.cpp:284–290
+			if cg.CurrentBlock() != nil {
+				cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
+			}
+			callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+			if cg.FM != nil {
+				cg.FM.GlobalFacts = facts
+			}
+		}
+	} else {
+		// FunctionInvocationUser.cpp:293–297 — static effect, no re-analyze
+		// add_external_effect(func->get_feffect())
+		if callee.IsEffectKnown() {
+			cg.AddExternalEffect(callee.FEffect)
+		}
 	}
 	_ = probs
+	_ = r
 	return fi
 }
 

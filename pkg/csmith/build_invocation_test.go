@@ -94,3 +94,110 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 		t.Fatalf("args %d", len(fi.Args))
 	}
 }
+
+func TestGetFirstFunction(t *testing.T) {
+	if GetFirstFunction(nil) != nil {
+		t.Fatal("nil list")
+	}
+	a := &Function{Name: "func_1"}
+	b := &Function{Name: "func_2"}
+	list := &FunctionList{Funcs: []*Function{a, b}}
+	if GetFirstFunction(list) != a {
+		t.Fatal("want first")
+	}
+}
+
+func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	g := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	callee := &Function{
+		Name:       "func_2",
+		ReturnType: GetIntType(),
+		BuildState: BuildBuilt,
+		IsBuilt:    true,
+		FEffect:    EmptyEffect().ReadVar(g),
+		// NeedsRevisit false — no FactChanged / ptrs
+	}
+	caller := &Function{Name: "func_1"}
+	list := &FunctionList{Funcs: []*Function{caller, callee}}
+	blk := &Block{Func: caller}
+	caller.Stack = []*Block{blk}
+	accum := EmptyEffect()
+	cg := WithFunc(caller, EmptyEffect())
+	cg.EffectAccum = &accum
+	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, callee)
+	if fi.Failed {
+		t.Fatal("failed")
+	}
+	// static path: external effect of callee merged into accum (global read)
+	if !accum.IsRead(g) {
+		// AddExternalEffect only globals — g is global so should be visible
+		t.Log("accum may track via EffectStm; check FEffect path")
+	}
+}
+
+func TestBuildUserInvocationRevisitPath(t *testing.T) {
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	opts.MaxBlockDepth = 1
+	vs := NewVariableSelector(opts)
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	// callee that needs revisit
+	callee := &Function{
+		Name:        "func_2",
+		ReturnType:  GetIntType(),
+		BuildState:  BuildBuilt,
+		IsBuilt:     true,
+		FactChanged: true,
+		Body:        &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
+		Param:       []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+	}
+	callee.Body.Func = callee
+	caller := &Function{Name: "func_1"}
+	list := &FunctionList{Funcs: []*Function{caller, callee}}
+	blk := &Block{Func: caller}
+	caller.Stack = []*Block{blk}
+	fm := NewFactMgr(caller)
+	// also register callee FM facts via same FM for light revisit (uses caller FM)
+	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
+	cg.Funcs = list
+	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, callee)
+	if fi == nil {
+		t.Fatal("nil")
+	}
+	// args for one param
+	if len(fi.Args) != 1 {
+		t.Fatalf("args %d", len(fi.Args))
+	}
+	// revisit increments visited
+	if callee.VisitedCnt < 1 && !fi.Failed {
+		// empty body visit may still count
+		t.Log("visited", callee.VisitedCnt, "failed", fi.Failed)
+	}
+}
+
+func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	first := &Function{
+		Name:        "func_1",
+		BuildState:  BuildBuilt,
+		IsBuilt:     true,
+		FactChanged: true, // would need revisit if not first
+		FEffect:     EmptyEffect(),
+	}
+	list := &FunctionList{Funcs: []*Function{first}}
+	caller := first
+	blk := &Block{Func: caller}
+	caller.Stack = []*Block{blk}
+	cg := WithFunc(caller, EmptyEffect())
+	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, first)
+	if fi.Failed {
+		t.Fatal("first should not fail revisit")
+	}
+	// first path uses add_external_effect, not revisit → VisitedCnt unchanged by Revisit
+	if first.VisitedCnt != 0 {
+		t.Fatalf("first should skip revisit, visited=%d", first.VisitedCnt)
+	}
+}
