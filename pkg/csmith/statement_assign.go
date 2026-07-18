@@ -153,9 +153,9 @@ func MakeRandomAssign(
 	lhsCG.EffectStm = rhsCG.EffectStm
 	lhsCG.CurrRHS = rhs
 
+	// StatementAssign.cpp:195–200 — compound_assign = (op != simple); no_signed_overflow = need_no_rhs(op)
 	compound := op != AssignSimple
-	// need_no_rhs path uses compound-like for Lhs? upstream passes need_no_rhs as no_signed_overflow flag
-	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, typ, compound || op.NeedNoRHS())
+	lhs := MakeRandomLhs(r, opts, probs, vs, lhsCG, typ, compound, op.NeedNoRHS())
 	var lhsVar *Variable
 	if lhs != nil {
 		lhsVar = lhs.Var

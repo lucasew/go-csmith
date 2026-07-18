@@ -12,7 +12,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	vs.Types = &TypeEnv{}
 	r := NewRng(3)
 	cg := EmptyCGContext()
-	lhs := MakeRandomLhs(r, opts, probs, vs, cg, GetIntType(), false)
+	lhs := MakeRandomLhs(r, opts, probs, vs, cg, GetIntType(), false, false)
 	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil lhs")
 	}
@@ -40,7 +40,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	// force high deref probability by trying many seeds
 	var got *Lhs
 	for seed := uint64(1); seed < 100; seed++ {
-		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false)
+		got = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false, false)
 		if got != nil && got.Var != nil && got.Var.Type != nil && got.Var.Type.IndirectLevel() == 1 && got.IndirectLevel() == 1 {
 			break
 		}
@@ -128,9 +128,57 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	// bump deref prob
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
-		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false)
+		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, EmptyCGContext(), GetIntType(), false, false)
 	}
 	if CalcTotal(writeDereferenceCnts) == 0 && writeVolatileCnt+writeNonVolatileCnt == 0 {
 		t.Fatal("expected some write bookkeeping")
+	}
+}
+
+func TestMakeRandomLhsNoSignedOverflow(t *testing.T) {
+	// Lhs.cpp:110–113 — no_signed_overflow rejects signed / bitfield for ++/--
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	// only a signed int global
+	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	// force create of unsigned if signed rejected — or nil after tries
+	// with only signed available and noSignedOverflow, must not return signed
+	foundSigned := false
+	for seed := uint64(1); seed < 15; seed++ {
+		lhs := MakeRandomLhs(NewRng(seed), opts, NewProbabilities(opts), vs, EmptyCGContext(), GetIntType(), true, true)
+		if lhs == nil {
+			continue
+		}
+		base := lhs.Var.Type.BaseType()
+		if base != nil && base.IsSigned() && !lhs.Var.IsBitfield {
+			// new variables might be created unsigned; if same g_1 then fail
+			if lhs.Var == g {
+				foundSigned = true
+				break
+			}
+		}
+	}
+	if foundSigned {
+		t.Fatal("no_signed_overflow must reject signed g_1 for need_no_rhs ops")
+	}
+}
+
+func TestMakeRandomLhsRejectsWrittenInEffectStm(t *testing.T) {
+	// Lhs.cpp:105 — !effect_stm.is_written(var)
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	cg := EmptyCGContext()
+	cg.EffectStm = EmptyEffect().WriteVar(g)
+	// with only g written in stm, make may create another var or fail
+	lhs := MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, cg, GetIntType(), false, false)
+	if lhs != nil && lhs.Var == g {
+		t.Fatal("must not select var already written in effect_stm")
 	}
 }

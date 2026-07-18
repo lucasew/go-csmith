@@ -187,9 +187,10 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 	return base
 }
 
-// MakeRandomLhs mirrors Lhs::make_random with visit_facts retry when FactMgr set.
-// Lhs.cpp:58–147 — must_use, SelectDerefPointerProb, select eDerefExact, bookkeeping.
-// Returns Lhs (var + desired type) or nil.
+// MakeRandomLhs mirrors Lhs::make_random.
+// Lhs.cpp:58–143 — must_use / select_deref_pointer / select(eDerefExact) with dummy
+// invalid_vars; no_signed_overflow, ccomp bitfield, float filters; visit_facts.
+// noSignedOverflow is StatementAssign::need_no_rhs(op) at call sites (Lhs.cpp param name).
 func MakeRandomLhs(
 	r *Rng,
 	opts Options,
@@ -198,6 +199,7 @@ func MakeRandomLhs(
 	cg CGContext,
 	typ *Type,
 	compoundAssign bool,
+	noSignedOverflow bool,
 ) *Lhs {
 	if typ == nil {
 		typ = GetIntType()
@@ -205,11 +207,10 @@ func MakeRandomLhs(
 	if r == nil || vs == nil {
 		return nil
 	}
-	// non-const WRITE qualifiers + restrict (Lhs.cpp:111–116)
+	// base WRITE qfer (StatementAssign builds non-const; restrict on select path)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	q.Restrict(AccessWrite, cg)
 
-	// save effects for visit_facts backtrack (Lhs.cpp:68–70)
+	// Lhs.cpp:67–69 — save effects for visit_facts backtrack
 	var accumSave *Effect
 	if cg.EffectAccum != nil {
 		cp := *cg.EffectAccum
@@ -224,50 +225,88 @@ func MakeRandomLhs(
 		cg.EffectStm = stmSave
 	}
 
-	// Lhs.cpp: do { … } while(true) with visit_facts — bounded retries
+	// Lhs.cpp:63, 70–140 — do { select; filters; visit } while; dummy invalid_vars
+	var dummy []*Variable
 	for tries := 0; tries < 32; tries++ {
 		var v *Variable
 		// Lhs.cpp:73–76 — try must_use WRITE first
-		if v = vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q); v != nil {
-			if compoundAssign && v.IsVolatile() {
-				v = nil
-			}
-		}
-		// Lhs.cpp:84–96 — flipcoin SelectDerefPointerProb
+		v = vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q)
+		// Lhs.cpp:77–87 — flipcoin SelectDerefPointerProb
 		if v == nil {
 			derefProb := 0
 			if probs != nil {
 				derefProb = probs.Single(PSelectDerefPointerProb)
 			}
 			if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
-				v = selectDerefPointer(r, opts, probs, vs, cg, typ, &q, AccessWrite)
-				if v != nil && compoundAssign && v.IsVolatile() {
-					v = nil
-				}
+				v = selectDerefPointerInv(r, opts, probs, vs, cg, typ, &q, AccessWrite, dummy)
 			}
 		}
-		// Lhs.cpp:106–118 — VariableSelector::select(WRITE, eDerefExact)
+		// Lhs.cpp:89–100 — select(WRITE, restricted qfer, dummy, eDerefExact)
 		if v == nil {
-			v = vs.Select(AccessWrite, cg, typ, &q, r, MatchDerefExact)
-			if v != nil && compoundAssign && v.IsVolatile() {
-				if nv := selectWritable(r, vs, cg, typ, true); nv != nil {
-					v = nv
-				}
+			newQ := q
+			if !newQ.Wildcard {
+				newQ.Restrict(AccessWrite, cg)
 			}
+			v = vs.SelectWithInvalid(AccessWrite, cg, typ, &newQ, r, MatchDerefExact, dummy)
 		}
 		if v == nil {
-			// last resort create global
+			// last resort create global (practical; C++ loops forever)
 			v = vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
 		}
 		if v == nil {
 			restore()
-			return nil
+			continue
 		}
+
+		// Lhs.cpp:103–122 — validity filters before visit_facts
+		valid := true
+		if cg.FM != nil {
+			if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) == 0 {
+				valid = false
+			}
+		}
+		// Lhs.cpp:105 — !effect_stm.is_written(var)
+		if valid && cg.EffectStm.IsWritten(v) {
+			valid = false
+		}
+		// Lhs.cpp:110–113 — no_signed_overflow rejects signed base / bitfield for ++/--
+		if valid && typ.IsSimple() && noSignedOverflow {
+			base := v.Type
+			if base != nil {
+				base = base.BaseType()
+			}
+			if (base != nil && base.IsSigned()) || v.IsBitfield {
+				valid = false
+			}
+		}
+		// Lhs.cpp:114–116 — ccomp forbids bitfield assigned as long long
+		if valid && opts.CComp && v.IsBitfield && typ.IsSimple() {
+			switch typ.Simple() {
+			case ELongLong, EULongLong:
+				valid = false
+			}
+		}
+		// Lhs.cpp:117–121 — float filters
+		if valid && typ != nil && v.Type != nil {
+			if !typ.IsFloat() && v.Type.IsFloat() {
+				valid = false
+			}
+			if opts.StrictFloat && typ.IsFloat() && !v.Type.IsFloat() {
+				valid = false
+			}
+		}
+		if !valid {
+			dummy = append(dummy, v)
+			restore()
+			continue
+		}
+
 		lhs := finishLhs(v, typ, compoundAssign, cg, opts)
 		if lhs != nil {
 			return lhs
 		}
-		// visit_facts failed — restore effects and retry
+		// visit_facts failed — Lhs.cpp:135–139
+		dummy = append(dummy, v)
 		restore()
 	}
 	return nil
