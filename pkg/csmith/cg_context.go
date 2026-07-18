@@ -23,6 +23,8 @@ type CGContext struct {
 	MustUseArrays []*ArrayVariable
 	// EffectAccum is optional mutable effect (Effect::effect_accum) for write tracking.
 	EffectAccum *Effect
+	// FM is optional FactMgr for the current function (get_fact_mgr).
+	FM *FactMgr
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -80,6 +82,20 @@ func WithFunc(f *Function, eff Effect) CGContext {
 func (c CGContext) WithFuncList(list *FunctionList) CGContext {
 	c.Funcs = list
 	return c
+}
+
+// WithFactMgr attaches a FactMgr (get_fact_mgr path).
+func (c CGContext) WithFactMgr(fm *FactMgr) CGContext {
+	c.FM = fm
+	return c
+}
+
+// CurrentBlock mirrors CGContext::get_current_block — top of function stack.
+func (c CGContext) CurrentBlock() *Block {
+	if c.CurrentFunc == nil || len(c.CurrentFunc.Stack) == 0 {
+		return nil
+	}
+	return c.CurrentFunc.Stack[len(c.CurrentFunc.Stack)-1]
 }
 
 

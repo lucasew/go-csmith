@@ -143,6 +143,40 @@ func (v *Variable) IsFieldVar() bool {
 	return v != nil && v.FieldVarOf != nil
 }
 
+// IsVisibleLocal mirrors Variable::is_visible_local.
+// Variable.cpp:482–503 — params + block-chain locals; fields recurse parent.
+func (v *Variable) IsVisibleLocal(blk *Block) bool {
+	if v == nil {
+		return false
+	}
+	if blk == nil {
+		return v.IsGlobal()
+	}
+	if v.IsFieldVar() {
+		return v.FieldVarOf.IsVisibleLocal(blk)
+	}
+	// params of blk's function
+	f := blk.Func
+	for b := blk; f == nil && b != nil; b = b.Parent {
+		f = b.Func
+	}
+	if f != nil {
+		for _, p := range f.Param {
+			if p == v {
+				return true
+			}
+		}
+	}
+	for b := blk; b != nil; b = b.Parent {
+		for _, loc := range b.LocalVars {
+			if loc == v {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsConstAfterDeref mirrors Variable::is_const_after_deref.
 // Variable.cpp:521–538.
 func (v *Variable) IsConstAfterDeref(derefLevel int) bool {

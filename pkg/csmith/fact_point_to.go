@@ -112,3 +112,44 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 	}
 	return fact.IsDead() && deadProb == 0
 }
+
+// IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals (indirection≥0 subset).
+// FactPointTo.cpp:487–526 — indirection -1 → IsVisibleLocal; 0 → fact pointees local.
+func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
+	if v == nil {
+		return false
+	}
+	if indirection == -1 {
+		return v.IsVisibleLocal(b)
+	}
+	if !v.IsPointer() {
+		return false
+	}
+	// indirection==0: look at points-to set; higher levels deferred (merge_pointees)
+	if indirection == 0 {
+		ft := FindRelatedPointTo(facts, v)
+		if ft == nil {
+			return false
+		}
+		for _, p := range ft.PointTo {
+			if p == nil || IsSpecialPtr(p) {
+				continue
+			}
+			if p.IsVisibleLocal(b) {
+				return true
+			}
+		}
+		return false
+	}
+	// multi-level: treat like indirection 0 for now (no merge_pointees yet)
+	ft := FindRelatedPointTo(facts, v)
+	if ft == nil {
+		return false
+	}
+	for _, p := range ft.PointTo {
+		if p != nil && !IsSpecialPtr(p) && p.IsVisibleLocal(b) {
+			return true
+		}
+	}
+	return false
+}

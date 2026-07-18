@@ -318,7 +318,17 @@ func makeExpressionVariableFlags(
 					}
 				}
 			}
-			_ = asReturn // dead-ptr FactPointTo deferred
+			// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
+			if asReturn && vs.Opts.NoReturnDeadPointer && v.IsPointer() {
+				indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
+				var facts []*FactPointTo
+				if cg.FM != nil {
+					facts = cg.FM.GlobalFacts
+				}
+				if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
+					continue
+				}
+			}
 		}
 		// Effect::read_var for selected variable
 		cg.NoteRead(v)

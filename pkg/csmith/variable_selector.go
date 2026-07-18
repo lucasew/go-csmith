@@ -302,13 +302,16 @@ func (vs *VariableSelector) createAndInitialize(
 		blk.LocalVars = append(blk.LocalVars, v)
 	}
 	vs.AllVars = append(vs.AllVars, v)
+	// FactMgr::add_new_var_fact_and_update_inout_maps when FM present
+	if cg.FM != nil {
+		cg.FM.AddNewVarFactAndUpdate(blk, v)
+	}
 	vs.VarCreated = true
 	return v
 }
 
 // GenerateNewGlobal mirrors VariableSelector::GenerateNewGlobal for simple types:
 // random_qualifiers (or copy qfer), RandomGlobalName, CreateVariable, push GlobalList.
-// create_and_initialize / FactMgr / access_once deferred.
 // VariableSelector.cpp:546–575.
 func (vs *VariableSelector) GenerateNewGlobal(
 	access Access,
@@ -486,53 +489,51 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	return v
 }
 
-// SelectLoopCtrlVar mirrors VariableSelector::SelectLoopCtrlVar (simplified).
-// VariableSelector.cpp:1146–1179 — non-array visible ints, WRITE, eConvert; else new global.
+// SelectLoopCtrlVar mirrors VariableSelector::SelectLoopCtrlVar.
+// VariableSelector.cpp:1146–1179 — non-array visible, has_int_field, drop union+ptr; WRITE eConvert.
 func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[*Variable]bool) *Variable {
 	if vs == nil || r == nil {
 		return nil
 	}
 	ty := GetIntType()
-	var cands []*Variable
-	// Globals (find_all_non_array_visible without full block chain)
-	for _, v := range vs.GlobalList {
-		if v == nil || invalid[v] || v.IsArray || v.IsVolatile() {
+	blk := cg.CurrentBlock()
+	vars := vs.FindAllNonArrayVisibleVars(blk)
+	// remove no-int-field and union-with-pointer (VariableSelector.cpp:1155–1168)
+	var filtered []*Variable
+	for _, v := range vars {
+		if v == nil || v.Type == nil || invalid[v] {
 			continue
 		}
-		if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
-			cands = append(cands, v)
+		if !v.Type.HasIntField() {
+			continue
 		}
+		if v.Type.IsUnion() && v.Type.ContainPointerField() {
+			continue
+		}
+		filtered = append(filtered, v)
 	}
-	// Locals on function stack
-	if cg.CurrentFunc != nil {
-		for _, blk := range cg.CurrentFunc.Stack {
-			if blk == nil {
-				continue
-			}
-			for _, v := range blk.LocalVars {
-				if v == nil || invalid[v] || v.IsArray || v.IsVolatile() {
-					continue
-				}
-				if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
-					cands = append(cands, v)
-				}
-			}
+	// choose_var WRITE eConvert; no_bitfield true (loop IV not bitfield)
+	var ok []*Variable
+	for _, x := range ExpandStructUnionVars(filtered, ty) {
+		if x == nil || x.Type == nil || x.IsBitfield {
+			continue
 		}
-		// params
-		for _, v := range cg.CurrentFunc.Param {
-			if v == nil || invalid[v] || v.IsVolatile() {
-				continue
-			}
-			if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
-				cands = append(cands, v)
-			}
+		if !ty.Match(x.Type, MatchConvert) {
+			continue
 		}
+		if !IsEligibleVar(x, x.Type.IndirectLevel()-ty.IndirectLevel(), AccessWrite, cg) {
+			continue
+		}
+		ok = append(ok, x)
 	}
-	if v := ChooseOKVar(r, cands); v != nil {
+	if v := ChooseOKVar(r, ok); v != nil {
 		return v
 	}
 	if vs.Opts.GlobalVariables {
 		return vs.GenerateNewGlobal(AccessWrite, cg, ty, nil, r)
+	}
+	if blk != nil {
+		return vs.GenerateNewParentLocal(blk, AccessWrite, cg, ty, nil, r)
 	}
 	return nil
 }

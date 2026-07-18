@@ -42,3 +42,31 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 	m.byFunc[f] = fm
 	return fm
 }
+
+// AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to init.
+// FactMgr.cpp:118–131 + FactPointTo default garbage for pointers.
+func (fm *FactMgr) AddNewVarFact(v *Variable) {
+	if fm == nil || v == nil {
+		return
+	}
+	// only pointer vars get FactPointTo in this skeleton
+	if !v.IsPointer() {
+		// aggregates: add field pointer facts
+		for _, f := range v.FieldVars {
+			fm.AddNewVarFact(f)
+		}
+		return
+	}
+	if FindRelatedPointTo(fm.GlobalFacts, v) != nil {
+		return
+	}
+	fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
+}
+
+// AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps
+// without stm maps — only global_facts.
+// FactMgr.cpp:69–85 subset.
+func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
+	_ = blk
+	fm.AddNewVarFact(v)
+}

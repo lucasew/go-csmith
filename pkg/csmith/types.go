@@ -168,6 +168,48 @@ func (t *Type) IsNonVoidSimple() bool {
 	return t != nil && t.IsSimple() && t.simple != EVoid
 }
 
+// IsInt mirrors Type::is_int — non-void simple (integer-ish including float in upstream).
+// Type.h:291–293.
+func (t *Type) IsInt() bool {
+	return t.IsNonVoidSimple()
+}
+
+// HasIntField mirrors Type::has_int_field.
+// Type.cpp:471–480 — self is int or any field has_int_field.
+func (t *Type) HasIntField() bool {
+	if t == nil {
+		return false
+	}
+	if t.IsInt() {
+		return true
+	}
+	for _, f := range t.Fields {
+		if f.Type != nil && f.Type.HasIntField() {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainPointerField mirrors Type::contain_pointer_field.
+// Type.cpp:1664–1674 — ePointer, or any aggregate field that does.
+func (t *Type) ContainPointerField() bool {
+	if t == nil {
+		return false
+	}
+	if t.ptrTo != nil {
+		return true
+	}
+	if t.IsAggregate() {
+		for _, f := range t.Fields {
+			if f.Type != nil && f.Type.ContainPointerField() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // IsFloat mirrors Type::is_float.
 func (t *Type) IsFloat() bool {
 	return t != nil && t.IsSimple() && t.simple == EFloat
