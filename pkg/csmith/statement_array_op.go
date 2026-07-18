@@ -210,11 +210,11 @@ func MakeRandomArrayInit(
 		initN, incrN := 0, 1
 		var iv *Variable
 		// StatementArrayOp.cpp:110–126 — do { SelectLoopCtrlVar } while filters
-		// SelectLoopCtrlVar creates global/local on miss (no second soft invent here)
-		for tries := 0; tries < 32; tries++ {
+		// C++ loops until break; SelectLoopCtrlVar creates on miss (no soft invent)
+		for tries := 0; tries < 256; tries++ {
 			iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-			if iv == nil {
-				// C++ SelectLoopCtrlVar rarely null after create; no soft GenerateNewGlobal
+			if iv == nil || HasError() {
+				// ERROR_GUARD path
 				break
 			}
 			// float IV rejected (StatementArrayOp.cpp:112–115)

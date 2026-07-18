@@ -1554,8 +1554,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		}
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
+	// C++ loops until success or ERROR_GUARD; cap high (no soft invent nil early)
 	var elem *Type
-	for tries := 0; tries < 16; tries++ {
+	for tries := 0; tries < 256; tries++ {
 		if asGlobal {
 			if vs.Types != nil {
 				elem = vs.Types.ChooseRandomNonvoid(r, vs.Opts, vs.Probs)
@@ -1568,6 +1569,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			} else {
 				elem = GetSimpleType(ChooseRandomNonvoidSimple(r, vs.Probs))
 			}
+		}
+		if HasError() {
+			return nil
 		}
 		if elem == nil {
 			continue

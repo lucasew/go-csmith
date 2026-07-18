@@ -587,7 +587,7 @@ func MakeRandomExpression(
 	// C++ do-while always yields a type; no GetIntType soft invent.
 	if typ == nil {
 		seFree := cg.EffectContext().IsSideEffectFree()
-		for tries := 0; tries < 32; tries++ {
+		for tries := 0; tries < 256; tries++ {
 			if env != nil && len(env.AllTypes) > 0 {
 				if seFree {
 					typ = env.ChooseRandomNonvoid(r, opts, probs)
@@ -596,6 +596,9 @@ func MakeRandomExpression(
 				}
 			} else {
 				typ = GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+			}
+			if HasError() {
+				return nil
 			}
 			// Expression.cpp:151–152 — constant structs not as subexpression
 			if typ != nil && typ.IsStruct() && tt == TermConstant {

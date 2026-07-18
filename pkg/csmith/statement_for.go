@@ -194,11 +194,13 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
+	// StatementFor.cpp:181–189 — do { SelectLoopCtrlVar; skip volatile } while (true)
+	// C++ ERROR_GUARD(nullptr) on select fail; cap high toward infinite re-pick
 	invalid := map[*Variable]bool{}
 	var iv *Variable
-	for tries := 0; tries < 32; tries++ {
+	for tries := 0; tries < 256; tries++ {
 		iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
-		if iv == nil {
+		if iv == nil || HasError() {
 			return nil
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
