@@ -33,8 +33,13 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	if !opts.CompoundAssignment {
 		return AssignSimple
 	}
+	// StatementAssign.cpp:92–95 — non-simple or base float → simple assign
 	if typ != nil && (!typ.IsSimple() || typ.IsFloat()) {
 		return AssignSimple
+	}
+	// C++ always has RNG + assignOpsTable_; no soft invent simple without pick
+	if r == nil {
+		return AssignOp(-1)
 	}
 	if table == nil {
 		table = NewAssignOpsTable(opts)
@@ -327,9 +332,13 @@ func makePossibleCompoundAssign(
 		}
 	}
 	flags := MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
+	// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
+	if flags == nil {
+		return Stmt{Kind: StmtAssign}
+	}
 	st.SafeFlags = flags
 	// StatementAssign.cpp:296–297 — blk->create_new_tmp_var (gensym "t_")
-	if opts.MathNoTmp && flags != nil {
+	if opts.MathNoTmp {
 		if blk := cg.CurrentBlock(); blk != nil {
 			st1 := EInt
 			if t := flags.LHSType(); t != nil && t.IsSimple() {

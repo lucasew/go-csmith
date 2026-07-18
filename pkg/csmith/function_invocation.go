@@ -291,6 +291,10 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 	if ReachMaxFunctions(list, opts) && !opts.Builtins {
 		return true
 	}
+	// ExpressionFuncall.cpp:57–62 — always rnd_flipcoin(80); no soft invent without RNG
+	if r == nil {
+		return false
+	}
 	return r.RndFlipcoin(80)
 }
 

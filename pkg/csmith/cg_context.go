@@ -435,19 +435,22 @@ func IsVariableInSet(set []*Variable, v *Variable) bool {
 // CGContext.cpp:352–380 — visit IndexExprs on itemized arrays; walk field_var_of;
 // array fields walk to parent array.
 func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
+	// CGContext.cpp:352+ — always live this + v; no soft invent true on nil
 	if c == nil || v == nil {
-		return true
+		return false
 	}
 	if v.IsArray || v.AsArray != nil {
 		av := v.AsArray
+		// C++ static_cast ArrayVariable* on isArray; missing AsArray is broken IR
 		if av == nil {
-			return true
+			return false
 		}
 		opts := Defaults()
-		// CGContext.cpp:356–363 — visit each index expression with facts copy
+		// CGContext.cpp:356–363 — visit each index expression (live Expression*)
 		for _, e := range av.IndexExprs {
+			// C++ av->get_indices()[i] always non-null; no soft skip
 			if e == nil {
-				continue
+				return false
 			}
 			// work on a context copy so index visits don't clobber caller stm incorrectly
 			// (upstream mutates facts_copy; VisitFactsExpression uses GlobalFacts on FM)
@@ -461,13 +464,14 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		return true
 	}
 	if v.IsArrayField() {
-		// CGContext.cpp:368–374 — walk to parent array
+		// CGContext.cpp:368–374 — walk to parent array; assert(v) found
 		p := v
 		for p != nil && !p.IsArray && p.AsArray == nil {
 			p = p.FieldVarOf
 		}
+		// CGContext.cpp:373 — assert(v); no soft invent true when parent missing
 		if p == nil {
-			return true
+			return false
 		}
 		return c.ReadIndices(p, facts)
 	}
@@ -516,8 +520,9 @@ func (c *CGContext) WriteVar(v *Variable) {
 // CheckDerefVolatile mirrors CGContext::check_deref_volatile.
 // CGContext.cpp:152–169.
 func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options) bool {
-	if v == nil {
-		return true
+	// CGContext.cpp:153 — assert(v && "nullptr Variable!"); no soft invent true
+	if c == nil || v == nil {
+		return false
 	}
 	if !opts.StrictVolatileRule {
 		return true
