@@ -19,6 +19,8 @@ type ProgramGenerator struct {
 	Funcs   FunctionList
 	// Argv are CLI args for the Options: header line (excluding argv[0] typically).
 	Argv []string
+	// Types holds derived pointer types (Type::derived_types).
+	Types TypeEnv
 }
 
 // NewProgramGenerator constructs a generator (DefaultProgramGenerator ctor + initialize subset).
@@ -28,8 +30,7 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	r := NewRng(seed)
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	// Share gensym counter across functions and variables (util.cpp process-global).
-	return &ProgramGenerator{
+	g := &ProgramGenerator{
 		Opts:    opts,
 		Seed:    seed,
 		Rng:     r,
@@ -38,6 +39,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 		Tables:  NewExprTables(opts),
 		StmtTab: NewStatementThresholdTable(opts),
 	}
+	// Share gensym + derived_types across selector and generator.
+	vs.Types = &g.Types
+	return g
 }
 
 // Initialize mirrors DefaultProgramGenerator::initialize (RNG already seeded).
@@ -58,6 +62,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	if g == nil {
 		return
 	}
+	g.Funcs.Types = &g.Types
 	// Function::make_first
 	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs)
 	// Create body of each function until no new unbuilt remain (Function.cpp:801–807).
@@ -66,6 +71,7 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		if f != nil && !f.IsBuilt {
 			cg := EmptyCGContext().WithFuncList(&g.Funcs)
 			cg.CurrentFunc = f
+			cg.Types = &g.Types
 			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		}
 	}

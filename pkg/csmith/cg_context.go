@@ -16,6 +16,8 @@ type CGContext struct {
 	ExprDepth int
 	// Funcs is the session FuncList for choose_func / create.
 	Funcs *FunctionList
+	// Types is session derived_types.
+	Types *TypeEnv
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).

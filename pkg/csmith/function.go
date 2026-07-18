@@ -21,6 +21,7 @@ type Function struct {
 type FunctionList struct {
 	Funcs []*Function
 	Sym   *GenSym // shared with VariableSelector ideally
+	Types *TypeEnv
 }
 
 // RandomFunctionName mirrors Function.cpp RandomFunctionName → gensym("func_").
@@ -129,6 +130,9 @@ func MakeFirst(
 	cg := WithFunc(f, EmptyEffect())
 	if list != nil {
 		cg = cg.WithFuncList(list)
+		if list.Types != nil {
+			cg.Types = list.Types
+		}
 	}
 	// register f before body so recursive choose_func can see it
 	if list != nil {

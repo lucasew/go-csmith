@@ -15,6 +15,8 @@ type VariableSelector struct {
 	TmpCount int
 	// VarCreated is VariableSelector::var_created.
 	VarCreated bool
+	// Types is session Type::derived_types (optional).
+	Types *TypeEnv
 }
 
 // NewVariableSelector constructs an empty selector with opts-derived probs.
@@ -169,11 +171,12 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 		return nil
 	}
 	var t *Type
-	// has_pointer_type() && flipcoin(40) — no derived_types yet → always simple
-	if false && r.RndFlipcoin(40) {
-		// Type::choose_random_pointer_type deferred
+	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
+	if vs.Types != nil && vs.Types.HasPointerType() && r.RndFlipcoin(40) {
+		// Type::choose_random_pointer_type → pick derived or make new
+		t = vs.Types.MakeRandomPointerType(r, vs.Opts, vs.Probs)
 	} else {
-		// Type::choose_random_nonvoid_nonvolatile ≈ choose_random_nonvoid_simple under no structs
+		// Type::choose_random_nonvoid_nonvolatile ≈ nonvoid simple under no structs
 		st := ChooseRandomNonvoidSimple(r, vs.Probs)
 		t = GetSimpleType(st)
 	}

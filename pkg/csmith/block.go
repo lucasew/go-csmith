@@ -160,7 +160,7 @@ func makeRandomStmt(
 			}
 		}
 	case StmtAssign:
-		return MakeRandomAssign(r, opts, probs, vs, tables, cg, GetIntType())
+		return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
 	case StmtBreak, StmtContinue:
 		// bare
 	case StmtIfElse:

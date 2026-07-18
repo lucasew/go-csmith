@@ -57,12 +57,18 @@ func MakeRandomAssign(
 	cg CGContext,
 	typ *Type,
 ) Stmt {
-	if typ == nil {
-		// Type::SelectLType deferred → int
-		typ = GetIntType()
-	}
 	assignTab := NewAssignOpsTable(opts)
+	// When type is nil, SelectLType after op — but op needs type for filters.
+	// Upstream: op = AssignOpsProbability(type) then if type nil SelectLType(..., op).
+	// First call with nil type uses simple/int path in AssignOpsProbability.
 	op := AssignOpsProbability(r, opts, assignTab, typ)
+	if typ == nil {
+		// Type::SelectLType(!SE-free, op)
+		noVol := !cg.EffectContext().IsSideEffectFree()
+		typ = SelectLType(r, opts, probs, cg.Types, noVol, op)
+		// Re-roll op for actual type (signed filter, float)
+		op = AssignOpsProbability(r, opts, assignTab, typ)
+	}
 
 	var rhs *Expression
 	if op.NeedNoRHS() {
