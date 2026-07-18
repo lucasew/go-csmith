@@ -45,7 +45,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
 	// force globals enabled so body can create
-	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
 	if fi == nil || fi.Failed {
 		t.Fatal("fail")
 	}
@@ -57,10 +57,13 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 }
 
 func TestBuildUserInvocationParamMerge(t *testing.T) {
+	// FunctionInvocationUser.cpp:252–268 — param_cg + merge_param_context raises expr_depth
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
 	callee := &Function{
 		Name:       "c",
 		ReturnType: GetIntType(),
@@ -72,8 +75,27 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect())
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, nil, callee)
+	cg.ExprDepth = 0
+	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if fi == nil || len(fi.Args) != 1 {
 		t.Fatal("args")
+	}
+	// constant/variable param bumps depth via make_random_param + merge
+	if fi.Args[0] != nil && BumpsExprDepth(fi.Args[0]) && cg.ExprDepth < 1 {
+		t.Fatalf("ExprDepth=%d after param (want ≥1)", cg.ExprDepth)
+	}
+}
+
+func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
+	// FunctionInvocation.cpp:157–159 — operand make_random mutates cg.expr_depth
+	opts := Defaults()
+	cg := EmptyCGContext()
+	cg.ExprDepth = 1
+	fi := MakeRandomUnaryInvocation(NewRng(2), opts, NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	if fi == nil || !fi.IsUnary {
+		t.Fatal("unary")
+	}
+	if cg.ExprDepth < 2 {
+		t.Fatalf("ExprDepth=%d want ≥2 after operand leaf", cg.ExprDepth)
 	}
 }

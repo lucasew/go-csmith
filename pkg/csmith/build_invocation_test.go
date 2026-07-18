@@ -29,12 +29,12 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	list.Funcs = []*Function{caller}
 
 	// force new function creation path
-	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, tables, stmtTab, cg, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType())
 	if fi == nil || fi.Failed {
 		// may fail if max funcs / depth — try more seeds
 		ok := false
 		for seed := uint64(1); seed < 40; seed++ {
-			fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, tables, stmtTab, cg, list, GetIntType())
+			fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType())
 			if fi != nil && !fi.Failed && fi.User != nil {
 				ok = true
 				break
@@ -86,7 +86,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	cg := WithFunc(caller, EmptyEffect())
-	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, nil, callee)
+	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
 	if fi.Failed {
 		t.Fatal("failed")
 	}
@@ -126,7 +126,7 @@ func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 	accum := EmptyEffect()
 	cg := WithFunc(caller, EmptyEffect())
 	cg.EffectAccum = &accum
-	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, callee)
+	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
 	if fi.Failed {
 		t.Fatal("failed")
 	}
@@ -162,7 +162,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	// also register callee FM facts via same FM for light revisit (uses caller FM)
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
 	cg.Funcs = list
-	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, callee)
+	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
 	if fi == nil {
 		t.Fatal("nil")
 	}
@@ -192,7 +192,7 @@ func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	cg := WithFunc(caller, EmptyEffect())
-	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, list, first)
+	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, first)
 	if fi.Failed {
 		t.Fatal("first should not fail revisit")
 	}

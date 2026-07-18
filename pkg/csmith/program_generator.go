@@ -351,7 +351,7 @@ func (g *ProgramGenerator) OutputMain() string {
 		f0 = g.Funcs.Funcs[0]
 		cg := EmptyCGContext().WithFuncList(&g.Funcs)
 		cg.Types = &g.Types
-		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, cg, &g.Funcs, f0)
+		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
 		if inv == nil || inv.Failed {
 			firstInv = f0.Name + "()"
 		} else {

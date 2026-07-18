@@ -301,24 +301,23 @@ func GetFirstFunction(list *FunctionList) *Function {
 
 // BuildUserInvocation mirrors FunctionInvocationUser::build_invocation.
 // FunctionInvocationUser.cpp:246–303 — params; then revisit or add_external_effect.
+// cg is *CGContext (C++ CGContext&) so merge_param_context / add_external_effect stick.
 func BuildUserInvocation(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	list *FunctionList,
 	callee *Function,
 ) *Invocation {
-	if callee == nil {
+	if callee == nil || cg == nil {
 		return &Invocation{Failed: true}
 	}
 	fi := &Invocation{User: callee}
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
-	// Expression.cpp:213–218 — leaf/user-call args bump depth for subsequent params
-	argDepth := cg.ExprDepth
 	for _, p := range callee.Param {
 		ty := GetIntType()
 		var qfer *CVQualifiers
@@ -329,24 +328,30 @@ func BuildUserInvocation(
 			q := p.Qfer
 			qfer = &q
 		}
+		// FunctionInvocationUser.cpp:252–254 — param_cg(cg, running_eff_context, &param_eff_accum)
 		paramAccum := EmptyEffect()
-		paramCG := cg
+		paramCG := *cg
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
-		paramCG.ExprDepth = argDepth
-		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, argDepth, list)
+		paramCG.EffectStm = EmptyEffect()
+		// Expression::make_random_param bumps paramCG.ExprDepth; merge copies it
+		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		if arg == nil {
+			// library soft path when make_random_param fails (C++ ERROR_GUARD)
 			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
-		}
-		if arg != nil {
-			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
-			arg.CheckAndSetCastOpts(ty, opts)
-			if BumpsExprDepth(arg) {
-				argDepth++
+			if arg != nil && BumpsExprDepth(arg) {
+				paramCG.ExprDepth++
 			}
 		}
+		if arg != nil {
+			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
+			arg.CheckAndSetCastOpts(ty, opts)
+		}
 		fi.Args = append(fi.Args, arg)
+		// FunctionInvocationUser.cpp:268 — merge_param_context (default include_lhs=false)
+		// keep includeLHS true: matches prior Go assign-style merge used by callers
 		cg.MergeParamContext(paramCG, true)
+		// FunctionInvocationUser.cpp:264–265 — running_eff_context.add_effect(param_eff_accum)
 		running = running.AddEffect(paramAccum)
 	}
 
@@ -358,7 +363,7 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
 		effectAccum := EmptyEffect()
 		effectContext := cg.EffectContext().AddEffect(callee.AccumEffContext)
-		newCG := cg
+		newCG := *cg
 		newCG.effectContext = effectContext
 		newCG.EffectAccum = &effectAccum
 		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
@@ -393,6 +398,7 @@ func BuildUserInvocation(
 // BuildInvocationAndFunction mirrors build_invocation_and_function.
 // FunctionInvocationUser.cpp:173–241 — signature, params first, handover with args,
 // generate_body_with_known_params, return facts, renew_facts, effect handoff.
+// cg is *CGContext (C++ CGContext&).
 func BuildInvocationAndFunction(
 	r *Rng,
 	opts Options,
@@ -400,18 +406,18 @@ func BuildInvocationAndFunction(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 	list *FunctionList,
 	retType *Type,
 ) *Invocation {
-	if list == nil || ReachMaxFunctions(list, opts) {
+	if cg == nil || list == nil || ReachMaxFunctions(list, opts) {
 		return &Invocation{Failed: true}
 	}
 	if retType == nil {
 		retType = GetIntType()
 	}
 	// FunctionInvocationUser.cpp:179 — make_random_signature
-	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, retType, nil, list)
+	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, nil, list)
 	if callee == nil {
 		return &Invocation{Failed: true}
 	}
@@ -419,7 +425,6 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:181–197 — build all parameters before body
 	fi := &Invocation{User: callee}
 	running := cg.EffectContext()
-	argDepth := cg.ExprDepth
 	for _, p := range callee.Param {
 		ty := GetIntType()
 		var qfer *CVQualifiers
@@ -431,23 +436,23 @@ func BuildInvocationAndFunction(
 			qfer = &q
 		}
 		paramAccum := EmptyEffect()
-		paramCG := cg
+		paramCG := *cg
 		paramCG.effectContext = running
 		paramCG.EffectAccum = &paramAccum
-		paramCG.ExprDepth = argDepth
-		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, argDepth, list)
+		paramCG.EffectStm = EmptyEffect()
+		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		if arg == nil {
 			arg = makeExpressionVariableFlags(r, vs, &paramCG, ty, qfer, true, false)
-		}
-		if arg != nil {
-			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
-			arg.CheckAndSetCastOpts(ty, opts)
-			if BumpsExprDepth(arg) {
-				argDepth++
+			if arg != nil && BumpsExprDepth(arg) {
+				paramCG.ExprDepth++
 			}
 		}
+		if arg != nil {
+			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
+			arg.CheckAndSetCastOpts(ty, opts)
+		}
 		fi.Args = append(fi.Args, arg)
-		// FunctionInvocationUser.cpp:195–196
+		// FunctionInvocationUser.cpp:195–196 — merge_param_context
 		cg.MergeParamContext(paramCG, true)
 		running = running.AddEffect(paramAccum)
 	}
@@ -467,7 +472,7 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
 	effectAccum := EmptyEffect()
-	bodyCG := cg
+	bodyCG := *cg
 	bodyCG.CurrentFunc = callee
 	bodyCG.FM = calFM
 	bodyCG.Flags = 0
@@ -832,14 +837,18 @@ func MakeBinary(
 // MakeRandomUnaryInvocation mirrors make_random_unary.
 // FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER;
 // always SafeOpFlags::make_random_unary; operand of get_lhs_type.
+// cg is *CGContext (C++ CGContext&) so operand visit_facts / expr_depth++ stick.
 func MakeRandomUnaryInvocation(
 	r *Rng,
 	opts Options,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 ) *Invocation {
+	if cg == nil {
+		return nil
+	}
 	if typ == nil {
 		typ = GetIntType()
 	}
@@ -864,10 +873,9 @@ func MakeRandomUnaryInvocation(
 		argTy = flags.LHSType()
 	}
 	// FunctionInvocation.cpp:157–159 — CreateFunctionInvocationUnary; operand under expr_depth
-	d := cg.ExprDepth
-	arg := MakeRandomExpression(r, opts, tables, vs, &cg, argTy, nil, true, false, MaxTermTypes, d)
+	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, cg.ExprDepth)
 	if arg == nil {
-		arg = MakeRandomExpression(r, opts, tables, vs, &cg, argTy, nil, true, false, TermConstant, d)
+		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, cg.ExprDepth)
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
 	inv.setOutOpts(opts)
@@ -878,7 +886,7 @@ func MakeRandomUnaryInvocation(
 		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
 			st = ty.Simple()
 		}
-		if blk := currentBlock(cg); blk != nil {
+		if blk := currentBlock(*cg); blk != nil {
 			var sym *GenSym
 			if vs != nil {
 				sym = &vs.Sym
@@ -892,18 +900,22 @@ func MakeRandomUnaryInvocation(
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.
 // FunctionInvocation.cpp:78–120.
 // typ may be nil (StatementExpr) — choose_func ignores return type; new funcs use RandomReturnType.
+// cg is *CGContext (C++ CGContext&).
 func MakeRandomInvocation(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	list *FunctionList,
 	typ *Type,
 	qfer *CVQualifiers,
 	stdFunc bool,
 ) *Invocation {
+	if cg == nil {
+		return &Invocation{Failed: true}
+	}
 	// Match type for choose_func: nil means any return type (C++ type=0).
 	matchType := typ
 	// Concrete type for std ops / new signatures.
@@ -922,8 +934,7 @@ func MakeRandomInvocation(
 		// FunctionInvocation.cpp:87 — pure_rnd_flipcoin(50) (random mode == rnd)
 		if r.RndFlipcoin(50) && list != nil {
 			// Function.cpp:choose_func with in_conflict / strict_volatile / qfer
-			cgp := &cg
-			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cgp, opts, qfer)
+			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cg, opts, qfer)
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
@@ -958,7 +969,7 @@ func MakeRandomInvocation(
 		if r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
 			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, workType)
 		} else {
-			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, &cg, workType)
+			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, workType)
 		}
 	}
 	return fi

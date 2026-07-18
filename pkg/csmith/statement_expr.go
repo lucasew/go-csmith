@@ -27,7 +27,7 @@ func MakeRandomExprStmt(
 	}
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)
-	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, nil, nil, false)
+	fi := MakeRandomInvocation(r, opts, probs, vs, tables, &cg, list, nil, nil, false)
 	if fi == nil || fi.Failed {
 		// StatementExpr.cpp:62–66 — reset_effect_accum + restore_facts
 		if cg.EffectAccum != nil {

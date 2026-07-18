@@ -202,7 +202,7 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 	found := false
 	for seed := uint64(1); seed < 40; seed++ {
 		caller.FactChanged = false
-		fi := MakeRandomInvocation(NewRng(seed), opts, probs, vs, tables, cg, list, GetIntType(), nil, false)
+		fi := MakeRandomInvocation(NewRng(seed), opts, probs, vs, tables, &cg, list, GetIntType(), nil, false)
 		if fi != nil && !fi.Failed && fi.User == callee {
 			if !caller.FactChanged {
 				t.Fatal("caller.fact_changed not set from callee")
@@ -213,7 +213,7 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 	}
 	if !found {
 		// may not hit callee due to RNG; at least ensure BuildUserInvocation path works
-		fi := BuildUserInvocation(NewRng(1), opts, probs, vs, tables, cg, list, callee)
+		fi := BuildUserInvocation(NewRng(1), opts, probs, vs, tables, &cg, list, callee)
 		if fi != nil && !fi.Failed {
 			caller.FactChanged = caller.FactChanged || fi.User.FactChanged
 			if !caller.FactChanged {

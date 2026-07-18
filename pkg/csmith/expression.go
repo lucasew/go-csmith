@@ -854,7 +854,7 @@ func makeExpressionFuncall(
 	if cg.FM != nil {
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	fi := MakeRandomInvocation(r, opts, probs, vs, tables, *cg, list, typ, qfer, stdFunc)
+	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	if fi == nil || fi.Failed {
 		// ExpressionFuncall.cpp:84–91 — restore env; replace with simple var
 		if cg.EffectAccum != nil {
