@@ -271,6 +271,24 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	return false
 }
 
+// AccessDerefVolatile mirrors Effect::access_deref_volatile.
+// Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
+func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
+	if !strictVolatile || v == nil {
+		return e
+	}
+	out := e
+	level := derefLevel
+	for level > 0 {
+		if v.IsVolatileAfterDeref(level) {
+			out.sideEffectFree = false
+			return out
+		}
+		level--
+	}
+	return out
+}
+
 // IsReadPartially mirrors Effect::is_read_partially.
 // Effect.cpp:444–446.
 func (e Effect) IsReadPartially(v *Variable) bool {

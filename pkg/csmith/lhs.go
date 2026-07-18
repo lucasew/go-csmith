@@ -110,7 +110,7 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 	return base
 }
 
-// MakeRandomLhs mirrors Lhs::make_random without full visit_facts retry loop.
+// MakeRandomLhs mirrors Lhs::make_random with visit_facts retry when FactMgr set.
 // Lhs.cpp:58–147 — must_use, SelectDerefPointerProb, select eDerefExact, bookkeeping.
 // Returns Lhs (var + desired type) or nil.
 func MakeRandomLhs(
@@ -132,57 +132,84 @@ func MakeRandomLhs(
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	q.Restrict(AccessWrite, cg)
 
-	// Lhs.cpp:73–76 — try must_use WRITE first
-	if v := vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q); v != nil {
-		if !compoundAssign || !v.IsVolatile() {
-			return finishLhs(v, typ, compoundAssign, cg, opts)
+	// save effects for visit_facts backtrack (Lhs.cpp:68–70)
+	var accumSave *Effect
+	if cg.EffectAccum != nil {
+		cp := *cg.EffectAccum
+		accumSave = &cp
+	}
+	stmSave := cg.EffectStm
+
+	restore := func() {
+		if accumSave != nil && cg.EffectAccum != nil {
+			*cg.EffectAccum = *accumSave
 		}
+		cg.EffectStm = stmSave
 	}
 
-	// Lhs.cpp:84–96 — flipcoin SelectDerefPointerProb
-	derefProb := 0
-	if probs != nil {
-		derefProb = probs.Single(PSelectDerefPointerProb)
-	}
-	if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
-		if v := selectDerefPointer(r, opts, probs, vs, cg, typ, &q, AccessWrite); v != nil {
-			if !compoundAssign || !v.IsVolatile() {
-				return finishLhs(v, typ, compoundAssign, cg, opts)
+	// Lhs.cpp: do { … } while(true) with visit_facts — bounded retries
+	for tries := 0; tries < 32; tries++ {
+		var v *Variable
+		// Lhs.cpp:73–76 — try must_use WRITE first
+		if v = vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q); v != nil {
+			if compoundAssign && v.IsVolatile() {
+				v = nil
 			}
 		}
-	}
-
-	// Lhs.cpp:106–118 — VariableSelector::select(WRITE, eDerefExact)
-	v := vs.Select(AccessWrite, cg, typ, &q, r, MatchDerefExact)
-	if v != nil && compoundAssign && v.IsVolatile() {
-		if nv := selectWritable(r, vs, cg, typ, true); nv != nil {
-			return finishLhs(nv, typ, compoundAssign, cg, opts)
+		// Lhs.cpp:84–96 — flipcoin SelectDerefPointerProb
+		if v == nil {
+			derefProb := 0
+			if probs != nil {
+				derefProb = probs.Single(PSelectDerefPointerProb)
+			}
+			if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
+				v = selectDerefPointer(r, opts, probs, vs, cg, typ, &q, AccessWrite)
+				if v != nil && compoundAssign && v.IsVolatile() {
+					v = nil
+				}
+			}
 		}
+		// Lhs.cpp:106–118 — VariableSelector::select(WRITE, eDerefExact)
+		if v == nil {
+			v = vs.Select(AccessWrite, cg, typ, &q, r, MatchDerefExact)
+			if v != nil && compoundAssign && v.IsVolatile() {
+				if nv := selectWritable(r, vs, cg, typ, true); nv != nil {
+					v = nv
+				}
+			}
+		}
+		if v == nil {
+			// last resort create global
+			v = vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
+		}
+		if v == nil {
+			restore()
+			return nil
+		}
+		lhs := finishLhs(v, typ, compoundAssign, cg, opts)
+		if lhs != nil {
+			return lhs
+		}
+		// visit_facts failed — restore effects and retry
+		restore()
 	}
-	if v != nil {
-		return finishLhs(v, typ, compoundAssign, cg, opts)
-	}
-	// last resort create global
-	v = vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
-	if v == nil {
-		return nil
-	}
-	return finishLhs(v, typ, compoundAssign, cg, opts)
+	return nil
 }
 
-// finishLhs builds Lhs and records write dereference / volatile access.
-// Lhs.cpp:132–140 bookkeeping.
+// finishLhs builds Lhs, optional visit_facts, records write dereference / volatile access.
+// Lhs.cpp:106–140 — visit_facts then bookkeeping.
 func finishLhs(v *Variable, typ *Type, compound bool, cg CGContext, opts Options) *Lhs {
 	if v == nil {
 		return nil
 	}
-	// optional: skip signed overflow-prone for compound (Lhs.cpp:106–120 subset)
-	if compound && typ != nil && typ.IsSimple() && !typ.IsFloat() {
-		if v.IsBitfield || (v.Type != nil && v.Type.IsSigned()) {
-			// still allow; full no_signed_overflow path needs visit_facts retry
+	lhs := &Lhs{Var: v, Type: typ, CompoundAssign: compound}
+	// Lhs.cpp:122–140 — visit_facts when FactMgr present; fail → caller retries
+	if cg.FM != nil {
+		cgp := &cg
+		if !cgp.VisitFactsLhs(lhs, opts) {
+			return nil
 		}
 	}
-	lhs := &Lhs{Var: v, Type: typ, CompoundAssign: compound}
 	// Lhs.cpp:132–140 — bookkeeping on successful make
 	deref := lhs.IndirectLevel()
 	if deref > 0 {
@@ -193,7 +220,6 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg CGContext, opts Options
 	if opts.WrapVolatiles {
 		v.UseVolRVal = true
 	}
-	_ = cg
 	return lhs
 }
 

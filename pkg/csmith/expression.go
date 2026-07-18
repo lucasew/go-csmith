@@ -406,9 +406,17 @@ func makeExpressionVariableFlags(
 				}
 			}
 		}
-		// Effect::read_var for selected variable
-		cg.NoteRead(v)
 		ev := &Expression{Term: TermVariable, Var: v, ExprType: typ}
+		// ExpressionVariable::visit_facts when FactMgr present
+		if cg.FM != nil {
+			cgp := &cg
+			if !cgp.VisitFactsExpressionVariable(ev, vs.Opts) {
+				continue
+			}
+		} else {
+			// Effect::read_var for selected variable (no fact walk)
+			cg.NoteRead(v)
+		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
 		deref := ev.IndirectLevel()
 		if deref > 0 {

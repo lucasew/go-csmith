@@ -283,3 +283,318 @@ func (c *CGContext) RemoveIVBound(iv *Variable) {
 	}
 	delete(c.IVBounds, iv)
 }
+
+// IsVariableInSet reports whether v appears in set (pointer equality).
+func IsVariableInSet(set []*Variable, v *Variable) bool {
+	if v == nil {
+		return false
+	}
+	for _, x := range set {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// ReadIndices mirrors CGContext::read_indices for array subscript expressions.
+// CGContext.cpp:352–380 — no Indices on our ArrayVariable → always true for now.
+func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
+	_ = c
+	_ = facts
+	if v == nil {
+		return true
+	}
+	// ArrayVariable indices as Expressions not yet stored; skip walk.
+	return true
+}
+
+// ReadVar mirrors CGContext::read_var — force read into accum + stm.
+// CGContext.cpp:175–185.
+func (c *CGContext) ReadVar(v *Variable) {
+	if c == nil || v == nil {
+		return
+	}
+	v = v.GetCollective()
+	if c.IsNonReadable(v) {
+		// upstream asserts; we skip recording
+		return
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+	}
+	c.EffectStm = c.EffectStm.ReadVar(v)
+	if c.CurrentFunc != nil && v.IsGlobal() {
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
+	}
+}
+
+// WriteVar mirrors CGContext::write_var.
+// CGContext.cpp:307–317.
+func (c *CGContext) WriteVar(v *Variable) {
+	if c == nil || v == nil {
+		return
+	}
+	v = v.GetCollective()
+	if c.IsNonWritable(v) {
+		return
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+	}
+	c.EffectStm = c.EffectStm.WriteVar(v)
+	if c.CurrentFunc != nil && v.IsGlobal() {
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
+	}
+}
+
+// CheckDerefVolatile mirrors CGContext::check_deref_volatile.
+// CGContext.cpp:152–169.
+func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options) bool {
+	if v == nil {
+		return true
+	}
+	if !opts.StrictVolatileRule {
+		return true
+	}
+	if !c.EffectContext().IsSideEffectFree() {
+		level := derefLevel
+		for level > 0 {
+			if v.IsVolatileAfterDeref(level) {
+				return false
+			}
+			level--
+		}
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
+	}
+	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
+	return true
+}
+
+// pointToFacts returns FactMgr global points-to facts (or nil).
+func (c CGContext) pointToFacts() []*FactPointTo {
+	if c.FM == nil {
+		return nil
+	}
+	return c.FM.GlobalFacts
+}
+
+// unionFacts returns FactMgr union facts when present.
+func (c CGContext) unionFacts() []*FactUnion {
+	if c.FM == nil {
+		return nil
+	}
+	return c.FM.UnionFacts
+}
+
+// CheckReadVar mirrors CGContext::check_read_var.
+// CGContext.cpp:191–213 — indices, nonreadable field/context, partial write, volatile, dangling.
+func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
+	if c == nil || v == nil {
+		return false
+	}
+	if !c.ReadIndices(v, facts) {
+		return false
+	}
+	v = v.GetCollective()
+	if IsNonreadableField(v, c.unionFacts()) {
+		return false
+	}
+	if c.IsNonReadable(v) {
+		return false
+	}
+	if c.EffectContext().IsWrittenPartially(v) {
+		return false
+	}
+	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+		return false
+	}
+	if v.IsPointer() && IsDanglingPtr(v, facts, 0) {
+		return false
+	}
+	c.ReadVar(v)
+	return true
+}
+
+// CheckWriteVar mirrors CGContext::check_write_var.
+// CGContext.cpp:323–349.
+func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
+	if c == nil || v == nil {
+		return false
+	}
+	if !c.ReadIndices(v, facts) {
+		return false
+	}
+	v = v.GetCollective()
+	if c.IsNonWritable(v) || v.IsConst() {
+		return false
+	}
+	eff := c.EffectContext()
+	if eff.IsWrittenPartially(v) || eff.IsReadPartially(v) {
+		return false
+	}
+	if v.IsVolatile() && !eff.IsSideEffectFree() {
+		return false
+	}
+	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, 0) {
+		return false
+	}
+	c.WriteVar(v)
+	return true
+}
+
+// ReadPointed mirrors CGContext::read_pointed — recursive pointee reads.
+// CGContext.cpp:216–252.
+func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo, opts Options) bool {
+	if c == nil || v == nil || indirect <= 0 {
+		return false
+	}
+	var accumCopy *Effect
+	if c.EffectAccum != nil {
+		cp := *c.EffectAccum
+		accumCopy = &cp
+	}
+	IncrCounter(&dereferenceLevelCnts, indirect)
+	allowNull := opts.NullPointerDerefProb > 0
+	allowDead := opts.DanglingPtrDerefProb > 0
+	if !c.ReadIndices(v, facts) {
+		return false
+	}
+	tmp := []*Variable{v.GetCollective()}
+	for indirect > 0 {
+		indirect--
+		tmp = MergePointeesOfPointers(tmp, facts)
+		if len(tmp) == 0 ||
+			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
+			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
+			if accumCopy != nil && c.EffectAccum != nil {
+				*c.EffectAccum = *accumCopy
+			}
+			return false
+		}
+		for _, pointee := range tmp {
+			if pointee == nil || IsSpecialPtr(pointee) {
+				continue
+			}
+			if !c.CheckReadVar(pointee, facts) {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// WritePointed mirrors CGContext::write_pointed — last hop is write, intermediates read.
+// CGContext.cpp:255–304.
+func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) bool {
+	if c == nil || lhs == nil || lhs.Var == nil {
+		return false
+	}
+	indirect := lhs.IndirectLevel()
+	if indirect <= 0 {
+		return false
+	}
+	var accumCopy *Effect
+	if c.EffectAccum != nil {
+		cp := *c.EffectAccum
+		accumCopy = &cp
+	}
+	IncrCounter(&dereferenceLevelCnts, indirect)
+	if !c.ReadIndices(lhs.Var, facts) {
+		return false
+	}
+	tmp := []*Variable{lhs.Var.GetCollective()}
+	allowNull := opts.NullPointerDerefProb > 0
+	allowDead := opts.DanglingPtrDerefProb > 0
+	for indirect > 0 {
+		indirect--
+		tmp = MergePointeesOfPointers(tmp, facts)
+		if len(tmp) == 0 ||
+			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
+			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
+			if accumCopy != nil && c.EffectAccum != nil {
+				*c.EffectAccum = *accumCopy
+			}
+			return false
+		}
+		for _, pointee := range tmp {
+			if pointee == nil || IsSpecialPtr(pointee) {
+				continue
+			}
+			var succ bool
+			if indirect == 0 {
+				succ = c.CheckWriteVar(pointee, facts)
+			} else {
+				succ = c.CheckReadVar(pointee, facts)
+			}
+			if !succ {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// VisitFactsExpressionVariable mirrors ExpressionVariable::visit_facts.
+// ExpressionVariable.cpp:237–274.
+func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bool {
+	if c == nil || e == nil || e.Var == nil {
+		return false
+	}
+	facts := c.pointToFacts()
+	deref := e.IndirectLevel()
+	v := e.Var
+	if deref > 0 {
+		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
+			return false
+		}
+		if !c.CheckReadVar(v, facts) {
+			return false
+		}
+		if !c.ReadPointed(v, deref, facts, opts) {
+			return false
+		}
+		return c.CheckDerefVolatile(v, deref, opts)
+	}
+	if deref < 0 {
+		// address-of: forbid bitfields
+		if v.IsBitfield {
+			return false
+		}
+		return true
+	}
+	return c.CheckReadVar(v, facts)
+}
+
+// VisitFactsLhs mirrors Lhs::visit_facts core checks (without index walk).
+// Lhs.cpp:301+ subset — check_write_var or write_pointed + deref volatile.
+func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
+	if c == nil || lhs == nil || lhs.Var == nil {
+		return false
+	}
+	facts := c.pointToFacts()
+	deref := lhs.IndirectLevel()
+	v := lhs.Var
+	if deref > 0 {
+		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
+			return false
+		}
+		// read the pointer itself then write pointees
+		if !c.CheckReadVar(v, facts) {
+			return false
+		}
+		if !c.WritePointed(lhs, facts, opts) {
+			return false
+		}
+		return c.CheckDerefVolatile(v, deref, opts)
+	}
+	return c.CheckWriteVar(v, facts)
+}
