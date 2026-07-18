@@ -347,11 +347,9 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
-		// FunctionInvocationUser.cpp:268 — merge_param_context (default include_lhs=false)
-		// keep includeLHS true: matches prior Go assign-style merge used by callers
-		cg.MergeParamContext(paramCG, true)
-		// FunctionInvocationUser.cpp:264–265 — running_eff_context.add_effect(param_eff_accum)
+		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
 		running = running.AddEffect(paramAccum)
+		cg.MergeParamContext(paramCG, false)
 	}
 
 	// FunctionInvocationUser.cpp:272–301
@@ -448,9 +446,9 @@ func BuildInvocationAndFunction(
 		// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
-		// FunctionInvocationUser.cpp:195–196 — merge_param_context
-		cg.MergeParamContext(paramCG, true)
+		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
 		running = running.AddEffect(paramAccum)
+		cg.MergeParamContext(paramCG, false)
 	}
 
 	// FunctionInvocationUser.cpp:203–206 — hand-over from caller to callee with args

@@ -318,25 +318,22 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
 	}
-	c.EffectStm = c.EffectStm.AddEffectOpts(e, includeLHS)
+	// CGContext.cpp:386 — effect_stm.add_effect(e) always default include_lhs=false
+	c.EffectStm = c.EffectStm.AddEffectOpts(e, false)
 }
 
 // MergeParamContext mirrors CGContext::merge_param_context.
-// CGContext.cpp:390–394 — fold param accum into this; copy expr_depth.
+// CGContext.cpp:390–394 — add_effect(*param.effect_accum, include_lhs); copy expr_depth.
+// Does not merge param.effect_stm (only accum is folded via add_effect).
 func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if c == nil {
 		return
 	}
 	if param.EffectAccum != nil {
-		if c.EffectAccum != nil {
-			*c.EffectAccum = c.EffectAccum.AddEffectOpts(*param.EffectAccum, includeLHS)
-		} else {
-			// fold into EffectStm
-			c.EffectStm = c.EffectStm.AddEffectOpts(*param.EffectAccum, includeLHS)
-		}
+		// CGContext.cpp:392 — add_effect(*param.get_effect_accum(), include_lhs_effects)
+		c.AddEffect(*param.EffectAccum, includeLHS)
 	}
-	// also merge stm effects from param
-	c.EffectStm = c.EffectStm.AddEffectOpts(param.EffectStm, includeLHS)
+	// CGContext.cpp:393 — expr_depth = param_cg_context.expr_depth
 	c.ExprDepth = param.ExprDepth
 }
 
