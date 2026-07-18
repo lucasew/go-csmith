@@ -248,6 +248,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			}
 		}
 	}
+	// StatementFor.cpp:218–227 — array_control adjusts bound; else INVALID_BOUND stays
 	arrayBound := bound != InvalidIVBound && bound > 0
 	if arrayBound {
 		// StatementFor.cpp:220–221 — make_random_array_control(--bound, …)
@@ -266,7 +267,8 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		// C++ replaces bound with adjusted return value for IV bounds
 		bound = outBound
 	} else {
-		bound = 0
+		// StatementFor.cpp:200 / 223–226 — leave bound = INVALID_BOUND
+		bound = InvalidIVBound
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
 	}
 
@@ -395,14 +397,10 @@ func MakeRandomFor(
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
+	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
 	bodyCG := cg.WithFlags(FlagInLoop)
 	if lc.IV != nil {
-		// use Bound when array-control; else LimitN as soft bound for nonwritable IV
-		bnd := lc.Bound
-		if bnd <= 0 {
-			bnd = lc.LimitN
-		}
-		bodyCG.AddIVBound(lc.IV, bnd)
+		bodyCG.AddIVBound(lc.IV, lc.Bound)
 	}
 	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
 	bodyEff := EmptyEffect()

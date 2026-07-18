@@ -28,6 +28,33 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	}
 }
 
+func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
+	// StatementFor.cpp:200 / 223–226 — free loop leaves bound = INVALID_BOUND
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	cg := WithFunc(f, EmptyEffect())
+	// no must-use arrays → free loop control
+	var lc *LoopControl
+	for seed := uint64(1); seed < 30; seed++ {
+		ClearError()
+		lc = MakeIteration(NewRng(seed), opts, NewProbabilities(opts), vs, &cg)
+		if lc != nil {
+			break
+		}
+	}
+	if lc == nil {
+		t.Fatal("nil iteration")
+	}
+	if lc.Bound != InvalidIVBound {
+		t.Fatalf("Bound=%d want InvalidIVBound", lc.Bound)
+	}
+}
+
 func TestMakeIterationBuildsIR(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
