@@ -189,6 +189,7 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 	}
 	st := typ.Simple()
 
+	var v string
 	// pure_rnd_flipcoin(50) — in random mode == rnd_flipcoin(50)
 	if r.RndFlipcoin(50) {
 		// small integer / small float path (Constant.cpp:318–361)
@@ -200,30 +201,38 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		}
 		// Constant.cpp:346–348 — eFloat → GenerateSmallRandomFloatHexConstant(num)
 		if st == EFloat {
-			return generateSmallRandomFloatHexConstant(num, r)
+			v = generateSmallRandomFloatHexConstant(num, r)
+		} else {
+			v = formatSmallConstant(st, num, opts)
 		}
-		return formatSmallConstant(st, num, opts)
+	} else {
+		// hex / wide path by simple type
+		switch st {
+		case EChar, EUChar:
+			v = generateRandomCharConstant(opts, r)
+		case EInt, EUInt:
+			v = generateRandomIntConstant(opts, r)
+		case EShort, EUShort:
+			v = generateRandomShortConstant(opts, r)
+		case ELong, EULong:
+			v = generateRandomLongConstant(opts, r)
+		case ELongLong, EULongLong:
+			v = generateRandomLongLongConstant(opts, r)
+		case EInt128, EUInt128:
+			v = generateRandomInt128Constant(opts, r)
+		case EFloat:
+			v = generateRandomFloatHexConstant(r)
+		default:
+			// Constant.cpp:407 — assert(0 && "Unsupported type!"); no soft invent int
+			return ""
+		}
 	}
-	// hex / wide path by simple type
-	switch st {
-	case EChar, EUChar:
-		return generateRandomCharConstant(opts, r)
-	case EInt, EUInt:
-		return generateRandomIntConstant(opts, r)
-	case EShort, EUShort:
-		return generateRandomShortConstant(opts, r)
-	case ELong, EULong:
-		return generateRandomLongConstant(opts, r)
-	case ELongLong, EULongLong:
-		return generateRandomLongLongConstant(opts, r)
-	case EInt128, EUInt128:
-		return generateRandomInt128Constant(opts, r)
-	case EFloat:
-		return generateRandomFloatHexConstant(r)
-	default:
-		// Constant.cpp:407 — assert(0 && "Unsupported type!"); no soft invent int
-		return ""
+	// Constant.cpp:413–415 — simple + mark_mutable_const → "(" + v + ")"
+	// no soft invent ignore of MarkMutableConst (silent option no-op)
+	if v != "" && opts.MarkMutableConst {
+		return "(" + v + ")"
 	}
+	return v
 }
 
 // generateSmallRandomFloatHexConstant mirrors GenerateSmallRandomFloatHexConstant.

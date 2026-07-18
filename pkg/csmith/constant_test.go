@@ -113,6 +113,39 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 	}
 }
 
+func TestMarkMutableConstWrapsSimple(t *testing.T) {
+	// Constant.cpp:413–415 — simple + mark_mutable_const → "(" + v + ")"
+	// no soft invent ignore of MarkMutableConst
+	opts := Defaults()
+	opts.MarkMutableConst = true
+	// force deterministic simple path via MakeRandom int
+	r := NewRng(2)
+	c := MakeRandom(GetSimpleType(EInt), opts, nil, r)
+	if c == nil || c.Value == "" {
+		t.Fatal("nil const")
+	}
+	if !strings.HasPrefix(c.Value, "(") || !strings.HasSuffix(c.Value, ")") {
+		t.Fatalf("want paren wrap, got %q", c.Value)
+	}
+	// pointer is not simple wrap path in C++ (type ePointer, not eSimple)
+	c2 := MakeRandom(PointerTo(GetIntType()), opts, nil, NewRng(1))
+	if c2 == nil || c2.Value != "0" {
+		t.Fatalf("pointer must stay 0, got %+v", c2)
+	}
+	// off → no invent wrap
+	opts.MarkMutableConst = false
+	c3 := MakeRandom(GetSimpleType(EInt), opts, nil, NewRng(2))
+	if c3 == nil || strings.HasPrefix(c3.Value, "(") {
+		t.Fatalf("off must not wrap, got %q", c3.Value)
+	}
+	// bitfield InRange also wraps
+	opts.MarkMutableConst = true
+	s := GenerateRandomConstantInRange(GetIntType(), 8, opts, NewRng(3))
+	if s == "" || !strings.HasPrefix(s, "(") || !strings.HasSuffix(s, ")") {
+		t.Fatalf("InRange wrap got %q", s)
+	}
+}
+
 func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	// Constant.cpp:207–223 — RandomHexDigits(1) + flipcoin ±1; no invent from num%
 	// positive num

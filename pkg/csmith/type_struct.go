@@ -392,7 +392,12 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	if st == EInt && r.RndFlipcoin(50) {
 		num = -num
 	}
-	return formatSmallConstant(st, num, opts)
+	v := formatSmallConstant(st, num, opts)
+	// Constant.cpp:246 — mark_mutable_const → "(" + oss + ")"; no invent ignore option
+	if v != "" && opts.MarkMutableConst {
+		return "(" + v + ")"
+	}
+	return v
 }
 
 // MakeStructConstant mirrors GenerateRandomStructConstant.
