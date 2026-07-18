@@ -53,12 +53,13 @@ func NewStatementThresholdTable(opts Options) *ThresholdTable {
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).
 // Statement.cpp:141–147.
 func NumberToType(table *ThresholdTable, value uint32) StatementType {
+	// Statement.cpp:141–147 — assert(stmtTable_); assert(value < 100)
 	if table == nil || value >= 100 {
-		return StmtAssign
+		return MaxStatementType
 	}
 	v := table.GetValue(int(value))
 	if v < 0 {
-		return StmtAssign
+		return MaxStatementType
 	}
 	return StatementType(v)
 }
@@ -67,8 +68,9 @@ func NumberToType(table *ThresholdTable, value uint32) StatementType {
 // Statement.cpp:230–235 — rnd_upto(100); number_to_type.
 // Callers that need filter pass reject via RndUptoFilter.
 func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
+	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); no soft invent eAssign
 	if r == nil {
-		return StmtAssign
+		return MaxStatementType
 	}
 	v := r.RndUpto(100)
 	return NumberToType(table, v)
@@ -77,8 +79,9 @@ func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
 // StatementProbabilityFilter mirrors StatementProbability with a Filter
 // (e.g. reject compound when at max depth — filter implemented by caller).
 func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
+	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); no soft invent eAssign
 	if r == nil {
-		return StmtAssign
+		return MaxStatementType
 	}
 	v := r.RndUptoFilter(100, f)
 	return NumberToType(table, v)

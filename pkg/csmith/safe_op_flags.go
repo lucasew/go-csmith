@@ -237,9 +237,11 @@ func pickSafeOpSize(r *Rng, opts Options) SafeOpSize {
 }
 
 // SizeToken mirrors OutputSize (without leading 'u' for unsigned).
+// SafeOpFlags.cpp:219–242 — assert invalid size; method is const on live flags.
 func (f *SafeOpFlags) SizeToken() string {
 	if f == nil {
-		return "int32_t"
+		// no soft invent int32_t for nil flags
+		return ""
 	}
 	var b strings.Builder
 	if !f.Op1Signed {
@@ -257,7 +259,8 @@ func (f *SafeOpFlags) SizeToken() string {
 	case SafeFloat:
 		return "float"
 	default:
-		b.WriteString("int32_t")
+		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); no soft invent int32_t
+		return ""
 	}
 	return b.String()
 }

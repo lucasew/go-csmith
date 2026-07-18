@@ -271,6 +271,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 // getOneFunction mirrors Function::get_one_function — random pick.
 // Function.cpp:262–276.
 func getOneFunction(r *Rng, funcs []*Function) *Function {
+	// Function.cpp:262–276 — rnd_upto(ok_size) when n>1; no soft invent funcs[0]
 	n := len(funcs)
 	if n == 0 {
 		return nil
@@ -279,7 +280,7 @@ func getOneFunction(r *Rng, funcs []*Function) *Function {
 		return funcs[0]
 	}
 	if r == nil {
-		return funcs[0]
+		return nil
 	}
 	return funcs[r.RndUpto(uint32(n))]
 }

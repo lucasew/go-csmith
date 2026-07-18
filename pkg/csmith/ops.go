@@ -127,8 +127,9 @@ func BinaryOpsFilter(opts Options) Filter {
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:179–183.
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
+	// FunctionInvocation.cpp:179–183 — always rnd_upto; no soft invent eAdd
 	if r == nil {
-		return BinAdd
+		return BinaryOp(MaxBinaryOp)
 	}
 	return BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), BinaryOpsFilter(opts)))
 }
@@ -185,7 +186,8 @@ func (op UnaryOp) UnaryOpC() string {
 	case UnBitNot:
 		return "~"
 	default:
-		return "-"
+		// invalid unary; no soft invent "-"
+		return ""
 	}
 }
 
@@ -207,8 +209,9 @@ func UnaryOpsFilter(opts Options) Filter {
 
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
+	// FunctionInvocation.cpp:146–148 — always rnd_upto; no soft invent eMinus
 	if r == nil {
-		return UnMinus
+		return UnaryOp(MaxUnaryOp)
 	}
 	return UnaryOp(r.RndUptoFilter(uint32(MaxUnaryOp), UnaryOpsFilter(opts)))
 }

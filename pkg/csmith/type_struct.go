@@ -253,11 +253,13 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 // GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
 // Constant.cpp:225–250 — small random value within ~2^(bound/2).
 func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
+	// Constant.cpp:225+ — pure_rnd_*; no soft invent NewRng(0)
 	if r == nil {
-		r = NewRng(0)
+		return ""
 	}
 	if bound <= 0 {
-		return "0"
+		// invalid bitfield width; no soft invent "0" for broken range
+		return ""
 	}
 	// b = 2^(bound/2); clamp
 	exp := bound / 2
