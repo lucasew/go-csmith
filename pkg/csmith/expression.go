@@ -105,7 +105,9 @@ func (e *Expression) IndirectLevel() int {
 	return e.Var.Type.IndirectLevel() - want.IndirectLevel()
 }
 
-// GetType mirrors Expression::get_type approximate.
+// GetType mirrors Expression::get_type.
+// ExpressionFuncall.cpp:122–124 — invoke.get_type();
+// ExpressionAssign — LHS type; Constant / Variable as typed.
 func (e *Expression) GetType() *Type {
 	if e == nil {
 		return nil
@@ -126,14 +128,29 @@ func (e *Expression) GetType() *Type {
 			return e.Var.Type
 		}
 	case TermFunction:
-		if e.Invoke != nil && e.Invoke.User != nil {
-			return e.Invoke.User.ReturnType
+		// ExpressionFuncall.cpp:122–124
+		if e.Invoke != nil {
+			return e.Invoke.GetType()
+		}
+		if e.ExprType != nil {
+			return e.ExprType
 		}
 	case TermCommaExpr:
 		return e.CommaRHS.GetType()
 	case TermAssignment:
-		if e.Assign != nil && e.Assign.LhsVar != nil {
-			return e.Assign.LhsVar.Type
+		// ExpressionAssign::get_type — LHS type
+		if e.Assign != nil {
+			if e.Assign.Lhs != nil {
+				if t := e.Assign.Lhs.GetType(); t != nil {
+					return t
+				}
+			}
+			if e.Assign.LhsVar != nil {
+				return e.Assign.LhsVar.Type
+			}
+		}
+		if e.ExprType != nil {
+			return e.ExprType
 		}
 	}
 	return nil

@@ -94,3 +94,105 @@ func TestSafeOpsBinaryMatches(t *testing.T) {
 		t.Fatal("safe ops set")
 	}
 }
+
+func TestInvocationGetTypeUnary(t *testing.T) {
+	// FunctionInvocationUnary.cpp:120–128
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(ELongLong), Value: "7"}}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{arg}}
+	if fi.GetType() != GetSimpleType(ELongLong) {
+		t.Fatalf("minus type %v", fi.GetType())
+	}
+	fi.Unary = "!"
+	if fi.GetType() != GetIntType() {
+		t.Fatal("not → int")
+	}
+}
+
+func TestInvocationGetTypeBinary(t *testing.T) {
+	// cmp → int
+	fi := &Invocation{IsStd: true, Binary: ">", Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeInt(0)},
+	}}
+	if fi.GetType() != GetIntType() {
+		t.Fatal("cmp")
+	}
+	// float size flags → float
+	fi = &Invocation{
+		IsStd: true, Binary: "+",
+		Args: []*Expression{
+			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: MakeInt(2)},
+		},
+		Safe: &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat},
+	}
+	if !fi.IsReturnTypeFloat() || fi.GetType() != GetSimpleType(EFloat) {
+		t.Fatal("float ret")
+	}
+	// both unsigned → uint
+	u := GetSimpleType(EUInt)
+	cu := &Constant{Type: u, Value: "1"}
+	fi = &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
+		{Term: TermConstant, Con: cu},
+		{Term: TermConstant, Con: cu},
+	}}
+	if fi.GetType() != GetSimpleType(EUInt) {
+		t.Fatalf("unsigned add %v", fi.GetType())
+	}
+	// shift follows left
+	fi = &Invocation{IsStd: true, Binary: "<<", Args: []*Expression{
+		{Term: TermConstant, Con: cu},
+		{Term: TermConstant, Con: MakeInt(1)},
+	}}
+	if fi.GetType() != GetSimpleType(EUInt) {
+		t.Fatal("ushift")
+	}
+}
+
+func TestInvocationSafeInvocation(t *testing.T) {
+	// Unary: minus unsafe; others safe; binary always unsafe; user always safe
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-"}).SafeInvocation() {
+		t.Fatal("minus")
+	}
+	if !(&Invocation{IsStd: true, IsUnary: true, Unary: "!"}).SafeInvocation() {
+		t.Fatal("not")
+	}
+	if (&Invocation{IsStd: true, Binary: "+"}).SafeInvocation() {
+		t.Fatal("binary")
+	}
+	if !(&Invocation{User: &Function{Name: "f"}}).SafeInvocation() {
+		t.Fatal("user")
+	}
+}
+
+func TestInvocationCompatibleVarUnary(t *testing.T) {
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
+	if !fi.CompatibleVar(v, false) {
+		t.Fatal("self")
+	}
+	if fi.CompatibleVar(CreateVariableScalars("g_2", GetIntType(), true, false), false) {
+		t.Fatal("other")
+	}
+	// binary never compatible
+	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ev}}
+	if fi2.CompatibleVar(v, false) {
+		t.Fatal("binary")
+	}
+}
+
+func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {
+	// ExpressionFuncall.cpp:122–124
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleType(EShort), Value: "1"}}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	if e.GetType() != GetSimpleType(EShort) {
+		t.Fatalf("got %v", e.GetType())
+	}
+	// user return type
+	e2 := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "f", ReturnType: GetSimpleType(EFloat)}}}
+	if e2.GetType() != GetSimpleType(EFloat) {
+		t.Fatal("user")
+	}
+}

@@ -52,6 +52,125 @@ func GetBinopString(op BinaryOp) string {
 	return op.BinaryOpC()
 }
 
+// IsReturnTypeFloat mirrors FunctionInvocationBinary::is_return_type_float.
+// FunctionInvocationBinary.cpp:184–187 — op_flags size is sFloat.
+func (fi *Invocation) IsReturnTypeFloat() bool {
+	if fi == nil || fi.Safe == nil {
+		return false
+	}
+	return fi.Safe.Size == SafeFloat
+}
+
+// GetType mirrors FunctionInvocation{Unary,Binary,User}::get_type.
+// FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
+// FunctionInvocationUser.cpp:380 — return type.
+func (fi *Invocation) GetType() *Type {
+	if fi == nil {
+		return GetIntType()
+	}
+	if fi.User != nil {
+		if fi.User.ReturnType != nil {
+			return fi.User.ReturnType
+		}
+		return GetIntType()
+	}
+	if !fi.IsStd {
+		return GetIntType()
+	}
+	if fi.IsUnary {
+		return fi.getTypeUnary()
+	}
+	return fi.getTypeBinary()
+}
+
+// getTypeUnary mirrors FunctionInvocationUnary::get_type.
+// FunctionInvocationUnary.cpp:114–131.
+func (fi *Invocation) getTypeUnary() *Type {
+	// eNot → int; ePlus/eMinus/eBitNot → operand type
+	if fi.Unary == "!" {
+		return GetIntType()
+	}
+	if len(fi.Args) >= 1 && fi.Args[0] != nil {
+		if t := fi.Args[0].GetType(); t != nil {
+			return t
+		}
+	}
+	return GetIntType()
+}
+
+// getTypeBinary mirrors FunctionInvocationBinary::get_type.
+// FunctionInvocationBinary.cpp:192–241.
+func (fi *Invocation) getTypeBinary() *Type {
+	// FunctionInvocationBinary.cpp:193–194
+	if fi.IsReturnTypeFloat() {
+		return GetSimpleType(EFloat)
+	}
+	op, ok := BinaryOpFromString(fi.Binary)
+	if !ok {
+		return GetIntType()
+	}
+	switch op {
+	case BinAdd, BinSub, BinMul, BinDiv, BinMod, BinBitXor, BinBitAnd, BinBitOr:
+		// FunctionInvocationBinary.cpp:208–224 — both signed → int else uint
+		ls, rs := true, true
+		if len(fi.Args) >= 1 && fi.Args[0] != nil {
+			if t := fi.Args[0].GetType(); t != nil {
+				ls = t.IsSigned()
+			}
+		}
+		if len(fi.Args) >= 2 && fi.Args[1] != nil {
+			if t := fi.Args[1].GetType(); t != nil {
+				rs = t.IsSigned()
+			}
+		}
+		if ls && rs {
+			return GetSimpleType(EInt)
+		}
+		return GetSimpleType(EUInt)
+	case BinCmpGt, BinCmpLt, BinCmpGe, BinCmpLe, BinCmpEq, BinCmpNe, BinAnd, BinOr:
+		return GetIntType()
+	case BinLShift, BinRShift:
+		// FunctionInvocationBinary.cpp:229–238 — follow left signedness
+		if len(fi.Args) >= 1 && fi.Args[0] != nil {
+			if t := fi.Args[0].GetType(); t != nil && !t.IsSigned() {
+				return GetSimpleType(EUInt)
+			}
+		}
+		return GetSimpleType(EInt)
+	default:
+		return GetIntType()
+	}
+}
+
+// SafeInvocation mirrors FunctionInvocation::safe_invocation.
+// Unary: eMinus false (FunctionInvocationUnary.cpp:185–187);
+// Binary: always false; User: always true.
+func (fi *Invocation) SafeInvocation() bool {
+	if fi == nil {
+		return false
+	}
+	if fi.User != nil {
+		return true
+	}
+	if fi.IsStd && fi.IsUnary {
+		return fi.Unary != "-"
+	}
+	// binary std: false
+	return false
+}
+
+// CompatibleVar mirrors FunctionInvocationUnary::compatible.
+// FunctionInvocationUnary.cpp:137–141 — operand[0].compatible(v); binary/user false.
+func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
+	if fi == nil || v == nil || !fi.IsStd || !fi.IsUnary {
+		return false
+	}
+	if len(fi.Args) == 0 || fi.Args[0] == nil {
+		return false
+	}
+	return fi.Args[0].CompatibleWithVar(v, expandStruct)
+}
+
 // Is0Or1 mirrors FunctionInvocationBinary::is_0_or_1 and Unary eNot.
 // FunctionInvocationBinary.cpp:179–181 — comparison ops yield 0/1.
 // FunctionInvocationUnary.h:67 — eNot only.
