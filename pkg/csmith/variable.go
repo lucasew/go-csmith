@@ -295,11 +295,12 @@ func CtrlVarsDoFinalization() {
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.
+// No soft invent for nil entries (C++ ctrl_vars[i] always live).
 func CtrlVarNames(ctrl []*Variable) []string {
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
 		if v == nil {
-			out[i] = "i" + itoa(i)
+			out[i] = ""
 			continue
 		}
 		out[i] = v.GetActualName(false)
@@ -308,13 +309,15 @@ func CtrlVarNames(ctrl []*Variable) []string {
 }
 
 // OutputArrayCtrlVars mirrors OutputArrayCtrlVars — "int i, j, k;".
-// Variable.cpp:800–811.
+// Variable.cpp:800–811 — assert(dimen <= ctrl_vars.size()); get_actual_name only.
+// No letter-name invent for nil slots.
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen <= 0 || len(ctrl) == 0 {
 		return ""
 	}
+	// Variable.cpp:802 — assert(dimen <= ctrl_vars.size())
 	if dimen > len(ctrl) {
-		dimen = len(ctrl)
+		return ""
 	}
 	var b strings.Builder
 	b.WriteString(indent + "int ")
@@ -322,10 +325,9 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
+		// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); no soft i/j/k
 		if ctrl[i] != nil {
 			b.WriteString(ctrl[i].GetActualName(false))
-		} else {
-			b.WriteString(string([]byte{byte('i' + i)}))
 		}
 	}
 	b.WriteString(";\n")

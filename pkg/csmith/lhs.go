@@ -234,9 +234,13 @@ func MakeRandomLhs(
 		cg.EffectStm = stmSave
 	}
 
-	// Lhs.cpp:63, 70–140 — do { select; filters; visit } while; dummy invalid_vars
+	// Lhs.cpp:63, 70–140 — do { DEPTH_GUARD; select; filters; visit } while; dummy invalid_vars
 	var dummy []*Variable
 	for tries := 0; tries < 32; tries++ {
+		// Lhs.cpp:71 — DEPTH_GUARD_BY_TYPE_RETURN(dtLhs, nullptr) inside the do-loop
+		if DepthGuardByType(opts, DtLhs) == BadDepth {
+			return nil
+		}
 		var v *Variable
 		// Lhs.cpp:73–76 — try must_use WRITE first
 		v = vs.SelectMustUseVar(r, AccessWrite, *cg, typ, &q)

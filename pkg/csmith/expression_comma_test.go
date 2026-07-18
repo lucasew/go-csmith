@@ -16,12 +16,27 @@ func TestMakeExpressionComma(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 	out := e.Output()
-	if !strings.Contains(out, ", ") {
+	// ExpressionComma.cpp:141 — " , " (spaces around comma)
+	if !strings.Contains(out, " , ") {
 		t.Fatal(out)
 	}
 	// outer parens
 	if !strings.HasPrefix(out, "(") || !strings.HasSuffix(out, ")") {
 		t.Fatal(out)
+	}
+	// no soft invent "0" for missing sides
+	bare := &Expression{Term: TermCommaExpr}
+	if bare.Output() != "( , )" {
+		t.Fatalf("want empty sides, got %q", bare.Output())
+	}
+}
+
+func TestMakeRandomParamNilType(t *testing.T) {
+	// Expression.cpp:241 — assert(type); no GetIntType soft invent
+	opts := Defaults()
+	c := EmptyCGContext()
+	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
+		t.Fatal("nil type must not soft-fallback")
 	}
 }
 

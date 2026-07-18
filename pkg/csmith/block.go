@@ -489,6 +489,11 @@ func makeRandomStmt(
 	if cg == nil {
 		return Stmt{}
 	}
+	// Statement.cpp:243–244 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtStatement, t, nullptr)
+	// t is MAX_STATEMENT_TYPE when choosing randomly (flag = MaxStatementType).
+	if DepthGuardByTypeFlag(opts, DtStatement, int(MaxStatementType)) == BadDepth {
+		return Stmt{}
+	}
 	if stmtTab == nil {
 		stmtTab = NewStatementThresholdTable(opts)
 	}

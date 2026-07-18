@@ -47,6 +47,10 @@ func MakeRandomReturn(
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return st
 	}
+	// StatementReturn.cpp:55 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementReturn, nullptr)
+	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
+		return st
+	}
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
 		ret = GetIntType()

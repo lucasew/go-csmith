@@ -491,8 +491,14 @@ func MakeRandomParam(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
+	// Expression.cpp:241–242 — assert(type); DEPTH_GUARD after type known
 	if typ == nil {
-		typ = GetIntType()
+		return nil
+	}
+	// Expression.cpp:242–243 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpressionRandomParam, tt, …)
+	// term type not chosen yet when MAX; guard uses flag 0 until Pick (C++ uses tt arg)
+	if DepthGuardByTypeFlag(opts, DtExpressionRandomParam, int(MaxTermTypes)) == BadDepth {
+		return nil
 	}
 	// Expression.cpp:258 — use cg_context.expr_depth (exprDepth param kept for API)
 	depth := exprDepth
@@ -555,6 +561,10 @@ func MakeRandomExpression(
 	if cg == nil {
 		return nil
 	}
+	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)
+	if DepthGuardByTypeFlag(opts, DtExpression, int(tt)) == BadDepth {
+		return nil
+	}
 	var flist *FunctionList
 	if len(list) > 0 {
 		flist = list[0]
@@ -574,9 +584,10 @@ func MakeRandomExpression(
 
 	// Expression.cpp:147–153 — type==nullptr → choose_random_nonvoid(_nonvolatile)
 	// based on effect_context purity; re-roll if struct + Constant want.
+	// C++ do-while always yields a type; no GetIntType soft invent.
 	if typ == nil {
 		seFree := cg.EffectContext().IsSideEffectFree()
-		for tries := 0; tries < 16; tries++ {
+		for tries := 0; tries < 32; tries++ {
 			if env != nil && len(env.AllTypes) > 0 {
 				if seFree {
 					typ = env.ChooseRandomNonvoid(r, opts, probs)
@@ -595,7 +606,7 @@ func MakeRandomExpression(
 			}
 		}
 		if typ == nil {
-			typ = GetIntType()
+			return nil
 		}
 	}
 	// Expression.cpp:155 — constant struct not allowed as term type
@@ -665,6 +676,10 @@ func makeExpressionVariableFlags(
 	asParam, asReturn bool,
 ) *Expression {
 	if vs == nil || cg == nil {
+		return nil
+	}
+	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)
+	if DepthGuardByType(vs.Opts, DtExpressionVariable) == BadDepth {
 		return nil
 	}
 	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore
@@ -818,14 +833,16 @@ func (e *Expression) outputBody() string {
 			}
 		}
 	case TermCommaExpr:
-		l, r := "0", "0"
+		// ExpressionComma.cpp:137–144 — "(" + lhs + " , " + rhs + ")"
+		// no soft invent "0" for nil sides (C++ always has live lhs/rhs)
+		l, r := "", ""
 		if e.CommaLHS != nil {
 			l = e.CommaLHS.Output()
 		}
 		if e.CommaRHS != nil {
 			r = e.CommaRHS.Output()
 		}
-		return "(" + l + ", " + r + ")"
+		return "(" + l + " , " + r + ")"
 	}
 	return "/*expr*/"
 }
