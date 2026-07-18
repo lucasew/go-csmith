@@ -62,6 +62,53 @@ func TestFactMgrGlobalFacts(t *testing.T) {
 	}
 }
 
+func TestMarkFuncEnd(t *testing.T) {
+	// FactPointTo.cpp:129–154 — stack local pointee → garbage
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	loc := CreateVariableScalars("l_t", GetIntType(), false, false)
+	loc.Name = "l_t"
+	body := &Block{Func: f, LocalVars: []*Variable{loc}}
+	f.Blocks = []*Block{body}
+	f.Body = body
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	ft := MakeFactPointTo(p, loc)
+	nf := ft.MarkFuncEnd(f, body)
+	if nf == nil || len(nf.PointTo) != 1 || nf.PointTo[0] != GarbagePtr {
+		t.Fatalf("%+v", nf)
+	}
+	// non-stack target unchanged
+	g := CreateVariableScalars("g_t", GetIntType(), true, false)
+	ft2 := MakeFactPointTo(p, g)
+	if ft2.MarkFuncEnd(f, body) != nil {
+		t.Fatal("global pointee")
+	}
+}
+
+func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
+	// remaining global ptr that points at local → garbage after remove
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	loc := CreateVariableScalars("l_t", GetIntType(), false, false)
+	loc.Name = "l_t"
+	body := &Block{Func: fn, LocalVars: []*Variable{loc}}
+	fn.Blocks = []*Block{body}
+	fn.Body = body
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	lp.Name = "l_p"
+	body.LocalVars = append(body.LocalVars, lp)
+	facts := []*FactPointTo{
+		MakeFactPointTo(lp, NullPtr),
+		MakeFactPointTo(gp, loc),
+	}
+	out := RemoveFunctionLocalFacts(facts, fn)
+	if len(out) != 1 || out[0].Var != gp {
+		t.Fatalf("%+v", out)
+	}
+	if len(out[0].PointTo) != 1 || out[0].PointTo[0] != GarbagePtr {
+		t.Fatal("want garbage pointee", out[0].PointTo)
+	}
+}
+
 func TestUpdateWithModifiedIndex(t *testing.T) {
 	// FactPointTo.cpp:712–748 — a[i] → a[-1] when i modified
 	parent := &ArrayVariable{

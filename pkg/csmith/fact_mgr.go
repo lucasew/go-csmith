@@ -419,32 +419,55 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 	return filterFactsNotInVars(facts, locals)
 }
 
-// RemoveFunctionLocalFacts mirrors FactMgr::remove_function_local_facts subset.
-// FactMgr.cpp:179+ — drop l_/p_ and function-local vars.
+// RemoveFunctionLocalFacts mirrors FactMgr::remove_function_local_facts
+// with stParent=Body (function exit). FactMgr.cpp:179–205.
 func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo {
-	var locals []*Variable
+	var parent *Block
 	if f != nil {
-		locals = append(locals, f.Param...)
-		for _, b := range f.Blocks {
-			if b != nil {
-				locals = append(locals, b.LocalVars...)
-			}
-		}
+		parent = f.Body
 	}
-	// also drop by name prefix when function unknown
+	return RemoveFunctionLocalFactsAt(facts, f, parent)
+}
+
+// RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
+// FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
+func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, fact := range facts {
 		if fact == nil || fact.Var == nil {
 			continue
 		}
-		if fact.Var.IsLocal() || fact.Var.IsArgument() {
+		// drop locals/params on stack at stm, or other function RVs
+		if f != nil && stParent != nil && f.IsVarOnStack(fact.Var, stParent) {
 			continue
 		}
-		if IsVariableInSet(locals, fact.Var) {
+		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
 			continue
 		}
-		out = append(out, fact)
+		// name-prefix fallback when no parent block
+		if stParent == nil && (fact.Var.IsLocal() || fact.Var.IsArgument()) {
+			continue
+		}
+		// also drop known function locals when parent missing IsVarOnStack coverage
+		if f != nil && stParent == nil {
+			if IsVariableInSet(f.Param, fact.Var) {
+				continue
+			}
+			drop := false
+			for _, b := range f.Blocks {
+				if b != nil && IsVariableInSet(b.LocalVars, fact.Var) {
+					drop = true
+					break
+				}
+			}
+			if drop {
+				continue
+			}
+		}
+		out = append(out, fact.Clone())
 	}
+	// FactMgr.cpp:196–204 — remaining facts may point to stack locals → garbage
+	MarkFuncEndOnFacts(&out, f, stParent)
 	return out
 }
 

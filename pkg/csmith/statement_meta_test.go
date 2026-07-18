@@ -16,6 +16,36 @@ func TestGetBlkDepthAndInBlock(t *testing.T) {
 	}
 }
 
+func TestFindTypedStmts(t *testing.T) {
+	// Statement.cpp:631–646
+	ret := Stmt{Kind: StmtReturn, StmID: 3}
+	assign := Stmt{Kind: StmtAssign, StmID: 2}
+	gotos := Stmt{Kind: StmtGoto, StmID: 4}
+	inner := Stmt{
+		Kind: StmtIfElse, StmID: 1,
+		Then: &Block{Stmts: []Stmt{assign, ret}},
+		Else: &Block{Stmts: []Stmt{gotos}},
+	}
+	var stms []*Stmt
+	n := FindTypedStmts(&inner, &stms, []StatementType{StmtReturn, StmtGoto})
+	if n != 2 {
+		t.Fatalf("count %d stms=%v", n, stms)
+	}
+	kinds := map[StatementType]bool{}
+	for _, s := range stms {
+		kinds[s.Kind] = true
+	}
+	if !kinds[StmtReturn] || !kinds[StmtGoto] {
+		t.Fatal(kinds)
+	}
+	// block walk
+	var stms2 []*Stmt
+	FindTypedStmtsInBlock(&Block{Stmts: []Stmt{inner}}, &stms2, []StatementType{StmtAssign})
+	if len(stms2) != 1 || stms2[0].Kind != StmtAssign {
+		t.Fatal(stms2)
+	}
+}
+
 func TestIs1stStm(t *testing.T) {
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},

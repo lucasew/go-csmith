@@ -143,13 +143,13 @@ func MakeRandomSignature(
 	}
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, ReturnType: retType}
-	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil
+	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil;
+	// else qfer->random_qualifiers(true, READ, cg) (Function.cpp:416–418).
 	var retQ CVQualifiers
 	if qfer == nil {
 		retQ = RandomQualifiersDefaultProbs(retType, AccessRead, cg, true, opts, probs, r)
 	} else {
-		// qfer->random_qualifiers(true, READ, cg) deferred → use no_volatile random from type
-		retQ = RandomQualifiersDefaultProbs(retType, AccessRead, cg, true, opts, probs, r)
+		retQ = qfer.RandomQualifiersFrom(true, AccessRead, cg, opts, probs, r)
 	}
 	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
 	// GenerateParameterList: for i=0; i<=max; i++

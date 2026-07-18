@@ -531,6 +531,61 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	return MakeFactPointToSet(f.Var, set)
 }
 
+// MarkFuncEnd mirrors FactPointTo::mark_func_end.
+// FactPointTo.cpp:129–154 — pointees on stack at stm become garbage.
+// stParent is the statement's parent block (for is_var_on_stack).
+func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
+	if f == nil || fn == nil {
+		return nil
+	}
+	set := append([]*Variable(nil), f.PointTo...)
+	hasGarbage := false
+	for _, p := range set {
+		if p == GarbagePtr {
+			hasGarbage = true
+			break
+		}
+	}
+	changed := false
+	for i := 0; i < len(set); i++ {
+		v := set[i]
+		if v == nil || IsSpecialPtr(v) {
+			continue
+		}
+		if !fn.IsVarOnStack(v, stParent) {
+			continue
+		}
+		if hasGarbage {
+			set = append(set[:i], set[i+1:]...)
+			i--
+		} else {
+			set[i] = GarbagePtr
+			hasGarbage = true
+		}
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return MakeFactPointToSet(f.Var, set)
+}
+
+// MarkFuncEndOnFacts applies mark_func_end to each point-to fact in-place.
+// FactMgr.cpp:196–204.
+func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
+	if facts == nil {
+		return
+	}
+	for i, f := range *facts {
+		if f == nil {
+			continue
+		}
+		if nf := f.MarkFuncEnd(fn, stParent); nf != nil {
+			(*facts)[i] = nf
+		}
+	}
+}
+
 // indexExprUsesVar reports whether a string index expression refers to indexVar.
 // Indices are stored as strings (e.g. "i", "(i + 2)"); approximate Expression::use_var.
 func indexExprUsesVar(idx string, indexVar *Variable) bool {

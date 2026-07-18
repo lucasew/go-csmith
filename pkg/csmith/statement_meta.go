@@ -24,6 +24,57 @@ func StmtInBlock(stParent, b *Block) bool {
 	return false
 }
 
+// GetBlocksStmt returns child blocks of a statement (Statement::get_blocks).
+// Then/Else for if/for; nested only — not the parent block.
+func GetBlocksStmt(st *Stmt) []*Block {
+	if st == nil {
+		return nil
+	}
+	var out []*Block
+	if st.Then != nil {
+		out = append(out, st.Then)
+	}
+	if st.Else != nil {
+		out = append(out, st.Else)
+	}
+	return out
+}
+
+// FindTypedStmts mirrors Statement::find_typed_stmts.
+// Statement.cpp:631–646 — collect statements whose Kind is in kinds (recursive).
+// Returns count of matches appended to stms.
+func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
+	if st == nil || stms == nil {
+		return 0
+	}
+	for _, k := range kinds {
+		if st.Kind == k {
+			*stms = append(*stms, st)
+			break
+		}
+	}
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			continue
+		}
+		for i := range b.Stmts {
+			FindTypedStmts(&b.Stmts[i], stms, kinds)
+		}
+	}
+	return len(*stms)
+}
+
+// FindTypedStmtsInBlock walks a block's statements for typed collection.
+func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
+	if b == nil || stms == nil {
+		return 0
+	}
+	for i := range b.Stmts {
+		FindTypedStmts(&b.Stmts[i], stms, kinds)
+	}
+	return len(*stms)
+}
+
 // Is1stStm mirrors Statement::is_1st_stm.
 // Statement.cpp:649–651 — first statement of parent block.
 func Is1stStm(st *Stmt, parent *Block) bool {

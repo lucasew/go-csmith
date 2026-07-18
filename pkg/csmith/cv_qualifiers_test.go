@@ -2,6 +2,64 @@ package csmith
 
 import "testing"
 
+func TestRandomStricterAndLooserConsts(t *testing.T) {
+	// CVQualifiers.cpp:375–457 — exact match returns identity
+	opts := Defaults()
+	opts.MatchExactQualifiers = true
+	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
+	if got := q.RandomStricterConsts(NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsConsts) {
+		t.Fatal("exact stricter const", got)
+	}
+	if got := q.RandomLooserVolatiles(NewRng(2), opts, NewProbabilities(opts)); !boolsEqual(got, q.IsVolatiles) {
+		t.Fatal("exact looser vol", got)
+	}
+	// non-exact: already-const level stays const under stricter
+	opts.MatchExactQualifiers = false
+	q2 := NewCVQualifiers([]bool{true}, []bool{false})
+	got := q2.RandomStricterConsts(NewRng(2), opts, NewProbabilities(opts))
+	if len(got) != 1 || !got[0] {
+		t.Fatal("already const stays", got)
+	}
+	// looser: non-const stays false
+	q3 := NewCVQualifiers([]bool{false}, []bool{false})
+	got3 := q3.RandomLooserConsts(NewRng(2), opts, NewProbabilities(opts))
+	if len(got3) != 1 || got3[0] {
+		t.Fatal("non-const stays false", got3)
+	}
+}
+
+func TestRandomQualifiersFromNoVolatile(t *testing.T) {
+	// CVQualifiers.cpp:194–225 — no_volatile clears all vols
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	base := NewCVQualifiers([]bool{true, false}, []bool{true, true})
+	base.AcceptStricter = true
+	out := base.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, NewRng(2))
+	for _, v := range out.IsVolatiles {
+		if v {
+			t.Fatal("no_volatile", out)
+		}
+	}
+	if len(out.IsConsts) != 2 {
+		t.Fatal(out)
+	}
+	// WRITE clears storage const
+	outW := base.RandomQualifiersFrom(true, AccessWrite, EmptyCGContext(), opts, probs, NewRng(2))
+	if len(outW.IsConsts) > 0 && outW.IsConsts[len(outW.IsConsts)-1] {
+		t.Fatal("write no storage const", outW)
+	}
+}
+
+func TestRandomLooseQualifiers(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	base := NewCVQualifiers([]bool{true}, []bool{true})
+	out := base.RandomLooseQualifiers(true, AccessRead, EmptyCGContext(), opts, probs, NewRng(3))
+	if len(out.IsVolatiles) != 1 || out.IsVolatiles[0] {
+		t.Fatal(out)
+	}
+}
+
 func TestIsVolatileOKOnOneLevelCPP(t *testing.T) {
 	// CVQualifiers.cpp:269–293
 	opts := Defaults()

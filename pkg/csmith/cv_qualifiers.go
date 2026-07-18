@@ -202,6 +202,192 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 		len(q.IsConsts) == level+1
 }
 
+// RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.
+// CVQualifiers.cpp:375–397.
+func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabilities) []bool {
+	depth := len(q.IsConsts)
+	if opts.MatchExactQualifiers {
+		return append([]bool(nil), q.IsConsts...)
+	}
+	out := make([]bool, 0, depth)
+	for i := 0; i < depth; i++ {
+		// special case: already const, or more than 2 levels of * after → keep
+		if q.IsConsts[i] || (depth-i > 2) {
+			out = append(out, q.IsConsts[i])
+			continue
+		}
+		if i < len(q.IsVolatiles) && q.IsVolatiles[i] && !opts.AllowConstVolatile {
+			out = append(out, false)
+			continue
+		}
+		p := 50
+		if probs != nil {
+			p = probs.Single(PStricterConstProb)
+		}
+		index := false
+		if r != nil {
+			index = r.RndFlipcoin(uint32(p))
+		}
+		out = append(out, index)
+	}
+	return out
+}
+
+// RandomStricterVolatiles mirrors CVQualifiers::random_stricter_volatiles.
+// CVQualifiers.cpp:399–420.
+func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
+	depth := len(q.IsVolatiles)
+	if opts.MatchExactQualifiers {
+		return append([]bool(nil), q.IsVolatiles...)
+	}
+	out := make([]bool, 0, depth)
+	for i := 0; i < depth; i++ {
+		// first storage must match when multi-level; deep levels match
+		if q.IsVolatiles[i] || (i == 0 && depth > 1) || (depth-i > 2) {
+			out = append(out, q.IsVolatiles[i])
+			continue
+		}
+		if i < len(q.IsConsts) && q.IsConsts[i] && !opts.AllowConstVolatile {
+			out = append(out, false)
+			continue
+		}
+		p := 50
+		if probs != nil {
+			p = probs.Single(PRegularVolatileProb)
+		}
+		index := false
+		if r != nil {
+			index = r.RndFlipcoin(uint32(p))
+		}
+		out = append(out, index)
+	}
+	MakeScalarVolatiles(opts, out)
+	return out
+}
+
+// RandomLooserConsts mirrors CVQualifiers::random_looser_consts.
+// CVQualifiers.cpp:422–439.
+func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilities) []bool {
+	depth := len(q.IsConsts)
+	if opts.MatchExactQualifiers {
+		return append([]bool(nil), q.IsConsts...)
+	}
+	out := make([]bool, 0, depth)
+	for i := 0; i < depth; i++ {
+		if !q.IsConsts[i] || (depth-i > 2) {
+			out = append(out, q.IsConsts[i])
+			continue
+		}
+		p := 50
+		if probs != nil {
+			p = probs.Single(PLooserConstProb)
+		}
+		index := false
+		if r != nil {
+			index = r.RndFlipcoin(uint32(p))
+		}
+		out = append(out, index)
+	}
+	return out
+}
+
+// RandomLooserVolatiles mirrors CVQualifiers::random_looser_volatiles.
+// CVQualifiers.cpp:441–457.
+func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
+	depth := len(q.IsVolatiles)
+	if opts.MatchExactQualifiers {
+		return append([]bool(nil), q.IsVolatiles...)
+	}
+	out := make([]bool, 0, depth)
+	for i := 0; i < depth; i++ {
+		if !q.IsVolatiles[i] || (i == 0 && depth > 1) || (depth-i > 2) {
+			out = append(out, q.IsVolatiles[i])
+			continue
+		}
+		p := 50
+		if probs != nil {
+			p = probs.Single(PRegularVolatileProb)
+		}
+		index := false
+		if r != nil {
+			index = r.RndFlipcoin(uint32(p))
+		}
+		out = append(out, index)
+	}
+	MakeScalarVolatiles(opts, out)
+	return out
+}
+
+// RandomQualifiersFrom mirrors CVQualifiers::random_qualifiers(no_vol, access, cg).
+// CVQualifiers.cpp:194–225 — random relative to this qfer (stricter or looser).
+func (q CVQualifiers) RandomQualifiersFrom(
+	noVolatile bool,
+	access Access,
+	cg CGContext,
+	opts Options,
+	probs *Probabilities,
+	r *Rng,
+) CVQualifiers {
+	if q.Wildcard {
+		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
+	}
+	var vols []bool
+	if noVolatile {
+		vols = make([]bool, len(q.IsVolatiles))
+	} else if !q.AcceptStricter {
+		vols = q.RandomLooserVolatiles(r, opts, probs)
+	} else {
+		vols = q.RandomStricterVolatiles(r, opts, probs)
+	}
+	if !noVolatile && !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
+		vols[len(vols)-1] = false
+	}
+	MakeScalarVolatiles(opts, vols)
+
+	var consts []bool
+	if !q.AcceptStricter {
+		consts = q.RandomLooserConsts(r, opts, probs)
+	} else {
+		consts = q.RandomStricterConsts(r, opts, probs)
+	}
+	MakeScalarConsts(opts, consts)
+	if access == AccessWrite && len(consts) > 0 {
+		consts[len(consts)-1] = false
+	}
+	return NewCVQualifiers(consts, vols)
+}
+
+// RandomLooseQualifiers mirrors CVQualifiers::random_loose_qualifiers.
+// CVQualifiers.cpp:231–259 — always looser (ignore AcceptStricter for direction).
+func (q CVQualifiers) RandomLooseQualifiers(
+	noVolatile bool,
+	access Access,
+	cg CGContext,
+	opts Options,
+	probs *Probabilities,
+	r *Rng,
+) CVQualifiers {
+	if q.Wildcard {
+		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
+	}
+	var vols []bool
+	if noVolatile {
+		vols = make([]bool, len(q.IsVolatiles))
+	} else {
+		vols = q.RandomLooserVolatiles(r, opts, probs)
+		if !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
+			vols[len(vols)-1] = false
+		}
+	}
+	MakeScalarVolatiles(opts, vols)
+	consts := q.RandomLooserConsts(r, opts, probs)
+	MakeScalarConsts(opts, consts)
+	if access == AccessWrite && len(consts) > 0 {
+		consts[len(consts)-1] = false
+	}
+	return NewCVQualifiers(consts, vols)
+}
+
 // RandomAddQualifiers mirrors CVQualifiers::random_add_qualifiers.
 // CVQualifiers.cpp:467–494 — append one pointer level with const/volatile probs.
 func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabilities, noVolatile bool) CVQualifiers {
