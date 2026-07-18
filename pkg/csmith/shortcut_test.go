@@ -244,3 +244,58 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 		t.Fatal("visited must be set even on fail")
 	}
 }
+
+func TestContainsUnfixedGotoImply(t *testing.T) {
+	// Statement.cpp:797–800 — dest fact not imply jump_src → unfixed
+	f := &Function{Name: "f"}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	// dest in: p→{a}; jump src out: p→{a,b} — dest does not imply src (narrower dest
+	// imply wider src? Imply is other ⊆ this, so dest.Imply(src) means src ⊆ dest.
+	// C++: !f->imply(*jump_src_f) with f = dest in, jump_src = src out.
+	// If dest is {a} and src is {a,b}, {a}.Imply({a,b}) is false (b not in dest).
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl"},
+		{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	fm.MapVisited = map[int]bool{20: true}
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointToSet(p, []*Variable{a, b})})
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
+	root := &Stmt{Kind: StmtBlock, Then: body, StmID: 1}
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("expect unfixed when dest does not imply jump src")
+	}
+	// equal sets → fixed
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	if ContainsUnfixedGoto(root, fm) {
+		t.Fatal("equal should be fixed")
+	}
+}
+
+func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
+	// block shortcut must not fire with unfixed internal goto
+	f := &Function{Name: "f"}
+	body := &Block{Func: f, StmID: 50, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 51},
+		{Kind: StmtGoto, StmID: 52, Label: "elsewhere", GotoDestStmID: 99},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 52, DestStmID: 99}} // dest outside
+	// unvisited goto
+	fm.MapVisited = map[int]bool{}
+	fm.SetMapFactsIn(50, nil)
+	fm.SetMapFactsOut(50, nil)
+	fm.SetMapStmEffect(50, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{}
+	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutNone {
+		t.Fatal("unfixed goto must block shortcut")
+	}
+}

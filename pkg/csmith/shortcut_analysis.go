@@ -140,36 +140,76 @@ func BlockContainsStmt(b *Block, target *Stmt) bool {
 }
 
 // ContainsUnfixedGoto mirrors Statement::contains_unfixed_goto for a statement tree.
-// Statement.cpp:769–804 — goto edge from inside root, dest outside, not yet visited.
+// Statement.cpp:769–804 — unvisited goto out of tree, or visited goto whose
+// dest facts are not implied by jump-src outs.
 func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 	if root == nil || fm == nil {
 		return false
 	}
 	ids := map[int]bool{}
 	collectStmIDs(root, ids)
+	return containsUnfixedGotoIDs(ids, fm)
+}
+
+// ContainsUnfixedGotoBlock mirrors contains_unfixed_goto when root is a Block.
+// Block is a Statement in C++; walk nested stmts for contains_stmt(goto/dest).
+func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
+	if b == nil || fm == nil {
+		return false
+	}
+	ids := map[int]bool{}
+	if b.StmID > 0 {
+		ids[b.StmID] = true
+	}
+	for i := range b.Stmts {
+		collectStmIDs(&b.Stmts[i], ids)
+	}
+	return containsUnfixedGotoIDs(ids, fm)
+}
+
+// containsUnfixedGotoIDs is the CFG scan for Statement.cpp:769–804.
+func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
+	if fm == nil || len(ids) == 0 {
+		return false
+	}
 	for _, e := range fm.CFGEdges {
 		if e == nil || e.SrcID <= 0 {
 			continue
 		}
-		// only care about edges sourced inside this tree
+		// Statement.cpp:781 — edge->src is eGoto and contains_stmt(src)
+		if fm.Func != nil {
+			src := FindStmtByID(fm.Func, e.SrcID)
+			if src == nil || src.Kind != StmtGoto {
+				continue
+			}
+		}
 		if !ids[e.SrcID] {
 			continue
 		}
-		// unfixed: source not visited and dest outside this tree
 		visited := fm.MapVisited != nil && fm.MapVisited[e.SrcID]
+		// contains_stmt(dest): dest stm_id in tree (block dest DestStmID==0 rare for goto)
 		destInside := e.DestStmID > 0 && ids[e.DestStmID]
+		// Statement.cpp:781–784 — unvisited goto to dest outside this tree
 		if !visited && !destInside {
-			// likely backward/forward goto out of this statement
-			if e.BackLink || e.DestStmID > 0 {
-				return true
-			}
+			return true
 		}
-		// visited goto into this tree with empty dest facts vs nonempty src
+		// Statement.cpp:785–803 — visited goto into this tree; re-analyze if dest
+		// facts not implied by jump-src outs (or dest in empty while src out nonempty)
 		if visited && destInside {
 			srcOut := fm.MapFactsOut[e.SrcID]
 			destIn := fm.MapFactsIn[e.DestStmID]
 			if len(srcOut) > 0 && len(destIn) == 0 {
 				return true
+			}
+			for _, f := range destIn {
+				if f == nil || f.Var == nil || f.Var.IsRV() {
+					continue
+				}
+				// Statement.cpp:797–800 — jump_src_f && !f->imply(*jump_src_f)
+				jumpSrc := FindRelatedPointTo(srcOut, f.Var)
+				if jumpSrc != nil && !f.Imply(jumpSrc) {
+					return true
+				}
 			}
 		}
 	}

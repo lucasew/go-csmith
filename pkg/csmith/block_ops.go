@@ -460,7 +460,7 @@ func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
 }
 
 // ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.
-// Statement.cpp:545–567 via Block as Statement.
+// Statement.cpp:545–567 — same_facts && !is_ctrl_stmt && !contains_unfixed_goto.
 func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if b == nil || facts == nil || cg == nil || cg.FM == nil || b.StmID == 0 {
 		return ShortcutNone
@@ -473,7 +473,11 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !SameFacts(*facts, in) {
 		return ShortcutNone
 	}
-	// block is not is_ctrl_stmt; skip unfixed goto under block for light path
+	// Statement.cpp:552 — !contains_unfixed_goto()
+	if ContainsUnfixedGotoBlock(b, fm) {
+		return ShortcutNone
+	}
+	// block is not is_ctrl_stmt
 	eff := fm.GetMapStmEffect(b.StmID)
 	if cg.InConflict(eff) {
 		return ShortcutConflict
@@ -486,5 +490,9 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		fm.MapAccumEffect = make(map[int]Effect)
 	}
 	fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+	if fm.MapVisited == nil {
+		fm.MapVisited = make(map[int]bool)
+	}
+	fm.MapVisited[b.StmID] = true
 	return ShortcutOK
 }
