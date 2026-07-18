@@ -274,16 +274,18 @@ func MakeFirst(
 	if env == nil && vs != nil {
 		env = vs.Types
 	}
-	// Function.cpp:444–454
+	// Function.cpp:444–445 — RandomReturnType; ERROR_GUARD
 	ty := RandomReturnType(r, probs, env, opts)
-	// ERROR_GUARD when choose_random fails (empty AllTypes)
-	if ty == nil {
+	if ty == nil || HasError() {
 		return nil
 	}
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
-	// CVQualifiers::random_qualifiers(ty) — no context
+	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
+	if HasError() {
+		return nil
+	}
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 
 	// Function.cpp:457–458 — FactMgr with empty global facts
@@ -319,10 +321,17 @@ func MakeFirst(
 		cg.Types = env
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
+	// sticky error from body — do not invent Built first function
+	if HasError() || f.Body == nil {
+		return nil
+	}
 
 	// Function.cpp:464–465 — inline flip after body
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
+	}
+	if HasError() {
+		return nil
 	}
 
 	// Function.cpp:466 — setup_in_out_maps(true)

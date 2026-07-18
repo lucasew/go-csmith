@@ -86,8 +86,12 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	if g.Opts.Builtins {
 		InitializeBuiltinFunctions(g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
 	}
-	// Function::make_first — creates FactMgr for func_1
-	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
+	// Function.cpp:796–797 — make_first; ERROR_RETURN
+	first := MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
+	if first == nil || HasError() {
+		// sticky error / failed first function — stop generation (no soft invent continue)
+		return
+	}
 	// Function.cpp:801–807 — create body of each unbuilt function (list may grow)
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
@@ -105,6 +109,10 @@ func (g *ProgramGenerator) GenerateFunctions() {
 			cg = cg.WithFactMgr(fm)
 		}
 		f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
+		// Function.cpp:805 ERROR_RETURN after each GenerateBody
+		if HasError() {
+			return
+		}
 	}
 	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
 	AggregateAllPointToSets(g.Funcs.Funcs, g.FactMgrs)

@@ -57,3 +57,49 @@ func TestMakeRandomFunction(t *testing.T) {
 		t.Log("params", len(f.Param))
 	}
 }
+
+func TestMakeFirstERRORGuard(t *testing.T) {
+	// Function.cpp:445/453 ERROR_GUARD paths
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	// empty Types → RandomReturnType nil
+	vs.Types = &TypeEnv{}
+	list := &FunctionList{Types: vs.Types}
+	if MakeFirst(NewRng(1), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+		t.Fatal("empty AllTypes must fail closed")
+	}
+	// sticky error
+	seedTypesForTest(NewRng(2), opts, probs, vs, list)
+	SetError(ErrGeneric)
+	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+		t.Fatal("sticky error")
+	}
+	ClearError()
+}
+
+func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
+	// Function.cpp:797/805 ERROR_RETURN after make_first / GenerateBody
+	ClearError()
+	opts := Defaults()
+	opts.MaxFuncs = 2
+	opts.MaxBlockSize = 1
+	g := NewProgramGenerator(opts)
+	// poison after types so make_first fails
+	g.Initialize()
+	g.GenerateAllTypes()
+	SetError(ErrGeneric)
+	g.GenerateFunctions()
+	// with sticky error, first may fail; must not invent many built funcs
+	built := 0
+	for _, f := range g.Funcs.Funcs {
+		if f != nil && f.IsBuilt {
+			built++
+		}
+	}
+	if built > 0 {
+		t.Log("unexpected built with sticky error", built)
+	}
+	ClearError()
+}

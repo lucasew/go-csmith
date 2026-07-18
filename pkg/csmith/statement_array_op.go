@@ -324,7 +324,7 @@ func MakeRandomArrayInit(
 		}
 		return Stmt{Kind: StmtArrayOp}
 	}
-	// StatementArrayOp.cpp:144 — assert(init->visit_facts(...))
+	// StatementArrayOp.cpp:144 — assert(init->visit_facts(...)); no soft invent skip
 	if cg.FM != nil {
 		if !VisitFactsExpression(rhs, cg, opts) {
 			for _, d := range dims {
@@ -332,6 +332,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
+			SetError(ErrGeneric)
 			return Stmt{Kind: StmtArrayOp}
 		}
 	}
