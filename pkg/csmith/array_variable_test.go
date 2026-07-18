@@ -26,6 +26,39 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	}
 }
 
+func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
+	// ArrayVariable.cpp:154–157 — empty sizes when no dim fits; no invent [1]
+	opts := Defaults()
+	opts.MaxArrayDim = 0
+	opts.MaxArrayLenPerDim = 0
+	opts.MaxArrayLength = 0
+	av := CreateArrayVariable(NewRng(1), opts, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("nil")
+	}
+	if len(av.Sizes) != 0 {
+		t.Fatalf("want empty sizes, got %v", av.Sizes)
+	}
+}
+
+func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
+	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
+	opts := Defaults()
+	env := &TypeEnv{}
+	probs := NewProbabilities(opts)
+	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
+	if st == nil || !st.IsStruct() {
+		t.Skip("no struct")
+	}
+	av := CreateArrayVariable(NewRng(3), opts, nil, "g_s", st, MakeRandom(st, opts, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("nil av")
+	}
+	if len(av.FieldVars) == 0 {
+		t.Fatal("aggregate array must expand field vars")
+	}
+}
+
 func TestArrayCDecl(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},

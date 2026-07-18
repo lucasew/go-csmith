@@ -59,23 +59,25 @@ func CreateArrayVariable(
 	if dimension > opts.MaxArrayDim {
 		dimension = opts.MaxArrayDim
 	}
+	// ArrayVariable.cpp:146–158 — only push when dimen_size > 0 after clamp;
+	// empty sizes allowed (no soft invent sizes=[1])
 	sizes := make([]int, 0, dimension)
 	total := 1
 	for i := 0; i < dimension; i++ {
+		// ArrayVariable.cpp:149–150 — rnd_upto(max_len_per_dim)+1; ERROR_GUARD
+		if HasError() {
+			return nil
+		}
 		dimen := int(r.RndUpto(uint32(opts.MaxArrayLenPerDim))) + 1
 		if opts.MaxArrayLength > 0 && total*dimen > opts.MaxArrayLength {
 			dimen = opts.MaxArrayLength / total
 		}
+		// ArrayVariable.cpp:154–157 — if (dimen_size) push; else skip (may leave sizes empty)
 		if dimen < 1 {
-			// stop adding dims if cannot fit
-			break
+			continue
 		}
 		total *= dimen
 		sizes = append(sizes, dimen)
-	}
-	if len(sizes) == 0 {
-		sizes = []int{1}
-		total = 1
 	}
 	av := &ArrayVariable{
 		Variable: Variable{
@@ -91,13 +93,14 @@ func CreateArrayVariable(
 	}
 	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
 	av.AsArray = av
-	// init_num = pure_rnd_upto(total_size/2); alt constants
-	// ArrayVariable.cpp:166
-	half := total / 2
-	if half < 1 {
-		half = 1
+	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
+	if elem.IsAggregate() {
+		av.CreateFieldVars()
 	}
-	initNum := int(r.RndUpto(uint32(half)))
+	// ArrayVariable.cpp:166 — pure_rnd_upto(total_size/2); pure_rnd_upto(0)==0
+	// no soft invent half=1 when total_size/2 is 0
+	half := uint32(total / 2)
+	initNum := int(r.RndUpto(half))
 	for i := 0; i < initNum; i++ {
 		c := MakeRandom(elem, opts, r)
 		if c != nil {
