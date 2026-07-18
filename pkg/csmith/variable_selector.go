@@ -1702,7 +1702,13 @@ func (vs *VariableSelector) SelectWithInvalid(
 	case ScopeParentParam:
 		v = vs.SelectParentParamInv(access, cg, t, qfer, r, mt, invalidVars)
 	case ScopeNewValue:
+		// VariableSelector.cpp:1217–1219 — GenerateNewVariable; expand_struct sets ERROR
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
+		if vs.Opts.ExpandStruct {
+			// ERROR_GUARD(nullptr) after switch discards selection
+			SetError(ErrGeneric)
+			return nil
+		}
 	default:
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
 	}
@@ -1710,13 +1716,15 @@ func (vs *VariableSelector) SelectWithInvalid(
 	if v == nil {
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
 	}
-	// VariableSelector.cpp:1225–1227 — non-SE-free context must not pick volatile
+	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
-		// soft reject: prefer another non-vol by regenerating once
+		// must not return volatile under impure effect_context
 		vs.VarCreated = false
 		v2 := vs.GenerateNewVariable(access, cg, t, qfer, r)
 		if v2 != nil && !v2.IsVolatile() {
 			v = v2
+		} else {
+			v = nil
 		}
 	}
 	// VariableSelector.cpp:1229–1239 — record statistics

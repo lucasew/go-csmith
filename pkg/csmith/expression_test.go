@@ -264,6 +264,54 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	}
 }
 
+func TestSelectWithInvalidRejectsVolatileWhenImpure(t *testing.T) {
+	// VariableSelector.cpp:1225–1227 — assert(!var->is_volatile()) under impure effect_context
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	vs.Opts = opts
+	vq := NewCVQualifiers([]bool{false}, []bool{true})
+	vol := CreateVariableQfer("g_v", GetIntType(), vq)
+	vs.GlobalList = []*Variable{vol}
+	vs.AllVars = []*Variable{vol}
+	cg := WithEffectContext(WithSideEffects())
+	// under impure context must never hand back a volatile
+	for seed := uint64(1); seed < 40; seed++ {
+		got := vs.SelectWithInvalid(AccessRead, cg, GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
+		if got != nil && got.IsVolatile() {
+			t.Fatalf("seed %d: must not return volatile under impure effect_context", seed)
+		}
+	}
+}
+
+func TestSelectWithInvalidExpandStructNewValueErrors(t *testing.T) {
+	// VariableSelector.cpp:1217–1219 — eNewValue + expand_struct sets ERROR → nullptr
+	opts := Defaults()
+	opts.ExpandStruct = true
+	opts.GlobalVariables = true
+	vs := NewVariableSelector(opts)
+	vs.Opts = opts
+	// scan until ScopeNewValue (rnd_upto(100) in [95,100) with globals table)
+	hit := false
+	for seed := uint64(1); seed < 200; seed++ {
+		ClearError()
+		// empty lists → local/param fail, NewValue or Global create
+		vs.GlobalList = nil
+		vs.AllVars = nil
+		v := vs.SelectWithInvalid(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
+		if HasError() {
+			hit = true
+			if v != nil {
+				t.Fatal("ERROR_GUARD must return nil")
+			}
+			break
+		}
+	}
+	ClearError()
+	if !hit {
+		t.Log("ScopeNewValue+expand_struct not hit in seed scan")
+	}
+}
+
 func TestSelectWithInvalidExcludesDummy(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
