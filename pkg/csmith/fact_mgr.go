@@ -131,12 +131,18 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 // CreateCFGEdge mirrors FactMgr::create_cfg_edge.
 // FactMgr.cpp:597–598.
 func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool) {
+	fm.CreateCFGEdgeTo(srcID, dest, 0, postDest, backLink)
+}
+
+// CreateCFGEdgeTo is create_cfg_edge with optional dest statement id (goto).
+func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDest, backLink bool) {
 	if fm == nil || dest == nil || srcID == 0 {
 		return
 	}
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
 		SrcID:     srcID,
 		DestBlock: dest,
+		DestStmID: destStmID,
 		PostDest:  postDest,
 		BackLink:  backLink,
 	})

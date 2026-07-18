@@ -3,15 +3,17 @@
 package csmith
 
 // CFGEdge mirrors CFGEdge — control-flow edge between statements/blocks.
-// CFGEdge.h:43–55. Src stored by StmID (Go values are copied into Block.Stmts).
+// CFGEdge.h:43–55. Src/Dest stored by StmID (Go values are copied into Block.Stmts).
 type CFGEdge struct {
 	// SrcID is Statement::stm_id of the source.
 	SrcID int
-	// DestBlock is the destination block (loop head/end).
+	// DestBlock is the destination block (loop head/end or target's block).
 	DestBlock *Block
+	// DestStmID is optional target statement id (goto); 0 if dest is block only.
+	DestStmID int
 	// PostDest mirrors post_dest.
 	PostDest bool
-	// BackLink mirrors back_link (continue → loop head).
+	// BackLink mirrors back_link (continue → loop head; backward goto).
 	BackLink bool
 }
 

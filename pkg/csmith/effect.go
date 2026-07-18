@@ -134,6 +134,36 @@ func (e Effect) IsWritten(v *Variable) bool {
 	return false
 }
 
+// ReadVars mirrors Effect::get_read_vars — list of read variables (stable order by name).
+func (e Effect) ReadVars() []*Variable {
+	if len(e.read) == 0 {
+		return nil
+	}
+	out := make([]*Variable, 0, len(e.read))
+	for v, ok := range e.read {
+		if ok && v != nil {
+			out = append(out, v)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// WrittenVars mirrors Effect::get_write_vars subset.
+func (e Effect) WrittenVars() []*Variable {
+	if len(e.written) == 0 {
+		return nil
+	}
+	out := make([]*Variable, 0, len(e.written))
+	for v, ok := range e.written {
+		if ok && v != nil {
+			out = append(out, v)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
 // IsRead mirrors Effect::is_read — exact or struct parent (not union).
 // Effect.cpp:276–289.
 func (e Effect) IsRead(v *Variable) bool {

@@ -63,6 +63,33 @@ type Block struct {
 	BreakStmIDs []int
 }
 
+// IsVarOnStack mirrors Block::is_var_on_stack.
+// Block.cpp:443–456 — params + local_vars chain.
+func (b *Block) IsVarOnStack(v *Variable) bool {
+	if b == nil || v == nil {
+		return false
+	}
+	f := b.Func
+	for bb := b; f == nil && bb != nil; bb = bb.Parent {
+		f = bb.Func
+	}
+	if f != nil {
+		for _, p := range f.Param {
+			if p != nil && p.Match(v) {
+				return true
+			}
+		}
+	}
+	for bb := b; bb != nil; bb = bb.Parent {
+		for _, loc := range bb.LocalVars {
+			if loc == v || (loc != nil && loc.Match(v)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
 // Block.cpp:216–219.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {

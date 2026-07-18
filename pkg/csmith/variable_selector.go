@@ -44,6 +44,39 @@ func (vs *VariableSelector) RandomParamName() string {
 	return vs.Sym.Next("p_")
 }
 
+// ChooseVisibleReadVar mirrors VariableSelector::choose_visible_read_var.
+// VariableSelector.cpp:361–377 — expand structs; match convert; on stack or global; not vol.
+func ChooseVisibleReadVar(
+	r *Rng,
+	b *Block,
+	readVars []*Variable,
+	typ *Type,
+	unionFacts []*FactUnion,
+) *Variable {
+	if typ == nil {
+		typ = GetIntType()
+	}
+	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
+	var ok []*Variable
+	for _, v := range expanded {
+		if v == nil || v.Type == nil || v.IsVirtual() || v.IsVolatile() {
+			continue
+		}
+		if !typ.Match(v.Type, MatchConvert) {
+			continue
+		}
+		onStack := b != nil && b.IsVarOnStack(v)
+		if !onStack && !v.IsGlobal() {
+			continue
+		}
+		if IsNonreadableField(v, unionFacts) {
+			continue
+		}
+		ok = append(ok, v)
+	}
+	return ChooseOKVar(r, ok)
+}
+
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
 // VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {

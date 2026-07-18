@@ -44,10 +44,24 @@ func MakeExpressionComma(
 	if rhs == nil {
 		rhs = MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, true, false, TermConstant, d)
 	}
-	// lang_cpp cast_if_needed skipped (defaults lang_cpp false)
+	// ExpressionComma.cpp:48–53 cast_if_needed — null pointer constant gets cast_type
+	// (upstream gates on lang_cpp; still useful for typed null in C)
+	castIfNeeded(rhs)
 	return &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: lhs,
 		CommaRHS: rhs,
+	}
+}
+
+// castIfNeeded mirrors ExpressionComma.cpp cast_if_needed.
+// ExpressionComma.cpp:48–53 — nullptr constant of pointer type → cast_type.
+func castIfNeeded(exp *Expression) {
+	if exp == nil || exp.Term != TermConstant || exp.Con == nil {
+		return
+	}
+	ty := exp.GetType()
+	if ty != nil && ty.IsPointerLike() && exp.EqualsInt(0) {
+		exp.CastType = ty
 	}
 }
