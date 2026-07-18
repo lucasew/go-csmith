@@ -17,7 +17,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	BookkeeperDoFinalization()
-	fi := MakeRandomBinaryPtrComparison(NewRng(5), opts, probs, vs, NewExprTables(opts), cg, env)
+	fi := MakeRandomBinaryPtrComparison(NewRng(5), opts, probs, vs, NewExprTables(opts), &cg, env)
 	if fi == nil {
 		t.Fatal("nil")
 	}
@@ -44,7 +44,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	for seed := uint64(1); seed < 100; seed++ {
-		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, NewExprTables(opts), cg, GetIntType())
+		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntType())
 		if fi != nil && fi.PtrCmp {
 			if fi.Binary != "==" && fi.Binary != "!=" {
 				t.Fatal(fi.Binary)

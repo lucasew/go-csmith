@@ -299,6 +299,20 @@ func TestBumpsExprDepth(t *testing.T) {
 	}
 }
 
+func TestMakeRandomExpressionBumpsCallerExprDepth(t *testing.T) {
+	// Expression.cpp:213–218 — cg_context.expr_depth++ on Constant/Variable/user call
+	opts := Defaults()
+	cg := EmptyCGContext()
+	cg.ExprDepth = 2
+	e := MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
+	if e == nil || e.Term != TermConstant {
+		t.Fatalf("%+v", e)
+	}
+	if cg.ExprDepth != 3 {
+		t.Fatalf("ExprDepth=%d want 3", cg.ExprDepth)
+	}
+}
+
 func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	// Expression.cpp:147–152 — nil type from choose_random_nonvoid when SE-free
 	opts := Defaults()

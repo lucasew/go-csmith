@@ -35,7 +35,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	// Full eBinaryOps includes cmp/logic; Output uses safe_* only for arith/shift.
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
-		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		fi = func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType()) }()
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}
@@ -57,7 +57,7 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	// C++ always builds SafeOpFlags; Output must not emit safe_* when SafeMath off.
-	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &c, GetIntType()) }()
 	if fi == nil {
 		t.Fatal("nil inv")
 	}

@@ -503,9 +503,14 @@ func MakeRandomParam(
 	}
 	// ExpressionVariable::make_random(..., as_param=true)
 	if tt == TermVariable {
-		return makeExpressionVariableFlags(r, vs, cg, typ, qfer, true, false)
+		// Expression.cpp:291–294 — depth++ for variable (make_random_param path)
+		e := makeExpressionVariableFlags(r, vs, cg, typ, qfer, true, false)
+		if e != nil && cg != nil && BumpsExprDepth(e) {
+			cg.ExprDepth++
+		}
+		return e
 	}
-	// no_func=false, no_const=true for other terms
+	// no_func=false, no_const=true for other terms (MakeRandomExpression bumps depth)
 	return MakeRandomExpression(r, opts, tables, vs, cg, typ, qfer, false, true, tt, exprDepth, list...)
 }
 
@@ -627,9 +632,11 @@ func MakeRandomExpression(
 	default:
 		return nil
 	}
-	// Expression.cpp:213–218 — depth++ for leaves / user calls
-	// (callers that share exprDepth across siblings should also use BumpsExprDepth)
-	_ = BumpsExprDepth(e)
+	// Expression.cpp:213–218 — depth++ for Constant, Variable, or user FuncCall
+	// so siblings (comma/binary/params) see raised expr_depth via same CGContext&.
+	if e != nil && BumpsExprDepth(e) {
+		cg.ExprDepth++
+	}
 	return e
 }
 

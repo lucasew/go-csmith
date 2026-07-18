@@ -521,16 +521,20 @@ func BuildInvocationAndFunction(
 
 // MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary.
 // FunctionInvocation.cpp:171–288 — 10% ptr comparison; BINARY_OPS_PROB_FILTER;
-// ordered/unordered RHS effect contexts.
+// separate LHS CGContext + merge_param_context; ordered/unordered RHS.
+// cg is *CGContext (C++ CGContext&) so merge_param_context expr_depth/effects stick.
 func MakeRandomBinaryInvocation(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 ) *Invocation {
+	if cg == nil {
+		return nil
+	}
 	if typ == nil {
 		typ = GetIntType()
 	}
@@ -568,28 +572,31 @@ func MakeRandomBinaryInvocation(
 	if !SafeOpsBinary(opStr) {
 		// still keep flags (C++ does); Output uses standard tokens
 	}
-	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
-	// FunctionInvocation.cpp:208–261 — ordered (&&/||) RHS under original effect context;
-	// unordered RHS under original + LHS accum.
-	// Expression.cpp:213–218 — each leaf/user-call bumps depth for subsequent siblings
-	d := cg.ExprDepth
-	preLeft := EmptyEffect()
-	if cg.EffectAccum != nil {
-		preLeft = *cg.EffectAccum
-	}
-	left := MakeRandomExpression(r, opts, tables, vs, &cg, lhsTy, nil, true, false, MaxTermTypes, d)
+
+	// FunctionInvocation.cpp:208–216 — LHS under dedicated accum + ambient effect_context
+	lhsAccum := EmptyEffect()
+	lhsCG := *cg
+	lhsCG.effectContext = cg.EffectContext()
+	lhsCG.EffectAccum = &lhsAccum
+	lhsCG.EffectStm = EmptyEffect()
+	// no_func=true on operands avoids exponential recursion (library depth bias)
+	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, &cg, lhsTy, nil, true, false, TermConstant, d)
+		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, lhsTy, nil, true, false, TermConstant, lhsCG.ExprDepth)
 	}
-	if BumpsExprDepth(left) {
-		d++
+	// FunctionInvocation.cpp:221 — merge_param_context(lhs) (effects + expr_depth)
+	cg.MergeParamContext(lhsCG, true)
+
+	// FunctionInvocation.cpp:222 — snapshot facts before RHS (ordered merge)
+	var factsCopy []*FactPointTo
+	if cg.FM != nil {
+		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
+
 	var right *Expression
 	if op == BinLShift || op == BinRShift {
-		// prefer constant shift amount (FunctionInvocation.cpp:236–244)
-		// ShiftByNonConstantProb default 50
+		// FunctionInvocation.cpp:236–244 — ShiftByNonConstantProb (default 50)
 		if !r.RndFlipcoin(50) {
-			// Constant::make_random_upto(SizeInBytes*8)
 			bits := uint32(32)
 			if lhsTy != nil {
 				if sb := lhsTy.SizeInBytes(); sb > 0 {
@@ -597,52 +604,53 @@ func MakeRandomBinaryInvocation(
 				}
 			}
 			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(bits, r)}
-			// constant bumps depth (Expression.cpp:213–218)
-			d++
+			// Expression.cpp:213–218 — constant bumps expr_depth on caller context
+			cg.ExprDepth++
 		}
 	}
 	if right == nil {
-		if IsOrderedBinary(op) && cg.EffectAccum != nil {
-			// RHS under pre-left context only; merge back (FunctionInvocation.cpp:222–226)
-			postLeft := *cg.EffectAccum
-			*cg.EffectAccum = preLeft
-			// ambient context stays pre-left (effect_context); ordered short-circuit
-			right = MakeRandomExpression(r, opts, tables, vs, &cg, rhsTy, nil, true, false, MaxTermTypes, d)
+		if IsOrderedBinary(op) {
+			// FunctionInvocation.cpp:224–226 — RHS under original cg_context
+			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, cg.ExprDepth)
 			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, &cg, rhsTy, nil, true, false, TermConstant, d)
+				right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, cg.ExprDepth)
 			}
-			*cg.EffectAccum = MergeEffects(postLeft, *cg.EffectAccum)
 		} else {
-			// unordered: RHS under original + LHS effects as effect_context
-			// FunctionInvocation.cpp:228–234
-			rhsCG := cg
-			if cg.EffectAccum != nil {
-				rhsCG.effectContext = *cg.EffectAccum
-			}
-			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, MaxTermTypes, d)
+			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
+			rhsAccum := EmptyEffect()
+			rhsCG := *cg
+			rhsCG.effectContext = cg.EffectContext().AddEffectOpts(lhsAccum, true)
+			rhsCG.EffectAccum = &rhsAccum
+			rhsCG.EffectStm = EmptyEffect()
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, MaxTermTypes, rhsCG.ExprDepth)
 			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, TermConstant, d)
+				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, true, false, TermConstant, rhsCG.ExprDepth)
 			}
-			// fold RHS accum into caller's accum
-			if cg.EffectAccum != nil && rhsCG.EffectAccum != nil && rhsCG.EffectAccum != cg.EffectAccum {
-				*cg.EffectAccum = cg.EffectAccum.AddEffect(*rhsCG.EffectAccum)
-			}
+			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
+			cg.MergeParamContext(rhsCG, true)
 		}
 	}
-	// avoid div/mod by zero-ish constant: re-pick op excluding div/mod/shift
+	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or 0/1 constant
 	if (op == BinMod || op == BinDiv) && right != nil && right.Term == TermConstant && right.Con != nil {
 		if right.Con.Value == "0" || right.Con.Value == "1" {
-			op = BinAdd
-			opStr = op.BinaryOpC()
-			// keep flags if still safe-ops
-			if flags != nil && !SafeOpsBinary(opStr) {
-				flags = nil
+			if lhsTy == nil || !lhsTy.IsFloat() {
+				op = BinAdd
+				opStr = op.BinaryOpC()
+				if flags != nil && !SafeOpsBinary(opStr) {
+					flags = nil
+				}
 			}
 		}
 	}
-	// CompatibleChecker on binary operands when enabled
+	// FunctionInvocation.cpp:266–273 — CompatibleChecker hard-fail (nullptr)
 	if CompatibleCheckExprs(opts, left, right) {
-		right = &Expression{Term: TermConstant, Con: MakeInt(1)}
+		SetError(ErrCompatibleCheck)
+		return nil
+	}
+	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
+	if IsOrderedBinary(op) && cg.FM != nil && factsCopy != nil {
+		MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts)
+		MergeFacts(&cg.FM.GlobalFacts, factsCopy)
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
 	inv.setOutOpts(opts)
@@ -654,7 +662,7 @@ func MakeRandomBinaryInvocation(
 		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
 			st = ty.Simple()
 		}
-		if blk := currentBlock(cg); blk != nil {
+		if blk := currentBlock(*cg); blk != nil {
 			var sym *GenSym
 			if vs != nil {
 				sym = &vs.Sym
@@ -684,16 +692,17 @@ func currentBlock(cg CGContext) *Block {
 // MakeRandomBinaryPtrComparison mirrors make_random_binary_ptr_comparison.
 // FunctionInvocation.cpp:294–360 — == or != on random pointer type operands;
 // NO_DANGLING_PTR; ordered/unordered RHS effect contexts; bookkeeping.
+// cg is *CGContext (C++ CGContext&).
 func MakeRandomBinaryPtrComparison(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	env *TypeEnv,
 ) *Invocation {
-	if r == nil || env == nil || !env.HasPointerType() {
+	if r == nil || cg == nil || env == nil || !env.HasPointerType() {
 		return nil
 	}
 	// FunctionInvocation.cpp:295–296 — eCmpEq or eCmpNe
@@ -710,16 +719,18 @@ func MakeRandomBinaryPtrComparison(
 	if ptrTy == nil {
 		return nil
 	}
-	d := cg.ExprDepth + 1
 	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func
 	lhsAccum := EmptyEffect()
-	lhsCG := cg
+	lhsCG := *cg
+	lhsCG.effectContext = cg.EffectContext()
 	lhsCG.Flags |= FlagNoDanglingPtr
 	lhsCG.EffectAccum = &lhsAccum
-	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, d)
+	lhsCG.EffectStm = EmptyEffect()
+	left := MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, MaxTermTypes, lhsCG.ExprDepth)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, TermVariable, d)
+		left = MakeRandomExpression(r, opts, tables, vs, &lhsCG, ptrTy, nil, true, false, TermVariable, lhsCG.ExprDepth)
 	}
+	// FunctionInvocation.cpp:313 — merge_param_context(lhs)
 	cg.MergeParamContext(lhsCG, true)
 
 	// FunctionInvocation.cpp:317–320 — if LHS const, force RHS variable
@@ -733,21 +744,24 @@ func MakeRandomBinaryPtrComparison(
 	if IsOrderedBinary(op) {
 		oldFlags := cg.Flags
 		cg.Flags |= FlagNoDanglingPtr
-		right = MakeRandomExpression(r, opts, tables, vs, &cg, ptrTy, nil, true, false, tt, d)
+		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, cg.ExprDepth)
 		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, &cg, ptrTy, nil, true, false, TermVariable, d)
+			right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, cg.ExprDepth)
 		}
 		cg.Flags = oldFlags
 	} else {
 		rhsAccum := EmptyEffect()
-		rhsCG := cg
+		rhsCG := *cg
+		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
 		rhsCG.effectContext = cg.EffectContext().AddEffect(lhsAccum)
 		rhsCG.EffectAccum = &rhsAccum
+		rhsCG.EffectStm = EmptyEffect()
 		rhsCG.Flags |= FlagNoDanglingPtr
-		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, d)
+		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
 		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, TermVariable, d)
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, TermVariable, rhsCG.ExprDepth)
 		}
+		// FunctionInvocation.cpp:345
 		cg.MergeParamContext(rhsCG, true)
 	}
 	if left == nil || right == nil {
@@ -944,7 +958,7 @@ func MakeRandomInvocation(
 		if r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
 			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, workType)
 		} else {
-			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, workType)
+			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, &cg, workType)
 		}
 	}
 	return fi

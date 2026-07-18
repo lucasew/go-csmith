@@ -26,7 +26,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	// find an arithmetic safe op invocation
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {
-		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		fi = func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType()) }()
 		if fi != nil && fi.Safe != nil && SafeOpsBinary(fi.Binary) {
 			break
 		}

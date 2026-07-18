@@ -34,7 +34,7 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	// force a binary invoke via synthetic expr
-	fi := MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &c, GetIntType()) }()
 	st := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
 	b := &Block{Stmts: []Stmt{st}}
 	out := b.Output(0)

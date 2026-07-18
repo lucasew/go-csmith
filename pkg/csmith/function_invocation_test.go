@@ -27,7 +27,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	// C++ always sets SafeOpFlags; Output uses safe_* only for arith/shift + SafeMath.
 	var fi *Invocation
 	for seed := uint64(1); seed < 100; seed++ {
-		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		fi = func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &c, GetIntType()) }()
 		if fi != nil && fi.IsStd && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
 			break
 		}
@@ -39,6 +39,43 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	out := fi.Output()
 	if !strings.Contains(out, "safe_") {
 		t.Fatalf("safe wrapper missing: %s", out)
+	}
+}
+
+func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
+	// FunctionInvocation.cpp:208–221 — LHS under dedicated accum; merge_param_context
+	// folds reads into caller's effect_accum and raises expr_depth.
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	cg.ExprDepth = 0
+	var fi *Invocation
+	for seed := uint64(1); seed < 80; seed++ {
+		// fresh accum each try
+		eff = EmptyEffect()
+		cg.EffectAccum = &eff
+		cg.ExprDepth = 0
+		cg.EffectStm = EmptyEffect()
+		fi = MakeRandomBinaryInvocation(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())
+		if fi != nil && len(fi.Args) == 2 && fi.Args[0] != nil {
+			break
+		}
+		fi = nil
+	}
+	if fi == nil {
+		t.Skip("no binary")
+	}
+	// leaf LHS constant or variable bumps expr_depth via merge_param_context
+	if cg.ExprDepth < 1 {
+		t.Fatalf("ExprDepth=%d after binary (want ≥1 from LHS leaf)", cg.ExprDepth)
 	}
 }
 
@@ -125,7 +162,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	_ = env.FindPointerType(GetIntType(), true)
 	vs.Types = env
 	tables := NewExprTables(opts)
-	fi := MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, EmptyCGContext(), env)
+	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env) }()
 	if fi == nil || !fi.IsStd {
 		t.Fatalf("%+v", fi)
 	}
