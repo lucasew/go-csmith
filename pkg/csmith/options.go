@@ -33,13 +33,19 @@ import (
 // processScopeTab mirrors VariableSelector::scopeTable_ (InitScopeTable once).
 // VariableSelectionProbability shares one session table; nil means fail closed
 // (no invent NewScopeThresholdTable per draw).
+//
+// processAssignOpsTab mirrors StatementAssign::assignOpsTable_ (InitProbabilityTable).
+// processExprTables mirrors Expression::exprTable_/paramTable_ (InitProbabilityTables).
+// Both are set once from Probabilities::initialize_group_probs; nil = fail closed.
 var (
-	processOptsMu   sync.RWMutex
-	processOpts     = Defaults()
-	processProbs    *Probabilities
-	processRng      *Rng
-	processStmtTab  *ThresholdTable
-	processScopeTab *ThresholdTable
+	processOptsMu      sync.RWMutex
+	processOpts        = Defaults()
+	processProbs       *Probabilities
+	processRng         *Rng
+	processStmtTab     *ThresholdTable
+	processScopeTab    *ThresholdTable
+	processAssignOpsTab *DistributionTable
+	processExprTables  *ExprTables
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -128,6 +134,42 @@ func ProcessScopeTab() *ThresholdTable {
 // VariableSelector.cpp:110–122 — create once from CGOptions::global_variables.
 func InitScopeTable(opts Options) {
 	SetProcessScopeTab(NewScopeThresholdTable(opts))
+}
+
+// SetProcessAssignOpsTable installs StatementAssign::assignOpsTable_.
+func SetProcessAssignOpsTable(t *DistributionTable) {
+	processOptsMu.Lock()
+	processAssignOpsTab = t
+	processOptsMu.Unlock()
+}
+
+// ProcessAssignOpsTable returns the session assign-ops table (may be nil).
+func ProcessAssignOpsTable() *DistributionTable {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processAssignOpsTab
+}
+
+// SetProcessExprTables installs Expression::exprTable_/paramTable_ session pair.
+func SetProcessExprTables(t *ExprTables) {
+	processOptsMu.Lock()
+	processExprTables = t
+	processOptsMu.Unlock()
+}
+
+// ProcessExprTables returns the session Expression term tables (may be nil).
+func ProcessExprTables() *ExprTables {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processExprTables
+}
+
+// InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs
+// StatementAssign::InitProbabilityTable + Expression::InitProbabilityTables.
+// Probabilities.cpp:573–578 — once per generation with process CGOptions.
+func InitSessionProbabilityTables(opts Options) {
+	SetProcessAssignOpsTable(NewAssignOpsTable(opts))
+	SetProcessExprTables(NewExprTables(opts))
 }
 
 const defaultPlatformInfoPath = "platform.info"

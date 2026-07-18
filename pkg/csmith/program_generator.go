@@ -39,6 +39,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
 	probs := NewProbabilities(opts)
 	SetProcessProbabilities(probs)
+	// Probabilities.cpp:573–578 — assignOpsTable_ + expr/param tables once
+	InitSessionProbabilityTables(opts)
 	// share session Probabilities with VS (no invent throwaway NewProbabilities then overwrite)
 	vs := NewVariableSelectorProbs(opts, probs)
 	stmtTab := NewStatementThresholdTable(opts)
@@ -47,13 +49,19 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	SetProcessStmtTab(stmtTab)
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
 	InitScopeTable(opts)
+	// Expression session tables (same instance as ProcessExprTables)
+	exprTables := ProcessExprTables()
+	if exprTables == nil {
+		exprTables = NewExprTables(opts)
+		SetProcessExprTables(exprTables)
+	}
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,
 		Rng:      r,
 		Probs:    probs,
 		VS:       vs,
-		Tables:   NewExprTables(opts),
+		Tables:   exprTables,
 		StmtTab:  stmtTab,
 		FactMgrs: NewFactMgrMap(),
 	}
@@ -78,8 +86,11 @@ func (g *ProgramGenerator) Initialize() {
 		SetProcessRng(g.Rng)
 		SetProcessProbabilities(g.Probs)
 		SetProcessStmtTab(g.StmtTab)
-		// re-init scope table from session opts (InitScopeTable once semantics)
+		SetProcessExprTables(g.Tables)
+		// re-init scope + assign ops from session opts (once-per-run tables)
 		InitScopeTable(g.Opts)
+		// assignOpsTable_ depends on CGOptions incr/compound flags
+		SetProcessAssignOpsTable(NewAssignOpsTable(g.Opts))
 	}
 }
 
@@ -96,8 +107,9 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	if g == nil {
 		return
 	}
+	// Function::FMList is session state from NewProgramGenerator; no invent mid-run
 	if g.FactMgrs == nil {
-		g.FactMgrs = NewFactMgrMap()
+		return
 	}
 	g.Funcs.Types = &g.Types
 	// Function.cpp:791 — FactMgr::add_interested_facts(CGOptions::interested_facts())

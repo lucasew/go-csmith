@@ -429,7 +429,10 @@ func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
 // PickTermType builds default filters for Expression::make_random when tt==MAX.
 // Expression.cpp:160–179 (subset: no_func, no_const, depth).
 func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
-	// Expression::InitProbabilityTables always live; no soft invent NewExprTables
+	// Expression::InitProbabilityTables always live; process tables if arg nil
+	if tables == nil {
+		tables = ProcessExprTables()
+	}
 	if tables == nil {
 		return MaxTermTypes
 	}
@@ -463,7 +466,10 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 // PickParamTermType mirrors Expression::make_random_param term selection.
 // Expression.cpp:244–260 — paramTable + always filter Constant.
 func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
-	// Expression::InitProbabilityTables always live; no soft invent NewExprTables
+	// Expression::InitProbabilityTables always live; process tables if arg nil
+	if tables == nil {
+		tables = ProcessExprTables()
+	}
 	if tables == nil {
 		return MaxTermTypes
 	}
@@ -579,6 +585,14 @@ func MakeRandomExpression(
 	}
 	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)
 	if DepthGuardByTypeFlag(opts, DtExpression, int(tt)) == BadDepth {
+		return nil
+	}
+	// Expression::InitProbabilityTables — process tables when caller omits session tables
+	if tables == nil {
+		tables = ProcessExprTables()
+	}
+	if tables == nil {
+		// no soft invent NewExprTables mid expression
 		return nil
 	}
 	var flist *FunctionList

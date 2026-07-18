@@ -4,6 +4,10 @@ import "testing"
 
 func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	// Expression::InitProbabilityTables always live; no invent NewExprTables
+	// when both arg and process tables are missing
+	prev := ProcessExprTables()
+	SetProcessExprTables(nil)
+	defer SetProcessExprTables(prev)
 	tt := PickTermType(NewRng(1), nil, Defaults(), GetIntType(), false, false, 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("want MaxTermTypes, got %v", tt)
@@ -12,6 +16,24 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	if tt != MaxTermTypes {
 		t.Fatalf("param want MaxTermTypes, got %v", tt)
 	}
+}
+
+func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
+	// StatementAssign::assignOpsTable_ from InitProbabilityTable; no invent per assign
+	prev := ProcessAssignOpsTable()
+	SetProcessAssignOpsTable(nil)
+	defer SetProcessAssignOpsTable(prev)
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := EmptyCGContext().WithFactMgr(f.ensurePairedFactMgr())
+	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	if stmtOK(st) {
+		t.Fatal("nil assignOpsTable must fail closed")
+	}
+	InitSessionProbabilityTables(opts)
+	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
+	// may still fail for other reasons; at least table is live
+	_ = st
 }
 
 func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {

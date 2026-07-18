@@ -103,8 +103,15 @@ func MakeRandomAssignQfer(
 	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
-	assignTab := NewAssignOpsTable(opts)
+	// StatementAssign::assignOpsTable_ from InitProbabilityTable (no invent per assign)
+	assignTab := ProcessAssignOpsTable()
+	if assignTab == nil {
+		return Stmt{}
+	}
 	op := AssignOpsProbability(r, opts, assignTab, typ)
+	if op < 0 {
+		return Stmt{}
+	}
 	if typ == nil {
 		// Type::SelectLType(!SE-free, op)
 		noVol := !cg.EffectContext().IsSideEffectFree()
