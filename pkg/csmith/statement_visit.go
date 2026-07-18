@@ -201,17 +201,14 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	return true
 }
 
-// VisitFactsStatementFor mirrors StatementFor::visit_facts core.
-// StatementFor.cpp:427–472 — init, IV bound, body, restore pre if must_return.
+// VisitFactsStatementFor mirrors StatementFor::visit_facts.
+// StatementFor.cpp:427–472 — init; IV bound; body; map_facts_in[body] or
+// post-init restore on must_return; merge post_dest break edges; accum effect.
 func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
 		return false
 	}
-	var preFacts []*FactPointTo
-	if cg.FM != nil {
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-	}
-	// StatementFor.cpp:430–432 — walk init statement
+	// StatementFor.cpp:430–432 — walk initializing statement
 	if st.Loop != nil {
 		if st.Loop.InitStmt != nil {
 			if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
@@ -229,20 +226,28 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 		}
 	}
+	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init
+	var factsCopy []*FactPointTo
+	if cg.FM != nil {
+		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+	}
+	eff := cg.EffectStm.Clone()
+
 	var iv *Variable
 	if st.Loop != nil {
 		iv = st.Loop.IV
 	}
 	if iv != nil {
-		// StatementFor.cpp:441–443 — IV must not be written in body
+		// StatementFor.cpp:437–443 — scalar IV; not outer loop IV (assert upstream)
 		if cg.IVBounds != nil {
 			if _, ok := cg.IVBounds[iv]; ok {
-				// already outer IV — upstream asserts
+				// outer IV — upstream asserts; still track for body reject
 			}
 		}
 		cg.AddIVBound(iv, 0)
 		defer cg.RemoveIVBound(iv)
 	}
+	// StatementFor.cpp:445–449 — body under IN_LOOP (body uses shared accum)
 	bodyCG := *cg
 	bodyCG.Flags |= FlagInLoop
 	if st.Then != nil {
@@ -250,17 +255,29 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 	}
-	// body must_return → restore pre-loop facts
 	if cg.FM != nil {
+		// StatementFor.cpp:452–458
 		if st.Then != nil && st.Then.MustReturn() {
-			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
-		} else {
-			// 0+ iterations: merge pre with post-body
-			post := CloneFactSlice(cg.FM.GlobalFacts)
-			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
-			MergeFacts(&cg.FM.GlobalFacts, post)
+			// control reaches end of for with pre-loop (post-init) env
+			cg.FM.GlobalFacts = CloneFactSlice(factsCopy)
+		} else if st.Then != nil && st.Then.StmID > 0 {
+			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
+			if in, ok := cg.FM.MapFactsIn[st.Then.StmID]; ok {
+				cg.FM.GlobalFacts = CloneFactSlice(in)
+			}
 		}
-		// StatementFor.cpp:460–466 — merge break edges into inputs
+		// StatementFor.cpp:460–466 — find_edges_in(true, false) on this for stmt
+		if st.StmID > 0 {
+			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
+				if e == nil {
+					continue
+				}
+				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
+					MergeJumpFacts(&cg.FM.GlobalFacts, out)
+				}
+			}
+		}
+		// also breaks targeting body block (CreateCFGEdge to looping block)
 		if st.Then != nil {
 			for _, e := range cg.FM.FindEdgesInToBlock(st.Then, true, false) {
 				if e == nil {
@@ -271,6 +288,14 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				}
 			}
 		}
+	}
+	// StatementFor.cpp:468 — set_accumulated_effect_after_block(eff, &body, …)
+	if st.Then != nil {
+		bodyEff := EmptyEffect()
+		if cg.FM != nil && st.Then.StmID > 0 {
+			bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
+		}
+		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
 	}
 	return true
 }
