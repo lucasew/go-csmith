@@ -93,6 +93,32 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 	return t
 }
 
+// RandomTypeFromType mirrors Type::random_type_from_type.
+// Type.cpp:589–606 — nil → choose nonvoid; simple → re-roll choose_random_simple.
+func RandomTypeFromType(
+	r *Rng,
+	env *TypeEnv,
+	opts Options,
+	probs *Probabilities,
+	typ *Type,
+	noVolatile bool,
+) *Type {
+	if typ == nil {
+		if env != nil && len(env.AllTypes) > 0 {
+			// nonvolatile path deferred to same nonvoid choose for now
+			_ = noVolatile
+			return env.ChooseRandomNonvoid(r, opts, probs)
+		}
+		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+	}
+	// simple + !strict_simple_type → choose_random_simple (always for our callers)
+	if typ.IsSimple() {
+		st := ChooseRandomNonvoidSimple(r, probs)
+		return GetSimpleType(st)
+	}
+	return typ
+}
+
 // ChooseRandomNonvoid mirrors Type::choose_random_nonvoid.
 // Type.cpp:1218–1227 — NonVoidTypeFilter rejects void.
 func (env *TypeEnv) ChooseRandomNonvoid(r *Rng, opts Options, probs *Probabilities) *Type {

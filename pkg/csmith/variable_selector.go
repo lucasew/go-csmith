@@ -199,8 +199,13 @@ func (vs *VariableSelector) SelectGlobal(
 	if v != nil {
 		return v
 	}
-	// Empty / no match → GenerateNewGlobal
-	return vs.GenerateNewGlobal(access, cg, t, qfer, r)
+	// SelectGlobal.cpp:685–694 — random_type_from_type then GenerateNewGlobal
+	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
+	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
+	if t2 == nil {
+		t2 = t
+	}
+	return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 }
 
 // GenerateParameterVariableTyped mirrors

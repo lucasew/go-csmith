@@ -279,16 +279,19 @@ func (g *ProgramGenerator) OutputMain() string {
 	if g.Opts.ComputeHash {
 		b.WriteString("    crc32_gentab();\n")
 	}
-	// First function invocation
+	// ExtensionMgr::OutputFirstFunInvocation — FunctionInvocation::make_random(first)
+	// OutputMgr.cpp:127–136 / FunctionInvocation.cpp:128–135
 	if len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
 		f0 := g.Funcs.Funcs[0]
-		b.WriteString("    ")
-		if f0.ReturnType != nil && !(f0.ReturnType.IsSimple() && f0.ReturnType.Simple() == EVoid) {
-			// discard return like many drivers; cast void
-			b.WriteString("(void)")
+		cg := EmptyCGContext().WithFuncList(&g.Funcs)
+		cg.Types = &g.Types
+		// build_invocation for target — args via make_random_param (empty if no params)
+		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, cg, &g.Funcs, f0)
+		if inv == nil || inv.Failed {
+			b.WriteString("    " + f0.Name + "();\n")
+		} else {
+			b.WriteString("    " + inv.Output() + ";\n")
 		}
-		b.WriteString(f0.Name)
-		b.WriteString("();\n")
 	}
 	if g.Opts.ComputeHash {
 		// HashGlobalVariables → Variable::hash / ArrayVariable::hash
@@ -298,6 +301,9 @@ func (g *ProgramGenerator) OutputMain() string {
 	} else {
 		b.WriteString("    platform_main_end(0,0);\n")
 	}
+	// ExtensionMgr::OutputTail — return 0 when extension null
+	// ExtensionMgr.cpp:109–111
+	b.WriteString("    return 0;\n")
 	b.WriteString("}\n")
 	return b.String()
 }
