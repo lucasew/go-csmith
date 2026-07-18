@@ -1,6 +1,9 @@
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAddRemoveQualifiers(t *testing.T) {
 	q := NewCVQualifiers([]bool{true}, []bool{false})
@@ -10,6 +13,48 @@ func TestAddRemoveQualifiers(t *testing.T) {
 	}
 	q.RemoveQualifiers(1)
 	if len(q.IsConsts) != 1 || !q.IsConsts[0] {
+		t.Fatal(q)
+	}
+}
+
+func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {
+	// CVQualifiers.cpp:510 — assert(level == -1); multi-level & → empty
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	got := q.IndirectQualifiers(-2)
+	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
+		t.Fatal("multi-level address-of must fail closed empty")
+	}
+	// -1 adds one level
+	got = q.IndirectQualifiers(-1)
+	if len(got.IsConsts) != 2 || got.IsConsts[1] {
+		t.Fatal(got)
+	}
+}
+
+func TestOutputFirstQualsRespectsOptions(t *testing.T) {
+	// CVQualifiers.cpp:641–648 — no invent keyword when option off
+	prev := ProcessOptions()
+	opts := Defaults()
+	opts.Consts = false
+	opts.Volatiles = false
+	SetProcessOptions(opts)
+	defer SetProcessOptions(prev)
+	q := NewCVQualifiers([]bool{true}, []bool{true})
+	if s := q.OutputFirstQuals(); s != "" {
+		t.Fatalf("want empty when options off, got %q", s)
+	}
+	opts.Consts = true
+	opts.Volatiles = true
+	SetProcessOptions(opts)
+	if s := q.OutputFirstQuals(); !strings.Contains(s, "const") || !strings.Contains(s, "volatile") {
+		t.Fatal(s)
+	}
+}
+
+func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
+	// CVQualifiers.cpp:96 — sizes must match; truncate to min
+	q := NewCVQualifiers([]bool{true, false}, []bool{false})
+	if len(q.IsConsts) != 1 || len(q.IsVolatiles) != 1 {
 		t.Fatal(q)
 	}
 }

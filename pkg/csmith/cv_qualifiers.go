@@ -15,7 +15,20 @@ type CVQualifiers struct {
 }
 
 // NewCVQualifiers mirrors CVQualifiers(const vector<bool>&, const vector<bool>&).
+// CVQualifiers.cpp:96 — assert(is_consts.size() == is_volatiles.size()) when both non-empty.
 func NewCVQualifiers(consts, vols []bool) CVQualifiers {
+	// fail closed: truncate to min length so depths stay paired (no invent pad false)
+	if len(consts) != len(vols) {
+		n := len(consts)
+		if len(vols) < n {
+			n = len(vols)
+		}
+		if n < 0 {
+			n = 0
+		}
+		consts = consts[:n]
+		vols = vols[:n]
+	}
 	return CVQualifiers{
 		IsConsts:    append([]bool(nil), consts...),
 		IsVolatiles: append([]bool(nil), vols...),
@@ -105,6 +118,10 @@ func boolsEqual(a, b []bool) bool {
 // StricterThan mirrors CVQualifiers::stricter_than (const/vol depth match).
 // CVQualifiers.cpp:95–120 subset — const: no looser const; multi-level ** special.
 func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
+	// CVQualifiers.cpp:96 — assert own vectors same size
+	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
+		return false
+	}
 	if len(q.IsConsts) != len(other.IsConsts) || len(q.IsVolatiles) != len(other.IsVolatiles) {
 		return false
 	}
@@ -140,7 +157,11 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
 	}
 	// both non-pointer (one level) → true
+	// CVQualifiers.cpp:148 — assert(is_consts.size() == is_volatiles.size())
 	if len(q.IsConsts) == len(other.IsConsts) && len(q.IsConsts) == 1 {
+		if len(q.IsConsts) != len(q.IsVolatiles) {
+			return false
+		}
 		return true
 	}
 	if !q.AcceptStricter {
@@ -183,6 +204,10 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 		return q
 	}
 	if level < 0 {
+		// CVQualifiers.cpp:510 — assert(level == -1); multi-level & fail closed as empty
+		if level != -1 {
+			return CVQualifiers{}
+		}
 		// address-of: add one false,false level (push_back)
 		out := q
 		out.IsConsts = append(append([]bool(nil), q.IsConsts...), false)
@@ -200,8 +225,9 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 }
 
 // SanityCheck mirrors CVQualifiers::sanity_check.
-// CVQualifiers.cpp:526–531 — qualifier depth == type indirect level + 1.
+// CVQualifiers.cpp:526–531 — assert(t); assert(level>=0); depth == indirect+1.
 func (q CVQualifiers) SanityCheck(t *Type) bool {
+	// CVQualifiers.cpp:527 assert(t)
 	if t == nil {
 		return false
 	}
@@ -209,6 +235,7 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 		return true
 	}
 	level := t.IndirectLevel()
+	// CVQualifiers.cpp:529 assert(level >= 0)
 	if level < 0 {
 		return false
 	}
@@ -477,13 +504,21 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 
 // OutputFirstQuals mirrors CVQualifiers::OutputFirstQuals.
 // CVQualifiers.cpp:639–650 — leading const/volatile of level 0.
+// assert(0) if const/vol bit set when option disabled — emit nothing for that bit.
 func (q CVQualifiers) OutputFirstQuals() string {
+	opts := ProcessOptions()
 	var b strings.Builder
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
-		b.WriteString("const ")
+		// CVQualifiers.cpp:641–642 — assert(consts())
+		if opts.Consts {
+			b.WriteString("const ")
+		}
 	}
 	if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
-		b.WriteString("volatile ")
+		// CVQualifiers.cpp:647–648 — assert(volatiles())
+		if opts.Volatiles {
+			b.WriteString("volatile ")
+		}
 	}
 	return b.String()
 }

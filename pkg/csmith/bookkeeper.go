@@ -244,8 +244,9 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 }
 
 // RecordVarsWithBitfields mirrors Bookkeeper::record_vars_with_bitfields.
-// Bookkeeper.cpp:460–475 subset.
+// Bookkeeper.cpp:464–474 — assert(type); base aggregate with bitfields.
 func RecordVarsWithBitfields(t *Type) {
+	// Bookkeeper.cpp:465 assert(type)
 	if t == nil || !t.HasBitfields() {
 		return
 	}
