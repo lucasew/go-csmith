@@ -1135,11 +1135,13 @@ func (vs *VariableSelector) createAndInitialize(
 			}
 			ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
 		} else {
+			// VariableSelector.cpp:528–529 — make_init_value; ERROR_GUARD
+			// no invent array without live Expression* init
 			ie = vs.MakeInitValue(access, cg, t, &qfer, blk, r)
-			if HasError() {
+			if ie == nil || HasError() {
 				return nil
 			}
-			if ie != nil && ie.Term == TermConstant {
+			if ie.Term == TermConstant {
 				init = ie.Con
 			}
 			// Expression init may be non-constant; still store on array InitExpr
@@ -1168,11 +1170,12 @@ func (vs *VariableSelector) createAndInitialize(
 		return &item.Variable
 	}
 	// VariableSelector.cpp:531–533 — make_init_value + new_variable
+	// make_init_value always returns Expression* or ERROR_GUARD(nullptr)
 	ie := vs.MakeInitValue(access, cg, t, &qfer, blk, r)
-	if HasError() {
+	if ie == nil || HasError() {
 		return nil
 	}
-	v := CreateVariableQfer(name, t, qfer)
+	v := CreateVariableWithInit(name, t, nil, qfer)
 	if v == nil {
 		// VariableSelector.cpp:535 assert(var)
 		return nil
@@ -1228,11 +1231,12 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	vs.TmpCount++
 	// VariableSelector.cpp:589–592 — make_init then new_variable (skip array flip)
 	// use &varQfer (C++ may pass original qfer; assert requires non-null qf)
+	// make_init_value always Expression* or ERROR_GUARD — no invent uninit var
 	ie := vs.MakeInitValue(access, cg, t, &varQfer, nil, r)
-	if HasError() {
+	if ie == nil || HasError() {
 		return nil
 	}
-	v := CreateVariableQfer(name, t, varQfer)
+	v := CreateVariableWithInit(name, t, nil, varQfer)
 	if v == nil {
 		return nil
 	}

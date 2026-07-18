@@ -30,9 +30,9 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	env := &TypeEnv{}
 	vs.Types = env
-	// seed an int* global
+	// seed an int* global — qfer depth must be indirect+1 (pointer: 2 levels)
 	p := env.FindPointerType(GetIntType(), true)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	pv := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), p, &q, NewRng(1))
 	if pv == nil {
 		t.Fatal("no ptr global")

@@ -207,3 +207,26 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
+	// VariableSelector.cpp:531–533 — make_init_value then new_variable;
+	// make_init_value always Expression* or ERROR_GUARD — no invent uninit shell.
+	opts := Defaults()
+	opts.Arrays = false // force scalar path
+	vs := NewVariableSelector(opts)
+	// nil qfer sanity: MakeInitValue requires non-nil qf
+	// createAndInitialize always builds qfer; force fail via void type
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_v", NewRng(1)) != nil {
+		t.Fatal("void must fail closed")
+	}
+	// nil RNG
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_n", nil) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	// bad qfer (empty levels on pointer) — MakeInitValue fail closed
+	ptr := PointerTo(GetIntType())
+	badQ := CVQualifiers{} // empty not sanity_check for pointer
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), ptr, badQ, nil, "g_p", NewRng(3)) != nil {
+		t.Fatal("bad qfer must fail closed without invent uninit var")
+	}
+}
