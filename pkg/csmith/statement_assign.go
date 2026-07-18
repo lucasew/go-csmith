@@ -140,6 +140,11 @@ func MakeRandomAssign(
 	// merge RHS effects into caller
 	cg.MergeParamContext(rhsCG, true)
 
+	// StatementAssign.cpp:183 — write_var_set(rhs_accum.get_lhs_write_vars())
+	if lw := rhsAccum.LhsWriteVars(); len(lw) > 0 {
+		runningEff = runningEff.WriteVarSet(lw)
+	}
+
 	// LHS context after RHS (StatementAssign.cpp:185–199)
 	lhsAccum := EmptyEffect()
 	lhsCG := cg

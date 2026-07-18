@@ -54,6 +54,91 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	fm.MapFactsOut[stmID] = CloneFactSlice(facts)
 }
 
+// SetMapFactsOutForStmt mirrors FactMgr::set_fact_out with jump/return filtering.
+// FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return.
+func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Block) {
+	if fm == nil || st == nil {
+		return
+	}
+	cp := CloneFactSlice(facts)
+	switch st.Kind {
+	case StmtContinue, StmtBreak:
+		cp = RemoveLoopLocalFacts(cp, blk)
+	case StmtReturn:
+		cp = RemoveFunctionLocalFacts(cp, fm.Func)
+	case StmtGoto:
+		// full dest update deferred; drop function-locals as approximation for far jumps
+		cp = RemoveFunctionLocalFacts(cp, fm.Func)
+	}
+	if st.StmID > 0 {
+		fm.SetMapFactsOut(st.StmID, cp)
+	}
+}
+
+// RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts.
+// FactMgr.cpp:601–612 — drop facts for locals in loop block chain.
+func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
+	if blk == nil {
+		return facts
+	}
+	var locals []*Variable
+	b := blk
+	for b != nil {
+		locals = append(locals, b.LocalVars...)
+		if b.Looping {
+			break
+		}
+		b = b.Parent
+	}
+	return filterFactsNotInVars(facts, locals)
+}
+
+// RemoveFunctionLocalFacts mirrors FactMgr::remove_function_local_facts subset.
+// FactMgr.cpp:179+ — drop l_/p_ and function-local vars.
+func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo {
+	var locals []*Variable
+	if f != nil {
+		locals = append(locals, f.Param...)
+		for _, b := range f.Blocks {
+			if b != nil {
+				locals = append(locals, b.LocalVars...)
+			}
+		}
+	}
+	// also drop by name prefix when function unknown
+	out := make([]*FactPointTo, 0, len(facts))
+	for _, fact := range facts {
+		if fact == nil || fact.Var == nil {
+			continue
+		}
+		if fact.Var.IsLocal() || fact.Var.IsArgument() {
+			continue
+		}
+		if IsVariableInSet(locals, fact.Var) {
+			continue
+		}
+		out = append(out, fact)
+	}
+	return out
+}
+
+func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
+	if len(drop) == 0 {
+		return facts
+	}
+	out := make([]*FactPointTo, 0, len(facts))
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		if IsVariableInSet(drop, f.Var) {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 // SetMapStmEffect records effect for a statement (map_stm_effect).
 func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	if fm == nil || stmID <= 0 {

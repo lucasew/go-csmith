@@ -25,6 +25,9 @@ type Effect struct {
 	written map[*Variable]bool
 	// read tracks variables read (Effect::read_vars subset).
 	read map[*Variable]bool
+	// lhsWrite tracks LHS write vars (Effect::lhs_write_vars).
+	// Effect.h:104 — used after assign visit to extend running context.
+	lhsWrite map[*Variable]bool
 }
 
 // EmptyEffect is Effect::empty_effect (pure, side-effect free).
@@ -63,9 +66,14 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 	return out
 }
 
-// AddEffect mirrors Effect::add_effect — union of reads/writes; pure/SE-free AND.
-// Effect.cpp:157–186 (lhs_write_vars omitted).
+// AddEffect mirrors Effect::add_effect(e) without LHS set merge.
+// Effect.cpp:157–186.
 func (e Effect) AddEffect(other Effect) Effect {
+	return e.AddEffectOpts(other, false)
+}
+
+// AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
+func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 	out := e
 	if other.read != nil {
 		if out.read == nil {
@@ -97,8 +105,65 @@ func (e Effect) AddEffect(other Effect) Effect {
 		}
 		out.written = nw
 	}
+	if includeLHS && other.lhsWrite != nil {
+		if out.lhsWrite == nil {
+			out.lhsWrite = make(map[*Variable]bool)
+		}
+		nl := make(map[*Variable]bool, len(out.lhsWrite)+len(other.lhsWrite))
+		for k, v := range out.lhsWrite {
+			nl[k] = v
+		}
+		for k, v := range other.lhsWrite {
+			if v {
+				nl[k] = true
+			}
+		}
+		out.lhsWrite = nl
+	}
 	out.pure = e.pure && other.pure
 	out.sideEffectFree = e.sideEffectFree && other.sideEffectFree
+	return out
+}
+
+// WriteVarSet mirrors Effect::write_var_set — write each var.
+// Effect.cpp:148–152.
+func (e Effect) WriteVarSet(vars []*Variable) Effect {
+	out := e
+	for _, v := range vars {
+		out = out.WriteVar(v)
+	}
+	return out
+}
+
+// SetLhsWriteVars mirrors Effect::set_lhs_write_vars from current write_vars.
+// Lhs.cpp:348–351 — after successful LHS visit.
+func (e Effect) SetLhsWriteVarsFromWritten() Effect {
+	out := e
+	if len(e.written) == 0 {
+		out.lhsWrite = nil
+		return out
+	}
+	out.lhsWrite = make(map[*Variable]bool, len(e.written))
+	for k, v := range e.written {
+		if v {
+			out.lhsWrite[k] = true
+		}
+	}
+	return out
+}
+
+// LhsWriteVars returns lhs_write_vars as a slice (stable name order).
+func (e Effect) LhsWriteVars() []*Variable {
+	if len(e.lhsWrite) == 0 {
+		return nil
+	}
+	out := make([]*Variable, 0, len(e.lhsWrite))
+	for v, ok := range e.lhsWrite {
+		if ok && v != nil {
+			out = append(out, v)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 

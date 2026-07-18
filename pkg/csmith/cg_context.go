@@ -252,15 +252,16 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if c == nil {
 		return
 	}
-	_ = includeLHS
 	if param.EffectAccum != nil {
 		if c.EffectAccum != nil {
-			*c.EffectAccum = c.EffectAccum.AddEffect(*param.EffectAccum)
+			*c.EffectAccum = c.EffectAccum.AddEffectOpts(*param.EffectAccum, includeLHS)
 		} else {
-			// fold into effect_context via EffectStm
-			c.EffectStm = c.EffectStm.AddEffect(*param.EffectAccum)
+			// fold into EffectStm
+			c.EffectStm = c.EffectStm.AddEffectOpts(*param.EffectAccum, includeLHS)
 		}
 	}
+	// also merge stm effects from param
+	c.EffectStm = c.EffectStm.AddEffectOpts(param.EffectStm, includeLHS)
 	c.ExprDepth = param.ExprDepth
 }
 
@@ -832,6 +833,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		}
 	}
 	deref := lhs.IndirectLevel()
+	valid := false
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
 			return false
@@ -847,7 +849,16 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		if !c.WritePointed(lhs, facts, opts) {
 			return false
 		}
-		return c.CheckDerefVolatile(v, deref, opts)
+		if !c.CheckDerefVolatile(v, deref, opts) {
+			return false
+		}
+		valid = true
+	} else {
+		valid = c.CheckWriteVar(v, facts)
 	}
-	return c.CheckWriteVar(v, facts)
+	// Lhs.cpp:348–351 — set_lhs_write_vars from write_vars on accum
+	if valid && c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWritten()
+	}
+	return valid
 }

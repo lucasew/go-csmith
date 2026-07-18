@@ -65,7 +65,7 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil && st.StmID > 0 {
-			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
+			cg.FM.SetMapFactsOutForStmt(st, cg.FM.GlobalFacts, b)
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
 	}

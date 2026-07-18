@@ -89,3 +89,32 @@ func LhsAsExpression(lhs *Lhs) *Expression {
 	}
 	return &Expression{Term: TermVariable, Var: lhs.Var, ExprType: ty}
 }
+
+// GetDereferencedPtrs mirrors ExpressionVariable::get_dereferenced_ptrs.
+// ExpressionVariable.cpp:221–227 — self if indirect_level > 0.
+func GetDereferencedPtrs(e *Expression) []*Expression {
+	if e == nil {
+		return nil
+	}
+	switch e.Term {
+	case TermVariable:
+		if e.IndirectLevel() > 0 {
+			return []*Expression{e}
+		}
+	case TermCommaExpr:
+		return append(GetDereferencedPtrs(e.CommaLHS), GetDereferencedPtrs(e.CommaRHS)...)
+	case TermAssignment:
+		if e.Assign != nil {
+			return GetDereferencedPtrs(e.Assign.Expr)
+		}
+	case TermFunction:
+		if e.Invoke != nil {
+			var out []*Expression
+			for _, a := range e.Invoke.Args {
+				out = append(out, GetDereferencedPtrs(a)...)
+			}
+			return out
+		}
+	}
+	return nil
+}
