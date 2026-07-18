@@ -715,13 +715,9 @@ func (b *Block) Output(indent int) string {
 	// OutputArrayInitializers for locals without brace init
 	// Variable.cpp:829–841 — new_ctrl_vars + OutputArrayCtrlVars
 	if len(loopInits) > 0 {
-		// allocate a full max_array_dimensions set; declare only maxDim used
-		opts := Defaults()
-		if b.Func != nil {
-			// Options not stored on Block; letter names match default FreshArrayCtrl=false
-			_ = opts
-		}
-		ctrlVars := NewCtrlVars(maxDim, false)
+		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
+		opts := ProcessOptions()
+		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
 		sb.WriteString(OutputArrayCtrlVars(ctrlVars, maxDim, inner))
 		ctrl := CtrlVarNames(ctrlVars)
 		for _, av := range loopInits {
@@ -765,12 +761,10 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString(inner + st.ArrayAccess + " = tmp;\n")
 				break
 			}
-			// StatementAssign::OutputAsExpr
+			// StatementAssign::OutputAsExpr — CGOptions::identify_wrappers process-wide
 			wrap := st.LhsVar != nil && st.LhsVar.UseVolRVal
-			// use block emit options when available
-			opts := Defaults()
-			opts.IdentifyWrappers = false
-			asExpr := OutputAssignAsExprOpts(&st, wrap, opts)
+			// no soft invent Defaults() / force IdentifyWrappers=false
+			asExpr := OutputAssignAsExprOpts(&st, wrap, ProcessOptions())
 			if asExpr != "" {
 				sb.WriteString(asExpr + ";\n")
 			} else if st.ArrayAccess != "" && st.Expr != nil {

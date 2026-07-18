@@ -268,8 +268,8 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		v = vars[0]
 	} else {
 		// VariableSelector.cpp:324 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
-		// random mode always GOOD; still call for fair wiring (use Defaults opts)
-		if DepthGuardByDepth(Defaults(), 1) == BadDepth {
+		// random mode always GOOD; still call for fair wiring (process CGOptions)
+		if DepthGuardByDepth(ProcessOptions(), 1) == BadDepth {
 			return nil
 		}
 		// VariableSelector.cpp:326–329 — rnd_upto(len); no soft invent vars[0] without RNG
@@ -905,7 +905,8 @@ func ChooseVarFull(
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
 	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
-	opts := Defaults()
+	// FactPointTo::is_valid_ptr reads process CGOptions null/dead deref probs
+	opts := ProcessOptions()
 	if HasDereferenceableVar(cands, want, cg, opts) {
 		RecordPointerAvailForDeref()
 	}

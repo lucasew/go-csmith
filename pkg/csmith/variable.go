@@ -425,9 +425,10 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 		return nil
 	}
 	// Variable.cpp:395 — non-union top: Constant::make_random(type); union top: 0
+	// Constant::make_random reads process CGOptions (binary_constant, longlong, …)
 	var init *Constant
 	if typ == nil || !typ.IsUnion() {
-		init = MakeRandom(typ, Defaults(), nextCreateVarRng())
+		init = MakeRandom(typ, ProcessOptions(), nextCreateVarRng())
 	}
 	v := &Variable{
 		Name: name,
@@ -954,8 +955,9 @@ func (v *Variable) CreateFieldVars() {
 		}
 		var init *Constant
 		if top.Type == nil || !top.Type.IsUnion() {
-			// Variable.cpp:395 — Constant::make_random via process RNG (not fixed seed)
-			init = MakeRandom(f.Type, Defaults(), nextCreateVarRng())
+			// Variable.cpp:395 — Constant::make_random via process CGOptions + RNG
+			// no soft invent Defaults() when session options differ
+			init = MakeRandom(f.Type, ProcessOptions(), nextCreateVarRng())
 		}
 		fv := &Variable{
 			Name:       fname,

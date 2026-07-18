@@ -445,7 +445,8 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		if av == nil {
 			return false
 		}
-		opts := Defaults()
+		// Expression::visit_facts reads process CGOptions; no Defaults invent
+		opts := ProcessOptions()
 		// CGContext.cpp:356–363 — visit each index expression (live Expression*)
 		for _, e := range av.IndexExprs {
 			// C++ av->get_indices()[i] always non-null; no soft skip

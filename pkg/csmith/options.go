@@ -9,8 +9,35 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"unsafe"
 )
+
+// processOpts mirrors C++ CGOptions process-wide static configuration.
+// Constant::make_random, FactPointTo::is_valid_ptr, choose_var bookkeeping,
+// and Block emission read CGOptions; library-first Go keeps an explicit
+// process Options set for each generation run (see SetProcessOptions).
+var (
+	processOptsMu sync.RWMutex
+	processOpts   = Defaults()
+)
+
+// SetProcessOptions installs the active process Options (CGOptions mirror).
+// NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
+// use session options instead of inventing Defaults().
+func SetProcessOptions(o Options) {
+	processOptsMu.Lock()
+	processOpts = o
+	processOptsMu.Unlock()
+}
+
+// ProcessOptions returns the active process Options (CGOptions mirror).
+// Safe default is Defaults() until SetProcessOptions is called.
+func ProcessOptions() Options {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processOpts
+}
 
 const defaultPlatformInfoPath = "platform.info"
 

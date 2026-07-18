@@ -401,8 +401,9 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 
 // OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
 // StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeFlags set.
+// Uses process CGOptions (identify_wrappers); no soft invent Defaults().
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
-	return OutputAssignAsExprOpts(st, wrapVol, Defaults())
+	return OutputAssignAsExprOpts(st, wrapVol, ProcessOptions())
 }
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.

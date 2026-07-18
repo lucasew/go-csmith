@@ -28,6 +28,8 @@ type ProgramGenerator struct {
 // NewProgramGenerator constructs a generator (DefaultProgramGenerator ctor + initialize subset).
 // DefaultProgramGenerator::initialize — CreateInstance RNG; ExtensionMgr skipped (null).
 func NewProgramGenerator(opts Options) *ProgramGenerator {
+	// CGOptions process-wide state for Constant::make_random / choose_var / emit.
+	SetProcessOptions(opts)
 	seed := opts.Seed
 	r := NewRng(seed)
 	probs := NewProbabilities(opts)

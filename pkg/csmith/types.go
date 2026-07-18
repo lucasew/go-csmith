@@ -433,7 +433,8 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 	case MatchExact:
 		return t == other
 	case MatchConvert:
-		return t.IsConvertableOpts(other, Defaults())
+		// Type::is_convertable reads CGOptions::strict_float / lang_cpp
+		return t.IsConvertableOpts(other, ProcessOptions())
 	case MatchDereference:
 		return t.IsDereferencedFrom(other)
 	case MatchDerefExact:
@@ -473,8 +474,9 @@ func (t *Type) IsPromotable(other *Type) bool {
 
 // IsConvertable mirrors Type::is_convertable (simple + pointer size rules).
 // Type.cpp:1423–1455 — float→int forbidden; pointer same size unless strict_float/lang_cpp.
+// Uses process CGOptions; no soft invent Defaults().
 func (t *Type) IsConvertable(other *Type) bool {
-	return t.IsConvertableOpts(other, Defaults())
+	return t.IsConvertableOpts(other, ProcessOptions())
 }
 
 // IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.
