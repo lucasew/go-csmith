@@ -310,6 +310,33 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 	return false
 }
 
+// GetContainerUnion mirrors Variable::get_container_union.
+// Variable.cpp:226–232 — walk field_var_of until union type.
+func (v *Variable) GetContainerUnion() *Variable {
+	for p := v; p != nil; p = p.FieldVarOf {
+		if p.Type != nil && p.Type.IsUnion() {
+			return p
+		}
+	}
+	return nil
+}
+
+// LooseMatch mirrors Variable::loose_match.
+// Variable.cpp:239–250 — match collective, or same container union.
+func (v *Variable) LooseMatch(other *Variable) bool {
+	if v == nil || other == nil {
+		return false
+	}
+	me := v.GetCollective()
+	you := other.GetCollective()
+	if me.Match(you) {
+		return true
+	}
+	meU := me.GetContainerUnion()
+	youU := you.GetContainerUnion()
+	return meU != nil && youU != nil && meU == youU
+}
+
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {

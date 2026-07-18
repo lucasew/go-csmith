@@ -98,6 +98,28 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	return true
 }
 
+// FindDanglingGlobalPtrs mirrors FactMgr::find_dangling_global_ptrs.
+// FactMgr.cpp:688–700 — non-const global pointers that are dead at function exit.
+func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
+	if fm == nil || f == nil {
+		return
+	}
+	f.DeadGlobals = f.DeadGlobals[:0]
+	for _, fact := range fm.GlobalFacts {
+		if fact == nil || fact.Var == nil {
+			continue
+		}
+		v := fact.Var
+		// const pointers should never be dangling; only globals
+		if v.IsConst() || !v.IsGlobal() {
+			continue
+		}
+		if fact.IsDead() {
+			f.DeadGlobals = append(f.DeadGlobals, v)
+		}
+	}
+}
+
 // UpdateFactForReturn mirrors FactMgr::update_fact_for_return.
 // FactMgr.cpp:406–418 + Fact::abstract_fact_for_return — assign expr into func.rv.
 func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {

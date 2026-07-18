@@ -139,16 +139,60 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 	return false
 }
 
-// IsReadPartially mirrors Effect::is_read_partially (sibling-union deferred).
-// Effect.cpp:444–446.
-func (e Effect) IsReadPartially(v *Variable) bool {
-	return e.IsRead(v) || e.FieldIsRead(v)
+// SiblingUnionFieldIsRead mirrors Effect::sibling_union_field_is_read.
+// Effect.cpp:416–428 — another field of the same container union was read.
+func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
+	if v == nil {
+		return false
+	}
+	you := v.GetCollective().GetContainerUnion()
+	if you == nil {
+		return false
+	}
+	for r := range e.read {
+		if r == nil || !e.read[r] {
+			continue
+		}
+		me := r.GetCollective().GetContainerUnion()
+		if me == you {
+			return true
+		}
+	}
+	return false
 }
 
-// IsWrittenPartially mirrors Effect::is_written_partially (sibling-union deferred).
+// SiblingUnionFieldIsWritten mirrors Effect::sibling_union_field_is_written.
+// Effect.cpp:430–441.
+func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
+	if v == nil {
+		return false
+	}
+	you := v.GetCollective().GetContainerUnion()
+	if you == nil {
+		return false
+	}
+	for w := range e.written {
+		if w == nil || !e.written[w] {
+			continue
+		}
+		me := w.GetCollective().GetContainerUnion()
+		if me == you {
+			return true
+		}
+	}
+	return false
+}
+
+// IsReadPartially mirrors Effect::is_read_partially.
+// Effect.cpp:444–446.
+func (e Effect) IsReadPartially(v *Variable) bool {
+	return e.IsRead(v) || e.FieldIsRead(v) || e.SiblingUnionFieldIsRead(v)
+}
+
+// IsWrittenPartially mirrors Effect::is_written_partially.
 // Effect.cpp:448–451.
 func (e Effect) IsWrittenPartially(v *Variable) bool {
-	return e.IsWritten(v) || e.FieldIsWritten(v)
+	return e.IsWritten(v) || e.FieldIsWritten(v) || e.SiblingUnionFieldIsWritten(v)
 }
 
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.

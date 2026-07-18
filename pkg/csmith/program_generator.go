@@ -320,6 +320,10 @@ func (g *ProgramGenerator) OutputMain() string {
 		} else {
 			b.WriteString("    " + inv.Output() + ";\n")
 		}
+		// OutputMgr.cpp:136 — OutputPtrResets(dead_globals)
+		if g.Opts.DanglingGlobalPointers {
+			b.WriteString(OutputPtrResets(f0.DeadGlobals))
+		}
 	}
 	if g.Opts.ComputeHash {
 		if g.Opts.StepHashByStmt {
@@ -353,11 +357,37 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	body := HashGlobalVariables(g.VS)
 	b.WriteString(body)
 	b.WriteString("}\n")
-	// step_hash stub — OutputMgr.cpp:170–180 subset
+	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201
 	b.WriteString("\nvoid step_hash(int stmt_id)\n{\n")
-	b.WriteString("    (void)stmt_id;\n")
+	b.WriteString("    int i = 0;\n")
 	b.WriteString("    csmith_compute_hash();\n")
+	b.WriteString("    printf(\"before stmt(%d): checksum = %X\\n\", stmt_id, crc32_context ^ 0xFFFFFFFFUL);\n")
+	b.WriteString("    crc32_context = 0xFFFFFFFFUL;\n")
+	b.WriteString("    for (i = 0; i < 256; i++) {\n")
+	b.WriteString("        crc32_tab[i] = 0;\n")
+	b.WriteString("    }\n")
+	b.WriteString("    crc32_gentab();\n")
 	b.WriteString("}\n")
+	return b.String()
+}
+
+// OutputPtrResets mirrors OutputMgr::OutputPtrResets.
+// OutputMgr.cpp:326–340 — assign 0 to dangling global pointers (arrays deferred).
+func OutputPtrResets(ptrs []*Variable) string {
+	if len(ptrs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, v := range ptrs {
+		if v == nil {
+			continue
+		}
+		if v.IsArray {
+			// array reset via output_init deferred — skip multi-dim for now
+			continue
+		}
+		b.WriteString("    " + v.OutputC() + " = 0;\n")
+	}
 	return b.String()
 }
 

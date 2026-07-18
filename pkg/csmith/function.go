@@ -25,6 +25,8 @@ type Function struct {
 	FEffect Effect
 	// EmitConcise skips feffect comment (CGOptions::concise).
 	EmitConcise bool
+	// DeadGlobals mirrors Function::dead_globals (dangling global pointers at exit).
+	DeadGlobals []*Variable
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -201,6 +203,10 @@ func MakeFirst(
 			}
 		}
 	}
+	// FactMgr::find_dangling_global_ptrs (Function.cpp:472–473)
+	if opts.DanglingGlobalPointers {
+		fm.FindDanglingGlobalPtrs(f)
+	}
 	// Function::make_return_const — Function.cpp:608–615
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
@@ -249,6 +255,9 @@ func (f *Function) GenerateBody(
 			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
 			}
+		}
+		if opts.DanglingGlobalPointers {
+			cg.FM.FindDanglingGlobalPtrs(f)
 		}
 	}
 	if opts.DepthProtect && f.NeedReturnStmt() {
