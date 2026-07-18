@@ -183,6 +183,11 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputStructDecl emits a C struct definition.
 func (t *Type) OutputStructDecl() string {
+	return t.OutputStructDeclOpts(nil, nil)
+}
+
+// OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
+func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isStruct {
 		return ""
 	}
@@ -192,6 +197,9 @@ func (t *Type) OutputStructDecl() string {
 	}
 	b.WriteString("struct ")
 	b.WriteString(t.StructName)
+	if attrs != nil && r != nil {
+		b.WriteString(attrs.Output(r))
+	}
 	b.WriteString(" {\n")
 	for _, f := range t.Fields {
 		b.WriteString("   ")
@@ -376,12 +384,20 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 
 // OutputUnionDecl emits a C union definition.
 func (t *Type) OutputUnionDecl() string {
+	return t.OutputUnionDeclOpts(nil, nil)
+}
+
+// OutputUnionDeclOpts optionally emits type attributes.
+func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isUnion {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("union ")
 	b.WriteString(t.StructName)
+	if attrs != nil && r != nil {
+		b.WriteString(attrs.Output(r))
+	}
 	b.WriteString(" {\n")
 	for _, f := range t.Fields {
 		b.WriteString("   ")

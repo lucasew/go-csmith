@@ -1,6 +1,7 @@
 package csmith
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -31,10 +32,86 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 }
 
 func TestMultiChoiceAttribute(t *testing.T) {
-	a := &MultiChoiceAttribute{Name: "aligned", Prob: 100, Choices: []string{"8", "16"}}
+	// Attribute.cpp:66 — name("choice") with quotes
+	a := &MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default", "hidden"}}
 	s := a.MakeRandom(NewRng(2))
-	if !strings.HasPrefix(s, "aligned(") {
+	if !strings.HasPrefix(s, "visibility(\"") || !strings.HasSuffix(s, "\")") {
 		t.Fatal(s)
+	}
+}
+
+func TestAlignedAttribute(t *testing.T) {
+	// Attribute.cpp:82–84 — aligned(1<<k)
+	a := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}
+	s := a.MakeRandom(NewRng(2))
+	if !strings.HasPrefix(s, "aligned(") || !strings.HasSuffix(s, ")") {
+		t.Fatal(s)
+	}
+	// extract number
+	inner := strings.TrimSuffix(strings.TrimPrefix(s, "aligned("), ")")
+	n, err := strconv.Atoi(inner)
+	if err != nil || n < 1 || (n&(n-1)) != 0 {
+		t.Fatal("want power of 2", s)
+	}
+}
+
+func TestSectionAttribute(t *testing.T) {
+	a := &SectionAttribute{Name: "section", Prob: 100}
+	s := a.MakeRandom(NewRng(3))
+	if !strings.HasPrefix(s, "section(\"usersection") || !strings.HasSuffix(s, "\")") {
+		t.Fatal(s)
+	}
+}
+
+func TestNewVarAttrGeneratorGated(t *testing.T) {
+	opts := Defaults()
+	opts.VariableAttributes = false
+	g := NewVarAttrGenerator(opts, NewProbabilities(opts))
+	if len(g.Attributes) != 0 {
+		t.Fatal("off")
+	}
+	opts.VariableAttributes = true
+	g = NewVarAttrGenerator(opts, NewProbabilities(opts))
+	if len(g.Attributes) < 6 {
+		t.Fatal(len(g.Attributes))
+	}
+	// first is visibility multi
+	if _, ok := g.Attributes[0].(*MultiChoiceAttribute); !ok {
+		t.Fatalf("%T", g.Attributes[0])
+	}
+	if _, ok := g.Attributes[1].(*AlignedAttribute); !ok {
+		t.Fatalf("%T", g.Attributes[1])
+	}
+}
+
+func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
+	opts := Defaults()
+	opts.FunctionAttributes = true
+	g := NewFuncAttrGenerator(opts, NewProbabilities(opts))
+	foundSec, foundAlign := false, false
+	for _, a := range g.Attributes {
+		if _, ok := a.(*SectionAttribute); ok {
+			foundSec = true
+		}
+		if al, ok := a.(*AlignedAttribute); ok && al.Name == "aligned" {
+			foundAlign = true
+		}
+	}
+	if !foundSec || !foundAlign {
+		t.Fatal("section/aligned", foundSec, foundAlign)
+	}
+}
+
+func TestTypeAttrOnStructDecl(t *testing.T) {
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	attrs := &AttributeGenerator{Attributes: []Attribute{
+		&BooleanAttribute{Name: "unused", Prob: 100},
+	}}
+	out := st.OutputStructDeclOpts(NewRng(1), attrs)
+	if !strings.Contains(out, "struct S0") || !strings.Contains(out, "unused") {
+		t.Fatal(out)
 	}
 }
 

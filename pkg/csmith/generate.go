@@ -31,6 +31,10 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)
 	}
 	defer ClearPartialExpander()
+	// Attribute generators (Variable/Function/Label/Type Initialize*Attributes)
+	probs := NewProbabilities(opts)
+	InitAttrGenerators(opts, probs)
+	defer ClearAttrGenerators()
 	g := NewProgramGenerator(opts)
 	out := g.GoGenerator()
 	if out == "" {

@@ -44,6 +44,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	}
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types
+	// Attribute generators for this generation (Initialize*Attributes)
+	InitAttrGenerators(opts, probs)
 	return g
 }
 
@@ -182,15 +184,28 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	}
 	var b strings.Builder
 	b.WriteString("/* --- STRUCT/UNION TYPES --- */\n\n")
+	var structAttr, unionAttr *AttributeGenerator
+	if g.Opts.TypeAttributes {
+		structAttr = EnsureStructTypeAttrGenerator()
+		unionAttr = EnsureUnionTypeAttrGenerator()
+	}
 	for _, st := range g.Types.StructTypes {
 		if st != nil {
-			b.WriteString(st.OutputStructDecl())
+			if structAttr != nil {
+				b.WriteString(st.OutputStructDeclOpts(g.Rng, structAttr))
+			} else {
+				b.WriteString(st.OutputStructDecl())
+			}
 			b.WriteString("\n")
 		}
 	}
 	for _, ut := range g.Types.UnionTypes {
 		if ut != nil {
-			b.WriteString(ut.OutputUnionDecl())
+			if unionAttr != nil {
+				b.WriteString(ut.OutputUnionDeclOpts(g.Rng, unionAttr))
+			} else {
+				b.WriteString(ut.OutputUnionDecl())
+			}
 			b.WriteString("\n")
 		}
 	}
