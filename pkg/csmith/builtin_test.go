@@ -41,6 +41,29 @@ func TestEnabledBuiltinKinds(t *testing.T) {
 	}
 }
 
+func TestGenerateParameterListFromStringAsserts(t *testing.T) {
+	// Function.cpp:350/355 — empty / mid Void fail closed
+	f := &Function{Name: "b"}
+	if GenerateParameterListFromString(f, "") {
+		t.Fatal("empty params")
+	}
+	f2 := &Function{Name: "b2"}
+	if GenerateParameterListFromString(f2, "UInt, Void") {
+		t.Fatal("mid Void")
+	}
+	if len(f2.Param) != 0 {
+		t.Fatal("cleared params on fail")
+	}
+	f3 := &Function{Name: "b3"}
+	if !GenerateParameterListFromString(f3, "Void") {
+		t.Fatal("sole Void ok")
+	}
+	f4 := &Function{Name: "b4"}
+	if !GenerateParameterListFromString(f4, "UInt, UChar") || len(f4.Param) != 2 {
+		t.Fatal("two params", f4.Param)
+	}
+}
+
 func TestMakeBuiltinFunction(t *testing.T) {
 	opts := Defaults()
 	opts.Builtins = true

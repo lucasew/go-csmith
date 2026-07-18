@@ -31,7 +31,7 @@ var builtinFunctionStrings = []string{
 }
 
 // TypeFromString mirrors Type::get_type_from_string.
-// Type.cpp:370–402.
+// Type.cpp:370–402 — assert(0 && "Unsupported type string!") on default.
 func TypeFromString(s string) *Type {
 	s = strings.TrimSpace(s)
 	switch s {
@@ -64,6 +64,7 @@ func TypeFromString(s string) *Type {
 	case "UInt128":
 		return GetSimpleType(EUInt128)
 	default:
+		// Type.cpp:401 assert(0); no soft invent GetIntType for unknown names
 		return nil
 	}
 }
@@ -132,32 +133,44 @@ func MakeDummyBlock(f *Function) *Block {
 
 // GenerateParameterListFromString mirrors Function GenerateParameterListFromString.
 // Function.cpp:345–363.
-func GenerateParameterListFromString(f *Function, params string) {
+// Returns false on assert-path failure (empty list, mid Void, bad type, nil var).
+func GenerateParameterListFromString(f *Function, params string) bool {
 	if f == nil {
-		return
+		return false
 	}
 	vs := SplitString(params, ',')
+	// Function.cpp:350 — assert(params_cnt > 0)
 	if len(vs) == 0 {
-		return
+		return false
 	}
+	// Function.cpp:351–352 — sole "Void" → no params
 	if len(vs) == 1 && strings.TrimSpace(vs[0]) == "Void" {
-		return
+		return true
 	}
 	for i, ts := range vs {
 		ts = strings.TrimSpace(ts)
+		// Function.cpp:355 — assert(vs[i] != "Void"); no soft invent skip
 		if ts == "Void" {
-			continue
+			f.Param = nil
+			return false
 		}
 		ty := TypeFromString(ts)
 		if ty == nil {
-			continue
+			// unsupported type string — assert path
+			f.Param = nil
+			return false
 		}
 		q := NewCVQualifiers([]bool{false}, []bool{false})
 		name := "p_" + itoa(i+1)
-		// builtin params use p_N names (gensym-style simplified)
+		// Function.cpp:359–360 — GenerateParameterVariable; assert(v)
 		v := CreateVariableQfer(name, ty, q)
+		if v == nil {
+			f.Param = nil
+			return false
+		}
 		f.Param = append(f.Param, v)
 	}
+	return true
 }
 
 // MakeBuiltinFunction mirrors Function::make_builtin_function.
@@ -177,6 +190,7 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 			return nil
 		}
 	} else {
+		// Function.cpp:744 — assert(0 && "Invalid builtin function format!")
 		return nil
 	}
 	ty := TypeFromString(parts[0])
@@ -196,9 +210,15 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 		retQ = RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	}
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
+	if f.RV == nil {
+		return nil
+	}
 	// params from ( ... )
 	paramStr := GetSubstring(parts[2], '(', ')')
-	GenerateParameterListFromString(f, paramStr)
+	// Function.cpp:345+ — assert-path on bad param list; no soft invent empty params
+	if !GenerateParameterListFromString(f, paramStr) {
+		return nil
+	}
 	// FactMgr
 	var fm *FactMgr
 	if fmMap != nil {
@@ -208,6 +228,7 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	}
 	_ = fm
 	// dummy body (no random generation for builtins)
+	// Block.cpp:97 assert(curr_func) — f is live
 	f.Body = MakeDummyBlock(f)
 	f.ComputeSummary(EmptyEffect())
 	f.BuildState = BuildBuilt

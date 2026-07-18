@@ -135,8 +135,14 @@ func MinimalDepth(dType string, flag int) int {
 		DtFunctionInvocationBinary, DtFunctionInvocationUnary:
 		return 1
 	default:
-		return 1
+		// DepthSpec.cpp:381–382 assert(0) for unknown dType — no invent depth 1
+		return -1
 	}
+}
+
+// knownDepthType reports whether dType is a handled DepthSpec case.
+func knownDepthType(dType string) bool {
+	return MinimalDepth(dType, 0) >= 0
 }
 
 // DepthGuardByDepth mirrors DepthSpec::depth_guard_by_depth.
@@ -161,7 +167,10 @@ func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
-	_ = MinimalDepth(dType, flag)
-	// DFS backtracking not implemented; report GOOD (no false BAD)
+	// DepthSpec.cpp:381–382 — unknown dType assert(0) → BAD_DEPTH fail closed
+	if MinimalDepth(dType, flag) < 0 {
+		return BadDepth
+	}
+	// DFS backtracking not implemented; known types report GOOD (no false BAD)
 	return GoodDepth
 }

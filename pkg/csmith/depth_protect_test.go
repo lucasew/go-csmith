@@ -97,3 +97,20 @@ func TestMakeReturnConstWhenDepthProtect(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestDepthGuardUnknownTypeFailClosed(t *testing.T) {
+	// DepthSpec.cpp:381–382 assert(0); DFS mode → BAD_DEPTH
+	opts := Defaults()
+	opts.DFSExhaustive = true
+	if DepthGuardByType(opts, "dtNoSuchType") != BadDepth {
+		t.Fatal("unknown dType must fail closed")
+	}
+	if MinimalDepth("dtNoSuchType", 0) >= 0 {
+		t.Fatal("unknown minimal depth")
+	}
+	// random mode still GOOD for any type name (guard short-circuits)
+	opts.DFSExhaustive = false
+	if DepthGuardByType(opts, "dtNoSuchType") != GoodDepth {
+		t.Fatal("random mode always GOOD")
+	}
+}
