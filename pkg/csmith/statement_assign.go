@@ -369,11 +369,17 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	if st.AssignOp.NeedNoRHS() && st.SafeFlags == nil {
 		return st.AssignOp.AssignOpC(lhs, "")
 	}
-	// avoid_signed_overflow path when SafeFlags present
+	// avoid_signed_overflow path when SafeFlags present (StatementAssign.cpp:543+)
 	if st.SafeFlags != nil {
 		switch st.AssignOp {
 		case AssignSimple, AssignBitAnd, AssignBitXor, AssignBitOr:
-			// safe_assign ops / simple — OutputSimple form
+			// StatementAssign.cpp:546–565 — simple/bit compounds
+			// ccomp + volatile + real compound → "lhs = lhs binop rhs"
+			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
+				if assignLhsIsVolatile(st) {
+					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
+				}
+			}
 			return OutputAssignSimple(st, wrapVol)
 		case AssignPreIncr:
 			return "++" + lhs
@@ -461,6 +467,18 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 		}
 	}
 	return OutputAssignSimple(st, wrapVol)
+}
+
+// assignLhsIsVolatile reports LHS volatile for OutputAsExpr ccomp rewrite.
+// StatementAssign.cpp:552 — lhs.is_volatile().
+func assignLhsIsVolatile(st *Stmt) bool {
+	if st == nil {
+		return false
+	}
+	if st.Lhs != nil {
+		return st.Lhs.IsVolatile()
+	}
+	return st.LhsVar != nil && st.LhsVar.IsVolatile()
 }
 
 // expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.

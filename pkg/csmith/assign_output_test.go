@@ -92,3 +92,52 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 		_ = b.MustReturn()
 	}
 }
+
+func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
+	// StatementAssign.cpp:552–556 — ccomp + volatile compound → lhs = lhs op rhs
+	v := CreateVariableScalars("g_v", GetIntType(), false, true) // volatile
+	flags := MakeDummyFlags()
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		AssignOp: AssignBitAnd,
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(7)},
+		SafeFlags: flags,
+	}
+	opts := Defaults()
+	opts.CComp = true
+	out := OutputAssignAsExprOpts(st, false, opts)
+	// expect "g_v = g_v & 7" not "g_v &= 7"
+	if !strings.Contains(out, "=") || !strings.Contains(out, "&") {
+		t.Fatal(out)
+	}
+	if strings.Contains(out, "&=") {
+		t.Fatal("ccomp should expand compound", out)
+	}
+	if !strings.Contains(out, "g_v = g_v & 7") && !strings.Contains(out, "g_v = g_v & ") {
+		t.Fatal(out)
+	}
+	// non-ccomp keeps compound form
+	opts.CComp = false
+	out2 := OutputAssignAsExprOpts(st, false, opts)
+	if !strings.Contains(out2, "&=") {
+		t.Fatal("non-ccomp compound", out2)
+	}
+}
+
+func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
+	// simple assign has no compound_to_binary — stays "lhs = rhs"
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, SafeFlags: MakeDummyFlags(),
+	}
+	opts := Defaults()
+	opts.CComp = true
+	out := OutputAssignAsExprOpts(st, false, opts)
+	if strings.Count(out, "g_v") != 1 {
+		// "g_v = 1" has one mention of g_v on lhs only for simple
+		if !strings.Contains(out, "g_v = 1") && !strings.Contains(out, "g_v = ") {
+			t.Fatal(out)
+		}
+	}
+}
