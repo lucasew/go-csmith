@@ -257,7 +257,8 @@ func MakeRandomGoto(
 
 	st := Stmt{
 		Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
-		GotoDestStmID: tgt.StmID,
+		GotoDestStmID:  tgt.StmID,
+		GotoDestParent: okBlk,
 	}
 	if backEdge {
 		st.GotoBack = true

@@ -41,6 +41,9 @@ type Stmt struct {
 	InitSkippedVars []*Variable
 	// GotoDestStmID is the destination statement stm_id for goto (StatementGoto::dest).
 	GotoDestStmID int
+	// GotoDestParent is dest statement's parent block (StatementGoto::dest->parent).
+	// Used by FactMgr::add_fact_out visibility (FactMgr.cpp:296–300).
+	GotoDestParent *Block
 	// StmID mirrors Statement::stm_id for step_hash.
 	StmID int
 	// SafeFlags / Tmp1 / Tmp2 for compound assign safe-math OutputAsExpr.

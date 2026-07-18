@@ -99,6 +99,39 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	}
 }
 
+// FindParentBlockOfStmID walks function blocks for the parent of stm_id.
+// Used when StatementGoto::dest parent is not stored on Stmt.
+func FindParentBlockOfStmID(f *Function, stmID int) *Block {
+	if f == nil || stmID <= 0 {
+		return nil
+	}
+	var walk func(b *Block) *Block
+	walk = func(b *Block) *Block {
+		if b == nil {
+			return nil
+		}
+		for i := range b.Stmts {
+			st := &b.Stmts[i]
+			if st.StmID == stmID {
+				return b
+			}
+			if p := walk(st.Then); p != nil {
+				return p
+			}
+			if p := walk(st.Else); p != nil {
+				return p
+			}
+		}
+		return nil
+	}
+	for _, b := range f.Blocks {
+		if p := walk(b); p != nil {
+			return p
+		}
+	}
+	return nil
+}
+
 // AddFactOut mirrors FactMgr::add_fact_out.
 // FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
 // drop non-globals on return; drop loop-invisible on break/continue.
@@ -125,8 +158,15 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			return
 		}
 	case StmtGoto:
-		// dest visibility: without dest parent, keep if visible at parent
-		// full dest check when GotoDest known is deferred
+		// FactMgr.cpp:296–300 — drop if var not visible at StatementGoto::dest.
+		// Prefer GotoDestParent; else resolve parent of GotoDestStmID via function blocks.
+		destParent := st.GotoDestParent
+		if destParent == nil && st.GotoDestStmID > 0 && f != nil {
+			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
+		}
+		if destParent != nil && f != nil && !f.IsVarVisible(fact.Var, destParent) {
+			return
+		}
 	}
 	if fm.MapFactsOut == nil {
 		fm.MapFactsOut = make(map[int][]*FactPointTo)

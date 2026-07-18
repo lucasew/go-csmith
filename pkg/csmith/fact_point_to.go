@@ -531,6 +531,112 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	return MakeFactPointToSet(f.Var, set)
 }
 
+// indexExprUsesVar reports whether a string index expression refers to indexVar.
+// Indices are stored as strings (e.g. "i", "(i + 2)"); approximate Expression::use_var.
+func indexExprUsesVar(idx string, indexVar *Variable) bool {
+	if indexVar == nil || idx == "" {
+		return false
+	}
+	name := indexVar.Name
+	if name == "" {
+		return false
+	}
+	if idx == name {
+		return true
+	}
+	// token-ish: whole name appears bounded by non-ident chars
+	for i := 0; i+len(name) <= len(idx); i++ {
+		if idx[i:i+len(name)] != name {
+			continue
+		}
+		leftOK := i == 0 || !isIdentChar(idx[i-1])
+		rightOK := i+len(name) == len(idx) || !isIdentChar(idx[i+len(name)])
+		if leftOK && rightOK {
+			return true
+		}
+	}
+	return false
+}
+
+func isIdentChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') || c == '_'
+}
+
+// UpdateWithModifiedIndex mirrors FactPointTo::update_with_modified_index.
+// FactPointTo.cpp:712–748 — if pointee is itemized array whose index uses
+// indexVar, replace that index with Constant("-1") (any-member).
+// Returns this fact if unchanged, or a new fact with rewritten pointees.
+func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
+	if f == nil || indexVar == nil {
+		return f
+	}
+	pointees := append([]*Variable(nil), f.PointTo...)
+	changed := false
+	for j, v := range f.PointTo {
+		if v == nil {
+			continue
+		}
+		// walk to root field_var_of (FactPointTo.cpp:718–720)
+		root := v
+		for root.FieldVarOf != nil {
+			root = root.FieldVarOf
+		}
+		// itemized array: isArray && get_collective() != v (FactPointTo.cpp:722)
+		av := root.AsArray
+		if av == nil || !root.IsArray || av.Collective == nil {
+			continue
+		}
+		var modified []int
+		for k, exp := range av.Indices {
+			if indexExprUsesVar(exp, indexVar) {
+				modified = append(modified, k)
+			}
+		}
+		if len(modified) == 0 {
+			continue
+		}
+		// ArrayVariable.cpp set_index path: clone itemized member, set -1 on hit dims
+		newAV := &ArrayVariable{
+			Variable:   av.Variable,
+			Sizes:      append([]int(nil), av.Sizes...),
+			InitValues: av.InitValues,
+			Block:      av.Block,
+			Collective: av.Collective,
+			Indices:    append([]string(nil), av.Indices...),
+		}
+		newAV.IsArray = true
+		newAV.AsArray = newAV
+		for _, k := range modified {
+			newAV.SetIndex(k, "-1")
+		}
+		// FactPointTo.cpp:740 — pointees[j] = new_av (array root, even if field walked)
+		pointees[j] = &newAV.Variable
+		changed = true
+	}
+	if !changed {
+		return f
+	}
+	return MakeFactPointToSet(f.Var, pointees)
+}
+
+// UpdateFactsWithModifiedIndex mirrors FactPointTo::update_facts_with_modified_index.
+// FactPointTo.cpp:751–761 — rewrite each point-to fact when indexVar is modified.
+func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
+	if facts == nil || indexVar == nil {
+		return
+	}
+	for i, fp := range *facts {
+		if fp == nil {
+			continue
+		}
+		newFP := fp.UpdateWithModifiedIndex(indexVar)
+		if newFP != fp {
+			(*facts)[i] = newFP
+		}
+	}
+}
+
 // MergePointeesOfPointers mirrors FactPointTo::merge_pointees_of_pointers.
 // FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {

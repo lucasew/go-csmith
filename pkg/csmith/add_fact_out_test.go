@@ -45,6 +45,52 @@ func TestAddFactOutVisible(t *testing.T) {
 	_ = g
 }
 
+func TestAddFactOutGotoDestVisibility(t *testing.T) {
+	// FactMgr.cpp:296–300 — fact dropped when local not visible at dest parent
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	outer := &Block{Func: f}
+	inner := &Block{Func: f, Parent: outer}
+	loc := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	loc.Name = "l_p"
+	inner.LocalVars = []*Variable{loc}
+	f.Blocks = []*Block{outer, inner}
+	fm := NewFactMgr(f)
+	// goto from inner to outer dest — local of inner not visible at outer
+	st := &Stmt{
+		Kind: StmtGoto, StmID: 9,
+		GotoDestStmID:  20,
+		GotoDestParent: outer,
+	}
+	fm.AddFactOut(st, inner, MakeFactPointTo(loc, NullPtr))
+	if len(fm.MapFactsOut[9]) != 0 {
+		t.Fatal("local invisible at dest should drop", fm.MapFactsOut[9])
+	}
+	// global pointer still recorded
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.AddFactOut(st, inner, MakeFactPointTo(gp, NullPtr))
+	if len(fm.MapFactsOut[9]) != 1 {
+		t.Fatal("global at dest", fm.MapFactsOut[9])
+	}
+	// dest parent = inner → local visible
+	st2 := &Stmt{
+		Kind: StmtGoto, StmID: 10,
+		GotoDestStmID:  21,
+		GotoDestParent: inner,
+	}
+	fm.AddFactOut(st2, inner, MakeFactPointTo(loc, NullPtr))
+	if len(fm.MapFactsOut[10]) != 1 {
+		t.Fatal("local visible at dest", fm.MapFactsOut[10])
+	}
+	// resolve via FindParentBlockOfStmID when GotoDestParent nil
+	tgt := Stmt{Kind: StmtAssign, StmID: 30}
+	outer.Stmts = []Stmt{tgt}
+	st3 := &Stmt{Kind: StmtGoto, StmID: 11, GotoDestStmID: 30}
+	fm.AddFactOut(st3, inner, MakeFactPointTo(loc, NullPtr))
+	if len(fm.MapFactsOut[11]) != 0 {
+		t.Fatal("resolved dest parent outer, local drop")
+	}
+}
+
 func TestArrayIsVariant(t *testing.T) {
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", IsArray: true, Type: GetIntType()},

@@ -57,6 +57,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 }
 
 func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
+	ClearPartialExpander()
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	f := NewVectorFilter(&tables.Expr)
@@ -69,5 +70,27 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	got := ExpressionTypeProbability(r, f)
 	if got != want {
 		t.Fatalf("got %v want %v (raw %d)", got, want, raw)
+	}
+}
+
+func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
+	// Expression.cpp:104–105 — direct_expand_check(eInvoke) → eFunction
+	ClearPartialExpander()
+	if !InitPartialExpander("invoke") {
+		t.Fatal("init")
+	}
+	defer ClearPartialExpander()
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	f := NewVectorFilter(&tables.Expr)
+	// even with no_func filter setup in PickTermType, ExpressionTypeProbability alone forces Function
+	got := ExpressionTypeProbability(NewRng(2), f)
+	if got != TermFunction {
+		t.Fatalf("got %v want TermFunction", got)
+	}
+	// PickTermType with noFunc still hits ExpressionTypeProbability force
+	tt := PickTermType(NewRng(2), tables, opts, GetIntType(), true, false, 0)
+	if tt != TermFunction {
+		t.Fatalf("PickTermType force: %v", tt)
 	}
 }

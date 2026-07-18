@@ -257,9 +257,13 @@ func NewExprTables(opts Options) *ExprTables {
 }
 
 // ExpressionTypeProbability mirrors ExpressionTypeProbability.
-// Expression.cpp:103–112 — rnd_upto(filter.max, filter); lookup → eTermType.
-// PartialExpander force-function for expressions is separate; stmt PartialExpander is ported.
+// Expression.cpp:103–112 — PartialExpander force eFunction when invoke expand;
+// else rnd_upto(filter.max, filter); lookup → eTermType.
 func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
+	// Expression.cpp:104–105 — PartialExpander::direct_expand_check(eInvoke)
+	if DirectExpandCheck(StmtInvoke) {
+		return TermFunction
+	}
 	if r == nil || filter == nil {
 		return TermVariable
 	}
