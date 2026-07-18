@@ -127,8 +127,12 @@ func ExpandCheck(t StatementType) bool {
 		// not in partial mode → all valid
 		return true
 	}
+	// PartialExpander.cpp:137 — assert(expands_.find(t) != end)
+	// map only holds Assign/Block/For/IfElse/Invoke/Return/MAX; other kinds fail closed
+	// (filter rejects), not soft invent allow-all for unregistered types
 	rv := partialExpands[t]
 	if t == StmtAssign {
+		// Assign also ok when Invoke is listed (PartialExpander.cpp:143–145)
 		rv = rv || partialExpands[StmtInvoke]
 	}
 	if rv {

@@ -140,6 +140,42 @@ func TestSelectParentLocalExpandStruct(t *testing.T) {
 	}
 }
 
+func TestSelectParentLocalErrorGuardAndEmptyStack(t *testing.T) {
+	// VariableSelector.cpp:991–1003 — empty stack assert; ERROR_GUARD after rnd_upto
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Opts = opts
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	// empty stack → fail closed (no soft invent param/global)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect())
+	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(1), MatchFlexible) != nil {
+		t.Fatal("empty stack must not invent parent local")
+	}
+	// sticky error after stack pick → ERROR_GUARD
+	f.Stack = []*Block{{}}
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	if vs.SelectParentLocal(AccessRead, cg, GetIntType(), &q, NewRng(1), MatchFlexible) != nil {
+		t.Fatal("sticky error must fail SelectParentLocal")
+	}
+}
+
+func TestExpandCheckUnregisteredKindFailClosed(t *testing.T) {
+	// PartialExpander.cpp:137 — kinds not in expands_ map fail closed under partial mode
+	ClearPartialExpander()
+	if !InitPartialExpander("for") {
+		t.Fatal("init")
+	}
+	// Goto/Break not in expands_ → ExpandCheck false (filter rejects)
+	if ExpandCheck(StmtGoto) || ExpandCheck(StmtBreak) {
+		t.Fatal("unregistered kinds must not soft invent allow")
+	}
+	ClearPartialExpander()
+}
+
 func TestVariableCreationProbability10(t *testing.T) {
 	// flipcoin(10): seed scan for at least one global and mostly local
 	opts := Defaults()

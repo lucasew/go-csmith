@@ -2046,12 +2046,16 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	if DepthGuardByType(vs.Opts, DtSelectParentLocal) == BadDepth {
 		return nil
 	}
+	// VariableSelector.cpp:991–996 — assert(!stack.empty()); no soft invent global/param
 	stack := cg.CurrentFunc.Stack
 	if len(stack) == 0 {
 		return nil
 	}
-	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size())
+	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size()); ERROR_GUARD(nullptr)
 	blk := stack[r.RndUpto(uint32(len(stack)))]
+	if HasError() {
+		return nil
+	}
 	if blk == nil {
 		return nil
 	}
@@ -2062,10 +2066,14 @@ func (vs *VariableSelector) SelectParentLocalInv(
 			if v := vs.EagerCreateLocalStruct(blk, access, cg, t, qfer, r, mt, invalidVars); v != nil {
 				return v
 			}
+			// VariableSelector.cpp:1009–1010 — ERROR_GUARD after eager_create
+			if HasError() {
+				return nil
+			}
 		}
-		// VariableSelector.cpp:1013 — random_type_from_type(type, true, false)
+		// VariableSelector.cpp:1013–1015 — random_type_from_type(type, true, false); ERROR_GUARD
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
-		if t2 == nil {
+		if t2 == nil || HasError() {
 			return nil
 		}
 		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
@@ -2073,18 +2081,25 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t
 	if t != nil && t.IsSimple() && t.Simple() != EVoid {
+		// VariableSelector.cpp:1019–1020 — get_int_type() (upstream type widen for locals)
 		matchT = GetIntType()
 	} else {
-		// VariableSelector.cpp:1021 — random_type_from_type(type, true, false)
+		// VariableSelector.cpp:1021–1023 — random_type_from_type(type, true, false); ERROR_GUARD
 		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
-		// VariableSelector.cpp:1023–1024 — ERROR_GUARD(nullptr); no soft invent keep type
-		if matchT == nil {
+		// no soft invent keep original type when random_type_from_type fails
+		if matchT == nil || HasError() {
 			return nil
 		}
 	}
-	if v := ChooseVarFull(r, blk.LocalVars, access, cg, matchT, qfer, mt, invalidVars, false, false, false); v != nil {
+	// VariableSelector.cpp:1026–1028 — choose_var; ERROR_GUARD
+	v := ChooseVarFull(r, blk.LocalVars, access, cg, matchT, qfer, mt, invalidVars, false, false, false)
+	if HasError() {
+		return nil
+	}
+	if v != nil {
 		return v
 	}
+	// VariableSelector.cpp:1038 — GenerateNewParentLocal on miss
 	return vs.GenerateNewParentLocal(blk, access, cg, matchT, qfer, r)
 }
 
