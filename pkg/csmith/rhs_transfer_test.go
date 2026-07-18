@@ -206,3 +206,58 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 		t.Fatalf("union walk should yield ptr field facts: %+v", facts)
 	}
 }
+
+func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
+	// FactPointTo.cpp:164–167 — assert all LHS are pointers; no invent transfer
+	i := CreateVariableScalars("g_i", GetIntType(), false, false)
+	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
+	if RhsToLhsTransfer(nil, []*Variable{i}, rhs) != nil {
+		t.Fatal("non-pointer lvar must fail closed")
+	}
+}
+
+func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
+	// FactPointTo.cpp:205 — assert(indirect == -1); no invent for multi-level &
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	// int var with ** type → IndirectLevel = 0-2 = -2
+	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(PointerTo(GetIntType()))}
+	if rhs.IndirectLevel() != -2 {
+		t.Fatalf("want indir -2 got %d", rhs.IndirectLevel())
+	}
+	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
+		t.Fatal("multi-level address-of must fail closed")
+	}
+}
+
+func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
+	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
+	}}
+	uv := &Variable{Name: "g_u", Type: ut}
+	pf := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: uv}
+	uv.FieldVars = []*Variable{pf}
+	lhs0 := CreateVariableScalars("g_p0", PointerTo(GetIntType()), false, false)
+	lhs1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
+	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
+	// two LHS pointers vs one field pointer
+	if RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs) != nil {
+		t.Fatal("lvars/pointers length mismatch must fail closed")
+	}
+}
+
+func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
+	// FactPointTo.cpp:252 — assert(rv_fact); no invent garbage points-to
+	InvocationReturnFactsDoFinalization()
+	defer InvocationReturnFactsDoFinalization()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
+	fn.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fi := &Invocation{User: fn}
+	// no AddReturnFactForInvocation
+	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
+	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
+		t.Fatal("missing rv_fact must fail closed")
+	}
+}

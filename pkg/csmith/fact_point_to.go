@@ -180,6 +180,13 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	if len(lvars) == 0 {
 		return nil
 	}
+	// FactPointTo.cpp:164–167 — assert all possible LHS are pointers
+	for _, v := range lvars {
+		if v == nil || !v.IsPointer() {
+			// fail closed — no soft invent transfer onto non-pointer
+			return nil
+		}
+	}
 	if rhs == nil {
 		return MakeFactsPointTo(lvars, GarbagePtr)
 	}
@@ -194,14 +201,14 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	}
 	switch rhs.Term {
 	case TermConstant:
-		if rt.ptrTo != nil {
+		if rt.IsPointerLike() {
 			if rhs.EqualsInt(0) {
 				return MakeFactsPointTo(lvars, NullPtr)
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
 		// FactPointTo.cpp:186–193 — union constant field0 "0" → null on field0 pointers
-		if rt.IsUnion() && len(lvars) > 0 {
+		if rt.IsUnion() {
 			lv0 := lvars[0]
 			if lv0 != nil && lv0.FieldVarOf != nil && lv0.FieldVarOf.Type != nil &&
 				lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
@@ -213,15 +220,22 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 					return MakeFactsPointTo(lvars, NullPtr)
 				}
 			}
-		}
-		return MakeFactsPointTo(lvars, GarbagePtr)
-	case TermVariable:
-		if rhs.Var == nil {
 			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
+		// FactPointTo.cpp:195–196 — assert(0); no soft invent garbage for other constants
+		return nil
+	case TermVariable:
+		// C++ always has ExpressionVariable; nil var is broken IR
+		if rhs.Var == nil {
+			return nil
 		}
 		indirect := rhs.IndirectLevel()
 		if indirect < 0 {
-			// taking address: point to the var itself (collective)
+			// FactPointTo.cpp:202–207 — taking address; multi-level & not allowed
+			// assert(indirect == -1); no soft invent for indirect < -1
+			if indirect != -1 {
+				return nil
+			}
 			return MakeFactsPointTo(lvars, rhs.Var.GetCollective())
 		}
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
@@ -233,46 +247,46 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 					continue
 				}
 				ptrs := vv.FindPointerFields()
-				n := len(lvars)
-				if len(ptrs) < n {
-					n = len(ptrs)
+				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
+				if len(lvars) != len(ptrs) {
+					// fail closed — no soft invent min-length pairwise transfer
+					return nil
 				}
-				for j := 0; j < n; j++ {
+				for j := 0; j < len(lvars); j++ {
 					set := MergePointeesOfPointer(ptrs[j], 1, facts)
-					if len(set) == 0 {
-						ret = append(ret, MakeFactPointTo(lvars[j], GarbagePtr))
-					} else {
-						ret = append(ret, MakeFactPointToSet(lvars[j], set))
-					}
+					// C++ make_fact with set as-is (may be empty); no invent garbage
+					ret = append(ret, MakeFactPointToSet(lvars[j], set))
 				}
 			}
 			return ret
 		}
 		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
+		// empty set is valid (no soft invent GarbagePtr)
 		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
-		if len(set) == 0 {
-			return MakeFactsPointTo(lvars, GarbagePtr)
-		}
 		return MakeFactsPointToSet(lvars, set)
 	case TermFunction:
-		// FactPointTo.cpp:230–255 — user call return fact for RV / pointer fields
-		if rhs.Invoke == nil || rhs.Invoke.User == nil {
+		// FactPointTo.cpp:230–231 — assert(fi); no soft invent empty on missing invoke
+		if rhs.Invoke == nil {
 			return nil
 		}
 		fi := rhs.Invoke
+		// TODO: support pointer arithmetics (upstream); only FuncCall transfers
+		if fi.User == nil {
+			return nil
+		}
 		fn := fi.User
 		if fn.RV != nil && fn.RV.Type != nil && fn.RV.Type.IsAggregate() {
 			ptrs := fn.RV.FindPointerFields()
-			var ret []*FactPointTo
-			n := len(lvars)
-			if len(ptrs) < n {
-				n = len(ptrs)
+			// pairwise like aggregate path; length mismatch is broken IR
+			if len(lvars) != len(ptrs) {
+				return nil
 			}
-			for i := 0; i < n; i++ {
+			var ret []*FactPointTo
+			for i := 0; i < len(lvars); i++ {
 				rvFact := GetReturnFactForInvocation(fi, ptrs[i])
+				// missing return fact → fail closed (no invent GarbagePtr)
 				if rvFact == nil {
-					ret = append(ret, MakeFactPointTo(lvars[i], GarbagePtr))
-					continue
+					return nil
 				}
 				ret = append(ret, MakeFactPointToSet(lvars[i], rvFact.PointTo))
 			}
@@ -281,6 +295,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		if fn.RV == nil {
 			return nil
 		}
+		// FactPointTo.cpp:250–252 — assert(rv_fact)
 		rvFact := GetReturnFactForInvocation(fi, fn.RV)
 		if rvFact == nil {
 			return nil
@@ -317,19 +332,11 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	}
 	if lhsTy != nil && lhsTy.PtrType() != nil {
 		// pointer-valued store (possibly *p when p is multi-level pointer)
-		if len(lvars) == 0 && lhsIndir == 0 {
-			lvars = []*Variable{lhs.GetCollective()}
-		}
+		// FactPointTo.cpp:277 — transfer lvars as merged; no soft invent when empty
 		return RhsToLhsTransfer(factsIn, lvars, rhs)
 	}
 	// when assigning through *p (indir>0) or to aggregate, transfer to pointer fields
-	if len(lvars) == 0 && lhsIndir == 0 {
-		// non-pointer scalar LHS
-		if !lhs.IsAggregate() {
-			return nil
-		}
-		lvars = []*Variable{lhs}
-	}
+	// FactPointTo.cpp:280–293 — merge_pointees already yields collective at indir 0
 	// FactPointTo.cpp:280–293 — union field assign: walk to container union, then
 	// find_pointer_fields on that union (all pointer fields share storage).
 	var out []*FactPointTo
@@ -351,6 +358,11 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 					}
 				}
 			}
+			// FactPointTo.cpp:288 — assert(v && v->type->eType == eUnion)
+			if u == nil || u.Type == nil || !u.Type.IsUnion() {
+				// fail closed — no soft invent fields from non-union container
+				return nil
+			}
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()
@@ -365,7 +377,12 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		if len(ptrs) == 0 {
 			continue
 		}
-		out = append(out, RhsToLhsTransfer(factsIn, ptrs, rhs)...)
+		part := RhsToLhsTransfer(factsIn, ptrs, rhs)
+		if part == nil && len(ptrs) > 0 {
+			// transfer assert fail-closed (non-pointer lvars / mismatch)
+			return nil
+		}
+		out = append(out, part...)
 	}
 	return out
 }
@@ -806,6 +823,8 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 
 // MergePointeesOfPointers mirrors FactPointTo::merge_pointees_of_pointers.
 // FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
+// FactPointTo.cpp:694 — assert(exist_fact) but still guarded with if (exist_fact);
+// missing facts happen mid function-create for params — skip, do not invent pointees.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
 	var out []*Variable
 	seen := make(map[*Variable]bool)
@@ -935,6 +954,7 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 
 // AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
 // FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
+// FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
 	for _, f := range funcs {
@@ -949,12 +969,13 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 			continue
 		}
 		// prefer map_facts_out values; also include GlobalFacts
-		seen := map[int]bool{}
-		for id, facts := range fm.MapFactsOut {
-			_ = id
+		for _, facts := range fm.MapFactsOut {
 			UpdatePtrAliases(facts, &AllPtrs, &AllAliases)
-			seen[id] = true
 		}
 		UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases)
+	}
+	// FactPointTo.cpp:803 — sizes must stay paired (no soft invent desync)
+	if len(AllPtrs) != len(AllAliases) {
+		ClearPointToAggregates()
 	}
 }
