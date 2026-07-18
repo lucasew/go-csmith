@@ -583,19 +583,19 @@ func MakeRandomExpression(
 
 	// Expression.cpp:147–153 — type==nullptr → choose_random_nonvoid(_nonvolatile)
 	// based on effect_context purity; re-roll if struct + Constant want.
-	// C++ do-while always yields a type; no GetIntType soft invent.
+	// C++ always has AllTypes from GenerateSimpleTypes; no GetSimpleType invent.
 	if typ == nil {
+		if env == nil || len(env.AllTypes) == 0 {
+			return nil
+		}
 		seFree := cg.EffectContext().IsSideEffectFree()
 		for tries := 0; tries < 256; tries++ {
-			if env != nil && len(env.AllTypes) > 0 {
-				if seFree {
-					typ = env.ChooseRandomNonvoid(r, opts, probs)
-				} else {
-					typ = env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
-				}
+			if seFree {
+				typ = env.ChooseRandomNonvoid(r, opts, probs)
 			} else {
-				typ = GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+				typ = env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
 			}
+			// Expression.cpp: ERROR_GUARD paths inside choose_random*
 			if HasError() {
 				return nil
 			}

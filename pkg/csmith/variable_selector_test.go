@@ -2,6 +2,24 @@ package csmith
 
 import "testing"
 
+func TestChooseOKVarItemizeFailClosed(t *testing.T) {
+	// VariableSelector.cpp:332–337 — collective array must itemize(); no return bare
+	ClearError()
+	av := CreateArrayVariable(NewRng(2), Defaults(), nil, "g_a", GetIntType(), MakeInt(0),
+		NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("create")
+	}
+	// r nil with multi-cand would fail earlier; single collective with nil r → fail closed
+	if ChooseOKVar(nil, []*Variable{&av.Variable}) != nil {
+		t.Fatal("itemize needs RNG; no soft return collective")
+	}
+	got := ChooseOKVar(NewRng(3), []*Variable{&av.Variable})
+	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
+		t.Fatalf("want itemized member, got %+v", got)
+	}
+}
+
 func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	// VariableSelector::choose_ok_var
 	a := CreateVariableScalars("g_1", GetSimpleType(EInt), false, false)

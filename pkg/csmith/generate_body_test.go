@@ -76,10 +76,18 @@ func TestMakeReturnConst(t *testing.T) {
 }
 
 func TestMakeExpressionCommaNilLHSType(t *testing.T) {
+	// ExpressionComma lhs type nullptr → choose_random_nonvoid needs Type env
+	ClearError()
 	opts := Defaults()
+	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
-	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType(), nil) }()
+	e := func() *Expression {
+		c := EmptyCGContext()
+		c.Types = vs.Types
+		return MakeExpressionComma(NewRng(3), opts, probs, vs, NewExprTables(opts), &c, GetIntType(), nil)
+	}()
 	if e == nil || e.Term != TermCommaExpr {
 		t.Fatal(e)
 	}

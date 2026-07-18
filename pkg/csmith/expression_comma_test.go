@@ -6,12 +6,19 @@ import (
 )
 
 func TestMakeExpressionComma(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	// ExpressionComma lhs uses type nullptr → needs Type env (GenerateSimpleTypes)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil) }()
+	e := func() *Expression {
+		c := EmptyCGContext()
+		c.Types = vs.Types
+		return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil)
+	}()
 	if e == nil || e.Term != TermCommaExpr || e.CommaLHS == nil || e.CommaRHS == nil {
 		t.Fatalf("%+v", e)
 	}
@@ -42,13 +49,19 @@ func TestMakeRandomParamNilType(t *testing.T) {
 
 func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	// LHS built with noConst=true — may still be variable/function/assign
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	tables := NewExprTables(opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
-	e := func() *Expression { c := EmptyCGContext(); return MakeExpressionComma(NewRng(11), opts, probs, vs, tables, &c, GetIntType(), nil) }()
-	if e.CommaLHS == nil {
+	e := func() *Expression {
+		c := EmptyCGContext()
+		c.Types = vs.Types
+		return MakeExpressionComma(NewRng(11), opts, probs, vs, tables, &c, GetIntType(), nil)
+	}()
+	if e == nil || e.CommaLHS == nil {
 		t.Fatal("lhs")
 	}
 }

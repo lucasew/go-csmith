@@ -155,14 +155,21 @@ func TestGenerateNewParentLocal(t *testing.T) {
 }
 
 func TestMakeRandomBinaryPtrComparison(t *testing.T) {
+	// Operands may recurse into comma (type nullptr) — seed full Type env
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
 	_ = env.FindPointerType(GetIntType(), true)
 	vs.Types = env
 	tables := NewExprTables(opts)
-	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env) }()
+	fi := func() *Invocation {
+		c := EmptyCGContext()
+		c.Types = env
+		return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env)
+	}()
 	if fi == nil || !fi.IsStd {
 		t.Fatalf("%+v", fi)
 	}

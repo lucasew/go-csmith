@@ -58,10 +58,12 @@ func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
 func TestMakeRandomAssignDualContext(t *testing.T) {
 	// StatementAssign.cpp:181/225 — merge_param_context folds RHS/LHS into caller;
 	// expr_depth and effect_accum must stick on *CGContext.
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	vs.Types = &TypeEnv{}
+	// RHS make_random may pick comma (type nullptr) — needs Type env
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// seed a global
 	g := vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	if g == nil {

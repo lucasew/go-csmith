@@ -109,18 +109,22 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 
 func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	// StatementIf.cpp:69 — get_effect_stm().clear() on CGContext& before condition
+	ClearError()
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	vs := NewVariableSelector(opts)
+	probs := NewProbabilities(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(1))
 	v := CreateVariableScalars("g_z", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())
+	cg.Types = vs.Types
 	cg.EffectStm = EmptyEffect().WriteVar(v)
-	st := MakeRandomIf(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}

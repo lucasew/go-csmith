@@ -276,13 +276,24 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		if r == nil {
 			return nil
 		}
-		v = vars[r.RndUpto(uint32(n))]
+		idx := r.RndUpto(uint32(n))
+		// VariableSelector.cpp:327 ERROR_GUARD
+		if HasError() {
+			return nil
+		}
+		v = vars[idx]
 	}
 	// if collective array, return itemized member (VariableSelector.cpp:332–337)
-	if v != nil && v.IsArray && v.AsArray != nil && v.AsArray.Collective == nil && r != nil {
-		if item := v.AsArray.Itemize(r); item != nil {
-			return &item.Variable
+	// C++ always itemize(); no soft return collective on itemize fail
+	if v != nil && v.IsArray && v.AsArray != nil && v.AsArray.Collective == nil {
+		if r == nil {
+			return nil
 		}
+		item := v.AsArray.Itemize(r)
+		if item == nil {
+			return nil
+		}
+		return &item.Variable
 	}
 	return v
 }

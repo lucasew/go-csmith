@@ -395,6 +395,12 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	if e.Con == nil || e.Con.Type == nil {
 		t.Fatal("const type")
 	}
+	// no soft invent simple when AllTypes empty
+	cg2 := EmptyCGContext()
+	cg2.Types = &TypeEnv{}
+	if MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg2, nil, nil, true, false, TermConstant, 0) != nil {
+		t.Fatal("empty Type env must not invent simple type")
+	}
 }
 
 func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
