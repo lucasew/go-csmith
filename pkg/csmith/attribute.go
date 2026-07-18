@@ -107,8 +107,9 @@ func NewVarAttrGenerator() *AttributeGenerator {
 
 // Package-level generators (Variable::var_attr_generator / Function::func_attr_generator).
 var (
-	varAttrGenerator  *AttributeGenerator
-	funcAttrGenerator *AttributeGenerator
+	varAttrGenerator   *AttributeGenerator
+	funcAttrGenerator  *AttributeGenerator
+	labelAttrGenerator *AttributeGenerator
 )
 
 // EnsureVarAttrGenerator lazy-inits Variable::var_attr_generator.
@@ -138,8 +139,28 @@ func EnsureFuncAttrGenerator() *AttributeGenerator {
 	return funcAttrGenerator
 }
 
+// NewLabelAttrGenerator mirrors Statement label_attr_generator.
+// Statement.cpp label attributes (unused/used/deprecated-ish).
+func NewLabelAttrGenerator() *AttributeGenerator {
+	p := 10
+	return &AttributeGenerator{Attributes: []Attribute{
+		&BooleanAttribute{Name: "unused", Prob: p},
+		&BooleanAttribute{Name: "hot", Prob: p},
+		&BooleanAttribute{Name: "cold", Prob: p},
+	}}
+}
+
+// EnsureLabelAttrGenerator lazy-inits label attributes.
+func EnsureLabelAttrGenerator() *AttributeGenerator {
+	if labelAttrGenerator == nil {
+		labelAttrGenerator = NewLabelAttrGenerator()
+	}
+	return labelAttrGenerator
+}
+
 // ClearAttrGenerators for Finalization between runs.
 func ClearAttrGenerators() {
 	varAttrGenerator = nil
 	funcAttrGenerator = nil
+	labelAttrGenerator = nil
 }

@@ -30,6 +30,8 @@ type Stmt struct {
 	Label string
 	// SourceLabel is emitted before this statement (back-edge target).
 	SourceLabel string
+	// LabelAttr is optional __attribute__((...)) after label (pre_output).
+	LabelAttr string
 	// GotoForward: after this goto, insert a labeled no-op in the block.
 	GotoForward bool
 	// GotoBack: label lives on an earlier statement (SourceLabel).
@@ -70,14 +72,94 @@ type Block struct {
 	BreakStmIDs []int
 	// InArrayLoop mirrors Block::in_array_loop — disallow goto in/out.
 	InArrayLoop bool
+	// NeedRevisit mirrors Block::need_revisit — force full re-analysis.
+	// Block.cpp:195.
+	NeedRevisit bool
+	// StmID mirrors Statement::stm_id for the block itself (compound stmt).
+	StmID int
+	// EmitLabelAttrs: emit __attribute__ on goto labels (CGOptions::label_attributes).
+	EmitLabelAttrs bool
+	// LabelAttrRng seed for attributes when EmitLabelAttrs (optional; use package gen).
+	LabelAttrRng *Rng
 }
 
-// GetLastStm mirrors Block::get_last_stm — last statement, or nil.
+// GetLastStm mirrors Block::get_last_stm — last effective statement.
+// Block.cpp:336–346 — last stmt, but stop early if return encountered.
 func (b *Block) GetLastStm() *Stmt {
 	if b == nil || len(b.Stmts) == 0 {
 		return nil
 	}
-	return &b.Stmts[len(b.Stmts)-1]
+	var last *Stmt
+	for i := range b.Stmts {
+		last = &b.Stmts[i]
+		if last.Kind == StmtReturn {
+			break
+		}
+	}
+	return last
+}
+
+// FromTailToHead mirrors Block::from_tail_to_head.
+// Block.cpp:362–372 — looping body may fall through to head if last does not must_jump.
+func (b *Block) FromTailToHead() bool {
+	if b == nil || !b.Looping || len(b.Stmts) == 0 {
+		return false
+	}
+	s := b.GetLastStm()
+	if s == nil {
+		return false
+	}
+	if s.MustJump() {
+		return false
+	}
+	return true
+}
+
+// SetAccumulatedEffect mirrors Block::set_accumulated_effect.
+// Block.cpp:571–580 — union of map_stm_effect for each statement.
+func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
+	eff := EmptyEffect()
+	if b == nil || fm == nil {
+		return eff
+	}
+	for i := range b.Stmts {
+		st := &b.Stmts[i]
+		if st.StmID > 0 {
+			eff = eff.AddEffect(fm.GetMapStmEffect(st.StmID))
+		}
+	}
+	if b.StmID > 0 {
+		fm.SetMapStmEffect(b.StmID, eff)
+	}
+	return eff
+}
+
+// RandomParentBlock mirrors Block::random_parent_block.
+// Block.cpp:353–370 — self and ancestors; optional nil global if GlobalVariables.
+func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
+	if r == nil {
+		return b
+	}
+	var blks []*Block
+	if allowGlobal {
+		blks = append(blks, nil)
+	}
+	for cur := b; cur != nil; cur = cur.Parent {
+		blks = append(blks, cur)
+	}
+	if len(blks) == 0 {
+		return b
+	}
+	return blks[r.RndUpto(uint32(len(blks)))]
+}
+
+// MustBreakOrReturn mirrors Block::must_break_or_return light — last must_jump.
+func (b *Block) MustBreakOrReturn() bool {
+	if b == nil {
+		return false
+	}
+	s := b.GetLastStm()
+	return s != nil && s.MustJump()
 }
 
 // IsVarOnStack mirrors Block::is_var_on_stack.
@@ -168,6 +250,9 @@ func MakeRandomBlock(
 		blockSize:        opts.MaxBlockSize,
 		EmitDepthProtect: opts.DepthProtect,
 		EmitStepHash:     opts.StepHashByStmt,
+		EmitLabelAttrs:   opts.LabelAttributes,
+		LabelAttrRng:     r,
+		StmID:            AllocStmID(),
 	}
 	if f != nil {
 		f.Stack = append(f.Stack, b)
@@ -222,9 +307,29 @@ func MakeRandomBlock(
 		}
 		b.Stmts = append(b.Stmts, ret)
 	}
-	// FactMgr::update_facts_for_oos_vars when leaving block (locals go out of scope)
-	if cg.FM != nil && len(b.LocalVars) > 0 {
-		cg.FM.UpdateFactsForOOSVars(b.LocalVars)
+	// Block::post_creation_analysis light path (Block.cpp:682–694)
+	// StmID already assigned at creation when possible
+	if b.StmID == 0 {
+		b.StmID = AllocStmID()
+	}
+	if cg.FM != nil {
+		if cg.FM.MapVisited == nil {
+			cg.FM.MapVisited = make(map[int]bool)
+		}
+		cg.FM.MapVisited[b.StmID] = true
+		// accumulate statement effects into block
+		b.SetAccumulatedEffect(cg.FM)
+		// locals OOS; drop other RVs; set fact out
+		if len(b.LocalVars) > 0 {
+			cg.FM.UpdateFactsForOOSVars(b.LocalVars)
+		}
+		cg.FM.RemoveRVFacts(&cg.FM.GlobalFacts)
+		// block as "statement" for facts out — use SetMapFactsOut
+		cg.FM.SetMapFactsOut(b.StmID, cg.FM.GlobalFacts)
+		// loop self back-edge when fall-through to head
+		if b.Looping && b.FromTailToHead() {
+			cg.FM.CreateCFGEdge(b.StmID, b, false, true)
+		}
 	}
 	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
@@ -430,7 +535,16 @@ func (b *Block) Output(indent int) string {
 	}
 	for _, st := range b.Stmts {
 		if st.SourceLabel != "" {
-			sb.WriteString(inner + st.SourceLabel + ":\n")
+			// Statement::pre_output — label: [attrs]\n
+			lab := st.SourceLabel + ":"
+			attr := st.LabelAttr
+			if attr == "" && b.EmitLabelAttrs && b.LabelAttrRng != nil {
+				attr = EnsureLabelAttrGenerator().Output(b.LabelAttrRng)
+			}
+			if attr != "" {
+				lab += attr
+			}
+			sb.WriteString(inner + lab + "\n")
 		}
 		if st.Kind == StmtLabel {
 			sb.WriteString(inner + "    ;\n")

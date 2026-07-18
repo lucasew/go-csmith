@@ -972,8 +972,13 @@ func (vs *VariableSelector) SelectParentLocal(
 	if len(stack) == 0 {
 		return nil
 	}
-	// VariableSelector.cpp:1001–1004 — pick one block on the stack
-	blk := stack[r.RndUpto(uint32(len(stack)))]
+	// VariableSelector.cpp:1001–1004 — pick parent block (incl. self); optional global=nil unused for locals
+	cur := stack[len(stack)-1]
+	blk := cur.RandomParentBlock(r, false)
+	if blk == nil {
+		// fall back to random stack entry
+		blk = stack[r.RndUpto(uint32(len(stack)))]
+	}
 	if blk == nil {
 		return nil
 	}
