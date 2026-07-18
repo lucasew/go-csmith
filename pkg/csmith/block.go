@@ -528,8 +528,8 @@ func makeRandomStmt(
 		return false
 	})
 	// retry failed factories (null Statement* upstream) — Statement.cpp:314–316
-	// C++: ERROR_GUARD after factory; if s==0 (no error) return make_random re-pick.
-	for tries := 0; tries < 32; tries++ {
+	// C++: if s==0 without error, make_random re-picks forever; cap high (no soft invent empty early)
+	for tries := 0; tries < 256; tries++ {
 		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
 		cg.EffectStm = EmptyEffect()
 		cg.ExprDepth = 0

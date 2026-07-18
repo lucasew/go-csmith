@@ -232,11 +232,15 @@ func MakeRandomLhs(
 		cg.EffectStm = stmSave
 	}
 
-	// Lhs.cpp:63, 70–140 — do { DEPTH_GUARD; select; filters; visit } while; dummy invalid_vars
+	// Lhs.cpp:63, 70–140 — do { DEPTH_GUARD; select; filters; visit } while (!lhs)
+	// C++ loops until success or ERROR_GUARD; cap high to avoid soft invent nil early
 	var dummy []*Variable
-	for tries := 0; tries < 32; tries++ {
+	for tries := 0; tries < 256; tries++ {
 		// Lhs.cpp:71 — DEPTH_GUARD_BY_TYPE_RETURN(dtLhs, nullptr) inside the do-loop
 		if DepthGuardByType(opts, DtLhs) == BadDepth {
+			return nil
+		}
+		if HasError() {
 			return nil
 		}
 		var v *Variable

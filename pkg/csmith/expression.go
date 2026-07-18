@@ -698,8 +698,9 @@ func makeExpressionVariableFlags(
 	preStm = cg.EffectStm.Clone()
 	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (!ev)
 	// dummy is invalid_vars passed into select (ExpressionVariable.cpp:78, 131)
+	// C++ loops until success or ERROR_GUARD; cap high to avoid soft invent nil early
 	var dummy []*Variable
-	for tries := 0; tries < 24; tries++ {
+	for tries := 0; tries < 256; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, *cg, typ, qfer)
 		if v == nil {
@@ -707,7 +708,10 @@ func makeExpressionVariableFlags(
 			v = vs.SelectWithInvalid(AccessRead, *cg, typ, qfer, r, MatchFlexible, dummy)
 		}
 		if v == nil {
-			// C++ continues the loop; we give up after tries
+			// ERROR_GUARD from select; sticky error aborts like C++
+			if HasError() {
+				break
+			}
 			continue
 		}
 		// already in dummy should be rare when SelectWithInvalid works; keep guard

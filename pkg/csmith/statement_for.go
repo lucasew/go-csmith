@@ -465,8 +465,9 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 // forHeaderOutput emits "for (init; test; incr)" using full IR when present.
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
 func forHeaderOutput(lc *LoopControl) string {
+	// StatementFor always has init/test/incr IR; incomplete → empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
-		return "for (;;)"
+		return ""
 	}
 	init := forInitOutput(lc)
 	test := forTestOutput(lc)
@@ -489,8 +490,9 @@ func forInitOutput(lc *LoopControl) string {
 }
 
 func forTestOutput(lc *LoopControl) string {
+	// StatementFor.cpp:412 — test.Output; no soft invent "1" for missing test
 	if lc == nil {
-		return "1"
+		return ""
 	}
 	if lc.TestExpr != nil {
 		if s := lc.TestExpr.Output(); s != "" {
@@ -498,7 +500,7 @@ func forTestOutput(lc *LoopControl) string {
 		}
 	}
 	if lc.IV == nil {
-		return "1"
+		return ""
 	}
 	return fmt.Sprintf("%s %s %d", lc.IV.OutputC(), lc.TestOp.CmpOpC(), lc.LimitN)
 }
