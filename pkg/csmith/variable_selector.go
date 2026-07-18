@@ -1490,41 +1490,51 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 }
 
 // GenerateParameterVariable mirrors VariableSelector::GenerateParameterVariable(Function&).
-// VariableSelector.cpp:963–979 — 40% pointer when derived exist; else nonvoid nonvolatile;
-// CGOptions arg_structs / arg_unions gates.
+// VariableSelector.cpp:963–981 — 40% pointer when derived exist; else nonvoid nonvolatile;
+// ERROR_RETURN after each RNG; no make_random_pointer / simple invent.
 func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Variable {
 	if vs == nil || f == nil || r == nil {
 		return nil
 	}
-	var t *Type
-	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
-	if vs.Types != nil && vs.Types.HasPointerType() && r.RndFlipcoin(40) {
-		// Type::choose_random_pointer_type — pick existing derived pointer
-		t = vs.Types.ChooseRandomPointerType(r)
-		if t == nil {
-			t = vs.Types.MakeRandomPointerType(r, vs.Opts, vs.Probs)
-		}
-	} else if vs.Types != nil && len(vs.Types.AllTypes) > 0 {
-		// Type::choose_random_nonvoid_nonvolatile (filters arg_structs/arg_unions)
-		t = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
-	} else {
-		st := ChooseRandomNonvoidSimple(r, vs.Probs)
-		t = GetSimpleType(st)
-	}
-	// VariableSelector.cpp:973–976 — ERROR_RETURN on null; assert non-void simple
-	// no soft invent GetIntType (arg_structs filter is in NonVoidNonVolatileTypeFilter)
-	if t == nil {
+	// VariableSelector.cpp:967 ERROR_RETURN after flipcoin setup
+	if HasError() {
 		return nil
 	}
+	// VariableSelector.cpp:966–972 — has_pointer_type() && flipcoin(40)
+	// no soft invent MakeRandomPointerType when choose returns nil
+	rndPtr := r.RndFlipcoin(40)
+	if HasError() {
+		return nil
+	}
+	var t *Type
+	if vs.Types != nil && vs.Types.HasPointerType() && rndPtr {
+		// Type::choose_random_pointer_type — pick existing derived only
+		t = vs.Types.ChooseRandomPointerType(r)
+	} else if vs.Types != nil {
+		// Type::choose_random_nonvoid_nonvolatile (arg_structs/arg_unions in filter)
+		// no soft invent GetSimpleType when AllTypes empty
+		t = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
+	}
+	// VariableSelector.cpp:972 ERROR_RETURN
+	if t == nil || HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:973–974 assert non-void simple
 	if t.IsSimple() && t.Simple() == EVoid {
 		return nil
 	}
-	// CVQualifiers::random_qualifiers(t) — no context
+	// VariableSelector.cpp:976 — CVQualifiers::random_qualifiers(t)
 	qfer := RandomQualifiersNoContextNoVolatile(t, vs.Opts, vs.Probs, r)
-	v := vs.GenerateParameterVariableTyped(t, qfer)
-	if v != nil {
-		f.Param = append(f.Param, v)
+	// VariableSelector.cpp:977 ERROR_RETURN
+	if HasError() {
+		return nil
 	}
+	v := vs.GenerateParameterVariableTyped(t, qfer)
+	// VariableSelector.cpp:979–980 ERROR_RETURN; param.push_back
+	if v == nil || HasError() {
+		return nil
+	}
+	f.Param = append(f.Param, v)
 	return v
 }
 
@@ -1697,24 +1707,34 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		add(av)
 	}
 	n := len(arrayVars)
+	// VariableSelector.cpp:1428–1435
 	if n == 0 {
 		return vs.CreateRandomArray(r, cg)
 	}
 	if n == 1 {
 		return arrayVars[0]
 	}
-	return arrayVars[r.RndUpto(uint32(n))]
+	idx := r.RndUpto(uint32(n))
+	// VariableSelector.cpp:1434 ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
+	return arrayVars[idx]
 }
 
 // CreateRandomArray mirrors VariableSelector::create_random_array.
 // VariableSelector.cpp:1340–1379 — global 25%; choose_random_nonvoid(_nonvolatile);
 // skip const struct/union and !accept_type; DFA new-var facts.
+// CreateArrayVariable (C++ ArrayVariable.cpp:190–191) also registers GlobalList/local.
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
 		return nil
 	}
-	// VariableSelector.cpp:1341 — global_variables && rnd_flipcoin(25)
+	// VariableSelector.cpp:1341–1342 — global_variables && rnd_flipcoin(25); ERROR_GUARD
 	asGlobal := vs.Opts.GlobalVariables && r.RndFlipcoin(25)
+	if HasError() {
+		return nil
+	}
 	var name string
 	var blk *Block
 	if asGlobal {
@@ -1739,21 +1759,18 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
 	// C++ loops until success or ERROR_GUARD; cap high (no soft invent nil early)
+	// no soft invent GetSimpleType when Types nil — fail closed like ERROR_GUARD
 	var elem *Type
 	for tries := 0; tries < 256; tries++ {
-		if asGlobal {
-			if vs.Types != nil {
-				elem = vs.Types.ChooseRandomNonvoid(r, vs.Opts, vs.Probs)
-			} else {
-				elem = GetSimpleType(ChooseRandomNonvoidSimple(r, vs.Probs))
-			}
-		} else {
-			if vs.Types != nil {
-				elem = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
-			} else {
-				elem = GetSimpleType(ChooseRandomNonvoidSimple(r, vs.Probs))
-			}
+		if vs.Types == nil {
+			return nil
 		}
+		if asGlobal {
+			elem = vs.Types.ChooseRandomNonvoid(r, vs.Opts, vs.Probs)
+		} else {
+			elem = vs.Types.ChooseRandomNonvoidNonvolatile(r, vs.Opts, vs.Probs)
+		}
+		// VariableSelector.cpp:1360 ERROR_GUARD
 		if HasError() {
 			return nil
 		}
@@ -1773,17 +1790,19 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	if elem == nil {
 		return nil
 	}
-	// VariableSelector.cpp:1362–1363 — non-const non-vol storage qfer
+	// VariableSelector.cpp:1362–1363 — qfer.add_qualifiers(false, false)
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	init := MakeRandom(elem, vs.Opts, r)
 	av := CreateArrayVariable(r, vs.Opts, blk, name, elem, init, qfer)
-	if av == nil {
+	if av == nil || HasError() {
 		return nil
 	}
 	// VariableSelector.cpp:1368 — AllVars
 	vs.AllVars = append(vs.AllVars, &av.Variable)
 	vs.Arrays = append(vs.Arrays, av)
-	// VariableSelector.cpp:1371–1377 — DFA facts + inventory
+	// ArrayVariable.cpp:190–191 — CreateArrayVariable pushes GlobalList/local;
+	// Go CreateArrayVariable does not, so register here (same as C++ side effect)
+	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals
 	if asGlobal {
 		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		if !av.IsVolatile() {
@@ -1793,13 +1812,11 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, &av.Variable)
 		}
 		if cg.FM != nil {
-			// VariableSelector.cpp:1373–1374
 			cg.FM.AddNewVarFactAndUpdate(nil, &av.Variable)
 		}
 	} else if blk != nil {
 		blk.LocalVars = append(blk.LocalVars, &av.Variable)
 		if cg.FM != nil {
-			// VariableSelector.cpp:1376–1377
 			cg.FM.AddNewVarFactAndUpdate(blk, &av.Variable)
 		}
 	}

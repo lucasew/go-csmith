@@ -6,6 +6,7 @@ import (
 )
 
 func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.ArgStructs = false
 	opts.ArgUnions = false
@@ -37,12 +38,14 @@ func TestGenerateParameterVariableArgStructsOff(t *testing.T) {
 }
 
 func TestGenerateParameterVariablePointerChoice(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
 	vs.Types = &TypeEnv{DerivedTypes: []*Type{pt}, AllTypes: []*Type{GetIntType(), pt}}
 	foundPtr := false
 	for seed := uint64(1); seed < 50; seed++ {
+		ClearError()
 		f := &Function{Name: "f"}
 		_ = vs.GenerateParameterVariable(f, NewRng(seed))
 		if len(f.Param) > 0 && f.Param[0].Type != nil && f.Param[0].Type.IsPointerLike() {
@@ -52,6 +55,30 @@ func TestGenerateParameterVariablePointerChoice(t *testing.T) {
 	}
 	if !foundPtr {
 		t.Fatal("expected some pointer params")
+	}
+}
+
+func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
+	// VariableSelector.cpp:968–970 — only choose_random_pointer_type; no make invent
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	// HasPointerType true via DerivedTypes but ChooseRandomPointerType needs non-empty
+	// empty Derived after flip: HasPointerType false → nonvoid path
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	f := &Function{Name: "f"}
+	v := vs.GenerateParameterVariable(f, NewRng(1))
+	if v == nil || v.Type == nil {
+		t.Fatal("expected nonvoid param")
+	}
+	if v.Type.IsPointerLike() {
+		t.Fatal("no derived pointers → must not invent pointer param")
+	}
+	// nil Types → fail closed (no GetSimpleType invent)
+	vs2 := NewVariableSelector(opts)
+	vs2.Types = nil
+	if vs2.GenerateParameterVariable(&Function{Name: "g"}, NewRng(2)) != nil {
+		t.Fatal("nil Types must not invent simple param")
 	}
 }
 

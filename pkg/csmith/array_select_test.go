@@ -35,8 +35,11 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 }
 
 func TestSelectArrayCreatesWhenEmpty(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
+	// create_random_array uses Type env (C++ GenerateSimpleTypes always live)
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
 	r := NewRng(2)
 	av := vs.SelectArray(r, EmptyCGContext())
 	if av == nil || len(vs.Arrays) < 1 {

@@ -25,9 +25,12 @@ func TestParamListProbabilityRange(t *testing.T) {
 }
 
 func TestMakeRandomSignatureParams(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	// GenerateParameterVariable needs Type env (no soft invent simple)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// share gensym counters: use vs.Sym for params and separate for funcs is OK upstream-global
 	// For 1:1 naming, share one GenSym for both
 	sym := &vs.Sym
