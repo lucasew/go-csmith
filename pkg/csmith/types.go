@@ -122,3 +122,30 @@ func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	}
 	return st
 }
+
+// PtrType returns Type::ptr_type (pointee), or nil if not a pointer.
+func (t *Type) PtrType() *Type {
+	if t == nil {
+		return nil
+	}
+	return t.ptrTo
+}
+
+// IndirectLevel mirrors Type::get_indirect_level — count of pointer steps.
+func (t *Type) IndirectLevel() int {
+	n := 0
+	for cur := t; cur != nil && cur.ptrTo != nil; cur = cur.ptrTo {
+		n++
+	}
+	return n
+}
+
+// PointerTo builds a pointer type whose pointee is t (Type constructor for pointers).
+// Upstream: Type(const Type *t) for pointer types / find_pointer_type paths.
+func PointerTo(pointee *Type) *Type {
+	if pointee == nil {
+		pointee = GetSimpleType(EInt)
+	}
+	return &Type{ptrTo: pointee}
+}
+

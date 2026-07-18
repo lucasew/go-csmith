@@ -393,9 +393,11 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 1: `Rng` | **Done** — `rng.go` + tests |
 | Layer 2: `CGOptions` defaults | **Done** — macros 1:1 tests; `MaxPointerDepth` fixed to 5 (`max_indirect_level`) |
 | Layer 3: `Probabilities` singles + simple-types equal group | **Done** — `probabilities.go` + tests |
-| Layer 4: `Type` simple + `choose_random_nonvoid_simple` | **Partial** — `types.go` simple only |
+| Layer 4: `Type` simple + pointer wrapper | **Partial** — simple + `PointerTo` / indirect level |
+| Layer 5: `Effect` + empty `CGContext` | **Partial** — purity / SE-free only |
+| Layer 5b: `CVQualifiers::random_qualifiers` | **Partial** — type-based path + scalar make_* |
 | `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` |
-| CVQualifiers → … → ProgramGenerator | **Not started** |
+| Variable → … → ProgramGenerator | **Not started** |
 | CLI drop-in | **Last** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
