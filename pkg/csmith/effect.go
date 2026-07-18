@@ -73,22 +73,52 @@ func WithSideEffects() Effect {
 }
 
 // AddExternalEffect mirrors Effect::add_external_effect — only global reads/writes.
-// Effect.cpp:192–215. Uses sorted name order for determinism (Go map range is random).
+// Effect.cpp:192–215.
 func (e Effect) AddExternalEffect(other Effect) Effect {
+	return e.AddExternalEffectWithCallers(other, nil)
+}
+
+// AddExternalEffectWithCallers mirrors Effect::add_external_effect(e, call_chain).
+// Effect.cpp:221–269 — globals always; non-globals only if on a call_chain stack frame.
+func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
 	out := e
 	for _, v := range other.ReadVars() {
-		if v != nil && v.IsGlobal() {
+		if v == nil {
+			continue
+		}
+		if v.IsGlobal() {
+			out = out.ReadVar(v)
+			continue
+		}
+		if varOnCallChain(v, callChain) {
 			out = out.ReadVar(v)
 		}
 	}
 	for _, v := range other.WrittenVars() {
-		if v != nil && v.IsGlobal() {
+		if v == nil {
+			continue
+		}
+		if v.IsGlobal() {
+			out = out.WriteVar(v)
+			out.pure = false
+			continue
+		}
+		if varOnCallChain(v, callChain) {
 			out = out.WriteVar(v)
 			out.pure = false
 		}
 	}
 	out.sideEffectFree = out.sideEffectFree && other.sideEffectFree
 	return out
+}
+
+func varOnCallChain(v *Variable, chain []*Block) bool {
+	for _, b := range chain {
+		if b != nil && b.IsVarOnStack(v) {
+			return true
+		}
+	}
+	return false
 }
 
 // AddEffect mirrors Effect::add_effect(e) without LHS set merge.

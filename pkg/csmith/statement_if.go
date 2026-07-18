@@ -13,6 +13,16 @@ func MakeRandomIf(
 	stmtTab *ThresholdTable,
 	cg CGContext,
 ) *Stmt {
+	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
+	var func1PreFacts []*FactPointTo
+	var func1PreEffect Effect
+	func1Hack := cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop()
+	if func1Hack && cg.FM != nil {
+		func1PreFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		if cg.EffectAccum != nil {
+			func1PreEffect = cg.EffectAccum.Clone()
+		}
+	}
 	// Expression::make_random(..., get_int_type(), no_const = !const_as_condition)
 	noConst := !opts.ConstAsCondition
 	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
@@ -24,6 +34,20 @@ func MakeRandomIf(
 			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermConstant, cg.ExprDepth)
 		} else {
 			test = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+		}
+	}
+	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
+	if func1Hack && cg.FM != nil && test != nil && HasUncertainCallRecursiveExpr(test) {
+		MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts)
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = func1PreEffect.Clone()
+		}
+		preWork := CloneFactSlice(func1PreFacts)
+		cg.FM.GlobalFacts = preWork
+		if VisitFactsExpression(test, &cg, opts) {
+			// ok — keep facts from re-visit
+		} else {
+			cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
 		}
 	}
 	// Snapshot pre-branch effect; each arm runs from the same pre-state (StatementIf.cpp:96–99).
@@ -38,7 +62,8 @@ func MakeRandomIf(
 	}
 
 	// StatementIf.cpp:80 — visit_facts on condition before branches (when FM set)
-	if cg.FM != nil && test != nil {
+	// (skipped when already re-analyzed under func_1 uncertain path)
+	if cg.FM != nil && test != nil && !(func1Hack && HasUncertainCallRecursiveExpr(test)) {
 		cgp := &cg
 		if !VisitFactsExpression(test, cgp, opts) {
 			// soft-fail: keep test, continue generation

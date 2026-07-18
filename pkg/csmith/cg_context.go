@@ -270,10 +270,23 @@ func (c *CGContext) AddExternalEffect(e Effect) {
 }
 
 // AddVisibleEffect mirrors CGContext::add_visible_effect.
-// CGContext.cpp:411–417 — external effect with call_chain (simplified: same as external).
+// CGContext.cpp:411–417 — add_external_effect with call_chain + current block.
 func (c *CGContext) AddVisibleEffect(e Effect) {
-	// full call-chain filtering deferred; global external is the main transfer
-	c.AddExternalEffect(e)
+	if c == nil {
+		return
+	}
+	callers := append([]*Block(nil), c.CallChain...)
+	if b := c.CurrentBlock(); b != nil {
+		callers = append(callers, b)
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.AddExternalEffectWithCallers(e, callers)
+	}
+	c.EffectStm = c.EffectStm.AddExternalEffectWithCallers(e, callers)
+	if c.CurrentFunc != nil {
+		// FEffect remains global-external summary for the function
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
+	}
 }
 
 // AddEffect mirrors CGContext::add_effect — fold into accum and effect_stm.
