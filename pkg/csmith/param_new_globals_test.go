@@ -98,6 +98,44 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 	}
 }
 
+func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
+	// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false) sticky error → failed
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	callee := &Function{
+		Name:       "c",
+		ReturnType: GetIntType(),
+		BuildState: BuildBuilt,
+		IsBuilt:    true,
+		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+	}
+	caller := &Function{Name: "a"}
+	cg := WithFunc(caller, EmptyEffect())
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	if fi == nil || !fi.Failed {
+		t.Fatal("sticky error must fail invocation, not invent params")
+	}
+}
+
+func TestMakeRandomSignatureErrorGuardOnRV(t *testing.T) {
+	// Function.cpp:419–420 — CreateVariable ERROR_GUARD; sticky error aborts signature
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	vs.Types = env
+	cg := EmptyCGContext()
+	cg.Types = env
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	if MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("sticky error must not invent signature")
+	}
+}
+
 func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 	// FunctionInvocation.cpp:157–159 — operand make_random mutates cg.expr_depth
 	opts := Defaults()

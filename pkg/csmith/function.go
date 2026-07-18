@@ -173,6 +173,10 @@ func MakeRandomSignature(
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", retType, retQ)
+	// Function.cpp:419–420 — CreateVariable + ERROR_GUARD path; no soft invent signature without rv
+	if f.RV == nil || HasError() {
+		return nil
+	}
 	// GenerateParameterList: for i=0; i<=max; i++
 	max := ParamListProbability(r, opts)
 	if HasError() {
@@ -287,6 +291,10 @@ func MakeFirst(
 		return nil
 	}
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
+	// Function.cpp:453 — CreateVariable + ERROR_GUARD; no soft invent first without rv
+	if f.RV == nil || HasError() {
+		return nil
+	}
 
 	// Function.cpp:457–458 — FactMgr with empty global facts
 	var fm *FactMgr
@@ -526,13 +534,20 @@ func (f *Function) MakeReturnConst(opts Options, r *Rng) {
 	if f == nil || !opts.DepthProtect || !f.NeedReturnStmt() {
 		return
 	}
-	// Function.cpp:611–612 — assert non-void simple when simple
-	if f.ReturnType != nil && f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
+	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid
+	if f.ReturnType == nil {
+		return
+	}
+	if f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
+		// need_return_stmt is false for void; fail closed if called wrongly
 		return
 	}
 	f.RetConst = MakeRandom(f.ReturnType, opts, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
-	// sticky error left for GenerateBody ERROR_RETURN
+	// sticky error left for GenerateBody ERROR_RETURN; nil const is incomplete IR
+	if HasError() {
+		return
+	}
 }
 
 // returnTypeC is qualified return type (from RV qfer when present).

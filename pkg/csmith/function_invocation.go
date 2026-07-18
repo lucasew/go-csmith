@@ -345,8 +345,8 @@ func BuildUserInvocation(
 		paramCG.EffectStm = EmptyEffect()
 		// Expression::make_random_param bumps paramCG.ExprDepth; merge copies it
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
-		// FunctionInvocationUser.cpp:257–258 — ERROR_GUARD(false) on null param
-		if arg == nil {
+		// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false); sticky error or null param → fail
+		if arg == nil || HasError() {
 			fi.Failed = true
 			return fi
 		}
@@ -444,8 +444,9 @@ func BuildInvocationAndFunction(
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
-		// FunctionInvocationUser.cpp:186–187 — make_random_param must succeed (null = fail)
-		if arg == nil {
+		// FunctionInvocationUser.cpp:186–187 — make_random_param; C++ would ERROR_GUARD after sticky error
+		// (build_invocation_and_function has no explicit ERROR_GUARD but uses param pointer)
+		if arg == nil || HasError() {
 			fi.Failed = true
 			return fi
 		}
