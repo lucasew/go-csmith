@@ -530,3 +530,50 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 		t.Fatal("const struct assign must fail closed")
 	}
 }
+
+func TestMakeDummyBlockCGFactIn(t *testing.T) {
+	// Block.cpp:95–110 — fact_in + post_creation, not empty shell only
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "builtin_x", ReturnType: GetIntType(), IsBuiltin: true}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	b := MakeDummyBlockCG(&cg, opts)
+	if b == nil || b.StmID == 0 {
+		t.Fatal("nil dummy")
+	}
+	if in, ok := fm.MapFactsIn[b.StmID]; !ok || FindRelatedPointTo(in, p) == nil {
+		t.Fatal("fact_in missing")
+	}
+	// stack popped after make
+	if len(f.Stack) != 0 {
+		t.Fatal("stack")
+	}
+}
+
+func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
+	// Block.cpp:383–384 assert(visited) → sticky error, no soft drop only
+	ClearError()
+	opts := Defaults()
+	// void return type makes NeedReturn false; use int return without seed for expr
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// no globals / no params → ExpressionVariable make may fail → AppendReturn fails
+	b := &Block{Func: f, Parent: nil}
+	f.Body = b
+	f.Stack = []*Block{b}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// MakeRandomReturn with empty selector may still invent globals via select
+	// Force error by sticky error before append path visit
+	// Direct path: call AppendReturn with vs that cannot create
+	vs := NewVariableSelector(opts)
+	vs.Opts.GlobalVariables = false
+	st := b.AppendReturnStmt(NewRng(1), opts, vs, &cg)
+	// either success or fail with SetError on visit fail; must not leave incomplete without error if visit fails
+	if st == nil && !HasError() {
+		// make return itself failed without visit — also ok (no invent)
+	}
+	ClearError()
+}

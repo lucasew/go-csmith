@@ -491,7 +491,19 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	// Block.cpp:734–741 — append return for top-level body when still missing
 	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() && !b.MustReturn() {
 		fm.GlobalFacts = postFacts
-		b.AppendReturnStmt(r, opts, vs, cg)
+		if b.AppendReturnStmt(r, opts, vs, cg) == nil {
+			// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
+			return
+		}
+		// Block.cpp:740 — set_fact_out(this, map_facts_out[sr])
+		if len(b.Stmts) > 0 {
+			sr := &b.Stmts[len(b.Stmts)-1]
+			if sr.StmID > 0 {
+				if out, ok := fm.MapFactsOut[sr.StmID]; ok {
+					fm.SetMapFactsOut(b.StmID, out)
+				}
+			}
+		}
 	}
 }
 

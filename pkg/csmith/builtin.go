@@ -117,13 +117,15 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 	return false
 }
 
-// MakeDummyBlock mirrors Block::make_dummy_block — empty body for builtins.
-// Block.cpp:95–110.
+// MakeDummyBlock mirrors Block::make_dummy_block without live CGContext.
+// Prefer MakeDummyBlockCG when CGContext is available (fact_in + post_creation).
+// Block.cpp:95–110 — empty block, stack push/pop, fact_in, post_creation_analysis.
 func MakeDummyBlock(f *Function) *Block {
 	if f == nil {
 		return nil
 	}
-	b := &Block{Func: f, blockSize: 0}
+	// Library path without CGContext: still register block (no soft invent body stmts)
+	b := &Block{Func: f, blockSize: 0, StmID: AllocStmID()}
 	f.Blocks = append(f.Blocks, b)
 	return b
 }

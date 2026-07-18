@@ -438,8 +438,9 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:643–648 — builtin dummy vs make_random
+	// make_dummy_block needs CGContext (fact_in + post_creation); no soft empty shell
 	if f.IsBuiltin {
-		f.Body = MakeDummyBlock(f)
+		f.Body = MakeDummyBlockCG(&cg, opts)
 	} else {
 		f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &cg, false)
 	}

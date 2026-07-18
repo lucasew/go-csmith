@@ -482,9 +482,11 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	if fm != nil {
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
 		// Block.cpp:383–384 — sr->visit_facts; assert(visited)
-		// no soft invent success when visit fails
+		// no soft invent success / silent drop when visit fails
 		if !VisitFactsStatementReturn(st, cg, opts) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			// C++ assert(visited) — sticky error for ERROR_GUARD callers
+			SetError(ErrGeneric)
 			return nil
 		}
 		if st.StmID > 0 {
@@ -543,30 +545,38 @@ func blockHasStmtID(b *Block, id int) bool {
 }
 
 // MakeDummyBlockCG mirrors Block::make_dummy_block with CGContext.
-// Block.cpp:95–110 — empty block, fact_in, post_creation_analysis.
+// Block.cpp:95–110 — empty block, fact_in, post_creation_analysis, stack pop.
 func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
+	// Block.cpp:96–97 — assert(curr_func)
 	if cg == nil || cg.CurrentFunc == nil {
 		return nil
 	}
 	f := cg.CurrentFunc
 	parent := cg.CurrentBlock()
+	// Block.cpp:99 — Block(get_current_block(), 0)
 	b := &Block{
 		Parent:      parent,
 		Func:        f,
 		blockSize:   0,
 		StmID:       AllocStmID(),
+		// Block.cpp:101 — in_array_loop from iv_bounds
 		InArrayLoop: len(cg.IVBounds) > 0,
+		EmitFM:      cg.FM,
 	}
+	// Block.cpp:102–103 — blocks + stack push
 	f.Blocks = append(f.Blocks, b)
 	f.Stack = append(f.Stack, b)
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
 		preEffect = cg.EffectAccum.Clone()
 	}
+	// Block.cpp:105 — set_fact_in(b, global_facts)
 	if cg.FM != nil {
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
+	// Block.cpp:107 — post_creation_analysis
 	b.PostCreationAnalysis(cg, opts, preEffect, nil, nil)
+	// Block.cpp:108 — stack pop
 	if len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
