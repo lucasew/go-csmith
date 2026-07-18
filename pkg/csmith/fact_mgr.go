@@ -388,3 +388,128 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 		fm.GlobalFacts[i] = cur
 	}
 }
+
+// AddParamFacts mirrors FactMgr::add_param_facts.
+// FactMgr.cpp:108–116 — assign each param from arg expression into facts.
+func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
+	if fm == nil || fm.Func == nil || facts == nil {
+		return
+	}
+	for i, p := range fm.Func.Param {
+		if p == nil || !p.IsPointer() {
+			continue
+		}
+		var arg *Expression
+		if i < len(args) {
+			arg = args[i]
+		}
+		// update_fact_for_assign(param, arg)
+		if arg != nil {
+			fm.UpdateFactForAssignInto(p, 0, arg, facts)
+		} else {
+			*facts = MergeFactInto(*facts, NewFactPointTo(p))
+		}
+	}
+}
+
+// UpdateFactForAssignInto is UpdateFactForAssign writing into a fact slice.
+func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
+	if facts == nil || lhs == nil {
+		return false
+	}
+	changed := false
+	newFacts := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
+	for _, f := range newFacts {
+		*facts = MergeFactInto(*facts, f)
+		changed = true
+	}
+	return changed
+}
+
+// PointsTo reports whether this fact's set contains v.
+func (f *FactPointTo) PointsTo(v *Variable) bool {
+	if f == nil || v == nil {
+		return false
+	}
+	return IsVariableInSet(f.PointTo, v)
+}
+
+// CallerToCalleeHandover mirrors FactMgr::caller_to_callee_handover.
+// FactMgr.cpp:312–353 — param facts; keep globals/params and transitively pointed stack vars.
+func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
+	if fm == nil || inputs == nil {
+		return
+	}
+	fm.AddParamFacts(args, inputs)
+	// partition: keep globals and params
+	var keep, rest []*FactPointTo
+	for _, f := range *inputs {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		v := f.Var
+		if v.IsGlobal() || IsVariableInSet(fm.Func.Param, v) {
+			keep = append(keep, f)
+		} else {
+			rest = append(rest, f)
+		}
+	}
+	// transitively keep facts for variables pointed to by kept pointer facts
+	for {
+		cnt := len(keep)
+		for i := 0; i < len(rest); i++ {
+			rf := rest[i]
+			if rf == nil || rf.Var == nil {
+				continue
+			}
+			for _, kf := range keep {
+				if kf != nil && kf.PointsTo(rf.Var) {
+					keep = append(keep, rf)
+					rest = append(rest[:i], rest[i+1:]...)
+					i--
+					break
+				}
+			}
+		}
+		if len(keep) == cnt {
+			break
+		}
+	}
+	*inputs = keep
+}
+
+// RemoveRVFacts mirrors FactMgr::remove_rv_facts.
+// FactMgr.cpp:358–368 — drop other functions' return variables.
+func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
+	if fm == nil || facts == nil {
+		return
+	}
+	out := make([]*FactPointTo, 0, len(*facts))
+	for _, f := range *facts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		if f.Var.IsRV() {
+			// keep only this function's RV
+			if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
+				out = append(out, f)
+			}
+			continue
+		}
+		out = append(out, f)
+	}
+	*facts = out
+}
+
+// OutputTab mirrors output_tab — indent spaces (4 per level).
+// util.cpp / OutputMgr — TAB is typically 4 spaces.
+func OutputTab(indent int) string {
+	if indent <= 0 {
+		return ""
+	}
+	s := ""
+	for i := 0; i < indent; i++ {
+		s += "    "
+	}
+	return s
+}

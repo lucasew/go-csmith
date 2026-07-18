@@ -408,6 +408,14 @@ func (v *Variable) IsArgument() bool {
 	return len(v.Name) >= 2 && v.Name[0] == 'p' && v.Name[1] == '_'
 }
 
+// IsRV mirrors Variable::is_rv — return dummy name ends with "_rv".
+func (v *Variable) IsRV() bool {
+	if v == nil || len(v.Name) < 3 {
+		return false
+	}
+	return v.Name[len(v.Name)-3:] == "_rv"
+}
+
 // IsConst mirrors Variable::is_const → qfer is_const_after_deref(0).
 func (v *Variable) IsConst() bool {
 	if v == nil {

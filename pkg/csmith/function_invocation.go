@@ -266,9 +266,16 @@ func BuildInvocationAndFunction(
 		callerFM = cg.FM
 	}
 	calFM := NewFactMgr(callee)
+	// build args first for handover? generate_body_with_known_params uses caller facts;
+	// FunctionInvocationUser.cpp:205 — caller_to_callee_handover before body.
+	facts := []*FactPointTo{}
 	if callerFM != nil {
-		calFM.GlobalFacts = CloneFactSlice(callerFM.GlobalFacts)
+		facts = CloneFactSlice(callerFM.GlobalFacts)
 	}
+	// provisional empty args for signature-only; real args after body in BuildUserInvocation
+	// For new function creation, params get TBD at GenerateBody start; still run handover keep filter
+	calFM.CallerToCalleeHandover(nil, &facts)
+	calFM.GlobalFacts = facts
 	// generate body with call chain (Function.cpp:668–697)
 	bodyCG := cg
 	bodyCG.ExtendCallChain(cg)

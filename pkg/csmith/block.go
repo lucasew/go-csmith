@@ -274,13 +274,23 @@ func makeRandomStmt(
 	// retry failed factories (null Statement* upstream)
 	for tries := 0; tries < 6; tries++ {
 		kind := StatementProbabilityFilter(r, stmtTab, f)
+		// Statement.cpp: pre_facts / pre_effect snapshot before make
+		var preFacts []*FactPointTo
+		if cg.FM != nil {
+			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		}
+		preEffect := cg.EffectStm
 		st := makeRandomStmtKind(r, opts, probs, vs, tables, stmtTab, cg, b, kind)
 		if stmtOK(st) {
+			// Statement.cpp:320 — post_creation_analysis
+			PostCreationAnalysis(&st, preFacts, preEffect, &cg)
 			return st
 		}
 	}
 	// last resort: assignment (always producible)
-	return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+	PostCreationAnalysis(&st, nil, EmptyEffect(), &cg)
+	return st
 }
 
 func makeRandomStmtKind(
