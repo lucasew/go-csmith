@@ -204,6 +204,14 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
+	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
+	// library: nil FM allowed for tests without facts; block required for generation
+	if cg.CurrentBlock() == nil {
+		return nil
+	}
+	// StatementFor.cpp:176 — clear effect_stm before select
+	cg.EffectStm = EmptyEffect()
+
 	// StatementFor.cpp:181–189 — do { SelectLoopCtrlVar; skip volatile } while (true)
 	// C++ ERROR_GUARD(nullptr) on select fail; cap high toward infinite re-pick
 	invalid := map[*Variable]bool{}
@@ -223,16 +231,34 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if iv == nil {
 		return nil
 	}
-	signed := iv.Type == nil || iv.Type.IsSigned()
+	// StatementFor.cpp:191–194 — read_indices assert; write_var; read_var
+	var facts []*FactPointTo
+	if cg.FM != nil {
+		facts = cg.FM.GlobalFacts
+	}
+	if !cg.ReadIndices(iv, facts) {
+		// assert(read); no soft invent continue after failed index visit
+		return nil
+	}
+	cg.WriteVar(iv)
+	cg.ReadVar(iv)
+
+	// StatementFor.cpp:222 — assert(var->type)
+	if iv.Type == nil {
+		return nil
+	}
+	signed := iv.Type.IsSigned()
 	var initN, limitN, incrN int
 	var testOp BinaryOp
 	var incrOp AssignOp
-	// array-loop path: must-use arrays (StatementFor.cpp:205–220)
+	// array-loop path: must-use arrays (StatementFor.cpp:204–216)
+	// C++ only rw_directive; Go also MustUseArrays from make_random_array_loop
 	mustArr := cg.MustUseArrays
 	if len(mustArr) == 0 && cg.RW != nil {
 		mustArr = cg.RW.FindMustUseArrays()
 	}
-	// choose_ok_var among must-use arrays for shortest dim (StatementFor.cpp:208–214)
+	// StatementFor.cpp:208–214 — choose_ok_var among must-use arrays; assert(av)
+	// no soft invent scan-all-arrays when choose_ok_var returns nil
 	bound := InvalidIVBound
 	if len(mustArr) > 0 {
 		var arrVars []*Variable
@@ -241,22 +267,14 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 				arrVars = append(arrVars, &av.Variable)
 			}
 		}
-		if pick := ChooseOKVar(r, arrVars); pick != nil && pick.AsArray != nil {
-			for _, sz := range pick.AsArray.Sizes {
-				if bound == InvalidIVBound || sz < bound {
-					bound = sz
-				}
-			}
-		} else {
-			for _, av := range mustArr {
-				if av == nil {
-					continue
-				}
-				for _, sz := range av.Sizes {
-					if bound == InvalidIVBound || sz < bound {
-						bound = sz
-					}
-				}
+		pick := ChooseOKVar(r, arrVars)
+		// StatementFor.cpp:210–211 — assert(av); library fail closed
+		if pick == nil || pick.AsArray == nil {
+			return nil
+		}
+		for _, sz := range pick.AsArray.Sizes {
+			if bound == InvalidIVBound || sz < bound {
+				bound = sz
 			}
 		}
 	}
@@ -288,26 +306,23 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// --- build IR: init assign (StatementFor.cpp:229–245) ---
 	lhs := &Lhs{Var: iv, Type: iv.Type}
 	cInit := MakeInt(initN)
-	bop, _ := AssignAdd.CompoundToBinaryOps() // for SafeOpFlags kind on simple assign flags
-	_ = bop
 	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
+	// StatementFor.cpp:237–239 — ERROR_GUARD if flags null
 	incrBop, hasBop := incrOp.CompoundToBinaryOps()
-	var flags1 *SafeOpFlags
-	if hasBop {
-		flags1 = MakeRandomBinary(r, opts, probs, iv.Type)
-	} else {
-		// ++/-- still use flags from add
-		flags1 = MakeRandomBinary(r, opts, probs, iv.Type)
-		_ = incrBop
+	_ = hasBop
+	flags1 := MakeRandomBinary(r, opts, probs, iv.Type)
+	if flags1 == nil || HasError() {
+		return nil
 	}
+	_ = incrBop
 	initSt := &Stmt{
-		Kind:     StmtAssign,
-		LhsVar:   iv,
-		Lhs:      lhs,
-		Expr:     &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
-		AssignOp: AssignSimple,
+		Kind:      StmtAssign,
+		LhsVar:    iv,
+		Lhs:       lhs,
+		Expr:      &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
+		AssignOp:  AssignSimple,
 		SafeFlags: flags1,
-		StmID:    AllocStmID(),
+		StmID:     AllocStmID(),
 	}
 	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited)
 	if cg.FM != nil {

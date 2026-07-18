@@ -51,6 +51,9 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	// StatementFor.cpp:172 assert(blk) — parent block on stack (MakeFirst pops body)
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect())
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {

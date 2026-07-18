@@ -61,6 +61,8 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	iv := CreateVariableQfer("g_2", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
 	cg.MustUseArrays = []*ArrayVariable{av}
 	lc := MakeIteration(NewRng(5), opts, probs, vs, &cg)

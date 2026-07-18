@@ -41,6 +41,9 @@ func TestForSafeIncrEmit(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	// StatementFor.cpp:172 assert(blk) — parent on stack after MakeFirst
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect())
 	st := MakeRandomFor(NewRng(5), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {

@@ -10,6 +10,8 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	fm := NewFactMgr(f)
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{iv}
@@ -33,6 +35,8 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}

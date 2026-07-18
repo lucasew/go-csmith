@@ -68,17 +68,24 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	// StatementFor.cpp:172 assert(blk) — parent on stack for array_loop → for
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect())
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
+		f.Stack = []*Block{parent}
 		st = MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
-		if st.Kind == StmtArrayOp || st.Kind == StmtFor {
+		if (st.Kind == StmtArrayOp || st.Kind == StmtFor) && st.Loop != nil {
 			break
 		}
 	}
 	if st.Kind != StmtArrayOp && st.Kind != StmtFor {
 		t.Fatalf("kind %v", st.Kind)
+	}
+	if st.Loop == nil {
+		t.Fatal("incomplete arrayop/for without loop IR")
 	}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
 	if !strings.Contains(out, "for (") {
