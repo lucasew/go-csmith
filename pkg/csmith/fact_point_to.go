@@ -563,3 +563,76 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	}
 	return false
 }
+
+// Package-level alias aggregates (FactPointTo.cpp:67–68).
+var (
+	// AllPtrs mirrors FactPointTo::all_ptrs.
+	AllPtrs []*Variable
+	// AllAliases mirrors FactPointTo::all_aliases (parallel to AllPtrs).
+	AllAliases [][]*Variable
+)
+
+// ClearPointToAggregates resets all_ptrs / all_aliases (generation start).
+func ClearPointToAggregates() {
+	AllPtrs = nil
+	AllAliases = nil
+}
+
+// UpdatePtrAliases mirrors FactPointTo::update_ptr_aliases.
+// FactPointTo.cpp:764–790 — merge point-to sets into parallel ptr/alias vectors.
+func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) {
+	if ptrs == nil || aliases == nil {
+		return
+	}
+	for _, f := range facts {
+		if f == nil || f.Var == nil || f.Var.Type == nil {
+			// skip rv-like without type (upstream: type != 0)
+			continue
+		}
+		pos := -1
+		for i, p := range *ptrs {
+			if p == f.Var {
+				pos = i
+				break
+			}
+		}
+		if pos < 0 {
+			*ptrs = append(*ptrs, f.Var)
+			set := append([]*Variable(nil), f.PointTo...)
+			*aliases = append(*aliases, set)
+			continue
+		}
+		// merge alias set
+		for _, v := range f.PointTo {
+			if !IsVariableInSet((*aliases)[pos], v) {
+				(*aliases)[pos] = append((*aliases)[pos], v)
+			}
+		}
+	}
+}
+
+// AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
+// FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
+func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
+	ClearPointToAggregates()
+	for _, f := range funcs {
+		if f == nil || f.IsBuiltin {
+			continue
+		}
+		var fm *FactMgr
+		if fms != nil {
+			fm = fms.ForFunc(f)
+		}
+		if fm == nil {
+			continue
+		}
+		// prefer map_facts_out values; also include GlobalFacts
+		seen := map[int]bool{}
+		for id, facts := range fm.MapFactsOut {
+			_ = id
+			UpdatePtrAliases(facts, &AllPtrs, &AllAliases)
+			seen[id] = true
+		}
+		UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases)
+	}
+}

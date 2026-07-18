@@ -90,6 +90,8 @@ func (g *ProgramGenerator) GenerateFunctions() {
 			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		}
 	}
+	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
+	AggregateAllPointToSets(g.Funcs.Funcs, g.FactMgrs)
 }
 
 // OutputHeader mirrors OutputMgr::OutputHeader (non-concise path).

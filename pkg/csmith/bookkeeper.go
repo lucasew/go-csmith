@@ -495,7 +495,12 @@ func outputExprStatistics(b *strings.Builder, funcs []*Function) {
 }
 
 func outputPointerStatistics(b *strings.Builder) {
-	// FactPointTo::all_ptrs not fully tracked — emit address_taken + deref counters.
+	// Bookkeeper.cpp:245–318 — all_ptrs / all_aliases when present
+	ptrs := AllPtrs
+	formattedOutput(b, "total number of pointers: ", len(ptrs))
+	if len(ptrs) > 0 {
+		b.WriteString("\n")
+	}
 	formattedOutput(b, "times a variable address is taken: ", addressTakenCnt)
 	formattedOutput(b, "times a pointer is dereferenced on RHS: ", CalcTotal(readDereferenceCnts))
 	b.WriteString("breakdown:\n")
@@ -518,6 +523,36 @@ func outputPointerStatistics(b *strings.Builder) {
 		for i, c := range dereferenceLevelCnts {
 			b.WriteString(fmt.Sprintf("   level: %d, occurrence: %d\n", i, c))
 		}
+	}
+	if len(ptrs) > 0 {
+		totalAlias := 0
+		hasNull := 0
+		ptPtr, ptScalar, ptStruct := 0, 0, 0
+		for i, p := range ptrs {
+			if p == nil || p.Type == nil {
+				continue
+			}
+			if i < len(AllAliases) {
+				totalAlias += len(AllAliases[i])
+				if IsVariableInSet(AllAliases[i], NullPtr) {
+					hasNull++
+				}
+			}
+			if p.Type.IndirectLevel() > 1 {
+				ptPtr++
+			} else if pt := p.Type.PtrType(); pt != nil {
+				if pt.IsSimple() {
+					ptScalar++
+				} else if pt.IsStruct() {
+					ptStruct++
+				}
+			}
+		}
+		formattedOutput(b, "number of pointers point to pointers: ", ptPtr)
+		formattedOutput(b, "number of pointers point to scalars: ", ptScalar)
+		formattedOutput(b, "number of pointers point to structs: ", ptStruct)
+		formattedOutputf(b, "percent of pointers has null in alias set: ", float64(hasNull)*100.0/float64(len(ptrs)))
+		formattedOutputf(b, "average alias set size: ", float64(totalAlias)/float64(len(ptrs)))
 	}
 }
 

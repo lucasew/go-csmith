@@ -127,6 +127,58 @@ const (
 	FlagNoDanglingPtr uint = 8
 )
 
+// Variable scope codes (CGContext.h).
+const (
+	// ScopeGlobal is find_variable_scope for globals (-1).
+	ScopeGlobalVar = -1
+	// ScopeInvisible is INVISIBLE — on a caller stack frame.
+	ScopeInvisible = 9999
+	// ScopeInactive is INACTIVE — not found.
+	ScopeInactive = 8888
+)
+
+// FindVariableScope mirrors CGContext::find_variable_scope.
+// CGContext.cpp:431–468 — -1 global; 0 param; 1+ block depth; INVISIBLE/INACTIVE.
+func (c CGContext) FindVariableScope(v *Variable) int {
+	if v == nil {
+		return ScopeInactive
+	}
+	if v.IsGlobal() {
+		return ScopeGlobalVar
+	}
+	f := c.CurrentFunc
+	if f == nil {
+		return ScopeInactive
+	}
+	// params → 0
+	for _, p := range f.Param {
+		if p != nil && p.Match(v) {
+			return 0
+		}
+	}
+	// visible in current function blocks
+	b := c.CurrentBlock()
+	idx := 1
+	for b != nil {
+		if IsVariableInSet(b.LocalVars, v) {
+			return idx
+		}
+		b = b.Parent
+		idx++
+	}
+	// exist on one of the stack frames (caller) → INVISIBLE
+	for i := len(c.CallChain) - 1; i >= 0; i-- {
+		b = c.CallChain[i]
+		for b != nil {
+			if IsVariableInSet(b.LocalVars, v) {
+				return ScopeInvisible
+			}
+			b = b.Parent
+		}
+	}
+	return ScopeInactive
+}
+
 // InLoop is true when flags include IN_LOOP (2).
 func (c CGContext) InLoop() bool { return c.Flags&FlagInLoop != 0 }
 

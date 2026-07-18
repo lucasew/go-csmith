@@ -9,6 +9,8 @@ func DoFinalization() {
 	CtrlVarsDoFinalization()
 	// Bookkeeper::doFinalization
 	BookkeeperDoFinalization()
+	// FactPointTo::all_ptrs / all_aliases
+	ClearPointToAggregates()
 	// Statement sid
 	nextStmID = 0
 	// Error state
