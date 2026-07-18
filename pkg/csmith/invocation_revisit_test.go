@@ -95,6 +95,40 @@ func TestVisitUnorderedParamsMerges(t *testing.T) {
 	}
 }
 
+func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
+	// FunctionInvocation.cpp:434–453 + util permute(empty) → empty;
+	// visit_unordered assert(orders.size()>0) — no soft invent identity order
+	fi := &Invocation{Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+	}}
+	if got := fi.PermuteParamOrders(); len(got) != 0 {
+		t.Fatalf("want empty orders for n!=2 without call args, got %v", got)
+	}
+	fi0 := &Invocation{}
+	if got := fi0.PermuteParamOrders(); len(got) != 0 {
+		t.Fatalf("want empty for 0 args, got %v", got)
+	}
+	// n==2 still both orders
+	fi2 := &Invocation{Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeInt(2)},
+	}}
+	if len(fi2.PermuteParamOrders()) != 2 {
+		t.Fatal("2-arg shortcut")
+	}
+}
+
+func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
+	// FunctionInvocation.cpp:462 — assert(orders.size() > 0)
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}}}
+	facts := []*FactPointTo{}
+	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
+		t.Fatal("empty orders must fail closed")
+	}
+}
+
 func TestFactChangedOnAssign(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)

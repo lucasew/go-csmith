@@ -89,6 +89,17 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	_ = b
 }
 
+func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
+	// no soft invent visit success on nil / short args
+	cg := EmptyCGContext()
+	if VisitFactsBinaryOrdered(nil, &cg, Defaults()) {
+		t.Fatal("nil fi")
+	}
+	if VisitFactsBinaryOrdered(&Invocation{IsStd: true, Binary: "&&"}, &cg, Defaults()) {
+		t.Fatal("short args")
+	}
+}
+
 func TestSafeOpsBinaryMatches(t *testing.T) {
 	if !SafeOpsBinary("+") || SafeOpsBinary("&&") {
 		t.Fatal("safe ops set")

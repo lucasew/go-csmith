@@ -542,10 +542,15 @@ func (f *Function) MakeReturnConst(opts Options, r *Rng) {
 		// need_return_stmt is false for void; fail closed if called wrongly
 		return
 	}
+	// Function.cpp:612 — Constant::make_random; no invent "0" on nil RNG/fail
+	if r == nil {
+		return
+	}
 	f.RetConst = MakeRandom(f.ReturnType, opts, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
 	// sticky error left for GenerateBody ERROR_RETURN; nil const is incomplete IR
-	if HasError() {
+	if HasError() || f.RetConst == nil {
+		f.RetConst = nil
 		return
 	}
 }
@@ -566,20 +571,36 @@ func (f *Function) returnTypeC() string {
 
 // paramListC emits parameter list with qualified types.
 // Function.cpp:501–512 — empty → void.
+// opts nil uses ProcessOptions for arg_structs/arg_unions asserts.
 func (f *Function) paramListC() string {
+	return f.paramListCOpts(ProcessOptions())
+}
+
+// paramListCOpts returns param C list, or "" if IR violates arg_structs/arg_unions asserts.
+func (f *Function) paramListCOpts(opts Options) string {
 	if f == nil || len(f.Param) == 0 {
+		// Function.cpp:502–504 — assert(Type::void_type); emit void
 		return "void"
 	}
 	var b strings.Builder
 	for i, p := range f.Param {
+		if p == nil || p.Type == nil {
+			// incomplete param IR — fail closed (no invent type name)
+			return ""
+		}
+		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions)
+		if !opts.ArgStructs && p.Type.IsStruct() {
+			return ""
+		}
+		if !opts.ArgUnions && p.Type.IsUnion() {
+			return ""
+		}
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		if p != nil && p.Type != nil {
-			b.WriteString(p.Qfer.OutputQualifiedType(p.Type))
-			b.WriteString(" ")
-			b.WriteString(p.Name)
-		}
+		b.WriteString(p.Qfer.OutputQualifiedType(p.Type))
+		b.WriteString(" ")
+		b.WriteString(p.Name)
 	}
 	return b.String()
 }
@@ -587,7 +608,31 @@ func (f *Function) paramListC() string {
 // OutputHeader mirrors Function::OutputHeader.
 // Function.cpp:516–531 — optional inline/static + qualified return + name(params).
 func (f *Function) OutputHeader(forceStatic bool) string {
+	return f.OutputHeaderOpts(forceStatic, ProcessOptions())
+}
+
+// OutputHeaderOpts is OutputHeader with explicit Options for return/arg struct/union asserts.
+func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	if f == nil {
+		return ""
+	}
+	// Function.cpp:517–520 — assert no return struct/union when options off
+	// fail closed: empty header (no invent alternate scalar return)
+	rt := f.ReturnType
+	if f.RV != nil && f.RV.Type != nil {
+		rt = f.RV.Type
+	}
+	if rt != nil {
+		if !opts.ReturnStructs && rt.IsStruct() {
+			return ""
+		}
+		if !opts.ReturnUnions && rt.IsUnion() {
+			return ""
+		}
+	}
+	params := f.paramListCOpts(opts)
+	if params == "" {
+		// assert-path fail closed on forbidden/incomplete params
 		return ""
 	}
 	var b strings.Builder
@@ -604,7 +649,7 @@ func (f *Function) OutputHeader(forceStatic bool) string {
 	b.WriteString(" ")
 	b.WriteString(f.Name)
 	b.WriteString("(")
-	b.WriteString(f.paramListC())
+	b.WriteString(params)
 	b.WriteString(")")
 	return b.String()
 }

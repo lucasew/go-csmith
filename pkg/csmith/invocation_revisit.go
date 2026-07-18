@@ -100,28 +100,33 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // PermuteParamOrders mirrors FunctionInvocation::permute_param_oders.
 // FunctionInvocation.cpp:418–455 — for 2 args both orders; else permute call-bearing slots.
 // Returns sequences of arg indices.
+// Empty result matches C++ when n!=2 and no call-bearing params (permute empty base).
+// FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.
 func (fi *Invocation) PermuteParamOrders() [][]int {
-	if fi == nil || len(fi.Args) == 0 {
-		return [][]int{{}}
+	if fi == nil {
+		return nil
 	}
 	n := len(fi.Args)
+	// FunctionInvocation.cpp:424–432 — shortcut for 2 parameters
 	if n == 2 {
 		return [][]int{{0, 1}, {1, 0}}
 	}
-	// base order 0..n-1; call-bearing indices
+	// FunctionInvocation.cpp:434–453 — base order; only call-bearing slots permute
+	// util.cpp:85–90 — permute(empty) → empty out; no soft invent identity order
 	base := make([]int, 0, n)
 	retBase := make([]int, n)
 	for i := 0; i < n; i++ {
 		retBase[i] = i
-		if FuncCount(fi.Args[i]) > 0 {
+		if fi.Args[i] != nil && FuncCount(fi.Args[i]) > 0 {
 			base = append(base, i)
 		}
 	}
-	if len(base) == 0 {
-		return [][]int{retBase}
-	}
 	// all permutations of call-bearing positions (capped)
 	perms := permuteInts(base)
+	if len(perms) == 0 {
+		// empty base → empty orders (C++); visit_unordered asserts size>0
+		return nil
+	}
 	if len(perms) > 24 {
 		perms = perms[:24]
 	}
@@ -137,16 +142,14 @@ func (fi *Invocation) PermuteParamOrders() [][]int {
 		}
 		ret = append(ret, tmp)
 	}
-	if len(ret) == 0 {
-		ret = [][]int{retBase}
-	}
 	return ret
 }
 
 // permuteInts all permutations of a (heap's algorithm), small n only.
+// util.cpp:85–90 — empty input → empty out (no soft invent one empty order).
 func permuteInts(a []int) [][]int {
 	if len(a) == 0 {
-		return [][]int{{}}
+		return nil
 	}
 	if len(a) == 1 {
 		return [][]int{{a[0]}}
@@ -182,9 +185,9 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 	}
 	inputsCopy := CloneFactSlice(*facts)
 	orders := fi.PermuteParamOrders()
+	// FunctionInvocation.cpp:462 — assert(orders.size() > 0); no soft invent success
 	if len(orders) == 0 {
-		// no params — success
-		return true
+		return false
 	}
 	var merged []*FactPointTo
 	for i, order := range orders {
@@ -332,9 +335,14 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 // GetQualifiers mirrors FunctionInvocation::get_qualifiers.
 // FunctionInvocation.cpp:482–498 — user rv qfer; else non-const non-vol.
 func (fi *Invocation) GetQualifiers() CVQualifiers {
-	if fi != nil && fi.User != nil && fi.User.RV != nil {
+	// FunctionInvocation.cpp:486–491 — eFuncCall: assert(func); assert(rv)
+	if fi != nil && fi.User != nil {
+		// fail closed bare qfer when RV missing (no invent arbitrary qualifiers)
+		if fi.User.RV == nil {
+			return NewCVQualifiers([]bool{false}, []bool{false})
+		}
 		return fi.User.RV.Qfer
 	}
-	// non-const non-volatile int-like
+	// binary/unary — non-const non-volatile int-like
 	return NewCVQualifiers([]bool{false}, []bool{false})
 }

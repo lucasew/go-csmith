@@ -668,13 +668,23 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			cg.AddVisibleEffectAt(fi.User.FEffect, cg.CurrentBlock())
+			// FunctionInvocation.cpp:543 — assert(cg_context.curr_blk)
+			blk := cg.CurrentBlock()
+			if blk == nil {
+				return false
+			}
+			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
 		} else if fi.User.IsEffectKnown() {
 			// static effect path (no fact/pointer change)
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			cg.AddVisibleEffectAt(fi.User.FEffect, cg.CurrentBlock())
+			// same curr_blk for visible effect (visit_facts path uses curr_blk)
+			blk := cg.CurrentBlock()
+			if blk == nil {
+				return false
+			}
+			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
 			// also add_external_effect of feffect
 			cg.AddExternalEffect(fi.User.FEffect)
 		}

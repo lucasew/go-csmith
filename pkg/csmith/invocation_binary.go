@@ -260,8 +260,9 @@ func (fi *Invocation) EqualsInt(num int) bool {
 // VisitFactsBinaryOrdered mirrors FunctionInvocationBinary::visit_facts for &&/||.
 // FunctionInvocationBinary.cpp:487–508 — evaluate left; merge right with post-left.
 func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
+	// incomplete IR — fail closed (no soft invent visit success)
 	if fi == nil || cg == nil || len(fi.Args) < 2 {
-		return true
+		return false
 	}
 	// left
 	if fi.Args[0] != nil && !VisitFactsExpression(fi.Args[0], cg, opts) {

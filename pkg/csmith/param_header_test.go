@@ -82,6 +82,29 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 	}
 }
 
+func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
+	// Function.cpp:517–518 — assert when !return_structs and eStruct return
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
+	f := &Function{Name: "f", ReturnType: st}
+	opts := Defaults()
+	opts.ReturnStructs = false
+	if f.OutputHeaderOpts(false, opts) != "" {
+		t.Fatal("struct return with ReturnStructs off must fail closed")
+	}
+}
+
+func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
+	// Function.cpp:489–490 — assert when !arg_structs and struct param
+	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
+	pv := &Variable{Name: "p", Type: st}
+	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{pv}}
+	opts := Defaults()
+	opts.ArgStructs = false
+	if f.OutputHeaderOpts(false, opts) != "" {
+		t.Fatal("struct arg with ArgStructs off must fail closed")
+	}
+}
+
 func TestOutputHeaderInlineStatic(t *testing.T) {
 	f := &Function{
 		Name:       "func_2",
