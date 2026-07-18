@@ -81,6 +81,11 @@ type Block struct {
 	EmitLabelAttrs bool
 	// LabelAttrRng seed for attributes when EmitLabelAttrs (optional; use package gen).
 	LabelAttrRng *Rng
+	// EmitParanoid / EmitConcise / EmitFM: Statement::post_output assertions.
+	// Block.cpp Output + Statement.cpp:919–924 when CGOptions::paranoid.
+	EmitParanoid bool
+	EmitConcise  bool
+	EmitFM       *FactMgr
 }
 
 // GetLastStm mirrors Block::get_last_stm — last effective statement.
@@ -254,7 +259,10 @@ func MakeRandomBlock(
 		LabelAttrRng:     r,
 		StmID:            AllocStmID(),
 		// Block.cpp:127 — in_array_loop when induction bounds non-empty
-		InArrayLoop: len(cg.IVBounds) > 0,
+		InArrayLoop:  len(cg.IVBounds) > 0,
+		EmitParanoid: opts.Paranoid,
+		EmitConcise:  opts.Concise,
+		EmitFM:       cg.FM,
 	}
 	if f != nil {
 		f.Stack = append(f.Stack, b)
@@ -744,6 +752,10 @@ func (b *Block) Output(indent int) string {
 			}
 		default:
 			sb.WriteString("/* stmt */;\n")
+		}
+		// Statement::post_output — paranoid fact assertions (Statement.cpp:919–924)
+		if b.EmitParanoid && b.EmitFM != nil {
+			sb.WriteString(PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner))
 		}
 	}
 	// Block.cpp:266–267

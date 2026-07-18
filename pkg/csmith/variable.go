@@ -416,6 +416,79 @@ func (v *Variable) IsRV() bool {
 	return v.Name[len(v.Name)-3:] == "_rv"
 }
 
+// IsTmpVar mirrors Variable::is_tmp_var — name prefix "t_".
+// Variable.cpp:512–514.
+func (v *Variable) IsTmpVar() bool {
+	if v == nil {
+		return false
+	}
+	return len(v.Name) >= 2 && v.Name[0] == 't' && v.Name[1] == '_'
+}
+
+// IsValidVolatile mirrors Variable::is_valid_volatile.
+// Variable.cpp:1061–1072 — union fields recurse; const null pointer init invalid.
+func (v *Variable) IsValidVolatile() bool {
+	if v == nil {
+		return false
+	}
+	if v.IsInsideUnionField() {
+		uv := v.GetContainerUnion()
+		if uv == nil {
+			return false
+		}
+		return uv.IsValidVolatile()
+	}
+	// non-const, or non-zero init, or non-pointer → valid
+	if !v.IsConst() {
+		return true
+	}
+	if v.Type == nil || !v.Type.IsPointerLike() {
+		return true
+	}
+	// const pointer: invalid only when init equals 0 (null)
+	if v.Init == nil {
+		// no init expression — treat as valid (cannot prove null)
+		return true
+	}
+	return v.Init.NotEqualsZero()
+}
+
+// IsPackedAfterBitfield mirrors Variable::is_packed_after_bitfield.
+// Variable.cpp:1240–1258 — packed struct field after a bitfield has unstable offset.
+func (v *Variable) IsPackedAfterBitfield() bool {
+	if v == nil || v.FieldVarOf == nil {
+		return false
+	}
+	parent := v.FieldVarOf
+	if parent.Type != nil && parent.Type.IsStruct() && parent.Type.Packed {
+		for i, f := range parent.FieldVars {
+			if f == v {
+				break
+			}
+			if parent.Type.IsBitfieldIndex(i) {
+				return true
+			}
+			if f != nil && f.Type != nil && f.Type.HasBitfields() {
+				return true
+			}
+		}
+	}
+	return parent.IsPackedAfterBitfield()
+}
+
+// IsArrayField mirrors Variable::is_array_field.
+// Variable.cpp:270–277 — field of an array variable (or recursive).
+func (v *Variable) IsArrayField() bool {
+	if v == nil || v.FieldVarOf == nil {
+		return false
+	}
+	p := v.FieldVarOf
+	if p.IsArray || p.AsArray != nil {
+		return true
+	}
+	return p.IsArrayField()
+}
+
 // IsConst mirrors Variable::is_const → qfer is_const_after_deref(0).
 func (v *Variable) IsConst() bool {
 	if v == nil {

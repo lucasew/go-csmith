@@ -52,6 +52,11 @@ func (c *Constant) Equals(num int) bool {
 	return n == num
 }
 
+// NotEqualsZero mirrors Constant/Expression not_equals(0).
+func (c *Constant) NotEqualsZero() bool {
+	return c != nil && !c.Equals(0)
+}
+
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
 func generateRandomConstant(typ *Type, opts Options, r *Rng) string {

@@ -495,6 +495,15 @@ func (t *Type) HasBitfields() bool {
 	return false
 }
 
+// IsBitfieldIndex mirrors Type::is_bitfield(index).
+// Type.cpp:1286+ — field at index has BitWidth >= 0.
+func (t *Type) IsBitfieldIndex(index int) bool {
+	if t == nil || index < 0 || index >= len(t.Fields) {
+		return false
+	}
+	return t.Fields[index].BitWidth >= 0
+}
+
 // ChooseRandomNonvoidSimple mirrors Type::choose_random_nonvoid_simple.
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	if r == nil || probs == nil {
