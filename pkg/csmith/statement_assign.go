@@ -253,14 +253,15 @@ func makePossibleCompoundAssign(
 		st.SafeFlags = MakeDummyFlags()
 		return st
 	}
-	// MakeRandomBinary for arithmetic/shift compound
+	// MakeRandomBinary for arithmetic/shift compound (sOpAssign)
+	// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
 	lt := typ
 	if lhs != nil {
 		if t := lhs.GetType(); t != nil {
 			lt = t
 		}
 	}
-	flags := MakeRandomBinary(r, opts, probs, lt)
+	flags := MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 	st.SafeFlags = flags
 	// math_notmp temps on current block
 	if opts.MathNoTmp && flags != nil {

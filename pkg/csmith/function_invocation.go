@@ -643,7 +643,8 @@ func MakeRandomBinaryPtrComparison(
 }
 
 // MakeRandomUnaryInvocation mirrors make_random_unary.
-// FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER.
+// FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER;
+// SafeOpFlags::make_random_unary; operand of get_lhs_type.
 func MakeRandomUnaryInvocation(
 	r *Rng,
 	opts Options,
@@ -655,14 +656,32 @@ func MakeRandomUnaryInvocation(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	uop := PickUnaryOp(r, opts)
+	// FunctionInvocation.cpp:146–149 — pick unary op (reject float-invalid when float type)
+	var uop UnaryOp
+	for tries := 0; tries < 16; tries++ {
+		uop = PickUnaryOp(r, opts)
+		if typ.IsFloat() && !UnaryOpWorksForFloat(uop) {
+			continue
+		}
+		break
+	}
 	op := uop.UnaryOpC()
-	// SafeOpFlags::make_random_unary then operand of get_lhs_type (FunctionInvocation.cpp:141–165)
+	// FunctionInvocation.cpp:151–155 — make_random_unary then operand type from flags
 	argTy := typ
 	var flags *SafeOpFlags
 	if opts.SafeMath && op == "-" {
-		flags = MakeRandomBinary(r, opts, NewProbabilities(opts), typ)
+		probs := NewProbabilities(opts)
+		if vs != nil && vs.Probs != nil {
+			probs = vs.Probs
+		}
+		flags = MakeRandomUnary(r, opts, probs, typ, nil, uop)
 		if flags != nil {
+			// no float unary safe func — force int size path for naming
+			if flags.Size == SafeFloat {
+				flags.Size = SafeInt32
+				flags.Op1Signed = true
+				flags.Op2Signed = true
+			}
 			argTy = flags.LHSType()
 		}
 	}

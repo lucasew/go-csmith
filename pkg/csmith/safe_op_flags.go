@@ -132,6 +132,35 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 	return MakeRandomBinaryKind(r, opts, probs, typ, typ, typ, SafeOpBinary, BinAdd)
 }
 
+// MakeRandomUnary mirrors SafeOpFlags::make_random_unary.
+// SafeOpFlags.cpp:139–167 — float always signed + SafeFloat; else signed coin + int size.
+func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
+	if r == nil {
+		return &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
+	}
+	f := &SafeOpFlags{IsFunc: true}
+	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
+	sigProb := uint32(50)
+	if probs != nil {
+		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
+			sigProb = uint32(p)
+		}
+	}
+	// SafeOpFlags.cpp:146–153
+	if rvFloat {
+		f.Op1Signed = true
+	} else {
+		f.Op1Signed = r.RndFlipcoin(sigProb)
+	}
+	f.Op2Signed = f.Op1Signed
+	if rvFloat {
+		f.Size = SafeFloat
+	} else {
+		f.Size = pickSafeOpSize(r, opts)
+	}
+	return f
+}
+
 // MakeRandomBinaryKind mirrors SafeOpFlags::make_random_binary full signature.
 // SafeOpFlags.cpp:169–215.
 func MakeRandomBinaryKind(
@@ -277,10 +306,14 @@ func (f *SafeOpFlags) RHSType() *Type {
 }
 
 // BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
-// SafeOpFlags.cpp:285–320.
+// SafeOpFlags.cpp:285–320 — float uses safe_*_func_float_f_f.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	if f == nil {
 		return ""
+	}
+	// SafeOpFlags.cpp:286–287 — float size short-circuit
+	if f.Size == SafeFloat {
+		return safeFloatFuncString(op)
 	}
 	var prefix string
 	shift := false
@@ -333,9 +366,34 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	return b.String()
 }
 
+// safeFloatFuncString mirrors SafeOpFlags::safe_float_func_string.
+// SafeOpFlags.cpp:261–283 — safe_{add,sub,mul,div}_func_float_f_f.
+func safeFloatFuncString(op string) string {
+	var prefix string
+	switch op {
+	case "+":
+		prefix = "safe_add_"
+	case "-":
+		prefix = "safe_sub_"
+	case "*":
+		prefix = "safe_mul_"
+	case "/":
+		prefix = "safe_div_"
+	default:
+		return ""
+	}
+	return prefix + "func_float_f_f"
+}
+
 // UnaryMinusFuncName mirrors to_string(eMinus).
+// SafeOpFlags.cpp:323–341 — no float unary safe function.
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	if f == nil {
+		return "safe_unary_minus_func_int32_t_s"
+	}
+	// SafeOpFlags.cpp:324 — assert no float unary
+	if f.Size == SafeFloat {
+		// fall back to int32 signed if misconfigured
 		return "safe_unary_minus_func_int32_t_s"
 	}
 	var b strings.Builder
