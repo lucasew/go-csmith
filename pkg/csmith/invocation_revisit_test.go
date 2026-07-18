@@ -126,9 +126,17 @@ func TestFactChangedOnAssign(t *testing.T) {
 }
 
 func TestRevisitUserInvocationSimple(t *testing.T) {
+	// StatementAssign always has live Lhs + Expression* (Constant make_int for ++/--)
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	assign := Stmt{
+		Kind: StmtAssign, StmID: 101,
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
 	callee := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
-		Body: &Block{StmID: 100, Stmts: []Stmt{{Kind: StmtAssign, StmID: 101}}},
+		Body:        &Block{StmID: 100, Stmts: []Stmt{assign}},
 		FactChanged: true,
 	}
 	callee.RV = CreateVariableScalars("func_x_rv", GetIntType(), false, false)

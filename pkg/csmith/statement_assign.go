@@ -541,9 +541,10 @@ func expressionQualifiers(e *Expression) *CVQualifiers {
 
 // VisitFactsExpression mirrors Expression::visit_facts dispatch by term.
 // Constant always true; Variable/Lhs paths; comma sequential; assign delegates.
+// Incomplete IR (nil/missing sides) fails — no soft invent true (C++ always has live Expression*).
 func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 	if e == nil || cg == nil {
-		return true
+		return false
 	}
 	switch e.Term {
 	case TermConstant:
@@ -551,22 +552,26 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 	case TermVariable:
 		return cg.VisitFactsExpressionVariable(e, opts)
 	case TermCommaExpr:
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return false
+		}
 		if !VisitFactsExpression(e.CommaLHS, cg, opts) {
 			return false
 		}
 		return VisitFactsExpression(e.CommaRHS, cg, opts)
 	case TermAssignment:
 		if e.Assign == nil {
-			return true
+			return false
 		}
 		return VisitFactsStatementAssign(e.Assign, cg, opts)
 	case TermFunction:
-		if e.Invoke != nil {
-			return VisitFactsInvocation(e.Invoke, cg, opts)
+		if e.Invoke == nil {
+			return false
 		}
-		return true
+		return VisitFactsInvocation(e.Invoke, cg, opts)
 	default:
-		return true
+		// unknown term; no soft invent success
+		return false
 	}
 }
 
@@ -575,8 +580,9 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 // upstream sets unordered=false); then user revisit when NeedsRevisit.
 // Binary &&/|| use FunctionInvocationBinary::visit_facts short-circuit merge.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
+	// C++ always has live FunctionInvocation*; nil / failed → visit fail (no soft invent true)
 	if fi == nil || cg == nil {
-		return true
+		return false
 	}
 	if fi.Failed {
 		return false
@@ -604,12 +610,16 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	} else {
 		running := cg.EffectContext()
 		for i, arg := range fi.Args {
+			// FunctionInvocation.cpp: param_value[i] always non-null after ERROR_GUARD
+			if arg == nil {
+				_ = i
+				return false
+			}
 			paramAccum := EmptyEffect()
 			paramCG := *cg
 			paramCG.effectContext = running
 			paramCG.EffectAccum = &paramAccum
-			if arg != nil && !VisitFactsExpression(arg, &paramCG, opts) {
-				_ = i
+			if !VisitFactsExpression(arg, &paramCG, opts) {
 				return false
 			}
 			running = running.AddEffect(paramAccum)
@@ -654,6 +664,10 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtAssign {
 		return false
 	}
+	// StatementAssign.cpp always has live Lhs and Expression* (make_int(1) for ++/--)
+	if st.Expr == nil {
+		return false
+	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
 	runningEff := cg.EffectContext()
 	rhsAccum := EmptyEffect()
@@ -662,7 +676,7 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = cg.EffectStm
 
-	if st.Expr != nil && !VisitFactsExpression(st.Expr, &rhsCG, opts) {
+	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false
 	}
 	// StatementAssign.cpp:372–375 — compound: LHS sees RHS effect
@@ -697,6 +711,9 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		lhsVar = st.LhsVar
+	} else {
+		// incomplete assign IR — no soft invent visit success without LHS
+		return false
 	}
 	cg.MergeParamContext(lhsCG, true)
 
