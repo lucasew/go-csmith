@@ -27,6 +27,9 @@ type Invocation struct {
 	Tmp1, Tmp2 string
 	// MathNoTmp mirrors CGOptions::math_notmp for Output.
 	MathNoTmp bool
+	// PtrCmp mirrors FunctionInvocation::ptr_cmp — pointer ==/!= operands.
+	// FunctionInvocation.cpp:355.
+	PtrCmp bool
 }
 
 // Output C for the invocation.
@@ -311,8 +314,8 @@ func BuildInvocationAndFunction(
 }
 
 // MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary.
-// FunctionInvocation.cpp:171–288 — full eBinaryOps via BINARY_OPS_PROB_FILTER;
-// pointer-comparison branch and FactMgr omitted.
+// FunctionInvocation.cpp:171–288 — 10% ptr comparison; BINARY_OPS_PROB_FILTER;
+// ordered/unordered RHS effect contexts.
 func MakeRandomBinaryInvocation(
 	r *Rng,
 	opts Options,
@@ -462,7 +465,8 @@ func currentBlock(cg CGContext) *Block {
 }
 
 // MakeRandomBinaryPtrComparison mirrors make_random_binary_ptr_comparison.
-// FunctionInvocation.cpp:294–360 — == or != on random pointer type operands.
+// FunctionInvocation.cpp:294–360 — == or != on random pointer type operands;
+// NO_DANGLING_PTR; ordered/unordered RHS effect contexts; bookkeeping.
 func MakeRandomBinaryPtrComparison(
 	r *Rng,
 	opts Options,
@@ -475,36 +479,73 @@ func MakeRandomBinaryPtrComparison(
 	if r == nil || env == nil || !env.HasPointerType() {
 		return nil
 	}
-	// eCmpEq or eCmpNe
+	// FunctionInvocation.cpp:295–296 — eCmpEq or eCmpNe
 	op := BinCmpEq
 	if r.RndFlipcoin(50) {
 		op = BinCmpNe
 	}
 	opStr := op.BinaryOpC()
+	// FunctionInvocation.cpp:297–299 creates SafeOpFlags but Output for ptr_cmp
+	// does not use safe wrappers (pointer ==/!= emit as infix). Leave Safe nil.
+	_ = probs
 	// Type::choose_random_pointer_type
 	ptrTy := env.ChooseRandomPointerType(r)
 	if ptrTy == nil {
 		return nil
 	}
 	d := cg.ExprDepth + 1
-	// FunctionInvocation.cpp:311 — NO_DANGLING_PTR on operand contexts
-	pcg := cg.WithFlags(FlagNoDanglingPtr)
-	// no_func on both sides (true); const ok on LHS
-	left := MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, MaxTermTypes, d)
+	// FunctionInvocation.cpp:307–313 — LHS under ambient + NO_DANGLING_PTR + no_func
+	lhsAccum := EmptyEffect()
+	lhsCG := cg
+	lhsCG.Flags |= FlagNoDanglingPtr
+	lhsCG.EffectAccum = &lhsAccum
+	left := MakeRandomExpression(r, opts, tables, vs, lhsCG, ptrTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, TermVariable, d)
+		left = MakeRandomExpression(r, opts, tables, vs, lhsCG, ptrTy, nil, true, false, TermVariable, d)
 	}
+	cg.MergeParamContext(lhsCG, true)
+
+	// FunctionInvocation.cpp:317–320 — if LHS const, force RHS variable
 	tt := MaxTermTypes
 	if left != nil && left.Term == TermConstant {
 		tt = TermVariable
 	}
-	right := MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, tt, d)
-	if right == nil {
-		right = MakeRandomExpression(r, opts, tables, vs, pcg, ptrTy, nil, true, false, TermVariable, d)
+	var right *Expression
+	// FunctionInvocation.cpp:326–345 — ordered short-circuit ops use original context;
+	// ==/!= are unordered → RHS under original + LHS accum as effect_context
+	if IsOrderedBinary(op) {
+		oldFlags := cg.Flags
+		cg.Flags |= FlagNoDanglingPtr
+		right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, tt, d)
+		if right == nil {
+			right = MakeRandomExpression(r, opts, tables, vs, cg, ptrTy, nil, true, false, TermVariable, d)
+		}
+		cg.Flags = oldFlags
+	} else {
+		rhsAccum := EmptyEffect()
+		rhsCG := cg
+		rhsCG.effectContext = cg.EffectContext().AddEffect(lhsAccum)
+		rhsCG.EffectAccum = &rhsAccum
+		rhsCG.Flags |= FlagNoDanglingPtr
+		right = MakeRandomExpression(r, opts, tables, vs, rhsCG, ptrTy, nil, true, false, tt, d)
+		if right == nil {
+			right = MakeRandomExpression(r, opts, tables, vs, rhsCG, ptrTy, nil, true, false, TermVariable, d)
+		}
+		cg.MergeParamContext(rhsCG, true)
 	}
-	_ = probs
-	// pointer comparisons do not use safe math wrappers
-	return &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}}
+	if left == nil || right == nil {
+		return nil
+	}
+	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed
+	right.CheckAndSetCast(left.GetType())
+	// FunctionInvocation.cpp:358 — bookkeeping
+	RecordPointerComparisons(left, right)
+	return &Invocation{
+		IsStd:  true,
+		Binary: opStr,
+		Args:   []*Expression{left, right},
+		PtrCmp: true,
+	}
 }
 
 // MakeRandomUnaryInvocation mirrors make_random_unary.

@@ -211,22 +211,17 @@ func RecordBitfieldsWrites(v *Variable) {
 	}
 }
 
-// RecordPointerComparisons mirrors Bookkeeper::record_pointer_comparisons (expr terms).
-// Bookkeeper.cpp:361–382 — simplified for our Expression terms.
+// RecordPointerComparisons mirrors Bookkeeper::record_pointer_comparisons.
+// Bookkeeper.cpp:361–382 — skip function terms; pointer types; null/ptr/addr counts.
 func RecordPointerComparisons(lhs, rhs *Expression) {
 	if lhs == nil || rhs == nil {
 		return
 	}
+	// Bookkeeper.cpp:363 — both non-function
 	if lhs.Term == TermFunction || rhs.Term == TermFunction {
 		return
 	}
-	lt, rt := lhs.ExprType, rhs.ExprType
-	if lt == nil && lhs.Var != nil {
-		lt = lhs.Var.Type
-	}
-	if rt == nil && rhs.Var != nil {
-		rt = rhs.Var.Type
-	}
+	lt, rt := lhs.GetType(), rhs.GetType()
 	if lt == nil || rt == nil || !lt.IsPointerLike() || !rt.IsPointerLike() {
 		return
 	}
