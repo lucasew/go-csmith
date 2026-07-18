@@ -390,10 +390,12 @@ Superseding integrity text that banned residual while still logging residual cli
 |------|--------|
 | SPEC fair-rewrite lock | **Done** |
 | Branch `fair-rewrite` + delete residual mass | **Done** (generator/residual/types godfiles removed) |
-| Layer 1: `Rng` (AbsRndNumGenerator + DefaultRndNumGenerator) | **Done** — `rng.go` + `rng_test.go` 1:1 vectors |
-| `CGOptions` defaults (`options.go`) | **Carried** — cite header; re-verify field-by-field later |
-| `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` until spine |
-| Type → … → ProgramGenerator | **Not started** |
-| CLI drop-in | **Last** (CLI still calls `Generate`, errors clearly) |
+| Layer 1: `Rng` | **Done** — `rng.go` + tests |
+| Layer 2: `CGOptions` defaults | **Done** — macros 1:1 tests; `MaxPointerDepth` fixed to 5 (`max_indirect_level`) |
+| Layer 3: `Probabilities` singles + simple-types equal group | **Done** — `probabilities.go` + tests |
+| Layer 4: `Type` simple + `choose_random_nonvoid_simple` | **Partial** — `types.go` simple only |
+| `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` |
+| CVQualifiers → … → ProgramGenerator | **Not started** |
+| CLI drop-in | **Last** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

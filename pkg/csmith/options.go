@@ -186,7 +186,9 @@ func Defaults() Options {
 		MaxStructFields:      10,
 		MaxUnionFields:       5,
 		MaxNestedStructLevel: 3,
-		MaxPointerDepth:      2,
+		// CGOptions::max_indirect_level = CGOPTIONS_DEFAULT_MAX_INDIRECT_LEVEL (5).
+		// Older residual-era default of 2 was wrong vs upstream.
+		MaxPointerDepth: 5,
 		MaxArrayDim:          3,
 		MaxArrayLenPerDim:    10,
 		MaxArrayLength:       256,
@@ -306,6 +308,15 @@ func Defaults() Options {
 
 		MaxGlobals: 80,
 	}
+}
+
+// AllowInt64 mirrors CGOptions::allow_int64.
+// CGOptions.cpp: !has_extension_support() && math64() && longlong().
+func (o Options) AllowInt64() bool {
+	if o.Klee || o.Crest || o.CoverageTest {
+		return false
+	}
+	return o.Math64 && o.LongLong
 }
 
 func (o Options) resolvePlatformInfo() (Options, error) {

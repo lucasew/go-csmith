@@ -1,0 +1,194 @@
+// Upstream: Probabilities.h / Probabilities.cpp
+// (initialize_single_probs, set_default_simple_types_prob, ProbabilityFilter for equal groups).
+// Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
+package csmith
+
+// ProbName identifies a probability knob (subset used by the fair spine so far).
+// Full enum in Probabilities.h — extend when a ported path needs a name.
+type ProbName int
+
+const (
+	// Single probs — Probabilities::initialize_single_probs
+	PMoreStructUnionProb ProbName = iota
+	PBitFieldsCreationProb
+	PBitFieldInNormalStructProb
+	PScalarFieldInFullBitFieldsProb
+	PExhaustiveBitFieldsProb
+	PBitFieldsSignedProb
+	PSafeOpsSignedProb
+	PFuncAttrProb
+	PTypeAttrProb
+	PLabelAttrProb
+	PVarAttrProb
+	PBinaryConstProb
+	PRegularVolatileProb
+	PRegularConstProb
+	PStricterConstProb
+	PLooserConstProb
+	PFieldVolatileProb
+	PFieldConstProb
+	PStdUnaryFuncProb
+	PShiftByNonConstantProb
+	PStructAsLTypeProb
+	PUnionAsLTypeProb
+	PFloatAsLTypeProb
+	PNewArrayVariableProb
+	PPointerAsLTypeProb
+	PSelectDerefPointerProb
+	PAccessOnceVariableProb
+	PInlineFunctionProb
+	PBuiltinFunctionProb
+	PArrayOOBProb
+
+	// Group: simple types (equal weights 0/1)
+	PSimpleTypesProb
+)
+
+// Probabilities holds default probability tables for the current Options.
+// Mirrors Probabilities singleton after initialize() for the fields we port.
+type Probabilities struct {
+	single map[ProbName]int
+	// simpleTypeWeight[i] is weight for eSimpleType(i) in equal group pSimpleTypesProb.
+	// Probabilities::set_default_simple_types_prob — weight 0 or 1.
+	simpleTypeWeight []int
+}
+
+// NewProbabilities builds tables from opts like Probabilities::initialize
+// after CGOptions::set_default_settings (and option flags).
+func NewProbabilities(opts Options) *Probabilities {
+	p := &Probabilities{
+		single: make(map[ProbName]int),
+	}
+	p.initSingle(opts)
+	p.initSimpleTypes(opts)
+	return p
+}
+
+// Single returns a single probability in [0,100].
+// SingleProbElem::get_prob_direct.
+func (p *Probabilities) Single(name ProbName) int {
+	if p == nil {
+		return 0
+	}
+	return p.single[name]
+}
+
+// SimpleTypeWeight returns equal-group weight (0 or 1) for eSimpleType index.
+func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
+	if p == nil || simpleIdx < 0 || simpleIdx >= len(p.simpleTypeWeight) {
+		return 0
+	}
+	return p.simpleTypeWeight[simpleIdx]
+}
+
+// SimpleTypesFilter rejects eSimpleType indices with weight 0.
+// ProbabilityFilter for pSimpleTypesProb (equal group): filter(v) when weight==0.
+func (p *Probabilities) SimpleTypesFilter() Filter {
+	return filterFunc(func(v uint32) bool {
+		return p.SimpleTypeWeight(int(v)) == 0
+	})
+}
+
+// initSingle — Probabilities::initialize_single_probs
+func (p *Probabilities) initSingle(opts Options) {
+	m := p.single
+	m[PMoreStructUnionProb] = 50
+	m[PBitFieldsCreationProb] = 50
+	m[PBitFieldInNormalStructProb] = 10
+	m[PScalarFieldInFullBitFieldsProb] = 10
+	m[PExhaustiveBitFieldsProb] = 10
+	m[PBitFieldsSignedProb] = 50
+	m[PSafeOpsSignedProb] = 50
+	m[PFuncAttrProb] = 30
+	m[PTypeAttrProb] = 50
+	m[PLabelAttrProb] = 30
+	m[PVarAttrProb] = 30
+	m[PBinaryConstProb] = 3
+
+	if opts.Volatiles {
+		m[PRegularVolatileProb] = 50
+	} else {
+		m[PRegularVolatileProb] = 0
+	}
+	if opts.Consts {
+		m[PRegularConstProb] = 10
+		m[PStricterConstProb] = 50
+		m[PLooserConstProb] = 50
+	} else {
+		m[PRegularConstProb] = 0
+		m[PStricterConstProb] = 0
+		m[PLooserConstProb] = 0
+	}
+	if opts.Volatiles && opts.VolStructUnionFields && opts.GlobalVariables {
+		m[PFieldVolatileProb] = 30
+	} else {
+		m[PFieldVolatileProb] = 0
+	}
+	if opts.Consts && opts.ConstStructUnionFields {
+		m[PFieldConstProb] = 20
+	} else {
+		m[PFieldConstProb] = 0
+	}
+
+	m[PStdUnaryFuncProb] = 5
+	m[PShiftByNonConstantProb] = 50
+	m[PStructAsLTypeProb] = 30
+	m[PUnionAsLTypeProb] = 25
+	if opts.EnableFloat {
+		m[PFloatAsLTypeProb] = 40
+	} else {
+		m[PFloatAsLTypeProb] = 0
+	}
+	if opts.Arrays {
+		m[PNewArrayVariableProb] = 20
+	} else {
+		m[PNewArrayVariableProb] = 0
+	}
+	if opts.Pointers {
+		m[PPointerAsLTypeProb] = 50
+		m[PSelectDerefPointerProb] = 80
+	} else {
+		m[PPointerAsLTypeProb] = 0
+		m[PSelectDerefPointerProb] = 0
+	}
+	m[PAccessOnceVariableProb] = 20
+	m[PInlineFunctionProb] = opts.InlineFunctionProb
+	m[PBuiltinFunctionProb] = opts.BuiltinFunctionProb
+	m[PArrayOOBProb] = opts.ArrayOOBProb
+}
+
+// initSimpleTypes — Probabilities::set_default_simple_types_prob (equal group).
+func (p *Probabilities) initSimpleTypes(opts Options) {
+	// Type.h eSimpleType order; weight 0/1.
+	w := make([]int, MaxSimpleTypes)
+	// Void always 0 for non-parameter choose paths.
+	w[int(EVoid)] = 0
+	if opts.Int8 {
+		w[int(EChar)] = 1
+	}
+	w[int(EInt)] = 1
+	w[int(EShort)] = 1
+	if !opts.CComp {
+		w[int(ELong)] = 1
+		w[int(EULong)] = 1
+	}
+	if opts.AllowInt64() {
+		w[int(ELongLong)] = 1
+		w[int(EULongLong)] = 1
+	}
+	if opts.UInt8 {
+		w[int(EUChar)] = 1
+	}
+	w[int(EUInt)] = 1
+	w[int(EUShort)] = 1
+	if opts.EnableFloat {
+		w[int(EFloat)] = 1
+	}
+	if opts.Int128 {
+		w[int(EInt128)] = 1
+	}
+	if opts.UInt128 {
+		w[int(EUInt128)] = 1
+	}
+	p.simpleTypeWeight = w
+}
