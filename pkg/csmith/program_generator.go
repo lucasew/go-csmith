@@ -143,6 +143,11 @@ func (g *ProgramGenerator) OutputHeader() string {
 		b.WriteString("#define ACCESS_ONCE(v) (*(volatile typeof(v) *)&(v))\n")
 		b.WriteString("#endif\n\n")
 	}
+	if g.Opts.StepHashByStmt {
+		// OutputMgr::OutputHashFuncDecl / OutputStepHashFuncDecl
+		b.WriteString("void csmith_compute_hash(void);\n")
+		b.WriteString("void step_hash(int stmt_id);\n\n")
+	}
 	return b.String()
 }
 
@@ -304,9 +309,13 @@ func (g *ProgramGenerator) OutputMain() string {
 		}
 	}
 	if g.Opts.ComputeHash {
-		// HashGlobalVariables → Variable::hash / ArrayVariable::hash
-		// VariableSelector.cpp:1613–1615
-		b.WriteString(HashGlobalVariables(g.VS))
+		if g.Opts.StepHashByStmt {
+			// OutputMgr.cpp:139–140 — call hash function instead of inline
+			b.WriteString("    csmith_compute_hash();\n")
+		} else {
+			// HashGlobalVariables inline
+			b.WriteString(HashGlobalVariables(g.VS))
+		}
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
 	} else {
 		b.WriteString("    platform_main_end(0,0);\n")
@@ -314,6 +323,27 @@ func (g *ProgramGenerator) OutputMain() string {
 	// ExtensionMgr::OutputTail — return 0 when extension null
 	// ExtensionMgr.cpp:109–111
 	b.WriteString("    return 0;\n")
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// OutputHashFuncDef mirrors OutputMgr::OutputHashFuncDef.
+// OutputMgr.cpp:209–220 — void csmith_compute_hash(void) { HashGlobalVariables; }
+func (g *ProgramGenerator) OutputHashFuncDef() string {
+	if g == nil || !g.Opts.StepHashByStmt || !g.Opts.ComputeHash {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
+	// body is HashGlobalVariables without outer indent adjustment — use 4-space already in Hash
+	// HashGlobalVariables emits "    transparent_crc..." so wrap is fine
+	body := HashGlobalVariables(g.VS)
+	b.WriteString(body)
+	b.WriteString("}\n")
+	// step_hash stub — OutputMgr.cpp:170–180 subset
+	b.WriteString("\nvoid step_hash(int stmt_id)\n{\n")
+	b.WriteString("    (void)stmt_id;\n")
+	b.WriteString("    csmith_compute_hash();\n")
 	b.WriteString("}\n")
 	return b.String()
 }
@@ -329,6 +359,7 @@ func (g *ProgramGenerator) GoGenerator() string {
 	g.GenerateFunctions()
 	b.WriteString(g.OutputGlobals())
 	b.WriteString(g.OutputFunctions())
+	b.WriteString(g.OutputHashFuncDef())
 	b.WriteString(g.OutputMain())
 	return b.String()
 }

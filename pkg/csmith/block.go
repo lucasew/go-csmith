@@ -108,6 +108,11 @@ func MakeRandomBlock(
 	}
 	max := BlockProbability(b.blockSize, r)
 	cg.BlkDepth++
+	// Running effect accum for this block (side-effect / no_volatile for SelectLType)
+	if cg.EffectAccum == nil {
+		eff := EmptyEffect()
+		cg.EffectAccum = &eff
+	}
 	// Forward goto: prefer labeling the next real statement; no-op if goto is last.
 	pendingFwd := ""
 	for i := 0; i <= max; i++ {
@@ -207,7 +212,12 @@ func makeRandomStmtKind(
 	case StmtReturn:
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
-		return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+		// Effect::write_var on LHS (CGContext effect_accum)
+		if st.LhsVar != nil {
+			cg.NoteWrite(st.LhsVar)
+		}
+		return st
 	case StmtBreak:
 		return MakeRandomBreak(r, opts, vs, tables, cg)
 	case StmtContinue:

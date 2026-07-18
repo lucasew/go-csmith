@@ -21,6 +21,8 @@ type CGContext struct {
 	// MustUseArrays mirrors rw_directive must-use arrays for array-loop for-control.
 	// StatementFor::make_iteration when find_must_use_arrays nonempty.
 	MustUseArrays []*ArrayVariable
+	// EffectAccum is optional mutable effect (Effect::effect_accum) for write tracking.
+	EffectAccum *Effect
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -29,8 +31,19 @@ func EmptyCGContext() CGContext {
 }
 
 // EffectContext mirrors CGContext::get_effect_context.
+// Prefers EffectAccum when set (running accum from statements in block).
 func (c CGContext) EffectContext() Effect {
+	if c.EffectAccum != nil {
+		return *c.EffectAccum
+	}
 	return c.effectContext
+}
+
+// NoteWrite records a variable write into EffectAccum if present.
+func (c CGContext) NoteWrite(v *Variable) {
+	if c.EffectAccum != nil && v != nil {
+		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+	}
 }
 
 // WithEffectContext returns a context with the given effect_context.

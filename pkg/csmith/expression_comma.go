@@ -19,11 +19,16 @@ func MakeExpressionComma(
 	if r == nil {
 		return nil
 	}
-	// LHS: any non-void type, no const terms
+	// LHS: ExpressionComma.cpp:58 — make_random(nullptr type) → choose_random_nonvoid
 	lhsType := GetIntType()
-	if probs != nil {
+	if cg.Types != nil {
+		lhsType = cg.Types.ChooseRandomNonvoid(r, opts, probs)
+	} else if probs != nil {
 		st := ChooseRandomNonvoidSimple(r, probs)
 		lhsType = GetSimpleType(st)
+	}
+	if lhsType == nil {
+		lhsType = GetIntType()
 	}
 	d := cg.ExprDepth + 1
 	// noFunc false, noConst true for lhs (ExpressionComma.cpp:58–59)

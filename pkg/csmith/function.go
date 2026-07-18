@@ -15,7 +15,7 @@ type Function struct {
 	IsInlined  bool
 	IsBuiltin  bool
 	IsBuilt    bool // BuildState::Built after GenerateBody/make_first
-	// Labels are goto targets emitted at end of body (simplified CFG).
+	// Labels legacy end-of-body targets (superseded by Stmt SourceLabel / StmtLabel).
 	Labels []string
 }
 
