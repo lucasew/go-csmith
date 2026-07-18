@@ -68,9 +68,16 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	r := NewRng(2)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil)
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomArrayOp(NewRng(7), opts, probs, vs, tables, stmtTab, cg)
-	if st.Kind != StmtArrayOp {
-		t.Fatal(st.Kind)
+	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
+	var st Stmt
+	for seed := uint64(1); seed < 40; seed++ {
+		st = MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, cg)
+		if st.Kind == StmtArrayOp || st.Kind == StmtFor {
+			break
+		}
+	}
+	if st.Kind != StmtArrayOp && st.Kind != StmtFor {
+		t.Fatalf("kind %v", st.Kind)
 	}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
 	if !strings.Contains(out, "for (") {

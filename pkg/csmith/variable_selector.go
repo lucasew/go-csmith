@@ -403,3 +403,171 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	vs.VarCreated = true
 	return av
 }
+
+// VariableScope mirrors eVariableScope.
+type VariableScope int
+
+const (
+	ScopeGlobal VariableScope = iota
+	ScopeParentLocal
+	ScopeParentParam
+	ScopeNewValue
+	MaxVarScope
+)
+
+// NewScopeThresholdTable mirrors InitScopeTable / VariableSelectionProbability table.
+// VariableSelector.cpp:112–121 — with globals: 35 Global, 65 Local, 95 Param, 100 New;
+// without: 50 Local, 95 Param, 100 New.
+func NewScopeThresholdTable(opts Options) *ThresholdTable {
+	t := &ThresholdTable{}
+	if opts.GlobalVariables {
+		t.Add(35, int(ScopeGlobal))
+		t.Add(65, int(ScopeParentLocal))
+		t.Add(95, int(ScopeParentParam))
+		t.Add(100, int(ScopeNewValue))
+	} else {
+		t.Add(50, int(ScopeParentLocal))
+		t.Add(95, int(ScopeParentParam))
+		t.Add(100, int(ScopeNewValue))
+	}
+	return t
+}
+
+// VariableSelectionProbability mirrors VariableSelectionProbability.
+// VariableSelector.cpp:1043–1059 — rnd_upto(100); scopeTable get_value.
+func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
+	if r == nil {
+		return ScopeNewValue
+	}
+	tab := NewScopeThresholdTable(opts)
+	v := r.RndUpto(100)
+	sc := tab.GetValue(int(v))
+	if sc < 0 {
+		return ScopeNewValue
+	}
+	return VariableScope(sc)
+}
+
+// VariableCreationProbability mirrors VariableCreationProbability.
+// VariableSelector.cpp:1063–1070 — 50% global if allowed else local.
+func VariableCreationProbability(r *Rng, opts Options) VariableScope {
+	if opts.GlobalVariables && r != nil && r.RndFlipcoin(50) {
+		return ScopeGlobal
+	}
+	return ScopeParentLocal
+}
+
+// Select mirrors VariableSelector::select.
+// VariableSelector.cpp:1189–1243 — pick scope then SelectGlobal / ParentLocal / Param / New.
+func (vs *VariableSelector) Select(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+) *Variable {
+	if vs == nil || r == nil {
+		return nil
+	}
+	vs.VarCreated = false
+	scope := VariableSelectionProbability(r, vs.Opts)
+	var v *Variable
+	switch scope {
+	case ScopeGlobal:
+		v = vs.SelectGlobal(access, cg, t, qfer, r)
+	case ScopeParentLocal:
+		v = vs.SelectParentLocal(access, cg, t, qfer, r, mt)
+	case ScopeParentParam:
+		v = vs.SelectParentParam(access, cg, t, qfer, r, mt)
+	case ScopeNewValue:
+		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
+	default:
+		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
+	}
+	// if scope pick failed (e.g. no params), fall through to create
+	if v == nil {
+		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
+	}
+	return v
+}
+
+// SelectParentLocal mirrors VariableSelector::SelectParentLocal simplified.
+// choose among stack locals with match; else GenerateNewParentLocal.
+func (vs *VariableSelector) SelectParentLocal(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+) *Variable {
+	if vs == nil || cg.CurrentFunc == nil {
+		return nil
+	}
+	var locals []*Variable
+	for _, blk := range cg.CurrentFunc.Stack {
+		if blk == nil {
+			continue
+		}
+		locals = append(locals, blk.LocalVars...)
+	}
+	skipConst := access == AccessWrite
+	if v := ChooseOKVarMatch(r, locals, t, mt, skipConst); v != nil {
+		return v
+	}
+	// create on current block
+	if len(cg.CurrentFunc.Stack) == 0 {
+		return nil
+	}
+	blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
+	return vs.GenerateNewParentLocal(blk, access, cg, t, qfer, r)
+}
+
+// SelectParentParam mirrors VariableSelector::SelectParentParam.
+// choose among function parameters with match.
+func (vs *VariableSelector) SelectParentParam(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+) *Variable {
+	_ = qfer
+	if cg.CurrentFunc == nil {
+		return nil
+	}
+	skipConst := access == AccessWrite
+	return ChooseOKVarMatch(r, cg.CurrentFunc.Param, t, mt, skipConst)
+}
+
+// GenerateNewVariable mirrors VariableSelector::GenerateNewVariable.
+// VariableSelector.cpp:1090+ — VariableCreationProbability → global or parent local.
+func (vs *VariableSelector) GenerateNewVariable(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+) *Variable {
+	if vs == nil || t == nil {
+		return nil
+	}
+	// random_type_from_type like SelectGlobal create path
+	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
+	if t2 == nil {
+		t2 = t
+	}
+	scope := VariableCreationProbability(r, vs.Opts)
+	switch scope {
+	case ScopeGlobal:
+		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+	default:
+		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
+			blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
+			return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+		}
+		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+	}
+}

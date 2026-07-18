@@ -248,51 +248,13 @@ func MakeRandomExpression(
 }
 
 
-// makeExpressionVariable — ExpressionVariable.cpp:56+ simplified:
-// VariableSelector::select → SelectGlobal with MatchFlexible (globals only).
+// makeExpressionVariable — ExpressionVariable.cpp:56+ :
+// VariableSelector::select(READ, type, qfer, eFlexible).
 func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, qfer *CVQualifiers) *Expression {
 	if vs == nil {
 		return nil
 	}
-	var ok []*Variable
-	addIf := func(v *Variable) {
-		if v == nil {
-			return
-		}
-		for _, x := range v.CollectExpandable() {
-			if x != nil && x.Type != nil && typ != nil && typ.Match(x.Type, MatchFlexible) {
-				ok = append(ok, x)
-			}
-		}
-	}
-	// Locals on current function stack (prefer before globals when present).
-	if cg.CurrentFunc != nil {
-		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
-			blk := cg.CurrentFunc.Stack[i]
-			if blk == nil {
-				continue
-			}
-			for _, v := range blk.LocalVars {
-				addIf(v)
-			}
-		}
-		for _, v := range cg.CurrentFunc.Param {
-			addIf(v)
-		}
-	}
-	for _, v := range vs.GlobalList {
-		addIf(v)
-	}
-	var v *Variable
-	if len(ok) > 0 {
-		v = ChooseOKVar(r, ok)
-	} else if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-		// GenerateNewParentLocal on current block
-		blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
-		v = vs.GenerateNewParentLocal(blk, AccessRead, cg, typ, qfer, r)
-	} else {
-		v = vs.GenerateNewGlobal(AccessRead, cg, typ, qfer, r)
-	}
+	v := vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
 	if v == nil {
 		return nil
 	}

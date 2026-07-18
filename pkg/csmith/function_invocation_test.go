@@ -134,8 +134,12 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	if out == "/*invoke*/" || out == "" {
 		t.Fatal(out)
 	}
-	// no safe_ for ptr cmp
-	if strings.Contains(out, "safe_") {
-		t.Fatalf("ptr cmp should not use safe math: %s", out)
+	// top-level is ==/!= (operands may contain safe_* from nested exprs)
+	if !strings.Contains(out, "==") && !strings.Contains(out, "!=") {
+		t.Fatalf("expected cmp op in %s", out)
+	}
+	// Invocation itself must not wrap the comparison in safe_*
+	if fi.Safe != nil {
+		t.Fatal("ptr cmp must not set Safe flags")
 	}
 }
