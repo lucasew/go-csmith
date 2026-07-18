@@ -60,6 +60,8 @@ type StructField struct {
 	Name string
 	Type *Type
 	Qfer CVQualifiers
+	// BitWidth is bitfield width; -1 means not a bitfield (Type.cpp fields_length).
+	BitWidth int
 }
 
 // simpleTypes mirrors Type::simple_types[MAX_SIMPLE_TYPES] cache.

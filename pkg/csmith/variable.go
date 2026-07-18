@@ -115,7 +115,10 @@ func (v *Variable) CreateFieldVars() {
 		if f.Type == nil {
 			continue
 		}
-		// skip unnamed padding later
+		// Type::is_unamed_padding — zero-length bitfield skipped (Variable.cpp:351–352)
+		if f.BitWidth == 0 {
+			continue
+		}
 		fname := v.Name + ".f" + itoa(j)
 		j++
 		consts := append([]bool(nil), f.Qfer.IsConsts...)

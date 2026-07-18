@@ -37,14 +37,50 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
 	return StructField{
-		Name: fmt.Sprintf("f%d", fieldIdx),
-		Type: ft,
-		Qfer: q,
+		Name:     fmt.Sprintf("f%d", fieldIdx),
+		Type:     ft,
+		Qfer:     q,
+		BitWidth: -1,
 	}
 }
 
-// MakeRandomStructType mirrors Type::make_random_struct_type without bitfields.
-// Type.cpp:1075–1130.
+
+// MakeOneBitfield mirrors Type::make_one_bitfield.
+// Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
+func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {
+	maxLen := opts.IntSize * 8
+	if maxLen < 1 {
+		maxLen = 32
+	}
+	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
+	var ft *Type
+	if sign {
+		ft = GetIntType()
+	} else {
+		ft = GetSimpleType(EUInt)
+	}
+	constP := uint32(probs.Single(PFieldConstProb))
+	volP := uint32(probs.Single(PFieldVolatileProb))
+	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
+	length := int(r.RndUpto(uint32(maxLen)))
+	// force non-zero if first field or previous was zero-length
+	if length == 0 && prevZero {
+		if maxLen <= 2 {
+			length = 1
+		} else {
+			length = int(r.RndUpto(uint32(maxLen-1))) + 1
+		}
+	}
+	return StructField{
+		Name:     fmt.Sprintf("f%d", fieldIdx),
+		Type:     ft,
+		Qfer:     q,
+		BitWidth: length,
+	}
+}
+
+// MakeRandomStructType mirrors Type::make_random_struct_type.
+// Type.cpp:1075–1130 — BitFieldsCreationProb chooses full-bitfields vs normal fields.
 func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
 	if r == nil {
 		return nil
@@ -57,24 +93,32 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 	if !opts.FixedStructFields {
 		fieldCnt = int(r.RndUpto(uint32(maxCnt))) + 1
 	}
-	// skip full bitfields path (BitFieldsCreationProb) — always normal fields
-	// still burn the flip to stay closer to stream when bitfields enabled
-	if opts.Bitfields {
-		_ = r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
-	}
+	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
+	fullBitfields := opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldsCreationProb)))
 	fields := make([]StructField, 0, fieldCnt)
+	prevZero := true // first field cannot be zero-width
 	for i := 0; i < fieldCnt; i++ {
-		// BitFieldInNormalStructProb — skip actual bitfield; burn flip
+		if fullBitfields {
+			// make_full_bitfields_struct_fields: ScalarFieldInFullBitFieldsProb → normal else bitfield
+			if r.RndFlipcoin(uint32(probs.Single(PScalarFieldInFullBitFieldsProb))) {
+				fields = append(fields, MakeOneStructField(r, opts, probs, env, i))
+				prevZero = false
+			} else {
+				f := MakeOneBitfield(r, opts, probs, i, prevZero)
+				prevZero = f.BitWidth == 0
+				fields = append(fields, f)
+			}
+			continue
+		}
+		// make_normal_struct_fields: BitFieldInNormalStructProb → bitfield
 		if opts.Bitfields && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
-			// would make_one_bitfield — emit as int field instead (approx)
-			fields = append(fields, StructField{
-				Name: fmt.Sprintf("f%d", i),
-				Type: GetIntType(),
-				Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
-			})
+			f := MakeOneBitfield(r, opts, probs, i, prevZero)
+			prevZero = f.BitWidth == 0
+			fields = append(fields, f)
 			continue
 		}
 		fields = append(fields, MakeOneStructField(r, opts, probs, env, i))
+		prevZero = false
 	}
 	packed := false
 	if opts.PackedStruct {
@@ -157,6 +201,10 @@ func (t *Type) OutputStructDecl() string {
 		}
 		b.WriteString(" ")
 		b.WriteString(f.Name)
+		if f.BitWidth >= 0 {
+			// bitfield: "int f0 : 3;" (width 0 allowed as padding after first)
+			b.WriteString(fmt.Sprintf(" : %d", f.BitWidth))
+		}
 		b.WriteString(";\n")
 	}
 	b.WriteString("};")
