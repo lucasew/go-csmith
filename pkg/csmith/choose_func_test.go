@@ -82,3 +82,17 @@ func TestChooseFuncUsesIsConvertable(t *testing.T) {
 		t.Fatal("short should convert via is_convertable to int return")
 	}
 }
+
+func TestChooseFuncNoSoftBuiltinFallback(t *testing.T) {
+	// Function.cpp:330–337 — after failed builtin coin / empty user pool, return null
+	// (do not soft-fallback to builtins)
+	opts := Defaults()
+	opts.Builtins = true
+	opts.BuiltinFunctionProb = 0 // never pick builtin first
+	bi := &Function{Name: "b", ReturnType: GetIntType(), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}
+	// only builtins eligible
+	got := ChooseFuncContext(NewRng(1), []*Function{bi}, GetIntType(), nil, nil, opts, nil)
+	if got != nil {
+		t.Fatal("must not fall back to builtins when coin says user pool")
+	}
+}

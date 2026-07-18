@@ -309,13 +309,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	RecordVolatileAccess(iv, 0, true)
 
 	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
-	// StatementFor.cpp:255–263
+	// StatementFor.cpp:255–263 — ERROR_GUARD on null (no soft bare Invocation)
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
 	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
 	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
-	if testFi == nil {
-		testFi = &Invocation{IsStd: true, Binary: testOp.BinaryOpC(), Args: []*Expression{vExpr, cLimit}}
-		testFi.setOutOpts(opts)
+	if testFi == nil || HasError() {
+		return nil
 	}
 	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testFi.GetType()}
 

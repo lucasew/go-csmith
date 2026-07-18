@@ -248,21 +248,22 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		}
 		ok = append(ok, f)
 	}
-	// Function.cpp:330–333 — prefer builtin with BuiltinFunctionProb
+	// Function.cpp:330–337 — BuiltinFunctionProb → try builtin; else user only
+	// (no soft fallback to builtins when user pool empty / not chosen)
+	var f *Function
 	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
 		p := opts.BuiltinFunctionProb
 		if p <= 0 {
 			p = 50
 		}
 		if r.RndFlipcoin(uint32(p)) {
-			return getOneFunction(r, okBuiltin)
+			f = getOneFunction(r, okBuiltin)
 		}
 	}
-	if f := getOneFunction(r, ok); f != nil {
-		return f
+	if f == nil {
+		f = getOneFunction(r, ok)
 	}
-	// fallback builtins if no user funcs
-	return getOneFunction(r, okBuiltin)
+	return f
 }
 
 // getOneFunction mirrors Function::get_one_function — random pick.
