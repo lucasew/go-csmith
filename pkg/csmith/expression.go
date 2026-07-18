@@ -68,29 +68,77 @@ func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bo
 
 // CheckAndSetCast mirrors Expression::check_and_set_cast.
 // Expression.cpp:222–226 — lang_cpp or needs_cast; we apply when desired type needs cast.
+// CheckAndSetCast mirrors Expression::check_and_set_cast without lang_cpp gate
+// (tests / call sites that already decided a cast may be needed).
+// Expression.cpp:221–225 — get_type().needs_cast(desired) → cast_type = desired.
 func (e *Expression) CheckAndSetCast(desired *Type) {
+	e.checkAndSetCastCore(desired)
+}
+
+// CheckAndSetCastOpts mirrors Expression::check_and_set_cast fully.
+// Expression.cpp:221–225 — only when CGOptions::lang_cpp().
+func (e *Expression) CheckAndSetCastOpts(desired *Type, opts Options) {
+	if !opts.LangCPP {
+		return
+	}
+	e.checkAndSetCastCore(desired)
+}
+
+func (e *Expression) checkAndSetCastCore(desired *Type) {
 	if e == nil || desired == nil {
 		return
 	}
-	// Source type from var / const / invoke approximate
-	var src *Type
-	switch e.Term {
-	case TermVariable:
-		if e.ExprType != nil {
-			src = e.ExprType
-		} else if e.Var != nil {
-			src = e.Var.Type
-		}
-	case TermConstant:
-		if e.Con != nil {
-			src = e.Con.Type
-		}
-	default:
-		return
-	}
-	if src != nil && desired.NeedsCast(src) {
+	// Expression.cpp:222 — get_type() before cast is applied
+	src := e.GetTypeUncast()
+	if src != nil && src.NeedsCast(desired) {
 		e.CastType = desired
 	}
+}
+
+// GetTypeUncast is get_type ignoring cast_type (for check_and_set_cast).
+func (e *Expression) GetTypeUncast() *Type {
+	if e == nil {
+		return nil
+	}
+	switch e.Term {
+	case TermConstant:
+		if e.Con != nil {
+			return e.Con.Type
+		}
+	case TermVariable:
+		if e.ExprType != nil {
+			return e.ExprType
+		}
+		if e.Var != nil {
+			return e.Var.Type
+		}
+	case TermFunction:
+		if e.Invoke != nil {
+			return e.Invoke.GetType()
+		}
+		if e.ExprType != nil {
+			return e.ExprType
+		}
+	case TermCommaExpr:
+		if e.CommaRHS != nil {
+			return e.CommaRHS.GetTypeUncast()
+		}
+	case TermAssignment:
+		if e.Assign != nil {
+			if e.Assign.Lhs != nil {
+				if t := e.Assign.Lhs.GetType(); t != nil {
+					return t
+				}
+			}
+			if e.Assign.LhsVar != nil {
+				return e.Assign.LhsVar.Type
+			}
+		}
+		if e.ExprType != nil {
+			return e.ExprType
+		}
+	}
+	return nil
 }
 
 // IndirectLevel mirrors ExpressionVariable::get_indirect_level.
@@ -618,13 +666,15 @@ func makeExpressionVariableFlags(
 }
 
 // Output is a minimal C fragment (Expression::Output + optional cast).
+// Expression.cpp:227–232 output_cast — "(type) " prefix when cast_type set.
 func (e *Expression) Output() string {
 	if e == nil {
 		return ""
 	}
 	body := e.outputBody()
 	if e.CastType != nil {
-		return "(" + e.CastType.CName() + ")" + body
+		// Expression.cpp:228–231 — "(" + type + ") " (space after close paren)
+		return "(" + e.CastType.CName() + ") " + body
 	}
 	return body
 }

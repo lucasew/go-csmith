@@ -559,14 +559,21 @@ func (t *Type) BaseType() *Type {
 	return t
 }
 
-// NeedsCast mirrors Type::needs_cast — pointer with inequivalent base.
-// Type.cpp:1466–1469.
+// NeedsCast mirrors Type::needs_cast.
+// Type.cpp:1470–1473 — this is pointer and base_type not equivalent to other's base.
+// `this` is the expression's type; `other` is the desired cast target type.
 func (t *Type) NeedsCast(other *Type) bool {
 	if t == nil || other == nil {
 		return false
 	}
-	return t.PtrType() != nil && other.PtrType() != nil &&
-		!t.BaseType().IsEquivalent(other.BaseType())
+	if t.PtrType() == nil {
+		return false
+	}
+	tb, ob := t.BaseType(), other.BaseType()
+	if tb == nil || ob == nil {
+		return true
+	}
+	return !tb.IsEquivalent(ob)
 }
 
 // HasBitfields mirrors Type::has_bitfields.

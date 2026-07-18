@@ -165,9 +165,9 @@ func MakeRandomAssign(
 		return Stmt{Kind: StmtAssign}
 	}
 
-	// RHS cast to L type when needed (StatementAssign.cpp:207–208)
+	// RHS cast to L type when needed (StatementAssign.cpp:207–208 — lang_cpp)
 	if rhs != nil && typ != nil {
-		rhs.CheckAndSetCast(typ)
+		rhs.CheckAndSetCastOpts(typ, opts)
 	}
 	if opts.CComp && lhsVar != nil && lhsVar.IsBitfield {
 		if rhs != nil {
@@ -188,7 +188,7 @@ func MakeRandomAssign(
 		// regenerate RHS once as constant (practical recovery vs hard fail)
 		rhs = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
 		if rhs.Con != nil {
-			rhs.CheckAndSetCast(typ)
+			rhs.CheckAndSetCastOpts(typ, opts)
 		}
 		ClearError()
 	}

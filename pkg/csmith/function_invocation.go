@@ -332,7 +332,8 @@ func BuildUserInvocation(
 			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
-			arg.CheckAndSetCast(ty)
+			// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
+			arg.CheckAndSetCastOpts(ty, opts)
 		}
 		fi.Args = append(fi.Args, arg)
 		cg.MergeParamContext(paramCG, true)
@@ -428,7 +429,8 @@ func BuildInvocationAndFunction(
 			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
 		if arg != nil {
-			arg.CheckAndSetCast(ty)
+			// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
+			arg.CheckAndSetCastOpts(ty, opts)
 		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:195–196
@@ -731,8 +733,8 @@ func MakeRandomBinaryPtrComparison(
 	if left == nil || right == nil {
 		return nil
 	}
-	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed
-	right.CheckAndSetCast(left.GetType())
+	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed (lang_cpp)
+	right.CheckAndSetCastOpts(left.GetType(), opts)
 	// FunctionInvocation.cpp:358 — bookkeeping
 	RecordPointerComparisons(left, right)
 	// FunctionInvocation.cpp:297–302 — flags always; Output uses standard ==/!= (not safe_ops)

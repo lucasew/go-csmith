@@ -38,8 +38,12 @@ func TestExpressionCastOutput(t *testing.T) {
 		CastType: PointerTo(GetIntType()),
 	}
 	out := e.Output()
+	// Expression.cpp:228–231 — "(type) " with trailing space
 	if !strings.Contains(out, "int*") || !strings.HasPrefix(out, "(") {
 		t.Fatal(out)
+	}
+	if !strings.Contains(out, ") ") {
+		t.Fatalf("want space after cast: %q", out)
 	}
 }
 
@@ -59,7 +63,7 @@ func TestHasBitfields(t *testing.T) {
 }
 
 func TestCheckAndSetCast(t *testing.T) {
-	// int* expr desired as char* → needs cast if sizes differ
+	// int* expr desired as char* → needs cast if bases inequivalent
 	v := CreateVariableQfer("g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
 	want := PointerTo(GetSimpleType(EChar))
@@ -68,6 +72,57 @@ func TestCheckAndSetCast(t *testing.T) {
 		if e.CastType == nil {
 			t.Fatal("expected cast")
 		}
+	}
+}
+
+func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
+	// Expression.cpp:222 — only lang_cpp sets cast
+	v := CreateVariableQfer("g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
+	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
+	want := PointerTo(GetSimpleType(EChar))
+	opts := Defaults()
+	opts.LangCPP = false
+	e.CheckAndSetCastOpts(want, opts)
+	if e.CastType != nil {
+		t.Fatal("C mode must not set cast via check_and_set_cast")
+	}
+	opts.LangCPP = true
+	e.CheckAndSetCastOpts(want, opts)
+	if e.CastType == nil && !PointerTo(GetIntType()).BaseType().IsEquivalent(want.BaseType()) {
+		t.Fatal("lang_cpp should set cast for inequivalent pointer bases")
+	}
+}
+
+func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
+	// check_and_set_cast uses get_type() for all term kinds (not only var/const)
+	arg := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	want := PointerTo(GetSimpleType(EChar))
+	e.CheckAndSetCast(want)
+	if e.GetTypeUncast() == nil {
+		t.Fatal("uncast type")
+	}
+	// + of pointer-typed constant still pointer type via unary get_type
+	if e.CastType == nil && e.GetTypeUncast().NeedsCast(want) {
+		t.Fatal("expected cast from invoke type")
+	}
+}
+
+func TestNeedsCastOnlySourcePointer(t *testing.T) {
+	// Type.cpp:1470 — only `this` must be pointer
+	pi := PointerTo(GetIntType())
+	// bases int vs char inequivalent → cast
+	if !pi.NeedsCast(GetSimpleType(EChar)) {
+		t.Fatal("int* needs_cast(char)")
+	}
+	// non-pointer source never needs cast
+	if GetIntType().NeedsCast(pi) {
+		t.Fatal("int does not needs_cast")
+	}
+	// same base → no cast
+	if pi.NeedsCast(GetIntType()) {
+		t.Fatal("int* base int equivalent to int")
 	}
 }
 
