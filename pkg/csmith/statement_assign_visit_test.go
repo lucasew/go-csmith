@@ -56,6 +56,8 @@ func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
 }
 
 func TestMakeRandomAssignDualContext(t *testing.T) {
+	// StatementAssign.cpp:181/225 — merge_param_context folds RHS/LHS into caller;
+	// expr_depth and effect_accum must stick on *CGContext.
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -69,13 +71,23 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	cg := EmptyCGContext()
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
+	cg.ExprDepth = 0
 	tables := NewExprTables(opts)
-	st := MakeRandomAssign(NewRng(5), opts, probs, vs, tables, cg, GetIntType())
+	st := MakeRandomAssign(NewRng(5), opts, probs, vs, tables, &cg, GetIntType())
 	if st.Kind != StmtAssign {
 		t.Fatal("kind")
 	}
 	if st.LhsVar == nil && st.Lhs == nil {
 		t.Fatal("no lhs", st)
+	}
+	// successful assign with RHS expression bumps depth via merge
+	if st.Expr != nil && BumpsExprDepth(st.Expr) && cg.ExprDepth < 1 {
+		t.Fatalf("ExprDepth=%d after assign with leaf RHS (want ≥1)", cg.ExprDepth)
+	}
+	// LHS write lands on shared effect_accum
+	if st.LhsVar != nil && !eff.IsWritten(st.LhsVar) && !cg.EffectStm.IsWritten(st.LhsVar) {
+		// NoteWrite / visit_facts path — allow either accum or stm
+		t.Fatalf("expected write effect for lhs %s", st.LhsVar.Name)
 	}
 }
 

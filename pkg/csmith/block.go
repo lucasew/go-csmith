@@ -512,7 +512,7 @@ func makeRandomStmt(
 	// last resort: assignment (always producible)
 	cg.EffectStm = EmptyEffect()
 	cg.ExprDepth = 0
-	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+	st := MakeRandomAssign(r, opts, probs, vs, tables, &cg, nil)
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
 		preEffect = cg.EffectAccum.Clone()
@@ -536,7 +536,7 @@ func makeRandomStmtKind(
 	case StmtReturn:
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
-		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+		st := MakeRandomAssign(r, opts, probs, vs, tables, &cg, nil)
 		// Effect::write_var on LHS (CGContext effect_accum)
 		if st.LhsVar != nil {
 			cg.NoteWrite(st.LhsVar)

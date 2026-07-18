@@ -62,13 +62,14 @@ func SafeAssign(op AssignOp) bool {
 // MakeRandomAssign mirrors StatementAssign::make_random.
 // StatementAssign.cpp:111–231 — RHS then LHS contexts; merge effects; facts update.
 // MakeRandomAssign mirrors StatementAssign::make_random(cg, type, qf=nullptr).
+// cg is *CGContext (C++ CGContext&) so merge_param_context RHS/LHS stick.
 func MakeRandomAssign(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 ) Stmt {
 	return MakeRandomAssignQfer(r, opts, probs, vs, tables, cg, typ, nil)
@@ -76,16 +77,21 @@ func MakeRandomAssign(
 
 // MakeRandomAssignQfer mirrors StatementAssign::make_random with optional qf.
 // StatementAssign.cpp:111–231 — when qf non-nil, force match_exact_qualifiers for Lhs.
+// cg is *CGContext (C++ CGContext&).
 func MakeRandomAssignQfer(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	typ *Type,
 	qf *CVQualifiers,
 ) Stmt {
+	if cg == nil {
+		SetError(ErrGeneric)
+		return Stmt{Kind: StmtAssign}
+	}
 	ClearError()
 	assignTab := NewAssignOpsTable(opts)
 	op := AssignOpsProbability(r, opts, assignTab, typ)
@@ -103,7 +109,7 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:131–140 — running effect + separate RHS/LHS accum
 	runningEff := cg.EffectContext()
 	rhsAccum := EmptyEffect()
-	rhsCG := cg
+	rhsCG := *cg
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = EmptyEffect()
@@ -181,7 +187,7 @@ func MakeRandomAssignQfer(
 			}
 		}
 	}
-	// merge RHS effects into caller
+	// StatementAssign.cpp:181 — merge_param_context(rhs_cg_context, true)
 	cg.MergeParamContext(rhsCG, true)
 
 	// StatementAssign.cpp:183 — write_var_set(rhs_accum.get_lhs_write_vars())
@@ -191,7 +197,7 @@ func MakeRandomAssignQfer(
 
 	// LHS context after RHS (StatementAssign.cpp:185–199)
 	lhsAccum := EmptyEffect()
-	lhsCG := cg
+	lhsCG := *cg
 	lhsCG.effectContext = runningEff
 	lhsCG.EffectAccum = &lhsAccum
 	lhsCG.EffectStm = rhsCG.EffectStm
@@ -252,10 +258,11 @@ func MakeRandomAssignQfer(
 		return Stmt{Kind: StmtAssign}
 	}
 
+	// StatementAssign.cpp:225 — merge_param_context(lhs_cg_context, true)
 	cg.MergeParamContext(lhsCG, true)
 
 	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
-	st := makePossibleCompoundAssign(cg, opts, probs, r, typ, lhs, op, rhs)
+	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs)
 	lhsIndir := 0
 	if st.Lhs != nil {
 		lhsIndir = st.Lhs.IndirectLevel()

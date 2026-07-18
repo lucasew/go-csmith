@@ -36,7 +36,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	foundCompound := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRng(seed)
-		st := MakeRandomAssign(r, opts, probs, vs, tables, EmptyCGContext(), GetIntType())
+		st := func() Stmt { c := EmptyCGContext(); return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType()) }()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
 		}
@@ -89,7 +89,7 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{true})
 	cg := EmptyCGContext()
 	// should not panic; may fail to find var and return empty assign
-	st := MakeRandomAssignQfer(NewRng(3), opts, probs, vs, NewExprTables(opts), cg, GetIntType(), &q)
+	st := MakeRandomAssignQfer(NewRng(3), opts, probs, vs, NewExprTables(opts), &cg, GetIntType(), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged
 	if opts.MatchExactQualifiers {
 		t.Fatal("caller opts mutated")

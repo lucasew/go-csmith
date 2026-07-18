@@ -109,7 +109,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	}
 	// generate assigns — should not panic
 	for seed := uint64(1); seed < 10; seed++ {
-		st := MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), EmptyCGContext(), GetIntType())
+		st := func() Stmt { c := EmptyCGContext(); return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType()) }()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
 		}
