@@ -95,12 +95,30 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 }
 
 func TestMakeupNewVarFacts(t *testing.T) {
+	// FactMgr.cpp:504 — add_new_var_fact → abstract_fact_for_var_init; no invent garbage
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
 	old := []*FactPointTo{}
+	// pointer with const null init (CreateVariableScalars → Constant "0")
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if p == nil || p.Init == nil {
+		t.Fatal("pointer init")
+	}
+	// seed new_facts with a related fact entry so makeup sees the var
 	newF := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	MakeupNewVarFacts(&old, newF)
-	if FindRelatedPointTo(old, p) == nil {
+	got := FindRelatedPointTo(old, p)
+	if got == nil {
 		t.Fatal("added")
+	}
+	// must use init abstract (null), not invent NewFactPointTo garbage default
+	if got.IsDead() {
+		t.Fatal("makeup must not invent garbage for null-init pointer")
+	}
+	if !got.IsNull() {
+		t.Fatalf("want null from init, got %+v", got.PointTo)
 	}
 	// idempotent
 	MakeupNewVarFacts(&old, newF)
@@ -112,6 +130,17 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatal("dup")
+	}
+	// address-of init preserved
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	pt := PointerTo(GetIntType())
+	q := CreateVariableQfer("g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
+	old2 := []*FactPointTo{}
+	MakeupNewVarFacts(&old2, []*FactPointTo{MakeFactPointTo(q, GarbagePtr)})
+	fq := FindRelatedPointTo(old2, q)
+	if fq == nil || fq.IsDead() || len(fq.PointTo) != 1 || fq.PointTo[0] != tgt {
+		t.Fatalf("want &g_t fact, got %+v", fq)
 	}
 }
 

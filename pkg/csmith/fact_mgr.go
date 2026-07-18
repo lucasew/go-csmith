@@ -892,10 +892,44 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
 			continue
 		}
 		if FindRelatedPointTo(*oldFacts, v) == nil {
-			// add_new_var_fact into old set
-			if v.IsPointer() {
-				*oldFacts = append(*oldFacts, NewFactPointTo(v))
-			}
+			// FactMgr.cpp:504 — add_new_var_fact(v, old_facts) → abstract_fact_for_var_init
+			// no invent NewFactPointTo garbage (tbd/garbage default) for live inits
+			AddNewVarFactInto(v, oldFacts)
+		}
+	}
+}
+
+// AddNewVarFactInto mirrors FactMgr::add_new_var_fact(v, facts).
+// FactMgr.cpp:118–131 — abstract_fact_for_var_init into the given fact slice.
+func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
+	if v == nil || facts == nil {
+		return
+	}
+	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
+	if !metaFactPointToEnabled {
+		return
+	}
+	// recurse into aggregate fields (pointer members) like AddNewVarFact
+	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
+		for _, f := range v.FieldVars {
+			AddNewVarFactInto(f, facts)
+		}
+		return
+	}
+	if !v.IsPointer() {
+		return
+	}
+	if FindRelatedPointTo(*facts, v) != nil {
+		return
+	}
+	pt, _ := AbstractFactForVarInit(v)
+	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
+	for _, f := range pt {
+		if f == nil {
+			continue
+		}
+		if FindRelatedPointTo(*facts, f.Var) == nil {
+			*facts = append(*facts, f.Clone())
 		}
 	}
 }
