@@ -192,14 +192,14 @@ func RandomTypeFromType(
 		return nil
 	}
 	if typ == nil {
-		if env != nil && len(env.AllTypes) > 0 {
-			// Type.cpp:594–595 — no_volatile → nonvoid_nonvolatile
-			if noVolatile {
-				return env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
-			}
-			return env.ChooseRandomNonvoid(r, opts, probs)
+		// Type.cpp:594–597 — choose_random_nonvoid(_nonvolatile) + ERROR_GUARD; no soft invent simple
+		if env == nil || len(env.AllTypes) == 0 {
+			return nil
 		}
-		return GetSimpleType(ChooseRandomNonvoidSimple(r, probs))
+		if noVolatile {
+			return env.ChooseRandomNonvoidNonvolatile(r, opts, probs)
+		}
+		return env.ChooseRandomNonvoid(r, opts, probs)
 	}
 	// simple + !strict_simple_type → choose_random_simple (always for our callers)
 	// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
@@ -208,6 +208,10 @@ func RandomTypeFromType(
 			return nil
 		}
 		st := ChooseRandomNonvoidSimple(r, probs)
+		// Type.cpp:603–605 — assert(simple != eVoid); no soft invent int for void
+		if st == EVoid {
+			return nil
+		}
 		return GetSimpleType(st)
 	}
 	return typ
@@ -235,9 +239,9 @@ func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *
 
 // chooseRandomFiltered shared filter for nonvoid (+ optional nonvolatile aggregate).
 func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilities, noVolatileAgg bool) *Type {
-	if env == nil || len(env.AllTypes) == 0 {
-		st := ChooseRandomNonvoidSimple(r, probs)
-		return GetSimpleType(st)
+	// Type.cpp:1218+ — rnd_upto(AllTypes); ERROR_GUARD(nullptr); no soft invent simple
+	if env == nil || len(env.AllTypes) == 0 || r == nil {
+		return nil
 	}
 	filt := filterFunc(func(v uint32) bool {
 		i := int(v)

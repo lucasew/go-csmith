@@ -1248,8 +1248,9 @@ func (vs *VariableSelector) SelectGlobalMT(
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
 	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
+	// VariableSelector.cpp:691–693 — ERROR_GUARD(nullptr); no soft invent keep original type
 	if t2 == nil {
-		t2 = t
+		return nil
 	}
 	return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 }
@@ -1802,10 +1803,10 @@ func (vs *VariableSelector) SelectParentLocalInv(
 				return v
 			}
 		}
-		// VariableSelector.cpp:1011 — random_type_from_type(type, true, false) no_vol=true
+		// VariableSelector.cpp:1011–1013 — random_type_from_type + ERROR_GUARD; no soft invent keep type
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
 		if t2 == nil {
-			t2 = t
+			return nil
 		}
 		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
 	}
@@ -1815,8 +1816,9 @@ func (vs *VariableSelector) SelectParentLocalInv(
 		matchT = GetIntType()
 	} else {
 		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+		// VariableSelector.cpp:1023–1024 — ERROR_GUARD(nullptr); no soft invent keep type
 		if matchT == nil {
-			matchT = t
+			return nil
 		}
 	}
 	if v := ChooseVarFull(r, blk.LocalVars, access, cg, matchT, qfer, mt, invalidVars, false, false, false); v != nil {
@@ -1887,10 +1889,10 @@ func (vs *VariableSelector) GenerateNewVariable(
 		if DepthGuardByType(vs.Opts, DtGenerateNewGlobal) == BadDepth {
 			return nil
 		}
-		// VariableSelector.cpp:1105 — random_type_from_type(type) default no_vol=false
+		// VariableSelector.cpp:1105–1107 — random_type_from_type + ERROR_GUARD; no soft invent keep type
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
 		if t2 == nil {
-			t2 = t
+			return nil
 		}
 		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	case ScopeParentLocal:
@@ -1904,10 +1906,10 @@ func (vs *VariableSelector) GenerateNewVariable(
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			// VariableSelector.cpp:1118 — rnd_upto(func.stack.size())
 			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
-			// VariableSelector.cpp:1129 — random_type_from_type(type, true, false)
+			// VariableSelector.cpp:1129–1130 — random_type_from_type + ERROR_GUARD; no soft invent keep type
 			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
 			if t2 == nil {
-				t2 = t
+				return nil
 			}
 			return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
 		}
