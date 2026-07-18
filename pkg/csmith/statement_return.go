@@ -35,7 +35,8 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 // MakeRandomReturn mirrors StatementReturn::make_random.
-// StatementReturn.cpp:54–72 — ExpressionVariable only; visit_facts updates return facts.
+// StatementReturn.cpp:54–72 — ExpressionVariable only (as_return); no fact update here.
+// ERROR_GUARD(nullptr) when ExpressionVariable::make_random fails — no const soft-fallback.
 func MakeRandomReturn(
 	r *Rng,
 	opts Options,
@@ -59,8 +60,8 @@ func MakeRandomReturn(
 	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true) — as_return
 	ev := makeExpressionVariableFlags(r, vs, cg, ret, qfer, false, true)
 	if ev == nil {
-		// last resort: constant of return type (not upstream, avoids empty return)
-		ev = &Expression{Term: TermConstant, Con: MakeRandom(ret, opts, r)}
+		// StatementReturn.cpp:66 — ERROR_GUARD(nullptr); stmtOK rejects Expr-less return
+		return st
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
 	ev.CheckAndSetCastOpts(ret, opts)
@@ -72,11 +73,6 @@ func MakeRandomReturn(
 	if st.StmID == 0 {
 		st.StmID = AllocStmID()
 	}
-	// StatementReturn.cpp make_random does not update facts — visit_facts does
-	// (StatementReturn.cpp:76–97). Optional eager visit when FM present for
-	// generation-time analysis consistency with other stmt factories.
-	if cg.FM != nil {
-		_ = VisitFactsStatementReturn(&st, cg, opts)
-	}
+	// StatementReturn.cpp make_random does not visit_facts — stm_visit / append_return does
 	return st
 }

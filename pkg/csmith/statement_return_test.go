@@ -5,7 +5,8 @@ import (
 	"testing"
 )
 
-func TestMakeRandomReturnIsVariableOrConst(t *testing.T) {
+func TestMakeRandomReturnIsVariable(t *testing.T) {
+	// StatementReturn.cpp:60–66 — ExpressionVariable only; nullptr on fail (no const fallback)
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -19,14 +20,31 @@ func TestMakeRandomReturnIsVariableOrConst(t *testing.T) {
 		t.Fatalf("%v", st.Kind)
 	}
 	if st.Expr == nil {
-		t.Fatal("nil expr")
+		// ERROR_GUARD path: stmtOK rejects for retry
+		if stmtOK(st) {
+			t.Fatal("Expr-less return must fail stmtOK")
+		}
+		return
 	}
-	// upstream: ExpressionVariable (or our const fallback)
-	if st.Expr.Term != TermVariable && st.Expr.Term != TermConstant {
-		t.Fatalf("want variable/const, got %v", st.Expr.Term)
+	// upstream: ExpressionVariable only (as_return)
+	if st.Expr.Term != TermVariable {
+		t.Fatalf("want TermVariable, got %v", st.Expr.Term)
 	}
-	if st.Expr.Term == TermFunction {
-		t.Fatal("return must not be free func call (StatementReturn)")
+}
+
+func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
+	// StatementReturn.cpp:66 ERROR_GUARD — no soft const when select fails
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	cg := WithFunc(f, EmptyEffect())
+	// nil vs → ExpressionVariable::make_random cannot select → nullptr
+	st := MakeRandomReturn(NewRng(1), opts, nil, &cg)
+	if st.Expr != nil {
+		t.Fatal("nil vs must yield nullptr-style empty return")
+	}
+	if stmtOK(st) {
+		t.Fatal("stmtOK must reject")
 	}
 }
 

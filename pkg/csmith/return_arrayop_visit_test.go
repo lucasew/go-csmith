@@ -70,7 +70,8 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	}
 }
 
-func TestMakeRandomReturnVisitFactsNotOnlyEager(t *testing.T) {
+func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
+	// StatementReturn.cpp:54–72 — make_random does not visit_facts; append_return does
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
 	vs := NewVariableSelector(opts)
@@ -84,5 +85,9 @@ func TestMakeRandomReturnVisitFactsNotOnlyEager(t *testing.T) {
 	st := MakeRandomReturn(NewRng(3), opts, vs, &cg)
 	if st.Kind != StmtReturn || st.Expr == nil {
 		t.Fatal(st)
+	}
+	// no map_visited / map_stm_effect until explicit visit or append_return
+	if st.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[st.StmID] {
+		t.Fatal("make_random must not mark visited (no eager visit_facts)")
 	}
 }

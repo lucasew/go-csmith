@@ -333,10 +333,12 @@ func MakeRandomBlock(
 	// Without FactMgr, append return here so function bodies stay valid C.
 	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
 		ret := MakeRandomReturn(r, opts, vs, cg)
-		if ret.StmID == 0 {
-			ret.StmID = AllocStmID()
+		if stmtOK(ret) {
+			if ret.StmID == 0 {
+				ret.StmID = AllocStmID()
+			}
+			b.Stmts = append(b.Stmts, ret)
 		}
-		b.Stmts = append(b.Stmts, ret)
 	}
 	if b.StmID == 0 {
 		b.StmID = AllocStmID()
