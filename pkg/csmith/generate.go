@@ -39,6 +39,12 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 	defer ClearAttrGenerators()
 	g := NewProgramGenerator(opts)
 	out := g.GoGenerator()
+	// sticky ERROR_RETURN / failed make_first → empty out (no soft invent success)
+	if HasError() {
+		code := GetError()
+		ClearError()
+		return "", fmt.Errorf("generation error (Error=%d)", code)
+	}
 	if out == "" {
 		return "", fmt.Errorf("empty program generation")
 	}

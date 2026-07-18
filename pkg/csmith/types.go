@@ -409,7 +409,16 @@ func (t *Type) IndirectLevel() int {
 }
 
 // pointerCache keys by pointee pointer for stable eExact match on pointers.
+// Mirrors Type::derived_types pointer entries (Type.cpp find_pointer_type).
 var pointerCache = map[*Type]*Type{}
+
+// TypeDoFinalization mirrors Type::doFinalization for process-wide derived types.
+// Type.cpp:1962–1971 — clears derived_types (Go: pointerCache).
+// simpleTypes stay: permanent eSimple cache (C++ simple_types[] is not reallocated each run).
+// Allocated struct/union *Type values are GC'd with their ProgramGenerator session.
+func TypeDoFinalization() {
+	pointerCache = map[*Type]*Type{}
+}
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).
 func PointerTo(pointee *Type) *Type {

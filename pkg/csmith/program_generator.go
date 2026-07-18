@@ -542,13 +542,22 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) stri
 
 // GoGenerator mirrors DefaultProgramGenerator::goGenerator / DefaultOutputMgr::Output.
 // DefaultProgramGenerator.cpp:67–80; DefaultOutputMgr.cpp:175–195.
+// Returns empty string when sticky ERROR_RETURN aborts generation (no soft invent
+// of partial program as success).
 func (g *ProgramGenerator) GoGenerator() string {
 	g.Initialize()
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
 	g.GenerateAllTypes()
+	if HasError() {
+		return ""
+	}
 	b.WriteString(g.OutputStructTypes())
 	g.GenerateFunctions()
+	// Function.cpp:797/805 ERROR_RETURN — stop output when generation failed
+	if HasError() {
+		return ""
+	}
 	b.WriteString(g.OutputGlobals())
 	b.WriteString(g.OutputFunctions())
 	b.WriteString(g.OutputHashFuncDef())
