@@ -145,3 +145,43 @@ func (vs *VariableSelector) SelectGlobal(
 	// Empty / no match → GenerateNewGlobal (expand_struct skipped when ExpandStruct false).
 	return vs.GenerateNewGlobal(access, cg, t, qfer, r)
 }
+
+// GenerateParameterVariableTyped mirrors
+// VariableSelector::GenerateParameterVariable(type, qfer).
+// VariableSelector.cpp:955–957.
+func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQualifiers) *Variable {
+	if vs == nil {
+		return nil
+	}
+	name := vs.RandomParamName()
+	v := CreateVariableQfer(name, typ, qfer)
+	if v == nil {
+		return nil
+	}
+	vs.AllVars = append(vs.AllVars, v)
+	return v
+}
+
+// GenerateParameterVariable mirrors VariableSelector::GenerateParameterVariable(Function&).
+// VariableSelector.cpp:963–979 — 40% pointer when derived exist; else nonvoid simple.
+func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Variable {
+	if vs == nil || f == nil || r == nil {
+		return nil
+	}
+	var t *Type
+	// has_pointer_type() && flipcoin(40) — no derived_types yet → always simple
+	if false && r.RndFlipcoin(40) {
+		// Type::choose_random_pointer_type deferred
+	} else {
+		// Type::choose_random_nonvoid_nonvolatile ≈ choose_random_nonvoid_simple under no structs
+		st := ChooseRandomNonvoidSimple(r, vs.Probs)
+		t = GetSimpleType(st)
+	}
+	// CVQualifiers::random_qualifiers(t) — READ empty no_volatile path
+	qfer := RandomQualifiersNoContextNoVolatile(t, vs.Opts, vs.Probs, r)
+	v := vs.GenerateParameterVariableTyped(t, qfer)
+	if v != nil {
+		f.Param = append(f.Param, v)
+	}
+	return v
+}

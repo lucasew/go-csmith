@@ -400,10 +400,12 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 7: `VariableSelector` | **Partial** — choose_ok_var, GenerateNewGlobal (+init), SelectGlobal |
 | Layer 7b: `Constant::make_random` | **Partial** — simple + pointer |
 | Layer 4b: `Type::match` / cache | **Partial** |
-| Layer 8: `Expression` term pick + const/var | **Partial** — DistributionTable, VectorFilter, make_random const/var |
-| Layer 9: `Statement` probability | **Partial** — threshold table + U100 pick; no emit |
+| Layer 8: `Expression` term pick + const/var | **Partial** |
+| Layer 9: `Statement` probability + minimal Stmt emit | **Partial** |
+| Layer 10: `Function` signature + `make_first` | **Partial** — params, rv, body block; no DFA/extensions |
+| Layer 10b: `Block::make_random` | **Partial** — size Keep-filter, stmt stubs, early return |
 | `Generate` / ProgramGenerator | **Stub** |
-| Function/Block/ArrayVariable | **Not started** |
+| ArrayVariable / full Statement subclasses | **Not started** |
 | CLI drop-in | **Last** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

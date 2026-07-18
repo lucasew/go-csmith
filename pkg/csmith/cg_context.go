@@ -6,6 +6,14 @@ package csmith
 // Function/block/fact fields land with later ports.
 type CGContext struct {
 	effectContext Effect
+	// CurrentFunc mirrors current_func_ (Function*).
+	CurrentFunc *Function
+	// BlkDepth mirrors blk_depth.
+	BlkDepth int
+	// Flags mirrors CGContext flags (IN_LOOP etc.).
+	Flags uint
+	// ExprDepth mirrors expr_depth.
+	ExprDepth int
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -22,3 +30,12 @@ func (c CGContext) EffectContext() Effect {
 func WithEffectContext(eff Effect) CGContext {
 	return CGContext{effectContext: eff}
 }
+
+// WithFunc returns a context for generating inside f.
+func WithFunc(f *Function, eff Effect) CGContext {
+	return CGContext{effectContext: eff, CurrentFunc: f}
+}
+
+// InLoop is true when flags include IN_LOOP (2).
+func (c CGContext) InLoop() bool { return c.Flags&2 != 0 }
+
