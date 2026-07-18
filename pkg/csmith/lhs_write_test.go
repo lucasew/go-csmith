@@ -52,10 +52,13 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 }
 
 func TestRemoveFunctionLocalFacts(t *testing.T) {
+	// FactMgr.cpp:191 — is_var_on_stack(v, stm) via Body as function-exit parent
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	f.Blocks = []*Block{{LocalVars: []*Variable{loc}}}
+	body := &Block{Func: f, LocalVars: []*Variable{loc}}
+	f.Blocks = []*Block{body}
+	f.Body = body
 	facts := []*FactPointTo{
 		MakeFactPointTo(loc, NullPtr),
 		MakeFactPointTo(g, NullPtr),

@@ -69,7 +69,8 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	}
 }
 
-func TestSkippedInitsAtLabelEmit(t *testing.T) {
+func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
+	// Statement.cpp:911–913 — output_skipped_var_inits after label is commented out
 	loc := CreateVariableScalars("l_2", GetIntType(), false, false)
 	loc.Name = "l_2"
 	loc.Init = MakeInt(9)
@@ -82,8 +83,11 @@ func TestSkippedInitsAtLabelEmit(t *testing.T) {
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)}},
 	}}
 	out := b.Output(0)
-	if !strings.Contains(out, "lbl_x:") || !strings.Contains(out, "l_2 = 9;") {
+	if !strings.Contains(out, "lbl_x:") {
 		t.Fatal(out)
+	}
+	if strings.Contains(out, "l_2 = 9;") {
+		t.Fatal("skipped inits must not emit after label (C++ pre_output commented)", out)
 	}
 }
 

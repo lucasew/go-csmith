@@ -514,32 +514,12 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 		if fact == nil || fact.Var == nil {
 			continue
 		}
-		// drop locals/params on stack at stm, or other function RVs
+		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
 		if f != nil && stParent != nil && f.IsVarOnStack(fact.Var, stParent) {
 			continue
 		}
 		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
 			continue
-		}
-		// name-prefix fallback when no parent block
-		if stParent == nil && (fact.Var.IsLocal() || fact.Var.IsArgument()) {
-			continue
-		}
-		// also drop known function locals when parent missing IsVarOnStack coverage
-		if f != nil && stParent == nil {
-			if IsVariableInSet(f.Param, fact.Var) {
-				continue
-			}
-			drop := false
-			for _, b := range f.Blocks {
-				if b != nil && IsVariableInSet(b.LocalVars, fact.Var) {
-					drop = true
-					break
-				}
-			}
-			if drop {
-				continue
-			}
 		}
 		out = append(out, fact.Clone())
 	}

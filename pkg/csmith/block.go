@@ -728,22 +728,8 @@ func (b *Block) Output(indent int) string {
 		if pre != "" {
 			sb.WriteString(pre)
 		}
-		if isGotoTarget {
-			// StatementGoto::output_skipped_var_inits after dest label (library path;
-			// C++ pre_output has this commented out)
-			lab := st.SourceLabel
-			if lab == "" && b.EmitFM != nil && st.StmID > 0 {
-				lab = FindJumpLabel(b.EmitFM, st.StmID)
-			}
-			if lab != "" {
-				for i := range b.Stmts {
-					g := &b.Stmts[i]
-					if g.Kind == StmtGoto && g.Label == lab && len(g.InitSkippedVars) > 0 {
-						sb.WriteString(OutputSkippedVarInits(g, inner))
-					}
-				}
-			}
-		}
+		// Statement.cpp:911–913 — output_skipped_var_inits after label is commented out upstream
+		_ = isGotoTarget
 		if st.Kind == StmtLabel {
 			sb.WriteString(inner + "    ;\n")
 			continue
