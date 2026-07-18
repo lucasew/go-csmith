@@ -22,9 +22,10 @@ func MakeRandom(typ *Type, opts Options, r *Rng) *Constant {
 }
 
 // MakeRandomUpto mirrors Constant::make_random_upto — rnd_upto(limit) as eUInt decimal.
+// Constant.cpp:429–433 — always has RNG; no soft invent NewRng(0).
 func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 	if r == nil {
-		r = NewRng(0)
+		return nil
 	}
 	n := r.RndUpto(limit)
 	return &Constant{Type: GetSimpleType(EUInt), Value: strconv.FormatUint(uint64(n), 10)}
@@ -127,10 +128,12 @@ func splitConstFields(s string) []string {
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
 func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
+	// Constant.cpp:296+ — uses process RNG; no soft invent NewRng(0) for nil
 	if r == nil {
-		r = NewRng(0)
+		return ""
 	}
 	if typ == nil {
+		// Constant.cpp:303–304 — type==0 → "0"
 		return "0"
 	}
 	// Pointer → "0" (no RNG). Constant.cpp:308–310
@@ -149,9 +152,9 @@ func generateRandomConstant(typ *Type, opts Options, r *Rng) string {
 		}
 		return ""
 	}
-	// Constant.cpp:364–367 — eVoid emits "/* void */"; non-simple other than pointer/struct/union already handled
+	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union; no soft invent "0"
 	if !typ.IsSimple() {
-		return "0"
+		return ""
 	}
 	if typ.Simple() == EVoid {
 		return "/* void */"

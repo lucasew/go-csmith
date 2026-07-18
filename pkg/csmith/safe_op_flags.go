@@ -135,8 +135,9 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 // MakeRandomUnary mirrors SafeOpFlags::make_random_unary.
 // SafeOpFlags.cpp:139–167 — float always signed + SafeFloat; else signed coin + int size.
 func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
+	// SafeOpFlags.cpp:139–167 — always uses rnd_flipcoin / rnd_upto; no soft invent fixed flags
 	if r == nil {
-		return &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
+		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true}
 	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
@@ -175,8 +176,9 @@ func MakeRandomBinaryKind(
 	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(opKind)) == BadDepth {
 		return nil
 	}
+	// SafeOpFlags.cpp:176+ — always uses rnd_*; no soft invent fixed flags
 	if r == nil {
-		return &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
+		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
 	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
@@ -263,6 +265,7 @@ func (f *SafeOpFlags) SizeToken() string {
 // FlagsToType mirrors SafeOpFlags::flags_to_type.
 // SafeOpFlags.cpp:65–98.
 func FlagsToType(signed bool, size SafeOpSize) *Type {
+	// SafeOpFlags.cpp:65–98 — default: assert(0); return eInt is dead after assert
 	if signed {
 		switch size {
 		case SafeInt8:
@@ -276,7 +279,8 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 		case SafeFloat:
 			return GetSimpleType(EFloat)
 		default:
-			return GetIntType()
+			// assert(0) path — no soft invent GetIntType for unknown size
+			return nil
 		}
 	}
 	switch size {
@@ -289,7 +293,8 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 	case SafeInt64:
 		return GetSimpleType(EULongLong)
 	default:
-		return GetSimpleType(EUInt)
+		// assert(0) path — no soft invent EUInt for unknown size
+		return nil
 	}
 }
 

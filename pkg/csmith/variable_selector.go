@@ -272,8 +272,9 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		if DepthGuardByDepth(Defaults(), 1) == BadDepth {
 			return nil
 		}
+		// VariableSelector.cpp:326–329 — rnd_upto(len); no soft invent vars[0] without RNG
 		if r == nil {
-			return vars[0]
+			return nil
 		}
 		v = vars[r.RndUpto(uint32(n))]
 	}

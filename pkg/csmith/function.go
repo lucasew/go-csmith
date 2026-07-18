@@ -128,8 +128,9 @@ func MakeRandomSignature(
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Function {
+	// Function.cpp:401+ — always has RNG; no soft invent NewRng(0)
 	if r == nil {
-		r = NewRng(0)
+		return nil
 	}
 	if probs == nil {
 		probs = NewProbabilities(opts)
@@ -230,8 +231,9 @@ func MakeFirst(
 	list *FunctionList,
 	fmMap *FactMgrMap,
 ) *Function {
+	// Function.cpp:443+ — always has RNG; no soft invent NewRng(0)
 	if r == nil {
-		r = NewRng(0)
+		return nil
 	}
 	if probs == nil {
 		probs = NewProbabilities(opts)

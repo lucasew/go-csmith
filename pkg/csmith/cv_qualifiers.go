@@ -655,8 +655,9 @@ func RandomQualifiersForType(
 	if t == nil {
 		return CVQualifiers{}
 	}
+	// CVQualifiers.cpp:295+ — always has RNG; no soft invent NewRng(0)
 	if r == nil {
-		r = NewRng(0)
+		return CVQualifiers{}
 	}
 
 	var isConsts, isVolatiles []bool
