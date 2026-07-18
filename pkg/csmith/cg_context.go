@@ -2,6 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"strings"
+)
+
 // RWDirective mirrors CGContext.h RWDirective — must/no read/write sets.
 // Directs VariableSelector without changing language semantics alone.
 type RWDirective struct {
@@ -222,6 +227,31 @@ func (c *CGContext) ExtendCallChain(from CGContext) {
 	if b != nil {
 		c.CallChain = append(c.CallChain, b)
 	}
+}
+
+// OutputCallChain mirrors CGContext::output_call_chain.
+// CGContext.cpp:481–490 — "b%p in func -> ..." debug line.
+func (c CGContext) OutputCallChain() string {
+	var b strings.Builder
+	for i, blk := range c.CallChain {
+		if blk == nil {
+			continue
+		}
+		if i > 0 {
+			b.WriteString(" -> ")
+		}
+		// pointer identity as hex-ish index; use name if no func
+		fname := "?"
+		if blk.Func != nil {
+			fname = blk.Func.Name
+		}
+		b.WriteString("b")
+		b.WriteString(fmt.Sprintf("%p", blk))
+		b.WriteString(" in ")
+		b.WriteString(fname)
+	}
+	b.WriteString("\n")
+	return b.String()
 }
 
 // AddExternalEffect mirrors CGContext::add_external_effect.

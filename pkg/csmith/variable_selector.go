@@ -3,6 +3,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "fmt"
+
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	AllVars                []*Variable
@@ -75,6 +77,144 @@ func ChooseVisibleReadVar(
 		ok = append(ok, v)
 	}
 	return ChooseOKVar(r, ok)
+}
+
+// FindVarByName mirrors VariableSelector::find_var_by_name.
+// VariableSelector.cpp:1571–1579 — scan AllVars via match_var_name.
+func (vs *VariableSelector) FindVarByName(name string) *Variable {
+	if vs == nil || name == "" {
+		return nil
+	}
+	for _, v := range vs.AllVars {
+		if m := v.MatchVarName(name); m != nil {
+			return m
+		}
+	}
+	// also search arrays' Variable wrappers
+	for _, av := range vs.Arrays {
+		if av == nil {
+			continue
+		}
+		if m := av.Variable.MatchVarName(name); m != nil {
+			return m
+		}
+	}
+	return nil
+}
+
+// DoFinalization mirrors VariableSelector::doFinalization.
+// VariableSelector.cpp:1584–1592 — clear AllVars / GlobalList / nonvolatiles.
+func (vs *VariableSelector) DoFinalization() {
+	if vs == nil {
+		return
+	}
+	vs.AllVars = nil
+	vs.GlobalList = nil
+	vs.GlobalNonvolatilesList = nil
+	vs.Arrays = nil
+	vs.TmpCount = 0
+	vs.VarCreated = false
+}
+
+// ItemizeArray mirrors VariableSelector::itemize_array.
+// VariableSelector.cpp:1440–1500 — pick IVs in bounds per dimension; optional offset.
+func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable) *ArrayVariable {
+	if av == nil || r == nil {
+		return nil
+	}
+	if av.Collective != nil {
+		return av
+	}
+	dims := len(av.Sizes)
+	if dims == 0 {
+		return nil
+	}
+	if len(cg.IVBounds) < dims {
+		// not enough induction variables
+		return nil
+	}
+	// collect IVs sorted by name for deterministic order
+	type ivPair struct {
+		v     *Variable
+		bound int
+	}
+	var all []ivPair
+	for iv, bound := range cg.IVBounds {
+		if iv == nil || bound < 0 {
+			continue
+		}
+		if iv.Type != nil && iv.Type.IsFloat() {
+			continue
+		}
+		// skip signed char index when option off
+		if !cgHasSignedCharIndex(vs) && iv.Type != nil && iv.Type.IsSimple() &&
+			iv.Type.Simple() == EChar && iv.Type.IsSigned() {
+			continue
+		}
+		all = append(all, ivPair{iv, bound})
+	}
+	// sort by name
+	for i := 0; i < len(all); i++ {
+		for j := i + 1; j < len(all); j++ {
+			if all[j].v.Name < all[i].v.Name {
+				all[i], all[j] = all[j], all[i]
+			}
+		}
+	}
+	indices := make([]string, 0, dims)
+	for d := 0; d < dims; d++ {
+		dimenLen := av.Sizes[d]
+		var ok []*Variable
+		boundOf := map[*Variable]int{}
+		for _, p := range all {
+			if p.bound < dimenLen {
+				ok = append(ok, p.v)
+				boundOf[p.v] = p.bound
+			}
+		}
+		v := ChooseOKVar(r, ok)
+		if v == nil {
+			return nil
+		}
+		idx := v.Name
+		// offset within remaining range
+		remain := dimenLen - boundOf[v]
+		if remain > 1 {
+			off := int(r.RndUpto(uint32(remain)))
+			if off > 0 {
+				idx = fmt.Sprintf("(%s + %d)", v.Name, off)
+			}
+		}
+		indices = append(indices, idx)
+	}
+	item := &ArrayVariable{
+		Variable: Variable{
+			Name:       av.Name,
+			Type:       av.Type,
+			Qfer:       av.Qfer,
+			IsArray:    true,
+			Init:       av.Init,
+			ArraySizes: av.Sizes,
+			ArrayInits: av.ArrayInits,
+		},
+		Sizes:      av.Sizes,
+		InitValues: av.InitValues,
+		Block:      cg.CurrentBlock(),
+		Collective: av,
+		Indices:    indices,
+	}
+	item.AsArray = item
+	if vs != nil {
+		vs.AllVars = append(vs.AllVars, &item.Variable)
+	}
+	return item
+}
+
+func cgHasSignedCharIndex(vs *VariableSelector) bool {
+	if vs == nil {
+		return true
+	}
+	return vs.Opts.SignedCharIndex
 }
 
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
@@ -310,7 +450,15 @@ func (vs *VariableSelector) SelectMustUseVar(
 		}
 		var out *Variable
 		if v.IsArray && v.AsArray != nil && r != nil {
-			if item := v.AsArray.Itemize(r); item != nil {
+			// prefer IV-based itemize when enough bounds (VariableSelector.cpp:1545–1546)
+			var item *ArrayVariable
+			if len(cg.IVBounds) >= len(v.AsArray.Sizes) {
+				item = vs.ItemizeArray(r, cg, v.AsArray)
+			}
+			if item == nil {
+				item = v.AsArray.Itemize(r)
+			}
+			if item != nil {
 				out = &item.Variable
 			}
 		} else {

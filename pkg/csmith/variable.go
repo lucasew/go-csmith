@@ -489,6 +489,47 @@ func (v *Variable) IsArrayField() bool {
 	return p.IsArrayField()
 }
 
+// MatchVarName mirrors Variable::match_var_name.
+// Variable.cpp:1205–1222 — name match, array Output text, or field recurse.
+func (v *Variable) MatchVarName(vname string) *Variable {
+	if v == nil || vname == "" {
+		return nil
+	}
+	if v.Name == vname {
+		return v
+	}
+	// array / array field: compare Output text
+	if v.IsArray || v.IsArrayField() {
+		if v.OutputC() == vname {
+			return v
+		}
+		// itemized with indices
+		if v.AsArray != nil && len(v.AsArray.Indices) > 0 {
+			if v.AsArray.OutputAccess() == vname {
+				return v
+			}
+		}
+	}
+	for _, f := range v.FieldVars {
+		if m := f.MatchVarName(vname); m != nil {
+			return m
+		}
+	}
+	return nil
+}
+
+// IsSeenName mirrors Variable::is_seen_name.
+// Variable.cpp:1048–1058 — name starts with seen+"[".
+func IsSeenName(seen []string, name string) bool {
+	for _, n := range seen {
+		prefix := n + "["
+		if len(name) >= len(prefix) && name[:len(prefix)] == prefix {
+			return true
+		}
+	}
+	return false
+}
+
 // IsConst mirrors Variable::is_const → qfer is_const_after_deref(0).
 func (v *Variable) IsConst() bool {
 	if v == nil {
