@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // Variable mirrors Variable for non-array, non-field cases first.
 type Variable struct {
 	Name string
@@ -170,4 +172,88 @@ func (v *Variable) CollectExpandable() []*Variable {
 		out = append(out, f.CollectExpandable()...)
 	}
 	return out
+}
+
+// HashOutput mirrors Variable::hash for compute_hash path.
+// Variable.cpp:889–923 — aggregates recurse fields; simple transparent_crc;
+// float uses transparent_crc_bytes; pointers emit nothing.
+// FactUnion readability omitted (hash all union fields).
+func (v *Variable) HashOutput() string {
+	if v == nil || v.Type == nil {
+		return ""
+	}
+	if v.IsArray && len(v.ArraySizes) > 0 {
+		return hashArrayVariable(v)
+	}
+	if v.Type.IsAggregate() {
+		var b strings.Builder
+		for _, f := range v.FieldVars {
+			b.WriteString(f.HashOutput())
+		}
+		return b.String()
+	}
+	if v.Type.IsSimple() {
+		if v.Type.IsFloat() {
+			return "    transparent_crc_bytes (&" + v.Name + ", sizeof(" + v.Name + "), \"" + v.Name + "\", print_hash_value);\n"
+		}
+		return "    transparent_crc(" + v.Name + ", \"" + v.Name + "\", print_hash_value);\n"
+	}
+	// ePointer: no hash (Variable.cpp:921–922)
+	return ""
+}
+
+// hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
+// ArrayVariable.cpp:735+ simplified — int index vars i0..; no FactUnion exclude.
+func hashArrayVariable(v *Variable) string {
+	if v == nil || len(v.ArraySizes) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	// declare index vars
+	for i := range v.ArraySizes {
+		b.WriteString("    int i" + itoa(i) + ";\n")
+	}
+	// nested for loops
+	indent := "    "
+	for i, sz := range v.ArraySizes {
+		iv := "i" + itoa(i)
+		b.WriteString(indent + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		b.WriteString(indent + "{\n")
+		indent += "    "
+	}
+	// element access g_1[i0][i1]
+	access := v.Name
+	nameStr := v.Name
+	for i := range v.ArraySizes {
+		access += "[i" + itoa(i) + "]"
+		nameStr += "[i" + itoa(i) + "]"
+	}
+	// subfields for aggregate elements
+	if v.Type != nil && v.Type.IsAggregate() {
+		// use field vars naming: Name.f0 — but array field vars may not exist;
+		// emit int subfields from type.Fields
+		j := 0
+		for _, f := range v.Type.Fields {
+			if f.Type == nil || f.BitWidth == 0 {
+				continue
+			}
+			if f.Type.IsSimple() && !f.Type.IsFloat() {
+				fn := ".f" + itoa(j)
+				b.WriteString(indent + "transparent_crc(" + access + fn + ", \"" + nameStr + fn + "\", print_hash_value);\n")
+			}
+			j++
+		}
+	} else if v.Type != nil && v.Type.IsSimple() {
+		if v.Type.IsFloat() {
+			b.WriteString(indent + "transparent_crc_bytes (&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
+		} else {
+			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
+		}
+	}
+	// close braces
+	for range v.ArraySizes {
+		indent = indent[:len(indent)-4]
+		b.WriteString(indent + "}\n")
+	}
+	return b.String()
 }

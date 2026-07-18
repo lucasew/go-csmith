@@ -231,7 +231,23 @@ func (g *ProgramGenerator) OutputFunctions() string {
 	return b.String()
 }
 
-// OutputMain mirrors OutputMgr::OutputMain (no extension, simplified hash).
+// HashGlobalVariables mirrors VariableSelector::HashGlobalVariables.
+// VariableSelector.cpp:1613–1615 — MapVariableList(GlobalList, HashVariable).
+func HashGlobalVariables(vs *VariableSelector) string {
+	if vs == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, v := range vs.GlobalList {
+		if v == nil {
+			continue
+		}
+		b.WriteString(v.HashOutput())
+	}
+	return b.String()
+}
+
+// OutputMain mirrors OutputMgr::OutputMain (no extension).
 // OutputMgr.cpp:92–153.
 func (g *ProgramGenerator) OutputMain() string {
 	if g.Opts.NoMain {
@@ -264,13 +280,9 @@ func (g *ProgramGenerator) OutputMain() string {
 		b.WriteString("();\n")
 	}
 	if g.Opts.ComputeHash {
-		for _, v := range g.VS.GlobalList {
-			if v == nil {
-				continue
-			}
-			// HashGlobalVariables simplified: transparent_crc for integers
-			b.WriteString(fmt.Sprintf("    transparent_crc(%s, \"%s\", print_hash_value);\n", v.Name, v.Name))
-		}
+		// HashGlobalVariables → Variable::hash / ArrayVariable::hash
+		// VariableSelector.cpp:1613–1615
+		b.WriteString(HashGlobalVariables(g.VS))
 		b.WriteString("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
 	} else {
 		b.WriteString("    platform_main_end(0,0);\n")

@@ -110,11 +110,23 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	if noConst {
 		f.Add(int(TermConstant))
 	}
+	// Expression.cpp:166–175 — struct/union cannot be constant subexpr; func gated by return flags
+	if typ != nil && (typ.IsStruct() || typ.IsUnion()) {
+		f.Add(int(TermConstant))
+		if typ.IsStruct() && !opts.ReturnStructs {
+			f.Add(int(TermFunction))
+		}
+		if typ.IsUnion() && !opts.ReturnUnions {
+			f.Add(int(TermFunction))
+		}
+		if typ.IsConstStructUnion() || typ.IsVolatileStructUnion() {
+			f.Add(int(TermAssignment))
+		}
+	}
 	// depth gate: Expression.cpp:177–178
 	if exprDepth+2 > opts.MaxExprComplexity {
 		f.Add(int(TermFunction)).Add(int(TermAssignment)).Add(int(TermCommaExpr))
 	}
-	_ = typ // struct/union filters deferred
 	return ExpressionTypeProbability(r, f)
 }
 

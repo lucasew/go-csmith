@@ -102,6 +102,40 @@ func (t *Type) IsAggregate() bool {
 	return t != nil && (t.isStruct || t.isUnion)
 }
 
+// IsConstStructUnion mirrors Type::is_const_struct_union.
+// Type.cpp:437–451 — any field const or nested const aggregate.
+func (t *Type) IsConstStructUnion() bool {
+	if t == nil || !t.IsAggregate() {
+		return false
+	}
+	for _, f := range t.Fields {
+		if f.Type != nil && f.Type.IsConstStructUnion() {
+			return true
+		}
+		if f.Qfer.IsConst() {
+			return true
+		}
+	}
+	return false
+}
+
+// IsVolatileStructUnion mirrors Type::is_volatile_struct_union.
+// Type.cpp:454+.
+func (t *Type) IsVolatileStructUnion() bool {
+	if t == nil || !t.IsAggregate() {
+		return false
+	}
+	for _, f := range t.Fields {
+		if f.Type != nil && f.Type.IsVolatileStructUnion() {
+			return true
+		}
+		if f.Qfer.IsVolatile() {
+			return true
+		}
+	}
+	return false
+}
+
 // Simple returns the eSimpleType (only meaningful if IsSimple).
 func (t *Type) Simple() ESimpleType {
 	if t == nil {
