@@ -11,8 +11,15 @@ func TestAddEffect(t *testing.T) {
 	if !m.IsRead(a) || !m.IsWritten(b) {
 		t.Fatal("union")
 	}
-	if m.IsSideEffectFree() {
-		t.Fatal("write clears se-free")
+	// non-vol write does not clear SE-free (Effect.cpp:144–145)
+	if !m.IsSideEffectFree() {
+		t.Fatal("non-vol stays SE-free")
+	}
+	// volatile write in add_effect union clears SE-free
+	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
+	m2 := EmptyEffect().AddEffect(EmptyEffect().WriteVar(vol))
+	if m2.IsSideEffectFree() {
+		t.Fatal("vol write clears SE-free")
 	}
 }
 

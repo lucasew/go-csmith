@@ -222,28 +222,33 @@ func (e Effect) LhsWriteVars() []*Variable {
 	return out
 }
 
-// WriteVar mirrors Effect::write_var — marks impure and records write.
-// Effect.cpp write_var path (simplified, no partial/field).
+// WriteVar mirrors Effect::write_var.
+// Effect.cpp:137–146 — record write; SE-free &= !volatile && !access_once;
+// pure left unchanged (upstream "pure = pure").
 func (e Effect) WriteVar(v *Variable) Effect {
-	e.pure = false
-	e.sideEffectFree = false
-	if v != nil {
-		if e.written == nil {
-			e.written = make(map[*Variable]bool)
-		}
-		// copy-on-write for value semantics
-		nw := make(map[*Variable]bool, len(e.written)+1)
-		for k, val := range e.written {
-			nw[k] = val
-		}
-		nw[v] = true
-		e.written = nw
+	if v == nil {
+		return e
+	}
+	if e.written == nil {
+		e.written = make(map[*Variable]bool)
+	}
+	// copy-on-write for value semantics
+	nw := make(map[*Variable]bool, len(e.written)+1)
+	for k, val := range e.written {
+		nw[k] = val
+	}
+	nw[v] = true
+	e.written = nw
+	// Effect.cpp:144–145 — SE-free means volatile/access_once free
+	if v.IsVolatile() || v.IsAccessOnce {
+		e.sideEffectFree = false
 	}
 	return e
 }
 
-// ReadVar mirrors Effect::read_var — records a read (does not alone clear SE-free).
-// Effect.cpp read_var path (simplified).
+// ReadVar mirrors Effect::read_var.
+// Effect.cpp:116–122 — record read; pure &= const&&!vol&&!access_once;
+// SE-free &= !vol&&!access_once.
 func (e Effect) ReadVar(v *Variable) Effect {
 	if v == nil {
 		return e
@@ -254,6 +259,13 @@ func (e Effect) ReadVar(v *Variable) Effect {
 	}
 	nr[v] = true
 	e.read = nr
+	// Effect.cpp:120–121
+	if !(v.IsConst() && !v.IsVolatile() && !v.IsAccessOnce) {
+		e.pure = false
+	}
+	if v.IsVolatile() || v.IsAccessOnce {
+		e.sideEffectFree = false
+	}
 	return e
 }
 

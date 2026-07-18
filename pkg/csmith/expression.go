@@ -495,7 +495,7 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 	return makeExpressionVariableFlags(r, vs, cg, typ, qfer, false, false)
 }
 
-// makeExpressionVariableFlags adds as_param / as_return restrictions (ExpressionVariable.cpp:99–117).
+// makeExpressionVariableFlags adds as_param / as_return restrictions (ExpressionVariable.cpp:56–142).
 func makeExpressionVariableFlags(
 	r *Rng,
 	vs *VariableSelector,
@@ -507,8 +507,15 @@ func makeExpressionVariableFlags(
 	if vs == nil {
 		return nil
 	}
-	// try several selects if filtered
-	for tries := 0; tries < 8; tries++ {
+	// ExpressionVariable.cpp:67–69 — snapshot effects for visit_facts failure restore
+	var preAccum, preStm Effect
+	if cg.EffectAccum != nil {
+		preAccum = cg.EffectAccum.Clone()
+	}
+	preStm = cg.EffectStm.Clone()
+	// try several selects if filtered (dummy exclusion)
+	var dummy []*Variable
+	for tries := 0; tries < 16; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, cg, typ, qfer)
 		if v == nil {
@@ -517,46 +524,67 @@ func makeExpressionVariableFlags(
 		if v == nil {
 			return nil
 		}
+		// skip already rejected (ExpressionVariable.cpp:131 dummy.push_back)
+		skip := false
+		for _, d := range dummy {
+			if d == v {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
 		if typ != nil && v.Type != nil {
-			// as_param: forbid address-of argument (is_dereferenced_from desired type)
-			if asParam && v.IsArgument() && typ.PtrType() != nil && typ.Match(v.Type, MatchDereference) {
+			// ExpressionVariable.cpp:93–94 — no float var for non-float want
+			if !typ.IsFloat() && v.Type.IsFloat() {
+				dummy = append(dummy, v)
 				continue
 			}
-			// !addr_taken_of_locals: forbid & of local/arg when desired is pointer-to-var
-			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) {
-				if typ.IndirectLevel() < v.Type.IndirectLevel() {
-					if v.Type.IndirectLevel()-typ.IndirectLevel() < 0 {
-						continue
-					}
-				}
+			// as_param: forbid address-of argument (ExpressionVariable.cpp:97–100)
+			if asParam && v.IsArgument() && typ.IsDereferencedFrom(v.Type) {
+				dummy = append(dummy, v)
+				continue
+			}
+			// !addr_taken_of_locals: forbid & of local/arg (ExpressionVariable.cpp:101–105)
+			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
+				typ.IsDereferencedFrom(v.Type) {
+				dummy = append(dummy, v)
+				continue
 			}
 			// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
-			if asReturn && vs.Opts.NoReturnDeadPointer && v.IsPointer() {
+			if asReturn && vs.Opts.NoReturnDeadPointer {
 				indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
 				var facts []*FactPointTo
 				if cg.FM != nil {
 					facts = cg.FM.GlobalFacts
 				}
 				if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
+					dummy = append(dummy, v)
 					continue
 				}
 			}
-			// ExpressionVariable.cpp:118–119 — opportunistic_validate when FactMgr present
-			if cg.FM != nil && v.Type.IndirectLevel() > typ.IndirectLevel() {
+			// ExpressionVariable.cpp:116–119 — opportunistic_validate
+			if cg.FM != nil {
 				if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+					dummy = append(dummy, v)
 					continue
 				}
 			}
 		}
 		ev := &Expression{Term: TermVariable, Var: v, ExprType: typ}
-		// ExpressionVariable::visit_facts when FactMgr present
+		// ExpressionVariable.cpp:120–128 — visit_facts; restore effects on fail
 		if cg.FM != nil {
 			cgp := &cg
 			if !cgp.VisitFactsExpressionVariable(ev, vs.Opts) {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				dummy = append(dummy, v)
 				continue
 			}
 		} else {
-			// Effect::read_var for selected variable (no fact walk)
 			cg.NoteRead(v)
 		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
@@ -564,7 +592,6 @@ func makeExpressionVariableFlags(
 		if deref > 0 {
 			IncrCounter(&readDereferenceCnts, deref)
 		} else if deref < 0 {
-			// address-of: mark at generation time (not emit)
 			RecordAddressTaken(v)
 		}
 		RecordVolatileAccess(v, deref, false)
