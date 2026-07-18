@@ -110,6 +110,10 @@ func (fi *Invocation) outputUnary(a0 string) string {
 			return fmt.Sprintf("(-%s)", a0)
 		}
 		fname := fi.Safe.UnaryMinusFuncName()
+		// SafeOpFlags.cpp:325 assert / empty name → cast path (no invent wrapper name)
+		if fname == "" {
+			return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+		}
 		id := SafeOpFlagsToID(fname)
 		// FunctionInvocationUnary.cpp:208–218 — safe_math_wrapper filter
 		if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {

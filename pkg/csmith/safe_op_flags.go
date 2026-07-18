@@ -402,13 +402,18 @@ func safeFloatFuncString(op string) string {
 // UnaryMinusFuncName mirrors to_string(eMinus).
 // SafeOpFlags.cpp:323–341 — no float unary safe function.
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
+	// live flags required; no soft invent int32 name for nil
 	if f == nil {
-		return "safe_unary_minus_func_int32_t_s"
+		return ""
 	}
-	// SafeOpFlags.cpp:324 — assert no float unary
+	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); no invent int32 fallback
 	if f.Size == SafeFloat {
-		// fall back to int32 signed if misconfigured
-		return "safe_unary_minus_func_int32_t_s"
+		return ""
+	}
+	sz := f.SizeToken()
+	if sz == "" {
+		// invalid size assert path
+		return ""
 	}
 	var b strings.Builder
 	b.WriteString("safe_unary_minus_")
@@ -417,7 +422,7 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	} else {
 		b.WriteString("macro_")
 	}
-	b.WriteString(f.SizeToken())
+	b.WriteString(sz)
 	if f.Op1Signed {
 		b.WriteString("_s")
 	} else {

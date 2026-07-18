@@ -73,6 +73,22 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	}
 }
 
+func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
+	// Constant.cpp:488–493 — expand_struct → true; else false
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	c := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	if c.CompatibleWithVar(v, false) {
+		t.Fatal("without expand_struct constant incompatible")
+	}
+	if !c.CompatibleWithVar(v, true) {
+		t.Fatal("expand_struct → true")
+	}
+	// assert(v) — nil var fail closed
+	if c.CompatibleWithVar(nil, true) {
+		t.Fatal("nil var")
+	}
+}
+
 func TestExpressionGetQualifiersIndirect(t *testing.T) {
 	// ExpressionVariable.cpp:194–196 — qfer.indirect_qualifiers(deref)
 	// Layout [ptr_level, storage]; deref pops storage (Lhs test: remaining [false])

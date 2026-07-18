@@ -44,6 +44,7 @@ type Expression struct {
 // ExpressionFuncall.cpp:206–207 — invoke.compatible(v) (unary operand only);
 // default / other terms false.
 func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
+	// Constant.cpp:489 / ExpressionVariable.cpp:289 — assert(v)
 	if e == nil || v == nil {
 		return false
 	}
@@ -61,6 +62,10 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 			return false
 		}
 		return e.Var.Compatible(v, expandStruct)
+	case TermConstant:
+		// Constant.cpp:488–493 — assert(v); expand_struct → true; else false
+		// no soft invent field-var special cases beyond expand_struct
+		return expandStruct
 	default:
 		return false
 	}

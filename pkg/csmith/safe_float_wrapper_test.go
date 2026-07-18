@@ -49,9 +49,9 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	if !f.Op1Signed || !f.Op2Signed {
 		t.Fatal("float unary always signed")
 	}
-	// no float unary safe wrapper — UnaryMinusFuncName falls back to int32
-	if name := f.UnaryMinusFuncName(); name != "safe_unary_minus_func_int32_t_s" {
-		t.Fatalf("unary minus name %q", name)
+	// SafeOpFlags.cpp:325 — assert no float unary; fail closed empty (no invent int32)
+	if name := f.UnaryMinusFuncName(); name != "" {
+		t.Fatalf("float unary must fail closed, got %q", name)
 	}
 }
 
@@ -68,6 +68,14 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 	name := f.UnaryMinusFuncName()
 	if !strings.HasPrefix(name, "safe_unary_minus_func_") {
 		t.Fatalf("%q", name)
+	}
+}
+
+func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
+	// no soft invent default int32 name for nil flags
+	var f *SafeOpFlags
+	if f.UnaryMinusFuncName() != "" {
+		t.Fatal("nil flags must fail closed")
 	}
 }
 

@@ -308,8 +308,15 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 // GenerateRandomConstantInRange mirrors GenerateRandomConstantInRange for bitfields.
 // Constant.cpp:225–250 — small random value within ~2^(bound/2).
 func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) string {
-	// Constant.cpp:225+ — pure_rnd_*; no soft invent NewRng(0)
-	if r == nil {
+	// Constant.cpp:222–246 — GenerateRandomConstantInRange
+	// Constant.cpp:223 — assert(type->eType == eSimple)
+	// Constant.cpp:226–245 — only eInt / eUInt; else assert(0)
+	if r == nil || typ == nil || !typ.IsSimple() {
+		return ""
+	}
+	st := typ.Simple()
+	if st != EInt && st != EUInt {
+		// assert(0) for other simples — no soft invent generic decimal
 		return ""
 	}
 	if bound <= 0 {
@@ -329,25 +336,18 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 		bmax = 1
 	}
 	num := int(r.RndUpto(bmax))
-	signed := typ != nil && typ.IsSimple() && typ.IsSigned()
-	if signed && r.RndFlipcoin(50) {
+	// Constant.cpp:226–235 — eInt may negate; eUInt stays non-negative
+	if st == EInt && r.RndFlipcoin(50) {
 		num = -num
 	}
-	// format as small constant for field type
-	if typ != nil && typ.IsSimple() {
-		return formatSmallConstant(typ.Simple(), num, opts)
-	}
-	if num < 0 {
-		return fmt.Sprintf("%d", num)
-	}
-	return fmt.Sprintf("%d", num)
+	return formatSmallConstant(st, num, opts)
 }
 
 // MakeStructConstant mirrors GenerateRandomStructConstant.
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
+	// Constant.cpp:255 — assert(eStruct)
 	if st == nil || !st.isStruct {
-		// Constant.cpp assert(type); no soft invent MakeInt(0)
 		return nil
 	}
 	var b strings.Builder
@@ -358,13 +358,9 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 		if f.BitWidth == 0 {
 			continue
 		}
-		if !first {
-			b.WriteString(", ")
-		}
-		first = false
 		var val string
 		if f.BitWidth > 0 {
-			// bitfield: GenerateRandomConstantInRange
+			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
 		} else if f.Type != nil && f.Type.IsStruct() {
 			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
@@ -380,7 +376,14 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 				val = c.Value
 			}
 		}
-		// nil field type / failed GenerateRandomConstant — empty (no invent "0")
+		// Constant.cpp ERROR_GUARD("") on empty field — fail whole struct, no invent hole
+		if val == "" {
+			return nil
+		}
+		if !first {
+			b.WriteString(", ")
+		}
+		first = false
 		b.WriteString(val)
 	}
 	b.WriteString("}")
@@ -583,6 +586,10 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 		if c := MakeRandom(f0.Type, opts, r); c != nil {
 			val = c.Value
 		}
+	}
+	// ERROR_GUARD on empty first field — no invent "{}"
+	if val == "" {
+		return nil
 	}
 	return &Constant{Type: ut, Value: "{" + val + "}"}
 }
