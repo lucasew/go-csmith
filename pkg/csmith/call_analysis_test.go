@@ -154,12 +154,15 @@ func TestPostCreationAssignFacts(t *testing.T) {
 }
 
 func TestPostCreationUncertainFunc1(t *testing.T) {
+	// Statement.cpp:868–871 — assert(validate) when func_1 uncertain revalidate fails
+	ClearError()
+	defer ClearError()
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	// assign with RHS uncertain call (two call args)
+	// assign with RHS uncertain call (two call args) — incomplete user IR fails visit
 	a := userCall("func_a")
 	b := userCall("func_b")
 	rhs := &Expression{
@@ -179,8 +182,9 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 		t.Fatal("expect uncertain")
 	}
 	PostCreationAnalysis(st, nil, EmptyEffect(), &cg, Defaults())
-	if !fm.MapVisited[9] {
-		t.Fatal("visited")
+	// incomplete call tree fails validate → sticky error (no soft invent continue)
+	if !HasError() {
+		t.Fatal("validate fail must set sticky error like assert(0)")
 	}
 }
 

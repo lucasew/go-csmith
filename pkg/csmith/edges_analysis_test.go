@@ -81,6 +81,7 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 }
 
 func TestFindFixedPointBlock(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	b := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},

@@ -99,6 +99,7 @@ func TestShortcutConflict(t *testing.T) {
 }
 
 func TestValidateAndUpdateFacts(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},

@@ -164,10 +164,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 			}
-			if ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock()) {
-				fm.GlobalFacts = outputs
-				specialHandled = true
+			// Statement.cpp:868–871 — assert(validate); no soft invent skip special path
+			if !ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock()) {
+				SetError(ErrGeneric)
+				return
 			}
+			fm.GlobalFacts = outputs
+			specialHandled = true
 		}
 	}
 	if !specialHandled {
@@ -229,7 +232,9 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
 		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
 			if cnt++; cnt > 7 {
-				// Block.cpp:526–530 — assert(0) when too many iterations; no soft invent success
+				// Block.cpp:526–530 — assert(0) when too many iterations; sticky error
+				// no soft invent success / silent false without ERROR for callers
+				SetError(ErrGeneric)
 				return currentInputs, -1, false
 			}
 			for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
