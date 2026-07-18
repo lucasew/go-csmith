@@ -422,19 +422,10 @@ func selectDerefPointerInv(
 	if typ == nil || r == nil {
 		return nil
 	}
-	// VariableSelector.cpp:1252–1266 — GlobalNonvolatiles + block locals + params
+	// VariableSelector.cpp:1252–1266 — GlobalNonvolatilesList only (no GlobalList soft-fallback)
 	var cands []*Variable
 	if vs != nil {
-		if len(vs.GlobalNonvolatilesList) > 0 {
-			cands = append(cands, vs.GlobalNonvolatilesList...)
-		} else {
-			// fallback if list not tracked yet
-			for _, g := range vs.GlobalList {
-				if g != nil && !g.IsVolatile() {
-					cands = append(cands, g)
-				}
-			}
-		}
+		cands = append(cands, vs.GlobalNonvolatilesList...)
 	}
 	var blk *Block
 	if cg.CurrentFunc != nil {

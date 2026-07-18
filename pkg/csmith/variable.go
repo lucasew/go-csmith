@@ -1146,7 +1146,7 @@ func hashArrayHasPayload(v *Variable) bool {
 // Union array elements: exclude unreadable fields when unionFacts non-nil
 // (ArrayVariable.cpp:741–752).
 // Skips arrays with no hashable payload (e.g. pointer element type).
-// ctrl nil → synthesize letter names for standalone HashOutput.
+// ArrayVariable.cpp:763 — get_last_ctrl_vars only (no letter-name soft-fallback).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
 	if v == nil || len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
 		return ""
@@ -1154,14 +1154,16 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	if ctrl == nil {
 		ctrl = GetLastCtrlVars()
 	}
+	if len(ctrl) < len(v.ArraySizes) {
+		// C++ assumes last_ctrl_vars sized for dimension after OutputArrayInitializers
+		return ""
+	}
 	names := make([]string, len(v.ArraySizes))
 	for i := range v.ArraySizes {
-		if i < len(ctrl) && ctrl[i] != nil {
-			names[i] = ctrl[i].GetActualName(false)
-		} else {
-			// fallback letter names matching new_ctrl_vars
-			names[i] = string([]byte{byte('i' + i)})
+		if ctrl[i] == nil {
+			return ""
 		}
+		names[i] = ctrl[i].GetActualName(false)
 	}
 	var b strings.Builder
 	indent := "    "
