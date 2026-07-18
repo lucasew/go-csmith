@@ -209,13 +209,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			// taking address: point to the var itself (collective)
 			return MakeFactsPointTo(lvars, rhs.Var.GetCollective())
 		}
-		// copy pointees of RHS pointer (indirect+1 merge simplified to fact set)
-		src := FindRelatedPointTo(facts, rhs.Var.GetCollective())
-		if src == nil {
-			// unknown → garbage
+		// FactPointTo.cpp:223–226 — merge_pointees(collective, indirect+1)
+		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
+		if len(set) == 0 {
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
-		return MakeFactsPointToSet(lvars, src.PointTo)
+		return MakeFactsPointToSet(lvars, set)
 	default:
 		// function/assign/comma — conservative garbage
 		return MakeFactsPointTo(lvars, GarbagePtr)
@@ -342,8 +341,46 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	return MakeFactPointToSet(f.Var, set)
 }
 
-// IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals (indirection≥0 subset).
-// FactPointTo.cpp:487–526 — indirection -1 → IsVisibleLocal; 0 → fact pointees local.
+// MergePointeesOfPointers mirrors FactPointTo::merge_pointees_of_pointers.
+// FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
+func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
+	var out []*Variable
+	seen := make(map[*Variable]bool)
+	for _, p := range ptrs {
+		if p == nil || IsSpecialPtr(p) {
+			continue
+		}
+		ft := FindRelatedPointTo(facts, p)
+		if ft == nil {
+			continue
+		}
+		for _, pointee := range ft.PointTo {
+			if pointee == nil || seen[pointee] {
+				continue
+			}
+			seen[pointee] = true
+			out = append(out, pointee)
+		}
+	}
+	return out
+}
+
+// MergePointeesOfPointer mirrors FactPointTo::merge_pointees_of_pointer.
+// FactPointTo.cpp:669–676 — start from ptr, indirect steps of merge_pointees.
+func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
+	if ptr == nil {
+		return nil
+	}
+	tmp := []*Variable{ptr}
+	for indirect > 0 {
+		tmp = MergePointeesOfPointers(tmp, facts)
+		indirect--
+	}
+	return tmp
+}
+
+// IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals.
+// FactPointTo.cpp:487–526.
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
 		return false
@@ -354,30 +391,33 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	if !v.IsPointer() {
 		return false
 	}
-	// indirection==0: look at points-to set; higher levels deferred (merge_pointees)
+	var pointees []*Variable
 	if indirection == 0 {
 		ft := FindRelatedPointTo(facts, v)
 		if ft == nil {
 			return false
 		}
-		for _, p := range ft.PointTo {
-			if p == nil || IsSpecialPtr(p) {
-				continue
-			}
-			if p.IsVisibleLocal(b) {
-				return true
-			}
+		pointees = ft.PointTo
+	} else {
+		pointees = MergePointeesOfPointer(v, indirection, facts)
+	}
+	for _, p := range pointees {
+		if p == nil || IsSpecialPtr(p) {
+			continue
 		}
-		return false
-	}
-	// multi-level: treat like indirection 0 for now (no merge_pointees yet)
-	ft := FindRelatedPointTo(facts, v)
-	if ft == nil {
-		return false
-	}
-	for _, p := range ft.PointTo {
-		if p != nil && !IsSpecialPtr(p) && p.IsVisibleLocal(b) {
+		if p.IsVisibleLocal(b) {
 			return true
+		}
+		// recurse one level of pointees that are pointers
+		if p.IsPointer() {
+			for j := 0; j < p.Type.IndirectLevel(); j++ {
+				nested := MergePointeesOfPointer(p, j+1, facts)
+				for _, n := range nested {
+					if n != nil && !IsSpecialPtr(n) && n.IsVisibleLocal(b) {
+						return true
+					}
+				}
+			}
 		}
 	}
 	return false

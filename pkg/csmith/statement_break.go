@@ -3,9 +3,7 @@
 package csmith
 
 // MakeRandomBreak mirrors StatementBreak::make_random.
-// StatementBreak.cpp:59–82 — Expression::make_random(int, no_func, no_const, eVariable);
-// emit as if (test) break;
-// Requires IN_LOOP (caller StatementFilter). Closest looping block bookkeeping deferred.
+// StatementBreak.cpp:59–82 — closest looping block; test expr; break_stms push.
 func MakeRandomBreak(
 	r *Rng,
 	opts Options,
@@ -17,11 +15,24 @@ func MakeRandomBreak(
 	if r == nil {
 		return st
 	}
+	// find closest looping parent (StatementBreak.cpp:71–75)
+	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// Expression::make_random(..., true, true, eVariable)
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {
 		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
 	}
 	st.Expr = expr
+	if st.StmID == 0 {
+		st.StmID = AllocStmID()
+	}
+	// Block::break_stms.push_back (StatementBreak.cpp:81)
+	if loop != nil {
+		loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)
+		// break exits to after loop — post_dest true, back_link false (common shape)
+		if cg.FM != nil {
+			cg.FM.CreateCFGEdge(st.StmID, loop, true, false)
+		}
+	}
 	return st
 }

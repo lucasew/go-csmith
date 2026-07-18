@@ -59,6 +59,8 @@ type Block struct {
 	EmitDepthProtect bool
 	// EmitStepHash: emit step_hash(stm_id) before each stmt (CGOptions::step_hash_by_stmt).
 	EmitStepHash bool
+	// BreakStmIDs mirrors Block::break_stms (stm_id list).
+	BreakStmIDs []int
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.

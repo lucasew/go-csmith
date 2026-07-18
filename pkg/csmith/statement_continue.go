@@ -3,13 +3,7 @@
 package csmith
 
 // MakeRandomContinue mirrors StatementContinue::make_random.
-// StatementContinue.cpp:59–84 —
-//
-//	reject if block has no prior statement (first stmt);
-//	Expression::make_random(int, no_func, no_const, eVariable);
-//	emit if (test) continue;
-//
-// CFG edge to loop head deferred (FactMgr).
+// StatementContinue.cpp:59–84 — first-stmt reject; closest loop; cfg_edge back_link.
 func MakeRandomContinue(
 	r *Rng,
 	opts Options,
@@ -27,10 +21,18 @@ func MakeRandomContinue(
 	if r == nil {
 		return st
 	}
+	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {
 		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
 	}
 	st.Expr = expr
+	if st.StmID == 0 {
+		st.StmID = AllocStmID()
+	}
+	// FactMgr::create_cfg_edge(sc, b, false, true) — StatementContinue.cpp:83
+	if loop != nil && cg.FM != nil {
+		cg.FM.CreateCFGEdge(st.StmID, loop, false, true)
+	}
 	return st
 }

@@ -11,6 +11,8 @@ type FactMgr struct {
 	GlobalFacts []*FactPointTo
 	// UnionFacts is FactUnion subset of global_facts.
 	UnionFacts []*FactUnion
+	// CFGEdges mirrors cfg_edges.
+	CFGEdges []*CFGEdge
 }
 
 // NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
@@ -124,6 +126,43 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 		}
 	}
 	return append(facts, f)
+}
+
+// CreateCFGEdge mirrors FactMgr::create_cfg_edge.
+// FactMgr.cpp:597–598.
+func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool) {
+	if fm == nil || dest == nil || srcID == 0 {
+		return
+	}
+	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{
+		SrcID:     srcID,
+		DestBlock: dest,
+		PostDest:  postDest,
+		BackLink:  backLink,
+	})
+}
+
+// MakeupNewVarFacts mirrors FactMgr::makeup_new_var_facts.
+// FactMgr.cpp:494–507 — add facts for globals/locals created after old_facts snapshot.
+func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
+	if oldFacts == nil {
+		return
+	}
+	for _, f := range newFacts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		v := f.Var
+		if !v.IsGlobal() && !v.IsLocal() {
+			continue
+		}
+		if FindRelatedPointTo(*oldFacts, v) == nil {
+			// add_new_var_fact into old set
+			if v.IsPointer() {
+				*oldFacts = append(*oldFacts, NewFactPointTo(v))
+			}
+		}
+	}
 }
 
 // FindDanglingGlobalPtrs mirrors FactMgr::find_dangling_global_ptrs.
