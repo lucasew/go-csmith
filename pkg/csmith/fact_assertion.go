@@ -167,6 +167,56 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	return b.String()
 }
 
+// PreOutput mirrors Statement::pre_output.
+// Statement.cpp:905–917 — if goto target emit "label:" [attrs]; else output_hash.
+// isGotoTarget true means step_hash was not emitted (C++ returns 1 after label).
+//
+// Label resolution: FindJumpLabel from CFG (find_jump_sources), else SourceLabel
+// set at generation (library path when edges incomplete).
+func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
+	if st == nil {
+		return "", false
+	}
+	label := ""
+	// Statement.cpp:908–914 — find_jump_sources → first goto label
+	if fm != nil && st.StmID > 0 {
+		if srcs := fm.FindJumpSources(st.StmID); len(srcs) > 0 {
+			label = FindJumpLabel(fm, st.StmID)
+			// resolve from source stmt when FindJumpLabel missed registry
+			if label == "" && fm.Func != nil {
+				if src := FindStmtByID(fm.Func, srcs[0]); src != nil {
+					label = src.Label
+				}
+			}
+		}
+	}
+	if label == "" {
+		label = st.SourceLabel
+	}
+	if label != "" {
+		var b strings.Builder
+		b.WriteString(indent)
+		b.WriteString(label)
+		b.WriteString(":")
+		attr := st.LabelAttr
+		if attr == "" && emitLabelAttrs && attrRng != nil {
+			attr = EnsureLabelAttrGenerator().Output(attrRng)
+		}
+		if attr != "" {
+			b.WriteString(attr)
+		}
+		b.WriteString("\n")
+		// Statement.cpp:905–914 — return 1 after label (no output_hash)
+		return b.String(), true
+	}
+	// Statement.cpp:916 — output_hash when not a jump target
+	// Statement.cpp:927–931 / OutputMgr.cpp:161–167
+	if emitStepHash && st.StmID > 0 {
+		return indent + "step_hash(" + Int2Str(st.StmID) + ");\n", false
+	}
+	return "", false
+}
+
 // PostOutput mirrors Statement::post_output.
 // Statement.cpp:919–924 — paranoid assertions after non-block statements.
 func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, indent string) string {

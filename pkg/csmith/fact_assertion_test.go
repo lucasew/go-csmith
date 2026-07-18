@@ -93,3 +93,59 @@ func TestIsTopEmpty(t *testing.T) {
 		t.Fatal("empty is top")
 	}
 }
+
+func TestPreOutputLabelSkipsStepHash(t *testing.T) {
+	// Statement.cpp:905–917 — jump target emits label, not step_hash
+	st := &Stmt{Kind: StmtAssign, StmID: 5, SourceLabel: "lbl_1"}
+	out, tgt := PreOutput(st, nil, true, false, nil, "    ")
+	if !tgt || !strings.Contains(out, "lbl_1:") {
+		t.Fatal(out, tgt)
+	}
+	if strings.Contains(out, "step_hash") {
+		t.Fatal("goto target must not step_hash", out)
+	}
+}
+
+func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
+	st := &Stmt{Kind: StmtAssign, StmID: 9}
+	out, tgt := PreOutput(st, nil, true, false, nil, "  ")
+	if tgt || out != "  step_hash(9);\n" {
+		t.Fatal(out, tgt)
+	}
+}
+
+func TestPreOutputFromCFGJumpSources(t *testing.T) {
+	f := &Function{Name: "f"}
+	body := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1},
+		{Kind: StmtGoto, StmID: 2, Label: "lbl_cfg", GotoDestStmID: 1},
+	}}
+	f.Blocks = []*Block{body}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 2, DestStmID: 1}}
+	st := &body.Stmts[0]
+	out, tgt := PreOutput(st, fm, true, false, nil, "")
+	if !tgt || !strings.Contains(out, "lbl_cfg:") {
+		t.Fatal(out, tgt)
+	}
+}
+
+func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
+	b := &Block{
+		EmitStepHash: true,
+		Stmts: []Stmt{
+			{Kind: StmtAssign, StmID: 3, SourceLabel: "lbl_x",
+				LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),
+				Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)},
+				AssignOp: AssignSimple},
+		},
+	}
+	out := b.Output(0)
+	if !strings.Contains(out, "lbl_x:") {
+		t.Fatal(out)
+	}
+	// labeled stmt should not have step_hash(3)
+	if strings.Contains(out, "step_hash(3)") {
+		t.Fatal("labeled target should skip hash", out)
+	}
+}

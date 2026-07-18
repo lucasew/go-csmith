@@ -3,7 +3,6 @@
 package csmith
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 )
@@ -660,34 +659,31 @@ func (b *Block) Output(indent int) string {
 		}
 	}
 	for _, st := range b.Stmts {
-		if st.SourceLabel != "" {
-			// Statement::pre_output — label: [attrs]\n
-			lab := st.SourceLabel + ":"
-			attr := st.LabelAttr
-			if attr == "" && b.EmitLabelAttrs && b.LabelAttrRng != nil {
-				attr = EnsureLabelAttrGenerator().Output(b.LabelAttrRng)
+		// Statement::pre_output — label from jump sources / SourceLabel, else step_hash
+		// Statement.cpp:905–917 — goto target skips output_hash
+		pre, isGotoTarget := PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
+		if pre != "" {
+			sb.WriteString(pre)
+		}
+		if isGotoTarget {
+			// StatementGoto::output_skipped_var_inits after dest label (library path;
+			// C++ pre_output has this commented out)
+			lab := st.SourceLabel
+			if lab == "" && b.EmitFM != nil && st.StmID > 0 {
+				lab = FindJumpLabel(b.EmitFM, st.StmID)
 			}
-			if attr != "" {
-				lab += attr
-			}
-			sb.WriteString(inner + lab + "\n")
-			// StatementGoto::output_skipped_var_inits after dest label
-			// StatementGoto.cpp:264–275 / pre_output comment path
-			for i := range b.Stmts {
-				g := &b.Stmts[i]
-				if g.Kind == StmtGoto && g.Label == st.SourceLabel && len(g.InitSkippedVars) > 0 {
-					sb.WriteString(OutputSkippedVarInits(g, inner))
+			if lab != "" {
+				for i := range b.Stmts {
+					g := &b.Stmts[i]
+					if g.Kind == StmtGoto && g.Label == lab && len(g.InitSkippedVars) > 0 {
+						sb.WriteString(OutputSkippedVarInits(g, inner))
+					}
 				}
 			}
 		}
 		if st.Kind == StmtLabel {
 			sb.WriteString(inner + "    ;\n")
 			continue
-		}
-		// Statement::pre_output / output_hash — step_hash(stm_id)
-		// Statement.cpp:927–931 / OutputMgr.cpp:161–167
-		if b.EmitStepHash && st.StmID > 0 {
-			sb.WriteString(inner + fmt.Sprintf("step_hash(%d);\n", st.StmID))
 		}
 		sb.WriteString(inner)
 		switch st.Kind {
