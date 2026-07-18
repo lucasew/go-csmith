@@ -5,7 +5,10 @@ import (
 )
 
 func TestVariableSelectionProbabilityRange(t *testing.T) {
+	// VariableSelector.cpp:110–122 InitScopeTable once; no invent table per draw
 	opts := Defaults()
+	InitScopeTable(opts)
+	defer SetProcessScopeTab(nil)
 	seen := map[VariableScope]bool{}
 	r := NewRng(2)
 	for i := 0; i < 200; i++ {
@@ -16,10 +19,23 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 	}
 }
 
+func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
+	// VariableSelector.cpp:1050 InitScopeTable required; no invent NewScopeThresholdTable
+	prev := ProcessScopeTab()
+	SetProcessScopeTab(nil)
+	defer SetProcessScopeTab(prev)
+	sc := VariableSelectionProbability(NewRng(1), Defaults())
+	if sc != MaxVarScope {
+		t.Fatalf("want MAX without InitScopeTable, got %v", sc)
+	}
+}
+
 func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	// VariableSelector.cpp:98–105 — ParentParam filtered when param.empty()
 	ClearError()
 	opts := Defaults()
+	InitScopeTable(opts)
+	defer SetProcessScopeTab(nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	// many draws with empty params: never ParentParam
@@ -48,6 +64,8 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 
 func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
+	InitScopeTable(opts)
+	defer SetProcessScopeTab(nil)
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{}
 	r := NewRng(3)

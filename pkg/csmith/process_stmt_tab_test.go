@@ -59,3 +59,21 @@ func TestGenerateSeed65WithProcessStmtTab(t *testing.T) {
 		t.Fatal("empty")
 	}
 }
+
+func TestEnsureAttrGeneratorsNoInvent(t *testing.T) {
+	// InitAttrGenerators required; no soft invent zero-opts generators
+	ClearAttrGenerators()
+	if EnsureVarAttrGenerator() != nil || EnsureFuncAttrGenerator() != nil {
+		t.Fatal("must not invent generators without InitAttrGenerators")
+	}
+	// Output nil-safe
+	if EnsureVarAttrGenerator().Output(NewRng(1)) != "" {
+		t.Fatal("nil Output must be empty")
+	}
+	opts := Defaults()
+	InitAttrGenerators(opts, NewProbabilities(opts))
+	if EnsureVarAttrGenerator() == nil {
+		t.Fatal("want generator after init")
+	}
+	ClearAttrGenerators()
+}

@@ -288,43 +288,34 @@ func InitAttrGenerators(opts Options, probs *Probabilities) {
 	unionTypeAttrGen = NewUnionTypeAttrGenerator(opts, probs)
 }
 
-// EnsureVarAttrGenerator lazy-inits Variable::var_attr_generator.
+// EnsureVarAttrGenerator returns Variable::var_attr_generator after InitAttrGenerators.
+// No soft invent NewVarAttrGenerator with zero opts when init was skipped
+// (C++ InitializeVariableAttributes runs from CreateVariable / generation start).
 func EnsureVarAttrGenerator() *AttributeGenerator {
-	if varAttrGenerator == nil {
-		varAttrGenerator = NewVarAttrGenerator(attrGeneratorsOpts, attrGeneratorsProbs)
-	}
 	return varAttrGenerator
 }
 
-// EnsureFuncAttrGenerator lazy-inits function attributes.
+// EnsureFuncAttrGenerator returns function attributes after InitAttrGenerators.
+// No soft invent generator when process init skipped.
 func EnsureFuncAttrGenerator() *AttributeGenerator {
-	if funcAttrGenerator == nil {
-		funcAttrGenerator = NewFuncAttrGenerator(attrGeneratorsOpts, attrGeneratorsProbs)
-	}
 	return funcAttrGenerator
 }
 
-// EnsureLabelAttrGenerator lazy-inits label attributes.
+// EnsureLabelAttrGenerator returns label attributes after InitAttrGenerators.
+// No soft invent generator when process init skipped.
 func EnsureLabelAttrGenerator() *AttributeGenerator {
-	if labelAttrGenerator == nil {
-		labelAttrGenerator = NewLabelAttrGenerator(attrGeneratorsOpts, attrGeneratorsProbs)
-	}
 	return labelAttrGenerator
 }
 
-// EnsureStructTypeAttrGenerator lazy-inits struct type attributes.
+// EnsureStructTypeAttrGenerator returns struct type attributes after InitAttrGenerators.
+// No soft invent generator when process init skipped.
 func EnsureStructTypeAttrGenerator() *AttributeGenerator {
-	if structTypeAttrGen == nil {
-		structTypeAttrGen = NewStructTypeAttrGenerator(attrGeneratorsOpts, attrGeneratorsProbs)
-	}
 	return structTypeAttrGen
 }
 
-// EnsureUnionTypeAttrGenerator lazy-inits union type attributes.
+// EnsureUnionTypeAttrGenerator returns union type attributes after InitAttrGenerators.
+// No soft invent generator when process init skipped.
 func EnsureUnionTypeAttrGenerator() *AttributeGenerator {
-	if unionTypeAttrGen == nil {
-		unionTypeAttrGen = NewUnionTypeAttrGenerator(attrGeneratorsOpts, attrGeneratorsProbs)
-	}
 	return unionTypeAttrGen
 }
 

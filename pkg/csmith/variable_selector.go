@@ -1880,9 +1880,13 @@ func NewScopeThresholdTable(opts Options) *ThresholdTable {
 // variableSelectFilter mirrors VariableSelectFilter.
 // VariableSelector.cpp:98–105 — reject eParentParam when parent.param.empty().
 // Filter true = reject (re-roll rnd_upto).
-func variableSelectFilter(opts Options, cg *CGContext) Filter {
-	tab := NewScopeThresholdTable(opts)
+// tab must be the live scopeTable_ (same instance as VariableSelectionProbabilityCG).
+func variableSelectFilter(tab *ThresholdTable, cg *CGContext) Filter {
 	return filterFunc(func(v uint32) bool {
+		if tab == nil {
+			// no soft invent scope mapping without InitScopeTable
+			return true
+		}
 		sc := VariableScope(tab.GetValue(int(v)))
 		if sc != ScopeParentParam {
 			return false
@@ -1909,8 +1913,15 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 	if r == nil {
 		return MaxVarScope
 	}
-	tab := NewScopeThresholdTable(opts)
-	filt := variableSelectFilter(opts, cg)
+	// VariableSelector.cpp:1050 — InitScopeTable(); use process scopeTable_ only
+	// (no invent NewScopeThresholdTable per draw)
+	tab := ProcessScopeTab()
+	if tab == nil {
+		// library path without InitScopeTable — fail closed MAX
+		_ = opts
+		return MaxVarScope
+	}
+	filt := variableSelectFilter(tab, cg)
 	// C++ unbounded do-while; cap high (no soft invent MAX early)
 	for tries := 0; tries < 256; tries++ {
 		i := r.RndUptoFilter(100, filt)

@@ -45,6 +45,8 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// C++ Statement static ProbabilityTable — one session table for Block::make_random
 	// and nested GenerateBody via FunctionInvocation (no invent second table mid-call)
 	SetProcessStmtTab(stmtTab)
+	// VariableSelector::InitScopeTable — scopeTable_ once per generation
+	InitScopeTable(opts)
 	g := &ProgramGenerator{
 		Opts:     opts,
 		Seed:     seed,
@@ -76,6 +78,8 @@ func (g *ProgramGenerator) Initialize() {
 		SetProcessRng(g.Rng)
 		SetProcessProbabilities(g.Probs)
 		SetProcessStmtTab(g.StmtTab)
+		// re-init scope table from session opts (InitScopeTable once semantics)
+		InitScopeTable(g.Opts)
 	}
 }
 

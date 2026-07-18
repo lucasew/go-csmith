@@ -29,12 +29,17 @@ import (
 // processStmtTab mirrors Statement static ProbabilityTable (pStatementProb).
 // Block::make_random / nested GenerateBody share one session table; nil means
 // fail closed (no invent NewStatementThresholdTable mid-invocation).
+//
+// processScopeTab mirrors VariableSelector::scopeTable_ (InitScopeTable once).
+// VariableSelectionProbability shares one session table; nil means fail closed
+// (no invent NewScopeThresholdTable per draw).
 var (
-	processOptsMu  sync.RWMutex
-	processOpts    = Defaults()
-	processProbs   *Probabilities
-	processRng     *Rng
-	processStmtTab *ThresholdTable
+	processOptsMu   sync.RWMutex
+	processOpts     = Defaults()
+	processProbs    *Probabilities
+	processRng      *Rng
+	processStmtTab  *ThresholdTable
+	processScopeTab *ThresholdTable
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -101,6 +106,28 @@ func ProcessStmtTab() *ThresholdTable {
 	processOptsMu.RLock()
 	defer processOptsMu.RUnlock()
 	return processStmtTab
+}
+
+// SetProcessScopeTab installs the session VariableSelector::scopeTable_.
+// NewProgramGenerator / InitScopeTable set this once per generation.
+func SetProcessScopeTab(t *ThresholdTable) {
+	processOptsMu.Lock()
+	processScopeTab = t
+	processOptsMu.Unlock()
+}
+
+// ProcessScopeTab returns the active scope ThresholdTable (may be nil).
+// C++ scopeTable_ is always live after InitScopeTable; nil is fail-closed.
+func ProcessScopeTab() *ThresholdTable {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processScopeTab
+}
+
+// InitScopeTable mirrors VariableSelector::InitScopeTable.
+// VariableSelector.cpp:110–122 — create once from CGOptions::global_variables.
+func InitScopeTable(opts Options) {
+	SetProcessScopeTab(NewScopeThresholdTable(opts))
 }
 
 const defaultPlatformInfoPath = "platform.info"
