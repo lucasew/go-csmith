@@ -49,7 +49,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -82,7 +82,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{5, 5}
 	av.ArraySizes = av.Sizes
 	vs.Arrays = []*ArrayVariable{av}
@@ -144,7 +144,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	// seed several arrays so select_array can pick
 	for i := 0; i < 3; i++ {
-		av := CreateArrayVariable(NewRng(uint64(10+i)), opts, NewProbabilities(opts), nil, "g_"+string(rune('a'+i)), GetIntType(), MakeInt(0), q)
+		av := CreateArrayVariable(NewRng(uint64(10+i)), opts, NewProbabilities(opts), nil, nil, nil, "g_"+string(rune('a'+i)), GetIntType(), MakeInt(0), q)
 		if av == nil {
 			continue
 		}

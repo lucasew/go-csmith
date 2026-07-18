@@ -9,7 +9,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -72,7 +72,7 @@ func TestMakeRandomArrayInitEmptySizesNoSoft(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_empty", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_empty", GetIntType(), MakeInt(0), q)
 	av.Sizes = nil
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
@@ -92,7 +92,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	// no float types in simple select — just ensure no panic with empty filter path
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_b", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_b", GetIntType(), MakeInt(0), q)
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}

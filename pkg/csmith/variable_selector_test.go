@@ -5,7 +5,7 @@ import "testing"
 func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	// VariableSelector.cpp:332–337 — collective array must itemize(); no return bare
 	ClearError()
-	av := CreateArrayVariable(NewRng(2), Defaults(), NewProbabilities(Defaults()), nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), Defaults(), NewProbabilities(Defaults()), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("create")
 	}

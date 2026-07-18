@@ -1131,7 +1131,7 @@ func (vs *VariableSelector) createAndInitialize(
 		if HasError() {
 			return nil
 		}
-		av := CreateArrayVariable(r, vs.Opts, vs.Probs, blk, name, t, init, qfer)
+		av := CreateArrayVariable(r, vs.Opts, vs.Probs, vs, &cg, blk, name, t, init, qfer)
 		if av == nil || HasError() {
 			return nil
 		}
@@ -1808,7 +1808,7 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	// VariableSelector.cpp:1362–1363 — qfer.add_qualifiers(false, false)
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
 	init := MakeRandom(elem, vs.Opts, vs.Probs, r)
-	av := CreateArrayVariable(r, vs.Opts, vs.Probs, blk, name, elem, init, qfer)
+	av := CreateArrayVariable(r, vs.Opts, vs.Probs, vs, &cg, blk, name, elem, init, qfer)
 	if av == nil || HasError() {
 		return nil
 	}

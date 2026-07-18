@@ -26,12 +26,17 @@ type ArrayVariable struct {
 }
 
 // CreateArrayVariable mirrors ArrayVariable::CreateArrayVariable.
-// ArrayVariable.cpp:123–180 — dimension distribution and size caps.
+// ArrayVariable.cpp:123–193 — dimension distribution, size caps, alt init_values.
 // probs is session Probabilities (C++ singleton); no invent NewProbabilities(opts).
+// vs+cg are required for pointer alt-inits via make_init_value when
+// !strict_const_arrays (ArrayVariable.cpp:179–184); nil → fail closed that branch
+// (no invent Constant "0" as a soft stand-in for make_init_value).
 func CreateArrayVariable(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
+	vs *VariableSelector,
+	cg *CGContext,
 	blk *Block,
 	name string,
 	elem *Type,
@@ -116,18 +121,38 @@ func CreateArrayVariable(
 	half := uint32(total / 2)
 	initNum := int(r.RndUpto(half))
 	for i := 0; i < initNum; i++ {
-		// ArrayVariable.cpp:177–185 — Constant::make_random(type) when non-pointer
-		// or strict_const_arrays; else make_init_value (needs cg — not on this path yet).
-		// session probs for aggregates; nil → fail closed empty (no invent tables)
-		c := MakeRandom(elem, opts, probs, r)
-		// sticky ERROR_GUARD from Constant::make_random
-		if HasError() {
-			return nil
+		// ArrayVariable.cpp:177–185
+		// if (!pointer || strict_const_arrays) Constant::make_random
+		// else VariableSelector::make_init_value
+		var val string
+		if !elem.IsPointerLike() || opts.StrictConstArrays {
+			c := MakeRandom(elem, opts, probs, r)
+			if HasError() {
+				return nil
+			}
+			if c != nil {
+				val = c.Value
+			}
+		} else {
+			// make_init_value needs live VS + CGContext (C++ always has both)
+			if vs == nil || cg == nil {
+				// no invent Constant "0" / null stand-in for missing make_init_value
+				return nil
+			}
+			qf := qfer
+			e := vs.MakeInitValue(AccessRead, *cg, elem, &qf, blk, r)
+			if HasError() {
+				return nil
+			}
+			if e != nil {
+				// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for emit
+				val = e.Output()
+			}
 		}
-		// ArrayVariable.cpp:185 — add_init_value(e); skip null (no invent "0" shell)
-		if c != nil {
-			av.InitValues = append(av.InitValues, c.Value)
-			av.ArrayInits = append(av.ArrayInits, c.Value)
+		// ArrayVariable.cpp:185 — add_init_value(e); skip null (no invent shell)
+		if val != "" {
+			av.InitValues = append(av.InitValues, val)
+			av.ArrayInits = append(av.ArrayInits, val)
 		}
 	}
 	return av

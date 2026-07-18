@@ -9,7 +9,7 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	opts := Defaults()
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, "g_1", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
 	if av == nil || av.Dimension() < 1 {
 		t.Fatal(av)
 	}
@@ -30,16 +30,16 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	// ArrayVariable.cpp:127–133 — assert type/void; ERROR_GUARD after rnd_upto(99)
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_n", nil, MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
 	ClearError()
 	SetError(ErrGeneric)
 	defer ClearError()
-	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
 		t.Fatal("sticky error after dim draw must fail closed")
 	}
 }
@@ -50,7 +50,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
 	opts.MaxArrayLength = 0
-	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_z", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil")
 	}
@@ -69,7 +69,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	if st == nil || !st.IsStruct() {
 		t.Skip("no struct")
 	}
-	av := CreateArrayVariable(NewRng(3), opts, probs, nil, "g_s", st, MakeRandom(st, opts, probs, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(3), opts, probs, nil, nil, nil, "g_s", st, MakeRandom(st, opts, probs, NewRng(4)), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
@@ -88,12 +88,58 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	// large init_num path still must not invent aggregate alt values without probs
-	av := CreateArrayVariable(NewRng(1), opts, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(1), opts, nil, nil, nil, nil, "g_s", st, nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("nil av")
 	}
 	if len(av.InitValues) != 0 {
 		t.Fatalf("nil probs must not invent aggregate alt inits, got %v", av.InitValues)
+	}
+}
+
+func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
+	// ArrayVariable.cpp:179–184 — pointer + !strict_const → make_init_value, not Constant "0"
+	opts := Defaults()
+	opts.StrictConstArrays = false
+	opts.MaxArrayDim = 1
+	opts.MaxArrayLenPerDim = 8
+	opts.MaxArrayLength = 8
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	pt := PointerTo(GetIntType())
+	// without VS/CG: when alt init_num > 0 fail closed (no invent Constant stand-in)
+	sawFail := false
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		av := CreateArrayVariable(NewRng(seed), opts, NewProbabilities(opts), nil, nil, nil, "g_a", pt, MakeInt(0), q)
+		if av == nil {
+			sawFail = true
+			continue
+		}
+		if len(av.InitValues) != 0 {
+			t.Fatalf("seed %d: invented pointer alts without make_init_value: %v", seed, av.InitValues)
+		}
+	}
+	if !sawFail {
+		t.Fatal("expected some seeds to need make_init_value and fail closed")
+	}
+	// with VS+CG: make_init_value path is live
+	vs := NewVariableSelector(opts)
+	vs.Probs = NewProbabilities(opts)
+	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	ClearError()
+	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
+	if av == nil {
+		// make_init_value may ERROR_GUARD; not invent Constant "0"
+		return
+	}
+	for _, s := range av.InitValues {
+		if s == "" {
+			t.Fatal("empty alt")
+		}
 	}
 }
 

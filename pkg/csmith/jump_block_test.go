@@ -45,8 +45,11 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	// OutputMgr uses get_last_ctrl_vars — seed pool like OutputArrayInitializers
 	CtrlVarsDoFinalization()
 	opts := Defaults()
+	// ArrayVariable.cpp:179 — pointer alt-inits need make_init_value; strict_const
+	// uses Constant::make_random so library test can omit VS/CGContext.
+	opts.StrictConstArrays = true
 	_ = GetNewCtrlVars(opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}

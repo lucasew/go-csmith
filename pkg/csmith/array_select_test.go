@@ -9,7 +9,7 @@ func TestItemizeConsumesRNGPerDim(t *testing.T) {
 	opts := Defaults()
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, "g_a", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("create")
 	}
@@ -52,8 +52,8 @@ func TestSelectArrayChoosesExisting(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	a := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, "g_1", GetIntType(), MakeInt(0), q)
-	b := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, "g_2", GetIntType(), MakeInt(1), q)
+	a := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(0), q)
+	b := CreateArrayVariable(r, opts, NewProbabilities(opts), nil, nil, nil, "g_2", GetIntType(), MakeInt(1), q)
 	vs.Arrays = []*ArrayVariable{a, b}
 	// sole when filter... both ok
 	got := vs.SelectArray(NewRng(3), EmptyCGContext())
@@ -125,7 +125,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	// force multi-dim array
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, "g_md", GetIntType(), MakeInt(0), q)
+	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_md", GetIntType(), MakeInt(0), q)
 	if av == nil {
 		t.Fatal("nil array")
 	}
