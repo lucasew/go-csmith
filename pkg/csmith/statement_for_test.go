@@ -28,6 +28,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	var list FunctionList
 	// need a function for context
 	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, &list)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	cg := WithFunc(f, EmptyEffect())
 	// force if generation
@@ -48,6 +49,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)

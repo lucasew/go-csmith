@@ -66,6 +66,7 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	var list FunctionList
 	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, &list)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	if f == nil || f.Body == nil {
 		t.Fatal("body")
@@ -118,6 +119,7 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 	for seed := uint64(1); seed < 50; seed++ {
 		vs := NewVariableSelector(opts)
 		r := NewRng(seed)
+		seedTypesForTest(r, opts, probs, vs, nil)
 		f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 		if f.Body != nil && len(f.Body.Stmts) < opts.MaxBlockSize {
 			// last should be return if early

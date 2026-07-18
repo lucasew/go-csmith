@@ -99,8 +99,9 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 // StatementFor.cpp:128–161 — bound is shortest dim-1; OOB via ArrayOOBProb;
 // returns adjusted IV bound (out-param `bound` in C++).
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
+	// StatementFor.cpp:128+ — pure_rnd_* with valid bound; no soft invent fixed loop params
 	if r == nil || bound < 1 {
-		return 0, 1, 1, BinCmpLt, AssignAdd, 1
+		return 0, 0, 0, 0, 0, 0
 	}
 	// StatementFor.cpp:133 — pure_rnd_flipcoin(array_oob_prob) (random mode == rnd)
 	oob := r.RndFlipcoin(uint32(oobProb))

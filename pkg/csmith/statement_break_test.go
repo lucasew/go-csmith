@@ -12,6 +12,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, nil)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2 // IN_LOOP
@@ -68,6 +69,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	tables := NewExprTables(opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	probs := NewProbabilities(opts)
+	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2

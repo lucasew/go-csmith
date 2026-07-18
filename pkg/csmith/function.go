@@ -86,21 +86,22 @@ type FunctionList struct {
 }
 
 // RandomFunctionName mirrors Function.cpp RandomFunctionName → gensym("func_").
+// Function.cpp:249 — gensym uses process-wide counter; no soft invent private GenSym{}.
 func RandomFunctionName(sym *GenSym) string {
 	if sym == nil {
-		sym = &GenSym{}
+		return Gensym("func_")
 	}
 	return sym.Next("func_")
 }
 
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.
-// Function.cpp:256–259. When env is nil/empty, fall back to nonvoid simple.
+// Function.cpp:256–259 — no soft invent nonvoid simple when AllTypes empty.
 func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) *Type {
-	if env != nil && len(env.AllTypes) > 0 {
-		return env.ChooseRandom(r, opts, probs, false)
+	// Type::choose_random requires AllTypes; ERROR_GUARD path → nil
+	if env == nil || len(env.AllTypes) == 0 {
+		return nil
 	}
-	st := ChooseRandomNonvoidSimple(r, probs)
-	return GetSimpleType(st)
+	return env.ChooseRandom(r, opts, probs, false)
 }
 
 // ParamListProbability mirrors Function.cpp ParamListProbability → rnd_upto(max_params).
@@ -144,6 +145,10 @@ func MakeRandomSignature(
 	}
 	if retType == nil {
 		retType = RandomReturnType(r, probs, env, opts)
+		// Function.cpp:404–408 — ERROR_GUARD after RandomReturnType / DEPTH_GUARD
+		if retType == nil {
+			return nil
+		}
 	}
 	// Function.cpp:407 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunction, nullptr)
 	if DepthGuardByType(opts, DtFunction) == BadDepth {
@@ -238,12 +243,20 @@ func MakeFirst(
 	if probs == nil {
 		probs = NewProbabilities(opts)
 	}
+	// Type::AllTypes is process-global in C++; session Types on list or vs
 	var env *TypeEnv
 	if list != nil {
 		env = list.Types
 	}
+	if env == nil && vs != nil {
+		env = vs.Types
+	}
 	// Function.cpp:444–454
 	ty := RandomReturnType(r, probs, env, opts)
+	// ERROR_GUARD when choose_random fails (empty AllTypes)
+	if ty == nil {
+		return nil
+	}
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
 	// CVQualifiers::random_qualifiers(ty) — no context

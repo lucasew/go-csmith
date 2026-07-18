@@ -9,6 +9,7 @@ func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
 	fmMap := NewFactMgrMap()
+	seedTypesForTest(NewRng(5), opts, NewProbabilities(opts), vs, list)
 	f := MakeFirst(NewRng(5), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, fmMap)
 	if f == nil || f.Body == nil {
 		t.Fatal("nil first")
@@ -39,6 +40,7 @@ func TestMakeRandomFunction(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	list := &FunctionList{}
 	// seed first so list non-empty for choose
+	seedTypesForTest(NewRng(2), opts, NewProbabilities(opts), vs, list)
 	_ = MakeFirst(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil)
 	cg := EmptyCGContext()
 	cg.Funcs = list

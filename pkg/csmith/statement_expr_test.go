@@ -13,6 +13,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRng(2)
 	var list FunctionList
+	seedTypesForTest(r, opts, probs, vs, &list)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
 	cg := WithFunc(f, EmptyEffect()).WithFuncList(&list)
 	st := MakeRandomExprStmt(NewRng(7), opts, probs, vs, tables, &cg)

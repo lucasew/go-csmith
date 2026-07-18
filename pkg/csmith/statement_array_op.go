@@ -5,8 +5,9 @@ package csmith
 // MakeRandomIterCtrl mirrors StatementArrayOp::make_random_iter_ctrl.
 // StatementArrayOp.cpp:64–70 — pure_rnd flip for init 0 or upto(size); incr 1 or upto(size)+1.
 func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
+	// StatementArrayOp.cpp:64–70 — pure_rnd_upto(size); no soft invent incr=1 without RNG/size
 	if r == nil || size < 1 {
-		return 0, 1
+		return 0, 0
 	}
 	if r.RndFlipcoin(50) {
 		init = 0

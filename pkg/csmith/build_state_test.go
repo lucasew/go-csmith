@@ -85,6 +85,7 @@ func TestMakeFirstMarksBuilt(t *testing.T) {
 	opts.MaxBlockSize = 1
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil)
 	if f == nil || !f.IsEffectKnown() {
 		t.Fatal("built")

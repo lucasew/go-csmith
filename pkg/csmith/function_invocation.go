@@ -979,6 +979,10 @@ func MakeRandomInvocation(
 					env = cg.Types
 				}
 				sigType = RandomReturnType(r, probs, env, opts)
+				// ERROR_GUARD when choose_random fails; no soft invent GetIntType return
+				if sigType == nil {
+					return &Invocation{Failed: true}
+				}
 			}
 			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, NewStatementThresholdTable(opts), cg, list, sigType)
 			if fi != nil && !fi.Failed && cg.CurrentFunc != nil && fi.User != nil {

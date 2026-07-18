@@ -106,8 +106,9 @@ func (fi *Invocation) getTypeBinary() *Type {
 		return GetSimpleType(EFloat)
 	}
 	op, ok := BinaryOpFromString(fi.Binary)
+	// FunctionInvocationBinary.cpp:196–199 — assert invalid operator; no soft invent eInt
 	if !ok {
-		return GetIntType()
+		return nil
 	}
 	switch op {
 	case BinAdd, BinSub, BinMul, BinDiv, BinMod, BinBitXor, BinBitAnd, BinBitOr:
@@ -138,7 +139,8 @@ func (fi *Invocation) getTypeBinary() *Type {
 		}
 		return GetSimpleType(EInt)
 	default:
-		return GetIntType()
+		// FunctionInvocationBinary.cpp:240–241 — assert(0); no soft invent eInt
+		return nil
 	}
 }
 
