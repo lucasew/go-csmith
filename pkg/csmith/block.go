@@ -393,13 +393,17 @@ func (b *Block) Output(indent int) string {
 		sb.WriteString("\n")
 	}
 	// OutputArrayInitializers for locals without brace init
-	// Variable.cpp:829–841
+	// Variable.cpp:829–841 — new_ctrl_vars + OutputArrayCtrlVars
 	if len(loopInits) > 0 {
-		ctrl := make([]string, maxDim)
-		for i := 0; i < maxDim; i++ {
-			ctrl[i] = "i" + itoa(i)
-			sb.WriteString(inner + "int " + ctrl[i] + ";\n")
+		// allocate a full max_array_dimensions set; declare only maxDim used
+		opts := Defaults()
+		if b.Func != nil {
+			// Options not stored on Block; letter names match default FreshArrayCtrl=false
+			_ = opts
 		}
+		ctrlVars := NewCtrlVars(maxDim, false)
+		sb.WriteString(OutputArrayCtrlVars(ctrlVars, maxDim, inner))
+		ctrl := CtrlVarNames(ctrlVars)
 		for _, av := range loopInits {
 			sb.WriteString(av.OutputInit(inner, ctrl))
 		}

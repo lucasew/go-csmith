@@ -88,20 +88,23 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 }
 
 func TestHashGlobalVarsSharedIndices(t *testing.T) {
-	vs := NewVariableSelector(Defaults())
+	CtrlVarsDoFinalization()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{
 		{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}
-	out := HashGlobalVariables(vs)
-	// only one "int i0" decl
-	if strings.Count(out, "int i0;") != 1 {
+	// OutputHashFuncDef path: declare ctrl vars then hash
+	dimen := GetMaxArrayDimension(vs.GlobalList)
+	ctrl := GetNewCtrlVars(opts)
+	decl := OutputArrayCtrlVars(ctrl, dimen, "    ")
+	out := decl + HashGlobalVariables(vs)
+	// one combined "int i, j;" (max dim 2)
+	if !strings.Contains(out, "int i, j;") {
 		t.Fatal(out)
 	}
-	if strings.Count(out, "int i1;") != 1 {
-		t.Fatal(out)
-	}
-	if !strings.Contains(out, "g_a[i0][i1]") || !strings.Contains(out, "g_b[i0]") {
+	if !strings.Contains(out, "g_a[i][j]") || !strings.Contains(out, "g_b[i]") {
 		t.Fatal(out)
 	}
 }

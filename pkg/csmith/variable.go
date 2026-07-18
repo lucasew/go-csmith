@@ -4,6 +4,13 @@ package csmith
 
 import "strings"
 
+// ctrl_vars pool mirrors Variable::ctrl_vars_vectors / ctrl_vars_count.
+// Variable.cpp:73–74, 747–776.
+var (
+	ctrlVarsVectors [][]*Variable
+	ctrlVarsCount   uint64
+)
+
 // Variable mirrors Variable for non-array, non-field cases first.
 type Variable struct {
 	Name string
@@ -160,6 +167,183 @@ func (v *Variable) OutputAddrOf(prefixName bool) string {
 		return "&0"
 	}
 	return "&" + v.GetActualName(prefixName)
+}
+
+// OutputForComment mirrors Variable::OutputForComment — bare actual name.
+// Variable.cpp:711–713.
+func (v *Variable) OutputForComment(prefixName bool) string {
+	if v == nil {
+		return ""
+	}
+	return v.GetActualName(prefixName)
+}
+
+// OutputUpperBound mirrors Variable::OutputUpperBound — field path for bounds.
+// Variable.cpp:721–732.
+func (v *Variable) OutputUpperBound(prefixName bool) string {
+	if v == nil {
+		return ""
+	}
+	if v.FieldVarOf != nil {
+		base := v.FieldVarOf.OutputUpperBound(prefixName)
+		dot := strings.LastIndex(v.Name, ".")
+		if dot < 0 {
+			return base
+		}
+		return base + v.Name[dot:]
+	}
+	return v.GetActualName(prefixName)
+}
+
+// OutputLowerBound mirrors Variable::OutputLowerBound.
+// Variable.cpp:734–745. Arrays override separately.
+func (v *Variable) OutputLowerBound(prefixName bool) string {
+	if v == nil {
+		return ""
+	}
+	if v.AsArray != nil {
+		return v.AsArray.OutputLowerBound()
+	}
+	if v.FieldVarOf != nil {
+		base := v.FieldVarOf.OutputLowerBound(prefixName)
+		dot := strings.LastIndex(v.Name, ".")
+		if dot < 0 {
+			return base
+		}
+		return base + v.Name[dot:]
+	}
+	return v.GetActualName(prefixName)
+}
+
+// NewCtrlVars mirrors Variable::new_ctrl_vars — i,j,k… (±suffix when fresh).
+// Variable.cpp:747–767. maxDim is CGOptions::max_array_dimensions().
+func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
+	if maxDim < 1 {
+		maxDim = 1
+	}
+	suffix := ctrlVarsCount
+	ctrl := make([]*Variable, 0, maxDim)
+	name := byte('i')
+	for i := 0; i < maxDim; i++ {
+		nm := string([]byte{name})
+		if freshNames {
+			nm += itoa(int(suffix))
+		}
+		ctrl = append(ctrl, &Variable{
+			Name: nm,
+			Type: GetIntType(),
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		})
+		name++
+	}
+	ctrlVarsCount++
+	ctrlVarsVectors = append(ctrlVarsVectors, ctrl)
+	return ctrl
+}
+
+// GetNewCtrlVars mirrors Variable::get_new_ctrl_vars.
+func GetNewCtrlVars(opts Options) []*Variable {
+	return NewCtrlVars(opts.MaxArrayDim, opts.FreshArrayCtrlVarNames)
+}
+
+// GetLastCtrlVars mirrors Variable::get_last_ctrl_vars.
+// Variable.cpp:774–776. Returns nil if none allocated.
+func GetLastCtrlVars() []*Variable {
+	if len(ctrlVarsVectors) == 0 {
+		return nil
+	}
+	return ctrlVarsVectors[len(ctrlVarsVectors)-1]
+}
+
+// CtrlVarsDoFinalization mirrors Variable::doFinalization for ctrl var pool.
+// Variable.cpp:779–786.
+func CtrlVarsDoFinalization() {
+	ctrlVarsVectors = nil
+	ctrlVarsCount = 0
+}
+
+// CtrlVarNames returns actual names of a ctrl-var slice.
+func CtrlVarNames(ctrl []*Variable) []string {
+	out := make([]string, len(ctrl))
+	for i, v := range ctrl {
+		if v == nil {
+			out[i] = "i" + itoa(i)
+			continue
+		}
+		out[i] = v.GetActualName(false)
+	}
+	return out
+}
+
+// OutputArrayCtrlVars mirrors OutputArrayCtrlVars — "int i, j, k;".
+// Variable.cpp:800–811.
+func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
+	if dimen <= 0 || len(ctrl) == 0 {
+		return ""
+	}
+	if dimen > len(ctrl) {
+		dimen = len(ctrl)
+	}
+	var b strings.Builder
+	b.WriteString(indent + "int ")
+	for i := 0; i < dimen; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		if ctrl[i] != nil {
+			b.WriteString(ctrl[i].GetActualName(false))
+		} else {
+			b.WriteString(string([]byte{byte('i' + i)}))
+		}
+	}
+	b.WriteString(";\n")
+	return b.String()
+}
+
+// GetMaxArrayDimension mirrors Variable::GetMaxArrayDimension.
+// Variable.cpp:813–826.
+func GetMaxArrayDimension(vars []*Variable) int {
+	dimen := 0
+	for _, v := range vars {
+		if v == nil || !v.IsArray {
+			continue
+		}
+		n := len(v.ArraySizes)
+		if v.AsArray != nil && len(v.AsArray.Sizes) > n {
+			n = len(v.AsArray.Sizes)
+		}
+		if n > dimen {
+			dimen = n
+		}
+	}
+	return dimen
+}
+
+// OutputArrayInitializers mirrors OutputArrayInitializers for loop-init arrays.
+// Variable.cpp:829–841 — allocate ctrl vars, declare, emit output_init.
+func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
+	dimen := GetMaxArrayDimension(vars)
+	if dimen == 0 {
+		return ""
+	}
+	ctrl := GetNewCtrlVars(opts)
+	var b strings.Builder
+	b.WriteString(OutputArrayCtrlVars(ctrl, dimen, indent))
+	names := CtrlVarNames(ctrl)
+	for _, v := range vars {
+		if v == nil || !v.IsArray {
+			continue
+		}
+		av := v.AsArray
+		if av == nil {
+			av = &ArrayVariable{Variable: *v, Sizes: v.ArraySizes, InitValues: v.ArrayInits}
+		}
+		if av.NoLoopInitializer() {
+			continue
+		}
+		b.WriteString(av.OutputInit(indent, names))
+	}
+	return b.String()
 }
 
 // CreateVariableQfer mirrors
@@ -567,31 +751,32 @@ func (v *Variable) CollectExpandable() []*Variable {
 // Variable.cpp:889–923 — aggregates recurse fields; simple transparent_crc;
 // float uses transparent_crc_bytes; pointers emit nothing.
 // FactUnion readability omitted (hash all union fields).
-// declareIdx: if true, emit int iN decls (standalone use); HashGlobalVariables
-// declares shared index vars once.
+// Standalone path allocates temporary letter ctrl names (i,j,…) without
+// mutating the package ctrl-var pool when no last set exists.
 func (v *Variable) HashOutput() string {
-	return v.hashOutput(true)
+	return v.hashOutput(nil)
 }
 
-func (v *Variable) hashOutput(declareIdx bool) string {
+func (v *Variable) hashOutput(ctrl []*Variable) string {
 	if v == nil || v.Type == nil {
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
-		return hashArrayVariable(v, declareIdx)
+		return hashArrayVariable(v, ctrl)
 	}
 	if v.Type.IsAggregate() {
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			b.WriteString(f.hashOutput(declareIdx))
+			b.WriteString(f.hashOutput(ctrl))
 		}
 		return b.String()
 	}
 	if v.Type.IsSimple() {
+		name := v.GetActualName(false)
 		if v.Type.IsFloat() {
-			return "    transparent_crc_bytes (&" + v.Name + ", sizeof(" + v.Name + "), \"" + v.Name + "\", print_hash_value);\n"
+			return "    transparent_crc_bytes (&" + name + ", sizeof(" + name + "), \"" + v.Name + "\", print_hash_value);\n"
 		}
-		return "    transparent_crc(" + v.Name + ", \"" + v.Name + "\", print_hash_value);\n"
+		return "    transparent_crc(" + name + ", \"" + v.Name + "\", print_hash_value);\n"
 	}
 	// ePointer: no hash (Variable.cpp:921–922)
 	return ""
@@ -621,30 +806,39 @@ func hashArrayHasPayload(v *Variable) bool {
 }
 
 // hashArrayVariable mirrors ArrayVariable::hash (loop over dims; simple elements).
-// ArrayVariable.cpp:735+ simplified — index vars i0..; no FactUnion exclude.
+// ArrayVariable.cpp:735–820 — uses get_last_ctrl_vars names (i,j,k…); no FactUnion exclude.
 // Skips arrays with no hashable payload (e.g. pointer element type).
-func hashArrayVariable(v *Variable, declareIdx bool) string {
+// ctrl nil → synthesize letter names for standalone HashOutput.
+func hashArrayVariable(v *Variable, ctrl []*Variable) string {
 	if v == nil || len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
 		return ""
 	}
-	var b strings.Builder
-	if declareIdx {
-		for i := range v.ArraySizes {
-			b.WriteString("    int i" + itoa(i) + ";\n")
+	if ctrl == nil {
+		ctrl = GetLastCtrlVars()
+	}
+	names := make([]string, len(v.ArraySizes))
+	for i := range v.ArraySizes {
+		if i < len(ctrl) && ctrl[i] != nil {
+			names[i] = ctrl[i].GetActualName(false)
+		} else {
+			// fallback letter names matching new_ctrl_vars
+			names[i] = string([]byte{byte('i' + i)})
 		}
 	}
+	var b strings.Builder
 	indent := "    "
 	for i, sz := range v.ArraySizes {
-		iv := "i" + itoa(i)
+		iv := names[i]
 		b.WriteString(indent + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
 		b.WriteString(indent + "{\n")
 		indent += "    "
 	}
-	access := v.Name
-	nameStr := v.Name
-	for i := range v.ArraySizes {
-		access += "[i" + itoa(i) + "]"
-		nameStr += "[i" + itoa(i) + "]"
+	// ArrayVariable::output_with_indices
+	access := v.GetActualName(false)
+	nameStr := access
+	for _, iv := range names {
+		access += "[" + iv + "]"
+		nameStr += "[" + iv + "]"
 	}
 	if v.Type != nil && v.Type.IsAggregate() {
 		j := 0

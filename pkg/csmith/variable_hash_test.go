@@ -49,7 +49,8 @@ func TestHashArrayLoops(t *testing.T) {
 		Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
 	}
 	out := v.HashOutput()
-	if !strings.Contains(out, "for (i0 = 0") || !strings.Contains(out, "g_4[i0]") {
+	// Variable::new_ctrl_vars uses letter names i, j, k…
+	if !strings.Contains(out, "for (i = 0") || !strings.Contains(out, "g_4[i]") {
 		t.Fatal(out)
 	}
 }

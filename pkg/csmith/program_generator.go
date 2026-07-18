@@ -51,6 +51,10 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 func (g *ProgramGenerator) Initialize() {
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
+	// Clear ctrl-var pool so each generation starts fresh (Variable::doFinalization).
+	CtrlVarsDoFinalization()
+	// Statement::sid starts over for a new program (process-local in upstream).
+	nextStmID = 0
 }
 
 // GenerateAllTypes mirrors Type::GenerateAllTypes (random mode).
@@ -246,27 +250,18 @@ func (g *ProgramGenerator) OutputFunctions() string {
 
 // HashGlobalVariables mirrors VariableSelector::HashGlobalVariables.
 // VariableSelector.cpp:1613–1615 — MapVariableList(GlobalList, HashVariable).
-// Declares max-dimension index vars once (OutputArrayCtrlVars-ish).
+// Uses GetLastCtrlVars for array index names (caller declares via OutputArrayCtrlVars).
 func HashGlobalVariables(vs *VariableSelector) string {
 	if vs == nil {
 		return ""
 	}
-	maxDim := 0
-	for _, v := range vs.GlobalList {
-		if v != nil && v.IsArray && hashArrayHasPayload(v) && len(v.ArraySizes) > maxDim {
-			maxDim = len(v.ArraySizes)
-		}
-	}
+	ctrl := GetLastCtrlVars()
 	var b strings.Builder
-	for i := 0; i < maxDim; i++ {
-		b.WriteString("    int i" + itoa(i) + ";\n")
-	}
 	for _, v := range vs.GlobalList {
 		if v == nil {
 			continue
 		}
-		// declareIdx=false — indices shared above
-		b.WriteString(v.hashOutput(false))
+		b.WriteString(v.hashOutput(ctrl))
 	}
 	return b.String()
 }
@@ -284,6 +279,8 @@ func (g *ProgramGenerator) OutputMain() string {
 	} else {
 		b.WriteString("int main (void)\n{\n")
 	}
+	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
+	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
 	b.WriteString("    int print_hash_value = 0;\n")
 	if g.Opts.AcceptArgc {
 		b.WriteString("    if (argc == 2 && strcmp(argv[1], \"1\") == 0) print_hash_value = 1;\n")
@@ -305,9 +302,9 @@ func (g *ProgramGenerator) OutputMain() string {
 		} else {
 			b.WriteString("    " + inv.Output() + ";\n")
 		}
-		// OutputMgr.cpp:136 — OutputPtrResets(dead_globals)
-		if g.Opts.DanglingGlobalPointers {
-			b.WriteString(OutputPtrResets(f0.DeadGlobals))
+		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
+		if !g.Opts.DanglingGlobalPointers {
+			b.WriteString(OutputPtrResets(f0.DeadGlobals, g.Opts))
 		}
 	}
 	if g.Opts.ComputeHash {
@@ -315,6 +312,11 @@ func (g *ProgramGenerator) OutputMain() string {
 			// OutputMgr.cpp:139–140 — call hash function instead of inline
 			b.WriteString("    csmith_compute_hash();\n")
 		} else {
+			// ensure ctrl vars exist when only arrays with brace init (no prior set)
+			if GetLastCtrlVars() == nil && GetMaxArrayDimension(g.VS.GlobalList) > 0 {
+				ctrl := GetNewCtrlVars(g.Opts)
+				b.WriteString(OutputArrayCtrlVars(ctrl, GetMaxArrayDimension(g.VS.GlobalList), "    "))
+			}
 			// HashGlobalVariables inline
 			b.WriteString(HashGlobalVariables(g.VS))
 		}
@@ -330,17 +332,20 @@ func (g *ProgramGenerator) OutputMain() string {
 }
 
 // OutputHashFuncDef mirrors OutputMgr::OutputHashFuncDef.
-// OutputMgr.cpp:209–220 — void csmith_compute_hash(void) { HashGlobalVariables; }
+// OutputMgr.cpp:209–220 — declare ctrl vars then HashGlobalVariables.
 func (g *ProgramGenerator) OutputHashFuncDef() string {
 	if g == nil || !g.Opts.StepHashByStmt || !g.Opts.ComputeHash {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
-	// body is HashGlobalVariables without outer indent adjustment — use 4-space already in Hash
-	// HashGlobalVariables emits "    transparent_crc..." so wrap is fine
-	body := HashGlobalVariables(g.VS)
-	b.WriteString(body)
+	// OutputMgr.cpp:213–218 — GetMaxArrayDimension + get_new_ctrl_vars + OutputArrayCtrlVars
+	dimen := GetMaxArrayDimension(g.VS.GlobalList)
+	if dimen > 0 {
+		ctrl := GetNewCtrlVars(g.Opts)
+		b.WriteString(OutputArrayCtrlVars(ctrl, dimen, "    "))
+	}
+	b.WriteString(HashGlobalVariables(g.VS))
 	b.WriteString("}\n")
 	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201
 	b.WriteString("\nvoid step_hash(int stmt_id)\n{\n")
@@ -357,46 +362,83 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 }
 
 // OutputPtrResets mirrors OutputMgr::OutputPtrResets.
-// OutputMgr.cpp:326–340 — scalar = 0; arrays nested for = 0 (always loop form).
-func OutputPtrResets(ptrs []*Variable) string {
+// OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init zero.
+func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	if len(ptrs) == 0 {
 		return ""
 	}
+	ctrl := GetLastCtrlVars()
+	if ctrl == nil {
+		// generation-time fallback when no prior OutputArrayInitializers
+		ctrl = GetNewCtrlVars(opts)
+	}
+	names := CtrlVarNames(ctrl)
 	var b strings.Builder
 	for _, v := range ptrs {
 		if v == nil {
 			continue
 		}
 		sizes := v.ArraySizes
-		if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
-			sizes = v.AsArray.Sizes
+		av := v.AsArray
+		if av != nil && len(av.Sizes) > 0 {
+			sizes = av.Sizes
 		}
 		if v.IsArray && len(sizes) > 0 {
-			// force nested for zeroing (globals skip OutputInit via no_loop_initializer)
-			b.WriteString("    {\n")
-			pad := "    "
-			for i, sz := range sizes {
-				iv := "i" + itoa(i)
-				b.WriteString(pad + "int " + iv + ";\n")
-				b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
-				if i+1 < len(sizes) {
-					b.WriteString(pad + "{\n")
-					pad += "    "
+			// ArrayVariable::output_init with Constant zero (always loop form)
+			if av == nil {
+				av = &ArrayVariable{
+					Variable: *v,
+					Sizes:    sizes,
 				}
 			}
-			access := v.Name
-			for i := range sizes {
-				access += "[i" + itoa(i) + "]"
-			}
-			b.WriteString(pad + "    " + access + " = 0;\n")
-			for i := len(sizes) - 1; i >= 1; i-- {
-				pad = pad[:len(pad)-4]
-				b.WriteString(pad + "}\n")
-			}
-			b.WriteString("    }\n")
+			// force loop even if NoLoopInitializer (globals)
+			saved := av.Init
+			av.Init = MakeInt(0)
+			// temporary: override NoLoopInitializer by calling force form
+			b.WriteString(outputArrayInitForced(av, "    ", names))
+			av.Init = saved
 			continue
 		}
 		b.WriteString("    " + v.OutputC() + " = 0;\n")
+	}
+	return b.String()
+}
+
+// outputArrayInitForced is OutputInit without NoLoopInitializer early-out.
+// Used by OutputPtrResets (upstream always loops for array dead_globals).
+func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) string {
+	if av == nil {
+		return ""
+	}
+	initVal := "0"
+	if av.Init != nil && av.Init.Value != "" {
+		initVal = av.Init.Value
+	}
+	var b strings.Builder
+	pad := indent
+	for i, sz := range av.Sizes {
+		iv := string([]byte{byte('i' + i)})
+		if i < len(ctrl) && ctrl[i] != "" {
+			iv = ctrl[i]
+		}
+		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		if i+1 < len(av.Sizes) {
+			b.WriteString(pad + "{\n")
+			pad += "    "
+		}
+	}
+	access := av.GetActualName(false)
+	for i := range av.Sizes {
+		iv := string([]byte{byte('i' + i)})
+		if i < len(ctrl) && ctrl[i] != "" {
+			iv = ctrl[i]
+		}
+		access += "[" + iv + "]"
+	}
+	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
+	for i := len(av.Sizes) - 1; i >= 1; i-- {
+		pad = pad[:len(pad)-4]
+		b.WriteString(pad + "}\n")
 	}
 	return b.String()
 }

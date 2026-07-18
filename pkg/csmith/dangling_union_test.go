@@ -70,12 +70,13 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 }
 
 func TestOutputPtrResets(t *testing.T) {
+	CtrlVarsDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	out := OutputPtrResets([]*Variable{p})
+	out := OutputPtrResets([]*Variable{p}, Defaults())
 	if !strings.Contains(out, "g_p = 0") {
 		t.Fatal(out)
 	}
-	if OutputPtrResets(nil) != "" {
+	if OutputPtrResets(nil, Defaults()) != "" {
 		t.Fatal("empty")
 	}
 }

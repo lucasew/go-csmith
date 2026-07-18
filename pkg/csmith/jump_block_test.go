@@ -42,13 +42,14 @@ func TestFindGoodJumpBlock(t *testing.T) {
 }
 
 func TestOutputPtrResetsArray(t *testing.T) {
+	CtrlVarsDoFinalization()
 	opts := Defaults()
 	av := CreateArrayVariable(NewRng(2), opts, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
 	}
-	out := OutputPtrResets([]*Variable{&av.Variable})
-	if !strings.Contains(out, "g_a") || !strings.Contains(out, "0") {
+	out := OutputPtrResets([]*Variable{&av.Variable}, opts)
+	if !strings.Contains(out, "g_a") || !strings.Contains(out, "0") || !strings.Contains(out, "for (i = 0") {
 		t.Fatal(out)
 	}
 }

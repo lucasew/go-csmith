@@ -41,8 +41,8 @@ func TestArrayNoLoopInitializer(t *testing.T) {
 		// local non-const simple without multi inits → false
 		t.Fatal("local should allow loop init")
 	}
-	out := loc.OutputInit("    ", []string{"i0"})
-	if out == "" || !contains(out, "for") {
+	out := loc.OutputInit("    ", []string{"i"})
+	if out == "" || !contains(out, "for") || !contains(out, "for (i = 0") {
 		t.Fatal(out)
 	}
 }

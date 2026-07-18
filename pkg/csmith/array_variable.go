@@ -238,8 +238,41 @@ func (av *ArrayVariable) OutputDef() string {
 	return b.String()
 }
 
+// OutputLowerBound mirrors ArrayVariable::OutputLowerBound — name[0][0]….
+// ArrayVariable.cpp:694–700.
+func (av *ArrayVariable) OutputLowerBound() string {
+	if av == nil {
+		return ""
+	}
+	s := av.Name
+	for range av.Sizes {
+		s += "[0]"
+	}
+	return s
+}
+
+// OutputWithIndices mirrors ArrayVariable::output_with_indices.
+// ArrayVariable.cpp:703–711.
+func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
+	if av == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(av.GetActualName(false))
+	for i := range av.Sizes {
+		b.WriteString("[")
+		if i < len(ctrl) && ctrl[i] != "" {
+			b.WriteString(ctrl[i])
+		} else {
+			b.WriteString(string([]byte{byte('i' + i)}))
+		}
+		b.WriteString("]")
+	}
+	return b.String()
+}
+
 // OutputInit mirrors ArrayVariable::output_init — nested for loops assigning init.
-// ArrayVariable.cpp:619–655. ctrl names are index var names (i0, i1, …).
+// ArrayVariable.cpp:619–655. ctrl names from new_ctrl_vars (i,j,k…).
 func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 	if av == nil || av.NoLoopInitializer() {
 		return ""
@@ -252,11 +285,9 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 	// nested fors for each dimension
 	pad := indent
 	for i, sz := range av.Sizes {
-		iv := "i0"
-		if i < len(ctrl) {
+		iv := string([]byte{byte('i' + i)})
+		if i < len(ctrl) && ctrl[i] != "" {
 			iv = ctrl[i]
-		} else {
-			iv = "i" + itoa(i)
 		}
 		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
 		if i+1 < len(av.Sizes) {
@@ -264,16 +295,8 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 			pad += "    "
 		}
 	}
-	// a[i0][i1] = init;
-	access := av.Name
-	for i := range av.Sizes {
-		iv := "i" + itoa(i)
-		if i < len(ctrl) {
-			iv = ctrl[i]
-		}
-		access += "[" + iv + "]"
-	}
-	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
+	// a[i][j] = init;
+	b.WriteString(pad + "    " + av.OutputWithIndices(ctrl) + " = " + initVal + ";\n")
 	for i := len(av.Sizes) - 1; i >= 1; i-- {
 		pad = pad[:len(pad)-4]
 		b.WriteString(pad + "}\n")
