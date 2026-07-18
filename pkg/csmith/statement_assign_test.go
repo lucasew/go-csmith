@@ -43,8 +43,9 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType())
 		}()
-		if st.Kind != StmtAssign {
-			t.Fatal(st.Kind)
+		// StmtAssign is iota 0 — empty nullptr and success share Kind; use stmtOK
+		if !stmtOK(st) {
+			continue
 		}
 		if st.AssignOp != AssignSimple {
 			foundCompound = true
@@ -138,3 +139,30 @@ func TestMakeRandomAssignUpdatesIndirectFacts(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
+	// failed factories return empty Stmt (C++ nullptr), not incomplete Kind shells
+	// note: StmtAssign is iota 0 — distinguish success via stmtOK / payload
+	opts := Defaults()
+	ClearError()
+	// assign: nil cg
+	if stmtOK(MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType())) {
+		t.Fatal("nil cg assign")
+	}
+	// array op: nil vs
+	if st := MakeRandomArrayOp(NewRng(1), opts, NewProbabilities(opts), nil, NewExprTables(opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
+		t.Fatalf("nil arrayop invent %#v", st)
+	}
+	// goto: no FM
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Stack = []*Block{blk}
+	f.Blocks = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect()) // no FM
+	st := MakeRandomGoto(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
+	if st.Kind != 0 || stmtOK(st) {
+		t.Fatalf("goto without FM invent %#v", st)
+	}
+}
+
+

@@ -94,11 +94,11 @@ func MakeRandomAssignQfer(
 	qf *CVQualifiers,
 ) Stmt {
 	if cg == nil {
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
-	// StatementAssign.cpp:127 — assert(fm); no invent assign without FactMgr
+	// StatementAssign.cpp:127 — assert(fm); nullptr empty Stmt (no Kind shell)
 	if cg.FM == nil {
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
@@ -110,13 +110,13 @@ func MakeRandomAssignQfer(
 		typ = SelectLType(r, opts, probs, cg.Types, noVol, op)
 		// ERROR_GUARD after SelectLType RNG paths
 		if HasError() || typ == nil {
-			return Stmt{Kind: StmtAssign}
+			return Stmt{}
 		}
 		op = AssignOpsProbability(r, opts, assignTab, typ)
 	}
 	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()); fail closed
 	if typ != nil && typ.IsConstStructUnion() {
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
 	if typ != nil && typ.IsFloat() && !AssignOpWorksForFloat(op) {
@@ -156,12 +156,12 @@ func MakeRandomAssignQfer(
 		// StatementAssign.cpp:145–167
 		if typ != nil && typ.IsVolatileStructUnion() {
 			// StatementAssign.cpp:145–146 — return nullptr (no set_error)
-			return Stmt{Kind: StmtAssign}
+			return Stmt{}
 		}
 		// StatementAssign.cpp:148 — Expression::make_random; ERROR_GUARD (no const soft-fallback)
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil || HasError() {
-			return Stmt{Kind: StmtAssign}
+			return Stmt{}
 		}
 		if !callerQf {
 			if q := expressionQualifiers(rhs); q != nil {
@@ -186,7 +186,7 @@ func MakeRandomAssignQfer(
 		// StatementAssign.cpp:168–181
 		rhs = MakeRandomExpression(r, opts, tables, vs, &rhsCG, typ, rhsQf, false, false, MaxTermTypes, rhsCG.ExprDepth)
 		if rhs == nil || HasError() {
-			return Stmt{Kind: StmtAssign}
+			return Stmt{}
 		}
 		if !callerQf {
 			if q := expressionQualifiers(rhs); q != nil {
@@ -248,7 +248,7 @@ func MakeRandomAssignQfer(
 	}
 	if lhs == nil {
 		// Lhs::make_random null — re-pick unless sticky error already set
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
 
 	// RHS cast to L type when needed (StatementAssign.cpp:207–208 — lang_cpp)
@@ -277,7 +277,7 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:218–223 — CompatibleChecker → nullptr
 	if CompatibleCheckExprs(opts, rhs, LhsAsExpression(lhs)) {
 		SetError(ErrCompatibleCheck)
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
 
 	// StatementAssign.cpp:225 — merge_param_context(lhs_cg_context, true)
@@ -355,7 +355,7 @@ func makePossibleCompoundAssign(
 		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
 		if flags == nil || HasError() {
-			return Stmt{Kind: StmtAssign}
+			return Stmt{}
 		}
 		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
 		inv.setOutOpts(opts)
@@ -365,7 +365,7 @@ func makePossibleCompoundAssign(
 			blk := cg.CurrentBlock()
 			if blk == nil {
 				// FunctionInvocationBinary.cpp:68 assert(blk)
-				return Stmt{Kind: StmtAssign}
+				return Stmt{}
 			}
 			st1 := EInt
 			if t := flags.LHSType(); t != nil && t.IsSimple() {
@@ -387,7 +387,7 @@ func makePossibleCompoundAssign(
 	lhsExpr := LhsAsExpression(lhs)
 	if lhsExpr == nil {
 		// C++ always has live Lhs; incomplete IR → empty assign (ERROR path)
-		return Stmt{Kind: StmtAssign}
+		return Stmt{}
 	}
 	// e.clone() — Expression is value-like; shallow copy of the root is enough
 	// (operands of the original expr are shared by pointer, as clone shares subtrees).

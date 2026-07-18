@@ -54,12 +54,12 @@ func MakeRandomArrayOp(
 	cg *CGContext,
 ) Stmt {
 	if vs == nil || r == nil || cg == nil {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	// StatementArrayOp.cpp:77–80 — rnd_flipcoin(5); ERROR_GUARD
 	aryInit := r.RndFlipcoin(5)
 	if HasError() {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	if aryInit {
 		return MakeRandomArrayInit(r, opts, probs, vs, tables, stmtTab, cg)
@@ -67,7 +67,7 @@ func MakeRandomArrayOp(
 	// StatementFor::make_random_array_loop
 	st := MakeRandomArrayLoop(r, opts, probs, vs, tables, stmtTab, cg)
 	if st == nil || HasError() {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	return *st
 }
@@ -193,20 +193,20 @@ func MakeRandomArrayInit(
 	_ = stmtTab
 	_ = tables
 	if vs == nil || r == nil || cg == nil {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	av := vs.SelectArray(r, *cg)
 	// StatementArrayOp.cpp:90–91 — ERROR_GUARD after select_array
 	if av == nil || HasError() {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	// StatementArrayOp.cpp:103 — get_dimension(); no soft invent size 1
 	if len(av.Sizes) == 0 {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	// StatementArrayOp.cpp:100 — get_fact_mgr always live for visit/update
 	if cg.FM == nil {
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	// StatementArrayOp.cpp:92–93, 100 — clear effect_stm
 	cg.EffectStm = EmptyEffect()
@@ -259,7 +259,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
-			return Stmt{Kind: StmtArrayOp}
+			return Stmt{}
 		}
 		invalid[iv] = true
 		// StatementArrayOp.cpp:129–131 — read_indices + write_var; assert(read)
@@ -270,7 +270,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
-			return Stmt{Kind: StmtArrayOp}
+			return Stmt{}
 		}
 		cg.WriteVar(iv)
 		// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
@@ -305,7 +305,7 @@ func MakeRandomArrayInit(
 				cg.RemoveIVBound(d.IV)
 			}
 		}
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	parent := blk.RandomParentBlock(r, false)
 	// no soft invent parent=blk when RandomParentBlock fails
@@ -315,7 +315,7 @@ func MakeRandomArrayInit(
 				cg.RemoveIVBound(d.IV)
 			}
 		}
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	qfer := av.Qfer
 	// StatementArrayOp.cpp:141–143 — make_init_value; assert(visit_facts) (no const soft-fallback)
@@ -326,7 +326,7 @@ func MakeRandomArrayInit(
 				cg.RemoveIVBound(d.IV)
 			}
 		}
-		return Stmt{Kind: StmtArrayOp}
+		return Stmt{}
 	}
 	// StatementArrayOp.cpp:144 — assert(init->visit_facts(...)); no soft invent skip
 	if cg.FM != nil {
@@ -337,7 +337,7 @@ func MakeRandomArrayInit(
 				}
 			}
 			SetError(ErrGeneric)
-			return Stmt{Kind: StmtArrayOp}
+			return Stmt{}
 		}
 	}
 

@@ -225,9 +225,10 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 	return nil
 }
 
-// makeGotoFailed is StatementGoto::make_random returning nullptr (stmtOK rejects).
+// makeGotoFailed is StatementGoto::make_random returning nullptr (empty Stmt;
+// no invent Kind-only shell — stmtOK rejects zero-value).
 func makeGotoFailed() Stmt {
-	return Stmt{Kind: StmtGoto}
+	return Stmt{}
 }
 
 // MakeRandomGoto mirrors StatementGoto::make_random.

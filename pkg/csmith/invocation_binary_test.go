@@ -110,12 +110,12 @@ func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
 }
 
 func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
-	// StatementAssign.cpp:127 assert(fm)
+	// StatementAssign.cpp:127 assert(fm) — nullptr empty (stmtOK false; StmtAssign is iota 0)
 	opts := Defaults()
 	c := EmptyCGContext()
 	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
-	if st.LhsVar != nil || st.Expr != nil {
-		t.Fatal("nil FM must fail closed empty assign")
+	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
+		t.Fatalf("nil FM must fail closed empty assign, got %#v", st)
 	}
 }
 
