@@ -1656,14 +1656,16 @@ func NewScopeThresholdTable(opts Options) *ThresholdTable {
 // VariableSelectionProbability mirrors VariableSelectionProbability.
 // VariableSelector.cpp:1043–1059 — rnd_upto(100); scopeTable get_value.
 func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
+	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ScopeNewValue
 	if r == nil {
-		return ScopeNewValue
+		return MaxVarScope
 	}
 	tab := NewScopeThresholdTable(opts)
 	v := r.RndUpto(100)
 	sc := tab.GetValue(int(v))
 	if sc < 0 {
-		return ScopeNewValue
+		// VariableSelector.cpp:1059 — return MAX_VAR_SCOPE
+		return MaxVarScope
 	}
 	return VariableScope(sc)
 }
@@ -1671,7 +1673,11 @@ func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
 // VariableCreationProbability mirrors VariableCreationProbability.
 // VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
 func VariableCreationProbability(r *Rng, opts Options) VariableScope {
-	if opts.GlobalVariables && r != nil && r.RndFlipcoin(10) {
+	// VariableSelector.cpp:1065 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ParentLocal without RNG
+	if r == nil {
+		return MaxVarScope
+	}
+	if opts.GlobalVariables && r.RndFlipcoin(10) {
 		return ScopeGlobal
 	}
 	return ScopeParentLocal
@@ -1727,23 +1733,17 @@ func (vs *VariableSelector) SelectWithInvalid(
 			SetError(ErrGeneric)
 			return nil
 		}
+	case MaxVarScope:
+		// VariableSelector.cpp:1222–1223 — assert(0); no soft invent GenerateNewVariable
+		return nil
 	default:
-		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
+		// unknown scope — no soft invent create
+		return nil
 	}
-	// if scope pick failed (e.g. no params), fall through to create
-	if v == nil {
-		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
-	}
-	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
+	// VariableSelector.cpp:1224 — ERROR_GUARD(nullptr); null scope pick stays null (no soft create)
+	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile()); no soft invent non-vol
 	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
-		// must not return volatile under impure effect_context
-		vs.VarCreated = false
-		v2 := vs.GenerateNewVariable(access, cg, t, qfer, r)
-		if v2 != nil && !v2.IsVolatile() {
-			v = v2
-		} else {
-			v = nil
-		}
+		return nil
 	}
 	// VariableSelector.cpp:1229–1239 — record statistics
 	if v != nil {
@@ -1877,6 +1877,10 @@ func (vs *VariableSelector) GenerateNewVariable(
 		return nil
 	}
 	scope := VariableCreationProbability(r, vs.Opts)
+	// VariableSelector.cpp:1096–1097 — ERROR_GUARD(nullptr) when creation scope is MAX
+	if scope == MaxVarScope {
+		return nil
+	}
 	switch scope {
 	case ScopeGlobal:
 		// VariableSelector.cpp:1100 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewGlobal, nullptr)
@@ -1889,9 +1893,12 @@ func (vs *VariableSelector) GenerateNewVariable(
 			t2 = t
 		}
 		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
-	default:
+	case ScopeParentLocal:
 		// VariableSelector.cpp:1114–1115 — DEPTH_GUARD_BY_DEPTH for parent-local create
 		if DepthGuardByDepth(vs.Opts, MinimalDepth(DtGenerateNewParentLocal, 0)) == BadDepth {
+			return nil
+		}
+		if r == nil {
 			return nil
 		}
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
@@ -1904,10 +1911,10 @@ func (vs *VariableSelector) GenerateNewVariable(
 			}
 			return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
 		}
-		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
-		if t2 == nil {
-			t2 = t
-		}
-		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+		// empty stack: C++ would rnd_upto(0); library → nil (no soft invent global)
+		return nil
+	default:
+		// only Global / ParentLocal from VariableCreationProbability
+		return nil
 	}
 }
