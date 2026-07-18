@@ -844,7 +844,8 @@ func (e *Expression) outputBody() string {
 		}
 		return "(" + l + " , " + r + ")"
 	}
-	return "/*expr*/"
+	// Expression.cpp:195–200 default: no emit invent; incomplete IR → empty
+	return ""
 }
 
 // makeExpressionFuncall mirrors ExpressionFuncall::make_random.

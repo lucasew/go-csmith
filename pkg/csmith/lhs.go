@@ -206,10 +206,8 @@ func MakeRandomLhs(
 	noSignedOverflow bool,
 	qfer *CVQualifiers,
 ) *Lhs {
-	if typ == nil {
-		typ = GetIntType()
-	}
-	if r == nil || vs == nil || cg == nil {
+	// Lhs::make_random always receives a type from assign/factories (no GetIntType invent)
+	if typ == nil || r == nil || vs == nil || cg == nil {
 		return nil
 	}
 	// Lhs.cpp:qfer from caller; default non-const non-vol storage

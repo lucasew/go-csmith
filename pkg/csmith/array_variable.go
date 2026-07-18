@@ -338,20 +338,19 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 }
 
 // SetIndex mirrors ArrayVariable::set_index (string form for emit).
-// ArrayVariable.cpp:229+ — set index expression string at position.
+// ArrayVariable.cpp:229–231 — indices[index] = e; no soft invent "0" padding.
 func (av *ArrayVariable) SetIndex(index int, expr string) {
 	if av == nil || index < 0 {
 		return
 	}
+	// grow with empty slots (C++ assumes index already valid; no invent constants)
 	for len(av.Indices) <= index {
-		av.Indices = append(av.Indices, "0")
+		av.Indices = append(av.Indices, "")
 	}
 	av.Indices[index] = expr
-	// keep IndexExprs in sync: constant string → TermConstant; "-1" any-member
+	// keep IndexExprs in sync: constant string → TermConstant
 	for len(av.IndexExprs) <= index {
-		av.IndexExprs = append(av.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType(),
-		})
+		av.IndexExprs = append(av.IndexExprs, nil)
 	}
 	av.IndexExprs[index] = &Expression{
 		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
@@ -359,7 +358,7 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 }
 
 // SetIndexExpr mirrors ArrayVariable::set_index(size_t, const Expression*).
-// ArrayVariable.cpp:229 — stores Expression* and updates emit string.
+// ArrayVariable.cpp:229–231 — stores Expression*; emit string from Output only.
 func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 	if av == nil || index < 0 {
 		return
@@ -368,20 +367,18 @@ func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 		av.IndexExprs = append(av.IndexExprs, nil)
 	}
 	av.IndexExprs[index] = e
-	s := "0"
+	// no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
+	s := ""
 	if e != nil {
 		s = e.Output()
-		if s == "" {
-			s = "0"
-		}
 	}
 	for len(av.Indices) <= index {
-		av.Indices = append(av.Indices, "0")
+		av.Indices = append(av.Indices, "")
 	}
 	av.Indices[index] = s
 }
 
-// AddIndex mirrors ArrayVariable::add_index.
+// AddIndex mirrors ArrayVariable::add_index (string helper).
 func (av *ArrayVariable) AddIndex(expr string) {
 	if av == nil {
 		return
@@ -393,26 +390,25 @@ func (av *ArrayVariable) AddIndex(expr string) {
 }
 
 // AddIndexExpr appends an index Expression (ArrayVariable::add_index).
+// ArrayVariable.cpp:227 — indices.push_back(e); no soft invent "0".
 func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 	if av == nil {
 		return
 	}
 	av.IndexExprs = append(av.IndexExprs, e)
-	s := "0"
+	s := ""
 	if e != nil {
 		s = e.Output()
-		if s == "" {
-			s = "0"
-		}
 	}
 	av.Indices = append(av.Indices, s)
 }
 
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
 // ArrayVariable.cpp:439–461 — nested braces for multi-dim; pick from init_strings.
+// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR.
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {
 	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
-		return "0"
+		return ""
 	}
 	var b strings.Builder
 	b.WriteString("{")
@@ -690,8 +686,9 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 // index may be out of range (signed cast + % size). Kept for completeness;
 // live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.
 func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
+	// dead path; C++ would dereference indices[i] — no soft invent "0"
 	if av == nil || idx == nil {
-		return "0"
+		return ""
 	}
 	size := 1
 	if i >= 0 && i < len(av.Sizes) && av.Sizes[i] > 0 {

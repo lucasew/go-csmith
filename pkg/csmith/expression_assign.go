@@ -18,9 +18,8 @@ func MakeExpressionAssign(
 	if cg == nil {
 		return nil
 	}
-	if typ == nil {
-		typ = GetIntType()
-	}
+	// ExpressionAssign.cpp:49+ — type from Expression::make_random (may be non-null);
+	// StatementAssign::make_random SelectLType when type nullptr — pass through nil, no invent.
 	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)
 	if qfer == nil {
 		q := RandomQualifiersDefaultProbs(typ, AccessWrite, *cg, true, opts, probs, r)

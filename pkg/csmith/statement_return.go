@@ -51,9 +51,10 @@ func MakeRandomReturn(
 	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
 		return st
 	}
+	// StatementReturn.cpp:56–62 — curr_func->return_type (assert curr_func); no invent
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
-		ret = GetIntType()
+		return st
 	}
 	// rv->qfer for return dummy when present
 	var qfer *CVQualifiers

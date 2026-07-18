@@ -157,6 +157,29 @@ func TestOutputUpperBoundArray(t *testing.T) {
 	}
 }
 
+func TestSetIndexExprNoSoftZero(t *testing.T) {
+	// ArrayVariable.cpp:227–231 — push/set Expression*; no invent "0" for nil/empty
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	av.AddIndexExpr(nil)
+	if len(av.Indices) != 1 || av.Indices[0] != "" {
+		t.Fatalf("want empty index string, got %q", av.Indices)
+	}
+	av.SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
+	if av.Indices[0] != "3" {
+		t.Fatal(av.Indices[0])
+	}
+	// grow SetIndex without padding invent zeros
+	av2 := &ArrayVariable{Variable: Variable{Name: "g_b"}, Sizes: []int{2, 2}}
+	av2.SetIndex(1, "i")
+	if len(av2.Indices) != 2 || av2.Indices[0] != "" || av2.Indices[1] != "i" {
+		t.Fatalf("pad empty not 0: %v", av2.Indices)
+	}
+}
+
 func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// ArrayVariable.cpp:703–711 — cvs[i] only; no soft i/j/k invent
 	av := &ArrayVariable{
