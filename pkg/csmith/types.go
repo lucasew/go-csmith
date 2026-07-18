@@ -286,3 +286,8 @@ func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
 	}
 	return st
 }
+
+// GetIntType mirrors get_int_type() → eInt.
+// Type.cpp:408.
+func GetIntType() *Type { return GetSimpleType(EInt) }
+

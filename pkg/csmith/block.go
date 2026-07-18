@@ -2,15 +2,23 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Stmt is a minimal statement record (emit only; full Statement subclasses later).
 type Stmt struct {
 	Kind StatementType
-	// Expr is return value / assign RHS when present.
+	// Expr is return value / assign RHS / if-test when present.
 	Expr *Expression
 	// LhsVar is assign target when Kind==StmtAssign.
 	LhsVar *Variable
+	// Then/Else for if; Then is for-body for for.
+	Then *Block
+	Else *Block
+	// Loop holds for-loop control (init/test/incr).
+	Loop *LoopControl
 }
 
 // Block mirrors Block : Statement with local_vars and stms.
@@ -131,7 +139,7 @@ func makeRandomStmt(
 		}
 	case StmtAssign:
 		// Lhs: SelectGlobal WRITE; RHS expression
-		ty := GetSimpleType(EInt)
+		ty := GetIntType()
 		if vs != nil {
 			q := NewCVQualifiers([]bool{false}, []bool{false})
 			st.LhsVar = vs.SelectGlobal(AccessWrite, cg, ty, &q, r)
@@ -142,9 +150,12 @@ func makeRandomStmt(
 		}
 	case StmtBreak, StmtContinue:
 		// bare
-	case StmtFor, StmtIfElse, StmtGoto, StmtArrayOp, StmtInvoke:
-		// structural stubs — no nested body yet (avoid unbounded recursion without depth care)
-		// Emit as comments / empty for now via Output
+	case StmtIfElse:
+		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, cg)
+	case StmtFor:
+		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+	case StmtGoto, StmtArrayOp, StmtInvoke:
+		// still stubs
 	default:
 	}
 	_ = b
@@ -198,9 +209,39 @@ func (b *Block) Output(indent int) string {
 		case StmtContinue:
 			sb.WriteString("continue;\n")
 		case StmtFor:
-			sb.WriteString("/* for-stub */;\n")
+			if st.Loop != nil && st.Loop.IV != nil {
+				iv := st.Loop.IV.Name
+				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
+				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
+				incr := st.Loop.IncrOp.AssignOpC(iv, fmt.Sprintf("%d", st.Loop.IncrN))
+				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
+				if st.Then != nil {
+					sb.WriteString(st.Then.Output(indent + 1))
+				} else {
+					sb.WriteString(inner + "{\n" + inner + "}\n")
+				}
+			} else {
+				sb.WriteString("/* for-stub */;\n")
+			}
 		case StmtIfElse:
-			sb.WriteString("/* if-stub */;\n")
+			sb.WriteString("if (")
+			if st.Expr != nil {
+				sb.WriteString(st.Expr.Output())
+			} else {
+				sb.WriteString("0")
+			}
+			sb.WriteString(")\n")
+			if st.Then != nil {
+				sb.WriteString(st.Then.Output(indent + 1))
+			} else {
+				sb.WriteString(inner + "{\n" + inner + "}\n")
+			}
+			sb.WriteString(inner + "else\n")
+			if st.Else != nil {
+				sb.WriteString(st.Else.Output(indent + 1))
+			} else {
+				sb.WriteString(inner + "{\n" + inner + "}\n")
+			}
 		case StmtGoto:
 			sb.WriteString("/* goto-stub */;\n")
 		case StmtArrayOp:

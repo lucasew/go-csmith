@@ -404,8 +404,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 9: `Statement` probability + minimal Stmt emit | **Partial** |
 | Layer 10: `Function` signature + `make_first` | **Partial** |
 | Layer 10b: `Block::make_random` | **Partial** |
-| Layer 12: `DefaultProgramGenerator` + `Generate` | **Partial** — header, make_first, globals, main; no structs/hash fidelity |
-| ArrayVariable / full Statement subclasses / multi-func | **Not started** |
-| CLI drop-in | **Wired** (calls Generate; flag parity still incomplete) |
+| Layer 12: `DefaultProgramGenerator` + `Generate` | **Partial** |
+| Layer 9b: `StatementIf` / `StatementFor` | **Partial** — real then/else and for control+body; no FactMgr/SafeOpFlags |
+| SelectLoopCtrlVar | **Partial** — globals/params/stack ints |
+| ArrayVariable / multi-func / SafeOp | **Not started** |
+| CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

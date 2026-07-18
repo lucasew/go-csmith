@@ -185,3 +185,54 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	}
 	return v
 }
+
+// SelectLoopCtrlVar mirrors VariableSelector::SelectLoopCtrlVar (simplified).
+// VariableSelector.cpp:1146–1179 — non-array visible ints, WRITE, eConvert; else new global.
+func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[*Variable]bool) *Variable {
+	if vs == nil || r == nil {
+		return nil
+	}
+	ty := GetIntType()
+	var cands []*Variable
+	// Globals (find_all_non_array_visible without full block chain)
+	for _, v := range vs.GlobalList {
+		if v == nil || invalid[v] || v.IsArray || v.IsVolatile() {
+			continue
+		}
+		if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
+			cands = append(cands, v)
+		}
+	}
+	// Locals on function stack
+	if cg.CurrentFunc != nil {
+		for _, blk := range cg.CurrentFunc.Stack {
+			if blk == nil {
+				continue
+			}
+			for _, v := range blk.LocalVars {
+				if v == nil || invalid[v] || v.IsArray || v.IsVolatile() {
+					continue
+				}
+				if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
+					cands = append(cands, v)
+				}
+			}
+		}
+		// params
+		for _, v := range cg.CurrentFunc.Param {
+			if v == nil || invalid[v] || v.IsVolatile() {
+				continue
+			}
+			if v.Type != nil && v.Type.IsSimple() && ty.Match(v.Type, MatchConvert) {
+				cands = append(cands, v)
+			}
+		}
+	}
+	if v := ChooseOKVar(r, cands); v != nil {
+		return v
+	}
+	if vs.Opts.GlobalVariables {
+		return vs.GenerateNewGlobal(AccessWrite, cg, ty, nil, r)
+	}
+	return nil
+}
