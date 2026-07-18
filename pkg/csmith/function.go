@@ -14,6 +14,7 @@ type Function struct {
 	Blocks     []*Block // Function::blocks
 	IsInlined  bool
 	IsBuiltin  bool
+	IsBuilt    bool // BuildState::Built after GenerateBody/make_first
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -127,6 +128,7 @@ func MakeFirst(
 	// GenerateBody
 	cg := WithFunc(f, EmptyEffect())
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
+	f.IsBuilt = true
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
 	}
@@ -152,6 +154,7 @@ func (f *Function) GenerateBody(
 	cg := prev
 	cg.CurrentFunc = f
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
+	f.IsBuilt = true
 }
 
 // OutputForwardDecl emits a C prototype.
@@ -212,7 +215,8 @@ func (f *Function) Output() string {
 	}
 	s += ")\n"
 	if f.Body != nil {
-		s += f.Body.Output(1)
+		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
+		s += f.Body.Output(0)
 	} else {
 		s += "{\n}\n"
 	}

@@ -402,10 +402,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 4b: `Type::match` / cache | **Partial** |
 | Layer 8: `Expression` term pick + const/var | **Partial** |
 | Layer 9: `Statement` probability + minimal Stmt emit | **Partial** |
-| Layer 10: `Function` signature + `make_first` | **Partial** — params, rv, body block; no DFA/extensions |
-| Layer 10b: `Block::make_random` | **Partial** — size Keep-filter, stmt stubs, early return |
-| `Generate` / ProgramGenerator | **Stub** |
-| ArrayVariable / full Statement subclasses | **Not started** |
-| CLI drop-in | **Last** |
+| Layer 10: `Function` signature + `make_first` | **Partial** |
+| Layer 10b: `Block::make_random` | **Partial** |
+| Layer 12: `DefaultProgramGenerator` + `Generate` | **Partial** — header, make_first, globals, main; no structs/hash fidelity |
+| ArrayVariable / full Statement subclasses / multi-func | **Not started** |
+| CLI drop-in | **Wired** (calls Generate; flag parity still incomplete) |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
