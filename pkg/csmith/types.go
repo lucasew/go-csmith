@@ -403,7 +403,7 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 	case MatchExact:
 		return t == other
 	case MatchConvert:
-		return t.IsConvertable(other)
+		return t.IsConvertableOpts(other, Defaults())
 	case MatchDereference:
 		return t.IsDereferencedFrom(other)
 	case MatchDerefExact:
@@ -415,8 +415,40 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 	}
 }
 
+// IsPromotable mirrors Type::is_promotable.
+// Type.cpp:1387–1416 — integer rank promotion among simples.
+func (t *Type) IsPromotable(other *Type) bool {
+	if t == nil || other == nil || !t.IsSimple() || !other.IsSimple() {
+		return false
+	}
+	switch t.simple {
+	case EChar, EUChar:
+		return other.simple != EVoid
+	case EShort, EUShort:
+		return other.simple != EVoid && other.simple != EChar && other.simple != EUChar
+	case EInt, EUInt:
+		return other.simple != EVoid && other.simple != EChar && other.simple != EUChar &&
+			other.simple != EShort && other.simple != EUShort
+	case ELong, EULong:
+		return other.simple == ELong || other.simple == EULong ||
+			other.simple == ELongLong || other.simple == EULongLong
+	case ELongLong, EULongLong:
+		return other.simple == ELongLong || other.simple == EULongLong
+	case EFloat:
+		return other.simple != EVoid
+	default:
+		return false
+	}
+}
+
 // IsConvertable mirrors Type::is_convertable (simple + pointer size rules).
+// Type.cpp:1423–1455 — float→int forbidden; pointer same size unless strict_float/lang_cpp.
 func (t *Type) IsConvertable(other *Type) bool {
+	return t.IsConvertableOpts(other, Defaults())
+}
+
+// IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.
+func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 	if t == nil || other == nil {
 		return false
 	}
@@ -424,7 +456,7 @@ func (t *Type) IsConvertable(other *Type) bool {
 		return true
 	}
 	if t.IsSimple() && other.IsSimple() {
-		// forbidden float → int
+		// forbidden conversion from float to int (Type.cpp:1428–1429)
 		if other.IsFloat() && !t.IsFloat() {
 			return false
 		}
@@ -441,7 +473,15 @@ func (t *Type) IsConvertable(other *Type) bool {
 			if t.ptrTo.simple == other.ptrTo.simple {
 				return true
 			}
-			// lang_cpp / strict_float not applied (defaults: C, !strict_float)
+			// Type.cpp:1439–1449
+			if opts.StrictFloat &&
+				((t.ptrTo.IsFloat() && !other.ptrTo.IsFloat()) ||
+					(!t.ptrTo.IsFloat() && other.ptrTo.IsFloat())) {
+				return false
+			}
+			if opts.LangCPP {
+				return false
+			}
 			return t.ptrTo.SizeInBytes() == other.ptrTo.SizeInBytes()
 		}
 	}
