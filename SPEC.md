@@ -412,9 +412,9 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 9c: `StatementAssign` ops table | **Partial** |
 | Layer 4c: `SelectLType` + pointer types | **Partial** |
 | Arrays select/itemize/array-op | **Partial** |
-| Struct types + field expand | **Partial** |
-| Layer 4e: bitfields in structs | **Partial** — make_one_bitfield, full/normal paths, `: width` emit |
-| Unions / CFG back-edge / zero-pad skip | **Not started** / partial |
+| Structs + bitfields + field expand | **Partial** |
+| Layer 4f: unions | **Partial** — make_random_union, first-field init, LType, decls |
+| CFG back-edge gotos | **Not started** |
 | CLI drop-in | **Wired** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.

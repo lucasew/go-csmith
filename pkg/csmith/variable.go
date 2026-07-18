@@ -102,7 +102,7 @@ func (v *Variable) IsPointer() bool {
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
 func (v *Variable) CreateFieldVars() {
-	if v == nil || v.Type == nil || !v.Type.IsStruct() {
+	if v == nil || v.Type == nil || !v.Type.IsAggregate() {
 		return
 	}
 	if len(v.FieldVars) > 0 {

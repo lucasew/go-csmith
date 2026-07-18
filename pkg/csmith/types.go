@@ -43,9 +43,10 @@ type Type struct {
 	simple ESimpleType
 	// ptrTo non-nil ⇒ pointer type (Type::ptr_type).
 	ptrTo *Type
-	// Struct fields when isStruct (Type eStruct).
+	// Struct/union aggregate.
 	isStruct bool
-	// StructName is C tag, e.g. "S0".
+	isUnion  bool
+	// StructName is C tag, e.g. "S0" or "U0".
 	StructName string
 	// Fields are struct/union members (simple or nested struct).
 	Fields []StructField
@@ -83,7 +84,7 @@ func GetSimpleType(st ESimpleType) *Type {
 
 // IsSimple reports eType == eSimple.
 func (t *Type) IsSimple() bool {
-	return t != nil && t.ptrTo == nil && !t.isStruct
+	return t != nil && t.ptrTo == nil && !t.isStruct && !t.isUnion
 }
 
 // IsStruct reports eType == eStruct.
@@ -91,9 +92,14 @@ func (t *Type) IsStruct() bool {
 	return t != nil && t.isStruct
 }
 
+// IsUnion reports eType == eUnion.
+func (t *Type) IsUnion() bool {
+	return t != nil && t.isUnion
+}
+
 // IsAggregate mirrors Type::is_aggregate (struct/union).
 func (t *Type) IsAggregate() bool {
-	return t != nil && t.isStruct
+	return t != nil && (t.isStruct || t.isUnion)
 }
 
 // Simple returns the eSimpleType (only meaningful if IsSimple).
@@ -166,6 +172,12 @@ func (t *Type) CName() string {
 			return "struct " + t.StructName
 		}
 		return "struct"
+	}
+	if t.isUnion {
+		if t.StructName != "" {
+			return "union " + t.StructName
+		}
+		return "union"
 	}
 	switch t.simple {
 	case EVoid:

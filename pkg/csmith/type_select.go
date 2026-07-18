@@ -10,6 +10,8 @@ type TypeEnv struct {
 	AllTypes []*Type
 	// StructTypes are created struct types (subset of AllTypes).
 	StructTypes []*Type
+	// UnionTypes are created union types.
+	UnionTypes []*Type
 }
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).
@@ -87,6 +89,12 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	if op == AssignSimple && env != nil && len(env.StructTypes) > 0 {
 		if r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
 			return env.StructTypes[r.RndUpto(uint32(len(env.StructTypes)))]
+		}
+	}
+	// union as LType (UnionAsLTypeProb) when any unions exist
+	if op == AssignSimple && env != nil && len(env.UnionTypes) > 0 {
+		if r.RndFlipcoin(uint32(probs.Single(PUnionAsLTypeProb))) {
+			return env.UnionTypes[r.RndUpto(uint32(len(env.UnionTypes)))]
 		}
 	}
 

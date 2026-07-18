@@ -136,16 +136,25 @@ func (g *ProgramGenerator) OutputHeader() string {
 	return b.String()
 }
 
-// OutputStructTypes emits struct definitions (before globals/functions).
+// OutputStructTypes emits struct/union definitions (before globals/functions).
 func (g *ProgramGenerator) OutputStructTypes() string {
-	if g == nil || len(g.Types.StructTypes) == 0 {
+	if g == nil {
+		return ""
+	}
+	if len(g.Types.StructTypes) == 0 && len(g.Types.UnionTypes) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("/* --- STRUCT TYPES --- */\n\n")
+	b.WriteString("/* --- STRUCT/UNION TYPES --- */\n\n")
 	for _, st := range g.Types.StructTypes {
 		if st != nil {
 			b.WriteString(st.OutputStructDecl())
+			b.WriteString("\n")
+		}
+	}
+	for _, ut := range g.Types.UnionTypes {
+		if ut != nil {
+			b.WriteString(ut.OutputUnionDecl())
 			b.WriteString("\n")
 		}
 	}
