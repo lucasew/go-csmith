@@ -32,6 +32,16 @@ func MakeRandomExprStmt(
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, nil, nil, false)
+	// StatementExpr.cpp:61 ERROR_GUARD(nullptr)
+	if HasError() {
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preEffect
+		}
+		if cg.FM != nil {
+			cg.FM.RestoreFacts(factsCopy)
+		}
+		return Stmt{Kind: StmtInvoke}
+	}
 	if fi == nil || fi.Failed {
 		// StatementExpr.cpp:62–66 — reset_effect_accum + restore_facts
 		if cg.EffectAccum != nil {

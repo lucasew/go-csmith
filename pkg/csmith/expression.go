@@ -726,14 +726,15 @@ func makeExpressionVariableFlags(
 				dummy = append(dummy, v)
 				continue
 			}
-			// as_param: forbid address-of argument (ExpressionVariable.cpp:97–100)
-			if asParam && v.IsArgument() && typ.IsDereferencedFrom(v.Type) {
+			// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
+			// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
+			if asParam && v.IsArgument() && v.Type.IsDereferencedFrom(typ) {
 				dummy = append(dummy, v)
 				continue
 			}
-			// !addr_taken_of_locals: forbid & of local/arg (ExpressionVariable.cpp:101–105)
+			// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
 			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
-				typ.IsDereferencedFrom(v.Type) {
+				v.Type.IsDereferencedFrom(typ) {
 				dummy = append(dummy, v)
 				continue
 			}
@@ -749,28 +750,31 @@ func makeExpressionVariableFlags(
 					continue
 				}
 			}
-			// ExpressionVariable.cpp:116–119 — opportunistic_validate
+			// ExpressionVariable.cpp:116–119 — opportunistic_validate (always; empty facts if no FM)
+			var facts []*FactPointTo
 			if cg.FM != nil {
-				if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
-					dummy = append(dummy, v)
-					continue
-				}
+				facts = cg.FM.GlobalFacts
 			}
-		}
-		// ExpressionVariable.cpp:120–124 — visit_facts with (var, type); on success
-		// use ExpressionVariable(*var) when indirection==0 else (*var, type)
-		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
-		if cg.FM != nil {
-			if !cg.VisitFactsExpressionVariable(probe, vs.Opts) {
-				if cg.EffectAccum != nil {
-					*cg.EffectAccum = preAccum
-				}
-				cg.EffectStm = preStm
+			if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
 				dummy = append(dummy, v)
 				continue
 			}
-		} else {
-			cg.NoteRead(v)
+		}
+		// ExpressionVariable.cpp:80 ERROR_GUARD after select (sticky)
+		if HasError() {
+			break
+		}
+		// ExpressionVariable.cpp:120–124 — visit_facts with (var, type); on success
+		// use ExpressionVariable(*var) when indirection==0 else (*var, type)
+		// C++ always has FactMgr; visit_facts records reads even with empty fact vec
+		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
+		if !cg.VisitFactsExpressionVariable(probe, vs.Opts) {
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			dummy = append(dummy, v)
+			continue
 		}
 		// ExpressionVariable.cpp:122–123
 		ev := probe

@@ -463,3 +463,47 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	}
 	_ = e
 }
+
+func TestExpressionVariableAddrOfArgForbiddenAsParam(t *testing.T) {
+	// ExpressionVariable.cpp:97–100 — var->type->is_dereferenced_from(want)
+	// Taking & of argument for pointer want is forbidden when as_param.
+	ClearError()
+	opts := Defaults()
+	opts.AddrTakenOfLocals = true // only as_param rule under test
+	vs := NewVariableSelector(opts)
+	pt := PointerTo(GetIntType())
+	// sole candidate: int argument (address would yield int*)
+	arg := CreateVariableScalars("p_1", GetIntType(), false, false)
+	// mark as argument via name p_ / IsArgument
+	if !arg.IsArgument() {
+		// force argument role if CreateVariableScalars does not
+		arg.Name = "p_1"
+	}
+	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{arg}}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// only param available — select may create globals; disable globals to force param
+	opts.GlobalVariables = false
+	vs.Opts = opts
+	// param on function only
+	e := makeExpressionVariableFlags(NewRng(2), vs, &cg, pt, nil, true, false)
+	// either nil (loop exhaust / create local only) or not &arg
+	if e != nil && e.Var == arg && e.IndirectLevel() < 0 {
+		t.Fatal("as_param must not take address of argument")
+	}
+}
+
+func TestExpressionVariableIsDereferencedFromOrder(t *testing.T) {
+	// want int*, var int → var.Type.IsDereferencedFrom(want) true (address-of)
+	// want.IsDereferencedFrom(var) false
+	want := PointerTo(GetIntType())
+	vty := GetIntType()
+	if !vty.IsDereferencedFrom(want) {
+		t.Fatal("int is_dereferenced_from int* (address-of)")
+	}
+	if want.IsDereferencedFrom(vty) {
+		t.Fatal("int* is not obtained by deref of int")
+	}
+}
