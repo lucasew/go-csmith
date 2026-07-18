@@ -132,8 +132,8 @@ func MakeRandomBlock(
 	return b
 }
 
-// makeRandomStmt picks a statement kind and fills a minimal Stmt.
-// Full Statement::make_random deferred; uses StatementProbability + simple filters.
+// makeRandomStmt picks a statement kind and fills a Stmt.
+// Statement::make_random — filter + dispatch; retry on failed factory (Statement.cpp:314–316).
 func makeRandomStmt(
 	r *Rng,
 	opts Options,
@@ -167,11 +167,31 @@ func makeRandomStmt(
 		}
 		return false
 	})
-	kind := StatementProbabilityFilter(r, stmtTab, f)
-	st := Stmt{Kind: kind}
+	// retry failed factories (null Statement* upstream)
+	for tries := 0; tries < 6; tries++ {
+		kind := StatementProbabilityFilter(r, stmtTab, f)
+		st := makeRandomStmtKind(r, opts, probs, vs, tables, stmtTab, cg, b, kind)
+		if stmtOK(st) {
+			return st
+		}
+	}
+	// last resort: assignment (always producible)
+	return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
+}
+
+func makeRandomStmtKind(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	cg CGContext,
+	b *Block,
+	kind StatementType,
+) Stmt {
 	switch kind {
 	case StmtReturn:
-		// StatementReturn::make_random — ExpressionVariable only
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
 		return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
@@ -190,10 +210,28 @@ func makeRandomStmt(
 	case StmtInvoke:
 		return MakeRandomExprStmt(r, opts, probs, vs, tables, cg)
 	default:
+		return Stmt{Kind: kind}
 	}
-	_ = b
-	_ = probs
-	return st
+}
+
+// stmtOK reports whether a generated statement is usable (non-null factory).
+func stmtOK(st Stmt) bool {
+	switch st.Kind {
+	case StmtAssign:
+		return st.LhsVar != nil || st.ArrayAccess != ""
+	case StmtInvoke:
+		return st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed
+	case StmtFor, StmtArrayOp:
+		return st.Loop != nil && st.Loop.IV != nil
+	case StmtGoto:
+		return st.Label != ""
+	case StmtReturn:
+		return st.Expr != nil
+	case StmtIfElse:
+		return st.Then != nil
+	default:
+		return true
+	}
 }
 
 // Output emits C for the block with indent levels.

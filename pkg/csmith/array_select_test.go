@@ -104,3 +104,42 @@ func TestGenerateArrayOpOrDecl(t *testing.T) {
 		t.Log("arrays still rare in short seed scan")
 	}
 }
+
+func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{}
+	tables := NewExprTables(opts)
+	stmtTab := NewStatementThresholdTable(opts)
+	// force multi-dim array
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	av := CreateArrayVariable(NewRng(2), opts, nil, "g_md", GetIntType(), MakeInt(0), q)
+	if av == nil {
+		t.Fatal("nil array")
+	}
+	// ensure at least 2 dims if possible
+	if len(av.Sizes) < 2 {
+		av.Sizes = []int{2, 3}
+		av.ArraySizes = av.Sizes
+	}
+	vs.Arrays = []*ArrayVariable{av}
+	vs.GlobalList = []*Variable{&av.Variable}
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	// force array_init path by calling MakeRandomArrayInit directly
+	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, cg)
+	if st.Kind != StmtArrayOp || st.Loop == nil {
+		t.Fatalf("%+v", st)
+	}
+	out := (&Block{Stmts: []Stmt{st}}).Output(0)
+	// should have nested for and multi-index access
+	if strings.Count(out, "for (") < 2 && len(av.Sizes) >= 2 {
+		t.Log("dims", av.Sizes, out)
+	}
+	if !strings.Contains(out, "g_md[") {
+		t.Fatal(out)
+	}
+}

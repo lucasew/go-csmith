@@ -65,7 +65,7 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 }
 
 // MakeRandomArrayInit mirrors StatementArrayOp::make_random_array_init.
-// StatementArrayOp.cpp:85+ — select_array; per-dim loop ctrl; body assigns itemized cells.
+// StatementArrayOp.cpp:85+ — per-dimension ctrl vars; nested for header; body assigns a[i0][i1]….
 func MakeRandomArrayInit(
 	r *Rng,
 	opts Options,
@@ -83,52 +83,71 @@ func MakeRandomArrayInit(
 	if av == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
-	// first dimension drives our single for emit (multi-dim nested deferred)
-	size := 1
-	if len(av.Sizes) > 0 {
-		size = av.Sizes[0]
+	if len(av.Sizes) == 0 {
+		av.Sizes = []int{1}
 	}
-	init, incr := MakeRandomIterCtrl(r, size)
-	iv := vs.SelectLoopCtrlVar(r, cg, nil)
-	if iv == nil {
-		iv = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, r)
-	}
-	// burn RNG for other dimensions' ctrl vars like upstream loop over dim
-	for i := 1; i < len(av.Sizes); i++ {
-		_ = vs.SelectLoopCtrlVar(r, cg, nil)
-		_, _ = MakeRandomIterCtrl(r, av.Sizes[i])
-	}
-	lc := &LoopControl{
-		IV:       iv,
-		InitN:    init,
-		LimitN:   size,
-		IncrN:    incr,
-		TestOp:   BinCmpLt,
-		IncrOp:   AssignAdd,
-		SafeIncr: opts.SafeMath,
+	// per-dim loop control (StatementArrayOp.cpp:105–120)
+	var dims []*LoopControl
+	invalid := map[*Variable]bool{}
+	for _, size := range av.Sizes {
+		init, incr := MakeRandomIterCtrl(r, size)
+		iv := vs.SelectLoopCtrlVar(r, cg, invalid)
+		if iv == nil {
+			iv = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, r)
+		}
+		if iv != nil {
+			invalid[iv] = true
+		}
+		dims = append(dims, &LoopControl{
+			IV:       iv,
+			InitN:    init,
+			LimitN:   size,
+			IncrN:    incr,
+			TestOp:   BinCmpLt,
+			IncrOp:   AssignAdd,
+			SafeIncr: opts.SafeMath,
+		})
 	}
 	bodyCG := cg
 	bodyCG.Flags |= 2 // IN_LOOP
-	item := av.Itemize(r)
+	// access with ctrl vars: a[i0][i1]… (not constant itemize)
+	access := av.Name
+	for _, d := range dims {
+		if d != nil && d.IV != nil {
+			access += "[" + d.IV.Name + "]"
+		} else {
+			access += "[0]"
+		}
+	}
 	rhs := MakeRandomExpression(r, opts, tables, vs, bodyCG, av.Type, nil, true, false, MaxTermTypes, cg.ExprDepth)
 	if rhs == nil {
 		rhs = MakeRandomExpression(r, opts, tables, vs, bodyCG, av.Type, nil, true, false, TermConstant, cg.ExprDepth)
 	}
-	body := &Block{
+	// aggregate constant init may need tmp — emit direct assign for simple
+	innerBody := &Block{
 		Func: cg.CurrentFunc,
 		Stmts: []Stmt{{
 			Kind:        StmtAssign,
-			LhsVar:      &item.Variable,
 			Expr:        rhs,
 			AssignOp:    AssignSimple,
-			ArrayAccess: item.OutputAccess(),
+			ArrayAccess: access,
 		}},
 	}
-	_ = probs
-	return Stmt{
+	// nest fors: outermost first dim (StatementArrayOp::output_header)
+	// StmtArrayOp.Loop = outer; Then nests further ArrayOp fors or final body
+	st := Stmt{
 		Kind:        StmtArrayOp,
-		Loop:        lc,
-		Then:        body,
-		ArrayAccess: item.OutputAccess(),
+		Loop:        dims[len(dims)-1],
+		Then:        innerBody,
+		ArrayAccess: access,
 	}
+	for i := len(dims) - 2; i >= 0; i-- {
+		st = Stmt{
+			Kind: StmtArrayOp,
+			Loop: dims[i],
+			Then: &Block{Func: cg.CurrentFunc, Stmts: []Stmt{st}},
+		}
+	}
+	_ = probs
+	return st
 }
