@@ -165,3 +165,45 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 		t.Fatalf("pointer constant init want 0 got %+v", vp.Init)
 	}
 }
+
+func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
+	// VariableSelector.cpp:526–527 — Constant::make_random then create_array;
+	// no invent array with nil init when make_random fails.
+	opts := Defaults()
+	opts.StrictConstArrays = true
+	opts.Arrays = true
+	probs := NewProbabilities(opts)
+	probs.single[PNewArrayVariableProb] = 100
+	vs := NewVariableSelectorProbs(opts, probs)
+	// void → MakeRandom nil on array path → fail closed (no invent array shell)
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_x", NewRng(1)) != nil {
+		t.Fatal("void must fail closed")
+	}
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_y", nil) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+}
+
+func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
+	// VariableSelector.cpp:1364 — Constant::make_random; no invent CreateArray with nil init
+	opts := Defaults()
+	opts.GlobalVariables = true
+	probs := NewProbabilities(opts)
+	// only non-simple type in AllTypes so choose picks struct; MakeRandom needs probs
+	st := &Type{isStruct: true, StructName: "SOnly", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	vs := NewVariableSelectorProbs(opts, probs)
+	vs.Types = &TypeEnv{AllTypes: []*Type{st}, StructTypes: []*Type{st}}
+	vs.Probs = nil // MakeRandom(struct) fails closed
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	for seed := uint64(1); seed < 30; seed++ {
+		ClearError()
+		if av := vs.CreateRandomArray(NewRng(seed), cg); av != nil {
+			t.Fatalf("seed %d: must not invent array when make_random fails", seed)
+		}
+	}
+}

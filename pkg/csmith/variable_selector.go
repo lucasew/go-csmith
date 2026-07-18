@@ -1127,12 +1127,18 @@ func (vs *VariableSelector) createAndInitialize(
 		var init *Constant
 		var ie *Expression
 		if vs.Opts.StrictConstArrays {
+			// VariableSelector.cpp:526–527 — Constant::make_random; ERROR_GUARD
+			// no invent array with nil init when make_random fails
 			init = MakeRandom(t, vs.Opts, vs.Probs, r)
-			if init != nil {
-				ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
+			if init == nil || HasError() {
+				return nil
 			}
+			ie = &Expression{Term: TermConstant, Con: init, ExprType: t}
 		} else {
 			ie = vs.MakeInitValue(access, cg, t, &qfer, blk, r)
+			if HasError() {
+				return nil
+			}
 			if ie != nil && ie.Term == TermConstant {
 				init = ie.Con
 			}
@@ -1819,7 +1825,12 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	}
 	// VariableSelector.cpp:1362–1363 — qfer.add_qualifiers(false, false)
 	qfer := NewCVQualifiers([]bool{false}, []bool{false})
+	// VariableSelector.cpp:1364 — Constant::make_random(type); ERROR_GUARD path
+	// no invent CreateArrayVariable with nil init when make_random fails
 	init := MakeRandom(elem, vs.Opts, vs.Probs, r)
+	if init == nil || HasError() {
+		return nil
+	}
 	av := CreateArrayVariable(r, vs.Opts, vs.Probs, vs, &cg, blk, name, elem, init, qfer)
 	if av == nil || HasError() {
 		return nil
