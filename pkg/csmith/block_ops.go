@@ -480,8 +480,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
-		// Block.cpp:383 — sr->visit_facts(global_facts, …) (assert visited upstream)
-		_ = VisitFactsStatementReturn(st, cg, opts)
+		// Block.cpp:383–384 — sr->visit_facts; assert(visited)
+		// no soft invent success when visit fails
+		if !VisitFactsStatementReturn(st, cg, opts) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		if st.StmID > 0 {
 			// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
 			fm.SetMapFactsIn(st.StmID, preFacts)
