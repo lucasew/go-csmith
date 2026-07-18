@@ -83,10 +83,11 @@ func MakeRandomArrayLoop(
 	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
-	// StatementFor.cpp:316–330
+	// StatementFor.cpp:316–317 — rnd_upto(CGOptions::max_array_num_in_loop())
+	// no soft invent 4 when option is 0 (Defaults already set MaxArrayNumInLoop=4)
 	maxN := opts.MaxArrayNumInLoop
-	if maxN < 1 {
-		maxN = 4
+	if maxN < 0 {
+		maxN = 0
 	}
 	n := int(r.RndUpto(uint32(maxN)))
 	var mustReads, mustWrites []*Variable
@@ -150,8 +151,8 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 		return nil
 	}
 	maxN := opts.MaxArrayNumInLoop
-	if maxN < 1 {
-		maxN = 4
+	if maxN < 0 {
+		maxN = 0
 	}
 	n := int(r.RndUpto(uint32(maxN)))
 	var out []*ArrayVariable
@@ -237,11 +238,25 @@ func MakeRandomArrayInit(
 		}
 		// StatementArrayOp.cpp:128 — cvs.push_back(cv); cv must be live
 		if iv == nil {
+			// drop partial IV bounds before fail
+			for _, d := range dims {
+				if d != nil && d.IV != nil {
+					cg.RemoveIVBound(d.IV)
+				}
+			}
 			return Stmt{Kind: StmtArrayOp}
 		}
 		invalid[iv] = true
-		// StatementArrayOp.cpp:129–131 — read_indices + write_var
-		_ = cg.ReadIndices(iv, facts)
+		// StatementArrayOp.cpp:129–131 — read_indices + write_var; assert(read)
+		// no soft invent success when ReadIndices fails
+		if !cg.ReadIndices(iv, facts) {
+			for _, d := range dims {
+				if d != nil && d.IV != nil {
+					cg.RemoveIVBound(d.IV)
+				}
+			}
+			return Stmt{Kind: StmtArrayOp}
+		}
 		cg.WriteVar(iv)
 		// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
 		cg.AddIVBound(iv, size)
@@ -266,23 +281,46 @@ func MakeRandomArrayInit(
 		access += "[" + d.IV.Name + "]"
 	}
 
-	// StatementArrayOp.cpp:141–143 — make_init_value in random parent block
-	var parent *Block
-	if blk := cg.CurrentBlock(); blk != nil {
-		parent = blk.RandomParentBlock(r, false)
-		if parent == nil {
-			parent = blk
+	// StatementArrayOp.cpp:141 — get_current_block()->random_parent_block()
+	// Block::random_parent_block always includes self when allow_global=false
+	blk := cg.CurrentBlock()
+	if blk == nil {
+		for _, d := range dims {
+			if d != nil && d.IV != nil {
+				cg.RemoveIVBound(d.IV)
+			}
 		}
+		return Stmt{Kind: StmtArrayOp}
+	}
+	parent := blk.RandomParentBlock(r, false)
+	// no soft invent parent=blk when RandomParentBlock fails
+	if parent == nil {
+		for _, d := range dims {
+			if d != nil && d.IV != nil {
+				cg.RemoveIVBound(d.IV)
+			}
+		}
+		return Stmt{Kind: StmtArrayOp}
 	}
 	qfer := av.Qfer
 	// StatementArrayOp.cpp:141–143 — make_init_value; assert(visit_facts) (no const soft-fallback)
 	rhs := vs.MakeInitValue(AccessRead, *cg, av.Type, &qfer, parent, r)
 	if rhs == nil {
+		for _, d := range dims {
+			if d != nil && d.IV != nil {
+				cg.RemoveIVBound(d.IV)
+			}
+		}
 		return Stmt{Kind: StmtArrayOp}
 	}
 	// StatementArrayOp.cpp:144 — assert(init->visit_facts(...))
 	if cg.FM != nil {
 		if !VisitFactsExpression(rhs, cg, opts) {
+			for _, d := range dims {
+				if d != nil && d.IV != nil {
+					cg.RemoveIVBound(d.IV)
+				}
+			}
 			return Stmt{Kind: StmtArrayOp}
 		}
 	}

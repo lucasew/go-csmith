@@ -795,17 +795,17 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			if st.Loop != nil && st.Loop.IV != nil {
-				// StatementFor::Output — header from make_iteration IR
+				// StatementFor::Output — header + body Block always live
 				sb.WriteString(forHeaderOutput(st.Loop) + "\n")
+				// no soft invent empty "{}" body when Then missing
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
-				} else {
-					sb.WriteString(inner + "{\n" + inner + "}\n")
 				}
 			}
 			// incomplete for IR — no soft invent /* for-stub */
 		case StmtIfElse:
-			// StatementIf.cpp:147–148 — test.Output; no soft invent "0"
+			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
+			// no soft invent "0" test or empty "{}" branches
 			sb.WriteString("if (")
 			if st.Expr != nil {
 				sb.WriteString(st.Expr.Output())
@@ -813,14 +813,10 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(")\n")
 			if st.Then != nil {
 				sb.WriteString(st.Then.Output(indent + 1))
-			} else {
-				sb.WriteString(inner + "{\n" + inner + "}\n")
 			}
-			sb.WriteString(inner + "else\n")
 			if st.Else != nil {
+				sb.WriteString(inner + "else\n")
 				sb.WriteString(st.Else.Output(indent + 1))
-			} else {
-				sb.WriteString(inner + "{\n" + inner + "}\n")
 			}
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output; no soft invent "0"
@@ -834,14 +830,13 @@ func (b *Block) Output(indent int) string {
 			}
 			// incomplete goto IR — no soft invent /* goto-stub */
 		case StmtArrayOp:
-			// StatementArrayOp::output_header — numeric for (cv=init; cv<size; cv+=incr)
+			// StatementArrayOp::output_header + body/init block always live
 			// not StatementFor StatementAssign IR (InitStmt empty on array dims)
 			if st.Loop != nil && st.Loop.IV != nil {
 				sb.WriteString(arrayOpHeaderOutput(st.Loop, ProcessOptions()) + "\n")
+				// no soft invent empty "{}" when Then missing
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
-				} else {
-					sb.WriteString(inner + "{\n" + inner + "}\n")
 				}
 			}
 			// incomplete arrayop IR — no soft invent /* arrayop-stub */
