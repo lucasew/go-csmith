@@ -464,20 +464,83 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 	return item
 }
 
-// OutputAccess emits name[i0][i1]… for itemized, or bare name for collective.
+// OutputAccess mirrors ArrayVariable::Output for itemized / collective emit.
+// ArrayVariable.cpp:539–571 — collective bare name; itemized name[index]…
+// Index prefer IndexExprs (Expression::Output); C++ always takes the direct
+// path (`if (1)`), not the signed-cast % size branch.
 func (av *ArrayVariable) OutputAccess() string {
 	if av == nil {
 		return ""
 	}
-	if av.Collective == nil || len(av.Indices) == 0 {
-		return av.Name
+	name := av.GetActualName(false)
+	if av.Collective == nil {
+		return name
+	}
+	n := len(av.IndexExprs)
+	if n == 0 {
+		n = len(av.Indices)
+	}
+	if n == 0 {
+		// sizes-only fallback
+		n = len(av.Sizes)
+	}
+	if n == 0 {
+		return name
 	}
 	var b strings.Builder
-	b.WriteString(av.Name)
-	for _, ix := range av.Indices {
+	b.WriteString(name)
+	for i := 0; i < n; i++ {
 		b.WriteString("[")
-		b.WriteString(ix)
+		// ArrayVariable.cpp:548–552 — indices[i]->Output (if (1) path)
+		if i < len(av.IndexExprs) && av.IndexExprs[i] != nil {
+			b.WriteString(av.IndexExprs[i].Output())
+		} else if i < len(av.Indices) && av.Indices[i] != "" {
+			b.WriteString(av.Indices[i])
+		} else {
+			b.WriteString("0")
+		}
 		b.WriteString("]")
 	}
 	return b.String()
+}
+
+// OutputUpperBoundArray mirrors ArrayVariable::OutputUpperBound — name[size-1]….
+// ArrayVariable.cpp:572–577.
+func (av *ArrayVariable) OutputUpperBoundArray() string {
+	if av == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(av.GetActualName(false))
+	for _, sz := range av.Sizes {
+		b.WriteString("[")
+		if sz > 0 {
+			b.WriteString(itoa(sz - 1))
+		} else {
+			b.WriteString("0")
+		}
+		b.WriteString("]")
+	}
+	return b.String()
+}
+
+// OutputIndexModulo is the dead-code branch of ArrayVariable::Output when
+// index may be out of range (signed cast + % size). Kept for completeness;
+// live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.
+func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
+	if av == nil || idx == nil {
+		return "0"
+	}
+	size := 1
+	if i >= 0 && i < len(av.Sizes) && av.Sizes[i] > 0 {
+		size = av.Sizes[i]
+	}
+	body := idx.Output()
+	// cast signed index type to unsigned before %
+	if t := idx.GetType(); t != nil && t.IsSigned() {
+		if u := t.ToUnsigned(); u != nil {
+			return fmt.Sprintf("((%s)(%s) %% %d)", u.CName(), body, size)
+		}
+	}
+	return fmt.Sprintf("((%s) %% %d)", body, size)
 }

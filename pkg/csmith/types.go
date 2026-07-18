@@ -258,6 +258,33 @@ func (t *Type) IsSigned() bool {
 	}
 }
 
+// ToUnsigned mirrors Type::to_unsigned.
+// Type.cpp:1349–1377 — map signed simple types to unsigned counterparts.
+func (t *Type) ToUnsigned() *Type {
+	if t == nil || !t.IsSimple() {
+		return nil
+	}
+	switch t.simple {
+	case EUChar, EUInt, EUShort, EULong, EULongLong, EUInt128:
+		return t
+	case EChar:
+		return GetSimpleType(EUChar)
+	case EInt:
+		return GetSimpleType(EUInt)
+	case EShort:
+		return GetSimpleType(EUShort)
+	case ELong:
+		return GetSimpleType(EULong)
+	case ELongLong:
+		return GetSimpleType(EULongLong)
+	case EInt128:
+		// Type.cpp:1369–1372 — int128 stays as itself (and uint128)
+		return GetSimpleType(EInt128)
+	default:
+		return nil
+	}
+}
+
 // platform sizes from Options / platform.info (set by Generate via SetPlatformSizes).
 var (
 	platformIntSize = 4

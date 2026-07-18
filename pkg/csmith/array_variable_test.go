@@ -73,3 +73,78 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 		t.Fatalf("%+v arrays=%d", v, len(vs.Arrays))
 	}
 }
+
+
+func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
+	// ArrayVariable.cpp:539–552 — itemized emits name[expr]
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:    []int{8},
+	}
+	parent.AsArray = parent
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	off := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	ivExpr := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
+	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ivExpr, off}}
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:      []int{8},
+		Collective: parent,
+		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}},
+		Indices:    []string{"stale"},
+	}
+	item.AsArray = item
+	out := item.OutputAccess()
+	if !strings.Contains(out, "g_a[") || !strings.Contains(out, "+") {
+		t.Fatal(out)
+	}
+	if strings.Contains(out, "stale") {
+		t.Fatal("must prefer IndexExprs over Indices strings")
+	}
+	// Variable::Output dispatches to ArrayVariable::Output for itemized
+	if item.OutputC() != out {
+		t.Fatalf("OutputC %q want %q", item.OutputC(), out)
+	}
+	if item.OutputLhsC() != out {
+		t.Fatalf("OutputLhsC %q", item.OutputLhsC())
+	}
+}
+
+func TestOutputUpperBoundArray(t *testing.T) {
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Sizes:    []int{4, 5},
+	}
+	av.AsArray = av
+	if got := av.OutputUpperBoundArray(); got != "g_a[3][4]" {
+		t.Fatal(got)
+	}
+	if got := av.Variable.OutputUpperBound(false); got != "g_a[3][4]" {
+		t.Fatal(got)
+	}
+}
+
+func TestToUnsignedSimple(t *testing.T) {
+	if GetIntType().ToUnsigned() != GetSimpleType(EUInt) {
+		t.Fatal("int")
+	}
+	if GetSimpleType(EChar).ToUnsigned() != GetSimpleType(EUChar) {
+		t.Fatal("char")
+	}
+	u := GetSimpleType(EUInt)
+	if u.ToUnsigned() != u {
+		t.Fatal("uint identity")
+	}
+	if GetSimpleType(EFloat).ToUnsigned() != nil {
+		t.Fatal("float has no unsigned")
+	}
+}
+
+func TestOutputIndexModuloSignedCast(t *testing.T) {
+	av := &ArrayVariable{Sizes: []int{10}}
+	idx := &Expression{Term: TermVariable, Var: CreateVariableScalars("i", GetIntType(), false, false), ExprType: GetIntType()}
+	got := av.OutputIndexModulo(0, idx)
+	if !strings.Contains(got, "% 10") {
+		t.Fatal(got)
+	}
+}

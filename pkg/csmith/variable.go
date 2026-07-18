@@ -139,9 +139,15 @@ func (v *Variable) OutputC() string {
 }
 
 // OutputCOpts is Output with prefix_name.
+// ArrayVariable::Output overrides Variable::Output for itemized members
+// (ArrayVariable.cpp:539–571) — name + indices, no VOL_RVAL wrap.
 func (v *Variable) OutputCOpts(prefixName bool) string {
 	if v == nil {
 		return ""
+	}
+	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
+	if v.AsArray != nil && v.AsArray.Collective != nil {
+		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
@@ -164,9 +170,13 @@ func (v *Variable) OutputLhsC() string {
 }
 
 // OutputLhsCOpts is OutputLhs with prefix_name.
+// Itemized arrays use ArrayVariable::Output (indices) as LHS text.
 func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 	if v == nil {
 		return ""
+	}
+	if v.AsArray != nil && v.AsArray.Collective != nil {
+		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
@@ -198,10 +208,13 @@ func (v *Variable) OutputForComment(prefixName bool) string {
 }
 
 // OutputUpperBound mirrors Variable::OutputUpperBound — field path for bounds.
-// Variable.cpp:721–732.
+// Variable.cpp:721–732; ArrayVariable.cpp:572–577 for arrays.
 func (v *Variable) OutputUpperBound(prefixName bool) string {
 	if v == nil {
 		return ""
+	}
+	if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
+		return v.AsArray.OutputUpperBoundArray()
 	}
 	if v.FieldVarOf != nil {
 		base := v.FieldVarOf.OutputUpperBound(prefixName)

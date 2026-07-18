@@ -181,9 +181,10 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			return nil
 		}
 		// ExpressionVariable(*v) then optional (v + offset)
+		// VariableSelector.cpp:1492–1497 — FunctionInvocationBinary(eAdd, …, flags=0)
+		// null op_flags → Output emits plain "a + b" (FunctionInvocationBinary.cpp:357–361)
 		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		idx := v.Name
-		// VariableSelector.cpp:1488–1497
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
 			off := int(r.RndUpto(uint32(remain)))
@@ -193,8 +194,9 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				}
 				fi := &Invocation{
 					IsStd:  true,
-					Binary: BinAdd.BinaryOpC(),
+					Binary: "+",
 					Args:   []*Expression{idxExpr, offExpr},
+					// Safe nil: ArrayVariable index add must not use safe_* wrappers
 				}
 				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
 				idx = idxExpr.Output()
