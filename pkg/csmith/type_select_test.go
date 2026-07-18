@@ -35,6 +35,30 @@ func TestMakeRandomPointerTypeIntStar(t *testing.T) {
 			t.Fatalf("expected int* or deeper, got %s", p.CName())
 		}
 	}
+	// Type.cpp:1141 — nil env/rng → ERROR_GUARD nullptr, no soft invent
+	if (*TypeEnv)(nil).MakeRandomPointerType(NewRng(1), opts, probs) != nil {
+		t.Fatal("nil env must not invent int*")
+	}
+}
+
+func TestMakeRandomPointerTypeConsolidatesAllSimple(t *testing.T) {
+	// Type.cpp:1161–1164 — any eSimple (including float) consolidates to int*
+	opts := Defaults()
+	opts.EnableFloat = true
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetSimpleType(EFloat)}}
+	// avoid 20% derived path (empty derived)
+	found := false
+	for seed := uint64(1); seed < 40; seed++ {
+		p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+		if p != nil && p.IndirectLevel() == 1 && p.PtrType() == GetIntType() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("float base must consolidate to int*")
+	}
 }
 
 func TestSelectLTypeDefaultInt(t *testing.T) {

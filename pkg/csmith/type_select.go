@@ -275,24 +275,26 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 // MakeRandomPointerType mirrors Type::make_random_pointer_type.
 // Type.cpp:1141–1166.
 func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabilities) *Type {
-	if r == nil {
-		return PointerTo(GetIntType())
+	if r == nil || env == nil {
+		// Type.cpp ERROR_GUARD(nullptr) paths — no soft invent int*
+		return nil
 	}
-	// occasionally choose pointer to pointers (20%)
-	if r.RndFlipcoin(20) && env != nil && len(env.DerivedTypes) > 0 {
+	// Type.cpp:1145–1154 — occasionally choose pointer to pointers (20%)
+	if r.RndFlipcoin(20) && len(env.DerivedTypes) > 0 {
 		idx := r.RndUpto(uint32(len(env.DerivedTypes)))
 		t := env.DerivedTypes[idx]
 		if t != nil && t.IndirectLevel() < opts.MaxPointerDepth {
 			return env.FindPointerType(t, true)
 		}
 	}
-	// choose_random then consolidate integer pointers to int* (Type.cpp:1158–1166)
+	// Type.cpp:1158–1165 — choose_random then consolidate all simple → int*
 	base := env.ChooseRandom(r, opts, probs, false)
 	if base == nil {
-		base = GetIntType()
+		// ERROR_GUARD(nullptr) — no soft invent GetIntType
+		return nil
 	}
-	// consolidate all integer pointer types into "int*"
-	if base.IsSimple() && base.Simple() != EVoid && base.Simple() != EFloat {
+	// Type.cpp:1161–1164 — any eSimple consolidates to get_int_type()
+	if base.IsSimple() {
 		base = GetIntType()
 	}
 	return env.FindPointerType(base, true)
@@ -313,39 +315,38 @@ func AssignOpWorksForFloat(op AssignOp) bool {
 // Type.cpp:1603–1637.
 func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVolatile bool, op AssignOp) *Type {
 	if r == nil {
-		return GetIntType()
+		// C++ always has RNG; no soft invent default int
+		return nil
 	}
-	// pointer as LType (simple assign only)
-	if op == AssignSimple && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
+	var typ *Type
+	// Type.cpp:1609–1612 — pointer as LType (simple assign only)
+	if op == AssignSimple && probs != nil && r.RndFlipcoin(uint32(probs.Single(PPointerAsLTypeProb))) {
 		if env != nil {
-			return env.MakeRandomPointerType(r, opts, probs)
+			typ = env.MakeRandomPointerType(r, opts, probs)
 		}
-		return PointerTo(GetIntType())
+		// no soft invent PointerTo(int) when env missing
 	}
-	// struct/union as LType — get_all_ok_struct_union_types filtered (Type.cpp:1616–1622)
-	if op == AssignSimple && env != nil {
-		if len(env.StructTypes) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
-			cands := okStructUnionLTypes(env, noVolatile, true, false)
-			if len(cands) > 0 {
-				return cands[r.RndUpto(uint32(len(cands)))]
-			}
-		}
-		if len(env.UnionTypes) > 0 && r.RndFlipcoin(uint32(probs.Single(PUnionAsLTypeProb))) {
-			cands := okStructUnionLTypes(env, noVolatile, false, true)
-			if len(cands) > 0 {
-				return cands[r.RndUpto(uint32(len(cands)))]
-			}
+	// Type.cpp:1616–1625 — struct as LType only (bStruct=true); no union soft path
+	if typ == nil && op == AssignSimple && env != nil && probs != nil {
+		// Type.cpp:1617–1618 — get_all_ok_struct_union_types(ok, no_const=true, no_volatile, need_int=false, bStruct=true)
+		cands := env.GetAllOKStructUnionTypes(true, noVolatile, false, true)
+		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+			typ = ChooseRandomStructUnionType(r, cands)
 		}
 	}
 
-	// float as LType
-	if AssignOpWorksForFloat(op) && r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {
+	// Type.cpp:1628–1633 — float as LType
+	if typ == nil && AssignOpWorksForFloat(op) && probs != nil &&
+		r.RndFlipcoin(uint32(probs.Single(PFloatAsLTypeProb))) {
 		if opts.EnableFloat {
-			return GetSimpleType(EFloat)
+			typ = GetSimpleType(EFloat)
 		}
 	}
-	// default is any integer type → get_int_type()
-	return GetIntType()
+	// Type.cpp:1635–1637 — default get_int_type()
+	if typ == nil {
+		typ = GetIntType()
+	}
+	return typ
 }
 
 // okStructUnionLTypes filters struct/union types for SelectLType (no_volatile etc.).
