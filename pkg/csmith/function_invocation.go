@@ -234,7 +234,7 @@ func BuildUserInvocation(
 	}
 	// hand-over effects from built callee (FunctionInvocationUser.cpp:236–240)
 	if callee.IsEffectKnown() {
-		cg.AddVisibleEffect(callee.FEffect)
+		cg.AddVisibleEffectAt(callee.FEffect, cg.CurrentBlock())
 	}
 	_ = probs
 	return fi
@@ -305,7 +305,8 @@ func BuildInvocationAndFunction(
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, callee.NewGlobals...)
 	}
-	cg.AddVisibleEffect(callee.FEffect)
+	// FunctionInvocationUser.cpp:226 — add_visible_effect(..., get_current_block())
+	cg.AddVisibleEffectAt(callee.FEffect, cg.CurrentBlock())
 	return BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
 }
 

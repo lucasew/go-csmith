@@ -331,35 +331,84 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 	return &Constant{Type: st, Value: b.String()}
 }
 
-// MakeOneUnionField mirrors Type::make_one_union_field without nested union-in-union.
-// Type.cpp:699–763 simplified — no pointers in union fields; optional nested struct.
+// MakeOneUnionField mirrors Type::make_one_union_field.
+// Type.cpp:699–763 — bitfield optional; else non-pointer / no-bitfield structs;
+// no union-in-union; 15% struct fields.
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
-	// skip bitfield in ccomp; otherwise BitFieldInNormalStructProb for unions when !ccomp
+	// Type.cpp:702–706 — bitfield when bitfields && !ccomp
 	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
 		return MakeOneBitfield(r, opts, probs, fieldIdx, true)
 	}
-	// 15% nested struct if available
-	var ft *Type
-	if env != nil && len(env.StructTypes) > 0 && r.RndFlipcoin(15) {
-		// filter structs with bitfields for union membership (upstream)
-		cands := make([]*Type, 0)
-		for _, s := range env.StructTypes {
-			if s == nil {
+	// Build ok_nonstruct_types and struct_types (Type.cpp:708–739)
+	var nonStruct []*Type
+	var structTypes []*Type
+	if env != nil {
+		for _, t := range env.AllTypes {
+			if t == nil {
 				continue
 			}
-			hasBF := false
-			for _, f := range s.Fields {
-				if f.BitWidth >= 0 {
-					hasBF = true
-					break
+			// Type.cpp:716–717 — contain_pointer_field rejected
+			if t.ContainPointerField() {
+				continue
+			}
+			if !t.IsStruct() && !t.IsUnion() {
+				// skip void / filtered simples
+				if t.IsSimple() && t.Simple() == EVoid {
+					continue
+				}
+				if t.IsSimple() && t.IsFloat() && !opts.EnableFloat {
+					continue
+				}
+				nonStruct = append(nonStruct, t)
+				continue
+			}
+			// Type.cpp:726–727 — no bitfields in union members for now
+			if t.HasBitfields() {
+				continue
+			}
+			// Type.cpp:730–731 — assign-ops filter (C++)
+			if opts.LangCPP && t.HasAssignOps {
+				// has_implicit_nontrivial_assign_ops — use HasAssignOps as stand-in
+				// only reject when HasAssignOps true for nested with nontrivial ops
+				// fair: skip structs with assign ops under LangCPP like filter
+				continue
+			}
+			if t.IsStruct() {
+				structTypes = append(structTypes, t)
+			}
+			// Type.cpp:736–737 — no union in union
+		}
+	}
+	// if AllTypes empty, seed simples
+	if len(nonStruct) == 0 {
+		for st := EChar; int(st) < MaxSimpleTypes; st++ {
+			if st == EVoid {
+				continue
+			}
+			if st == EFloat && !opts.EnableFloat {
+				continue
+			}
+			nonStruct = append(nonStruct, GetSimpleType(st))
+		}
+	}
+	var ft *Type
+	// Type.cpp:742–755 — 15% struct field
+	if len(structTypes) > 0 && r.RndFlipcoin(15) {
+		ft = structTypes[r.RndUpto(uint32(len(structTypes)))]
+	} else if len(nonStruct) > 0 {
+		// pick until simple filter accepts (Type.cpp:747–752)
+		for tries := 0; tries < 32; tries++ {
+			cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
+			if cand.IsSimple() && probs != nil {
+				// SIMPLE_TYPES_PROB_FILTER style: weight 0 types rejected
+				// ChooseRandomNonvoidSimple already respects filter; for AllTypes
+				// re-check float and void only
+				if cand.Simple() == EVoid {
+					continue
 				}
 			}
-			if !hasBF {
-				cands = append(cands, s)
-			}
-		}
-		if len(cands) > 0 {
-			ft = cands[r.RndUpto(uint32(len(cands)))]
+			ft = cand
+			break
 		}
 	}
 	if ft == nil {
@@ -369,8 +418,7 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	constP := uint32(probs.Single(PFieldConstProb))
 	volP := uint32(probs.Single(PFieldVolatileProb))
 	q := RandomQualifiersForType(ft, AccessRead, EmptyCGContext(), false, constP, volP, opts, r)
-	bw := -1
-	return StructField{Name: fmt.Sprintf("f%d", fieldIdx), Type: ft, Qfer: q, BitWidth: bw}
+	return StructField{Name: fmt.Sprintf("f%d", fieldIdx), Type: ft, Qfer: q, BitWidth: -1}
 }
 
 // MakeRandomUnionType mirrors Type::make_random_union_type.

@@ -539,13 +539,13 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			cg.AddVisibleEffect(fi.User.FEffect)
+			cg.AddVisibleEffectAt(fi.User.FEffect, cg.CurrentBlock())
 		} else if fi.User.IsEffectKnown() {
 			// static effect path (no fact/pointer change)
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			cg.AddVisibleEffect(fi.User.FEffect)
+			cg.AddVisibleEffectAt(fi.User.FEffect, cg.CurrentBlock())
 			// also add_external_effect of feffect
 			cg.AddExternalEffect(fi.User.FEffect)
 		}

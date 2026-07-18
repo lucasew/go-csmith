@@ -224,6 +224,26 @@ func (t *Type) IsFloat() bool {
 	return t != nil && t.IsSimple() && t.simple == EFloat
 }
 
+// IsSignedChar mirrors Type::is_signed_char.
+// Type.h:265–268 — eSimple && eChar (signed char).
+func (t *Type) IsSignedChar() bool {
+	return t != nil && t.IsSimple() && t.simple == EChar
+}
+
+// IsFullBitfieldsStruct mirrors Type::is_full_bitfields_struct.
+// Type.cpp:1316–1324 — every field is a bitfield (BitWidth >= 0).
+func (t *Type) IsFullBitfieldsStruct() bool {
+	if t == nil || !t.IsStruct() || len(t.Fields) == 0 {
+		return false
+	}
+	for _, f := range t.Fields {
+		if f.BitWidth < 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // IsSigned mirrors Type::is_signed (Type.cpp:1326–1347).
 func (t *Type) IsSigned() bool {
 	if t == nil || !t.IsSimple() {

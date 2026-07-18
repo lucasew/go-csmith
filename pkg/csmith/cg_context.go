@@ -269,14 +269,20 @@ func (c *CGContext) AddExternalEffect(e Effect) {
 	}
 }
 
-// AddVisibleEffect mirrors CGContext::add_visible_effect.
-// CGContext.cpp:411–417 — add_external_effect with call_chain + current block.
+// AddVisibleEffect mirrors CGContext::add_visible_effect with current block.
+// CGContext.cpp:411–417 — call_chain + b as callers for external effect.
 func (c *CGContext) AddVisibleEffect(e Effect) {
+	c.AddVisibleEffectAt(e, c.CurrentBlock())
+}
+
+// AddVisibleEffectAt mirrors CGContext::add_visible_effect(e, b).
+// CGContext.cpp:411–417 — callers = call_chain then b.
+func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
 		return
 	}
 	callers := append([]*Block(nil), c.CallChain...)
-	if b := c.CurrentBlock(); b != nil {
+	if b != nil {
 		callers = append(callers, b)
 	}
 	if c.EffectAccum != nil {
