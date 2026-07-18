@@ -114,9 +114,10 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 }
 
 func TestVariableInitOutput(t *testing.T) {
+	// StatementGoto.cpp:271 — assert(v->init); no soft invent "0"
 	v := CreateVariableScalars("l_1", GetIntType(), false, false)
-	if variableInitOutput(v) != "0" {
-		t.Fatal("no init")
+	if variableInitOutput(v) != "" {
+		t.Fatal("no init must not invent 0", variableInitOutput(v))
 	}
 	v.Init = MakeInt(5)
 	if variableInitOutput(v) != "5" {

@@ -266,8 +266,11 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	if n == 1 {
 		v = vars[0]
 	} else {
-		// DepthSpec::depth_guard_by_depth(1) for multi-choice — random mode always GOOD
-		_ = DepthGuardByDepth(Options{}, 1)
+		// VariableSelector.cpp:324 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
+		// random mode always GOOD; still call for fair wiring (use Defaults opts)
+		if DepthGuardByDepth(Defaults(), 1) == BadDepth {
+			return nil
+		}
 		if r == nil {
 			return vars[0]
 		}
@@ -1235,6 +1238,11 @@ func (vs *VariableSelector) SelectGlobalMT(
 			return v
 		}
 	}
+	// VariableSelector.cpp:685 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectGlobal, nullptr)
+	// only on the GenerateNewGlobal path after choose_var miss
+	if DepthGuardByType(vs.Opts, DtSelectGlobal) == BadDepth {
+		return nil
+	}
 	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
 	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
@@ -1691,6 +1699,11 @@ func (vs *VariableSelector) SelectWithInvalid(
 	if vs == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1190–1191 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSelectVariable, scope, nullptr)
+	// scope not chosen yet → MAX_VAR_SCOPE flag (mirrors call with default MAX)
+	if DepthGuardByTypeFlag(vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
+		return nil
+	}
 	vs.VarCreated = false
 	scope := VariableSelectionProbability(r, vs.Opts)
 	var v *Variable
@@ -1762,6 +1775,10 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if vs == nil || cg.CurrentFunc == nil || r == nil {
+		return nil
+	}
+	// VariableSelector.cpp:989 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectParentLocal, nullptr)
+	if DepthGuardByType(vs.Opts, DtSelectParentLocal) == BadDepth {
 		return nil
 	}
 	stack := cg.CurrentFunc.Stack
@@ -1850,9 +1867,17 @@ func (vs *VariableSelector) GenerateNewVariable(
 	if vs == nil || t == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1093 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewVariable, nullptr)
+	if DepthGuardByType(vs.Opts, DtGenerateNewVariable) == BadDepth {
+		return nil
+	}
 	scope := VariableCreationProbability(r, vs.Opts)
 	switch scope {
 	case ScopeGlobal:
+		// VariableSelector.cpp:1100 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewGlobal, nullptr)
+		if DepthGuardByType(vs.Opts, DtGenerateNewGlobal) == BadDepth {
+			return nil
+		}
 		// VariableSelector.cpp:1105 — random_type_from_type(type) default no_vol=false
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
 		if t2 == nil {
@@ -1860,6 +1885,10 @@ func (vs *VariableSelector) GenerateNewVariable(
 		}
 		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	default:
+		// VariableSelector.cpp:1114–1115 — DEPTH_GUARD_BY_DEPTH for parent-local create
+		if DepthGuardByDepth(vs.Opts, MinimalDepth(DtGenerateNewParentLocal, 0)) == BadDepth {
+			return nil
+		}
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
 			// VariableSelector.cpp:1118 — rnd_upto(func.stack.size())
 			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]

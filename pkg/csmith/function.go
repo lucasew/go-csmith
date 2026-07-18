@@ -144,6 +144,10 @@ func MakeRandomSignature(
 	if retType == nil {
 		retType = RandomReturnType(r, probs, env, opts)
 	}
+	// Function.cpp:407 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunction, nullptr)
+	if DepthGuardByType(opts, DtFunction) == BadDepth {
+		return nil
+	}
 	name := RandomFunctionName(sym)
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType}
 	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil;

@@ -131,22 +131,21 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 }
 
 // variableInitOutput mirrors Variable::init->Output for re-init at goto dest.
-// Prefer InitExpr (full Expression*); else Constant value; else 0.
-// StatementGoto.cpp:271 — assert(v->init); v->init->Output(out).
+// Prefer InitExpr (full Expression*); else Constant value.
+// StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".
 func variableInitOutput(v *Variable) string {
 	if v == nil {
-		return "0"
+		return ""
 	}
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
-		if s := v.InitExpr.Output(); s != "" {
-			return s
-		}
+		return v.InitExpr.Output()
 	}
 	if v.Init != nil && v.Init.Value != "" {
 		return v.Init.Value
 	}
-	return "0"
+	// C++ assert(v->init); missing init is broken IR
+	return ""
 }
 
 // FindGoodJumpBlock mirrors StatementGoto::find_good_jump_block.
