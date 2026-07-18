@@ -44,6 +44,25 @@ func WithSideEffects() Effect {
 	return Effect{pure: false, sideEffectFree: false}
 }
 
+// AddExternalEffect mirrors Effect::add_external_effect — only global reads/writes.
+// Effect.cpp:192–215.
+func (e Effect) AddExternalEffect(other Effect) Effect {
+	out := e
+	for v, ok := range other.read {
+		if ok && v != nil && v.IsGlobal() {
+			out = out.ReadVar(v)
+		}
+	}
+	for v, ok := range other.written {
+		if ok && v != nil && v.IsGlobal() {
+			out = out.WriteVar(v)
+			out.pure = false
+		}
+	}
+	out.sideEffectFree = out.sideEffectFree && other.sideEffectFree
+	return out
+}
+
 // AddEffect mirrors Effect::add_effect — union of reads/writes; pure/SE-free AND.
 // Effect.cpp:157–186 (lhs_write_vars omitted).
 func (e Effect) AddEffect(other Effect) Effect {

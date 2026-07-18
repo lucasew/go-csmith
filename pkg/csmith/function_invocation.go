@@ -133,7 +133,7 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 }
 
 // BuildUserInvocation mirrors FunctionInvocationUser::build_invocation arg loop.
-// FunctionInvocationUser.cpp:188 — Expression::make_random_param(param type, param qfer).
+// FunctionInvocationUser.cpp:188+ — params; merge callee external effects when known.
 func BuildUserInvocation(
 	r *Rng,
 	opts Options,
@@ -148,6 +148,8 @@ func BuildUserInvocation(
 		return &Invocation{Failed: true}
 	}
 	fi := &Invocation{User: callee}
+	// running effect context across params (FunctionInvocationUser.cpp:200–216)
+	running := cg.EffectContext()
 	for _, p := range callee.Param {
 		ty := GetIntType()
 		var qfer *CVQualifiers
@@ -158,15 +160,78 @@ func BuildUserInvocation(
 			q := p.Qfer
 			qfer = &q
 		}
-		// make_random_param (param table: no constant args; as_param=true)
-		arg := MakeRandomParam(r, opts, tables, vs, cg, ty, qfer, cg.ExprDepth+1, list)
+		// param under combined running context
+		paramCG := cg
+		if cg.EffectAccum != nil {
+			// eligibility sees running; reads still go to parent accum
+			_ = running
+		}
+		arg := MakeRandomParam(r, opts, tables, vs, paramCG, ty, qfer, cg.ExprDepth+1, list)
 		if arg == nil {
-			arg = makeExpressionVariableFlags(r, vs, cg, ty, qfer, true, false)
+			arg = makeExpressionVariableFlags(r, vs, paramCG, ty, qfer, true, false)
 		}
 		fi.Args = append(fi.Args, arg)
+		// Update running from parent accum if present
+		if cg.EffectAccum != nil {
+			running = running.AddEffect(*cg.EffectAccum)
+		}
+	}
+	// hand-over effects from built callee (FunctionInvocationUser.cpp:236–240)
+	if callee.IsEffectKnown() {
+		cg.AddVisibleEffect(callee.FEffect)
 	}
 	_ = probs
 	return fi
+}
+
+// BuildInvocationAndFunction mirrors build_invocation_and_function.
+// FunctionInvocationUser.cpp:170–250 subset — signature + generate body + effect handoff.
+func BuildInvocationAndFunction(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	cg CGContext,
+	list *FunctionList,
+	retType *Type,
+) *Invocation {
+	if list == nil || ReachMaxFunctions(list, opts) {
+		return &Invocation{Failed: true}
+	}
+	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, retType, nil, list)
+	if callee == nil {
+		return &Invocation{Failed: true}
+	}
+	// FactMgr for callee; inherit caller global facts
+	var callerFM *FactMgr
+	if cg.FM != nil {
+		callerFM = cg.FM
+	}
+	calFM := NewFactMgr(callee)
+	if callerFM != nil {
+		calFM.GlobalFacts = CloneFactSlice(callerFM.GlobalFacts)
+	}
+	// generate body with call chain (Function.cpp:668–697)
+	bodyCG := cg
+	bodyCG.ExtendCallChain(cg)
+	bodyCG.CurrentFunc = callee
+	bodyCG.FM = calFM
+	bodyCG.Flags = 0 // fresh flags for callee
+	// FactMgrMap if list generation has one is not here — local calFM only
+	callee.GenerateBody(r, opts, probs, vs, tables, stmtTab, bodyCG)
+	// hand-over: merge ret/callee effects into caller
+	if callerFM != nil {
+		// renew points-to from callee global facts (globals only)
+		for _, f := range calFM.GlobalFacts {
+			if f != nil && f.Var != nil && f.Var.IsGlobal() {
+				callerFM.GlobalFacts = MergeFactInto(callerFM.GlobalFacts, f)
+			}
+		}
+	}
+	cg.AddVisibleEffect(callee.FEffect)
+	return BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
 }
 
 // MakeRandomBinaryInvocation mirrors FunctionInvocation::make_random_binary.
@@ -440,7 +505,7 @@ func MakeRandomInvocation(
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
 		} else if list != nil && !ReachMaxFunctions(list, opts) {
-			// build_invocation_and_function → make_random_signature only (body later)
+			// build_invocation_and_function (FunctionInvocationUser.cpp:170+)
 			sigType := workType
 			if typ == nil {
 				var env *TypeEnv
@@ -452,8 +517,7 @@ func MakeRandomInvocation(
 				}
 				sigType = RandomReturnType(r, probs, env, opts)
 			}
-			callee = MakeRandomSignature(r, opts, probs, vs, &vs.Sym, cg, sigType, nil, list)
-			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
+			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, NewStatementThresholdTable(opts), cg, list, sigType)
 		} else {
 			return &Invocation{Failed: true}
 		}

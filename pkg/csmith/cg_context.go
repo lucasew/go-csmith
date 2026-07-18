@@ -41,6 +41,8 @@ type CGContext struct {
 	// IVBounds mirrors iv_bounds — loop induction variables must not be written.
 	// Value is bound (unused for eligibility; presence matters).
 	IVBounds map[*Variable]int
+	// CallChain mirrors call_chain — caller blocks for external effect tracking.
+	CallChain []*Block
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
@@ -146,6 +148,41 @@ func (c *CGContext) ClearEffectStm() {
 		return
 	}
 	c.EffectStm = EmptyEffect()
+}
+
+// ExtendCallChain mirrors CGContext::extend_call_chain.
+// CGContext.cpp:470–478 — copy parent chain, push current block.
+func (c *CGContext) ExtendCallChain(from CGContext) {
+	if c == nil {
+		return
+	}
+	c.CallChain = append([]*Block(nil), from.CallChain...)
+	b := from.CurrentBlock()
+	if b != nil {
+		c.CallChain = append(c.CallChain, b)
+	}
+}
+
+// AddExternalEffect mirrors CGContext::add_external_effect.
+// CGContext.cpp:399–404 — merge global-only effects into accum and stm.
+func (c *CGContext) AddExternalEffect(e Effect) {
+	if c == nil {
+		return
+	}
+	if c.EffectAccum != nil {
+		*c.EffectAccum = c.EffectAccum.AddExternalEffect(e)
+	}
+	c.EffectStm = c.EffectStm.AddExternalEffect(e)
+	if c.CurrentFunc != nil {
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
+	}
+}
+
+// AddVisibleEffect mirrors CGContext::add_visible_effect.
+// CGContext.cpp:411–417 — external effect with call_chain (simplified: same as external).
+func (c *CGContext) AddVisibleEffect(e Effect) {
+	// full call-chain filtering deferred; global external is the main transfer
+	c.AddExternalEffect(e)
 }
 
 // FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
