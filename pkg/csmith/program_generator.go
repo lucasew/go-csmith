@@ -214,8 +214,8 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			b.WriteString("\n")
 			continue
 		}
-		// Variable::Output with force_globals_static (Variable.cpp:640–665)
-		b.WriteString(v.OutputDef(g.Opts.ForceGlobalsStatic))
+		// Variable::OutputDef with force_globals_static + prefix_name
+		b.WriteString(v.OutputDefOpts(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")

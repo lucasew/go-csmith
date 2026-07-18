@@ -36,9 +36,36 @@ type Variable struct {
 	AsArray *ArrayVariable
 }
 
+// GetActualName mirrors Variable::get_actual_name.
+// Variable.cpp:678–686 — globals may get_prefixed_name; default RNG returns name as-is.
+func (v *Variable) GetActualName(prefixName bool) string {
+	if v == nil {
+		return ""
+	}
+	if v.IsGlobal() {
+		return GetPrefixedName(v.Name, prefixName)
+	}
+	return v.Name
+}
+
+// GetPrefixedName mirrors get_prefixed_name (random.cpp:44–54).
+// DefaultRndNumGenerator returns name unchanged when prefix is on (DefaultRndNumGenerator.cpp:105–106).
+func GetPrefixedName(name string, prefixName bool) string {
+	if !prefixName {
+		return name
+	}
+	// sequence_name_prefix / DFS count prefix not used in default random mode
+	return name
+}
+
 // OutputDecl mirrors Variable::OutputDecl — static? + qualified type + name.
 // Variable.cpp:670–676.
 func (v *Variable) OutputDecl(forceStatic bool) string {
+	return v.OutputDeclOpts(forceStatic, false)
+}
+
+// OutputDeclOpts includes prefix_name option.
+func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	if v == nil {
 		return ""
 	}
@@ -48,60 +75,91 @@ func (v *Variable) OutputDecl(forceStatic bool) string {
 	}
 	b.WriteString(v.Qfer.OutputQualifiedType(v.Type))
 	b.WriteString(" ")
-	b.WriteString(v.Name)
+	b.WriteString(v.GetActualName(prefixName))
 	return b.String()
 }
 
-// OutputDef mirrors Variable definition line: OutputDecl + init + ";".
-// Variable.cpp:640–665 subset (no attrs).
+// OutputDef mirrors Variable::OutputDef — decl + init + ";" + optional volatile comment.
+// Variable.cpp:640–665.
 func (v *Variable) OutputDef(forceStatic bool) string {
+	return v.OutputDefOpts(forceStatic, false)
+}
+
+// OutputDefOpts adds prefix_name and VOLATILE GLOBAL comment for volatile globals.
+func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
 	if v == nil {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(v.OutputDecl(forceStatic))
+	b.WriteString(v.OutputDeclOpts(forceStatic, prefixName))
 	if v.Init != nil && v.Init.Value != "" {
 		b.WriteString(" = ")
 		b.WriteString(v.Init.Value)
 	}
 	b.WriteString(";")
+	// Variable.cpp:658–661 — volatile global comment on same line path uses comment helper
+	if v.IsGlobal() && v.IsVolatile() {
+		b.WriteString(" /* VOLATILE GLOBAL ")
+		b.WriteString(v.GetActualName(prefixName))
+		b.WriteString(" */")
+	}
 	return b.String()
 }
 
 // OutputC mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name.
 // Variable.cpp:689–700.
 func (v *Variable) OutputC() string {
+	return v.OutputCOpts(false)
+}
+
+// OutputCOpts is Output with prefix_name.
+func (v *Variable) OutputCOpts(prefixName bool) string {
 	if v == nil {
 		return ""
 	}
+	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
 		ty := "int"
 		if v.Type != nil {
 			ty = v.Type.CName()
 		}
-		return "VOL_RVAL(" + v.Name + ", " + ty + ")"
+		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
 	if v.IsAccessOnce && !v.IsAddrTaken {
-		return "ACCESS_ONCE(" + v.Name + ")"
+		return "ACCESS_ONCE(" + name + ")"
 	}
-	return v.Name
+	return name
 }
 
 // OutputLhsC mirrors Lhs::Output — VOL_LVAL when wrap_volatiles.
 // Lhs.cpp:207–218.
 func (v *Variable) OutputLhsC() string {
+	return v.OutputLhsCOpts(false)
+}
+
+// OutputLhsCOpts is OutputLhs with prefix_name.
+func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 	if v == nil {
 		return ""
 	}
+	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
 		ty := "int"
 		if v.Type != nil {
 			ty = v.Type.CName()
 		}
-		return "VOL_LVAL(" + v.Name + ", " + ty + ")"
+		return "VOL_LVAL(" + name + ", " + ty + ")"
 	}
-	// ACCESS_ONCE not used for write LHS (upstream ExpressionVariable only on Lhs via Output)
-	return v.Name
+	return name
+}
+
+// OutputAddrOf mirrors Variable::OutputAddrOf — always &actual_name (no VOL_RVAL).
+// Variable.cpp:707–710.
+func (v *Variable) OutputAddrOf(prefixName bool) string {
+	if v == nil {
+		return "&0"
+	}
+	return "&" + v.GetActualName(prefixName)
 }
 
 // CreateVariableQfer mirrors

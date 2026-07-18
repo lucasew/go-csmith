@@ -379,6 +379,7 @@ func (f *Function) Output() string {
 	if f.IsInlined {
 		s += "inline "
 	}
+	// Function.cpp:528 — get_prefixed_name(name); default random returns name
 	s += f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ")\n"
 	// Function.cpp:575–598 — depth_protect wraps body
 	if f.DepthProtect {

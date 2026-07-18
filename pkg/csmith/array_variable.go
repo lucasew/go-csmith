@@ -229,6 +229,12 @@ func (av *ArrayVariable) OutputDef() string {
 		}
 	}
 	b.WriteString(";")
+	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
+	if av.IsGlobal() && av.IsVolatile() {
+		b.WriteString(" /* VOLATILE GLOBAL ")
+		b.WriteString(av.GetActualName(false))
+		b.WriteString(" */")
+	}
 	return b.String()
 }
 
