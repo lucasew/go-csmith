@@ -878,6 +878,133 @@ func (v *Variable) CreateFieldVars() {
 	}
 }
 
+// OutputValueDump mirrors Variable::output_value_dump.
+// Variable.cpp:1173–1203 — printf checksum lines for simples; recurse aggregates;
+// arrays expand all index combinations; unions only readable fields.
+func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*FactUnion) string {
+	if v == nil || v.Type == nil {
+		return ""
+	}
+	// virtual array collective → expand all indices (Variable.cpp:1175–1183)
+	if v.IsArray && len(v.ArraySizes) > 0 {
+		if v.AsArray != nil && v.AsArray.Collective != nil {
+			// already itemized member — treat as scalar element access
+		} else {
+			return outputValueDumpArray(v, prefix, indent, unionFacts)
+		}
+	}
+	if v.Type.IsSimple() {
+		// Variable.cpp:1184–1188
+		name := v.GetActualName(false)
+		dir := v.Type.PrintfDirective()
+		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
+	}
+	if v.Type.IsStruct() {
+		var b strings.Builder
+		for _, f := range v.FieldVars {
+			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
+		}
+		return b.String()
+	}
+	if v.Type.IsUnion() {
+		var b strings.Builder
+		for i, f := range v.FieldVars {
+			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
+			if !IsFieldReadable(v, i, unionFacts) {
+				continue
+			}
+			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
+		}
+		return b.String()
+	}
+	// pointers: dump as pointer directive
+	if v.Type.IsPointerLike() {
+		name := v.GetActualName(false)
+		dir := v.Type.PrintfDirective()
+		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
+	}
+	return ""
+}
+
+// outputValueDumpArray expands array into all index combinations and dumps elements.
+func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
+	if v == nil || len(v.ArraySizes) == 0 {
+		return ""
+	}
+	all := expandWithinRanges(v.ArraySizes)
+	var b strings.Builder
+	for _, idx := range all {
+		// build access name g_a[0][1]
+		name := v.GetActualName(false)
+		for _, i := range idx {
+			name += "[" + itoa(i) + "]"
+		}
+		if v.Type != nil && v.Type.IsSimple() {
+			dir := v.Type.PrintfDirective()
+			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
+			continue
+		}
+		if v.Type != nil && v.Type.IsAggregate() && len(v.FieldVars) > 0 {
+			// dump fields with indexed prefix path via synthetic names
+			for fi, f := range v.FieldVars {
+				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
+					continue
+				}
+				if f == nil || f.Type == nil || !f.Type.IsSimple() {
+					continue
+				}
+				// field name is typically g_a.f0 — replace base with indexed access
+				fname := f.Name
+				// f.Name like "g_a.f0" → use name + ".f" + idx
+				suffix := ""
+				if dot := lastDot(fname); dot >= 0 {
+					suffix = fname[dot:]
+				} else {
+					suffix = ".f" + itoa(fi)
+				}
+				acc := name + suffix
+				dir := f.Type.PrintfDirective()
+				b.WriteString(OutputTab(indent) + "printf(\"" + prefix + acc + " = " + dir + "\\n\", " + acc + ");\n")
+			}
+		}
+	}
+	return b.String()
+}
+
+// expandWithinRanges mirrors expand_within_ranges — all index vectors in [0,size).
+func expandWithinRanges(sizes []int) [][]int {
+	if len(sizes) == 0 {
+		return nil
+	}
+	var out [][]int
+	var rec func(prefix []int, dim int)
+	rec = func(prefix []int, dim int) {
+		if dim == len(sizes) {
+			cp := append([]int(nil), prefix...)
+			out = append(out, cp)
+			return
+		}
+		n := sizes[dim]
+		if n < 1 {
+			n = 1
+		}
+		for i := 0; i < n; i++ {
+			rec(append(prefix, i), dim+1)
+		}
+	}
+	rec(nil, 0)
+	return out
+}
+
+func lastDot(s string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '.' {
+			return i
+		}
+	}
+	return -1
+}
+
 func itoa(n int) string {
 	if n == 0 {
 		return "0"

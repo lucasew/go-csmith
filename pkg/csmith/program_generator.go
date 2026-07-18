@@ -343,6 +343,42 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 	// OutputMgr.cpp:104 — OutputArrayInitializers for global arrays (ctrl vars + loop inits)
 	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
+
+	// first-function invocation builder (shared by blind_check and normal path)
+	var firstInv string
+	var f0 *Function
+	if len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
+		f0 = g.Funcs.Funcs[0]
+		cg := EmptyCGContext().WithFuncList(&g.Funcs)
+		cg.Types = &g.Types
+		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, cg, &g.Funcs, f0)
+		if inv == nil || inv.Failed {
+			firstInv = f0.Name + "()"
+		} else {
+			firstInv = inv.Output()
+		}
+	}
+
+	// OutputMgr.cpp:106–111 — blind_check_global: invoke + output_value_dump per global
+	if g.Opts.BlindCheckGlobal {
+		if firstInv != "" {
+			b.WriteString("    " + firstInv + ";\n")
+		}
+		// program end facts for union readability (FactMgr::get_program_end_facts)
+		var endUnion []*FactUnion
+		if f0 != nil && g.FactMgrs != nil {
+			if fm := g.FactMgrs.ForFunc(f0); fm != nil {
+				endUnion = fm.UnionFacts
+			}
+		}
+		for _, v := range g.VS.GlobalList {
+			b.WriteString(v.OutputValueDump("checksum ", 1, endUnion))
+		}
+		b.WriteString("    return 0;\n")
+		b.WriteString("}\n")
+		return b.String()
+	}
+
 	b.WriteString("    int print_hash_value = 0;\n")
 	if g.Opts.AcceptArgc {
 		b.WriteString("    if (argc == 2 && strcmp(argv[1], \"1\") == 0) print_hash_value = 1;\n")
@@ -351,21 +387,12 @@ func (g *ProgramGenerator) OutputMain() string {
 	if g.Opts.ComputeHash {
 		b.WriteString("    crc32_gentab();\n")
 	}
-	// ExtensionMgr::OutputFirstFunInvocation — FunctionInvocation::make_random(first)
-	// OutputMgr.cpp:127–136 / FunctionInvocation.cpp:128–135
-	if len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
-		f0 := g.Funcs.Funcs[0]
-		cg := EmptyCGContext().WithFuncList(&g.Funcs)
-		cg.Types = &g.Types
-		// build_invocation for target — args via make_random_param (empty if no params)
-		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, cg, &g.Funcs, f0)
-		if inv == nil || inv.Failed {
-			b.WriteString("    " + f0.Name + "();\n")
-		} else {
-			b.WriteString("    " + inv.Output() + ";\n")
-		}
+	// ExtensionMgr::OutputFirstFunInvocation
+	// OutputMgr.cpp:127–136
+	if firstInv != "" {
+		b.WriteString("    " + firstInv + ";\n")
 		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
-		if !g.Opts.DanglingGlobalPointers {
+		if f0 != nil && !g.Opts.DanglingGlobalPointers {
 			b.WriteString(OutputPtrResets(f0.DeadGlobals, g.Opts))
 		}
 	}
