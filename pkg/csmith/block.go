@@ -775,9 +775,8 @@ func (b *Block) Output(indent int) string {
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
 				sb.WriteString(st.ArrayAccess + " = " + st.Expr.Output() + ";\n")
-			} else {
-				sb.WriteString("/* assign */;\n")
 			}
+			// incomplete assign IR — no soft invent /* assign */
 		case StmtBreak:
 			// StatementBreak.cpp:117–118 — test.Output; no soft invent "1"
 			sb.WriteString("if (")
@@ -803,9 +802,8 @@ func (b *Block) Output(indent int) string {
 				} else {
 					sb.WriteString(inner + "{\n" + inner + "}\n")
 				}
-			} else {
-				sb.WriteString("/* for-stub */;\n")
 			}
+			// incomplete for IR — no soft invent /* for-stub */
 		case StmtIfElse:
 			// StatementIf.cpp:147–148 — test.Output; no soft invent "0"
 			sb.WriteString("if (")
@@ -833,9 +831,8 @@ func (b *Block) Output(indent int) string {
 				}
 				sb.WriteString(")\n")
 				sb.WriteString(inner + "    goto " + st.Label + ";\n")
-			} else {
-				sb.WriteString("/* goto-stub */;\n")
 			}
+			// incomplete goto IR — no soft invent /* goto-stub */
 		case StmtArrayOp:
 			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
 			if st.Loop != nil && st.Loop.IV != nil {
@@ -845,9 +842,8 @@ func (b *Block) Output(indent int) string {
 				} else {
 					sb.WriteString(inner + "{\n" + inner + "}\n")
 				}
-			} else {
-				sb.WriteString("/* arrayop-stub */;\n")
 			}
+			// incomplete arrayop IR — no soft invent /* arrayop-stub */
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
 			// no soft invent /* invoke */ when expr missing (stmtOK rejects null)

@@ -322,15 +322,14 @@ func BuildUserInvocation(
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
 	for _, p := range callee.Param {
-		ty := GetIntType()
-		var qfer *CVQualifiers
-		if p != nil {
-			if p.Type != nil {
-				ty = p.Type
-			}
-			q := p.Qfer
-			qfer = &q
+		// FunctionInvocationUser.cpp:256–258 — v->type / &v->qfer; no GetIntType invent
+		if p == nil || p.Type == nil {
+			fi.Failed = true
+			return fi
 		}
+		ty := p.Type
+		q := p.Qfer
+		qfer := &q
 		// FunctionInvocationUser.cpp:252–254 — param_cg(cg, running_eff_context, &param_eff_accum)
 		paramAccum := EmptyEffect()
 		paramCG := *cg
@@ -412,8 +411,9 @@ func BuildInvocationAndFunction(
 	if cg == nil || list == nil || ReachMaxFunctions(list, opts) {
 		return &Invocation{Failed: true}
 	}
+	// FunctionInvocationUser.cpp:175 — assert(type); return type must be provided
 	if retType == nil {
-		retType = GetIntType()
+		return &Invocation{Failed: true}
 	}
 	// FunctionInvocationUser.cpp:179 — make_random_signature
 	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, nil, list)
@@ -425,15 +425,14 @@ func BuildInvocationAndFunction(
 	fi := &Invocation{User: callee}
 	running := cg.EffectContext()
 	for _, p := range callee.Param {
-		ty := GetIntType()
-		var qfer *CVQualifiers
-		if p != nil {
-			if p.Type != nil {
-				ty = p.Type
-			}
-			q := p.Qfer
-			qfer = &q
+		// FunctionInvocationUser.cpp:185–187 — v->type; no GetIntType invent
+		if p == nil || p.Type == nil {
+			fi.Failed = true
+			return fi
 		}
+		ty := p.Type
+		q := p.Qfer
+		qfer := &q
 		paramAccum := EmptyEffect()
 		paramCG := *cg
 		paramCG.effectContext = running
@@ -922,13 +921,8 @@ func MakeRandomInvocation(
 	}
 	// Match type for choose_func: nil means any return type (C++ type=0).
 	matchType := typ
-	// Concrete type for std ops / new signatures.
-	workType := typ
-	if workType == nil {
-		workType = GetIntType()
-	}
-	// non-simple / void → force user path (std_func false)
-	if workType.PtrType() != nil || (workType.IsSimple() && workType.Simple() == EVoid) {
+	// FunctionInvocation.cpp:71–73 path — non-simple/void force user path (type known)
+	if typ != nil && (typ.PtrType() != nil || (typ.IsSimple() && typ.Simple() == EVoid)) {
 		stdFunc = false
 	}
 
@@ -947,9 +941,9 @@ func MakeRandomInvocation(
 				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
 			}
 		} else if list != nil && !ReachMaxFunctions(list, opts) {
-			// build_invocation_and_function (FunctionInvocationUser.cpp:170+)
-			sigType := workType
-			if typ == nil {
+			// FunctionInvocationUser.cpp:175 — assert(type); RandomReturnType when type nil
+			sigType := typ
+			if sigType == nil {
 				var env *TypeEnv
 				if list != nil {
 					env = list.Types
@@ -970,10 +964,11 @@ func MakeRandomInvocation(
 	}
 	if fi == nil {
 		// FunctionInvocation.cpp:111–118 — StdUnaryFuncProb → unary else binary
-		if r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
-			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, workType)
+		// unary asserts(type); when type nil prefer binary (no GetIntType invent)
+		if typ != nil && r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
+			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, typ)
 		} else {
-			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, workType)
+			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, typ)
 		}
 	}
 	return fi

@@ -5,6 +5,18 @@ import (
 	"testing"
 )
 
+func TestBuildInvocationAndFunctionNilType(t *testing.T) {
+	// FunctionInvocationUser.cpp:175 — assert(type); no GetIntType invent
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	list := &FunctionList{}
+	cg := EmptyCGContext()
+	fi := BuildInvocationAndFunction(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, nil)
+	if fi == nil || !fi.Failed {
+		t.Fatal("nil return type must fail without soft invent")
+	}
+}
+
 func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 10

@@ -53,8 +53,9 @@ func ChooseVisibleReadVar(
 	typ *Type,
 	unionFacts []*FactUnion,
 ) *Variable {
+	// VariableSelector.cpp:363 — type from caller (goto uses get_int_type); no invent
 	if typ == nil {
-		typ = GetIntType()
+		return nil
 	}
 	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
 	var ok []*Variable
