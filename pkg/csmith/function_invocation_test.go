@@ -172,7 +172,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	vs.Types = env
 	tables := NewExprTables(opts)
 	fi := func() *Invocation {
-		c := EmptyCGContext()
+		c := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
 		c.Types = env
 		return MakeRandomBinaryPtrComparison(NewRng(4), opts, probs, vs, tables, &c, env)
 	}()

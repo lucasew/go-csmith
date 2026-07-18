@@ -1027,7 +1027,8 @@ func (f *FactPointTo) PointsTo(v *Variable) bool {
 // CallerToCalleeHandover mirrors FactMgr::caller_to_callee_handover.
 // FactMgr.cpp:312–353 — param facts; keep globals/params and transitively pointed stack vars.
 func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
-	if fm == nil || inputs == nil {
+	// FactMgr always bound to a Function; nil Func is broken IR (no invent param partition)
+	if fm == nil || inputs == nil || fm.Func == nil {
 		return
 	}
 	fm.AddParamFacts(args, inputs)

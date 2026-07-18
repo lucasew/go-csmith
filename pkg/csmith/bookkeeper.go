@@ -342,17 +342,17 @@ func ExpressionComplexity(e *Expression) int {
 	case TermConstant, TermVariable:
 		return 0
 	case TermFunction:
-		// ExpressionFuncall::get_complexity
+		// ExpressionFuncall::get_complexity — live invoke only
+		// no soft invent complexity 1 for nil Invoke IR
+		if e.Invoke == nil {
+			return 0
+		}
 		comp := 0
-		if e.Invoke != nil {
-			if e.Invoke.User != nil && !e.Invoke.IsStd {
-				comp++ // function call itself
-			}
-			for _, a := range e.Invoke.Args {
-				comp += ExpressionComplexity(a)
-			}
-		} else {
-			comp = 1
+		if e.Invoke.User != nil && !e.Invoke.IsStd {
+			comp++ // function call itself
+		}
+		for _, a := range e.Invoke.Args {
+			comp += ExpressionComplexity(a)
 		}
 		return comp
 	case TermAssignment:

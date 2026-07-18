@@ -71,16 +71,27 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	}
 	eff := EmptyEffect()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	cg.ExprDepth = 0
 	tables := NewExprTables(opts)
-	st := MakeRandomAssign(NewRng(5), opts, probs, vs, tables, &cg, GetIntType())
-	if st.Kind != StmtAssign {
-		t.Fatal("kind")
+	// single seed may fail Lhs/exact qfer; retry like other factories
+	var st Stmt
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg2.EffectAccum = &eff
+		cg2.Types = vs.Types
+		st = MakeRandomAssign(NewRng(seed), opts, probs, vs, tables, &cg2, GetIntType())
+		if stmtOK(st) {
+			cg = cg2
+			break
+		}
 	}
-	if st.LhsVar == nil && st.Lhs == nil {
+	if !stmtOK(st) {
 		t.Fatal("no lhs", st)
 	}
 	// successful assign with RHS expression bumps depth via merge

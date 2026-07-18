@@ -21,15 +21,18 @@ func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
 			CollectReferencedPtrsStmt(e.Assign, ptrs)
 		}
 	case TermFunction:
-		if e.Invoke != nil {
-			for _, a := range e.Invoke.Args {
-				CollectReferencedPtrsExpression(a, ptrs)
-			}
-			// include callee's referenced ptrs when known
-			if e.Invoke.User != nil {
-				for _, p := range e.Invoke.User.ReferencedPtrs {
-					*ptrs = appendUniqueVar(*ptrs, p)
-				}
+		// ExpressionFuncall.cpp:165–177 — param_value then eFuncCall → assert(fiu) + callee
+		if e.Invoke == nil {
+			return
+		}
+		for _, a := range e.Invoke.Args {
+			CollectReferencedPtrsExpression(a, ptrs)
+		}
+		// ExpressionFuncall.cpp:172–177 — only user FuncCall walks callee refs
+		// assert(fiu); incomplete std-as-user skip (no invent empty follow)
+		if e.Invoke.User != nil && !e.Invoke.IsStd {
+			for _, p := range e.Invoke.User.ReferencedPtrs {
+				*ptrs = appendUniqueVar(*ptrs, p)
 			}
 		}
 	}

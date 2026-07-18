@@ -905,8 +905,16 @@ func makeExpressionFuncall(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// ExpressionFuncall.cpp:75 — get_fact_mgr always live; fail closed without invent
+	if cg.FM == nil {
+		return nil
+	}
 	// ExpressionFuncall.cpp:66+ — no DEPTH_GUARD here (guard is on Expression::make_random)
+	// session probs when VS owns tables (no invent NewProbabilities from opts alone)
 	probs := NewProbabilities(opts)
+	if vs != nil && vs.Probs != nil {
+		probs = vs.Probs
+	}
 	stdFunc := ExpressionFunctionProbability(r, list, opts)
 	// ExpressionFuncall.cpp:71–73 — unary/binary only for non-void simple types
 	if typ != nil && (!typ.IsSimple() || typ.Simple() == EVoid) {
@@ -918,20 +926,33 @@ func makeExpressionFuncall(
 		preAccum = cg.EffectAccum.Clone()
 	}
 	preStm := cg.EffectStm.Clone()
-	var factsCopy []*FactPointTo
-	if cg.FM != nil {
-		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
-	}
+	factsCopy := CloneFactSlice(cg.FM.GlobalFacts)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
-	if fi == nil || fi.Failed {
+	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
+	if HasError() {
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preAccum
+		}
+		cg.EffectStm = preStm
+		cg.FM.RestoreFacts(factsCopy)
+		return nil
+	}
+	// FunctionInvocation.cpp:119 assert(fi != 0); nil without Failed is incomplete
+	if fi == nil {
+		if cg.EffectAccum != nil {
+			*cg.EffectAccum = preAccum
+		}
+		cg.EffectStm = preStm
+		cg.FM.RestoreFacts(factsCopy)
+		return nil
+	}
+	if fi.Failed {
 		// ExpressionFuncall.cpp:84–91 — restore env; replace with simple var
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preAccum
 		}
 		cg.EffectStm = preStm
-		if cg.FM != nil {
-			cg.FM.RestoreFacts(factsCopy)
-		}
+		cg.FM.RestoreFacts(factsCopy)
 		return makeExpressionVariable(r, vs, cg, typ, qfer)
 	}
 	return &Expression{Term: TermFunction, Invoke: fi}

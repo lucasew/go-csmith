@@ -1052,5 +1052,14 @@ func MakeRandomInvocation(
 			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, typ)
 		}
 	}
+	// FunctionInvocation.cpp:119 — assert(fi != 0); std factories must yield live invoke
+	// incomplete null without sticky error → failed shell (ExpressionFuncall var fallback)
+	// no invent success IR
+	if fi == nil {
+		if HasError() {
+			return nil
+		}
+		return &Invocation{Failed: true}
+	}
 	return fi
 }

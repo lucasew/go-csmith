@@ -97,9 +97,9 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 	caller := &Function{Name: "func_1"}
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
-	cg := WithFunc(caller, EmptyEffect())
+	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(NewFactMgr(caller))
 	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
-	if fi.Failed {
+	if fi == nil || fi.Failed {
 		t.Fatal("failed")
 	}
 	if len(fi.Args) != 2 {

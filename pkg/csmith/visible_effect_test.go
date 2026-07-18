@@ -69,14 +69,31 @@ func TestMakeRandomIfFunc1UncertainPath(t *testing.T) {
 	// smoke: func_1 with FM does not panic on if generation
 	opts := Defaults()
 	opts.MaxBlockSize = 1
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(1))
 	fm := NewFactMgr(f)
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	vs := NewVariableSelector(opts)
-	st := MakeRandomIf(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts),
-		NewStatementThresholdTable(opts), &cg)
+	cg.Types = vs.Types
+	// seed may fail; retry
+	var st *Stmt
+	for seed := uint64(1); seed < 40; seed++ {
+		ClearError()
+		cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg2.EffectAccum = &eff
+		cg2.Types = vs.Types
+		st = MakeRandomIf(NewRng(seed), opts, probs, vs, NewExprTables(opts),
+			NewStatementThresholdTable(opts), &cg2)
+		if st != nil && st.Kind == StmtIfElse {
+			break
+		}
+	}
 	if st == nil || st.Kind != StmtIfElse {
 		t.Fatal(st)
 	}

@@ -15,7 +15,8 @@ func TestMakeExpressionComma(t *testing.T) {
 	tables := NewExprTables(opts)
 	r := NewRng(2)
 	e := func() *Expression {
-		c := EmptyCGContext()
+		// ExpressionFuncall / make_random paths need get_fact_mgr
+		c := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(r, opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()
@@ -57,7 +58,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	tables := NewExprTables(opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
 	e := func() *Expression {
-		c := EmptyCGContext()
+		c := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
 		c.Types = vs.Types
 		return MakeExpressionComma(NewRng(11), opts, probs, vs, tables, &c, GetIntType(), nil)
 	}()

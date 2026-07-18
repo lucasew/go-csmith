@@ -166,6 +166,10 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	if ExpressionComplexity(e2) != 2 {
 		t.Fatal(ExpressionComplexity(e2))
 	}
+	// nil Invoke — no soft invent complexity 1
+	if ExpressionComplexity(&Expression{Term: TermFunction}) != 0 {
+		t.Fatal("nil invoke must not invent complexity")
+	}
 }
 
 func TestExpressionIndentedOutput(t *testing.T) {
@@ -457,12 +461,14 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 	env := &TypeEnv{AllTypes: []*Type{st, GetIntType()}}
 	vs.Types = env
 	list := &FunctionList{Types: env}
-	cg := EmptyCGContext()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 	cg.Types = env
 	cg.Funcs = list
 	// many tries: result if any should not be pure std binary/unary alone when type is struct
 	// (user path may still fail → variable fallback)
 	for seed := uint64(1); seed < 20; seed++ {
+		ClearError()
 		e := makeExpressionFuncall(NewRng(seed), opts, vs, tables, &cg, st, nil, list)
 		if e == nil {
 			continue
@@ -470,6 +476,15 @@ func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {
 		if e.Term == TermFunction && e.Invoke != nil && e.Invoke.IsStd {
 			t.Fatalf("struct type must not use std op: %s", e.Invoke.Binary+e.Invoke.Unary)
 		}
+	}
+}
+
+func TestMakeExpressionFuncallRequiresFactMgr(t *testing.T) {
+	// ExpressionFuncall.cpp:75 get_fact_mgr — no invent without FM
+	opts := Defaults()
+	cg := EmptyCGContext()
+	if makeExpressionFuncall(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("nil FM must fail closed")
 	}
 }
 
