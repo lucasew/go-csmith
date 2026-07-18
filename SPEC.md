@@ -396,8 +396,10 @@ Superseding integrity text that banned residual while still logging residual cli
 | Layer 4: `Type` simple + pointer wrapper | **Partial** — simple + `PointerTo` / indirect level |
 | Layer 5: `Effect` + empty `CGContext` | **Partial** — purity / SE-free only |
 | Layer 5b: `CVQualifiers::random_qualifiers` | **Partial** — type-based path + scalar make_* |
+| Layer 6: `Variable` + `gensym` | **Partial** — CreateVariable, is_global/local/arg |
+| Layer 7: `VariableSelector` | **Partial** — choose_ok_var, GenerateNewGlobal, SelectGlobal (exact type; no array/struct expand) |
 | `Generate` / ProgramGenerator | **Stub** — `ErrNotImplemented` |
-| Variable → … → ProgramGenerator | **Not started** |
+| Constant / create_and_initialize / ArrayVariable | **Not started** |
 | CLI drop-in | **Last** |
 
 Progress rows are **functions/modules ported + tests**, not event tallies.
