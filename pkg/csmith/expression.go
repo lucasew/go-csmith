@@ -596,18 +596,21 @@ func makeExpressionVariableFlags(
 		preAccum = cg.EffectAccum.Clone()
 	}
 	preStm = cg.EffectStm.Clone()
-	// try several selects if filtered (dummy exclusion)
+	// ExpressionVariable.cpp:71–132 — do { select; filters; visit_facts } while (!ev)
+	// dummy is invalid_vars passed into select (ExpressionVariable.cpp:78, 131)
 	var dummy []*Variable
-	for tries := 0; tries < 16; tries++ {
+	for tries := 0; tries < 24; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, cg, typ, qfer)
 		if v == nil {
-			v = vs.Select(AccessRead, cg, typ, qfer, r, MatchFlexible)
+			// ExpressionVariable.cpp:77–78 — select(..., dummy, eFlexible)
+			v = vs.SelectWithInvalid(AccessRead, cg, typ, qfer, r, MatchFlexible, dummy)
 		}
 		if v == nil {
-			return nil
+			// C++ continues the loop; we give up after tries
+			continue
 		}
-		// skip already rejected (ExpressionVariable.cpp:131 dummy.push_back)
+		// already in dummy should be rare when SelectWithInvalid works; keep guard
 		skip := false
 		for _, d := range dummy {
 			if d == v {
@@ -655,11 +658,12 @@ func makeExpressionVariableFlags(
 				}
 			}
 		}
-		ev := &Expression{Term: TermVariable, Var: v, ExprType: typ}
-		// ExpressionVariable.cpp:120–128 — visit_facts; restore effects on fail
+		// ExpressionVariable.cpp:120–124 — visit_facts with (var, type); on success
+		// use ExpressionVariable(*var) when indirection==0 else (*var, type)
+		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
 		if cg.FM != nil {
 			cgp := &cg
-			if !cgp.VisitFactsExpressionVariable(ev, vs.Opts) {
+			if !cgp.VisitFactsExpressionVariable(probe, vs.Opts) {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
 				}
@@ -669,6 +673,11 @@ func makeExpressionVariableFlags(
 			}
 		} else {
 			cg.NoteRead(v)
+		}
+		// ExpressionVariable.cpp:122–123
+		ev := probe
+		if probe.IndirectLevel() == 0 {
+			ev = &Expression{Term: TermVariable, Var: v, ExprType: v.Type}
 		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
 		deref := ev.IndirectLevel()

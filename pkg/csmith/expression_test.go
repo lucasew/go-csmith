@@ -192,3 +192,66 @@ func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
 		t.Fatalf("PickTermType force: %v", tt)
 	}
 }
+
+func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
+	// ExpressionVariable.cpp:78 — select(..., dummy invalid_vars)
+	// After rejecting a float for non-float want, select must not keep returning it forever.
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	// only a float global
+	fv := CreateVariableScalars("g_f", GetSimpleType(EFloat), true, false)
+	vs.GlobalList = []*Variable{fv}
+	vs.AllVars = []*Variable{fv}
+	// force global selection
+	opts.GlobalVariables = true
+	vs.Opts = opts
+	// int want — float rejected then new var created (ScopeNewValue) or nil after tries
+	cg := EmptyCGContext()
+	cg.Types = vs.Types
+	ev := makeExpressionVariableFlags(NewRng(1), vs, cg, GetIntType(), nil, false, false)
+	// either created a new non-float, or nil — must not return the float
+	if ev != nil && ev.Var == fv {
+		t.Fatal("must not use float for int want")
+	}
+}
+
+func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
+	// ExpressionVariable.cpp:122–123 — indirection 0 → ExpressionVariable(*var) without forced type
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{v}
+	vs.AllVars = []*Variable{v}
+	vs.Opts = opts
+	cg := EmptyCGContext()
+	// want int, var int → indirect 0 → ExprType should be var.Type
+	ev := makeExpressionVariableFlags(NewRng(2), vs, cg, GetIntType(), nil, false, false)
+	if ev == nil {
+		t.Fatal("nil")
+	}
+	if ev.Var != v {
+		// may create new var if select path differs — still check zero indirect shape
+		if ev.IndirectLevel() != 0 {
+			t.Fatal("want 0")
+		}
+		return
+	}
+	if ev.ExprType != v.Type {
+		t.Fatalf("ExprType %v want var.Type", ev.ExprType)
+	}
+}
+
+func TestSelectWithInvalidExcludesDummy(t *testing.T) {
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{a, b}
+	vs.AllVars = []*Variable{a, b}
+	vs.Opts = opts
+	// only two globals; exclude a → must pick b or create
+	got := vs.SelectWithInvalid(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{a})
+	if got == a {
+		t.Fatal("invalid_vars must exclude a")
+	}
+}
