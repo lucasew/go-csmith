@@ -107,6 +107,9 @@ type Options struct {
 	AddrTakenOfLocals        bool
 	DanglingGlobalPointers   bool
 	NoReturnDeadPointer      bool
+	// InterestedFacts is FactMgr meta_facts bitmask (ePointTo|eUnionWrite).
+	// 0 means use DefaultInterestedFacts at generation time.
+	InterestedFacts          int
 	HashValuePrintf          bool
 	SignedCharIndex          bool
 	ForceGlobalsStatic       bool

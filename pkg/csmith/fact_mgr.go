@@ -2,6 +2,43 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+// eFactCategory (Fact.h) — bit flags for FactMgr::meta_facts registration.
+const (
+	// FactCategoryPointTo is ePointTo.
+	FactCategoryPointTo = 1
+	// FactCategoryUnionWrite is eUnionWrite.
+	FactCategoryUnionWrite = 2
+	// DefaultInterestedFacts matches CGOptions default (point-to | union-write).
+	DefaultInterestedFacts = FactCategoryPointTo | FactCategoryUnionWrite
+)
+
+// meta_facts enable flags (FactMgr.cpp:67 meta_facts vector).
+// When false, corresponding abstract_fact paths are skipped.
+var (
+	metaFactPointToEnabled = true
+	metaFactUnionEnabled   = true
+)
+
+// AddInterestedFacts mirrors FactMgr::add_interested_facts.
+// FactMgr.cpp:475–486 — register meta fact kinds for DFA.
+func AddInterestedFacts(interests int) {
+	metaFactPointToEnabled = interests&FactCategoryPointTo != 0
+	metaFactUnionEnabled = interests&FactCategoryUnionWrite != 0
+}
+
+// MetaFactPointToEnabled reports whether point-to analysis is active.
+func MetaFactPointToEnabled() bool { return metaFactPointToEnabled }
+
+// MetaFactUnionEnabled reports whether union-write analysis is active.
+func MetaFactUnionEnabled() bool { return metaFactUnionEnabled }
+
+// ClearMetaFacts restores default interested facts (both on).
+// Called from DoFinalization between generations.
+func ClearMetaFacts() {
+	metaFactPointToEnabled = true
+	metaFactUnionEnabled = true
+}
+
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps.
 // GlobalFacts holds FactPointTo; UnionFacts holds FactUnion.
 type FactMgr struct {
@@ -577,7 +614,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 }
 
 // AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to/union init.
-// FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init.
+// FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init via meta_facts loop.
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -589,25 +626,35 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		}
 		return
 	}
-	if v.IsPointer() && FindRelatedPointTo(fm.GlobalFacts, v) != nil {
+	// FactMgr.cpp:77–79 — only meta_facts that were registered
+	wantPT := metaFactPointToEnabled && v.IsPointer()
+	wantUn := metaFactUnionEnabled && v.Type != nil && v.Type.IsUnion()
+	if !wantPT && !wantUn {
 		return
 	}
-	if v.Type != nil && v.Type.IsUnion() && FindRelatedUnion(fm.UnionFacts, v) != nil {
+	if wantPT && FindRelatedPointTo(fm.GlobalFacts, v) != nil {
+		return
+	}
+	if wantUn && FindRelatedUnion(fm.UnionFacts, v) != nil {
 		return
 	}
 	pt, un := AbstractFactForVarInit(v)
-	for _, f := range pt {
-		fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+	if wantPT {
+		for _, f := range pt {
+			fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+		}
+		if len(pt) == 0 && v.IsPointer() {
+			fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
+		}
 	}
-	for _, uf := range un {
-		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
-	}
-	if len(pt) == 0 && v.IsPointer() {
-		fm.GlobalFacts = append(fm.GlobalFacts, NewFactPointTo(v))
-	}
-	if len(un) == 0 && v.Type != nil && v.Type.IsUnion() {
-		// no init → top (no write known)
-		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnionTop(v))
+	if wantUn {
+		for _, uf := range un {
+			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+		}
+		if len(un) == 0 && v.Type != nil && v.Type.IsUnion() {
+			// no init → top (no write known)
+			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, MakeFactUnionTop(v))
+		}
 	}
 }
 

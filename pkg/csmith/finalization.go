@@ -11,6 +11,8 @@ func DoFinalization() {
 	BookkeeperDoFinalization()
 	// FactPointTo::all_ptrs / all_aliases
 	ClearPointToAggregates()
+	// FactMgr::meta_facts
+	ClearMetaFacts()
 	// Attribute generators
 	ClearAttrGenerators()
 	// FunctionInvocationUser return-fact registry

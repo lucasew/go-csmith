@@ -64,7 +64,8 @@ func (g *ProgramGenerator) GenerateAllTypes() {
 }
 
 // GenerateFunctions mirrors Function.cpp GenerateFunctions.
-// Function.cpp:790–807 — make_first then GenerateBody; FactMgr per function.
+// Function.cpp:790–809 — interested facts; builtins; make_first; generate unbuilt;
+// aggregate_all_pointto_sets.
 func (g *ProgramGenerator) GenerateFunctions() {
 	if g == nil {
 		return
@@ -73,31 +74,39 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		g.FactMgrs = NewFactMgrMap()
 	}
 	g.Funcs.Types = &g.Types
+	// Function.cpp:791 — FactMgr::add_interested_facts(CGOptions::interested_facts())
+	interests := g.Opts.InterestedFacts
+	if interests == 0 {
+		interests = DefaultInterestedFacts
+	}
+	AddInterestedFacts(interests)
 	// Function.cpp:792–793 — initialize_builtin_functions when builtins on
 	if g.Opts.Builtins {
 		InitializeBuiltinFunctions(g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
 	}
 	// Function::make_first — creates FactMgr for func_1
 	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
-	// Create body of each function until no new unbuilt remain (Function.cpp:801–807).
+	// Function.cpp:801–807 — create body of each unbuilt function (list may grow)
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
-		if f != nil && !f.IsBuilt {
-			cg := EmptyCGContext().WithFuncList(&g.Funcs)
-			cg.CurrentFunc = f
-			cg.Types = &g.Types
-			if fm := g.FactMgrs.ForFunc(f); fm != nil {
-				// seed global pointer facts already known
-				for _, gv := range g.VS.GlobalList {
-					fm.AddNewVarFact(gv)
-				}
-				cg = cg.WithFactMgr(fm)
-			}
-			f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
+		if f == nil || f.IsBuilt || f.BuildState == BuildBuilt {
+			continue
 		}
+		cg := EmptyCGContext().WithFuncList(&g.Funcs)
+		cg.CurrentFunc = f
+		cg.Types = &g.Types
+		if fm := g.FactMgrs.ForFunc(f); fm != nil {
+			// seed global pointer facts already known
+			for _, gv := range g.VS.GlobalList {
+				fm.AddNewVarFact(gv)
+			}
+			cg = cg.WithFactMgr(fm)
+		}
+		f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 	}
 	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
 	AggregateAllPointToSets(g.Funcs.Funcs, g.FactMgrs)
+	// Function.cpp:809 — ExtensionMgr::GenerateValues (null extension → no-op)
 }
 
 // OutputHeader mirrors OutputMgr::OutputHeader (non-concise path).

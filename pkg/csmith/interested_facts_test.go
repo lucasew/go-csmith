@@ -1,0 +1,66 @@
+package csmith
+
+import "testing"
+
+func TestAddInterestedFactsGates(t *testing.T) {
+	defer ClearMetaFacts()
+	// only point-to
+	AddInterestedFacts(FactCategoryPointTo)
+	if !MetaFactPointToEnabled() || MetaFactUnionEnabled() {
+		t.Fatal("point only")
+	}
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.AddNewVarFact(p)
+	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
+		t.Fatal("want pt fact")
+	}
+	// union fact should not be created when disabled
+	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	fm.AddNewVarFact(uv)
+	if FindRelatedUnion(fm.UnionFacts, uv) != nil {
+		t.Fatal("union should be skipped")
+	}
+
+	// only union
+	AddInterestedFacts(FactCategoryUnionWrite)
+	fm2 := NewFactMgr(nil)
+	fm2.AddNewVarFact(p)
+	if FindRelatedPointTo(fm2.GlobalFacts, p) != nil {
+		t.Fatal("pt disabled")
+	}
+	fm2.AddNewVarFact(uv)
+	if FindRelatedUnion(fm2.UnionFacts, uv) == nil {
+		t.Fatal("want union fact")
+	}
+
+	// default both
+	ClearMetaFacts()
+	if !MetaFactPointToEnabled() || !MetaFactUnionEnabled() {
+		t.Fatal("defaults")
+	}
+}
+
+func TestGenerateFunctionsCallsAddInterested(t *testing.T) {
+	defer ClearMetaFacts()
+	// start with both off
+	AddInterestedFacts(0)
+	if MetaFactPointToEnabled() {
+		t.Fatal("should be off")
+	}
+	opts := Defaults()
+	opts.MaxFuncs = 2
+	opts.MaxBlockSize = 1
+	opts.MaxBlockDepth = 1
+	opts.InterestedFacts = DefaultInterestedFacts
+	g := NewProgramGenerator(opts)
+	g.GenerateAllTypes()
+	g.GenerateFunctions()
+	if !MetaFactPointToEnabled() || !MetaFactUnionEnabled() {
+		t.Fatal("GenerateFunctions should re-enable default interests")
+	}
+	if len(g.Funcs.Funcs) < 1 {
+		t.Fatal("no funcs")
+	}
+}
