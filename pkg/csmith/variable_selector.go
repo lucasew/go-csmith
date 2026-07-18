@@ -1170,23 +1170,35 @@ func (vs *VariableSelector) SelectGlobal(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
+	return vs.SelectGlobalMT(access, cg, t, qfer, r, MatchFlexible, nil)
+}
+
+// SelectGlobalMT is SelectGlobal with match type and invalid_vars.
+// VariableSelector.cpp:669–695.
+func (vs *VariableSelector) SelectGlobalMT(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+	invalidVars []*Variable,
+) *Variable {
 	if vs == nil {
 		return nil
 	}
-	// choose_var with eFlexible + is_eligible_var
-	v := ChooseVar(r, vs.GlobalList, access, cg, t, MatchFlexible)
+	// choose_var(GlobalList, …, mt, invalid_vars)
+	v := ChooseVarFull(r, vs.GlobalList, access, cg, t, qfer, mt, invalidVars, false, false, false)
 	if v != nil {
-		// VariableSelector.cpp:1237–1238 — use_old_var_cnt
-		RecordVarReused()
 		return v
 	}
 	// VariableSelector.cpp:677–684 — expand_struct eager path
 	if vs.Opts.ExpandStruct {
-		if v = vs.EagerCreateGlobalStruct(access, cg, t, qfer, r, MatchFlexible); v != nil {
+		if v = vs.EagerCreateGlobalStruct(access, cg, t, qfer, r, mt); v != nil {
 			return v
 		}
 	}
-	// SelectGlobal.cpp:685–694 — random_type_from_type then GenerateNewGlobal
+	// VariableSelector.cpp:685–694 — random_type_from_type then GenerateNewGlobal
 	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
 	if t2 == nil {
@@ -1583,7 +1595,7 @@ func VariableCreationProbability(r *Rng, opts Options) VariableScope {
 }
 
 // Select mirrors VariableSelector::select.
-// VariableSelector.cpp:1189–1243 — pick scope then SelectGlobal / ParentLocal / Param / New.
+// VariableSelector.cpp:1189–1243 — pick scope; bookkeep new/old; reject vol in non-SE-free.
 func (vs *VariableSelector) Select(
 	access Access,
 	cg CGContext,
@@ -1591,6 +1603,20 @@ func (vs *VariableSelector) Select(
 	qfer *CVQualifiers,
 	r *Rng,
 	mt MatchType,
+) *Variable {
+	return vs.SelectWithInvalid(access, cg, t, qfer, r, mt, nil)
+}
+
+// SelectWithInvalid is select with invalid_vars list.
+// VariableSelector.cpp:1189–1243.
+func (vs *VariableSelector) SelectWithInvalid(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+	invalidVars []*Variable,
 ) *Variable {
 	if vs == nil || r == nil {
 		return nil
@@ -1600,11 +1626,11 @@ func (vs *VariableSelector) Select(
 	var v *Variable
 	switch scope {
 	case ScopeGlobal:
-		v = vs.SelectGlobal(access, cg, t, qfer, r)
+		v = vs.SelectGlobalMT(access, cg, t, qfer, r, mt, invalidVars)
 	case ScopeParentLocal:
-		v = vs.SelectParentLocal(access, cg, t, qfer, r, mt)
+		v = vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, invalidVars)
 	case ScopeParentParam:
-		v = vs.SelectParentParam(access, cg, t, qfer, r, mt)
+		v = vs.SelectParentParamInv(access, cg, t, qfer, r, mt, invalidVars)
 	case ScopeNewValue:
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
 	default:
@@ -1614,11 +1640,28 @@ func (vs *VariableSelector) Select(
 	if v == nil {
 		v = vs.GenerateNewVariable(access, cg, t, qfer, r)
 	}
+	// VariableSelector.cpp:1225–1227 — non-SE-free context must not pick volatile
+	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
+		// soft reject: prefer another non-vol by regenerating once
+		vs.VarCreated = false
+		v2 := vs.GenerateNewVariable(access, cg, t, qfer, r)
+		if v2 != nil && !v2.IsVolatile() {
+			v = v2
+		}
+	}
+	// VariableSelector.cpp:1229–1239 — record statistics
+	if v != nil {
+		if vs.VarCreated {
+			RecordVarCreated(v)
+		} else {
+			RecordVarReused()
+		}
+	}
 	return v
 }
 
 // SelectParentLocal mirrors VariableSelector::SelectParentLocal.
-// VariableSelector.cpp:987–1041 — rnd stack block; expand_struct on empty; choose_var or create.
+// VariableSelector.cpp:987–1041 — rnd stack index; expand_struct on empty; choose_var or create.
 func (vs *VariableSelector) SelectParentLocal(
 	access Access,
 	cg CGContext,
@@ -1627,6 +1670,19 @@ func (vs *VariableSelector) SelectParentLocal(
 	r *Rng,
 	mt MatchType,
 ) *Variable {
+	return vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, nil)
+}
+
+// SelectParentLocalInv is SelectParentLocal with invalid_vars.
+func (vs *VariableSelector) SelectParentLocalInv(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+	invalidVars []*Variable,
+) *Variable {
 	if vs == nil || cg.CurrentFunc == nil || r == nil {
 		return nil
 	}
@@ -1634,13 +1690,8 @@ func (vs *VariableSelector) SelectParentLocal(
 	if len(stack) == 0 {
 		return nil
 	}
-	// VariableSelector.cpp:1001–1004 — pick parent block (incl. self); optional global=nil unused for locals
-	cur := stack[len(stack)-1]
-	blk := cur.RandomParentBlock(r, false)
-	if blk == nil {
-		// fall back to random stack entry
-		blk = stack[r.RndUpto(uint32(len(stack)))]
-	}
+	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size())
+	blk := stack[r.RndUpto(uint32(len(stack)))]
 	if blk == nil {
 		return nil
 	}
@@ -1651,13 +1702,14 @@ func (vs *VariableSelector) SelectParentLocal(
 				return v
 			}
 		}
+		// VariableSelector.cpp:1011 — random_type_from_type(type, true, false) no_vol=true
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
 		if t2 == nil {
 			t2 = t
 		}
 		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
 	}
-	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type
+	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t
 	if t != nil && t.IsSimple() && t.Simple() != EVoid {
 		matchT = GetIntType()
@@ -1667,7 +1719,7 @@ func (vs *VariableSelector) SelectParentLocal(
 			matchT = t
 		}
 	}
-	if v := ChooseVar(r, blk.LocalVars, access, cg, matchT, mt); v != nil {
+	if v := ChooseVarFull(r, blk.LocalVars, access, cg, matchT, qfer, mt, invalidVars, false, false, false); v != nil {
 		return v
 	}
 	return vs.GenerateNewParentLocal(blk, access, cg, matchT, qfer, r)
@@ -1683,20 +1735,33 @@ func (vs *VariableSelector) SelectParentParam(
 	r *Rng,
 	mt MatchType,
 ) *Variable {
+	return vs.SelectParentParamInv(access, cg, t, qfer, r, mt, nil)
+}
+
+// SelectParentParamInv is SelectParentParam with invalid_vars.
+func (vs *VariableSelector) SelectParentParamInv(
+	access Access,
+	cg CGContext,
+	t *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+	invalidVars []*Variable,
+) *Variable {
 	if cg.CurrentFunc == nil {
 		return nil
 	}
 	if len(cg.CurrentFunc.Param) == 0 {
-		return vs.SelectParentLocal(access, cg, t, qfer, r, mt)
+		return vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, invalidVars)
 	}
-	if v := ChooseVar(r, cg.CurrentFunc.Param, access, cg, t, mt); v != nil {
+	if v := ChooseVarFull(r, cg.CurrentFunc.Param, access, cg, t, qfer, mt, invalidVars, false, false, false); v != nil {
 		return v
 	}
-	return vs.SelectParentLocal(access, cg, t, qfer, r, mt)
+	return vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, invalidVars)
 }
 
 // GenerateNewVariable mirrors VariableSelector::GenerateNewVariable.
-// VariableSelector.cpp:1090+ — VariableCreationProbability → global or parent local.
+// VariableSelector.cpp:1090–1140 — VariableCreationProbability → global or parent local.
 func (vs *VariableSelector) GenerateNewVariable(
 	access Access,
 	cg CGContext,
@@ -1707,19 +1772,29 @@ func (vs *VariableSelector) GenerateNewVariable(
 	if vs == nil || t == nil {
 		return nil
 	}
-	// random_type_from_type like SelectGlobal create path
-	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
-	if t2 == nil {
-		t2 = t
-	}
 	scope := VariableCreationProbability(r, vs.Opts)
 	switch scope {
 	case ScopeGlobal:
+		// VariableSelector.cpp:1105 — random_type_from_type(type) default no_vol=false
+		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
+		if t2 == nil {
+			t2 = t
+		}
 		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	default:
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-			blk := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
+			// VariableSelector.cpp:1118 — rnd_upto(func.stack.size())
+			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
+			// VariableSelector.cpp:1129 — random_type_from_type(type, true, false)
+			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true)
+			if t2 == nil {
+				t2 = t
+			}
 			return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+		}
+		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false)
+		if t2 == nil {
+			t2 = t
 		}
 		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	}

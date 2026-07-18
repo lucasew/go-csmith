@@ -337,7 +337,8 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 }
 
 // selectDerefPointer mirrors VariableSelector::select_deref_pointer.
-// VariableSelector.cpp:1246–1318 — visible vars + MatchDereference + eligibility; else new ptr.
+// VariableSelector.cpp:1246–1318 — nonvol globals+locals+params, eDereference;
+// else create ptr with random_add_qualifiers / random_qualifiers.
 func selectDerefPointer(
 	r *Rng,
 	opts Options,
@@ -348,16 +349,36 @@ func selectDerefPointer(
 	qfer *CVQualifiers,
 	access Access,
 ) *Variable {
+	return selectDerefPointerInv(r, opts, probs, vs, cg, typ, qfer, access, nil)
+}
+
+// selectDerefPointerInv is select_deref_pointer with invalid_vars.
+func selectDerefPointerInv(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	access Access,
+	invalidVars []*Variable,
+) *Variable {
 	if typ == nil || r == nil {
 		return nil
 	}
-	// VariableSelector.cpp:1252–1266 — nonvol globals + block locals + params
+	// VariableSelector.cpp:1252–1266 — GlobalNonvolatiles + block locals + params
 	var cands []*Variable
 	if vs != nil {
 		if len(vs.GlobalNonvolatilesList) > 0 {
 			cands = append(cands, vs.GlobalNonvolatilesList...)
 		} else {
-			cands = append(cands, vs.GlobalList...)
+			// fallback if list not tracked yet
+			for _, g := range vs.GlobalList {
+				if g != nil && !g.IsVolatile() {
+					cands = append(cands, g)
+				}
+			}
 		}
 	}
 	var blk *Block
@@ -365,14 +386,13 @@ func selectDerefPointer(
 		if len(cg.CurrentFunc.Stack) > 0 {
 			blk = cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
 		}
-		// walk parent chain for locals
 		for b := blk; b != nil; b = b.Parent {
 			cands = append(cands, b.LocalVars...)
 		}
 		cands = append(cands, cg.CurrentFunc.Param...)
 	}
-	// choose_var with eDereference
-	if v := ChooseVar(r, cands, access, cg, typ, MatchDereference); v != nil {
+	// VariableSelector.cpp:1264–1265 — choose_var eDereference
+	if v := ChooseVarFull(r, cands, access, cg, typ, qfer, MatchDereference, invalidVars, false, false, false); v != nil {
 		return v
 	}
 
@@ -389,32 +409,46 @@ func selectDerefPointer(
 	if ptrType == nil {
 		return nil
 	}
-	// expand_struct on create path (VariableSelector.cpp:1288–1310)
-	// volatile qfer → global eager; else local eager
+	// VariableSelector.cpp:1275–1287 — ptr_qfer
+	var pq CVQualifiers
+	if qfer == nil || qfer.Wildcard || !opts.GlobalVariables {
+		pq = RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
+	} else {
+		// random_add_qualifiers(!SE-free)
+		noVol := !cg.EffectContext().IsSideEffectFree()
+		pq = qfer.RandomAddQualifiers(r, opts, probs, noVol)
+	}
+	pq.AcceptStricter = false
+	if access == AccessWrite {
+		// CVQualifiers::set_const(false, 1) — index len-pos-1 from end
+		// CVQualifiers.cpp:588–592
+		if n := len(pq.IsConsts); n > 0 {
+			idx := n - 1 - 1 // pos = 1
+			if idx >= 0 {
+				pq.IsConsts[idx] = false
+			}
+		}
+	}
+	// VariableSelector.cpp:1288–1314 — volatile → global; else local
 	if vs != nil && vs.Opts.ExpandStruct {
-		vol := qfer != nil && qfer.IsVolatile()
-		if vol {
-			if v := vs.EagerCreateGlobalStruct(access, cg, ptrType, qfer, r, MatchDereference); v != nil {
+		if pq.IsVolatile() {
+			if v := vs.EagerCreateGlobalStruct(access, cg, ptrType, &pq, r, MatchDereference); v != nil {
 				return v
 			}
 		} else if blk != nil {
-			if v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, qfer, r, MatchDereference); v != nil {
+			if v := vs.EagerCreateLocalStruct(blk, access, cg, ptrType, &pq, r, MatchDereference); v != nil {
 				return v
 			}
 		}
 	}
-	// new local non-volatile preferred; else global
-	if vs != nil && cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-		b := cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
-		pq := RandomQualifiersDefaultProbs(ptrType, access, cg, true, opts, probs, r)
-		if access == AccessWrite {
-			pq = NewCVQualifiers([]bool{false}, []bool{false})
-		}
-		return vs.GenerateNewParentLocal(b, access, cg, ptrType, &pq, r)
-	}
-	pq := NewCVQualifiers([]bool{false}, []bool{false})
 	if vs == nil {
 		return nil
+	}
+	if pq.IsVolatile() {
+		return vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
+	}
+	if blk != nil {
+		return vs.GenerateNewParentLocal(blk, access, cg, ptrType, &pq, r)
 	}
 	return vs.GenerateNewGlobal(access, cg, ptrType, &pq, r)
 }
