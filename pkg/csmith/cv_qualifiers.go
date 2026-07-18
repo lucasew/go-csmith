@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // CVQualifiers mirrors CVQualifiers — per-indirection const/volatile vectors.
 // Indexing: is_consts[0] is outermost pointer level when depth>1; last element is
 // the storage object (see random_qualifiers vector construction in CVQualifiers.cpp).
@@ -173,6 +175,117 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 		return false
 	}
 	return q.Match(other.IndirectQualifiers(deref), matchExact)
+}
+
+// SetConst mirrors CVQualifiers::set_const — pos defaults to 0 (storage / first vector slot).
+// CVQualifiers.cpp:588–593. pos is index from the start of is_consts.
+func (q *CVQualifiers) SetConst(isConst bool, pos int) {
+	if q == nil {
+		return
+	}
+	if pos < 0 {
+		pos = 0
+	}
+	for len(q.IsConsts) <= pos {
+		q.IsConsts = append(q.IsConsts, false)
+	}
+	q.IsConsts[pos] = isConst
+}
+
+// SetVolatile mirrors CVQualifiers::set_volatile.
+// CVQualifiers.cpp:595–600.
+func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
+	if q == nil {
+		return
+	}
+	if pos < 0 {
+		pos = 0
+	}
+	for len(q.IsVolatiles) <= pos {
+		q.IsVolatiles = append(q.IsVolatiles, false)
+	}
+	q.IsVolatiles[pos] = isVol
+}
+
+// Restrict mirrors CVQualifiers::restrict.
+// CVQualifiers.cpp:602–609 — WRITE clears const; non-SE-free clears volatile.
+func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
+	if q == nil || q.Wildcard {
+		return
+	}
+	if access == AccessWrite {
+		q.SetConst(false, 0)
+		// also clear last storage const if multi-level (storage often last)
+		if n := len(q.IsConsts); n > 1 {
+			q.IsConsts[n-1] = false
+		}
+	}
+	if !cg.EffectContext().IsSideEffectFree() {
+		q.SetVolatile(false, 0)
+		if n := len(q.IsVolatiles); n > 1 {
+			q.IsVolatiles[n-1] = false
+		}
+	}
+}
+
+// OutputQualifiedType mirrors CVQualifiers::output_qualified_type.
+// CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
+func (q CVQualifiers) OutputQualifiedType(t *Type) string {
+	if t == nil {
+		return "void"
+	}
+	if q.Wildcard || len(q.IsConsts) == 0 {
+		// bare type + single-level quals from storage
+		var b strings.Builder
+		if q.IsConst() {
+			b.WriteString("const ")
+		}
+		if q.IsVolatile() {
+			b.WriteString("volatile ")
+		}
+		b.WriteString(t.CName())
+		return b.String()
+	}
+	base := t.BaseType()
+	if base == nil {
+		base = t
+	}
+	// For simple types with one qualifier level: "const volatile int"
+	if t.IsSimple() || t.IsAggregate() {
+		var b strings.Builder
+		if len(q.IsConsts) > 0 && q.IsConsts[0] {
+			b.WriteString("const ")
+		}
+		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
+			b.WriteString("volatile ")
+		}
+		b.WriteString(t.CName())
+		return b.String()
+	}
+	// pointer: const volatile base * const * ...
+	var b strings.Builder
+	for i := 0; i < len(q.IsConsts); i++ {
+		if i > 0 {
+			b.WriteString("*")
+		}
+		if q.IsConsts[i] {
+			if i > 0 {
+				b.WriteString(" ")
+			}
+			b.WriteString("const ")
+		}
+		if i < len(q.IsVolatiles) && q.IsVolatiles[i] {
+			if i > 0 && !q.IsConsts[i] {
+				b.WriteString(" ")
+			}
+			b.WriteString("volatile ")
+		}
+		if i == 0 {
+			b.WriteString(base.CName())
+			b.WriteString(" ")
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // isVolatileOKOnOneLevel mirrors is_volatile_ok_on_one_level (CVQualifiers.cpp).

@@ -20,8 +20,9 @@ func MakeRandomLhs(
 	if r == nil || vs == nil {
 		return nil, typ
 	}
-	// non-const WRITE qualifiers
+	// non-const WRITE qualifiers + restrict (Lhs.cpp:111–116)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
+	q.Restrict(AccessWrite, cg)
 
 	// Lhs.cpp:73–76 — try must_use WRITE first
 	if v := vs.SelectMustUseVar(r, AccessWrite, cg, typ, &q); v != nil {

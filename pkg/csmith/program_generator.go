@@ -214,24 +214,9 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			b.WriteString("\n")
 			continue
 		}
-		// force_globals_static default true
-		if g.Opts.ForceGlobalsStatic {
-			b.WriteString("static ")
-		}
-		if v.IsConst() {
-			b.WriteString("const ")
-		}
-		if v.IsVolatile() {
-			b.WriteString("volatile ")
-		}
-		b.WriteString(v.Type.CName())
-		b.WriteString(" ")
-		b.WriteString(v.Name)
-		if v.Init != nil && v.Init.Value != "" {
-			b.WriteString(" = ")
-			b.WriteString(v.Init.Value)
-		}
-		b.WriteString(";\n")
+		// Variable::Output with force_globals_static (Variable.cpp:640–665)
+		b.WriteString(v.OutputDef(g.Opts.ForceGlobalsStatic))
+		b.WriteString("\n")
 	}
 	b.WriteString("\n")
 	return b.String()

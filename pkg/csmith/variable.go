@@ -36,6 +36,38 @@ type Variable struct {
 	AsArray *ArrayVariable
 }
 
+// OutputDecl mirrors Variable::OutputDecl — static? + qualified type + name.
+// Variable.cpp:670–676.
+func (v *Variable) OutputDecl(forceStatic bool) string {
+	if v == nil {
+		return ""
+	}
+	var b strings.Builder
+	if forceStatic && v.IsGlobal() {
+		b.WriteString("static ")
+	}
+	b.WriteString(v.Qfer.OutputQualifiedType(v.Type))
+	b.WriteString(" ")
+	b.WriteString(v.Name)
+	return b.String()
+}
+
+// OutputDef mirrors Variable definition line: OutputDecl + init + ";".
+// Variable.cpp:640–665 subset (no attrs).
+func (v *Variable) OutputDef(forceStatic bool) string {
+	if v == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(v.OutputDecl(forceStatic))
+	if v.Init != nil && v.Init.Value != "" {
+		b.WriteString(" = ")
+		b.WriteString(v.Init.Value)
+	}
+	b.WriteString(";")
+	return b.String()
+}
+
 // OutputC mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name.
 // Variable.cpp:689–700.
 func (v *Variable) OutputC() string {
