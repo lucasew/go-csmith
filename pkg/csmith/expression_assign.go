@@ -26,8 +26,8 @@ func MakeExpressionAssign(
 	// Force non-const lhs already; attach qfer is implicit
 	_ = qfer
 	return &Expression{
-		Term:     TermAssignment,
-		Assign:   &st,
+		Term:   TermAssignment,
+		Assign: &st,
 		// value of assignment expression is the LHS name (C semantics simplified)
 		Var: st.LhsVar,
 	}

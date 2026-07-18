@@ -44,7 +44,6 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	}
 }
 
-
 // MakeOneBitfield mirrors Type::make_one_bitfield.
 // Type.cpp:638–668 — signed flip, int/uint type, field qfer, length rnd_upto(int_size*8).
 func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, prevZero bool) StructField {

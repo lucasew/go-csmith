@@ -6,20 +6,20 @@ func TestSingleProbsDefaults(t *testing.T) {
 	// Probabilities::initialize_single_probs with default CGOptions flags.
 	p := NewProbabilities(Defaults())
 	want := map[ProbName]int{
-		PMoreStructUnionProb:     50,
-		PBitFieldsCreationProb:   50,
-		PRegularVolatileProb:     50, // volatiles on
-		PRegularConstProb:        10, // consts on
-		PSelectDerefPointerProb:  80, // pointers on
-		PNewArrayVariableProb:    20, // arrays on
-		PFloatAsLTypeProb:        0,  // float off
-		PInlineFunctionProb:      50,
-		PBuiltinFunctionProb:     50,
-		PPointerAsLTypeProb:      50,
-		PFieldVolatileProb:       30,
-		PFieldConstProb:          20,
-		PStdUnaryFuncProb:        5,
-		PBinaryConstProb:         3,
+		PMoreStructUnionProb:    50,
+		PBitFieldsCreationProb:  50,
+		PRegularVolatileProb:    50, // volatiles on
+		PRegularConstProb:       10, // consts on
+		PSelectDerefPointerProb: 80, // pointers on
+		PNewArrayVariableProb:   20, // arrays on
+		PFloatAsLTypeProb:       0,  // float off
+		PInlineFunctionProb:     50,
+		PBuiltinFunctionProb:    50,
+		PPointerAsLTypeProb:     50,
+		PFieldVolatileProb:      30,
+		PFieldConstProb:         20,
+		PStdUnaryFuncProb:       5,
+		PBinaryConstProb:        3,
 	}
 	for name, w := range want {
 		if got := p.Single(name); got != w {

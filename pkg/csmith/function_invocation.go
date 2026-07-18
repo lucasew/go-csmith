@@ -16,9 +16,9 @@ type Invocation struct {
 	// IsStd is true for unary/binary "stdlib" ops (not user).
 	IsStd bool
 	// UnaryOp / BinaryOp for std ops; BinaryOp uses left/right.
-	IsUnary  bool
-	Unary    string // "+", "-", "~", "!"
-	Binary   string // "+", "-", etc.
+	IsUnary bool
+	Unary   string // "+", "-", "~", "!"
+	Binary  string // "+", "-", etc.
 	// Args are parameter expressions (operands).
 	Args []*Expression
 	// Safe is set for std binary/unary under avoid_signed_overflow.

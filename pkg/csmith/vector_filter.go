@@ -5,7 +5,7 @@ package csmith
 // VectorFilter mirrors VectorFilter over a DistributionTable (FilterOut mode).
 // filter(v): lookup key from table, reject if key is in the filter-out set.
 type VectorFilter struct {
-	table   *DistributionTable
+	table     *DistributionTable
 	filterOut map[int]bool
 }
 

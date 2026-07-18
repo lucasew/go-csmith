@@ -4,9 +4,11 @@ package csmith
 
 // MakeRandomContinue mirrors StatementContinue::make_random.
 // StatementContinue.cpp:59–84 —
-//   reject if block has no prior statement (first stmt);
-//   Expression::make_random(int, no_func, no_const, eVariable);
-//   emit if (test) continue;
+//
+//	reject if block has no prior statement (first stmt);
+//	Expression::make_random(int, no_func, no_const, eVariable);
+//	emit if (test) continue;
+//
 // CFG edge to loop head deferred (FactMgr).
 func MakeRandomContinue(
 	r *Rng,

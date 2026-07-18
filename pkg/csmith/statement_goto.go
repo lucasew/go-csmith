@@ -15,8 +15,9 @@ func goodGotoTarget(st Stmt) bool {
 
 // MakeRandomGoto mirrors StatementGoto::make_random (simplified, no FactMgr).
 // StatementGoto.cpp:61+ —
-//   40% prefer back-edge into an earlier good statement (label on target);
-//   else forward edge with label placed after the goto in the current block.
+//
+//	40% prefer back-edge into an earlier good statement (label on target);
+//	else forward edge with label placed after the goto in the current block.
 func MakeRandomGoto(
 	r *Rng,
 	opts Options,

@@ -72,7 +72,7 @@ func TestGenerateCanReturnStruct(t *testing.T) {
 		if strings.Contains(out, "struct S") && strings.Contains(out, "func_") {
 			// look for "struct S0 func_" or "S0 func_" depending on CName
 			if strings.Contains(out, "func_") {
-				// return type of form "struct S0 func_N" 
+				// return type of form "struct S0 func_N"
 				if strings.Contains(out, "struct S0 ") || strings.Contains(out, "struct S1 ") {
 					found = true
 					break

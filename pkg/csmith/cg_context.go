@@ -98,7 +98,6 @@ func (c CGContext) CurrentBlock() *Block {
 	return c.CurrentFunc.Stack[len(c.CurrentFunc.Stack)-1]
 }
 
-
 // CGContext flag bits (CGContext.h).
 const (
 	// FlagInLoop is IN_LOOP.
@@ -118,4 +117,3 @@ func (c CGContext) WithFlags(f uint) CGContext {
 	c.Flags |= f
 	return c
 }
-

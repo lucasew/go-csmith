@@ -4,8 +4,9 @@ package csmith
 
 // MakeExpressionComma mirrors ExpressionComma::make_random.
 // ExpressionComma.cpp:55–66 —
-//   lhs = make_random(ctx, nullptr, nullptr, false, true)  // no const
-//   rhs = make_random(ctx, type, qfer, false, false)
+//
+//	lhs = make_random(ctx, nullptr, nullptr, false, true)  // no const
+//	rhs = make_random(ctx, type, qfer, false, false)
 func MakeExpressionComma(
 	r *Rng,
 	opts Options,
