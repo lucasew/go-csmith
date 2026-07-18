@@ -132,6 +132,28 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 	if curr.NeedRevisit {
 		t.Fatal("curr should not be marked when outer contains dest")
 	}
+	// StatementGoto.cpp:147 assert(b) — no soft invent NeedRevisit when dest not in ancestry
+	orphan := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 9}}}
+	MarkNeedRevisitLCA(orphan, d)
+	if orphan.NeedRevisit {
+		t.Fatal("orphan must not invent NeedRevisit when dest not found")
+	}
+}
+
+func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
+	// StatementGoto.cpp:66–67 get_fact_mgr; no soft invent goto without FM
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Stack = []*Block{blk}
+	f.Blocks = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	// no FM
+	st := MakeRandomGoto(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
+	if stmtOK(st) {
+		t.Fatal("goto without FactMgr must fail closed")
+	}
 }
 
 func TestMakeBinaryForCompare(t *testing.T) {

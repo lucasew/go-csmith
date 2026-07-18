@@ -70,14 +70,13 @@ func (b *Block) ContainsStmt(st *Stmt) bool {
 // MarkNeedRevisitLCA sets NeedRevisit on the least incomplete ancestor of curr
 // that contains dest (StatementGoto.cpp:141–147).
 func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
+	// StatementGoto.cpp:143–147 — while (!contains) b=parent; assert(b); need_revisit
+	// no soft invent NeedRevisit on curr when no ancestor contains dest
 	for b := curr; b != nil; b = b.Parent {
 		if b.ContainsStmt(dest) {
 			b.NeedRevisit = true
 			return
 		}
-	}
-	if curr != nil {
-		curr.NeedRevisit = true
 	}
 }
 
@@ -248,8 +247,11 @@ func MakeRandomGoto(
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return makeGotoFailed()
 	}
-	// StatementGoto.cpp:66–67 — FactMgr always present in C++; fail closed without FM
-	// (choose_visible_read_var needs global_facts; create_cfg_edge needs fm)
+	// StatementGoto.cpp:66–67 — FactMgr always present (get_fact_mgr);
+	// no soft invent goto without cfg/facts (choose_visible_read_var + create_cfg_edge)
+	if cg.FM == nil {
+		return makeGotoFailed()
+	}
 
 	// 40% prefer back-edge (StatementGoto.cpp:73–84)
 	wantBack := r.RndFlipcoin(40)
