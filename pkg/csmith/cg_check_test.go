@@ -70,7 +70,7 @@ func TestCheckWriteVarPartialConflict(t *testing.T) {
 
 func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	// FactPointTo.cpp:476–482 — is_dangling when dead && dead_pointer_dereference_prob==0
-	// no invent hardcode deadProb=0 ignoring CGOptions
+	// no invent dual DanglingPtrDerefProb independent of DeadPointerDerefProb
 	prev := ProcessOptions()
 	defer SetProcessOptions(prev)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -78,16 +78,26 @@ func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	cg := EmptyCGContext()
 	// default dead prob 0 → dangling reject
 	opts := Defaults()
-	opts.DanglingPtrDerefProb = 0
+	opts.DeadPointerDerefProb = 0
 	SetProcessOptions(opts)
 	if cg.CheckReadVar(p, facts) {
 		t.Fatal("dead ptr with deadProb 0 must fail")
 	}
 	// dead_pointer_dereference_prob > 0 → is_dangling_ptr false; read allowed
-	opts.DanglingPtrDerefProb = 50
+	opts.DeadPointerDerefProb = 50
 	SetProcessOptions(opts)
 	if !cg.CheckReadVar(p, facts) {
 		t.Fatal("dead ptr with deadProb>0 must not invent always-reject")
+	}
+	// residual DanglingPtrDerefProb alias still syncs into DeadPointer
+	opts = Defaults()
+	opts.DanglingPtrDerefProb = 50
+	SetProcessOptions(opts)
+	if ProcessOptions().DeadPointerDerefProb != 50 {
+		t.Fatal("DanglingPtr alias must sync to DeadPointer")
+	}
+	if !cg.CheckReadVar(p, facts) {
+		t.Fatal("alias sync must allow dead read when prob>0")
 	}
 }
 

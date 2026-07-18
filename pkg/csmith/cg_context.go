@@ -588,8 +588,8 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
-	// no invent hardcode deadProb=0 ignoring session option
-	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DanglingPtrDerefProb) {
+	// no invent dual DanglingPtrDerefProb knob or hardcode 0
+	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
 		return false
 	}
 	c.ReadVar(v)
@@ -617,7 +617,7 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
-	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DanglingPtrDerefProb) {
+	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
 		return false
 	}
 	c.WriteVar(v)
@@ -637,7 +637,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	}
 	IncrCounter(&dereferenceLevelCnts, indirect)
 	allowNull := opts.NullPointerDerefProb > 0
-	allowDead := opts.DanglingPtrDerefProb > 0
+	allowDead := opts.DeadPointerDerefProb > 0
 	if !c.ReadIndices(v, facts) {
 		return false
 	}
@@ -689,7 +689,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	}
 	tmp := []*Variable{lhs.Var.GetCollective()}
 	allowNull := opts.NullPointerDerefProb > 0
-	allowDead := opts.DanglingPtrDerefProb > 0
+	allowDead := opts.DeadPointerDerefProb > 0
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
@@ -732,7 +732,7 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	deref := e.IndirectLevel()
 	v := e.Var
 	if deref > 0 {
-		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
+		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			return false
 		}
 		if !c.CheckReadVar(v, facts) {
@@ -963,7 +963,7 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	deref := lhs.IndirectLevel()
 	valid := false
 	if deref > 0 {
-		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
+		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			return false
 		}
 		// Lhs.cpp:337–339 — pointer modified in RHS

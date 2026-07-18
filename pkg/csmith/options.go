@@ -32,10 +32,31 @@ var (
 	processRng    *Rng
 )
 
+// syncDerefProbs unifies residual dual option names with C++ single knobs.
+// CGOptions has null_pointer_dereference_prob and dead_pointer_dereference_prob only;
+// NullPtrDerefProb / DanglingPtrDerefProb invent a second independent pair — keep them
+// aliases of NullPointerDerefProb / DeadPointerDerefProb (prefer correctly-named fields).
+func syncDerefProbs(o *Options) {
+	if o == nil {
+		return
+	}
+	if o.NullPointerDerefProb != 0 {
+		o.NullPtrDerefProb = o.NullPointerDerefProb
+	} else if o.NullPtrDerefProb != 0 {
+		o.NullPointerDerefProb = o.NullPtrDerefProb
+	}
+	if o.DeadPointerDerefProb != 0 {
+		o.DanglingPtrDerefProb = o.DeadPointerDerefProb
+	} else if o.DanglingPtrDerefProb != 0 {
+		o.DeadPointerDerefProb = o.DanglingPtrDerefProb
+	}
+}
+
 // SetProcessOptions installs the active process Options (CGOptions mirror).
 // NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
 // use session options instead of inventing Defaults().
 func SetProcessOptions(o Options) {
+	syncDerefProbs(&o)
 	processOptsMu.Lock()
 	processOpts = o
 	processOptsMu.Unlock()
@@ -493,11 +514,13 @@ func (o Options) Validate() error {
 	if o.ArrayOOBProb < 0 || o.ArrayOOBProb > 100 {
 		return fmt.Errorf("array-oob-prob value must between [0,100]")
 	}
-	if o.NullPtrDerefProb < 0 || o.NullPtrDerefProb > 100 {
-		return fmt.Errorf("null-ptr-deref-prob value must between [0,100]")
+	// sync residual dual names before range checks (C++ single knobs)
+	syncDerefProbs(&o)
+	if o.NullPointerDerefProb < 0 || o.NullPointerDerefProb > 100 {
+		return fmt.Errorf("null-pointer-dereference-prob value must between [0,100]")
 	}
-	if o.DanglingPtrDerefProb < 0 || o.DanglingPtrDerefProb > 100 {
-		return fmt.Errorf("dangling-ptr-deref-prob value must between [0,100]")
+	if o.DeadPointerDerefProb < 0 || o.DeadPointerDerefProb > 100 {
+		return fmt.Errorf("dead-pointer-dereference-prob value must between [0,100]")
 	}
 	if !o.LangCPP && o.CPP11 {
 		return fmt.Errorf("--cpp11 option makes sense only with --lang-cpp option enabled")
