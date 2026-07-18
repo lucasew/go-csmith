@@ -81,6 +81,40 @@ func TestRemoveLoopLocalFacts(t *testing.T) {
 	}
 }
 
+func TestRemoveLoopLocalFactsMarksDeadPointee(t *testing.T) {
+	// FactMgr.cpp:601–612 — update_facts_for_oos_vars marks pointees garbage
+	loop := &Block{Looping: true}
+	loc := CreateVariableScalars("l_t", GetIntType(), false, false)
+	loop.LocalVars = []*Variable{loc}
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	facts := []*FactPointTo{MakeFactPointTo(g, loc)}
+	out := RemoveLoopLocalFacts(facts, loop)
+	if len(out) != 1 || out[0].Var != g {
+		t.Fatal(out)
+	}
+	if !out[0].IsDead() {
+		t.Fatalf("pointee to loop-local must be garbage: %+v", out[0])
+	}
+}
+
+func TestRemoveLoopLocalFactsForStmtUsesParent(t *testing.T) {
+	loop := &Block{Looping: true, LocalVars: []*Variable{
+		CreateVariableScalars("l_iv", GetIntType(), false, false),
+	}}
+	body := &Block{Parent: loop, LocalVars: []*Variable{
+		CreateVariableScalars("l_tmp", GetIntType(), false, false),
+	}}
+	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	body.LocalVars = append(body.LocalVars, lp)
+	g := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	br := &Stmt{Kind: StmtBreak, StmID: 3}
+	facts := []*FactPointTo{MakeFactPointTo(lp, NullPtr), MakeFactPointTo(g, NullPtr)}
+	out := RemoveLoopLocalFactsForStmt(facts, br, body)
+	if len(out) != 1 || out[0].Var != g {
+		t.Fatal(out)
+	}
+}
+
 func TestGetDereferencedPtrs(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}

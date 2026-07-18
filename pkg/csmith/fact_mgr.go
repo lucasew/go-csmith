@@ -118,7 +118,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	cp := CloneFactSlice(facts)
 	switch st.Kind {
 	case StmtContinue, StmtBreak:
-		cp = RemoveLoopLocalFacts(cp, blk)
+		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy)
+		cp = RemoveLoopLocalFactsForStmt(cp, st, blk)
 	case StmtReturn:
 		cp = RemoveFunctionLocalFacts(cp, fm.Func)
 	case StmtGoto:
@@ -456,12 +457,33 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	return updated
 }
 
-// RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts.
-// FactMgr.cpp:601–612 — drop facts for locals in loop block chain.
+// RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts for a block.
+// FactMgr.cpp:601–612 — collect locals from blk up through enclosing loop,
+// then update_facts_for_oos_vars (drop subjects + mark pointees garbage).
 func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 	if blk == nil {
 		return facts
 	}
+	locals := collectLoopLocalVars(blk)
+	out := CloneFactSlice(facts)
+	// Statement.cpp set_fact_out / FactMgr.cpp:607–611
+	UpdateFactsForOOSVars(locals, &out)
+	return out
+}
+
+// RemoveLoopLocalFactsForStmt mirrors remove_loop_local_facts(Statement*).
+// FactMgr.cpp:603–605 — block stmt uses itself; else use parent.
+func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) []*FactPointTo {
+	b := parent
+	if st != nil && st.Kind == StmtBlock && st.Then != nil {
+		b = st.Then
+	}
+	return RemoveLoopLocalFacts(facts, b)
+}
+
+// collectLoopLocalVars walks blk → parents until a looping block (inclusive).
+// FactMgr.cpp:605–610.
+func collectLoopLocalVars(blk *Block) []*Variable {
 	var locals []*Variable
 	b := blk
 	for b != nil {
@@ -471,7 +493,7 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 		}
 		b = b.Parent
 	}
-	return filterFactsNotInVars(facts, locals)
+	return locals
 }
 
 // RemoveFunctionLocalFacts mirrors FactMgr::remove_function_local_facts
