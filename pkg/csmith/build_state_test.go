@@ -9,6 +9,8 @@ func TestBuildStateTransitions(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	// Function.cpp FMList at create — pair before GenerateBody (no invent inside)
+	_ = f.ensurePairedFactMgr()
 	if f.BuildState != BuildUnbuilt || f.IsEffectKnown() {
 		t.Fatal("unbuilt")
 	}
@@ -33,7 +35,8 @@ func TestPointerParamTBD(t *testing.T) {
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
 	f.Param = []*Variable{p}
-	fm := NewFactMgr(f)
+	// pair FactMgr at create (Function.cpp FMList); pass same via CGContext
+	fm := f.ensurePairedFactMgr()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
 	// after build, may still have fact (or oos); at least was added during building

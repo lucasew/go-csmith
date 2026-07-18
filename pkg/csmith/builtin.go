@@ -219,12 +219,10 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	if !GenerateParameterListFromString(f, paramStr) {
 		return nil
 	}
-	// FactMgr
-	var fm *FactMgr
+	// Function.cpp:757–758 — FMList.push_back(new FactMgr(f)) at builtin create
+	fm := f.ensurePairedFactMgr()
 	if fmMap != nil {
-		fm = fmMap.ForFunc(f)
-	} else {
-		fm = NewFactMgr(f)
+		_ = fmMap.ForFunc(f)
 	}
 	_ = fm
 	// dummy body (no random generation for builtins)

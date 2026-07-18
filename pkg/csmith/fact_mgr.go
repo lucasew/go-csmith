@@ -617,8 +617,10 @@ func NewFactMgrMap() *FactMgrMap {
 	return &FactMgrMap{byFunc: make(map[*Function]*FactMgr)}
 }
 
-// ForFunc returns (creating if needed) the FactMgr for f.
-// get_fact_mgr_for_func.
+// ForFunc returns the FactMgr for f (session FMList).
+// Prefer the FactMgr paired at make_random_signature / make_first (Function.cpp:422);
+// only create when registering a function that has no paired entry yet.
+// get_fact_mgr_for_func itself only looks up — create happens at signature time.
 func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 	if m == nil || f == nil {
 		return nil
@@ -627,9 +629,19 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 		m.byFunc = make(map[*Function]*FactMgr)
 	}
 	if fm, ok := m.byFunc[f]; ok {
+		// keep Function pairing in sync
+		if f.factMgr == nil {
+			f.factMgr = fm
+		}
 		return fm
 	}
+	// reuse paired FactMgr from signature create (no invent second manager)
+	if f.factMgr != nil {
+		m.byFunc[f] = f.factMgr
+		return f.factMgr
+	}
 	fm := NewFactMgr(f)
+	f.factMgr = fm
 	m.byFunc[f] = fm
 	return fm
 }

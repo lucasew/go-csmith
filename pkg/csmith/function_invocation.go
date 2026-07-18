@@ -479,11 +479,16 @@ func BuildInvocationAndFunction(
 	}
 
 	// FunctionInvocationUser.cpp:203–206 — hand-over from caller to callee with args
+	// get_fact_mgr_for_func(func) after make_random_signature (FMList); no invent NewFactMgr
 	var callerFM *FactMgr
 	if cg.FM != nil {
 		callerFM = cg.FM
 	}
-	calFM := NewFactMgr(callee)
+	calFM := callee.PairedFactMgr()
+	if calFM == nil {
+		fi.Failed = true
+		return fi
+	}
 	facts := []*FactPointTo{}
 	if callerFM != nil {
 		facts = CloneFactSlice(callerFM.GlobalFacts)

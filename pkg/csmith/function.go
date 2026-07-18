@@ -61,6 +61,31 @@ type Function struct {
 	VisitedCnt int
 	// AccumEffContext mirrors Function::accum_eff_context across revisits.
 	AccumEffContext Effect
+	// factMgr is the FMList entry paired at make_random_signature / make_first /
+	// builtin create (Function.cpp:422 / 457–458 / 757–758). Not a second invent
+	// FactMgr at GenerateBody time.
+	factMgr *FactMgr
+}
+
+// PairedFactMgr returns the FactMgr registered with this function at create time.
+// Mirrors get_fact_mgr_for_func when the function is on FuncList/FMList.
+func (f *Function) PairedFactMgr() *FactMgr {
+	if f == nil {
+		return nil
+	}
+	return f.factMgr
+}
+
+// ensurePairedFactMgr returns the paired FactMgr, creating once at signature-time
+// semantics (Function.cpp FMList.push_back(new FactMgr(f))).
+func (f *Function) ensurePairedFactMgr() *FactMgr {
+	if f == nil {
+		return nil
+	}
+	if f.factMgr == nil {
+		f.factMgr = NewFactMgr(f)
+	}
+	return f.factMgr
 }
 
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.
@@ -189,10 +214,8 @@ func MakeRandomSignature(
 			return nil
 		}
 	}
-	// Function.cpp:422 — FMList.push_back(new FactMgr(f))
-	if cg.FM == nil {
-		// attach when map provided via FuncList path later
-	}
+	// Function.cpp:422 — FMList.push_back(new FactMgr(f)); always at signature
+	f.ensurePairedFactMgr()
 	// inline flip if enabled
 	if opts.InlineFunction && r.RndFlipcoin(uint32(probs.Single(PInlineFunctionProb))) {
 		f.IsInlined = true
@@ -226,18 +249,19 @@ func MakeRandomFunction(
 	if f == nil || HasError() {
 		return nil
 	}
-	// attach FactMgr if not already from map
-	if cg.FM == nil || cg.FM.Func != f {
-		cg.FM = NewFactMgr(f)
-		if vs != nil {
-			for _, gv := range vs.GlobalList {
-				cg.FM.AddNewVarFact(gv)
-			}
+	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
+	fm := f.PairedFactMgr()
+	if fm == nil {
+		return nil
+	}
+	if vs != nil {
+		for _, gv := range vs.GlobalList {
+			fm.AddNewVarFact(gv)
 		}
 	}
 	bodyCG := cg
 	bodyCG.CurrentFunc = f
-	bodyCG.FM = cg.FM
+	bodyCG.FM = fm
 	if list != nil {
 		bodyCG = bodyCG.WithFuncList(list)
 	}
@@ -297,12 +321,11 @@ func MakeFirst(
 		return nil
 	}
 
-	// Function.cpp:457–458 — FactMgr with empty global facts
-	var fm *FactMgr
+	// Function.cpp:457–458 — FactMgr with empty global facts (FMList.push_back)
+	fm := f.ensurePairedFactMgr()
 	if fmMap != nil {
-		fm = fmMap.ForFunc(f)
-	} else {
-		fm = NewFactMgr(f)
+		// register same instance into session FMList map
+		_ = fmMap.ForFunc(f)
 	}
 	// seed existing globals so first function sees them (generation convenience)
 	if vs != nil {
@@ -433,8 +456,15 @@ func (f *Function) generateBodyCore(
 	if prev.Funcs != nil {
 		cg.Funcs = prev.Funcs
 	}
+	// Function.cpp:635 / 674 — get_fact_mgr_for_func(this); no invent NewFactMgr here
 	if cg.FM == nil {
-		cg.FM = NewFactMgr(f)
+		cg.FM = f.PairedFactMgr()
+	}
+	if cg.FM == nil {
+		// get_fact_mgr_for_func returned null — fail closed (no soft invent FM)
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
 	}
 
 	// Function.cpp:680–685 — inherit external no-reads/writes (known-params only)

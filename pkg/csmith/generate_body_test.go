@@ -14,7 +14,8 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 	caller := &Function{Name: "func_1"}
 	cblk := &Block{Func: caller}
 	caller.Stack = []*Block{cblk}
-	fm := NewFactMgr(caller)
+	// Function.cpp:422 FMList at create — paired FactMgr, not invent at GenerateBody
+	fm := caller.ensurePairedFactMgr()
 	if g != nil {
 		fm.AddNewVarFact(g)
 	}
@@ -29,7 +30,8 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
 	}
 	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
-	// handover facts empty for new calFM inside generate
+	_ = callee.ensurePairedFactMgr()
+	// handover facts empty for calFM from signature pairing
 	callee.GenerateBodyWithKnownParams(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if callee.BuildState != BuildBuilt {
 		t.Fatal(callee.BuildState)
@@ -50,12 +52,37 @@ func TestGenerateBodyBuiltinDummy(t *testing.T) {
 		ReturnType: GetIntType(),
 		IsBuiltin:  true,
 	}
+	// Function.cpp:757–758 FMList at create; GenerateBody uses get_fact_mgr (no invent)
+	_ = f.ensurePairedFactMgr()
 	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext())
 	if f.Body == nil {
 		t.Fatal("dummy body")
 	}
 	if f.BuildState != BuildBuilt {
 		t.Fatal(f.BuildState)
+	}
+}
+
+func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
+	// Function.cpp:635 get_fact_mgr_for_func; null → fail closed (no invent NewFactMgr)
+	f := &Function{Name: "func_x", ReturnType: GetIntType()}
+	f.GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	if f.Body != nil || f.BuildState == BuildBuilt {
+		t.Fatal("must not invent body/FM without paired FactMgr")
+	}
+}
+
+func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
+	// Function.cpp:422 — FMList.push_back at make_random_signature
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
+	f := MakeRandomSignature(NewRng(2), opts, NewProbabilities(opts), vs, &vs.Sym, EmptyCGContext(), GetIntType(), nil, nil)
+	if f == nil {
+		t.Fatal("sig")
+	}
+	if f.PairedFactMgr() == nil {
+		t.Fatal("signature must pair FactMgr")
 	}
 }
 
