@@ -80,26 +80,20 @@ func MakeRandomAssign(
 		}
 	}
 
-	// Lhs: non-const WRITE select; compound → prefer non-volatile
-	q := NewCVQualifiers([]bool{false}, []bool{false})
-	var lhs *Variable
-	if vs != nil {
-		// try flexible match on existing then create
-		lhs = vs.SelectGlobal(AccessWrite, cg, typ, &q, r)
-		// if compound, skip volatile lhs
-		if op != AssignSimple && lhs != nil && lhs.IsVolatile() {
-			// reselect non-vol from nonvolatiles list
-			var ok []*Variable
-			for _, v := range vs.GlobalNonvolatilesList {
-				if v != nil && v.Type != nil && typ.Match(v.Type, MatchFlexible) {
-					ok = append(ok, v)
-				}
+	// Lhs::make_random — SelectDerefPointerProb / local+global WRITE
+	compound := op != AssignSimple
+	lhs, exprTy := MakeRandomLhs(r, opts, probs, vs, cg, typ, compound)
+	st := Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
+	// if LHS is a pointer to be dereferenced, emit (*p) via ArrayAccess-style text
+	if lhs != nil && exprTy != nil && lhs.Type != nil {
+		ind := lhs.Type.IndirectLevel() - exprTy.IndirectLevel()
+		if ind > 0 {
+			stars := ""
+			for i := 0; i < ind; i++ {
+				stars += "*"
 			}
-			if v := ChooseOKVar(r, ok); v != nil {
-				lhs = v
-			}
+			st.ArrayAccess = "(" + stars + lhs.Name + ")"
 		}
 	}
-	_ = probs
-	return Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
+	return st
 }

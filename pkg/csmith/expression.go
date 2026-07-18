@@ -3,6 +3,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // TermType mirrors eTermType.
 type TermType int
 
@@ -25,6 +27,9 @@ type Expression struct {
 	Con *Constant
 	// Var is set for TermVariable (the selected variable).
 	Var *Variable
+	// ExprType is the desired type for TermVariable (ExpressionVariable::type).
+	// Indir = Var.Type.IndirectLevel - ExprType.IndirectLevel (*… or &).
+	ExprType *Type
 	// Invoke is set for TermFunction.
 	Invoke *Invocation
 	// Assign is set for TermAssignment (embedded StatementAssign).
@@ -32,6 +37,18 @@ type Expression struct {
 	// CommaLHS / CommaRHS for TermCommaExpr.
 	CommaLHS *Expression
 	CommaRHS *Expression
+}
+
+// IndirectLevel mirrors ExpressionVariable::get_indirect_level.
+func (e *Expression) IndirectLevel() int {
+	if e == nil || e.Var == nil || e.Var.Type == nil {
+		return 0
+	}
+	want := e.ExprType
+	if want == nil {
+		want = e.Var.Type
+	}
+	return e.Var.Type.IndirectLevel() - want.IndirectLevel()
 }
 
 // ExprTables holds expr/param DistributionTables (Expression::exprTable_/paramTable_).
@@ -214,7 +231,8 @@ func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Typ
 	if v == nil {
 		return nil
 	}
-	return &Expression{Term: TermVariable, Var: v}
+	// ExpressionVariable(var, type) — desired type may imply * or &
+	return &Expression{Term: TermVariable, Var: v, ExprType: typ}
 }
 
 // Output is a minimal C fragment for tests (not full Expression::Output).
@@ -228,9 +246,21 @@ func (e *Expression) Output() string {
 			return e.Con.Value
 		}
 	case TermVariable:
-		if e.Var != nil {
-			return e.Var.Name
+		if e.Var == nil {
+			return ""
 		}
+		// ExpressionVariable::Output — *…var or &var from indirect level.
+		ind := e.IndirectLevel()
+		name := e.Var.Name
+		if ind > 0 {
+			stars := strings.Repeat("*", ind)
+			return "(" + stars + name + ")"
+		}
+		if ind < 0 {
+			// only -1 supported upstream (address-of)
+			return "&" + name
+		}
+		return name
 	case TermFunction:
 		if e.Invoke != nil {
 			return e.Invoke.Output()

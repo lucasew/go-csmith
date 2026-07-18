@@ -165,14 +165,8 @@ func makeRandomStmt(
 	st := Stmt{Kind: kind}
 	switch kind {
 	case StmtReturn:
-		// Expression::make_random for return type
-		if cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil {
-			st.Expr = MakeRandomExpression(r, opts, tables, vs, cg, cg.CurrentFunc.ReturnType, nil, false, false, MaxTermTypes, cg.ExprDepth)
-			// If Function/Assign/Comma picked and returned nil, force Constant
-			if st.Expr == nil {
-				st.Expr = MakeRandomExpression(r, opts, tables, vs, cg, cg.CurrentFunc.ReturnType, nil, true, false, TermConstant, cg.ExprDepth)
-			}
-		}
+		// StatementReturn::make_random — ExpressionVariable only
+		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
 		return MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
 	case StmtBreak, StmtContinue:
@@ -259,7 +253,12 @@ func (b *Block) Output(indent int) string {
 				if st.Expr != nil {
 					rhs = st.Expr.Output()
 				}
-				sb.WriteString(st.AssignOp.AssignOpC(lhs, rhs) + ";\n")
+				// NeedNoRHS ops ignore rhs text
+				if st.AssignOp.NeedNoRHS() {
+					sb.WriteString(st.AssignOp.AssignOpC(lhs, "") + ";\n")
+				} else {
+					sb.WriteString(st.AssignOp.AssignOpC(lhs, rhs) + ";\n")
+				}
 			} else {
 				sb.WriteString("/* assign */;\n")
 			}

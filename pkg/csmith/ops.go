@@ -149,6 +149,59 @@ func BinaryOpWorksForFloat(op BinaryOp) bool {
 	}
 }
 
+// UnaryOp mirrors eUnaryOps (FunctionInvocation.h order).
+type UnaryOp int
+
+const (
+	UnPlus UnaryOp = iota
+	UnMinus
+	UnNot
+	UnBitNot
+)
+
+// MaxUnaryOp mirrors MAX_UNARY_OP.
+const MaxUnaryOp = int(UnBitNot) + 1
+
+// UnaryOpC returns the C token for eUnaryOps.
+func (op UnaryOp) UnaryOpC() string {
+	switch op {
+	case UnPlus:
+		return "+"
+	case UnMinus:
+		return "-"
+	case UnNot:
+		return "!"
+	case UnBitNot:
+		return "~"
+	default:
+		return "-"
+	}
+}
+
+// UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER — reject weight-0 ops.
+// Probabilities.cpp set_default_unary_ops_prob.
+func UnaryOpsFilter(opts Options) Filter {
+	w := make([]int, MaxUnaryOp)
+	if opts.UnaryPlusOperator {
+		w[UnPlus] = 1
+	}
+	w[UnMinus] = 1
+	w[UnNot] = 1
+	w[UnBitNot] = 1
+	return filterFunc(func(v uint32) bool {
+		i := int(v)
+		return i < 0 || i >= len(w) || w[i] == 0
+	})
+}
+
+// PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
+func PickUnaryOp(r *Rng, opts Options) UnaryOp {
+	if r == nil {
+		return UnMinus
+	}
+	return UnaryOp(r.RndUptoFilter(uint32(MaxUnaryOp), UnaryOpsFilter(opts)))
+}
+
 // NeedNoRHS mirrors StatementAssign::need_no_rhs.
 func (op AssignOp) NeedNoRHS() bool {
 	return op == AssignPreIncr || op == AssignPreDecr || op == AssignPostIncr || op == AssignPostDecr

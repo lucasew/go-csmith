@@ -1,0 +1,36 @@
+// Upstream: StatementReturn.cpp (make_random, Output).
+// Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
+package csmith
+
+// MakeRandomReturn mirrors StatementReturn::make_random.
+// StatementReturn.cpp:54–72 — ExpressionVariable only (not free Expression::make_random).
+// FactPointTo / dead-ptr checks deferred.
+func MakeRandomReturn(
+	r *Rng,
+	opts Options,
+	vs *VariableSelector,
+	cg CGContext,
+) Stmt {
+	st := Stmt{Kind: StmtReturn}
+	if r == nil || cg.CurrentFunc == nil {
+		return st
+	}
+	ret := cg.CurrentFunc.ReturnType
+	if ret == nil {
+		ret = GetIntType()
+	}
+	// rv->qfer for return dummy when present
+	var qfer *CVQualifiers
+	if cg.CurrentFunc.RV != nil {
+		q := cg.CurrentFunc.RV.Qfer
+		qfer = &q
+	}
+	// ExpressionVariable::make_random(cg, return_type, &rv->qfer, false, true)
+	ev := makeExpressionVariable(r, vs, cg, ret, qfer)
+	if ev == nil {
+		// last resort: constant of return type (not upstream, avoids empty return)
+		ev = &Expression{Term: TermConstant, Con: MakeRandom(ret, opts, r)}
+	}
+	st.Expr = ev
+	return st
+}

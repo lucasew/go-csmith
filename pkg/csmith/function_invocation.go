@@ -213,7 +213,8 @@ func MakeRandomBinaryInvocation(
 	return inv
 }
 
-// MakeRandomUnaryInvocation mirrors make_random_unary subset: + - ~ !
+// MakeRandomUnaryInvocation mirrors make_random_unary.
+// FunctionInvocation.cpp:141–165 — eUnaryOps via UNARY_OPS_PROB_FILTER.
 func MakeRandomUnaryInvocation(
 	r *Rng,
 	opts Options,
@@ -225,11 +226,8 @@ func MakeRandomUnaryInvocation(
 	if typ == nil {
 		typ = GetIntType()
 	}
-	ops := []string{"-", "~", "!"}
-	if opts.UnaryPlusOperator {
-		ops = append([]string{"+"}, ops...)
-	}
-	op := ops[r.RndUpto(uint32(len(ops)))]
+	uop := PickUnaryOp(r, opts)
+	op := uop.UnaryOpC()
 	d := cg.ExprDepth + 1
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
 	if arg == nil {
@@ -238,7 +236,6 @@ func MakeRandomUnaryInvocation(
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}}
 	if opts.SafeMath && op == "-" {
 		inv.Safe = MakeRandomBinary(r, opts, NewProbabilities(opts), typ)
-		// unary only needs op1; re-roll size/sign via same helper is OK
 	}
 	return inv
 }
