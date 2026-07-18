@@ -13,6 +13,25 @@ func TestDepthGuardRandomModeAlwaysGood(t *testing.T) {
 	if DepthGuardByType(opts, "dtBlock") != GoodDepth {
 		t.Fatal("type")
 	}
+	// wired factories always GOOD in random mode
+	for _, dt := range []string{
+		DtStatementIf, DtStatementExpr, DtStatementReturn,
+		DtFunctionInvocationRandomUnary, DtFunctionInvocationRandomBinary,
+		DtFunctionInvocationBinary, DtExpression, DtLhs,
+	} {
+		if DepthGuardByType(opts, dt) != GoodDepth {
+			t.Fatal(dt)
+		}
+	}
+}
+
+func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
+	// FunctionInvocation.cpp:144 — assert(type); no GetIntType soft invent
+	opts := Defaults()
+	c := EmptyCGContext()
+	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &c, nil); fi != nil {
+		t.Fatal("nil type must not soft-fallback")
+	}
 }
 
 func TestDepthProtectEmit(t *testing.T) {

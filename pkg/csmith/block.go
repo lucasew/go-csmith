@@ -779,22 +779,18 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString("/* assign */;\n")
 			}
 		case StmtBreak:
-			// StatementBreak::Output — if (test)\n    break;
+			// StatementBreak.cpp:117–118 — test.Output; no soft invent "1"
 			sb.WriteString("if (")
 			if st.Expr != nil {
 				sb.WriteString(st.Expr.Output())
-			} else {
-				sb.WriteString("1")
 			}
 			sb.WriteString(")\n")
 			sb.WriteString(inner + "    break;\n")
 		case StmtContinue:
-			// StatementContinue::Output — if (test)\n    continue;
+			// StatementContinue.cpp — if (test) continue; no soft invent "1"
 			sb.WriteString("if (")
 			if st.Expr != nil {
 				sb.WriteString(st.Expr.Output())
-			} else {
-				sb.WriteString("1")
 			}
 			sb.WriteString(")\n")
 			sb.WriteString(inner + "    continue;\n")
@@ -811,11 +807,10 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString("/* for-stub */;\n")
 			}
 		case StmtIfElse:
+			// StatementIf.cpp:147–148 — test.Output; no soft invent "0"
 			sb.WriteString("if (")
 			if st.Expr != nil {
 				sb.WriteString(st.Expr.Output())
-			} else {
-				sb.WriteString("0")
 			}
 			sb.WriteString(")\n")
 			if st.Then != nil {
@@ -830,12 +825,11 @@ func (b *Block) Output(indent int) string {
 				sb.WriteString(inner + "{\n" + inner + "}\n")
 			}
 		case StmtGoto:
+			// StatementGoto.cpp:252–253 — test.Output; no soft invent "0"
 			if st.Label != "" {
 				sb.WriteString("if (")
 				if st.Expr != nil {
 					sb.WriteString(st.Expr.Output())
-				} else {
-					sb.WriteString("0")
 				}
 				sb.WriteString(")\n")
 				sb.WriteString(inner + "    goto " + st.Label + ";\n")

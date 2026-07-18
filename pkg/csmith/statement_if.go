@@ -17,6 +17,10 @@ func MakeRandomIf(
 	if cg == nil {
 		return nil
 	}
+	// StatementIf.cpp:58 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementIf, nullptr)
+	if DepthGuardByType(opts, DtStatementIf) == BadDepth {
+		return nil
+	}
 	// StatementIf.cpp:62–69 — func_1 hacking snapshot before condition
 	var func1PreFacts []*FactPointTo
 	var func1PreEffect Effect

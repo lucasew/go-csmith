@@ -16,6 +16,10 @@ func MakeRandomExprStmt(
 	if r == nil || cg == nil {
 		return Stmt{Kind: StmtInvoke}
 	}
+	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
+	if DepthGuardByType(opts, DtStatementExpr) == BadDepth {
+		return Stmt{Kind: StmtInvoke}
+	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
 	var preEffect Effect
 	if cg.EffectAccum != nil {

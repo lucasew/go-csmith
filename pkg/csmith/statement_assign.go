@@ -366,7 +366,8 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 	if lhs == "" {
 		return ""
 	}
-	rhs := "0"
+	// StatementAssign.cpp:515–537 — expr.Output always; no soft invent "0" for nil RHS
+	rhs := ""
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
 	}

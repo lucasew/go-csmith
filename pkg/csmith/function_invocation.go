@@ -68,17 +68,17 @@ func (fi *Invocation) Output() string {
 			if i > 0 {
 				b.WriteString(", ")
 			}
+			// FunctionInvocationUser::Output — param_value[i]->Output; no soft invent "0"
 			if a != nil {
 				b.WriteString(a.Output())
-			} else {
-				b.WriteString("0")
 			}
 		}
 		b.WriteString(")")
 		return b.String()
 	}
 	if fi.IsStd {
-		a0, a1 := "0", "0"
+		// FunctionInvocationUnary/Binary::Output — param_value[i]->Output; no soft invent "0"
+		a0, a1 := "", ""
 		if len(fi.Args) >= 1 && fi.Args[0] != nil {
 			a0 = fi.Args[0].Output()
 		}
@@ -534,6 +534,10 @@ func MakeRandomBinaryInvocation(
 	if cg == nil {
 		return nil
 	}
+	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
+	if DepthGuardByType(opts, DtFunctionInvocationRandomBinary) == BadDepth {
+		return nil
+	}
 	if typ == nil {
 		typ = GetIntType()
 	}
@@ -792,6 +796,10 @@ func MakeBinary(
 	if lhs == nil || rhs == nil {
 		return nil
 	}
+	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
+	if DepthGuardByType(opts, DtFunctionInvocationBinary) == BadDepth {
+		return nil
+	}
 	lt, rt := lhs.GetType(), rhs.GetType()
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
 	flags := MakeRandomBinaryKind(r, opts, probs, nil, lt, rt, SafeOpBinary, op)
@@ -839,8 +847,13 @@ func MakeRandomUnaryInvocation(
 	if cg == nil {
 		return nil
 	}
+	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
+	if DepthGuardByType(opts, DtFunctionInvocationRandomUnary) == BadDepth {
+		return nil
+	}
+	// FunctionInvocation.cpp:144 — assert(type)
 	if typ == nil {
-		typ = GetIntType()
+		return nil
 	}
 	// FunctionInvocation.cpp:146–149 — pick unary op (reject float-invalid when float type)
 	var uop UnaryOp

@@ -863,6 +863,7 @@ func makeExpressionFuncall(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// ExpressionFuncall.cpp:66+ — no DEPTH_GUARD here (guard is on Expression::make_random)
 	probs := NewProbabilities(opts)
 	stdFunc := ExpressionFunctionProbability(r, list, opts)
 	// ExpressionFuncall.cpp:71–73 — unary/binary only for non-void simple types

@@ -39,8 +39,12 @@ const (
 	DtVariableSelection            = "dtVariableSelection"
 	DtInitVariable                 = "dtInitVariable"
 	DtSafeOpFlags                  = "dtSafeOpFlags"
-	DtFunctionInvocationRandom     = "dtFunctionInvocationRandom"
-	DtGenerateNewVariable          = "dtGenerateNewVariable"
+	DtFunctionInvocationRandom       = "dtFunctionInvocationRandom"
+	DtFunctionInvocationRandomUnary  = "dtFunctionInvocationRandomUnary"
+	DtFunctionInvocationRandomBinary = "dtFunctionInvocationRandomBinary"
+	DtFunctionInvocationBinary       = "dtFunctionInvocationBinary"
+	DtFunctionInvocationUnary        = "dtFunctionInvocationUnary"
+	DtGenerateNewVariable            = "dtGenerateNewVariable"
 	DtSelectGlobal                 = "dtSelectGlobal"
 	DtGenerateNewGlobal            = "dtGenerateNewGlobal"
 	DtSelectParentLocal      = "dtSelectParentLocal"
@@ -125,7 +129,9 @@ func MinimalDepth(dType string, flag int) int {
 			return a + 1
 		}
 		return b + 1
-	case DtExpressionFuncall, DtFunctionInvocationRandom:
+	case DtExpressionFuncall, DtFunctionInvocationRandom,
+		DtFunctionInvocationRandomUnary, DtFunctionInvocationRandomBinary,
+		DtFunctionInvocationBinary, DtFunctionInvocationUnary:
 		return 1
 	default:
 		return 1
