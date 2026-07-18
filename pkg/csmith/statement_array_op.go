@@ -21,6 +21,25 @@ func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 	return init, incr
 }
 
+// AddVariableToSet mirrors add_variable_to_set — append if not already present.
+func AddVariableToSet(set *[]*Variable, v *Variable) {
+	if set == nil || v == nil {
+		return
+	}
+	if !IsVariableInSet(*set, v) {
+		*set = append(*set, v)
+	}
+}
+
+// CombineVariableSets mirrors combine_variable_sets.
+func CombineVariableSets(a, b []*Variable) []*Variable {
+	out := append([]*Variable(nil), a...)
+	for _, v := range b {
+		AddVariableToSet(&out, v)
+	}
+	return out
+}
+
 // MakeRandomArrayOp mirrors StatementArrayOp::make_random.
 // StatementArrayOp.cpp:75–82 — 5% array_init; else make_random_array_loop → for.
 func MakeRandomArrayOp(
@@ -39,46 +58,100 @@ func MakeRandomArrayOp(
 	if r.RndFlipcoin(5) {
 		return MakeRandomArrayInit(r, opts, probs, vs, tables, stmtTab, cg)
 	}
-	// StatementFor::make_random_array_loop — select arrays, attach must-use, then for
-	// StatementFor.cpp:314–347
-	avs := MakeRandomArrayLoopSetup(r, opts, vs, cg)
+	// StatementFor::make_random_array_loop
+	st := MakeRandomArrayLoop(r, opts, probs, vs, tables, stmtTab, cg)
+	if st == nil {
+		return Stmt{Kind: StmtArrayOp}
+	}
+	return *st
+}
+
+// MakeRandomArrayLoop mirrors StatementFor::make_random_array_loop.
+// StatementFor.cpp:314–347 — select arrays with access 0/1/2 → must_read/write;
+// combine with existing RWDirective; make_random for under loop CGContext.
+func MakeRandomArrayLoop(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	vs *VariableSelector,
+	tables *ExprTables,
+	stmtTab *ThresholdTable,
+	cg CGContext,
+) *Stmt {
+	if r == nil || vs == nil {
+		return nil
+	}
+	// StatementFor.cpp:316–330
+	maxN := opts.MaxArrayNumInLoop
+	if maxN < 1 {
+		maxN = 4
+	}
+	n := int(r.RndUpto(uint32(maxN)))
+	var mustReads, mustWrites []*Variable
+	var avs []*ArrayVariable
+	for i := 0; i < n; i++ {
+		av := vs.SelectArray(r, cg)
+		if av == nil {
+			// still burn access RNG for stream parity when select returns nil? upstream always gets av
+			_ = r.RndUpto(3)
+			continue
+		}
+		avs = append(avs, av)
+		// access: 0 = must read, 1 = must write, 2 = both
+		access := int(r.RndUpto(3))
+		if access == 0 || access == 2 {
+			AddVariableToSet(&mustReads, &av.Variable)
+		}
+		if access == 1 || access == 2 {
+			AddVariableToSet(&mustWrites, &av.Variable)
+		}
+	}
+	// StatementFor.cpp:331–345 — combine with existing directive
+	var allMustReads, allMustWrites, noReads, noWrites []*Variable
+	if cg.RW != nil {
+		allMustReads = CombineVariableSets(cg.RW.MustReadVars, mustReads)
+		allMustWrites = CombineVariableSets(cg.RW.MustWriteVars, mustWrites)
+		noReads = append([]*Variable(nil), cg.RW.NoReadVars...)
+		noWrites = append([]*Variable(nil), cg.RW.NoWriteVars...)
+	} else {
+		allMustReads = mustReads
+		allMustWrites = mustWrites
+	}
+	rwd := &RWDirective{
+		NoReadVars:    noReads,
+		NoWriteVars:   noWrites,
+		MustReadVars:  allMustReads,
+		MustWriteVars: allMustWrites,
+	}
+	// CGContext(loop, &rwd, nullptr, 0) — no outer IV
 	loopCG := cg
+	loopCG.RW = rwd
 	loopCG.MustUseArrays = avs
-	// also populate RWDirective must sets for select_must_use_var (StatementFor.cpp:331–345)
-	var mustVars []*Variable
-	for _, av := range avs {
-		if av != nil {
-			mustVars = append(mustVars, &av.Variable)
-		}
+	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
+	if st == nil {
+		return nil
 	}
-	if len(mustVars) > 0 {
-		rw := &RWDirective{
-			MustReadVars:  append([]*Variable(nil), mustVars...),
-			MustWriteVars: append([]*Variable(nil), mustVars...),
-		}
-		if loopCG.RW != nil {
-			rw.NoReadVars = loopCG.RW.NoReadVars
-			rw.NoWriteVars = loopCG.RW.NoWriteVars
-			rw.MustReadVars = append(rw.MustReadVars, loopCG.RW.MustReadVars...)
-			rw.MustWriteVars = append(rw.MustWriteVars, loopCG.RW.MustWriteVars...)
-		}
-		loopCG.RW = rw
-	}
-	st := *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
 	// mark body as in_array_loop (Block::in_array_loop) for goto restrictions
 	if st.Then != nil {
 		st.Then.InArrayLoop = true
 	}
+	// array-op kind for emission/distribution tracking when used as array op
+	st.Kind = StmtArrayOp
 	return st
 }
 
-// MakeRandomArrayLoopSetup mirrors make_random_array_loop array selection (side effects).
-// StatementFor.cpp:314–348 — rnd_upto(max_array_num_in_loop) arrays via select_array.
+// MakeRandomArrayLoopSetup selects arrays for array-loop (test helper / inventory).
+// Prefer MakeRandomArrayLoop for full must_read/write directive wiring.
+// StatementFor.cpp:314–330 selection half.
 func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGContext) []*ArrayVariable {
 	if r == nil || vs == nil {
 		return nil
 	}
-	n := int(r.RndUpto(uint32(opts.MaxArrayNumInLoop)))
+	maxN := opts.MaxArrayNumInLoop
+	if maxN < 1 {
+		maxN = 4
+	}
+	n := int(r.RndUpto(uint32(maxN)))
 	var out []*ArrayVariable
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, cg)

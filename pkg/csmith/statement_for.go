@@ -355,6 +355,9 @@ func MakeRandomFor(
 	stmtTab *ThresholdTable,
 	cg CGContext,
 ) *Stmt {
+	// StatementFor.cpp:290 — clear per-statement effect before building for
+	cg.EffectStm = EmptyEffect()
+
 	lc := MakeIteration(r, opts, probs, vs, cg)
 	if lc == nil {
 		return &Stmt{Kind: StmtFor}
@@ -367,19 +370,21 @@ func MakeRandomFor(
 			lc.SafeIncr = true
 		}
 	}
-	// init writes the IV (StatementAssign init)
-	if lc.IV != nil {
-		cg.NoteWrite(lc.IV)
-	}
-	// pre-loop facts (StatementFor.cpp:299–300)
+	// StatementFor.cpp:299–300 — record effect and facts before loop body
+	preEffect := cg.EffectStm.Clone()
 	var preFacts []*FactPointTo
 	if cg.FM != nil {
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
+	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	bodyCG := cg.WithFlags(FlagInLoop)
-	// StatementFor.cpp:441–443 — iv_bounds so body cannot assign the IV
 	if lc.IV != nil {
-		bodyCG.AddIVBound(lc.IV, lc.LimitN)
+		// use Bound when array-control; else LimitN as soft bound for nonwritable IV
+		bnd := lc.Bound
+		if bnd <= 0 {
+			bnd = lc.LimitN
+		}
+		bodyCG.AddIVBound(lc.IV, bnd)
 	}
 	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
 	bodyEff := EmptyEffect()
@@ -395,9 +400,12 @@ func MakeRandomFor(
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
 	if cg.FM != nil {
-		postLoopAnalysis(cg.FM, st, body, preFacts, &cg)
+		postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, &cg)
+	} else {
+		// still merge body effect when no FM
+		SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, &cg, preEffect)
 	}
-	// merge body effect into parent (loop may execute 0+ times — keep parent SE if body writes)
+	// merge body effect into parent accum
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)
 	}
@@ -406,19 +414,19 @@ func MakeRandomFor(
 
 // postLoopAnalysis mirrors StatementFor::post_loop_analysis.
 // StatementFor.cpp:350–370 — body entry facts; must_return restores pre;
-// break edges + merge_jump_facts; set_accumulated_effect_after_block.
-func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPointTo, cg *CGContext) {
+// break edges + merge_jump_facts; set_accumulated_effect_after_block(pre_effect).
+func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPointTo, preEffect Effect, cg *CGContext) {
 	if fm == nil {
 		return
 	}
-	// start from body entry facts when recorded (0-iteration fall-through base)
+	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	if body != nil && body.StmID > 0 {
 		if in, ok := fm.MapFactsIn[body.StmID]; ok {
 			fm.GlobalFacts = CloneFactSlice(in)
 		}
 	}
 	if body != nil && body.MustReturn() {
-		// StatementFor.cpp:358–360 — loop never entered; restore pre-loop
+		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
@@ -431,16 +439,10 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			}
 		}
 	}
-	// StatementFor.cpp:369 — set_accumulated_effect_after_block
+	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)
 	if cg != nil && forSt != nil && body != nil {
 		bodyEff := fm.GetMapStmEffect(body.StmID)
-		preEff := EmptyEffect()
-		if cg.EffectAccum != nil {
-			// pre_effect was snapshot before body; use current minus body as approx
-			// callers pass body effect via SetAccumulatedEffectAfterBlock with pre
-			_ = preEff
-		}
-		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, EmptyEffect())
+		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
 	}
 }
 

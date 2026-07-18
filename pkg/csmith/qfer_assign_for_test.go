@@ -91,7 +91,7 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtReturn}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
-	postLoopAnalysis(fm, forSt, body, pre, nil)
+	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
@@ -113,7 +113,7 @@ func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	// body entry facts base; merge break outs
-	postLoopAnalysis(fm, forSt, body, pre, nil)
+	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil {
 		t.Fatal("nil")
