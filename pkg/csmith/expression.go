@@ -411,8 +411,9 @@ func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
 	if DirectExpandCheck(StmtInvoke) {
 		return TermFunction
 	}
+	// Expression.cpp:107–111 — assert(filter); ERROR_GUARD(MAX_TERM_TYPES); no soft invent eVariable
 	if r == nil || filter == nil {
-		return TermVariable
+		return MaxTermTypes
 	}
 	i := r.RndUptoFilter(uint32(filter.MaxProb()), filter)
 	return TermType(filter.Lookup(int(i)))
@@ -506,11 +507,9 @@ func MakeRandomParam(
 		depth = cg.ExprDepth
 	}
 	tt := PickParamTermType(r, tables, opts, typ, depth)
-	// hard depth cap
-	if depth+2 > opts.MaxExprComplexity {
-		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
-			tt = TermVariable
-		}
+	// Expression.cpp:258–260 — depth filtered only in PickParamTermType; no soft invent leaf
+	if tt == MaxTermTypes {
+		return nil
 	}
 	// ExpressionVariable::make_random(..., as_param=true)
 	if tt == TermVariable {
@@ -622,17 +621,10 @@ func MakeRandomExpression(
 	if tt == MaxTermTypes {
 		tt = PickTermType(r, tables, opts, typ, noFunc, noConst, depth)
 	}
-	// Hard depth cap: never nest Function/Assign/Comma when near max_expr_depth
-	// (mirrors Expression.cpp:177–178 filter; prevents unbounded recursion).
-	if depth+2 > opts.MaxExprComplexity {
-		if tt == TermFunction || tt == TermAssignment || tt == TermCommaExpr {
-			if noConst {
-				tt = TermVariable
-			} else {
-				// prefer constant leaf
-				tt = TermConstant
-			}
-		}
+	// Expression.cpp:177–178 — depth only via filter in PickTermType; ERROR_GUARD if MAX
+	// no soft invent TermVariable/Constant leaf when depth high
+	if tt == MaxTermTypes {
+		return nil
 	}
 	var e *Expression
 	switch tt {

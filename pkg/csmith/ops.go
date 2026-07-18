@@ -91,7 +91,8 @@ func (op BinaryOp) BinaryOpC() string {
 	case BinLShift:
 		return "<<"
 	default:
-		return "+"
+		// invalid op; no soft invent "+"
+		return ""
 	}
 }
 
@@ -101,7 +102,8 @@ func (op BinaryOp) CmpOpC() string {
 	case BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe:
 		return op.BinaryOpC()
 	default:
-		return "<"
+		// invalid cmp; no soft invent "<"
+		return ""
 	}
 }
 
@@ -246,7 +248,8 @@ func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
 	case AssignRShift:
 		return BinRShift, true
 	default:
-		return BinAdd, false
+		// MAX when none; no soft invent eAdd with ok=false
+		return BinaryOp(MaxBinaryOp), false
 	}
 }
 
@@ -284,6 +287,7 @@ func (op AssignOp) AssignOpC(name, rhs string) string {
 	case AssignPostDecr:
 		return name + "--"
 	default:
-		return name + " = " + rhs
+		// invalid assign op; no soft invent simple assign
+		return ""
 	}
 }
