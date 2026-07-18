@@ -110,6 +110,30 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 	}
 }
 
+func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
+	// ArrayVariable.cpp:544–545 — assert(!indices.empty()); no invent from sizes
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Sizes:    []int{4, 5},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},
+		Sizes:      []int{4, 5},
+		Collective: parent,
+	}
+	item.AsArray = item
+	out := item.OutputAccess()
+	if out != "g_a" {
+		t.Fatalf("want bare name without soft [0]…, got %q", out)
+	}
+	// Indices string path (ItemizeConstIndices) still works without IndexExprs
+	item.Indices = []string{"1", "2"}
+	if got := item.OutputAccess(); got != "g_a[1][2]" {
+		t.Fatal(got)
+	}
+}
+
 func TestOutputUpperBoundArray(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4, 5}},

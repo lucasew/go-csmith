@@ -629,8 +629,8 @@ func (av *ArrayVariable) SizeInBytesArray() int {
 
 // OutputAccess mirrors ArrayVariable::Output for itemized / collective emit.
 // ArrayVariable.cpp:539–571 — collective bare name; itemized name[index]…
-// Index prefer IndexExprs (Expression::Output); C++ always takes the direct
-// path (`if (1)`), not the signed-cast % size branch.
+// C++ assert(!indices.empty()) then indices[i]->Output; always `if (1)` path
+// (not signed-cast % size). No sizes-only invent and no soft "[0]".
 func (av *ArrayVariable) OutputAccess() string {
 	if av == nil {
 		return ""
@@ -639,29 +639,27 @@ func (av *ArrayVariable) OutputAccess() string {
 	if av.Collective == nil {
 		return name
 	}
-	n := len(av.IndexExprs)
-	if n == 0 {
-		n = len(av.Indices)
-	}
-	if n == 0 {
-		// sizes-only fallback
-		n = len(av.Sizes)
-	}
-	if n == 0 {
+	// ArrayVariable.cpp:544–545 — assert(!indices.empty())
+	// IndexExprs preferred (Expression::Output); Indices is const-itemize string form.
+	if len(av.IndexExprs) == 0 && len(av.Indices) == 0 {
 		return name
 	}
 	var b strings.Builder
 	b.WriteString(name)
-	for i := 0; i < n; i++ {
-		b.WriteString("[")
-		// ArrayVariable.cpp:548–552 — indices[i]->Output (if (1) path)
-		if i < len(av.IndexExprs) && av.IndexExprs[i] != nil {
-			b.WriteString(av.IndexExprs[i].Output())
-		} else if i < len(av.Indices) && av.Indices[i] != "" {
-			b.WriteString(av.Indices[i])
-		} else {
-			b.WriteString("0")
+	if len(av.IndexExprs) > 0 {
+		for _, e := range av.IndexExprs {
+			b.WriteString("[")
+			// ArrayVariable.cpp:548–552 — indices[i]->Output (if (1) path)
+			if e != nil {
+				b.WriteString(e.Output())
+			}
+			b.WriteString("]")
 		}
+		return b.String()
+	}
+	for _, s := range av.Indices {
+		b.WriteString("[")
+		b.WriteString(s)
 		b.WriteString("]")
 	}
 	return b.String()
