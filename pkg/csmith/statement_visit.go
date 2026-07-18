@@ -123,29 +123,38 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 }
 
 // VisitFactsStatementIf mirrors StatementIf::visit_facts.
-// StatementIf.cpp:162–198 — test then true/false branches; merge by must_return.
+// StatementIf.cpp:162–198 — condition; both branches from post-cond env;
+// set_accumulated_effect_after_block(cond_eff, each arm); merge by must_return.
+// When both arms must_return, outputs restore pre-condition inputs (inputs_copy).
 func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtIfElse {
 		return false
 	}
-	// evaluate condition first
-	preStm := cg.EffectStm
+	// StatementIf.cpp:164 — inputs_copy before condition
+	var inputsCopy []*FactPointTo
+	if cg.FM != nil {
+		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+	}
+	// StatementIf.cpp:165–168 — evaluate condition first
 	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
-	var preFacts []*FactPointTo
+	// StatementIf.cpp:169 — effect_stm after condition
+	condEff := cg.EffectStm.Clone()
+	// post-condition env shared as entry to both arms
+	var postCond []*FactPointTo
 	if cg.FM != nil {
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		postCond = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	preEff := EmptyEffect()
+	preAccum := EmptyEffect()
 	if cg.EffectAccum != nil {
-		preEff = *cg.EffectAccum
+		preAccum = cg.EffectAccum.Clone()
 	}
 
-	// true branch
-	thenEff := preEff
+	// StatementIf.cpp:170–173 — true branch from post-cond facts
+	thenAccum := preAccum
 	thenCG := *cg
-	thenCG.EffectAccum = &thenEff
+	thenCG.EffectAccum = &thenAccum
 	if st.Then != nil {
 		if !VisitFactsBlock(st.Then, &thenCG, opts) {
 			return false
@@ -154,13 +163,14 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+		// StatementIf.cpp:174 — false starts from same post-cond inputs (not after true)
+		cg.FM.GlobalFacts = CloneFactSlice(postCond)
 	}
 
-	// false branch
-	elseEff := preEff
+	// StatementIf.cpp:174–177 — false branch
+	elseAccum := preAccum
 	elseCG := *cg
-	elseCG.EffectAccum = &elseEff
+	elseCG.EffectAccum = &elseAccum
 	if st.Else != nil {
 		if !VisitFactsBlock(st.Else, &elseCG, opts) {
 			return false
@@ -171,13 +181,33 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 
-	// merge facts by must_return
+	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block(eff, &if_true/false)
+	// eff is mutated across both calls: cond + then + else map_stm_effect[block]
+	if cg.FM != nil {
+		acc := condEff
+		if st.Then != nil && st.Then.StmID > 0 {
+			acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Then.StmID))
+		} else {
+			acc = acc.AddEffect(thenCG.EffectStm)
+		}
+		if st.Else != nil && st.Else.StmID > 0 {
+			acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Else.StmID))
+		} else {
+			acc = acc.AddEffect(elseCG.EffectStm)
+		}
+		if st.StmID > 0 {
+			cg.FM.SetMapStmEffect(st.StmID, acc)
+		}
+	}
+
+	// StatementIf.cpp:185–196 — must_return pruning
 	if cg.FM != nil {
 		trueMust := st.Then != nil && st.Then.MustReturn()
 		falseMust := st.Else != nil && st.Else.MustReturn()
 		switch {
 		case trueMust && falseMust:
-			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+			// pre-condition env (inputs_copy), not post-condition
+			cg.FM.GlobalFacts = CloneFactSlice(inputsCopy)
 		case trueMust:
 			cg.FM.GlobalFacts = elseFacts
 		case falseMust:
@@ -187,16 +217,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			MergeFacts(&cg.FM.GlobalFacts, elseFacts)
 		}
 	}
+	// parent accum: both arms observed (generation-time separates; visit matches merge)
 	if cg.EffectAccum != nil {
-		*cg.EffectAccum = MergeEffects(thenEff, elseEff)
-	}
-	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block for both arms
-	if st.Then != nil {
-		SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, cg, preStm)
-	}
-	if st.Else != nil {
-		// re-merge with else effect
-		SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, preStm.AddEffect(thenCG.EffectStm))
+		*cg.EffectAccum = MergeEffects(thenAccum, elseAccum)
 	}
 	return true
 }

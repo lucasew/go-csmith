@@ -270,3 +270,54 @@ func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
 		t.Fatalf("break merge: %+v", got)
 	}
 }
+
+func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
+	// StatementIf.cpp:187–188 — both must_return → inputs_copy (pre-condition)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	st := &Stmt{
+		Kind: StmtIfElse, StmID: 5,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{StmID: 6, Stmts: []Stmt{{Kind: StmtReturn, StmID: 7,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Else: &Block{StmID: 8, Stmts: []Stmt{{Kind: StmtReturn, StmID: 9,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementIf(st, &cg, Defaults()) {
+		t.Fatal("visit")
+	}
+	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	if got == nil || len(got.PointTo) != 1 || got.PointTo[0] != a {
+		t.Fatalf("both must_return should restore pre-cond p→a: %+v", got)
+	}
+}
+
+func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
+	// StatementIf.cpp:189–190 — true must_return → inputs_false
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	st := &Stmt{
+		Kind: StmtIfElse, StmID: 10,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtReturn, StmID: 12,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Else: &Block{StmID: 13, Stmts: []Stmt{}},
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsStatementIf(st, &cg, Defaults()) {
+		t.Fatal("visit")
+	}
+	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	if got == nil || len(got.PointTo) != 1 || got.PointTo[0] != a {
+		t.Fatalf("true must_return → else env p→a: %+v", got)
+	}
+}
