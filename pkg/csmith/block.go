@@ -312,20 +312,20 @@ func MakeRandomBlock(
 	if b.NeedNestedLoop(cg, r) && cg.BlkDepth < opts.MaxBlockDepth {
 		b.AppendNestedLoop(r, opts, probs, vs, tables, stmtTab, cg)
 	}
-	// Block.cpp:734–737 — top-level function body: append return if required and missing
-	// (still on stack so ExpressionVariable can see locals)
-	if parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
+	// Block::post_creation_analysis (Block.cpp:682–742)
+	// Upstream appends return only inside post_creation when still missing.
+	// Without FactMgr, append return here so function bodies stay valid C.
+	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
 		ret := MakeRandomReturn(r, opts, vs, cg)
 		if ret.StmID == 0 {
 			ret.StmID = AllocStmID()
 		}
 		b.Stmts = append(b.Stmts, ret)
 	}
-	// Block::post_creation_analysis (Block.cpp:682–742)
 	if b.StmID == 0 {
 		b.StmID = AllocStmID()
 	}
-	b.PostCreationAnalysis(&cg, opts, preEffect)
+	b.PostCreationAnalysis(&cg, opts, preEffect, r, vs)
 	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
@@ -334,8 +334,8 @@ func MakeRandomBlock(
 }
 
 // PostCreationAnalysis mirrors Block::post_creation_analysis.
-// Block.cpp:682–742 — effects, OOS, optional fixed-point with remove_stmt.
-func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect) {
+// Block.cpp:682–742 — effects, OOS, optional fixed-point with remove_stmt, append_return.
+func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect, r *Rng, vs *VariableSelector) {
 	if b == nil || cg == nil {
 		return
 	}
@@ -358,7 +358,9 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
 	mustBR := b.MustBreakOrReturnFull(fm)
 	isLoopBody := !mustBR && b.Looping
-	hasBack := fm.HasEdgeIn(b.StmID, false, true) || len(fm.FindEdgesInToBlock(b, false, true)) > 0
+	hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
+		len(fm.FindEdgesInToBlock(b, false, true)) > 0 ||
+		b.ContainsBackEdge(fm)
 	if isLoopBody || b.NeedRevisit || hasBack {
 		selfBack := false
 		if isLoopBody && b.FromTailToHead() {
@@ -383,12 +385,10 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			for failIdx < len(b.Stmts) {
 				id := b.Stmts[failIdx].StmID
 				if id == 0 {
-					// drop by index without map scrub
 					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
 					continue
 				}
 				if n := b.RemoveStmt(id, fm); n == 0 {
-					// stuck — drop one by index
 					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
 				}
 			}
@@ -401,7 +401,6 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 			}
-			// avoid infinite delete loop
 			if len(b.Stmts) == 0 {
 				break
 			}
@@ -410,17 +409,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			fm.GlobalFacts = CloneFactSlice(out)
 		}
 	} else if b.Looping && b.FromTailToHead() {
-		// light path: still record self back-edge for looping fall-through
 		fm.CreateCFGEdge(b.StmID, b, false, true)
 	}
-	// Block.cpp:734–741 — restore return if deleted from top-level body
+	// Block.cpp:734–741 — append return for top-level body when still missing
 	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() && !b.MustReturn() {
 		fm.GlobalFacts = postFacts
-		// return already appended earlier when missing; only re-append if fixed-point deleted it
-		// (MakeRandomBlock may have appended already — MustReturn false means need one)
-		// Caller MakeRandomBlock already appends return before post_creation; if still missing
-		// after delete, leave marker — full append_return_stmt visits facts later.
-		_ = postFacts
+		b.AppendReturnStmt(r, opts, vs, cg)
 	}
 }
 

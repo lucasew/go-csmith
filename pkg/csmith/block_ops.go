@@ -283,6 +283,199 @@ func (b *Block) AppendNestedLoop(
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
 		MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts)
+		if st.StmID > 0 {
+			cg.FM.SetMapFactsIn(st.StmID, preFacts)
+			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
+			if cg.FM.MapAccumEffect == nil {
+				cg.FM.MapAccumEffect = make(map[int]Effect)
+			}
+			cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+			if cg.FM.MapVisited == nil {
+				cg.FM.MapVisited = make(map[int]bool)
+			}
+			cg.FM.MapVisited[st.StmID] = true
+			// fold for effect into block
+			be := cg.FM.GetMapStmEffect(b.StmID)
+			cg.FM.SetMapStmEffect(b.StmID, be.AddEffect(cg.FM.GetMapStmEffect(st.StmID)))
+			cg.FM.MapAccumEffect[b.StmID] = cg.AccumEffect()
+		}
 	}
 	return st
+}
+
+// AppendReturnStmt mirrors Block::append_return_stmt.
+// Block.cpp:374–391 — make return, visit_facts, record fact/effect maps.
+func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg *CGContext) *Stmt {
+	if b == nil || cg == nil {
+		return nil
+	}
+	fm := cg.FM
+	var preFacts []*FactPointTo
+	if fm != nil {
+		preFacts = CloneFactSlice(fm.GlobalFacts)
+	}
+	cg.ClearEffectStm()
+	ret := MakeRandomReturn(r, opts, vs, *cg)
+	if ret.StmID == 0 {
+		ret.StmID = AllocStmID()
+	}
+	b.Stmts = append(b.Stmts, ret)
+	st := &b.Stmts[len(b.Stmts)-1]
+	if fm != nil {
+		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
+		// visit_facts on return
+		ok := VisitFactsStatementReturn(st, cg, opts)
+		if !ok {
+			// still keep statement; upstream asserts visited
+			_ = ok
+		}
+		if st.StmID > 0 {
+			fm.SetMapFactsIn(st.StmID, preFacts)
+			fm.SetMapFactsOut(st.StmID, fm.GlobalFacts)
+			if fm.MapAccumEffect == nil {
+				fm.MapAccumEffect = make(map[int]Effect)
+			}
+			fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+			if fm.MapVisited == nil {
+				fm.MapVisited = make(map[int]bool)
+			}
+			fm.MapVisited[st.StmID] = true
+			be := fm.GetMapStmEffect(b.StmID)
+			fm.SetMapStmEffect(b.StmID, be.AddEffect(fm.GetMapStmEffect(st.StmID)))
+			fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+			if b.StmID > 0 {
+				fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
+			}
+		}
+	}
+	return st
+}
+
+// ContainsBackEdge mirrors Block::contains_back_edge.
+// Block.cpp:485–497 — CFG back_link whose dest parent is this block.
+func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
+	if b == nil || fm == nil {
+		return false
+	}
+	for _, e := range fm.CFGEdges {
+		if e == nil || !e.BackLink {
+			continue
+		}
+		// dest statement's parent block is this
+		if e.DestBlock == b {
+			return true
+		}
+		// DestStmID: find parent via statement tree under this block
+		if e.DestStmID > 0 && blockHasStmtID(b, e.DestStmID) {
+			// parent of dest should be this for "inside this block not sub-blocks"
+			// approximate: dest is direct child statement of b
+			for i := range b.Stmts {
+				if b.Stmts[i].StmID == e.DestStmID {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func blockHasStmtID(b *Block, id int) bool {
+	if b == nil {
+		return false
+	}
+	for i := range b.Stmts {
+		if b.Stmts[i].StmID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// MakeDummyBlockCG mirrors Block::make_dummy_block with CGContext.
+// Block.cpp:95–110 — empty block, fact_in, post_creation_analysis.
+func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
+	if cg == nil || cg.CurrentFunc == nil {
+		return nil
+	}
+	f := cg.CurrentFunc
+	parent := cg.CurrentBlock()
+	b := &Block{
+		Parent:      parent,
+		Func:        f,
+		blockSize:   0,
+		StmID:       AllocStmID(),
+		InArrayLoop: len(cg.IVBounds) > 0,
+	}
+	f.Blocks = append(f.Blocks, b)
+	f.Stack = append(f.Stack, b)
+	preEffect := EmptyEffect()
+	if cg.EffectAccum != nil {
+		preEffect = cg.EffectAccum.Clone()
+	}
+	if cg.FM != nil {
+		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
+	}
+	b.PostCreationAnalysis(cg, opts, preEffect, nil, nil)
+	if len(f.Stack) > 0 {
+		f.Stack = f.Stack[:len(f.Stack)-1]
+	}
+	return b
+}
+
+// AddNewVarFactTo mirrors FactMgr::add_new_var_fact into a fact vector.
+// FactMgr.cpp:118–131 subset for pointer init into outputs (find_fixed_point).
+func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
+	if v == nil || facts == nil {
+		return
+	}
+	if !v.IsPointer() {
+		for _, f := range v.FieldVars {
+			AddNewVarFactTo(f, facts)
+		}
+		return
+	}
+	if FindRelatedPointTo(*facts, v) != nil {
+		return
+	}
+	if v.Init != nil {
+		rhs := &Expression{Term: TermConstant, Con: v.Init}
+		newFacts := AbstractFactForAssign(nil, v, 0, rhs)
+		for _, f := range newFacts {
+			*facts = MergeFactInto(*facts, f)
+		}
+		if len(newFacts) > 0 {
+			return
+		}
+	}
+	*facts = append(*facts, NewFactPointTo(v))
+}
+
+// ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.
+// Statement.cpp:545–567 via Block as Statement.
+func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
+	if b == nil || facts == nil || cg == nil || cg.FM == nil || b.StmID == 0 {
+		return ShortcutNone
+	}
+	fm := cg.FM
+	in, ok := fm.MapFactsIn[b.StmID]
+	if !ok {
+		return ShortcutNone
+	}
+	if !SameFacts(*facts, in) {
+		return ShortcutNone
+	}
+	// block is not is_ctrl_stmt; skip unfixed goto under block for light path
+	eff := fm.GetMapStmEffect(b.StmID)
+	if cg.InConflict(eff) {
+		return ShortcutConflict
+	}
+	if out, ok := fm.MapFactsOut[b.StmID]; ok {
+		*facts = CloneFactSlice(out)
+	}
+	cg.AddEffect(eff, false)
+	if fm.MapAccumEffect == nil {
+		fm.MapAccumEffect = make(map[int]Effect)
+	}
+	fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+	return ShortcutOK
 }

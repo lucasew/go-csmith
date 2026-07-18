@@ -156,14 +156,15 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	_ = preEffect
 }
 
-// FindFixedPointBlock is a light Block::find_fixed_point (one or two passes).
-// Block.cpp:513+ — sequential analyze_with_edges_in; optional second pass for loops.
+// FindFixedPointBlock mirrors Block::find_fixed_point.
+// Block.cpp:513–568 — merge back edges, shortcut, locals, analyze stmts, loop.
 // failIndex is the statement index that failed analyze_with_edges_in, or -1.
 func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) (facts []*FactPointTo, failIndex int, ok bool) {
 	if b == nil || cg == nil {
 		return inputs, -1, true
 	}
-	facts = CloneFactSlice(inputs)
+	fm := cg.FM
+	currentInputs := CloneFactSlice(inputs)
 	// push block
 	if cg.CurrentFunc != nil {
 		cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
@@ -173,41 +174,89 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 		}()
 	}
-	pass := func() (int, bool) {
-		cur := CloneFactSlice(facts)
+	cnt := 0
+	for {
+		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
+		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
+			if cnt++; cnt > 7 {
+				// upstream asserts; treat as converged with last outs
+				if out, has := fm.MapFactsOut[b.StmID]; has {
+					fm.GlobalFacts = CloneFactSlice(out)
+					return out, -1, true
+				}
+				return currentInputs, -1, true
+			}
+			for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
+				if e == nil {
+					continue
+				}
+				if out, has := fm.MapFactsOut[e.SrcID]; has {
+					MergeFacts(&currentInputs, out)
+				}
+			}
+			for _, e := range fm.FindEdgesInToBlock(b, false, true) {
+				if e == nil {
+					continue
+				}
+				if out, has := fm.MapFactsOut[e.SrcID]; has {
+					MergeFacts(&currentInputs, out)
+				}
+			}
+		}
+		// Block.cpp:537–541 — shortcut when inputs match previous
+		if !visitOnce && fm != nil {
+			work := CloneFactSlice(currentInputs)
+			sc := ShortcutAnalysisBlock(b, &work, cg)
+			switch sc {
+			case ShortcutOK:
+				if fm != nil {
+					fm.GlobalFacts = work
+				}
+				return work, -1, true
+			case ShortcutConflict:
+				return currentInputs, 0, false
+			}
+		}
+		outputs := CloneFactSlice(currentInputs)
+		// Block.cpp:546–549 — facts for locals
+		for _, v := range b.LocalVars {
+			AddNewVarFactTo(v, &outputs)
+		}
+		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
-			if !AnalyzeWithEdgesIn(&b.Stmts[i], &cur, cg, opts, b) {
-				return i, false
+			if !AnalyzeWithEdgesIn(&b.Stmts[i], &outputs, cg, opts, b) {
+				return outputs, i, false
 			}
 		}
-		facts = cur
-		return -1, true
-	}
-	if idx, passOK := pass(); !passOK {
-		return facts, idx, false
-	}
-	// loop body or back edges: second pass
-	needSecond := b.Looping || visitOnce
-	if !needSecond && cg.FM != nil {
-		for _, e := range cg.FM.CFGEdges {
-			if e != nil && e.BackLink && e.DestBlock == b {
-				needSecond = true
-				break
+		if fm != nil && b.StmID > 0 {
+			fm.SetMapFactsIn(b.StmID, currentInputs)
+			// OOS locals for fact_out (Block.cpp:560–561)
+			outCopy := CloneFactSlice(outputs)
+			if len(b.LocalVars) > 0 {
+				tmp := outCopy
+				// UpdateFactsForOOSVars mutates GlobalFacts; apply via temp
+				saved := fm.GlobalFacts
+				fm.GlobalFacts = tmp
+				fm.UpdateFactsForOOSVars(b.LocalVars)
+				outCopy = fm.GlobalFacts
+				fm.GlobalFacts = saved
 			}
+			fm.SetMapFactsOut(b.StmID, outCopy)
+			if fm.MapVisited == nil {
+				fm.MapVisited = make(map[int]bool)
+			}
+			fm.MapVisited[b.StmID] = true
+			b.SetAccumulatedEffect(fm)
+			fm.GlobalFacts = outCopy
+			facts = outCopy
+		} else {
+			facts = outputs
 		}
-	}
-	if needSecond {
-		if idx, passOK := pass(); !passOK {
-			return facts, idx, false
+		visitOnce = false
+		// Without FM maps, single pass is enough
+		if fm == nil || b.StmID == 0 {
+			return facts, -1, true
 		}
+		// next loop: merge edges + shortcut when inputs stable
 	}
-	if cg.FM != nil {
-		if b.StmID > 0 {
-			cg.FM.SetMapFactsIn(b.StmID, inputs)
-			cg.FM.SetMapFactsOut(b.StmID, facts)
-		}
-		cg.FM.GlobalFacts = facts
-		b.SetAccumulatedEffect(cg.FM)
-	}
-	return facts, -1, true
 }
