@@ -361,13 +361,12 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return true
 	}
 
-	// body path — reuse for visit_facts style on innermost Then as loop body
-	// StatementArrayOp.cpp:277–297
+	// body path — StatementArrayOp.cpp:277–297 (same shape as StatementFor visit)
 	preFacts := CloneFactSlice(cg.pointToFacts())
 	preStm := cg.EffectStm.Clone()
 	bodyCG := *cg
 	bodyCG.Flags |= FlagInLoop
-	// add all IVs as bounds
+	// add all IVs as bounds for body analysis
 	for _, iv := range ivs {
 		bodyCG.AddIVBound(iv, 0)
 		defer bodyCG.RemoveIVBound(iv)
@@ -377,11 +376,24 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil {
+			// StatementArrayOp.cpp:285–291 — must_return → pre-body; else map_facts_in[body]
 			if inner.Then.MustReturn() {
 				cg.FM.GlobalFacts = preFacts
 			} else if in, ok := cg.FM.MapFactsIn[inner.Then.StmID]; ok {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
+			// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
+			if st.StmID > 0 {
+				for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
+					if e == nil {
+						continue
+					}
+					if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
+						MergeJumpFacts(&cg.FM.GlobalFacts, out)
+					}
+				}
+			}
+			// breaks targeting body block (looping CreateCFGEdge dest)
 			for _, e := range cg.FM.FindEdgesInToBlock(inner.Then, true, false) {
 				if e == nil {
 					continue
@@ -390,7 +402,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 					MergeJumpFacts(&cg.FM.GlobalFacts, out)
 				}
 			}
-			SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, cg, preStm)
+			// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
+			bodyEff := EmptyEffect()
+			if inner.Then.StmID > 0 {
+				bodyEff = cg.FM.GetMapStmEffect(inner.Then.StmID)
+			}
+			if bodyEff.IsEmpty() {
+				bodyEff = bodyCG.EffectStm
+			}
+			SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 		}
 	}
 	return true

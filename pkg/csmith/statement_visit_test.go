@@ -241,3 +241,32 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 		t.Fatalf("expected c in merge: %+v", got.PointTo)
 	}
 }
+
+func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
+	// StatementArrayOp.cpp:292–297 — merge post_dest edges into arrayop
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	c := CreateVariableScalars("g_c", GetIntType(), false, false)
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	body := &Block{StmID: 50, Func: f, Looping: true}
+	st := &Stmt{
+		Kind: StmtArrayOp, StmID: 15,
+		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Then: body,
+	}
+	fm.CFGEdges = []*CFGEdge{{SrcID: 88, DestStmID: 15, PostDest: true}}
+	fm.SetMapFactsOut(88, []*FactPointTo{MakeFactPointTo(p, c)})
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	if !VisitFactsStatementArrayOp(st, &cg, Defaults()) {
+		t.Fatal("visit arrayop")
+	}
+	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	if got == nil || !IsVariableInSet(got.PointTo, c) {
+		t.Fatalf("break merge: %+v", got)
+	}
+}

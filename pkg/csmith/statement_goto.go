@@ -111,7 +111,7 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 }
 
 // OutputSkippedVarInits mirrors StatementGoto::output_skipped_var_inits.
-// StatementGoto.cpp:264–275 — re-init skipped locals at destination label.
+// StatementGoto.cpp:264–275 — re-init skipped locals at destination label via init->Output.
 func OutputSkippedVarInits(st *Stmt, indent string) string {
 	if st == nil || len(st.InitSkippedVars) == 0 {
 		return ""
@@ -124,14 +124,29 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		b.WriteString(indent)
 		b.WriteString(v.GetActualName(false))
 		b.WriteString(" = ")
-		if v.Init != nil {
-			b.WriteString(v.Init.Value)
-		} else {
-			b.WriteString("0")
-		}
+		b.WriteString(variableInitOutput(v))
 		b.WriteString(";\n")
 	}
 	return b.String()
+}
+
+// variableInitOutput mirrors Variable::init->Output for re-init at goto dest.
+// Prefer InitExpr (full Expression*); else Constant value; else 0.
+// StatementGoto.cpp:271 — assert(v->init); v->init->Output(out).
+func variableInitOutput(v *Variable) string {
+	if v == nil {
+		return "0"
+	}
+	// Variable.cpp:656 / OutputDef — InitExpr first
+	if v.InitExpr != nil {
+		if s := v.InitExpr.Output(); s != "" {
+			return s
+		}
+	}
+	if v.Init != nil && v.Init.Value != "" {
+		return v.Init.Value
+	}
+	return "0"
 }
 
 // FindGoodJumpBlock mirrors StatementGoto::find_good_jump_block.

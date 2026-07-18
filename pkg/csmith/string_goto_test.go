@@ -86,3 +86,40 @@ func TestSkippedInitsAtLabelEmit(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
+	// StatementGoto.cpp:271 — v->init->Output (InitExpr preferred)
+	loc := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	loc.Name = "l_p"
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	loc.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
+	// force address-like output path: variable expr of pointed type often emits name
+	// set InitExpr to constant pointer-ish "0" via constant for stable assert
+	loc.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: PointerTo(GetIntType())}
+	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{loc}}
+	out := OutputSkippedVarInits(st, "")
+	if !strings.Contains(out, "l_p = 0;") {
+		t.Fatal(out)
+	}
+	// InitExpr wins over Init
+	loc.Init = MakeInt(99)
+	out2 := OutputSkippedVarInits(st, "")
+	if strings.Contains(out2, "99") {
+		t.Fatal("InitExpr should win", out2)
+	}
+}
+
+func TestVariableInitOutput(t *testing.T) {
+	v := CreateVariableScalars("l_1", GetIntType(), false, false)
+	if variableInitOutput(v) != "0" {
+		t.Fatal("no init")
+	}
+	v.Init = MakeInt(5)
+	if variableInitOutput(v) != "5" {
+		t.Fatal(variableInitOutput(v))
+	}
+	v.InitExpr = &Expression{Term: TermConstant, Con: MakeInt(7)}
+	if variableInitOutput(v) != "7" {
+		t.Fatal(variableInitOutput(v))
+	}
+}
