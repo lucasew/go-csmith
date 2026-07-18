@@ -1249,9 +1249,9 @@ func (vs *VariableSelector) SelectGlobalMT(
 	if v != nil {
 		return v
 	}
-	// VariableSelector.cpp:677–684 — expand_struct eager path
+	// VariableSelector.cpp:677–684 — expand_struct eager path (invalid_vars through)
 	if vs.Opts.ExpandStruct {
-		if v = vs.EagerCreateGlobalStruct(access, cg, t, qfer, r, mt); v != nil {
+		if v = vs.EagerCreateGlobalStruct(access, cg, t, qfer, r, mt, invalidVars); v != nil {
 			return v
 		}
 	}
@@ -1289,6 +1289,7 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 
 // EagerCreateGlobalStruct mirrors VariableSelector::eager_create_global_struct.
 // VariableSelector.cpp:607–633 — create a random ok struct global, then choose_var field.
+// invalidVars passed through to choose_var (C++ signature).
 func (vs *VariableSelector) EagerCreateGlobalStruct(
 	access Access,
 	cg CGContext,
@@ -1296,21 +1297,51 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	qfer *CVQualifiers,
 	r *Rng,
 	mt MatchType,
+	invalidVars ...[]*Variable,
 ) *Variable {
 	if vs == nil || typ == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:611 assert(type)
 	level := typ.IndirectLevel()
-	if level > 1 {
+	var inv []*Variable
+	if len(invalidVars) > 0 {
+		inv = invalidVars[0]
+	}
+	// VariableSelector.cpp:613–630
+	var st *Type
+	var createQfer *CVQualifiers
+	switch level {
+	case 0:
+		// choose_random_struct_from_type(type, false)
+		st = chooseRandomStructFromType(vs.Types, typ, false, r)
+		createQfer = qfer
+	case 1:
+		// C++ source has t->ptr_type with t==null (upstream bug); fair uses type->ptr_type
+		pointee := typ.PtrType()
+		if pointee == nil {
+			return nil
+		}
+		st = chooseRandomStructFromType(vs.Types, pointee, false, r)
+		if qfer != nil {
+			// VariableSelector.cpp:621–622 — qfer->indirect_qualifiers(level)
+			q1 := qfer.IndirectQualifiers(level)
+			createQfer = &q1
+		} else {
+			createQfer = nil
+		}
+	default:
 		return nil
 	}
-	st := chooseRandomStructFromType(vs.Types, typ, false, r)
-	if st == nil {
+	// ERROR_GUARD if choose_random_struct / Generate fails
+	if st == nil || HasError() {
 		return nil
 	}
-	// level 0: create struct; level 1: still create struct (fields may match *T after expand)
-	_ = vs.GenerateNewGlobal(access, cg, st, qfer, r)
-	return ChooseVar(r, vs.GlobalList, access, cg, typ, mt)
+	if vs.GenerateNewGlobal(access, cg, st, createQfer, r) == nil || HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:631–632 — choose_var(GlobalList, …, invalid_vars)
+	return ChooseVarFull(r, vs.GlobalList, access, cg, typ, qfer, mt, inv, false, false, false)
 }
 
 // EagerCreateLocalStruct mirrors VariableSelector::eager_create_local_struct.
@@ -1323,21 +1354,49 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 	qfer *CVQualifiers,
 	r *Rng,
 	mt MatchType,
+	invalidVars ...[]*Variable,
 ) *Variable {
 	if vs == nil || block == nil || typ == nil || r == nil {
 		return nil
 	}
+	// VariableSelector.cpp:641 assert(type)
 	level := typ.IndirectLevel()
-	if level > 1 {
+	var inv []*Variable
+	if len(invalidVars) > 0 {
+		inv = invalidVars[0]
+	}
+	var st *Type
+	var createQfer *CVQualifiers
+	switch level {
+	case 0:
+		// choose_random_struct_from_type(type, true) — no_volatile for locals
+		st = chooseRandomStructFromType(vs.Types, typ, true, r)
+		createQfer = qfer
+	case 1:
+		// fair type->ptr_type (upstream t->ptr_type with t==0)
+		pointee := typ.PtrType()
+		if pointee == nil {
+			return nil
+		}
+		st = chooseRandomStructFromType(vs.Types, pointee, true, r)
+		if qfer != nil {
+			q1 := qfer.IndirectQualifiers(level)
+			createQfer = &q1
+		} else {
+			createQfer = nil
+		}
+	default:
 		return nil
 	}
-	// choose_random_struct_from_type(type, true) — no_volatile for locals
-	st := chooseRandomStructFromType(vs.Types, typ, true, r)
-	if st == nil {
+	// VariableSelector.cpp:654–656 — ERROR_GUARD; if (!t) return nullptr
+	if st == nil || HasError() {
 		return nil
 	}
-	_ = vs.GenerateNewParentLocal(block, access, cg, st, qfer, r)
-	return ChooseVar(r, block.LocalVars, access, cg, typ, mt)
+	if vs.GenerateNewParentLocal(block, access, cg, st, createQfer, r) == nil || HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:661–663 — choose_var(block.local_vars, …, invalid_vars)
+	return ChooseVarFull(r, block.LocalVars, access, cg, typ, qfer, mt, inv, false, false, false)
 }
 
 // GenerateParameterVariableTyped mirrors
@@ -1475,12 +1534,11 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	} else {
 		varQfer = *qfer
 	}
-	// restrict(access, cg): WRITE clears const; non-SE-free clears vol
-	if access == AccessWrite && len(varQfer.IsConsts) > 0 {
-		varQfer.IsConsts[len(varQfer.IsConsts)-1] = false
-	}
-	if !cg.EffectContext().IsSideEffectFree() && len(varQfer.IsVolatiles) > 0 {
-		varQfer.IsVolatiles[len(varQfer.IsVolatiles)-1] = false
+	// VariableSelector.cpp:938 — restrict(access, cg_context)
+	varQfer.Restrict(access, cg)
+	// VariableSelector.cpp:939 — assert(var_qfer.sanity_check(t)); no soft invent bad qfer
+	if !varQfer.SanityCheck(t) {
+		return nil
 	}
 	name := vs.RandomLocalName()
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
@@ -1821,9 +1879,10 @@ func (vs *VariableSelector) SelectParentLocalInv(
 		return nil
 	}
 	// empty locals: expand_struct eager then GenerateNewParentLocal
+	// VariableSelector.cpp:1007–1013 — eager_create_local_struct(…, invalid_vars)
 	if len(blk.LocalVars) == 0 {
 		if vs.Opts.ExpandStruct {
-			if v := vs.EagerCreateLocalStruct(blk, access, cg, t, qfer, r, mt); v != nil {
+			if v := vs.EagerCreateLocalStruct(blk, access, cg, t, qfer, r, mt, invalidVars); v != nil {
 				return v
 			}
 		}

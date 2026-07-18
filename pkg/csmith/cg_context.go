@@ -487,7 +487,9 @@ func (c *CGContext) ReadVar(v *Variable) {
 	}
 	v = v.GetCollective()
 	if c.IsNonReadable(v) {
-		// upstream asserts; we skip recording
+		// CGContext.cpp:178 — assert(!"attempted read from a nonreadable variable")
+		// no soft invent silent skip: set sticky error for ERROR_GUARD callers
+		SetError(ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
@@ -507,6 +509,9 @@ func (c *CGContext) WriteVar(v *Variable) {
 	}
 	v = v.GetCollective()
 	if c.IsNonWritable(v) {
+		// CGContext.cpp:310 — assert(!"attempted write to a nonwritable variable")
+		// no soft invent silent skip
+		SetError(ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
