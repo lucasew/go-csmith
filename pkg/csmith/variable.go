@@ -446,11 +446,15 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 	}
 	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
 	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
-	// Constant::make_random reads process CGOptions (binary_constant, longlong, …)
+	// Constant::make_random reads process CGOptions + Probabilities singleton
 	var init *Constant
 	if !typ.IsUnion() {
-		// ProcessOptions for CGOptions; nil probs — simple/pointer only (no invent tables)
-		init = MakeRandom(typ, ProcessOptions(), nil, nextCreateVarRng())
+		// process probs; nil → fail closed for aggregates (no invent NewProbabilities)
+		init = MakeRandom(typ, ProcessOptions(), ProcessProbabilities(), nextCreateVarRng())
+		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
+		if HasError() || init == nil {
+			return nil
+		}
 	}
 	// Variable.cpp:397 — ERROR_GUARD_AND_DEL1(nullptr, var)
 	if HasError() {
@@ -1076,9 +1080,13 @@ func (v *Variable) CreateFieldVars() {
 		}
 		var init *Constant
 		if top.Type == nil || !top.Type.IsUnion() {
-			// Variable.cpp:395 — Constant::make_random via process CGOptions + RNG
-			// no soft invent Defaults() when session options differ
-			init = MakeRandom(f.Type, ProcessOptions(), nil, nextCreateVarRng())
+			// Variable.cpp:395 — Constant::make_random via process CGOptions +
+			// Probabilities singleton; no invent NewProbabilities / Defaults
+			init = MakeRandom(f.Type, ProcessOptions(), ProcessProbabilities(), nextCreateVarRng())
+			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
+			if HasError() || init == nil {
+				return
+			}
 		}
 		// Variable.cpp:397 — ERROR_GUARD during field CreateVariable
 		if HasError() {

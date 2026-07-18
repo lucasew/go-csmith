@@ -17,9 +17,14 @@ import (
 // Constant::make_random, FactPointTo::is_valid_ptr, choose_var bookkeeping,
 // and Block emission read CGOptions; library-first Go keeps an explicit
 // process Options set for each generation run (see SetProcessOptions).
+//
+// processProbs mirrors C++ Probabilities process singleton (same lifetime as
+// CGOptions for a generation). CreateVariable / create_field_vars read it;
+// nil means not initialized — fail closed, no invent NewProbabilities(opts).
 var (
 	processOptsMu sync.RWMutex
 	processOpts   = Defaults()
+	processProbs  *Probabilities
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -37,6 +42,23 @@ func ProcessOptions() Options {
 	processOptsMu.RLock()
 	defer processOptsMu.RUnlock()
 	return processOpts
+}
+
+// SetProcessProbabilities installs the session Probabilities singleton.
+// NewProgramGenerator sets this to the same table shared with VS / generator.
+func SetProcessProbabilities(p *Probabilities) {
+	processOptsMu.Lock()
+	processProbs = p
+	processOptsMu.Unlock()
+}
+
+// ProcessProbabilities returns the active process Probabilities (may be nil).
+// C++ Probabilities::GetInstance() is always live after init; nil here is
+// fail-closed for library paths that ran without NewProgramGenerator.
+func ProcessProbabilities() *Probabilities {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processProbs
 }
 
 const defaultPlatformInfoPath = "platform.info"

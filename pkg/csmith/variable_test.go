@@ -44,3 +44,58 @@ func TestCreateVariableErrorGuardAfterInit(t *testing.T) {
 		t.Fatal("sticky error must fail CreateVariableWithInit after field expand")
 	}
 }
+
+func TestCreateVariableScalarsUsesProcessProbs(t *testing.T) {
+	// Variable.cpp:395 — Constant::make_random uses Probabilities singleton
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(probs)
+	defer SetProcessProbabilities(prev)
+	ClearError()
+	// simple still works with process table
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if v == nil || v.Init == nil || v.Init.Value == "" {
+		t.Fatal("simple init")
+	}
+	// aggregate needs live process probs (no invent NewProbabilities)
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	s := CreateVariableScalars("g_s", st, false, false)
+	if s == nil || s.Init == nil {
+		t.Fatal("struct init needs process probs")
+	}
+	if len(s.FieldVars) != 1 || s.FieldVars[0].Init == nil {
+		t.Fatal("field init needs process probs")
+	}
+}
+
+func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
+	// no invent NewProbabilities when process singleton unset
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
+	ClearError()
+	st := &Type{isStruct: true, StructName: "SFail", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	if CreateVariableScalars("g_s", st, false, false) != nil {
+		t.Fatal("nil process probs must not invent aggregate init")
+	}
+	// simple still ok (MakeRandom allows nil probs for non-aggregate)
+	if CreateVariableScalars("g_i", GetIntType(), false, false) == nil {
+		t.Fatal("simple without process probs")
+	}
+}
+
+func TestNewProgramGeneratorSetsProcessProbs(t *testing.T) {
+	opts := Defaults()
+	g := NewProgramGenerator(opts)
+	if ProcessProbabilities() != g.Probs {
+		t.Fatal("process probs must be session table")
+	}
+	if g.VS.Probs != g.Probs {
+		t.Fatal("VS share")
+	}
+}
