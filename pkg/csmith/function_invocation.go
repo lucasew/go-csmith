@@ -46,6 +46,8 @@ func (fi *Invocation) setOutOpts(opts Options) {
 	fi.OutSafeMath = opts.SafeMath
 	fi.OutIdentifyWrappers = opts.IdentifyWrappers
 	fi.OutSafeMathWrappers = opts.SafeMathWrappers
+	// MathNoTmp only gates emit; temps are always allocated for safe_ops (C++ Create*)
+	fi.MathNoTmp = opts.MathNoTmp
 }
 
 // wrapperOpts reconstructs Options for SafeMathWrapperAllowed checks.
@@ -676,30 +678,9 @@ func MakeRandomBinaryInvocation(
 	}
 	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
 	inv.setOutOpts(opts)
-	// CreateFunctionInvocationBinary tmp vars when math_notmp (FunctionInvocationBinary.cpp:59–75)
-	// C++ always creates tmps for safe_ops; we allocate only when MathNoTmp will emit them.
-	if flags != nil && opts.MathNoTmp && SafeOpsBinary(opStr) && flags.Size != SafeFloat {
-		inv.MathNoTmp = true
-		st := EInt
-		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
-			st = ty.Simple()
-		}
-		if blk := currentBlock(*cg); blk != nil {
-			var sym *GenSym
-			if vs != nil {
-				sym = &vs.Sym
-			}
-			inv.Tmp1 = blk.CreateNewTmpVar(sym, st)
-			// shifts use op2 type for tmp2; else same as op1 (upstream)
-			st2 := st
-			if op == BinLShift || op == BinRShift {
-				if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
-					st2 = ty.Simple()
-				}
-			}
-			inv.Tmp2 = blk.CreateNewTmpVar(sym, st2)
-		}
-	}
+	// FunctionInvocationBinary.cpp:59–75 — CreateFunctionInvocationBinary always creates
+	// tmps for safe_ops when flags; math_notmp only affects Output.
+	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(*cg, vs, flags, op)
 	return inv
 }
 
@@ -838,25 +819,8 @@ func MakeBinary(
 		Safe:   flags,
 	}
 	inv.setOutOpts(opts)
-	// CreateFunctionInvocationBinary tmps when math_notmp + safe_ops
-	if flags != nil && opts.MathNoTmp && SafeOpsBinary(op.BinaryOpC()) && flags.Size != SafeFloat {
-		inv.MathNoTmp = true
-		st := EInt
-		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
-			st = ty.Simple()
-		}
-		// FunctionInvocationBinary.cpp:70–75 — blk->create_new_tmp_var → gensym("t_")
-		if blk := currentBlock(cg); blk != nil {
-			inv.Tmp1 = blk.CreateNewTmpVar(nil, st)
-			st2 := st
-			if op == BinLShift || op == BinRShift {
-				if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
-					st2 = ty.Simple()
-				}
-			}
-			inv.Tmp2 = blk.CreateNewTmpVar(nil, st2)
-		}
-	}
+	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
+	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
 	return inv
 }
 
@@ -920,22 +884,61 @@ func MakeRandomUnaryInvocation(
 	}
 	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
 	inv.setOutOpts(opts)
-	// FunctionInvocationUnary.cpp:51–60 — tmp when flags (we only emit when MathNoTmp + minus non-float)
-	if flags != nil && opts.MathNoTmp && op == "-" && flags.Size != SafeFloat {
-		inv.MathNoTmp = true
-		st := EInt
-		if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
-			st = ty.Simple()
-		}
-		if blk := currentBlock(*cg); blk != nil {
-			var sym *GenSym
-			if vs != nil {
-				sym = &vs.Sym
-			}
-			inv.Tmp1 = blk.CreateNewTmpVar(sym, st)
+	// FunctionInvocationUnary.cpp:51–60 — CreateFunctionInvocationUnary always creates
+	// tmp when flags; math_notmp only affects Output (eMinus path).
+	inv.Tmp1 = createUnarySafeTmp(*cg, vs, flags)
+	return inv
+}
+
+// createBinarySafeTmps mirrors FunctionInvocationBinary::CreateFunctionInvocationBinary
+// temp allocation. FunctionInvocationBinary.cpp:59–75 — always when flags && safe_ops;
+// no soft invent skip on !MathNoTmp or float size.
+func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags, op BinaryOp) (tmp1, tmp2 string) {
+	if flags == nil || !SafeOpsBinary(op.BinaryOpC()) {
+		return "", ""
+	}
+	blk := currentBlock(cg)
+	if blk == nil {
+		return "", ""
+	}
+	st := EInt
+	if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
+		st = ty.Simple()
+	}
+	var sym *GenSym
+	if vs != nil {
+		sym = &vs.Sym
+	}
+	tmp1 = blk.CreateNewTmpVar(sym, st)
+	st2 := st
+	if op == BinLShift || op == BinRShift {
+		if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
+			st2 = ty.Simple()
 		}
 	}
-	return inv
+	tmp2 = blk.CreateNewTmpVar(sym, st2)
+	return tmp1, tmp2
+}
+
+// createUnarySafeTmp mirrors FunctionInvocationUnary::CreateFunctionInvocationUnary
+// temp allocation. FunctionInvocationUnary.cpp:51–60 — always when flags non-nil.
+func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) string {
+	if flags == nil {
+		return ""
+	}
+	blk := currentBlock(cg)
+	if blk == nil {
+		return ""
+	}
+	st := EInt
+	if ty := flags.LHSType(); ty != nil && ty.IsSimple() {
+		st = ty.Simple()
+	}
+	var sym *GenSym
+	if vs != nil {
+		sym = &vs.Sym
+	}
+	return blk.CreateNewTmpVar(sym, st)
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.

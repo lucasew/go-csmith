@@ -337,8 +337,10 @@ func makePossibleCompoundAssign(
 		return Stmt{Kind: StmtAssign}
 	}
 	st.SafeFlags = flags
-	// StatementAssign.cpp:296–297 — blk->create_new_tmp_var (gensym "t_")
-	if opts.MathNoTmp {
+	// StatementAssign.cpp:263–266 — CreateFunctionInvocationBinary always allocates
+	// tmp_var1/2 for safe_ops (math_notmp only affects OutputAsExpr).
+	// FunctionInvocationBinary.cpp:59–75; no soft invent skip on !MathNoTmp.
+	if SafeOpsBinary(bop.BinaryOpC()) {
 		if blk := cg.CurrentBlock(); blk != nil {
 			st1 := EInt
 			if t := flags.LHSType(); t != nil && t.IsSimple() {
@@ -415,7 +417,8 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	if lhs == "" {
 		return ""
 	}
-	rhs := "0"
+	// StatementAssign.cpp: expr.Output always; no soft invent "0" for nil RHS
+	rhs := ""
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
 	}
@@ -462,13 +465,14 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			b.WriteString(" = ")
 			b.WriteString(fname)
 			b.WriteString("(")
-			if st.Tmp1 != "" {
+			// StatementAssign.cpp:584–591 — math_notmp gates emit, not tmp existence
+			if opts.MathNoTmp && st.Tmp1 != "" {
 				b.WriteString(st.Tmp1)
 				b.WriteString(", ")
 			}
 			b.WriteString(lhs)
 			b.WriteString(", ")
-			if st.Tmp2 != "" {
+			if opts.MathNoTmp && st.Tmp2 != "" {
 				b.WriteString(st.Tmp2)
 				b.WriteString(", ")
 			}
@@ -494,11 +498,11 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 					b.WriteString(" = ")
 					b.WriteString(fname)
 					b.WriteString("(")
-					if st.Tmp1 != "" {
+					if opts.MathNoTmp && st.Tmp1 != "" {
 						b.WriteString(st.Tmp1 + ", ")
 					}
 					b.WriteString(lhs + ", ")
-					if st.Tmp2 != "" {
+					if opts.MathNoTmp && st.Tmp2 != "" {
 						b.WriteString(st.Tmp2 + ", ")
 					}
 					switch st.AssignOp {
