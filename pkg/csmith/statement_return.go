@@ -8,8 +8,9 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtReturn {
 		return false
 	}
+	// StatementReturn always has ExpressionVariable; nil expr is incomplete IR
 	if st.Expr == nil {
-		return true
+		return false
 	}
 	// no_return_dead_ptr: reject returning local-pointing ptrs
 	if opts.NoReturnDeadPointer && st.Expr.Term == TermVariable && st.Expr.Var != nil {

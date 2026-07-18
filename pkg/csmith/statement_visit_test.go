@@ -27,10 +27,17 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 		Then: &Block{Stmts: []Stmt{thenAssign}},
 		Else: &Block{Stmts: []Stmt{}},
 	}
-	// Fix then: assign p = &a is hard; empty then with return
-	st.Then = &Block{Stmts: []Stmt{{Kind: StmtReturn}}}
+	// Fix then: assign p = &a is hard; empty then with return (live ExpressionVariable)
+	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
+	ret := Stmt{
+		Kind: StmtReturn,
+		Expr: &Expression{Term: TermVariable, Var: rv, ExprType: GetIntType()},
+	}
+	st.Then = &Block{Stmts: []Stmt{ret}}
 	st.Else = &Block{Stmts: []Stmt{}}
 	cg := EmptyCGContext().WithFactMgr(fm)
+	// return path needs CurrentFunc.RV for fact update; visit still runs expr visit
+	cg.CurrentFunc = &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(&st, &cg, Defaults()) {

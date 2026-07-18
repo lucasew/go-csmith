@@ -176,12 +176,14 @@ func permuteInts(a []int) [][]int {
 // VisitUnorderedParams mirrors FunctionInvocation::visit_unordered_params.
 // FunctionInvocation.cpp:457–480 — visit args in all orders; merge facts.
 func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
+	// FunctionInvocation.cpp:457+ — always live this + facts; no soft invent true
 	if fi == nil || facts == nil || cg == nil {
-		return true
+		return false
 	}
 	inputsCopy := CloneFactSlice(*facts)
 	orders := fi.PermuteParamOrders()
 	if len(orders) == 0 {
+		// no params — success
 		return true
 	}
 	var merged []*FactPointTo
@@ -189,14 +191,18 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 		cur := CloneFactSlice(inputsCopy)
 		for _, paramID := range order {
 			if paramID < 0 || paramID >= len(fi.Args) {
-				continue
+				return false
 			}
 			arg := fi.Args[paramID]
+			// param_value[i] always non-null after ERROR_GUARD
+			if arg == nil {
+				return false
+			}
 			// visit under working facts
 			if cg.FM != nil {
 				cg.FM.GlobalFacts = cur
 			}
-			if arg != nil && !VisitFactsExpression(arg, cg, opts) {
+			if !VisitFactsExpression(arg, cg, opts) {
 				return false
 			}
 			if cg.FM != nil {
@@ -234,19 +240,21 @@ func (f *Function) IsPointerReferenced() bool {
 // RevisitUserInvocation mirrors FunctionInvocationUser::revisit.
 // FunctionInvocationUser.cpp:309–352.
 func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
+	// FunctionInvocationUser.cpp:309+ — get_fact_mgr_for_func + body always live
+	// no soft invent true for incomplete caller context
 	if fi == nil || fi.User == nil || facts == nil || cg == nil {
-		return true
+		return false
 	}
 	f := fi.User
 	if f.Body == nil {
-		return true
+		return false
 	}
 	// callee FactMgr — prefer function's FM from caller's package map if same
 	fm := cg.FM
 	// when revisiting callee, use a dedicated FM on the function if stored
 	// light: use caller FM but clear visited for body analysis
 	if fm == nil {
-		return true
+		return false
 	}
 	// backup maps
 	inCopy := cloneFactMap(fm.MapFactsIn)

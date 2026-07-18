@@ -4,9 +4,10 @@ package csmith
 
 // VisitFactsStmt dispatches Statement::visit_facts by kind.
 // Statement subclasses — assign/if/for/block/return/jump/expr.
+// Incomplete IR fails — no soft invent true (C++ always visits live Statement*).
 func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		return true
+		return false
 	}
 	switch st.Kind {
 	case StmtAssign:
@@ -31,12 +32,13 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	case StmtInvoke:
 		return VisitFactsStatementExpr(st, cg, opts)
 	case StmtBlock:
-		if st.Then != nil {
-			return VisitFactsBlock(st.Then, cg, opts)
+		if st.Then == nil {
+			return false
 		}
-		return true
+		return VisitFactsBlock(st.Then, cg, opts)
 	default:
-		return true
+		// unknown kind; no soft invent success
+		return false
 	}
 }
 
@@ -44,9 +46,10 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementBreak.cpp:126–134 / StatementContinue.cpp:125–133 — test then effect_stm.
 func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		return true
+		return false
 	}
-	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+	// C++ always has live test Expression*
+	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	if cg.FM != nil && st.StmID > 0 {
@@ -59,9 +62,10 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementGoto.cpp:364–402 — test; check_write skipped vars; subset re-analysis of dest.
 func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		return true
+		return false
 	}
-	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementGoto.cpp:366–368 — test.visit_facts always
+	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	// check write on skipped vars (re-init at dest)
@@ -97,9 +101,10 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementExpr.cpp:104–110 — expr.visit_facts; store effect_stm.
 func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
-		return true
+		return false
 	}
-	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementExpr.cpp:106 — expr always live
+	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	if cg.FM != nil && st.StmID > 0 {
@@ -112,7 +117,7 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 // Block.cpp:466–479.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
-		return true
+		return false
 	}
 	var inputs []*FactPointTo
 	if cg.FM != nil {
@@ -135,8 +140,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	// StatementIf.cpp:165–168 — evaluate condition first
-	if st.Expr != nil && !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementIf.cpp:165–168 — evaluate condition first (always live test)
+	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	// StatementIf.cpp:169 — effect_stm after condition
