@@ -98,4 +98,31 @@ func TestNewProgramGeneratorSetsProcessProbs(t *testing.T) {
 	if g.VS.Probs != g.Probs {
 		t.Fatal("VS share")
 	}
+	if ProcessRng() != g.Rng {
+		t.Fatal("process RNG must be session DefaultRndNumGenerator")
+	}
+}
+
+func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
+	// Variable.cpp:395 — Constant::make_random uses process DefaultRndNumGenerator
+	opts := Defaults()
+	r := NewRng(42)
+	prevR := ProcessRng()
+	prevP := ProcessProbabilities()
+	SetProcessRng(r)
+	SetProcessProbabilities(NewProbabilities(opts))
+	defer func() {
+		SetProcessRng(prevR)
+		SetProcessProbabilities(prevP)
+	}()
+	ClearError()
+	// burn some process draws so depth moves
+	before := r.RandDepth()
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if v == nil || v.Init == nil {
+		t.Fatal("want init")
+	}
+	if r.RandDepth() <= before {
+		t.Fatalf("CreateVariable must burn process RNG (depth %d → %d)", before, r.RandDepth())
+	}
 }

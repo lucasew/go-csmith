@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 )
 
-// createVarSeed advances CreateVariableScalars / CreateFieldVars init RNG
-// (C++ uses process-wide DefaultRndNumGenerator; NewRng(1) always was soft invent).
+// createVarSeed advances library-only CreateVariable when ProcessRng is unset
+// (C++ always has DefaultRndNumGenerator; NewRng(1) fixed seed was soft invent).
 var createVarSeed uint64
 
 // ctrl_vars pool mirrors Variable::ctrl_vars_vectors / ctrl_vars_count.
@@ -426,10 +426,21 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 	return v
 }
 
-// nextCreateVarRng returns a process-wide advancing Rng for CreateVariable init.
+// nextCreateVarRng is library/test fallback when no session ProcessRng is installed.
+// During generation, ProcessRng (DefaultRndNumGenerator) is used instead.
 func nextCreateVarRng() *Rng {
 	s := atomic.AddUint64(&createVarSeed, 1)
 	return NewRng(s)
+}
+
+// createVarRng mirrors process DefaultRndNumGenerator for CreateVariable init.
+// Variable.cpp:395 Constant::make_random uses the process RNG stream.
+func createVarRng() *Rng {
+	if r := ProcessRng(); r != nil {
+		return r
+	}
+	// no invent NewRng(1); advancing seed only outside a generation session
+	return nextCreateVarRng()
 }
 
 // CreateVariableScalars mirrors
@@ -449,8 +460,8 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 	// Constant::make_random reads process CGOptions + Probabilities singleton
 	var init *Constant
 	if !typ.IsUnion() {
-		// process probs; nil → fail closed for aggregates (no invent NewProbabilities)
-		init = MakeRandom(typ, ProcessOptions(), ProcessProbabilities(), nextCreateVarRng())
+		// process RNG + probs; nil probs → fail closed for aggregates
+		init = MakeRandom(typ, ProcessOptions(), ProcessProbabilities(), createVarRng())
 		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
 		if HasError() || init == nil {
 			return nil
@@ -1081,8 +1092,9 @@ func (v *Variable) CreateFieldVars() {
 		var init *Constant
 		if top.Type == nil || !top.Type.IsUnion() {
 			// Variable.cpp:395 — Constant::make_random via process CGOptions +
-			// Probabilities singleton; no invent NewProbabilities / Defaults
-			init = MakeRandom(f.Type, ProcessOptions(), ProcessProbabilities(), nextCreateVarRng())
+			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
+			// separate NewRng stream
+			init = MakeRandom(f.Type, ProcessOptions(), ProcessProbabilities(), createVarRng())
 			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
 			if HasError() || init == nil {
 				return

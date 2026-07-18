@@ -21,10 +21,15 @@ import (
 // processProbs mirrors C++ Probabilities process singleton (same lifetime as
 // CGOptions for a generation). CreateVariable / create_field_vars read it;
 // nil means not initialized — fail closed, no invent NewProbabilities(opts).
+//
+// processRng mirrors DefaultRndNumGenerator process instance. CreateVariable
+// Constant::make_random burns the same stream as the rest of generation; nil
+// means library/test path without NewProgramGenerator (not NewRng(1) invent).
 var (
 	processOptsMu sync.RWMutex
 	processOpts   = Defaults()
 	processProbs  *Probabilities
+	processRng    *Rng
 )
 
 // SetProcessOptions installs the active process Options (CGOptions mirror).
@@ -59,6 +64,21 @@ func ProcessProbabilities() *Probabilities {
 	processOptsMu.RLock()
 	defer processOptsMu.RUnlock()
 	return processProbs
+}
+
+// SetProcessRng installs the session DefaultRndNumGenerator (shared with generator).
+// NewProgramGenerator sets this to the same *Rng used for generation draws.
+func SetProcessRng(r *Rng) {
+	processOptsMu.Lock()
+	processRng = r
+	processOptsMu.Unlock()
+}
+
+// ProcessRng returns the active process Rng (may be nil outside a generation run).
+func ProcessRng() *Rng {
+	processOptsMu.RLock()
+	defer processOptsMu.RUnlock()
+	return processRng
 }
 
 const defaultPlatformInfoPath = "platform.info"

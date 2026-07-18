@@ -32,6 +32,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	SetProcessOptions(opts)
 	seed := opts.Seed
 	r := NewRng(seed)
+	// C++ DefaultRndNumGenerator process instance — CreateVariable / create_field_vars
+	// burn the same stream (no invent separate NewRng per CreateVariable).
+	SetProcessRng(r)
 	// C++ Probabilities is a process singleton — one session table for generator + VS
 	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
 	probs := NewProbabilities(opts)
