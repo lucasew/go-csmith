@@ -24,11 +24,11 @@ const MaxStatementType StatementType = StmtArrayOp + 1
 // StmtLabel is a Go-only labeled no-op marker for forward goto targets (not in Csmith enum).
 const StmtLabel StatementType = 100
 
-// NewStatementThresholdTable builds ProbabilityTable for pStatementProb
+// buildStatementThresholdTable builds ProbabilityTable entries for pStatementProb
 // from set_default_statement_prob thresholds (unequal group).
-// Probabilities.cpp:748–774; keys are cumulative cutoffs, values are statement kinds.
-// Note: pname_to_type maps ProbName → eStatementType; we store StatementType directly.
-func NewStatementThresholdTable(opts Options) *ThresholdTable {
+// Probabilities.cpp:748–774; keys are cumulative cutoffs, values are statement kinds
+// (C++ stores ProbName then pname_to_type → eStatementType; we store StatementType).
+func buildStatementThresholdTable(opts Options) *ThresholdTable {
 	t := &ThresholdTable{}
 	// Block weight 0 → not inserted
 	// IfElse 15, For 30, Return 35, Continue 40, Break 45
@@ -48,6 +48,20 @@ func NewStatementThresholdTable(opts Options) *ThresholdTable {
 	}
 	t.Add(100, int(StmtAssign))
 	return t
+}
+
+// NewStatementThresholdTable returns the session statement table when process
+// Probabilities is live (Statement::stmtTable_ from pStatementProb); otherwise
+// builds a library one-off from opts (tests that pass an explicit table).
+// Generation should prefer ProcessStmtTab / probs.StatementThresholdTable().
+func NewStatementThresholdTable(opts Options) *ThresholdTable {
+	if p := ProcessProbabilities(); p != nil {
+		if t := p.StatementThresholdTable(); t != nil {
+			return t
+		}
+	}
+	// no invent from process when unset — library path builds from opts only
+	return buildStatementThresholdTable(opts)
 }
 
 // NumberToType mirrors Statement::number_to_type(value) for value in [0,100).

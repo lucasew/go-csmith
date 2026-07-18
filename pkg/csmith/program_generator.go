@@ -43,9 +43,9 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	InitSessionProbabilityTables(opts)
 	// share session Probabilities with VS (no invent throwaway NewProbabilities then overwrite)
 	vs := NewVariableSelectorProbs(opts, probs)
-	stmtTab := NewStatementThresholdTable(opts)
-	// C++ Statement static ProbabilityTable — one session table for Block::make_random
-	// and nested GenerateBody via FunctionInvocation (no invent second table mid-call)
+	// Statement.cpp:133–139 — InitProbabilityTable from pStatementProb (session probs)
+	// no invent second NewStatementThresholdTable independent of Probabilities
+	stmtTab := probs.StatementThresholdTable()
 	SetProcessStmtTab(stmtTab)
 	// VariableSelector::InitScopeTable — scopeTable_ once per generation
 	InitScopeTable(opts)

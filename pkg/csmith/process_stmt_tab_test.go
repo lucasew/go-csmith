@@ -127,3 +127,37 @@ func TestBinaryOpsFilterNoInventProbs(t *testing.T) {
 		t.Fatal("nil process must reject-all")
 	}
 }
+
+func TestStatementTableFromSessionProbs(t *testing.T) {
+	// Statement.cpp:133–139 — stmtTable_ from pStatementProb on process Probabilities
+	opts := Defaults()
+	opts.Jumps = false
+	opts.Arrays = false
+	p := NewProbabilities(opts)
+	tab := p.StatementThresholdTable()
+	if tab == nil {
+		t.Fatal("want statement table on Probabilities")
+	}
+	// without jumps/arrays, Goto/ArrayOp cutoffs absent — Assign at 100
+	// rnd 50 must not be Goto
+	for v := 0; v < 100; v++ {
+		st := NumberToType(tab, uint32(v))
+		if st == StmtGoto || st == StmtArrayOp {
+			t.Fatalf("value %d → %v with jumps/arrays off", v, st)
+		}
+	}
+	// NewProgramGenerator installs same instance as ProcessStmtTab
+	prevP := ProcessProbabilities()
+	prevS := ProcessStmtTab()
+	defer func() {
+		SetProcessProbabilities(prevP)
+		SetProcessStmtTab(prevS)
+	}()
+	g := NewProgramGenerator(opts)
+	if g.StmtTab != g.Probs.StatementThresholdTable() {
+		t.Fatal("generator StmtTab must be probs statement table")
+	}
+	if ProcessStmtTab() != g.StmtTab {
+		t.Fatal("ProcessStmtTab must share generator table")
+	}
+}

@@ -165,11 +165,16 @@ func ProcessExprTables() *ExprTables {
 }
 
 // InitSessionProbabilityTables mirrors Probabilities::initialize_group_probs
-// StatementAssign::InitProbabilityTable + Expression::InitProbabilityTables.
-// Probabilities.cpp:573–578 — once per generation with process CGOptions.
+// StatementAssign::InitProbabilityTable + Expression::InitProbabilityTables
+// and installs Statement::stmtTable_ from process Probabilities pStatementProb.
+// Probabilities.cpp:565–578 / Statement.cpp:133–139.
 func InitSessionProbabilityTables(opts Options) {
 	SetProcessAssignOpsTable(NewAssignOpsTable(opts))
 	SetProcessExprTables(NewExprTables(opts))
+	// Statement::InitProbabilityTable — share process probs statement table
+	if p := ProcessProbabilities(); p != nil {
+		SetProcessStmtTab(p.StatementThresholdTable())
+	}
 }
 
 const defaultPlatformInfoPath = "platform.info"

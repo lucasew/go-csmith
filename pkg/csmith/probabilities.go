@@ -58,6 +58,9 @@ type Probabilities struct {
 	// safeOpsSizeWeight mirrors pSafeOpsSizeProb equal group (set_default_safe_ops_size_prob).
 	// Indices: SafeInt8..SafeInt64 (float excluded from draw).
 	safeOpsSizeWeight []int
+	// statementTable mirrors Statement::stmtTable_ after initialize(pStatementProb).
+	// Probabilities.cpp set_default_statement_prob (unequal group cutoffs → eStatementType).
+	statementTable *ThresholdTable
 }
 
 // NewProbabilities builds tables from opts like Probabilities::initialize
@@ -71,7 +74,17 @@ func NewProbabilities(opts Options) *Probabilities {
 	p.initBinaryOps(opts)
 	p.initUnaryOps(opts)
 	p.initSafeOpsSize(opts)
+	p.initStatementProbs(opts)
 	return p
+}
+
+// StatementThresholdTable returns Statement::stmtTable_ built from pStatementProb.
+// Nil when Probabilities is nil.
+func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
+	if p == nil {
+		return nil
+	}
+	return p.statementTable
 }
 
 // Single returns a single probability in [0,100].
@@ -277,6 +290,13 @@ func (p *Probabilities) initSafeOpsSize(opts Options) {
 		w[int(SafeInt64)] = 1
 	}
 	p.safeOpsSizeWeight = w
+}
+
+// initStatementProbs — Probabilities::set_default_statement_prob (unequal group).
+// Probabilities.cpp:748–774 — cumulative cutoffs; Statement::InitProbabilityTable
+// installs stmtTable_ from pStatementProb (pname_to_type → eStatementType).
+func (p *Probabilities) initStatementProbs(opts Options) {
+	p.statementTable = buildStatementThresholdTable(opts)
 }
 
 // SafeOpsSizeWeight returns equal-group weight for SafeOpSize index (int sizes only).
