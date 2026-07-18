@@ -92,6 +92,25 @@ func ClearSafeOpWrapperNames() {
 	wrapperNames = nil
 }
 
+// WrapperNamesCount mirrors SafeOpFlags::wrapper_names.size().
+func WrapperNamesCount() int { return len(wrapperNames) }
+
+// OutputWrapperH mirrors DefaultProgramGenerator identify_wrappers wrapper.h body.
+// DefaultProgramGenerator.cpp:73–77 — #define N_WRAP <count>.
+func OutputWrapperH() string {
+	return "#define N_WRAP " + itoa(WrapperNamesCount()) + "\n"
+}
+
+// SafeOpKind mirrors SafeOpKind for make_random_binary.
+type SafeOpKind int
+
+const (
+	// SafeOpBinary is sOpBinary.
+	SafeOpBinary SafeOpKind = iota
+	// SafeOpAssign is sOpAssign (compound assign).
+	SafeOpAssign
+)
+
 // SafeMathWrapperAllowed mirrors CGOptions::safe_math_wrapper(id).
 // CGOptions.cpp:597–602 — empty list means all allowed.
 func SafeMathWrapperAllowed(opts Options, id int) bool {
@@ -107,25 +126,58 @@ func SafeMathWrapperAllowed(opts Options, id int) bool {
 	return false
 }
 
-// MakeRandomBinary mirrors SafeOpFlags::make_random_binary for integer ops.
-// SafeOpFlags.cpp:169–215 (float path omitted unless EnableFloat).
+// MakeRandomBinary mirrors SafeOpFlags::make_random_binary for binary ops.
+// SafeOpFlags.cpp:169–215 — float path when EnableFloat and return_float_type.
 func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *SafeOpFlags {
+	return MakeRandomBinaryKind(r, opts, probs, typ, typ, typ, SafeOpBinary, BinAdd)
+}
+
+// MakeRandomBinaryKind mirrors SafeOpFlags::make_random_binary full signature.
+// SafeOpFlags.cpp:169–215.
+func MakeRandomBinaryKind(
+	r *Rng,
+	opts Options,
+	probs *Probabilities,
+	rvType, op1Type, op2Type *Type,
+	opKind SafeOpKind,
+	bop BinaryOp,
+) *SafeOpFlags {
 	if r == nil {
 		return &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
 	}
-	f := &SafeOpFlags{IsFunc: true}
-	// SafeOpsSignedProb — default 50
+	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
+	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
+
+	// SafeOpFlags.cpp:181–190 — float always signed
 	sigProb := uint32(50)
 	if probs != nil {
 		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
 			sigProb = uint32(p)
 		}
 	}
-	f.Op1Signed = r.RndFlipcoin(sigProb)
-	f.Op2Signed = r.RndFlipcoin(sigProb)
-	// size via equal group filter (int8 only if Int8&&UInt8, int64 if AllowInt64)
-	f.Size = pickSafeOpSize(r, opts)
-	_ = typ
+	if rvFloat {
+		f.Op1Signed = true
+	} else {
+		f.Op1Signed = r.RndFlipcoin(sigProb)
+	}
+
+	// SafeOpFlags.cpp:193–201 — op2 for binary; assign copies op1
+	if opKind == SafeOpBinary {
+		if rvFloat {
+			f.Op2Signed = true
+		} else {
+			f.Op2Signed = r.RndFlipcoin(sigProb)
+		}
+	} else {
+		f.Op2Signed = f.Op1Signed
+	}
+
+	// SafeOpFlags.cpp:207–213 — float size vs integer size pick
+	if rvFloat {
+		f.Size = SafeFloat
+	} else {
+		f.Size = pickSafeOpSize(r, opts)
+	}
 	return f
 }
 

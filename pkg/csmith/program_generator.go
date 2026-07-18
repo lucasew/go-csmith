@@ -534,7 +534,7 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string) stri
 }
 
 // GoGenerator mirrors DefaultProgramGenerator::goGenerator / DefaultOutputMgr::Output.
-// DefaultProgramGenerator.cpp:67–72; DefaultOutputMgr.cpp:175–195.
+// DefaultProgramGenerator.cpp:67–80; DefaultOutputMgr.cpp:175–195.
 func (g *ProgramGenerator) GoGenerator() string {
 	g.Initialize()
 	var b strings.Builder
@@ -548,5 +548,21 @@ func (g *ProgramGenerator) GoGenerator() string {
 	b.WriteString(g.OutputMain())
 	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
 	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
+	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes wrapper.h
+	// Library-first: append N_WRAP definition as a trailing section for consumers.
+	if g.Opts.IdentifyWrappers {
+		b.WriteString("\n/* --- wrapper.h (identify_wrappers) ---\n")
+		b.WriteString(OutputWrapperH())
+		b.WriteString("--- end wrapper.h --- */\n")
+	}
 	return b.String()
+}
+
+// WrapperHeader returns wrapper.h content when identify_wrappers is set.
+// DefaultProgramGenerator.cpp:73–77.
+func (g *ProgramGenerator) WrapperHeader() string {
+	if g == nil || !g.Opts.IdentifyWrappers {
+		return ""
+	}
+	return OutputWrapperH()
 }
