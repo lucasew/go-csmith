@@ -273,7 +273,13 @@ func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 
 // OutputInit mirrors ArrayVariable::output_init — nested for loops assigning init.
 // ArrayVariable.cpp:619–655. ctrl names from new_ctrl_vars (i,j,k…).
+// postIncr: CGOptions::post_incr_operator — "i++" vs "i = i + 1".
 func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
+	return av.OutputInitOpts(indent, ctrl, true)
+}
+
+// OutputInitOpts is OutputInit with post_incr_operator control.
+func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr bool) string {
 	if av == nil || av.NoLoopInitializer() {
 		return ""
 	}
@@ -289,7 +295,11 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 		if i < len(ctrl) && ctrl[i] != "" {
 			iv = ctrl[i]
 		}
-		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + iv + "++)\n")
+		incr := iv + "++"
+		if !postIncr {
+			incr = iv + " = " + iv + " + 1"
+		}
+		b.WriteString(pad + "for (" + iv + " = 0; " + iv + " < " + itoa(sz) + "; " + incr + ")\n")
 		if i+1 < len(av.Sizes) {
 			b.WriteString(pad + "{\n")
 			pad += "    "

@@ -11,6 +11,8 @@ func DoFinalization() {
 	BookkeeperDoFinalization()
 	// FactPointTo::all_ptrs / all_aliases
 	ClearPointToAggregates()
+	// Attribute generators
+	ClearAttrGenerators()
 	// Statement sid
 	nextStmID = 0
 	// Error state

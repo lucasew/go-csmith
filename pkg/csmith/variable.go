@@ -94,11 +94,21 @@ func (v *Variable) OutputDef(forceStatic bool) string {
 
 // OutputDefOpts adds prefix_name and VOLATILE GLOBAL comment for volatile globals.
 func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
+	return v.OutputDefFull(forceStatic, prefixName, false, nil)
+}
+
+// OutputDefFull mirrors Variable::OutputDef with optional __attribute__.
+// Variable.cpp:640–665 — decl, attr_generator.Output, init, volatile comment.
+func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng) string {
 	if v == nil {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(v.OutputDeclOpts(forceStatic, prefixName))
+	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
+	if withAttrs && r != nil {
+		b.WriteString(EnsureVarAttrGenerator().Output(r))
+	}
 	if v.Init != nil && v.Init.Value != "" {
 		b.WriteString(" = ")
 		b.WriteString(v.Init.Value)

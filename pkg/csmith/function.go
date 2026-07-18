@@ -382,16 +382,40 @@ func (f *Function) paramListC() string {
 // OutputForwardDecl emits a C prototype.
 // Function.cpp:555–561 — builtins emit nothing (compiler-provided).
 func (f *Function) OutputForwardDecl() string {
+	return f.OutputForwardDeclOpts(false, nil, false)
+}
+
+// OutputForwardDeclOpts adds optional func __attribute__ and force_static.
+// Function.cpp:516–561.
+func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
-	s := f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ");"
-	return s
+	var b strings.Builder
+	if forceStatic {
+		b.WriteString("static ")
+	}
+	b.WriteString(f.returnTypeC())
+	b.WriteString(" ")
+	b.WriteString(f.Name)
+	b.WriteString("(")
+	b.WriteString(f.paramListC())
+	b.WriteString(")")
+	if withAttrs && r != nil {
+		b.WriteString(EnsureFuncAttrGenerator().Output(r))
+	}
+	b.WriteString(";")
+	return b.String()
 }
 
 // Output emits a C function definition (minimal statements).
 // Function.cpp:565–598 — builtins emit nothing.
 func (f *Function) Output() string {
+	return f.OutputOpts(false, false, nil)
+}
+
+// OutputOpts adds force_static and optional function attributes on the header.
+func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
@@ -403,8 +427,15 @@ func (f *Function) Output() string {
 	if f.IsInlined {
 		s += "inline "
 	}
+	if forceStatic {
+		s += "static "
+	}
 	// Function.cpp:528 — get_prefixed_name(name); default random returns name
-	s += f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ")\n"
+	s += f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ")"
+	if withAttrs && r != nil {
+		s += EnsureFuncAttrGenerator().Output(r)
+	}
+	s += "\n"
 	// Function.cpp:575–598 — depth_protect wraps body
 	if f.DepthProtect {
 		s += "if (DEPTH < MAX_DEPTH) \n"

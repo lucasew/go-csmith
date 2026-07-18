@@ -222,8 +222,8 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			b.WriteString("\n")
 			continue
 		}
-		// Variable::OutputDef with force_globals_static + prefix_name
-		b.WriteString(v.OutputDefOpts(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName))
+		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
+		b.WriteString(v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
@@ -238,7 +238,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if f == nil || f.IsBuiltin {
 			continue
 		}
-		b.WriteString(f.OutputForwardDecl())
+		b.WriteString(f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n\n/* --- FUNCTIONS --- */\n")
@@ -246,7 +246,7 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if f == nil || f.IsBuiltin {
 			continue
 		}
-		b.WriteString(f.Output())
+		b.WriteString(f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng))
 		b.WriteString("\n")
 	}
 	return b.String()

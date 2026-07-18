@@ -774,6 +774,34 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
 }
 
+// PtrModifiedInRhs mirrors Lhs::ptr_modified_in_rhs.
+// Lhs.cpp:240–261 — intermediate pointers written in effect_stm from RHS.
+func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
+	if c == nil || lhs == nil || lhs.Var == nil {
+		return false
+	}
+	indirect := lhs.IndirectLevel()
+	if indirect <= 0 {
+		return false
+	}
+	// if the pointer variable itself was written by RHS
+	if c.EffectStm.IsWritten(lhs.Var) {
+		return true
+	}
+	tmp := []*Variable{lhs.Var.GetCollective()}
+	// only intermediate pointer levels (not ultimate pointees)
+	for indirect > 1 {
+		indirect--
+		tmp = MergePointeesOfPointers(tmp, facts)
+		for _, v := range tmp {
+			if v != nil && c.EffectStm.IsWritten(v) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // VisitFactsLhs mirrors Lhs::visit_facts.
 // Lhs.cpp:301–356 — compound read-first; curr_rhs overlap; write/write_pointed.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
@@ -806,6 +834,10 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	deref := lhs.IndirectLevel()
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DanglingPtrDerefProb) {
+			return false
+		}
+		// Lhs.cpp:337–339 — pointer modified in RHS
+		if c.PtrModifiedInRhs(lhs, facts) {
 			return false
 		}
 		// read the pointer itself then write pointees

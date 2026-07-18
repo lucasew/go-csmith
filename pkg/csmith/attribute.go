@@ -104,3 +104,42 @@ func NewVarAttrGenerator() *AttributeGenerator {
 		&BooleanAttribute{Name: "used", Prob: p},
 	}}
 }
+
+// Package-level generators (Variable::var_attr_generator / Function::func_attr_generator).
+var (
+	varAttrGenerator  *AttributeGenerator
+	funcAttrGenerator *AttributeGenerator
+)
+
+// EnsureVarAttrGenerator lazy-inits Variable::var_attr_generator.
+func EnsureVarAttrGenerator() *AttributeGenerator {
+	if varAttrGenerator == nil {
+		varAttrGenerator = NewVarAttrGenerator()
+	}
+	return varAttrGenerator
+}
+
+// NewFuncAttrGenerator mirrors Function attribute init (similar booleans).
+func NewFuncAttrGenerator() *AttributeGenerator {
+	p := 10
+	return &AttributeGenerator{Attributes: []Attribute{
+		&BooleanAttribute{Name: "noinline", Prob: p},
+		&BooleanAttribute{Name: "unused", Prob: p},
+		&BooleanAttribute{Name: "used", Prob: p},
+		&BooleanAttribute{Name: "deprecated", Prob: p},
+	}}
+}
+
+// EnsureFuncAttrGenerator lazy-inits function attributes.
+func EnsureFuncAttrGenerator() *AttributeGenerator {
+	if funcAttrGenerator == nil {
+		funcAttrGenerator = NewFuncAttrGenerator()
+	}
+	return funcAttrGenerator
+}
+
+// ClearAttrGenerators for Finalization between runs.
+func ClearAttrGenerators() {
+	varAttrGenerator = nil
+	funcAttrGenerator = nil
+}
