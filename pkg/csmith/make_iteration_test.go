@@ -16,7 +16,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(1))
 	cg := WithFunc(f, EmptyEffect())
-	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, cg)
+	lc := MakeIteration(NewRng(7), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil || lc.IV == nil {
 		t.Fatal("nil iteration")
 	}
@@ -53,7 +53,7 @@ func TestMakeIterationArrayBoundPath(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(3))
 	cg := WithFunc(f, EmptyEffect())
 	cg.MustUseArrays = []*ArrayVariable{av}
-	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, cg)
+	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
 		t.Fatal("nil")
 	}
@@ -76,7 +76,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()), GetIntType(), nil, NewRng(2))
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomFor(NewRng(9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomFor(NewRng(9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
 	}
@@ -98,7 +98,7 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
-	lc := MakeIteration(NewRng(4), opts, NewProbabilities(opts), vs, cg)
+	lc := MakeIteration(NewRng(4), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
 		t.Skip("no IV")
 	}

@@ -224,17 +224,18 @@ func makeGotoFailed() Stmt {
 // MakeRandomGoto mirrors StatementGoto::make_random.
 // StatementGoto.cpp:61–212 — find_good_jump_block; choose_visible_read_var;
 // back-edge returns goto; forward inserts after other_stm and returns nullptr.
+// cg is *CGContext (C++ CGContext&) so effect_stm clear sticks.
 func MakeRandomGoto(
 	r *Rng,
 	opts Options,
 	probs *Probabilities,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	blk *Block,
 ) Stmt {
 	_ = probs
-	if r == nil || cg.CurrentFunc == nil {
+	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return makeGotoFailed()
 	}
 
@@ -353,9 +354,9 @@ func MakeRandomGoto(
 	if cond == nil {
 		// library soft-fallback only when no fact maps (generation without DFA prep)
 		if cg.FM == nil || len(readVars) == 0 {
-			cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+			cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 			if cond == nil {
-				cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+				cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 			}
 		}
 		if cond == nil {
@@ -441,7 +442,7 @@ func MakeRandomGoto(
 			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy)
 			// feed merged facts as global for visit (stm_visit_facts inputs)
 			fm.GlobalFacts = CloneFactSlice(stmInMerged)
-			if !VisitFactsStmt(dest, &cg, opts) {
+			if !VisitFactsStmt(dest, cg, opts) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
@@ -520,12 +521,15 @@ func makeForwardGotoOnly(
 	opts Options,
 	vs *VariableSelector,
 	tables *ExprTables,
-	cg CGContext,
+	cg *CGContext,
 	blk *Block,
 ) Stmt {
-	cond := MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+	if cg == nil {
+		return makeGotoFailed()
+	}
+	cond := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if cond == nil {
-		cond = MakeRandomExpression(r, opts, tables, vs, &cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+		cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
 	}
 	label := "lbl_1"
 	if vs != nil {

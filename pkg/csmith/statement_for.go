@@ -190,14 +190,14 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 // StatementFor.cpp:164–283 — SelectLoopCtrlVar; array or free control;
 // StatementAssign init (SafeOpFlags binary), visit_facts; test binary;
 // compound/simple incr assign.
-func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg CGContext) *LoopControl {
-	if r == nil || vs == nil {
+func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg *CGContext) *LoopControl {
+	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
 	invalid := map[*Variable]bool{}
 	var iv *Variable
 	for tries := 0; tries < 32; tries++ {
-		iv = vs.SelectLoopCtrlVar(r, cg, invalid)
+		iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
 		if iv == nil {
 			return nil
 		}
@@ -296,8 +296,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	// init->visit_facts (StatementFor.cpp:244–245)
 	if cg.FM != nil {
-		cgp := cg
-		if !VisitFactsStatementAssign(initSt, &cgp, opts) {
+		if !VisitFactsStatementAssign(initSt, cg, opts) {
 			// upstream asserts visited; soft-fail: keep IR without fact update
 		}
 	} else {
@@ -312,7 +311,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// StatementFor.cpp:255–263
 	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
 	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
-	testFi := MakeBinary(r, opts, probs, cg, testOp, vExpr, cLimit)
+	testFi := MakeBinary(r, opts, probs, *cg, testOp, vExpr, cLimit)
 	if testFi == nil {
 		testFi = &Invocation{IsStd: true, Binary: testOp.BinaryOpC(), Args: []*Expression{vExpr, cLimit}}
 		testFi.setOutOpts(opts)
@@ -330,7 +329,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 	} else {
 		// StatementAssign::make_possible_compound_assign
-		incrSt = makePossibleCompoundAssign(cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr)
+		incrSt = makePossibleCompoundAssign(*cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr)
 		if incrSt.StmID == 0 {
 			incrSt.StmID = AllocStmID()
 		}
@@ -361,6 +360,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 
 // MakeRandomFor mirrors StatementFor::make_random — iteration + body with IN_LOOP.
 // StatementFor.cpp:287–308.
+// cg is *CGContext (C++ CGContext&) so effect_stm clear and post_loop stick.
 func MakeRandomFor(
 	r *Rng,
 	opts Options,
@@ -368,8 +368,11 @@ func MakeRandomFor(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) *Stmt {
+	if cg == nil {
+		return &Stmt{Kind: StmtFor}
+	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
 	cg.EffectStm = EmptyEffect()
 
@@ -415,10 +418,10 @@ func MakeRandomFor(
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
 	if cg.FM != nil {
-		postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, &cg)
+		postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
 	} else {
 		// still merge body effect when no FM
-		SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, &cg, preEffect)
+		SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, cg, preEffect)
 	}
 	// merge body effect into parent accum
 	if cg.EffectAccum != nil {

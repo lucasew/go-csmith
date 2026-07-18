@@ -74,7 +74,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(2))
-	st := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, b1)
+	st := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
 	if st.Kind != StmtGoto {
 		t.Fatal(st.Kind)
 	}

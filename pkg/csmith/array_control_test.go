@@ -63,7 +63,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	cg := WithFunc(f, EmptyEffect())
 	cg.MustUseArrays = []*ArrayVariable{av}
-	lc := MakeIteration(NewRng(5), opts, probs, vs, cg)
+	lc := MakeIteration(NewRng(5), opts, probs, vs, &cg)
 	if lc == nil {
 		t.Fatal("nil lc")
 	}
@@ -94,7 +94,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	// force non-init path by calling setup+for
 	avs := MakeRandomArrayLoopSetup(NewRng(3), opts, vs, cg)
 	cg.MustUseArrays = avs
-	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, cg)
+	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("for")
 	}
@@ -143,7 +143,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	foundSplit := false
 	for seed := uint64(1); seed < 60; seed++ {
 		// reset must-use by cloning selector inventories (reuse vs)
-		st := MakeRandomArrayLoop(NewRng(seed), opts, probs, vs, tables, stmtTab, cg)
+		st := MakeRandomArrayLoop(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st == nil || st.Loop == nil {
 			continue
 		}
@@ -187,13 +187,16 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVar(v)
-	st := MakeRandomFor(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomFor(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil {
 		t.Fatal("nil")
 	}
-	// MakeRandomFor clears EffectStm at start; after build EffectStm may hold body
-	// the key is it does not panic and produces a for
+	// StatementFor.cpp:290 — clear effect_stm on CGContext& before iteration
 	if st.Loop == nil {
 		t.Fatal("no loop")
+	}
+	// pre-seed write of unrelated v must not survive on caller's EffectStm
+	if cg.EffectStm.IsWritten(v) {
+		t.Fatal("effect_stm clear on *CGContext must drop pre-seed write")
 	}
 }

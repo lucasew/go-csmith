@@ -77,7 +77,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		fm.CFGEdges = nil
 		blk.Stmts = []Stmt{prior}
-		st := MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, blk)
+		st := MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
 		if st.GotoBack && len(fm.CFGEdges) > 0 {
 			e := fm.CFGEdges[0]
 			if e.BackLink && e.DestStmID == prior.StmID {
@@ -88,7 +88,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	}
 	if !found {
 		t.Log("back-edge not hit in seed scan; check forward at least")
-		st := MakeRandomGoto(NewRng(99), opts, NewProbabilities(opts), vs, NewExprTables(opts), cg, blk)
+		st := MakeRandomGoto(NewRng(99), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
 		if st.Kind != StmtGoto {
 			t.Fatal("kind")
 		}

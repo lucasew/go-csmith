@@ -16,7 +16,7 @@ func TestMakeRandomGotoHasLabel(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	// empty block → forward edge (no back-edge candidates yet)
 	blk := &Block{}
-	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, cg, blk)
+	st := MakeRandomGoto(NewRng(9), opts, probs, vs, tables, &cg, blk)
 	if st.Kind != StmtGoto || st.Label == "" {
 		t.Fatalf("%+v", st)
 	}
@@ -39,7 +39,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
 		blk.Stmts[0].SourceLabel = ""
-		st = MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, cg, blk)
+		st = MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, blk)
 		if st.GotoBack {
 			break
 		}
@@ -214,7 +214,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 			fm.MapAccumEffect[id] = eff
 		}
 		before := len(src.Stmts)
-		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, cg, curr)
+		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, &cg, curr)
 		// forward success: returns failed (no label) and inserts into some block
 		if st.Label == "" {
 			for _, b := range f.Blocks {

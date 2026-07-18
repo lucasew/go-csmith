@@ -50,7 +50,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	r := NewRng(2)
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, cg)
+	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
 	}

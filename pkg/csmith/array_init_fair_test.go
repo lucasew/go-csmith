@@ -29,7 +29,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
 	// force SelectArray to return our av by only having one
-	st := MakeRandomArrayInit(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomArrayInit(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatalf("kind %v", st.Kind)
 	}
@@ -81,7 +81,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
-	st := MakeRandomArrayInit(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomArrayInit(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Loop == nil && st.Then == nil {
 		t.Fatal("empty")
 	}

@@ -42,6 +42,7 @@ func CombineVariableSets(a, b []*Variable) []*Variable {
 
 // MakeRandomArrayOp mirrors StatementArrayOp::make_random.
 // StatementArrayOp.cpp:75–82 — 5% array_init; else make_random_array_loop → for.
+// cg is *CGContext (C++ CGContext&).
 func MakeRandomArrayOp(
 	r *Rng,
 	opts Options,
@@ -49,9 +50,9 @@ func MakeRandomArrayOp(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) Stmt {
-	if vs == nil || r == nil {
+	if vs == nil || r == nil || cg == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
 	// rnd_flipcoin(5) → make_random_array_init
@@ -76,9 +77,9 @@ func MakeRandomArrayLoop(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) *Stmt {
-	if r == nil || vs == nil {
+	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
 	// StatementFor.cpp:316–330
@@ -90,7 +91,7 @@ func MakeRandomArrayLoop(
 	var mustReads, mustWrites []*Variable
 	var avs []*ArrayVariable
 	for i := 0; i < n; i++ {
-		av := vs.SelectArray(r, cg)
+		av := vs.SelectArray(r, *cg)
 		if av == nil {
 			// still burn access RNG for stream parity when select returns nil? upstream always gets av
 			_ = r.RndUpto(3)
@@ -124,10 +125,10 @@ func MakeRandomArrayLoop(
 		MustWriteVars: allMustWrites,
 	}
 	// CGContext(loop, &rwd, nullptr, 0) — no outer IV
-	loopCG := cg
+	loopCG := *cg
 	loopCG.RW = rwd
 	loopCG.MustUseArrays = avs
-	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, loopCG)
+	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &loopCG)
 	if st == nil {
 		return nil
 	}
@@ -167,6 +168,7 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 // MakeRandomArrayInit mirrors StatementArrayOp::make_random_array_init.
 // StatementArrayOp.cpp:85–155 — select array; per-dim IV (init 0, incr 1) with
 // float/volatile/packed/signed-char filters; make_init_value RHS; update facts.
+// cg is *CGContext (C++ CGContext&).
 func MakeRandomArrayInit(
 	r *Rng,
 	opts Options,
@@ -174,14 +176,14 @@ func MakeRandomArrayInit(
 	vs *VariableSelector,
 	tables *ExprTables,
 	stmtTab *ThresholdTable,
-	cg CGContext,
+	cg *CGContext,
 ) Stmt {
 	_ = stmtTab
 	_ = tables
-	if vs == nil || r == nil {
+	if vs == nil || r == nil || cg == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
-	av := vs.SelectArray(r, cg)
+	av := vs.SelectArray(r, *cg)
 	if av == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
@@ -207,9 +209,9 @@ func MakeRandomArrayInit(
 		initN, incrN := 0, 1
 		var iv *Variable
 		for tries := 0; tries < 32; tries++ {
-			iv = vs.SelectLoopCtrlVar(r, cg, invalid)
+			iv = vs.SelectLoopCtrlVar(r, *cg, invalid)
 			if iv == nil {
-				iv = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, r)
+				iv = vs.GenerateNewGlobal(AccessWrite, *cg, GetIntType(), nil, r)
 			}
 			if iv == nil {
 				break
@@ -234,9 +236,8 @@ func MakeRandomArrayInit(
 		if iv != nil {
 			invalid[iv] = true
 			// StatementArrayOp.cpp:129–131 — read_indices + write_var
-			cgp := &cg
-			_ = cgp.ReadIndices(iv, facts)
-			cgp.WriteVar(iv)
+			_ = cg.ReadIndices(iv, facts)
+			cg.WriteVar(iv)
 			// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
 			cg.AddIVBound(iv, size)
 		}
@@ -273,7 +274,7 @@ func MakeRandomArrayInit(
 		}
 	}
 	qfer := av.Qfer
-	rhs := vs.MakeInitValue(AccessRead, cg, av.Type, &qfer, parent, r)
+	rhs := vs.MakeInitValue(AccessRead, *cg, av.Type, &qfer, parent, r)
 	if rhs == nil {
 		// fallback constant
 		c := MakeRandom(av.Type, opts, r)
@@ -283,8 +284,7 @@ func MakeRandomArrayInit(
 	}
 	// StatementArrayOp.cpp:144 — init->visit_facts
 	if cg.FM != nil && rhs != nil {
-		cgp := &cg
-		_ = VisitFactsExpression(rhs, cgp, opts)
+		_ = VisitFactsExpression(rhs, cg, opts)
 	}
 
 	// StatementArrayOp.cpp:145–150 — StatementArrayOp + update_fact_for_assign

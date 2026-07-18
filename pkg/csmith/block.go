@@ -549,11 +549,11 @@ func makeRandomStmtKind(
 	case StmtIfElse:
 		return *MakeRandomIf(r, opts, probs, vs, tables, stmtTab, &cg)
 	case StmtFor:
-		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+		return *MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &cg)
 	case StmtArrayOp:
-		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, cg)
+		return MakeRandomArrayOp(r, opts, probs, vs, tables, stmtTab, &cg)
 	case StmtGoto:
-		return MakeRandomGoto(r, opts, probs, vs, tables, cg, b)
+		return MakeRandomGoto(r, opts, probs, vs, tables, &cg, b)
 	case StmtInvoke:
 		return MakeRandomExprStmt(r, opts, probs, vs, tables, &cg)
 	default:

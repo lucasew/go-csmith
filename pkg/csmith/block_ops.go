@@ -426,7 +426,7 @@ func (b *Block) AppendNestedLoop(
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	cg.ClearEffectStm()
-	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, cg)
+	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil {
 		return nil
 	}

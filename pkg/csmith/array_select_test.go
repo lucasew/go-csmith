@@ -71,7 +71,7 @@ func TestMakeRandomArrayOpEmitsFor(t *testing.T) {
 	// StatementArrayOp::make_random — 5% array_init (StmtArrayOp) else for-loop (StmtFor)
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st = MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, cg)
+		st = MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st.Kind == StmtArrayOp || st.Kind == StmtFor {
 			break
 		}
@@ -130,7 +130,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
 	// force array_init path by calling MakeRandomArrayInit directly
-	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, cg)
+	st := MakeRandomArrayInit(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
 	if st.Kind != StmtArrayOp || st.Loop == nil {
 		t.Fatalf("%+v", st)
 	}

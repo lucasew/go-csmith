@@ -81,7 +81,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect())
 	// force some arrays via select
 	for seed := uint64(1); seed < 30; seed++ {
-		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, cg)
+		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
 		if st.Kind != StmtArrayOp && st.Kind != StmtFor {
 			// array loop returns for
 			if st.Loop == nil && st.Kind == StmtArrayOp {

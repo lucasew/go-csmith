@@ -60,7 +60,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
-	st := MakeRandomArrayInit(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), cg)
+	st := MakeRandomArrayInit(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatal(st.Kind)
 	}
