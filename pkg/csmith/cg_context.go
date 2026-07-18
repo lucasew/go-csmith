@@ -588,7 +588,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
-	// no invent dual DanglingPtrDerefProb knob or hardcode 0
+	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
 	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
 		return false
 	}

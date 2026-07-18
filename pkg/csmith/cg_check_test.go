@@ -70,7 +70,7 @@ func TestCheckWriteVarPartialConflict(t *testing.T) {
 
 func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	// FactPointTo.cpp:476–482 — is_dangling when dead && dead_pointer_dereference_prob==0
-	// no invent dual DanglingPtrDerefProb independent of DeadPointerDerefProb
+	// CGOptions has dead_pointer_dereference_prob only (no dual DanglingPtrDerefProb invent)
 	prev := ProcessOptions()
 	defer SetProcessOptions(prev)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -88,16 +88,6 @@ func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	SetProcessOptions(opts)
 	if !cg.CheckReadVar(p, facts) {
 		t.Fatal("dead ptr with deadProb>0 must not invent always-reject")
-	}
-	// residual DanglingPtrDerefProb alias still syncs into DeadPointer
-	opts = Defaults()
-	opts.DanglingPtrDerefProb = 50
-	SetProcessOptions(opts)
-	if ProcessOptions().DeadPointerDerefProb != 50 {
-		t.Fatal("DanglingPtr alias must sync to DeadPointer")
-	}
-	if !cg.CheckReadVar(p, facts) {
-		t.Fatal("alias sync must allow dead read when prob>0")
 	}
 }
 
@@ -129,7 +119,7 @@ func TestVisitFactsExpressionVariableAddrBitfield(t *testing.T) {
 func TestReadPointedNullRejected(t *testing.T) {
 	opts := Defaults()
 	opts.NullPointerDerefProb = 0
-	opts.DanglingPtrDerefProb = 0
+	opts.DeadPointerDerefProb = 0
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}

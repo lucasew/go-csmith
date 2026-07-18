@@ -141,8 +141,10 @@ func NewRootCmd() *cobra.Command {
 	cmd.Flags().IntVar(&opts.InlineFunctionProb, "inline-function-prob", opts.InlineFunctionProb, "probability [0,100]")
 	cmd.Flags().IntVar(&opts.BuiltinFunctionProb, "builtin-function-prob", opts.BuiltinFunctionProb, "probability [0,100]")
 	cmd.Flags().IntVar(&opts.ArrayOOBProb, "array-oob-prob", opts.ArrayOOBProb, "probability [0,100]")
-	cmd.Flags().IntVar(&opts.NullPtrDerefProb, "null-ptr-deref-prob", opts.NullPtrDerefProb, "probability [0,100]")
-	cmd.Flags().IntVar(&opts.DanglingPtrDerefProb, "dangling-ptr-deref-prob", opts.DanglingPtrDerefProb, "probability [0,100]")
+	// RandomProgramGenerator.cpp — flags bind CGOptions null_pointer / dead_pointer knobs
+	// (CLI names null-ptr / dangling-ptr; no residual dual Options fields).
+	cmd.Flags().IntVar(&opts.NullPointerDerefProb, "null-ptr-deref-prob", opts.NullPointerDerefProb, "probability [0,100]")
+	cmd.Flags().IntVar(&opts.DeadPointerDerefProb, "dangling-ptr-deref-prob", opts.DeadPointerDerefProb, "probability [0,100]")
 	cmd.Flags().IntVar(&opts.StopByStmt, "stop-by-stmt", opts.StopByStmt, "stop generation after N statements")
 	cmd.Flags().IntVar(&opts.MaxGlobals, "max-globals", opts.MaxGlobals, "maximum number of generated globals")
 	cmd.Flags().IntVar(&opts.MaxSplitFiles, "max-split-files", opts.MaxSplitFiles, "maximum number of split output files")

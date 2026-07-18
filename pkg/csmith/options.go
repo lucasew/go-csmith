@@ -32,31 +32,10 @@ var (
 	processRng    *Rng
 )
 
-// syncDerefProbs unifies residual dual option names with C++ single knobs.
-// CGOptions has null_pointer_dereference_prob and dead_pointer_dereference_prob only;
-// NullPtrDerefProb / DanglingPtrDerefProb invent a second independent pair — keep them
-// aliases of NullPointerDerefProb / DeadPointerDerefProb (prefer correctly-named fields).
-func syncDerefProbs(o *Options) {
-	if o == nil {
-		return
-	}
-	if o.NullPointerDerefProb != 0 {
-		o.NullPtrDerefProb = o.NullPointerDerefProb
-	} else if o.NullPtrDerefProb != 0 {
-		o.NullPointerDerefProb = o.NullPtrDerefProb
-	}
-	if o.DeadPointerDerefProb != 0 {
-		o.DanglingPtrDerefProb = o.DeadPointerDerefProb
-	} else if o.DanglingPtrDerefProb != 0 {
-		o.DeadPointerDerefProb = o.DanglingPtrDerefProb
-	}
-}
-
 // SetProcessOptions installs the active process Options (CGOptions mirror).
 // NewProgramGenerator calls this so CreateVariable / ChooseVarFull / Block.Output
 // use session options instead of inventing Defaults().
 func SetProcessOptions(o Options) {
-	syncDerefProbs(&o)
 	processOptsMu.Lock()
 	processOpts = o
 	processOptsMu.Unlock()
@@ -138,13 +117,11 @@ type Options struct {
 	MaxArrayLength       int
 	MaxArrayNumInLoop    int
 	MaxExhaustiveDepth   int
-	InlineFunctionProb   int
-	BuiltinFunctionProb  int
-	ArrayOOBProb         int
-	NullPtrDerefProb     int
-	DanglingPtrDerefProb int
-	StopByStmt           int
-	CoverageTestSize     int
+	InlineFunctionProb  int
+	BuiltinFunctionProb int
+	ArrayOOBProb        int
+	StopByStmt          int
+	CoverageTestSize    int
 
 	// Extension/mode switches
 	RandomBased   bool
@@ -291,13 +268,11 @@ func Defaults() Options {
 		MaxArrayLength:       256,
 		MaxArrayNumInLoop:    4,
 		MaxExhaustiveDepth:   -1,
-		InlineFunctionProb:   50,
-		BuiltinFunctionProb:  50,
-		ArrayOOBProb:         0,
-		NullPtrDerefProb:     0,
-		DanglingPtrDerefProb: 0,
-		StopByStmt:           -1,
-		CoverageTestSize:     500,
+		InlineFunctionProb:  50,
+		BuiltinFunctionProb: 50,
+		ArrayOOBProb:        0,
+		StopByStmt:          -1,
+		CoverageTestSize:    500,
 
 		RandomBased:   true,
 		DFSExhaustive: false,
@@ -514,8 +489,7 @@ func (o Options) Validate() error {
 	if o.ArrayOOBProb < 0 || o.ArrayOOBProb > 100 {
 		return fmt.Errorf("array-oob-prob value must between [0,100]")
 	}
-	// sync residual dual names before range checks (C++ single knobs)
-	syncDerefProbs(&o)
+	// CGOptions.cpp — single knobs only (null_pointer / dead_pointer_dereference_prob)
 	if o.NullPointerDerefProb < 0 || o.NullPointerDerefProb > 100 {
 		return fmt.Errorf("null-pointer-dereference-prob value must between [0,100]")
 	}

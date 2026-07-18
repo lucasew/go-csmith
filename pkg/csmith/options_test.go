@@ -33,8 +33,9 @@ func TestDefaultsMatchCGOptionsMacros(t *testing.T) {
 		{"InlineFunctionProb", o.InlineFunctionProb, 50},
 		{"BuiltinFunctionProb", o.BuiltinFunctionProb, 50},
 		{"ArrayOOBProb", o.ArrayOOBProb, 0},
-		{"NullPtrDerefProb", o.NullPtrDerefProb, 0},
-		{"DanglingPtrDerefProb", o.DanglingPtrDerefProb, 0},
+		// CGOptions: null_pointer_dereference_prob / dead_pointer_dereference_prob only
+		{"NullPointerDerefProb", o.NullPointerDerefProb, 0},
+		{"DeadPointerDerefProb", o.DeadPointerDerefProb, 0},
 		{"StopByStmt", o.StopByStmt, -1},
 	}
 	for _, c := range checks {
