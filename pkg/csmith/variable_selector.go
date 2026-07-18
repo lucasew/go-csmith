@@ -56,7 +56,8 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	if n == 1 {
 		return vars[0]
 	}
-	// DEPTH_GUARD omitted (no DepthSpec port).
+	// DepthSpec::depth_guard_by_depth(1) for multi-choice — random mode always GOOD
+	_ = DepthGuardByDepth(Options{}, 1)
 	idx := r.RndUpto(uint32(n))
 	return vars[idx]
 }

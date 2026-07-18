@@ -109,6 +109,10 @@ func MakeRandomBlock(
 		f.Stack = append(f.Stack, b)
 		f.Blocks = append(f.Blocks, b)
 	}
+	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
+	if DepthGuardByType(opts, "dtBlock") == BadDepth {
+		return nil
+	}
 	max := BlockProbability(b.blockSize, r)
 	cg.BlkDepth++
 	// Running effect accum for this block (side-effect / no_volatile for SelectLType)

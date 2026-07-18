@@ -40,9 +40,16 @@ func (c CGContext) EffectContext() Effect {
 }
 
 // NoteWrite records a variable write into EffectAccum if present.
+// Also updates CurrentFunc.FEffect for globals (Function::feffect external).
 func (c CGContext) NoteWrite(v *Variable) {
-	if c.EffectAccum != nil && v != nil {
+	if v == nil {
+		return
+	}
+	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+	}
+	if c.CurrentFunc != nil && v.IsGlobal() {
+		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
 	}
 }
 

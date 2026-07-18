@@ -21,6 +21,10 @@ type Function struct {
 	RetConst *Constant
 	// DepthProtect mirrors body depth_protect / CGOptions for emit.
 	DepthProtect bool
+	// FEffect mirrors Function::feffect (external effect on globals).
+	FEffect Effect
+	// EmitConcise skips feffect comment (CGOptions::concise).
+	EmitConcise bool
 }
 
 // FunctionList is Function::FuncList for this generation session.
@@ -163,6 +167,7 @@ func MakeFirst(
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
+	f.EmitConcise = opts.Concise
 	// Function::make_return_const — Function.cpp:608–615
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
@@ -195,6 +200,7 @@ func (f *Function) GenerateBody(
 	f.Body = MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	f.IsBuilt = true
 	f.DepthProtect = opts.DepthProtect
+	f.EmitConcise = opts.Concise
 	if opts.DepthProtect && f.NeedReturnStmt() {
 		f.RetConst = MakeRandom(f.ReturnType, opts, r)
 	}
@@ -234,6 +240,10 @@ func (f *Function) Output() string {
 		ret = f.ReturnType.CName()
 	}
 	s := ""
+	// Function.cpp:568–570 — feffect.Output when !concise
+	if !f.EmitConcise {
+		s += f.FEffect.CommentOutput()
+	}
 	if f.IsInlined {
 		s += "inline "
 	}

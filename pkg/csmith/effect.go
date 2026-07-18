@@ -2,6 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"sort"
+	"strings"
+)
+
 // Access mirrors Effect::Access.
 type Access int
 
@@ -60,6 +65,32 @@ func (e Effect) WriteVar(v *Variable) Effect {
 // IsWritten mirrors Effect::is_written (exact var).
 func (e Effect) IsWritten(v *Variable) bool {
 	return v != nil && e.written[v]
+}
+
+// CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
+// Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
+// Write names sorted for deterministic emit (Go map iteration is random).
+func (e Effect) CommentOutput() string {
+	var b strings.Builder
+	b.WriteString("/*\n")
+	b.WriteString(" * reads :")
+	// read set not tracked yet
+	b.WriteString("\n")
+	b.WriteString(" * writes:")
+	names := make([]string, 0, len(e.written))
+	for v := range e.written {
+		if v != nil && e.written[v] {
+			names = append(names, v.Name)
+		}
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		b.WriteString(" ")
+		b.WriteString(n)
+	}
+	b.WriteString("\n")
+	b.WriteString(" */\n")
+	return b.String()
 }
 
 // MergeEffects combines two post-branch effects (union of writes; SE-free only if both are).
