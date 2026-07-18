@@ -126,25 +126,54 @@ func TestRestoreFacts(t *testing.T) {
 }
 
 func TestSetMapFactsOutGotoDest(t *testing.T) {
+	// FactMgr.cpp:263–266 — update_facts_for_dest via StatementGoto::dest;
+	// no soft invent RemoveFunctionLocalFacts when dest fields present.
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
-	loc.Name = "l_1"
-	body := &Block{Func: f, LocalVars: []*Variable{loc}}
-	f.Blocks = []*Block{body}
+	// nested local not visible at body dest → OOS/garbage
+	innerLoc := CreateVariableScalars("l_inner", PointerTo(GetIntType()), false, false)
+	inner := &Block{Func: f, LocalVars: []*Variable{innerLoc}}
+	body := &Block{Func: f, LocalVars: nil}
+	inner.Parent = body
+	f.Body = body
+	f.Blocks = []*Block{body, inner}
+	// dest stmt at body level
+	dest := &Stmt{Kind: StmtAssign, StmID: 10}
+	body.Stmts = []Stmt{*dest}
+	// goto in inner jumps to dest in body
+	st := &Stmt{
+		Kind: StmtGoto, StmID: 3,
+		GotoDestStmID:  10,
+		GotoDestParent: body,
+	}
+	inner.Stmts = []Stmt{*st}
 	fm := NewFactMgr(f)
-	// local fact should be OOS at dest outside function (nil parent)
-	// use global pointer fact only for merge
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// invent a fact about local subject — IsLocal by name
-	// CreateVariableScalars may set is_global based on true/false arg
-	// loc is local of body → OOS at destParent=nil
-	facts := []*FactPointTo{}
-	// Add fact for local if pointer — skip; use Remove path via dest
-	st := &Stmt{Kind: StmtGoto, StmID: 3}
-	// with destParent = body, loc is visible
-	fm.SetMapFactsOutForStmtDest(st, facts, body, body)
-	if _, ok := fm.MapFactsOut[3]; !ok {
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// global points to inner local; after goto to body, pointee is OOS → garbage
+	facts := []*FactPointTo{
+		MakeFactPointTo(g, innerLoc),
+		MakeFactPointTo(innerLoc, NullPtr),
+	}
+	// SetMapFactsOutForStmt resolves GotoDestParent (no invent approx drop)
+	fm.SetMapFactsOutForStmt(st, facts, inner)
+	out := fm.MapFactsOut[3]
+	if out == nil {
 		t.Fatal("out set")
 	}
-	_ = p
+	// global kept; subject innerLoc OOS at body dest → dropped from subjects
+	if FindRelatedPointTo(out, g) == nil {
+		t.Fatal("global lost", out)
+	}
+	// pointee of g marked dead (OOS local)
+	gf := FindRelatedPointTo(out, g)
+	if gf == nil || !gf.IsDead() {
+		t.Fatalf("want g→garbage after OOS pointee, got %+v", gf)
+	}
+	// return uses s->parent stack walk, not invent f.Body-only
+	ret := &Stmt{Kind: StmtReturn, StmID: 4}
+	fm.SetMapFactsOutForStmt(ret, facts, inner)
+	retOut := fm.MapFactsOut[4]
+	// innerLoc on stack at return → subject dropped
+	if FindRelatedPointTo(retOut, innerLoc) != nil {
+		t.Fatal("return must drop stack local subject", retOut)
+	}
 }

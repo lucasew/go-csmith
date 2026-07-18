@@ -105,12 +105,20 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 
 // SetMapFactsOutForStmt mirrors FactMgr::set_fact_out with jump/return filtering.
 // FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return/goto.
-// destParent is the goto destination's parent block when Kind==StmtGoto (optional).
+// blk is s->parent (statement parent block).
 func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Block) {
-	fm.SetMapFactsOutForStmtDest(st, facts, blk, nil)
+	// Goto dest from StatementGoto::dest (no soft invent always-nil destParent).
+	var destParent *Block
+	if st != nil && st.Kind == StmtGoto {
+		destParent = st.GotoDestParent
+		if destParent == nil && st.GotoDestStmID > 0 && fm != nil && fm.Func != nil {
+			destParent = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
+		}
+	}
+	fm.SetMapFactsOutForStmtDest(st, facts, blk, destParent)
 }
 
-// SetMapFactsOutForStmtDest is set_fact_out with optional goto dest parent.
+// SetMapFactsOutForStmtDest is set_fact_out with optional goto dest parent override.
 func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk, destParent *Block) {
 	if fm == nil || st == nil {
 		return
@@ -121,15 +129,31 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		// FactMgr.cpp:257–262 — remove_loop_local_facts(s, facts_copy)
 		cp = RemoveLoopLocalFactsForStmt(cp, st, blk)
 	case StmtReturn:
-		cp = RemoveFunctionLocalFacts(cp, fm.Func)
+		// FactMgr.cpp:268–270 — remove_function_local_facts(facts_copy, s)
+		// stack check uses s->parent (blk); no invent f.Body-only walk
+		cp = RemoveFunctionLocalFactsAt(cp, fm.Func, blk)
 	case StmtGoto:
-		if destParent != nil && fm.Func != nil {
-			out := []*FactPointTo{}
-			UpdateFactsForDest(cp, &out, fm.Func, destParent)
-			cp = out
+		// FactMgr.cpp:263–266 — update_facts_for_dest(facts, facts_copy, sg->dest)
+		dp := destParent
+		if dp == nil {
+			dp = st.GotoDestParent
+		}
+		if dp == nil && st.GotoDestStmID > 0 && fm.Func != nil {
+			dp = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
+		}
+		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
+		// when dest unknown (wrong filter vs update_facts_for_dest)
+		if fm.Func == nil {
+			cp = nil
 		} else {
-			// approximation when dest unknown: drop function-locals
-			cp = RemoveFunctionLocalFacts(cp, fm.Func)
+			out := []*FactPointTo{}
+			UpdateFactsForDest(cp, &out, fm.Func, dp)
+			cp = out
+		}
+	default:
+		// FactMgr.cpp:268 — eReturn || s->parent == nullptr → remove function locals
+		if blk == nil {
+			cp = RemoveFunctionLocalFactsAt(cp, fm.Func, nil)
 		}
 	}
 	if st.StmID > 0 {
