@@ -39,30 +39,48 @@ type Expression struct {
 	CastType *Type
 }
 
-// CompatibleWithVar mirrors ExpressionVariable::compatible(Variable*).
-// ExpressionVariable.cpp:288–291 — var.compatible(v); non-variable terms false.
+// CompatibleWithVar mirrors Expression::compatible(Variable*).
+// ExpressionVariable.cpp:288–291 — var.compatible(v);
+// ExpressionFuncall.cpp:206–207 — invoke.compatible(v) (unary operand only);
+// default / other terms false.
 func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 	if e == nil || v == nil {
 		return false
 	}
-	if e.Term != TermVariable || e.Var == nil {
+	switch e.Term {
+	case TermVariable:
+		if e.Var == nil {
+			return false
+		}
+		return e.Var.Compatible(v, expandStruct)
+	case TermFunction:
+		// ExpressionFuncall.cpp:206–207
+		return e.Invoke != nil && e.Invoke.CompatibleVar(v, expandStruct)
+	case TermLhs:
+		if e.Var == nil {
+			return false
+		}
+		return e.Var.Compatible(v, expandStruct)
+	default:
 		return false
 	}
-	return e.Var.Compatible(v, expandStruct)
 }
 
-// CompatibleWithExpr mirrors ExpressionVariable::compatible(Expression*).
-// ExpressionVariable.cpp:276–282 — exp.compatible(&var).
+// CompatibleWithExpr mirrors Expression::compatible(Expression*).
+// ExpressionVariable.cpp:276–282 — exp.compatible(&var);
+// ExpressionFuncall.cpp:210–212 — always false for Expression*.
 func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
 	if e == nil || other == nil {
 		return false
 	}
-	if e.Term == TermVariable && e.Var != nil {
+	// Variable / Lhs → other.compatible(this.var)
+	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var != nil {
 		return other.CompatibleWithVar(e.Var, expandStruct)
 	}
-	if other.Term == TermVariable && other.Var != nil {
+	if (other.Term == TermVariable || other.Term == TermLhs) && other.Var != nil {
 		return e.CompatibleWithVar(other.Var, expandStruct)
 	}
+	// Funcall::compatible(Expression*) is false (ExpressionFuncall.cpp:210–212)
 	return false
 }
 

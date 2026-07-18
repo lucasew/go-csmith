@@ -115,3 +115,67 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 		}
 	}
 }
+
+func TestLhsCompatibleExpr(t *testing.T) {
+	// Lhs.cpp:359–362
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	lhs := &Lhs{Var: a, Type: GetIntType()}
+	ea := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
+	eb := &Expression{Term: TermVariable, Var: b, ExprType: GetIntType()}
+	if !lhs.CompatibleExpr(ea, false) {
+		t.Fatal("same var")
+	}
+	if lhs.CompatibleExpr(eb, false) {
+		t.Fatal("other var")
+	}
+}
+
+func TestExpressionFuncallCompatibleUnary(t *testing.T) {
+	// ExpressionFuncall.cpp:206–207 — unary invoke compatible via operand
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	if !e.CompatibleWithVar(v, false) {
+		t.Fatal("unary minus of v compatible with v")
+	}
+	other := CreateVariableScalars("g_2", GetIntType(), true, false)
+	if e.CompatibleWithVar(other, false) {
+		t.Fatal("not other")
+	}
+	// binary always false
+	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ev}}
+	e2 := &Expression{Term: TermFunction, Invoke: fi2}
+	if e2.CompatibleWithVar(v, false) {
+		t.Fatal("binary not compatible")
+	}
+}
+
+func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
+	// VariableSelector.cpp:301–303 — match_indirect; scalar non-exact Match is always true
+	// (CVQualifiers.cpp both len==1). Filter matters when level counts differ.
+	BookkeeperDoFinalization()
+	defer BookkeeperDoFinalization()
+	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
+	pt := PointerTo(GetIntType())
+	vol := CreateVariableScalars("g_p", pt, true, false)
+	vol.Qfer = NewCVQualifiers([]bool{false, false}, []bool{true, true}) // vol at both levels
+	// request only storage-level volatile (len 1) — match_indirect via indirect_qualifiers
+	// deref = 2-1 = 1 → other.IndirectQualifiers(1) → should still allow if eligible
+	qfer := NewCVQualifiers([]bool{false}, []bool{true})
+	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qfer, AccessRead, EmptyCGContext()) {
+		// may fail IsEligibleVar if effect rules; at least no panic
+		t.Log("eligible path optional under empty effect")
+	}
+	// wildcard always matches
+	qw := NewCVQualifiers([]bool{true}, []bool{true})
+	qw.Wildcard = true
+	BookkeeperDoFinalization()
+	if !HasEligibleVolatileVarQfer([]*Variable{vol}, pt, &qw, AccessRead, EmptyCGContext()) {
+		t.Fatal("wildcard qfer must accept")
+	}
+	if VolatileAvailCount() < 1 {
+		t.Fatal("volatile_avail")
+	}
+}

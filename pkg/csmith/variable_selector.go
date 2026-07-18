@@ -705,15 +705,27 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 }
 
 // HasEligibleVolatileVar mirrors VariableSelector::has_eligible_volatile_var.
-// VariableSelector.cpp:294–316 — flexible match + eligible + is_volatile;
-// increments Bookkeeper::volatile_avail on first hit.
+// VariableSelector.cpp:294–316 — flexible match + qfer match_indirect + eligible +
+// is_volatile; increments Bookkeeper::volatile_avail on first hit.
 func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGContext) bool {
+	return HasEligibleVolatileVarQfer(vars, typ, nil, access, cg)
+}
+
+// HasEligibleVolatileVarQfer is has_eligible_volatile_var with CVQualifiers filter.
+// VariableSelector.cpp:294–316.
+func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
 	for _, v := range vars {
 		if v == nil || v.Type == nil {
 			continue
 		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
 			continue
+		}
+		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
+		if qfer != nil && !qfer.Wildcard {
+			if !qfer.MatchIndirect(v.Qfer, false) {
+				continue
+			}
 		}
 		deref := 0
 		if typ != nil {
@@ -885,7 +897,8 @@ func ChooseVarFull(
 	if !noExpandStructUnion && (want.IsSimple() || want.IsAggregate()) {
 		cands = ExpandStructUnionVars(vars, want)
 	}
-	_ = HasEligibleVolatileVar(cands, want, access, cg)
+	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
+	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
 	opts := Defaults()
 	if HasDereferenceableVar(cands, want, cg, opts) {

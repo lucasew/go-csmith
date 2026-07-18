@@ -135,6 +135,15 @@ func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
 	return l.Var.Compatible(v, expandStruct)
 }
 
+// CompatibleExpr mirrors Lhs::compatible(Expression*).
+// Lhs.cpp:359–362 — exp->compatible(&var).
+func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
+	if l == nil || l.Var == nil || exp == nil {
+		return false
+	}
+	return exp.CompatibleWithVar(l.Var, expandStruct)
+}
+
 // Output mirrors Lhs::Output — ExpressionVariable shape, optional VOL_LVAL wrap.
 // Lhs.cpp:207–218.
 func (l *Lhs) Output(wrapVolatiles bool) string {
