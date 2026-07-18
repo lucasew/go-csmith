@@ -1853,21 +1853,57 @@ func NewScopeThresholdTable(opts Options) *ThresholdTable {
 	return t
 }
 
-// VariableSelectionProbability mirrors VariableSelectionProbability.
-// VariableSelector.cpp:1043–1059 — rnd_upto(100); scopeTable get_value.
+// variableSelectFilter mirrors VariableSelectFilter.
+// VariableSelector.cpp:98–105 — reject eParentParam when parent.param.empty().
+// Filter true = reject (re-roll rnd_upto).
+func variableSelectFilter(opts Options, cg *CGContext) Filter {
+	tab := NewScopeThresholdTable(opts)
+	return filterFunc(func(v uint32) bool {
+		sc := VariableScope(tab.GetValue(int(v)))
+		if sc != ScopeParentParam {
+			return false
+		}
+		// VariableSelector.cpp:100–102 — empty params → filter out ParentParam
+		if cg == nil || cg.CurrentFunc == nil || len(cg.CurrentFunc.Param) == 0 {
+			return true
+		}
+		return false
+	})
+}
+
+// VariableSelectionProbability mirrors VariableSelectionProbability without filter
+// (tests / call sites that only need unfiltered draw).
+// VariableSelector.cpp:1043–1059 — upper=MAX, filter=nullptr.
 func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
+	return VariableSelectionProbabilityCG(r, opts, nil, MaxVarScope)
+}
+
+// VariableSelectionProbabilityCG mirrors VariableSelectionProbability(upper, filter).
+// VariableSelector.cpp:1043–1059 — do { rnd_upto(100, filter); if scope < upper return }.
+func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper VariableScope) VariableScope {
 	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ScopeNewValue
 	if r == nil {
 		return MaxVarScope
 	}
 	tab := NewScopeThresholdTable(opts)
-	v := r.RndUpto(100)
-	sc := tab.GetValue(int(v))
-	if sc < 0 {
-		// VariableSelector.cpp:1059 — return MAX_VAR_SCOPE
-		return MaxVarScope
+	filt := variableSelectFilter(opts, cg)
+	// C++ unbounded do-while; cap high (no soft invent MAX early)
+	for tries := 0; tries < 256; tries++ {
+		i := r.RndUptoFilter(100, filt)
+		if HasError() {
+			return MaxVarScope
+		}
+		sc := VariableScope(tab.GetValue(int(i)))
+		if sc < 0 {
+			return MaxVarScope
+		}
+		// VariableSelector.cpp:1055–1057 — scope < upper
+		if sc < upper {
+			return sc
+		}
 	}
-	return VariableScope(sc)
+	// VariableSelector.cpp:1059
+	return MaxVarScope
 }
 
 // VariableCreationProbability mirrors VariableCreationProbability.
@@ -1877,7 +1913,12 @@ func VariableCreationProbability(r *Rng, opts Options) VariableScope {
 	if r == nil {
 		return MaxVarScope
 	}
-	if opts.GlobalVariables && r.RndFlipcoin(10) {
+	flag := opts.GlobalVariables && r.RndFlipcoin(10)
+	// VariableSelector.cpp:1065 ERROR_GUARD after flipcoin
+	if HasError() {
+		return MaxVarScope
+	}
+	if flag {
 		return ScopeGlobal
 	}
 	return ScopeParentLocal
@@ -1916,7 +1957,12 @@ func (vs *VariableSelector) SelectWithInvalid(
 		return nil
 	}
 	vs.VarCreated = false
-	scope := VariableSelectionProbability(r, vs.Opts)
+	// VariableSelector.cpp:1192–1196 — VariableSelectFilter + VariableSelectionProbability(MAX, &filter)
+	scope := VariableSelectionProbabilityCG(r, vs.Opts, &cg, MaxVarScope)
+	// VariableSelector.cpp:1196 ERROR_GUARD
+	if scope == MaxVarScope || HasError() {
+		return nil
+	}
 	var v *Variable
 	switch scope {
 	case ScopeGlobal:
@@ -1941,6 +1987,9 @@ func (vs *VariableSelector) SelectWithInvalid(
 		return nil
 	}
 	// VariableSelector.cpp:1224 — ERROR_GUARD(nullptr); null scope pick stays null (no soft create)
+	if HasError() {
+		return nil
+	}
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile()); no soft invent non-vol
 	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
 		return nil
@@ -2042,6 +2091,7 @@ func (vs *VariableSelector) SelectParentParam(
 }
 
 // SelectParentParamInv is SelectParentParam with invalid_vars.
+// VariableSelector.cpp:1074–1087.
 func (vs *VariableSelector) SelectParentParamInv(
 	access Access,
 	cg CGContext,
@@ -2054,10 +2104,17 @@ func (vs *VariableSelector) SelectParentParamInv(
 	if cg.CurrentFunc == nil {
 		return nil
 	}
+	// VariableSelector.cpp:1079–1080 — empty param → SelectParentLocal
 	if len(cg.CurrentFunc.Param) == 0 {
 		return vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, invalidVars)
 	}
-	if v := ChooseVarFull(r, cg.CurrentFunc.Param, access, cg, t, qfer, mt, invalidVars, false, false, false); v != nil {
+	v := ChooseVarFull(r, cg.CurrentFunc.Param, access, cg, t, qfer, mt, invalidVars, false, false, false)
+	// VariableSelector.cpp:1082 ERROR_GUARD
+	if HasError() {
+		return nil
+	}
+	// VariableSelector.cpp:1083–1086 — miss → SelectParentLocal
+	if v != nil {
 		return v
 	}
 	return vs.SelectParentLocalInv(access, cg, t, qfer, r, mt, invalidVars)
@@ -2081,21 +2138,25 @@ func (vs *VariableSelector) GenerateNewVariable(
 	}
 	scope := VariableCreationProbability(r, vs.Opts)
 	// VariableSelector.cpp:1096–1097 — ERROR_GUARD(nullptr) when creation scope is MAX
-	if scope == MaxVarScope {
+	if scope == MaxVarScope || HasError() {
 		return nil
 	}
+	var v *Variable
 	switch scope {
 	case ScopeGlobal:
 		// VariableSelector.cpp:1100 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewGlobal, nullptr)
 		if DepthGuardByType(vs.Opts, DtGenerateNewGlobal) == BadDepth {
 			return nil
 		}
+		// VariableSelector.cpp:1104–1107 — !is_random && GlobalList.empty → ERROR
+		// library random mode always has is_random; skip dfs_exhaustive invent
 		// VariableSelector.cpp:1108 — random_type_from_type(type) defaults
 		t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, false, false)
-		if t2 == nil {
+		// VariableSelector.cpp:1109 ERROR_GUARD
+		if t2 == nil || HasError() {
 			return nil
 		}
-		return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+		v = vs.GenerateNewGlobal(access, cg, t2, qfer, r)
 	case ScopeParentLocal:
 		// VariableSelector.cpp:1114–1115 — DEPTH_GUARD_BY_DEPTH for parent-local create
 		if DepthGuardByDepth(vs.Opts, MinimalDepth(DtGenerateNewParentLocal, 0)) == BadDepth {
@@ -2105,19 +2166,30 @@ func (vs *VariableSelector) GenerateNewVariable(
 			return nil
 		}
 		if cg.CurrentFunc != nil && len(cg.CurrentFunc.Stack) > 0 {
-			// VariableSelector.cpp:1118 — rnd_upto(func.stack.size())
+			// VariableSelector.cpp:1116–1117 — rnd_upto(func.stack.size()); ERROR_GUARD
 			blk := cg.CurrentFunc.Stack[r.RndUpto(uint32(len(cg.CurrentFunc.Stack)))]
-			// VariableSelector.cpp:1126 — random_type_from_type(type, true, false)
-			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
-			if t2 == nil {
+			if HasError() {
 				return nil
 			}
-			return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+			// VariableSelector.cpp:1126 — random_type_from_type(type, true, false)
+			t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
+			// VariableSelector.cpp:1127 ERROR_GUARD
+			if t2 == nil || HasError() {
+				return nil
+			}
+			v = vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+		} else {
+			// empty stack: C++ would rnd_upto(0); library → nil (no soft invent global)
+			return nil
 		}
-		// empty stack: C++ would rnd_upto(0); library → nil (no soft invent global)
-		return nil
 	default:
 		// only Global / ParentLocal from VariableCreationProbability
 		return nil
 	}
+	// VariableSelector.cpp:1135 ERROR_GUARD; 1136 var_created
+	if v == nil || HasError() {
+		return nil
+	}
+	vs.VarCreated = true
+	return v
 }

@@ -16,6 +16,36 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 	}
 }
 
+func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
+	// VariableSelector.cpp:98–105 — ParentParam filtered when param.empty()
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect())
+	// many draws with empty params: never ParentParam
+	for seed := uint64(1); seed < 80; seed++ {
+		sc := VariableSelectionProbabilityCG(NewRng(seed), opts, &cg, MaxVarScope)
+		if sc == ScopeParentParam {
+			t.Fatalf("seed %d: ParentParam with empty params", seed)
+		}
+		if sc == MaxVarScope {
+			t.Fatalf("seed %d: MAX scope", seed)
+		}
+	}
+	// with a param, ParentParam is allowed
+	f.Param = []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)}
+	seenParam := false
+	for seed := uint64(1); seed < 100; seed++ {
+		if VariableSelectionProbabilityCG(NewRng(seed), opts, &cg, MaxVarScope) == ScopeParentParam {
+			seenParam = true
+			break
+		}
+	}
+	if !seenParam {
+		t.Fatal("expected ParentParam when params present")
+	}
+}
+
 func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
