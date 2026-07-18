@@ -138,14 +138,18 @@ type Options struct {
 	PrefixName               bool
 	SequenceNamePrefix       bool
 	CompatibleCheck          bool
-	MathNoTmp                bool
-	StrictFloat              bool
-	WrapVolatiles            bool
-	AllowConstVolatile       bool
-	FunctionAttributes       bool
-	TypeAttributes           bool
-	LabelAttributes          bool
-	VariableAttributes       bool
+	// NullPointerDerefProb mirrors null_pointer_dereference_prob [0,100]; default 0.
+	NullPointerDerefProb int
+	// DeadPointerDerefProb mirrors dead_pointer_dereference_prob [0,100]; default 0.
+	DeadPointerDerefProb int
+	MathNoTmp            bool
+	StrictFloat          bool
+	WrapVolatiles        bool
+	AllowConstVolatile   bool
+	FunctionAttributes   bool
+	TypeAttributes       bool
+	LabelAttributes      bool
+	VariableAttributes   bool
 
 	StructOutput             string
 	DFSDebugSequence         string
@@ -188,7 +192,7 @@ func Defaults() Options {
 		MaxNestedStructLevel: 3,
 		// CGOptions::max_indirect_level = CGOPTIONS_DEFAULT_MAX_INDIRECT_LEVEL (5).
 		// Older residual-era default of 2 was wrong vs upstream.
-		MaxPointerDepth: 5,
+		MaxPointerDepth:      5,
 		MaxArrayDim:          3,
 		MaxArrayLenPerDim:    10,
 		MaxArrayLength:       256,
@@ -282,6 +286,8 @@ func Defaults() Options {
 		PrefixName:               false,
 		SequenceNamePrefix:       false,
 		CompatibleCheck:          false,
+		NullPointerDerefProb:     0,
+		DeadPointerDerefProb:     0,
 		MathNoTmp:                false,
 		StrictFloat:              false,
 		WrapVolatiles:            false,

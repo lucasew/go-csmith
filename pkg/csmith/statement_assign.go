@@ -96,6 +96,14 @@ func MakeRandomAssign(
 			rhs.CastType = typ
 		}
 	}
+	// StatementAssign.cpp:218–223 — CompatibleChecker rejects self-compatible assign
+	if CompatibleCheckExprVar(opts, lhs, rhs) {
+		// regenerate RHS once as constant to avoid COMPATIBLE_CHECK_ERROR path
+		rhs = &Expression{Term: TermConstant, Con: MakeRandom(typ, opts, r)}
+		if rhs.Con != nil {
+			rhs.CheckAndSetCast(typ)
+		}
+	}
 	st := Stmt{Kind: StmtAssign, LhsVar: lhs, Expr: rhs, AssignOp: op}
 	// if LHS is a pointer to be dereferenced, emit (*p) via ArrayAccess-style text
 	if lhs != nil && exprTy != nil && lhs.Type != nil {

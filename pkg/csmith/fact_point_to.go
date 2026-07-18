@@ -113,6 +113,41 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 	return fact.IsDead() && deadProb == 0
 }
 
+// OpportunisticValidate mirrors FactPointTo::opportunistic_validate.
+// FactPointTo.cpp:442–472 — 0 reject, 1 ok, 2 allowed unsafe deref via flipcoin.
+// r may be nil when both probs are 0 (deterministic reject on null/dead).
+func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
+	if v == nil || v.Type == nil || typ == nil {
+		return 0
+	}
+	// no extra indirection needed
+	if v.Type.IndirectLevel() <= typ.IndirectLevel() {
+		return 1
+	}
+	fp := FindRelatedPointTo(facts, v)
+	if fp == nil {
+		return 0
+	}
+	ret := 0
+	if fp.IsNull() {
+		if nullProb > 0 && r != nil && r.RndFlipcoin(uint32(nullProb)) {
+			ret = 2
+		} else {
+			return 0
+		}
+	} else {
+		ret = 1
+	}
+	if fp.IsDead() {
+		if deadProb > 0 && r != nil && r.RndFlipcoin(uint32(deadProb)) {
+			ret = 2
+		} else {
+			return 0
+		}
+	}
+	return ret
+}
+
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals (indirection≥0 subset).
 // FactPointTo.cpp:487–526 — indirection -1 → IsVisibleLocal; 0 → fact pointees local.
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {

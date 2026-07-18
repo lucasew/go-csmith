@@ -5,12 +5,12 @@ package csmith
 
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
-	AllVars                 []*Variable
-	GlobalList              []*Variable
-	GlobalNonvolatilesList  []*Variable
-	Sym                     GenSym
-	Opts                    Options
-	Probs                   *Probabilities
+	AllVars                []*Variable
+	GlobalList             []*Variable
+	GlobalNonvolatilesList []*Variable
+	Sym                    GenSym
+	Opts                   Options
+	Probs                  *Probabilities
 	// TmpCount is VariableSelector::tmp_count (incremented in GenerateNewGlobal).
 	TmpCount int
 	// VarCreated is VariableSelector::var_created.
@@ -131,6 +131,10 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	if v == nil {
 		return false
 	}
+	// VariableSelector.cpp:232–234 — partial volatile through pointer
+	if derefLevel > 0 && v.IsPartialVolatileAfterDeref(derefLevel) {
+		return false
+	}
 	eff := cg.EffectContext()
 	isConst := v.IsConstAfterDeref(derefLevel)
 	isVol := v.IsVolatileAfterDeref(derefLevel) || v.IsVolatile()
@@ -154,6 +158,27 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		return false
 	}
 	return true
+}
+
+// HasDereferenceableVar mirrors VariableSelector::has_dereferenceable_var.
+// VariableSelector.cpp:198–210 — type is_dereferenced_from + is_valid_ptr.
+func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
+	if typ == nil {
+		return false
+	}
+	var facts []*FactPointTo
+	if cg.FM != nil {
+		facts = cg.FM.GlobalFacts
+	}
+	for _, v := range vars {
+		if v == nil || v.Type == nil {
+			continue
+		}
+		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			return true
+		}
+	}
+	return false
 }
 
 // ChooseVar mirrors VariableSelector::choose_var type+eligibility filter.
@@ -254,7 +279,6 @@ func typesMatchExact(a, b *Type) bool {
 	}
 	return a.Match(b, MatchExact)
 }
-
 
 // createAndInitialize mirrors VariableSelector::create_and_initialize.
 // VariableSelector.cpp:518+ — NewArrayVariableProb flip → CreateArrayVariable.

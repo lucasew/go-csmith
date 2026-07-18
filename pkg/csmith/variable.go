@@ -207,6 +207,44 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 	return v.IsVolatile() && derefLevel == 0
 }
 
+// IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
+// Variable.cpp:541–558 — not fully volatile at level, but pointee is volatile struct/union.
+func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
+	if v == nil || derefLevel < 0 {
+		return false
+	}
+	// whole type volatile at this deref → not "partial"
+	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
+		return false
+	}
+	t := v.Type
+	for i := 0; i < derefLevel && t != nil; i++ {
+		t = t.PtrType()
+	}
+	if t != nil {
+		return t.IsVolatileStructUnion()
+	}
+	return false
+}
+
+// Compatible mirrors Variable::compatible.
+// Variable.cpp:878–886 — no volatiles; same ptr; expand_struct only non-fields.
+func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
+	if v == nil || other == nil {
+		return false
+	}
+	if v.IsVolatile() || other.IsVolatile() {
+		return false
+	}
+	if v == other {
+		return true
+	}
+	if expandStruct {
+		return !v.IsFieldVar() && !other.IsFieldVar()
+	}
+	return false
+}
+
 // IsPointer mirrors Variable::is_pointer.
 func (v *Variable) IsPointer() bool {
 	return v != nil && v.Type != nil && v.Type.PtrType() != nil

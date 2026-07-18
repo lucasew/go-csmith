@@ -41,6 +41,33 @@ type Expression struct {
 	CastType *Type
 }
 
+// CompatibleWithVar mirrors ExpressionVariable::compatible(Variable*).
+// ExpressionVariable.cpp:288–291 — var.compatible(v); non-variable terms false.
+func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
+	if e == nil || v == nil {
+		return false
+	}
+	if e.Term != TermVariable || e.Var == nil {
+		return false
+	}
+	return e.Var.Compatible(v, expandStruct)
+}
+
+// CompatibleWithExpr mirrors ExpressionVariable::compatible(Expression*).
+// ExpressionVariable.cpp:276–282 — exp.compatible(&var).
+func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
+	if e == nil || other == nil {
+		return false
+	}
+	if e.Term == TermVariable && e.Var != nil {
+		return other.CompatibleWithVar(e.Var, expandStruct)
+	}
+	if other.Term == TermVariable && other.Var != nil {
+		return e.CompatibleWithVar(other.Var, expandStruct)
+	}
+	return false
+}
+
 // CheckAndSetCast mirrors Expression::check_and_set_cast.
 // Expression.cpp:222–226 — lang_cpp or needs_cast; we apply when desired type needs cast.
 func (e *Expression) CheckAndSetCast(desired *Type) {
@@ -280,7 +307,6 @@ func MakeRandomExpression(
 	}
 }
 
-
 // makeExpressionVariable — ExpressionVariable.cpp:56+ :
 // VariableSelector::select(READ, type, qfer, eFlexible); as_param / as_return filters.
 func makeExpressionVariable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, qfer *CVQualifiers) *Expression {
@@ -326,6 +352,12 @@ func makeExpressionVariableFlags(
 					facts = cg.FM.GlobalFacts
 				}
 				if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
+					continue
+				}
+			}
+			// ExpressionVariable.cpp:118–119 — opportunistic_validate when FactMgr present
+			if cg.FM != nil && v.Type.IndirectLevel() > typ.IndirectLevel() {
+				if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
 					continue
 				}
 			}
