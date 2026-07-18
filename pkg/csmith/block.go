@@ -281,7 +281,8 @@ func MakeRandomBlock(
 		return nil
 	}
 	max := BlockProbability(b.blockSize, r)
-	cg.BlkDepth++
+	// Note: blk_depth is bumped in Statement::make_random for compound stmts
+	// (Statement.cpp:267–269), not when entering Block::make_random.
 	// Running effect accum for this block (side-effect / no_volatile for SelectLType)
 	if cg.EffectAccum == nil {
 		eff := EmptyEffect()
@@ -342,7 +343,6 @@ func MakeRandomBlock(
 		b.StmID = AllocStmID()
 	}
 	b.PostCreationAnalysis(&cg, opts, preEffect, r, vs)
-	cg.BlkDepth--
 	if f != nil && len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
 	}
@@ -456,49 +456,71 @@ func makeRandomStmt(
 		if !ExpandCheck(k) {
 			return true
 		}
+		// Statement.cpp:164–166 — eBlock always filtered
 		if k == StmtBlock {
 			return true
 		}
-		if (k == StmtBreak || k == StmtContinue) && !cg.InLoop() {
-			return true
-		}
-		if cg.BlkDepth >= opts.MaxBlockDepth && IsCompound(k) {
-			return true
-		}
-		// void return type → reject Return
+		// Statement.cpp:167–169 — void functions cannot return
 		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil &&
 			cg.CurrentFunc.ReturnType.IsSimple() && cg.CurrentFunc.ReturnType.Simple() == EVoid {
 			return true
 		}
-		// Statement.cpp:172–178 — at max funcs, filter out Invoke (no new calls)
-		if k == StmtInvoke && ReachMaxFunctions(cg.Funcs, opts) {
+		// Statement.cpp:171–173 — break/continue only in loops
+		if (k == StmtBreak || k == StmtContinue) && !cg.InLoop() {
 			return true
+		}
+		// Statement.cpp:176–178 — max nesting: filter compounds
+		if cg.BlkDepth >= opts.MaxBlockDepth {
+			return IsCompound(k)
+		}
+		// Statement.cpp:179–183 — at max funcs: filter only Invoke (allow others)
+		if ReachMaxFunctions(cg.Funcs, opts) {
+			return k == StmtInvoke
 		}
 		return false
 	})
-	// retry failed factories (null Statement* upstream)
+	// retry failed factories (null Statement* upstream) — Statement.cpp:314–316
 	for tries := 0; tries < 6; tries++ {
+		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
+		cg.EffectStm = EmptyEffect()
+		cg.ExprDepth = 0
 		kind := StatementProbabilityFilter(r, stmtTab, f)
 		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
 		if opts.StopByStmt >= 0 && nextStmID >= opts.StopByStmt {
 			kind = StmtReturn
 		}
-		// Statement.cpp: pre_facts / pre_effect snapshot before make
+		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
 		var preFacts []*FactPointTo
 		if cg.FM != nil {
 			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		}
-		preEffect := cg.EffectStm
+		preEffect := EmptyEffect()
+		if cg.EffectAccum != nil {
+			preEffect = cg.EffectAccum.Clone()
+		}
+		// Statement.cpp:267–269 / 306–308 — compound stmts bump blk_depth around factory
+		if IsCompound(kind) {
+			cg.BlkDepth++
+		}
 		st := makeRandomStmtKind(r, opts, probs, vs, tables, stmtTab, cg, b, kind)
+		if IsCompound(kind) {
+			cg.BlkDepth--
+		}
 		if stmtOK(st) {
-			// Statement.cpp:320 — post_creation_analysis
+			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
 			PostCreationAnalysis(&st, preFacts, preEffect, &cg)
 			return st
 		}
 	}
 	// last resort: assignment (always producible)
+	cg.EffectStm = EmptyEffect()
+	cg.ExprDepth = 0
 	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
-	PostCreationAnalysis(&st, nil, EmptyEffect(), &cg)
+	preEffect := EmptyEffect()
+	if cg.EffectAccum != nil {
+		preEffect = cg.EffectAccum.Clone()
+	}
+	PostCreationAnalysis(&st, nil, preEffect, &cg)
 	return st
 }
 
