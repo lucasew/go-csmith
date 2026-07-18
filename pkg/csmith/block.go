@@ -359,7 +359,7 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
 		}
 	}
-	// collect local arrays needing loop init (OutputVariableList order)
+	// OutputVariableList(local_vars) — Variable.cpp Output
 	var loopInits []*ArrayVariable
 	maxDim := 0
 	for _, lv := range b.LocalVars {
@@ -367,33 +367,30 @@ func (b *Block) Output(indent int) string {
 			continue
 		}
 		sb.WriteString(inner)
-		if lv.IsArray && len(lv.ArraySizes) > 0 {
-			av := &ArrayVariable{
-				Variable:   *lv,
-				Sizes:      lv.ArraySizes,
-				InitValues: lv.ArrayInits,
-			}
-			sb.WriteString(av.OutputDef())
-			sb.WriteString("\n")
-			if !av.NoLoopInitializer() {
-				loopInits = append(loopInits, av)
-				if len(av.Sizes) > maxDim {
-					maxDim = len(av.Sizes)
+		if lv.IsArray {
+			av := lv.AsArray
+			if av == nil && len(lv.ArraySizes) > 0 {
+				av = &ArrayVariable{
+					Variable:   *lv,
+					Sizes:      lv.ArraySizes,
+					InitValues: lv.ArrayInits,
 				}
 			}
-			continue
+			if av != nil {
+				sb.WriteString(av.OutputDef())
+				sb.WriteString("\n")
+				if !av.NoLoopInitializer() {
+					loopInits = append(loopInits, av)
+					if len(av.Sizes) > maxDim {
+						maxDim = len(av.Sizes)
+					}
+				}
+				continue
+			}
 		}
-		if lv.IsConst() {
-			sb.WriteString("const ")
-		}
-		if lv.IsVolatile() {
-			sb.WriteString("volatile ")
-		}
-		sb.WriteString(lv.Type.CName() + " " + lv.Name)
-		if lv.Init != nil {
-			sb.WriteString(" = " + lv.Init.Value)
-		}
-		sb.WriteString(";\n")
+		// Variable::Output for locals (no force static)
+		sb.WriteString(lv.OutputDef(false))
+		sb.WriteString("\n")
 	}
 	// OutputArrayInitializers for locals without brace init
 	// Variable.cpp:829–841

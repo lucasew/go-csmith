@@ -3,6 +3,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // BuildState mirrors Function::BuildState.
 // Function.h:158–163.
 type BuildState int
@@ -322,38 +324,52 @@ func (f *Function) GenerateBody(
 	f.markBuilt()
 }
 
+// returnTypeC is qualified return type (from RV qfer when present).
+func (f *Function) returnTypeC() string {
+	if f == nil {
+		return "void"
+	}
+	if f.RV != nil && f.RV.Type != nil {
+		return f.RV.Qfer.OutputQualifiedType(f.RV.Type)
+	}
+	if f.ReturnType != nil {
+		return f.ReturnType.CName()
+	}
+	return "void"
+}
+
+// paramListC emits parameter list with qualified types.
+func (f *Function) paramListC() string {
+	if f == nil || len(f.Param) == 0 {
+		return "void"
+	}
+	var b strings.Builder
+	for i, p := range f.Param {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		if p != nil && p.Type != nil {
+			b.WriteString(p.Qfer.OutputQualifiedType(p.Type))
+			b.WriteString(" ")
+			b.WriteString(p.Name)
+		}
+	}
+	return b.String()
+}
+
 // OutputForwardDecl emits a C prototype.
 func (f *Function) OutputForwardDecl() string {
 	if f == nil {
 		return ""
 	}
-	ret := "void"
-	if f.ReturnType != nil {
-		ret = f.ReturnType.CName()
-	}
-	s := ret + " " + f.Name + "("
-	for i, p := range f.Param {
-		if i > 0 {
-			s += ", "
-		}
-		if p != nil && p.Type != nil {
-			s += p.Type.CName() + " " + p.Name
-		}
-	}
-	if len(f.Param) == 0 {
-		s += "void"
-	}
-	return s + ");"
+	s := f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ");"
+	return s
 }
 
 // Output emits a C function definition (minimal statements).
 func (f *Function) Output() string {
 	if f == nil {
 		return ""
-	}
-	ret := "void"
-	if f.ReturnType != nil {
-		ret = f.ReturnType.CName()
 	}
 	s := ""
 	// Function.cpp:568–570 — feffect.Output when !concise
@@ -363,26 +379,7 @@ func (f *Function) Output() string {
 	if f.IsInlined {
 		s += "inline "
 	}
-	s += ret + " " + f.Name + "("
-	for i, p := range f.Param {
-		if i > 0 {
-			s += ", "
-		}
-		if p != nil && p.Type != nil {
-			// output first quals simply
-			if p.IsConst() {
-				s += "const "
-			}
-			if p.IsVolatile() {
-				s += "volatile "
-			}
-			s += p.Type.CName() + " " + p.Name
-		}
-	}
-	if len(f.Param) == 0 {
-		s += "void"
-	}
-	s += ")\n"
+	s += f.returnTypeC() + " " + f.Name + "(" + f.paramListC() + ")\n"
 	// Function.cpp:575–598 — depth_protect wraps body
 	if f.DepthProtect {
 		s += "if (DEPTH < MAX_DEPTH) \n"
