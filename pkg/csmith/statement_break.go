@@ -33,11 +33,8 @@ func MakeRandomBreak(
 	if st.StmID == 0 {
 		st.StmID = AllocStmID()
 	}
-	// Block::break_stms.push_back (StatementBreak.cpp:81)
+	// StatementBreak.cpp:81 — b->break_stms.push_back only
+	// CFG edges created in StatementFor::post_loop_analysis (for-stmt dest), not here
 	loop.BreakStmIDs = append(loop.BreakStmIDs, st.StmID)
-	// break exits to after loop — post_dest true, back_link false (common shape)
-	if cg.FM != nil {
-		cg.FM.CreateCFGEdge(st.StmID, loop, true, false)
-	}
 	return st
 }

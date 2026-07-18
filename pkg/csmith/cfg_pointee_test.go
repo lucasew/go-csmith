@@ -67,10 +67,13 @@ func TestBreakContinueCFGEdges(t *testing.T) {
 			t.Fatalf("break_stms loop=%v inner=%v", loop.BreakStmIDs, inner.BreakStmIDs)
 		}
 	}
-	if len(fm.CFGEdges) < 1 {
-		t.Fatal("no edge")
+	// StatementBreak.cpp — no create_cfg_edge at make; post_loop_analysis owns edges
+	for _, e := range fm.CFGEdges {
+		if e != nil && e.SrcID == br.StmID {
+			t.Fatal("break make must not invent CFG edge")
+		}
 	}
-	// continue
+	// continue still creates edge at make (StatementContinue.cpp:83)
 	fm2 := NewFactMgr(f)
 	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
 	inner.Stmts = []Stmt{{Kind: StmtAssign}}

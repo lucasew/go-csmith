@@ -281,20 +281,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
 		}
-		// StatementFor.cpp:460–466 — find_edges_in(true, false) on this for stmt
+		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
+		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
+		// no soft invent merge from edges to body block
 		if st.StmID > 0 {
 			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
-				if e == nil {
-					continue
-				}
-				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-					MergeJumpFacts(&cg.FM.GlobalFacts, out)
-				}
-			}
-		}
-		// also breaks targeting body block (CreateCFGEdge to looping block)
-		if st.Then != nil {
-			for _, e := range cg.FM.FindEdgesInToBlock(st.Then, true, false) {
 				if e == nil {
 					continue
 				}
@@ -401,6 +392,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
 			// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
+			// no soft invent merge from edges to body block
 			if st.StmID > 0 {
 				for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
 					if e == nil {
@@ -409,15 +401,6 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 					if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
 						MergeJumpFacts(&cg.FM.GlobalFacts, out)
 					}
-				}
-			}
-			// breaks targeting body block (looping CreateCFGEdge dest)
-			for _, e := range cg.FM.FindEdgesInToBlock(inner.Then, true, false) {
-				if e == nil {
-					continue
-				}
-				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-					MergeJumpFacts(&cg.FM.GlobalFacts, out)
 				}
 			}
 			// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block

@@ -144,3 +144,37 @@ func TestGenerateEmitsIfBreakOrContinue(t *testing.T) {
 		t.Log("break/continue rare in sample seeds")
 	}
 }
+
+func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
+	// StatementBreak.cpp:79–81 — only break_stms push; edges in post_loop_analysis
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	loop := &Block{Func: f, Looping: true}
+	inner := &Block{Func: f, Parent: loop, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1, LhsVar: g, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+	}}
+	f.Stack = []*Block{loop, inner}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.Types = vs.Types
+	// force variable term with existing global
+	st := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), &cg)
+	if st.Expr == nil {
+		t.Skip("break expr nil")
+	}
+	if len(loop.BreakStmIDs) != 1 {
+		t.Fatalf("break_stms %v", loop.BreakStmIDs)
+	}
+	// no CFG edge invented at make time
+	for _, e := range fm.CFGEdges {
+		if e != nil && e.SrcID == st.StmID {
+			t.Fatal("break must not CreateCFGEdge in make_random", e)
+		}
+	}
+}

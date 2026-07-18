@@ -93,18 +93,25 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
 		return nil
 	}
+	// StatementGoto.cpp:286–290 — climb dest->parent … until src
+	reachedSrc := false
+	var intermediate []*Variable
+	for b := destParent; b != nil; b = b.Parent {
+		if b == src {
+			reachedSrc = true
+			break
+		}
+		intermediate = append(intermediate, b.LocalVars...)
+	}
 	var skipped []*Variable
-	// walk dest ancestors until src
-	for b := destParent; b != nil && b != src; b = b.Parent {
-		for _, v := range b.LocalVars {
-			if v == nil {
-				continue
-			}
-			// b==src handled by loop exit; all locals in intermediate blocks skipped
-			// when not visible in src
-			if src == nil || !v.IsVisibleLocal(src) {
-				skipped = append(skipped, v)
-			}
+	for _, v := range intermediate {
+		if v == nil {
+			continue
+		}
+		// StatementGoto.cpp:296–304 — after climb b==src → all intermediate skipped;
+		// else !is_visible_local(src)
+		if reachedSrc || src == nil || !v.IsVisibleLocal(src) {
+			skipped = append(skipped, v)
 		}
 	}
 	return skipped
@@ -156,7 +163,7 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 	if r == nil || len(blocks) == 0 {
 		return nil
 	}
-	// StatementGoto.cpp:314–320
+	// StatementGoto.cpp:314–324
 	if curr != nil {
 		if curr.InArrayLoop && !asDest {
 			return nil
@@ -170,25 +177,30 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 			}
 		}
 	}
-	// work on a mutable copy
+	// work on a mutable copy (C++ mutates vector in place via erase)
 	blks := append([]*Block(nil), blocks...)
 	for len(blks) > 0 {
 		idx := int(r.RndUpto(uint32(len(blks))))
+		// StatementGoto.cpp:326 ERROR_GUARD
+		if HasError() {
+			return nil
+		}
 		b := blks[idx]
 		if b == nil {
 			blks = append(blks[:idx], blks[idx+1:]...)
 			continue
 		}
-		// disallow array-loop dest
+		// StatementGoto.cpp:328–331 — disallow array-loop dest
 		if b.InArrayLoop && asDest {
 			blks = append(blks[:idx], blks[idx+1:]...)
 			continue
 		}
+		// StatementGoto.cpp:333–336 — empty stms
 		if len(b.Stmts) == 0 {
 			blks = append(blks[:idx], blks[idx+1:]...)
 			continue
 		}
-		// sole return cannot be jump source
+		// StatementGoto.cpp:339–343 — sole return cannot be jump source
 		if !asDest && len(b.Stmts) == 1 && b.Stmts[0].Kind == StmtReturn {
 			blks = append(blks[:idx], blks[idx+1:]...)
 			continue
@@ -196,15 +208,14 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		if b == curr {
 			return b
 		}
-		// skipped locals between blocks
+		// StatementGoto.cpp:348–352 — has_init_skipped_vars(src, dest_stmt)
+		// as_dest: (curr, b.stms[0]); !as_dest: (b, curr.stms[0])
 		if asDest {
-			// jump from curr into b
-			if curr != nil && len(b.Stmts) > 0 && HasInitSkippedVars(curr, b) {
+			if curr != nil && HasInitSkippedVars(curr, b) {
 				blks = append(blks[:idx], blks[idx+1:]...)
 				continue
 			}
 		} else {
-			// jump from b into curr
 			if curr != nil && len(curr.Stmts) > 0 && HasInitSkippedVars(b, curr) {
 				blks = append(blks[:idx], blks[idx+1:]...)
 				continue
