@@ -57,7 +57,7 @@ func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	good := &Function{Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// context already wrote g → bad conflicts
 	cg := WithEffectContext(EmptyEffect().WriteVar(g))
-	got := ChooseFuncContext(NewRng(2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults())
+	got := ChooseFuncContext(NewRng(2), []*Function{bad, good}, GetIntType(), nil, &cg, Defaults(), nil)
 	if got != good {
 		t.Fatalf("got %v", got)
 	}

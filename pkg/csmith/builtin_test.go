@@ -127,7 +127,7 @@ func TestChooseFuncCanPickBuiltin(t *testing.T) {
 	opts.BuiltinFunctionProb = 100
 	bi := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true, BuildState: BuildBuilt, IsBuilt: true}
 	user := &Function{Name: "func_1", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
-	got := ChooseFuncContext(NewRng(3), []*Function{user, bi}, GetIntType(), nil, nil, opts)
+	got := ChooseFuncContext(NewRng(3), []*Function{user, bi}, GetIntType(), nil, nil, opts, nil)
 	if got != bi {
 		t.Fatalf("want builtin got %v", got)
 	}

@@ -58,3 +58,27 @@ func contains(s, sub string) bool {
 			return false
 		})())
 }
+
+func TestChooseFuncContextQferWildcard(t *testing.T) {
+	// Function.cpp:294–295 — qfer when set; Wildcard accepts any RV qfer
+	good := &Function{
+		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		RV:      &Variable{Name: "good_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{true})},
+		FEffect: EmptyEffect(),
+	}
+	wild := NewCVQualifiers([]bool{false}, []bool{false})
+	wild.Wildcard = true
+	got := ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &wild)
+	if got != good {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestChooseFuncUsesIsConvertable(t *testing.T) {
+	// Function.cpp:288–289 — is_convertable (short → int return ok)
+	f := &Function{Name: "f", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}
+	got := ChooseFuncContext(NewRng(1), []*Function{f}, GetSimpleType(EShort), nil, nil, Defaults(), nil)
+	if got != f {
+		t.Fatal("short should convert via is_convertable to int return")
+	}
+}

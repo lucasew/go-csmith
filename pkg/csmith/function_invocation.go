@@ -203,23 +203,31 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 // Function.cpp:279+ — skip unbuilt, builtins, effect conflict with context.
 // cg may be nil (no conflict filter).
 func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Function {
-	return ChooseFuncContext(r, funcs, ret, exclude, nil, Options{})
+	return ChooseFuncContext(r, funcs, ret, exclude, nil, Options{}, nil)
 }
 
 // ChooseFuncContext is ChooseFunc with CGContext for in_conflict / strict_volatile.
 // Function.cpp:279–340 — separate user vs builtin pools; BuiltinFunctionProb pick.
-func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options) *Function {
+// qfer when non-nil must match callee RV qualifiers (Function.cpp:294–295).
+func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options, qfer *CVQualifiers) *Function {
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
 		if f == nil || f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
-		if ret != nil && f.ReturnType != nil && !ret.Match(f.ReturnType, MatchConvert) {
+		// Function.cpp:288–289 — type->is_convertable(return_type)
+		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
 			continue
 		}
 		if ret != nil && f.ReturnType == nil {
 			continue
+		}
+		// Function.cpp:294–295 — qfer->match(rv->qfer)
+		if qfer != nil && f.RV != nil && !qfer.Wildcard {
+			if !qfer.Match(f.RV.Qfer, false) {
+				continue
+			}
 		}
 		// Function.cpp:303–306 — in_conflict with callee feffect
 		if cg != nil && cg.InConflict(f.FEffect) {
@@ -231,10 +239,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				continue
 			}
 		}
-		// Function.cpp:318–321 — has_race_with (optional, often commented; we apply)
-		if cg != nil && f.FEffect.HasRaceWith(cg.EffectContext()) {
-			continue
-		}
+		// Function.cpp:318–326 — has_race_with is commented out upstream; do not filter
 		if f.IsBuiltin {
 			if opts.Builtins {
 				okBuiltin = append(okBuiltin, f)
@@ -885,7 +890,6 @@ func MakeRandomInvocation(
 	qfer *CVQualifiers,
 	stdFunc bool,
 ) *Invocation {
-	_ = qfer
 	// Match type for choose_func: nil means any return type (C++ type=0).
 	matchType := typ
 	// Concrete type for std ops / new signatures.
@@ -903,9 +907,9 @@ func MakeRandomInvocation(
 		var callee *Function
 		// FunctionInvocation.cpp:87 — pure_rnd_flipcoin(50) (random mode == rnd)
 		if r.RndFlipcoin(50) && list != nil {
-			// Function.cpp:choose_func with in_conflict / strict_volatile
+			// Function.cpp:choose_func with in_conflict / strict_volatile / qfer
 			cgp := &cg
-			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cgp, opts)
+			callee = ChooseFuncContext(r, list.Funcs, matchType, cg.CurrentFunc, cgp, opts, qfer)
 		}
 		if callee != nil {
 			fi = BuildUserInvocation(r, opts, probs, vs, tables, cg, list, callee)
