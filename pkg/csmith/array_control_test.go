@@ -115,6 +115,25 @@ func TestCombineVariableSets(t *testing.T) {
 	}
 }
 
+func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {
+	// StatementFor.cpp:319+ — select_array used; no soft invent fewer arrays by skipping nil
+	opts := Defaults()
+	opts.MaxArrayNumInLoop = 3
+	opts.GlobalVariables = false // CreateRandomArray needs stack for local
+	vs := NewVariableSelector(opts)
+	// no Types env → CreateRandomArray fails closed
+	vs.Types = nil
+	vs.Arrays = nil
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	// empty stack → CreateRandomArray cannot invent local array
+	cg := WithFunc(f, EmptyEffect())
+	ClearError()
+	st := MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	if st != nil {
+		t.Fatal("nil select_array must fail closed whole array-loop, not soft-skip slots")
+	}
+}
+
 func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 	opts := Defaults()
 	opts.MaxArrayNumInLoop = 4

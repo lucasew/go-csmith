@@ -279,4 +279,15 @@ func TestIsConstAfterDeref(t *testing.T) {
 	if !q.IsVolatileAfterDeref(0) {
 		t.Fatal("deref0 vol storage true")
 	}
+	// CVQualifiers.cpp:569/578 — assert OOB; fail closed as const/vol (not soft non-const)
+	if !q.IsConstAfterDeref(5) {
+		t.Fatal("OOB deref must fail closed as const")
+	}
+	if !q.IsVolatileAfterDeref(5) {
+		t.Fatal("OOB deref must fail closed as volatile")
+	}
+	// empty qfer remains non-const (zero-value)
+	if (CVQualifiers{}).IsConstAfterDeref(0) {
+		t.Fatal("empty qfer not const")
+	}
 }

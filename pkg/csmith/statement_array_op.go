@@ -101,18 +101,17 @@ func MakeRandomArrayLoop(
 	var avs []*ArrayVariable
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, *cg)
-		// select_array may ERROR_GUARD
-		if HasError() {
+		// StatementFor.cpp:319–328 — select_array then always use av; ERROR_GUARD sticky
+		// no soft invent fewer arrays by skipping nil (was continue + burn RndUpto)
+		if HasError() || av == nil {
 			return nil
-		}
-		if av == nil {
-			// still burn access RNG for stream parity when select returns nil? upstream always gets av
-			_ = r.RndUpto(3)
-			continue
 		}
 		avs = append(avs, av)
 		// access: 0 = must read, 1 = must write, 2 = both
 		access := int(r.RndUpto(3))
+		if HasError() {
+			return nil
+		}
 		if access == 0 || access == 2 {
 			AddVariableToSet(&mustReads, &av.Variable)
 		}

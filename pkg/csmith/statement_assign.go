@@ -350,7 +350,7 @@ func makePossibleCompoundAssign(
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
 		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
-		if flags == nil {
+		if flags == nil || HasError() {
 			return Stmt{Kind: StmtAssign}
 		}
 		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}

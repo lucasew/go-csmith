@@ -33,25 +33,36 @@ func (q CVQualifiers) IsVolatile() bool {
 }
 
 // IsConstAfterDeref mirrors CVQualifiers::is_const_after_deref.
+// CVQualifiers.cpp:564–570 — assert(len > deref_level); OOB is broken IR.
 func (q CVQualifiers) IsConstAfterDeref(derefLevel int) bool {
 	if derefLevel < 0 {
 		return false
 	}
 	lenC := len(q.IsConsts)
-	if lenC <= derefLevel {
+	// zero-value qfer (no storage slot): not const; C++ live vars always have ≥1 level
+	if lenC == 0 {
 		return false
+	}
+	// assert(len > deref_level) fail-closed as const (no soft invent non-const WRITE)
+	if lenC <= derefLevel {
+		return true
 	}
 	return q.IsConsts[lenC-derefLevel-1]
 }
 
 // IsVolatileAfterDeref mirrors CVQualifiers::is_volatile_after_deref.
+// CVQualifiers.cpp:573–585 — assert(len > deref_level); OOB is broken IR.
 func (q CVQualifiers) IsVolatileAfterDeref(derefLevel int) bool {
 	if derefLevel < 0 {
 		return false
 	}
 	lenV := len(q.IsVolatiles)
-	if lenV <= derefLevel {
+	if lenV == 0 {
 		return false
+	}
+	// assert fail-closed as volatile (no soft invent non-vol access)
+	if lenV <= derefLevel {
+		return true
 	}
 	return q.IsVolatiles[lenV-derefLevel-1]
 }
