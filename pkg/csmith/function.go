@@ -86,12 +86,11 @@ type FunctionList struct {
 }
 
 // RandomFunctionName mirrors Function.cpp RandomFunctionName → gensym("func_").
-// Function.cpp:249 — gensym uses process-wide counter; no soft invent private GenSym{}.
+// Function.cpp:249 — util.cpp gensym_count is process-wide; sym is ignored
+// (no invent private GenSym counter desynced from g_/t_).
 func RandomFunctionName(sym *GenSym) string {
-	if sym == nil {
-		return Gensym("func_")
-	}
-	return sym.Next("func_")
+	_ = sym
+	return Gensym("func_")
 }
 
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.

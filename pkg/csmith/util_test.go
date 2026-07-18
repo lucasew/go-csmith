@@ -20,8 +20,19 @@ func TestGensymSequence(t *testing.T) {
 	}
 }
 
+func TestDoFinalizationResetsGensym(t *testing.T) {
+	// DFSProgramGenerator.cpp:92 reset_gensym between runs
+	ResetDefaultGensym()
+	_ = Gensym("g_")
+	DoFinalization()
+	if Gensym("g_") != "g_1" {
+		t.Fatal("DoFinalization must reset process gensym_count")
+	}
+}
+
 func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
-	// Block.cpp:216–219 — gensym("t_"); no len(TmpVars) soft invent
+	// Block.cpp:216–219 — always gensym("t_") process-wide; ignore private GenSym
+	ResetDefaultGensym()
 	var sym GenSym
 	b := &Block{}
 	a := b.CreateNewTmpVar(&sym, EInt)
@@ -32,14 +43,14 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	if b.TmpVars[a] != EInt || b.TmpVars[c] != EShort {
 		t.Fatal(b.TmpVars)
 	}
-	// nil GenSym uses package util counter (not soft t_+len restarting at 1)
-	ResetDefaultGensym()
+	// private GenSym must not invent separate stream
 	x := b.CreateNewTmpVar(nil, EInt)
-	y := b.CreateNewTmpVar(nil, EInt)
-	if x == y {
-		t.Fatal("nil GenSym must advance package gensym", x, y)
+	y := b.CreateNewTmpVar(&sym, EInt)
+	if x != "t_3" || y != "t_4" {
+		t.Fatalf("process gensym sequence %q %q", x, y)
 	}
-	if x != "t_1" || y != "t_2" {
-		t.Fatalf("package gensym sequence %q %q", x, y)
+	// g_/t_ share one util.cpp gensym_count
+	if Gensym("g_") != "g_5" {
+		t.Fatal("shared counter with RandomGlobalName path")
 	}
 }

@@ -38,18 +38,20 @@ func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelec
 }
 
 // RandomGlobalName mirrors VariableSelector.cpp RandomGlobalName → gensym("g_").
+// util.cpp gensym_count is process-wide (shared with t_/func_/lbl_); no invent
+// private VS.Sym counter that desyncs from create_new_tmp_var.
 func (vs *VariableSelector) RandomGlobalName() string {
-	return vs.Sym.Next("g_")
+	return Gensym("g_")
 }
 
 // RandomLocalName mirrors RandomLocalName → gensym("l_").
 func (vs *VariableSelector) RandomLocalName() string {
-	return vs.Sym.Next("l_")
+	return Gensym("l_")
 }
 
 // RandomParamName mirrors RandomParamName → gensym("p_").
 func (vs *VariableSelector) RandomParamName() string {
-	return vs.Sym.Next("p_")
+	return Gensym("p_")
 }
 
 // ChooseVisibleReadVar mirrors VariableSelector::choose_visible_read_var.

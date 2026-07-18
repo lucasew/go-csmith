@@ -6,9 +6,15 @@ import (
 )
 
 func TestRandomFunctionName(t *testing.T) {
-	var g GenSym
-	if RandomFunctionName(&g) != "func_1" || RandomFunctionName(&g) != "func_2" {
+	// Function.cpp:249 — util.cpp gensym process-wide; private GenSym ignored
+	ResetDefaultGensym()
+	if RandomFunctionName(nil) != "func_1" || RandomFunctionName(nil) != "func_2" {
 		t.Fatal("func gensym")
+	}
+	// private GenSym must not invent a separate stream
+	var g GenSym
+	if RandomFunctionName(&g) != "func_3" {
+		t.Fatal("must use process gensym, not private GenSym")
 	}
 }
 

@@ -381,11 +381,9 @@ func MakeRandomGoto(
 		return makeGotoFailed()
 	}
 
+	// util.cpp gensym_count process-wide; no invent VS.Sym private or fixed "lbl_1"
 	nextLab := func() string {
-		if vs != nil {
-			return vs.Sym.Next("lbl_")
-		}
-		return "lbl_1"
+		return Gensym("lbl_")
 	}
 
 	if backEdge {

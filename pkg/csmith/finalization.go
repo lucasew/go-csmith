@@ -30,6 +30,9 @@ func DoFinalization() {
 	GotoLabelsDoFinalization()
 	// Statement sid
 	nextStmID = 0
+	// util.cpp reset_gensym — process gensym_count (DFSProgramGenerator.cpp:92)
+	// DefaultProgramGenerator process is one-shot; library multi-Generate needs reset
+	ResetDefaultGensym()
 	// Probabilities::DestroyInstance — session Probs, no process singleton
 	// RandomNumber::doFinalization — session Rng
 	// Error state

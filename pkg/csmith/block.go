@@ -211,16 +211,13 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 }
 
 // CreateNewTmpVar mirrors Block::create_new_tmp_var.
-// Block.cpp:216–219 — always gensym("t_") (util.cpp global counter); no
-// len(TmpVars) soft names when GenSym is nil.
+// Block.cpp:216–219 — always gensym("t_") (util.cpp process-wide gensym_count);
+// no invent VS.Sym private counter (that desynced t_ from g_/l_/func_).
+// sym is ignored; kept for call-site compatibility.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
+	_ = sym
 	// Block.cpp:217 — const string var_name = gensym("t_");
-	name := ""
-	if sym != nil {
-		name = sym.Next("t_")
-	} else {
-		name = Gensym("t_")
-	}
+	name := Gensym("t_")
 	if b == nil {
 		return name
 	}

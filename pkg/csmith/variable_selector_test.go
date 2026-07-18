@@ -44,6 +44,7 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 
 func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	// GenerateNewGlobal: gensym g_1, push GlobalList, random_qualifiers draws.
+	ResetDefaultGensym()
 	opts := Defaults()
 	// force scalar path — NewArrayVariableProb can flip to array (collective+member on list)
 	opts.Arrays = false
@@ -70,6 +71,7 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 
 func TestSelectGlobalEmptyCreates(t *testing.T) {
 	// SelectGlobal empty → GenerateNewGlobal
+	ResetDefaultGensym()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
