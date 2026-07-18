@@ -53,6 +53,15 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	}
 }
 
+// testForInit builds a simple StatementAssign init (StatementFor always has live init).
+func testForInit(iv *Variable, n int) *Stmt {
+	return &Stmt{
+		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(n), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
+}
+
 func TestVisitFactsStatementForIV(t *testing.T) {
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	// body tries to write IV — should fail VisitFactsStatementAssign inside
@@ -62,7 +71,10 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 	}}}
 	st := Stmt{
 		Kind: StmtFor,
-		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 10, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
 		Then: body,
 	}
 	cg := EmptyCGContext()
@@ -71,6 +83,22 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 	// visit should fail because IV write in body
 	if VisitFactsStatementFor(&st, &cg, Defaults()) {
 		t.Fatal("expected IV write reject")
+	}
+}
+
+func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
+	// StatementFor.cpp always has init StatementAssign — no soft invent from InitN
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	st := Stmt{
+		Kind: StmtFor,
+		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1},
+		Then: &Block{},
+	}
+	cg := EmptyCGContext()
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if VisitFactsStatementFor(&st, &cg, Defaults()) {
+		t.Fatal("expected fail without InitStmt")
 	}
 }
 
@@ -184,7 +212,10 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, b)})
 	st := &Stmt{
 		Kind: StmtFor, StmID: 10,
-		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 3, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
 		Then: body,
 	}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -227,7 +258,10 @@ func TestVisitFactsStatementForMustReturnRestoresPostInit(t *testing.T) {
 	}}
 	st := &Stmt{
 		Kind: StmtFor, StmID: 11,
-		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 2, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
 		Then: body,
 	}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
@@ -254,7 +288,10 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	body := &Block{StmID: 40, Func: f, Looping: true}
 	st := &Stmt{
 		Kind: StmtFor, StmID: 12,
-		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 1, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd},
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 1, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
 		Then: body,
 	}
 	// break edge into for (post_dest)

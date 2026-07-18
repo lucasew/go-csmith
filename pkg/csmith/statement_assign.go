@@ -516,44 +516,9 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			b.WriteString(")")
 			return b.String()
 		default:
-			// other compound: try generic safe rewrite
-			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok {
-				opStr := bop.BinaryOpC()
-				fname := st.SafeFlags.BinaryFuncName(opStr)
-				if fname != "" {
-					id := SafeOpFlagsToID(fname)
-					if !SafeMathWrapperAllowed(opts, id) {
-						return OutputAssignSimple(st, wrapVol)
-					}
-					var b strings.Builder
-					b.WriteString(lhs)
-					b.WriteString(" = ")
-					b.WriteString(fname)
-					b.WriteString("(")
-					if opts.MathNoTmp && st.Tmp1 != "" {
-						b.WriteString(st.Tmp1 + ", ")
-					}
-					b.WriteString(lhs + ", ")
-					if opts.MathNoTmp && st.Tmp2 != "" {
-						b.WriteString(st.Tmp2 + ", ")
-					}
-					switch st.AssignOp {
-					case AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
-						if opts.MarkMutableConst {
-							b.WriteString("(1)")
-						} else {
-							b.WriteString("1")
-						}
-					default:
-						b.WriteString(rhs)
-					}
-					if opts.IdentifyWrappers {
-						b.WriteString(", " + Int2Str(id))
-					}
-					b.WriteString(")")
-					return b.String()
-				}
-			}
+			// StatementAssign.cpp:618–619 — assert(false) for other ops with op_flags
+			// (assign table only simple/bit/incr; no soft invent safe_* for *= etc.)
+			// library: fall through to OutputSimple
 		}
 	}
 	return OutputAssignSimple(st, wrapVol)

@@ -486,73 +486,36 @@ func forHeaderOutput(lc *LoopControl) string {
 }
 
 func forInitOutput(lc *LoopControl) string {
-	if lc == nil || lc.IV == nil {
+	// StatementFor.cpp:408–410 — init->OutputAsExpr; always live StatementAssign
+	// no soft invent "iv = InitN" when InitStmt missing
+	if lc == nil || lc.InitStmt == nil {
 		return ""
 	}
-	if lc.InitStmt != nil {
-		// OutputAsExpr for simple assign: lhs = rhs (no trailing semicolon)
-		wrap := lc.IV.UseVolRVal
-		if s := OutputAssignAsExpr(lc.InitStmt, wrap); s != "" {
-			return s
-		}
+	wrap := false
+	if lc.IV != nil {
+		wrap = lc.IV.UseVolRVal
 	}
-	return fmt.Sprintf("%s = %d", lc.IV.OutputC(), lc.InitN)
+	return OutputAssignAsExpr(lc.InitStmt, wrap)
 }
 
 func forTestOutput(lc *LoopControl) string {
-	// StatementFor.cpp:412 — test.Output; no soft invent "1" for missing test
-	if lc == nil {
+	// StatementFor.cpp:412 — test.Output; no soft invent "iv < LimitN" for missing test
+	if lc == nil || lc.TestExpr == nil {
 		return ""
 	}
-	if lc.TestExpr != nil {
-		if s := lc.TestExpr.Output(); s != "" {
-			return s
-		}
-	}
-	if lc.IV == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s %s %d", lc.IV.OutputC(), lc.TestOp.CmpOpC(), lc.LimitN)
+	return lc.TestExpr.Output()
 }
 
-// forIncrOutput emits for-loop increment (plain or safe_add rewrite).
-// StatementAssign::OutputAsExpr safe path for eAddAssign / ePreIncr-ish.
+// forIncrOutput emits for-loop increment via IncrStmt OutputAsExpr.
+// StatementFor.cpp:414 — incr->OutputAsExpr; always live StatementAssign.
+// no soft invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
 func forIncrOutput(lc *LoopControl) string {
-	if lc == nil || lc.IV == nil {
+	if lc == nil || lc.IncrStmt == nil {
 		return ""
 	}
-	if lc.IncrStmt != nil {
-		wrap := lc.IV.UseVolRVal
-		if s := OutputAssignAsExpr(lc.IncrStmt, wrap); s != "" {
-			return s
-		}
+	wrap := false
+	if lc.IV != nil {
+		wrap = lc.IV.UseVolRVal
 	}
-	iv := lc.IV.OutputC()
-	n := fmt.Sprintf("%d", lc.IncrN)
-	if !lc.SafeIncr {
-		return lc.IncrOp.AssignOpC(iv, n)
-	}
-	// safe rewrite: iv = safe_add/sub(iv, n) for +=/-= / ++/--
-	op := "+"
-	switch lc.IncrOp {
-	case AssignSub, AssignPreDecr, AssignPostDecr:
-		op = "-"
-	case AssignPreIncr, AssignPostIncr:
-		n = "1"
-	case AssignAdd:
-		// n already
-	default:
-		return lc.IncrOp.AssignOpC(iv, n)
-	}
-	// SafeOpFlags default int32 s_s for loop IV
-	flags := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
-	if lc.IV.Type != nil && !lc.IV.Type.IsSigned() {
-		flags.Op1Signed = false
-		flags.Op2Signed = false
-	}
-	fname := flags.BinaryFuncName(op)
-	if fname == "" {
-		return lc.IncrOp.AssignOpC(iv, n)
-	}
-	return iv + " = " + fname + "(" + iv + ", " + n + ")"
+	return OutputAssignAsExpr(lc.IncrStmt, wrap)
 }

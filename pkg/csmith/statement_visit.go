@@ -240,22 +240,13 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		return false
 	}
-	// StatementFor.cpp:430–432 — walk initializing statement
-	if st.Loop.InitStmt != nil {
-		if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
-			return false
-		}
-	} else {
-		// incomplete IR without InitStmt: reconstruct from IV+InitN (library partial)
-		initLhs := &Lhs{Var: st.Loop.IV, Type: st.Loop.IV.Type}
-		initSt := Stmt{
-			Kind: StmtAssign, LhsVar: st.Loop.IV, Lhs: initLhs,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(st.Loop.InitN)},
-			AssignOp: AssignSimple,
-		}
-		if !VisitFactsStatementAssign(&initSt, cg, opts) {
-			return false
-		}
+	// StatementFor.cpp:430–432 — init StatementAssign always live; no soft invent
+	// reconstruct from InitN when InitStmt missing
+	if st.Loop.InitStmt == nil {
+		return false
+	}
+	if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
+		return false
 	}
 	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init
 	var factsCopy []*FactPointTo
