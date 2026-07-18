@@ -137,6 +137,32 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 	}
 }
 
+func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
+	// FactMgr.cpp:69–110 — assert global when blk nil; push into map_facts_in/out
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// seed map slots for a statement
+	sid := 42
+	fm.MapFactsIn[sid] = nil
+	fm.MapFactsOut[sid] = nil
+	// non-global with blk==nil must fail closed (assert path)
+	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	before := len(fm.GlobalFacts)
+	fm.AddNewVarFactAndUpdate(nil, loc)
+	if len(fm.GlobalFacts) != before {
+		t.Fatal("non-global must not invent facts when blk==nil")
+	}
+	// global pointer: facts in global + maps
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.AddNewVarFactAndUpdate(nil, g)
+	if FindRelatedPointTo(fm.GlobalFacts, g) == nil {
+		t.Fatal("global fact missing")
+	}
+	if len(fm.MapFactsIn[sid]) == 0 || len(fm.MapFactsOut[sid]) == 0 {
+		t.Fatal("blk==nil must append fact to all map_facts_in/out")
+	}
+}
+
 func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	// AcceptType false for volatile struct when context not SE-free
 	opts := Defaults()

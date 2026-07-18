@@ -267,9 +267,13 @@ func MakeRandomBlock(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// Block.cpp:120 — assert(curr_func); no soft invent parentless block
 	f := cg.CurrentFunc
+	if f == nil {
+		return nil
+	}
 	parent := (*Block)(nil)
-	if f != nil && len(f.Stack) > 0 {
+	if len(f.Stack) > 0 {
 		parent = f.Stack[len(f.Stack)-1]
 	}
 	b := &Block{
@@ -288,10 +292,9 @@ func MakeRandomBlock(
 		EmitConcise:  opts.Concise,
 		EmitFM:       cg.FM,
 	}
-	if f != nil {
-		f.Stack = append(f.Stack, b)
-		f.Blocks = append(f.Blocks, b)
-	}
+	// Block.cpp:132–133 — stack + blocks push
+	f.Stack = append(f.Stack, b)
+	f.Blocks = append(f.Blocks, b)
 	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
 	if DepthGuardByType(opts, "dtBlock") == BadDepth {
 		abortBlockMake(f, b)

@@ -678,12 +678,68 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 }
 
-// AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps
-// without stm maps — only global_facts.
-// FactMgr.cpp:69–85 subset.
+// AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps.
+// FactMgr.cpp:69–110 — abstract_fact_for_var_init into global_facts and
+// map_facts_in/out for statements under blk (or all when blk is nil).
 func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
-	_ = blk
+	if fm == nil || v == nil {
+		return
+	}
+	// FactMgr.cpp:72 — assert(var->is_global()) when blk==nullptr
+	// no soft invent facts for non-global "global create" path
+	if blk == nil && !v.IsGlobal() {
+		return
+	}
+	// snapshot length to detect newly merged facts
+	beforePT := len(fm.GlobalFacts)
 	fm.AddNewVarFact(v)
+	// FactMgr.cpp:77–104 — push each new init fact into maps
+	for i := beforePT; i < len(fm.GlobalFacts); i++ {
+		f := fm.GlobalFacts[i]
+		if f == nil {
+			continue
+		}
+		// map_facts_in: stm in_block(blk) || blk==null
+		if fm.MapFactsIn != nil {
+			for id := range fm.MapFactsIn {
+				if blk == nil || stmtIDInBlock(fm.Func, id, blk) {
+					fm.MapFactsIn[id] = append(fm.MapFactsIn[id], f.Clone())
+				}
+			}
+		}
+		// map_facts_out
+		if fm.MapFactsOut == nil {
+			continue
+		}
+		if blk == nil {
+			// FactMgr.cpp:102–103 — append to all outs
+			for id := range fm.MapFactsOut {
+				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], f.Clone())
+			}
+		} else {
+			// FactMgr.cpp:99–100 — add_fact_out(stm, f) with visibility filters
+			for id := range fm.MapFactsOut {
+				if !stmtIDInBlock(fm.Func, id, blk) {
+					continue
+				}
+				st := FindStmtByID(fm.Func, id)
+				if st == nil {
+					continue
+				}
+				parent := FindParentBlockOfStmID(fm.Func, id)
+				fm.AddFactOut(st, parent, f)
+			}
+		}
+	}
+}
+
+// stmtIDInBlock reports Statement::in_block(blk) for a statement id under func.
+func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
+	if blk == nil || stmID <= 0 {
+		return false
+	}
+	// BlockContainsStmID walks nested Then/Else under blk
+	return BlockContainsStmID(blk, stmID)
 }
 
 // lhsAssignPointees mirrors merge_pointees_of_pointer used by abstract_fact_for_assign.
