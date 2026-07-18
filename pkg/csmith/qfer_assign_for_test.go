@@ -3,6 +3,13 @@ package csmith
 import "testing"
 
 func TestCVQualifiersMatch(t *testing.T) {
+	// isolate process match_exact (CGOptions) so Match(false) still sees non-exact
+	prev := ProcessOptions()
+	po := prev
+	po.MatchExactQualifiers = false
+	SetProcessOptions(po)
+	defer SetProcessOptions(prev)
+
 	a := NewCVQualifiers([]bool{false}, []bool{false})
 	b := NewCVQualifiers([]bool{true}, []bool{false})
 	// one-level → always match (non-exact)
@@ -16,9 +23,44 @@ func TestCVQualifiersMatch(t *testing.T) {
 	if !w.Match(b, true) {
 		t.Fatal("wild")
 	}
+	// process CGOptions::match_exact_qualifiers true → exact even with matchExact=false
+	po.MatchExactQualifiers = true
+	SetProcessOptions(po)
+	if a.Match(b, false) {
+		t.Fatal("process exact should reject differing 1-level")
+	}
+}
+
+func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
+	// VariableSelector choose_var → match_indirect → process match_exact
+	prev := ProcessOptions()
+	defer SetProcessOptions(prev)
+	po := prev
+	po.MatchExactQualifiers = true
+	SetProcessOptions(po)
+
+	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
+	plain := CreateVariableScalars("g_p", GetIntType(), false, false)
+	// const qfer wants exact match — volatile var should fail
+	q := NewCVQualifiers([]bool{true}, []bool{false})
+	cg := EmptyCGContext()
+	got := ChooseVarFull(NewRng(1), []*Variable{vol, plain}, AccessRead, cg, GetIntType(), &q, MatchFlexible, nil, false, false, false)
+	// neither matches exact const; plain is non-const non-vol
+	if got != nil {
+		// may still be nil if eligibility rejects; process exact must not pick vol for const want
+		if got == vol {
+			t.Fatal("exact match must not select volatile for const qfer")
+		}
+	}
 }
 
 func TestMatchIndirect(t *testing.T) {
+	prev := ProcessOptions()
+	po := prev
+	po.MatchExactQualifiers = false
+	SetProcessOptions(po)
+	defer SetProcessOptions(prev)
+
 	// wanted scalar qfer vs pointer var qfer (2 levels)
 	want := NewCVQualifiers([]bool{false}, []bool{false})
 	have := NewCVQualifiers([]bool{false, false}, []bool{false, false})

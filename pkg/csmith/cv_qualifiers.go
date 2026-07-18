@@ -117,12 +117,15 @@ func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
 }
 
 // Match mirrors CVQualifiers::match.
-// CVQualifiers.cpp:137–152.
+// CVQualifiers.cpp:137–152 — CGOptions::match_exact_qualifiers() is process-wide;
+// matchExact ORs with ProcessOptions so ChooseVarFull / select see session force.
+// Explicit matchExact=true still works for unit tests without SetProcessOptions.
 func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 	if q.Wildcard {
 		return true
 	}
-	if matchExact {
+	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
+	if matchExact || ProcessOptions().MatchExactQualifiers {
 		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
 	}
 	// both non-pointer (one level) → true

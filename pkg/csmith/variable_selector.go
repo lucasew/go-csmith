@@ -910,7 +910,9 @@ func ChooseVarFull(
 	if HasDereferenceableVar(cands, want, cg, opts) {
 		RecordPointerAvailForDeref()
 	}
-	matchExact := false
+	// CVQualifiers::match_indirect → match → CGOptions::match_exact_qualifiers()
+	// no soft invent matchExact:=false ignoring process / StatementAssign force
+	matchExact := opts.MatchExactQualifiers
 	var ok []*Variable
 	for _, x := range cands {
 		if x == nil || x.Type == nil {
