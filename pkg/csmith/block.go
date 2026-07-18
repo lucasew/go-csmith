@@ -299,6 +299,10 @@ func MakeRandomBlock(
 	pendingFwd := ""
 	for i := 0; i <= max; i++ {
 		st := makeRandomStmt(r, opts, probs, vs, tables, stmtTab, cg, b)
+		// Block.cpp:142–146 — null Statement* (exhaustive / failed factories) → break
+		if !stmtOK(st) {
+			break
+		}
 		if st.StmID == 0 {
 			st.StmID = AllocStmID()
 		}
@@ -484,7 +488,8 @@ func makeRandomStmt(
 		return false
 	})
 	// retry failed factories (null Statement* upstream) — Statement.cpp:314–316
-	for tries := 0; tries < 6; tries++ {
+	// C++: if (s == 0) return make_random(cg_context); re-pick type, no forced assign.
+	for tries := 0; tries < 32; tries++ {
 		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
 		cg.EffectStm = EmptyEffect()
 		cg.ExprDepth = 0
@@ -516,16 +521,8 @@ func makeRandomStmt(
 			return st
 		}
 	}
-	// last resort: assignment (always producible)
-	cg.EffectStm = EmptyEffect()
-	cg.ExprDepth = 0
-	st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
-	preEffect := EmptyEffect()
-	if cg.EffectAccum != nil {
-		preEffect = cg.EffectAccum.Clone()
-	}
-	PostCreationAnalysis(&st, nil, preEffect, cg)
-	return st
+	// bounded library limit (C++ recurses forever); empty stmt is not appended usable
+	return Stmt{}
 }
 
 func makeRandomStmtKind(
@@ -595,8 +592,11 @@ func stmtOK(st Stmt) bool {
 	case StmtContinue, StmtBreak:
 		// factories always set test expr; Expr-less marks nullptr reject (e.g. continue first-stmt)
 		return st.Expr != nil
+	case StmtLabel:
+		return st.SourceLabel != ""
 	default:
-		return true
+		// zero-value / unknown kind from failed make_random (Statement.cpp:314 null)
+		return false
 	}
 }
 

@@ -258,12 +258,10 @@ func MakeRandomLhs(
 				newQ.Restrict(AccessWrite, *cg)
 			}
 			v = vs.SelectWithInvalid(AccessWrite, *cg, typ, &newQ, r, MatchDerefExact, dummy)
+			// Lhs.cpp:94 — ERROR_GUARD(nullptr); select may create vars itself
 		}
 		if v == nil {
-			// last resort create global (practical; C++ loops forever)
-			v = vs.SelectGlobal(AccessWrite, *cg, typ, &q, r)
-		}
-		if v == nil {
+			// Lhs.cpp:101 assert(var) / ERROR_GUARD — no separate SelectGlobal soft path
 			restore()
 			continue
 		}
