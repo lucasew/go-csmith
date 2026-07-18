@@ -489,8 +489,13 @@ func (f *Function) generateBodyCore(
 	}
 	f.ComputeSummary(summaryEff)
 
-	// Function.cpp:658 / 694 — make_return_const
+	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
 	f.MakeReturnConst(opts, r)
+	if HasError() {
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
+	}
 
 	// keep EffectAccum in sync for caller of known-params
 	if prev.EffectAccum != nil {
@@ -501,6 +506,7 @@ func (f *Function) generateBodyCore(
 	if cg.FM != nil && f.Body != nil {
 		AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts)
 	}
+	// Function.cpp:661–662 — Mark Built
 	f.markBuilt()
 }
 
@@ -510,10 +516,13 @@ func (f *Function) MakeReturnConst(opts Options, r *Rng) {
 	if f == nil || !opts.DepthProtect || !f.NeedReturnStmt() {
 		return
 	}
+	// Function.cpp:611–612 — assert non-void simple when simple
 	if f.ReturnType != nil && f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
 		return
 	}
 	f.RetConst = MakeRandom(f.ReturnType, opts, r)
+	// Function.cpp:614 ERROR_RETURN after Constant::make_random
+	// sticky error left for GenerateBody ERROR_RETURN
 }
 
 // returnTypeC is qualified return type (from RV qfer when present).

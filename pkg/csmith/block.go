@@ -232,17 +232,22 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 }
 
 // BlockProbability mirrors Block.cpp BlockProbability.
-
-// Keep-filter on {block_size-1} forces return value max_block_size-1.
-// Block.cpp:88–94.
+// Block.cpp:87–93 — VectorFilter Keep on {block_size-1} then
+// filter.disable(fDefault). In random mode valid_filter() is false so
+// filter() never rejects → uniform rnd_upto(block_size) in [0, block_size).
+// No soft invent always block_size-1 (that would force max statements).
 func BlockProbability(blockSize int, r *Rng) int {
 	if blockSize < 1 {
 		return 0
 	}
-	// rnd_upto(block_size) with Keep filter only accepting block_size-1
-	// → always block_size-1 after retries.
-	_ = r
-	return blockSize - 1
+	if r == nil {
+		// C++ always has RNG; library fail-closed → 0 (one stmt: i<=0)
+		return 0
+	}
+	// Block.cpp:92 — rnd_upto(block.block_size(), &filter) with filter inert
+	v := int(r.RndUpto(uint32(blockSize)))
+	// ERROR_GUARD path: caller checks HasError after BlockProbability
+	return v
 }
 
 // MakeRandomBlock mirrors Block::make_random.

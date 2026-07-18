@@ -475,3 +475,24 @@ func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 		t.Fatal(outer.Stmts)
 	}
 }
+
+func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {
+	// Block.cpp:87–93 random mode: disable filter → uniform rnd_upto(size)
+	// not soft invent always size-1
+	ClearError()
+	seen := map[int]bool{}
+	r := NewRng(2)
+	for i := 0; i < 80; i++ {
+		v := BlockProbability(5, r)
+		if v < 0 || v >= 5 {
+			t.Fatalf("out of range %d", v)
+		}
+		seen[v] = true
+	}
+	if len(seen) < 3 {
+		t.Fatalf("want spread over [0,5), got %#v", seen)
+	}
+	if !seen[0] && !seen[1] && !seen[2] {
+		t.Fatal("never saw low values — still inventing max?")
+	}
+}
