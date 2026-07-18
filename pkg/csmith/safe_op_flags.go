@@ -94,6 +94,55 @@ func (f *SafeOpFlags) SizeToken() string {
 	return b.String()
 }
 
+// FlagsToType mirrors SafeOpFlags::flags_to_type.
+// SafeOpFlags.cpp:65–98.
+func FlagsToType(signed bool, size SafeOpSize) *Type {
+	if signed {
+		switch size {
+		case SafeInt8:
+			return GetSimpleType(EChar)
+		case SafeInt16:
+			return GetSimpleType(EShort)
+		case SafeInt32:
+			return GetSimpleType(EInt)
+		case SafeInt64:
+			return GetSimpleType(ELongLong)
+		case SafeFloat:
+			return GetSimpleType(EFloat)
+		default:
+			return GetIntType()
+		}
+	}
+	switch size {
+	case SafeInt8:
+		return GetSimpleType(EUChar)
+	case SafeInt16:
+		return GetSimpleType(EUShort)
+	case SafeInt32:
+		return GetSimpleType(EUInt)
+	case SafeInt64:
+		return GetSimpleType(EULongLong)
+	default:
+		return GetSimpleType(EUInt)
+	}
+}
+
+// LHSType mirrors SafeOpFlags::get_lhs_type.
+func (f *SafeOpFlags) LHSType() *Type {
+	if f == nil {
+		return GetIntType()
+	}
+	return FlagsToType(f.Op1Signed, f.Size)
+}
+
+// RHSType mirrors SafeOpFlags::get_rhs_type.
+func (f *SafeOpFlags) RHSType() *Type {
+	if f == nil {
+		return GetIntType()
+	}
+	return FlagsToType(f.Op2Signed, f.Size)
+}
+
 // BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
 // SafeOpFlags.cpp:285–320.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {

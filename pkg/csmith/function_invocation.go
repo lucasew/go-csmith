@@ -193,42 +193,57 @@ func MakeRandomBinaryInvocation(
 		op = PickBinaryOp(r, opts)
 	}
 	opStr := op.BinaryOpC()
+	// FunctionInvocation.cpp:188–207 — SafeOpFlags first; operands use get_lhs/rhs_type
+	var flags *SafeOpFlags
+	lhsTy, rhsTy := typ, typ
+	if opts.SafeMath && SafeOpsBinary(opStr) {
+		flags = MakeRandomBinary(r, opts, probs, typ)
+		if flags != nil {
+			lhsTy = flags.LHSType()
+			rhsTy = flags.RHSType()
+		}
+	}
 	// Operands: no nested Function (depth + leaf bias) — avoids exponential recursion.
 	d := cg.ExprDepth + 1
-	left := MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
+	left := MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, MaxTermTypes, d)
 	if left == nil {
-		left = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
+		left = MakeRandomExpression(r, opts, tables, vs, cg, lhsTy, nil, true, false, TermConstant, d)
 	}
 	var right *Expression
 	if op == BinLShift || op == BinRShift {
-		// prefer constant shift amount (FunctionInvocation.cpp:236–244 simplified)
-		// ShiftByNonConstantProb default ~50 → flipcoin for non-constant
+		// prefer constant shift amount (FunctionInvocation.cpp:236–244)
+		// ShiftByNonConstantProb default 50
 		if !r.RndFlipcoin(50) {
-			// Constant::make_random_upto(SizeInBytes*8); int → 32 bits
-			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(32, r)}
+			// Constant::make_random_upto(SizeInBytes*8)
+			bits := uint32(32)
+			if lhsTy != nil {
+				if sb := lhsTy.SizeInBytes(); sb > 0 {
+					bits = uint32(sb * 8)
+				}
+			}
+			right = &Expression{Term: TermConstant, Con: MakeRandomUpto(bits, r)}
 		}
 	}
 	if right == nil {
-		// ordered ops (&& ||) could use original effect context; we omit FactMgr merge
-		right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
+		// ordered ops (&& ||) use original effect context; FactMgr merge deferred
+		right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, MaxTermTypes, d)
 		if right == nil {
-			right = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
+			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, true, false, TermConstant, d)
 		}
 	}
 	// avoid div/mod by zero-ish constant: re-pick op excluding div/mod/shift
 	if (op == BinMod || op == BinDiv) && right != nil && right.Term == TermConstant && right.Con != nil {
 		if right.Con.Value == "0" || right.Con.Value == "1" {
-			// VectorFilter out mod/div/shifts — simplified re-pick arithmetic
 			op = BinAdd
 			opStr = op.BinaryOpC()
+			// keep flags if still safe-ops
+			if flags != nil && !SafeOpsBinary(opStr) {
+				flags = nil
+			}
 		}
 	}
-	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}}
-	// CGOptions::avoid_signed_overflow → SafeMath for safe_ops subset
-	if opts.SafeMath && SafeOpsBinary(opStr) {
-		inv.Safe = MakeRandomBinary(r, opts, probs, typ)
-	}
-	_ = IsOrderedBinary // cite path; effect merge deferred
+	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
+	_ = IsOrderedBinary
 	return inv
 }
 
@@ -291,16 +306,21 @@ func MakeRandomUnaryInvocation(
 	}
 	uop := PickUnaryOp(r, opts)
 	op := uop.UnaryOpC()
-	d := cg.ExprDepth + 1
-	arg := MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, MaxTermTypes, d)
-	if arg == nil {
-		arg = MakeRandomExpression(r, opts, tables, vs, cg, typ, nil, true, false, TermConstant, d)
-	}
-	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}}
+	// SafeOpFlags::make_random_unary then operand of get_lhs_type (FunctionInvocation.cpp:141–165)
+	argTy := typ
+	var flags *SafeOpFlags
 	if opts.SafeMath && op == "-" {
-		inv.Safe = MakeRandomBinary(r, opts, NewProbabilities(opts), typ)
+		flags = MakeRandomBinary(r, opts, NewProbabilities(opts), typ)
+		if flags != nil {
+			argTy = flags.LHSType()
+		}
 	}
-	return inv
+	d := cg.ExprDepth + 1
+	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, MaxTermTypes, d)
+	if arg == nil {
+		arg = MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, true, false, TermConstant, d)
+	}
+	return &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.

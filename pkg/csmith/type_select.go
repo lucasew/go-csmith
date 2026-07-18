@@ -167,10 +167,15 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 			return env.FindPointerType(t, true)
 		}
 	}
-	// choose pointer to basic type — choose_random deferred to nonvoid simple
-	// consolidate simple → int* (Type.cpp:1164–1166)
-	_ = ChooseRandomNonvoidSimple(r, probs) // still burns RNG as choose_random would
-	base := GetIntType()
+	// choose_random then consolidate integer pointers to int* (Type.cpp:1158–1166)
+	base := env.ChooseRandom(r, opts, probs, false)
+	if base == nil {
+		base = GetIntType()
+	}
+	// consolidate all integer pointer types into "int*"
+	if base.IsSimple() && base.Simple() != EVoid && base.Simple() != EFloat {
+		base = GetIntType()
+	}
 	return env.FindPointerType(base, true)
 }
 
