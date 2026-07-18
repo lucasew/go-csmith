@@ -2,9 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// MakeRandomIf mirrors StatementIf::make_random without FactMgr re-analysis.
-// StatementIf.cpp:57–111 — test on get_int_type(), then/else Block::make_random
-// with shared pre-branch env (else does not see then-only accum).
+// MakeRandomIf mirrors StatementIf::make_random.
+// StatementIf.cpp:57–111 — shared pre-branch env; visit_facts merge (cpp:162–202).
 func MakeRandomIf(
 	r *Rng,
 	opts Options,
@@ -32,15 +31,45 @@ func MakeRandomIf(
 	if cg.EffectAccum != nil {
 		pre = *cg.EffectAccum
 	}
+	// Snapshot pre-branch facts for else arm (StatementIf.cpp:96–99 map_facts_in)
+	var preFacts []*FactPointTo
+	if cg.FM != nil {
+		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+	}
+
 	thenEff := pre
 	thenCG := cg
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, thenCG, false)
+	var thenFacts []*FactPointTo
+	if cg.FM != nil {
+		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// restore pre-branch facts for else
+		cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+	}
 
 	elseEff := pre
 	elseCG := cg
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, elseCG, false)
+	var elseFacts []*FactPointTo
+	if cg.FM != nil {
+		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// StatementIf.cpp:185–200 — merge branch outputs into GlobalFacts
+		trueMust := thenB != nil && thenB.MustReturn()
+		falseMust := elseB != nil && elseB.MustReturn()
+		switch {
+		case trueMust && falseMust:
+			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+		case trueMust:
+			cg.FM.GlobalFacts = elseFacts
+		case falseMust:
+			cg.FM.GlobalFacts = thenFacts
+		default:
+			cg.FM.GlobalFacts = thenFacts
+			MergeFacts(&cg.FM.GlobalFacts, elseFacts)
+		}
+	}
 
 	// Merge branch effects into parent accum
 	if cg.EffectAccum != nil {

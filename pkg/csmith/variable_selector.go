@@ -215,6 +215,27 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	return true
 }
 
+// HasEligibleVolatileVar mirrors VariableSelector::has_eligible_volatile_var.
+// VariableSelector.cpp:294–316 — flexible match + eligible + is_volatile.
+func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGContext) bool {
+	for _, v := range vars {
+		if v == nil || v.Type == nil {
+			continue
+		}
+		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
+			continue
+		}
+		deref := 0
+		if typ != nil {
+			deref = v.Type.IndirectLevel() - typ.IndirectLevel()
+		}
+		if IsEligibleVar(v, deref, access, cg) && v.IsVolatile() {
+			return true
+		}
+	}
+	return false
+}
+
 // HasDereferenceableVar mirrors VariableSelector::has_dereferenceable_var.
 // VariableSelector.cpp:198–210 — type is_dereferenced_from + is_valid_ptr.
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
@@ -237,7 +258,8 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 }
 
 // ChooseVar mirrors VariableSelector::choose_var type+eligibility filter.
-// VariableSelector.cpp:394–447 subset — expand, match, is_eligible_var.
+// VariableSelector.cpp:394–447 subset — expand, match, is_eligible_var;
+// has_eligible_volatile_var bookkeeping (no Bookkeeper).
 func ChooseVar(
 	r *Rng,
 	vars []*Variable,
@@ -259,6 +281,12 @@ func ChooseVar(
 	cands := vars
 	if want.IsSimple() || want.IsAggregate() {
 		cands = ExpandStructUnionVars(vars, want)
+	}
+	// VariableSelector.cpp:410–415 — probe volatile availability (side table only)
+	_ = HasEligibleVolatileVar(cands, want, access, cg)
+	// VariableSelector.cpp:410 — has_dereferenceable_var bookkeeping
+	if cg.FM != nil {
+		_ = HasDereferenceableVar(cands, want, cg, Options{})
 	}
 	var ok []*Variable
 	for _, x := range cands {

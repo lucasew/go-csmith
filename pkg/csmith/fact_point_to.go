@@ -239,19 +239,131 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	return RhsToLhsTransfer(factsIn, lvars, rhs)
 }
 
-// MergeFactInto replaces or appends a related FactPointTo in facts (merge_fact subset).
+// Equal reports same var and same points-to set.
+func (f *FactPointTo) Equal(other *FactPointTo) bool {
+	if f == nil || other == nil || f.Var != other.Var {
+		return false
+	}
+	if len(f.PointTo) != len(other.PointTo) {
+		return false
+	}
+	set := make(map[*Variable]bool, len(f.PointTo))
+	for _, p := range f.PointTo {
+		set[p] = true
+	}
+	for _, p := range other.PointTo {
+		if !set[p] {
+			return false
+		}
+	}
+	return true
+}
+
+// Imply mirrors FactPointTo::imply — other.point_to ⊆ this.point_to.
+// FactPointTo.cpp:602–609.
+func (f *FactPointTo) Imply(other *FactPointTo) bool {
+	if f == nil || other == nil || f.Var != other.Var {
+		return false
+	}
+	set := make(map[*Variable]bool, len(f.PointTo))
+	for _, p := range f.PointTo {
+		set[p] = true
+	}
+	for _, p := range other.PointTo {
+		if !set[p] {
+			return false
+		}
+	}
+	return true
+}
+
+// Join mirrors FactPointTo::join — union of points-to sets; returns true if changed.
+// FactPointTo.cpp:563–578.
+func (f *FactPointTo) Join(other *FactPointTo) bool {
+	if f == nil || other == nil || f.Var != other.Var {
+		return false
+	}
+	set := make(map[*Variable]bool, len(f.PointTo))
+	for _, p := range f.PointTo {
+		set[p] = true
+	}
+	changed := false
+	for _, p := range other.PointTo {
+		if p == nil || set[p] {
+			continue
+		}
+		set[p] = true
+		f.PointTo = append(f.PointTo, p)
+		changed = true
+	}
+	return changed
+}
+
+// Clone shallow-copies the fact (new PointTo slice).
+func (f *FactPointTo) Clone() *FactPointTo {
+	if f == nil {
+		return nil
+	}
+	return MakeFactPointToSet(f.Var, f.PointTo)
+}
+
+// MergeFactInto merges new fact with lattice join (Fact::merge_fact).
+// Fact.cpp:149–171 — strong replace only when not related; else join.
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	if f == nil {
 		return facts
 	}
 	for i, old := range facts {
 		if old != nil && old.Var == f.Var {
-			// replace (strong update)
-			facts[i] = f
+			if old.Imply(f) {
+				// old already covers f
+				return facts
+			}
+			// join: copy f, join old into it
+			cp := f.Clone()
+			_ = cp.Join(old)
+			facts[i] = cp
 			return facts
 		}
 	}
-	return append(facts, f)
+	return append(facts, f.Clone())
+}
+
+// MergeFacts mirrors merge_facts — merge each of new into facts.
+// Fact.cpp:192–200.
+func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	if facts == nil {
+		return false
+	}
+	changed := false
+	for _, f := range newFacts {
+		before := len(*facts)
+		*facts = MergeFactInto(*facts, f)
+		// detect change roughly: length or content
+		if len(*facts) != before {
+			changed = true
+			continue
+		}
+		// check related fact expanded
+		if f != nil {
+			cur := FindRelatedPointTo(*facts, f.Var)
+			if cur != nil && !cur.Equal(f) && !f.Imply(cur) {
+				changed = true
+			}
+		}
+	}
+	return changed
+}
+
+// CloneFactSlice deep-clones a FactPointTo slice.
+func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
+	out := make([]*FactPointTo, 0, len(facts))
+	for _, f := range facts {
+		if f != nil {
+			out = append(out, f.Clone())
+		}
+	}
+	return out
 }
 
 // MarkDeadVar mirrors FactPointTo::mark_dead_var.
