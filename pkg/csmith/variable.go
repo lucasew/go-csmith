@@ -395,8 +395,11 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 // CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421.
 func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
-	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
-		// Upstream asserts non-void simple; refuse quietly for Go.
+	// Variable.cpp:412–414 — assert(type); assert simple != eVoid
+	if typ == nil {
+		return nil
+	}
+	if typ.IsSimple() && typ.Simple() == EVoid {
 		return nil
 	}
 	v := &Variable{
@@ -405,7 +408,13 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 		Qfer: qfer,
 		Init: init,
 	}
-	v.CreateFieldVars()
+	if typ.IsAggregate() {
+		v.CreateFieldVars()
+	}
+	// Variable.cpp:420 — ERROR_GUARD_AND_DEL1(nullptr, var)
+	if HasError() {
+		return nil
+	}
 	return v
 }
 
@@ -420,15 +429,23 @@ func nextCreateVarRng() *Rng {
 // Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
 // unless outermost container is union (Variable.cpp:395).
 func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
-	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
-	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+	// Variable.cpp:388–390 — assert(type); assert simple != eVoid
+	if typ == nil {
 		return nil
 	}
-	// Variable.cpp:395 — non-union top: Constant::make_random(type); union top: 0
+	if typ.IsSimple() && typ.Simple() == EVoid {
+		return nil
+	}
+	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
+	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
 	// Constant::make_random reads process CGOptions (binary_constant, longlong, …)
 	var init *Constant
-	if typ == nil || !typ.IsUnion() {
+	if !typ.IsUnion() {
 		init = MakeRandom(typ, ProcessOptions(), nextCreateVarRng())
+	}
+	// Variable.cpp:397 — ERROR_GUARD_AND_DEL1(nullptr, var)
+	if HasError() {
+		return nil
 	}
 	v := &Variable{
 		Name: name,
@@ -436,7 +453,13 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 		Qfer: qfer,
 		Init: init,
 	}
-	v.CreateFieldVars()
+	if typ.IsAggregate() {
+		v.CreateFieldVars()
+	}
+	// Variable.cpp:401 — ERROR_GUARD_AND_DEL1 after create_field_vars
+	if HasError() {
+		return nil
+	}
 	return v
 }
 
@@ -959,6 +982,10 @@ func (v *Variable) CreateFieldVars() {
 			// no soft invent Defaults() when session options differ
 			init = MakeRandom(f.Type, ProcessOptions(), nextCreateVarRng())
 		}
+		// Variable.cpp:397 — ERROR_GUARD during field CreateVariable
+		if HasError() {
+			return
+		}
 		fv := &Variable{
 			Name:       fname,
 			Type:       f.Type,
@@ -969,7 +996,12 @@ func (v *Variable) CreateFieldVars() {
 			Init:       init,
 		}
 		// recursive expand nested structs
-		fv.CreateFieldVars()
+		if f.Type.IsAggregate() {
+			fv.CreateFieldVars()
+		}
+		if HasError() {
+			return
+		}
 		v.FieldVars = append(v.FieldVars, fv)
 	}
 }

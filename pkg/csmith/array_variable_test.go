@@ -26,6 +26,24 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 	}
 }
 
+func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
+	// ArrayVariable.cpp:127–133 — assert type/void; ERROR_GUARD after rnd_upto(99)
+	opts := Defaults()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if CreateArrayVariable(NewRng(1), opts, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
+		t.Fatal("void element must fail closed")
+	}
+	if CreateArrayVariable(NewRng(1), opts, nil, "g_n", nil, MakeInt(0), q) != nil {
+		t.Fatal("nil element must fail closed")
+	}
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	if CreateArrayVariable(NewRng(1), opts, nil, "g_e", GetIntType(), MakeInt(0), q) != nil {
+		t.Fatal("sticky error after dim draw must fail closed")
+	}
+}
+
 func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	// ArrayVariable.cpp:154–157 — empty sizes when no dim fits; no invent [1]
 	opts := Defaults()

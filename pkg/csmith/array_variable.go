@@ -36,6 +36,7 @@ func CreateArrayVariable(
 	init *Constant,
 	qfer CVQualifiers,
 ) *ArrayVariable {
+	// ArrayVariable.cpp:127–129 — assert(type); assert simple != eVoid
 	if r == nil || elem == nil {
 		return nil
 	}
@@ -45,6 +46,10 @@ func CreateArrayVariable(
 	// dimension: 1d 60%, 2d 30%, … via rnd_upto(99)+1 stepping
 	// ArrayVariable.cpp:131–144
 	num := int(r.RndUpto(99)) + 1
+	// ArrayVariable.cpp:133 — ERROR_GUARD(nullptr)
+	if HasError() {
+		return nil
+	}
 	dimension := 0
 	step := 100
 	for num > 0 {
@@ -64,11 +69,11 @@ func CreateArrayVariable(
 	sizes := make([]int, 0, dimension)
 	total := 1
 	for i := 0; i < dimension; i++ {
+		dimen := int(r.RndUpto(uint32(opts.MaxArrayLenPerDim))) + 1
 		// ArrayVariable.cpp:149–150 — rnd_upto(max_len_per_dim)+1; ERROR_GUARD
 		if HasError() {
 			return nil
 		}
-		dimen := int(r.RndUpto(uint32(opts.MaxArrayLenPerDim))) + 1
 		if opts.MaxArrayLength > 0 && total*dimen > opts.MaxArrayLength {
 			dimen = opts.MaxArrayLength / total
 		}
@@ -91,11 +96,18 @@ func CreateArrayVariable(
 		Sizes: sizes,
 		Block: blk,
 	}
+	// ArrayVariable.cpp:161 — ERROR_GUARD_AND_DEL1 after new ArrayVariable
+	if HasError() {
+		return nil
+	}
 	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
 	if elem.IsAggregate() {
 		av.CreateFieldVars()
+	}
+	if HasError() {
+		return nil
 	}
 	// ArrayVariable.cpp:166 — pure_rnd_upto(total_size/2); pure_rnd_upto(0)==0
 	// no soft invent half=1 when total_size/2 is 0
@@ -103,6 +115,10 @@ func CreateArrayVariable(
 	initNum := int(r.RndUpto(half))
 	for i := 0; i < initNum; i++ {
 		c := MakeRandom(elem, opts, r)
+		// sticky ERROR_GUARD from Constant::make_random
+		if HasError() {
+			return nil
+		}
 		if c != nil {
 			av.InitValues = append(av.InitValues, c.Value)
 			av.ArrayInits = append(av.ArrayInits, c.Value)
