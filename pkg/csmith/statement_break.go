@@ -17,6 +17,8 @@ func MakeRandomBreak(
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	// StatementBreak.cpp:76 — clear effect_stm before condition
+	cg.EffectStm = EmptyEffect()
 	// Expression::make_random(..., true, true, eVariable)
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {

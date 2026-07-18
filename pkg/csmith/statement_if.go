@@ -23,6 +23,8 @@ func MakeRandomIf(
 			func1PreEffect = cg.EffectAccum.Clone()
 		}
 	}
+	// StatementIf.cpp:69 — clear per-statement effect before condition
+	cg.EffectStm = EmptyEffect()
 	// Expression::make_random(..., get_int_type(), no_const = !const_as_condition)
 	noConst := !opts.ConstAsCondition
 	test := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, false, noConst, MaxTermTypes, cg.ExprDepth)
@@ -70,6 +72,13 @@ func MakeRandomIf(
 		}
 	}
 
+	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
+	condEff := cg.EffectStm.Clone()
+	// re-snapshot facts after condition as pre-branch env
+	if cg.FM != nil {
+		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+	}
+
 	thenEff := pre
 	thenCG := cg
 	thenCG.EffectAccum = &thenEff
@@ -77,8 +86,17 @@ func MakeRandomIf(
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
-		// restore pre-branch facts for else
-		cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+		// StatementIf.cpp:98 — else branch starts from map_facts_in[if_true]
+		// (entry facts of true block == pre-branch after condition)
+		if thenB != nil && thenB.StmID > 0 {
+			if in, ok := cg.FM.MapFactsIn[thenB.StmID]; ok {
+				cg.FM.GlobalFacts = CloneFactSlice(in)
+			} else {
+				cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+			}
+		} else {
+			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+		}
 	}
 
 	elseEff := pre
@@ -104,9 +122,14 @@ func MakeRandomIf(
 		}
 	}
 
+	st := &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB, StmID: AllocStmID()}
+	// StatementIf.cpp:105–106 — set_accumulated_effect_after_block(eff, branch)
+	SetAccumulatedEffectAfterBlock(st, thenCG.EffectStm, &cg, condEff)
+	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, &cg, condEff)
+
 	// Merge branch effects into parent accum
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(thenEff, elseEff)
 	}
-	return &Stmt{Kind: StmtIfElse, Expr: test, Then: thenB, Else: elseB}
+	return st
 }

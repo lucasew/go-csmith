@@ -165,7 +165,8 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 }
 
 // MakeRandomArrayInit mirrors StatementArrayOp::make_random_array_init.
-// StatementArrayOp.cpp:85+ — per-dimension ctrl vars; nested for header; body assigns a[i0][i1]….
+// StatementArrayOp.cpp:85–155 — select array; per-dim IV (init 0, incr 1) with
+// float/volatile/packed/signed-char filters; make_init_value RHS; update facts.
 func MakeRandomArrayInit(
 	r *Rng,
 	opts Options,
@@ -176,6 +177,7 @@ func MakeRandomArrayInit(
 	cg CGContext,
 ) Stmt {
 	_ = stmtTab
+	_ = tables
 	if vs == nil || r == nil {
 		return Stmt{Kind: StmtArrayOp}
 	}
@@ -186,30 +188,73 @@ func MakeRandomArrayInit(
 	if len(av.Sizes) == 0 {
 		av.Sizes = []int{1}
 	}
-	// per-dim loop control (StatementArrayOp.cpp:105–120)
+	// StatementArrayOp.cpp:92–93, 100 — clear effect_stm
+	cg.EffectStm = EmptyEffect()
+
+	// StatementArrayOp.cpp:103–136 — per-dimension ctrl vars
 	var dims []*LoopControl
 	invalid := map[*Variable]bool{}
-	for _, size := range av.Sizes {
-		init, incr := MakeRandomIterCtrl(r, size)
-		iv := vs.SelectLoopCtrlVar(r, cg, invalid)
-		if iv == nil {
-			iv = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, r)
+	volCount := 0
+	if av.IsVolatile() {
+		volCount++
+	}
+	var facts []*FactPointTo
+	if cg.FM != nil {
+		facts = cg.FM.GlobalFacts
+	}
+	for di, size := range av.Sizes {
+		// StatementArrayOp.cpp:106–107 — inits 0, incrs 1 (not random iter_ctrl)
+		initN, incrN := 0, 1
+		var iv *Variable
+		for tries := 0; tries < 32; tries++ {
+			iv = vs.SelectLoopCtrlVar(r, cg, invalid)
+			if iv == nil {
+				iv = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, r)
+			}
+			if iv == nil {
+				break
+			}
+			// float IV rejected (StatementArrayOp.cpp:112–115)
+			if iv.Type != nil && iv.Type.IsFloat() {
+				invalid[iv] = true
+				continue
+			}
+			if iv.IsVolatile() {
+				volCount++
+			}
+			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
+			if (opts.StrictVolatileRule && volCount > 1 && iv.IsVolatile()) ||
+				(opts.CComp && iv.IsPackedAggregateFieldVar()) ||
+				(!opts.SignedCharIndex && iv.Type != nil && iv.Type.IsSignedChar()) {
+				invalid[iv] = true
+				continue
+			}
+			break
 		}
 		if iv != nil {
 			invalid[iv] = true
+			// StatementArrayOp.cpp:129–131 — read_indices + write_var
+			cgp := &cg
+			_ = cgp.ReadIndices(iv, facts)
+			cgp.WriteVar(iv)
+			// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
+			cg.AddIVBound(iv, size)
 		}
+		_ = di
 		dims = append(dims, &LoopControl{
 			IV:       iv,
-			InitN:    init,
+			InitN:    initN,
 			LimitN:   size,
-			IncrN:    incr,
+			IncrN:    incrN,
 			TestOp:   BinCmpLt,
 			IncrOp:   AssignAdd,
 			SafeIncr: opts.SafeMath,
 		})
 	}
-	bodyCG := cg.WithFlags(FlagInLoop)
-	// access with ctrl vars: a[i0][i1]… (not constant itemize)
+	// StatementArrayOp.cpp:137 — write_var(av)
+	cg.WriteVar(&av.Variable)
+
+	// access with ctrl vars: a[i0][i1]…
 	access := av.Name
 	for _, d := range dims {
 		if d != nil && d.IV != nil {
@@ -218,11 +263,47 @@ func MakeRandomArrayInit(
 			access += "[0]"
 		}
 	}
-	rhs := MakeRandomExpression(r, opts, tables, vs, bodyCG, av.Type, nil, true, false, MaxTermTypes, cg.ExprDepth)
-	if rhs == nil {
-		rhs = MakeRandomExpression(r, opts, tables, vs, bodyCG, av.Type, nil, true, false, TermConstant, cg.ExprDepth)
+
+	// StatementArrayOp.cpp:141–143 — make_init_value in random parent block
+	var parent *Block
+	if blk := cg.CurrentBlock(); blk != nil {
+		parent = blk.RandomParentBlock(r, false)
+		if parent == nil {
+			parent = blk
+		}
 	}
-	// aggregate constant init may need tmp — emit direct assign for simple
+	qfer := av.Qfer
+	rhs := vs.MakeInitValue(AccessRead, cg, av.Type, &qfer, parent, r)
+	if rhs == nil {
+		// fallback constant
+		c := MakeRandom(av.Type, opts, r)
+		if c != nil {
+			rhs = &Expression{Term: TermConstant, Con: c, ExprType: av.Type}
+		}
+	}
+	// StatementArrayOp.cpp:144 — init->visit_facts
+	if cg.FM != nil && rhs != nil {
+		cgp := &cg
+		_ = VisitFactsExpression(rhs, cgp, opts)
+	}
+
+	// StatementArrayOp.cpp:145–150 — StatementArrayOp + update_fact_for_assign
+	if cg.FM != nil {
+		// LHS is the collective array variable
+		if cg.FM.UpdateFactForAssign(&av.Variable, 0, rhs) {
+			if cg.CurrentFunc != nil {
+				cg.CurrentFunc.FactChanged = true
+			}
+		}
+	}
+
+	// clear IV list (StatementArrayOp.cpp:154–156)
+	for _, d := range dims {
+		if d != nil && d.IV != nil {
+			cg.RemoveIVBound(d.IV)
+		}
+	}
+
 	innerBody := &Block{
 		Func: cg.CurrentFunc,
 		Stmts: []Stmt{{
@@ -230,22 +311,31 @@ func MakeRandomArrayInit(
 			Expr:        rhs,
 			AssignOp:    AssignSimple,
 			ArrayAccess: access,
+			LhsVar:      &av.Variable,
 		}},
 	}
 	// nest fors: outermost first dim (StatementArrayOp::output_header)
-	// StmtArrayOp.Loop = outer; Then nests further ArrayOp fors or final body
+	if len(dims) == 0 {
+		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody}
+	}
 	st := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        dims[len(dims)-1],
 		Then:        innerBody,
 		ArrayAccess: access,
+		StmID:       AllocStmID(),
 	}
 	for i := len(dims) - 2; i >= 0; i-- {
 		st = Stmt{
-			Kind: StmtArrayOp,
-			Loop: dims[i],
-			Then: &Block{Func: cg.CurrentFunc, Stmts: []Stmt{st}},
+			Kind:  StmtArrayOp,
+			Loop:  dims[i],
+			Then:  &Block{Func: cg.CurrentFunc, Stmts: []Stmt{st}},
+			StmID: AllocStmID(),
 		}
+	}
+	// map_stm_effect[sa] = effect_stm (StatementArrayOp.cpp:151)
+	if cg.FM != nil && st.StmID > 0 {
+		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
 	}
 	_ = probs
 	return st

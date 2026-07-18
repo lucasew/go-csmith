@@ -22,6 +22,8 @@ func MakeRandomContinue(
 		return st
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
+	// StatementContinue.cpp:72 — clear effect_stm before condition
+	cg.EffectStm = EmptyEffect()
 	expr := MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
 	if expr == nil {
 		expr = makeExpressionVariable(r, vs, cg, GetIntType(), nil)
