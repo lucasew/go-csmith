@@ -156,14 +156,16 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		preAccum = cg.EffectAccum.Clone()
 	}
 
+	// StatementIf.cpp:170–177 — both arms always live Blocks
+	if st.Then == nil || st.Else == nil {
+		return false
+	}
 	// StatementIf.cpp:170–173 — true branch from post-cond facts
 	thenAccum := preAccum
 	thenCG := *cg
 	thenCG.EffectAccum = &thenAccum
-	if st.Then != nil {
-		if !VisitFactsBlock(st.Then, &thenCG, opts) {
-			return false
-		}
+	if !VisitFactsBlock(st.Then, &thenCG, opts) {
+		return false
 	}
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
@@ -176,10 +178,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	elseAccum := preAccum
 	elseCG := *cg
 	elseCG.EffectAccum = &elseAccum
-	if st.Else != nil {
-		if !VisitFactsBlock(st.Else, &elseCG, opts) {
-			return false
-		}
+	if !VisitFactsBlock(st.Else, &elseCG, opts) {
+		return false
 	}
 	var elseFacts []*FactPointTo
 	if cg.FM != nil {
@@ -236,22 +236,25 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
 		return false
 	}
+	// StatementFor.cpp:430+ — always has init StatementAssign, body Block, IV
+	if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+		return false
+	}
 	// StatementFor.cpp:430–432 — walk initializing statement
-	if st.Loop != nil {
-		if st.Loop.InitStmt != nil {
-			if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
-				return false
-			}
-		} else if st.Loop.IV != nil {
-			initLhs := &Lhs{Var: st.Loop.IV, Type: st.Loop.IV.Type}
-			initSt := Stmt{
-				Kind: StmtAssign, LhsVar: st.Loop.IV, Lhs: initLhs,
-				Expr: &Expression{Term: TermConstant, Con: MakeInt(st.Loop.InitN)},
-				AssignOp: AssignSimple,
-			}
-			if !VisitFactsStatementAssign(&initSt, cg, opts) {
-				return false
-			}
+	if st.Loop.InitStmt != nil {
+		if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
+			return false
+		}
+	} else {
+		// incomplete IR without InitStmt: reconstruct from IV+InitN (library partial)
+		initLhs := &Lhs{Var: st.Loop.IV, Type: st.Loop.IV.Type}
+		initSt := Stmt{
+			Kind: StmtAssign, LhsVar: st.Loop.IV, Lhs: initLhs,
+			Expr: &Expression{Term: TermConstant, Con: MakeInt(st.Loop.InitN)},
+			AssignOp: AssignSimple,
+		}
+		if !VisitFactsStatementAssign(&initSt, cg, opts) {
+			return false
 		}
 	}
 	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init
@@ -261,27 +264,20 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	eff := cg.EffectStm.Clone()
 
-	var iv *Variable
-	if st.Loop != nil {
-		iv = st.Loop.IV
-	}
-	if iv != nil {
-		// StatementFor.cpp:437–443 — scalar IV; not outer loop IV (assert upstream)
-		if cg.IVBounds != nil {
-			if _, ok := cg.IVBounds[iv]; ok {
-				// outer IV — upstream asserts; still track for body reject
-			}
+	iv := st.Loop.IV
+	// StatementFor.cpp:437–443 — scalar IV; not outer loop IV (assert upstream)
+	if cg.IVBounds != nil {
+		if _, ok := cg.IVBounds[iv]; ok {
+			// outer IV — upstream asserts; still track for body reject
 		}
-		cg.AddIVBound(iv, 0)
-		defer cg.RemoveIVBound(iv)
 	}
+	cg.AddIVBound(iv, 0)
+	defer cg.RemoveIVBound(iv)
 	// StatementFor.cpp:445–449 — body under IN_LOOP (body uses shared accum)
 	bodyCG := *cg
 	bodyCG.Flags |= FlagInLoop
-	if st.Then != nil {
-		if !VisitFactsBlock(st.Then, &bodyCG, opts) {
-			return false
-		}
+	if !VisitFactsBlock(st.Then, &bodyCG, opts) {
+		return false
 	}
 	if cg.FM != nil {
 		// StatementFor.cpp:452–458
@@ -318,13 +314,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 	// StatementFor.cpp:468 — set_accumulated_effect_after_block(eff, &body, …)
-	if st.Then != nil {
-		bodyEff := EmptyEffect()
-		if cg.FM != nil && st.Then.StmID > 0 {
-			bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
-		}
-		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
+	bodyEff := EmptyEffect()
+	if cg.FM != nil && st.Then.StmID > 0 {
+		bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
 	}
+	SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
 	return true
 }
 
@@ -350,6 +344,10 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		cur = next
 	}
+	// StatementArrayOp.cpp:270–275 — ctrl_vars sized to dimension; empty is incomplete IR
+	if len(ivs) == 0 {
+		return false
+	}
 	// StatementArrayOp.cpp:270–275 — check_write_var each ctrl var
 	facts := cg.pointToFacts()
 	for _, iv := range ivs {
@@ -361,8 +359,9 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// find innermost body assign (array init) or nested block body
 	inner := findArrayOpInnermost(st)
+	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete
 	if inner == nil {
-		return true
+		return false
 	}
 
 	// body path: nested fors around a Block of statements (array loop)

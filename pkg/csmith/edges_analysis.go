@@ -205,8 +205,9 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 // Block.cpp:513–568 — merge back edges, shortcut, locals, analyze stmts, loop.
 // failIndex is the statement index that failed analyze_with_edges_in, or -1.
 func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Options, visitOnce bool) (facts []*FactPointTo, failIndex int, ok bool) {
+	// Block.cpp:513+ — always live this + cg_context; no soft invent success on nil
 	if b == nil || cg == nil {
-		return inputs, -1, true
+		return inputs, -1, false
 	}
 	fm := cg.FM
 	currentInputs := CloneFactSlice(inputs)
