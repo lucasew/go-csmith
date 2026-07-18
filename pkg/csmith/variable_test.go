@@ -83,9 +83,25 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 	if CreateVariableScalars("g_s", st, false, false) != nil {
 		t.Fatal("nil process probs must not invent aggregate init")
 	}
-	// simple still ok (MakeRandom allows nil probs for non-aggregate)
+	// simple non-aggregate still works with process RNG (probs optional for simple)
 	if CreateVariableScalars("g_i", GetIntType(), false, false) == nil {
-		t.Fatal("simple without process probs")
+		t.Fatal("simple with process RNG")
+	}
+}
+
+func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
+	// Variable.cpp:395 — Constant::make_random uses process RNG; no invent private stream
+	prevR := ProcessRng()
+	SetProcessRng(nil)
+	defer SetProcessRng(prevR)
+	ClearError()
+	// simple needs pure_rnd — fail closed without invent nextCreateVarRng
+	if CreateVariableScalars("g_i", GetIntType(), false, false) != nil {
+		t.Fatal("simple must fail closed without ProcessRng")
+	}
+	// pointer constant is "0" without RNG draws (Constant.cpp:308–310)
+	if CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false) == nil {
+		t.Fatal("pointer init must not require RNG")
 	}
 }
 

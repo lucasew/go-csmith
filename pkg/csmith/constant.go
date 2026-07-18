@@ -147,21 +147,14 @@ func splitConstFields(s string) []string {
 // generateRandomConstant mirrors GenerateRandomConstant (simple + pointer only).
 // Constant.cpp:296–...
 func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rng) string {
-	// Constant.cpp:296+ — uses process RNG; no soft invent NewRng(0) for nil
-	if r == nil {
-		return ""
-	}
+	// Constant.cpp:302–314 — type dispatch before pure_rnd (no invent require RNG first)
 	if typ == nil {
 		// Constant.cpp:303–304 — type==0 → "0"
 		return "0"
 	}
-	// Pointer → "0" (no RNG). Constant.cpp:308–310
-	if typ.PtrType() != nil {
-		return "0"
-	}
 	if typ.IsStruct() {
 		// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
-		if probs == nil {
+		if r == nil || probs == nil {
 			return ""
 		}
 		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
@@ -170,7 +163,7 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		return ""
 	}
 	if typ.IsUnion() {
-		if probs == nil {
+		if r == nil || probs == nil {
 			return ""
 		}
 		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
@@ -178,13 +171,20 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		}
 		return ""
 	}
-	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union; no soft invent "0"
+	// Constant.cpp:308–310 — pointer constant is always "0" (no RNG draw)
+	if typ.PtrType() != nil {
+		return "0"
+	}
+	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union
 	if !typ.IsSimple() {
 		return ""
 	}
-	// Constant.cpp:312 — assert(st != eVoid); switch eVoid→"/* void */" is dead after assert
-	// no soft invent comment literal
+	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal
 	if typ.Simple() == EVoid {
+		return ""
+	}
+	// simple non-void needs process RNG (no invent NewRng for nil)
+	if r == nil {
 		return ""
 	}
 	st := typ.Simple()

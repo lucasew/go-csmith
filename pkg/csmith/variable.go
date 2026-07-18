@@ -4,12 +4,7 @@ package csmith
 
 import (
 	"strings"
-	"sync/atomic"
 )
-
-// createVarSeed advances library-only CreateVariable when ProcessRng is unset
-// (C++ always has DefaultRndNumGenerator; NewRng(1) fixed seed was soft invent).
-var createVarSeed uint64
 
 // ctrl_vars pool mirrors Variable::ctrl_vars_vectors / ctrl_vars_count.
 // Variable.cpp:73–74, 747–776.
@@ -426,21 +421,11 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 	return v
 }
 
-// nextCreateVarRng is library/test fallback when no session ProcessRng is installed.
-// During generation, ProcessRng (DefaultRndNumGenerator) is used instead.
-func nextCreateVarRng() *Rng {
-	s := atomic.AddUint64(&createVarSeed, 1)
-	return NewRng(s)
-}
-
 // createVarRng mirrors process DefaultRndNumGenerator for CreateVariable init.
 // Variable.cpp:395 Constant::make_random uses the process RNG stream.
+// Nil when ProcessRng unset — fail closed (no invent private advancing NewRng stream).
 func createVarRng() *Rng {
-	if r := ProcessRng(); r != nil {
-		return r
-	}
-	// no invent NewRng(1); advancing seed only outside a generation session
-	return nextCreateVarRng()
+	return ProcessRng()
 }
 
 // CreateVariableScalars mirrors
