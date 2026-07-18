@@ -190,8 +190,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 }
 
 // SelectGlobal mirrors VariableSelector::SelectGlobal.
-// VariableSelector.cpp:669–695 — choose_var(GlobalList, …, eFlexible); else GenerateNewGlobal.
-// random_type_from_type applied on create path; expand_struct not enabled by default.
+// VariableSelector.cpp:669–695 — choose_var; expand_struct eager create; else GenerateNewGlobal.
 func (vs *VariableSelector) SelectGlobal(
 	access Access,
 	cg CGContext,
@@ -208,6 +207,12 @@ func (vs *VariableSelector) SelectGlobal(
 	if v != nil {
 		return v
 	}
+	// VariableSelector.cpp:677–684 — expand_struct eager path
+	if vs.Opts.ExpandStruct {
+		if v = vs.EagerCreateGlobalStruct(access, cg, t, qfer, r, MatchFlexible); v != nil {
+			return v
+		}
+	}
 	// SelectGlobal.cpp:685–694 — random_type_from_type then GenerateNewGlobal
 	noVol := qfer != nil && !qfer.Wildcard && !qfer.IsVolatile()
 	t2 := RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, noVol)
@@ -215,6 +220,39 @@ func (vs *VariableSelector) SelectGlobal(
 		t2 = t
 	}
 	return vs.GenerateNewGlobal(access, cg, t2, qfer, r)
+}
+
+// EagerCreateGlobalStruct mirrors VariableSelector::eager_create_global_struct.
+// VariableSelector.cpp:607–633 — create a random ok struct global, then choose_var field.
+func (vs *VariableSelector) EagerCreateGlobalStruct(
+	access Access,
+	cg CGContext,
+	typ *Type,
+	qfer *CVQualifiers,
+	r *Rng,
+	mt MatchType,
+) *Variable {
+	if vs == nil || typ == nil || r == nil || vs.Types == nil {
+		return nil
+	}
+	level := typ.IndirectLevel()
+	if level > 1 {
+		return nil
+	}
+	// Type::choose_random_struct_from_type — pick any ok struct/union
+	cands := okStructUnionLTypes(vs.Types, false, true, true)
+	if len(cands) == 0 {
+		return nil
+	}
+	st := cands[r.RndUpto(uint32(len(cands)))]
+	if st == nil {
+		return nil
+	}
+	// level 0: create struct; level 1: still create struct (fields may match *T after expand)
+	_ = vs.GenerateNewGlobal(access, cg, st, qfer, r)
+	// choose_var(GlobalList, …) for field matching desired type
+	skipConst := access == AccessWrite
+	return ChooseOKVarMatch(r, vs.GlobalList, typ, mt, skipConst)
 }
 
 // GenerateParameterVariableTyped mirrors

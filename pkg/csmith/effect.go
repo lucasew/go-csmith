@@ -125,25 +125,37 @@ func (e Effect) CommentOutput() string {
 	return b.String()
 }
 
-// MergeEffects combines two post-branch effects (union of writes; SE-free only if both are).
+// MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).
 // Approximates StatementIf fact/effect merge without FactMgr.
 func MergeEffects(a, b Effect) Effect {
 	out := Effect{
 		pure:           a.pure && b.pure,
 		sideEffectFree: a.sideEffectFree && b.sideEffectFree,
 	}
-	if len(a.written) == 0 && len(b.written) == 0 {
-		return out
-	}
-	out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
-	for k, v := range a.written {
-		if v {
-			out.written[k] = true
+	if len(a.written)+len(b.written) > 0 {
+		out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
+		for k, v := range a.written {
+			if v {
+				out.written[k] = true
+			}
+		}
+		for k, v := range b.written {
+			if v {
+				out.written[k] = true
+			}
 		}
 	}
-	for k, v := range b.written {
-		if v {
-			out.written[k] = true
+	if len(a.read)+len(b.read) > 0 {
+		out.read = make(map[*Variable]bool, len(a.read)+len(b.read))
+		for k, v := range a.read {
+			if v {
+				out.read[k] = true
+			}
+		}
+		for k, v := range b.read {
+			if v {
+				out.read[k] = true
+			}
 		}
 	}
 	if len(out.written) > 0 {
