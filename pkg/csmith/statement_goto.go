@@ -201,8 +201,14 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 	return nil
 }
 
+// makeGotoFailed is StatementGoto::make_random returning nullptr (stmtOK rejects).
+func makeGotoFailed() Stmt {
+	return Stmt{Kind: StmtGoto}
+}
+
 // MakeRandomGoto mirrors StatementGoto::make_random.
-// StatementGoto.cpp:61+ — find_good_jump_block; choose_visible_read_var; cfg_edge.
+// StatementGoto.cpp:61–212 — find_good_jump_block; choose_visible_read_var;
+// back-edge returns goto; forward inserts after other_stm and returns nullptr.
 func MakeRandomGoto(
 	r *Rng,
 	opts Options,
@@ -212,16 +218,15 @@ func MakeRandomGoto(
 	cg CGContext,
 	blk *Block,
 ) Stmt {
-	_ = opts
 	_ = probs
 	if r == nil || cg.CurrentFunc == nil {
-		return Stmt{Kind: StmtGoto}
+		return makeGotoFailed()
 	}
 
 	// clear per-stmt effect (StatementGoto.cpp:112)
 	cg.ClearEffectStm()
 
-	// 40% prefer back-edge (StatementGoto.cpp:76)
+	// 40% prefer back-edge (StatementGoto.cpp:76–84)
 	wantBack := r.RndFlipcoin(40)
 	blocks := append([]*Block(nil), cg.CurrentFunc.Blocks...)
 	// include current if not yet in Blocks list
@@ -248,6 +253,7 @@ func MakeRandomGoto(
 		}
 	}
 	if okBlk == nil {
+		// StatementGoto.cpp:81–84 — forward: as_dest=false (ok_blk is jump source)
 		backEdge = false
 		blocks = append([]*Block(nil), cg.CurrentFunc.Blocks...)
 		if blk != nil {
@@ -262,23 +268,31 @@ func MakeRandomGoto(
 				blocks = append(blocks, blk)
 			}
 		}
-		// forward: dest block for forward jump; as_dest true for dest selection
-		// When back failed, pick dest for forward (as_dest true)
-		okBlk = FindGoodJumpBlock(r, blocks, blk, true)
+		okBlk = FindGoodJumpBlock(r, blocks, blk, false)
 	}
 	if okBlk == nil {
-		// fallback: forward label-after-goto in current block (legacy path)
+		// C++ returns nullptr; library soft-fallback for emission coverage
 		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
 	}
 
-	// pick a good statement in okBlk
+	// StatementGoto.cpp:89–92 — stm is curr_blk->stms.back() (jump dest for forward)
+	var dest *Stmt
+	if blk != nil && len(blk.Stmts) > 0 {
+		dest = &blk.Stmts[len(blk.Stmts)-1]
+	}
+
+	// StatementGoto.cpp:97–107 — s != stm && !must_return
 	var okStms []int
-	for i, s := range okBlk.Stmts {
-		if !goodGotoTarget(s) || s.MustReturn() {
+	for i := range okBlk.Stmts {
+		s := &okBlk.Stmts[i]
+		if dest != nil && s == dest {
 			continue
 		}
-		// skip "current" last stmt identity loosely: same block last
-		if blk == okBlk && i == len(okBlk.Stmts)-1 {
+		// also match by StmID when dest is in a different slice cell with same id
+		if dest != nil && s.StmID != 0 && dest.StmID != 0 && s.StmID == dest.StmID {
+			continue
+		}
+		if s.MustReturn() {
 			continue
 		}
 		okStms = append(okStms, i)
@@ -287,14 +301,12 @@ func MakeRandomGoto(
 		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
 	}
 	ti := okStms[r.RndUpto(uint32(len(okStms)))]
-	tgt := &okBlk.Stmts[ti]
-	if tgt.StmID == 0 {
-		tgt.StmID = AllocStmID()
+	other := &okBlk.Stmts[ti]
+	if other.StmID == 0 {
+		other.StmID = AllocStmID()
 	}
 
 	// condition: prefer already-read visible var (StatementGoto.cpp:117–132)
-	// back: curr_blk + effect_accum reads; forward: ok_blk + map_accum_effect[dest]
-	var cond *Expression
 	var uf []*FactUnion
 	if cg.FM != nil {
 		uf = cg.FM.UnionFacts
@@ -310,83 +322,184 @@ func MakeRandomGoto(
 		// StatementGoto.cpp:125–128 — travel in time to other_stm accum effect
 		condBlk = okBlk
 		if cg.FM != nil {
-			if acc, ok := cg.FM.MapAccumEffect[tgt.StmID]; ok {
+			if acc, ok := cg.FM.MapAccumEffect[other.StmID]; ok {
 				readVars = acc.ReadVars()
 			}
-			// prefer union facts from dest out when available
-			if out, ok := cg.FM.MapFactsOut[tgt.StmID]; ok && len(out) > 0 {
-				// map_facts_out used for nonreadable filter via uf only; point-to list not required here
-				_ = out
-			}
-		}
-		if len(readVars) == 0 && cg.EffectAccum != nil {
-			readVars = cg.EffectAccum.ReadVars()
 		}
 	}
+	var cond *Expression
 	if len(readVars) > 0 {
 		if v := ChooseVisibleReadVar(r, condBlk, readVars, GetIntType(), uf); v != nil {
 			cg.NoteRead(v)
 			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 		}
 	}
-	// C++ returns nullptr when cond_var missing; we soft-fallback for library generation
+	// StatementGoto.cpp:130–132 — nullptr when cond_var missing
 	if cond == nil {
-		cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+		// library soft-fallback only when no fact maps (generation without DFA prep)
+		if cg.FM == nil || len(readVars) == 0 {
+			cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, true, TermVariable, cg.ExprDepth)
+			if cond == nil {
+				cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+			}
+		}
 		if cond == nil {
-			cond = MakeRandomExpression(r, opts, tables, vs, cg, GetIntType(), nil, true, false, TermVariable, cg.ExprDepth)
+			return makeGotoFailed()
 		}
 	}
 
-	// StatementGoto.cpp:224–229 — stm_labels[dest]
 	nextLab := func() string {
 		if vs != nil {
 			return vs.Sym.Next("lbl_")
 		}
 		return "lbl_1"
 	}
-	label := tgt.SourceLabel
+
+	if backEdge {
+		// StatementGoto.cpp:138–150 — goto in curr jumps to other_stm
+		label := other.SourceLabel
+		if label == "" {
+			label = LabelForGotoDest(other.StmID, nextLab)
+			other.SourceLabel = label
+		} else if other.StmID > 0 {
+			stmLabels[other.StmID] = label
+		}
+		st := Stmt{
+			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
+			GotoBack:       true,
+			GotoDestStmID:  other.StmID,
+			GotoDestParent: okBlk,
+			InitSkippedVars: CollectInitSkippedVars(blk, okBlk),
+		}
+		// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm, false, true)
+		if cg.FM != nil {
+			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, other.StmID, false, true)
+		}
+		// StatementGoto.cpp:141–147 — LCA need_revisit
+		MarkNeedRevisitLCA(blk, other)
+		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
+		RecordBackwardJump()
+		return st
+	}
+
+	// Forward path — StatementGoto.cpp:152–211
+	// Dest is last stmt of curr; goto is inserted after other_stm in okBlk.
+	// C++ returns nullptr after insert (side-effect only); stmtOK rejects empty label.
+	if dest == nil {
+		return makeForwardGotoOnly(r, opts, vs, tables, cg, blk)
+	}
+	if dest.StmID == 0 {
+		dest.StmID = AllocStmID()
+	}
+	label := dest.SourceLabel
 	if label == "" {
-		label = LabelForGotoDest(tgt.StmID, nextLab)
-		tgt.SourceLabel = label
-	} else {
-		// keep SourceLabel; ensure registry knows it
-		if tgt.StmID > 0 {
-			stmLabels[tgt.StmID] = label
+		label = LabelForGotoDest(dest.StmID, nextLab)
+		dest.SourceLabel = label
+	} else if dest.StmID > 0 {
+		stmLabels[dest.StmID] = label
+	}
+
+	fm := cg.FM
+	foundNewFacts := false
+	var gotoIn, gotoOut, stmInMerged, stmOut []*FactPointTo
+	if fm != nil {
+		// StatementGoto.cpp:159–162 — ctrl uses facts_in, else facts_out
+		if IsCtrlStmt(other) {
+			gotoIn = CloneFactSlice(fm.MapFactsIn[other.StmID])
+		} else {
+			gotoIn = CloneFactSlice(fm.MapFactsOut[other.StmID])
+		}
+		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
+		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
+		// StatementGoto.cpp:164–166 — merge effect from goto src
+		preEffect := cg.AccumEffect()
+		if acc, ok := fm.MapAccumEffect[other.StmID]; ok {
+			cg.AddEffect(acc, true)
+		}
+		// StatementGoto.cpp:167–182
+		stmInMerged = CloneFactSlice(fm.MapFactsIn[dest.StmID])
+		if MergeJumpFacts(&stmInMerged, gotoOut) {
+			stmOut = CloneFactSlice(stmInMerged)
+			foundNewFacts = true
+			factsInCopy := make(map[int][]*FactPointTo)
+			factsOutCopy := make(map[int][]*FactPointTo)
+			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy)
+			// feed merged facts as global for visit (stm_visit_facts inputs)
+			fm.GlobalFacts = CloneFactSlice(stmInMerged)
+			if !VisitFactsStmt(dest, &cg, opts) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				return makeGotoFailed()
+			}
+			// visit may update GlobalFacts as outs; capture for set_fact_out
+			stmOut = CloneFactSlice(fm.GlobalFacts)
+			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out
+			if ContainsStmt(dest, other) {
+				gotoOut = nil
+				UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
+			}
 		}
 	}
 
-	st := Stmt{
-		Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
-		GotoDestStmID:  tgt.StmID,
-		GotoDestParent: okBlk,
+	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
+	sg := Stmt{
+		Kind:            StmtGoto,
+		Expr:            cond,
+		Label:           label,
+		StmID:           AllocStmID(),
+		GotoForward:     true,
+		GotoDestStmID:   dest.StmID,
+		GotoDestParent:  blk,
+		InitSkippedVars: CollectInitSkippedVars(okBlk, blk),
 	}
-	if backEdge {
-		st.GotoBack = true
-		// jump from curr (blk) into okBlk → collect skipped locals
-		st.InitSkippedVars = CollectInitSkippedVars(blk, okBlk)
-		// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm, false, true)
-		if cg.FM != nil {
-			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, true)
+	// re-resolve other index (slice stable until insert)
+	insertAt := -1
+	for i := range okBlk.Stmts {
+		if okBlk.Stmts[i].StmID == other.StmID {
+			insertAt = i
+			break
 		}
-		// StatementGoto.cpp:141–147 — LCA need_revisit
-		MarkNeedRevisitLCA(blk, tgt)
-		// StatementGoto.cpp:149 — Bookkeeper::backward_jump_cnt++
-		RecordBackwardJump()
-	} else {
-		st.GotoForward = true
-		// jump from okBlk into curr (blk)
-		st.InitSkippedVars = CollectInitSkippedVars(okBlk, blk)
+	}
+	if insertAt < 0 {
+		insertAt = ti
+	}
+	okBlk.Stmts = append(okBlk.Stmts[:insertAt+1], append([]Stmt{sg}, okBlk.Stmts[insertAt+1:]...)...)
+	// pointer to inserted stmt for fact maps
+	ins := &okBlk.Stmts[insertAt+1]
+
+	if fm != nil {
+		// StatementGoto.cpp:195–202
+		fm.SetMapFactsIn(ins.StmID, gotoIn)
+		fm.SetMapFactsOut(ins.StmID, gotoOut)
+		if fm.MapVisited == nil {
+			fm.MapVisited = make(map[int]bool)
+		}
+		fm.MapVisited[ins.StmID] = true
+		if foundNewFacts {
+			// StatementGoto.cpp:200–201 — set_fact_in(stm, stm_in); set_fact_out(stm, stm_out)
+			fm.SetMapFactsIn(dest.StmID, stmInMerged)
+			fm.SetMapFactsOut(dest.StmID, stmOut)
+		}
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
-		if cg.FM != nil {
-			cg.FM.CreateCFGEdgeTo(st.StmID, okBlk, tgt.StmID, false, false)
+		fm.CreateCFGEdgeTo(ins.StmID, blk, dest.StmID, false, false)
+		// StatementGoto.cpp:204–210
+		if out, ok := fm.MapFactsOut[dest.StmID]; ok {
+			fm.GlobalFacts = CloneFactSlice(out)
 		}
-		// StatementGoto.cpp:211 — Bookkeeper::forward_jump_cnt++
-		RecordForwardJump()
+		if IsCtrlStmt(dest) || dest.Kind == StmtReturn {
+			if in, ok := fm.MapFactsIn[dest.StmID]; ok {
+				fm.GlobalFacts = CloneFactSlice(in)
+			}
+		}
 	}
-	return st
+	// StatementGoto.cpp:211
+	RecordForwardJump()
+	// StatementGoto.cpp:212 — return nullptr (goto already in other_blk)
+	return makeGotoFailed()
 }
 
 // makeForwardGotoOnly is the fall-back: label placed after goto in current block.
+// Used when C++ would return nullptr but library generation still needs a goto.
 func makeForwardGotoOnly(
 	r *Rng,
 	opts Options,

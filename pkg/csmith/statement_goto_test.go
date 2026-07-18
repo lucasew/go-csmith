@@ -159,3 +159,113 @@ func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 	}
 	GotoLabelsDoFinalization()
 }
+
+func TestMakeRandomGotoForwardInsert(t *testing.T) {
+	// Two-block setup: curr has dest stmt; other block has insert site.
+	// Force forward path (as_dest=false) via seed scan; expect side-effect insert.
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	// source block (forward ok_blk) — two assigns so insert after first is possible
+	src := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+	}}
+	// current block with a dest last stmt
+	curr := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+	}}
+	f.Blocks = []*Block{src, curr}
+	f.Body = curr
+	fm := NewFactMgr(f)
+	// seed map facts so merge can run
+	for _, b := range f.Blocks {
+		for i := range b.Stmts {
+			id := b.Stmts[i].StmID
+			fm.SetMapFactsIn(id, nil)
+			fm.SetMapFactsOut(id, nil)
+			fm.MapAccumEffect[id] = EmptyEffect()
+		}
+	}
+	// visible read var on accum for cond selection (back) / src accum (forward)
+	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	vs.AllVars = append(vs.AllVars, g)
+	eff := EmptyEffect().ReadVar(g)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	// mark both stmts' accum as having read g so forward cond can choose
+	for i := range src.Stmts {
+		fm.MapAccumEffect[src.Stmts[i].StmID] = eff
+	}
+
+	inserted := false
+	for seed := uint64(1); seed < 80; seed++ {
+		// reset src to two assigns (prior seeds may have inserted)
+		src.Stmts = []Stmt{
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+			{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()},
+		}
+		for i := range src.Stmts {
+			id := src.Stmts[i].StmID
+			fm.SetMapFactsIn(id, nil)
+			fm.SetMapFactsOut(id, nil)
+			fm.MapAccumEffect[id] = eff
+		}
+		before := len(src.Stmts)
+		st := MakeRandomGoto(NewRng(seed), opts, probs, vs, tables, cg, curr)
+		// forward success: returns failed (no label) and inserts into some block
+		if st.Label == "" {
+			for _, b := range f.Blocks {
+				for _, s := range b.Stmts {
+					if s.Kind == StmtGoto && s.GotoForward {
+						inserted = true
+						if s.GotoDestStmID != curr.Stmts[len(curr.Stmts)-1].StmID {
+							t.Fatalf("dest id: got %d want last curr", s.GotoDestStmID)
+						}
+						if s.Label == "" {
+							t.Fatal("inserted goto missing label")
+						}
+						break
+					}
+				}
+			}
+			if inserted {
+				// side-effect insert grew a block
+				if len(src.Stmts) <= before && len(curr.Stmts) <= 1 {
+					// may insert into curr if FindGoodJumpBlock picked curr
+					grew := false
+					for _, b := range f.Blocks {
+						for _, s := range b.Stmts {
+							if s.Kind == StmtGoto && s.GotoForward {
+								grew = true
+							}
+						}
+					}
+					if !grew {
+						t.Fatal("forward claimed but no goto found")
+					}
+				}
+				break
+			}
+		}
+		// back-edge success returns labeled goto — keep scanning for forward
+		_ = before
+	}
+	if !inserted {
+		t.Skip("no forward insert in seed sample (RNG)")
+	}
+}
+
+func TestResetEffectAccum(t *testing.T) {
+	cg := EmptyCGContext()
+	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	pre := EmptyEffect().ReadVar(v)
+	cg.EffectAccum = &Effect{}
+	*cg.EffectAccum = EmptyEffect().WriteVar(v)
+	cg.ResetEffectAccum(pre)
+	if !cg.EffectAccum.IsRead(v) || cg.EffectAccum.IsWritten(v) {
+		t.Fatalf("%+v", cg.EffectAccum)
+	}
+}

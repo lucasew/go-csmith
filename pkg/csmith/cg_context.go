@@ -216,6 +216,20 @@ func (c *CGContext) ClearEffectStm() {
 	c.EffectStm = EmptyEffect()
 }
 
+// ResetEffectAccum mirrors CGContext::reset_effect_accum.
+// CGContext.h:156 — replace effect_accum with a snapshot (e.g. after failed DFA).
+func (c *CGContext) ResetEffectAccum(e Effect) {
+	if c == nil {
+		return
+	}
+	cp := e.Clone()
+	if c.EffectAccum != nil {
+		*c.EffectAccum = cp
+		return
+	}
+	c.EffectAccum = &cp
+}
+
 // ExtendCallChain mirrors CGContext::extend_call_chain.
 // CGContext.cpp:470–478 — copy parent chain, push current block.
 func (c *CGContext) ExtendCallChain(from CGContext) {
