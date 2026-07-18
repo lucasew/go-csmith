@@ -709,11 +709,8 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			if st.Loop != nil && st.Loop.IV != nil {
-				iv := st.Loop.IV.OutputC()
-				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
-				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
-				incr := forIncrOutput(st.Loop)
-				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
+				// StatementFor::Output — header from make_iteration IR
+				sb.WriteString(forHeaderOutput(st.Loop) + "\n")
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
 				} else {
@@ -757,11 +754,7 @@ func (b *Block) Output(indent int) string {
 		case StmtArrayOp:
 			// Emit as for-loop over array write (MakeRandomArrayOp filled Loop+Then).
 			if st.Loop != nil && st.Loop.IV != nil {
-				iv := st.Loop.IV.OutputC()
-				init := fmt.Sprintf("%s = %d", iv, st.Loop.InitN)
-				test := fmt.Sprintf("%s %s %d", iv, st.Loop.TestOp.CmpOpC(), st.Loop.LimitN)
-				incr := forIncrOutput(st.Loop)
-				sb.WriteString(fmt.Sprintf("for (%s; %s; %s)\n", init, test, incr))
+				sb.WriteString(forHeaderOutput(st.Loop) + "\n")
 				if st.Then != nil {
 					sb.WriteString(st.Then.Output(indent + 1))
 				} else {

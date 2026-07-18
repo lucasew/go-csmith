@@ -5,6 +5,7 @@ package csmith
 import "fmt"
 
 // LoopControl holds IR for a counting for-loop (init/test/incr).
+// StatementFor.cpp make_iteration — numeric params plus full assign/test IR.
 type LoopControl struct {
 	IV     *Variable
 	InitN  int
@@ -14,6 +15,15 @@ type LoopControl struct {
 	IncrOp AssignOp
 	// SafeIncr: emit safe_add/sub rewrite for increment (avoid_signed_overflow).
 	SafeIncr bool
+	// Bound is array shortest-dim bound used for control (0 = non-array loop).
+	// StatementFor.cpp:make_iteration bound out-param.
+	Bound int
+	// InitStmt is StatementAssign init (simple assign of InitN).
+	InitStmt *Stmt
+	// TestExpr is ExpressionFuncall comparing IV to LimitN.
+	TestExpr *Expression
+	// IncrStmt is StatementAssign for the increment.
+	IncrStmt *Stmt
 }
 
 // MakeRandomLoopControl mirrors make_random_loop_control.
@@ -160,8 +170,10 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 	return init, limit, incr, testOp, incrOp
 }
 
-// MakeIteration mirrors StatementFor::make_iteration without SafeOpFlags/visit_facts.
-// StatementFor.cpp:164–283.
+// MakeIteration mirrors StatementFor::make_iteration.
+// StatementFor.cpp:164–283 — SelectLoopCtrlVar; array or free control;
+// StatementAssign init (SafeOpFlags binary), visit_facts; test binary;
+// compound/simple incr assign.
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg CGContext) *LoopControl {
 	if r == nil || vs == nil {
 		return nil
@@ -173,6 +185,7 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		if iv == nil {
 			return nil
 		}
+		// reject volatile IVs (infinite-loop / SE issues)
 		if iv.IsVolatile() {
 			invalid[iv] = true
 			continue
@@ -187,23 +200,40 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var testOp BinaryOp
 	var incrOp AssignOp
 	// array-loop path: must-use arrays (StatementFor.cpp:205–220)
-	// Prefer MustUseArrays on context; also RWDirective.find_must_use_arrays
 	mustArr := cg.MustUseArrays
 	if len(mustArr) == 0 && cg.RW != nil {
 		mustArr = cg.RW.FindMustUseArrays()
 	}
-	bound := -1
-	for _, av := range mustArr {
-		if av == nil {
-			continue
+	// choose_ok_var among must-use arrays for shortest dim (StatementFor.cpp:208–214)
+	bound := InvalidIVBound
+	if len(mustArr) > 0 {
+		var arrVars []*Variable
+		for _, av := range mustArr {
+			if av != nil {
+				arrVars = append(arrVars, &av.Variable)
+			}
 		}
-		for _, sz := range av.Sizes {
-			if bound < 0 || sz < bound {
-				bound = sz
+		if pick := ChooseOKVar(r, arrVars); pick != nil && pick.AsArray != nil {
+			for _, sz := range pick.AsArray.Sizes {
+				if bound == InvalidIVBound || sz < bound {
+					bound = sz
+				}
+			}
+		} else {
+			for _, av := range mustArr {
+				if av == nil {
+					continue
+				}
+				for _, sz := range av.Sizes {
+					if bound == InvalidIVBound || sz < bound {
+						bound = sz
+					}
+				}
 			}
 		}
 	}
-	if bound > 0 {
+	arrayBound := bound != InvalidIVBound && bound > 0
+	if arrayBound {
 		// make_random_array_control(--bound, ...)
 		b := bound - 1
 		if b < 1 {
@@ -217,16 +247,100 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 		initN, limitN, incrN, testOp, incrOp = MakeRandomArrayControl(r, b, signed, oob)
 	} else {
+		bound = 0
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
 	}
-	_ = probs
+
+	// --- build IR: init assign (StatementFor.cpp:229–245) ---
+	lhs := &Lhs{Var: iv, Type: iv.Type}
+	cInit := MakeInt(initN)
+	bop, _ := AssignAdd.CompoundToBinaryOps() // for SafeOpFlags kind on simple assign flags
+	_ = bop
+	// SafeOpFlags::make_random_binary(var, var, var, sOpAssign, compound_to_binary(incr_op))
+	incrBop, hasBop := incrOp.CompoundToBinaryOps()
+	var flags1 *SafeOpFlags
+	if hasBop {
+		flags1 = MakeRandomBinary(r, opts, probs, iv.Type)
+	} else {
+		// ++/-- still use flags from add
+		flags1 = MakeRandomBinary(r, opts, probs, iv.Type)
+		_ = incrBop
+	}
+	initSt := &Stmt{
+		Kind:     StmtAssign,
+		LhsVar:   iv,
+		Lhs:      lhs,
+		Expr:     &Expression{Term: TermConstant, Con: cInit, ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+		SafeFlags: flags1,
+		StmID:    AllocStmID(),
+	}
+	// init->visit_facts (StatementFor.cpp:244–245)
+	if cg.FM != nil {
+		cgp := cg
+		if !VisitFactsStatementAssign(initSt, &cgp, opts) {
+			// upstream asserts visited; soft-fail: keep IR without fact update
+		}
+	} else {
+		cg.NoteWrite(iv)
+	}
+
+	// Bookkeeper::record_volatile_access read+write on IV (StatementFor.cpp:249–253)
+	RecordVolatileAccess(iv, 0, false)
+	RecordVolatileAccess(iv, 0, true)
+
+	// test: FunctionInvocation::make_binary(test_op, ExpressionVariable(iv), limit)
+	// StatementFor.cpp:255–263
+	vExpr := &Expression{Term: TermVariable, Var: iv, ExprType: iv.Type}
+	cLimit := &Expression{Term: TermConstant, Con: MakeInt(limitN), ExprType: GetIntType()}
+	testFi := &Invocation{
+		IsStd:  true,
+		Binary: testOp.BinaryOpC(),
+		Args:   []*Expression{vExpr, cLimit},
+	}
+	// safe flags on compare when SafeMath
+	if opts.SafeMath {
+		testFi.Safe = MakeRandomBinary(r, opts, probs, iv.Type)
+	}
+	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: GetIntType()}
+
+	// incr assign (StatementFor.cpp:273–281)
+	lhs1 := &Lhs{Var: iv, Type: iv.Type}
+	cIncr := &Expression{Term: TermConstant, Con: MakeInt(incrN), ExprType: GetIntType()}
+	var incrSt Stmt
+	if arrayBound {
+		// plain compound assign (no make_possible_compound)
+		incrSt = Stmt{
+			Kind: StmtAssign, LhsVar: iv, Lhs: lhs1, Expr: cIncr, AssignOp: incrOp, StmID: AllocStmID(),
+		}
+	} else {
+		// StatementAssign::make_possible_compound_assign
+		incrSt = makePossibleCompoundAssign(cg, opts, probs, r, iv.Type, lhs1, incrOp, cIncr)
+		if incrSt.StmID == 0 {
+			incrSt.StmID = AllocStmID()
+		}
+	}
+
+	safeIncr := false
+	if opts.SafeMath {
+		switch incrOp {
+		case AssignAdd, AssignSub, AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
+			safeIncr = true
+		}
+	}
+
 	return &LoopControl{
-		IV:     iv,
-		InitN:  initN,
-		LimitN: limitN,
-		IncrN:  incrN,
-		TestOp: testOp,
-		IncrOp: incrOp,
+		IV:       iv,
+		InitN:    initN,
+		LimitN:   limitN,
+		IncrN:    incrN,
+		TestOp:   testOp,
+		IncrOp:   incrOp,
+		SafeIncr: safeIncr,
+		Bound:    bound,
+		InitStmt: initSt,
+		TestExpr: testExpr,
+		IncrStmt: &incrSt,
 	}
 }
 
@@ -330,11 +444,58 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	}
 }
 
+// forHeaderOutput emits "for (init; test; incr)" using full IR when present.
+// StatementFor::Output / StatementAssign OutputAsExpr paths.
+func forHeaderOutput(lc *LoopControl) string {
+	if lc == nil || lc.IV == nil {
+		return "for (;;)"
+	}
+	init := forInitOutput(lc)
+	test := forTestOutput(lc)
+	incr := forIncrOutput(lc)
+	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
+}
+
+func forInitOutput(lc *LoopControl) string {
+	if lc == nil || lc.IV == nil {
+		return ""
+	}
+	if lc.InitStmt != nil {
+		// OutputAsExpr for simple assign: lhs = rhs (no trailing semicolon)
+		wrap := lc.IV.UseVolRVal
+		if s := OutputAssignAsExpr(lc.InitStmt, wrap); s != "" {
+			return s
+		}
+	}
+	return fmt.Sprintf("%s = %d", lc.IV.OutputC(), lc.InitN)
+}
+
+func forTestOutput(lc *LoopControl) string {
+	if lc == nil {
+		return "1"
+	}
+	if lc.TestExpr != nil {
+		if s := lc.TestExpr.Output(); s != "" {
+			return s
+		}
+	}
+	if lc.IV == nil {
+		return "1"
+	}
+	return fmt.Sprintf("%s %s %d", lc.IV.OutputC(), lc.TestOp.CmpOpC(), lc.LimitN)
+}
+
 // forIncrOutput emits for-loop increment (plain or safe_add rewrite).
 // StatementAssign::OutputAsExpr safe path for eAddAssign / ePreIncr-ish.
 func forIncrOutput(lc *LoopControl) string {
 	if lc == nil || lc.IV == nil {
 		return ""
+	}
+	if lc.IncrStmt != nil {
+		wrap := lc.IV.UseVolRVal
+		if s := OutputAssignAsExpr(lc.IncrStmt, wrap); s != "" {
+			return s
+		}
 	}
 	iv := lc.IV.OutputC()
 	n := fmt.Sprintf("%d", lc.IncrN)

@@ -209,16 +209,22 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM != nil {
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	// init as assignment of IV if present
-	if st.Loop != nil && st.Loop.IV != nil {
-		initLhs := &Lhs{Var: st.Loop.IV, Type: st.Loop.IV.Type}
-		initSt := Stmt{
-			Kind: StmtAssign, LhsVar: st.Loop.IV, Lhs: initLhs,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(st.Loop.InitN)},
-			AssignOp: AssignSimple,
-		}
-		if !VisitFactsStatementAssign(&initSt, cg, opts) {
-			return false
+	// StatementFor.cpp:430–432 — walk init statement
+	if st.Loop != nil {
+		if st.Loop.InitStmt != nil {
+			if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
+				return false
+			}
+		} else if st.Loop.IV != nil {
+			initLhs := &Lhs{Var: st.Loop.IV, Type: st.Loop.IV.Type}
+			initSt := Stmt{
+				Kind: StmtAssign, LhsVar: st.Loop.IV, Lhs: initLhs,
+				Expr: &Expression{Term: TermConstant, Con: MakeInt(st.Loop.InitN)},
+				AssignOp: AssignSimple,
+			}
+			if !VisitFactsStatementAssign(&initSt, cg, opts) {
+				return false
+			}
 		}
 	}
 	var iv *Variable
