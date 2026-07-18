@@ -96,6 +96,10 @@ func MakeRandomAssignQfer(
 	if cg == nil {
 		return Stmt{Kind: StmtAssign}
 	}
+	// StatementAssign.cpp:127 — assert(fm); no invent assign without FactMgr
+	if cg.FM == nil {
+		return Stmt{Kind: StmtAssign}
+	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
 	assignTab := NewAssignOpsTable(opts)

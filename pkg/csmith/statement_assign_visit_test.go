@@ -70,7 +70,8 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 		t.Fatal("global")
 	}
 	eff := EmptyEffect()
-	cg := EmptyCGContext()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	cg.ExprDepth = 0

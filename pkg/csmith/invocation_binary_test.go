@@ -89,6 +89,36 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	_ = b
 }
 
+func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
+	// FunctionInvocationUnary.cpp:117 — assert invalid operator; no invent eInt
+	arg := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "??", Args: []*Expression{arg}}
+	if fi.GetType() != nil {
+		t.Fatal("invalid unary op must fail closed")
+	}
+	// valid not
+	fi.Unary = "!"
+	if fi.GetType() != GetIntType() {
+		t.Fatal("!")
+	}
+	// empty args for minus
+	fi.Unary = "-"
+	fi.Args = nil
+	if fi.GetType() != nil {
+		t.Fatal("empty args")
+	}
+}
+
+func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
+	// StatementAssign.cpp:127 assert(fm)
+	opts := Defaults()
+	c := EmptyCGContext()
+	st := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
+	if st.LhsVar != nil || st.Expr != nil {
+		t.Fatal("nil FM must fail closed empty assign")
+	}
+}
+
 func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	// no soft invent visit success on nil / short args
 	cg := EmptyCGContext()

@@ -15,7 +15,8 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	tab := &ThresholdTable{}
 	tab.Add(100, int(StmtAssign))
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	cg := WithFunc(f, EmptyEffect())
+	// StatementAssign.cpp:127 assert(fm) — assign needs FactMgr
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	cg.Types = &TypeEnv{}
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
 	eff := EmptyEffect()

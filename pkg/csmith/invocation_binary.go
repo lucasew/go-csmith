@@ -53,8 +53,9 @@ func GetBinopString(op BinaryOp) string {
 }
 
 // IsReturnTypeFloat mirrors FunctionInvocationBinary::is_return_type_float.
-// FunctionInvocationBinary.cpp:184–187 — op_flags size is sFloat.
+// FunctionInvocationBinary.cpp:184–187 — assert(op_flags); size is sFloat.
 func (fi *Invocation) IsReturnTypeFloat() bool {
+	// assert(op_flags) — missing Safe → false (not invent float return)
 	if fi == nil || fi.Safe == nil {
 		return false
 	}
@@ -85,17 +86,20 @@ func (fi *Invocation) GetType() *Type {
 // getTypeUnary mirrors FunctionInvocationUnary::get_type.
 // FunctionInvocationUnary.cpp:114–131.
 func (fi *Invocation) getTypeUnary() *Type {
-	// eNot → int; ePlus/eMinus/eBitNot → operand type
-	if fi.Unary == "!" {
+	// FunctionInvocationUnary.cpp:116–129 — switch on known ops only
+	switch fi.Unary {
+	case "!":
 		return GetIntType()
-	}
-	if len(fi.Args) >= 1 && fi.Args[0] != nil {
-		if t := fi.Args[0].GetType(); t != nil {
-			return t
+	case "+", "-", "~":
+		// C++ param_value[0]->get_type(); missing operand → incomplete IR
+		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			return nil
 		}
+		return fi.Args[0].GetType()
+	default:
+		// FunctionInvocationUnary.cpp:117 assert invalid operator; no invent eInt
+		return nil
 	}
-	// C++ uses param_value[0]->get_type(); missing operand → incomplete IR
-	return nil
 }
 
 // getTypeBinary mirrors FunctionInvocationBinary::get_type.
@@ -202,7 +206,8 @@ func (fi *Invocation) EqualsInt(num int) bool {
 	if fi == nil || !fi.IsStd {
 		return false
 	}
-	// FunctionInvocationUnary.cpp:144–156
+	// FunctionInvocationUnary.cpp:145 — assert(!param_value.empty())
+	// FunctionInvocationBinary.cpp:155 — assert(param_value.size() == 2)
 	if fi.IsUnary {
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
 			return false

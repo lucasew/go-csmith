@@ -82,19 +82,28 @@ func (fi *Invocation) Output() string {
 	}
 	if fi.IsStd {
 		// FunctionInvocationUnary/Binary::Output — param_value[i]->Output; no soft invent "0"
-		a0, a1 := "", ""
-		if len(fi.Args) >= 1 && fi.Args[0] != nil {
-			a0 = fi.Args[0].Output()
+		if fi.IsUnary {
+			// assert known unary op + non-empty param
+			switch fi.Unary {
+			case "+", "-", "!", "~":
+			default:
+				// FunctionInvocationUnary.cpp:197 assert invalid operator
+				return ""
+			}
+			if len(fi.Args) < 1 || fi.Args[0] == nil {
+				return ""
+			}
+			return fi.outputUnary(fi.Args[0].Output())
 		}
-		if len(fi.Args) >= 2 && fi.Args[1] != nil {
-			a1 = fi.Args[1].Output()
+		// binary: need two live args
+		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
+			return ""
 		}
-		if fi.IsUnary && len(fi.Args) >= 1 {
-			return fi.outputUnary(a0)
+		if _, ok := BinaryOpFromString(fi.Binary); !ok && fi.Binary != "+" {
+			// invalid op (except bare + for array mutate without flags)
+			return ""
 		}
-		if !fi.IsUnary && len(fi.Args) >= 2 {
-			return fi.outputBinary(a0, a1)
-		}
+		return fi.outputBinary(fi.Args[0].Output(), fi.Args[1].Output())
 	}
 	return ""
 }
@@ -142,7 +151,14 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		// need_cast when Safe flags exist but avoid_signed_overflow off
 		return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
 	}
-	return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
+	// FunctionInvocationUnary.cpp:226–239 — standard form (op)(arg)
+	switch fi.Unary {
+	case "+", "-", "!", "~":
+		return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
+	default:
+		// assert invalid operator — no invent emit
+		return ""
+	}
 }
 
 // outputBinary mirrors FunctionInvocationBinary::Output.

@@ -33,10 +33,16 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
+	// seed globals for selection
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))
 	foundCompound := false
 	for seed := uint64(1); seed < 80; seed++ {
 		r := NewRng(seed)
-		st := func() Stmt { c := EmptyCGContext(); return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType()) }()
+		st := func() Stmt {
+			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+			return MakeRandomAssign(r, opts, probs, vs, tables, &c, GetIntType())
+		}()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
 		}
@@ -91,7 +97,8 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), &vq, NewRng(1))
 	// volatile-only WRITE qfer
 	q := NewCVQualifiers([]bool{false}, []bool{true})
-	cg := EmptyCGContext()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 	// should not panic; may fail to find var and return empty assign
 	st := MakeRandomAssignQfer(NewRng(3), opts, probs, vs, NewExprTables(opts), &cg, GetIntType(), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged

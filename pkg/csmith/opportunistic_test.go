@@ -116,9 +116,13 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	if g == nil {
 		t.Fatal("g")
 	}
-	// generate assigns — should not panic
+	// generate assigns — should not panic; StatementAssign.cpp:127 assert(fm)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
 	for seed := uint64(1); seed < 10; seed++ {
-		st := func() Stmt { c := EmptyCGContext(); return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType()) }()
+		st := func() Stmt {
+			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
+		}()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
 		}
