@@ -107,33 +107,29 @@ func (op BinaryOp) CmpOpC() string {
 	}
 }
 
-// BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER — reject zero-weight ops.
-// Probabilities.cpp set_default_binary_ops_prob (equal group, weight 0/1).
+// BinaryOpsFilter mirrors BINARY_OPS_PROB_FILTER from opts defaults only.
+// Prefer Probabilities.BinaryOpsFilter via ProcessProbabilities (session singleton).
+// Kept for library tests that build a one-off filter without process probs.
 func BinaryOpsFilter(opts Options) Filter {
-	w := make([]int, MaxBinaryOp)
-	for i := range w {
-		w[i] = 1
-	}
-	if !opts.Muls {
-		w[BinMul] = 0
-	}
-	if !opts.Divs {
-		w[BinDiv] = 0
-	}
-	return filterFunc(func(v uint32) bool {
-		i := int(v)
-		return i < 0 || i >= len(w) || w[i] == 0
-	})
+	return NewProbabilities(opts).BinaryOpsFilter()
 }
 
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
-// FunctionInvocation.cpp:179–183.
+// FunctionInvocation.cpp:179–183 — filter from Probabilities pBinaryOpsProb.
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
 	// FunctionInvocation.cpp:179–183 — always rnd_upto; no soft invent eAdd
 	if r == nil {
 		return BinaryOp(MaxBinaryOp)
 	}
-	return BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), BinaryOpsFilter(opts)))
+	// BINARY_OPS_PROB_FILTER uses process Probabilities group (no invent opts-only
+	// filter when session singleton is live).
+	probs := ProcessProbabilities()
+	if probs == nil {
+		// library path without NewProgramGenerator — fail closed MAX
+		_ = opts
+		return BinaryOp(MaxBinaryOp)
+	}
+	return BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), probs.BinaryOpsFilter()))
 }
 
 // IsOrderedBinary mirrors FunctionInvocation::IsOrderedStandardFunc (&& / ||).
@@ -193,29 +189,26 @@ func (op UnaryOp) UnaryOpC() string {
 	}
 }
 
-// UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER — reject weight-0 ops.
-// Probabilities.cpp set_default_unary_ops_prob.
+// UnaryOpsFilter mirrors UNARY_OPS_PROB_FILTER from opts defaults only.
+// Prefer Probabilities.UnaryOpsFilter via ProcessProbabilities.
 func UnaryOpsFilter(opts Options) Filter {
-	w := make([]int, MaxUnaryOp)
-	if opts.UnaryPlusOperator {
-		w[UnPlus] = 1
-	}
-	w[UnMinus] = 1
-	w[UnNot] = 1
-	w[UnBitNot] = 1
-	return filterFunc(func(v uint32) bool {
-		i := int(v)
-		return i < 0 || i >= len(w) || w[i] == 0
-	})
+	return NewProbabilities(opts).UnaryOpsFilter()
 }
 
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
+// FunctionInvocation.cpp:146–148 — filter from Probabilities pUnaryOpsProb.
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
 	// FunctionInvocation.cpp:146–148 — always rnd_upto; no soft invent eMinus
 	if r == nil {
 		return UnaryOp(MaxUnaryOp)
 	}
-	return UnaryOp(r.RndUptoFilter(uint32(MaxUnaryOp), UnaryOpsFilter(opts)))
+	probs := ProcessProbabilities()
+	if probs == nil {
+		// library path without session probs — fail closed MAX
+		_ = opts
+		return UnaryOp(MaxUnaryOp)
+	}
+	return UnaryOp(r.RndUptoFilter(uint32(MaxUnaryOp), probs.UnaryOpsFilter()))
 }
 
 // NeedNoRHS mirrors StatementAssign::need_no_rhs.

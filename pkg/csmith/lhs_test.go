@@ -77,7 +77,11 @@ func TestLhsIndirectLevel(t *testing.T) {
 }
 
 func TestPickUnaryOp(t *testing.T) {
+	// FunctionInvocation.cpp:146 — UNARY_OPS_PROB_FILTER from process Probabilities
 	opts := Defaults()
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(NewProbabilities(opts))
+	defer SetProcessProbabilities(prev)
 	seen := map[UnaryOp]bool{}
 	r := NewRng(1)
 	for i := 0; i < 100; i++ {
@@ -87,6 +91,7 @@ func TestPickUnaryOp(t *testing.T) {
 		t.Fatalf("seen %v", seen)
 	}
 	opts.UnaryPlusOperator = false
+	SetProcessProbabilities(NewProbabilities(opts))
 	r2 := NewRng(2)
 	for i := 0; i < 50; i++ {
 		if PickUnaryOp(r2, opts) == UnPlus {

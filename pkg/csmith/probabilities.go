@@ -51,6 +51,10 @@ type Probabilities struct {
 	// simpleTypeWeight[i] is weight for eSimpleType(i) in equal group pSimpleTypesProb.
 	// Probabilities::set_default_simple_types_prob — weight 0 or 1.
 	simpleTypeWeight []int
+	// binaryOpWeight mirrors pBinaryOpsProb equal group (set_default_binary_ops_prob).
+	binaryOpWeight []int
+	// unaryOpWeight mirrors pUnaryOpsProb equal group (set_default_unary_ops_prob).
+	unaryOpWeight []int
 }
 
 // NewProbabilities builds tables from opts like Probabilities::initialize
@@ -61,6 +65,8 @@ func NewProbabilities(opts Options) *Probabilities {
 	}
 	p.initSingle(opts)
 	p.initSimpleTypes(opts)
+	p.initBinaryOps(opts)
+	p.initUnaryOps(opts)
 	return p
 }
 
@@ -86,6 +92,38 @@ func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
 func (p *Probabilities) SimpleTypesFilter() Filter {
 	return filterFunc(func(v uint32) bool {
 		return p.SimpleTypeWeight(int(v)) == 0
+	})
+}
+
+// BinaryOpWeight returns equal-group weight for eBinaryOps index.
+func (p *Probabilities) BinaryOpWeight(opIdx int) int {
+	if p == nil || opIdx < 0 || opIdx >= len(p.binaryOpWeight) {
+		return 0
+	}
+	return p.binaryOpWeight[opIdx]
+}
+
+// BinaryOpsFilter rejects eBinaryOps with weight 0 (BINARY_OPS_PROB_FILTER).
+// Probabilities.cpp set_default_binary_ops_prob + set_prob_filter.
+func (p *Probabilities) BinaryOpsFilter() Filter {
+	return filterFunc(func(v uint32) bool {
+		return p.BinaryOpWeight(int(v)) == 0
+	})
+}
+
+// UnaryOpWeight returns equal-group weight for eUnaryOps index.
+func (p *Probabilities) UnaryOpWeight(opIdx int) int {
+	if p == nil || opIdx < 0 || opIdx >= len(p.unaryOpWeight) {
+		return 0
+	}
+	return p.unaryOpWeight[opIdx]
+}
+
+// UnaryOpsFilter rejects eUnaryOps with weight 0 (UNARY_OPS_PROB_FILTER).
+// Probabilities.cpp set_default_unary_ops_prob + set_prob_filter.
+func (p *Probabilities) UnaryOpsFilter() Filter {
+	return filterFunc(func(v uint32) bool {
+		return p.UnaryOpWeight(int(v)) == 0
 	})
 }
 
@@ -191,4 +229,33 @@ func (p *Probabilities) initSimpleTypes(opts Options) {
 		w[int(EUInt128)] = 1
 	}
 	p.simpleTypeWeight = w
+}
+
+// initBinaryOps — Probabilities::set_default_binary_ops_prob (equal group weight 0/1).
+// Probabilities.cpp:704–737 — muls/divs gated by CGOptions; all other ops weight 1.
+func (p *Probabilities) initBinaryOps(opts Options) {
+	w := make([]int, MaxBinaryOp)
+	for i := range w {
+		w[i] = 1
+	}
+	if !opts.Muls {
+		w[int(BinMul)] = 0
+	}
+	if !opts.Divs {
+		w[int(BinDiv)] = 0
+	}
+	p.binaryOpWeight = w
+}
+
+// initUnaryOps — Probabilities::set_default_unary_ops_prob (equal group weight 0/1).
+// Probabilities.cpp:680+ — unary_plus gated by CGOptions::unary_plus_operator.
+func (p *Probabilities) initUnaryOps(opts Options) {
+	w := make([]int, MaxUnaryOp)
+	if opts.UnaryPlusOperator {
+		w[int(UnPlus)] = 1
+	}
+	w[int(UnMinus)] = 1
+	w[int(UnNot)] = 1
+	w[int(UnBitNot)] = 1
+	p.unaryOpWeight = w
 }
