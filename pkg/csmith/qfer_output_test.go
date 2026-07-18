@@ -69,10 +69,42 @@ func TestSelectDerefExpandStructFailClosed(t *testing.T) {
 }
 
 func TestOutputQualifiedTypeSimple(t *testing.T) {
+	// Defaults enable Consts/Volatiles
+	SetProcessOptions(Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	s := q.OutputQualifiedType(GetIntType())
 	if !strings.Contains(s, "const") || !strings.Contains(s, "volatile") || !strings.Contains(s, "int") {
 		t.Fatal(s)
+	}
+}
+
+func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
+	// CVQualifiers.cpp:541–552 — assert(0) if const/vol bit without option; no invent keyword
+	opts := Defaults()
+	opts.Consts = false
+	opts.Volatiles = false
+	SetProcessOptions(opts)
+	defer SetProcessOptions(Defaults())
+	q := NewCVQualifiers([]bool{true}, []bool{true})
+	s := q.OutputQualifiedType(GetIntType())
+	if strings.Contains(s, "const") || strings.Contains(s, "volatile") {
+		t.Fatalf("must not invent disabled quals: %q", s)
+	}
+	if !strings.Contains(s, "int") {
+		t.Fatal(s)
+	}
+}
+
+func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
+	// StatementFor.cpp:79/82/102 ERROR_RETURN on sticky error
+	ClearError()
+	SetError(ErrGeneric)
+	defer ClearError()
+	opts := Defaults()
+	_, _, _, _, _ = MakeRandomLoopControl(NewRng(1), opts, true)
+	// sticky remains; MakeIteration would abort
+	if !HasError() {
+		t.Fatal("ERROR_RETURN must keep sticky error")
 	}
 }
 

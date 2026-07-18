@@ -364,6 +364,7 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 
 // RandomQualifiersFrom mirrors CVQualifiers::random_qualifiers(no_vol, access, cg).
 // CVQualifiers.cpp:194–225 — random relative to this qfer (stricter or looser).
+// ERROR_GUARD paths: sticky error leaves partial qfer; callers check HasError.
 func (q CVQualifiers) RandomQualifiersFrom(
 	noVolatile bool,
 	access Access,
@@ -383,10 +384,18 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	} else {
 		vols = q.RandomStricterVolatiles(r, opts, probs)
 	}
+	// CVQualifiers.cpp:209 — ERROR_GUARD after random_*_volatiles
+	if HasError() {
+		return NewCVQualifiers(nil, vols)
+	}
 	if !noVolatile && !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
 		vols[len(vols)-1] = false
 	}
 	MakeScalarVolatiles(opts, vols)
+	// CVQualifiers.cpp:215 — ERROR_GUARD
+	if HasError() {
+		return NewCVQualifiers(nil, vols)
+	}
 
 	var consts []bool
 	if !q.AcceptStricter {
@@ -395,6 +404,10 @@ func (q CVQualifiers) RandomQualifiersFrom(
 		consts = q.RandomStricterConsts(r, opts, probs)
 	}
 	MakeScalarConsts(opts, consts)
+	// CVQualifiers.cpp:219 — ERROR_GUARD after random_*_consts
+	if HasError() {
+		return NewCVQualifiers(consts, vols)
+	}
 	if access == AccessWrite && len(consts) > 0 {
 		consts[len(consts)-1] = false
 	}
@@ -568,17 +581,27 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 
 // OutputQualifiedType mirrors CVQualifiers::output_qualified_type.
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
+// Uses ProcessOptions for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
+	// CVQualifiers.cpp:532 — assert(t)
 	if t == nil {
 		return "void"
 	}
+	// CVQualifiers.cpp:533 — assert(sanity_check(t)); fail closed bare type (no invent bad layout)
+	if !q.Wildcard && len(q.IsConsts) > 0 && !q.SanityCheck(t) {
+		return t.CName()
+	}
+	opts := ProcessOptions()
+	emitConst := func() bool { return opts.Consts }
+	emitVol := func() bool { return opts.Volatiles }
 	if q.Wildcard || len(q.IsConsts) == 0 {
 		// bare type + single-level quals from storage
 		var b strings.Builder
-		if q.IsConst() {
+		// CVQualifiers.cpp:541–544 — assert(0) if const bit without Consts option
+		if q.IsConst() && emitConst() {
 			b.WriteString("const ")
 		}
-		if q.IsVolatile() {
+		if q.IsVolatile() && emitVol() {
 			b.WriteString("volatile ")
 		}
 		b.WriteString(t.CName())
@@ -591,10 +614,10 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	// For simple types with one qualifier level: "const volatile int"
 	if t.IsSimple() || t.IsAggregate() {
 		var b strings.Builder
-		if len(q.IsConsts) > 0 && q.IsConsts[0] {
+		if len(q.IsConsts) > 0 && q.IsConsts[0] && emitConst() {
 			b.WriteString("const ")
 		}
-		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
+		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] && emitVol() {
 			b.WriteString("volatile ")
 		}
 		b.WriteString(t.CName())
@@ -606,14 +629,15 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		if i > 0 {
 			b.WriteString("*")
 		}
-		if q.IsConsts[i] {
+		// CVQualifiers.cpp:540–544 / 545–552 — no invent const/vol when option disabled
+		if q.IsConsts[i] && emitConst() {
 			if i > 0 {
 				b.WriteString(" ")
 			}
 			b.WriteString("const ")
 		}
-		if i < len(q.IsVolatiles) && q.IsVolatiles[i] {
-			if i > 0 && !q.IsConsts[i] {
+		if i < len(q.IsVolatiles) && q.IsVolatiles[i] && emitVol() {
+			if i > 0 && !(q.IsConsts[i] && emitConst()) {
 				b.WriteString(" ")
 			}
 			b.WriteString("volatile ")

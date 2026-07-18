@@ -31,8 +31,9 @@ type LoopControl struct {
 
 // MakeRandomLoopControl mirrors make_random_loop_control.
 // StatementFor.cpp:61–113.
+// Sticky ERROR_RETURN leaves partial values; callers must check HasError.
 func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
-	// pure_rnd_* == rnd_* in random mode
+	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
 	if r.RndFlipcoin(50) {
 		init = 0
 	} else {
@@ -45,8 +46,16 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 	}
 	tOps := []BinaryOp{BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe}
 	testOp = tOps[r.RndUpto(uint32(len(tOps)))]
+	// StatementFor.cpp:79 — ERROR_RETURN after test_op pick
+	if HasError() {
+		return
+	}
 
 	if r.RndFlipcoin(50) {
+		// StatementFor.cpp:82 — ERROR_RETURN after flip into +=/-= branch
+		if HasError() {
+			return
+		}
 		incr = int(r.RndUpto(10))
 		if testOp == BinCmpNe && incr > 1 {
 			// avoid infinite loop: limit = (limit-init)/incr*incr + init
@@ -71,6 +80,10 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 			}
 		}
 	} else {
+		// StatementFor.cpp:102 — ERROR_RETURN after flip into ++/-- branch
+		if HasError() {
+			return
+		}
 		// ++/-- pre or post
 		if (limit < init) || (limit == init && testOp == BinCmpGe) {
 			if r.RndFlipcoin(50) {
@@ -301,6 +314,10 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		// StatementFor.cpp:200 / 223–226 — leave bound = INVALID_BOUND
 		bound = InvalidIVBound
 		initN, limitN, incrN, testOp, incrOp = MakeRandomLoopControl(r, opts, signed)
+		// StatementFor.cpp:79/82/102 ERROR_RETURN inside make_random_loop_control
+		if HasError() {
+			return nil
+		}
 	}
 
 	// --- build IR: init attach flags for incr (StatementFor.cpp:229–245) ---
