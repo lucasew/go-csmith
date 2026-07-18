@@ -71,6 +71,10 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		g.FactMgrs = NewFactMgrMap()
 	}
 	g.Funcs.Types = &g.Types
+	// Function.cpp:792–793 — initialize_builtin_functions when builtins on
+	if g.Opts.Builtins {
+		InitializeBuiltinFunctions(g.Opts, g.Probs, g.Rng, &g.Funcs, g.FactMgrs)
+	}
 	// Function::make_first — creates FactMgr for func_1
 	_ = MakeFirst(g.Rng, g.Opts, g.Probs, g.VS, &g.VS.Sym, g.Tables, g.StmtTab, &g.Funcs, g.FactMgrs)
 	// Create body of each function until no new unbuilt remain (Function.cpp:801–807).

@@ -108,11 +108,11 @@ func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Functi
 }
 
 // ChooseFuncContext is ChooseFunc with CGContext for in_conflict / strict_volatile.
-// Function.cpp:279–330.
+// Function.cpp:279–340 — separate user vs builtin pools; BuiltinFunctionProb pick.
 func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options) *Function {
-	var ok []*Function
+	var ok, okBuiltin []*Function
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin || f == exclude || !f.IsEffectKnown() {
+		if f == nil || f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
@@ -132,19 +132,49 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				continue
 			}
 		}
+		// Function.cpp:318–321 — has_race_with (optional, often commented; we apply)
+		if cg != nil && f.FEffect.HasRaceWith(cg.EffectContext()) {
+			continue
+		}
+		if f.IsBuiltin {
+			if opts.Builtins {
+				okBuiltin = append(okBuiltin, f)
+			}
+			continue
+		}
 		ok = append(ok, f)
 	}
-	n := len(ok)
+	// Function.cpp:330–333 — prefer builtin with BuiltinFunctionProb
+	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
+		p := opts.BuiltinFunctionProb
+		if p <= 0 {
+			p = 50
+		}
+		if r.RndFlipcoin(uint32(p)) {
+			return getOneFunction(r, okBuiltin)
+		}
+	}
+	if f := getOneFunction(r, ok); f != nil {
+		return f
+	}
+	// fallback builtins if no user funcs
+	return getOneFunction(r, okBuiltin)
+}
+
+// getOneFunction mirrors Function::get_one_function — random pick.
+// Function.cpp:262–276.
+func getOneFunction(r *Rng, funcs []*Function) *Function {
+	n := len(funcs)
 	if n == 0 {
 		return nil
 	}
 	if n == 1 {
-		return ok[0]
+		return funcs[0]
 	}
 	if r == nil {
-		return ok[0]
+		return funcs[0]
 	}
-	return ok[r.RndUpto(uint32(n))]
+	return funcs[r.RndUpto(uint32(n))]
 }
 
 // ExpressionFunctionProbability mirrors ExpressionFuncall.cpp:57–62.

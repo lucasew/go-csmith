@@ -271,6 +271,37 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	return false
 }
 
+// HasRaceWith mirrors Effect::has_race_with.
+// Effect.cpp:480–484 — non-empty intersection of read/write sets.
+func (e Effect) HasRaceWith(other Effect) bool {
+	for _, v := range e.ReadVars() {
+		if other.IsWritten(v) {
+			return true
+		}
+	}
+	for _, v := range e.WrittenVars() {
+		if other.IsRead(v) || other.IsWritten(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsEmpty mirrors Effect::is_empty — no reads and no writes.
+// Effect.cpp:490–492.
+func (e Effect) IsEmpty() bool {
+	return len(e.ReadVars()) == 0 && len(e.WrittenVars()) == 0
+}
+
+// Clear mirrors Effect::clear — empty pure SE-free effect.
+// Effect.cpp:497–501.
+func (e *Effect) Clear() {
+	if e == nil {
+		return
+	}
+	*e = EmptyEffect()
+}
+
 // AccessDerefVolatile mirrors Effect::access_deref_volatile.
 // Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
 func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
