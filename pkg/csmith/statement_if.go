@@ -77,13 +77,14 @@ func MakeRandomIf(
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
 	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
-	if HasError() {
+	// live if_true Block* required (no invent if with nil Then shell)
+	if HasError() || thenB == nil {
 		return nil
 	}
 
 	// StatementIf.cpp:97–98 — else starts from map_facts_in[if_true]
 	if cg.FM != nil {
-		if thenB != nil && thenB.StmID > 0 {
+		if thenB.StmID > 0 {
 			if in, ok := cg.FM.MapFactsIn[thenB.StmID]; ok {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			} else {
@@ -99,7 +100,8 @@ func MakeRandomIf(
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
 	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
-	if HasError() {
+	// live if_false Block* required
+	if HasError() || elseB == nil {
 		return nil
 	}
 	// StatementIf.cpp:101–107 — construct StatementIf; do not merge branch facts here

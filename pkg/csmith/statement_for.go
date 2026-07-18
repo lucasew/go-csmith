@@ -416,19 +416,24 @@ func MakeRandomFor(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
+	// StatementFor.cpp nullptr factory — nil (no invent Kind-only shell)
 	if cg == nil {
-		return &Stmt{Kind: StmtFor}
+		return nil
+	}
+	// StatementFor.cpp:288–289 — assert(fm); get_fact_mgr always live
+	if cg.FM == nil {
+		return nil
 	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
 	cg.EffectStm = EmptyEffect()
 
 	lc := MakeIteration(r, opts, probs, vs, cg)
-	// StatementFor.cpp:293–296 — make_iteration null / ERROR_GUARD
+	// StatementFor.cpp:296 make_iteration null / ERROR paths → nullptr
 	if lc == nil || HasError() {
-		return &Stmt{Kind: StmtFor}
+		return nil
 	}
 	// when SafeMath and compound add/sub incr, attach dummy flags for emit
-	if opts.SafeMath && lc != nil {
+	if opts.SafeMath {
 		switch lc.IncrOp {
 		case AssignAdd, AssignSub, AssignPreIncr, AssignPostIncr, AssignPreDecr, AssignPostDecr:
 			// flags created at emit from IV type; mark via LoopControl.SafeIncr
@@ -437,10 +442,7 @@ func MakeRandomFor(
 	}
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
 	preEffect := cg.EffectStm.Clone()
-	var preFacts []*FactPointTo
-	if cg.FM != nil {
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-	}
+	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
 	bodyCG := cg.WithFlags(FlagInLoop)
@@ -455,11 +457,11 @@ func MakeRandomFor(
 	bodyCG.EffectAccum = &bodyEff
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
-	if HasError() {
+	if HasError() || body == nil {
 		if lc.IV != nil {
 			bodyCG.RemoveIVBound(lc.IV)
 		}
-		return &Stmt{Kind: StmtFor}
+		return nil
 	}
 	// StatementFor.cpp:447,470 — erase iv_bounds after body
 	if lc.IV != nil {
@@ -467,12 +469,7 @@ func MakeRandomFor(
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
-	if cg.FM != nil {
-		postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
-	} else {
-		// still merge body effect when no FM
-		SetAccumulatedEffectAfterBlock(st, bodyCG.EffectStm, cg, preEffect)
-	}
+	postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
 	// merge body effect into parent accum
 	if cg.EffectAccum != nil {
 		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)

@@ -34,7 +34,7 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	// force if generation
 	r2 := NewRng(11)
 	st := MakeRandomIf(r2, opts, probs, vs, tables, stmtTab, &cg)
-	if st.Kind != StmtIfElse || st.Then == nil || st.Else == nil {
+	if st == nil || st.Kind != StmtIfElse || st.Then == nil || st.Else == nil {
 		t.Fatalf("%+v", st)
 	}
 	if st.Expr == nil {
@@ -56,7 +56,7 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	f.Stack = []*Block{parent}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
-	if st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+	if st == nil || st.Kind != StmtFor || st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		t.Fatalf("%+v", st)
 	}
 	out := (&Block{Stmts: []Stmt{*st}}).Output(0)
@@ -65,6 +65,21 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 	}
 	if !strings.Contains(out, st.Loop.IV.Name) {
 		t.Fatal("iv name missing")
+	}
+}
+
+func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
+	// StatementFor.cpp:288 assert(fm); nullptr not Kind-only StmtFor
+	opts := Defaults()
+	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+		t.Fatal("nil cg")
+	}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect()) // no FM
+	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+		t.Fatalf("nil FM must return nil, got %#v", st)
 	}
 }
 
