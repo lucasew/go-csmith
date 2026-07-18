@@ -150,11 +150,12 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 
 // RandomHexDigits is DefaultRndNumGenerator::RandomHexDigits when CGOptions::is_random().
 // Each digit: genrand()%16; increments rand_depth_ per digit.
+// AbsRndNumGenerator.cpp:50 — hex1 = "0123456789ABCDEF" (uppercase; no invent abcdef).
 func (r *Rng) RandomHexDigits(num int) string {
 	if r == nil || num <= 0 {
 		return ""
 	}
-	const hex1 = "0123456789abcdef"
+	const hex1 = "0123456789ABCDEF"
 	b := make([]byte, 0, num)
 	for i := 0; i < num; i++ {
 		x := r.Genrand() % 16

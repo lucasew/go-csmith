@@ -101,11 +101,12 @@ func TestRndFlipcoinFilterForce(t *testing.T) {
 
 func TestRandomHexDigits(t *testing.T) {
 	// DefaultRndNumGenerator::RandomHexDigits: each digit genrand()%16, depth++.
+	// AbsRndNumGenerator.cpp:50 — hex1 uppercase ABCDEF
 	r := NewRng(2)
-	// 1959434203%16 = 11 → 'b'
+	// 1959434203%16 = 11 → 'B'
 	hex := r.RandomHexDigits(1)
-	if hex != "b" {
-		t.Fatalf("RandomHexDigits(1) seed2: got %q want b", hex)
+	if hex != "B" {
+		t.Fatalf("RandomHexDigits(1) seed2: got %q want B", hex)
 	}
 	if r.RandDepth() != 1 {
 		t.Fatalf("rand_depth after one hex digit: got %d want 1", r.RandDepth())
