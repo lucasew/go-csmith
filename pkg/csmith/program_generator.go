@@ -405,13 +405,19 @@ func (g *ProgramGenerator) OutputGlobals() string {
 
 // OutputFunctions mirrors OutputForwardDeclarations + OutputFunctions.
 // Function.cpp:812–830 — optional FORWARD ALIAS DECLARATIONS when func_attr_flag.
+// Incomplete Funcs fails closed sticky (no invent empty-section / soft-skip hole).
 func (g *ProgramGenerator) OutputFunctions() string {
+	if g == nil {
+		return ""
+	}
+	// incomplete Funcs list fails closed sticky (no invent partial section past hole)
+	if !FunctionsComplete(g.Funcs.Funcs) {
+		SetError(ErrGeneric)
+		return ""
+	}
 	var forwards, aliases, bodies strings.Builder
 	for _, f := range g.Funcs.Funcs {
-		// Function* always live; builtins skip emit; no invent skip incomplete user funcs
-		if f == nil {
-			return ""
-		}
+		// pre-validated FunctionsComplete
 		if f.IsBuiltin {
 			continue
 		}

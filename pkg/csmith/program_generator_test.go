@@ -166,9 +166,13 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	if hasUser {
 		t.Fatal("nil Funcs hole must not invent hasUser from later built func")
 	}
-	// OutputFunctions already fails closed on hole
+	// OutputFunctions fails closed sticky on hole
+	ClearError()
 	if g.OutputFunctions() != "" {
 		t.Fatal("OutputFunctions must fail closed on nil Funcs hole")
+	}
+	if !HasError() {
+		t.Fatal("nil Funcs hole OutputFunctions must SetError sticky")
 	}
 	ClearError()
 }

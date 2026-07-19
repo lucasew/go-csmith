@@ -384,8 +384,8 @@ func CtrlVarNames(ctrl []*Variable) []string {
 
 // OutputArrayCtrlVars mirrors OutputArrayCtrlVars — "int i, j, k;".
 // Variable.cpp:800–811 — assert(dimen <= ctrl_vars.size()); get_actual_name only.
-// C++ ctrl_vars[i] always live; incomplete ctrl list fails closed empty
-// (no invent "int , j;" / empty-complete decl for nil slots).
+// Incomplete ctrl list fails closed sticky empty (no invent "int , j;" / empty-complete
+// decl for nil slots via soft return "").
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen <= 0 || len(ctrl) == 0 {
 		return ""
@@ -396,6 +396,7 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	}
 	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); always live names
 	if !VariablesComplete(ctrl[:dimen]) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	for i := 0; i < dimen; i++ {

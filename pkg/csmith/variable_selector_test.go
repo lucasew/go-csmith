@@ -125,6 +125,37 @@ func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
 	}
 }
 
+func TestCreateArrayVariableIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / GlobalFacts fail closed sticky when CG is live
+	opts := Defaults()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	ClearError()
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, &cg, nil, "g_a", GetIntType(), MakeInt(0), q) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed CreateArrayVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	eff := EmptyEffect()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2.EffectAccum = &eff
+	if CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, &cg2, nil, "g_b", GetIntType(), MakeInt(0), q) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed CreateArrayVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectGlobalEmptyCreates(t *testing.T) {
 	// SelectGlobal empty → GenerateNewGlobal
 	ResetDefaultGensym()

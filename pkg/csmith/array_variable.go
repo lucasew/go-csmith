@@ -55,6 +55,20 @@ func CreateArrayVariable(
 	if elem.IsSimple() && elem.Simple() == EVoid {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky when CG is live (make_init_value path)
+	// (no invent array create / soft re-pick past holes under incomplete shells)
+	if cg != nil {
+		if !EffectComplete(cg.EffectContext()) ||
+			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+			!EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
+	}
 	// dimension: 1d 60%, 2d 30%, … via rnd_upto(99)+1 stepping
 	// ArrayVariable.cpp:131–144
 	num := int(r.RndUpto(99)) + 1

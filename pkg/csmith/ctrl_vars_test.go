@@ -44,11 +44,16 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	if decl != "    int i, j;\n" {
 		t.Fatal(decl)
 	}
-	// Variable.cpp:806 — ctrl_vars[i] always live; no invent empty names
+	// Variable.cpp:806 — ctrl_vars[i] always live; nil fails closed sticky
 	broken := []*Variable{c1[0], nil}
+	ClearError()
 	if out := OutputArrayCtrlVars(broken, 2, ""); out != "" {
 		t.Fatal("nil ctrl slot must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("nil ctrl slot must SetError sticky")
+	}
+	ClearError()
 	emptyName := []*Variable{c1[0], {Name: "", Type: GetIntType()}}
 	if out := OutputArrayCtrlVars(emptyName, 2, ""); out != "" {
 		t.Fatal("empty ctrl name must fail closed", out)

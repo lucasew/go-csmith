@@ -921,8 +921,9 @@ func (b *Block) Output(indent int) string {
 		}
 	}
 	// OutputVariableList(local_vars) — Variable.cpp Output
-	// Incomplete LocalVars fails closed whole block (no invent soft-skip hole partial)
+	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
 	if !VariablesComplete(b.LocalVars) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var loopInits []*ArrayVariable

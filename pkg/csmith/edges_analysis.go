@@ -66,13 +66,14 @@ func isReturnVar(v *Variable) bool {
 
 // FindEdgesIn mirrors Statement::find_edges_in for dest StmID.
 // Statement.cpp:453–467 — edges with matching dest, post_dest, back_link.
-// CFGEdge* always live; nil hole in CFGEdges → nil (fail closed).
+// Incomplete CFG fails closed sticky nil (no invent soft re-pick empty edges past holes).
 // Complete scan with no matches returns empty non-nil slice.
 func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdge {
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	out := make([]*CFGEdge, 0)
@@ -85,12 +86,13 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 }
 
 // FindEdgesInToBlock finds edges whose DestBlock matches (break/continue).
-// Incomplete CFGEdges → nil (fail closed). Complete empty → non-nil [].
+// Incomplete CFGEdges → sticky nil (fail closed). Complete empty → non-nil [].
 func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*CFGEdge {
 	if fm == nil || dest == nil {
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	out := make([]*CFGEdge, 0)

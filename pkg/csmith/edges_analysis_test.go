@@ -66,22 +66,35 @@ func TestFindEdgesInNilHoleFailClosed(t *testing.T) {
 		nil,
 		{SrcID: 11, DestStmID: 20},
 	}
-	// nil hole must not invent skip — return nil (incomplete)
+	// nil hole fails closed sticky (no invent soft-skip / re-pick past holes)
+	ClearError()
 	if got := fm.FindEdgesIn(20, false, true); got != nil {
 		t.Fatal("nil CFG hole must fail closed", got)
 	}
+	if !HasError() {
+		t.Fatal("nil CFG hole FindEdgesIn must SetError sticky")
+	}
+	ClearError()
 	if got := fm.FindEdgesIn(20, false, false); got != nil {
 		t.Fatal("nil CFG hole must fail closed fwd", got)
 	}
-	// HasEdgeIn must not invent false from len(nil)==0
+	if !HasError() {
+		t.Fatal("nil CFG hole FindEdgesIn fwd must SetError sticky")
+	}
+	// HasEdgeIn must not invent false from len(nil)==0 (sticky already set)
 	if !fm.HasEdgeIn(20, false, true) {
 		t.Fatal("incomplete FindEdgesIn must HasEdgeIn true, not invent none")
 	}
+	ClearError()
 	b := &Block{}
 	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 1, DestBlock: b, BackLink: true}}
 	if got := fm.FindEdgesInToBlock(b, false, true); got != nil {
 		t.Fatal("nil hole FindEdgesInToBlock", got)
 	}
+	if !HasError() {
+		t.Fatal("nil hole FindEdgesInToBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasEdgeInNilFMFailClosed(t *testing.T) {
@@ -163,6 +176,7 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 }
 
 func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -177,6 +191,10 @@ func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("incomplete CFG must fail closed analyze")
 	}
+	if !HasError() {
+		t.Fatal("incomplete CFG analyze must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
