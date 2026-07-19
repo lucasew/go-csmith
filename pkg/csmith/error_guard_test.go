@@ -74,3 +74,39 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 		t.Fatal("success must ClearError")
 	}
 }
+
+func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
+	// incomplete EffectAccum / GlobalFacts must not invent block success
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 0
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	cg.Types = &TypeEnv{}
+	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBlock")
+	}
+	if !HasError() {
+		t.Fatal("must SetError")
+	}
+	if len(f.Blocks) != 0 || len(f.Stack) != 0 {
+		t.Fatal("must abortBlockMake registration")
+	}
+	ClearError()
+	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
+	fm2 := NewFactMgr(f2)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f2, EmptyEffect()).WithFactMgr(fm2)
+	cg2.Types = &TypeEnv{}
+	if MakeRandomBlock(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, false) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBlock")
+	}
+	if !HasError() {
+		t.Fatal("must SetError GlobalFacts")
+	}
+	ClearError()
+}

@@ -372,12 +372,28 @@ func MakeRandomBlock(
 		cg.EffectAccum = &eff
 	}
 	// Block.cpp:134–138 — snapshot facts-in and pre_effect for post_creation
+	// Incomplete accum/facts fail closed (no invent post_creation / return block past holes)
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			abortBlockMake(f, b)
+			SetError(ErrGeneric)
+			return nil
+		}
 		preEffect = cg.EffectAccum.Clone()
+	}
+	if !EffectComplete(preEffect) {
+		abortBlockMake(f, b)
+		SetError(ErrGeneric)
+		return nil
 	}
 	// StmID always allocated at make; FM path always records map_facts_in
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			abortBlockMake(f, b)
+			SetError(ErrGeneric)
+			return nil
+		}
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
 	// Forward goto: prefer labeling the next real statement; no-op if goto is last.
@@ -443,8 +459,13 @@ func MakeRandomBlock(
 		b.StmID = AllocStmID()
 	}
 	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
-	if HasError() {
+	// incomplete post-creation GlobalFacts fail closed even without sticky ERROR
+	// (no invent return live block past IncompleteFactSlice wipe)
+	if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
 		// Block.cpp:170–174 — ERROR after post_creation → delete
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		abortBlockMake(f, b)
 		return nil
 	}
