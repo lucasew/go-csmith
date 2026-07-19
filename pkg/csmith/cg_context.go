@@ -502,6 +502,8 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 // FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
 // CGContext.cpp:610–624 — unique arrays from must_read and must_write.
 // Variable* always live on must-use lists; nil hole sticky fails closed (nil out).
+// IsArray without AsArray sticky fails closed (no invent soft-skip broken array
+// as absent then complete empty must-use pool / soft re-pick past hole).
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 	// RWDirective always live when queried; nil RW complete empty (no must-use)
 	if rw == nil {
@@ -519,9 +521,13 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 			return true
 		}
 		seen[v] = true
-		if v.AsArray != nil {
-			out = append(out, v.AsArray)
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent soft-skip shell as absent then empty complete pool)
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return false
 		}
+		out = append(out, v.AsArray)
 		return true
 	}
 	for _, v := range rw.MustReadVars {

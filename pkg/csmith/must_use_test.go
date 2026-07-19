@@ -31,6 +31,17 @@ func TestFindMustUseArrays(t *testing.T) {
 		t.Fatal("nil hole FindMustUseArrays must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was soft-skip shell as absent → empty complete
+	// fair: sticky nil fail closed
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	rw2 := &RWDirective{MustReadVars: []*Variable{shell}}
+	if rw2.FindMustUseArrays() != nil {
+		t.Fatal("IsArray without AsArray FindMustUseArrays must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray FindMustUseArrays must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSelectMustUseVar(t *testing.T) {

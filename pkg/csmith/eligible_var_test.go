@@ -44,6 +44,25 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 		t.Fatal("nil LocalVars hole must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was soft-skip as array-filtered → complete pool
+	// fair: sticky IncompleteVariables
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	vs.GlobalList = []*Variable{g, shell}
+	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
+		t.Fatal("IsArray without AsArray must fail closed incomplete non-array pool")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray FindAllNonArrayVisibleVars must SetError sticky")
+	}
+	ClearError()
+	// same for LocalVars
+	if VariablesComplete(vs.FindAllNonArrayVisibleVars(&Block{LocalVars: []*Variable{shell}})) {
+		t.Fatal("IsArray without AsArray LocalVars must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray local FindAllNonArrayVisibleVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsEligibleVarSEFreeVolatile(t *testing.T) {

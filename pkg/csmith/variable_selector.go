@@ -641,6 +641,8 @@ func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining [
 // VariableSelector.cpp:713–735 — non-array globals, params, non-array locals.
 // Variable* always live; nil hole fails closed IncompleteVariables
 // (not bare nil invent empty-complete pool).
+// IsArray without AsArray sticky IncompleteVariables (no invent soft-skip broken
+// array shell as "array filtered out" then complete non-array pool past hole).
 func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
@@ -649,6 +651,11 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 			return IncompleteVariables()
 		}
 		for _, v := range vs.GlobalList {
+			// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
+			if v.IsArray && v.AsArray == nil {
+				SetError(ErrGeneric)
+				return IncompleteVariables()
+			}
 			if !v.IsArray {
 				vars = append(vars, v)
 			}
@@ -675,6 +682,11 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 			return IncompleteVariables()
 		}
 		for _, v := range b.LocalVars {
+			// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
+			if v.IsArray && v.AsArray == nil {
+				SetError(ErrGeneric)
+				return IncompleteVariables()
+			}
 			if !v.IsArray {
 				vars = append(vars, v)
 			}
