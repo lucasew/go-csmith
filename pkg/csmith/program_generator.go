@@ -127,7 +127,11 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	// Function.cpp:801–807 — create body of each unbuilt function (list may grow)
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
-		if f == nil || f.IsBuilt || f.BuildState == BuildBuilt {
+		// Function* always live on Funcs; no invent skip nil holes mid generation
+		if f == nil {
+			return
+		}
+		if f.IsBuilt || f.BuildState == BuildBuilt {
 			continue
 		}
 		cg := EmptyCGContext().WithFuncList(&g.Funcs)
@@ -143,6 +147,10 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		f.GenerateBody(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, g.StmtTab, cg)
 		// Function.cpp:805 ERROR_RETURN after each GenerateBody
 		if HasError() {
+			return
+		}
+		// no invent continue past unbuilt/null-body (C++ would crash on body->)
+		if f.Body == nil || f.BuildState != BuildBuilt {
 			return
 		}
 	}
@@ -461,7 +469,10 @@ func (g *ProgramGenerator) hashGlobals() string {
 // OutputMain mirrors OutputMgr::OutputMain (no extension).
 // OutputMgr.cpp:92–153.
 func (g *ProgramGenerator) OutputMain() string {
-	if g.Opts.NoMain {
+	if g == nil || g.Opts.NoMain {
+		return ""
+	}
+	if g.VS == nil {
 		return ""
 	}
 	var b strings.Builder
@@ -477,17 +488,28 @@ func (g *ProgramGenerator) OutputMain() string {
 	b.WriteString(OutputArrayInitializers(g.VS.GlobalList, g.Opts, "    "))
 
 	// first-function invocation builder (shared by blind_check and normal path)
+	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation always live when Funcs non-empty
 	var firstInv string
 	var f0 *Function
-	if len(g.Funcs.Funcs) > 0 && g.Funcs.Funcs[0] != nil {
+	if len(g.Funcs.Funcs) > 0 {
+		// Function* always live; no invent main without first call shell
+		if g.Funcs.Funcs[0] == nil {
+			return ""
+		}
 		f0 = g.Funcs.Funcs[0]
-		cg := EmptyCGContext().WithFuncList(&g.Funcs)
-		cg.Types = &g.Types
-		// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation always live invoke
-		// no soft invent name()+"()" when build fails
-		inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
-		if inv != nil && !inv.Failed {
+		// skip builtin first (unlikely); still need live invoke for user first
+		if !f0.IsBuiltin {
+			cg := EmptyCGContext().WithFuncList(&g.Funcs)
+			cg.Types = &g.Types
+			inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
+			// no soft invent name()+"()" or main without call when build/output fails
+			if inv == nil || inv.Failed {
+				return ""
+			}
 			firstInv = inv.Output()
+			if firstInv == "" {
+				return ""
+			}
 		}
 	}
 
@@ -504,6 +526,10 @@ func (g *ProgramGenerator) OutputMain() string {
 			}
 		}
 		for _, v := range g.VS.GlobalList {
+			// Variable* always live; no invent skip nil holes in dump list
+			if v == nil {
+				return ""
+			}
 			b.WriteString(v.OutputValueDump("checksum ", 1, endUnion))
 		}
 		b.WriteString("    return 0;\n")
@@ -520,12 +546,17 @@ func (g *ProgramGenerator) OutputMain() string {
 		b.WriteString("    crc32_gentab();\n")
 	}
 	// ExtensionMgr::OutputFirstFunInvocation
-	// OutputMgr.cpp:127–136
+	// OutputMgr.cpp:127–136 — always emit live first invoke when present
 	if firstInv != "" {
 		b.WriteString("    " + firstInv + ";\n")
 		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
 		if f0 != nil && !g.Opts.DanglingGlobalPointers {
-			b.WriteString(OutputPtrResets(f0.DeadGlobals, g.Opts))
+			resets := OutputPtrResets(f0.DeadGlobals, g.Opts)
+			// incomplete dead_globals IR fails closed whole main
+			if len(f0.DeadGlobals) > 0 && resets == "" {
+				return ""
+			}
+			b.WriteString(resets)
 		}
 	}
 	// OutputMgr.cpp:141–145 — step_hash path invokes csmith_compute_hash; else inline HashGlobalVariables

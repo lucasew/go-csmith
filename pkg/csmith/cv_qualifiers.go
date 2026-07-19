@@ -268,15 +268,17 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 			}
 			return out
 		}
+		// CVQualifiers.cpp always has process RNG for flipcoin paths
+		// no invent fixed false (non-stricter) without draw — keep original bit
+		if r == nil {
+			out = append(out, q.IsConsts[i])
+			continue
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PStricterConstProb)
 		}
-		index := false
-		if r != nil {
-			index = r.RndFlipcoin(uint32(p))
-		}
-		out = append(out, index)
+		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	return out
 }
@@ -307,15 +309,16 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 			MakeScalarVolatiles(opts, out)
 			return out
 		}
+		// no invent fixed non-vol without RNG draw — keep original bit
+		if r == nil {
+			out = append(out, q.IsVolatiles[i])
+			continue
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PRegularVolatileProb)
 		}
-		index := false
-		if r != nil {
-			index = r.RndFlipcoin(uint32(p))
-		}
-		out = append(out, index)
+		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	MakeScalarVolatiles(opts, out)
 	return out
@@ -341,15 +344,16 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 			}
 			return out
 		}
+		// no invent fixed non-const without RNG draw — keep original bit
+		if r == nil {
+			out = append(out, q.IsConsts[i])
+			continue
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PLooserConstProb)
 		}
-		index := false
-		if r != nil {
-			index = r.RndFlipcoin(uint32(p))
-		}
-		out = append(out, index)
+		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	return out
 }
@@ -375,15 +379,16 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 			MakeScalarVolatiles(opts, out)
 			return out
 		}
+		// no invent fixed non-vol without RNG draw — keep original bit
+		if r == nil {
+			out = append(out, q.IsVolatiles[i])
+			continue
+		}
 		p := 50
 		if probs != nil {
 			p = probs.Single(PRegularVolatileProb)
 		}
-		index := false
-		if r != nil {
-			index = r.RndFlipcoin(uint32(p))
-		}
-		out = append(out, index)
+		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	MakeScalarVolatiles(opts, out)
 	return out

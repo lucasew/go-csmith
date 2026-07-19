@@ -111,3 +111,32 @@ func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {
+	// Function* always live on Funcs; nil hole stops unbuilt-body loop
+	ClearError()
+	opts := Defaults()
+	opts.MaxFuncs = 3
+	opts.MaxBlockSize = 1
+	g := NewProgramGenerator(opts)
+	g.Initialize()
+	g.GenerateAllTypes()
+	// pre-seed nil hole; make_first appends after it → [nil, first]
+	g.Funcs.Funcs = []*Function{nil}
+	g.GenerateFunctions()
+	// loop hits nil at index 0 and returns; no invent filling the hole
+	if len(g.Funcs.Funcs) < 1 || g.Funcs.Funcs[0] != nil {
+		t.Fatalf("nil hole must remain, got %v", g.Funcs.Funcs)
+	}
+	// no invent processing past hole into extra unbuilt creates from body
+	unbuilt := 0
+	for _, f := range g.Funcs.Funcs {
+		if f != nil && f.BuildState != BuildBuilt {
+			unbuilt++
+		}
+	}
+	if unbuilt > 0 {
+		t.Fatalf("must not invent unbuilt past nil hole, unbuilt=%d", unbuilt)
+	}
+	ClearError()
+}

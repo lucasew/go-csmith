@@ -1381,6 +1381,11 @@ func (vs *VariableSelector) SelectGlobalMT(
 	if vs == nil {
 		return nil
 	}
+	// VariableSelector.cpp always has process RNG for multi-choose / create paths
+	// n==1 ChooseOKVar can skip draw; empty or multi without r → fail closed
+	if r == nil && len(vs.GlobalList) != 1 {
+		return nil
+	}
 	// choose_var(GlobalList, …, mt, invalid_vars)
 	v := ChooseVarFull(r, vs.GlobalList, access, cg, t, qfer, mt, invalidVars, false, false, false)
 	if v != nil {

@@ -113,4 +113,26 @@ func TestBlindCheckGlobalMain(t *testing.T) {
 	if strings.Contains(main, "platform_main_begin") {
 		t.Fatal("blind path should skip platform begin", main)
 	}
+	// first call always live for non-empty Funcs
+	if !strings.Contains(main, "func_") {
+		t.Fatal("main must emit first function call", main)
+	}
+}
+
+func TestOutputMainNoInventWithoutFirstInvoke(t *testing.T) {
+	// OutputMgr.cpp:97 — MakeFuncInvocation always live; no invent main shell without call
+	opts := Defaults()
+	opts.NoMain = false
+	g := NewProgramGenerator(opts)
+	// incomplete first func (no RV/body) — BuildUserInvocation may still run with empty params
+	g.Funcs.Funcs = []*Function{{
+		Name: "func_1", ReturnType: GetIntType(),
+		// no Body / not Built — invocation of unbuilt still possible for zero-param
+		IsBuilt: true, BuildState: BuildBuilt,
+	}}
+	// nil Rng → BuildUserInvocation fails closed
+	g.Rng = nil
+	if out := g.OutputMain(); out != "" {
+		t.Fatal("nil RNG first invoke must fail closed main", out)
+	}
 }
