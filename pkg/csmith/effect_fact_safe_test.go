@@ -69,6 +69,52 @@ func TestEffectConsolidate(t *testing.T) {
 	}
 }
 
+func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
+	// Type-nil parent sticky read true (restrictive — no invent not-read soft-skip)
+	ClearError()
+	parent := &Variable{Name: "g_s"} // Type nil
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	e := EmptyEffect()
+	if !e.IsRead(field) {
+		t.Fatal("Type-nil parent IsRead must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsRead must SetError sticky")
+	}
+	ClearError()
+	// complete non-field not-read
+	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if e.IsRead(v) {
+		t.Fatal("unrelated var must be not-read complete")
+	}
+	if HasError() {
+		t.Fatal("complete not-read must not sticky")
+	}
+	ClearError()
+}
+
+func TestEffectSiblingTypeNilContainerSticky(t *testing.T) {
+	// Type-nil container GetContainerUnion stickies; Sibling must not invent no-sibling false
+	ClearError()
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	e := EmptyEffect()
+	if !e.SiblingUnionFieldIsRead(field) {
+		t.Fatal("Type-nil container SiblingUnionFieldIsRead must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil container SiblingUnionFieldIsRead must SetError sticky")
+	}
+	ClearError()
+	if !e.SiblingUnionFieldIsWritten(field) {
+		t.Fatal("Type-nil container SiblingUnionFieldIsWritten must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil container SiblingUnionFieldIsWritten must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	// soft invent: delete some fields then hit nil key mid-map under random order
 	// fair: incomplete sticky → IncompleteEffect (not invent partial consolidate / leave base complete)

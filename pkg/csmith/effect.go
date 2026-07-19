@@ -469,8 +469,16 @@ func (e Effect) IsRead(v *Variable) bool {
 		return true
 	}
 	// struct fields inherit parent read; unions do not
-	if v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsStruct() {
-		return e.IsRead(v.FieldVarOf)
+	// Type-nil parent sticky read true (restrictive — no invent not-read / conflict-free
+	// soft-skip past incomplete parent type shell)
+	if v.FieldVarOf != nil {
+		if v.FieldVarOf.Type == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		if v.FieldVarOf.Type.IsStruct() {
+			return e.IsRead(v.FieldVarOf)
+		}
 	}
 	return false
 }
@@ -535,6 +543,21 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 	return false
 }
 
+
+// ancestryTypeHole reports Type-nil on FieldVarOf chain (excluding specials).
+// Used by SiblingUnionField* so residual global HasError cannot invent sibling-use.
+func ancestryTypeHole(v *Variable) bool {
+	for p := v; p != nil; p = p.FieldVarOf {
+		if IsSpecialPtr(p) {
+			return false
+		}
+		if p.Type == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // SiblingUnionFieldIsRead mirrors Effect::sibling_union_field_is_read.
 // Effect.cpp:416–428 — another field of the same container union was read.
 // Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
@@ -557,6 +580,15 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	}
 	you := youColl.GetContainerUnion()
 	if you == nil {
+		// Type-nil ancestry (not residual global HasError): restrictive true
+		// (no invent no-sibling / conflict-free past incomplete container shell)
+		if ancestryTypeHole(youColl) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return true
+		}
+		// complete no container union
 		return false
 	}
 	for r := range e.read {
@@ -602,6 +634,15 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	}
 	you := youColl.GetContainerUnion()
 	if you == nil {
+		// Type-nil ancestry (not residual global HasError): restrictive true
+		// (no invent no-sibling / conflict-free past incomplete container shell)
+		if ancestryTypeHole(youColl) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return true
+		}
+		// complete no container union
 		return false
 	}
 	for w := range e.written {
