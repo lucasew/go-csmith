@@ -72,6 +72,31 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	}
 }
 
+func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
+	// C++ get_exprs always yields live Expression* for assign/invoke
+	// soft invent skip nil Expr would invent empty call list as success
+	var calls []*Invocation
+	calls = []*Invocation{{User: &Function{Name: "stale"}}}
+	CollectCalledInvocationsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &calls)
+	if calls != nil {
+		t.Fatal("assign without Expr must clear, not invent empty success", calls)
+	}
+	calls = []*Invocation{{User: &Function{Name: "stale"}}}
+	CollectCalledInvocationsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &calls)
+	if calls != nil {
+		t.Fatal("invoke without Expr must clear")
+	}
+	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtAssign, StmID: 3}) {
+		t.Fatal("nil Expr assign must fail closed uncertain")
+	}
+	if !HasUncertainCallRecursiveExpr(nil) {
+		t.Fatal("nil expr must fail closed uncertain")
+	}
+	if !(*Invocation)(nil).HasUncertainCall() {
+		t.Fatal("nil invoke must fail closed HasUncertainCall")
+	}
+}
+
 func TestHasUncertainCall(t *testing.T) {
 	// two args each with a call → uncertain
 	a := userCall("func_a")

@@ -77,17 +77,33 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 	if st == nil || out == nil {
 		return false
 	}
-	// StatementFor::get_exprs → test only
-	if st.Kind == StmtFor || st.Loop != nil {
+	// StatementFor/ArrayOp::get_exprs → test only (not st.Expr)
+	// Kind-gated: no invent treat Loop-on-wrong-kind as for get_exprs
+	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			return false
 		}
 		if !collectCalledInvocationsExpr(st.Loop.TestExpr, out) {
 			return false
 		}
-	} else if st.Expr != nil {
-		if !collectCalledInvocationsExpr(st.Expr, out) {
-			return false
+	} else {
+		switch st.Kind {
+		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+			// C++ get_exprs always yields live Expression* for these kinds
+			// incomplete nil Expr fails closed (no invent empty call list as success)
+			if st.Expr == nil {
+				return false
+			}
+			if !collectCalledInvocationsExpr(st.Expr, out) {
+				return false
+			}
+		default:
+			// other kinds: optional expr if present
+			if st.Expr != nil {
+				if !collectCalledInvocationsExpr(st.Expr, out) {
+					return false
+				}
+			}
 		}
 	}
 	// get_blocks → Then/Else
@@ -137,10 +153,11 @@ func FuncCount(e *Expression) int {
 
 // HasUncertainCall mirrors FunctionInvocation::has_uncertain_call.
 // FunctionInvocation.cpp:383–394 — ≥2 params each containing a call.
-// Nil arg / incomplete FuncCount fails closed true (no invent certain order).
+// Nil invoke / nil arg / incomplete FuncCount fails closed true
+// (no invent certain order / no-call).
 func (fi *Invocation) HasUncertainCall() bool {
 	if fi == nil {
-		return false
+		return true
 	}
 	cnt := 0
 	for _, a := range fi.Args {
@@ -160,10 +177,10 @@ func (fi *Invocation) HasUncertainCall() bool {
 
 // HasUncertainCallRecursive mirrors FunctionInvocation::has_uncertain_call_recursive.
 // FunctionInvocation.cpp:396–406.
-// Nil arg fails closed true (no invent skip hole as non-call).
+// Nil invoke / nil arg fails closed true (no invent skip hole as non-call).
 func (fi *Invocation) HasUncertainCallRecursive() bool {
 	if fi == nil {
-		return false
+		return true
 	}
 	for _, a := range fi.Args {
 		if a == nil {
@@ -204,7 +221,7 @@ func (fi *Invocation) HasSimpleParams() bool {
 // Incomplete IR fails closed true (no invent "no uncertain call").
 func HasUncertainCallRecursiveExpr(e *Expression) bool {
 	if e == nil {
-		return false
+		return true
 	}
 	switch e.Term {
 	case TermFunction:
@@ -232,7 +249,7 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 // Incomplete for/expr fails closed true (no invent skip for-test calls).
 func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 	if st == nil {
-		return false
+		return true
 	}
 	switch st.Kind {
 	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
