@@ -283,3 +283,48 @@ func TestDoFinalization(t *testing.T) {
 		t.Fatal("not cleared")
 	}
 }
+
+func TestReadUnionFieldIncompleteSticky(t *testing.T) {
+	ClearError()
+	if !ReadUnionFieldExpr(nil) {
+		t.Fatal("nil Expr ReadUnionField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Expr ReadUnionField must SetError sticky")
+	}
+	ClearError()
+	if !ReadUnionFieldStmt(nil) {
+		t.Fatal("nil Stmt ReadUnionField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt ReadUnionField must SetError sticky")
+	}
+	ClearError()
+	// complete constant assign does not read union field
+	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: CreateVariableScalars("g_x", GetIntType(), false, false), AssignOp: AssignSimple}
+	if ReadUnionFieldStmt(st) {
+		t.Fatal("scalar assign must not read union field")
+	}
+	if HasError() {
+		t.Fatal("complete ReadUnionFieldStmt must not sticky")
+	}
+	ClearError()
+}
+
+func TestNeedNestedLoopIsEffectKnownSticky(t *testing.T) {
+	ClearError()
+	if (*Block)(nil).NeedNestedLoop(EmptyCGContext(), NewRng(1)) {
+		t.Fatal("nil Block NeedNestedLoop must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Block NeedNestedLoop must SetError sticky")
+	}
+	ClearError()
+	if (*Function)(nil).IsEffectKnown() {
+		t.Fatal("nil Function IsEffectKnown must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Function IsEffectKnown must SetError sticky")
+	}
+	ClearError()
+}

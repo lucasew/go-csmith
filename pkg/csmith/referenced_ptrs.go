@@ -213,33 +213,40 @@ func appendUniqueVar(s []*Variable, v *Variable) []*Variable {
 
 // ReadUnionFieldExpr reports whether expression reads a union field.
 // Statement.cpp:665+ subset via IsInsideUnionField.
-// Incomplete IR fails closed as true (no invent "no union field read").
+// Incomplete IR sticky true (no invent "no union field read" / soft re-pick).
 func ReadUnionFieldExpr(e *Expression) bool {
+	// Expression always live; sticky incomplete as reads-union (restrictive)
 	if e == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	switch e.Term {
 	case TermVariable:
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.Var.IsInsideUnionField()
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return ReadUnionFieldExpr(e.CommaLHS) || ReadUnionFieldExpr(e.CommaRHS)
 	case TermAssignment:
 		if e.Assign == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return ReadUnionFieldStmt(e.Assign)
 	case TermFunction:
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		for _, a := range e.Invoke.Args {
 			if a == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			if ReadUnionFieldExpr(a) {
@@ -253,16 +260,19 @@ func ReadUnionFieldExpr(e *Expression) bool {
 // ReadUnionFieldStmt mirrors Statement::read_union_field for one stmt.
 // Statement.cpp:665–678 — map_stm_effect union_field_is_read + callees'
 // union_field_read. Go subset: IR walk of get_exprs/get_blocks + callee flags.
-// Incomplete for-test / call-collect / block holes fail closed true
-// (no invent "no union field read").
+// Incomplete for-test / call-collect / block holes sticky true
+// (no invent "no union field read" / soft re-pick past holes).
 func ReadUnionFieldStmt(st *Stmt) bool {
+	// Statement always live; sticky incomplete as reads-union (restrictive)
 	if st == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	// get_exprs: for → Loop.TestExpr; assign/etc require live Expr
 	// Kind-gated for (no invent Loop-on-wrong-kind)
 	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if ReadUnionFieldExpr(st.Loop.TestExpr) {
@@ -271,8 +281,9 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 	} else {
 		switch st.Kind {
 		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-			// C++ get_exprs always live; nil Expr fails closed true
+			// C++ get_exprs always live; nil Expr sticky fail closed true
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			if ReadUnionFieldExpr(st.Expr) {
@@ -288,8 +299,9 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 		return true
 	}
 	if st.Lhs != nil {
-		// Lhs always has live Var; incomplete fails closed
+		// Lhs always has live Var; incomplete sticky fail closed
 		if st.Lhs.Var == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if st.Lhs.Var.IsInsideUnionField() {
@@ -299,10 +311,14 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 	// Statement.cpp:671–676 — get_called_funcs; callee->union_field_read
 	var calls []*Invocation
 	if !collectCalledInvocationsStmt(st, &calls) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	for _, inv := range calls {
 		if inv == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if inv.User != nil && inv.User.UnionFieldRead {
@@ -312,6 +328,7 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 	// get_blocks → nested stmts (Then/Else for if/for body)
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if ReadUnionFieldBlock(b) {

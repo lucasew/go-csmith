@@ -19,8 +19,14 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 
 // NeedNestedLoop mirrors Block::need_nested_loop.
 // Block.cpp:390–420 — looping block needs deeper IV for must-use array dimensions.
+// Incomplete Block/Rng sticky false (no invent nested-loop soft-skip past holes).
 func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
-	if b == nil || !b.Looping || r == nil {
+	// Block + Rng always live; sticky incomplete no invent not-nested soft-skip
+	if b == nil || r == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !b.Looping {
 		return false
 	}
 	s := b.GetLastStm()
@@ -246,14 +252,20 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 }
 
 // collectTypedStmIDs collects stm_ids of given kinds under st (find_typed_stmts light).
-// Uses kind-gated get_blocks; returns false on incomplete Block* hole
+// Uses kind-gated get_blocks; sticky false on incomplete Block* hole
 // (no invent partial typed list past missing if-arm as complete).
 func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool {
+	// Statement + id set always live; sticky incomplete no invent empty typed list
 	if st == nil || ids == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	var stms []*Stmt
 	if FindTypedStmts(st, &stms, kinds) < 0 {
+		// FindTypedStmts may already sticky IncompleteStmtsSlice
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	for _, s := range stms {
@@ -265,14 +277,18 @@ func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool 
 }
 
 // blockUnderStmt reports whether blk is a get_blocks child of st or nested under them.
-// Incomplete get_blocks hole fails closed true (no invent "not under" while soft-skipping
+// Incomplete get_blocks hole sticky true (no invent "not under" while soft-skipping
 // a nil if-arm — scrub aggressively / treat as contained for remove_stmt).
 func blockUnderStmt(st *Stmt, blk *Block) bool {
+	// Statement + Block always live; sticky incomplete no invent not-under soft-skip
 	if st == nil || blk == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
+			// incomplete arm sticky contained (restrictive scrub)
+			SetError(ErrGeneric)
 			return true
 		}
 		if b == blk {
@@ -288,9 +304,14 @@ func blockUnderStmt(st *Stmt, blk *Block) bool {
 }
 
 // stmtTreeContainsID reports whether id appears under st via get_blocks.
-// Incomplete arm fails closed false (no invent membership past holes).
+// Incomplete arm sticky false (no invent membership past holes).
 func stmtTreeContainsID(st *Stmt, id int) bool {
-	if st == nil || id <= 0 {
+	// Statement always live; sticky incomplete no invent not-contain soft-skip
+	if st == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if id <= 0 {
 		return false
 	}
 	if st.StmID == id {
@@ -299,6 +320,8 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 	blks := GetBlocksStmt(st)
 	for _, b := range blks {
 		if b == nil {
+			// incomplete arm sticky not-contain
+			SetError(ErrGeneric)
 			return false
 		}
 	}

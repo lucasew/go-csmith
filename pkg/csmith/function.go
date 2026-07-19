@@ -69,8 +69,11 @@ type Function struct {
 
 // PairedFactMgr returns the FactMgr registered with this function at create time.
 // Mirrors get_fact_mgr_for_func when the function is on FuncList/FMList.
+// Incomplete Function sticky nil (no invent soft-miss FM past hole).
 func (f *Function) PairedFactMgr() *FactMgr {
+	// Function always live; sticky incomplete no invent nil FM soft-skip
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return f.factMgr
@@ -79,7 +82,9 @@ func (f *Function) PairedFactMgr() *FactMgr {
 // ensurePairedFactMgr returns the paired FactMgr, creating once at signature-time
 // semantics (Function.cpp FMList.push_back(new FactMgr(f))).
 func (f *Function) ensurePairedFactMgr() *FactMgr {
+	// Function always live; sticky incomplete no invent FM without function
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if f.factMgr == nil {
@@ -90,8 +95,14 @@ func (f *Function) ensurePairedFactMgr() *FactMgr {
 
 // IsEffectKnown mirrors Function::is_effect_known — true only when Built.
 // Function.h:96–97.
+// Incomplete Function sticky false (no invent effect-known / soft re-pick past hole).
 func (f *Function) IsEffectKnown() bool {
-	return f != nil && f.BuildState == BuildBuilt
+	// Function always live; sticky incomplete no invent effect-known soft-skip
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.BuildState == BuildBuilt
 }
 
 // markBuilt sets Built state and IsBuilt flag.
@@ -926,8 +937,11 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 
 // OutputHeaderAlias mirrors Function::OutputHeaderAlias.
 // Function.cpp:533–541 — static? + type alias_name(params) __attribute__((alias("name"))).
+// Incomplete Function sticky empty (no invent alias shell without function).
 func (f *Function) OutputHeaderAlias(forceStatic bool) string {
+	// Function always live at emit; sticky incomplete no invent empty alias shell
 	if f == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Function::alias_name set at create (name + "_alias"); sticky no invent when missing
