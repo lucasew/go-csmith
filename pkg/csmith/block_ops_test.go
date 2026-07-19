@@ -542,6 +542,10 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 		t.Fatal("sticky error must not append nested for")
 	}
 	ClearError()
+	// Block.cpp always has RNG for make_random(eFor)
+	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+		t.Fatal("nil RNG must not invent nested for")
+	}
 }
 
 func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {

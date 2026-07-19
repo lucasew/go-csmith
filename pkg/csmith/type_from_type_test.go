@@ -55,6 +55,17 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	if ty != st {
 		t.Fatal("struct should pass through")
 	}
+	// nil type / simple re-roll need RNG; no invent pick/keep-simple shells
+	if RandomTypeFromType(nil, &TypeEnv{AllTypes: []*Type{GetIntType()}}, opts, probs, nil, false, false) != nil {
+		t.Fatal("nil RNG + nil type must fail closed")
+	}
+	if RandomTypeFromType(nil, nil, opts, probs, GetIntType(), false, false) != nil {
+		t.Fatal("nil RNG + simple re-roll must fail closed")
+	}
+	// non-simple keep path does not need RNG
+	if RandomTypeFromType(nil, nil, opts, probs, st, false, false) != st {
+		t.Fatal("struct keep without RNG")
+	}
 }
 
 func TestGenerateMainHasReturn0(t *testing.T) {

@@ -87,6 +87,8 @@ func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 }
 
 func TestMakeReturnConst(t *testing.T) {
+	ClearError()
+	defer ClearError()
 	opts := Defaults()
 	opts.DepthProtect = true
 	probs := NewProbabilities(opts)
@@ -101,7 +103,7 @@ func TestMakeReturnConst(t *testing.T) {
 	if f2.RetConst != nil {
 		t.Fatal("void no const")
 	}
-	// aggregate ret + nil probs — no invent NewProbabilities(opts)
+	// aggregate ret + nil probs — no invent NewProbabilities(opts); ERROR_RETURN
 	st := &Type{isStruct: true, StructName: "SRet", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -110,6 +112,17 @@ func TestMakeReturnConst(t *testing.T) {
 	if f3.RetConst != nil {
 		t.Fatal("nil probs must not invent aggregate ret_c")
 	}
+	if !HasError() {
+		t.Fatal("nil probs aggregate must ERROR_RETURN for GenerateBody")
+	}
+	ClearError()
+	// nil RNG — no invent "0"; sticky error for GenerateBody
+	f4 := &Function{Name: "n", ReturnType: GetIntType()}
+	f4.MakeReturnConst(opts, probs, nil)
+	if f4.RetConst != nil || !HasError() {
+		t.Fatal("nil RNG must fail closed with sticky error")
+	}
+	ClearError()
 }
 
 func TestMakeExpressionCommaNilLHSType(t *testing.T) {

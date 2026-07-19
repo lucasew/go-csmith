@@ -419,7 +419,9 @@ func (b *Block) AppendNestedLoop(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
-	if b == nil || cg == nil {
+	// Block.cpp:422+ — Statement::make_random(eFor) always has RNG
+	// no invent nested for shell without live block/context/RNG
+	if b == nil || r == nil || cg == nil {
 		return nil
 	}
 	var preFacts []*FactPointTo

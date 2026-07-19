@@ -346,6 +346,11 @@ func makePossibleCompoundAssign(
 		// simple assign — StatementAssign ctor rhs(&expr)
 		return st
 	}
+	// compound always maps to a live binary token; no invent empty Binary shell
+	opStr := bop.BinaryOpC()
+	if int(bop) < 0 || int(bop) >= MaxBinaryOp || opStr == "" {
+		return Stmt{}
+	}
 	lt := typ
 	if lhs != nil {
 		if t := lhs.GetType(); t != nil {
@@ -357,21 +362,25 @@ func makePossibleCompoundAssign(
 	if SafeAssign(op) {
 		// StatementAssign.cpp:256–259 — dummy flags + FunctionInvocationBinary(bop, local_fs)
 		flags = MakeDummyFlags()
-		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
+		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
 		inv.setOutOpts(opts)
 	} else {
 		// StatementAssign.cpp:260–266 — make_random_binary + CreateFunctionInvocationBinary
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
+		// always has RNG for non-safe compounds; no invent nil-flags shell
+		if r == nil {
+			return Stmt{}
+		}
 		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
 		// StatementAssign.cpp:260–262 — ERROR_GUARD(nullptr); no soft invent nil-flags compound
 		if flags == nil || HasError() {
 			return Stmt{}
 		}
-		inv = &Invocation{IsStd: true, Binary: bop.BinaryOpC(), Safe: flags}
+		inv = &Invocation{IsStd: true, Binary: opStr, Safe: flags}
 		inv.setOutOpts(opts)
 		// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 		// assert(blk) when safe_ops — no soft invent compound without temps
-		if SafeOpsBinary(bop.BinaryOpC()) {
+		if SafeOpsBinary(opStr) {
 			blk := cg.CurrentBlock()
 			if blk == nil {
 				// FunctionInvocationBinary.cpp:68 assert(blk)

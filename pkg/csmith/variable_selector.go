@@ -1544,6 +1544,10 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 		return nil
 	}
 	name := vs.RandomParamName()
+	// gensym always live; no invent empty-name parameter shell
+	if name == "" {
+		return nil
+	}
 	v := CreateVariableQfer(name, typ, qfer)
 	if v == nil {
 		return nil
@@ -2231,7 +2235,8 @@ func (vs *VariableSelector) GenerateNewVariable(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
-	if vs == nil || t == nil {
+	// VariableSelector.cpp:1090+ — always has RNG; no invent scope/type without it
+	if vs == nil || t == nil || r == nil {
 		return nil
 	}
 	// VariableSelector.cpp:1093 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewVariable, nullptr)

@@ -68,6 +68,10 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 	if outerN == 0 || innerN == 0 {
 		t.Fatalf("want both stack frames used: outer=%d inner=%d", outerN, innerN)
 	}
+	// VariableSelector.cpp always has RNG; no invent scope/type without it
+	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("nil RNG must not invent new variable")
+	}
 }
 
 func TestSelectGlobalMTInvalidVars(t *testing.T) {

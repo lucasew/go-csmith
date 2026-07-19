@@ -577,6 +577,8 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	}
 	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid
 	if f.ReturnType == nil {
+		// assert(return_type) — sticky error for GenerateBody ERROR_RETURN
+		SetError(ErrGeneric)
 		return
 	}
 	if f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
@@ -585,14 +587,19 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 	}
 	// Function.cpp:612 — Constant::make_random; no invent "0" on nil RNG/fail
 	if r == nil {
+		// C++ always has process RNG; fail closed with ERROR_RETURN semantics
+		SetError(ErrGeneric)
 		return
 	}
 	// session probs; aggregate ret_c needs live tables (nil → fail closed, no invent)
 	f.RetConst = MakeRandom(f.ReturnType, opts, probs, r)
 	// Function.cpp:614 ERROR_RETURN after Constant::make_random
-	// sticky error left for GenerateBody ERROR_RETURN; nil const is incomplete IR
+	// sticky error so GenerateBody does not invent Built without ret_c
 	if HasError() || f.RetConst == nil {
 		f.RetConst = nil
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 }

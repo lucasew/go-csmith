@@ -526,7 +526,8 @@ func makeRandomStmt(
 	cg *CGContext,
 	b *Block,
 ) Stmt {
-	if cg == nil {
+	// Statement.cpp always has RNG + CGContext; no invent MAX-kind shell without them
+	if r == nil || cg == nil {
 		return Stmt{}
 	}
 	// Statement.cpp:243–244 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtStatement, t, nullptr)

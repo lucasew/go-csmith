@@ -218,7 +218,12 @@ func RandomTypeFromType(
 	if DepthGuardByType(opts, DtRandomTypeFromType) == BadDepth {
 		return nil
 	}
+	// Type.cpp always has process RNG; nil type / simple re-roll need it
+	// no invent keep-simple / pick-nonvoid shells without RNG
 	if typ == nil {
+		if r == nil {
+			return nil
+		}
 		// Type.cpp:594–597 — choose_random_nonvoid(_nonvolatile) + ERROR_GUARD; no soft invent simple
 		if env == nil || len(env.AllTypes) == 0 {
 			return nil
@@ -231,6 +236,9 @@ func RandomTypeFromType(
 	// Type.cpp:599–601 — eSimple && !strict_simple_type → choose_random_simple
 	// no soft invent re-roll when strict_simple_type (make_init_value pointer create)
 	if typ.IsSimple() && !strictSimple {
+		if r == nil {
+			return nil
+		}
 		// Type.cpp:1242 — DEPTH_GUARD_BY_TYPE_RETURN(dtTypeChooseSimple, nullptr)
 		if DepthGuardByType(opts, DtTypeChooseSimple) == BadDepth {
 			return nil
