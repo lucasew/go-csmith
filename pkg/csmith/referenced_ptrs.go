@@ -209,21 +209,60 @@ func ReadUnionFieldExpr(e *Expression) bool {
 }
 
 // ReadUnionFieldStmt mirrors Statement::read_union_field for one stmt.
+// Statement.cpp:665–678 — map_stm_effect union_field_is_read + callees'
+// union_field_read. Go subset: IR walk of get_exprs/get_blocks + callee flags.
+// Incomplete for-test / call-collect / block holes fail closed true
+// (no invent "no union field read").
 func ReadUnionFieldStmt(st *Stmt) bool {
 	if st == nil {
 		return false
 	}
-	if ReadUnionFieldExpr(st.Expr) {
-		return true
+	// get_exprs: for → Loop.TestExpr; else Expr when present
+	if st.Kind == StmtFor || st.Loop != nil {
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			return true
+		}
+		if ReadUnionFieldExpr(st.Loop.TestExpr) {
+			return true
+		}
+	} else if st.Expr != nil {
+		if ReadUnionFieldExpr(st.Expr) {
+			return true
+		}
 	}
 	if st.LhsVar != nil && st.LhsVar.IsInsideUnionField() {
 		return true
 	}
-	if st.Then != nil && ReadUnionFieldBlock(st.Then) {
+	if st.Lhs != nil {
+		// Lhs always has live Var; incomplete fails closed
+		if st.Lhs.Var == nil {
+			return true
+		}
+		if st.Lhs.Var.IsInsideUnionField() {
+			return true
+		}
+	}
+	// Statement.cpp:671–676 — get_called_funcs; callee->union_field_read
+	var calls []*Invocation
+	if !collectCalledInvocationsStmt(st, &calls) {
 		return true
 	}
-	if st.Else != nil && ReadUnionFieldBlock(st.Else) {
-		return true
+	for _, inv := range calls {
+		if inv == nil {
+			return true
+		}
+		if inv.User != nil && inv.User.UnionFieldRead {
+			return true
+		}
+	}
+	// get_blocks → nested stmts (Then/Else for if/for body)
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return true
+		}
+		if ReadUnionFieldBlock(b) {
+			return true
+		}
 	}
 	return false
 }
@@ -244,14 +283,25 @@ func ReadUnionFieldBlock(b *Block) bool {
 // ComputeSummary mirrors Function::compute_summary.
 // Function.cpp:773–784 — referenced_ptrs + feffect external + union_field_read.
 // bodyEffect is the accumulated effect of the function body (map_stm_effect[body]).
+// Incomplete body IR fails closed UnionFieldRead (no invent clean empty summary).
 func (f *Function) ComputeSummary(bodyEffect Effect) {
 	if f == nil {
 		return
 	}
 	f.ReferencedPtrs = nil
+	f.UnionFieldRead = false
 	if f.Body != nil {
-		CollectReferencedPtrsBlock(f.Body, &f.ReferencedPtrs)
-		f.UnionFieldRead = ReadUnionFieldBlock(f.Body)
+		var ptrs []*Variable
+		if !collectReferencedPtrsBlock(f.Body, &ptrs) {
+			// incomplete referenced-ptrs walk — fail closed needs-revisit path
+			// (no invent empty ReferencedPtrs + false UnionFieldRead as clean)
+			f.UnionFieldRead = true
+		} else {
+			f.ReferencedPtrs = ptrs
+		}
+		if ReadUnionFieldBlock(f.Body) {
+			f.UnionFieldRead = true
+		}
 	}
 	// feffect.add_external_effect(body effect)
 	f.FEffect = f.FEffect.AddExternalEffect(bodyEffect)

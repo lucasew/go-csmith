@@ -92,6 +92,50 @@ func TestComputeSummaryReferencedPtrs(t *testing.T) {
 	if !f.FEffect.IsWritten(p) {
 		t.Fatal("feffect")
 	}
+	if f.UnionFieldRead {
+		t.Fatal("no union field on plain ptr assign")
+	}
+}
+
+func TestReadUnionFieldForTestExpr(t *testing.T) {
+	// StatementFor get_exprs → test; soft invent skip would miss for-test union field
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: uv}
+	uv.FieldVars = []*Variable{f0}
+	test := &Expression{Term: TermVariable, Var: f0, ExprType: GetIntType()}
+	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}}
+	if !ReadUnionFieldStmt(st) {
+		t.Fatal("for-test union field must count")
+	}
+	// incomplete for without TestExpr fails closed true
+	if !ReadUnionFieldStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
+		t.Fatal("incomplete for must fail closed true")
+	}
+}
+
+func TestReadUnionFieldCalleeFlag(t *testing.T) {
+	// Statement.cpp:671–676 — callee union_field_read
+	callee := &Function{Name: "g", UnionFieldRead: true, ReturnType: GetIntType(), IsBuilt: true}
+	call := &Expression{Term: TermFunction, Invoke: &Invocation{User: callee}}
+	st := &Stmt{Kind: StmtInvoke, Expr: call}
+	if !ReadUnionFieldStmt(st) {
+		t.Fatal("callee UnionFieldRead must count")
+	}
+}
+
+func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
+	// incomplete for in body — no invent clean empty summary (false UnionFieldRead)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.Body = &Block{Stmts: []Stmt{
+		{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}},
+	}}
+	f.ComputeSummary(EmptyEffect())
+	if !f.UnionFieldRead {
+		t.Fatal("incomplete for must fail closed UnionFieldRead")
+	}
 }
 
 func TestIsFrameVar(t *testing.T) {
