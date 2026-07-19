@@ -440,10 +440,17 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 	if lhs == "" {
 		return ""
 	}
-	// StatementAssign.cpp:515–537 — expr.Output always; no soft invent "0" for nil RHS
-	rhs := ""
-	if st.Expr != nil {
-		rhs = st.Expr.Output()
+	// StatementAssign.cpp:515–537 — expr.Output always for ops that need RHS
+	// no soft invent "0" or "lhs = " empty RHS for incomplete IR
+	if st.AssignOp.NeedNoRHS() {
+		return st.AssignOp.AssignOpC(lhs, "")
+	}
+	if st.Expr == nil {
+		return ""
+	}
+	rhs := st.Expr.Output()
+	if rhs == "" {
+		return ""
 	}
 	return st.AssignOp.AssignOpC(lhs, rhs)
 }

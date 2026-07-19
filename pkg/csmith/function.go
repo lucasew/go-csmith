@@ -765,23 +765,25 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		s += EnsureFuncAttrGenerator().Output(r)
 	}
 	s += "\n"
-	// Function.cpp:575–598 — depth_protect wraps body
-	if f.DepthProtect {
+	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
+	// no invent if without else, else without body, or empty "{}" body
+	if f.Body == nil {
+		// incomplete IR — header only (C++ would dereference body)
+		return s
+	}
+	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
+	if f.DepthProtect && f.RetConst != nil {
+		// Function.cpp:575–597 — if (DEPTH…) body else return ret_c
 		s += "if (DEPTH < MAX_DEPTH) \n"
-	}
-	// Function.cpp:591 — body->Output always; no soft invent empty "{}" when Body missing
-	if f.Body != nil {
-		// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 		s += f.Body.Output(0)
+		s += "else\n"
+		s += "return "
+		s += f.RetConst.Value
+		s += ";\n"
+		return s
 	}
-	if f.DepthProtect {
-		// Function.cpp:593–597 — else; ret_c->Output; no soft invent "0" when ret_c null
-		if f.RetConst != nil {
-			s += "else\n"
-			s += "return "
-			s += f.RetConst.Value
-			s += ";\n"
-		}
-	}
+	// body without complete depth_protect wrap (void / missing ret_c)
+	// no soft invent "if (DEPTH…)" without else ret_c
+	s += f.Body.Output(0)
 	return s
 }

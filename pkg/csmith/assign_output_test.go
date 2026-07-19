@@ -22,6 +22,25 @@ func TestOutputAssignSimple(t *testing.T) {
 	}
 }
 
+func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
+	// StatementAssign.cpp:515–537 — expr.Output always; no invent "g_1 = "
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
+	if out := OutputAssignSimple(st, false); out != "" {
+		t.Fatal("nil Expr must fail closed", out)
+	}
+	st.Expr = &Expression{Term: TermConstant} // nil Con → empty Output
+	if out := OutputAssignSimple(st, false); out != "" {
+		t.Fatal("empty RHS must fail closed", out)
+	}
+	// pre/post incr need no RHS
+	st.AssignOp = AssignPreIncr
+	st.Expr = nil
+	if out := OutputAssignSimple(st, false); out != "++g_1" {
+		t.Fatal(out)
+	}
+}
+
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())

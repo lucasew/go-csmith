@@ -65,6 +65,13 @@ func (fi *Invocation) Output() string {
 		return ""
 	}
 	if fi.User != nil {
+		// FunctionInvocationUser::Output — param_value[i] always live Expression*
+		// no invent empty slots "f(a, , c)" or soft "0" for nil args
+		for _, a := range fi.Args {
+			if a == nil {
+				return ""
+			}
+		}
 		var b strings.Builder
 		b.WriteString(fi.User.Name)
 		b.WriteString("(")
@@ -72,10 +79,7 @@ func (fi *Invocation) Output() string {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			// FunctionInvocationUser::Output — param_value[i]->Output; no soft invent "0"
-			if a != nil {
-				b.WriteString(a.Output())
-			}
+			b.WriteString(a.Output())
 		}
 		b.WriteString(")")
 		return b.String()

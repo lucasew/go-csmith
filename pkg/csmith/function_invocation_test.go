@@ -238,3 +238,21 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 		}
 	}
 }
+
+func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
+	// FunctionInvocationUser::Output — param_value[i] always live; no invent f(a, , c)
+	callee := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt}
+	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	fi := &Invocation{
+		User: callee,
+		Args: []*Expression{a0, nil},
+	}
+	if out := fi.Output(); out != "" {
+		t.Fatal("nil arg must fail closed empty, got", out)
+	}
+	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeInt(2)}}
+	out := fi.Output()
+	if out != "func_2(1, 2)" {
+		t.Fatal(out)
+	}
+}

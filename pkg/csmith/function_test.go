@@ -185,34 +185,43 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 }
 
 func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
-	// Function.cpp:591 body->Output; 595 ret_c->Output — no invent empty braces / "0"
+	// Function.cpp:575–597 — depth_protect + body + ret_c always together
+	// no invent empty braces / if without else / else without body / "0"
 	f := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
 		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
 		DepthProtect: true,
 	}
-	// empty Param path: OutputHeader needs params string; use void params via empty Param + void type
-	// OutputHeaderOpts with process defaults: paramListC for nil params emits "void"
 	out := f.Output()
 	if strings.Contains(out, "{\n}\n") {
 		t.Fatal("nil Body must not invent empty braces", out)
 	}
+	if strings.Contains(out, "if (DEPTH") {
+		t.Fatal("nil Body must not invent depth if", out)
+	}
 	if strings.Contains(out, "return 0") {
 		t.Fatal("nil RetConst must not invent return 0", out)
 	}
-	// with RetConst only — else branch present, still no invent body
+	// RetConst only — no invent if/else without body
 	f.RetConst = MakeInt(42)
 	out = f.Output()
-	if !strings.Contains(out, "return 42") {
-		t.Fatal(out)
+	if strings.Contains(out, "if (DEPTH") || strings.Contains(out, "return 42") {
+		t.Fatal("RetConst without Body must not invent depth shell", out)
 	}
-	if strings.Contains(out, "{\n}\n") {
-		t.Fatal("still no invent body", out)
-	}
-	// live body
+	// Body without RetConst — body only, no invent if without else
+	f.RetConst = nil
 	f.Body = &Block{Func: f}
 	out = f.Output()
 	if !strings.Contains(out, "{") {
 		t.Fatal("want body braces", out)
+	}
+	if strings.Contains(out, "if (DEPTH") {
+		t.Fatal("Body without RetConst must not invent depth if", out)
+	}
+	// complete depth_protect IR
+	f.RetConst = MakeInt(42)
+	out = f.Output()
+	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") || !strings.Contains(out, "return 42") {
+		t.Fatal("complete depth_protect IR", out)
 	}
 }
