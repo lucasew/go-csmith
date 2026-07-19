@@ -170,3 +170,21 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputForCommentNilSticky(t *testing.T) {
+	ClearError()
+	if (*Variable)(nil).OutputForComment(false) != "" {
+		t.Fatal("nil Variable OutputForComment must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable OutputForComment must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).GetActualName(false) != "" {
+		t.Fatal("nil Variable GetActualName must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable GetActualName must SetError sticky")
+	}
+	ClearError()
+}

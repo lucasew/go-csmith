@@ -418,3 +418,22 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 		t.Fatal("offset form", nf2)
 	}
 }
+
+func TestFindRelatedPointToNilSticky(t *testing.T) {
+	ClearError()
+	if FindRelatedPointTo(nil, nil) != nil {
+		t.Fatal("nil subject FindRelatedPointTo must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil subject FindRelatedPointTo must SetError sticky")
+	}
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if FindRelatedPointTo([]*FactPointTo{nil}, p) != nil {
+		t.Fatal("nil fact hole FindRelatedPointTo must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil fact hole FindRelatedPointTo must SetError sticky")
+	}
+	ClearError()
+}

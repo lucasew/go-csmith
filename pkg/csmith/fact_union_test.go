@@ -265,3 +265,22 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 		t.Fatalf("%+v", out)
 	}
 }
+
+func TestFindRelatedUnionNilSticky(t *testing.T) {
+	ClearError()
+	if FindRelatedUnion(nil, nil) != nil {
+		t.Fatal("nil subject FindRelatedUnion must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil subject FindRelatedUnion must SetError sticky")
+	}
+	ClearError()
+	v := CreateVariableScalars("g_u", GetIntType(), false, false)
+	if FindRelatedUnion([]*FactUnion{nil}, v) != nil {
+		t.Fatal("nil fact hole FindRelatedUnion must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil fact hole FindRelatedUnion must SetError sticky")
+	}
+	ClearError()
+}

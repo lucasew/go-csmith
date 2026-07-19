@@ -164,3 +164,23 @@ func TestVariableSelectorDoFinalization(t *testing.T) {
 		t.Fatal("cleared")
 	}
 }
+
+func TestMatchVarNameNilSticky(t *testing.T) {
+	ClearError()
+	if (*Variable)(nil).MatchVarName("g_1") != nil {
+		t.Fatal("nil Variable MatchVarName must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable MatchVarName must SetError sticky")
+	}
+	ClearError()
+	// empty query soft miss
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if v.MatchVarName("") != nil {
+		t.Fatal("empty name MatchVarName must soft miss")
+	}
+	if HasError() {
+		t.Fatal("empty name MatchVarName must stay non-sticky soft miss")
+	}
+	ClearError()
+}

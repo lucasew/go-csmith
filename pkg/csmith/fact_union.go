@@ -67,11 +67,15 @@ func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 // FindRelatedUnion finds FactUnion for union variable v.
 // FactUnion* always live; nil hole fails closed (nil — no invent skip to later match).
 func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
+	// subject always live; sticky no invent miss / soft-skip nil key
 	if v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for _, f := range facts {
+		// FactUnion* always live; sticky no invent skip hole to later match
 		if f == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if f.Var == v {

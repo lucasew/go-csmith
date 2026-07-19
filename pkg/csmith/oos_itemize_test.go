@@ -98,3 +98,24 @@ func TestVariableMatchAggregate(t *testing.T) {
 		t.Fatal("field match")
 	}
 }
+
+func TestMarkDeadVarNilSticky(t *testing.T) {
+	ClearError()
+	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalars("g_x", GetIntType(), false, false)) != nil {
+		t.Fatal("nil Fact MarkDeadVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact MarkDeadVar must SetError sticky")
+	}
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	f := MakeFactPointTo(p, tgt)
+	if f.MarkDeadVar(nil) != nil {
+		t.Fatal("nil var MarkDeadVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil var MarkDeadVar must SetError sticky")
+	}
+	ClearError()
+}

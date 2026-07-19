@@ -51,7 +51,9 @@ type Variable struct {
 // GetActualName mirrors Variable::get_actual_name.
 // Variable.cpp:678–686 — globals may get_prefixed_name; default RNG returns name as-is.
 func (v *Variable) GetActualName(prefixName bool) string {
+	// Variable* always live for name emit; sticky no invent empty identifier
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.IsGlobal() {
@@ -269,16 +271,25 @@ func (v *Variable) OutputAddrOf(prefixName bool) string {
 // OutputForComment mirrors Variable::OutputForComment — bare actual name.
 // Variable.cpp:711–713.
 func (v *Variable) OutputForComment(prefixName bool) string {
+	// Variable* always live at comment emit; sticky no invent empty comment name
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
-	return v.GetActualName(prefixName)
+	name := v.GetActualName(prefixName)
+	if name == "" {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return name
 }
 
 // OutputUpperBound mirrors Variable::OutputUpperBound — field path for bounds.
 // Variable.cpp:721–732; ArrayVariable.cpp:572–577 for arrays.
 func (v *Variable) OutputUpperBound(prefixName bool) string {
+	// Variable* always live at bound emit; sticky no invent empty upper bound
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.AsArray != nil && len(v.AsArray.Sizes) > 0 {
@@ -781,7 +792,13 @@ func (v *Variable) GetDimension() int {
 // MatchVarName mirrors Variable::match_var_name — name or field path.
 // Variable* always live in FieldVars; nil hole fails closed (nil match).
 func (v *Variable) MatchVarName(vname string) *Variable {
-	if v == nil || vname == "" {
+	// Variable* always live for name match; sticky no invent miss without it
+	if v == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// empty query: soft miss (not incomplete subject IR)
+	if vname == "" {
 		return nil
 	}
 	if v.Name == vname {
@@ -800,7 +817,9 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 		}
 	}
 	for _, f := range v.FieldVars {
+		// FieldVars hole sticky — no invent soft-skip field hole to later match
 		if f == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if m := f.MatchVarName(vname); m != nil {

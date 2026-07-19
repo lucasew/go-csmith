@@ -118,11 +118,15 @@ func IsSpecialPtr(p *Variable) bool {
 // FindRelatedPointTo mirrors find_related_fact for ePointTo (var identity).
 // Fact* always live; nil hole fails closed (nil — no invent skip to later match).
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
+	// subject always live; sticky no invent miss / soft-skip nil key
 	if p == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for _, f := range facts {
+		// Fact* always live; sticky no invent skip hole to later match
 		if f == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if f.Var == p {
@@ -879,16 +883,21 @@ func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 // Incomplete FieldVars on v fails closed (nil — no invent leave stack field
 // pointees live because HasFieldVar returned false past a hole).
 func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
+	// Fact + subject always live; sticky no invent leave pointees live past hole
 	if f == nil || v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if !v.FieldVarsComplete() {
+		SetError(ErrGeneric)
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)
 	pos := -1
 	for i, p := range set {
+		// PointTo hole sticky — no invent skip dead-mark past incomplete set
 		if p == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if p == v || v.HasFieldVar(p) || (p.FieldVarOf != nil && isAncestorField(p, v)) {
@@ -930,7 +939,13 @@ func isAncestorField(field, root *Variable) bool {
 // MarkFuncEndLocals marks pointees that are locals as garbage/dead at function end.
 // Variable* always live in locals/PointTo; nil hole fails closed (nil fact).
 func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
-	if f == nil || len(locals) == 0 {
+	// Fact always live; sticky no invent leave stack pointees live without it
+	if f == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// empty locals: soft no-op (nothing to mark dead)
+	if len(locals) == 0 {
 		return nil
 	}
 	localSet := make(map[*Variable]bool, len(locals))
@@ -992,7 +1007,9 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 // Incomplete Param/LocalVars stack lists fail closed (nil — no invent leave
 // stack pointees live because IsVarOnStack returned false past a hole).
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
+	// Fact + Function always live; sticky no invent leave stack pointees live past hole
 	if f == nil || fn == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete stack lists fail closed sticky (no invent leave stack pointees live)
