@@ -340,8 +340,8 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			var ret []*FactPointTo
 			for _, vv := range vars {
 				ptrs := vv.FindPointerFields()
-				// FindPointerFields nil = incomplete FieldVars
-				if ptrs == nil {
+				// incomplete FieldVars
+				if !VariablesComplete(ptrs) {
 					return IncompleteFactSlice()
 				}
 				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
@@ -385,6 +385,9 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		fn := fi.User
 		if fn.RV != nil && fn.RV.Type != nil && fn.RV.Type.IsAggregate() {
 			ptrs := fn.RV.FindPointerFields()
+			if !VariablesComplete(ptrs) {
+				return IncompleteFactSlice()
+			}
 			// pairwise like aggregate path; length mismatch is broken IR
 			if len(lvars) != len(ptrs) {
 				return IncompleteFactSlice()
@@ -488,6 +491,9 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()
+		if !VariablesComplete(ptrs) {
+			return IncompleteFactSlice()
+		}
 		if v.IsPointer() && lhsIndir > 0 {
 			// assigning *p = rhs: also update pointer pointees
 			more := MergePointeesOfPointer(v, 1, factsIn)

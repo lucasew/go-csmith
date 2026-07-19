@@ -93,8 +93,8 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 			nil,
 		},
 	}
-	if sv.FindPointerFields() != nil {
-		t.Fatal("nil FieldVars hole must fail closed")
+	if VariablesComplete(sv.FindPointerFields()) {
+		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
 }
 

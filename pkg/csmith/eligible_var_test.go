@@ -28,11 +28,11 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 	vs := NewVariableSelector(Defaults())
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g, nil}
-	if vs.FindAllNonArrayVisibleVars(nil) != nil {
-		t.Fatal("nil GlobalList hole must fail closed")
+	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
+		t.Fatal("nil GlobalList hole must fail closed incomplete")
 	}
-	if GetAllLocalVars(&Block{LocalVars: []*Variable{g, nil}}) != nil {
-		t.Fatal("nil LocalVars hole must fail closed")
+	if VariablesComplete(GetAllLocalVars(&Block{LocalVars: []*Variable{g, nil}})) {
+		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
 }
 

@@ -359,24 +359,21 @@ func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 // VariableSelector.cpp:752–759 — GlobalList + block chain locals (no params).
 // FindAllVisibleVars mirrors VariableSelector::find_all_visible_vars.
 // Variable* always live on GlobalList/LocalVars; nil hole fails closed
-// (nil out — no invent partial visible pool by soft-skipping holes).
+// IncompleteVariables (not bare nil invent empty-complete visible pool).
+// Complete empty returns non-nil empty slice.
 func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
-		for _, v := range vs.GlobalList {
-			if v == nil {
-				return nil
-			}
-			vars = append(vars, v)
+		if !VariablesComplete(vs.GlobalList) {
+			return IncompleteVariables()
 		}
+		vars = append(vars, vs.GlobalList...)
 	}
 	for b != nil {
-		for _, v := range b.LocalVars {
-			if v == nil {
-				return nil
-			}
-			vars = append(vars, v)
+		if !VariablesComplete(b.LocalVars) {
+			return IncompleteVariables()
 		}
+		vars = append(vars, b.LocalVars...)
 		b = b.Parent
 	}
 	return vars
@@ -580,14 +577,15 @@ func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining [
 
 // FindAllNonArrayVisibleVars mirrors find_all_non_array_visible_vars.
 // VariableSelector.cpp:713–735 — non-array globals, params, non-array locals.
-// Variable* always live; nil hole fails closed (nil out, no invent partial pool).
+// Variable* always live; nil hole fails closed IncompleteVariables
+// (not bare nil invent empty-complete pool).
 func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
+		if !VariablesComplete(vs.GlobalList) {
+			return IncompleteVariables()
+		}
 		for _, v := range vs.GlobalList {
-			if v == nil {
-				return nil
-			}
 			if !v.IsArray {
 				vars = append(vars, v)
 			}
@@ -602,18 +600,16 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 		}
 	}
 	if f != nil {
-		for _, p := range f.Param {
-			if p == nil {
-				return nil
-			}
-			vars = append(vars, p)
+		if !VariablesComplete(f.Param) {
+			return IncompleteVariables()
 		}
+		vars = append(vars, f.Param...)
 	}
 	for b != nil {
+		if !VariablesComplete(b.LocalVars) {
+			return IncompleteVariables()
+		}
 		for _, v := range b.LocalVars {
-			if v == nil {
-				return nil
-			}
 			if !v.IsArray {
 				vars = append(vars, v)
 			}
@@ -625,16 +621,15 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 
 // GetAllLocalVars mirrors VariableSelector::get_all_local_vars.
 // VariableSelector.cpp:747–751.
-// Variable* always live on LocalVars; nil hole fails closed (nil out).
+// Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
+// (not bare nil invent empty-complete local pool).
 func GetAllLocalVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	for b != nil {
-		for _, v := range b.LocalVars {
-			if v == nil {
-				return nil
-			}
-			vars = append(vars, v)
+		if !VariablesComplete(b.LocalVars) {
+			return IncompleteVariables()
 		}
+		vars = append(vars, b.LocalVars...)
 		b = b.Parent
 	}
 	return vars
@@ -642,16 +637,17 @@ func GetAllLocalVars(b *Block) []*Variable {
 
 // GetAllArrayVars mirrors VariableSelector::get_all_array_vars.
 // VariableSelector.cpp:737–745 — collect array globals (invalid for ccomp pointer init).
-// Variable* always live; nil hole fails closed (nil out, no invent partial list).
+// Variable* always live; nil hole fails closed IncompleteVariables
+// (not bare nil invent empty-complete array list).
 func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 	out := make([]*Variable, 0)
 	if vs == nil {
 		return out
 	}
+	if !VariablesComplete(vs.GlobalList) {
+		return IncompleteVariables()
+	}
 	for _, v := range vs.GlobalList {
-		if v == nil {
-			return nil
-		}
 		if v.IsArray {
 			out = append(out, v)
 		}
@@ -721,17 +717,27 @@ func (vs *VariableSelector) MakeInitValue(
 		return nil
 	}
 	vars := vs.FindAllVisibleVars(b)
+	// incomplete visible pool — fail closed (no invent choose from partial)
+	if !VariablesComplete(vars) {
+		return nil
+	}
 	noUnion := !vs.Opts.TakeUnionFieldAddr
 	var invalid []*Variable
 	var chosen *Variable
 	// VariableSelector.cpp:853–862
 	if b == nil && vs.Opts.CComp {
 		invalid = vs.GetAllArrayVars()
+		if !VariablesComplete(invalid) {
+			return nil
+		}
 		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
 			invalid, true, true, noUnion)
 	} else {
 		if !vs.Opts.AddrTakenOfLocals {
 			invalid = GetAllLocalVars(b)
+			if !VariablesComplete(invalid) {
+				return nil
+			}
 		}
 		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
 			invalid, true, false, noUnion)
@@ -1766,12 +1772,15 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	ty := GetIntType()
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
+	// incomplete visible pool — fail closed (no invent loop ctrl from partial)
+	if !VariablesComplete(vars) {
+		return nil
+	}
 	// VariableSelector.cpp:1155–1168 — remove no-int-field and union-with-pointer
-	// Variable* always live; nil hole fails closed (nil loop ctrl)
 	var filtered []*Variable
 	var invalidSlice []*Variable
 	for _, v := range vars {
-		if v == nil || v.Type == nil {
+		if v.Type == nil {
 			return nil
 		}
 		if invalid[v] {
@@ -1887,8 +1896,8 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	}
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllVisibleVars(blk)
-	// nil vars = incomplete GlobalList/LocalVars hole — fail closed
-	if vars == nil {
+	// incomplete GlobalList/LocalVars hole — fail closed
+	if !VariablesComplete(vars) {
 		return nil
 	}
 	// also include Arrays list members that may not be on GlobalList yet
