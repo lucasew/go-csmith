@@ -1589,8 +1589,14 @@ func (v *Variable) CreateFieldVars() {
 		for top.FieldVarOf != nil {
 			top = top.FieldVarOf
 		}
+		// outermost container Type always live; Type-nil sticky fail (no invent
+		// make_random init path as if non-union past incomplete top shell)
+		if top.Type == nil {
+			fail()
+			return
+		}
 		var init *Constant
-		if top.Type == nil || !top.Type.IsUnion() {
+		if !top.Type.IsUnion() {
 			// Variable.cpp:395 — Constant::make_random via process CGOptions +
 			// Probabilities + DefaultRndNumGenerator; no invent NewProbabilities /
 			// separate NewRng stream
@@ -2043,8 +2049,10 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	if v.Type != nil && v.Type.IsAggregate() {
 		j := 0
 		for i, f := range v.Type.Fields {
-			// Type* always live; nil hole fails closed (no invent skip partial hash)
+			// Type* always live; nil hole fails closed sticky (no invent skip partial
+			// hash / soft re-pick past incomplete field type as empty success)
 			if f.Type == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			if f.BitWidth == 0 {

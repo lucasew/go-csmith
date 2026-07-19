@@ -64,6 +64,21 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 		t.Fatal("non-aggregate must not invent FieldVars", scalar.FieldVars)
 	}
 	ClearError()
+	// nested field create: Type-nil outermost top sticky fail (no invent make_random init)
+	// plant as field_var_of chain so top walk hits Type-nil container
+	top := &Variable{Name: "g_top"} // Type nil
+	st2 := &Type{isStruct: true, StructName: "Snest", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	nested := &Variable{Name: "g_top.inner", Type: st2, FieldVarOf: top, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	nested.CreateFieldVars()
+	if nested.FieldVarsComplete() {
+		t.Fatal("Type-nil top CreateFieldVars must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil top CreateFieldVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasFieldVarNilHole(t *testing.T) {

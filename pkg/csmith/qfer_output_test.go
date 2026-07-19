@@ -337,6 +337,22 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 		t.Fatal("empty ctrl name hashArrayVariable must SetError sticky")
 	}
 	ClearError()
+	// incomplete field Type sticky (no invent skip partial hash as empty success)
+	agg := &Type{isStruct: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: nil, BitWidth: -1},
+	}}
+	arr2 := &Variable{
+		Name: "g_s", Type: agg, IsArray: true, ArraySizes: []int{1},
+		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	if s := hashArrayVariable(arr2, ctrl, nil); s != "" {
+		t.Fatal("field Type hole must fail closed hash", s)
+	}
+	if !HasError() {
+		t.Fatal("field Type hole hashArrayVariable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {
