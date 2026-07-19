@@ -64,7 +64,8 @@ func TypeFromString(s string) *Type {
 	case "UInt128":
 		return GetSimpleType(EUInt128)
 	default:
-		// Type.cpp:401 assert(0); no soft invent GetIntType for unknown names
+		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
+		SetError(ErrGeneric)
 		return nil
 	}
 }

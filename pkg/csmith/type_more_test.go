@@ -6,6 +6,7 @@ import (
 )
 
 func TestGetTypeFromString(t *testing.T) {
+	ClearError()
 	if GetTypeFromString("Int") != GetIntType() {
 		t.Fatal("Int")
 	}
@@ -18,9 +19,21 @@ func TestGetTypeFromString(t *testing.T) {
 	if GetTypeFromString("Nope") != nil {
 		t.Fatal("unknown")
 	}
+	if !HasError() {
+		t.Fatal("unknown type string must SetError sticky")
+	}
+	ClearError()
 	if GetIntType().TypeNameString() != "Int" {
 		t.Fatal(GetIntType().TypeNameString())
 	}
+	// unknown simple TypeNameString — sticky no invent empty token
+	if s := (&Type{simple: ESimpleType(99)}).TypeNameString(); s != "" {
+		t.Fatal("unknown simple TypeNameString invent", s)
+	}
+	if !HasError() {
+		t.Fatal("unknown simple TypeNameString must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSignedOverflowPossible(t *testing.T) {
@@ -43,10 +56,15 @@ func TestSignedOverflowPossible(t *testing.T) {
 }
 
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
-	// unknown simple — no soft invent platform int size
+	// unknown simple — sticky no soft invent platform int size
+	ClearError()
 	if n := (&Type{simple: ESimpleType(99)}).SizeInBytes(); n != 0 {
 		t.Fatal("unknown simple SizeInBytes invent", n)
 	}
+	if !HasError() {
+		t.Fatal("unknown simple SizeInBytes must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPrintfDirective(t *testing.T) {
@@ -96,7 +114,8 @@ func TestPointerToNoInventIntStar(t *testing.T) {
 }
 
 func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
-	// Type.cpp fields[i]->printf_directive always live; no invent empty holes
+	// Type.cpp fields[i]->printf_directive always live; sticky no invent empty holes
+	ClearError()
 	st := &Type{
 		isStruct:   true,
 		StructName: "S0",
@@ -108,6 +127,10 @@ func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
 	if s := st.PrintfDirective(); s != "" {
 		t.Fatal("nil field type must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("nil field type PrintfDirective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasAggregateAndLongLongField(t *testing.T) {

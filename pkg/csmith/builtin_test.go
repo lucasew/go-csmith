@@ -6,6 +6,7 @@ import (
 )
 
 func TestTypeFromString(t *testing.T) {
+	ClearError()
 	if TypeFromString("Int") != GetIntType() {
 		t.Fatal("Int")
 	}
@@ -18,6 +19,10 @@ func TestTypeFromString(t *testing.T) {
 	if TypeFromString("NoSuch") != nil {
 		t.Fatal("bad")
 	}
+	if !HasError() {
+		t.Fatal("unknown type string must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEnabledBuiltinKinds(t *testing.T) {

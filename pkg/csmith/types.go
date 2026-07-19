@@ -727,7 +727,7 @@ func (t *Type) SignedOverflowPossible(intSize int) bool {
 }
 
 // GetTypeFromString mirrors Type::get_type_from_string.
-// Type.cpp:370–402 — builtin name → simple type.
+// Type.cpp:370–402 — builtin name → simple type; default assert(0) sticky.
 func GetTypeFromString(typeString string) *Type {
 	switch typeString {
 	case "Void":
@@ -759,6 +759,8 @@ func GetTypeFromString(typeString string) *Type {
 	case "UInt128":
 		return GetSimpleType(EUInt128)
 	default:
+		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
+		SetError(ErrGeneric)
 		return nil
 	}
 }
@@ -807,6 +809,8 @@ func (t *Type) TypeNameString() string {
 	case EUInt128:
 		return "UInt128"
 	default:
+		// unknown simple — assert path sticky; no soft invent empty type-name token
+		SetError(ErrGeneric)
 		return ""
 	}
 }
@@ -822,15 +826,19 @@ func (t *Type) PrintfDirective() string {
 	}
 	if t.IsAggregate() {
 		// Type.cpp:1945–1951 — fields[i]->printf_directive always live Type*
-		// no invent empty holes for nil field types
+		// sticky no invent empty holes / partial "{%d, }" for nil field types
 		var b strings.Builder
 		b.WriteString("{")
 		for i, f := range t.Fields {
 			if f.Type == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			part := f.Type.PrintfDirective()
 			if part == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			if i > 0 {
