@@ -708,8 +708,9 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 // upstream sets unordered=false); then user revisit when NeedsRevisit.
 // Binary &&/|| use FunctionInvocationBinary::visit_facts short-circuit merge.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
-	// C++ always has live FunctionInvocation*; nil / failed → visit fail (no soft invent true)
+	// C++ always has live FunctionInvocation*; nil sticky; Failed is policy false
 	if fi == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if fi.Failed {
@@ -727,8 +728,9 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if unordered {
 		var facts []*FactPointTo
 		if cg.FM != nil {
-			// incomplete GlobalFacts fail closed (no invent cleaned visit)
+			// incomplete GlobalFacts sticky (no invent cleaned visit / soft re-pick)
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
 				return false
 			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -742,9 +744,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	} else {
 		running := cg.EffectContext()
 		for i, arg := range fi.Args {
-			// FunctionInvocation.cpp: param_value[i] always non-null after ERROR_GUARD
+			// FunctionInvocation.cpp: param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
 				_ = i
+				SetError(ErrGeneric)
 				return false
 			}
 			paramAccum := EmptyEffect()
@@ -754,14 +757,20 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if !VisitFactsExpression(arg, &paramCG, opts) {
 				return false
 			}
-			// Incomplete param accum fails closed (no invent visit more args under incomplete running)
+			// Incomplete param accum sticky (no invent visit more args under incomplete)
 			running = running.AddEffect(paramAccum)
 			if !EffectComplete(running) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			// merge_param_context; include_lhs for std ops only
 			cg.MergeParamContext(paramCG, !isFuncCall)
 			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 		}
@@ -769,16 +778,20 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if isFuncCall {
 		// FunctionInvocation.cpp:530–551 — revisit user callee when DFA needed
 		if fi.User.NeedsRevisit() && fi.User.Body != nil && cg.FM != nil {
-			// incomplete GlobalFacts fail closed (no invent cleaned revisit)
+			// incomplete GlobalFacts sticky (no invent cleaned revisit)
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
 				return false
 			}
 			facts := CloneFactSlice(cg.FM.GlobalFacts)
 			if !RevisitUserInvocation(fi, &facts, cg, opts) {
 				return false
 			}
-			// incomplete post-revisit must not invent GlobalFacts assignment
+			// incomplete post-revisit sticky
 			if !FactsComplete(facts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = facts
@@ -786,9 +799,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			// FunctionInvocation.cpp:543 — assert(cg_context.curr_blk)
+			// FunctionInvocation.cpp:543 — assert(cg_context.curr_blk) sticky
 			blk := cg.CurrentBlock()
 			if blk == nil {
+				SetError(ErrGeneric)
 				return false
 			}
 			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
@@ -800,9 +814,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if cg.InConflict(fi.User.FEffect) {
 				return false
 			}
-			// same curr_blk for visible effect (visit_facts path uses curr_blk)
+			// same curr_blk for visible effect sticky when missing
 			blk := cg.CurrentBlock()
 			if blk == nil {
+				SetError(ErrGeneric)
 				return false
 			}
 			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
@@ -828,23 +843,27 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 // context; write_var_set of RHS lhs_write_vars; update_fact_for_assign; map_stm_effect.
 func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtAssign {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementAssign.cpp always has live Lhs and Expression* (make_int(1) for ++/--)
+	// StatementAssign.cpp always has live Lhs and Expression* sticky
 	if st.Expr == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
-	// Incomplete ambient/stm/accum fails closed (no invent visit under incomplete;
-	// no MergeParamContext AddEffect sticky SetError on intentional false)
+	// Incomplete ambient/stm/accum sticky (no invent visit under incomplete shell)
 	runningEff := cg.EffectContext()
 	if !EffectComplete(runningEff) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		SetError(ErrGeneric)
 		return false
 	}
 	rhsAccum := EmptyEffect()
@@ -857,22 +876,31 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// StatementAssign.cpp:372–375 — compound: LHS sees RHS effect
-	// Incomplete folds fail closed (no invent LHS visit under incomplete running)
+	// Incomplete folds sticky (no invent LHS visit under incomplete running)
 	if st.AssignOp != AssignSimple {
 		runningEff = runningEff.AddEffect(rhsAccum)
 		if !EffectComplete(runningEff) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
 	cg.MergeParamContext(rhsCG, true)
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
-	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge)
+	// IncompleteVariables → WriteVarSet IncompleteEffect sticky
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
 		if !EffectComplete(runningEff) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
@@ -900,29 +928,37 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		lhsVar = st.LhsVar
 	} else {
-		// incomplete assign IR — no soft invent visit success without LHS
+		// incomplete assign IR sticky (no invent visit success without LHS)
+		SetError(ErrGeneric)
 		return false
 	}
 	cg.MergeParamContext(lhsCG, true)
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 
 	// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
 	// uses get_rhs() (canonized ExpressionFuncall for compounds)
 	if cg.FM != nil && lhsVar != nil {
-		// Statement::stm_id always live; StmID 0 fails closed (no invent
-		// visit success without map_stm_effect / map_facts_out)
+		// Statement::stm_id always live; StmID 0 sticky
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		_ = cg.FM.UpdateFactForAssign(lhsVar, indir, st.GetAssignRhs())
-		// incomplete assign must not invent visit success / SetMapFactsOut
+		// incomplete assign sticky (no invent visit success / SetMapFactsOut)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
-		// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+		// Incomplete EffectStm sticky
 		if !EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
 			return false
 		}
 		// StatementAssign.cpp:388–389 — map_stm_effect[this] = effect_stm

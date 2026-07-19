@@ -367,17 +367,21 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 // VisitFactsStatementFor mirrors StatementFor::visit_facts.
 // StatementFor.cpp:427–472 — init; IV bound; body; map_facts_in[body] or
 // post-init restore on must_return; merge post_dest break edges; accum effect.
+// Hard IR incomplete sticky (nil Loop/IV/body/init, StmID 0, incomplete maps/effect);
+// visit/body policy fails stay non-sticky false.
 func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementFor.cpp:430+ — always has init StatementAssign, body Block, IV
+	// StatementFor.cpp:430+ — always has init StatementAssign, body Block, IV sticky
 	if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementFor.cpp:430–432 — init StatementAssign always live; no soft invent
-	// reconstruct from InitN when InitStmt missing
+	// StatementFor.cpp:430–432 — init StatementAssign always live sticky
 	if st.Loop.InitStmt == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !VisitFactsStatementAssign(st.Loop.InitStmt, cg, opts) {
@@ -387,6 +391,9 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
@@ -394,13 +401,15 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	eff := cg.EffectStm.Clone()
 
 	iv := st.Loop.IV
-	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple)
+	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple) sticky
 	if iv.Type == nil || !iv.Type.IsSimple() {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementFor.cpp:441 — assert(iv_bounds.find(iv) == end); no soft invent re-bind
+	// StatementFor.cpp:441 — assert(iv_bounds.find(iv) == end); hard sticky re-bind
 	if cg.IVBounds != nil {
 		if _, ok := cg.IVBounds[iv]; ok {
+			SetError(ErrGeneric)
 			return false
 		}
 	}
@@ -414,8 +423,9 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	if cg.FM != nil {
-		// StatementFor.cpp:452–458 — body Block always has stm_id
+		// StatementFor.cpp:452–458 — body Block always has stm_id sticky
 		if st.Then.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		if st.Then.MustReturn() {
@@ -426,46 +436,59 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			// C++ map[] always assigns (missing → empty); no invent keep prior
 			in := cg.FM.GetMapFactsIn(st.Then.StmID)
 			if !FactsComplete(in) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
-		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
-		// C++ always merge_jump_facts(inputs, map_facts_out[src]); missing → empty
+		// nil FindEdgesIn sticky incomplete CFG; tryMergeJumpFacts already sticky
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 		if edges == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		for _, e := range edges {
 			out := cg.FM.GetMapFactsOut(e.SrcID)
-			// incomplete jump facts fail closed (no invent skip merge)
+			// incomplete jump facts sticky via tryMergeJumpFacts
 			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
 				return false
 			}
 		}
 	}
 	// StatementFor.cpp:468 — set_accumulated_effect_after_block(eff, &body, …)
-	// body stm_id always live when FM path runs
-	// Incomplete body/pre effect fails closed (no invent visit true with IncompleteEffect map)
+	// Incomplete body/pre effect sticky (no invent visit true with IncompleteEffect map)
 	bodyEff := EmptyEffect()
 	if cg.FM != nil {
 		if st.Then.StmID <= 0 || st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(eff) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	} else if !EffectComplete(eff) {
+		SetError(ErrGeneric)
 		return false
 	}
 	SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
 	if cg.FM != nil && !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	return true
@@ -473,16 +496,19 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 
 // VisitFactsStatementArrayOp mirrors StatementArrayOp::visit_facts.
 // StatementArrayOp.cpp:268–318 — write each IV; body or init_value assign path.
+// Hard IR incomplete sticky (nil Loop/IV/body, StmID 0, incomplete maps/effect);
+// CheckWrite/visit policy fails stay non-sticky false.
 func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// collect IVs from nested ArrayOp Loop chain
-	// StatementArrayOp always has live ctrl_vars[i] for each dimension
-	// incomplete Loop/IV fails closed (no invent soft-skip level and still visit)
+	// StatementArrayOp always has live ctrl_vars[i]; incomplete Loop/IV sticky
 	var ivs []*Variable
 	for cur := st; cur != nil && cur.Kind == StmtArrayOp; {
 		if cur.Loop == nil || cur.Loop.IV == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		ivs = append(ivs, cur.Loop.IV)
@@ -496,15 +522,20 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		cur = next
 	}
-	// StatementArrayOp.cpp:270–275 — ctrl_vars sized to dimension; empty is incomplete IR
+	// StatementArrayOp.cpp:270–275 — empty ctrl chain incomplete sticky
 	if len(ivs) == 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	// StatementArrayOp.cpp:270–275 — check_write_var each ctrl var
-	// IV always live; no invent skip nil holes in ctrl chain
+	// IV nil sticky; CheckWrite policy fail non-sticky
 	facts := cg.pointToFacts()
 	for _, iv := range ivs {
-		if iv == nil || !cg.CheckWriteVar(iv, facts) {
+		if iv == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		if !cg.CheckWriteVar(iv, facts) {
 			return false
 		}
 		facts = cg.pointToFacts()
@@ -512,8 +543,9 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 
 	// find innermost body assign (array init) or nested block body
 	inner := findArrayOpInnermost(st)
-	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete
+	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete sticky
 	if inner == nil || inner.Then == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 
@@ -523,10 +555,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		// StatementArrayOp.cpp:299–316 — init_value + lhs visit + update_fact_for_assign
 		// StatementAssign always has live Lhs + Expression*
 		asg := &inner.Then.Stmts[0]
-		if asg.Expr == nil || !VisitFactsExpression(asg.Expr, cg, opts) {
+		if asg.Expr == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		if !VisitFactsExpression(asg.Expr, cg, opts) {
 			return false
 		}
 		if asg.LhsVar == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		lhs := &Lhs{Var: asg.LhsVar, Type: asg.LhsVar.Type}
@@ -534,17 +571,22 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil {
-			// Statement::stm_id always live; StmID 0 fails closed
+			// Statement::stm_id always live; StmID 0 sticky
 			if st.StmID <= 0 {
+				SetError(ErrGeneric)
 				return false
 			}
 			_ = cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
-			// incomplete assign must not invent visit success / effect map
+			// incomplete assign sticky (no invent visit success / soft re-pick)
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
-			// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+			// Incomplete EffectStm sticky
 			if !EffectComplete(cg.EffectStm) {
+				SetError(ErrGeneric)
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
@@ -553,9 +595,10 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 
 	// body path — StatementArrayOp.cpp:277–297 (same shape as StatementFor visit)
-	// incomplete GlobalFacts fail closed (no invent cleaned pre-body snapshot)
+	// incomplete GlobalFacts sticky (no invent cleaned pre-body snapshot)
 	ptFacts := cg.pointToFacts()
 	if !FactsComplete(ptFacts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	preFacts := CloneFactSlice(ptFacts)
@@ -571,9 +614,9 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	if cg.FM != nil {
-		// StatementArrayOp.cpp:285–291 — body Block always has stm_id
-		// StmID 0 fails closed (no invent keep prior / soft EffectStm fallback)
+		// StatementArrayOp.cpp:285–291 — body Block always has stm_id sticky
 		if inner.Then.StmID <= 0 || st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		if inner.Then.MustReturn() {
@@ -582,14 +625,20 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			// map_facts_in[&body] — C++ map[] always; missing → empty
 			in := cg.FM.GetMapFactsIn(inner.Then.StmID)
 			if !FactsComplete(in) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
-		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
+		// nil FindEdgesIn sticky incomplete CFG
 		edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 		if edges == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		for _, e := range edges {
@@ -599,14 +648,19 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 		}
 		// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
-		// map_stm_effect[body] only (no invent EffectStm soft fallback when empty)
-		// Incomplete body/pre fails closed (no invent visit true with IncompleteEffect map)
+		// Incomplete body/pre sticky
 		bodyEff := cg.FM.GetMapStmEffect(inner.Then.StmID)
 		if !EffectComplete(bodyEff) || !EffectComplete(preStm) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 		if !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}

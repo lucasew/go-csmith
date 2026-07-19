@@ -222,7 +222,8 @@ func TestVisitFactsStatementForIV(t *testing.T) {
 }
 
 func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
-	// StatementFor.cpp always has init StatementAssign — no soft invent from InitN
+	// StatementFor.cpp always has init StatementAssign — sticky without InitStmt
+	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	st := Stmt{
 		Kind: StmtFor,
@@ -235,6 +236,10 @@ func TestVisitFactsStatementForRequiresInitStmt(t *testing.T) {
 	if VisitFactsStatementFor(&st, &cg, Defaults()) {
 		t.Fatal("expected fail without InitStmt")
 	}
+	if !HasError() {
+		t.Fatal("missing InitStmt For visit must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputAssignAsExprSafeAdd(t *testing.T) {
@@ -571,12 +576,17 @@ func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
 }
 
 func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
-	// StatementArrayOp always has live ctrl_vars; nil Loop/IV fails closed
-	// (no invent soft-skip dimension and still visit)
+	// StatementArrayOp always has live ctrl_vars; nil Loop/IV sticky
+	// (no invent soft-skip dimension / soft re-pick past holes)
+	ClearError()
 	cg := EmptyCGContext()
 	if VisitFactsStatementArrayOp(&Stmt{Kind: StmtArrayOp, Then: &Block{}}, &cg, Defaults()) {
 		t.Fatal("nil Loop must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil Loop ArrayOp visit must SetError sticky")
+	}
+	ClearError()
 	if VisitFactsStatementArrayOp(&Stmt{
 		Kind: StmtArrayOp,
 		Loop: &LoopControl{}, // IV nil
@@ -584,6 +594,10 @@ func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
 	}, &cg, Defaults()) {
 		t.Fatal("nil IV must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil IV ArrayOp visit must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
