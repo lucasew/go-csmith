@@ -405,7 +405,12 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 
 	// body path — StatementArrayOp.cpp:277–297 (same shape as StatementFor visit)
-	preFacts := CloneFactSlice(cg.pointToFacts())
+	// incomplete GlobalFacts fail closed (no invent cleaned pre-body snapshot)
+	ptFacts := cg.pointToFacts()
+	if !FactsComplete(ptFacts) {
+		return false
+	}
+	preFacts := CloneFactSlice(ptFacts)
 	preStm := cg.EffectStm.Clone()
 	bodyCG := *cg
 	bodyCG.Flags |= FlagInLoop

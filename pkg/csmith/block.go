@@ -468,7 +468,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			selfBack = true
 			fm.CreateCFGEdge(b.StmID, b, false, true)
 		}
-		factsCopy := CloneFactSlice(fm.MapFactsIn[b.StmID])
+		// incomplete MapFactsIn fails closed (no invent cleaned fixed-point inputs)
+		// C++ map[] missing → empty; holes → treat as empty env for re-analysis
+		in0 := fm.MapFactsIn[b.StmID]
+		if !FactsComplete(in0) {
+			in0 = nil
+		}
+		factsCopy := CloneFactSlice(in0)
 		// reset accum to pre-block effect
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = preEffect.Clone()
@@ -611,8 +617,12 @@ func makeRandomStmt(
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
+		// incomplete GlobalFacts fail closed (no invent cleaned pre-stmt snapshot)
 		var preFacts []*FactPointTo
 		if cg.FM != nil {
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				return Stmt{}
+			}
 			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		}
 		preEffect := EmptyEffect()

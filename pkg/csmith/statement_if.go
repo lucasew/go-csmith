@@ -27,6 +27,10 @@ func MakeRandomIf(
 	var func1PreEffect Effect
 	func1Hack := cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop()
 	if func1Hack && cg.FM != nil {
+		// incomplete GlobalFacts fail closed (no invent cleaned pre-facts snapshot)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return nil
+		}
 		func1PreFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		if cg.EffectAccum != nil {
 			func1PreEffect = cg.EffectAccum.Clone()
@@ -45,7 +49,15 @@ func MakeRandomIf(
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
 	if func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test) {
 		// makeup_new_var_facts(pre_facts, global); reset accum; visit(pre_facts)
+		// incomplete current GlobalFacts fail closed (makeup would nil snapshot)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return nil
+		}
 		MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts)
+		if func1PreFacts == nil {
+			// incomplete makeup / snapshot — fail closed
+			return nil
+		}
 		if cg.EffectAccum != nil {
 			*cg.EffectAccum = func1PreEffect.Clone()
 		}

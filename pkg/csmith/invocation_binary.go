@@ -275,9 +275,13 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	if fi.Args[0] != nil && !VisitFactsExpression(fi.Args[0], cg, opts) {
 		return false
 	}
-	// snapshot after left
+	// snapshot after left — incomplete GlobalFacts fail closed
+	// (no invent cleaned afterLeft merge)
 	var afterLeft []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		afterLeft = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	// right may or may not evaluate
@@ -286,6 +290,9 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	}
 	// merge post-right with post-left
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeft) {
+			return false
+		}
 		MergeFacts(&cg.FM.GlobalFacts, afterLeft)
 	}
 	return true

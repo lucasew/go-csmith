@@ -438,6 +438,10 @@ func (b *Block) AppendNestedLoop(
 	}
 	var preFacts []*FactPointTo
 	if cg.FM != nil {
+		// incomplete GlobalFacts fail closed (no invent cleaned pre-for snapshot)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return nil
+		}
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	cg.ClearEffectStm()
@@ -483,6 +487,10 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	fm := cg.FM
 	var preFacts []*FactPointTo
 	if fm != nil {
+		// incomplete GlobalFacts fail closed (no invent cleaned pre-return snapshot)
+		if !FactsComplete(fm.GlobalFacts) {
+			return nil
+		}
 		preFacts = CloneFactSlice(fm.GlobalFacts)
 	}
 	cg.ClearEffectStm()

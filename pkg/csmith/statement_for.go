@@ -446,6 +446,10 @@ func MakeRandomFor(
 		}
 	}
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
+	// incomplete GlobalFacts fail closed (no invent cleaned pre-loop snapshot)
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		return nil
+	}
 	preEffect := cg.EffectStm.Clone()
 	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
