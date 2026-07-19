@@ -73,3 +73,49 @@ func TestStmtOKBlockRequiresThen(t *testing.T) {
 		t.Fatal("StmtBlock with Then is usable")
 	}
 }
+
+func TestStmtOKIncompleteForIfAssignFailClosed(t *testing.T) {
+	// no invent usable shells from partial IR
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	if stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{IV: iv}}) {
+		t.Fatal("for IV-only must fail stmtOK")
+	}
+	if stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{
+		IV: iv, InitStmt: &Stmt{Kind: StmtAssign}, TestExpr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}, Then: &Block{}}) {
+		t.Fatal("for missing IncrStmt must fail stmtOK")
+	}
+	// complete for shape
+	init := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	incr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	if !stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{
+		IV: iv, InitStmt: init, TestExpr: test, IncrStmt: incr,
+	}, Then: &Block{}}) {
+		t.Fatal("complete for must pass stmtOK")
+	}
+	// if missing Else/test
+	if stmtOK(Stmt{Kind: StmtIfElse, Then: &Block{}}) {
+		t.Fatal("if without Expr/Else must fail stmtOK")
+	}
+	if stmtOK(Stmt{Kind: StmtIfElse, Expr: test, Then: &Block{}}) {
+		t.Fatal("if without Else must fail stmtOK")
+	}
+	if !stmtOK(Stmt{Kind: StmtIfElse, Expr: test, Then: &Block{}, Else: &Block{}}) {
+		t.Fatal("complete if must pass")
+	}
+	// assign without RHS
+	if stmtOK(Stmt{Kind: StmtAssign, LhsVar: iv}) {
+		t.Fatal("assign without Expr must fail stmtOK")
+	}
+	if !stmtOK(Stmt{Kind: StmtAssign, LhsVar: iv, Expr: test}) {
+		t.Fatal("assign with lhs+rhs must pass")
+	}
+	// goto without test
+	if stmtOK(Stmt{Kind: StmtGoto, Label: "lbl"}) {
+		t.Fatal("goto without Expr must fail stmtOK")
+	}
+	if !stmtOK(Stmt{Kind: StmtGoto, Label: "lbl", Expr: test}) {
+		t.Fatal("goto with label+test must pass")
+	}
+}

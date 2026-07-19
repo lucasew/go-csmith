@@ -712,20 +712,37 @@ func makeRandomStmtKind(
 }
 
 // stmtOK reports whether a generated statement is usable (non-null factory).
+// Incomplete shells fail closed false (no invent usable Kind-only / partial for/if IR).
 func stmtOK(st Stmt) bool {
 	switch st.Kind {
 	case StmtAssign:
-		return st.LhsVar != nil || st.ArrayAccess != ""
+		// StatementAssign always has live lhs + rhs after make_random
+		if st.Expr == nil {
+			return false
+		}
+		return st.LhsVar != nil || st.ArrayAccess != "" || (st.Lhs != nil && st.Lhs.Var != nil)
 	case StmtInvoke:
 		return st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed
 	case StmtFor, StmtArrayOp:
-		return st.Loop != nil && st.Loop.IV != nil
+		// StatementFor always has init/test/incr + body (StatementFor.cpp make_random)
+		// no invent OK from IV alone without test/body
+		if st.Loop == nil || st.Loop.IV == nil {
+			return false
+		}
+		if st.Loop.InitStmt == nil || st.Loop.TestExpr == nil || st.Loop.IncrStmt == nil {
+			return false
+		}
+		return st.Then != nil
 	case StmtGoto:
-		return st.Label != ""
+		// StatementGoto always has live test + label
+		return st.Label != "" && st.Expr != nil
 	case StmtReturn:
 		return st.Expr != nil
-	case StmtIfElse, StmtBlock:
-		// nested Block::make_random / if-then both require live Then body
+	case StmtIfElse:
+		// StatementIf always has test + both arms
+		return st.Expr != nil && st.Then != nil && st.Else != nil
+	case StmtBlock:
+		// nested Block::make_random requires live Then body
 		return st.Then != nil
 	case StmtContinue, StmtBreak:
 		// factories always set test expr; Expr-less marks nullptr reject (e.g. continue first-stmt)
