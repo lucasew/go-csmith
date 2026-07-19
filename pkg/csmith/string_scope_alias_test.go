@@ -64,10 +64,15 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	facts := []*FactPointTo{MakeFactPointTo(p, a), MakeFactPointTo(p, NullPtr)}
 	var ptrs []*Variable
 	var aliases [][]*Variable
-	UpdatePtrAliases(facts[:1], &ptrs, &aliases)
-	UpdatePtrAliases(facts[1:], &ptrs, &aliases)
+	if !UpdatePtrAliases(facts[:1], &ptrs, &aliases) || !UpdatePtrAliases(facts[1:], &ptrs, &aliases) {
+		t.Fatal("complete facts must succeed")
+	}
 	if len(ptrs) != 1 || len(aliases[0]) != 2 {
 		t.Fatal(ptrs, aliases)
+	}
+	// nil fact hole fails closed
+	if UpdatePtrAliases([]*FactPointTo{nil}, &ptrs, &aliases) {
+		t.Fatal("nil fact hole must fail closed")
 	}
 	// Aggregate from FactMgr
 	fm := NewFactMgr(nil)

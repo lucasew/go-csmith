@@ -42,6 +42,13 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if !got.IsRead(v) || got.IsWritten(v) {
 		t.Fatal("nil effect key must not invent partial merge", got)
 	}
+	// HasRaceWith / HasGlobalEffect nil keys fail closed as conflict/global
+	if !EmptyEffect().HasRaceWith(hole) {
+		t.Fatal("nil write key must fail closed as race")
+	}
+	if !hole.HasGlobalEffect() {
+		t.Fatal("nil write key must fail closed as global effect")
+	}
 }
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {

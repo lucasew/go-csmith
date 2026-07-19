@@ -139,8 +139,14 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		cg.Types = &g.Types
 		if fm := g.FactMgrs.ForFunc(f); fm != nil {
 			// seed global pointer facts already known
-			for _, gv := range g.VS.GlobalList {
-				fm.AddNewVarFact(gv)
+			// Variable* always live on GlobalList; nil hole fails closed (stop gen)
+			if g.VS != nil {
+				for _, gv := range g.VS.GlobalList {
+					if gv == nil {
+						return
+					}
+					fm.AddNewVarFact(gv)
+				}
 			}
 			cg = cg.WithFactMgr(fm)
 		}
@@ -320,10 +326,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		return ""
 	}
 	arrayByName := map[string]*ArrayVariable{}
+	// ArrayVariable* always live on Arrays; nil hole fails closed (no invent skip)
 	for _, av := range g.VS.Arrays {
-		if av != nil {
-			arrayByName[av.Name] = av
+		if av == nil {
+			return ""
 		}
+		arrayByName[av.Name] = av
 	}
 	// C++ GlobalList may hold collective + itemized member; emit array def once
 	emittedArray := map[string]bool{}

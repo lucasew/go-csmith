@@ -428,6 +428,7 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 
 // SiblingUnionFieldIsRead mirrors Effect::sibling_union_field_is_read.
 // Effect.cpp:416–428 — another field of the same container union was read.
+// Variable* always live as map keys; nil hole fails closed as true (no invent none).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	if v == nil {
 		return false
@@ -437,7 +438,10 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 		return false
 	}
 	for r := range e.read {
-		if r == nil || !e.read[r] {
+		if r == nil {
+			return true
+		}
+		if !e.read[r] {
 			continue
 		}
 		me := r.GetCollective().GetContainerUnion()
@@ -450,6 +454,7 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 
 // SiblingUnionFieldIsWritten mirrors Effect::sibling_union_field_is_written.
 // Effect.cpp:430–441.
+// Variable* always live as map keys; nil hole fails closed as true (no invent none).
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	if v == nil {
 		return false
@@ -459,7 +464,10 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 		return false
 	}
 	for w := range e.written {
-		if w == nil || !e.written[w] {
+		if w == nil {
+			return true
+		}
+		if !e.written[w] {
 			continue
 		}
 		me := w.GetCollective().GetContainerUnion()
@@ -472,14 +480,32 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 
 // HasRaceWith mirrors Effect::has_race_with.
 // Effect.cpp:480–484 — non-empty intersection of read/write sets.
+// Incomplete effect lists fail closed as race (no invent race-free).
 func (e Effect) HasRaceWith(other Effect) bool {
+	// incomplete either side → race (no invent race-free incomplete maps)
 	for _, v := range e.ReadVars() {
+		if v == nil {
+			return true
+		}
 		if other.IsWritten(v) {
 			return true
 		}
 	}
 	for _, v := range e.WrittenVars() {
+		if v == nil {
+			return true
+		}
 		if other.IsRead(v) || other.IsWritten(v) {
+			return true
+		}
+	}
+	for _, v := range other.ReadVars() {
+		if v == nil {
+			return true
+		}
+	}
+	for _, v := range other.WrittenVars() {
+		if v == nil {
 			return true
 		}
 	}
@@ -533,14 +559,21 @@ func (e Effect) IsWrittenPartially(v *Variable) bool {
 
 // HasGlobalEffect mirrors Effect::has_global_effect.
 // Effect.cpp:543–562 — any global in read or write sets.
+// Variable* always live as map keys; nil hole fails closed as true (no invent pure).
 func (e Effect) HasGlobalEffect() bool {
 	for v := range e.read {
-		if v != nil && e.read[v] && v.IsGlobal() {
+		if v == nil {
+			return true
+		}
+		if e.read[v] && v.IsGlobal() {
 			return true
 		}
 	}
 	for v := range e.written {
-		if v != nil && e.written[v] && v.IsGlobal() {
+		if v == nil {
+			return true
+		}
+		if e.written[v] && v.IsGlobal() {
 			return true
 		}
 	}

@@ -725,6 +725,9 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 
 // AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to/union init.
 // FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init via meta_facts loop.
+// AddNewVarFact abstracts init facts for a new variable into GlobalFacts.
+// Variable* FieldVars always live; nil hole fails closed (stop — no invent skip).
+// Fact* from abstract always live; nil hole fails closed (stop).
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -732,6 +735,9 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	// recurse into aggregate fields (pointer members)
 	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
 		for _, f := range v.FieldVars {
+			if f == nil {
+				return
+			}
 			fm.AddNewVarFact(f)
 		}
 		return
@@ -752,12 +758,26 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if wantPT {
 		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
 		for _, f := range pt {
-			fm.GlobalFacts = MergeFactInto(fm.GlobalFacts, f)
+			if f == nil {
+				return
+			}
+			merged := MergeFactInto(fm.GlobalFacts, f)
+			if merged == nil {
+				return
+			}
+			fm.GlobalFacts = merged
 		}
 	}
 	if wantUn {
 		for _, uf := range un {
-			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+			if uf == nil {
+				return
+			}
+			merged := MergeUnionFact(fm.UnionFacts, uf)
+			if merged == nil {
+				return
+			}
+			fm.UnionFacts = merged
 		}
 		// union abstract returns fact(s) when valid; no invent TOP on empty/fail
 	}
@@ -898,12 +918,17 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 }
 
 // MergeUnionFact replaces or appends FactUnion for the same union var.
+// MergeUnionFact replaces or appends a union fact by subject.
+// FactUnion* always live; nil f or map hole fails closed (nil out).
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
-		return facts
+		return nil
 	}
 	for i, old := range facts {
-		if old != nil && old.Var == f.Var {
+		if old == nil {
+			return nil
+		}
+		if old.Var == f.Var {
 			facts[i] = f
 			return facts
 		}

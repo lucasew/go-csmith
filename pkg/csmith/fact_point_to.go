@@ -1054,14 +1054,27 @@ func ClearPointToAggregates() {
 
 // UpdatePtrAliases mirrors FactPointTo::update_ptr_aliases.
 // FactPointTo.cpp:764–790 — merge point-to sets into parallel ptr/alias vectors.
-func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) {
+// UpdatePtrAliases merges facts into parallel ptrs/aliases tables.
+// Fact* always live; nil hole fails closed (false — no invent skip partial alias).
+// Returns false on incomplete maps; true when scan completed.
+func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
 	if ptrs == nil || aliases == nil {
-		return
+		return false
 	}
 	for _, f := range facts {
-		if f == nil || f.Var == nil || f.Var.Type == nil {
+		// Fact* always live; no invent skip nil holes as absent aliases
+		if f == nil {
+			return false
+		}
+		if f.Var == nil || f.Var.Type == nil {
 			// skip rv-like without type (upstream: type != 0)
 			continue
+		}
+		// PointTo Variable* always live
+		for _, v := range f.PointTo {
+			if v == nil {
+				return false
+			}
 		}
 		pos := -1
 		for i, p := range *ptrs {
@@ -1083,11 +1096,13 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 			}
 		}
 	}
+	return true
 }
 
 // AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
 // FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
 // FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
+// Incomplete fact maps fail closed (clear aggregates — no invent partial AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
 	for _, f := range funcs {
@@ -1112,9 +1127,15 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		}
 		// prefer map_facts_out values; also include GlobalFacts
 		for _, facts := range fm.MapFactsOut {
-			UpdatePtrAliases(facts, &AllPtrs, &AllAliases)
+			if !UpdatePtrAliases(facts, &AllPtrs, &AllAliases) {
+				ClearPointToAggregates()
+				return
+			}
 		}
-		UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases)
+		if !UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases) {
+			ClearPointToAggregates()
+			return
+		}
 	}
 	// FactPointTo.cpp:803 — sizes must stay paired (no soft invent desync)
 	if len(AllPtrs) != len(AllAliases) {
