@@ -64,9 +64,12 @@ func TestMakeRandomParamNilType(t *testing.T) {
 		t.Fatal("nil type MakeRandomParam must SetError sticky")
 	}
 	ClearError()
-	// Expression.cpp always has RNG; no invent param shell
+	// Expression.cpp always has RNG sticky; no invent param shell
 	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(opts), &c, GetIntType(), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomParam must SetError sticky")
 	}
 	ClearError()
 }

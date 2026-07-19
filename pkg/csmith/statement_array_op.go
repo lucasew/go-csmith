@@ -210,7 +210,9 @@ func MakeRandomArrayLoop(
 // StatementFor.cpp:314–330 selection half.
 // select_array always used; nil fails closed whole setup (no invent fewer arrays).
 func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGContext) []*ArrayVariable {
+	// StatementFor array-loop setup always has RNG + VS; sticky no invent empty pool without them
 	if r == nil || vs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent array-loop setup past holes)

@@ -559,8 +559,9 @@ func MakeRandomParam(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
-	// Expression.cpp always has RNG; no invent param expression without it
+	// Expression.cpp always has RNG sticky; no invent param expression without it
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky when live cg (no invent param past holes)

@@ -130,4 +130,12 @@ func TestRandomDigits(t *testing.T) {
 	if d != "3" {
 		t.Fatalf("RandomDigits(1) seed2: got %q want 3", d)
 	}
+	ClearError()
+	if (*Rng)(nil).RandomDigits(4) != "" {
+		t.Fatal("nil RNG RandomDigits must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomDigits must SetError sticky")
+	}
+	ClearError()
 }

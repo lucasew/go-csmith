@@ -173,7 +173,12 @@ func (r *Rng) RandomHexDigits(num int) string {
 
 // RandomDigits is DefaultRndNumGenerator::RandomDigits when CGOptions::is_random().
 func (r *Rng) RandomDigits(num int) string {
-	if r == nil || num <= 0 {
+	// AbsRndNumGenerator always has live RNG; sticky no invent empty digits without it
+	if r == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if num <= 0 {
 		return ""
 	}
 	const dec1 = "0123456789"

@@ -270,6 +270,14 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 		t.Fatal("nil SelectArray must fail closed whole setup, not invent fewer arrays")
 	}
 	ClearError()
+	// sticky factory gates
+	if MakeRandomArrayLoopSetup(nil, opts, vs, EmptyCGContext()) != nil {
+		t.Fatal("nil RNG setup must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomArrayLoopSetup must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {

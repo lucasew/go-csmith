@@ -2813,8 +2813,9 @@ func (vs *VariableSelector) SelectParentParamInv(
 		return nil
 	}
 	// VariableSelector.cpp always has process RNG for multi-choose / parent-local create
-	// n==1 param can skip draw; empty or multi without r → fail closed
+	// n==1 param can skip draw; multi without r sticky fail closed
 	if r == nil && len(cg.CurrentFunc.Param) != 1 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1079–1080 — empty param → SelectParentLocal
