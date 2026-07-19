@@ -6,6 +6,7 @@ import (
 )
 
 func TestFunctionIsVarOnStack(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
@@ -21,6 +22,10 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	if !f.IsVarVisible(g, blk) {
 		t.Fatal("global visible")
 	}
+	if HasError() {
+		t.Fatal("complete visibility paths must not sticky")
+	}
+	ClearError()
 }
 
 func TestStackScanCompleteHoleFailClosed(t *testing.T) {
@@ -37,6 +42,10 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	if f.IsVarOnStack(loc, blk) {
 		t.Fatal("IsVarOnStack must not invent membership past hole")
 	}
+	if !HasError() {
+		t.Fatal("IsVarOnStack incomplete stack must SetError sticky")
+	}
+	ClearError()
 	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
 	MarkFuncEndOnFacts(&facts, f, blk)
 	if FactsComplete(facts) {
@@ -62,6 +71,7 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 }
 
 func TestFunctionIsVarOOS(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	inner := &Block{Func: f, LocalVars: []*Variable{loc}}
@@ -77,6 +87,10 @@ func TestFunctionIsVarOOS(t *testing.T) {
 	if f.IsVarOOS(loc, inner) {
 		t.Fatal("visible not oos")
 	}
+	if HasError() {
+		t.Fatal("complete IsVarOOS paths must not sticky")
+	}
+	ClearError()
 }
 
 func TestAddBackReturnFacts(t *testing.T) {

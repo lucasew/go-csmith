@@ -59,7 +59,7 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 
 func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVarVisible false → not found in Blocks → not OOS
-	// fair: StackScanComplete false → OOS true
+	// fair: StackScanComplete false → OOS true sticky
 	ClearError()
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
@@ -68,9 +68,17 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	if f.IsVarVisible(p, body) {
 		t.Fatal("incomplete Param must not invent visible")
 	}
+	if !HasError() {
+		t.Fatal("incomplete Param IsVarVisible must SetError sticky")
+	}
+	ClearError()
 	if !f.IsVarOOS(p, body) {
 		t.Fatal("incomplete stack must fail closed OOS, not invent not-OOS")
 	}
+	if !HasError() {
+		t.Fatal("incomplete stack IsVarOOS must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {

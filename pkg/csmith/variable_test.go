@@ -216,3 +216,22 @@ func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestHasFieldVarLooseMatchIncompleteSticky(t *testing.T) {
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if (*Variable)(nil).HasFieldVar(v) {
+		t.Fatal("nil HasFieldVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil HasFieldVar must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).LooseMatch(v) {
+		t.Fatal("nil LooseMatch must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil LooseMatch must SetError sticky")
+	}
+	ClearError()
+}

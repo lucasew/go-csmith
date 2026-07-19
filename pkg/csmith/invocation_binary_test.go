@@ -423,6 +423,7 @@ func TestInvocationGetTypeBinary(t *testing.T) {
 
 func TestInvocationSafeInvocation(t *testing.T) {
 	// Unary: minus unsafe; others safe; binary always unsafe; user always safe
+	ClearError()
 	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-"}).SafeInvocation() {
 		t.Fatal("minus")
 	}
@@ -435,6 +436,17 @@ func TestInvocationSafeInvocation(t *testing.T) {
 	if !(&Invocation{User: &Function{Name: "f"}}).SafeInvocation() {
 		t.Fatal("user")
 	}
+	if HasError() {
+		t.Fatal("complete SafeInvocation must not sticky")
+	}
+	ClearError()
+	if (*Invocation)(nil).SafeInvocation() {
+		t.Fatal("nil SafeInvocation must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil SafeInvocation must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestInvocationCompatibleVarUnary(t *testing.T) {

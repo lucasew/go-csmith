@@ -309,8 +309,11 @@ func IsPtrUsed(st *Stmt) bool {
 
 // ContainsStmtInBlock mirrors Block as Statement::contains_stmt for a block root.
 // Statement.cpp:684–694 — s's parent chain includes block.
+// Incomplete block root sticky false (no invent not-contain / soft re-pick past hole).
 func ContainsStmtInBlock(b *Block, stParent *Block) bool {
+	// Block root always live; sticky incomplete no invent not-contain
 	if b == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return StmtInBlock(stParent, b)

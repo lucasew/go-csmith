@@ -1180,17 +1180,20 @@ func (v *Variable) FieldVarsComplete() bool {
 }
 
 // HasFieldVar mirrors Variable::has_field_var — other is this or nested field.
-// Variable* always live in FieldVars; nil hole fails closed as false
-// (no invent skip hole and match a later field). Callers that must not invent
-// "no field" for OOS/mark use FieldVarsComplete first.
+// Variable* always live in FieldVars; incomplete shell/hole sticky false
+// (no invent skip hole and match a later field / soft re-pick past holes).
 func (v *Variable) HasFieldVar(other *Variable) bool {
+	// both Variable* always live; sticky incomplete no invent not-has-field
 	if v == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v == other {
 		return true
 	}
 	if !v.FieldVarsComplete() {
+		// incomplete FieldVars sticky (no invent not-has-field past hole)
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, f := range v.FieldVars {
@@ -1214,14 +1217,20 @@ func (v *Variable) GetContainerUnion() *Variable {
 
 // LooseMatch mirrors Variable::loose_match.
 // Variable.cpp:239–250 — match collective, or same container union.
-// Incomplete GetCollective fails closed false (no invent match / panic on nil).
+// Incomplete GetCollective fails closed sticky false (no invent match / soft re-pick).
 func (v *Variable) LooseMatch(other *Variable) bool {
+	// both Variable* always live; sticky incomplete no invent not-loose-match
 	if v == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	me := v.GetCollective()
 	you := other.GetCollective()
+	// GetCollective may already sticky incomplete; incomplete collective no match
 	if me == nil || you == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if me.Match(you) {

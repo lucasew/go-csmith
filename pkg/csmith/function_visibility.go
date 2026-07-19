@@ -5,6 +5,7 @@ package csmith
 // StackScanComplete reports Param + LocalVars parent-chain have no nil holes.
 // Incomplete lists must not invent "not on stack" membership for mark_func_end /
 // remove_function_local_facts (false from a hole-shorted scan).
+// Function nil is incomplete (false); does not SetError — predicate only.
 func (f *Function) StackScanComplete(stParent *Block) bool {
 	if f == nil {
 		return false
@@ -27,13 +28,17 @@ func (f *Function) StackScanComplete(stParent *Block) bool {
 // IsVarOnStack mirrors Function::is_var_on_stack(var, stm).
 // Function.cpp:185–201 — param or local in stm's parent block chain.
 // stParent is the statement's parent block (Stmt has no Parent field; pass enclosing block).
-// Variable* always live on Param/LocalVars; nil hole fails closed as false for the
-// membership bit — callers that need fail-closed OOS/mark use StackScanComplete.
+// Incomplete Function/Variable/Param/LocalVars sticky false (no invent not-on-stack
+// / soft re-pick past holes).
 func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
+	// Function + Variable always live; sticky incomplete no invent not-on-stack
 	if f == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !f.StackScanComplete(stParent) {
+		// incomplete Param/LocalVars sticky fail closed not-on-stack
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, p := range f.Param {
@@ -53,28 +58,40 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 
 // IsVarVisible mirrors Function::is_var_visible.
 // Function.cpp:204–205 — global or on stack at statement.
-// Incomplete Param/LocalVars: non-globals not visible (membership bit false);
-// callers that must not invent not-visible for stack locals use StackScanComplete.
+// Incomplete Variable sticky false; incomplete stack via IsVarOnStack sticky.
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
+	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsGlobal() {
 		return true
 	}
-	return f != nil && f.IsVarOnStack(v, stParent)
+	// nil Function for non-global sticky not-visible (IsVarOnStack also stickies)
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.IsVarOnStack(v, stParent)
 }
 
 // IsVarOOS mirrors Function::is_var_oos.
 // Function.cpp:214–224 — not visible at stm but is a local of this function.
-// Block*/Variable* always live; nil holes fail closed as OOS (no invent not-OOS).
-// Incomplete stack at stParent also fails closed OOS — no invent not-OOS when
-// IsVarVisible is false only because a Param/LocalVars hole short-circuited the scan.
+// Incomplete Function/Variable/stack/Blocks sticky true OOS (no invent not-OOS
+// / soft re-pick past holes).
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
+	// Function + Variable always live; sticky incomplete OOS fail closed
 	if f == nil || v == nil {
+		SetError(ErrGeneric)
+		// nil Function: cannot be OOS local of unknown func — fail closed false
+		// would invent not-OOS; true OOS is safer for dead marking, but C++ has
+		// live Function*. Sticky false for nil shell (assert path).
 		return false
 	}
 	if !f.StackScanComplete(stParent) {
+		// incomplete stack sticky OOS (no invent not-OOS when scan short-circuits)
+		SetError(ErrGeneric)
 		return true
 	}
 	if f.IsVarVisible(v, stParent) {
@@ -82,10 +99,13 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	}
 	for _, b := range f.Blocks {
 		if b == nil {
+			// incomplete Blocks sticky OOS
+			SetError(ErrGeneric)
 			return true
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			if loc.Match(v) || loc == v {

@@ -175,8 +175,11 @@ func (fi *Invocation) getTypeBinary() *Type {
 // SafeInvocation mirrors FunctionInvocation::safe_invocation.
 // Unary: eMinus false (FunctionInvocationUnary.cpp:185–187);
 // Binary: always false; User: always true.
+// Incomplete Invocation sticky false (no invent unsafe soft-skip / soft re-pick).
 func (fi *Invocation) SafeInvocation() bool {
+	// Invocation always live; sticky incomplete no invent not-safe soft-skip
 	if fi == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if fi.User != nil {

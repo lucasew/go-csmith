@@ -72,6 +72,10 @@ func TestIsVisibleLocal(t *testing.T) {
 	if f.IsVarOnStack(l, inner) {
 		t.Fatal("IsVarOnStack nil local hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("IsVarOnStack LocalVars hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPointingToLocalsNilHole(t *testing.T) {
