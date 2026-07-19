@@ -82,6 +82,17 @@ func TestSubsetFacts(t *testing.T) {
 		t.Fatal("SubsetFacts nil hole must SetError sticky")
 	}
 	ClearError()
+	// Imply residual: PointTo nil hole soft invent was soft-continue not-subset then invent subset later.
+	// Fair: sticky fail closed not-subset with ERROR.
+	broken := &FactPointTo{Var: p, PointTo: []*Variable{NullPtr, nil}}
+	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	if SubsetFacts(ok, []*FactPointTo{broken}) {
+		t.Fatal("Imply residual must fail closed not-subset")
+	}
+	if !HasError() {
+		t.Fatal("Imply residual SubsetFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsCtrlStmt(t *testing.T) {

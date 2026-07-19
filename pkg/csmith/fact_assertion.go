@@ -33,6 +33,14 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 		return true
 	}
 	if !f.Var.IsVisible(stParent) {
+		// residual ERROR sticky — no invent invisible true past IsVisible hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue visible scan past IsVisible residual false path
+	if HasError() {
 		return true
 	}
 	for _, p := range f.PointTo {
@@ -45,6 +53,14 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 			continue
 		}
 		if !p.IsVisible(stParent) {
+			// residual ERROR sticky — no invent invisible true past pointee IsVisible hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue visible past pointee residual false path
+		if HasError() {
 			return true
 		}
 	}

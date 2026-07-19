@@ -69,7 +69,19 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 	}
 	for _, f1 := range a {
 		f2 := FindRelatedPointTo(b, f1.Var)
-		if f2 == nil || !f2.Imply(f1) {
+		// residual ERROR sticky — no invent soft-continue not-subset past FindRelated hole
+		if HasError() {
+			return false
+		}
+		if f2 == nil {
+			return false
+		}
+		ok := f2.Imply(f1)
+		// residual ERROR sticky — no invent soft-continue not-subset past Imply hole
+		if HasError() {
+			return false
+		}
+		if !ok {
 			return false
 		}
 	}

@@ -282,15 +282,43 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 	}
 	if f != nil {
 		for _, p := range f.Param {
+			// Param live after StackScanComplete; nil hole already sticky above
+			if p == nil {
+				SetError(ErrGeneric)
+				return false
+			}
 			if p.Match(v) {
+				// residual ERROR sticky — no invent on-stack true past Match hole
+				if HasError() {
+					return false
+				}
 				return true
+			}
+			// residual ERROR sticky — no invent soft-continue then true later past Match hole
+			if HasError() {
+				return false
 			}
 		}
 	}
 	for bb := b; bb != nil; bb = bb.Parent {
 		for _, loc := range bb.LocalVars {
-			if loc == v || loc.Match(v) {
+			if loc == nil {
+				SetError(ErrGeneric)
+				return false
+			}
+			if loc == v {
 				return true
+			}
+			if loc.Match(v) {
+				// residual ERROR sticky — no invent on-stack true past Match hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue then true later past Match hole
+			if HasError() {
+				return false
 			}
 		}
 	}

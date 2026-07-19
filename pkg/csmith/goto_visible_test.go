@@ -32,6 +32,17 @@ func TestIsVarOnStack(t *testing.T) {
 	}
 	ClearError()
 	outer.LocalVars = []*Variable{l}
+	// Match residual: Type-nil param soft invent was soft-continue then invent on-stack later good.
+	// Fair: sticky fail closed not-on-stack.
+	f.Param = []*Variable{&Variable{Name: "p_hole"}, p} // Type-nil then good
+	if inner.IsVarOnStack(p) {
+		t.Fatal("Match residual must fail closed not-on-stack, not invent later param match")
+	}
+	if !HasError() {
+		t.Fatal("Match residual IsVarOnStack must SetError sticky")
+	}
+	ClearError()
+	f.Param = []*Variable{p}
 }
 
 func TestChooseVisibleReadVar(t *testing.T) {

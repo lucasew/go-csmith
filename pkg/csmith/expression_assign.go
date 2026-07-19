@@ -59,9 +59,12 @@ func MakeExpressionAssign(
 			indir = st.Lhs.IndirectLevel()
 		}
 		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
+		// residual ERROR sticky — no invent ExpressionAssign shell past UpdateFact residual
 		// incomplete assign must not invent ExpressionAssign shell with wiped facts
-		if !FactsComplete(cg.FM.GlobalFacts) {
-			SetError(ErrGeneric)
+		if HasError() || !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 	}

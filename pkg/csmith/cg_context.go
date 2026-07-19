@@ -817,14 +817,29 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 		return false
 	}
 	if !c.EffectContext().IsSideEffectFree() {
+		// residual ERROR sticky — no invent OK past IsSideEffectFree residual false path
+		if HasError() {
+			return false
+		}
 		level := derefLevel
 		for level > 0 {
 			if v.IsVolatileAfterDeref(level) {
+				// residual ERROR sticky — no invent OK past IsVolatileAfterDeref residual
+				if HasError() {
+					return false
+				}
 				// policy reject (volatile under impure) — not incomplete IR sticky
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue peel past residual false path
+			if HasError() {
 				return false
 			}
 			level--
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent SE-free true past residual hole
+		return false
 	}
 	// Incomplete accum/stm AccessDerefVolatile sticky (AccessDerefVolatile sets ERROR)
 	if c.EffectAccum != nil {
@@ -1275,12 +1290,27 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		if c.IsNonReadable(v) {
+			// residual ERROR sticky — no invent conflict true past IsNonReadable hole
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue conflict scan past IsNonReadable residual
+		if HasError() {
 			return true
 		}
 		if c.EffectContext().IsWrittenPartially(v) {
 			return true
 		}
+		if HasError() {
+			return true
+		}
 		if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+			// residual ERROR sticky — no invent conflict past IsVolatile/SE residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
 			return true
 		}
 	}
@@ -1290,13 +1320,32 @@ func (c CGContext) InConflict(eff Effect) bool {
 			return true
 		}
 		if c.IsNonWritable(v) || v.IsConst() {
+			// residual ERROR sticky — no invent conflict true past IsNonWritable/IsConst hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
 			return true
 		}
 		ctx := c.EffectContext()
 		if ctx.IsWrittenPartially(v) || ctx.IsReadPartially(v) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
 			return true
 		}
 		if v.IsVolatile() && !ctx.IsSideEffectFree() {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
 			return true
 		}
 	}
