@@ -25,11 +25,11 @@ func TestGetExternalNoReadsWrites(t *testing.T) {
 		t.Fatal("frame nr", nr)
 	}
 	_ = nw
-	// nil RW hole fails closed
+	// nil RW hole fails closed incomplete (not bare nil invent empty complete)
 	cg2 := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil, g}})
 	nr, nw = cg2.GetExternalNoReadsWrites(nil)
-	if nr != nil || nw != nil {
-		t.Fatal("nil NoReadVars hole must fail closed", nr, nw)
+	if VariablesComplete(nr) || VariablesComplete(nw) {
+		t.Fatal("nil NoReadVars hole must fail closed incomplete", nr, nw)
 	}
 }
 
@@ -107,8 +107,8 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 	}
 	// incomplete fact map fails closed nil
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	if cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}) != nil {
-		t.Fatal("incomplete facts must fail closed nil")
+	if VariablesComplete(cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
+		t.Fatal("incomplete facts must fail closed incomplete")
 	}
 }
 

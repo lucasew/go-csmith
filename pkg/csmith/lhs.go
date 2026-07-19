@@ -450,7 +450,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		}
 		// expand fields for aggregates
 		exp := v.CollectExpandable()
-		if exp == nil {
+		if !VariablesComplete(exp) {
 			incomplete = true
 			return
 		}

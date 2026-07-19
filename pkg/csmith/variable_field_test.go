@@ -58,8 +58,8 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect())
 	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
-	if got := cg.FindReachableFrameVars(facts); got != nil {
-		t.Fatal("incomplete frame stack must fail closed nil, not invent empty", got)
+	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
+		t.Fatal("incomplete frame stack must fail closed incomplete, not invent empty complete")
 	}
 }
 
@@ -74,10 +74,10 @@ func TestCollectExpandable(t *testing.T) {
 	if len(all) < 1+len(st.Fields) {
 		t.Fatal(len(all))
 	}
-	// nil FieldVars hole fails closed
+	// nil FieldVars hole fails closed incomplete (not bare nil invent empty complete)
 	v.FieldVars = append(v.FieldVars, nil)
-	if v.CollectExpandable() != nil {
-		t.Fatal("nil field hole must fail closed")
+	if VariablesComplete(v.CollectExpandable()) {
+		t.Fatal("nil field hole must fail closed incomplete")
 	}
 }
 

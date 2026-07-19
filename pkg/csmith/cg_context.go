@@ -475,6 +475,9 @@ func (c *CGContext) RemoveIVBound(iv *Variable) {
 // VariablesComplete reports set has no nil Variable* holes.
 // Incomplete lists must not invent membership via IsVariableInSet (false past a
 // hole drops params/locals from keep sets / lower_block coverage).
+// Note: VariablesComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteVariables() so bare nil cannot invent empty-complete
+// expand/frame/RW lists.
 func VariablesComplete(set []*Variable) bool {
 	for _, x := range set {
 		if x == nil {
@@ -482,6 +485,12 @@ func VariablesComplete(set []*Variable) bool {
 		}
 	}
 	return true
+}
+
+// IncompleteVariables is the fail-closed incomplete Variable* list marker.
+// VariablesComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteVariables() []*Variable {
+	return []*Variable{nil}
 }
 
 // IsVariableInSet reports whether v appears in set (pointer equality).
@@ -959,14 +968,14 @@ func (c CGContext) frameStacksComplete() bool {
 // FindReachableFrameVars mirrors CGContext::find_reachable_frame_vars.
 // CGContext.cpp:566–578 — pointees that are frame locals.
 // Fact* always live; incomplete map/pointees or incomplete frame stacks fail closed
-// (nil out — no invent empty frame set when IsFrameVar is false past a hole).
-// Complete empty returns non-nil empty slice (no invent nil==incomplete).
+// IncompleteVariables (not bare nil invent empty-complete via VariablesComplete(nil)).
+// Complete empty returns non-nil empty slice.
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	if !FactsComplete(facts) {
-		return nil
+		return IncompleteVariables()
 	}
 	if !c.frameStacksComplete() {
-		return nil
+		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
 	seen := map[*Variable]bool{}
@@ -974,7 +983,7 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 		for _, p := range f.PointTo {
 			// pointee Variable* always live in point-to sets (specials are non-nil)
 			if p == nil {
-				return nil
+				return IncompleteVariables()
 			}
 			if IsSpecialPtr(p) || seen[p] {
 				continue
@@ -990,7 +999,8 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 
 // GetExternalNoReadsWrites mirrors CGContext::get_external_no_reads_writes.
 // CGContext.cpp:581–607 — globals + frame_vars from RW + global IVs as no-write.
-// Variable* always live on RW/IV lists; nil hole fails closed (nil,nil — no invent partial).
+// Variable* always live on RW/IV lists; nil hole fails closed IncompleteVariables
+// on both outs (no invent empty partial / bare nil,nil empty-complete).
 func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noWrites []*Variable) {
 	inFrame := func(v *Variable) bool {
 		if v == nil {
@@ -1001,10 +1011,14 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		}
 		return IsVariableInSet(frameVars, v)
 	}
+	// incomplete frame list must not invent membership past holes
+	if frameVars != nil && !VariablesComplete(frameVars) {
+		return IncompleteVariables(), IncompleteVariables()
+	}
 	if c.RW != nil {
 		for _, v := range c.RW.NoReadVars {
 			if v == nil {
-				return nil, nil
+				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
 				noReads = append(noReads, v)
@@ -1012,7 +1026,7 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		}
 		for _, v := range c.RW.NoWriteVars {
 			if v == nil {
-				return nil, nil
+				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
 				noWrites = append(noWrites, v)
@@ -1022,7 +1036,7 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 	// convert global / frame IVs into non-writables
 	for iv := range c.IVBounds {
 		if iv == nil {
-			return nil, nil
+			return IncompleteVariables(), IncompleteVariables()
 		}
 		if inFrame(iv) {
 			noWrites = append(noWrites, iv)
@@ -1034,10 +1048,10 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 // BuildCalleeRWDirective builds RW for generate_body_with_known_params path.
 // Function.cpp:675–681 — inherit external no-read/write from caller.
 // Incomplete frame facts fail closed: inherit full caller NoRead/NoWrite without
-// inventing nil (no restrictions) from incomplete reachable frames.
+// inventing unrestricted empty RW from incomplete reachable frames.
 func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	frame := c.FindReachableFrameVars(facts)
-	if frame == nil {
+	if !VariablesComplete(frame) {
 		// incomplete facts — fail closed full external lists (no invent empty RW)
 		if c.RW == nil {
 			return &RWDirective{}
@@ -1061,8 +1075,8 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 		return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
 	}
 	nr, nw := c.GetExternalNoReadsWrites(frame)
-	// GetExternal nil,nil = incomplete RW/IV lists
-	if nr == nil && nw == nil && c.RW != nil {
+	// incomplete RW/IV lists — fail closed empty RW directive (no invent unrestricted)
+	if !VariablesComplete(nr) || !VariablesComplete(nw) {
 		return &RWDirective{}
 	}
 	if len(nr) == 0 && len(nw) == 0 {

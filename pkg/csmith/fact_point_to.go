@@ -858,7 +858,7 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 		}
 		localSet[l] = true
 		exp := l.CollectExpandable()
-		if exp == nil {
+		if !VariablesComplete(exp) {
 			return nil
 		}
 		for _, fv := range exp {

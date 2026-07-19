@@ -58,17 +58,36 @@ func GetBlocksStmt(st *Stmt) []*Block {
 	}
 }
 
+// StmtsComplete reports every Stmt* is live (no nil holes).
+// Note: StmtsComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteStmtsSlice() so len(nil)==0 cannot invent
+// empty-complete typed-stmt list success.
+func StmtsComplete(stms []*Stmt) bool {
+	for _, s := range stms {
+		if s == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteStmtsSlice is the fail-closed incomplete Stmt* list marker.
+// StmtsComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteStmtsSlice() []*Stmt {
+	return []*Stmt{nil}
+}
+
 // FindTypedStmts mirrors Statement::find_typed_stmts.
 // Statement.cpp:631–646 — collect statements whose Kind is in kinds (recursive).
 // Returns count of matches appended to stms, or -1 on incomplete IR
-// (nil Block hole — no invent partial typed-stmt list past hole; *stms cleared).
+// (nil Block hole — *stms IncompleteStmtsSlice; no invent empty match via bare nil).
 func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
 	}
 	if st == nil {
-		// incomplete Statement* — fail closed clear (no invent empty match success)
-		*stms = nil
+		// incomplete Statement* — fail closed hole marker
+		*stms = IncompleteStmtsSlice()
 		return -1
 	}
 	for _, k := range kinds {
@@ -80,11 +99,15 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	for _, b := range GetBlocksStmt(st) {
 		// Block* always live from get_blocks; nil hole fails closed
 		if b == nil {
-			*stms = nil
+			*stms = IncompleteStmtsSlice()
 			return -1
 		}
 		for i := range b.Stmts {
 			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+				// child already set IncompleteStmtsSlice when it failed closed
+				if StmtsComplete(*stms) {
+					*stms = IncompleteStmtsSlice()
+				}
 				return -1
 			}
 		}
@@ -99,11 +122,14 @@ func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 		return -1
 	}
 	if b == nil {
-		*stms = nil
+		*stms = IncompleteStmtsSlice()
 		return -1
 	}
 	for i := range b.Stmts {
 		if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+			if StmtsComplete(*stms) {
+				*stms = IncompleteStmtsSlice()
+			}
 			return -1
 		}
 	}
