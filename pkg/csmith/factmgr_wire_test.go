@@ -688,4 +688,16 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 		t.Fatal("nil Blocks hole FindParentBlockOfStmID must SetError sticky")
 	}
 	ClearError()
+	// incomplete if-arm sticky whole miss (no invent soft-continue past nil Else)
+	inner := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
+	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner, Else: nil}}}
+	inner.Parent = outer
+	f.Blocks = []*Block{outer}
+	if FindParentBlockOfStmID(f, 3) != nil {
+		t.Fatal("nil Else arm must fail closed FindParentBlockOfStmID")
+	}
+	if !HasError() {
+		t.Fatal("nil Else arm FindParentBlockOfStmID must SetError sticky")
+	}
+	ClearError()
 }

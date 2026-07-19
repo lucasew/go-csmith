@@ -813,14 +813,18 @@ func TestFindStmtByID(t *testing.T) {
 	if FindStmtByID(f, 999) != nil {
 		t.Fatal("missing")
 	}
-	// incomplete if on sole Blocks entry fails closed (no invent soft-skip nil Else)
+	// incomplete if on sole Blocks entry fails closed sticky (no invent soft-continue past nil Else)
+	ClearError()
 	f.Blocks = []*Block{outer}
 	outer.Stmts[0].Else = nil
 	if FindStmtByID(f, 3) != nil {
 		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
-	// Function + live StmID always required; sticky no invent miss soft-success
+	if !HasError() {
+		t.Fatal("nil Else FindStmtByID must SetError sticky")
+	}
 	ClearError()
+	// Function + live StmID always required; sticky no invent miss soft-success
 	if FindStmtByID(nil, 3) != nil {
 		t.Fatal("nil Function FindStmtByID must fail closed")
 	}
