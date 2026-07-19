@@ -151,9 +151,15 @@ func (t *Type) IsVolatileStructUnion() bool {
 	return false
 }
 
+// incompleteStructDepth is returned when Fields contain a nil Type hole.
+// Large enough that MaxNestedStructLevel filters reject the type (no invent
+// depth-0 allowing deeper nesting), but bounded so bookkeeper counters stay small.
+const incompleteStructDepth = 256
+
 // StructDepth mirrors Type::get_struct_depth.
 // Type.cpp:1261–1275 — 0 if not struct; else 1 + max field depth.
-// Type* always live on Fields; nil hole fails closed as depth 0 (no invent skip).
+// Type* always live on Fields; nil hole fails closed as incompleteStructDepth
+// (no invent depth 0 that soft-skips nested-struct caps).
 func (t *Type) StructDepth() int {
 	if t == nil || !t.IsStruct() {
 		return 0
@@ -162,7 +168,7 @@ func (t *Type) StructDepth() int {
 	maxField := 0
 	for _, f := range t.Fields {
 		if f.Type == nil {
-			return 0
+			return incompleteStructDepth
 		}
 		if d := f.Type.StructDepth(); d > maxField {
 			maxField = d

@@ -19,6 +19,19 @@ func TestStructDepthNested(t *testing.T) {
 	if GetIntType().StructDepth() != 0 {
 		t.Fatal("int")
 	}
+	// nil field Type: fail closed deep (no invent depth 0 past hole)
+	hole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
+		{Type: nil, BitWidth: -1},
+	}}
+	if hole.StructDepth() != incompleteStructDepth {
+		t.Fatalf("incomplete depth %d want %d", hole.StructDepth(), incompleteStructDepth)
+	}
+	// nested filter treats incomplete as too deep
+	opts := Defaults()
+	opts.MaxNestedStructLevel = 3
+	if hole.StructDepth() < opts.MaxNestedStructLevel {
+		t.Fatal("incomplete must fail closed over max nested")
+	}
 }
 
 func TestChooseRandomFiltersReturnUnions(t *testing.T) {
