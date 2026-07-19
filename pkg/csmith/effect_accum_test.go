@@ -53,6 +53,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 }
 
 func TestStepHashOutput(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.Seed = 2
 	opts.StepHashByStmt = true
@@ -70,6 +71,7 @@ func TestStepHashOutput(t *testing.T) {
 	if !strings.Contains(out, "void step_hash(int stmt_id)") {
 		t.Fatal("missing step_hash")
 	}
+	ClearError()
 }
 
 func TestStepHashNoInventDeclWithoutComputeHash(t *testing.T) {
@@ -114,9 +116,11 @@ func TestStepHashNoInventCallWithoutDef(t *testing.T) {
 	if strings.Contains(main, "csmith_compute_hash()") {
 		t.Fatal("must not invent hash call without def", main)
 	}
+	ClearError()
 }
 
 func TestExpressionCommaUsesEnv(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)

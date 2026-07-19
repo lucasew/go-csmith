@@ -485,6 +485,7 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 	}
 	ctrl := GetNewCtrlVars(opts)
 	// Variable.cpp:802 assert(dimen <= ctrl_vars.size()); no invent inits without decl
+	// undersize MaxArrayDim is config soft re-pick (non-sticky); broken name/IR sticky inside OutputArrayCtrlVars
 	decl := OutputArrayCtrlVars(ctrl, dimen, indent)
 	if decl == "" {
 		return ""
@@ -510,6 +511,7 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 		}
 		initOut := av.OutputInit(indent, names)
 		// incomplete loop-init IR — fail closed whole initializers
+		// (OutputInit already sticky; no double-config sticky for soft re-pick)
 		if initOut == "" {
 			return ""
 		}
@@ -1630,9 +1632,10 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return b.String()
 	}
 	if v.Type.IsSimple() {
-		// Variable.cpp:900–920 — name always live; no invent empty transparent_crc
+		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
 		name := v.GetActualName(false)
 		if name == "" || v.Name == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if v.Type.IsFloat() {
@@ -1685,22 +1688,27 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		ctrl = GetLastCtrlVars()
 	}
 	if len(ctrl) < len(v.ArraySizes) {
-		// C++ assumes last_ctrl_vars sized for dimension after OutputArrayInitializers
+		// C++ assumes last_ctrl_vars sized for dimension after OutputArrayInitializers sticky
+		SetError(ErrGeneric)
 		return ""
 	}
-	// array name always live; no invent transparent_crc([i], …) / for ( = 0; …)
+	// array name always live sticky; no invent transparent_crc([i], …) / for ( = 0; …)
 	access := v.GetActualName(false)
 	if access == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	names := make([]string, len(v.ArraySizes))
 	for i := range v.ArraySizes {
 		if ctrl[i] == nil {
+			// incomplete ctrl IR sticky — no invent empty index id
+			SetError(ErrGeneric)
 			return ""
 		}
 		names[i] = ctrl[i].GetActualName(false)
 		if names[i] == "" {
-			// ctrl get_actual_name always live; no invent empty index id
+			// ctrl get_actual_name always live sticky; no invent empty index id
+			SetError(ErrGeneric)
 			return ""
 		}
 	}

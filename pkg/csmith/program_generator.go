@@ -653,10 +653,8 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 		ctrl := GetNewCtrlVars(g.Opts)
 		ctrlDecl = OutputArrayCtrlVars(ctrl, dimen, "    ")
 		if ctrlDecl == "" {
-			// incomplete ctrl IR sticky — fail closed empty (no invent partial hash shell)
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			// incomplete ctrl IR — fail closed empty (call sites use hashFuncDefReady;
+			// config undersize soft; broken name sticky inside OutputArrayCtrlVars)
 			return ""
 		}
 	}
@@ -756,19 +754,22 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	if av == nil {
 		return ""
 	}
-	// ArrayVariable.cpp:622–623 — collective itemized members skip
+	// ArrayVariable.cpp:622–623 — collective itemized members skip (policy empty)
 	if av.Collective != nil {
 		return ""
 	}
+	// undersized / empty ctrl sticky — no invent letter names
 	if len(ctrl) < len(av.Sizes) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}
-	// ArrayVariable.cpp:649 — init->Output; always live Expression* (no invent "0")
+	// ArrayVariable.cpp:649 — init->Output; always live Expression* sticky (no invent "0")
 	var initVal string
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
@@ -776,6 +777,9 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 		initVal = av.Init.Value
 	}
 	if initVal == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder
@@ -792,9 +796,12 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 			pad += "    "
 		}
 	}
-	// ArrayVariable::output_with_indices always live access; no invent " = init;" without LHS
+	// ArrayVariable::output_with_indices always live access sticky; no invent " = init;" without LHS
 	access := av.OutputWithIndices(ctrl)
 	if access == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")

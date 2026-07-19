@@ -6,11 +6,21 @@ import (
 )
 
 func TestHashSimpleInt(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	out := v.HashOutput()
 	if !strings.Contains(out, `transparent_crc(g_1, "g_1"`) {
 		t.Fatal(out)
 	}
+	// empty name sticky — no invent transparent_crc(,"")
+	anon := &Variable{Name: "", Type: GetIntType()}
+	if anon.HashOutput() != "" {
+		t.Fatal("empty name must fail closed hash")
+	}
+	if !HasError() {
+		t.Fatal("empty name HashOutput must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHashPointerEmpty(t *testing.T) {
@@ -41,6 +51,10 @@ func TestHashStructFields(t *testing.T) {
 }
 
 func TestHashArrayLoops(t *testing.T) {
+	ClearError()
+	CtrlVarsDoFinalization()
+	// ArrayVariable::hash uses get_last_ctrl_vars (no letter invent without pool)
+	_ = GetNewCtrlVars(Defaults())
 	v := &Variable{
 		Name:       "g_4",
 		Type:       GetIntType(),
@@ -53,6 +67,17 @@ func TestHashArrayLoops(t *testing.T) {
 	if !strings.Contains(out, "for (i = 0") || !strings.Contains(out, "g_4[i]") {
 		t.Fatal(out)
 	}
+	// undersized ctrl sticky — no invent loops with empty index
+	ClearError()
+	CtrlVarsDoFinalization()
+	if v.HashOutput() != "" {
+		t.Fatal("no last ctrl must fail closed array hash")
+	}
+	if !HasError() {
+		t.Fatal("no last ctrl HashOutput must SetError sticky")
+	}
+	ClearError()
+	CtrlVarsDoFinalization()
 }
 
 func TestGenerateHashUsesFieldCrc(t *testing.T) {

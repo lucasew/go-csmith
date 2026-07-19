@@ -285,7 +285,8 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 }
 
 func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
-	// Variable.cpp:1184 — name + directive always live
+	// Variable.cpp:1184 — name + directive always live; hash empty name sticky
+	ClearError()
 	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
 		t.Fatal("empty name must fail closed dump", s)
@@ -293,6 +294,10 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	if s := v.HashOutput(); s != "" {
 		t.Fatal("empty name must fail closed hash", s)
 	}
+	if !HasError() {
+		t.Fatal("empty name HashOutput must SetError sticky")
+	}
+	ClearError()
 	// array dump/hash without name — no invent bare "[0]" / for ( = 0; …)
 	arr := &Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if s := arr.OutputValueDump("c ", 1, nil); s != "" {
@@ -304,17 +309,29 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	if s := hashArrayVariable(arr, ctrl, nil); s != "" {
 		t.Fatal("empty array name must fail closed hash", s)
 	}
-	// empty ctrl name — no invent for ( = 0; …)
+	if !HasError() {
+		t.Fatal("empty array name hashArrayVariable must SetError sticky")
+	}
+	ClearError()
+	// empty ctrl name sticky — no invent for ( = 0; …)
 	arr.Name = "g_a"
 	if s := hashArrayVariable(arr, []*Variable{{Type: GetIntType()}}, nil); s != "" {
 		t.Fatal("empty ctrl name must fail closed array hash", s)
 	}
+	if !HasError() {
+		t.Fatal("empty ctrl name hashArrayVariable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {
 	// ExpressionVariable Output requires live Variable::Output base
 	// UseVolRVal + volatile + nil type → OutputC empty; multi * must not invent
+	ClearError()
 	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, true)
+	if v == nil {
+		t.Fatal("create g_p")
+	}
 	v.UseVolRVal = true
 	v.Type = nil // force VOL_RVAL fail closed empty
 	if s := outputExpressionVariable(v, GetIntType()); s != "" {
