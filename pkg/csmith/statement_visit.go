@@ -69,9 +69,10 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// check write on skipped vars (re-init at dest)
+	// StatementGoto.cpp — vars[i] always live; no invent skip nil holes
 	facts := cg.pointToFacts()
 	for _, v := range st.InitSkippedVars {
-		if v != nil && !cg.CheckWriteVar(v, facts) {
+		if v == nil || !cg.CheckWriteVar(v, facts) {
 			return false
 		}
 	}
@@ -288,11 +289,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
-		// no soft invent merge from edges to body block
+		// CFGEdge* always live; no invent skip nil holes
 		if st.StmID > 0 {
 			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
 				if e == nil {
-					continue
+					return false
 				}
 				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
 					MergeJumpFacts(&cg.FM.GlobalFacts, out)
@@ -336,9 +337,10 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// StatementArrayOp.cpp:270–275 — check_write_var each ctrl var
+	// IV always live; no invent skip nil holes in ctrl chain
 	facts := cg.pointToFacts()
 	for _, iv := range ivs {
-		if !cg.CheckWriteVar(iv, facts) {
+		if iv == nil || !cg.CheckWriteVar(iv, facts) {
 			return false
 		}
 		facts = cg.pointToFacts()
@@ -347,26 +349,27 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	// find innermost body assign (array init) or nested block body
 	inner := findArrayOpInnermost(st)
 	// StatementArrayOp.cpp:276–317 — body OR init_value path; neither is incomplete
-	if inner == nil {
+	if inner == nil || inner.Then == nil {
 		return false
 	}
 
 	// body path: nested fors around a Block of statements (array loop)
 	// init path: Then is a block whose first stmt is assign with ArrayAccess
-	if inner.Then != nil && isArrayInitBody(inner.Then) {
+	if isArrayInitBody(inner.Then) {
 		// StatementArrayOp.cpp:299–316 — init_value + lhs visit + update_fact_for_assign
+		// StatementAssign always has live Lhs + Expression*
 		asg := &inner.Then.Stmts[0]
-		if asg.Expr != nil && !VisitFactsExpression(asg.Expr, cg, opts) {
+		if asg.Expr == nil || !VisitFactsExpression(asg.Expr, cg, opts) {
 			return false
 		}
-		lhs := &Lhs{Var: asg.LhsVar, Type: nil}
-		if asg.LhsVar != nil {
-			lhs.Type = asg.LhsVar.Type
-		}
-		if lhs.Var != nil && !cg.VisitFactsLhs(lhs, opts) {
+		if asg.LhsVar == nil {
 			return false
 		}
-		if cg.FM != nil && asg.LhsVar != nil {
+		lhs := &Lhs{Var: asg.LhsVar, Type: asg.LhsVar.Type}
+		if !cg.VisitFactsLhs(lhs, opts) {
+			return false
+		}
+		if cg.FM != nil {
 			cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
 			if st.StmID > 0 {
 				cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
@@ -385,39 +388,37 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		bodyCG.AddIVBound(iv, 0)
 		defer bodyCG.RemoveIVBound(iv)
 	}
-	if inner.Then != nil {
-		if !VisitFactsBlock(inner.Then, &bodyCG, opts) {
-			return false
+	if !VisitFactsBlock(inner.Then, &bodyCG, opts) {
+		return false
+	}
+	if cg.FM != nil {
+		// StatementArrayOp.cpp:285–291 — must_return → pre-body; else map_facts_in[body]
+		if inner.Then.MustReturn() {
+			cg.FM.GlobalFacts = preFacts
+		} else if in, ok := cg.FM.MapFactsIn[inner.Then.StmID]; ok {
+			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
-		if cg.FM != nil {
-			// StatementArrayOp.cpp:285–291 — must_return → pre-body; else map_facts_in[body]
-			if inner.Then.MustReturn() {
-				cg.FM.GlobalFacts = preFacts
-			} else if in, ok := cg.FM.MapFactsIn[inner.Then.StmID]; ok {
-				cg.FM.GlobalFacts = CloneFactSlice(in)
-			}
-			// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
-			// no soft invent merge from edges to body block
-			if st.StmID > 0 {
-				for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
-					if e == nil {
-						continue
-					}
-					if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-						MergeJumpFacts(&cg.FM.GlobalFacts, out)
-					}
+		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
+		// CFGEdge* always live; no invent skip nil holes
+		if st.StmID > 0 {
+			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
+				if e == nil {
+					return false
+				}
+				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
+					MergeJumpFacts(&cg.FM.GlobalFacts, out)
 				}
 			}
-			// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
-			bodyEff := EmptyEffect()
-			if inner.Then.StmID > 0 {
-				bodyEff = cg.FM.GetMapStmEffect(inner.Then.StmID)
-			}
-			if bodyEff.IsEmpty() {
-				bodyEff = bodyCG.EffectStm
-			}
-			SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 		}
+		// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
+		bodyEff := EmptyEffect()
+		if inner.Then.StmID > 0 {
+			bodyEff = cg.FM.GetMapStmEffect(inner.Then.StmID)
+		}
+		if bodyEff.IsEmpty() {
+			bodyEff = bodyCG.EffectStm
+		}
+		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 	}
 	return true
 }

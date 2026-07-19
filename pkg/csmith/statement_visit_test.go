@@ -248,6 +248,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 
 func TestVisitFactsStatementForMustReturnRestoresPostInit(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -351,19 +352,22 @@ func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
 
 func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 	// StatementIf.cpp:187–188 — both must_return → inputs_copy (pre-condition)
+	// StatementReturn visit requires curr_func + rv
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgr(f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 5,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
-		Then: &Block{StmID: 6, Stmts: []Stmt{{Kind: StmtReturn, StmID: 7,
+		Then: &Block{StmID: 6, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 7,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
-		Else: &Block{StmID: 8, Stmts: []Stmt{{Kind: StmtReturn, StmID: 9,
+		Else: &Block{StmID: 8, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 9,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {
@@ -377,18 +381,20 @@ func TestVisitFactsStatementIfBothMustReturnUsesPreCond(t *testing.T) {
 
 func TestVisitFactsStatementIfTrueMustUsesElse(t *testing.T) {
 	// StatementIf.cpp:189–190 — true must_return → inputs_false
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	fm := NewFactMgr(nil)
+	fm := NewFactMgr(f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	st := &Stmt{
 		Kind: StmtIfElse, StmID: 10,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
-		Then: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtReturn, StmID: 12,
+		Then: &Block{StmID: 11, Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: 12,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
-		Else: &Block{StmID: 13, Stmts: []Stmt{}},
+		Else: &Block{StmID: 13, Func: f, Stmts: []Stmt{}},
 	}
-	cg := EmptyCGContext().WithFactMgr(fm)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(st, &cg, Defaults()) {

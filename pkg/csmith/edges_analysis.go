@@ -177,20 +177,26 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		switch st.Kind {
 		case StmtAssign:
 			// abstract assign into global_facts (RHS calls already handled at gen)
+			// StatementAssign always has live Lhs; incomplete IR — no invent skip update
 			lhs := st.LhsVar
 			indir := 0
 			if st.Lhs != nil {
 				lhs = st.Lhs.Var
 				indir = st.Lhs.IndirectLevel()
 			}
-			if lhs != nil {
-				// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
-				fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
+			if lhs == nil {
+				SetError(ErrGeneric)
+				return
 			}
+			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
+			fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
 		case StmtReturn:
-			if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
-				fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
+			// curr_func + rv always live for return after make; incomplete → ERROR
+			if cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
+				SetError(ErrGeneric)
+				return
 			}
+			fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 		}
 	}
 	fm.RemoveRVFacts(&fm.GlobalFacts)

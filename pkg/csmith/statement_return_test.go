@@ -64,6 +64,29 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	}
 }
 
+func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
+	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live
+	opts := Defaults()
+	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	// no CurrentFunc
+	cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+	if VisitFactsStatementReturn(st, &cg, opts) {
+		t.Fatal("nil CurrentFunc must fail closed")
+	}
+	// CurrentFunc without RV
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if VisitFactsStatementReturn(st, &cg2, opts) {
+		t.Fatal("nil RV must fail closed")
+	}
+	// complete path
+	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
+	if !VisitFactsStatementReturn(st, &cg2, opts) {
+		t.Fatal("live return must visit")
+	}
+}
+
 func TestGenerateReturnUsesVar(t *testing.T) {
 	// returns should look like "return g_N;" or "return l_N;" often
 	found := false

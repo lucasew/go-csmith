@@ -30,13 +30,11 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94
-	// get_fact_mgr always present in C++; fail closed without inventing FM
-	if cg.FM == nil {
+	// get_fact_mgr + curr_func + rv always live in C++; no invent visit success without them
+	if cg.FM == nil || cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
 		return false
 	}
-	if cg.CurrentFunc != nil && cg.CurrentFunc.RV != nil {
-		cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
-	}
+	cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
 	if st.StmID > 0 {
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
