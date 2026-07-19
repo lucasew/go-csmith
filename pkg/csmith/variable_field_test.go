@@ -41,6 +41,11 @@ func TestCollectExpandable(t *testing.T) {
 	if len(all) < 1+len(st.Fields) {
 		t.Fatal(len(all))
 	}
+	// nil FieldVars hole fails closed
+	v.FieldVars = append(v.FieldVars, nil)
+	if v.CollectExpandable() != nil {
+		t.Fatal("nil field hole must fail closed")
+	}
 }
 
 func TestFieldVolatileOrFromParent(t *testing.T) {

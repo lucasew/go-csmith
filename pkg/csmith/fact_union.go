@@ -260,12 +260,16 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 }
 
 // MergeUnionFactInto merges nf into facts slice (join if related).
+// FactUnion* always live; nil nf or map hole fails closed (nil out, no invent skip).
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	if nf == nil {
-		return facts
+		return nil
 	}
 	for i, old := range facts {
-		if old != nil && old.Var == nf.Var {
+		if old == nil {
+			return nil
+		}
+		if old.Var == nf.Var {
 			cp := old.Clone()
 			cp.Join(nf)
 			facts[i] = cp

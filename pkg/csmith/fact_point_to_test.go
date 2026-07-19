@@ -149,6 +149,18 @@ func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {
 	}
 }
 
+func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
+	idx := CreateVariableScalars("i", GetIntType(), false, false)
+	if f.UpdateWithModifiedIndex(idx) != nil {
+		t.Fatal("nil pointee hole must fail closed")
+	}
+	if MergePointeesOfPointers([]*Variable{nil}, nil) != nil {
+		t.Fatal("nil ptr hole MergePointees must fail closed")
+	}
+}
+
 func TestUpdateWithModifiedIndex(t *testing.T) {
 	// FactPointTo.cpp:712–748 — a[i] → a[-1] when i modified
 	parent := &ArrayVariable{

@@ -817,8 +817,9 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 	pointees := append([]*Variable(nil), f.PointTo...)
 	changed := false
 	for j, v := range f.PointTo {
+		// Variable* always live in PointTo; nil hole fails closed (no invent skip)
 		if v == nil {
-			continue
+			return nil
 		}
 		// walk to root field_var_of (FactPointTo.cpp:718–720)
 		root := v
@@ -895,11 +896,16 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 // FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
 // FactPointTo.cpp:694 — assert(exist_fact) but still guarded with if (exist_fact);
 // missing facts happen mid function-create for params — skip, do not invent pointees.
+// MergePointeesOfPointers merges pointees of each pointer in ptrs.
+// Variable* always live; nil hole fails closed (nil out, no invent partial merge).
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
-	var out []*Variable
+	out := make([]*Variable, 0)
 	seen := make(map[*Variable]bool)
 	for _, p := range ptrs {
-		if p == nil || IsSpecialPtr(p) {
+		if p == nil {
+			return nil
+		}
+		if IsSpecialPtr(p) {
 			continue
 		}
 		ft := FindRelatedPointTo(facts, p)
@@ -907,7 +913,10 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 			continue
 		}
 		for _, pointee := range ft.PointTo {
-			if pointee == nil || seen[pointee] {
+			if pointee == nil {
+				return nil
+			}
+			if seen[pointee] {
 				continue
 			}
 			seen[pointee] = true

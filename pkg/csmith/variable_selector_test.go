@@ -28,6 +28,10 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	if ChooseOKVar(NewRng(2), nil) != nil {
 		t.Fatal("empty")
 	}
+	// nil hole fails closed — no invent skip as absent candidate
+	if ChooseOKVar(NewRng(2), []*Variable{a, nil, b}) != nil {
+		t.Fatal("nil hole must fail closed")
+	}
 	if ChooseOKVar(NewRng(2), []*Variable{a}) != a {
 		t.Fatal("sole")
 	}

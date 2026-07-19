@@ -804,13 +804,15 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			}
 		} else {
 			// FactMgr.cpp:99–100 — add_fact_out(stm, f) with visibility filters
+			// Statement* always resolvable for ids under blk; nil fails closed
+			// (stop map push — no invent skip stale/missing stm as absent)
 			for id := range fm.MapFactsOut {
 				if !stmtIDInBlock(fm.Func, id, blk) {
 					continue
 				}
 				st := FindStmtByID(fm.Func, id)
 				if st == nil {
-					continue
+					return
 				}
 				parent := FindParentBlockOfStmID(fm.Func, id)
 				fm.AddFactOut(st, parent, f)

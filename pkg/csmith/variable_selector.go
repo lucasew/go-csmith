@@ -281,10 +281,17 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
 // VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
+// ChooseOKVar picks one eligible variable (optionally itemizing arrays).
+// Variable* always live in vars; nil hole fails closed (nil pick, no invent skip).
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	n := len(vars)
 	if n == 0 {
 		return nil
+	}
+	for _, x := range vars {
+		if x == nil {
+			return nil
+		}
 	}
 	var v *Variable
 	if n == 1 {
@@ -1075,15 +1082,26 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 
 // ExpandStructUnionVars mirrors VariableSelector::expand_struct_union_vars.
 // VariableSelector.cpp:156–173 — replace non-matching aggregates with field_vars.
+// ExpandStructUnionVars expands aggregate candidates into field vars.
+// Variable* always live; nil hole fails closed (nil out, no invent skip).
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 	out := append([]*Variable(nil), vars...)
 	for i := 0; i < len(out); i++ {
 		v := out[i]
-		if v == nil || v.IsVirtual() {
+		if v == nil {
+			return nil
+		}
+		if v.IsVirtual() {
 			continue
 		}
 		// don't break up a struct if it matches the given type
 		if v.Type != nil && v.Type.IsAggregate() && v.Type != want {
+			// FieldVars always live; nil hole fails closed
+			for _, f := range v.FieldVars {
+				if f == nil {
+					return nil
+				}
+			}
 			// erase i, append field_vars at end (upstream insert end + i--)
 			fields := v.FieldVars
 			out = append(out[:i], out[i+1:]...)
@@ -1105,10 +1123,17 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 	if want.IsSimple() || want.IsAggregate() {
 		cands = ExpandStructUnionVars(vars, want)
 	}
+	// ExpandStructUnionVars nil = incomplete candidate list
+	if cands == nil && vars != nil {
+		return nil
+	}
 	var ok []*Variable
 	for _, x := range cands {
-		if x == nil || x.Type == nil {
-			continue
+		if x == nil {
+			return nil
+		}
+		if x.Type == nil {
+			return nil
 		}
 		if skipConst && x.IsConst() {
 			continue

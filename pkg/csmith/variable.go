@@ -1377,13 +1377,22 @@ func itoa(n int) string {
 }
 
 // CollectExpandable returns v plus all field_vars recursively (expand_struct_union_vars-ish).
+// CollectExpandable walks field_vars for selectable members.
+// Variable* always live in FieldVars; nil hole fails closed (nil out).
 func (v *Variable) CollectExpandable() []*Variable {
 	if v == nil {
 		return nil
 	}
 	out := []*Variable{v}
 	for _, f := range v.FieldVars {
-		out = append(out, f.CollectExpandable()...)
+		if f == nil {
+			return nil
+		}
+		nested := f.CollectExpandable()
+		if nested == nil {
+			return nil
+		}
+		out = append(out, nested...)
 	}
 	return out
 }

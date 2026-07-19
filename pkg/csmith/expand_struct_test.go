@@ -92,6 +92,14 @@ func TestExpandStructUnionVars(t *testing.T) {
 	if len(keep) != 1 || keep[0] != sv {
 		t.Fatalf("keep aggregate: %+v", keep)
 	}
+	// nil candidate / field hole fails closed
+	if ExpandStructUnionVars([]*Variable{nil}, GetIntType()) != nil {
+		t.Fatal("nil var hole must fail closed")
+	}
+	sv.FieldVars = append(sv.FieldVars, nil)
+	if ExpandStructUnionVars([]*Variable{sv}, GetIntType()) != nil {
+		t.Fatal("nil FieldVars hole must fail closed")
+	}
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {

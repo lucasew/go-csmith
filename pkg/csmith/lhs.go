@@ -390,10 +390,17 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 }
 
 // selectWritable gathers non-const matching variables from stack, params, globals.
+// Stack/Param/Global Variable* always live; nil holes fail closed (nil select).
 func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compound bool) *Variable {
 	var ok []*Variable
+	incomplete := false
 	add := func(v *Variable) {
+		if incomplete {
+			return
+		}
+		// Variable* always live in stack/params/globals
 		if v == nil || v.Type == nil {
+			incomplete = true
 			return
 		}
 		if v.IsConst() {
@@ -403,20 +410,31 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			return
 		}
 		// expand fields for aggregates
-		for _, x := range v.CollectExpandable() {
-			if x != nil && x.Type != nil && !x.IsConst() && typ.Match(x.Type, MatchFlexible) {
-				if compound && x.IsVolatile() {
-					continue
-				}
-				ok = append(ok, x)
+		exp := v.CollectExpandable()
+		if exp == nil {
+			incomplete = true
+			return
+		}
+		for _, x := range exp {
+			if x == nil || x.Type == nil {
+				incomplete = true
+				return
 			}
+			if x.IsConst() || !typ.Match(x.Type, MatchFlexible) {
+				continue
+			}
+			if compound && x.IsVolatile() {
+				continue
+			}
+			ok = append(ok, x)
 		}
 	}
 	if cg.CurrentFunc != nil {
 		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
 			blk := cg.CurrentFunc.Stack[i]
+			// Block* always live on Stack; nil hole fails closed
 			if blk == nil {
-				continue
+				return nil
 			}
 			for _, v := range blk.LocalVars {
 				add(v)
@@ -430,6 +448,9 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		for _, v := range vs.GlobalList {
 			add(v)
 		}
+	}
+	if incomplete {
+		return nil
 	}
 	return ChooseOKVar(r, ok)
 }

@@ -26,12 +26,23 @@ func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
 			return
 		}
 		for _, a := range e.Invoke.Args {
+			// Expression* args always live after ERROR_GUARD; nil hole fails closed
+			// (clear collected so far — no invent partial arg ptrs)
+			if a == nil {
+				*ptrs = nil
+				return
+			}
 			CollectReferencedPtrsExpression(a, ptrs)
 		}
 		// ExpressionFuncall.cpp:172–177 — only user FuncCall walks callee refs
 		// assert(fiu); incomplete std-as-user skip (no invent empty follow)
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
 			for _, p := range e.Invoke.User.ReferencedPtrs {
+				// Variable* always live on ReferencedPtrs; nil hole fails closed
+				if p == nil {
+					*ptrs = nil
+					return
+				}
 				*ptrs = appendUniqueVar(*ptrs, p)
 			}
 		}
