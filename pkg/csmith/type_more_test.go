@@ -159,18 +159,34 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 }
 
 func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
-	// Type.cpp get_simple_type assert path — no invent eInt for invalid enum
+	// Type.cpp get_simple_type assert path — sticky, no invent eInt for invalid enum
+	ClearError()
 	if GetSimpleType(ESimpleType(-1)) != nil {
 		t.Fatal("negative eSimpleType must fail closed nil")
 	}
+	if !HasError() {
+		t.Fatal("negative eSimpleType must SetError sticky")
+	}
+	ClearError()
 	if GetSimpleType(ESimpleType(MaxSimpleTypes)) != nil {
 		t.Fatal("OOB eSimpleType must fail closed nil, not invent eInt")
 	}
+	if !HasError() {
+		t.Fatal("OOB eSimpleType must SetError sticky")
+	}
+	ClearError()
 	if GetSimpleType(ESimpleType(MaxSimpleTypes+99)) != nil {
 		t.Fatal("far OOB must fail closed nil")
 	}
+	if !HasError() {
+		t.Fatal("far OOB must SetError sticky")
+	}
+	ClearError()
 	if GetSimpleType(EInt) != GetIntType() {
 		t.Fatal("valid eInt must still resolve")
+	}
+	if HasError() {
+		t.Fatal("valid eInt must not leave sticky error")
 	}
 }
 

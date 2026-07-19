@@ -86,6 +86,7 @@ func init() {
 // path — fail closed nil (no invent eInt for invalid eSimpleType).
 func GetSimpleType(st ESimpleType) *Type {
 	if st < 0 || int(st) >= MaxSimpleTypes {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return simpleTypes[st]
