@@ -626,6 +626,10 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 	if !opts.StrictVolatileRule {
 		return true
 	}
+	// Incomplete ambient fails closed (no invent OK under IncompleteEffect as non-SE-free path)
+	if !EffectComplete(c.EffectContext()) {
+		return false
+	}
 	if !c.EffectContext().IsSideEffectFree() {
 		level := derefLevel
 		for level > 0 {
@@ -635,10 +639,17 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 			level--
 		}
 	}
+	// Incomplete accum/stm AccessDerefVolatile must not invent visit success after poison
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
+		if !EffectComplete(*c.EffectAccum) {
+			return false
+		}
 	}
 	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
+	if !EffectComplete(c.EffectStm) {
+		return false
+	}
 	return true
 }
 
@@ -661,8 +672,12 @@ func (c CGContext) unionFacts() []*FactUnion {
 // CheckReadVar mirrors CGContext::check_read_var.
 // CGContext.cpp:191–213 — indices, nonreadable field/context, partial write, volatile, dangling.
 // Incomplete GetCollective fails closed false (no invent read success / panic on nil).
+// Incomplete EffectStm/accum fails closed (no invent read success after ReadVar poison).
 func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
+		return false
+	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
@@ -690,14 +705,21 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	c.ReadVar(v)
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		return false
+	}
 	return true
 }
 
 // CheckWriteVar mirrors CGContext::check_write_var.
 // CGContext.cpp:323–349.
 // Incomplete GetCollective fails closed false (no invent write success / panic on nil).
+// Incomplete EffectStm/accum fails closed (no invent write success after WriteVar poison).
 func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
+		return false
+	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
@@ -722,6 +744,9 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	c.WriteVar(v)
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		return false
+	}
 	return true
 }
 

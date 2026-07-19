@@ -200,6 +200,45 @@ func TestAccessDerefVolatile(t *testing.T) {
 	}
 }
 
+func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
+	// incomplete ambient/stm must not invent CheckDerefVolatile success
+	opts := Defaults()
+	opts.StrictVolatileRule = true
+	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	cg := WithEffectContext(IncompleteEffect())
+	if cg.CheckDerefVolatile(v, 1, opts) {
+		t.Fatal("incomplete ambient must fail closed CheckDerefVolatile")
+	}
+	cg2 := EmptyCGContext()
+	cg2.EffectStm = IncompleteEffect()
+	if cg2.CheckDerefVolatile(v, 1, opts) {
+		t.Fatal("incomplete EffectStm must fail closed CheckDerefVolatile")
+	}
+}
+
+func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
+	// incomplete EffectStm must not invent CheckRead/WriteVar success
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	cg := EmptyCGContext()
+	cg.EffectStm = IncompleteEffect()
+	if cg.CheckReadVar(v, nil) {
+		t.Fatal("incomplete EffectStm must fail closed CheckReadVar")
+	}
+	if cg.CheckWriteVar(v, nil) {
+		t.Fatal("incomplete EffectStm must fail closed CheckWriteVar")
+	}
+	// incomplete EffectAccum
+	cg2 := EmptyCGContext()
+	inc := IncompleteEffect()
+	cg2.EffectAccum = &inc
+	if cg2.CheckReadVar(v, nil) {
+		t.Fatal("incomplete EffectAccum must fail closed CheckReadVar")
+	}
+	if cg2.CheckWriteVar(v, nil) {
+		t.Fatal("incomplete EffectAccum must fail closed CheckWriteVar")
+	}
+}
+
 func TestReadIndicesConstantOK(t *testing.T) {
 	// CGContext.cpp:352–380 — constant index expressions always visit OK
 	parent := &ArrayVariable{
