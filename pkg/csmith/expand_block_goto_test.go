@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestBlockContainsStmIDParentChain(t *testing.T) {
+	ClearError()
 	outer := &Block{StmID: 1}
 	inner := &Block{Parent: outer, StmID: 2}
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
@@ -20,6 +21,16 @@ func TestBlockContainsStmIDParentChain(t *testing.T) {
 	if !BlockContainsStmID(outer, 10) || !BlockContainsStmID(outer, 20) {
 		t.Fatal("outer contains both")
 	}
+	// incomplete if-arm sticky (no invent soft-continue past nil Else then miss Then)
+	ClearError()
+	outer.Stmts[0].Else = nil
+	if BlockContainsStmID(outer, 10) {
+		t.Fatal("nil Else must fail closed not-contain (sticky miss whole search)")
+	}
+	if !HasError() {
+		t.Fatal("nil Else BlockContainsStmID must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpandBlockForGotoClimbsParent(t *testing.T) {

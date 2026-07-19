@@ -441,8 +441,8 @@ func rootBlock(b *Block) *Block {
 }
 
 // findParentOfStmIDInTree returns the block that directly owns stmID under root.
-// Walks get_blocks only; incomplete if-arm skips that compound's children
-// (no invent soft-skip missing arm then find under sibling arm / stray Then on assign).
+// Walks get_blocks only; incomplete if-arm sticky whole miss
+// (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 	if root == nil || stmID <= 0 {
@@ -460,15 +460,12 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 				return b
 			}
 			blks := GetBlocksStmt(st)
-			incomplete := false
 			for _, nb := range blks {
 				if nb == nil {
-					incomplete = true
-					break
+					// incomplete get_blocks arm sticky fail whole search
+					SetError(ErrGeneric)
+					return nil
 				}
-			}
-			if incomplete {
-				continue
 			}
 			for _, nb := range blks {
 				if p := walk(nb); p != nil {
@@ -482,7 +479,8 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 }
 
 // findStmtByIDInTree finds a statement by stm_id under root (self + nested blocks).
-// Walks get_blocks only; incomplete if-arm skips that compound's children.
+// Walks get_blocks only; incomplete if-arm sticky whole miss
+// (no invent soft-continue past nil arm then miss Then / soft-skip to sibling).
 // Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
@@ -500,15 +498,12 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 				return st
 			}
 			blks := GetBlocksStmt(st)
-			incomplete := false
 			for _, nb := range blks {
 				if nb == nil {
-					incomplete = true
-					break
+					// incomplete get_blocks arm sticky fail whole search
+					SetError(ErrGeneric)
+					return nil
 				}
-			}
-			if incomplete {
-				continue
 			}
 			for _, nb := range blks {
 				if s := walk(nb); s != nil {
