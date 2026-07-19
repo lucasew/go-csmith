@@ -164,7 +164,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	}
 	var facts []*FactPointTo
 	if !postCondition {
-		facts = fm.MapFactsInFinal[st.StmID]
+		facts = fm.GetMapFactsInFinal(st.StmID)
 	} else {
 		facts = fm.FindUpdatedFinalFacts(st.StmID)
 		// fall back to non-final updated if final empty (complete empty only)

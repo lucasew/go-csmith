@@ -620,9 +620,8 @@ func MakeRandomGoto(
 		// StatementGoto.cpp:203 — create_cfg_edge(sg, stm, false, false)
 		fm.CreateCFGEdgeTo(ins.StmID, blk, dest.StmID, false, false)
 		// StatementGoto.cpp:204–210 — global_facts = map_facts_out[stm]
-		// C++ map[] always assigns (missing → empty); no invent keep prior
-		// Incomplete maps fail closed (nil — no invent cleaned clone of holes)
-		out := fm.MapFactsOut[dest.StmID]
+		// GetMapFacts*: StmID 0 Incomplete; missing live → empty complete
+		out := fm.GetMapFactsOut(dest.StmID)
 		if !FactsComplete(out) {
 			fm.GlobalFacts = IncompleteFactSlice()
 		} else {
@@ -630,7 +629,7 @@ func MakeRandomGoto(
 		}
 		if IsCtrlStmt(dest) || dest.Kind == StmtReturn {
 			// ctrl/return: use map_facts_in[stm] (altered outs for OOS)
-			in := fm.MapFactsIn[dest.StmID]
+			in := fm.GetMapFactsIn(dest.StmID)
 			if !FactsComplete(in) {
 				fm.GlobalFacts = IncompleteFactSlice()
 			} else {

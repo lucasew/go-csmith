@@ -367,6 +367,9 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	if FactsComplete(fm.GetMapFactsIn(0)) || FactsComplete(fm.GetMapFactsOut(0)) {
 		t.Fatal("StmID 0 must IncompleteFactSlice")
 	}
+	if FactsComplete(fm.GetMapFactsInFinal(0)) || FactsComplete(fm.GetMapFactsOutFinal(0)) {
+		t.Fatal("StmID 0 final maps must IncompleteFactSlice")
+	}
 	// missing live key is complete empty
 	if !FactsComplete(fm.GetMapFactsIn(42)) || len(fm.GetMapFactsIn(42)) != 0 {
 		t.Fatal("missing live id must complete empty")

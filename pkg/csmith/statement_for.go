@@ -508,9 +508,8 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
-	// C++ map[] always assigns (missing → empty); Incomplete in fails closed
-	// (no invent must_return RestoreFacts past incomplete body entry)
-	in := fm.MapFactsIn[body.StmID]
+	// GetMapFactsIn: StmID 0 Incomplete; missing live → empty complete
+	in := fm.GetMapFactsIn(body.StmID)
 	if !FactsComplete(in) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
@@ -521,14 +520,12 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
-	// C++ always merge_jump_facts(global, map_facts_out[break]); missing → empty
-	// Incomplete out / mid-join fails closed wipe + stop (no invent continue
-	// later breaks onto FactsComplete(nil)==true empty success)
+	// GetMapFactsOut: breakID 0 Incomplete; incomplete mid-join wipe + stop
 	if forSt != nil {
 		for _, breakID := range body.BreakStmIDs {
 			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
 			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
-			out := fm.MapFactsOut[breakID]
+			out := fm.GetMapFactsOut(breakID)
 			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				return
@@ -594,7 +591,7 @@ func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 	b.WriteString("; ")
 	b.WriteString(iv)
 	if opts.CComp {
-		// StatementArrayOp.cpp:211–215 — avoid volatile += 
+		// StatementArrayOp.cpp:211–215 — avoid volatile +=
 		b.WriteString(" = ")
 		b.WriteString(iv)
 		b.WriteString(" + ")

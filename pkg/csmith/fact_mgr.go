@@ -156,6 +156,40 @@ func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
 	return []*FactPointTo{}
 }
 
+// GetMapFactsInFinal is GetMapFactsIn for map_facts_in_final.
+func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
+	if stmID <= 0 {
+		return IncompleteFactSlice()
+	}
+	if fm == nil || fm.MapFactsInFinal == nil {
+		return []*FactPointTo{}
+	}
+	if facts, ok := fm.MapFactsInFinal[stmID]; ok {
+		if !FactsComplete(facts) {
+			return IncompleteFactSlice()
+		}
+		return facts
+	}
+	return []*FactPointTo{}
+}
+
+// GetMapFactsOutFinal is GetMapFactsOut for map_facts_out_final.
+func (fm *FactMgr) GetMapFactsOutFinal(stmID int) []*FactPointTo {
+	if stmID <= 0 {
+		return IncompleteFactSlice()
+	}
+	if fm == nil || fm.MapFactsOutFinal == nil {
+		return []*FactPointTo{}
+	}
+	if facts, ok := fm.MapFactsOutFinal[stmID]; ok {
+		if !FactsComplete(facts) {
+			return IncompleteFactSlice()
+		}
+		return facts
+	}
+	return []*FactPointTo{}
+}
+
 // SetMapFactsOutForStmt mirrors FactMgr::set_fact_out with jump/return filtering.
 // FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return/goto.
 // blk is s->parent (statement parent block).
@@ -658,8 +692,8 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
 	}
-	in := fm.MapFactsIn[stmID]
-	out := fm.MapFactsOut[stmID]
+	in := fm.GetMapFactsIn(stmID)
+	out := fm.GetMapFactsOut(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
 		return IncompleteFactSlice()
 	}
@@ -686,8 +720,8 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
 	}
-	in := fm.MapFactsInFinal[stmID]
-	out := fm.MapFactsOutFinal[stmID]
+	in := fm.GetMapFactsInFinal(stmID)
+	out := fm.GetMapFactsOutFinal(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
 		return IncompleteFactSlice()
 	}

@@ -20,7 +20,7 @@ const (
 
 // Function mirrors Function (signature + body block).
 type Function struct {
-	Name       string
+	Name string
 	// AliasName mirrors Function::alias_name (name + "_alias").
 	// Function.cpp:414 / 451 — used with FunctionAttributes forward alias decls.
 	AliasName  string
@@ -383,21 +383,16 @@ func MakeFirst(
 	fm.SetupInOutMaps(true)
 
 	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
-	// C++ map[] always assigns (missing → empty); no invent keep prior GlobalFacts
-	// Incomplete out / StmID 0 / add_back fail closed (nil) — no invent soft-merge
-	// return outs onto a wiped GlobalFacts via FactsComplete(nil)==true
+	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
+	// Incomplete out / add_back fail closed — no invent soft-merge returns
 	if f.Body != nil {
-		if f.Body.StmID <= 0 {
+		out := fm.GetMapFactsOut(f.Body.StmID)
+		if !FactsComplete(out) {
 			fm.GlobalFacts = IncompleteFactSlice()
 		} else {
-			out := fm.MapFactsOut[f.Body.StmID]
-			if !FactsComplete(out) {
+			fm.GlobalFacts = CloneFactSlice(out)
+			if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
-			} else {
-				fm.GlobalFacts = CloneFactSlice(out)
-				if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) {
-					fm.GlobalFacts = IncompleteFactSlice()
-				}
 			}
 		}
 	}
@@ -605,21 +600,15 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
-	// (generate_body_with_known_params / GenerateBody post-body handoff)
-	// Incomplete body out / StmID 0 / add_back fail: wipe (no invent soft-merge
-	// return facts onto wiped GlobalFacts via FactsComplete(nil)==true)
+	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
 	if cg.FM != nil && f.Body != nil {
-		if f.Body.StmID <= 0 {
+		out := cg.FM.GetMapFactsOut(f.Body.StmID)
+		if !FactsComplete(out) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 		} else {
-			out := cg.FM.MapFactsOut[f.Body.StmID]
-			if !FactsComplete(out) {
+			cg.FM.GlobalFacts = CloneFactSlice(out)
+			if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) {
 				cg.FM.GlobalFacts = IncompleteFactSlice()
-			} else {
-				cg.FM.GlobalFacts = CloneFactSlice(out)
-				if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) {
-					cg.FM.GlobalFacts = IncompleteFactSlice()
-				}
 			}
 		}
 	}
