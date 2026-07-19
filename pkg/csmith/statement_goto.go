@@ -525,8 +525,17 @@ func MakeRandomGoto(
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
 		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing live id)
+		// Incomplete map_accum_effect fails closed (no invent AddEffect poison then success)
 		preEffect := cg.AccumEffect()
-		cg.AddEffect(fm.GetMapAccumEffect(other.StmID), true)
+		srcAcc := fm.GetMapAccumEffect(other.StmID)
+		if !EffectComplete(srcAcc) {
+			return makeGotoFailed()
+		}
+		cg.AddEffect(srcAcc, true)
+		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			cg.ResetEffectAccum(preEffect)
+			return makeGotoFailed()
+		}
 		// StatementGoto.cpp:167–182
 		destIn := fm.GetMapFactsIn(dest.StmID)
 		if !FactsComplete(destIn) {

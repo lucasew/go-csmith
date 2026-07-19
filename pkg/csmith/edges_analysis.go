@@ -153,7 +153,15 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 					return false
 				}
 				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
-				cg.AddEffect(fm.GetMapAccumEffect(e.SrcID), false)
+				// Incomplete accum fails closed (no invent AddEffect poison then still ok)
+				accE := fm.GetMapAccumEffect(e.SrcID)
+				if !EffectComplete(accE) {
+					return false
+				}
+				cg.AddEffect(accE, false)
+				if !EffectComplete(cg.EffectStm) {
+					return false
+				}
 			}
 		}
 		// always consider forward edges
@@ -170,7 +178,14 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			if _, ok := tryMergeJumpFacts(facts, out); !ok {
 				return false
 			}
-			cg.AddEffect(fm.GetMapAccumEffect(e.SrcID), false)
+			accE := fm.GetMapAccumEffect(e.SrcID)
+			if !EffectComplete(accE) {
+				return false
+			}
+			cg.AddEffect(accE, false)
+			if !EffectComplete(cg.EffectStm) {
+				return false
+			}
 		}
 	}
 	return ValidateAndUpdateFacts(st, facts, cg, opts, blk)
@@ -231,7 +246,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		}
 	}
 	// simple statements: save effect_stm
+	// Incomplete EffectStm fails closed (no invent map_stm_effect incomplete as recorded success)
 	if !IsCompound(st.Kind) {
+		if !EffectComplete(cg.EffectStm) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	specialHandled := false

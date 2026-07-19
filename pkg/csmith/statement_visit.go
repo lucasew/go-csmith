@@ -27,8 +27,9 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	case StmtLabel:
 		// Statement::stm_id always live; StmID 0 + FM fails closed
 		// (no invent visit success without recording effect)
+		// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
 		if cg.FM != nil {
-			if st.StmID <= 0 {
+			if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -58,8 +59,9 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 + FM fails closed
+	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
 	if cg.FM != nil {
-		if st.StmID <= 0 {
+		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -114,6 +116,10 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 				delete(fm.MapFactsOut, destID)
 			}
 		}
+		// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+		if !EffectComplete(cg.EffectStm) {
+			return false
+		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	return true
@@ -130,8 +136,9 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// Statement::stm_id always live; StmID 0 + FM fails closed
+	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
 	if cg.FM != nil {
-		if st.StmID <= 0 {
+		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -481,6 +488,10 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			_ = cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
 			// incomplete assign must not invent visit success / effect map
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				return false
+			}
+			// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+			if !EffectComplete(cg.EffectStm) {
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())

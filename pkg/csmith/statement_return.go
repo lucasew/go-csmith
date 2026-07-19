@@ -48,6 +48,10 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if !FactsComplete(cg.FM.GlobalFacts) {
 		return false
 	}
+	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+	if !EffectComplete(cg.EffectStm) {
+		return false
+	}
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
 	cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 	return true

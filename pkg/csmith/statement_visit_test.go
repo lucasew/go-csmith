@@ -118,6 +118,47 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
+	// SetMapStmEffect with incomplete EffectStm must not invent visit true
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectStm = IncompleteEffect()
+	// Jump / Label / Expr
+	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed jump visit")
+	}
+	if VisitFactsStmt(&Stmt{Kind: StmtLabel, StmID: 2}, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed label visit")
+	}
+	if VisitFactsStatementExpr(&Stmt{Kind: StmtInvoke, StmID: 3, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed expr visit")
+	}
+	// Return
+	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
+	f.RV = rv
+	cg.CurrentFunc = f
+	cg.EffectStm = IncompleteEffect()
+	if VisitFactsStatementReturn(&Stmt{
+		Kind: StmtReturn, StmID: 4,
+		Expr: &Expression{Term: TermVariable, Var: rv, ExprType: GetIntType()},
+	}, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed return visit")
+	}
+	// Assign
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	cg.EffectStm = IncompleteEffect()
+	if VisitFactsStatementAssign(&Stmt{
+		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: v.Type},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}, &cg, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed assign visit")
+	}
+	ClearError()
+}
+
 // testForInit builds a simple StatementAssign init (StatementFor always has live init).
 // StmID is always live after create — required when FM path records map_stm_effect.
 func testForInit(iv *Variable, n int) *Stmt {

@@ -400,7 +400,28 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		fm.GlobalFacts = savedGlobal
 		return false
 	}
-	cg.AddEffect(fm.GetMapStmEffect(f.Body.StmID), false)
+	// Incomplete body map_stm_effect fails closed (AddEffect poisons EffectStm —
+	// no invent revisit success with incomplete caller effects)
+	bodyEff := fm.GetMapStmEffect(f.Body.StmID)
+	if !EffectComplete(bodyEff) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
+	cg.AddEffect(bodyEff, false)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
 	// FunctionInvocationUser.cpp: ret from map_facts_out[body] + add_back_return_facts
 	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
 	bodyOut := fm.GetMapFactsOut(f.Body.StmID)
