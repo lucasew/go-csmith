@@ -155,6 +155,18 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	if exprDepthCnts != nil {
 		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", exprDepthCnts)
 	}
+	// incomplete Funcs list must not invent soft-skip hole and count later funcs
+	exprDepthCnts = []int{99}
+	good := &Function{Name: "g", Body: &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
+	}}}
+	StatExprDepths([]*Function{nil, good})
+	if exprDepthCnts != nil {
+		t.Fatal("Funcs hole must clear depths, not invent count past hole", exprDepthCnts)
+	}
+	if StatBlkDepths([]*Function{nil, good}) != 0 || blkDepthCnts != nil {
+		t.Fatal("Funcs hole must zero StatBlkDepths")
+	}
 }
 
 func TestStatExprDepthsForTestExpr(t *testing.T) {

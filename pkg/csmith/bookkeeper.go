@@ -460,17 +460,16 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 
 // StatExprDepths mirrors Bookkeeper::stat_expr_depths over non-builtin funcs.
 // Bookkeeper.cpp:224–230.
-// Function* always live; nil hole clears counts. Builtins without body skip.
-// Incomplete expressions (ExpressionComplexity < 0) or incomplete stmt IR clear
-// counts — no invent counting broken IR as leaf depth 0 / skipping for-test.
+// Function* always live; incomplete Funcs list clears counts (FunctionsComplete).
+// Builtins without body skip. Incomplete expressions (ExpressionComplexity < 0)
+// or incomplete stmt IR clear counts — no invent counting broken IR as leaf
+// depth 0 / skipping for-test / soft-skip nil Funcs mid walk.
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
+	if !FunctionsComplete(funcs) {
+		return
+	}
 	for _, f := range funcs {
-		// Function* always live on Funcs; nil hole → clear (no invent partial depths)
-		if f == nil {
-			exprDepthCnts = nil
-			return
-		}
 		if f.IsBuiltin {
 			continue
 		}
@@ -499,9 +498,13 @@ func StatExprDepths(funcs []*Function) {
 
 // StatBlkDepths mirrors Bookkeeper::stat_blk_depths.
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
+// Incomplete Funcs list fails closed zero counts (no invent partial depths past hole).
 func StatBlkDepths(funcs []*Function) int {
 	blkDepthCnts = nil
 	cnt := 0
+	if !FunctionsComplete(funcs) {
+		return 0
+	}
 	incomplete := false
 	// Bookkeeper.cpp:128–140 — stat_blk_depths_for_stmt
 	var walk func(st *Stmt, parent *Block)
@@ -532,11 +535,7 @@ func StatBlkDepths(funcs []*Function) int {
 		}
 	}
 	for _, f := range funcs {
-		// Function* always live on Funcs; nil hole → zero counts (no invent partial)
-		if f == nil {
-			blkDepthCnts = nil
-			return 0
-		}
+		// pre-validated FunctionsComplete
 		if f.IsBuiltin {
 			continue
 		}

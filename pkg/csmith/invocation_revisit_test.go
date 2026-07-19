@@ -65,6 +65,19 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fi, rv) != nil {
 		t.Fatal("incomplete PointTo must not invent registry")
 	}
+	// nil Invocation* registry slot must not invent soft-skip match later
+	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
+	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
+	returnFactInvocations = append([]*Invocation{nil}, returnFactInvocations...)
+	returnFactPoints = append([]*FactPointTo{MakeFactPointTo(rv, NullPtr)}, returnFactPoints...)
+	if GetReturnFactForInvocation(fi2, rv) != nil {
+		t.Fatal("nil inv registry hole must fail closed, not invent later match")
+	}
+	// Add with hole must wipe rather than soft-skip re-seed
+	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
+	if GetReturnFactForInvocation(fi2, rv) != nil {
+		t.Fatal("AddReturnFact over hole must wipe, not invent re-seed")
+	}
 }
 
 func TestNeedsRevisit(t *testing.T) {
