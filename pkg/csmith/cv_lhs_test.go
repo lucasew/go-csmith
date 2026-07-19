@@ -93,11 +93,16 @@ func TestOutputFirstQualsRespectsOptions(t *testing.T) {
 }
 
 func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
-	// CVQualifiers.cpp:96 — sizes must match; truncate to min
+	// CVQualifiers.cpp:96 — sizes must match; sticky empty (no invent truncate)
+	ClearError()
 	q := NewCVQualifiers([]bool{true, false}, []bool{false})
-	if len(q.IsConsts) != 1 || len(q.IsVolatiles) != 1 {
+	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal(q)
 	}
+	if !HasError() {
+		t.Fatal("unequal len NewCVQualifiers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSanityCheck(t *testing.T) {

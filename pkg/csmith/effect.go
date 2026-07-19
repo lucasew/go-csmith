@@ -874,9 +874,15 @@ func (e *Effect) Consolidate() {
 // IsReadByName mirrors Effect::is_read(string).
 // Effect.cpp:295–308.
 // Incomplete effect / nil key fails closed as true (no invent not-read).
+// Empty name sticky true (restrictive — no invent not-read soft-skip past incomplete
+// identifier query that would soft-match every empty-named var as non-hit).
 func (e Effect) IsReadByName(name string) bool {
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as read (restrictive)
+		SetError(ErrGeneric)
+		return true
+	}
+	if name == "" {
 		SetError(ErrGeneric)
 		return true
 	}
@@ -895,9 +901,14 @@ func (e Effect) IsReadByName(name string) bool {
 // IsWrittenByName mirrors Effect::is_written(string).
 // Effect.cpp:351–364.
 // Incomplete effect / nil key sticky true (no invent not-written soft re-pick).
+// Empty name sticky true (restrictive — no invent not-written soft-skip past hole).
 func (e Effect) IsWrittenByName(name string) bool {
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as written (restrictive)
+		SetError(ErrGeneric)
+		return true
+	}
+	if name == "" {
 		SetError(ErrGeneric)
 		return true
 	}

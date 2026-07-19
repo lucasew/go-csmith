@@ -280,6 +280,14 @@ func TestEffectIsReadByName(t *testing.T) {
 		t.Fatal("incomplete by-name must SetError sticky")
 	}
 	ClearError()
+	// empty name sticky true (no invent not-read / not-written soft-skip past hole)
+	if !e.IsReadByName("") || !e.IsWrittenByName("") {
+		t.Fatal("empty name by-name must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("empty name by-name must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestJoinVisits(t *testing.T) {

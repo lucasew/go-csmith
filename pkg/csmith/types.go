@@ -988,6 +988,9 @@ func (t *Type) PrintfDirective() string {
 		}
 		return "%u"
 	}
+	// Type.cpp switch covers simple/pointer/struct/union only; other shape sticky
+	// empty (no invent empty directive soft-success past broken type shell)
+	SetError(ErrGeneric)
 	return ""
 }
 

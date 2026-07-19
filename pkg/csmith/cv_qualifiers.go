@@ -16,18 +16,13 @@ type CVQualifiers struct {
 
 // NewCVQualifiers mirrors CVQualifiers(const vector<bool>&, const vector<bool>&).
 // CVQualifiers.cpp:96 — assert(is_consts.size() == is_volatiles.size()) when both non-empty.
+// Mismatched depths sticky empty (no invent truncated paired qfer / soft re-pick past hole).
 func NewCVQualifiers(consts, vols []bool) CVQualifiers {
-	// fail closed: truncate to min length so depths stay paired (no invent pad false)
+	// C++ vectors always equal length at construction; mismatch is broken IR sticky
+	// (no invent truncate-to-min complete success past unpaired const/vol depths)
 	if len(consts) != len(vols) {
-		n := len(consts)
-		if len(vols) < n {
-			n = len(vols)
-		}
-		if n < 0 {
-			n = 0
-		}
-		consts = consts[:n]
-		vols = vols[:n]
+		SetError(ErrGeneric)
+		return CVQualifiers{}
 	}
 	return CVQualifiers{
 		IsConsts:    append([]bool(nil), consts...),
@@ -121,9 +116,12 @@ func boolsEqual(a, b []bool) bool {
 
 // StricterThan mirrors CVQualifiers::stricter_than (const/vol depth match).
 // CVQualifiers.cpp:95–120 subset — const: no looser const; multi-level ** special.
+// Unpaired const/vol depths sticky false (no invent not-stricter soft-skip past hole).
+// Depth mismatch between sides is complete false (different pointer depth).
 func (q CVQualifiers) StricterThan(other CVQualifiers) bool {
-	// CVQualifiers.cpp:96 — assert own vectors same size
+	// CVQualifiers.cpp:96 — assert own vectors same size sticky
 	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if len(q.IsConsts) != len(other.IsConsts) || len(q.IsVolatiles) != len(other.IsVolatiles) {
@@ -156,16 +154,18 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 	if q.Wildcard {
 		return true
 	}
+	// CVQualifiers.cpp:148 — assert is_consts.size() == is_volatiles.size() sticky
+	// (no invent match/not-match soft-skip past unpaired depth shells)
+	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
+		SetError(ErrGeneric)
+		return false
+	}
 	// CVQualifiers.cpp:141–143 — if (CGOptions::match_exact_qualifiers())
 	if matchExact || ProcessOptions().MatchExactQualifiers {
 		return boolsEqual(q.IsConsts, other.IsConsts) && boolsEqual(q.IsVolatiles, other.IsVolatiles)
 	}
 	// both non-pointer (one level) → true
-	// CVQualifiers.cpp:148 — assert(is_consts.size() == is_volatiles.size())
 	if len(q.IsConsts) == len(other.IsConsts) && len(q.IsConsts) == 1 {
-		if len(q.IsConsts) != len(q.IsVolatiles) {
-			return false
-		}
 		return true
 	}
 	if !q.AcceptStricter {

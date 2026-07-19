@@ -2,6 +2,36 @@ package csmith
 
 import "testing"
 
+func TestNewCVQualifiersMismatchSticky(t *testing.T) {
+	// C++ assert equal vector sizes; mismatch no invent truncated paired qfer
+	ClearError()
+	q := NewCVQualifiers([]bool{true, false}, []bool{false})
+	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
+		t.Fatalf("mismatch must fail closed empty, got consts=%v vols=%v", q.IsConsts, q.IsVolatiles)
+	}
+	if !HasError() {
+		t.Fatal("mismatch NewCVQualifiers must SetError sticky")
+	}
+	ClearError()
+	// unpaired shells sticky on Match / StricterThan
+	unpaired := CVQualifiers{IsConsts: []bool{true, false}, IsVolatiles: []bool{false}}
+	other := NewCVQualifiers([]bool{false}, []bool{false})
+	if unpaired.Match(other, false) {
+		t.Fatal("unpaired Match must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("unpaired Match must SetError sticky")
+	}
+	ClearError()
+	if unpaired.StricterThan(other) {
+		t.Fatal("unpaired StricterThan must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("unpaired StricterThan must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRandomStricterAndLooserConsts(t *testing.T) {
 	// CVQualifiers.cpp:375–457 — exact match returns identity
 	opts := Defaults()
