@@ -58,6 +58,45 @@ func TestFindGoodJumpBlock(t *testing.T) {
 	}
 }
 
+func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
+	// HasInitSkippedVars residual ERROR soft invent was soft-continue then pick later block.
+	// Fair: sticky fail closed whole FindGoodJumpBlock.
+	ClearError()
+	f := &Function{Name: "f"}
+	src := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	// hole in LocalVars stickies CollectInitSkippedVars residual when climbed as dest parent
+	hole := &Block{Func: f, Parent: src, LocalVars: []*Variable{nil}, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
+	good := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
+	// asDest: HasInitSkippedVars(src, hole) stickies residual; soft invent picks good
+	if FindGoodJumpBlock(NewRng(1), []*Block{hole, good}, src, true) != nil {
+		t.Fatal("HasInitSkippedVars residual must fail closed FindGoodJumpBlock")
+	}
+	if !HasError() {
+		t.Fatal("HasInitSkippedVars residual FindGoodJumpBlock must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
+	// IsVisibleLocal residual soft invent was treat not-visible then complete skip list.
+	// Fair: sticky IncompleteVariables fail closed.
+	// When src is not an ancestor of dest, path uses !IsVisibleLocal(src) for each intermediate.
+	ClearError()
+	src := &Block{}
+	src.LocalVars = []*Variable{nil} // incomplete: IsVisibleLocal hits nil hole
+	mid := &Block{}                  // no Parent chain to src → !reachedSrc
+	loc := &Variable{Name: "l_x", Type: GetIntType()} // non-global local
+	mid.LocalVars = []*Variable{loc}
+	got := CollectInitSkippedVars(src, mid)
+	if VariablesComplete(got) {
+		t.Fatal("IsVisibleLocal residual must fail closed incomplete skip list")
+	}
+	if !HasError() {
+		t.Fatal("IsVisibleLocal residual CollectInitSkippedVars must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestOutputPtrResetsArray(t *testing.T) {
 	// OutputMgr.cpp:326–340 — get_last_ctrl_vars + output_init(&zero); no invent "0"
 	CtrlVarsDoFinalization()

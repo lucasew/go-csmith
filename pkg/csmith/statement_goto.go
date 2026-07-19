@@ -155,7 +155,16 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	for _, v := range intermediate {
 		// StatementGoto.cpp:296–304 — after climb b==src → all intermediate skipped;
 		// else !is_visible_local(src)
-		if reachedSrc || src == nil || !v.IsVisibleLocal(src) {
+		if reachedSrc || src == nil {
+			skipped = append(skipped, v)
+			continue
+		}
+		visible := v.IsVisibleLocal(src)
+		// residual ERROR sticky — no invent complete skip list past IsVisibleLocal hard IR hole
+		if HasError() {
+			return IncompleteVariables()
+		}
+		if !visible {
 			skipped = append(skipped, v)
 		}
 	}
@@ -314,11 +323,19 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		// as_dest: (curr, b.stms[0]); !as_dest: (b, curr.stms[0])
 		if asDest {
 			if curr != nil && HasInitSkippedVars(curr, b) {
+				// residual ERROR sticky — no invent soft-continue then pick later past hole
+				if HasError() {
+					return nil
+				}
 				blks = append(blks[:idx], blks[idx+1:]...)
 				continue
 			}
 		} else {
 			if curr != nil && len(curr.Stmts) > 0 && HasInitSkippedVars(b, curr) {
+				// residual ERROR sticky — no invent soft-continue then pick later past hole
+				if HasError() {
+					return nil
+				}
 				blks = append(blks[:idx], blks[idx+1:]...)
 				continue
 			}
@@ -451,6 +468,10 @@ func MakeRandomGoto(
 			continue
 		}
 		if s.MustReturn() {
+			// residual ERROR sticky — no invent soft-skip must-return then pick later target
+			if HasError() {
+				return makeGotoFailed()
+			}
 			continue
 		}
 		okStms = append(okStms, i)
