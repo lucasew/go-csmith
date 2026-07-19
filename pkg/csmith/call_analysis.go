@@ -376,13 +376,9 @@ func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
 		return IncompleteLabelsSlice()
 	}
-	// CFGEdge* always live; nil hole fails whole label collect (no invent partial)
-	if fm != nil {
-		for _, e := range fm.CFGEdges {
-			if e == nil {
-				return IncompleteLabelsSlice()
-			}
-		}
+	// incomplete CFG fails whole label collect (no invent partial / empty complete)
+	if fm != nil && !CFGEdgesComplete(fm.CFGEdges) {
+		return IncompleteLabelsSlice()
 	}
 	var labels []string
 	if !findContainedLabels(st, &labels, fm) {

@@ -87,6 +87,18 @@ func TestFindJumpSources(t *testing.T) {
 	if FindJumpLabel(fm, 5) != "" {
 		t.Fatal("nil hole FindJumpLabel must fail closed")
 	}
+	// IncompleteCFGEdges marker is incomplete (not invent empty-complete)
+	if CFGEdgesComplete(IncompleteCFGEdges()) {
+		t.Fatal("IncompleteCFGEdges must be incomplete")
+	}
+	if CFGEdgesComplete(nil) {
+		// complete empty is complete
+	} else {
+		t.Fatal("CFGEdgesComplete(nil) must be complete empty")
+	}
+	if !CFGEdgesComplete([]*CFGEdge{}) {
+		t.Fatal("empty non-nil CFG must be complete")
+	}
 }
 
 func TestNeedNestedLoop(t *testing.T) {
@@ -705,6 +717,38 @@ func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 	}
 	if len(outer.Stmts) != 1 || outer.Stmts[0].StmID != 7 {
 		t.Fatal(outer.Stmts)
+	}
+}
+
+func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
+	// incomplete CFG scrub must wipe IncompleteCFGEdges (not bare nil invent empty complete)
+	fm := NewFactMgr(nil)
+	b := &Block{
+		StmID: 10,
+		Stmts: []Stmt{
+			{Kind: StmtAssign, StmID: 1},
+			{Kind: StmtBreak, StmID: 2},
+		},
+	}
+	fm.CFGEdges = []*CFGEdge{{SrcID: 2, DestStmID: 100}, nil}
+	n := b.RemoveStmt(2, fm)
+	if n != 1 {
+		t.Fatal(n)
+	}
+	if CFGEdgesComplete(fm.CFGEdges) {
+		t.Fatal("incomplete scrub must leave IncompleteCFGEdges, not invent empty complete", fm.CFGEdges)
+	}
+	// incomplete Function.Blocks hole → IncompleteBlocks
+	f := &Function{Name: "f"}
+	fm2 := NewFactMgr(f)
+	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
+	f.Blocks = []*Block{outer, nil}
+	f.Body = outer
+	if outer.RemoveStmt(3, fm2) != 1 {
+		t.Fatal("remove")
+	}
+	if BlocksComplete(f.Blocks) {
+		t.Fatal("incomplete Blocks scrub must leave IncompleteBlocks", f.Blocks)
 	}
 }
 

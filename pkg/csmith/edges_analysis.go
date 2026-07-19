@@ -72,12 +72,11 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return nil
+	}
 	out := make([]*CFGEdge, 0)
 	for _, e := range fm.CFGEdges {
-		// CFGEdge* always live; no invent skip nil holes as absent edges
-		if e == nil {
-			return nil
-		}
 		if e.DestStmID == destStmID && e.PostDest == postDest && e.BackLink == backLink {
 			out = append(out, e)
 		}
@@ -86,18 +85,16 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 }
 
 // FindEdgesInToBlock finds edges whose DestBlock matches (break/continue).
-// CFGEdge* always live; nil hole in CFGEdges → nil (fail closed).
-// Complete scan with no matches returns empty non-nil slice.
+// Incomplete CFGEdges → nil (fail closed). Complete empty → non-nil [].
 func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*CFGEdge {
 	if fm == nil || dest == nil {
 		return nil
 	}
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return nil
+	}
 	out := make([]*CFGEdge, 0)
 	for _, e := range fm.CFGEdges {
-		// CFGEdge* always live; no invent skip nil holes as absent edges
-		if e == nil {
-			return nil
-		}
 		if e.DestBlock == dest && e.DestStmID == 0 && e.PostDest == postDest && e.BackLink == backLink {
 			out = append(out, e)
 		}

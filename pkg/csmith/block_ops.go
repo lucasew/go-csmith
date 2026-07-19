@@ -119,10 +119,10 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	// Statement.cpp find_typed_stmts: continue/break/goto inside s
 	cfgIDs := map[int]bool{}
 	if !collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs) {
-		// incomplete IR under removed — fail closed wipe CFG (no invent
-		// partial control-stmt scrub as complete edge set)
+		// incomplete IR under removed — fail closed wipe CFG with hole marker
+		// (not bare nil — CFGEdgesComplete(nil) invents empty-complete edge set)
 		if fm != nil {
-			fm.CFGEdges = nil
+			fm.CFGEdges = IncompleteCFGEdges()
 		}
 		cfgIDs = map[int]bool{}
 	}
@@ -145,35 +145,24 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	var gotoSrcIDs []int
 	if fm != nil {
 		// Block.cpp:617–629 — remove edges with control stmt inside s as src
-		// CFGEdge* always live; nil hole fails closed (nil whole CFG — no invent
-		// keep-hole partial scrub that soft-skips past incomplete edges)
-		ne := make([]*CFGEdge, 0, len(fm.CFGEdges))
-		for _, e := range fm.CFGEdges {
-			if e == nil {
-				fm.CFGEdges = nil
-				gotoSrcIDs = nil
-				ne = nil
-				break
+		// CFGEdge* always live; nil hole fails closed IncompleteCFGEdges
+		// (no invent keep-hole partial scrub / empty-complete via bare nil)
+		if !CFGEdgesComplete(fm.CFGEdges) {
+			fm.CFGEdges = IncompleteCFGEdges()
+			gotoSrcIDs = nil
+		} else {
+			ne := make([]*CFGEdge, 0, len(fm.CFGEdges))
+			for _, e := range fm.CFGEdges {
+				if cfgIDs[e.SrcID] {
+					continue
+				}
+				ne = append(ne, e)
 			}
-			if cfgIDs[e.SrcID] {
-				continue
-			}
-			ne = append(ne, e)
-		}
-		if ne != nil {
 			fm.CFGEdges = ne
-		}
 
-		// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
-		if fm.CFGEdges != nil {
+			// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
 			ne = make([]*CFGEdge, 0, len(fm.CFGEdges))
 			for _, e := range fm.CFGEdges {
-				if e == nil {
-					fm.CFGEdges = nil
-					gotoSrcIDs = nil
-					ne = nil
-					break
-				}
 				destIn := e.DestStmID > 0 && ids[e.DestStmID]
 				if !destIn && e.DestBlock != nil {
 					// dest block nested under removed stmt
@@ -196,9 +185,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 				}
 				ne = append(ne, e)
 			}
-			if ne != nil {
-				fm.CFGEdges = ne
-			}
+			fm.CFGEdges = ne
 		}
 	}
 
@@ -209,22 +196,17 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	}
 	if f != nil {
 		// Block* always live on Function.Blocks; nil hole fails closed
-		// (nil whole list — no invent keep-hole partial scrub)
-		nb := make([]*Block, 0, len(f.Blocks))
-		incomplete := false
-		for _, blk := range f.Blocks {
-			if blk == nil {
-				incomplete = true
-				break
-			}
-			if blockUnderStmt(removed, blk) {
-				continue
-			}
-			nb = append(nb, blk)
-		}
-		if incomplete {
-			f.Blocks = nil
+		// IncompleteBlocks (not bare nil invent empty-complete Blocks list)
+		if !BlocksComplete(f.Blocks) {
+			f.Blocks = IncompleteBlocks()
 		} else {
+			nb := make([]*Block, 0, len(f.Blocks))
+			for _, blk := range f.Blocks {
+				if blockUnderStmt(removed, blk) {
+					continue
+				}
+				nb = append(nb, blk)
+			}
 			f.Blocks = nb
 		}
 	}
@@ -409,12 +391,12 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
+	// incomplete CFG fails closed nil (distinct from complete empty non-nil [])
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return nil
+	}
 	srcs := make([]int, 0)
 	for _, e := range fm.CFGEdges {
-		// CFGEdge* always live; no invent skip nil holes as absent gotos
-		if e == nil {
-			return nil
-		}
 		if e.DestStmID != destStmID || e.SrcID <= 0 {
 			continue
 		}
@@ -441,11 +423,11 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	if fm == nil || destStmID <= 0 {
 		return ""
 	}
+	// incomplete CFG — no invent label from partial scan or registry alone
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return ""
+	}
 	for _, e := range fm.CFGEdges {
-		if e == nil {
-			// incomplete CFG — no invent label from partial scan or registry alone
-			return ""
-		}
 		if e.DestStmID != destStmID || e.SrcID <= 0 {
 			continue
 		}

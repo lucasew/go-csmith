@@ -25,3 +25,40 @@ func ClosestLoopingBlock(b *Block) *Block {
 	}
 	return b
 }
+
+// CFGEdgesComplete reports every CFGEdge* is live (no nil holes).
+// Note: CFGEdgesComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteCFGEdges() so len(nil)==0 cannot invent empty-complete
+// edge-set success after scrub/analysis holes.
+func CFGEdgesComplete(edges []*CFGEdge) bool {
+	for _, e := range edges {
+		if e == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteCFGEdges is the fail-closed incomplete CFG edge-list marker.
+// CFGEdgesComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteCFGEdges() []*CFGEdge {
+	return []*CFGEdge{nil}
+}
+
+// BlocksComplete reports every Block* is live (no nil holes).
+// Note: BlocksComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteBlocks() so bare nil cannot invent empty-complete
+// Function.Blocks after scrub holes.
+func BlocksComplete(blks []*Block) bool {
+	for _, b := range blks {
+		if b == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteBlocks is the fail-closed incomplete Block* list marker.
+func IncompleteBlocks() []*Block {
+	return []*Block{nil}
+}
