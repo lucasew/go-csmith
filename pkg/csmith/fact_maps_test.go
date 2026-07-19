@@ -245,7 +245,8 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
-	// nil fact hole fails closed at store and find_updated
+	// nil fact hole fails closed sticky at store and find_updated
+	ClearError()
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
 	// incomplete store is hole marker (FactsComplete false), not cleaned list
@@ -255,17 +256,29 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("incomplete out map must fail closed incomplete, not invent empty complete")
 	}
+	if !HasError() {
+		t.Fatal("incomplete out FindUpdatedFacts must SetError sticky")
+	}
+	ClearError()
 	// direct find with hole in out (bypass Set)
 	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
 	if FactsComplete(fm.FindUpdatedFacts(1)) {
 		t.Fatal("nil fact hole in out must fail closed incomplete")
 	}
-	// final maps: incomplete → IncompleteFactSlice (not bare nil invent empty)
+	if !HasError() {
+		t.Fatal("nil hole FindUpdatedFacts must SetError sticky")
+	}
+	ClearError()
+	// final maps: incomplete → sticky IncompleteFactSlice (not bare nil invent empty)
 	fm.MapFactsInFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, NullPtr)}}
 	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, GarbagePtr), nil}}
 	if FactsComplete(fm.FindUpdatedFinalFacts(1)) {
 		t.Fatal("incomplete final out must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("incomplete final FindUpdatedFinalFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRestoreFacts(t *testing.T) {
@@ -432,7 +445,8 @@ func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
 }
 
 func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
-	// LocalVars nil hole fails closed (no invent skip partial OOS list)
+	// LocalVars nil hole fails closed sticky (no invent skip partial OOS list)
+	ClearError()
 	loop := &Block{Looping: true, LocalVars: []*Variable{
 		CreateVariableScalars("l_1", GetIntType(), false, false),
 		nil,
@@ -440,6 +454,10 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	if VariablesComplete(collectLoopLocalVars(loop)) {
 		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil LocalVars collectLoopLocalVars must SetError sticky")
+	}
+	ClearError()
 	// complete empty
 	empty := &Block{Looping: true}
 	got := collectLoopLocalVars(empty)

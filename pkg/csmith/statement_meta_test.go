@@ -144,6 +144,7 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 }
 
 func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	destParent := &Block{Stmts: []Stmt{{StmID: 5}}}
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 5}}
@@ -160,10 +161,20 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	if !IsJumpTargetFromOtherBlocks(5, destParent, nil, nil) {
 		t.Fatal("nil FM must fail closed jump-target")
 	}
+	// StmID 0 fails closed sticky as jump-target (no invent not-target)
+	ClearError()
+	if !IsJumpTargetFromOtherBlocks(0, destParent, fm, nil) {
+		t.Fatal("StmID 0 must fail closed jump-target")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 IsJumpTarget must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPtrUsedForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs → test; ptr in for-test must count (no invent skip)
+	ClearError()
 	pt := PointerTo(GetIntType())
 	pv := CreateVariableScalars("p", pt, false, false)
 	test := &Expression{Term: TermVariable, Var: pv, ExprType: pt}
@@ -171,11 +182,16 @@ func TestIsPtrUsedForTestExpr(t *testing.T) {
 	if !IsPtrUsed(st) {
 		t.Fatal("for-test pointer must be used")
 	}
-	// incomplete for without TestExpr fails closed as true (IsPtrUsed)
+	// incomplete for without TestExpr fails closed sticky as true (IsPtrUsed)
+	ClearError()
 	st2 := &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}
 	if !IsPtrUsed(st2) {
 		t.Fatal("incomplete for must fail closed ptr-used true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete for IsPtrUsed must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPtrUsed(t *testing.T) {

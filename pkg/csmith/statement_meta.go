@@ -228,9 +228,11 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 // When srcParentOf is nil, treat non-sibling StmIDs in destParent as other-block sources.
 // Incomplete CFG (FindJumpSources nil) fails closed as jump-target (no invent none).
 // Nil FactMgr fails closed as jump-target (no invent "not target" without CFG).
+// destStmID ≤0 fails closed sticky as jump-target (no invent "not target" on incomplete id).
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
 	if destStmID <= 0 {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if fm == nil {
 		return true
@@ -265,10 +267,12 @@ func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, 
 
 // IsPtrUsed mirrors Statement::is_ptr_used.
 // Statement.cpp:355–359.
-// Incomplete IR fails closed as true (no invent "no pointer used" past holes).
+// Incomplete IR fails closed sticky as true (no invent "no pointer used" / soft re-pick past holes).
 func IsPtrUsed(st *Stmt) bool {
 	var ptrs []*Variable
-	if !collectReferencedPtrsStmt(st, &ptrs) {
+	CollectReferencedPtrsStmt(st, &ptrs)
+	if !VariablesComplete(ptrs) {
+		// CollectReferencedPtrsStmt already SetError sticky
 		return true
 	}
 	return len(ptrs) > 0

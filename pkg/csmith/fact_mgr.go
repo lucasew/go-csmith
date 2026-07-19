@@ -749,8 +749,8 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 
 // FindUpdatedFacts mirrors FactMgr::find_updated_facts.
 // FactMgr.cpp:652–665 — facts_out that differ from related facts_in.
-// Incomplete in/out maps fail closed IncompleteFactSlice (not bare nil —
-// FactsComplete(nil)==true invents empty-update success via hole skip).
+// Incomplete in/out maps fail closed sticky IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
@@ -758,6 +758,9 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	in := fm.GetMapFactsIn(stmID)
 	out := fm.GetMapFactsOut(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	var updated []*FactPointTo
@@ -777,8 +780,8 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 
 // FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
 // FactMgr.cpp:667–686 — final maps; always include rv facts.
-// Incomplete in/out maps fail closed IncompleteFactSlice (not bare nil —
-// FactsComplete(nil)==true invents empty-update success via hole skip).
+// Incomplete in/out maps fail closed sticky IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
@@ -786,6 +789,9 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	in := fm.GetMapFactsInFinal(stmID)
 	out := fm.GetMapFactsOutFinal(stmID)
 	if !FactsComplete(in) || !FactsComplete(out) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	var updated []*FactPointTo
@@ -856,14 +862,15 @@ func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) 
 
 // collectLoopLocalVars walks blk → parents until a looping block (inclusive).
 // FactMgr.cpp:605–610.
-// Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
-// (not bare nil invent empty-complete loop-local set).
+// Variable* always live on LocalVars; nil hole fails closed sticky IncompleteVariables
+// (not bare nil invent empty-complete loop-local set / soft re-pick past hole).
 // Empty complete walk returns non-nil empty slice.
 func collectLoopLocalVars(blk *Block) []*Variable {
 	locals := make([]*Variable, 0)
 	b := blk
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		locals = append(locals, b.LocalVars...)

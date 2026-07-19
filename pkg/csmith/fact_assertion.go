@@ -172,8 +172,11 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 			facts = fm.FindUpdatedFacts(st.StmID)
 		}
 	}
-	// incomplete maps fail closed (no invent empty assertion block / soft-skip holes)
+	// incomplete maps fail closed sticky (no invent empty assertion block / soft re-pick)
 	if !FactsComplete(facts) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if len(facts) == 0 {
@@ -186,8 +189,9 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	}
 	var body strings.Builder
 	for _, f := range facts {
-		// Fact* always live in fact maps; no invent skip nil holes
+		// Fact* always live in fact maps; nil hole sticky (no invent skip holes)
 		if f == nil || f.Var == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		// skip globals neither read nor written in this function
