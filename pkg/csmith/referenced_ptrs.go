@@ -94,9 +94,37 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		}
 		return false
 	}
-	if st.Expr != nil {
-		if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+	// Statement.cpp:331–345 — get_exprs + get_blocks; get_exprs always live for
+	// assign/invoke/return/if/break/continue/goto and for-test.
+	// Kind-gated for (no invent Loop-on-wrong-kind as for get_exprs).
+	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
+		// Incomplete Loop without TestExpr fails closed (no invent skip for-test
+		// ptrs / soft-claim IV alone as the only for-related pointer).
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			*ptrs = nil
 			return false
+		}
+		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
+			return false
+		}
+	} else {
+		switch st.Kind {
+		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+			// C++ get_exprs always yields live Expression* for these kinds
+			// incomplete nil Expr fails closed (no invent partial ptr list as success)
+			if st.Expr == nil {
+				*ptrs = nil
+				return false
+			}
+			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+				return false
+			}
+		default:
+			if st.Expr != nil {
+				if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+					return false
+				}
+			}
 		}
 	}
 	if st.LhsVar != nil && st.LhsVar.IsPointer() {
@@ -119,18 +147,6 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	}
 	if st.Else != nil {
 		if !collectReferencedPtrsBlock(st.Else, ptrs) {
-			return false
-		}
-	}
-	// StatementFor::get_exprs → test; get_referenced_ptrs walks that expr.
-	// Incomplete Loop without TestExpr fails closed (no invent skip for-test
-	// ptrs / soft-claim IV alone as the only for-related pointer).
-	if st.Kind == StmtFor || st.Loop != nil {
-		if st.Loop == nil || st.Loop.TestExpr == nil {
-			*ptrs = nil
-			return false
-		}
-		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
 			return false
 		}
 	}
@@ -174,7 +190,7 @@ func appendUniqueVar(s []*Variable, v *Variable) []*Variable {
 // Incomplete IR fails closed as true (no invent "no union field read").
 func ReadUnionFieldExpr(e *Expression) bool {
 	if e == nil {
-		return false
+		return true
 	}
 	switch e.Term {
 	case TermVariable:
@@ -215,19 +231,31 @@ func ReadUnionFieldExpr(e *Expression) bool {
 // (no invent "no union field read").
 func ReadUnionFieldStmt(st *Stmt) bool {
 	if st == nil {
-		return false
+		return true
 	}
-	// get_exprs: for → Loop.TestExpr; else Expr when present
-	if st.Kind == StmtFor || st.Loop != nil {
+	// get_exprs: for → Loop.TestExpr; assign/etc require live Expr
+	// Kind-gated for (no invent Loop-on-wrong-kind)
+	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			return true
 		}
 		if ReadUnionFieldExpr(st.Loop.TestExpr) {
 			return true
 		}
-	} else if st.Expr != nil {
-		if ReadUnionFieldExpr(st.Expr) {
-			return true
+	} else {
+		switch st.Kind {
+		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+			// C++ get_exprs always live; nil Expr fails closed true
+			if st.Expr == nil {
+				return true
+			}
+			if ReadUnionFieldExpr(st.Expr) {
+				return true
+			}
+		default:
+			if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
+				return true
+			}
 		}
 	}
 	if st.LhsVar != nil && st.LhsVar.IsInsideUnionField() {

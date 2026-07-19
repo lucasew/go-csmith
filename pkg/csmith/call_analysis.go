@@ -202,10 +202,13 @@ func (fi *Invocation) HasUncertainCallRecursive() bool {
 // FunctionInvocation.cpp:408–416 — no TermFunction args.
 // Nil arg fails closed false (no invent simple past hole).
 func (fi *Invocation) HasSimpleParams() bool {
+	// C++ always has live FunctionInvocation*; nil shell fails closed not-simple
+	// (no invent simple-params success without args IR)
 	if fi == nil {
-		return true
+		return false
 	}
 	for _, a := range fi.Args {
+		// param_value[i] always live; nil hole fails closed not-simple
 		if a == nil {
 			return false
 		}

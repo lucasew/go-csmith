@@ -124,6 +124,29 @@ func TestReadUnionFieldCalleeFlag(t *testing.T) {
 	if !ReadUnionFieldStmt(st) {
 		t.Fatal("callee UnionFieldRead must count")
 	}
+	// assign/invoke without Expr — no invent "no union field read"
+	if !ReadUnionFieldStmt(&Stmt{Kind: StmtAssign, StmID: 1}) {
+		t.Fatal("nil Expr assign must fail closed true")
+	}
+	if !ReadUnionFieldExpr(nil) {
+		t.Fatal("nil expr must fail closed true")
+	}
+}
+
+func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
+	// C++ get_exprs always live; nil Expr must not invent empty ptr list as success
+	var ptrs []*Variable
+	ptrs = []*Variable{CreateVariableScalars("stale", PointerTo(GetIntType()), false, false)}
+	if collectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs) {
+		t.Fatal("assign without Expr must fail closed")
+	}
+	if ptrs != nil {
+		t.Fatal("incomplete collect must clear ptrs", ptrs)
+	}
+	ptrs = []*Variable{}
+	if collectReferencedPtrsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs) {
+		t.Fatal("invoke without Expr must fail closed")
+	}
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {

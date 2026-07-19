@@ -211,6 +211,20 @@ func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	if VisitFactsBinaryOrdered(&Invocation{IsStd: true, Binary: "&&"}, &cg, Defaults()) {
 		t.Fatal("short args")
 	}
+	// nil param_value hole — no invent skip left/right visit as success
+	left := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	if VisitFactsBinaryOrdered(&Invocation{
+		IsStd: true, Binary: "&&",
+		Args: []*Expression{nil, left},
+	}, &cg, Defaults()) {
+		t.Fatal("nil left arg must fail closed")
+	}
+	if VisitFactsBinaryOrdered(&Invocation{
+		IsStd: true, Binary: "&&",
+		Args: []*Expression{left, nil},
+	}, &cg, Defaults()) {
+		t.Fatal("nil right arg must fail closed")
+	}
 }
 
 func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {

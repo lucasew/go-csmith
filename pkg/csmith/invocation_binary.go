@@ -268,11 +268,15 @@ func (fi *Invocation) EqualsInt(num int) bool {
 // FunctionInvocationBinary.cpp:487–508 — evaluate left; merge right with post-left.
 func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	// incomplete IR — fail closed (no soft invent visit success)
+	// param_value[0/1] always live Expression* after ERROR_GUARD
 	if fi == nil || cg == nil || len(fi.Args) < 2 {
 		return false
 	}
+	if fi.Args[0] == nil || fi.Args[1] == nil {
+		return false
+	}
 	// left
-	if fi.Args[0] != nil && !VisitFactsExpression(fi.Args[0], cg, opts) {
+	if !VisitFactsExpression(fi.Args[0], cg, opts) {
 		return false
 	}
 	// snapshot after left — incomplete GlobalFacts fail closed
@@ -284,8 +288,8 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		}
 		afterLeft = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	// right may or may not evaluate
-	if fi.Args[1] != nil && !VisitFactsExpression(fi.Args[1], cg, opts) {
+	// right may or may not evaluate (short-circuit still visits for facts merge)
+	if !VisitFactsExpression(fi.Args[1], cg, opts) {
 		return false
 	}
 	// merge post-right with post-left

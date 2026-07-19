@@ -138,6 +138,10 @@ func TestHasSimpleParams(t *testing.T) {
 	if fi.HasSimpleParams() {
 		t.Fatal("nil arg must fail closed not-simple")
 	}
+	// nil invoke shell — no invent simple-params success
+	if (*Invocation)(nil).HasSimpleParams() {
+		t.Fatal("nil invoke must fail closed not-simple")
+	}
 	// incomplete FuncCount → uncertain
 	fiHole := &Invocation{Args: []*Expression{
 		userCall("a"),
