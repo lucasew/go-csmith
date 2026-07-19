@@ -358,13 +358,12 @@ func CtrlVarsDoFinalization() {
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.
-// No soft invent for nil entries (C++ ctrl_vars[i] always live).
+// Variable* always live; nil hole fails closed as nil (no invent empty-name pad).
 func CtrlVarNames(ctrl []*Variable) []string {
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
 		if v == nil {
-			out[i] = ""
-			continue
+			return nil
 		}
 		out[i] = v.GetActualName(false)
 	}
@@ -403,10 +402,14 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 
 // GetMaxArrayDimension mirrors Variable::GetMaxArrayDimension.
 // Variable.cpp:813–826.
+// Variable* always live; nil hole fails closed as -1 (no invent skip partial max).
 func GetMaxArrayDimension(vars []*Variable) int {
 	dimen := 0
 	for _, v := range vars {
-		if v == nil || !v.IsArray {
+		if v == nil {
+			return -1
+		}
+		if !v.IsArray {
 			continue
 		}
 		n := len(v.ArraySizes)
@@ -422,9 +425,10 @@ func GetMaxArrayDimension(vars []*Variable) int {
 
 // OutputArrayInitializers mirrors OutputArrayInitializers for loop-init arrays.
 // Variable.cpp:829–841 — allocate ctrl vars, declare, emit output_init.
+// Incomplete vars list (GetMaxArrayDimension -1) fails closed empty (no invent partial).
 func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
 	dimen := GetMaxArrayDimension(vars)
-	if dimen == 0 {
+	if dimen <= 0 {
 		return ""
 	}
 	ctrl := GetNewCtrlVars(opts)
@@ -1301,11 +1305,15 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 		}
 		if v.Type != nil && v.Type.IsAggregate() && len(v.FieldVars) > 0 {
 			// dump fields with indexed prefix path via synthetic names
+			// Variable* always live in FieldVars; nil hole fails closed whole dump
 			for fi, f := range v.FieldVars {
+				if f == nil || f.Type == nil {
+					return ""
+				}
 				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
 					continue
 				}
-				if f == nil || f.Type == nil || !f.Type.IsSimple() {
+				if !f.Type.IsSimple() {
 					continue
 				}
 				// field name is typically g_a.f0 — replace base with indexed access
@@ -1438,6 +1446,10 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 	if v.Type.IsAggregate() {
 		var b strings.Builder
 		for i, f := range v.FieldVars {
+			// Variable* always live in FieldVars; nil hole fails closed whole hash
+			if f == nil {
+				return ""
+			}
 			// Variable.cpp:893–898 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
 				if !IsFieldReadable(v, i, unionFacts) {
@@ -1464,6 +1476,7 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 }
 
 // hashArrayHasPayload reports whether array hashing would emit any transparent_crc.
+// Type* always live on Fields; nil hole fails closed as false (no invent has-payload).
 func hashArrayHasPayload(v *Variable) bool {
 	if v == nil || v.Type == nil {
 		return false
@@ -1474,7 +1487,10 @@ func hashArrayHasPayload(v *Variable) bool {
 	if v.Type.IsAggregate() {
 		j := 0
 		for _, f := range v.Type.Fields {
-			if f.Type == nil || f.BitWidth == 0 {
+			if f.Type == nil {
+				return false
+			}
+			if f.BitWidth == 0 {
 				continue
 			}
 			if f.Type.IsSimple() {
@@ -1536,7 +1552,11 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 	if v.Type != nil && v.Type.IsAggregate() {
 		j := 0
 		for i, f := range v.Type.Fields {
-			if f.Type == nil || f.BitWidth == 0 {
+			// Type* always live; nil hole fails closed (no invent skip partial hash)
+			if f.Type == nil {
+				return ""
+			}
+			if f.BitWidth == 0 {
 				continue
 			}
 			// ArrayVariable.cpp:741–752 — skip unreadable union fields

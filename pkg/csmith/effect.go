@@ -229,7 +229,13 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 
 // WriteVarSet mirrors Effect::write_var_set — write each var.
 // Effect.cpp:148–152.
+// Variable* always live; nil hole fails closed (return e unchanged, no invent partial).
 func (e Effect) WriteVarSet(vars []*Variable) Effect {
+	for _, v := range vars {
+		if v == nil {
+			return e
+		}
+	}
 	out := e
 	for _, v := range vars {
 		out = out.WriteVar(v)
@@ -239,6 +245,7 @@ func (e Effect) WriteVarSet(vars []*Variable) Effect {
 
 // SetLhsWriteVars mirrors Effect::set_lhs_write_vars from current write_vars.
 // Lhs.cpp:348–351 — after successful LHS visit.
+// Variable* always live as write keys; nil hole fails closed (empty lhsWrite).
 func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 	out := e
 	if len(e.written) == 0 {
@@ -247,6 +254,10 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 	}
 	out.lhsWrite = make(map[*Variable]bool, len(e.written))
 	for k, v := range e.written {
+		if k == nil {
+			out.lhsWrite = nil
+			return out
+		}
 		if v {
 			out.lhsWrite[k] = true
 		}
@@ -255,15 +266,20 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 }
 
 // LhsWriteVars returns lhs_write_vars as a slice (stable name order).
+// Variable* always live; nil key fails closed as []*Variable{nil}.
 func (e Effect) LhsWriteVars() []*Variable {
 	if len(e.lhsWrite) == 0 {
 		return nil
 	}
 	out := make([]*Variable, 0, len(e.lhsWrite))
 	for v, ok := range e.lhsWrite {
-		if ok && v != nil {
-			out = append(out, v)
+		if !ok {
+			continue
 		}
+		if v == nil {
+			return []*Variable{nil}
+		}
+		out = append(out, v)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
@@ -593,9 +609,13 @@ func (e *Effect) UpdatePurity() {
 
 // UnionFieldIsRead mirrors Effect::union_field_is_read.
 // Effect.cpp:565–572 — any read var is_inside_union_field.
+// Variable* always live; nil key fails closed as true (no invent none).
 func (e Effect) UnionFieldIsRead() bool {
 	for v := range e.read {
-		if v != nil && e.read[v] && v.IsInsideUnionField() {
+		if v == nil {
+			return true
+		}
+		if e.read[v] && v.IsInsideUnionField() {
 			return true
 		}
 	}
@@ -604,13 +624,18 @@ func (e Effect) UnionFieldIsRead() bool {
 
 // Consolidate mirrors Effect::consolidate.
 // Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
+// Variable* always live as map keys; nil hole fails closed (no invent clean filter).
 func (e *Effect) Consolidate() {
 	if e == nil {
 		return
 	}
 	// remove field reads when parent is also read
 	for v := range e.read {
-		if v == nil || !e.read[v] || !v.IsFieldVar() {
+		if v == nil {
+			// incomplete map — leave as-is (no invent drop-only-holes clean)
+			return
+		}
+		if !e.read[v] || !v.IsFieldVar() {
 			continue
 		}
 		parent := v.FieldVarOf
@@ -620,7 +645,10 @@ func (e *Effect) Consolidate() {
 	}
 	// remove field writes when parent is also written
 	for v := range e.written {
-		if v == nil || !e.written[v] || !v.IsFieldVar() {
+		if v == nil {
+			return
+		}
+		if !e.written[v] || !v.IsFieldVar() {
 			continue
 		}
 		parent := v.FieldVarOf
@@ -632,9 +660,13 @@ func (e *Effect) Consolidate() {
 
 // IsReadByName mirrors Effect::is_read(string).
 // Effect.cpp:295–308.
+// Variable* always live; nil key fails closed as true (no invent not-read).
 func (e Effect) IsReadByName(name string) bool {
 	for v := range e.read {
-		if v != nil && e.read[v] && v.Name == name {
+		if v == nil {
+			return true
+		}
+		if e.read[v] && v.Name == name {
 			return true
 		}
 	}
@@ -643,9 +675,13 @@ func (e Effect) IsReadByName(name string) bool {
 
 // IsWrittenByName mirrors Effect::is_written(string).
 // Effect.cpp:351–364.
+// Variable* always live; nil key fails closed as true (no invent not-written).
 func (e Effect) IsWrittenByName(name string) bool {
 	for v := range e.written {
-		if v != nil && e.written[v] && v.Name == name {
+		if v == nil {
+			return true
+		}
+		if e.written[v] && v.Name == name {
 			return true
 		}
 	}
@@ -655,6 +691,7 @@ func (e Effect) IsWrittenByName(name string) bool {
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
 // Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
 // Write names sorted for deterministic emit (Go map iteration is random).
+// Variable* always live; nil key fails closed as empty comment (no invent partial list).
 func (e Effect) CommentOutput() string {
 	var b strings.Builder
 	b.WriteString("/*\n")
@@ -662,7 +699,10 @@ func (e Effect) CommentOutput() string {
 	rnames := make([]string, 0, len(e.read))
 	for v := range e.read {
 		// Effect.cpp: names from live Variable*; no invent blank tokens for empty Name
-		if v != nil && e.read[v] && v.Name != "" {
+		if v == nil {
+			return ""
+		}
+		if e.read[v] && v.Name != "" {
 			rnames = append(rnames, v.Name)
 		}
 	}
@@ -675,7 +715,10 @@ func (e Effect) CommentOutput() string {
 	b.WriteString(" * writes:")
 	names := make([]string, 0, len(e.written))
 	for v := range e.written {
-		if v != nil && e.written[v] && v.Name != "" {
+		if v == nil {
+			return ""
+		}
+		if e.written[v] && v.Name != "" {
 			names = append(names, v.Name)
 		}
 	}

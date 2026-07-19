@@ -49,6 +49,16 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if !hole.HasGlobalEffect() {
 		t.Fatal("nil write key must fail closed as global effect")
 	}
+	hole.read = map[*Variable]bool{nil: true}
+	if !hole.UnionFieldIsRead() {
+		t.Fatal("nil read key must fail closed as union field read")
+	}
+	if hole.CommentOutput() != "" {
+		t.Fatal("nil key CommentOutput must fail closed empty")
+	}
+	if EmptyEffect().WriteVarSet([]*Variable{v, nil}).IsWritten(v) {
+		t.Fatal("WriteVarSet nil hole must leave base unchanged")
+	}
 }
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
