@@ -103,7 +103,7 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "FUNCTIONS") || !strings.Contains(out, "int main") {
-		t.Fatal("full program requires FUNCTIONS and main", out[:min(200, len(out))])
+		t.Fatal("full program requires FUNCTIONS and main")
 	}
 	// sticky ERROR_RETURN path returns error, not partial C
 	ClearError()

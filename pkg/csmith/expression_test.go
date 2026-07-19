@@ -170,6 +170,18 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	if ExpressionComplexity(&Expression{Term: TermFunction}) != 0 {
 		t.Fatal("nil invoke must not invent complexity")
 	}
+	// incomplete assign / comma / nil arg — no invent complexity shells
+	if ExpressionComplexity(&Expression{Term: TermAssignment}) != 0 {
+		t.Fatal("nil Assign")
+	}
+	if ExpressionComplexity(&Expression{Term: TermCommaExpr, CommaLHS: inner}) != 0 {
+		t.Fatal("nil CommaRHS")
+	}
+	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{
+		User: &Function{Name: "h"}, Args: []*Expression{inner, nil},
+	}}) != 0 {
+		t.Fatal("nil arg hole")
+	}
 }
 
 func TestExpressionIndentedOutput(t *testing.T) {

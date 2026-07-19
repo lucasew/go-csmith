@@ -346,7 +346,17 @@ func ExpressionComplexity(e *Expression) int {
 		return 0
 	}
 	switch e.Term {
-	case TermConstant, TermVariable:
+	case TermConstant:
+		// Constant always has live Value; incomplete shell → 0 (not invent depth 1)
+		if e.Con == nil || e.Con.Value == "" {
+			return 0
+		}
+		return 0
+	case TermVariable:
+		// ExpressionVariable always has live Variable*; incomplete → 0
+		if e.Var == nil {
+			return 0
+		}
 		return 0
 	case TermFunction:
 		// ExpressionFuncall::get_complexity — live invoke only
@@ -359,16 +369,24 @@ func ExpressionComplexity(e *Expression) int {
 			comp++ // function call itself
 		}
 		for _, a := range e.Invoke.Args {
+			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed 0 total
+			if a == nil {
+				return 0
+			}
 			comp += ExpressionComplexity(a)
 		}
 		return comp
 	case TermAssignment:
-		c := 1
-		if e.Assign != nil && e.Assign.Expr != nil {
-			c += ExpressionComplexity(e.Assign.Expr)
+		// incomplete Assign IR — no invent complexity 1 shell
+		if e.Assign == nil || e.Assign.Expr == nil {
+			return 0
 		}
-		return c
+		return 1 + ExpressionComplexity(e.Assign.Expr)
 	case TermCommaExpr:
+		// both sides always live; incomplete → 0
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return 0
+		}
 		return 1 + ExpressionComplexity(e.CommaLHS) + ExpressionComplexity(e.CommaRHS)
 	default:
 		return 0

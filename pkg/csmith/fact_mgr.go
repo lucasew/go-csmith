@@ -451,8 +451,9 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	out := fm.MapFactsOut[stmID]
 	var updated []*FactPointTo
 	for _, f := range out {
-		if f == nil {
-			continue
+		// Fact* always live in map_facts_out; no invent skip nil holes
+		if f == nil || f.Var == nil {
+			return nil
 		}
 		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
 		// no soft invent "new out-only fact" as updated
@@ -477,8 +478,9 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	out := fm.MapFactsOutFinal[stmID]
 	var updated []*FactPointTo
 	for _, f := range out {
+		// Fact* always live; no invent skip nil holes
 		if f == nil || f.Var == nil {
-			continue
+			return nil
 		}
 		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
 		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {

@@ -107,6 +107,21 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
+	// nil fact hole fails closed at clone store and find_updated
+	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
+	// CloneFactSlice drops incomplete store → MapFactsOut[1] nil
+	if fm.MapFactsOut[1] != nil {
+		t.Fatal("SetMapFactsOut must not invent cleaned list from nil hole")
+	}
+	if fm.FindUpdatedFacts(1) != nil {
+		t.Fatal("nil out map must fail closed")
+	}
+	// direct find with hole in out (bypass Set)
+	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
+	if fm.FindUpdatedFacts(1) != nil {
+		t.Fatal("nil fact hole in out must fail closed")
+	}
 }
 
 func TestRestoreFacts(t *testing.T) {

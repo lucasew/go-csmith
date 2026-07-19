@@ -947,9 +947,14 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
 	if c.CurrRHS != nil {
 		lhsExpr := LhsAsExpression(lhs)
+		// Lhs always live for this check; incomplete RHS subexps fail closed
+		if lhsExpr == nil {
+			return false
+		}
 		for _, sub := range GetEvalToSubexps(c.CurrRHS) {
+			// Expression* always live in eval list; no invent skip nil holes
 			if sub == nil {
-				continue
+				return false
 			}
 			if sub.Term == TermVariable || sub.Term == TermLhs {
 				if HaveOverlappingFields(sub, lhsExpr, facts) {

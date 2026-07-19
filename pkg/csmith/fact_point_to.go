@@ -583,11 +583,16 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 
 // CloneFactSlice deep-clones a FactPointTo slice.
 func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
+	if facts == nil {
+		return nil
+	}
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
-		if f != nil {
-			out = append(out, f.Clone())
+		// Fact* always live in fact maps; no invent skip nil holes as partial clone
+		if f == nil {
+			return nil
 		}
+		out = append(out, f.Clone())
 	}
 	return out
 }

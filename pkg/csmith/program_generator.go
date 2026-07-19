@@ -749,7 +749,12 @@ func (g *ProgramGenerator) GoGenerator() string {
 	if HasError() {
 		return ""
 	}
-	b.WriteString(g.OutputStructTypes())
+	// struct/union inventory non-empty must emit live decls (no invent types-only skip)
+	structsOut := g.OutputStructTypes()
+	if (len(g.Types.StructTypes) > 0 || len(g.Types.UnionTypes) > 0) && structsOut == "" {
+		return ""
+	}
+	b.WriteString(structsOut)
 	g.GenerateFunctions()
 	// Function.cpp:797/805 ERROR_RETURN — stop output when generation failed
 	if HasError() {
@@ -766,14 +771,20 @@ func (g *ProgramGenerator) GoGenerator() string {
 	if !hasUser {
 		return ""
 	}
-	// OutputGlobals may be empty (no globals) — C++ legitimate
-	b.WriteString(g.OutputGlobals())
+	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
+	globalsOut := g.OutputGlobals()
+	if g.VS != nil && len(g.VS.GlobalList) > 0 && globalsOut == "" {
+		return ""
+	}
+	b.WriteString(globalsOut)
 	// functions section always live after successful GenerateFunctions
 	funcsOut := g.OutputFunctions()
 	if funcsOut == "" {
 		return ""
 	}
 	b.WriteString(funcsOut)
+	// OutputHashFuncDef empty when helpers off or ctrl IR incomplete (main falls back)
+	// no invent partial helper shells — OutputHashFuncDef already fail-closed empty
 	b.WriteString(g.OutputHashFuncDef())
 	// OutputMgr always emits main unless --nomain; incomplete main fails whole program
 	mainOut := g.OutputMain()

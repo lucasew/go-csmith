@@ -116,6 +116,17 @@ func TestVisitFactsExpressionVariableAddrBitfield(t *testing.T) {
 	}
 }
 
+func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
+	// incomplete Lhs must fail closed (no invent visit success)
+	cg := EmptyCGContext()
+	if cg.VisitFactsLhs(nil, Defaults()) {
+		t.Fatal("nil lhs")
+	}
+	if cg.VisitFactsLhs(&Lhs{}, Defaults()) {
+		t.Fatal("nil lhs.Var")
+	}
+}
+
 func TestReadPointedNullRejected(t *testing.T) {
 	opts := Defaults()
 	opts.NullPointerDerefProb = 0
