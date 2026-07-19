@@ -209,6 +209,19 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 		t.Fatal("nil OOS var hole must SetError sticky")
 	}
 	ClearError()
+	// facts always live; sticky (no invent soft-skip OOS cleanup past hole)
+	// empty vars is complete no-op
+	UpdateFactsForOOSVars(nil, nil)
+	if !HasError() {
+		t.Fatal("nil facts UpdateFactsForOOSVars must SetError sticky")
+	}
+	ClearError()
+	var empty []*FactPointTo
+	UpdateFactsForOOSVars(nil, &empty)
+	if HasError() {
+		t.Fatal("empty vars UpdateFactsForOOSVars must not sticky")
+	}
+	ClearError()
 }
 
 func TestOutputCommentLine(t *testing.T) {

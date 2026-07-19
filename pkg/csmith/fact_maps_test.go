@@ -63,6 +63,12 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 		t.Fatal("nil func UpdateFactsForDest must SetError sticky")
 	}
 	ClearError()
+	// factsOut always live; sticky (no invent soft-skip dest update past hole)
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil, f, nil)
+	if !HasError() {
+		t.Fatal("nil factsOut UpdateFactsForDest must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestClearMapVisited(t *testing.T) {

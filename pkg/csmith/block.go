@@ -546,8 +546,11 @@ func abortBlockMake(f *Function, b *Block) {
 // Block.cpp:682–742 — effects, OOS, optional fixed-point with remove_stmt, append_return.
 // Incomplete preEffect / StmID 0 fails closed sticky (no invent fixed-point / map
 // record / soft-reset EffectAccum from IncompleteEffect shell).
+// Block + CGContext always live; sticky (no invent soft-skip past hole).
+// Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect, r *Rng, vs *VariableSelector) {
 	if b == nil || cg == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	fm := cg.FM

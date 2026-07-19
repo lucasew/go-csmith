@@ -39,8 +39,10 @@ type Invocation struct {
 }
 
 // setOutOpts snapshots CGOptions bits needed by Output (no live Options at emit).
+// Invocation always live; sticky (no invent soft-skip out-opts past hole).
 func (fi *Invocation) setOutOpts(opts Options) {
 	if fi == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	fi.OutSafeMath = opts.SafeMath

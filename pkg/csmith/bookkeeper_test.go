@@ -66,6 +66,7 @@ func TestRecordVolatileAccess(t *testing.T) {
 
 func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	BookkeeperDoFinalization()
+	ClearError()
 	RecordForwardJump()
 	RecordBackwardJump()
 	RecordBackwardJump()
@@ -85,6 +86,50 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 	if !strings.Contains(out, "percentage a fresh-made variable is used: 50") {
 		t.Fatal(out)
 	}
+	// Variable + Type always live; sticky (no invent soft-skip create stats past hole)
+	RecordVarCreated(nil)
+	if !HasError() {
+		t.Fatal("nil var RecordVarCreated must SetError sticky")
+	}
+	ClearError()
+	RecordVarCreated(&Variable{Name: "x", Type: nil})
+	if !HasError() {
+		t.Fatal("nil type RecordVarCreated must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {
+	BookkeeperDoFinalization()
+	ClearError()
+	// Variable + Type always live; sticky
+	RecordBitfieldsReads(nil)
+	if !HasError() {
+		t.Fatal("nil var RecordBitfieldsReads must SetError sticky")
+	}
+	ClearError()
+	RecordBitfieldsWrites(&Variable{Name: "x", Type: nil})
+	if !HasError() {
+		t.Fatal("nil type RecordBitfieldsWrites must SetError sticky")
+	}
+	ClearError()
+	// Expression operands always live; sticky
+	RecordPointerComparisons(nil, &Expression{Term: TermConstant})
+	if !HasError() {
+		t.Fatal("nil lhs RecordPointerComparisons must SetError sticky")
+	}
+	ClearError()
+	// Type always live; sticky — non-aggregate complete no-op
+	RecordTypeWithBitfields(nil)
+	if !HasError() {
+		t.Fatal("nil type RecordTypeWithBitfields must SetError sticky")
+	}
+	ClearError()
+	RecordTypeWithBitfields(GetIntType())
+	if HasError() {
+		t.Fatal("non-aggregate RecordTypeWithBitfields must complete no-op")
+	}
+	ClearError()
 }
 
 func TestOutputTailStatistics(t *testing.T) {

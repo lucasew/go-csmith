@@ -206,8 +206,11 @@ func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
 
 // RecordBitfieldsReads mirrors Bookkeeper::record_bitfields_reads.
 // Bookkeeper.cpp:336–345.
+// RecordBitfieldsReads counts bitfield reads.
+// Variable + Type always live; sticky (no invent soft-skip bitfield read stats past hole).
 func RecordBitfieldsReads(v *Variable) {
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
@@ -220,8 +223,11 @@ func RecordBitfieldsReads(v *Variable) {
 
 // RecordBitfieldsWrites mirrors Bookkeeper::record_bitfields_writes.
 // Bookkeeper.cpp:347–356.
+// RecordBitfieldsWrites counts bitfield writes.
+// Variable + Type always live; sticky (no invent soft-skip bitfield write stats past hole).
 func RecordBitfieldsWrites(v *Variable) {
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if v.Type.HasBitfields() {
@@ -234,8 +240,11 @@ func RecordBitfieldsWrites(v *Variable) {
 
 // RecordPointerComparisons mirrors Bookkeeper::record_pointer_comparisons.
 // Bookkeeper.cpp:361–382 — skip function terms; pointer types; null/ptr/addr counts.
+// RecordPointerComparisons counts pointer comparison kinds.
+// Expression operands always live; sticky (no invent soft-skip cmp stats past hole).
 func RecordPointerComparisons(lhs, rhs *Expression) {
 	if lhs == nil || rhs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Bookkeeper.cpp:363 — both non-function
@@ -287,8 +296,15 @@ func RecordVarsWithBitfields(t *Type) {
 
 // RecordTypeWithBitfields mirrors Bookkeeper::record_type_with_bitfields.
 // Bookkeeper.cpp:476–499 — only when has_bitfields; count bitfield members.
+// RecordTypeWithBitfields counts bitfield members on aggregate types.
+// Type always live; sticky (no invent soft-skip bitfield stats past hole).
+// Non-aggregate is complete no-op.
 func RecordTypeWithBitfields(t *Type) {
-	if t == nil || !t.IsAggregate() {
+	if t == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if !t.IsAggregate() {
 		return
 	}
 	// Bookkeeper.cpp:480 — if (!typ->has_bitfields()) return (via outer if)
@@ -325,8 +341,11 @@ func RecordTypeWithBitfields(t *Type) {
 
 // RecordVarCreated mirrors use_new_var path in VariableSelector::SelectVariable.
 // VariableSelector.cpp:1230–1236.
+// RecordVarCreated mirrors use_new_var bookkeeping on create.
+// Variable + Type always live; sticky (no invent soft-skip create stats past hole).
 func RecordVarCreated(v *Variable) {
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	useNewVarCnt++

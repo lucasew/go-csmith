@@ -134,8 +134,10 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 // MarkContainedGotosVisited mirrors validate_and_update_facts shortcut==0 path.
 // Statement.cpp:580–595 — mark goto edges sourced inside this statement visited
 // so fixed-point can feed goto outputs into the label target.
+// Statement + FactMgr always live; sticky (no invent soft-skip mark past hole).
 func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete CFG sticky (no invent partial mark-as-visited / soft re-pick past holes)

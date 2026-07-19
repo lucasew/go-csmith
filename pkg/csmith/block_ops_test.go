@@ -453,6 +453,18 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 		t.Fatal("StmID 0 must SetError")
 	}
 	ClearError()
+	// Block + CGContext always live; sticky (no invent soft-skip past hole)
+	// Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM)
+	(*Block)(nil).PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
+	if !HasError() {
+		t.Fatal("nil block PostCreationAnalysis must SetError sticky")
+	}
+	ClearError()
+	b.PostCreationAnalysis(nil, Defaults(), EmptyEffect(), nil, nil)
+	if !HasError() {
+		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
@@ -565,6 +577,12 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("nil v must SetError sticky")
+	}
+	ClearError()
+	// facts always live; sticky (no invent soft-skip makeup past hole)
+	AddNewVarFactInto(CreateVariableScalars("g_n", GetIntType(), false, false), nil)
+	if !HasError() {
+		t.Fatal("nil facts AddNewVarFactInto must SetError sticky")
 	}
 	ClearError()
 }

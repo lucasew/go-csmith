@@ -105,8 +105,9 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		SetError(ErrGeneric)
 		return
 	}
-	// Function::FMList is session state from NewProgramGenerator; no invent mid-run
+	// Function::FMList is session state from NewProgramGenerator; sticky no invent mid-run miss
 	if g.FactMgrs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	g.Funcs.Types = &g.Types

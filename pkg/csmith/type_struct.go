@@ -240,8 +240,10 @@ func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
 
 // GenerateAllTypesEnv mirrors GenerateAllTypes for random mode with structs.
 // Type.cpp:1179–1202.
+// TypeEnv always live; sticky (no invent soft-skip type gen past hole).
 func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEnv) {
 	if env == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// GenerateSimpleTypes already cached; seed AllTypes with non-void simples

@@ -396,6 +396,15 @@ func TestGenerateFunctionsWiresFactMgr(t *testing.T) {
 	if fm == nil {
 		t.Fatal("fm")
 	}
+	// Function::FMList is session state; sticky no invent mid-run miss
+	ClearError()
+	g2 := NewProgramGenerator(opts)
+	g2.FactMgrs = nil
+	g2.GenerateFunctions()
+	if !HasError() {
+		t.Fatal("nil FactMgrs GenerateFunctions must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateFactForReturnSetsFactOut(t *testing.T) {

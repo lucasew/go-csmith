@@ -434,4 +434,10 @@ func TestInvocationOutputNilSticky(t *testing.T) {
 		t.Fatal("Failed Invocation Output must stay non-sticky soft re-pick")
 	}
 	ClearError()
+	// Invocation always live; sticky (no invent soft-skip out-opts past hole)
+	(*Invocation)(nil).setOutOpts(Defaults())
+	if !HasError() {
+		t.Fatal("nil Invocation setOutOpts must SetError sticky")
+	}
+	ClearError()
 }

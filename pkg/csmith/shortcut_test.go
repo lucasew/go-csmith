@@ -224,6 +224,17 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 		t.Fatal("incomplete CFG MarkContainedGotosVisited must SetError sticky")
 	}
 	ClearError()
+	// Statement + FactMgr always live; sticky (no invent soft-skip mark past hole)
+	MarkContainedGotosVisited(nil, fm)
+	if !HasError() {
+		t.Fatal("nil root MarkContainedGotosVisited must SetError sticky")
+	}
+	ClearError()
+	MarkContainedGotosVisited(root, nil)
+	if !HasError() {
+		t.Fatal("nil fm MarkContainedGotosVisited must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCGContextAddEffect(t *testing.T) {

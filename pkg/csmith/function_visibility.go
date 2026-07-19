@@ -201,8 +201,14 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 // Variable* in OOS list always live with complete FieldVars; nil / incomplete
 // FieldVars fail closed (nil facts — no invent leave field pointees live when
 // MarkDeadVar cannot see past a FieldVars hole).
+// facts always live; sticky (no invent soft-skip OOS cleanup past hole).
+// Empty vars is complete no-op.
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
-	if facts == nil || len(vars) == 0 {
+	if facts == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if len(vars) == 0 {
 		return
 	}
 	if !FactsComplete(*facts) {

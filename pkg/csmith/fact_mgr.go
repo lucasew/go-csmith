@@ -480,8 +480,10 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 // FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
 // Incomplete inputs fail closed sticky via IncompleteFactSlice (not bare nil —
 // FactsComplete(nil)==true invents empty-complete dest facts / soft re-pick past wipe).
+// factsOut always live; sticky (no invent soft-skip dest update past hole).
 func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
 	if factsOut == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:427–428 — dest->func; assert(func)
@@ -1652,8 +1654,10 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // FactMgr.cpp:118–131 — abstract_fact_for_var_init into the given fact slice.
 // Variable* FieldVars always live; nil hole fails closed (*facts = IncompleteFactSlice() — no invent
 // soft-skip hole and still makeup later fields as complete).
+// facts always live; sticky (no invent soft-skip makeup past hole).
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	if facts == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Variable* always live; nil v hole fails closed sticky (clear — no invent skip as absent)

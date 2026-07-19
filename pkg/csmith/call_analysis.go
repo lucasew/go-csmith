@@ -343,21 +343,26 @@ func GetDirectInvocation(st *Stmt) *Invocation {
 	case StmtAssign, StmtIfElse:
 		// StatementAssign/If always have live get_expr/get_test
 		if st.Expr == nil {
+			// incomplete Expr sticky Failed shell (no invent nil "no call" soft-skip)
+			SetError(ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		if st.Expr.Term != TermFunction {
 			return nil
 		}
 		if st.Expr.Invoke == nil {
+			SetError(ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		return st.Expr.Invoke
 	case StmtInvoke:
 		// StatementExpr always has live get_invoke
 		if st.Expr == nil || st.Expr.Term != TermFunction {
+			SetError(ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		if st.Expr.Invoke == nil {
+			SetError(ErrGeneric)
 			return &Invocation{Failed: true}
 		}
 		return st.Expr.Invoke

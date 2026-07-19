@@ -214,15 +214,32 @@ func TestGetDirectInvocation(t *testing.T) {
 	if GetDirectInvocation(st3) != nil {
 		t.Fatal("const")
 	}
-	// incomplete Expr/Invoke fails closed Failed (no invent nil as no-call)
+	// incomplete Expr/Invoke fails closed Failed sticky (no invent nil as no-call soft-skip)
+	ClearError()
 	got := GetDirectInvocation(&Stmt{Kind: StmtInvoke})
 	if got == nil || !got.Failed {
 		t.Fatal("nil Expr invoke must fail closed Failed shell", got)
 	}
+	if !HasError() {
+		t.Fatal("nil Expr invoke must SetError sticky")
+	}
+	ClearError()
 	got = GetDirectInvocation(&Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}})
 	if got == nil || !got.Failed {
 		t.Fatal("nil Invoke on TermFunction must fail closed Failed")
 	}
+	if !HasError() {
+		t.Fatal("nil Invoke must SetError sticky")
+	}
+	ClearError()
+	got = GetDirectInvocation(&Stmt{Kind: StmtAssign, Expr: nil})
+	if got == nil || !got.Failed {
+		t.Fatal("nil Expr assign must fail closed Failed")
+	}
+	if !HasError() {
+		t.Fatal("nil Expr assign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindContainedLabels(t *testing.T) {

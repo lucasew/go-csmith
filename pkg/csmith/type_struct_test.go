@@ -115,6 +115,12 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 		t.Fatal("simples still seeded")
 	}
 	ClearError()
+	// TypeEnv always live; sticky (no invent soft-skip type gen past hole)
+	GenerateAllTypesEnv(NewRng(1), opts, NewProbabilities(opts), nil)
+	if !HasError() {
+		t.Fatal("nil env GenerateAllTypesEnv must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGenerateEmitsStructDecl(t *testing.T) {
