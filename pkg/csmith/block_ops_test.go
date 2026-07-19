@@ -441,6 +441,40 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	}
 }
 
+func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
+	// incomplete MapFactsIn[block] must not invent empty fixed-point re-analysis
+	// (old soft path: FactsComplete fail → treat as nil empty env → FP success)
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	parent := &Block{StmID: 1, Func: f}
+	b := &Block{StmID: 80, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
+		Stmts: []Stmt{{Kind: StmtAssign, StmID: 81,
+			LhsVar: CreateVariableScalars("g_x", GetIntType(), false, false),
+			Lhs:    &Lhs{Var: CreateVariableScalars("g_x", GetIntType(), false, false), Type: GetIntType()},
+			Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+		}},
+	}
+	// fix LhsVar pointer identity
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	b.Stmts[0].LhsVar = v
+	b.Stmts[0].Lhs = &Lhs{Var: v, Type: GetIntType()}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	// plant hole in MapFactsIn (bypass SetMapFactsIn which stores nil for incomplete)
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		80: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	b.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete MapFactsIn must fail closed nil GlobalFacts, not invent empty FP", fm.GlobalFacts)
+	}
+	ClearError()
+}
+
 func TestPostCreationAppendsReturn(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1

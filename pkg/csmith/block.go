@@ -509,57 +509,63 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			selfBack = true
 			fm.CreateCFGEdge(b.StmID, b, false, true)
 		}
-		// incomplete MapFactsIn fails closed (no invent cleaned fixed-point inputs)
-		// C++ map[] missing → empty; holes → treat as empty env for re-analysis
+		// incomplete MapFactsIn fails closed — C++ map[] missing is empty complete;
+		// holes must not invent empty fixed-point re-analysis as success
 		in0 := fm.MapFactsIn[b.StmID]
 		if !FactsComplete(in0) {
-			in0 = nil
-		}
-		factsCopy := CloneFactSlice(in0)
-		// reset accum to pre-block effect
-		if cg.EffectAccum != nil {
-			*cg.EffectAccum = preEffect.Clone()
-		}
-		for {
-			out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
-			if ok {
-				postFacts = out
-				break
-			}
-			// remove from fail index through end (Block.cpp:709–714)
-			if failIdx < 0 {
-				failIdx = 0
-			}
-			for failIdx < len(b.Stmts) {
-				id := b.Stmts[failIdx].StmID
-				if id == 0 {
-					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
-					continue
-				}
-				if n := b.RemoveStmt(id, fm); n == 0 {
-					b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
-				}
-			}
-			b.NeedRevisit = true
-			fm.ResetBlockFactMaps(b)
-			if !selfBack && b.FromTailToHead() {
-				selfBack = true
-				fm.CreateCFGEdge(b.StmID, b, false, true)
-			}
+			fm.GlobalFacts = nil
+			postFacts = nil
+		} else {
+			factsCopy := CloneFactSlice(in0)
+			// reset accum to pre-block effect
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
 			}
-			if len(b.Stmts) == 0 {
-				break
+			for {
+				out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+				if ok {
+					postFacts = out
+					break
+				}
+				// remove from fail index through end (Block.cpp:709–714)
+				if failIdx < 0 {
+					failIdx = 0
+				}
+				for failIdx < len(b.Stmts) {
+					id := b.Stmts[failIdx].StmID
+					if id == 0 {
+						// incomplete stm_id — fail closed strip tail (no invent
+						// soft-skip hole and keep later stmts as complete block)
+						b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+						continue
+					}
+					if n := b.RemoveStmt(id, fm); n == 0 {
+						b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+					}
+				}
+				b.NeedRevisit = true
+				fm.ResetBlockFactMaps(b)
+				if !selfBack && b.FromTailToHead() {
+					selfBack = true
+					fm.CreateCFGEdge(b.StmID, b, false, true)
+				}
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preEffect.Clone()
+				}
+				if len(b.Stmts) == 0 {
+					break
+				}
 			}
-		}
-		// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
-		// incomplete out fails closed (nil — no invent keep prior GlobalFacts)
-		out := fm.MapFactsOut[b.StmID]
-		if !FactsComplete(out) {
-			fm.GlobalFacts = nil
-		} else {
-			fm.GlobalFacts = CloneFactSlice(out)
+			// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
+			// incomplete out fails closed (nil — no invent keep prior GlobalFacts)
+			out := fm.MapFactsOut[b.StmID]
+			if !FactsComplete(out) {
+				fm.GlobalFacts = nil
+				postFacts = nil
+			} else {
+				fm.GlobalFacts = CloneFactSlice(out)
+				postFacts = fm.GlobalFacts
+			}
 		}
 	} else if b.Looping && b.FromTailToHead() {
 		fm.CreateCFGEdge(b.StmID, b, false, true)
