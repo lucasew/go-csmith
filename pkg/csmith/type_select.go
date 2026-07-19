@@ -63,16 +63,18 @@ func (env *TypeEnv) FindType(t *Type) *Type {
 
 // GetAllOKStructUnionTypes mirrors Type::get_all_ok_struct_union_types.
 // Type.cpp:487–503 — filter const/volatile aggregates and optional int field.
-// Type* always live on AllTypes; nil hole fails closed (nil out, no invent partial).
+// Type* always live on AllTypes; nil hole fails closed IncompleteTypes
+// (not bare nil invent empty-complete ok_types pool via typesComplete(nil)/len==0).
+// Complete empty filter result returns non-nil empty slice.
 func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, wantStruct bool) []*Type {
 	if env == nil {
-		return nil
+		return []*Type{}
+	}
+	if !typesComplete(env.AllTypes) {
+		return IncompleteTypes()
 	}
 	ok := make([]*Type, 0)
 	for _, t := range env.AllTypes {
-		if t == nil {
-			return nil
-		}
 		if wantStruct {
 			if !t.IsStruct() {
 				continue
@@ -98,6 +100,9 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 
 // typesComplete reports Type* slices have no nil holes (Type* always live on
 // AllTypes / derived_types / ok_types in C++).
+// Note: typesComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteTypes() so len(nil)==0 cannot invent empty-complete
+// type-pool success.
 func typesComplete(ts []*Type) bool {
 	for _, t := range ts {
 		if t == nil {
@@ -105,6 +110,12 @@ func typesComplete(ts []*Type) bool {
 		}
 	}
 	return true
+}
+
+// IncompleteTypes is the fail-closed incomplete Type* list marker.
+// typesComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteTypes() []*Type {
+	return []*Type{nil}
 }
 
 // ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
@@ -143,6 +154,10 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 		}
 	}
 	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
+	// incomplete AllTypes pool — fail closed (no invent pick from partial)
+	if !typesComplete(ok) {
+		return nil
+	}
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
 	// process CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
 	if len(ok) > 0 {
@@ -425,7 +440,8 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	if typ == nil && op == AssignSimple && env != nil && probs != nil {
 		// Type.cpp:1617–1618 — get_all_ok_struct_union_types(ok, no_const=true, no_volatile, need_int=false, bStruct=true)
 		cands := env.GetAllOKStructUnionTypes(true, noVolatile, false, true)
-		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+		// incomplete ok_types — skip struct-as-LType (no invent pick from hole pool)
+		if typesComplete(cands) && len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
 			if HasError() {
 				return nil
 			}

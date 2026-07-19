@@ -304,16 +304,14 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
 // VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
 // ChooseOKVar picks one eligible variable (optionally itemizing arrays).
-// Variable* always live in vars; nil hole fails closed (nil pick, no invent skip).
+// Incomplete candidate list fails closed (nil pick — no invent skip hole).
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
+	if !VariablesComplete(vars) {
+		return nil
+	}
 	n := len(vars)
 	if n == 0 {
 		return nil
-	}
-	for _, x := range vars {
-		if x == nil {
-			return nil
-		}
 	}
 	var v *Variable
 	if n == 1 {
