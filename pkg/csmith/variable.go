@@ -586,7 +586,15 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 			continue
 		}
 		if av.NoLoopInitializer() {
+			// residual ERROR sticky — no invent soft-skip then partial inits past hole
+			if HasError() {
+				return ""
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue past NoLoopInitializer hole
+		if HasError() {
+			return ""
 		}
 		initOut := av.OutputInit(indent, names)
 		// incomplete loop-init IR sticky — fail closed whole initializers
@@ -2066,10 +2074,23 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 			// Variable.cpp:893–898 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
 				if !IsFieldReadable(v, i, unionFacts) {
+					// residual ERROR sticky — no invent soft-skip then partial hash past hole
+					if HasError() {
+						return ""
+					}
 					continue
 				}
+				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
+				if HasError() {
+					return ""
+				}
 			}
-			b.WriteString(f.hashOutput(ctrl, unionFacts))
+			part := f.hashOutput(ctrl, unionFacts)
+			// residual ERROR sticky — no invent partial field hash past hard IR hole
+			if HasError() {
+				return ""
+			}
+			b.WriteString(part)
 		}
 		return b.String()
 	}

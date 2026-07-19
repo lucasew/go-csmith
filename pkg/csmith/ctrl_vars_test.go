@@ -190,6 +190,30 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 		t.Fatal("IsArray without AsArray OutputArrayInitializers must SetError sticky")
 	}
 	ClearError()
+	// NoLoopInitializer residual: Type-nil stickies true; soft invent was soft-skip then
+	// partial inits for later arrays. Fair: sticky fail closed whole section.
+	// Need live AsArray with Type-nil after GetMaxArrayDimension validation path.
+	// Use Type-nil via NoLoopInitializer on live array that has Type then clear — not possible mid-loop.
+	// Use IsConst residual via nil Qfer unpaired? IsConst only stickies nil Variable.
+	// GetMaxArrayDimension requires complete vars + live AsArray; NoLoopInitializer Type-nil stickies.
+	avBroken := &ArrayVariable{
+		Variable: Variable{Name: "g_b", Type: nil, IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	avBroken.AsArray = avBroken
+	// GetMaxArrayDimension uses AsArray.Sizes — Type nil still dims from sizes
+	// NoLoopInitializer(av) Type nil stickies residual true → soft-skip invent next
+	avGood := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_c", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	if avGood == nil {
+		t.Fatal("good array")
+	}
+	if s := OutputArrayInitializers([]*Variable{&avBroken.Variable, &avGood.Variable}, opts, "    "); s != "" {
+		t.Fatal("NoLoopInitializer residual must fail closed empty", s)
+	}
+	if !HasError() {
+		t.Fatal("NoLoopInitializer residual OutputArrayInitializers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputForCommentNilSticky(t *testing.T) {

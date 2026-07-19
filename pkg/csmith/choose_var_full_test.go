@@ -96,6 +96,16 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 	if strings.Contains(out, "g_u.f1") {
 		t.Fatal("must skip f1", out)
 	}
+	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial hash.
+	// Fair: sticky fail closed empty whole hash.
+	ClearError()
+	if s := uv.HashOutputWithUnionFacts(IncompleteUnionFactSlice()); s != "" {
+		t.Fatal("incomplete UnionFacts HashOutput must fail closed empty", s)
+	}
+	if !HasError() {
+		t.Fatal("incomplete UnionFacts HashOutput must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRecordPointerAvailForDeref(t *testing.T) {

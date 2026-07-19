@@ -136,6 +136,24 @@ func TestJoinVarFactsUnion(t *testing.T) {
 	}
 }
 
+func TestJoinVarFactsUnionResidualSticky(t *testing.T) {
+	// FindRelated residual soft invent was continue then join later complete var.
+	// Fair: sticky fail closed nil whole join.
+	ClearError()
+	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	u1 := &Variable{Name: "g_u1", Type: ut}
+	u2 := &Variable{Name: "g_u2", Type: ut}
+	// facts hole then complete fact — soft invent was skip hole invent join u2
+	facts := []*FactUnion{nil, MakeFactUnion(u2, 0)}
+	if JoinVarFactsUnion(facts, []*Variable{u1, u2}) != nil {
+		t.Fatal("FindRelated residual must fail closed JoinVarFactsUnion")
+	}
+	if !HasError() {
+		t.Fatal("FindRelated residual JoinVarFactsUnion must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	// FactUnion.cpp:65 assert union; OOB fid fail closed sticky
 	ClearError()

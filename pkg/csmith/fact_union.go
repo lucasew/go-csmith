@@ -300,7 +300,19 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 		return false
 	}
 	fu := FindRelatedUnion(facts, v)
-	return fu != nil && tmp.Imply(fu)
+	// residual ERROR sticky — no invent readable/not-readable soft-skip past FindRelated hole
+	if HasError() {
+		return false
+	}
+	if fu == nil {
+		return false
+	}
+	ok := tmp.Imply(fu)
+	// residual ERROR sticky — no invent readable true past Imply hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsNonreadableField mirrors FactUnion::is_nonreadable_field.
@@ -371,16 +383,31 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 	var fu *FactUnion
 	for _, v := range vars {
 		exist := FindRelatedUnion(facts, v)
+		// residual ERROR sticky — no invent soft-continue join past FindRelated hole
+		if HasError() {
+			return nil
+		}
 		if exist == nil {
 			continue
 		}
 		if fu == nil {
 			fu = exist.Clone()
+			// residual ERROR sticky — no invent soft-continue past Clone hole
+			if HasError() || fu == nil {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return nil
+			}
 			continue
 		}
 		// hack: both must share var identity for join — set to exist's var
 		fu.Var = exist.Var
 		fu.Join(exist)
+		// residual ERROR sticky — no invent soft-continue partial join past Join hole
+		if HasError() {
+			return nil
+		}
 	}
 	return fu
 }
