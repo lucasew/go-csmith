@@ -764,9 +764,11 @@ func MakeRandomParam(
 
 // BumpsExprDepth reports whether this expression increments cg_context.expr_depth.
 // Expression.cpp:213–218 — Constant, Variable, or user FunctionInvocation.
+// Expression always live; sticky true (no invent not-bump soft-skip depth past hole).
 func BumpsExprDepth(e *Expression) bool {
 	if e == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	switch e.Term {
 	case TermConstant, TermVariable:

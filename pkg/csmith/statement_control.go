@@ -74,13 +74,23 @@ func (st Stmt) MustJump() bool {
 // MustReturn mirrors Block::must_return.
 // Block.cpp:313–331 — last must_return, no break_stms, no escape via back edges.
 // Uses b.EmitFM for CFG when set; prefer MustReturnWithFM during DFA.
+// Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturn() bool {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	return b.MustReturnWithFM(b.EmitFM)
 }
 
 // MustReturnWithFM is must_return with an explicit FactMgr for back-edge checks.
+// Block always live; sticky false (no invent not-must-return soft-skip past hole).
 func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
-	if b == nil || len(b.Stmts) == 0 {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(b.Stmts) == 0 {
 		return false
 	}
 	// StatementBreak.cpp push → break_stms; any break means can leave without return
@@ -97,8 +107,13 @@ func (b *Block) MustReturnWithFM(fm *FactMgr) bool {
 
 // MustJump mirrors Block::must_jump.
 // Block.cpp:336–341 — last must_jump and break_stms empty.
+// Block always live; sticky false (no invent not-must-jump soft-skip past hole).
 func (b *Block) MustJump() bool {
-	if b == nil || len(b.Stmts) == 0 {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(b.Stmts) == 0 {
 		return false
 	}
 	if len(b.BreakStmIDs) > 0 {

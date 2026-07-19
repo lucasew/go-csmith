@@ -144,6 +144,27 @@ func TestTypeNilHardQuerySticky(t *testing.T) {
 		t.Fatal("nil PrintfDirective must SetError sticky")
 	}
 	ClearError()
+	if (*Type)(nil).HasIntField() {
+		t.Fatal("nil HasIntField must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil HasIntField must SetError sticky")
+	}
+	ClearError()
+	if !(*Type)(nil).IsFullBitfieldsStruct() {
+		t.Fatal("nil IsFullBitfieldsStruct must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil IsFullBitfieldsStruct must SetError sticky")
+	}
+	ClearError()
+	if !(*Type)(nil).IsSigned() {
+		t.Fatal("nil IsSigned must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil IsSigned must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {

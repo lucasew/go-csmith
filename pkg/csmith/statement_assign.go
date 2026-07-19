@@ -682,9 +682,11 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 
 // assignLhsIsVolatile reports LHS volatile for OutputAsExpr ccomp rewrite.
 // StatementAssign.cpp:552 — lhs.is_volatile().
+// Statement always live; sticky true (no invent non-vol soft-skip ccomp path past hole).
 func assignLhsIsVolatile(st *Stmt) bool {
 	if st == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if st.Lhs != nil {
 		return st.Lhs.IsVolatile()
@@ -694,8 +696,10 @@ func assignLhsIsVolatile(st *Stmt) bool {
 
 // expressionQualifiers mirrors Expression::get_qualifiers for qfer seed.
 // Uses Expression.GetQualifiers (ExpressionVariable/Assign/Funcall/Comma).
+// Expression always live at qfer seed; sticky nil (no invent empty seed past hole).
 func expressionQualifiers(e *Expression) *CVQualifiers {
 	if e == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	q := e.GetQualifiers()

@@ -564,6 +564,15 @@ func TestBumpsExprDepth(t *testing.T) {
 	if BumpsExprDepth(&Expression{Term: TermCommaExpr}) {
 		t.Fatal("comma no bump")
 	}
+	// Expression always live; sticky true (no invent not-bump soft-skip depth)
+	ClearError()
+	if !BumpsExprDepth(nil) {
+		t.Fatal("nil BumpsExprDepth must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil BumpsExprDepth must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomExpressionBumpsCallerExprDepth(t *testing.T) {

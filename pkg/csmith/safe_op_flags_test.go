@@ -189,3 +189,15 @@ func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSafeOpFlagsCloneNilSticky(t *testing.T) {
+	// SafeOpFlags* always live at clone; sticky no invent soft-skip past hole
+	ClearError()
+	if (*SafeOpFlags)(nil).Clone() != nil {
+		t.Fatal("nil Clone must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil Clone must SetError sticky")
+	}
+	ClearError()
+}

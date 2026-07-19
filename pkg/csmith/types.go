@@ -216,10 +216,11 @@ func (t *Type) IsPointerLike() bool {
 
 // HasIntField mirrors Type::has_int_field.
 // Type.cpp:471–480 — self is int or any field has_int_field.
-// HasIntField mirrors Type::has_int_field.
-// Type* always live on Fields; nil hole fails closed as false (no invent has-int).
+// Type* always live; sticky false (no invent has-int soft success past hole).
+// Type* always live on Fields; nil field hole fails closed as false (no invent has-int).
 func (t *Type) HasIntField() bool {
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if t.IsInt() {
@@ -278,8 +279,13 @@ func (t *Type) IsSignedChar() bool {
 
 // IsFullBitfieldsStruct mirrors Type::is_full_bitfields_struct.
 // Type.cpp:1316–1324 — every field is a bitfield (BitWidth >= 0).
+// Type* always live; sticky true (no invent not-full-bitfields soft-skip past hole).
 func (t *Type) IsFullBitfieldsStruct() bool {
-	if t == nil || !t.IsStruct() || len(t.Fields) == 0 {
+	if t == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !t.IsStruct() || len(t.Fields) == 0 {
 		return false
 	}
 	for _, f := range t.Fields {
@@ -291,8 +297,13 @@ func (t *Type) IsFullBitfieldsStruct() bool {
 }
 
 // IsSigned mirrors Type::is_signed (Type.cpp:1326–1347).
+// Type* always live; sticky true (no invent unsigned soft-skip past hole).
 func (t *Type) IsSigned() bool {
-	if t == nil || !t.IsSimple() {
+	if t == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !t.IsSimple() {
 		return false
 	}
 	switch t.simple {

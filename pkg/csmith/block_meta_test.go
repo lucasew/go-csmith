@@ -214,6 +214,28 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 		t.Fatal("complete MustJump must not sticky")
 	}
 	ClearError()
+	// Block always live; sticky no invent not-must-return / not-must-jump soft-skip
+	if (*Block)(nil).MustReturn() {
+		t.Fatal("nil MustReturn must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil MustReturn must SetError sticky")
+	}
+	ClearError()
+	if (*Block)(nil).MustJump() {
+		t.Fatal("nil MustJump must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil MustJump must SetError sticky")
+	}
+	ClearError()
+	if (*Block)(nil).MustReturnWithFM(NewFactMgr(nil)) {
+		t.Fatal("nil MustReturnWithFM must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil MustReturnWithFM must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBlockOutputBlockIDComment(t *testing.T) {

@@ -84,8 +84,13 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 // drop edges into s and recursively remove goto sources; drop contained blocks
 // from Function.Blocks; erase s from stms.
 // Returns number of statements removed from this block (including cascaded gotos).
+// Block always live; sticky 0 (no invent no-op remove soft-skip past hole).
 func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
-	if b == nil || stmID <= 0 {
+	if b == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	if stmID <= 0 {
 		return 0
 	}
 	var removed *Stmt

@@ -305,4 +305,20 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 		t.Fatal("nil assignLhsText must SetError sticky")
 	}
 	ClearError()
+	// Statement always live; sticky true (no invent non-vol soft-skip ccomp)
+	if !assignLhsIsVolatile(nil) {
+		t.Fatal("nil assignLhsIsVolatile must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil assignLhsIsVolatile must SetError sticky")
+	}
+	ClearError()
+	// Expression always live at qfer seed; sticky nil
+	if expressionQualifiers(nil) != nil {
+		t.Fatal("nil expressionQualifiers must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil expressionQualifiers must SetError sticky")
+	}
+	ClearError()
 }

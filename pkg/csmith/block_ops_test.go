@@ -188,6 +188,14 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 		t.Fatal("nil MustBreakOrReturnFull must SetError sticky")
 	}
 	ClearError()
+	// Block always live at remove_stmt; sticky no invent no-op remove soft-skip
+	if (*Block)(nil).RemoveStmt(1, fm) != 0 {
+		t.Fatal("nil RemoveStmt must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil RemoveStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectCloneIndependent(t *testing.T) {

@@ -64,8 +64,10 @@ func ReturnFloatTypeUnary(opts Options, rv, op1 *Type, uop UnaryOp) bool {
 
 // Clone mirrors SafeOpFlags::clone.
 // SafeOpFlags.cpp:217.
+// SafeOpFlags* always live at clone; sticky nil (no invent soft-skip past hole).
 func (f *SafeOpFlags) Clone() *SafeOpFlags {
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	cp := *f
