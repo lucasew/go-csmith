@@ -133,6 +133,65 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestItemizeArrayTypeNilSticky(t *testing.T) {
+	// type always live at itemize; Type-nil no invent soft-success item
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	cg := EmptyCGContext()
+	cg.IVBounds = map[*Variable]int{iv: 0}
+	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+		t.Fatal("Type-nil array must fail closed ItemizeArray")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil array ItemizeArray must SetError sticky")
+	}
+	ClearError()
+	// IV Type-nil sticky — no invent OK-IV soft pool past hole
+	av2 := &ArrayVariable{
+		Variable: Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av2.AsArray = av2
+	ivHole := &Variable{Name: "j", Type: nil}
+	cg2 := EmptyCGContext()
+	cg2.IVBounds = map[*Variable]int{ivHole: 0}
+	if vs.ItemizeArray(NewRng(1), cg2, av2) != nil {
+		t.Fatal("Type-nil IV must fail closed ItemizeArray")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IV ItemizeArray must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestSelectArrayTypeNilSticky(t *testing.T) {
+	// av->type always live; Type-nil no invent soft-include / CreateRandom soft-success
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	vs.Arrays = []*ArrayVariable{av}
+	cg := EmptyCGContext()
+	if vs.SelectArray(NewRng(1), cg) != nil {
+		t.Fatal("Type-nil SelectArray must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil SelectArray must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

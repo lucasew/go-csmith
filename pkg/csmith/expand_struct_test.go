@@ -125,6 +125,15 @@ func TestExpandStructUnionVars(t *testing.T) {
 		t.Fatal("nil FieldVars hole must SetError sticky")
 	}
 	ClearError()
+	// Type-nil non-special sticky incomplete (no invent keep shell as complete candidate)
+	hole := &Variable{Name: "g_hole", Type: nil}
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{hole}, GetIntType())) {
+		t.Fatal("Type-nil expand must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil expand must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {

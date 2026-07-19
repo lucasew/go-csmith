@@ -231,11 +231,17 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			if bound < 0 || bound >= dimenLen {
 				continue
 			}
-			if iv.Type != nil && iv.Type.IsFloat() {
+			// VariableSelector.cpp:1455–1459 — iv->type always live Type*
+			// Type-nil sticky fail whole itemize (no invent OK-IV soft pool past hole)
+			if iv.Type == nil {
+				SetError(ErrGeneric)
+				return nil
+			}
+			if iv.Type.IsFloat() {
 				continue
 			}
 			// VariableSelector.cpp:1455–1456 — signed char index option
-			if !cgHasSignedCharIndex(vs) && iv.Type != nil && iv.Type.IsSignedChar() {
+			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedChar() {
 				continue
 			}
 			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
@@ -305,8 +311,13 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		IndexExprs: indexExprs,
 	}
 	item.AsArray = item
-	// ArrayVariable.cpp:372–375 — create_field_vars for aggregate element type
-	if item.Type != nil && item.Type.IsAggregate() {
+	// ArrayVariable.cpp:372–375 — type always live; create_field_vars for aggregates
+	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
+	if item.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
 	}
 	if vs != nil {
@@ -1369,8 +1380,18 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 		if v.IsVirtual() {
 			continue
 		}
+		// Variable Type* always live in expand pool; Type-nil sticky incomplete
+		// (no invent keep incomplete shell as complete candidate / soft re-pick)
+		// Special null/garbage/tbd have Type nil by design — complete skip expand.
+		if v.Type == nil {
+			if IsSpecialPtr(v) {
+				continue
+			}
+			SetError(ErrGeneric)
+			return IncompleteVariables()
+		}
 		// don't break up a struct if it matches the given type
-		if v.Type != nil && v.Type.IsAggregate() && v.Type != want {
+		if v.Type.IsAggregate() && v.Type != want {
 			// FieldVars always live; incomplete fails closed sticky
 			if !v.FieldVarsComplete() {
 				SetError(ErrGeneric)
@@ -2315,7 +2336,13 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		if cg.IsNonWritable(&av.Variable) {
 			return
 		}
-		if av.Type != nil && av.Type.IsConstStructUnion() {
+		// VariableSelector.cpp:1405 — av->type->is_const_struct_union() always live Type*
+		// Type-nil sticky fail select pool (no invent not-const soft-include past hole)
+		if av.Type == nil {
+			SetError(ErrGeneric)
+			return
+		}
+		if av.Type.IsConstStructUnion() {
 			return
 		}
 		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
@@ -2348,6 +2375,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return nil
 		}
 		add(av)
+	}
+	// Type-nil / filter sticky from add — no invent CreateRandomArray / pick soft-success
+	if HasError() {
+		return nil
 	}
 	n := len(arrayVars)
 	// VariableSelector.cpp:1428–1435

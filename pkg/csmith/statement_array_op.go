@@ -320,8 +320,14 @@ func MakeRandomArrayInit(
 				// ERROR_GUARD path
 				break
 			}
-			// float IV rejected (StatementArrayOp.cpp:112–115)
-			if iv.Type != nil && iv.Type.IsFloat() {
+			// StatementArrayOp.cpp:112–115 — iv->type always live; float rejected
+			// Type-nil sticky fail whole array-op (no invent OK-IV soft pool past hole)
+			if iv.Type == nil {
+				SetError(ErrGeneric)
+				iv = nil
+				break
+			}
+			if iv.Type.IsFloat() {
 				invalid[iv] = true
 				continue
 			}
@@ -331,7 +337,7 @@ func MakeRandomArrayInit(
 			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
 			if (opts.StrictVolatileRule && volCount > 1 && iv.IsVolatile()) ||
 				(opts.CComp && iv.IsPackedAggregateFieldVar()) ||
-				(!opts.SignedCharIndex && iv.Type != nil && iv.Type.IsSignedChar()) {
+				(!opts.SignedCharIndex && iv.Type.IsSignedChar()) {
 				invalid[iv] = true
 				continue
 			}
