@@ -277,3 +277,52 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 		t.Fatal("return must drop stack local subject", retOut)
 	}
 }
+
+func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
+	// incomplete facts must not invent cleaned MapFactsIn/Out entry
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
+	if fm.MapFactsIn[1] != nil {
+		t.Fatal("SetMapFactsIn incomplete must store nil")
+	}
+	fm.SetMapFactsOut(2, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
+	if fm.MapFactsOut[2] != nil {
+		t.Fatal("SetMapFactsOut incomplete must store nil")
+	}
+}
+
+func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
+	// LocalVars nil hole fails closed (no invent skip partial OOS list)
+	loop := &Block{Looping: true, LocalVars: []*Variable{
+		CreateVariableScalars("l_1", GetIntType(), false, false),
+		nil,
+	}}
+	if collectLoopLocalVars(loop) != nil {
+		t.Fatal("nil LocalVars hole must fail closed")
+	}
+	// complete empty
+	empty := &Block{Looping: true}
+	got := collectLoopLocalVars(empty)
+	if got == nil {
+		t.Fatal("empty complete must be non-nil empty")
+	}
+	if len(got) != 0 {
+		t.Fatal(got)
+	}
+	// incomplete facts on RemoveLoopLocalFacts
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	if RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty) != nil {
+		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
+	}
+}
+
+func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	st := &Stmt{Kind: StmtAssign, StmID: 5}
+	fm.SetMapFactsOutForStmt(st, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, nil)
+	if fm.MapFactsOut[5] != nil {
+		t.Fatal("incomplete set_fact_out must store nil")
+	}
+}

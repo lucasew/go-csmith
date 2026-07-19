@@ -287,10 +287,12 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 			continue
 		}
 		// Function.cpp:288–289 — type->is_convertable(return_type)
-		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
-			continue
-		}
+		// C++ always has live return_type*; nil is incomplete IR
+		// fail closed whole choose (no invent soft-skip broken func as absent)
 		if ret != nil && f.ReturnType == nil {
+			return nil
+		}
+		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
 			continue
 		}
 		// Function.cpp:294–295 — qfer->match(rv->qfer)

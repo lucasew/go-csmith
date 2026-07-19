@@ -24,6 +24,12 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	if ChooseFunc(NewRng(1), []*Function{built, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
+	// nil ReturnType when ret wanted fails closed — no invent soft-skip as absent
+	// (C++ is_convertable would deref return_type*; list hole aborts whole choose)
+	noRet := &Function{Name: "bad", ReturnType: nil, IsBuilt: true, BuildState: BuildBuilt}
+	if ChooseFunc(NewRng(1), []*Function{built, noRet}, GetIntType(), nil) != nil {
+		t.Fatal("nil ReturnType must fail closed whole choose, not invent skip")
+	}
 }
 
 func TestArrayNoLoopInitializer(t *testing.T) {

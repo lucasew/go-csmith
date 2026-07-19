@@ -89,6 +89,11 @@ func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 	if fm.MapFactsIn == nil {
 		fm.MapFactsIn = make(map[int][]*FactPointTo)
 	}
+	// incomplete facts store nil (no invent cleaned partial map entry)
+	if !FactsComplete(facts) {
+		fm.MapFactsIn[stmID] = nil
+		return
+	}
 	fm.MapFactsIn[stmID] = CloneFactSlice(facts)
 }
 
@@ -99,6 +104,11 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	}
 	if fm.MapFactsOut == nil {
 		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	}
+	// incomplete facts store nil (no invent cleaned partial map entry)
+	if !FactsComplete(facts) {
+		fm.MapFactsOut[stmID] = nil
+		return
 	}
 	fm.MapFactsOut[stmID] = CloneFactSlice(facts)
 }
@@ -121,6 +131,13 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 // SetMapFactsOutForStmtDest is set_fact_out with optional goto dest parent override.
 func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk, destParent *Block) {
 	if fm == nil || st == nil {
+		return
+	}
+	// incomplete source facts fail closed (nil out — no invent cleaned set_fact_out)
+	if !FactsComplete(facts) {
+		if st.StmID > 0 {
+			fm.SetMapFactsOut(st.StmID, nil)
+		}
 		return
 	}
 	cp := CloneFactSlice(facts)
@@ -578,7 +595,15 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 	if blk == nil {
 		return facts
 	}
+	// incomplete facts fail closed before OOS
+	if !FactsComplete(facts) {
+		return nil
+	}
 	locals := collectLoopLocalVars(blk)
+	// nil locals = incomplete LocalVars hole — fail closed
+	if locals == nil {
+		return nil
+	}
 	out := CloneFactSlice(facts)
 	// Statement.cpp set_fact_out / FactMgr.cpp:607–611
 	UpdateFactsForOOSVars(locals, &out)
@@ -597,10 +622,17 @@ func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) 
 
 // collectLoopLocalVars walks blk → parents until a looping block (inclusive).
 // FactMgr.cpp:605–610.
+// Variable* always live on LocalVars; nil hole fails closed (nil — no invent skip).
+// Empty complete walk returns non-nil empty slice.
 func collectLoopLocalVars(blk *Block) []*Variable {
-	var locals []*Variable
+	locals := make([]*Variable, 0)
 	b := blk
 	for b != nil {
+		for _, v := range b.LocalVars {
+			if v == nil {
+				return nil
+			}
+		}
 		locals = append(locals, b.LocalVars...)
 		if b.Looping {
 			break

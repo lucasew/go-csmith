@@ -397,11 +397,10 @@ func MakeRandomGoto(
 		}
 	} else {
 		// StatementGoto.cpp:125–128 — map_accum_effect[other] read_vars
+		// C++ map[] always (missing → empty Effect); no invent skip when key absent
 		condBlk = okBlk
-		if cg.FM != nil {
-			if acc, ok := cg.FM.MapAccumEffect[other.StmID]; ok {
-				readVars = acc.ReadVars()
-			}
+		if cg.FM != nil && cg.FM.MapAccumEffect != nil {
+			readVars = cg.FM.MapAccumEffect[other.StmID].ReadVars()
 		}
 	}
 	var cond *Expression
