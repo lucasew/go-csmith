@@ -85,6 +85,17 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	if !strings.Contains(out, "assert") {
 		t.Fatal(out)
 	}
+	// global fact neither read nor written → no invent comment-only shell
+	f2 := &Function{Name: "func_2", ReturnType: GetIntType()}
+	// empty effect: skip globals
+	fm2 := NewFactMgr(f2)
+	fm2.SetMapFactsIn(6, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm2.SetMapFactsOut(6, []*FactPointTo{MakeFactPointTo(p, tgt)})
+	fm2.SetupInOutMaps(true)
+	st2 := &Stmt{Kind: StmtAssign, StmID: 6}
+	if s := fm2.OutputAssertions(st2, nil, "    ", true); s != "" {
+		t.Fatal("filtered facts must not invent comment-only shell", s)
+	}
 }
 
 func TestPostOutputInBlock(t *testing.T) {

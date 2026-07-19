@@ -70,7 +70,11 @@ func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 		return ""
 	}
 	i := int(r.RndUpto(uint32(len(a.Choices))))
-	// Attribute.cpp:66 — name + "(\"" + choice + "\")"
+	// Attribute.cpp:66 — name + "(\"" + choice + "\")"; choice always live string
+	// no invent name("") for empty choice slot
+	if a.Choices[i] == "" {
+		return ""
+	}
 	return a.Name + "(\"" + a.Choices[i] + "\")"
 }
 

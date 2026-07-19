@@ -132,9 +132,13 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 
 // OutputCommentLine mirrors OutputMgr::output_comment_line.
 // OutputMgr.cpp:314–320 — "/* comment */\n" unless quiet/concise.
+// empty comment is incomplete IR — no invent "/*  */" shell (still emits "\n" when quiet/concise).
 func OutputCommentLine(comment string, quiet, concise bool) string {
 	if quiet || concise {
 		return "\n"
+	}
+	if comment == "" {
+		return ""
 	}
 	return "/* " + comment + " */\n"
 }

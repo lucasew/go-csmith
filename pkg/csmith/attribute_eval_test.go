@@ -79,6 +79,10 @@ func TestAttributeNoInventEmptyName(t *testing.T) {
 	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("aligned empty name", s)
 	}
+	// empty choice slot — no invent visibility("")
+	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandom(NewRng(1)); s != "" {
+		t.Fatal("empty choice must fail closed", s)
+	}
 }
 
 func TestSectionAttribute(t *testing.T) {

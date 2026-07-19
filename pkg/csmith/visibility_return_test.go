@@ -86,6 +86,10 @@ func TestOutputCommentLine(t *testing.T) {
 	if OutputCommentLine("x", true, false) != "\n" {
 		t.Fatal("quiet")
 	}
+	// empty comment — no invent "/*  */"
+	if OutputCommentLine("", false, false) != "" {
+		t.Fatal("empty comment must fail closed")
+	}
 }
 
 func TestFunctionOutputSeparator(t *testing.T) {

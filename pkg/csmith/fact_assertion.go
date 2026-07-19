@@ -159,6 +159,25 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	if len(facts) == 0 {
 		return ""
 	}
+	// emit assertions first; no invent comment-only shell when all facts filtered
+	eff := EmptyEffect()
+	if fm.Func != nil {
+		eff = fm.Func.FEffect
+	}
+	var body strings.Builder
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		// skip globals neither read nor written in this function
+		if f.Var.IsGlobal() && !eff.IsRead(f.Var) && !eff.IsWritten(f.Var) {
+			continue
+		}
+		body.WriteString(f.OutputAssertion(stParent, indent))
+	}
+	if body.Len() == 0 {
+		return ""
+	}
 	var b strings.Builder
 	// comments for compound / simple (FactMgr.cpp:625–635)
 	switch st.Kind {
@@ -169,20 +188,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	case StmtAssign, StmtInvoke, StmtReturn:
 		b.WriteString(indent + "/* statement id: " + itoa(st.StmID) + " */\n")
 	}
-	eff := EmptyEffect()
-	if fm.Func != nil {
-		eff = fm.Func.FEffect
-	}
-	for _, f := range facts {
-		if f == nil || f.Var == nil {
-			continue
-		}
-		// skip globals neither read nor written in this function
-		if f.Var.IsGlobal() && !eff.IsRead(f.Var) && !eff.IsWritten(f.Var) {
-			continue
-		}
-		b.WriteString(f.OutputAssertion(stParent, indent))
-	}
+	b.WriteString(body.String())
 	return b.String()
 }
 
