@@ -976,7 +976,9 @@ func makeExpressionVariableFlags(
 // Output is a minimal C fragment (Expression::Output + optional cast).
 // Expression.cpp:227–232 output_cast — "(type) " prefix when cast_type set.
 func (e *Expression) Output() string {
+	// Expression* always live at Output; sticky no invent empty token without it
 	if e == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	body := e.outputBody()

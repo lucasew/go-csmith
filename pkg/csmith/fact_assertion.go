@@ -159,7 +159,13 @@ func outputFactVar(v *Variable) string {
 // OutputAssertion mirrors Fact::OutputAssertion.
 // Fact.cpp:64–73 — assert(cond); comment-out if not assertable.
 func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
-	if f == nil || f.IsTop() {
+	// Fact* always live at assert emit; sticky no invent empty assert without it
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// TOP fact: no assert condition (complete empty success)
+	if f.IsTop() {
 		return ""
 	}
 	cond := f.OutputCondition()
@@ -180,7 +186,9 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 // OutputAssertions mirrors FactMgr::output_assertions.
 // FactMgr.cpp:614–649 — post_condition uses updated final facts; filter unused globals.
 func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
+	// FactMgr + Statement always live for assertion emit; sticky no invent section without them
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Statement::stm_id always live; StmID 0 sticky (no invent empty assertion section)
@@ -308,7 +316,13 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 // PostOutput mirrors Statement::post_output.
 // Statement.cpp:919–924 — paranoid assertions after non-block statements.
 func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, indent string) string {
-	if st == nil || fm == nil || !paranoid || concise {
+	// options off: soft empty (no assert section invented when not requested)
+	if !paranoid || concise {
+		return ""
+	}
+	// when paranoid, Statement + FactMgr always live sticky
+	if st == nil || fm == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if st.Kind == StmtBlock {

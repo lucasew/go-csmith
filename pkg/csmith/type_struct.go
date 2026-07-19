@@ -293,8 +293,13 @@ func (t *Type) OutputStructDecl() string {
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	// Type.cpp:1838 — assert(type->is_aggregate()); nil/non-struct soft empty
-	if t == nil || !t.isStruct {
+	// Type* always live at struct emit; sticky no invent decl without it
+	if t == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// non-struct: soft empty (callers use OutputUnionDecl for unions)
+	if !t.isStruct {
 		return ""
 	}
 	// Type.cpp always has sid name (S#); sticky no invent "struct  {"
@@ -645,7 +650,13 @@ func (t *Type) OutputUnionDecl() string {
 // OutputUnionDeclOpts optionally emits type attributes.
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	if t == nil || !t.isUnion {
+	// Type* always live at union emit; sticky no invent decl without it
+	if t == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// non-union: soft empty
+	if !t.isUnion {
 		return ""
 	}
 	// Type.cpp always has sid name (U#); sticky no invent "union  {"

@@ -371,3 +371,21 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsOutputNilSticky(t *testing.T) {
+	ClearError()
+	if (*Lhs)(nil).Output(false) != "" {
+		t.Fatal("nil Lhs Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs Output must SetError sticky")
+	}
+	ClearError()
+	if (&Lhs{}).Output(false) != "" {
+		t.Fatal("nil Var Lhs Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Var Lhs Output must SetError sticky")
+	}
+	ClearError()
+}

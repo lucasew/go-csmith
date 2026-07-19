@@ -156,6 +156,28 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 		t.Fatal("StmID 0 OutputAssertions must SetError sticky")
 	}
 	ClearError()
+	// nil FM / Statement sticky
+	if s := (*FactMgr)(nil).OutputAssertions(st, nil, "    ", true); s != "" {
+		t.Fatal("nil FM OutputAssertions must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil FM OutputAssertions must SetError sticky")
+	}
+	ClearError()
+	if s := fm.OutputAssertions(nil, nil, "    ", true); s != "" {
+		t.Fatal("nil Stmt OutputAssertions must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt OutputAssertions must SetError sticky")
+	}
+	ClearError()
+	if s := (*FactPointTo)(nil).OutputAssertion(nil, "  "); s != "" {
+		t.Fatal("nil Fact OutputAssertion must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil Fact OutputAssertion must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostOutputInBlock(t *testing.T) {

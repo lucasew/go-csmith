@@ -212,10 +212,9 @@ func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
 // Output mirrors Lhs::Output — ExpressionVariable shape, optional VOL_LVAL wrap.
 // Lhs.cpp:207–218.
 func (l *Lhs) Output(wrapVolatiles bool) string {
+	// Lhs always live with Var at emit; sticky no invent empty LHS without them
 	if l == nil || l.Var == nil {
-		if l != nil && l.Var == nil {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ExpressionVariable::Output for (var, type)

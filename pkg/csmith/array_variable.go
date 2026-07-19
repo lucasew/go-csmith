@@ -795,7 +795,13 @@ func (av *ArrayVariable) OutputInit(indent string, ctrl []string) string {
 // OutputInitOpts is OutputInit with post_incr_operator control.
 // ArrayVariable.cpp:619–655 — cvs[i] names only (no letter-name soft invent).
 func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr bool) string {
-	if av == nil || av.NoLoopInitializer() {
+	// ArrayVariable always live at init emit; sticky no invent empty loop-init without it
+	if av == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// no_loop_initializer: soft empty (brace def path used instead)
+	if av.NoLoopInitializer() {
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip output_init

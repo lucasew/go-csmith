@@ -171,3 +171,21 @@ func TestMakeRandomStructMaxFieldsNoInvent(t *testing.T) {
 		t.Fatalf("fixed max 0 must not invent struct, got %d fields", len(st.Fields))
 	}
 }
+
+func TestOutputStructUnionDeclNilSticky(t *testing.T) {
+	ClearError()
+	if (*Type)(nil).OutputStructDecl() != "" {
+		t.Fatal("nil Type OutputStructDecl must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Type OutputStructDecl must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).OutputUnionDecl() != "" {
+		t.Fatal("nil Type OutputUnionDecl must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Type OutputUnionDecl must SetError sticky")
+	}
+	ClearError()
+}

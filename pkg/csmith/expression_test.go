@@ -877,3 +877,14 @@ func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExpressionOutputNilSticky(t *testing.T) {
+	ClearError()
+	if (*Expression)(nil).Output() != "" {
+		t.Fatal("nil Expression Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression Output must SetError sticky")
+	}
+	ClearError()
+}
