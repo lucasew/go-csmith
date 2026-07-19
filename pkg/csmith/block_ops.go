@@ -386,13 +386,15 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
 // Statement.cpp:492–506 — CFG edges with dest=stm and src eType==eGoto.
 // Returns source StmIDs of gotos targeting destStmID.
 // When fm.Func is set, non-goto sources (e.g. break→for) are excluded.
-// CFGEdge* always live; nil hole → nil (fail closed). Complete empty → non-nil [].
+// Incomplete CFG fails closed sticky nil (no invent soft re-pick empty sources past holes).
+// Complete empty → non-nil [].
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
-	// incomplete CFG fails closed nil (distinct from complete empty non-nil [])
+	// incomplete CFG fails closed sticky nil (distinct from complete empty non-nil [])
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	srcs := make([]int, 0)
@@ -418,13 +420,14 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 
 // FindJumpLabel mirrors Statement::find_jump_label.
 // Statement.cpp:473–487 — label of first goto that jumps to destStmID.
-// CFGEdge* always live; nil hole fails closed (empty label, no invent scan past hole).
+// Incomplete CFG fails closed sticky (empty label — no invent scan/registry past hole).
 func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	if fm == nil || destStmID <= 0 {
 		return ""
 	}
-	// incomplete CFG — no invent label from partial scan or registry alone
+	// incomplete CFG fails closed sticky (no invent label from partial scan or registry)
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	for _, e := range fm.CFGEdges {

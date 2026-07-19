@@ -45,10 +45,14 @@ func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 }
 
 // HasPointerType mirrors Type::has_pointer_type.
-// Incomplete DerivedTypes fails closed false (no invent "has pointers" / ready
-// pool via len>0 while typesComplete is false).
+// Incomplete DerivedTypes fails closed sticky false (no invent "no pointers" /
+// soft re-pick scalar paths past DerivedTypes holes via typesComplete false).
 func (env *TypeEnv) HasPointerType() bool {
-	if env == nil || !typesComplete(env.DerivedTypes) {
+	if env == nil {
+		return false
+	}
+	if !typesComplete(env.DerivedTypes) {
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(env.DerivedTypes) > 0

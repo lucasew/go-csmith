@@ -18,9 +18,14 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 	}
 	// incomplete DerivedTypes: no invent soft-skip hole / HasPointerType true
 	env.DerivedTypes = append(env.DerivedTypes, nil)
+	ClearError()
 	if env.HasPointerType() {
 		t.Fatal("incomplete DerivedTypes must not invent HasPointerType true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete DerivedTypes HasPointerType must SetError sticky")
+	}
+	ClearError()
 	if env.FindPointerType(GetIntType(), true) != nil {
 		t.Fatal("incomplete DerivedTypes FindPointerType(add) must fail closed nil")
 	}

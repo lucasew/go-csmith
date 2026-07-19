@@ -159,11 +159,25 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("empty struct decls must fail closed section", out)
 	}
-	// nil hole fails closed
+	// nil hole fails closed sticky
+	ClearError()
 	g.Types.StructTypes = []*Type{nil}
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("nil struct hole must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("nil struct hole must SetError sticky")
+	}
+	ClearError()
+	g.Types.StructTypes = nil
+	g.Types.UnionTypes = []*Type{nil}
+	if out := g.OutputStructTypes(); out != "" {
+		t.Fatal("nil union hole must fail closed", out)
+	}
+	if !HasError() {
+		t.Fatal("nil union hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputFunctionsNoInventEmptySections(t *testing.T) {

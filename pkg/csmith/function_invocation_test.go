@@ -88,6 +88,79 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient / GlobalFacts fail closed sticky before choose/build
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	list := &FunctionList{Funcs: []*Function{f}}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	fi := MakeRandomInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntType(), nil, false)
+	if fi == nil || !fi.Failed {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	eff := EmptyEffect()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2.EffectAccum = &eff
+	fi2 := MakeRandomInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list, GetIntType(), nil, false)
+	if fi2 == nil || !fi2.Failed {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
+	// incomplete DerivedTypes must not invent scalar binary past HasPointerType hole
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	var env TypeEnv
+	env.DerivedTypes = IncompleteTypes()
+	vs.Types = &env
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	cg.Types = &env
+	// seed forces flipcoin(10) path when possible — try many seeds
+	var sawSticky bool
+	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
+		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())
+		if HasError() {
+			sawSticky = true
+			if fi != nil {
+				t.Fatal("sticky incomplete DerivedTypes must not return binary inv")
+			}
+			break
+		}
+	}
+	// if no seed hit flipcoin(10), still verify HasPointerType sticky alone
+	ClearError()
+	if env.HasPointerType() {
+		t.Fatal("incomplete DerivedTypes must fail HasPointerType")
+	}
+	if !HasError() {
+		t.Fatal("HasPointerType incomplete must SetError sticky")
+	}
+	ClearError()
+	_ = sawSticky
+}
+
 func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	// FunctionInvocation.cpp:208–221 — LHS under dedicated accum; merge_param_context
 	// folds reads into caller's effect_accum and raises expr_depth.

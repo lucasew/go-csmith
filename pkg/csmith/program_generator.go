@@ -279,11 +279,17 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 }
 
 // OutputStructTypes emits struct/union definitions (before globals/functions).
+// Incomplete StructTypes/UnionTypes fails closed sticky (no invent empty-section past holes).
 func (g *ProgramGenerator) OutputStructTypes() string {
 	if g == nil {
 		return ""
 	}
 	if len(g.Types.StructTypes) == 0 && len(g.Types.UnionTypes) == 0 {
+		return ""
+	}
+	// incomplete type pools fail closed sticky (no invent partial section / empty shell)
+	if !typesComplete(g.Types.StructTypes) || !typesComplete(g.Types.UnionTypes) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var structAttr, unionAttr *AttributeGenerator
@@ -293,10 +299,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	}
 	var body strings.Builder
 	for _, st := range g.Types.StructTypes {
-		// Type* always live in AllTypes/StructTypes; no invent skip nil/incomplete holes
-		if st == nil {
-			return ""
-		}
+		// pre-validated typesComplete
 		var decl string
 		if structAttr != nil {
 			decl = st.OutputStructDeclOpts(g.Rng, structAttr)
@@ -310,9 +313,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		body.WriteString("\n")
 	}
 	for _, ut := range g.Types.UnionTypes {
-		if ut == nil {
-			return ""
-		}
+		// pre-validated typesComplete
 		var decl string
 		if unionAttr != nil {
 			decl = ut.OutputUnionDeclOpts(g.Rng, unionAttr)

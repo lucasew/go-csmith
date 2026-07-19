@@ -79,14 +79,23 @@ func TestFindJumpSources(t *testing.T) {
 	if none == nil || len(none) != 0 {
 		t.Fatal("complete empty", none)
 	}
-	// nil CFG hole fails closed
+	// nil CFG hole fails closed sticky
+	ClearError()
 	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 5}, nil}
 	if fm.FindJumpSources(5) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil CFG hole FindJumpSources must SetError sticky")
+	}
+	ClearError()
 	if FindJumpLabel(fm, 5) != "" {
 		t.Fatal("nil hole FindJumpLabel must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil CFG hole FindJumpLabel must SetError sticky")
+	}
+	ClearError()
 	// IncompleteCFGEdges marker is incomplete (not invent empty-complete)
 	if CFGEdgesComplete(IncompleteCFGEdges()) {
 		t.Fatal("IncompleteCFGEdges must be incomplete")

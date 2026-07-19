@@ -799,6 +799,10 @@ func MakeRandomBinaryInvocation(
 				return fi
 			}
 		}
+		// incomplete DerivedTypes / ptr-cmp sticky must not invent scalar binary past hole
+		if HasError() {
+			return nil
+		}
 	}
 	// FunctionInvocation.cpp:179–183 — do { pick } while (type->is_float() && !works)
 	// FunctionInvocation.cpp:185 — assert(type); nil type allowed only for non-float paths (library)
@@ -1309,6 +1313,17 @@ func MakeRandomInvocation(
 ) *Invocation {
 	// FunctionInvocation.cpp always has RNG + CGContext; no invent invoke shell without them
 	if r == nil || cg == nil {
+		return &Invocation{Failed: true}
+	}
+	// incomplete ambient fails closed sticky (no invent choose/build / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return &Invocation{Failed: true}
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// Match type for choose_func: nil means any return type (C++ type=0).
