@@ -496,6 +496,17 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 		t.Fatal("LocalVars hole must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was synthetic ArrayVariable from ArraySizes
+	// fair: sticky empty whole block (no invent partial def emit)
+	arrShell := &Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	b3 := &Block{LocalVars: []*Variable{arrShell}}
+	if out := b3.Output(0); out != "" {
+		t.Fatal("IsArray without AsArray must fail closed whole block", out)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray Block.Output must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddNewVarFactTo(t *testing.T) {

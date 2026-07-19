@@ -1014,42 +1014,36 @@ func (b *Block) Output(indent int) string {
 			return ""
 		}
 		if lv.IsArray {
-			av := lv.AsArray
-			if av == nil && len(lv.ArraySizes) > 0 {
-				av = &ArrayVariable{
-					Variable:   *lv,
-					Sizes:      lv.ArraySizes,
-					InitValues: lv.ArrayInits,
-				}
+			// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
+			// sticky (no invent synthetic shell from ArraySizes past incomplete AsArray)
+			if lv.AsArray == nil {
+				SetError(ErrGeneric)
+				return ""
 			}
-			if av != nil {
-				// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
-				// (C++ LocalVars may hold itemize() member alongside parent)
-				if av.Collective != nil {
-					continue
-				}
-				// incomplete array def sticky — fail closed whole block
-				def := av.OutputDef()
-				if def == "" {
-					if !HasError() {
-						SetError(ErrGeneric)
-					}
-					return ""
-				}
-				sb.WriteString(inner)
-				sb.WriteString(def)
-				sb.WriteString("\n")
-				if !av.NoLoopInitializer() {
-					loopInits = append(loopInits, av)
-					if len(av.Sizes) > maxDim {
-						maxDim = len(av.Sizes)
-					}
-				}
+			av := lv.AsArray
+			// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
+			// (C++ LocalVars may hold itemize() member alongside parent)
+			if av.Collective != nil {
 				continue
 			}
-			// IsArray without AsArray/sizes — broken IR sticky
-			SetError(ErrGeneric)
-			return ""
+			// incomplete array def sticky — fail closed whole block
+			def := av.OutputDef()
+			if def == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return ""
+			}
+			sb.WriteString(inner)
+			sb.WriteString(def)
+			sb.WriteString("\n")
+			if !av.NoLoopInitializer() {
+				loopInits = append(loopInits, av)
+				if len(av.Sizes) > maxDim {
+					maxDim = len(av.Sizes)
+				}
+			}
+			continue
 		}
 		// Variable::Output for locals (no force static)
 		def := lv.OutputDef(false)

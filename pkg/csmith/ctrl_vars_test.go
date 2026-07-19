@@ -169,6 +169,16 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 		t.Fatal("incomplete loop-init OutputArrayInitializers must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was synthetic ArrayVariable shell from
+	// ArraySizes then partial loop inits. Fair: sticky empty whole section.
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if s := OutputArrayInitializers([]*Variable{shell}, opts, "    "); s != "" {
+		t.Fatal("IsArray without AsArray must fail closed empty, not invent synthetic", s)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputArrayInitializers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputForCommentNilSticky(t *testing.T) {

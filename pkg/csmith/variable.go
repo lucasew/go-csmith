@@ -534,10 +534,13 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 		if !v.IsArray {
 			continue
 		}
-		av := v.AsArray
-		if av == nil {
-			av = &ArrayVariable{Variable: *v, Sizes: v.ArraySizes, InitValues: v.ArrayInits}
+		// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
+		// sticky (no invent synthetic shell from ArraySizes / soft re-pick partial inits)
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return ""
 		}
+		av := v.AsArray
 		// itemized dual-count members — skip (collective emits init once)
 		if av.Collective != nil {
 			continue
