@@ -416,9 +416,9 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	if q.Wildcard {
 		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
 	}
-	// CVQualifiers.cpp always has process RNG for random_* paths
-	// no invent fixed non-stricter/looser shells when RNG missing
+	// CVQualifiers.cpp always has process RNG sticky; no invent empty shells when missing
 	if r == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser/stricter qfer past holes)
@@ -477,8 +477,9 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	if q.Wildcard {
 		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
 	}
-	// CVQualifiers.cpp always has process RNG; no invent fixed looser shells
+	// CVQualifiers.cpp always has process RNG sticky; no invent fixed looser shells
 	if r == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent looser qfer past holes)
@@ -522,9 +523,9 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	if DepthGuardByDepth(opts, need) == BadDepth {
 		return out
 	}
-	// CVQualifiers.cpp always has process RNG for const/vol flips
-	// no invent fixed non-const non-vol pointer level without draw
+	// CVQualifiers.cpp always has process RNG sticky; no invent fixed non-const non-vol level
 	if r == nil {
+		SetError(ErrGeneric)
 		return q
 	}
 	isConst := false
@@ -546,16 +547,20 @@ func (q CVQualifiers) OutputFirstQuals() string {
 	opts := ProcessOptions()
 	var b strings.Builder
 	if len(q.IsConsts) > 0 && q.IsConsts[0] {
-		// CVQualifiers.cpp:641–642 — assert(consts())
-		if opts.Consts {
-			b.WriteString("const ")
+		// CVQualifiers.cpp:641–642 — assert(consts()) sticky when bit set but option off
+		if !opts.Consts {
+			SetError(ErrGeneric)
+			return ""
 		}
+		b.WriteString("const ")
 	}
 	if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
-		// CVQualifiers.cpp:647–648 — assert(volatiles())
-		if opts.Volatiles {
-			b.WriteString("volatile ")
+		// CVQualifiers.cpp:647–648 — assert(volatiles()) sticky when bit set but option off
+		if !opts.Volatiles {
+			SetError(ErrGeneric)
+			return ""
 		}
+		b.WriteString("volatile ")
 	}
 	return b.String()
 }
@@ -676,14 +681,29 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	if q.Wildcard || len(q.IsConsts) == 0 {
 		// bare type + single-level quals from storage
 		var b strings.Builder
-		// CVQualifiers.cpp:541–544 — assert(0) if const bit without Consts option
-		if q.IsConst() && emitConst() {
+		// CVQualifiers.cpp:541–544 — assert(0) sticky if const bit without Consts option
+		if q.IsConst() {
+			if !emitConst() {
+				SetError(ErrGeneric)
+				return ""
+			}
 			b.WriteString("const ")
 		}
-		if q.IsVolatile() && emitVol() {
+		if q.IsVolatile() {
+			if !emitVol() {
+				SetError(ErrGeneric)
+				return ""
+			}
 			b.WriteString("volatile ")
 		}
-		b.WriteString(t.CName())
+		cn := t.CName()
+		if cn == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		b.WriteString(cn)
 		return b.String()
 	}
 	base := t.BaseType()
@@ -693,13 +713,28 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	// For simple types with one qualifier level: "const volatile int"
 	if t.IsSimple() || t.IsAggregate() {
 		var b strings.Builder
-		if len(q.IsConsts) > 0 && q.IsConsts[0] && emitConst() {
+		if len(q.IsConsts) > 0 && q.IsConsts[0] {
+			if !emitConst() {
+				SetError(ErrGeneric)
+				return ""
+			}
 			b.WriteString("const ")
 		}
-		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] && emitVol() {
+		if len(q.IsVolatiles) > 0 && q.IsVolatiles[0] {
+			if !emitVol() {
+				SetError(ErrGeneric)
+				return ""
+			}
 			b.WriteString("volatile ")
 		}
-		b.WriteString(t.CName())
+		cn := t.CName()
+		if cn == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		b.WriteString(cn)
 		return b.String()
 	}
 	// pointer: const volatile base * const * ...
@@ -708,21 +743,36 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		if i > 0 {
 			b.WriteString("*")
 		}
-		// CVQualifiers.cpp:540–544 / 545–552 — no invent const/vol when option disabled
-		if q.IsConsts[i] && emitConst() {
+		// CVQualifiers.cpp:540–544 / 545–552 — assert sticky when bit set but option off
+		if q.IsConsts[i] {
+			if !emitConst() {
+				SetError(ErrGeneric)
+				return ""
+			}
 			if i > 0 {
 				b.WriteString(" ")
 			}
 			b.WriteString("const ")
 		}
-		if i < len(q.IsVolatiles) && q.IsVolatiles[i] && emitVol() {
-			if i > 0 && !(q.IsConsts[i] && emitConst()) {
+		if i < len(q.IsVolatiles) && q.IsVolatiles[i] {
+			if !emitVol() {
+				SetError(ErrGeneric)
+				return ""
+			}
+			if i > 0 && !q.IsConsts[i] {
 				b.WriteString(" ")
 			}
 			b.WriteString("volatile ")
 		}
 		if i == 0 {
-			b.WriteString(base.CName())
+			cn := base.CName()
+			if cn == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return ""
+			}
+			b.WriteString(cn)
 			b.WriteString(" ")
 		}
 	}

@@ -35,14 +35,20 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	if len(added.IsConsts) != 3 {
 		t.Fatalf("add level %d", len(added.IsConsts))
 	}
-	// nil RNG — no invent fixed non-const non-vol pointer level
+	// nil RNG sticky — no invent fixed non-const non-vol pointer level
+	ClearError()
 	if got := q4.RandomAddQualifiers(nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
 		t.Fatalf("nil RNG must not invent grow, got %d", len(got.IsConsts))
 	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomAddQualifiers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
-	// CVQualifiers.cpp always has process RNG; no invent fixed looser/stricter shells
+	// CVQualifiers.cpp always has process RNG sticky; no invent fixed looser/stricter shells
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	base := NewCVQualifiers([]bool{false}, []bool{false})
@@ -50,13 +56,24 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG From must fail closed empty, got %+v", out)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomQualifiersFrom must SetError sticky")
+	}
+	ClearError()
 	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG Loose must fail closed empty, got %+v", out)
 	}
-	// wildcard still works without RNG
+	if !HasError() {
+		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
+	}
+	ClearError()
+	// wildcard still works without RNG (short-circuit before RNG)
 	w := CVQualifiers{Wildcard: true}
 	if out := w.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, nil); !out.Wildcard {
 		t.Fatal("wildcard")
+	}
+	if HasError() {
+		t.Fatal("wildcard RandomQualifiersFrom must not sticky on nil RNG")
 	}
 }
 

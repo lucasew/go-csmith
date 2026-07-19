@@ -93,7 +93,9 @@ func TestOutputQualifiedTypeSimple(t *testing.T) {
 }
 
 func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
-	// CVQualifiers.cpp:541–552 — assert(0) if const/vol bit without option; no invent keyword
+	// CVQualifiers.cpp:541–552 — assert(0) sticky if const/vol bit without option
+	// (no invent bare "int" by silently dropping disabled quals)
+	ClearError()
 	opts := Defaults()
 	opts.Consts = false
 	opts.Volatiles = false
@@ -101,12 +103,13 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 	defer SetProcessOptions(Defaults())
 	q := NewCVQualifiers([]bool{true}, []bool{true})
 	s := q.OutputQualifiedType(GetIntType())
-	if strings.Contains(s, "const") || strings.Contains(s, "volatile") {
-		t.Fatalf("must not invent disabled quals: %q", s)
+	if s != "" {
+		t.Fatalf("const bit without Consts option must fail closed empty, got %q", s)
 	}
-	if !strings.Contains(s, "int") {
-		t.Fatal(s)
+	if !HasError() {
+		t.Fatal("const bit without Consts option must SetError sticky")
 	}
+	ClearError()
 }
 
 func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
