@@ -149,6 +149,59 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 }
 
+func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
+	// FunctionInvocation.cpp:238 — ShiftByNonConstantProb(); 0% must always take constant RHS
+	// (no invent hard-coded RndFlipcoin(50) ignoring session table)
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	probs.single[PShiftByNonConstantProb] = 0
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(probs)
+	defer SetProcessProbabilities(prev)
+	vs := NewVariableSelector(opts)
+	vs.Probs = probs
+	tables := NewExprTables(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	foundShift := false
+	for seed := uint64(1); seed < 200; seed++ {
+		ClearError()
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
+		if fi == nil || !fi.IsStd {
+			continue
+		}
+		if fi.Binary != "<<" && fi.Binary != ">>" {
+			continue
+		}
+		foundShift = true
+		if len(fi.Args) < 2 || fi.Args[1] == nil {
+			t.Fatalf("shift missing rhs seed=%d", seed)
+		}
+		if fi.Args[1].Term != TermConstant {
+			t.Fatalf("ShiftByNonConstantProb=0 must invent constant rhs, got term=%v seed=%d",
+				fi.Args[1].Term, seed)
+		}
+	}
+	if !foundShift {
+		t.Log("no shift op in seeds 1..199 — still covered by nil-probs 0% unit path via Single")
+	}
+	// nil probs + nil process → 0% non-constant (no invent 50)
+	SetProcessProbabilities(nil)
+	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, nil, vs, tables, &cg, GetIntType())
+		if fi == nil || (fi.Binary != "<<" && fi.Binary != ">>") {
+			continue
+		}
+		if len(fi.Args) >= 2 && fi.Args[1] != nil && fi.Args[1].Term != TermConstant {
+			t.Fatalf("nil probs must not invent 50%% non-constant shift rhs seed=%d", seed)
+		}
+	}
+}
+
 func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	// no soft invent visit success on nil / short args
 	cg := EmptyCGContext()

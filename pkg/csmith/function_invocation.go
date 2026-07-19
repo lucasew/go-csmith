@@ -726,19 +726,29 @@ func MakeRandomBinaryInvocation(
 
 	var right *Expression
 	if op == BinLShift || op == BinRShift {
-		// FunctionInvocation.cpp:236–244 — ShiftByNonConstantProb (default 50)
-		if !r.RndFlipcoin(50) {
-			bits := uint32(32)
+		// FunctionInvocation.cpp:236–244 — rnd_flipcoin(ShiftByNonConstantProb())
+		// C++ Probabilities singleton; nil session → 0% (no invent hard-coded 50)
+		shiftNonConst := 0
+		if probs != nil {
+			shiftNonConst = probs.Single(PShiftByNonConstantProb)
+		} else if p := ProcessProbabilities(); p != nil {
+			shiftNonConst = p.Single(PShiftByNonConstantProb)
+		}
+		// not_constant = flip; constant path when !not_constant
+		if !r.RndFlipcoin(uint32(shiftNonConst)) {
+			// FunctionInvocation.cpp:241 — make_random_upto(lhs_type->SizeInBytes() * 8)
+			// Type always live after flags assert; SizeInBytes 0 is incomplete
+			// (no invent default 32-bit width)
 			if lhsTy != nil {
 				if sb := lhsTy.SizeInBytes(); sb > 0 {
-					bits = uint32(sb * 8)
+					bits := uint32(sb * 8)
+					// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
+					if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
+						right = &Expression{Term: TermConstant, Con: c}
+						// Expression.cpp:213–218 — constant bumps expr_depth on caller context
+						cg.ExprDepth++
+					}
 				}
-			}
-			// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
-			if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
-				right = &Expression{Term: TermConstant, Con: c}
-				// Expression.cpp:213–218 — constant bumps expr_depth on caller context
-				cg.ExprDepth++
 			}
 		}
 	}
