@@ -36,6 +36,14 @@ func TestFindVarByName(t *testing.T) {
 	if vs.FindVarByName("g_y") != nil {
 		t.Fatal("miss")
 	}
+	// nil VS sticky
+	ClearError()
+	if (*VariableSelector)(nil).FindVarByName("g_x") != nil {
+		t.Fatal("nil VS must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil VS FindVarByName must SetError sticky")
+	}
 	// empty name sticky
 	ClearError()
 	if vs.FindVarByName("") != nil {

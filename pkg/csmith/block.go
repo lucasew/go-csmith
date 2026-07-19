@@ -312,7 +312,8 @@ func BlockProbability(blockSize int, r *Rng) int {
 		return 0
 	}
 	if r == nil {
-		// C++ always has RNG; library fail-closed → 0 (one stmt: i<=0)
+		// C++ always has RNG; sticky fail-closed → 0 (no invent fixed size draw)
+		SetError(ErrGeneric)
 		return 0
 	}
 	// Block.cpp:92 — rnd_upto(block.block_size(), &filter) with filter inert

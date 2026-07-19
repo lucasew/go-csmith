@@ -1422,7 +1422,9 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 // Incomplete point-to apply or union merge fails closed (false; GlobalFacts and/or
 // UnionFacts cleared — no invent continue union after wiped point-to or partial maps).
 func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
+	// FactMgr always has live Lhs subject; sticky no invent soft-skip assign update
 	if fm == nil || lhs == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	changed := false
@@ -1677,9 +1679,10 @@ func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
 // FactMgr.cpp:406–421 — abstract_fact_for_return into global_facts; set_fact_out(sr).
 // Incomplete assign fails closed sticky (false; no invent SetMapFactsOut from wiped map).
 func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Expression) bool {
-	// Expression* always live on StatementReturn; nil expr fails closed
+	// Expression* always live on StatementReturn; sticky fail closed
 	// (no invent garbage RHS transfer as stand-in for missing return value IR)
 	if fm == nil || rv == nil || expr == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)

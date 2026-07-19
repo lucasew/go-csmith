@@ -315,6 +315,10 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 			decl = st.OutputStructDecl()
 		}
 		if decl == "" {
+			// incomplete struct decl IR sticky — no invent types-section header only
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		body.WriteString(decl)
@@ -329,6 +333,10 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 			decl = ut.OutputUnionDecl()
 		}
 		if decl == "" {
+			// incomplete union decl IR sticky — no invent types-section header only
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		body.WriteString(decl)
@@ -380,9 +388,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 				continue
 			}
 			emittedArray[v.Name] = true
-			// ArrayVariable::OutputDef always live; no invent "static \n" for empty
+			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
 			def := av.OutputDef()
 			if def == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
@@ -393,8 +404,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			continue
 		}
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
+		// sticky no invent blank global line for incomplete IR
 		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
 		if def == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		body.WriteString(def)
@@ -830,6 +845,9 @@ func (g *ProgramGenerator) GoGenerator() string {
 	// struct/union inventory non-empty must emit live decls (no invent types-only skip)
 	structsOut := g.OutputStructTypes()
 	if (len(g.Types.StructTypes) > 0 || len(g.Types.UnionTypes) > 0) && structsOut == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	b.WriteString(structsOut)
@@ -839,11 +857,12 @@ func (g *ProgramGenerator) GoGenerator() string {
 		return ""
 	}
 	// make_first always yields a built user function; no invent header-only program
-	// Function* always live on Funcs; nil hole fails closed whole program emit
+	// Function* always live on Funcs; nil hole fails closed sticky whole program emit
 	// (no invent soft-skip hole and still claim hasUser from a later slot)
 	hasUser := false
 	for _, f := range g.Funcs.Funcs {
 		if f == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
@@ -857,21 +876,30 @@ func (g *ProgramGenerator) GoGenerator() string {
 	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
 	globalsOut := g.OutputGlobals()
 	if g.VS != nil && len(g.VS.GlobalList) > 0 && globalsOut == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	b.WriteString(globalsOut)
 	// functions section always live after successful GenerateFunctions
 	funcsOut := g.OutputFunctions()
 	if funcsOut == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	b.WriteString(funcsOut)
 	// OutputHashFuncDef empty when helpers off or ctrl IR incomplete (main falls back)
 	// no invent partial helper shells — OutputHashFuncDef already fail-closed empty
 	b.WriteString(g.OutputHashFuncDef())
-	// OutputMgr always emits main unless --nomain; incomplete main fails whole program
+	// OutputMgr always emits main unless --nomain; incomplete main fails whole program sticky
 	mainOut := g.OutputMain()
 	if mainOut == "" && !g.Opts.NoMain {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	b.WriteString(mainOut)

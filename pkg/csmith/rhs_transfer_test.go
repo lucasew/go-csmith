@@ -27,13 +27,17 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	if len(facts) != 1 || !facts[0].IsDead() {
 		t.Fatal("nil rhs must abstract as garbage like C++", facts)
 	}
-	// return always has Expression*; nil expr fails closed before garbage invent
+	// return always has Expression*; sticky fail closed before garbage invent
 	ClearError()
 	fm := NewFactMgr(nil)
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
 		t.Fatal("nil return expr must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil return expr UpdateFactForReturnStmt must SetError sticky")
+	}
+	ClearError()
 	// incomplete GlobalFacts after assign path fails closed sticky
 	fm.GlobalFacts = IncompleteFactSlice()
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
@@ -78,7 +82,23 @@ func TestRhsToLhsTransferCopy(t *testing.T) {
 }
 
 func TestUpdateFactForAssign(t *testing.T) {
+	ClearError()
+	// nil FM / lhs sticky — no invent soft-skip assign update
+	if (*FactMgr)(nil).UpdateFactForAssign(CreateVariableScalars("g_x", GetIntType(), false, false), 0, nil) {
+		t.Fatal("nil FM must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FM UpdateFactForAssign must SetError sticky")
+	}
+	ClearError()
 	fm := NewFactMgr(nil)
+	if fm.UpdateFactForAssign(nil, 0, nil) {
+		t.Fatal("nil lhs must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil lhs UpdateFactForAssign must SetError sticky")
+	}
+	ClearError()
 	// Variable.cpp:395 — pointer Constant::make_random is "0" → null on AddNewVarFact
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)

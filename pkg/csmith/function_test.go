@@ -127,6 +127,18 @@ func TestBlockProbabilityAlwaysMaxMinusOne(t *testing.T) {
 	}
 }
 
+func TestBlockProbabilityNilRNGSticky(t *testing.T) {
+	// C++ always has RNG; sticky no invent fixed block size without draw
+	ClearError()
+	if BlockProbability(4, nil) != 0 {
+		t.Fatal("nil RNG must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG BlockProbability must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 	// With enough seeds, some bodies end early on return
 	opts := Defaults()

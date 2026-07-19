@@ -88,6 +88,18 @@ func TestMergeFactLattice(t *testing.T) {
 	}
 }
 
+func TestMergeFactsNilAccumulatorSticky(t *testing.T) {
+	// Fact merge always has live accumulator; sticky no invent soft-skip join
+	ClearError()
+	if MergeFacts(nil, nil) {
+		t.Fatal("nil facts must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil facts MergeFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMergeFacts(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)

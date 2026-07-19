@@ -816,7 +816,9 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 // Returns whether any fact changed. Incomplete maps fail closed: *facts set nil,
 // returns false (no invent skip partial join / keep broken partial).
 func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	// Fact merge always has live accumulator; sticky no invent soft-skip join
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {

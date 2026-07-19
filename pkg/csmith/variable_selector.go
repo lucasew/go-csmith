@@ -125,7 +125,9 @@ func ChooseVisibleReadVar(
 // VariableSelector.cpp:1571–1579 — scan AllVars via match_var_name.
 // Variable* always live on AllVars; nil hole fails closed (no invent skip).
 func (vs *VariableSelector) FindVarByName(name string) *Variable {
+	// VariableSelector always live; sticky no invent name lookup without it
 	if vs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// empty name incomplete sticky (no invent match-all / soft re-pick)

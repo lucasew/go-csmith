@@ -201,10 +201,14 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	// incomplete / empty decls must not invent section-only header
+	ClearError()
 	g := NewProgramGenerator(Defaults())
 	g.Types.StructTypes = []*Type{{isStruct: true}} // unnamed → empty decl
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("empty struct decls must fail closed section", out)
+	}
+	if !HasError() {
+		t.Fatal("empty struct decl OutputStructTypes must SetError sticky")
 	}
 	// nil hole fails closed sticky
 	ClearError()
