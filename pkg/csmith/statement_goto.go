@@ -216,9 +216,14 @@ func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
 // StatementGoto.cpp:309–354 — pick a block suitable as jump source/dest.
 // asDest true: block is jump destination; false: block is jump source (contains goto).
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
-// Block* always live; nil hole in blocks fails closed (nil — no invent soft-skip).
+// Incomplete Blocks list fails closed sticky (no invent soft-skip hole / re-pick past hole).
 func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
 	if r == nil || len(blocks) == 0 {
+		return nil
+	}
+	// incomplete Blocks pool fails closed sticky (no invent soft-skip nil hole as absent)
+	if !BlocksComplete(blocks) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// StatementGoto.cpp:314–324
@@ -236,15 +241,8 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		}
 	}
 	// work on a mutable copy (C++ mutates vector in place via erase)
-	// Block* always live on Function.Blocks; nil hole fails closed
-	// (no invent soft-skip hole as absent candidate)
-	blks := make([]*Block, 0, len(blocks))
-	for _, b := range blocks {
-		if b == nil {
-			return nil
-		}
-		blks = append(blks, b)
-	}
+	// pre-validated BlocksComplete
+	blks := append([]*Block(nil), blocks...)
 	for len(blks) > 0 {
 		idx := int(r.RndUpto(uint32(len(blks))))
 		// StatementGoto.cpp:326 ERROR_GUARD

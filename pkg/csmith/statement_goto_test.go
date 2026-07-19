@@ -334,14 +334,23 @@ func TestResetEffectAccum(t *testing.T) {
 }
 
 func TestFindGoodJumpBlockNilHoleFailClosed(t *testing.T) {
-	// Block* always live; nil hole must not invent soft-skip as absent candidate
+	// Block* always live; nil hole fails closed sticky (no invent soft-skip / re-pick)
 	good := &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
+	ClearError()
 	if FindGoodJumpBlock(NewRng(1), []*Block{good, nil}, good, false) != nil {
 		t.Fatal("nil Block hole must fail closed FindGoodJumpBlock")
 	}
+	if !HasError() {
+		t.Fatal("nil Block hole must SetError sticky")
+	}
+	ClearError()
 	if FindGoodJumpBlock(NewRng(2), []*Block{nil, good}, good, true) != nil {
 		t.Fatal("nil hole first must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil hole first must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {

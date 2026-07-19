@@ -20,16 +20,25 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	if ChooseFunc(NewRng(1), []*Function{unbuilt}, GetIntType(), nil) != nil {
 		t.Fatal("expected nil")
 	}
-	// nil Function* hole fails closed — no invent skip as absent
+	// nil Function* hole fails closed sticky — no invent skip as absent / soft re-pick
+	ClearError()
 	if ChooseFunc(NewRng(1), []*Function{built, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
-	// nil ReturnType when ret wanted fails closed — no invent soft-skip as absent
+	if !HasError() {
+		t.Fatal("nil Funcs hole must SetError sticky")
+	}
+	ClearError()
+	// nil ReturnType when ret wanted fails closed sticky — no invent soft-skip as absent
 	// (C++ is_convertable would deref return_type*; list hole aborts whole choose)
 	noRet := &Function{Name: "bad", ReturnType: nil, IsBuilt: true, BuildState: BuildBuilt}
 	if ChooseFunc(NewRng(1), []*Function{built, noRet}, GetIntType(), nil) != nil {
 		t.Fatal("nil ReturnType must fail closed whole choose, not invent skip")
 	}
+	if !HasError() {
+		t.Fatal("nil ReturnType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestArrayNoLoopInitializer(t *testing.T) {
@@ -96,13 +105,61 @@ func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
 		RV: nil, FEffect: EmptyEffect(),
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})
+	ClearError()
 	if ChooseFuncContext(NewRng(1), []*Function{good, noRV}, GetIntType(), nil, nil, Defaults(), &q) != nil {
 		t.Fatal("nil RV among candidates must fail closed whole choose")
 	}
+	if !HasError() {
+		t.Fatal("nil RV must SetError sticky")
+	}
+	ClearError()
 	// good alone with matching qfer still works
 	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &q) != good {
 		t.Fatal("complete RV must still choose")
 	}
+}
+
+func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
+	// incomplete EffectContext fails closed sticky (no invent conflict-filter under holes)
+	good := &Function{
+		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		FEffect: EmptyEffect(),
+	}
+	cg := WithEffectContext(IncompleteEffect())
+	ClearError()
+	if ChooseFuncContext(NewRng(1), []*Function{good}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
+		t.Fatal("incomplete ambient must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete ambient must SetError sticky")
+	}
+	ClearError()
+	// complete ambient still chooses
+	cg2 := EmptyCGContext()
+	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, &cg2, Defaults(), nil) != good {
+		t.Fatal("complete ambient must still choose")
+	}
+}
+
+func TestChooseFuncContextIncompleteFEffectSticky(t *testing.T) {
+	// incomplete callee FEffect fails closed sticky (no invent skip as conflict past hole)
+	good := &Function{
+		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		FEffect: EmptyEffect(),
+	}
+	bad := &Function{
+		Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		FEffect: IncompleteEffect(),
+	}
+	cg := EmptyCGContext()
+	ClearError()
+	if ChooseFuncContext(NewRng(1), []*Function{good, bad}, GetIntType(), nil, &cg, Defaults(), nil) != nil {
+		t.Fatal("incomplete FEffect among candidates must fail closed whole choose")
+	}
+	if !HasError() {
+		t.Fatal("incomplete FEffect must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestChooseFuncUsesIsConvertable(t *testing.T) {

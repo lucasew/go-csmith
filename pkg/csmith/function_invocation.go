@@ -275,35 +275,51 @@ func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Functi
 // ChooseFuncContext is ChooseFunc with CGContext for in_conflict / strict_volatile.
 // Function.cpp:279–340 — separate user vs builtin pools; BuiltinFunctionProb pick.
 // qfer when non-nil must match callee RV qualifiers (Function.cpp:294–295).
+// Incomplete Funcs / ambient / callee IR fails closed sticky (no invent soft re-pick
+// past holes as absent / conflict-free while a later complete entry would succeed).
 func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options, qfer *CVQualifiers) *Function {
+	// incomplete Funcs list fails closed sticky (no invent soft-skip nil hole as absent)
+	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete ambient fails closed sticky (no invent conflict-filter under hole shells)
+	if cg != nil && !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
-		// Function* always live on Funcs; nil hole fails closed (no invent skip)
-		if f == nil {
-			return nil
-		}
+		// pre-validated FunctionsComplete
 		if f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}
 		// Function.cpp:288–289 — type->is_convertable(return_type)
 		// C++ always has live return_type*; nil is incomplete IR
-		// fail closed whole choose (no invent soft-skip broken func as absent)
+		// fail closed sticky whole choose (no invent soft-skip broken func as absent)
 		if ret != nil && f.ReturnType == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
 			continue
 		}
 		// Function.cpp:294–295 — qfer->match(rv->qfer); RV always live after create
-		// incomplete RV fails closed whole choose (no invent soft-skip as match)
+		// incomplete RV fails closed sticky (no invent soft-skip as match / re-pick)
 		if qfer != nil && !qfer.Wildcard {
 			if f.RV == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			if !qfer.Match(f.RV.Qfer, false) {
 				continue
 			}
+		}
+		// incomplete callee FEffect fails closed sticky (no invent skip as conflict past hole)
+		if cg != nil && !EffectComplete(f.FEffect) {
+			SetError(ErrGeneric)
+			return nil
 		}
 		// Function.cpp:303–306 — in_conflict with callee feffect
 		if cg != nil && cg.InConflict(f.FEffect) {
