@@ -159,6 +159,7 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 }
 
 func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.CompatibleCheck = true
 	vs := NewVariableSelector(opts)
@@ -170,6 +171,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 	// generate assigns — should not panic; StatementAssign.cpp:127 assert(fm)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	for seed := uint64(1); seed < 10; seed++ {
+		ClearError() // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
 			c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
 			return MakeRandomAssign(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntType())
@@ -178,6 +180,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 			t.Fatal(st.Kind)
 		}
 	}
+	ClearError()
 }
 
 func TestLhsCompatibleExpr(t *testing.T) {

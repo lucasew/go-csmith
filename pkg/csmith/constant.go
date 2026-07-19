@@ -314,7 +314,8 @@ func HexToBinary(val string) string {
 		case c >= 'a' && c <= 'f':
 			idx = int(c - 'a' + 10)
 		default:
-			// broken hex IR — fail closed empty (C++ OOB ToBinary)
+			// broken hex IR — sticky fail closed empty (C++ OOB ToBinary)
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(toBin[idx*4 : idx*4+4])

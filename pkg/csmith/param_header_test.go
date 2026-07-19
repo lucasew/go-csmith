@@ -83,7 +83,8 @@ func TestGenerateParameterVariableNoMakePointerInvent(t *testing.T) {
 }
 
 func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
-	// Function.cpp:517–518 — assert when !return_structs and eStruct return
+	// Function.cpp:517–518 — assert when !return_structs and eStruct return sticky
+	ClearError()
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
 	f := &Function{Name: "f", ReturnType: st}
 	opts := Defaults()
@@ -91,10 +92,15 @@ func TestOutputHeaderForbiddenReturnStructFailClosed(t *testing.T) {
 	if f.OutputHeaderOpts(false, opts) != "" {
 		t.Fatal("struct return with ReturnStructs off must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("forbidden return struct must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
-	// Function.cpp:489–490 — assert when !arg_structs and struct param
+	// Function.cpp:489–490 — assert when !arg_structs and struct param sticky
+	ClearError()
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "x", Type: GetIntType(), BitWidth: -1}}}
 	pv := &Variable{Name: "p", Type: st}
 	f := &Function{Name: "f", ReturnType: GetIntType(), Param: []*Variable{pv}}
@@ -103,10 +109,15 @@ func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	if f.OutputHeaderOpts(false, opts) != "" {
 		t.Fatal("struct arg with ArgStructs off must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("forbidden arg struct must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestParamListNoInventEmptyNameOrType(t *testing.T) {
-	// Function.cpp param Output — live type + name; no invent "int " / bare type
+	// Function.cpp param Output — live type + name; sticky no invent "int " / bare type
+	ClearError()
 	f := &Function{
 		Name:       "func_p",
 		ReturnType: GetIntType(),
@@ -117,11 +128,19 @@ func TestParamListNoInventEmptyNameOrType(t *testing.T) {
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("empty param name must fail closed header", out)
 	}
+	if !HasError() {
+		t.Fatal("empty param name must SetError sticky")
+	}
+	ClearError()
 	f.Param[0].Name = "p_1"
 	f.Param[0].Type = nil
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("nil param type must fail closed header", out)
 	}
+	if !HasError() {
+		t.Fatal("nil param type must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputHeaderInlineStatic(t *testing.T) {

@@ -742,14 +742,23 @@ func (f *Function) returnTypeC() string {
 	if f.RV != nil && f.RV.Type != nil {
 		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
 		if out == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return out
 	}
 	if f.ReturnType != nil {
-		return f.ReturnType.CName()
+		cn := f.ReturnType.CName()
+		if cn == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		return cn
 	}
-	// incomplete IR — no invent void
+	// incomplete IR sticky — no invent void
+	SetError(ErrGeneric)
 	return ""
 }
 
@@ -769,19 +778,25 @@ func (f *Function) paramListCOpts(opts Options) string {
 	var b strings.Builder
 	for i, p := range f.Param {
 		if p == nil || p.Type == nil {
-			// incomplete param IR — fail closed (no invent type name)
+			// incomplete param IR sticky — fail closed (no invent type name)
+			SetError(ErrGeneric)
 			return ""
 		}
-		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions)
+		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions) sticky
 		if !opts.ArgStructs && p.Type.IsStruct() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if !opts.ArgUnions && p.Type.IsUnion() {
+			SetError(ErrGeneric)
 			return ""
 		}
-		// Variable always has live name + qualified type; no invent "int " / " p"
+		// Variable always has live name + qualified type; sticky no invent "int " / " p"
 		ty := p.Qfer.OutputQualifiedType(p.Type)
 		if ty == "" || p.Name == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		if i > 0 {
@@ -806,31 +821,40 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 		return ""
 	}
 	// Function.cpp:517–520 — assert no return struct/union when options off
-	// fail closed: empty header (no invent alternate scalar return)
+	// sticky fail closed: empty header (no invent alternate scalar return)
 	rt := f.ReturnType
 	if f.RV != nil && f.RV.Type != nil {
 		rt = f.RV.Type
 	}
 	if rt != nil {
 		if !opts.ReturnStructs && rt.IsStruct() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if !opts.ReturnUnions && rt.IsUnion() {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}
-	// Function always has a live name; no invent "int (void)" without name
+	// Function always has a live name; sticky no invent "int (void)" without name
 	if f.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	params := f.paramListCOpts(opts)
 	if params == "" {
-		// assert-path fail closed on forbidden/incomplete params
+		// assert-path sticky fail closed on forbidden/incomplete params
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	rtName := f.returnTypeC()
 	if rtName == "" {
-		// incomplete return type IR — no invent void header
+		// incomplete return type IR sticky — no invent void header
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder

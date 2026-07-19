@@ -505,18 +505,25 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 	}
 	lhs := assignLhsText(st, wrapVol)
 	if lhs == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// StatementAssign.cpp:515–537 — expr.Output always for ops that need RHS
-	// no soft invent "0" or "lhs = " empty RHS for incomplete IR
+	// sticky no soft invent "0" or "lhs = " empty RHS for incomplete IR
 	if st.AssignOp.NeedNoRHS() {
 		return st.AssignOp.AssignOpC(lhs, "")
 	}
 	if st.Expr == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	rhs := st.Expr.Output()
 	if rhs == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	return st.AssignOp.AssignOpC(lhs, rhs)

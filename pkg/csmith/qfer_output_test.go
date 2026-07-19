@@ -121,21 +121,31 @@ func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
 }
 
 func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
-	// Function always has return_type; no invent void when missing
+	// Function always has return_type; sticky no invent void when missing
+	ClearError()
 	f := &Function{Name: "func_x"}
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("missing return type must fail closed header", out)
 	}
+	if !HasError() {
+		t.Fatal("missing return type must SetError sticky")
+	}
+	ClearError()
 	f.ReturnType = GetSimpleType(EVoid)
 	out := f.OutputHeader(false)
 	if !strings.Contains(out, "void func_x(void)") {
 		t.Fatal(out)
 	}
-	// no invent "void (void)" without name
+	// sticky no invent "void (void)" without name
+	ClearError()
 	f.Name = ""
 	if out := f.OutputHeader(false); out != "" {
 		t.Fatal("empty name must fail closed header", out)
 	}
+	if !HasError() {
+		t.Fatal("empty function name must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputDeclNoInventEmptyName(t *testing.T) {

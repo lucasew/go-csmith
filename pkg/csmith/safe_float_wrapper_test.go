@@ -80,13 +80,22 @@ func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 }
 
 func TestCastOpNoInventEmptySizeToken(t *testing.T) {
-	// invalid SafeOpSize → empty SizeToken; no invent "(-()x)" / "(()a + ()b)"
+	// invalid SafeOpSize → empty SizeToken; sticky no invent "(-()x)" / "(()a + ()b)"
+	ClearError()
 	if unaryCastMinus("", "x") != "" || unaryCastMinus("int32_t", "") != "" {
 		t.Fatal("unary cast empty must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("unary cast empty must SetError sticky")
+	}
+	ClearError()
 	if binaryCastOp("", "a", "+", "b") != "" || binaryCastOp("int32_t", "a", "", "b") != "" {
 		t.Fatal("binary cast empty must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("binary cast empty must SetError sticky")
+	}
+	ClearError()
 	fi := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "-",
 		Args:        []*Expression{{Term: TermConstant, Con: MakeInt(1)}},
@@ -96,6 +105,10 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	if out := fi.Output(); out != "" {
 		t.Fatal("invalid size unary cast must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("invalid size unary cast must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
@@ -230,13 +243,18 @@ func TestUnaryEqualsIntFold(t *testing.T) {
 }
 
 func TestMakeRandomBinaryNoFloatWhenDisabled(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.EnableFloat = false
 	ft := GetSimpleType(EFloat)
 	f := MakeRandomBinaryKind(NewRng(2), opts, NewProbabilities(opts), ft, ft, ft, SafeOpBinary, BinAdd)
+	if f == nil {
+		t.Fatal("MakeRandomBinaryKind nil", HasError(), GetError())
+	}
 	if f.Size == SafeFloat {
 		t.Fatal("float size without EnableFloat")
 	}
+	ClearError()
 }
 
 func TestOutputWrapperH(t *testing.T) {

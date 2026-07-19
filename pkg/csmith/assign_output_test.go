@@ -45,16 +45,26 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	if out := OutputAssignSimple(st, false); out != "++g_1" {
 		t.Fatal(out)
 	}
-	// AssignOpC — no invent empty-name or empty-rhs shells
+	// AssignOpC — sticky no invent empty-name or empty-rhs shells
+	ClearError()
 	if AssignSimple.AssignOpC("", "1") != "" || AssignSimple.AssignOpC("g", "") != "" {
 		t.Fatal("AssignOpC empty sides must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("AssignOpC empty sides must SetError sticky")
+	}
+	ClearError()
 	if AssignPreIncr.AssignOpC("", "") != "" {
 		t.Fatal("empty name preincr must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("empty name preincr must SetError sticky")
+	}
+	ClearError()
 	if AssignPreIncr.AssignOpC("g", "") != "++g" {
 		t.Fatal(AssignPreIncr.AssignOpC("g", ""))
 	}
+	ClearError()
 }
 
 func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {

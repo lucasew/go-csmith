@@ -68,6 +68,7 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 
 func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	// StatementExpr.cpp:62–66 — failed invoke restores effect and facts
+	ClearError()
 	opts := Defaults()
 	opts.MaxFuncs = 0 // force no new functions if possible
 	// ReachMaxFunctions with empty list and max 0

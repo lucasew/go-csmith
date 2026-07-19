@@ -60,24 +60,29 @@ func (fi *Invocation) wrapperOpts() Options {
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
 func (fi *Invocation) Output() string {
 	// Failed invocations are not emitted (ExpressionFuncall replaces with var).
-	// No soft invent /*bad_call*/ / /*invoke*/ comments.
+	// No soft invent /*bad_call*/ / /*invoke*/ comments. Failed stays non-sticky soft re-pick.
 	if fi == nil || fi.Failed {
 		return ""
 	}
 	if fi.User != nil {
 		// FunctionInvocationUser::Output — func name + param_value[i] always live
-		// no invent "()" / empty slots "f(a, , c)" or soft "0" for nil/empty args
+		// sticky no invent "()" / empty slots "f(a, , c)" or soft "0" for nil/empty args
 		if fi.User.Name == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		var parts []string
 		for _, a := range fi.Args {
 			if a == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			out := a.Output()
 			if out == "" {
-				// incomplete arg IR — fail closed whole call
+				// incomplete arg IR — sticky fail closed whole call
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			parts = append(parts, out)
@@ -95,39 +100,51 @@ func (fi *Invocation) Output() string {
 		return b.String()
 	}
 	if fi.IsStd {
-		// FunctionInvocationUnary/Binary::Output — param_value[i]->Output; no soft invent "0"
+		// FunctionInvocationUnary/Binary::Output — param_value[i]->Output; sticky no soft invent "0"
 		if fi.IsUnary {
 			// assert known unary op + non-empty param
 			switch fi.Unary {
 			case "+", "-", "!", "~":
 			default:
-				// FunctionInvocationUnary.cpp:197 assert invalid operator
+				// FunctionInvocationUnary.cpp:197 assert invalid operator sticky
+				SetError(ErrGeneric)
 				return ""
 			}
 			if len(fi.Args) < 1 || fi.Args[0] == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			a0 := fi.Args[0].Output()
 			if a0 == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			return fi.outputUnary(a0)
 		}
 		// binary: need two live args with non-empty Output
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if _, ok := BinaryOpFromString(fi.Binary); !ok && fi.Binary != "+" {
-			// invalid op (except bare + for array mutate without flags)
+			// invalid op sticky (except bare + for array mutate without flags)
+			SetError(ErrGeneric)
 			return ""
 		}
 		a0 := fi.Args[0].Output()
 		a1 := fi.Args[1].Output()
 		if a0 == "" || a1 == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return fi.outputBinary(a0, a1)
 	}
+	// incomplete non-user non-std shell sticky
+	SetError(ErrGeneric)
 	return ""
 }
 
@@ -179,14 +196,16 @@ func (fi *Invocation) outputUnary(a0 string) string {
 	case "+", "-", "!", "~":
 		return fmt.Sprintf("(%s(%s))", fi.Unary, a0)
 	default:
-		// assert invalid operator — no invent emit
+		// assert invalid operator — sticky no invent emit
+		SetError(ErrGeneric)
 		return ""
 	}
 }
 
-// unaryCastMinus is (-(size)arg); empty size token fail closed (no invent "(-()x)").
+// unaryCastMinus is (-(size)arg); empty size token sticky fail closed (no invent "(-()x)").
 func unaryCastMinus(cast, a0 string) string {
 	if cast == "" || a0 == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("(-(%s)%s)", cast, a0)
@@ -238,9 +257,10 @@ func (fi *Invocation) outputBinary(a0, a1 string) string {
 	return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
 }
 
-// binaryCastOp is ((cast)a0 op (cast)a1); empty cast fail closed (no invent "(()a + ()b)").
+// binaryCastOp is ((cast)a0 op (cast)a1); empty cast sticky fail closed (no invent "(()a + ()b)").
 func binaryCastOp(cast, a0, op, a1 string) string {
 	if cast == "" || a0 == "" || a1 == "" || op == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, op, cast, a1)

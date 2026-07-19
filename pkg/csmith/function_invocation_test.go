@@ -353,13 +353,18 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 }
 
 func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
-	// FunctionInvocationUser::Output — param_value[i] always live; no invent f(a, , c)
+	// FunctionInvocationUser::Output — param_value[i] always live; sticky no invent f(a, , c)
+	ClearError()
 	callee := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt}
 	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	// empty callee name — no invent "()"
+	// empty callee name — sticky no invent "()"
 	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntType()}, Args: nil}).Output(); out != "" {
 		t.Fatal("empty User.Name must fail closed, got", out)
 	}
+	if !HasError() {
+		t.Fatal("empty User.Name must SetError sticky")
+	}
+	ClearError()
 	fi := &Invocation{
 		User: callee,
 		Args: []*Expression{a0, nil},
@@ -367,17 +372,26 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	if out := fi.Output(); out != "" {
 		t.Fatal("nil arg must fail closed empty, got", out)
 	}
-	// incomplete arg Output (nil Con) — no invent empty slot
+	if !HasError() {
+		t.Fatal("nil arg must SetError sticky")
+	}
+	// incomplete arg Output (nil Con) — sticky no invent empty slot
+	ClearError()
 	fi.Args = []*Expression{a0, {Term: TermConstant}}
 	if out := fi.Output(); out != "" {
 		t.Fatal("empty arg Output must fail closed, got", out)
 	}
+	if !HasError() {
+		t.Fatal("empty arg Output must SetError sticky")
+	}
+	ClearError()
 	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeInt(2)}}
 	out := fi.Output()
 	if out != "func_2(1, 2)" {
 		t.Fatal(out)
 	}
-	// binary incomplete operand Output
+	// binary incomplete operand Output sticky
+	ClearError()
 	bin := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(1)},
 		{Term: TermConstant},
@@ -385,4 +399,8 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	if out := bin.Output(); out != "" {
 		t.Fatal("empty binary operand must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty binary operand must SetError sticky")
+	}
+	ClearError()
 }

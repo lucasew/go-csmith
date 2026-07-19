@@ -115,15 +115,26 @@ func TestGenerateRandomFloatHexConstantSignFlip(t *testing.T) {
 
 func TestHexToBinary(t *testing.T) {
 	// Constant.cpp:85–97
+	ClearError()
 	if HexToBinary("0") != "0000" || HexToBinary("f") != "1111" || HexToBinary("A") != "1010" {
 		t.Fatalf("nibbles: 0=%q f=%q A=%q", HexToBinary("0"), HexToBinary("f"), HexToBinary("A"))
 	}
 	if HexToBinary("0f") != "00001111" {
 		t.Fatalf("0f=%q", HexToBinary("0f"))
 	}
-	if HexToBinary("g") != "" || HexToBinary("") != "" {
-		t.Fatal("invalid / empty")
+	ClearError()
+	if HexToBinary("g") != "" {
+		t.Fatal("invalid hex must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("invalid hex must SetError sticky")
+	}
+	// empty string has no broken digit — complete empty is ok non-sticky
+	ClearError()
+	if HexToBinary("") != "" {
+		t.Fatal("empty hex must be empty")
+	}
+	ClearError()
 }
 
 func TestBinaryConstantPath(t *testing.T) {
