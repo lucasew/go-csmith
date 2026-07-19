@@ -651,7 +651,11 @@ func forHeaderOutput(lc *LoopControl) string {
 // StatementArrayOp.cpp:194–220 — for (cv = init; cv < size; cv += incr)
 // (ccomp: cv = cv + incr). Numeric inits/incrs/sizes are the C++ IR (not StatementAssign).
 func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
+	// StatementArrayOp always has live LoopControl + IV sticky
 	if lc == nil || lc.IV == nil {
+		if lc != nil && lc.IV == nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)

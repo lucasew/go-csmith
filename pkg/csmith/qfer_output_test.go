@@ -285,12 +285,16 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 }
 
 func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
-	// Variable.cpp:1184 — name + directive always live; hash empty name sticky
+	// Variable.cpp:1184 — name + directive always live sticky; hash empty name sticky
 	ClearError()
 	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
 		t.Fatal("empty name must fail closed dump", s)
 	}
+	if !HasError() {
+		t.Fatal("empty name OutputValueDump must SetError sticky")
+	}
+	ClearError()
 	if s := v.HashOutput(); s != "" {
 		t.Fatal("empty name must fail closed hash", s)
 	}
@@ -303,6 +307,10 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	if s := arr.OutputValueDump("c ", 1, nil); s != "" {
 		t.Fatal("empty array name must fail closed dump", s)
 	}
+	if !HasError() {
+		t.Fatal("empty array name OutputValueDump must SetError sticky")
+	}
+	ClearError()
 	ctrl := []*Variable{
 		{Name: "i", Type: GetIntType()},
 	}

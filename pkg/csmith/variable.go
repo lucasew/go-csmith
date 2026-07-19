@@ -1384,8 +1384,9 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
 	if v.IsVirtual() {
-		// field of virtual array is broken IR for this path
+		// field of virtual array is broken IR sticky for this path
 		if v.IsFieldVar() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if v.IsArray || (v.AsArray != nil && len(v.AsArray.Sizes) > 0) {
@@ -1393,29 +1394,38 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		}
 	}
 	if v.Type.IsSimple() {
-		// Variable.cpp:1184–1188 — name + printf_directive always live
+		// Variable.cpp:1184–1188 — name + printf_directive always live sticky
 		// no invent printf with empty name/directive
 		name := v.GetActualName(false)
 		dir := v.Type.PrintfDirective()
 		if name == "" || dir == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
-		// incomplete FieldVars fails closed whole dump (no invent soft-skip hole)
+		// incomplete FieldVars sticky whole dump (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
+			part := f.OutputValueDump(prefix, indent, unionFacts)
+			if part == "" && HasError() {
+				return ""
+			}
+			b.WriteString(part)
 		}
 		return b.String()
 	}
 	if v.Type.IsUnion() {
-		// incomplete FieldVars fails closed whole dump
+		// incomplete FieldVars sticky whole dump
 		if !v.FieldVarsComplete() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		var b strings.Builder
@@ -1424,7 +1434,11 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 			if !IsFieldReadable(v, i, unionFacts) {
 				continue
 			}
-			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
+			part := f.OutputValueDump(prefix, indent, unionFacts)
+			if part == "" && HasError() {
+				return ""
+			}
+			b.WriteString(part)
 		}
 		return b.String()
 	}
@@ -1433,6 +1447,9 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		name := v.GetActualName(false)
 		dir := v.Type.PrintfDirective()
 		if name == "" || dir == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
@@ -1445,9 +1462,10 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 	if v == nil || len(v.ArraySizes) == 0 {
 		return ""
 	}
-	// base name always live; no invent printf with bare "[0]" access
+	// base name always live sticky; no invent printf with bare "[0]" access
 	base := v.GetActualName(false)
 	if base == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	all := expandWithinRanges(v.ArraySizes)
@@ -1461,16 +1479,20 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 		if v.Type != nil && v.Type.IsSimple() {
 			dir := v.Type.PrintfDirective()
 			if dir == "" {
-				continue
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return ""
 			}
 			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
 			continue
 		}
 		if v.Type != nil && v.Type.IsAggregate() && len(v.FieldVars) > 0 {
 			// dump fields with indexed prefix path via synthetic names
-			// Variable* always live in FieldVars; nil hole fails closed whole dump
+			// Variable* always live in FieldVars; nil hole sticky whole dump
 			for fi, f := range v.FieldVars {
 				if f == nil || f.Type == nil {
+					SetError(ErrGeneric)
 					return ""
 				}
 				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
