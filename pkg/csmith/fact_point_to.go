@@ -1101,7 +1101,23 @@ func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 			SetError(ErrGeneric)
 			return nil
 		}
-		if p == v || v.HasFieldVar(p) || (p.FieldVarOf != nil && isAncestorField(p, v)) {
+		if p == v {
+			pos = i
+			break
+		}
+		if v.HasFieldVar(p) {
+			// residual ERROR sticky — no invent dead-pos true past HasFieldVar hole
+			if HasError() {
+				return nil
+			}
+			pos = i
+			break
+		}
+		// residual ERROR sticky — no invent soft-continue later pointees past HasField residual
+		if HasError() {
+			return nil
+		}
+		if p.FieldVarOf != nil && isAncestorField(p, v) {
 			pos = i
 			break
 		}

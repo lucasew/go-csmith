@@ -233,6 +233,20 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 		t.Fatal("empty vars UpdateFactsForOOSVars must not sticky")
 	}
 	ClearError()
+	// Match residual: Type-nil OOS var soft invent was soft-continue keep later fact.
+	// Fair: sticky IncompleteFactSlice.
+	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
+	facts2 := []*FactPointTo{MakeFactPointTo(p2, NullPtr)}
+	holeOOS := &Variable{Name: "l_hole", Type: nil, FieldVars: nil}
+	// FieldVarsComplete for Type-nil with empty FieldVars is true (no nil holes)
+	UpdateFactsForOOSVars([]*Variable{holeOOS}, &facts2)
+	if FactsComplete(facts2) {
+		t.Fatal("Match residual UpdateFactsForOOSVars must fail closed incomplete", facts2)
+	}
+	if !HasError() {
+		t.Fatal("Match residual UpdateFactsForOOSVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputCommentLine(t *testing.T) {

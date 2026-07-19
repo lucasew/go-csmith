@@ -286,8 +286,19 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		drop := false
 		for _, v := range vars {
 			if v.Match(f.Var) {
+				// residual ERROR sticky — no invent drop-true past Match hole
+				if HasError() {
+					*facts = IncompleteFactSlice()
+					return
+				}
 				drop = true
 				break
+			}
+			// residual ERROR sticky — no invent soft-continue keep later past Match residual
+			// (Type-nil Match ERROR+false soft invents not-drop then keep fact)
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return
 			}
 		}
 		if !drop {
@@ -299,7 +310,16 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		cur := f
 		for _, v := range vars {
 			if nf := cur.MarkDeadVar(v); nf != nil {
+				// residual ERROR sticky — no invent mark-dead success past MarkDeadVar hole
+				if HasError() {
+					*facts = IncompleteFactSlice()
+					return
+				}
 				cur = nf
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue later mark past MarkDead residual
+				*facts = IncompleteFactSlice()
+				return
 			}
 		}
 		out[i] = cur

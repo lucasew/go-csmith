@@ -208,7 +208,15 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 			return ScopeInactive
 		}
 		if p.Match(v) {
+			// residual ERROR sticky — no invent param-scope true past Match hole
+			if HasError() {
+				return ScopeInactive
+			}
 			return 0
+		}
+		// residual ERROR sticky — no invent soft-continue then later scope past Match residual
+		if HasError() {
+			return ScopeInactive
 		}
 	}
 	// visible in current function blocks

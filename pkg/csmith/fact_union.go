@@ -629,6 +629,10 @@ func AbstractFactUnionForAssign(
 		}
 		var fu *FactUnion
 		if v.IsUnionField() {
+			// residual ERROR sticky — no invent soft-continue transfer past IsUnionField hole
+			if HasError() {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
 			// FactUnion.cpp:141–143
 			fu = MakeFactUnion(v.FieldVarOf, v.GetFieldID())
 			// FieldVarOf non-union → MakeFactUnion nil is broken IR sticky
@@ -636,7 +640,18 @@ func AbstractFactUnionForAssign(
 				SetError(ErrGeneric)
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
+			// residual ERROR sticky — no invent soft-continue past GetFieldID/MakeFactUnion hole
+			if HasError() {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue IsInside path past IsUnionField residual false
+			return IncompleteUnionFactSlice(), lvarCnt
 		} else if v.IsInsideUnionField() {
+			// residual ERROR sticky — no invent soft-continue transfer past IsInsideUnionField hole
+			if HasError() {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
 			// FactUnion.cpp:144–146 — v->type->has_padding() always live Type*
 			// Type-nil non-special sticky (no invent skip BOTTOM / soft re-pick)
 			typ := v.Type
@@ -646,6 +661,10 @@ func AbstractFactUnionForAssign(
 					return IncompleteUnionFactSlice(), lvarCnt
 				}
 			} else if typ.HasPadding() || v.IsPackedAfterBitfield() {
+				// residual ERROR sticky — no invent soft-continue padding path past IsPacked residual
+				if HasError() {
+					return IncompleteUnionFactSlice(), lvarCnt
+				}
 				cu := v.GetContainerUnion()
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)
@@ -654,7 +673,17 @@ func AbstractFactUnionForAssign(
 						return IncompleteUnionFactSlice(), lvarCnt
 					}
 				}
+				// residual ERROR sticky — no invent soft-skip container past GetContainerUnion hole
+				if HasError() {
+					return IncompleteUnionFactSlice(), lvarCnt
+				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip no-padding past IsPacked residual false
+				return IncompleteUnionFactSlice(), lvarCnt
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip not-inside past IsInside residual false
+			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		if fu != nil {
 			out = append(out, fu)

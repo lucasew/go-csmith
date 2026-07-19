@@ -368,6 +368,19 @@ func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
 		t.Fatal("special Type-nil must not SetError")
 	}
 	ClearError()
+	// IsUnionField residual: Type-nil parent soft invent was soft-continue IsInside path.
+	// Fair: sticky IncompleteUnionFactSlice.
+	parentHole := &Variable{Name: "g_u", Type: nil}
+	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parentHole}
+	parentHole.FieldVars = []*Variable{f0}
+	out3, _ := AbstractFactUnionForAssign(nil, nil, f0, 0, rhs)
+	if UnionFactsComplete(out3) {
+		t.Fatal("IsUnionField residual AbstractFactUnion must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsUnionField residual AbstractFactUnion must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindRelatedUnionNilSticky(t *testing.T) {

@@ -87,6 +87,18 @@ func TestFindVariableScope(t *testing.T) {
 		t.Fatal("global without CurrentFunc must not sticky")
 	}
 	ClearError()
+	// Match residual: Type-nil param soft invent was soft-continue then later scope.
+	// Fair: sticky ScopeInactive.
+	holeParam := &Variable{Name: "p_hole", Type: nil}
+	f.Param = []*Variable{holeParam, p}
+	if cg.FindVariableScope(p) != ScopeInactive {
+		t.Fatal("Match residual FindVariableScope must fail closed ScopeInactive")
+	}
+	if !HasError() {
+		t.Fatal("Match residual FindVariableScope must SetError sticky")
+	}
+	ClearError()
+	f.Param = []*Variable{p}
 }
 
 func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
