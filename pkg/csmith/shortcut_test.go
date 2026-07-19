@@ -475,3 +475,54 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 		t.Fatal("block incomplete MapFactsOut must fail closed")
 	}
 }
+
+func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
+	// incomplete map_stm_effect / accum must not invent ShortcutOK
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	facts := []*FactPointTo{}
+	fm.SetMapFactsIn(9, facts)
+	fm.SetMapFactsOut(9, facts)
+	fm.SetMapStmEffect(9, IncompleteEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("incomplete map_stm_effect must fail closed ShortcutNone")
+	}
+	// incomplete parent accum
+	fm.SetMapStmEffect(9, EmptyEffect())
+	inc := IncompleteEffect()
+	cg.EffectAccum = &inc
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("incomplete EffectAccum must fail closed ShortcutNone")
+	}
+}
+
+func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
+	// incomplete EffectAccum must not invent StmVisitFacts true while recording map_accum
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	inc := IncompleteEffect()
+	cg.EffectAccum = &inc
+	facts := []*FactPointTo{}
+	if StmVisitFacts(st, &facts, &cg, Defaults()) {
+		t.Fatal("incomplete EffectAccum must fail closed StmVisitFacts")
+	}
+	// C++ still records map_accum / visited — incomplete marker, not invent pure
+	if !fm.MapVisited[90] {
+		t.Fatal("must still mark visited")
+	}
+	if EffectComplete(fm.GetMapAccumEffect(90)) {
+		t.Fatal("map_accum must stay incomplete marker")
+	}
+}

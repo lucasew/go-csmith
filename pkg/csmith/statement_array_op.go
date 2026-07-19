@@ -421,8 +421,10 @@ func MakeRandomArrayInit(
 	}
 	// map_stm_effect[sa] = effect_stm (StatementArrayOp.cpp:151)
 	// StmID always allocated above; FM path always records (no invent soft-skip)
+	// Incomplete EffectStm fails closed (no invent map record / create success)
 	if cg.FM != nil {
-		if st.StmID <= 0 {
+		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())

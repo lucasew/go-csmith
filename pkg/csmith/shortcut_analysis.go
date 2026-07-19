@@ -307,7 +307,11 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if ContainsUnfixedGoto(st, fm) {
 		return ShortcutNone
 	}
+	// Incomplete map_stm_effect fails closed (no invent ShortcutOK with poison AddEffect)
 	eff := fm.GetMapStmEffect(st.StmID)
+	if !EffectComplete(eff) {
+		return ShortcutNone
+	}
 	if cg.InConflict(eff) {
 		return ShortcutConflict
 	}
@@ -319,10 +323,17 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
+	if !EffectComplete(cg.EffectStm) {
+		return ShortcutNone
+	}
+	acc := cg.AccumEffect()
+	if !EffectComplete(acc) {
+		return ShortcutNone
+	}
 	if fm.MapAccumEffect == nil {
 		fm.MapAccumEffect = make(map[int]Effect)
 	}
-	fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+	fm.MapAccumEffect[st.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
@@ -379,10 +390,16 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			cg.FM.GlobalFacts = IncompleteFactSlice()
 			return false
 		}
+		// Incomplete accum fails closed visit (record IncompleteEffect; no invent ok true)
+		acc := cg.AccumEffect()
+		if !EffectComplete(acc) {
+			ok = false
+			acc = IncompleteEffect()
+		}
 		if cg.FM.MapAccumEffect == nil {
 			cg.FM.MapAccumEffect = make(map[int]Effect)
 		}
-		cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		cg.FM.MapAccumEffect[st.StmID] = acc
 		if cg.FM.MapVisited == nil {
 			cg.FM.MapVisited = make(map[int]bool)
 		}

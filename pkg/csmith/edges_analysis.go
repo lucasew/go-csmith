@@ -325,10 +325,16 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	}
 	fm.SetMapFactsIn(st.StmID, preFacts)
 	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
+	// Incomplete accum fails closed (no invent MapAccumEffect incomplete as recorded success)
+	acc := cg.AccumEffect()
+	if !EffectComplete(acc) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	if fm.MapAccumEffect == nil {
 		fm.MapAccumEffect = make(map[int]Effect)
 	}
-	fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+	fm.MapAccumEffect[st.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}

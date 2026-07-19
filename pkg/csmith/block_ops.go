@@ -502,18 +502,37 @@ func (b *Block) AppendNestedLoop(
 		}
 		cg.FM.SetMapFactsIn(st.StmID, preFacts)
 		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
+		// Incomplete accum/stm effects fail closed (no invent MapAccumEffect/map fold success)
+		acc := cg.AccumEffect()
+		if !EffectComplete(acc) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
 		if cg.FM.MapAccumEffect == nil {
 			cg.FM.MapAccumEffect = make(map[int]Effect)
 		}
-		cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		cg.FM.MapAccumEffect[st.StmID] = acc
 		if cg.FM.MapVisited == nil {
 			cg.FM.MapVisited = make(map[int]bool)
 		}
 		cg.FM.MapVisited[st.StmID] = true
 		// fold for effect into block
 		be := cg.FM.GetMapStmEffect(b.StmID)
-		cg.FM.SetMapStmEffect(b.StmID, be.AddEffect(cg.FM.GetMapStmEffect(st.StmID)))
-		cg.FM.MapAccumEffect[b.StmID] = cg.AccumEffect()
+		stE := cg.FM.GetMapStmEffect(st.StmID)
+		if !EffectComplete(be) || !EffectComplete(stE) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
+		merged := be.AddEffect(stE)
+		if !EffectComplete(merged) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
+		cg.FM.SetMapStmEffect(b.StmID, merged)
+		cg.FM.MapAccumEffect[b.StmID] = acc
 	}
 	return st
 }
@@ -571,18 +590,37 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		fm.SetMapFactsIn(st.StmID, preFacts)
 		// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
 		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)
+		// Incomplete accum/stm effects fail closed (no invent MapAccumEffect/map fold success)
+		acc := cg.AccumEffect()
+		if !EffectComplete(acc) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
 		if fm.MapAccumEffect == nil {
 			fm.MapAccumEffect = make(map[int]Effect)
 		}
-		fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		fm.MapAccumEffect[st.StmID] = acc
 		if fm.MapVisited == nil {
 			fm.MapVisited = make(map[int]bool)
 		}
 		fm.MapVisited[st.StmID] = true
 		// Block.cpp:391–392 — map_accum_effect[block]; map_stm_effect[block] += return
 		be := fm.GetMapStmEffect(b.StmID)
-		fm.SetMapStmEffect(b.StmID, be.AddEffect(fm.GetMapStmEffect(st.StmID)))
-		fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+		stE := fm.GetMapStmEffect(st.StmID)
+		if !EffectComplete(be) || !EffectComplete(stE) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
+		merged := be.AddEffect(stE)
+		if !EffectComplete(merged) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
+		fm.SetMapStmEffect(b.StmID, merged)
+		fm.MapAccumEffect[b.StmID] = acc
 		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
 	}
 	return st
@@ -698,7 +736,11 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	// block is not is_ctrl_stmt
+	// Incomplete map_stm_effect fails closed (no invent ShortcutOK with poison AddEffect)
 	eff := fm.GetMapStmEffect(b.StmID)
+	if !EffectComplete(eff) {
+		return ShortcutNone
+	}
 	if cg.InConflict(eff) {
 		return ShortcutConflict
 	}
@@ -709,10 +751,17 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	}
 	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
+	if !EffectComplete(cg.EffectStm) {
+		return ShortcutNone
+	}
+	acc := cg.AccumEffect()
+	if !EffectComplete(acc) {
+		return ShortcutNone
+	}
 	if fm.MapAccumEffect == nil {
 		fm.MapAccumEffect = make(map[int]Effect)
 	}
-	fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+	fm.MapAccumEffect[b.StmID] = acc
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
