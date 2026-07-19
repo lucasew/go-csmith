@@ -252,10 +252,18 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		}
 		// skip globals neither read nor written in this function
 		if f.Var.IsGlobal() && !eff.IsRead(f.Var) && !eff.IsWritten(f.Var) {
+			// residual ERROR sticky — no invent soft-skip then partial assert emit past hole
+			if HasError() {
+				return ""
+			}
 			continue
 		}
 		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
 		body.WriteString(f.OutputAssertion(stParent, indent))
+		// residual ERROR sticky — no invent partial assertion section past hard IR hole
+		if HasError() {
+			return ""
+		}
 	}
 	if body.Len() == 0 {
 		return ""

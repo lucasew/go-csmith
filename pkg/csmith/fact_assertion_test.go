@@ -205,6 +205,24 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 		t.Fatal("nil Fact OutputAssertion must SetError sticky")
 	}
 	ClearError()
+	// OutputAssertion residual soft-continue invents partial assertion section past hard IR.
+	// Fair: sticky fail closed whole OutputAssertions.
+	shell := &Variable{Name: "g_arr", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
+	f3 := &Function{Name: "func_3", ReturnType: GetIntType()}
+	f3.FEffect = EmptyEffect().ReadVar(shell).WriteVar(shell).ReadVar(p).WriteVar(p)
+	fm3 := NewFactMgr(f3)
+	// postCondition uses updated facts — in≠out so both appear; shell subject stickies emit
+	fm3.SetMapFactsIn(8, []*FactPointTo{MakeFactPointTo(shell, NullPtr), MakeFactPointTo(p, NullPtr)})
+	fm3.SetMapFactsOut(8, []*FactPointTo{MakeFactPointTo(shell, tgt), MakeFactPointTo(p, tgt)})
+	fm3.SetupInOutMaps(true)
+	st8 := &Stmt{Kind: StmtAssign, StmID: 8}
+	if s := fm3.OutputAssertions(st8, nil, "    ", true); s != "" {
+		t.Fatal("OutputAssertion residual must fail closed whole OutputAssertions", s)
+	}
+	if !HasError() {
+		t.Fatal("OutputAssertion residual OutputAssertions must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostOutputInBlock(t *testing.T) {

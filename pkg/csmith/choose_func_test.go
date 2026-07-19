@@ -183,6 +183,31 @@ func TestChooseFuncContextIncompleteFEffectSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestChooseFuncContextMatchResidualSticky(t *testing.T) {
+	// unpaired qfer Match stickies residual ERROR; soft invent was continue then pick later good.
+	// Fair: sticky fail closed whole choose.
+	ClearError()
+	good := &Function{
+		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		RV:      &Variable{Name: "good_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		FEffect: EmptyEffect(),
+	}
+	broken := &Function{
+		Name: "broken", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		RV:      &Variable{Name: "broken_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		FEffect: EmptyEffect(),
+	}
+	// request qfer with unpaired const/vol depths → Match SetError
+	badQfer := CVQualifiers{IsConsts: []bool{false, false}, IsVolatiles: []bool{true}}
+	if ChooseFuncContext(NewRng(1), []*Function{broken, good}, GetIntType(), nil, nil, Defaults(), &badQfer) != nil {
+		t.Fatal("Match residual must fail closed ChooseFuncContext")
+	}
+	if !HasError() {
+		t.Fatal("Match residual ChooseFuncContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestChooseFuncUsesIsConvertable(t *testing.T) {
 	// Function.cpp:288–289 — is_convertable (short → int return ok)
 	f := &Function{Name: "f", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}

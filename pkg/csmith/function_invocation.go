@@ -339,6 +339,10 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 			return nil
 		}
 		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
+			// residual ERROR sticky — no invent soft-continue then pick later past hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		// Function.cpp:294–295 — qfer->match(rv->qfer); RV always live after create
@@ -349,6 +353,10 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				return nil
 			}
 			if !qfer.Match(f.RV.Qfer, false) {
+				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+				if HasError() {
+					return nil
+				}
 				continue
 			}
 		}
@@ -359,6 +367,10 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		}
 		// Function.cpp:303–306 — in_conflict with callee feffect
 		if cg != nil && cg.InConflict(f.FEffect) {
+			// residual ERROR sticky — no invent soft-continue conflict-skip past hard IR
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		// Function.cpp:307–313 — strict_volatile_rule
