@@ -501,8 +501,8 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 
 // okStructUnionLTypes filters struct/union types for SelectLType (no_volatile etc.).
 // Type.cpp get_all_ok_struct_union_types subset.
-// Type* always live; nil hole fails closed IncompleteTypes (not bare nil invent
-// empty-complete ok pool via typesComplete(nil)/len==0 → keep original type).
+// Type* always live; nil hole fails closed sticky IncompleteTypes (not bare nil invent
+// empty-complete ok pool / soft re-pick SelectLType past env holes).
 // Complete empty filter result returns non-nil empty slice.
 func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) []*Type {
 	if env == nil {
@@ -512,6 +512,7 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 	if wantStruct {
 		for _, t := range env.StructTypes {
 			if t == nil {
+				SetError(ErrGeneric)
 				return IncompleteTypes()
 			}
 			if noVolatile && t.IsVolatileStructUnion() {
@@ -523,6 +524,7 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 	if wantUnion {
 		for _, t := range env.UnionTypes {
 			if t == nil {
+				SetError(ErrGeneric)
 				return IncompleteTypes()
 			}
 			if noVolatile && t.IsVolatileStructUnion() {

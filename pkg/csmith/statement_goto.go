@@ -115,6 +115,7 @@ func HasInitSkippedVars(src *Block, destParent *Block) bool {
 // VariablesComplete(nil)/len==0 invent empty-complete skip list success).
 // Complete scan with no skipped vars → empty non-nil slice.
 // destParent nil → complete empty (no dest chain).
+// Incomplete LocalVars fails closed sticky IncompleteVariables (no soft re-pick past hole).
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
 		return []*Variable{}
@@ -129,6 +130,7 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
+				SetError(ErrGeneric)
 				return IncompleteVariables()
 			}
 			intermediate = append(intermediate, loc)

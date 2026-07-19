@@ -76,14 +76,19 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	if !strings.Contains(out, "l_1 = 3;") {
 		t.Fatal(out)
 	}
-	// nil LocalVars hole fails closed incomplete (not bare nil invent empty complete)
+	// nil LocalVars hole fails closed sticky incomplete (not bare nil invent empty complete)
+	ClearError()
 	hole := &Block{Parent: outer, LocalVars: []*Variable{nil}}
 	if VariablesComplete(CollectInitSkippedVars(outer, hole)) {
 		t.Fatal("nil local hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil local hole CollectInitSkippedVars must SetError sticky")
+	}
 	if !HasInitSkippedVars(outer, hole) {
 		t.Fatal("incomplete must fail closed as has-skipped")
 	}
+	ClearError()
 }
 
 func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
