@@ -1073,15 +1073,28 @@ func makeExpressionVariableFlags(
 	for tries := 0; tries < 256; tries++ {
 		// ExpressionVariable.cpp:74–76 — select_must_use_var READ first
 		v := vs.SelectMustUseVar(r, AccessRead, *cg, typ, qfer)
+		// residual ERROR sticky — no invent fall through soft select past must-use hole
+		if HasError() {
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			return nil
+		}
 		if v == nil {
 			// ExpressionVariable.cpp:77–78 — select(..., dummy, eFlexible)
 			v = vs.SelectWithInvalid(AccessRead, *cg, typ, qfer, r, MatchFlexible, dummy)
+			// residual ERROR sticky — no invent soft-continue / create past select hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 		}
 		if v == nil {
-			// ERROR_GUARD from select; sticky error aborts like C++
-			if HasError() {
-				break
-			}
+			// complete soft miss (no residual): re-pick
 			continue
 		}
 		// already in dummy should be rare when SelectWithInvalid works; keep guard
@@ -1099,7 +1112,21 @@ func makeExpressionVariableFlags(
 		// soft re-pick past hole candidate as if absent)
 		if v.Type == nil {
 			SetError(ErrGeneric)
-			break
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			return nil
+		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent READ var expr past broken array shell)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			return nil
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
 		if !typ.IsFloat() && v.Type.IsFloat() {
@@ -1109,12 +1136,28 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
 		if asParam && v.IsArgument() && v.Type.IsDereferencedFrom(typ) {
+			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 			dummy = append(dummy, v)
 			continue
 		}
 		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
 		if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
 			v.Type.IsDereferencedFrom(typ) {
+			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 			dummy = append(dummy, v)
 			continue
 		}
@@ -1126,11 +1169,23 @@ func makeExpressionVariableFlags(
 				// incomplete GlobalFacts fail closed sticky (no invent soft-skip local-ptr filter)
 				if !FactsComplete(cg.FM.GlobalFacts) {
 					SetError(ErrGeneric)
-					break
+					if cg.EffectAccum != nil {
+						*cg.EffectAccum = preAccum
+					}
+					cg.EffectStm = preStm
+					return nil
 				}
 				facts = cg.FM.GlobalFacts
 			}
 			if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
+				// residual ERROR sticky — no invent soft-continue past local-ptr hole
+				if HasError() {
+					if cg.EffectAccum != nil {
+						*cg.EffectAccum = preAccum
+					}
+					cg.EffectStm = preStm
+					return nil
+				}
 				dummy = append(dummy, v)
 				continue
 			}
@@ -1140,23 +1195,47 @@ func makeExpressionVariableFlags(
 		if cg.FM != nil {
 			if !FactsComplete(cg.FM.GlobalFacts) {
 				SetError(ErrGeneric)
-				break
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
 			}
 			facts = cg.FM.GlobalFacts
 		}
 		if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+			// residual ERROR sticky — no invent soft-continue past validate hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 			dummy = append(dummy, v)
 			continue
 		}
 		// ExpressionVariable.cpp:80 ERROR_GUARD after select (sticky)
 		if HasError() {
-			break
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			return nil
 		}
 		// ExpressionVariable.cpp:120–124 — visit_facts with (var, type); on success
 		// use ExpressionVariable(*var) when indirection==0 else (*var, type)
 		// C++ always has FactMgr; visit_facts records reads even with empty fact vec
 		probe := &Expression{Term: TermVariable, Var: v, ExprType: typ}
 		if !cg.VisitFactsExpressionVariable(probe, vs.Opts) {
+			// residual ERROR sticky — no invent soft-continue past visit_facts hard IR hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preAccum
 			}

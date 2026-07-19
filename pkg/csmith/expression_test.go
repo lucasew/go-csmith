@@ -975,6 +975,50 @@ func TestExpressionVariableIsDereferencedFromOrder(t *testing.T) {
 	}
 }
 
+func TestMakeExpressionVariableResidualSticky(t *testing.T) {
+	// residual ERROR soft-continue invents var expr via fall-through select / later try.
+	// Fair: sticky fail closed whole makeExpressionVariableFlags.
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{}
+	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken.Type = nil
+	good := CreateVariableScalars("g_good", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{good}
+	vs.AllVars = []*Variable{good}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// must_use Type-nil stickies residual; must not invent soft select past hole
+	rw := &RWDirective{MustReadVars: []*Variable{broken, good}}
+	cg := WithFunc(f, EmptyEffect()).WithRW(rw)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if makeExpressionVariableFlags(NewRng(1), vs, &cg, GetIntType(), &q, false, false) != nil {
+		t.Fatal("must-use Type-nil residual must fail closed makeExpressionVariable")
+	}
+	if !HasError() {
+		t.Fatal("must-use residual makeExpressionVariable must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray shell in must-use: same residual invent hole
+	shell := &Variable{
+		Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	rw2 := &RWDirective{MustReadVars: []*Variable{shell, good}}
+	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw2)
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	if makeExpressionVariableFlags(NewRng(2), vs, &cg2, GetIntType(), &q, false, false) != nil {
+		t.Fatal("IsArray without AsArray must-use residual must fail closed makeExpressionVariable")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray residual makeExpressionVariable must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent leaf / soft re-pick past holes)
 	ClearError()
