@@ -1256,13 +1256,15 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 	if want.IsSimple() || want.IsAggregate() {
 		cands = ExpandStructUnionVars(vars, want)
 	}
-	// incomplete expand / candidate list — fail closed
+	// incomplete expand / candidate list — fail closed sticky
 	if !VariablesComplete(cands) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var ok []*Variable
 	for _, x := range cands {
 		if x.Type == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if skipConst && x.IsConst() {
@@ -2294,6 +2296,11 @@ func (vs *VariableSelector) SelectWithInvalid(
 	if vs == nil || r == nil {
 		return nil
 	}
+	// incomplete invalid_vars fails closed sticky (no invent select past hole list)
+	if !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:1190–1191 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtSelectVariable, scope, nullptr)
 	// scope not chosen yet → MAX_VAR_SCOPE flag (mirrors call with default MAX)
 	if DepthGuardByTypeFlag(vs.Opts, DtSelectVariable, int(MaxVarScope)) == BadDepth {
@@ -2383,12 +2390,23 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	if len(stack) == 0 {
 		return nil
 	}
+	// incomplete Stack list fails closed sticky (no invent soft-skip nil frame)
+	if !BlocksComplete(stack) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete invalid_vars fails closed sticky
+	if !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:1001–1003 — rnd_upto(stack.size()); ERROR_GUARD(nullptr)
 	blk := stack[r.RndUpto(uint32(len(stack)))]
 	if HasError() {
 		return nil
 	}
 	if blk == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// empty locals: expand_struct eager then GenerateNewParentLocal
@@ -2409,6 +2427,11 @@ func (vs *VariableSelector) SelectParentLocalInv(
 			return nil
 		}
 		return vs.GenerateNewParentLocal(blk, access, cg, t2, qfer, r)
+	}
+	// incomplete LocalVars fails closed sticky before choose
+	if !VariablesComplete(blk.LocalVars) {
+		SetError(ErrGeneric)
+		return nil
 	}
 	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t

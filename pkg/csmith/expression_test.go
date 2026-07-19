@@ -322,12 +322,47 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if evBroken != nil && evBroken.Var == broken {
 		t.Fatal("Type-nil var must not be accepted as ExpressionVariable")
 	}
-	// sticky ERROR_GUARD after incomplete type IR (ChooseVarFull) — clear for suite
+	if !HasError() {
+		// Type-nil may SetError in makeExpressionVariableFlags or via ChooseVarFull
+		// either sticky path is acceptable; only invent success is forbidden
+	}
+	// sticky ERROR_GUARD after incomplete type IR — clear for suite
+	ClearError()
+}
+
+func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient must sticky ERROR (no invent var expr soft re-pick)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{v}
+	vs.AllVars = []*Variable{v}
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if makeExpressionVariableFlags(NewRng(1), vs, &cg, GetIntType(), nil, false, false) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed makeExpressionVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := EmptyCGContext().WithFactMgr(fm)
+	if makeExpressionVariableFlags(NewRng(2), vs, &cg2, GetIntType(), nil, false, false) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed makeExpressionVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
 	ClearError()
 }
 
 func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	// ExpressionVariable.cpp:122–123 — indirection 0 → ExpressionVariable(*var) without forced type
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)

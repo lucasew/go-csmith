@@ -286,3 +286,39 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 		t.Fatal("bad qfer must fail closed without invent uninit var")
 	}
 }
+
+func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// Stack with nil hole
+	f.Stack = []*Block{nil}
+	cg := WithFunc(f, EmptyEffect())
+	if vs.SelectParentLocalInv(AccessRead, cg, GetIntType(), nil, NewRng(1), MatchFlexible, nil) != nil {
+		t.Fatal("nil Stack hole must fail closed SelectParentLocalInv")
+	}
+	if !HasError() {
+		t.Fatal("nil Stack hole must SetError sticky")
+	}
+	ClearError()
+	// incomplete LocalVars
+	blk := &Block{Func: f, LocalVars: []*Variable{nil}}
+	f.Stack = []*Block{blk}
+	cg2 := WithFunc(f, EmptyEffect())
+	if vs.SelectParentLocalInv(AccessRead, cg2, GetIntType(), nil, NewRng(2), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete LocalVars must fail closed SelectParentLocalInv")
+	}
+	if !HasError() {
+		t.Fatal("incomplete LocalVars must SetError sticky")
+	}
+	ClearError()
+	// incomplete invalid_vars on SelectWithInvalid
+	if vs.SelectWithInvalid(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(3), MatchFlexible, []*Variable{nil}) != nil {
+		t.Fatal("incomplete invalid_vars must fail closed SelectWithInvalid")
+	}
+	if !HasError() {
+		t.Fatal("incomplete invalid_vars must SetError sticky")
+	}
+	ClearError()
+}

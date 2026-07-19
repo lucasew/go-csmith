@@ -816,6 +816,17 @@ func makeExpressionVariableFlags(
 	if r == nil || vs == nil || cg == nil || typ == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent var expr / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)
 	if DepthGuardByType(vs.Opts, DtExpressionVariable) == BadDepth {
 		return nil
@@ -855,11 +866,11 @@ func makeExpressionVariableFlags(
 		if skip {
 			continue
 		}
-		// Variable::type always live; incomplete type IR fails closed (no invent
-		// skip type/as_param/as_return filters and still accept the candidate)
+		// Variable::type always live; incomplete type IR fails closed sticky (no invent
+		// soft re-pick past hole candidate as if absent)
 		if v.Type == nil {
-			dummy = append(dummy, v)
-			continue
+			SetError(ErrGeneric)
+			break
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
 		if !typ.IsFloat() && v.Type.IsFloat() {
@@ -883,6 +894,11 @@ func makeExpressionVariableFlags(
 			indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
 			var facts []*FactPointTo
 			if cg.FM != nil {
+				// incomplete GlobalFacts fail closed sticky (no invent soft-skip local-ptr filter)
+				if !FactsComplete(cg.FM.GlobalFacts) {
+					SetError(ErrGeneric)
+					break
+				}
 				facts = cg.FM.GlobalFacts
 			}
 			if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
@@ -893,6 +909,10 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:116–119 — opportunistic_validate (always; empty facts if no FM)
 		var facts []*FactPointTo
 		if cg.FM != nil {
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
+				break
+			}
 			facts = cg.FM.GlobalFacts
 		}
 		if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
