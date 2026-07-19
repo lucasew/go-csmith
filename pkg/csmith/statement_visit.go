@@ -289,12 +289,13 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
-		// CFGEdge* always live; no invent skip nil holes
+		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
 		if st.StmID > 0 {
-			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
-				if e == nil {
-					return false
-				}
+			edges := cg.FM.FindEdgesIn(st.StmID, true, false)
+			if edges == nil {
+				return false
+			}
+			for _, e := range edges {
 				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
 					MergeJumpFacts(&cg.FM.GlobalFacts, out)
 				}
@@ -399,12 +400,13 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
-		// CFGEdge* always live; no invent skip nil holes
+		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
 		if st.StmID > 0 {
-			for _, e := range cg.FM.FindEdgesIn(st.StmID, true, false) {
-				if e == nil {
-					return false
-				}
+			edges := cg.FM.FindEdgesIn(st.StmID, true, false)
+			if edges == nil {
+				return false
+			}
+			for _, e := range edges {
 				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
 					MergeJumpFacts(&cg.FM.GlobalFacts, out)
 				}

@@ -44,6 +44,11 @@ func TestSubsetFacts(t *testing.T) {
 			t.Fatal("subset")
 		}
 	}
+	// nil fact hole fails closed — no invent skip as subset
+	hole := []*FactPointTo{nil}
+	if SubsetFacts(hole, hole) {
+		t.Fatal("nil hole must not be subset")
+	}
 }
 
 func TestIsCtrlStmt(t *testing.T) {

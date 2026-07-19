@@ -442,8 +442,10 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
 	mustBR := b.MustBreakOrReturnFull(fm)
 	isLoopBody := !mustBR && b.Looping
+	// FindEdgesInToBlock nil = incomplete CFG; fail closed as hasBack (no invent none)
+	toBlk := fm.FindEdgesInToBlock(b, false, true)
 	hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
-		len(fm.FindEdgesInToBlock(b, false, true)) > 0 ||
+		toBlk == nil || len(toBlk) > 0 ||
 		b.ContainsBackEdge(fm)
 	if isLoopBody || b.NeedRevisit || hasBack {
 		selfBack := false

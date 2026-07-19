@@ -81,20 +81,29 @@ func (b *Block) MustJump() bool {
 
 // hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.
 // Block.cpp:318–326 / 346–353 — continue into loop body can bypass end return.
+// Incomplete CFG (nil hole) fails closed as possible escape — no invent "no edge".
 func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false
 	}
 	// edges targeting the block as DestBlock
-	for _, e := range fm.FindEdgesInToBlock(b, false, true) {
-		if e != nil && e.SrcID != b.StmID {
+	toBlk := fm.FindEdgesInToBlock(b, false, true)
+	if toBlk == nil {
+		return true
+	}
+	for _, e := range toBlk {
+		if e.SrcID != b.StmID {
 			return true
 		}
 	}
 	// edges targeting block stm_id
 	if b.StmID > 0 {
-		for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
-			if e != nil && e.SrcID != b.StmID {
+		back := fm.FindEdgesIn(b.StmID, false, true)
+		if back == nil {
+			return true
+		}
+		for _, e := range back {
+			if e.SrcID != b.StmID {
 				return true
 			}
 		}

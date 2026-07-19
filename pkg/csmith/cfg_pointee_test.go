@@ -142,6 +142,13 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	if fq == nil || fq.IsDead() || len(fq.PointTo) != 1 || fq.PointTo[0] != tgt {
 		t.Fatalf("want &g_t fact, got %+v", fq)
 	}
+	// nil hole fails closed — no invent skip past hole to makeup later vars
+	r := CreateVariableScalars("g_r", PointerTo(GetIntType()), false, false)
+	old3 := []*FactPointTo{}
+	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointTo(r, NullPtr)})
+	if FindRelatedPointTo(old3, r) != nil {
+		t.Fatal("makeup must not invent past nil hole")
+	}
 }
 
 func TestIsPointingToLocalsMultiLevel(t *testing.T) {

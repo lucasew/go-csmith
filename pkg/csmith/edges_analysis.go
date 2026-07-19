@@ -3,19 +3,33 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+// factsSliceComplete reports whether every Fact* in the slice is live (non-nil).
+// Used by merge paths that must fail closed on nil map holes.
+func factsSliceComplete(facts []*FactPointTo) bool {
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
+// Fact* always live in maps; nil subject/jump holes fail closed (no invent skip).
+// Returns false when maps are incomplete OR when the join does not change facts.
 func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 	if facts == nil {
+		return false
+	}
+	// pre-validate: incomplete maps must not soft-join past holes
+	if !factsSliceComplete(*facts) || !factsSliceComplete(jumpFacts) {
 		return false
 	}
 	changed := false
 	// iterate a snapshot of subjects so we can grow via MergeFactInto
 	subjects := append([]*FactPointTo(nil), *facts...)
 	for _, f := range subjects {
-		if f == nil || f.Var == nil {
-			continue
-		}
 		// skip return variables (*_rv)
 		if isReturnVar(f.Var) {
 			continue
@@ -35,6 +49,18 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 	return changed
 }
 
+// tryMergeJumpFacts merges jump outs into facts; fails closed on incomplete maps.
+// Distinguishes incomplete (ok=false) from complete no-change (ok=true, changed=false).
+func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
+	if facts == nil {
+		return false, false
+	}
+	if !factsSliceComplete(*facts) || !factsSliceComplete(jumpFacts) {
+		return false, false
+	}
+	return MergeJumpFacts(facts, jumpFacts), true
+}
+
 func isReturnVar(v *Variable) bool {
 	if v == nil {
 		return false
@@ -46,14 +72,17 @@ func isReturnVar(v *Variable) bool {
 
 // FindEdgesIn mirrors Statement::find_edges_in for dest StmID.
 // Statement.cpp:453–467 — edges with matching dest, post_dest, back_link.
+// CFGEdge* always live; nil hole in CFGEdges → nil (fail closed).
+// Complete scan with no matches returns empty non-nil slice.
 func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdge {
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
-	var out []*CFGEdge
+	out := make([]*CFGEdge, 0)
 	for _, e := range fm.CFGEdges {
+		// CFGEdge* always live; no invent skip nil holes as absent edges
 		if e == nil {
-			continue
+			return nil
 		}
 		if e.DestStmID == destStmID && e.PostDest == postDest && e.BackLink == backLink {
 			out = append(out, e)
@@ -63,14 +92,17 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 }
 
 // FindEdgesInToBlock finds edges whose DestBlock matches (break/continue).
+// CFGEdge* always live; nil hole in CFGEdges → nil (fail closed).
+// Complete scan with no matches returns empty non-nil slice.
 func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*CFGEdge {
 	if fm == nil || dest == nil {
 		return nil
 	}
-	var out []*CFGEdge
+	out := make([]*CFGEdge, 0)
 	for _, e := range fm.CFGEdges {
+		// CFGEdge* always live; no invent skip nil holes as absent edges
 		if e == nil {
-			continue
+			return nil
 		}
 		if e.DestBlock == dest && e.DestStmID == 0 && e.PostDest == postDest && e.BackLink == backLink {
 			out = append(out, e)
@@ -96,27 +128,41 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 	if fm != nil && st.StmID > 0 {
 		// back edges only if already visited
 		if fm.MapVisited != nil && fm.MapVisited[st.StmID] {
-			for _, e := range fm.FindEdgesIn(st.StmID, false, true) {
-				if e == nil || fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
+			back := fm.FindEdgesIn(st.StmID, false, true)
+			// nil = incomplete CFG (hole); empty non-nil = no matching edges
+			if back == nil {
+				return false
+			}
+			for _, e := range back {
+				// unvisited src is intentional filter (not soft invent of edge)
+				if fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
 					continue
 				}
-				if out, ok := fm.MapFactsOut[e.SrcID]; ok {
-					MergeJumpFacts(facts, out)
+				if out, has := fm.MapFactsOut[e.SrcID]; has {
+					if _, ok := tryMergeJumpFacts(facts, out); !ok {
+						return false
+					}
 				}
-				if acc, ok := fm.MapAccumEffect[e.SrcID]; ok {
+				if acc, has := fm.MapAccumEffect[e.SrcID]; has {
 					cg.AddEffect(acc, false)
 				}
 			}
 		}
 		// always consider forward edges
-		for _, e := range fm.FindEdgesIn(st.StmID, false, false) {
-			if e == nil || fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
+		fwd := fm.FindEdgesIn(st.StmID, false, false)
+		if fwd == nil {
+			return false
+		}
+		for _, e := range fwd {
+			if fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
 				continue
 			}
-			if out, ok := fm.MapFactsOut[e.SrcID]; ok {
-				MergeJumpFacts(facts, out)
+			if out, has := fm.MapFactsOut[e.SrcID]; has {
+				if _, ok := tryMergeJumpFacts(facts, out); !ok {
+					return false
+				}
 			}
-			if acc, ok := fm.MapAccumEffect[e.SrcID]; ok {
+			if acc, has := fm.MapAccumEffect[e.SrcID]; has {
 				cg.AddEffect(acc, false)
 			}
 		}
@@ -243,18 +289,23 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				SetError(ErrGeneric)
 				return currentInputs, -1, false
 			}
-			for _, e := range fm.FindEdgesIn(b.StmID, false, true) {
-				if e == nil {
-					continue
-				}
+			back := fm.FindEdgesIn(b.StmID, false, true)
+			// nil = incomplete CFG; no invent skip holes as absent back-edges
+			if back == nil {
+				SetError(ErrGeneric)
+				return currentInputs, -1, false
+			}
+			for _, e := range back {
 				if out, has := fm.MapFactsOut[e.SrcID]; has {
 					MergeFacts(&currentInputs, out)
 				}
 			}
-			for _, e := range fm.FindEdgesInToBlock(b, false, true) {
-				if e == nil {
-					continue
-				}
+			toBlk := fm.FindEdgesInToBlock(b, false, true)
+			if toBlk == nil {
+				SetError(ErrGeneric)
+				return currentInputs, -1, false
+			}
+			for _, e := range toBlk {
 				if out, has := fm.MapFactsOut[e.SrcID]; has {
 					MergeFacts(&currentInputs, out)
 				}

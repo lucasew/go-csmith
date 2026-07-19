@@ -42,14 +42,16 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 
 // SubsetFacts mirrors subset_facts — each f1 is implied by related f2.
 // Fact.cpp:249–260.
+// Fact* always live; nil hole fails closed (no invent skip as subset).
 func SubsetFacts(a, b []*FactPointTo) bool {
 	if len(a) != len(b) {
 		// upstream requires same size
 		return false
 	}
 	for _, f1 := range a {
+		// no invent treat nil hole as absent fact that is "subset"
 		if f1 == nil {
-			continue
+			return false
 		}
 		f2 := FindRelatedPointTo(b, f1.Var)
 		if f2 == nil || !f2.Imply(f1) {
@@ -116,7 +118,11 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 		fm.MapVisited = make(map[int]bool)
 	}
 	for _, e := range fm.CFGEdges {
-		if e == nil || e.SrcID <= 0 {
+		// CFGEdge* always live; nil hole → stop (no invent partial mark-as-visited)
+		if e == nil {
+			return
+		}
+		if e.SrcID <= 0 {
 			continue
 		}
 		s := FindStmtInTree(root, e.SrcID)
@@ -182,7 +188,11 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		return false
 	}
 	for _, e := range fm.CFGEdges {
-		if e == nil || e.SrcID <= 0 {
+		// CFGEdge* always live; nil hole is unfixed (no invent skip as fixed)
+		if e == nil {
+			return true
+		}
+		if e.SrcID <= 0 {
 			continue
 		}
 		// Statement.cpp:781 — edge->src is eGoto and contains_stmt(src)
@@ -211,7 +221,11 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 				return true
 			}
 			for _, f := range destIn {
-				if f == nil || f.Var == nil || f.Var.IsRV() {
+				// Fact* always live; nil hole is unfixed
+				if f == nil || f.Var == nil {
+					return true
+				}
+				if f.Var.IsRV() {
 					continue
 				}
 				// Statement.cpp:797–800 — jump_src_f && !f->imply(*jump_src_f)
