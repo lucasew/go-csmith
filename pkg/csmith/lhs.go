@@ -204,7 +204,12 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		if ind != -1 {
 			return ""
 		}
-		return "&" + v.GetActualName(false)
+		// no invent bare "&" when get_actual_name empty
+		nm := v.GetActualName(false)
+		if nm == "" {
+			return ""
+		}
+		return "&" + nm
 	}
 	return base
 }

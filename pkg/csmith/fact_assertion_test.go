@@ -26,6 +26,26 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	if cond := broken.OutputCondition(); cond != "" {
 		t.Fatal("nil pointee must fail closed", cond)
 	}
+	// no invent " == 0" without subject name
+	anon := &FactPointTo{Var: &Variable{Type: PointerTo(GetIntType())}, PointTo: []*Variable{NullPtr}}
+	if cond := anon.OutputCondition(); cond != "" {
+		t.Fatal("empty subject name must fail closed", cond)
+	}
+	// no invent "(p >= & && p <= &)" with empty array bounds
+	arr := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	// empty name array bounds fail closed
+	arrNoName := &Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arrNoName}}).OutputCondition(); cond != "" {
+		t.Fatal("empty array bound name must fail closed", cond)
+	}
+	// live array range form (bounds via OutputLower/UpperBound)
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arr}}).OutputCondition(); !strings.Contains(cond, "g_p >= &g_a") {
+		t.Fatal("want array range form", cond)
+	}
+	// no invent bare "&" pointee
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{{Type: GetIntType()}}}).OutputCondition(); cond != "" {
+		t.Fatal("empty pointee name must fail closed", cond)
+	}
 }
 
 func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {

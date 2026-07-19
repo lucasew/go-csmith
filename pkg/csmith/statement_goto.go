@@ -132,8 +132,13 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		if init == "" {
 			continue
 		}
+		// get_actual_name always live; no invent " = init;" without identifier
+		name := v.GetActualName(false)
+		if name == "" {
+			continue
+		}
 		b.WriteString(indent)
-		b.WriteString(v.GetActualName(false))
+		b.WriteString(name)
 		b.WriteString(" = ")
 		b.WriteString(init)
 		b.WriteString(";\n")

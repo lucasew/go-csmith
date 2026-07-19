@@ -227,6 +227,14 @@ func TestVolWrapNoInventIntType(t *testing.T) {
 	if out := v.OutputLhsC(); out != "" {
 		t.Fatal("nil Type VOL_LVAL must fail closed", out)
 	}
+	// no invent VOL_RVAL(, int) / VOL_LVAL(, int) with empty name
+	v2 := &Variable{Type: GetIntType(), UseVolRVal: true, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
+	if out := v2.OutputC(); out != "" {
+		t.Fatal("empty name VOL_RVAL must fail closed", out)
+	}
+	if out := v2.OutputLhsC(); out != "" {
+		t.Fatal("empty name VOL_LVAL must fail closed", out)
+	}
 }
 
 func TestOutputHeaderAliasNoInvent(t *testing.T) {

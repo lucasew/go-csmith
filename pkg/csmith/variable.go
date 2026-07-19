@@ -172,6 +172,10 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
+	// Variable always has live get_actual_name; no invent VOL_RVAL(, T) / ACCESS_ONCE()
+	if name == "" {
+		return ""
+	}
 	if v.UseVolRVal && v.IsVolatile() {
 		// Variable.cpp:690–693 — type->Output always live; no invent "int"
 		if v.Type == nil {
@@ -207,6 +211,10 @@ func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
+	// no invent VOL_LVAL(, T) / empty LHS identifier
+	if name == "" {
+		return ""
+	}
 	if v.UseVolRVal && v.IsVolatile() {
 		// Lhs/Variable type->Output always live; no invent "int"
 		if v.Type == nil {

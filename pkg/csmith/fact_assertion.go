@@ -55,17 +55,25 @@ func (f *FactPointTo) OutputCondition() string {
 	if f == nil || f.Var == nil {
 		return ""
 	}
+	lhs := outputFactVar(f.Var)
+	// subject always live Output; no invent " == 0" / " >= &" without lhs
+	if lhs == "" {
+		return ""
+	}
 	var parts []string
 	for _, pointee := range f.PointTo {
 		// FactPointTo.cpp: point_to_vars[i] always live; no invent skip nil holes
 		if pointee == nil {
 			return ""
 		}
-		lhs := outputFactVar(f.Var)
 		if pointee.IsArray || (pointee.AsArray != nil) {
 			// range form: (p >= &lo && p <= &hi)
+			// OutputLower/UpperBound always live; no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
 			hi := pointee.OutputUpperBound(false)
+			if lo == "" || hi == "" {
+				return ""
+			}
 			parts = append(parts, "("+lhs+" >= &"+lo+" && "+lhs+" <= &"+hi+")")
 			continue
 		}
@@ -78,7 +86,12 @@ func (f *FactPointTo) OutputCondition() string {
 		case pointee == NullPtr:
 			rhs = "0"
 		default:
-			rhs = "&" + pointee.GetActualName(false)
+			// pointee->Output always live name; no invent bare "&"
+			nm := pointee.GetActualName(false)
+			if nm == "" {
+				return ""
+			}
+			rhs = "&" + nm
 		}
 		parts = append(parts, lhs+" == "+rhs)
 	}
@@ -90,6 +103,10 @@ func outputFactVar(v *Variable) string {
 		return ""
 	}
 	s := v.GetActualName(false)
+	// no invent "[0]" indices without identifier
+	if s == "" {
+		return ""
+	}
 	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
 	// no soft invent dim=1 when sizes empty
 	if v.IsArray || v.AsArray != nil {

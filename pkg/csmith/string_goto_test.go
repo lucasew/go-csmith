@@ -137,6 +137,18 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	if !strings.Contains(out, "l_ok = 4;") {
 		t.Fatal(out)
 	}
+	// no invent " = 4;" without identifier
+	anon := CreateVariableScalars("l_x", GetIntType(), false, false)
+	anon.Name = ""
+	anon.Init = MakeInt(5)
+	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{anon, good}}
+	out2 := OutputSkippedVarInits(st2, "")
+	if strings.Contains(out2, " = 5;") || strings.HasPrefix(strings.TrimSpace(out2), "=") {
+		t.Fatal("empty name must not invent re-init", out2)
+	}
+	if !strings.Contains(out2, "l_ok = 4;") {
+		t.Fatal(out2)
+	}
 }
 
 func TestVariableInitOutput(t *testing.T) {
