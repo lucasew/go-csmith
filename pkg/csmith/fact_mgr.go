@@ -949,7 +949,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				return
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
-			if merged == nil {
+			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
 			}
@@ -1119,14 +1119,19 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	}
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
 	ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
+	// incomplete abstract must not invent empty union merge success; leave prior
+	// complete UnionFacts for factory re-pick (do not poison)
+	if !UnionFactsComplete(ufacts) {
+		return false
+	}
 	for _, uf := range ufacts {
-		// FactUnion* always live from abstract; nil hole fails closed
+		// FactUnion* always live from complete abstract
 		if uf == nil {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return false
 		}
 		merged := MergeUnionFact(fm.UnionFacts, uf)
-		if merged == nil {
+		if !UnionFactsComplete(merged) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return false
 		}
@@ -1140,18 +1145,15 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	return changed
 }
 
-// MergeUnionFact replaces or appends FactUnion for the same union var.
 // MergeUnionFact replaces or appends a union fact by subject.
-// FactUnion* always live; nil f or map hole fails closed (nil out).
-// Incomplete map must not invent replace success when match appears before a hole.
+// FactUnion* always live; nil f or map hole fails closed IncompleteUnionFactSlice
+// (no invent empty-complete via UnionFactsComplete(nil)).
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
-		return nil
+		return IncompleteUnionFactSlice()
 	}
-	for _, old := range facts {
-		if old == nil {
-			return nil
-		}
+	if !UnionFactsComplete(facts) {
+		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
 		if old.Var == f.Var {
@@ -1398,13 +1400,17 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	}
 	if fm != nil {
 		ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
+		// incomplete abstract: fail closed without poisoning prior complete UnionFacts
+		if !UnionFactsComplete(ufacts) {
+			return false
+		}
 		for _, uf := range ufacts {
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return false
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
-			if merged == nil {
+			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
 				return false
 			}

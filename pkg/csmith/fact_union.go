@@ -43,17 +43,18 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 
 // MakeFactUnions mirrors FactUnion::make_facts.
 // FactUnion.cpp:169–176 — vars[i] always live; make_fact asserts union type.
-// no invent skip of nil Variable* holes as partial success
+// Incomplete IR fails closed IncompleteUnionFactSlice (not bare nil —
+// UnionFactsComplete(nil)==true invents empty-complete make_facts success).
 func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
 		if v == nil {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		f := MakeFactUnion(v, fid)
 		// non-union subject is assert path — fail closed whole batch
 		if f == nil {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		out = append(out, f)
 	}
@@ -270,13 +271,15 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 
 // JoinVarFactsUnion mirrors FactUnion::join_var_facts for a set of union vars.
 // FactUnion.cpp:226–245 — merge existing facts for vars into one.
-// Variable* always live in vars; nil hole fails closed (nil join, no invent skip).
+// Variable* always live in vars; nil hole / incomplete union map fails closed
+// (nil join — callers of transfer must not invent empty complete from that alone;
+// RhsToLhsTransferUnion pre-checks completeness before join).
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
+	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {
+		return nil
+	}
 	var fu *FactUnion
 	for _, v := range vars {
-		if v == nil {
-			return nil
-		}
 		exist := FindRelatedUnion(facts, v)
 		if exist == nil {
 			continue
@@ -293,22 +296,20 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 }
 
 // MergeUnionFactInto merges nf into facts slice (join if related).
-// FactUnion* always live; nil nf or map hole fails closed (nil out, no invent skip).
-// Incomplete map must not invent early-match join past later holes.
+// FactUnion* always live; nil nf or map hole fails closed IncompleteUnionFactSlice
+// (no invent empty-complete via UnionFactsComplete(nil)).
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	if nf == nil {
-		return nil
+		return IncompleteUnionFactSlice()
 	}
-	for _, old := range facts {
-		if old == nil {
-			return nil
-		}
+	if !UnionFactsComplete(facts) {
+		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
 		if old.Var == nf.Var {
 			cp := old.Clone()
 			if cp == nil {
-				return nil
+				return IncompleteUnionFactSlice()
 			}
 			cp.Join(nf)
 			facts[i] = cp
@@ -317,7 +318,7 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	}
 	cl := nf.Clone()
 	if cl == nil {
-		return nil
+		return IncompleteUnionFactSlice()
 	}
 	return append(facts, cl)
 }
@@ -325,21 +326,31 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
 // FactUnion.cpp:74–118 — constant→fid 0; variable→join RHS union facts;
 // assign/comma peel to RHS; function return uses registry when available.
+// Incomplete IR fails closed IncompleteUnionFactSlice (not bare nil invent
+// empty-complete transfer / assign apply success).
 func RhsToLhsTransferUnion(
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
 	lvars []*Variable,
 	rhs *Expression,
 ) []*FactUnion {
-	// FactUnion.cpp:82 — assert(rhs != nullptr)
-	if rhs == nil || len(lvars) == 0 {
+	// complete empty transfer targets
+	if len(lvars) == 0 {
 		return nil
+	}
+	// FactUnion.cpp:82 — assert(rhs != nullptr)
+	if rhs == nil {
+		return IncompleteUnionFactSlice()
+	}
+	// incomplete input maps must not invent transfer past holes
+	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
+		return IncompleteUnionFactSlice()
 	}
 	// FactUnion.cpp:80–81 — assert all possible LHS are unions
 	for _, v := range lvars {
 		if v == nil || v.Type == nil || !v.Type.IsUnion() {
 			// fail closed — no soft invent transfer onto non-union
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 	}
 	switch rhs.Term {
@@ -347,20 +358,25 @@ func RhsToLhsTransferUnion(
 		return MakeFactUnions(lvars, 0)
 	case TermVariable:
 		if rhs.Var == nil {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		// incomplete type IR must not invent level-0 union transfer
 		indirect, iok := rhs.IndirectLevelComplete()
 		if !iok {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		// FactUnion.cpp:89 — assert(indirect >= 0); no soft invent clamp to 0 for &
 		if indirect < 0 {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
+		// nil = incomplete pointees (not complete empty)
+		if rvars == nil || !VariablesComplete(rvars) {
+			return IncompleteUnionFactSlice()
+		}
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
 		if rhsFact == nil {
+			// complete: no related RHS union fact → empty transfer (not invent fid 0)
 			return nil
 		}
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
@@ -368,30 +384,30 @@ func RhsToLhsTransferUnion(
 		// FactUnion.cpp:99–109 — return fact for invocation RV (union category).
 		// assert(rv_fact) when FIU present — fail closed if missing (no invent fid 0)
 		if rhs.Invoke == nil || rhs.Invoke.User == nil || rhs.Invoke.User.RV == nil {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		rv := rhs.Invoke.User.RV
 		if uf := FindRelatedUnion(unionFacts, rv); uf != nil {
 			return MakeFactUnions(lvars, uf.LastWrittenFID)
 		}
 		// FactUnion.cpp:107 assert(rv_fact) — no soft invent empty transfer success
-		return nil
+		return IncompleteUnionFactSlice()
 	case TermAssignment:
 		if rhs.Assign == nil {
-			return nil
+			return IncompleteUnionFactSlice()
 		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.Assign.Expr)
 	case TermCommaExpr:
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.CommaRHS)
 	default:
-		return nil
+		return IncompleteUnionFactSlice()
 	}
 }
 
 // AbstractFactUnionForAssign mirrors FactUnion::abstract_fact_for_assign.
 // FactUnion.cpp:121–154 — union-typed LHS transfers fid; union-field write
 // records parent fid; padding/packed-after-bitfield → BOTTOM on container.
-// Returns (factsOut, lvarCount).
+// Returns (factsOut, lvarCount). Incomplete → IncompleteUnionFactSlice.
 func AbstractFactUnionForAssign(
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
@@ -400,25 +416,37 @@ func AbstractFactUnionForAssign(
 	rhs *Expression,
 ) (out []*FactUnion, lvarCnt int) {
 	if lhs == nil {
-		return nil, 0
+		return IncompleteUnionFactSlice(), 0
+	}
+	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
+		return IncompleteUnionFactSlice(), 0
 	}
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, ptFacts)
+	// nil from merge at indir>0 is incomplete; indir 0 yields [lhs] or nil ptr
+	if lvars == nil {
+		return IncompleteUnionFactSlice(), 0
+	}
 	lvarCnt = len(lvars)
 	if lhs.Type != nil && lhs.Type.IsUnion() {
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs), lvarCnt
 	}
 	if rhs == nil {
+		// non-union LHS with no RHS: complete empty field facts
 		return nil, lvarCnt
 	}
 	for _, v := range lvars {
 		// pointees always live; no invent skip nil holes
 		if v == nil {
-			return nil, lvarCnt
+			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		var fu *FactUnion
 		if v.IsUnionField() {
 			// FactUnion.cpp:141–143
 			fu = MakeFactUnion(v.FieldVarOf, v.GetFieldID())
+			// FieldVarOf non-union → MakeFactUnion nil is broken IR
+			if fu == nil && v.FieldVarOf != nil {
+				return IncompleteUnionFactSlice(), lvarCnt
+			}
 		} else if v.IsInsideUnionField() {
 			// FactUnion.cpp:144–146 — padding or packed-after-bitfield → BOTTOM
 			typ := v.Type
@@ -426,6 +454,9 @@ func AbstractFactUnionForAssign(
 				cu := v.GetContainerUnion()
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)
+					if fu == nil {
+						return IncompleteUnionFactSlice(), lvarCnt
+					}
 				}
 			}
 		}
