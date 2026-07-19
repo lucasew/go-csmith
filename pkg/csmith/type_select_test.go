@@ -118,6 +118,77 @@ func TestChooseRandomErrorGuard(t *testing.T) {
 	}
 }
 
+func TestChooseRandomNilTypeHole(t *testing.T) {
+	// Type* always live on AllTypes; filter-out hole is soft invent of partial pool
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
+	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
+		t.Fatal("nil AllTypes hole must fail closed ChooseRandom")
+	}
+	if env.ChooseRandomNonvoid(NewRng(2), opts, probs) != nil {
+		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoid")
+	}
+	if env.ChooseRandomNonvoidNonvolatile(NewRng(3), opts, probs) != nil {
+		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoidNonvolatile")
+	}
+}
+
+func TestChooseRandomPointerTypeNilHole(t *testing.T) {
+	// Type* always live on derived_types; no invent pick past hole
+	intStar := PointerTo(GetIntType())
+	env := &TypeEnv{DerivedTypes: []*Type{intStar, nil}}
+	if env.ChooseRandomPointerType(NewRng(1)) != nil {
+		t.Fatal("nil DerivedTypes hole must fail closed")
+	}
+}
+
+func TestChooseRandomStructUnionTypeNilHole(t *testing.T) {
+	st := &Type{isStruct: true, StructName: "S0"}
+	if ChooseRandomStructUnionType(NewRng(1), []*Type{st, nil}) != nil {
+		t.Fatal("nil ok_types hole must fail closed")
+	}
+}
+
+func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
+	// derived_types hole must not soft invent skip + fall through to choose_random
+	// as if the hole were absent. Incomplete AllTypes also fails ChooseRandom.
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	intStar := PointerTo(GetIntType())
+	envBad := &TypeEnv{
+		AllTypes:     []*Type{GetIntType(), nil},
+		DerivedTypes: []*Type{intStar, nil},
+	}
+	for seed := uint64(1); seed < 30; seed++ {
+		if envBad.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
+			t.Fatalf("incomplete type pools must fail closed MakeRandomPointerType seed=%d", seed)
+		}
+	}
+	// incomplete derived only: when 20% path hits, fail closed (nil); never soft-skip hole
+	envDerived := &TypeEnv{
+		AllTypes:     []*Type{GetIntType()},
+		DerivedTypes: []*Type{intStar, nil},
+	}
+	sawNilOnDerivedPath := false
+	for seed := uint64(1); seed < 200; seed++ {
+		r := NewRng(seed)
+		// peek same flip as MakeRandomPointerType first coin
+		if !r.RndFlipcoin(20) {
+			continue
+		}
+		// re-run full make with same seed — first flip true → derived incomplete → nil
+		if envDerived.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
+			t.Fatalf("derived nil hole + flipcoin(20) must fail closed seed=%d", seed)
+		}
+		sawNilOnDerivedPath = true
+		break
+	}
+	if !sawNilOnDerivedPath {
+		t.Fatal("expected a seed hitting flipcoin(20) derived path")
+	}
+}
+
 func TestSelectLTypeCanBePointer(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

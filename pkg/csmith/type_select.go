@@ -91,11 +91,26 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 	return ok
 }
 
+// typesComplete reports Type* slices have no nil holes (Type* always live on
+// AllTypes / derived_types / ok_types in C++).
+func typesComplete(ts []*Type) bool {
+	for _, t := range ts {
+		if t == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // ChooseRandomStructUnionType mirrors Type::choose_random_struct_union_type.
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
+// Type* always live on ok_types; nil hole fails closed (nil — no invent pick past hole).
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 	// Type.cpp:523 — assert(sz > 0); empty pool is broken caller / no invent
 	if r == nil || len(ok) == 0 {
+		return nil
+	}
+	if !typesComplete(ok) {
 		return nil
 	}
 	rv := ok[r.RndUpto(uint32(len(ok)))]
@@ -103,7 +118,8 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 	if HasError() {
 		return nil
 	}
-	if rv != nil && !rv.Used {
+	// pre-validated complete
+	if !rv.Used {
 		// Type.cpp:528–531
 		RecordTypeWithBitfields(rv)
 		rv.Used = true
@@ -134,8 +150,12 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
 // Type.cpp:536–539 — rnd_upto(derived_types.size()); ERROR_GUARD(nullptr).
+// Type* always live on derived_types; nil hole fails closed (nil — no invent pick past hole).
 func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 	if env == nil || len(env.DerivedTypes) == 0 || r == nil {
+		return nil
+	}
+	if !typesComplete(env.DerivedTypes) {
 		return nil
 	}
 	p := env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
@@ -149,6 +169,8 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 // ChooseRandom mirrors Type::choose_random via ChooseRandomTypeFilter.
 // Type.cpp:1206–1216 / ChooseRandomTypeFilter::filter (Type.cpp:223–244).
 // forFieldVar=false for return types.
+// Type* always live on AllTypes; nil hole fails closed (nil — no invent filter-out
+// hole as absent and still pick from remaining types).
 func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
 	if r == nil {
 		// Type.cpp always has RNG; no soft invent AllTypes[0]
@@ -158,6 +180,9 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		// Type.cpp:1208–1209 — rnd_upto(AllTypes.size()) + ERROR_GUARD(nullptr); no soft invent simple
 		return nil
 	}
+	if !typesComplete(env.AllTypes) {
+		return nil
+	}
 	// Type.cpp:1206–1216 — rnd_upto(AllTypes.size(), ChooseRandomTypeFilter)
 	filt := filterFunc(func(v uint32) bool {
 		i := int(v)
@@ -165,9 +190,7 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 			return true
 		}
 		t := env.AllTypes[i]
-		if t == nil {
-			return true
-		}
+		// pre-validated complete
 		if t.IsSimple() {
 			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
 			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
@@ -193,12 +216,10 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		return nil
 	}
 	t := env.AllTypes[idx]
-	if t != nil {
-		// Type.cpp:1211–1214 — record bitfields + mark used
-		if !t.Used {
-			RecordTypeWithBitfields(t)
-			t.Used = true
-		}
+	// Type.cpp:1211–1214 — record bitfields + mark used
+	if !t.Used {
+		RecordTypeWithBitfields(t)
+		t.Used = true
 	}
 	return t
 }
@@ -279,9 +300,14 @@ func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *
 }
 
 // chooseRandomFiltered shared filter for nonvoid (+ optional nonvolatile aggregate).
+// Type* always live on AllTypes; nil hole fails closed (nil — no invent filter-out
+// hole as absent and still pick from remaining types).
 func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilities, noVolatileAgg bool) *Type {
 	// Type.cpp:1218+ — rnd_upto(AllTypes); ERROR_GUARD(nullptr); no soft invent simple
 	if env == nil || len(env.AllTypes) == 0 || r == nil {
+		return nil
+	}
+	if !typesComplete(env.AllTypes) {
 		return nil
 	}
 	filt := filterFunc(func(v uint32) bool {
@@ -290,9 +316,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 			return true
 		}
 		t := env.AllTypes[i]
-		if t == nil {
-			return true
-		}
+		// pre-validated complete
 		if t.IsSimple() && t.Simple() == EVoid {
 			return true
 		}
@@ -317,10 +341,6 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		return nil
 	}
 	t := env.AllTypes[idx]
-	if t == nil {
-		// C++ assert(typ) after ERROR_GUARD
-		return nil
-	}
 	if !t.Used {
 		RecordTypeWithBitfields(t)
 		t.Used = true
@@ -336,10 +356,15 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 		return nil
 	}
 	// Type.cpp:1145–1154 — occasionally choose pointer to pointers (20%)
+	// Type* always live on derived_types; nil hole fails closed (no invent skip hole
+	// and fall through to choose_random as if derived were empty).
 	if r.RndFlipcoin(20) && len(env.DerivedTypes) > 0 {
+		if !typesComplete(env.DerivedTypes) {
+			return nil
+		}
 		idx := r.RndUpto(uint32(len(env.DerivedTypes)))
 		t := env.DerivedTypes[idx]
-		if t != nil && t.IndirectLevel() < opts.MaxPointerDepth {
+		if t.IndirectLevel() < opts.MaxPointerDepth {
 			return env.FindPointerType(t, true)
 		}
 	}
