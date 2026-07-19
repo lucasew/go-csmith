@@ -55,6 +55,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 }
 
 func TestIsNonreadableField(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
@@ -80,7 +81,11 @@ func TestIsNonreadableField(t *testing.T) {
 	if !IsNonreadableField(f1, facts) {
 		t.Fatal("f1 blocked")
 	}
-	// incomplete UnionFacts hole: fail closed nonreadable / not-readable
+	if HasError() {
+		t.Fatal("complete IsNonreadableField paths must not sticky")
+	}
+	// incomplete UnionFacts hole: sticky fail closed nonreadable / not-readable
+	ClearError()
 	hole := []*FactUnion{MakeFactUnion(uv, 0), nil}
 	if IsFieldReadable(uv, 0, hole) {
 		t.Fatal("incomplete UnionFacts must not invent field readable")
@@ -88,6 +93,10 @@ func TestIsNonreadableField(t *testing.T) {
 	if !IsNonreadableField(f0, hole) {
 		t.Fatal("incomplete UnionFacts must fail closed nonreadable")
 	}
+	if !HasError() {
+		t.Fatal("incomplete UnionFacts IsNonreadableField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateAssignUnionFact(t *testing.T) {
@@ -114,6 +123,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 
 func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	// && : after left writes a, RHS generation sees pre-left context only
+	ClearError()
 	opts := Defaults()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

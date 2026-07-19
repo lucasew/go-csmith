@@ -256,6 +256,8 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 		return false
 	}
 	if !UnionFactsComplete(facts) {
+		// incomplete union map sticky nonreadable (no invent readable past hole)
+		SetError(ErrGeneric)
 		return true
 	}
 	// walk to the union field variable
@@ -264,8 +266,10 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	for uf != nil && !uf.IsUnionField() {
 		uf = uf.FieldVarOf
 	}
-	// broken IR (no union field in ancestry) — fail closed nonreadable (no invent readable)
+	// broken IR (no union field in ancestry) — sticky fail closed nonreadable
+	// (no invent readable / soft re-pick past hole)
 	if uf == nil || uf.FieldVarOf == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	parent := uf.FieldVarOf
@@ -273,12 +277,15 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	// incomplete parent FieldVars → GetFieldID -1 → MakeFactUnion fails → nonreadable
 	tmp := MakeFactUnion(parent, fid)
 	if tmp == nil {
-		// parent not union type — fail closed nonreadable
+		// parent not union type — sticky fail closed nonreadable
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	fu := FindRelatedUnion(facts, parent)
 	if fu == nil || !tmp.Imply(fu) {
-		// no fact or last write was a different field → nonreadable
+		// no fact or last write was a different field → nonreadable (complete analysis)
 		return true
 	}
 	return false

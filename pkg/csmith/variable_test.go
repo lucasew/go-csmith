@@ -176,3 +176,43 @@ func TestCreateVariableScalarsUsesProcessRng(t *testing.T) {
 		t.Fatalf("CreateVariable must burn process RNG (depth %d → %d)", before, r.RandDepth())
 	}
 }
+
+func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if (*Variable)(nil).Compatible(v, false) {
+		t.Fatal("nil Variable Compatible must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable Compatible must SetError sticky")
+	}
+	ClearError()
+	if v.Compatible(nil, false) {
+		t.Fatal("nil other Compatible must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other Compatible must SetError sticky")
+	}
+	ClearError()
+	if !v.Compatible(v, false) {
+		t.Fatal("self Compatible must be true")
+	}
+	if HasError() {
+		t.Fatal("self Compatible must not sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).Match(v) {
+		t.Fatal("nil Variable Match must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable Match must SetError sticky")
+	}
+	ClearError()
+	if !v.Match(v) {
+		t.Fatal("self Match must be true")
+	}
+	if HasError() {
+		t.Fatal("self Match must not sticky")
+	}
+	ClearError()
+}

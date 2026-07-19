@@ -63,8 +63,11 @@ func MakeInt(v int) *Constant {
 
 // Equals mirrors Constant::equals(int).
 // Constant.cpp:509–510.
+// Incomplete Constant shell sticky false (no invent not-equal fold / soft re-pick).
 func (c *Constant) Equals(num int) bool {
+	// Constant always live for fold; sticky incomplete no invent not-equal
 	if c == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	n, err := strconv.Atoi(c.Value)
@@ -80,20 +83,30 @@ func (c *Constant) Equals(num int) bool {
 }
 
 // NotEqualsZero mirrors Constant/Expression not_equals(0).
+// Incomplete Constant sticky (Equals sets sticky false for nil).
 func (c *Constant) NotEqualsZero() bool {
-	return c != nil && !c.Equals(0)
+	return !c.Equals(0)
 }
 
 // NotEquals mirrors Constant::not_equals(int).
 // Constant.cpp:505–507.
+// Incomplete Constant sticky false (no invent equals fold / soft re-pick).
 func (c *Constant) NotEquals(num int) bool {
-	return c != nil && !c.Equals(num)
+	// nil → Equals stickies false; !false invents "not equals" — fail closed false sticky
+	if c == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return !c.Equals(num)
 }
 
 // LessThan mirrors Constant::less_than(int).
 // Constant.cpp:501–503 — str2int(value) < num.
+// Incomplete Constant sticky false (no invent compare fold / soft re-pick).
 func (c *Constant) LessThan(num int) bool {
+	// Constant always live for fold; sticky incomplete no invent less-than
 	if c == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	n, err := strconv.Atoi(c.Value)

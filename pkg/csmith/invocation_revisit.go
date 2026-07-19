@@ -559,12 +559,20 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 
 // GetQualifiers mirrors FunctionInvocation::get_qualifiers.
 // FunctionInvocation.cpp:482–498 — user rv qfer; else non-const non-vol.
+// Incomplete Invocation / user RV fails closed sticky empty (no invent
+// storage-level non-const non-vol shell / soft re-pick past holes).
 func (fi *Invocation) GetQualifiers() CVQualifiers {
+	// FunctionInvocation always live; sticky incomplete no invent default quals
+	if fi == nil {
+		SetError(ErrGeneric)
+		return CVQualifiers{}
+	}
 	// FunctionInvocation.cpp:486–491 — eFuncCall: assert(func); assert(rv)
-	if fi != nil && fi.User != nil {
-		// assert(rv) path — incomplete RV fails closed empty qfer
+	if fi.User != nil {
+		// assert(rv) path — incomplete RV sticky empty qfer
 		// (no invent NewCVQualifiers(false,false) storage-level shell)
 		if fi.User.RV == nil {
+			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
 		return fi.User.RV.Qfer

@@ -1008,8 +1008,11 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 
 // Compatible mirrors Variable::compatible.
 // Variable.cpp:878–886 — no volatiles; same ptr; expand_struct only non-fields.
+// Incomplete Variable* sticky false (no invent soft-skip compatibility past holes).
 func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
+	// both Variable* always live; sticky incomplete no invent soft-skip
 	if v == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsVolatile() || other.IsVolatile() {
@@ -1145,8 +1148,11 @@ func (v *Variable) GetSeqNum() int {
 
 // Match mirrors Variable::match — identity, or aggregate has field.
 // Variable.cpp:254–258.
+// Incomplete Variable* sticky false (no invent not-match / soft re-pick past holes).
 func (v *Variable) Match(other *Variable) bool {
+	// both Variable* always live; sticky incomplete no invent not-match
 	if v == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v == other {

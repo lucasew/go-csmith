@@ -6,6 +6,7 @@ import (
 )
 
 func TestLocalOutputDef(t *testing.T) {
+	ClearError()
 	b := &Block{}
 	lv := CreateVariableScalars("l_1", GetIntType(), true, false)
 	lv.Init = MakeInt(2)

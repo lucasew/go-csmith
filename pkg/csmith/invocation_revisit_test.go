@@ -142,10 +142,14 @@ func TestNeedsRevisit(t *testing.T) {
 }
 
 func TestGetQualifiers(t *testing.T) {
+	ClearError()
 	fi := &Invocation{IsStd: true}
 	q := fi.GetQualifiers()
 	if q.IsConst() || q.IsVolatile() {
 		t.Fatal(q)
+	}
+	if HasError() {
+		t.Fatal("std Invoke GetQualifiers must not sticky")
 	}
 	rv := CreateVariableScalars("f_rv", GetIntType(), false, false)
 	rv.Qfer.SetConst(true, 0)
@@ -153,12 +157,25 @@ func TestGetQualifiers(t *testing.T) {
 	if !fi2.GetQualifiers().IsConst() {
 		t.Fatal("rv const")
 	}
-	// nil RV fails closed empty qfer (no invent storage-level false/false shell)
+	// nil RV sticky empty qfer (no invent storage-level false/false shell)
+	ClearError()
 	fi3 := &Invocation{User: &Function{Name: "f"}}
 	q3 := fi3.GetQualifiers()
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil RV must not invent qfer bits: %+v", q3)
 	}
+	if !HasError() {
+		t.Fatal("nil RV GetQualifiers must SetError sticky")
+	}
+	ClearError()
+	// nil Invocation sticky empty
+	if q4 := (*Invocation)(nil).GetQualifiers(); len(q4.IsConsts) != 0 {
+		t.Fatal("nil Invocation GetQualifiers must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Invocation GetQualifiers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitUnorderedParamsMerges(t *testing.T) {
@@ -213,6 +230,7 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 	// multi-order merge: incomplete cur after second order fails closed
 	// plant via incomplete GlobalFacts mid-visit is hard; exercise MergeFacts path
 	// with two orders of constants — success baseline
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}

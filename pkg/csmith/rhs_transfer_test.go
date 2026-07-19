@@ -3,12 +3,35 @@ package csmith
 import "testing"
 
 func TestConstantEquals(t *testing.T) {
+	ClearError()
 	if !MakeInt(0).Equals(0) {
 		t.Fatal("0")
 	}
 	if MakeInt(3).Equals(0) {
 		t.Fatal("3")
 	}
+	// incomplete Constant sticky false (no invent not-equal / not-less)
+	if (*Constant)(nil).Equals(0) {
+		t.Fatal("nil Constant Equals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Constant Equals must SetError sticky")
+	}
+	ClearError()
+	if (*Constant)(nil).NotEquals(0) {
+		t.Fatal("nil Constant NotEquals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Constant NotEquals must SetError sticky")
+	}
+	ClearError()
+	if (*Constant)(nil).LessThan(1) {
+		t.Fatal("nil Constant LessThan must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Constant LessThan must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferNullConst(t *testing.T) {
