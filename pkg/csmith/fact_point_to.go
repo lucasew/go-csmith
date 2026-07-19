@@ -928,8 +928,16 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	for i, old := range facts {
 		if old.Var == f.Var {
 			if old.Imply(f) {
+				// residual ERROR sticky — no invent soft-skip join past Imply hole
+				if HasError() {
+					return IncompleteFactSlice()
+				}
 				// old already covers f
 				return facts
+			}
+			// residual ERROR sticky — no invent soft-continue join past Imply residual false path
+			if HasError() {
+				return IncompleteFactSlice()
 			}
 			// join: copy f, join old into it
 			cp := f.Clone()
@@ -941,6 +949,10 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 				return IncompleteFactSlice()
 			}
 			_ = cp.Join(old)
+			// residual ERROR sticky — no invent soft-skip Join residual then keep partial merge
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			facts[i] = cp
 			return facts
 		}
@@ -974,16 +986,38 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	changed := false
 	for _, f := range newFacts {
 		before := FindRelatedPointTo(*facts, f.Var)
-		merged := MergeFactInto(*facts, f)
-		// MergeFactInto incomplete = hole marker (should not happen after pre-validate)
-		if !FactsComplete(merged) {
+		// residual ERROR sticky — no invent soft-continue merge later past FindRelated hole
+		if HasError() {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
+			return false
+		}
+		merged := MergeFactInto(*facts, f)
+		// MergeFactInto incomplete / residual = hole marker
+		if HasError() || !FactsComplete(merged) {
+			*facts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
-		if before == nil || after == nil || !before.Equal(after) {
+		// residual ERROR sticky — no invent soft-continue Equal/changed past FindRelated hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
+		}
+		if before == nil || after == nil {
+			changed = true
+			continue
+		}
+		eq := before.Equal(after)
+		// residual ERROR sticky — no invent soft-continue changed/not-changed past Equal hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
+		}
+		if !eq {
 			changed = true
 		}
 	}

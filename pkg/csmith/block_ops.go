@@ -199,22 +199,40 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 
 			// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
 			ne = make([]*CFGEdge, 0, len(fm.CFGEdges))
+			scrubIncomplete := false
 			for _, e := range fm.CFGEdges {
 				destIn := e.DestStmID > 0 && ids[e.DestStmID]
 				if !destIn && e.DestBlock != nil {
 					// dest block nested under removed stmt
 					destIn = blockUnderStmt(removed, e.DestBlock)
+					// residual ERROR sticky — no invent dest-in scan past blockUnder residual
+					if HasError() {
+						scrubIncomplete = true
+						break
+					}
 				}
 				if destIn {
 					// Block.cpp:641–646 — if src is goto, remove_stmt(src)
+					// Soft invent was FindStmt residual/nil miss → isGoto true cascade invent.
+					// Fair: sticky fail closed wipe CFG (no invent goto cascade past hole).
 					if e.SrcID > 0 && !ids[e.SrcID] {
-						isGoto := true
 						if fm.Func != nil {
-							if src := FindStmtByID(fm.Func, e.SrcID); src != nil {
-								isGoto = src.Kind == StmtGoto
+							src := FindStmtByID(fm.Func, e.SrcID)
+							if HasError() {
+								scrubIncomplete = true
+								break
 							}
-						}
-						if isGoto {
+							if src == nil {
+								// unresolved with Func = incomplete IR sticky
+								SetError(ErrGeneric)
+								scrubIncomplete = true
+								break
+							}
+							if src.Kind == StmtGoto {
+								gotoSrcIDs = append(gotoSrcIDs, e.SrcID)
+							}
+						} else {
+							// no Func to classify — cascade as C++ assert-less default
 							gotoSrcIDs = append(gotoSrcIDs, e.SrcID)
 						}
 					}
@@ -222,7 +240,15 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 				}
 				ne = append(ne, e)
 			}
-			fm.CFGEdges = ne
+			if scrubIncomplete {
+				fm.CFGEdges = IncompleteCFGEdges()
+				gotoSrcIDs = nil
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+			} else {
+				fm.CFGEdges = ne
+			}
 		}
 	}
 

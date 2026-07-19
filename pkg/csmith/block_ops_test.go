@@ -1030,6 +1030,32 @@ func TestRemoveStmtCascadesGotoSource(t *testing.T) {
 	}
 }
 
+func TestRemoveStmtFindStmtResidualNoInventGotoCascade(t *testing.T) {
+	// Soft invent was FindStmt residual/nil miss → isGoto true cascade invent.
+	// Fair: unresolved SrcID with Func set sticky wipe IncompleteCFGEdges.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	destID := 10
+	// missing src stmt id — FindStmt returns nil complete miss
+	body := &Block{Func: f, StmID: 1, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: destID},
+		{Kind: StmtAssign, StmID: 30},
+	}}
+	f.Blocks = []*Block{body}
+	f.Body = body
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: destID}} // src 99 not in function
+	_ = body.RemoveStmt(destID, fm)
+	if CFGEdgesComplete(fm.CFGEdges) {
+		t.Fatal("unresolved SrcID must wipe IncompleteCFGEdges, not invent empty complete / cascade")
+	}
+	if !HasError() {
+		t.Fatal("unresolved SrcID RemoveStmt must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 	// Block.cpp:655–663 — nested Then block dropped from Function.Blocks
 	f := &Function{Name: "f"}

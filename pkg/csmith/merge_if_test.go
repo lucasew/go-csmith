@@ -127,6 +127,19 @@ func TestMergeFacts(t *testing.T) {
 		t.Fatal("incomplete MergeFacts must SetError sticky")
 	}
 	ClearError()
+	// PointTo nil hole: Imply/Join residual soft invent was soft-continue merge later.
+	// Fair: sticky wipe IncompleteFactSlice whole MergeFacts.
+	brokenPT := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
+	base2 := []*FactPointTo{MakeFactPointTo(p, a)}
+	if MergeFacts(&base2, []*FactPointTo{brokenPT}) {
+		t.Fatal("PointTo nil hole must fail closed MergeFacts")
+	}
+	if FactsComplete(base2) {
+		t.Fatal("PointTo nil hole must wipe IncompleteFactSlice, not invent complete merge")
+	}
+	if !HasError() {
+		t.Fatal("PointTo nil hole MergeFacts must SetError sticky")
+	}
 	ClearError()
 	if FactsComplete(MergeFactInto(facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
