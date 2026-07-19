@@ -179,6 +179,17 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 	if !parent.FieldVars[0].IsVirtual() {
 		t.Fatal("field of virtual array must be virtual")
 	}
+	// IsArray without AsArray soft invent was virtual-collective true
+	// fair: sticky false (broken IR, not invent virtual soft-success)
+	ClearError()
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if shell.IsVirtual() {
+		t.Fatal("IsArray without AsArray must fail closed not-virtual")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray IsVirtual must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsValidPtr(t *testing.T) {

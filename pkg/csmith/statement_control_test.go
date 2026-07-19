@@ -100,10 +100,18 @@ func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	vs.GlobalList = []*Variable{
-		{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
-		{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+	// live AsArray required for GetMaxArrayDimension / hashArrayVariable
+	ga := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Sizes:    []int{2, 3},
 	}
+	ga.AsArray = ga
+	gb := &ArrayVariable{
+		Variable: Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		Sizes:    []int{4},
+	}
+	gb.AsArray = gb
+	vs.GlobalList = []*Variable{&ga.Variable, &gb.Variable}
 	// OutputHashFuncDef path: declare ctrl vars then hash
 	dimen := GetMaxArrayDimension(vs.GlobalList)
 	ctrl := GetNewCtrlVars(opts)

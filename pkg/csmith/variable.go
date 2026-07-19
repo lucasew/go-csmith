@@ -484,6 +484,7 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 // Variable.cpp:813–826.
 // Incomplete vars list fails closed sticky as -1 (no invent skip partial max /
 // soft re-pick zero-dim success past holes). Complete empty / no arrays → 0.
+// IsArray without AsArray sticky -1 (no invent dim from ArraySizes past broken shell).
 func GetMaxArrayDimension(vars []*Variable) int {
 	if !VariablesComplete(vars) {
 		SetError(ErrGeneric)
@@ -494,9 +495,15 @@ func GetMaxArrayDimension(vars []*Variable) int {
 		if !v.IsArray {
 			continue
 		}
-		n := len(v.ArraySizes)
-		if v.AsArray != nil && len(v.AsArray.Sizes) > n {
-			n = len(v.AsArray.Sizes)
+		// C++ ArrayVariable* always live when isArray; missing AsArray sticky
+		// (no invent max-dim from ArraySizes alone past incomplete shell)
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return -1
+		}
+		n := len(v.AsArray.Sizes)
+		if n == 0 {
+			n = len(v.ArraySizes)
 		}
 		if n > dimen {
 			dimen = n
@@ -860,6 +867,7 @@ func (v *Variable) IsArrayField() bool {
 // Variable.h:88 — virtual size_t get_dimension() const { return 0; }
 // ArrayVariable — sizes.size().
 // Incomplete Variable sticky 0 (no invent dim soft-skip past hole).
+// IsArray without AsArray sticky 0 (no invent dim from ArraySizes past broken shell).
 func (v *Variable) GetDimension() int {
 	// Variable always live; sticky incomplete no invent dim 0 soft-skip
 	if v == nil {
@@ -869,8 +877,11 @@ func (v *Variable) GetDimension() int {
 	if v.AsArray != nil {
 		return v.AsArray.Dimension()
 	}
+	// C++ base Variable returns 0; IsArray without AsArray is broken IR sticky
+	// (no invent non-zero dim from ArraySizes / soft re-pick NeedNestedLoop past hole)
 	if v.IsArray {
-		return len(v.ArraySizes)
+		SetError(ErrGeneric)
+		return 0
 	}
 	return 0
 }
@@ -1189,6 +1200,7 @@ func (v *Variable) IsPointer() bool {
 // Variable.cpp:280–288 — field recurses; array is virtual when collective==0
 // (parent array, not itemized member). Dummy null/garbage/tbd use IsSpecialPtr / Type==nil.
 // Incomplete Variable sticky false (no invent not-virtual soft-skip past hole).
+// IsArray without AsArray sticky false (no invent virtual-collective past broken shell).
 func (v *Variable) IsVirtual() bool {
 	// Variable always live; sticky incomplete no invent not-virtual soft-skip
 	if v == nil {
@@ -1202,9 +1214,11 @@ func (v *Variable) IsVirtual() bool {
 		// ArrayVariable::collective == 0 → parent / non-itemized
 		return v.AsArray.Collective == nil
 	}
+	// C++ isArray always implies ArrayVariable*; missing AsArray is broken IR sticky
+	// (no invent virtual-collective soft-success past incomplete shell)
 	if v.IsArray {
-		// array flag without AsArray — treat as parent collective
-		return true
+		SetError(ErrGeneric)
+		return false
 	}
 	return false
 }
@@ -1696,6 +1710,12 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		SetError(ErrGeneric)
 		return ""
 	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky (no invent scalar
+	// dump / soft-skip expand past broken array shell)
+	if v.IsArray && v.AsArray == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
 	if v.IsVirtual() {
 		// field of virtual array is broken IR sticky for this path
@@ -1963,6 +1983,12 @@ func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
 func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
 	// Variable + Type always live at hash emit; sticky incomplete no invent empty hash
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky (no invent
+	// hash-array expand from ArraySizes alone past broken shell)
+	if v.IsArray && v.AsArray == nil {
 		SetError(ErrGeneric)
 		return ""
 	}

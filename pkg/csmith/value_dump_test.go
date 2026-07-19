@@ -94,14 +94,29 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 }
 
 func TestOutputValueDumpArrayExpand(t *testing.T) {
-	v := &Variable{
-		Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
-		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	// live AsArray required for virtual expand (no invent scalar dump past IsArray shell)
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{2},
 	}
-	out := v.OutputValueDump("c ", 1, nil)
+	av.AsArray = av
+	out := av.Variable.OutputValueDump("c ", 1, nil)
 	if !strings.Contains(out, "g_a[0]") || !strings.Contains(out, "g_a[1]") {
 		t.Fatal(out)
 	}
+	// IsArray without AsArray soft invent was scalar printf path
+	ClearError()
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if shell.OutputValueDump("c ", 1, nil) != "" {
+		t.Fatal("IsArray without AsArray OutputValueDump must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputValueDump must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputValueDumpTypeNilSticky(t *testing.T) {

@@ -17,8 +17,12 @@ func TestNewCtrlVarsNoInventDimOne(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	opts.MaxArrayDim = 0
-	v := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if out := OutputArrayInitializers([]*Variable{v}, opts, "    "); out != "" {
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	if out := OutputArrayInitializers([]*Variable{&av.Variable}, opts, "    "); out != "" {
 		t.Fatal("must fail closed without ctrl decl", out)
 	}
 	if HasError() {
@@ -172,6 +176,13 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	// IsArray without AsArray soft invent was synthetic ArrayVariable shell from
 	// ArraySizes then partial loop inits. Fair: sticky empty whole section.
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if GetMaxArrayDimension([]*Variable{shell}) >= 0 {
+		t.Fatal("IsArray without AsArray GetMaxArrayDimension must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetMaxArrayDimension must SetError sticky")
+	}
+	ClearError()
 	if s := OutputArrayInitializers([]*Variable{shell}, opts, "    "); s != "" {
 		t.Fatal("IsArray without AsArray must fail closed empty, not invent synthetic", s)
 	}

@@ -55,14 +55,19 @@ func TestHashArrayLoops(t *testing.T) {
 	CtrlVarsDoFinalization()
 	// ArrayVariable::hash uses get_last_ctrl_vars (no letter invent without pool)
 	_ = GetNewCtrlVars(Defaults())
-	v := &Variable{
-		Name:       "g_4",
-		Type:       GetIntType(),
-		IsArray:    true,
-		ArraySizes: []int{3},
-		Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
+	// live AsArray required (no invent hash-array expand from ArraySizes alone)
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name:       "g_4",
+			Type:       GetIntType(),
+			IsArray:    true,
+			ArraySizes: []int{3},
+			Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{3},
 	}
-	out := v.HashOutput()
+	av.AsArray = av
+	out := av.Variable.HashOutput()
 	// Variable::new_ctrl_vars uses letter names i, j, k…
 	if !strings.Contains(out, "for (i = 0") || !strings.Contains(out, "g_4[i]") {
 		t.Fatal(out)
@@ -70,11 +75,20 @@ func TestHashArrayLoops(t *testing.T) {
 	// undersized ctrl sticky — no invent loops with empty index
 	ClearError()
 	CtrlVarsDoFinalization()
-	if v.HashOutput() != "" {
+	if av.Variable.HashOutput() != "" {
 		t.Fatal("no last ctrl must fail closed array hash")
 	}
 	if !HasError() {
 		t.Fatal("no last ctrl HashOutput must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray sticky empty
+	shell := &Variable{Name: "g_5", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}}
+	if shell.HashOutput() != "" {
+		t.Fatal("IsArray without AsArray HashOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
 	}
 	ClearError()
 	CtrlVarsDoFinalization()

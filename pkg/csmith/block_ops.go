@@ -55,6 +55,11 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// pre-validated VariablesComplete
 	check := func(v *Variable) bool {
 		dimen := v.GetDimension()
+		// incomplete array IR (IsArray without AsArray) stickies via GetDimension
+		// sticky need nested (restrictive — no invent "no nested" past broken dim)
+		if HasError() {
+			return true
+		}
 		if dimen == 0 {
 			return false
 		}

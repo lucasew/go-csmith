@@ -148,9 +148,13 @@ func TestFindJumpSources(t *testing.T) {
 }
 
 func TestNeedNestedLoop(t *testing.T) {
-	arr := CreateVariableScalars("a", GetIntType(), false, false)
-	arr.IsArray = true
-	arr.ArraySizes = []int{2, 3} // dim 2
+	// live ArrayVariable AsArray required for GetDimension (no invent dim from ArraySizes alone)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Sizes:    []int{2, 3},
+	}
+	av.AsArray = av
+	arr := &av.Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustReadVars: []*Variable{arr}}
 	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}} // depth 0
@@ -171,9 +175,12 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	// Soft invent: skip nil RW entry as absent → no nested needed (false).
 	// Fair: incomplete MustRead/MustWrite list fails closed sticky true (need nested).
 	ClearError()
-	arr := CreateVariableScalars("a", GetIntType(), false, false)
-	arr.IsArray = true
-	arr.ArraySizes = []int{2, 3} // dim 2 > iv 0
+	av := &ArrayVariable{
+		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
+		Sizes:    []int{2, 3},
+	}
+	av.AsArray = av
+	arr := &av.Variable
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustReadVars: []*Variable{nil, arr}}
 	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}}
@@ -893,13 +900,18 @@ func TestGetDimension(t *testing.T) {
 	if av.Variable.GetDimension() != 3 {
 		t.Fatal(av.Variable.GetDimension())
 	}
-	// IsArray without AsArray
+	// IsArray without AsArray soft invent was dim from ArraySizes; fair sticky 0
+	ClearError()
 	v := CreateVariableScalars("g_b", GetIntType(), false, false)
 	v.IsArray = true
 	v.ArraySizes = []int{5, 6}
-	if v.GetDimension() != 2 {
-		t.Fatal(v.GetDimension())
+	if v.GetDimension() != 0 {
+		t.Fatal("IsArray without AsArray GetDimension must fail closed 0, got", v.GetDimension())
 	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetDimension must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestNeedNestedLoopUsesGetDimension(t *testing.T) {

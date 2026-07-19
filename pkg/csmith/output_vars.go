@@ -27,6 +27,12 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 	var b strings.Builder
 	for _, v := range cp {
 		// OutputDef always live; sticky no invent indent-only / blank lines for incomplete IR
+		// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
+		// sticky (no invent scalar OutputDef for IsArray shell / soft re-pick partial list)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
 		var def string
 		if v.IsArray && v.AsArray != nil {
 			def = v.AsArray.OutputDef()
