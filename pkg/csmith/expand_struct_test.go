@@ -134,6 +134,16 @@ func TestExpandStructUnionVars(t *testing.T) {
 		t.Fatal("Type-nil expand must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was IsVirtual residual false soft-continue
+	// fair: sticky IncompleteVariables
+	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{arrShell}, GetIntType())) {
+		t.Fatal("IsArray without AsArray expand must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ExpandStructUnionVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {

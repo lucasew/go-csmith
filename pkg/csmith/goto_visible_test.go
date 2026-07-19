@@ -84,6 +84,16 @@ func TestChooseVisibleReadVar(t *testing.T) {
 		t.Fatal("incomplete union facts must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was IsVirtual residual false then pick shell
+	// fair: sticky nil fail closed
+	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, arrShell}, GetIntType(), nil) != nil {
+		t.Fatal("IsArray without AsArray must fail closed ChooseVisibleReadVar")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ChooseVisibleReadVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectReadVarsSorted(t *testing.T) {

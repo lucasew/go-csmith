@@ -102,6 +102,12 @@ func ChooseVisibleReadVar(
 			SetError(ErrGeneric)
 			return nil
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (IsVirtual residual ERROR+false soft-continues then invents pick shell)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		if v.IsVirtual() || v.IsVolatile() {
 			continue
 		}
@@ -1169,6 +1175,12 @@ func (vs *VariableSelector) SelectMustUseVar(
 			continue
 		}
 		var out *Variable
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent bare array pick via else branch past broken shell)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		if v.IsArray && v.AsArray != nil {
 			// VariableSelector.cpp:1528–1530 — always itemize_array; no bare collective
 			// (C++ var = itemize_array(...); if null, try next — never return collective)
@@ -1392,6 +1404,12 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 	out := append([]*Variable(nil), vars...)
 	for i := 0; i < len(out); i++ {
 		v := out[i]
+		// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
+		// (IsVirtual residual ERROR+false soft-continues then invents keep shell)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return IncompleteVariables()
+		}
 		if v.IsVirtual() {
 			continue
 		}

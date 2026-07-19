@@ -81,6 +81,18 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 		t.Fatal("Type-nil must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was bare pick via else branch
+	// fair: sticky fail closed whole select
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	rw2 := &RWDirective{MustWriteVars: []*Variable{shell, good}}
+	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw2)
+	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
+		t.Fatal("IsArray without AsArray must fail closed SelectMustUseVar")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray SelectMustUseVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
