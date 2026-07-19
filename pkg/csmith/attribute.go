@@ -113,12 +113,12 @@ func (a *SectionAttribute) MakeRandom(r *Rng) string {
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
 		return ""
 	}
-	// Attribute.cpp:97–99 — rnd_upto(10)
+	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor (no invent "section")
+	if a.Name == "" {
+		return ""
+	}
 	n := int(r.RndUpto(10))
 	name := a.Name
-	if name == "" {
-		name = "section"
-	}
 	return fmt.Sprintf("%s(\"usersection%d\")", name, n)
 }
 

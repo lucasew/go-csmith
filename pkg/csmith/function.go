@@ -711,6 +711,10 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 		return ""
 	}
 	s := f.OutputHeader(forceStatic)
+	// incomplete header IR — no invent bare ";"
+	if s == "" {
+		return ""
+	}
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
 	}
@@ -757,7 +761,12 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
-	return f.OutputHeaderAlias(forceStatic) + ";"
+	s := f.OutputHeaderAlias(forceStatic)
+	// incomplete alias header — no invent bare ";"
+	if s == "" {
+		return ""
+	}
+	return s + ";"
 }
 
 // Output emits a C function definition (minimal statements).

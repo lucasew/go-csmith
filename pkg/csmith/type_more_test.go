@@ -68,6 +68,20 @@ func TestSizeofString(t *testing.T) {
 	if GetIntType().SizeofString() != "sizeof(int)" {
 		t.Fatal(GetIntType().SizeofString())
 	}
+	// Type* always live; no invent sizeof(void)/sizeof()
+	if s := (*Type)(nil).SizeofString(); s != "" {
+		t.Fatal("nil sizeof invent", s)
+	}
+	if s := (&Type{isStruct: true}).SizeofString(); s != "" {
+		t.Fatal("unnamed struct sizeof invent", s)
+	}
+}
+
+func TestPointerToNoInventIntStar(t *testing.T) {
+	// Type.cpp find_pointer_type — no soft invent int* for nil pointee
+	if p := PointerTo(nil); p != nil {
+		t.Fatal("PointerTo(nil) must fail closed nil, got", p.CName())
+	}
 }
 
 func TestHasAggregateAndLongLongField(t *testing.T) {

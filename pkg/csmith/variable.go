@@ -81,11 +81,16 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	if v == nil {
 		return ""
 	}
+	// Variable.cpp:670–676 — output_qualified_type always live type; no invent " name"
+	ty := v.Qfer.OutputQualifiedType(v.Type)
+	if ty == "" {
+		return ""
+	}
 	var b strings.Builder
 	if forceStatic && v.IsGlobal() {
 		b.WriteString("static ")
 	}
-	b.WriteString(v.Qfer.OutputQualifiedType(v.Type))
+	b.WriteString(ty)
 	b.WriteString(" ")
 	b.WriteString(v.GetActualName(prefixName))
 	return b.String()

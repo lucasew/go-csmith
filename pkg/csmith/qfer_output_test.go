@@ -175,6 +175,25 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	}
 }
 
+func TestOutputDeclNoInventEmptyType(t *testing.T) {
+	// Variable::OutputDecl — qualified type always live; no invent " name"
+	v := &Variable{Name: "g_x"}
+	if out := v.OutputDecl(false); out != "" {
+		t.Fatal("nil type must fail closed decl", out)
+	}
+}
+
+func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
+	// incomplete header → empty, not bare ";"
+	f := &Function{Name: "func_x"}
+	if out := f.OutputForwardDecl(); out != "" {
+		t.Fatal("incomplete forward decl must fail closed", out)
+	}
+	if out := f.OutputForwardDeclAlias(false); out != "" {
+		t.Fatal("incomplete alias decl must fail closed", out)
+	}
+}
+
 func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 	// StatementFor.cpp:79/82/102 ERROR_RETURN on sticky error
 	ClearError()

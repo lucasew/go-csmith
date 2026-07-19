@@ -60,6 +60,14 @@ func TestAlignedAttribute(t *testing.T) {
 	}
 }
 
+func TestSectionAttributeNoInventName(t *testing.T) {
+	// Attribute name from ctor; no invent "section" when empty
+	a := &SectionAttribute{Name: "", Prob: 100}
+	if s := a.MakeRandom(NewRng(1)); s != "" {
+		t.Fatal("empty name must fail closed", s)
+	}
+}
+
 func TestSectionAttribute(t *testing.T) {
 	a := &SectionAttribute{Name: "section", Prob: 100}
 	s := a.MakeRandom(NewRng(3))
