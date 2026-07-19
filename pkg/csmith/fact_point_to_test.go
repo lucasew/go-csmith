@@ -66,13 +66,22 @@ func TestFactPointToNullDead(t *testing.T) {
 	if FactsComplete([]*FactPointTo{{Var: p, PointTo: []*Variable{nil}}}) {
 		t.Fatal("nil pointee hole is incomplete")
 	}
-	// CloneFactSlice incomplete → hole marker (not bare nil invent empty complete)
+	// CloneFactSlice incomplete → sticky hole marker (not bare nil invent empty complete)
+	ClearError()
 	if FactsComplete(CloneFactSlice([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("CloneFactSlice nil fact hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("CloneFactSlice nil fact hole must SetError sticky")
+	}
+	ClearError()
 	if FactsComplete(CloneFactSlice([]*FactPointTo{{Var: p, PointTo: []*Variable{nil}}})) {
 		t.Fatal("CloneFactSlice pointee hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("CloneFactSlice pointee hole must SetError sticky")
+	}
+	ClearError()
 	// complete empty stays empty complete
 	if CloneFactSlice(nil) != nil {
 		t.Fatal("CloneFactSlice(nil) must stay complete empty nil")

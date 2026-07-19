@@ -398,18 +398,28 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 }
 
 func TestGetMapFactsStmID0FailClosed(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
-	// StmID 0 must IncompleteFactSlice — not invent empty-complete map miss
+	// StmID 0 must IncompleteFactSlice sticky — not invent empty-complete map miss
 	if FactsComplete(fm.GetMapFactsIn(0)) || FactsComplete(fm.GetMapFactsOut(0)) {
 		t.Fatal("StmID 0 must IncompleteFactSlice")
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 GetMapFacts must SetError sticky")
+	}
+	ClearError()
 	if FactsComplete(fm.GetMapFactsInFinal(0)) || FactsComplete(fm.GetMapFactsOutFinal(0)) {
 		t.Fatal("StmID 0 final maps must IncompleteFactSlice")
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 GetMapFactsFinal must SetError sticky")
+	}
+	ClearError()
 	// missing live key is complete empty
 	if !FactsComplete(fm.GetMapFactsIn(42)) || len(fm.GetMapFactsIn(42)) != 0 {
 		t.Fatal("missing live id must complete empty")
 	}
+	// stored incomplete stays incomplete marker (non-sticky local map hole)
 	fm.SetMapFactsOut(7, IncompleteFactSlice())
 	if FactsComplete(fm.GetMapFactsOut(7)) {
 		t.Fatal("stored incomplete must stay incomplete via getter")

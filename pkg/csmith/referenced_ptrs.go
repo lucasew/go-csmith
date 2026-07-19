@@ -4,14 +4,15 @@ package csmith
 
 // CollectReferencedPtrsExpression mirrors Expression::get_referenced_ptrs.
 // ExpressionVariable.cpp:230–235 — pointer vars; comma/assign recurse; invoke args + callee.
-// Incomplete IR fails closed: *ptrs → IncompleteVariables (not bare nil —
-// VariablesComplete(nil)/len==0 invents empty-complete ptr list success).
+// Incomplete IR fails closed sticky: *ptrs → IncompleteVariables (not bare nil —
+// VariablesComplete(nil)/len==0 invents empty-complete ptr list / soft re-pick past hole).
 func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
 	if ptrs == nil {
 		return
 	}
 	if !collectReferencedPtrsExpression(e, ptrs) {
 		*ptrs = IncompleteVariables()
+		SetError(ErrGeneric)
 	}
 }
 
@@ -90,13 +91,14 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 
 // CollectReferencedPtrsStmt mirrors Statement::get_referenced_ptrs.
 // Statement.cpp:331–345 — exprs + nested blocks.
-// Incomplete IR → IncompleteVariables (not bare nil invent empty-complete).
+// Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
 func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
 	if ptrs == nil {
 		return
 	}
 	if !collectReferencedPtrsStmt(st, ptrs) {
 		*ptrs = IncompleteVariables()
+		SetError(ErrGeneric)
 	}
 }
 
@@ -171,13 +173,14 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 }
 
 // CollectReferencedPtrsBlock walks all statements in a block.
-// Incomplete IR → IncompleteVariables (not bare nil invent empty-complete).
+// Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
 func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
 	if ptrs == nil {
 		return
 	}
 	if !collectReferencedPtrsBlock(b, ptrs) {
 		*ptrs = IncompleteVariables()
+		SetError(ErrGeneric)
 	}
 }
 

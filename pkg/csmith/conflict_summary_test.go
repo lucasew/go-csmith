@@ -156,23 +156,28 @@ func TestReadUnionFieldCalleeFlag(t *testing.T) {
 }
 
 func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
-	// C++ get_exprs always live; nil Expr must not invent empty ptr list as success
+	// C++ get_exprs always live; nil Expr must not invent empty ptr list sticky
+	ClearError()
 	var ptrs []*Variable
 	ptrs = []*Variable{CreateVariableScalars("stale", PointerTo(GetIntType()), false, false)}
-	if collectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs) {
-		t.Fatal("assign without Expr must fail closed")
-	}
-	// IncompleteVariables marker — not bare nil invent empty-complete
+	CollectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs)
+	// IncompleteVariables sticky — not bare nil invent empty-complete
 	if VariablesComplete(ptrs) {
 		t.Fatal("incomplete collect must IncompleteVariables, not empty-complete", ptrs)
 	}
-	ptrs = []*Variable{}
-	if collectReferencedPtrsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs) {
-		t.Fatal("invoke without Expr must fail closed")
+	if !HasError() {
+		t.Fatal("assign without Expr must SetError sticky")
 	}
+	ClearError()
+	ptrs = []*Variable{}
+	CollectReferencedPtrsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs)
 	if VariablesComplete(ptrs) {
 		t.Fatal("incomplete invoke must IncompleteVariables")
 	}
+	if !HasError() {
+		t.Fatal("invoke without Expr must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
