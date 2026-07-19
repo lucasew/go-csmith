@@ -1106,18 +1106,20 @@ func (f *FactPointTo) PointsTo(v *Variable) bool {
 
 // CallerToCalleeHandover mirrors FactMgr::caller_to_callee_handover.
 // FactMgr.cpp:312–353 — param facts; keep globals/params and transitively pointed stack vars.
+// Fact* always live; nil hole fails closed (inputs nil, no invent clean partition).
 func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
 	// FactMgr always bound to a Function; nil Func is broken IR (no invent param partition)
 	if fm == nil || inputs == nil || fm.Func == nil {
 		return
 	}
 	fm.AddParamFacts(args, inputs)
+	if !FactsComplete(*inputs) {
+		*inputs = nil
+		return
+	}
 	// partition: keep globals and params
 	var keep, rest []*FactPointTo
 	for _, f := range *inputs {
-		if f == nil || f.Var == nil {
-			continue
-		}
 		v := f.Var
 		if v.IsGlobal() || IsVariableInSet(fm.Func.Param, v) {
 			keep = append(keep, f)
@@ -1130,11 +1132,8 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 		cnt := len(keep)
 		for i := 0; i < len(rest); i++ {
 			rf := rest[i]
-			if rf == nil || rf.Var == nil {
-				continue
-			}
 			for _, kf := range keep {
-				if kf != nil && kf.PointsTo(rf.Var) {
+				if kf.PointsTo(rf.Var) {
 					keep = append(keep, rf)
 					rest = append(rest[:i], rest[i+1:]...)
 					i--
@@ -1151,15 +1150,17 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 
 // RemoveRVFacts mirrors FactMgr::remove_rv_facts.
 // FactMgr.cpp:358–368 — drop other functions' return variables.
+// Fact* always live; nil hole fails closed (facts nil, no invent clean filter).
 func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 	if fm == nil || facts == nil {
 		return
 	}
+	if !FactsComplete(*facts) {
+		*facts = nil
+		return
+	}
 	out := make([]*FactPointTo, 0, len(*facts))
 	for _, f := range *facts {
-		if f == nil || f.Var == nil {
-			continue
-		}
 		if f.Var.IsRV() {
 			// keep only this function's RV
 			if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {

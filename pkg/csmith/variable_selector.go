@@ -111,9 +111,10 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 		}
 	}
 	// also search arrays' Variable wrappers
+	// ArrayVariable* always live on Arrays; nil hole fails closed (no invent skip)
 	for _, av := range vs.Arrays {
 		if av == nil {
-			continue
+			return nil
 		}
 		if m := av.Variable.MatchVarName(name); m != nil {
 			return m
@@ -567,20 +568,24 @@ func GetAllLocalVars(b *Block) []*Variable {
 
 // GetAllArrayVars mirrors VariableSelector::get_all_array_vars.
 // VariableSelector.cpp:737–745 — collect array globals (invalid for ccomp pointer init).
+// Variable* always live; nil hole fails closed (nil out, no invent partial list).
 func (vs *VariableSelector) GetAllArrayVars() []*Variable {
-	var out []*Variable
+	out := make([]*Variable, 0)
 	if vs == nil {
 		return out
 	}
 	for _, v := range vs.GlobalList {
-		if v != nil && v.IsArray {
+		if v == nil {
+			return nil
+		}
+		if v.IsArray {
 			out = append(out, v)
 		}
 	}
 	// Arrays list may hold collectives not yet on GlobalList
 	for _, av := range vs.Arrays {
 		if av == nil {
-			continue
+			return nil
 		}
 		if av.IsGlobal() && av.Collective == nil {
 			if !IsVariableInSet(out, &av.Variable) {
@@ -796,10 +801,11 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 
 // HasEligibleVolatileVarQfer is has_eligible_volatile_var with CVQualifiers filter.
 // VariableSelector.cpp:294–316.
+// Variable* always live; nil hole fails closed as false (no invent skip as absent).
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
 	for _, v := range vars {
 		if v == nil || v.Type == nil {
-			continue
+			return false
 		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
 			continue
@@ -825,6 +831,7 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 
 // HasDereferenceableVar mirrors VariableSelector::has_dereferenceable_var.
 // VariableSelector.cpp:198–210 — type is_dereferenced_from + is_valid_ptr.
+// Variable* always live; nil hole fails closed as false (no invent skip).
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
 	if typ == nil {
 		return false
@@ -835,7 +842,7 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 	}
 	for _, v := range vars {
 		if v == nil || v.Type == nil {
-			continue
+			return false
 		}
 		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			return true
@@ -1040,15 +1047,19 @@ func ChooseVarFull(
 // VariableSelector.cpp:459–516 — prefer deref of higher-indirection vars, then
 // address-of lower-indirection (respecting take_union_field_addr); else uniform.
 // Volatile bias block is disabled upstream (if (0)).
+// chooseVarFromOK biases among already-filtered candidates.
+// Variable* always live in ok; nil hole fails closed (nil pick).
 func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
+	for _, vv := range ok {
+		if vv == nil || vv.Type == nil {
+			return nil
+		}
+	}
 	// VariableSelector.cpp:459–471 — artificially increase odds of dereferencing
 	if want != nil && len(ok) > 1 {
 		var ptrs []*Variable
 		wantInd := want.IndirectLevel()
 		for _, vv := range ok {
-			if vv == nil || vv.Type == nil {
-				continue
-			}
 			if wantInd < vv.Type.IndirectLevel() {
 				ptrs = append(ptrs, vv)
 			}
@@ -1062,9 +1073,6 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 		var addressable []*Variable
 		wantInd := want.IndirectLevel()
 		for _, vv := range ok {
-			if vv == nil || vv.Type == nil {
-				continue
-			}
 			if wantInd > vv.Type.IndirectLevel() {
 				// VariableSelector.cpp:490–494
 				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
@@ -1670,11 +1678,12 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
 	// VariableSelector.cpp:1155–1168 — remove no-int-field and union-with-pointer
+	// Variable* always live; nil hole fails closed (nil loop ctrl)
 	var filtered []*Variable
 	var invalidSlice []*Variable
 	for _, v := range vars {
 		if v == nil || v.Type == nil {
-			continue
+			return nil
 		}
 		if invalid[v] {
 			invalidSlice = append(invalidSlice, v)

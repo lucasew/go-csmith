@@ -495,15 +495,16 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 
 // JoinVisitsInto merges newFacts into facts with join_visits semantics.
 // Used when combining results of multiple visits to the same function.
+// Fact* always live; nil holes fail closed (false, no invent partial join).
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
+	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		return false
+	}
 	changed := false
 	for _, nf := range newFacts {
-		if nf == nil || nf.Var == nil {
-			continue
-		}
 		cur := FindRelatedPointTo(*facts, nf.Var)
 		if cur == nil {
 			*facts = append(*facts, nf.Clone())
@@ -877,15 +878,22 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 
 // UpdateFactsWithModifiedIndex mirrors FactPointTo::update_facts_with_modified_index.
 // FactPointTo.cpp:751–761 — rewrite each point-to fact when indexVar is modified.
+// Fact* always live; nil hole or failed rewrite fails closed (facts nil).
 func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 	if facts == nil || indexVar == nil {
 		return
 	}
+	if !FactsComplete(*facts) {
+		*facts = nil
+		return
+	}
 	for i, fp := range *facts {
-		if fp == nil {
-			continue
-		}
 		newFP := fp.UpdateWithModifiedIndex(indexVar)
+		// UpdateWithModifiedIndex nil = incomplete pointees
+		if newFP == nil {
+			*facts = nil
+			return
+		}
 		if newFP != fp {
 			(*facts)[i] = newFP
 		}

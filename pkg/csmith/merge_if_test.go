@@ -81,6 +81,10 @@ func TestHasEligibleVolatileVar(t *testing.T) {
 	if HasEligibleVolatileVar([]*Variable{v}, GetIntType(), AccessRead, WithEffectContext(WithSideEffects())) {
 		t.Fatal("se")
 	}
+	// nil hole fails closed — no invent skip as absent non-vol
+	if HasEligibleVolatileVar([]*Variable{nil, v}, GetIntType(), AccessRead, EmptyCGContext()) {
+		t.Fatal("nil hole must fail closed")
+	}
 }
 
 func TestIfMergesFacts(t *testing.T) {

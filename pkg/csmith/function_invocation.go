@@ -273,7 +273,11 @@ func ChooseFunc(r *Rng, funcs []*Function, ret *Type, exclude *Function) *Functi
 func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, cg *CGContext, opts Options, qfer *CVQualifiers) *Function {
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
-		if f == nil || f == exclude || !f.IsEffectKnown() {
+		// Function* always live on Funcs; nil hole fails closed (no invent skip)
+		if f == nil {
+			return nil
+		}
+		if f == exclude || !f.IsEffectKnown() {
 			// is_effect_known() == false for Unbuilt/Building
 			continue
 		}

@@ -20,6 +20,10 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	if ChooseFunc(NewRng(1), []*Function{unbuilt}, GetIntType(), nil) != nil {
 		t.Fatal("expected nil")
 	}
+	// nil Function* hole fails closed — no invent skip as absent
+	if ChooseFunc(NewRng(1), []*Function{built, nil}, GetIntType(), nil) != nil {
+		t.Fatal("nil hole must fail closed")
+	}
 }
 
 func TestArrayNoLoopInitializer(t *testing.T) {

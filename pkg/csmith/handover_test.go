@@ -64,6 +64,27 @@ func TestCallerToCalleeHandoverTransitive(t *testing.T) {
 	}
 }
 
+func TestCallerToCalleeHandoverNilHole(t *testing.T) {
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.CallerToCalleeHandover(nil, &facts)
+	if facts != nil {
+		t.Fatal("nil fact hole must fail closed", facts)
+	}
+}
+
+func TestRemoveRVFactsNilHole(t *testing.T) {
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	facts := []*FactPointTo{nil}
+	fm.RemoveRVFacts(&facts)
+	if facts != nil {
+		t.Fatal("nil fact hole must fail closed", facts)
+	}
+}
+
 func TestRemoveRVFacts(t *testing.T) {
 	f := &Function{Name: "f", RV: CreateVariableScalars("f_rv", GetIntType(), false, false)}
 	fm := NewFactMgr(f)

@@ -182,9 +182,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		f = fm.Func
 	}
 	if f != nil {
+		// Block* always live on Function.Blocks; nil hole kept (no invent clean list)
 		nb := f.Blocks[:0]
 		for _, blk := range f.Blocks {
 			if blk == nil {
+				nb = append(nb, nil)
 				continue
 			}
 			if blockUnderStmt(removed, blk) {

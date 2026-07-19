@@ -145,6 +145,7 @@ func (t *Type) IsVolatileStructUnion() bool {
 
 // StructDepth mirrors Type::get_struct_depth.
 // Type.cpp:1261–1275 — 0 if not struct; else 1 + max field depth.
+// Type* always live on Fields; nil hole fails closed as depth 0 (no invent skip).
 func (t *Type) StructDepth() int {
 	if t == nil || !t.IsStruct() {
 		return 0
@@ -153,7 +154,7 @@ func (t *Type) StructDepth() int {
 	maxField := 0
 	for _, f := range t.Fields {
 		if f.Type == nil {
-			continue
+			return 0
 		}
 		if d := f.Type.StructDepth(); d > maxField {
 			maxField = d
@@ -843,10 +844,11 @@ func HasAggregateField(fields []StructField) bool {
 
 // HasLongLongField mirrors Type::has_longlong_field.
 // Type.cpp:1066–1073.
+// Type* always live on Fields; nil hole fails closed as true (no invent none).
 func HasLongLongField(fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
-			continue
+			return true
 		}
 		if f.Type.IsSimple() && (f.Type.simple == ELongLong || f.Type.simple == EULongLong) {
 			return true
