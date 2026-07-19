@@ -26,16 +26,22 @@ func TestDepthGuardRandomModeAlwaysGood(t *testing.T) {
 }
 
 func TestMakeRandomUnaryInvocationNilType(t *testing.T) {
-	// FunctionInvocation.cpp:144 — assert(type); no GetIntType soft invent
+	// FunctionInvocation.cpp:144 — assert(type) sticky; no GetIntType soft invent
+	ClearError()
 	opts := Defaults()
 	c := EmptyCGContext()
 	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, NewVariableSelector(opts), NewExprTables(opts), &c, nil); fi != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
+	if !HasError() {
+		t.Fatal("nil type MakeRandomUnaryInvocation must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestDepthGuardTypeAndSafeOpFlags(t *testing.T) {
 	// Type.cpp / SafeOpFlags.cpp DEPTH_GUARD wired; random mode always GOOD
+	ClearError()
 	opts := Defaults()
 	if DepthGuardByType(opts, DtRandomTypeFromType) != GoodDepth {
 		t.Fatal("dtRandomTypeFromType")

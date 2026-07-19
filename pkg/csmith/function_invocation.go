@@ -868,10 +868,11 @@ func MakeRandomBinaryInvocation(
 		// SafeOpFlags DEPTH_GUARD / ERROR_GUARD
 		return nil
 	}
-	// FunctionInvocation.cpp:219–221 — assert(lhs_type && rhs_type)
+	// FunctionInvocation.cpp:219–221 — assert(lhs_type && rhs_type) sticky
 	lhsTy = flags.LHSType()
 	rhsTy = flags.RHSType()
 	if lhsTy == nil || rhsTy == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// non-arith/shift: keep flags for typing but Output ignores safe path (SafeOpsBinary filter)
@@ -1236,8 +1237,9 @@ func MakeRandomUnaryInvocation(
 	if DepthGuardByType(opts, DtFunctionInvocationRandomUnary) == BadDepth {
 		return nil
 	}
-	// FunctionInvocation.cpp:144 — assert(type)
+	// FunctionInvocation.cpp:144 — assert(type) sticky
 	if typ == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:146–149 — do { pick } while (float && !works); no soft invent invalid
@@ -1266,12 +1268,13 @@ func MakeRandomUnaryInvocation(
 		probs = vs.Probs
 	}
 	flags := MakeRandomUnary(r, opts, probs, typ, nil, uop)
-	// FunctionInvocation.cpp:152–154 — ERROR_GUARD; type = flags->get_lhs_type(); assert(type)
+	// FunctionInvocation.cpp:152–154 — ERROR_GUARD; type = flags->get_lhs_type(); assert(type) sticky
 	if flags == nil {
 		return nil
 	}
 	argTy := flags.LHSType()
 	if argTy == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:157–159 — Expression::make_random(cg, type) — no_func=false
