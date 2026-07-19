@@ -507,6 +507,10 @@ func MakeRandomParam(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
+	// Expression.cpp always has RNG; no invent param expression without it
+	if r == nil {
+		return nil
+	}
 	// Expression.cpp:241–242 — assert(type); DEPTH_GUARD after type known
 	if typ == nil {
 		return nil

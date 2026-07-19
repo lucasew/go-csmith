@@ -600,7 +600,8 @@ func MakeRandomBinaryInvocation(
 	cg *CGContext,
 	typ *Type,
 ) *Invocation {
-	if cg == nil {
+	// FunctionInvocation.cpp always has RNG + CGContext; no invent binary shell without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
@@ -640,7 +641,11 @@ func MakeRandomBinaryInvocation(
 			return nil
 		}
 	}
+	// PickBinaryOp MAX / empty token — no invent infix shell without live op
 	opStr := op.BinaryOpC()
+	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
+		return nil
+	}
 	// FunctionInvocation.cpp:188–207 — always SafeOpFlags::make_random_binary; operands use get_lhs/rhs_type
 	var flags *SafeOpFlags
 	lhsTy, rhsTy := typ, typ
@@ -909,7 +914,8 @@ func MakeRandomUnaryInvocation(
 	cg *CGContext,
 	typ *Type,
 ) *Invocation {
-	if cg == nil {
+	// FunctionInvocation.cpp always has RNG + CGContext; no invent unary shell without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
@@ -934,7 +940,11 @@ func MakeRandomUnaryInvocation(
 	if !validU {
 		return nil
 	}
+	// PickUnaryOp MAX / empty token — no invent unary shell without live op
 	op := uop.UnaryOpC()
+	if int(uop) < 0 || int(uop) >= MaxUnaryOp || op == "" {
+		return nil
+	}
 	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
 	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
 	var probs *Probabilities
@@ -1039,7 +1049,8 @@ func MakeRandomInvocation(
 	qfer *CVQualifiers,
 	stdFunc bool,
 ) *Invocation {
-	if cg == nil {
+	// FunctionInvocation.cpp always has RNG + CGContext; no invent invoke shell without them
+	if r == nil || cg == nil {
 		return &Invocation{Failed: true}
 	}
 	// Match type for choose_func: nil means any return type (C++ type=0).

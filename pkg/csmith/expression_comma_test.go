@@ -50,6 +50,10 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
+	// Expression.cpp always has RNG; no invent param shell
+	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(opts), &c, GetIntType(), nil, 0); e != nil {
+		t.Fatal("nil RNG must not invent param expr")
+	}
 }
 
 func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {

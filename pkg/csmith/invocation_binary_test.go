@@ -119,6 +119,36 @@ func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
 	}
 }
 
+func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
+	// StatementAssign.cpp always has RNG; no invent assign when CompoundAssignment off
+	opts := Defaults()
+	opts.CompoundAssignment = false
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	c := EmptyCGContext().WithFactMgr(NewFactMgr(f))
+	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType())
+	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
+		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
+	}
+}
+
+func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
+	// FunctionInvocation.cpp always has RNG; no invent empty-op std invoke shells
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	cg := EmptyCGContext()
+	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntType()); fi != nil {
+		t.Fatal("nil RNG binary")
+	}
+	if fi := MakeRandomUnaryInvocation(nil, opts, vs, tables, &cg, GetIntType()); fi != nil {
+		t.Fatal("nil RNG unary")
+	}
+	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntType(), nil, true); fi == nil || !fi.Failed {
+		t.Fatal("nil RNG invoke must fail closed")
+	}
+}
+
 func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	// no soft invent visit success on nil / short args
 	cg := EmptyCGContext()

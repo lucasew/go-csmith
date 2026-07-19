@@ -57,6 +57,12 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil cg soft invent %#v", st2)
 	}
+	// nil RNG — no invent Kind-only shell
+	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(opts),
+		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, StmtAssign)
+	if stmtOK(st3) || st3.Kind != 0 {
+		t.Fatalf("nil RNG soft invent %#v", st3)
+	}
 }
 
 func TestStmtOKBlockRequiresThen(t *testing.T) {
