@@ -91,6 +91,8 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	if parent.HasFieldVar(child) {
 		t.Fatal("nil FieldVars hole must fail closed (no invent skip to later)")
 	}
+	// nested HasFieldVar residual: soft invent was soft-continue later field invent not-has-field.
+	// Fair: sticky fail closed false (FieldVarsComplete false already). Covered above.
 	// MarkDeadVar / OOS must not invent leave field pointees live past hole
 	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)

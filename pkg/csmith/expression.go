@@ -539,6 +539,14 @@ func (e *Expression) UseVar(v *Variable) bool {
 				return true
 			}
 			if a.UseVar(v) {
+				// residual ERROR sticky — no invent use-true past nested UseVar hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later args past nested UseVar residual
+			if HasError() {
 				return true
 			}
 		}
@@ -549,7 +557,27 @@ func (e *Expression) UseVar(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.CommaLHS.UseVar(v) || e.CommaRHS.UseVar(v)
+		if e.CommaLHS.UseVar(v) {
+			// residual ERROR sticky — no invent use-true past LHS UseVar hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue RHS past LHS UseVar residual
+		if HasError() {
+			return true
+		}
+		if e.CommaRHS.UseVar(v) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
+			return true
+		}
+		return false
 	case TermAssignment:
 		if e.Assign == nil {
 			// incomplete Assign shell sticky — no invent non-use
@@ -602,7 +630,12 @@ func (e *Expression) UseVar(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.Assign.Expr.UseVar(v)
+		ok := e.Assign.Expr.UseVar(v)
+		// residual ERROR sticky — no invent not-use soft-skip past RHS UseVar hole
+		if HasError() {
+			return true
+		}
+		return ok
 	case TermLhs:
 		// Lhs as expression term if ever used
 		if e.Var == nil {

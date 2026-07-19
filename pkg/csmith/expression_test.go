@@ -1293,4 +1293,16 @@ func TestUseVarIncompleteSticky(t *testing.T) {
 		t.Fatal("Match residual UseVar must SetError sticky")
 	}
 	ClearError()
+	// nested UseVar residual in comma: soft invent was soft-continue RHS invent not-use.
+	// Fair: sticky uses true.
+	leftHole := &Expression{Term: TermVariable, Var: hole}
+	rightOK := &Expression{Term: TermVariable, Var: other}
+	comma := &Expression{Term: TermCommaExpr, CommaLHS: leftHole, CommaRHS: rightOK}
+	if !comma.UseVar(other) {
+		t.Fatal("nested Match residual UseVar must fail closed true (uses)")
+	}
+	if !HasError() {
+		t.Fatal("nested Match residual comma UseVar must SetError sticky")
+	}
+	ClearError()
 }

@@ -131,6 +131,9 @@ func TestIsNonreadableField(t *testing.T) {
 	if HasError() {
 		t.Fatal("complete IsNonreadableField paths must not sticky")
 	}
+	// Imply residual: PointTo-style hole via incomplete union fact soft invent was soft-continue readable.
+	// Fair: sticky nonreadable. Use incomplete map already covers; also Type-nil ancestry residual.
+	ClearError()
 	// incomplete UnionFacts hole: sticky fail closed nonreadable / not-readable
 	ClearError()
 	hole := []*FactUnion{MakeFactUnion(uv, 0), nil}

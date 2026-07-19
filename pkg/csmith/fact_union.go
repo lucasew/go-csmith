@@ -327,7 +327,15 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 		return true
 	}
 	if !v.IsInsideUnionField() {
+		// residual ERROR sticky — no invent not-nonreadable soft-skip past IsInsideUnionField hole
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue nonreadable past IsInsideUnion residual true path
+	if HasError() {
+		return true
 	}
 	if len(facts) == 0 {
 		// no FactUnion tracking yet — do not ban all union fields
@@ -342,7 +350,15 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	// FactUnion.cpp:181–184 — for (; !is_union_field(); field_var_of); assert(is_union_field)
 	uf := v
 	for uf != nil && !uf.IsUnionField() {
+		// residual ERROR sticky — no invent soft-continue walk past IsUnionField residual
+		if HasError() {
+			return true
+		}
 		uf = uf.FieldVarOf
+	}
+	// residual ERROR sticky — no invent soft-continue past final IsUnionField residual
+	if HasError() {
+		return true
 	}
 	// broken IR (no union field in ancestry) — sticky fail closed nonreadable
 	// (no invent readable / soft re-pick past hole)
@@ -362,8 +378,21 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 		return true
 	}
 	fu := FindRelatedUnion(facts, parent)
-	if fu == nil || !tmp.Imply(fu) {
-		// no fact or last write was a different field → nonreadable (complete analysis)
+	// residual ERROR sticky — no invent soft-continue readable past FindRelatedUnion hole
+	if HasError() {
+		return true
+	}
+	if fu == nil {
+		// no fact → nonreadable (complete analysis)
+		return true
+	}
+	ok := tmp.Imply(fu)
+	// residual ERROR sticky — no invent soft-continue readable past Imply hole
+	if HasError() {
+		return true
+	}
+	if !ok {
+		// last write was a different field → nonreadable
 		return true
 	}
 	return false

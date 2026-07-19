@@ -464,4 +464,23 @@ func TestIsConstAfterDeref(t *testing.T) {
 	if (CVQualifiers{}).IsConstAfterDeref(0) {
 		t.Fatal("empty qfer not const")
 	}
+	// Variable.IsConstAfterDeref residual: Type-nil after non-const qfer soft invent was non-const WRITE OK.
+	// Fair: sticky const true (restrictive).
+	ClearError()
+	v := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if !v.IsConstAfterDeref(0) {
+		t.Fatal("Type-nil IsConstAfterDeref must fail closed const true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsConstAfterDeref must SetError sticky")
+	}
+	ClearError()
+	// IsVolatileAfterDeref residual same
+	if !v.IsVolatileAfterDeref(0) {
+		t.Fatal("Type-nil IsVolatileAfterDeref must fail closed volatile true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsVolatileAfterDeref must SetError sticky")
+	}
+	ClearError()
 }

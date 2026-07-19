@@ -1082,7 +1082,12 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return v.FieldVarOf.IsVisibleLocal(blk)
+		ok := v.FieldVarOf.IsVisibleLocal(blk)
+		// residual ERROR sticky — no invent not-visible soft-skip past parent IsVisibleLocal hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	// ArrayVariable.cpp:419–429 — parent block chain for array (collective or itemized)
 	if v.AsArray != nil && v.AsArray.Block != nil {
@@ -1138,6 +1143,14 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 		return false
 	}
 	if v.Qfer.IsConstAfterDeref(derefLevel) {
+		// residual ERROR sticky — no invent const-true past qfer peel hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue peel past qfer residual false path
+	if HasError() {
 		return true
 	}
 	// incomplete type / OOB peel sticky const (restrictive)
@@ -1154,7 +1167,12 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 			return true
 		}
 	}
-	return t.IsConstStructUnion()
+	ok := t.IsConstStructUnion()
+	// residual ERROR sticky — no invent non-const soft-skip past IsConstStructUnion hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref.
@@ -1170,6 +1188,14 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 		return false
 	}
 	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
+		// residual ERROR sticky — no invent volatile-true past qfer peel hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue peel past qfer residual false path
+	if HasError() {
 		return true
 	}
 	if v.Type == nil {
@@ -1185,7 +1211,12 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 			return true
 		}
 	}
-	return t.IsVolatileStructUnion()
+	ok := t.IsVolatileStructUnion()
+	// residual ERROR sticky — no invent non-vol soft-skip past IsVolatileStructUnion hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
@@ -1472,7 +1503,15 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 	}
 	for _, f := range v.FieldVars {
 		if f.HasFieldVar(other) {
+			// residual ERROR sticky — no invent has-field true past nested HasFieldVar hole
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false path
+		if HasError() {
+			return false
 		}
 	}
 	return false
