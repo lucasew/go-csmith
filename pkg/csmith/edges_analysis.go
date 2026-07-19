@@ -202,12 +202,19 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 	if st == nil || cg == nil || cg.FM == nil || st.StmID <= 0 {
 		return
 	}
-	// incomplete inputs fail closed IncompleteEffect map entry (no invent pure merge)
+	// incomplete inputs fail closed sticky IncompleteEffect map entry (no invent pure merge
+	// or soft re-pick past holes as recorded success)
 	if !EffectComplete(preStm) || !EffectComplete(blockEffect) {
 		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
+		SetError(ErrGeneric)
 		return
 	}
 	eff := preStm.AddEffect(blockEffect)
+	if !EffectComplete(eff) {
+		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
+		SetError(ErrGeneric)
+		return
+	}
 	cg.FM.SetMapStmEffect(st.StmID, eff)
 }
 

@@ -1234,7 +1234,9 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	frame := c.FindReachableFrameVars(facts)
 	if !VariablesComplete(frame) {
-		// incomplete facts — fail closed full external lists (no invent empty RW)
+		// incomplete facts — fail closed sticky full external lists (no invent empty RW
+		// or soft re-pick unrestricted nil past holes)
+		SetError(ErrGeneric)
 		if c.RW == nil {
 			return &RWDirective{}
 		}
@@ -1257,8 +1259,9 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 		return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
 	}
 	nr, nw := c.GetExternalNoReadsWrites(frame)
-	// incomplete RW/IV lists — fail closed empty RW directive (no invent unrestricted)
+	// incomplete RW/IV lists — fail closed sticky empty RW directive (no invent unrestricted)
 	if !VariablesComplete(nr) || !VariablesComplete(nw) {
+		SetError(ErrGeneric)
 		return &RWDirective{}
 	}
 	if len(nr) == 0 && len(nw) == 0 {

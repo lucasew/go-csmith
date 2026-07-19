@@ -107,17 +107,22 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 }
 
 func TestCombineVariableSets(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	got := CombineVariableSets([]*Variable{a}, []*Variable{a, b})
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
 	}
-	// nil hole fails closed IncompleteVariables (not bare nil invent empty-complete)
+	// nil hole fails closed sticky IncompleteVariables (not bare nil invent empty-complete)
 	bad := CombineVariableSets([]*Variable{a, nil}, []*Variable{b})
 	if VariablesComplete(bad) {
 		t.Fatal("nil hole must IncompleteVariables, not empty-complete")
 	}
+	if !HasError() {
+		t.Fatal("incomplete CombineVariableSets must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVectorFilterNilTableFailClosed(t *testing.T) {

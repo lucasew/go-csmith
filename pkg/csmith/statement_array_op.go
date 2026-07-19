@@ -43,6 +43,8 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 // (not bare nil invent empty-complete combined set via VariablesComplete(nil)).
 func CombineVariableSets(a, b []*Variable) []*Variable {
 	if !VariablesComplete(a) || !VariablesComplete(b) {
+		// incomplete lists fail closed sticky (no invent soft re-pick combined pool past holes)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), a...)

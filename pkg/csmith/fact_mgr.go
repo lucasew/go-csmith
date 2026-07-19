@@ -1036,14 +1036,19 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
 		for _, f := range v.FieldVars {
 			if f == nil {
-				// incomplete FieldVars — clear partial aggregate makeup
+				// incomplete FieldVars — clear partial aggregate makeup sticky
+				// (no invent soft re-pick AddNewVarFact success past holes)
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			fm.AddNewVarFact(f)
 			// child may have cleared on hole / merge fail
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		}

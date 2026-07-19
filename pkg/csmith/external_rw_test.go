@@ -114,7 +114,8 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 
 func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	// soft invent: incomplete frame → nil RW (no restrictions)
-	// fair: inherit full NoWrite without inventing unrestricted nil
+	// fair: inherit full NoWrite without inventing unrestricted nil; sticky
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -125,6 +126,10 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	if len(rwd.NoWriteVars) != 1 || rwd.NoWriteVars[0] != g {
 		t.Fatal(rwd)
 	}
+	if !HasError() {
+		t.Fatal("incomplete frame facts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsInvocationParams(t *testing.T) {

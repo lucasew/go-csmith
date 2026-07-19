@@ -333,4 +333,15 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	if EffectComplete(fm.GetMapAccumEffect(0)) || fm.GetMapAccumEffect(0).IsPure() {
 		t.Fatal("StmID 0 GetMapAccumEffect must IncompleteEffect")
 	}
+	// incomplete pre/block effect must sticky Incomplete map entry
+	ClearError()
+	st2 := &Stmt{Kind: StmtIfElse, StmID: 8}
+	SetAccumulatedEffectAfterBlock(st2, IncompleteEffect(), &cg, EmptyEffect())
+	if EffectComplete(fm.GetMapStmEffect(8)) {
+		t.Fatal("incomplete block effect must map IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("incomplete block effect must SetError sticky")
+	}
+	ClearError()
 }
