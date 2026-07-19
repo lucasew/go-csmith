@@ -844,8 +844,13 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 // stParent is the statement's parent block (for is_var_on_stack).
 // MarkFuncEnd marks stack pointees as garbage at function end.
 // Variable* always live in PointTo; nil hole fails closed (nil fact).
+// Incomplete Param/LocalVars stack lists fail closed (nil — no invent leave
+// stack pointees live because IsVarOnStack returned false past a hole).
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	if f == nil || fn == nil {
+		return nil
+	}
+	if !fn.StackScanComplete(stParent) {
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)
@@ -885,12 +890,17 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 
 // MarkFuncEndOnFacts applies mark_func_end to each point-to fact in-place.
 // FactMgr.cpp:196–204.
-// Fact* always live; nil hole fails closed (nil facts, no invent partial mark).
+// Fact* always live; incomplete facts or stack lists fail closed (nil facts —
+// no invent partial mark / leave stack pointees live past Param/LocalVars holes).
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	if facts == nil {
 		return
 	}
 	if !FactsComplete(*facts) {
+		*facts = nil
+		return
+	}
+	if fn != nil && !fn.StackScanComplete(stParent) {
 		*facts = nil
 		return
 	}

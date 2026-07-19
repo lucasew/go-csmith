@@ -2,21 +2,16 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// IsVarOnStack mirrors Function::is_var_on_stack(var, stm).
-// Function.cpp:185–201 — param or local in stm's parent block chain.
-// stParent is the statement's parent block (Stmt has no Parent field; pass enclosing block).
-// Variable* always live on Param/LocalVars; nil hole fails closed as false
-// (no invent complete not-on-stack scan past holes).
-func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
-	if f == nil || v == nil {
+// StackScanComplete reports Param + LocalVars parent-chain have no nil holes.
+// Incomplete lists must not invent "not on stack" membership for mark_func_end /
+// remove_function_local_facts (false from a hole-shorted scan).
+func (f *Function) StackScanComplete(stParent *Block) bool {
+	if f == nil {
 		return false
 	}
 	for _, p := range f.Param {
 		if p == nil {
 			return false
-		}
-		if p.Match(v) {
-			return true
 		}
 	}
 	for b := stParent; b != nil; b = b.Parent {
@@ -24,6 +19,30 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 			if loc == nil {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+// IsVarOnStack mirrors Function::is_var_on_stack(var, stm).
+// Function.cpp:185–201 — param or local in stm's parent block chain.
+// stParent is the statement's parent block (Stmt has no Parent field; pass enclosing block).
+// Variable* always live on Param/LocalVars; nil hole fails closed as false for the
+// membership bit — callers that need fail-closed OOS/mark use StackScanComplete.
+func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
+	if f == nil || v == nil {
+		return false
+	}
+	if !f.StackScanComplete(stParent) {
+		return false
+	}
+	for _, p := range f.Param {
+		if p.Match(v) {
+			return true
+		}
+	}
+	for b := stParent; b != nil; b = b.Parent {
+		for _, loc := range b.LocalVars {
 			if loc == v || loc.Match(v) {
 				return true
 			}

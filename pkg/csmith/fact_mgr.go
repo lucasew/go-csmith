@@ -689,10 +689,14 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 
 // RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
 // FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
-// Fact* always live; incomplete PointTo/fact holes fail closed (nil out, no invent
-// clean filter / append nil clones from broken PointTo).
+// Fact* always live; incomplete PointTo/fact holes or incomplete Param/LocalVars
+// stack lists fail closed (nil out — no invent keep stack locals when IsVarOnStack
+// returns false past a hole, or leave stack pointees live).
 func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	if !FactsComplete(facts) {
+		return nil
+	}
+	if f != nil && stParent != nil && !f.StackScanComplete(stParent) {
 		return nil
 	}
 	out := make([]*FactPointTo, 0, len(facts))

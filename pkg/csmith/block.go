@@ -183,12 +183,10 @@ func (b *Block) MustBreakOrReturn() bool {
 	return b.MustBreakOrReturnFull(b.EmitFM)
 }
 
-// IsVarOnStack mirrors Block::is_var_on_stack.
-// Block.cpp:443–456 — params + local_vars chain.
-// IsVarOnStack reports whether v is a param or local visible on this block chain.
-// Variable* always live; nil hole fails closed as false (no invent complete scan).
-func (b *Block) IsVarOnStack(v *Variable) bool {
-	if b == nil || v == nil {
+// StackScanComplete reports Param + LocalVars parent-chain have no nil holes.
+// Incomplete lists must not invent not-on-stack membership for selection/mark paths.
+func (b *Block) StackScanComplete() bool {
+	if b == nil {
 		return false
 	}
 	f := b.Func
@@ -200,9 +198,6 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 			if p == nil {
 				return false
 			}
-			if p.Match(v) {
-				return true
-			}
 		}
 	}
 	for bb := b; bb != nil; bb = bb.Parent {
@@ -210,6 +205,36 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 			if loc == nil {
 				return false
 			}
+		}
+	}
+	return true
+}
+
+// IsVarOnStack mirrors Block::is_var_on_stack.
+// Block.cpp:443–456 — params + local_vars chain.
+// IsVarOnStack reports whether v is a param or local visible on this block chain.
+// Variable* always live; nil hole fails closed as false for the membership bit —
+// callers that need fail-closed selection use StackScanComplete.
+func (b *Block) IsVarOnStack(v *Variable) bool {
+	if b == nil || v == nil {
+		return false
+	}
+	if !b.StackScanComplete() {
+		return false
+	}
+	f := b.Func
+	for bb := b; f == nil && bb != nil; bb = bb.Parent {
+		f = bb.Func
+	}
+	if f != nil {
+		for _, p := range f.Param {
+			if p.Match(v) {
+				return true
+			}
+		}
+	}
+	for bb := b; bb != nil; bb = bb.Parent {
+		for _, loc := range bb.LocalVars {
 			if loc == v || loc.Match(v) {
 				return true
 			}

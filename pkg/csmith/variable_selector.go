@@ -83,6 +83,10 @@ func ChooseVisibleReadVar(
 	if expanded == nil && len(readVars) > 0 {
 		return nil
 	}
+	// incomplete stack lists must not invent filter that drops all locals
+	if b != nil && !b.StackScanComplete() {
+		return nil
+	}
 	var ok []*Variable
 	for _, v := range expanded {
 		if v == nil || v.Type == nil {

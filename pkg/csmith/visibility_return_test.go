@@ -23,6 +23,35 @@ func TestFunctionIsVarOnStack(t *testing.T) {
 	}
 }
 
+func TestStackScanCompleteHoleFailClosed(t *testing.T) {
+	// soft invent: IsVarOnStack false past LocalVars hole → leave stack pointees live
+	// fair: StackScanComplete false; MarkFuncEndOnFacts / RemoveFunctionLocal clear
+	f := &Function{Name: "f"}
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
+	if f.StackScanComplete(blk) {
+		t.Fatal("LocalVars hole must be incomplete stack scan")
+	}
+	if f.IsVarOnStack(loc, blk) {
+		t.Fatal("IsVarOnStack must not invent membership past hole")
+	}
+	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
+	MarkFuncEndOnFacts(&facts, f, blk)
+	if facts != nil {
+		t.Fatal("MarkFuncEndOnFacts must clear on incomplete stack, not invent live pointee", facts)
+	}
+	facts2 := []*FactPointTo{MakeFactPointTo(p, loc)}
+	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
+	if out != nil {
+		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
+	}
+	// Block stack scan
+	if blk.StackScanComplete() {
+		t.Fatal("Block.StackScanComplete hole")
+	}
+}
+
 func TestFunctionIsVarOOS(t *testing.T) {
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
