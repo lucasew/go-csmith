@@ -1275,6 +1275,12 @@ func ChooseVarFull(
 				SetError(ErrGeneric)
 				return nil
 			}
+			// C++ isArray always ArrayVariable*; missing AsArray sticky
+			// (no invent IsEligible soft-false then pick later past broken shell)
+			if v.IsArray && v.AsArray == nil {
+				SetError(ErrGeneric)
+				return nil
+			}
 			if IsVariableInSet(invalidVars, v) {
 				continue
 			}
@@ -1282,10 +1288,18 @@ func ChooseVarFull(
 				continue
 			}
 			if noUnion && v.IsInsideUnionField() {
+				// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
+				if HasError() {
+					return nil
+				}
 				continue
 			}
 			if IsEligibleVar(v, 0, access, cg) {
 				ok = append(ok, v)
+			} else if HasError() {
+				// hard IR residual (GetCollective/IsArray shell/etc.) sticky
+				// (no invent soft-skip not-eligible then pick a later candidate)
+				return nil
 			}
 		}
 		return ChooseOKVar(r, ok)
@@ -1317,11 +1331,21 @@ func ChooseVarFull(
 			SetError(ErrGeneric)
 			return nil
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent IsEligible soft-false then pick later past broken shell)
+		if x.IsArray && x.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		// VariableSelector.cpp:424–429
 		if noBitfield && x.IsBitfield {
 			continue
 		}
 		if noUnion && x.IsInsideUnionField() {
+			// Type-nil ancestry stickies residual ERROR — no invent soft-continue pick
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		if !want.Match(x.Type, mt) {
@@ -1329,6 +1353,10 @@ func ChooseVarFull(
 		}
 		if qfer != nil && !qfer.Wildcard {
 			if !qfer.MatchIndirect(x.Qfer, matchExact) {
+				// residual ERROR from MatchIndirect OOB/sticky — no invent soft-continue
+				if HasError() {
+					return nil
+				}
 				continue
 			}
 		}
@@ -1337,6 +1365,10 @@ func ChooseVarFull(
 		}
 		deref := x.Type.IndirectLevel() - want.IndirectLevel()
 		if !IsEligibleVar(x, deref, access, cg) {
+			// hard IR residual sticky (no invent soft-skip not-eligible then pick later)
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		ok = append(ok, x)

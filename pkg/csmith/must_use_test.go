@@ -139,6 +139,26 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 		t.Fatal("Type-nil must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was IsEligible residual false soft-continue
+	// then invent pick later good. Fair: sticky fail closed whole choose.
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if ChooseVarFull(NewRng(1), []*Variable{shell, good}, AccessRead, EmptyCGContext(),
+		nil, nil, MatchFlexible, nil, false, false, false) != nil {
+		t.Fatal("IsArray without AsArray want==nil must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ChooseVarFull want==nil must SetError sticky")
+	}
+	ClearError()
+	// same for want!=nil path
+	if ChooseVarFull(NewRng(1), []*Variable{shell, good}, AccessRead, EmptyCGContext(),
+		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
+		t.Fatal("IsArray without AsArray want!=nil must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ChooseVarFull want!=nil must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSelectMustUseArrayItemize(t *testing.T) {
