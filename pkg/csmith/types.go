@@ -886,6 +886,8 @@ func GetTypeFromString(typeString string) *Type {
 
 // TypeNameString is the reverse of get_type_from_string for simple types.
 // Type* always live at name emit; sticky empty (no invent empty type-name past hole).
+// Struct/union sid always live (parity with CName); empty StructName sticky empty
+// (no invent bare empty type-name token / soft re-pick past incomplete aggregate IR).
 func (t *Type) TypeNameString() string {
 	if t == nil {
 		SetError(ErrGeneric)
@@ -894,10 +896,12 @@ func (t *Type) TypeNameString() string {
 	if t.ptrTo != nil {
 		return "Pointer"
 	}
-	if t.IsStruct() {
-		return t.StructName
-	}
-	if t.IsUnion() {
+	if t.IsStruct() || t.IsUnion() {
+		// Type.cpp struct/union tag always live at name emit; sticky no invent ""
+		if t.StructName == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
 		return t.StructName
 	}
 	switch t.simple {

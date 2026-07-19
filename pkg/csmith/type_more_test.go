@@ -34,6 +34,24 @@ func TestGetTypeFromString(t *testing.T) {
 		t.Fatal("unknown simple TypeNameString must SetError sticky")
 	}
 	ClearError()
+	// empty struct/union tag sticky (parity with CName; no invent empty type-name)
+	if s := (&Type{isStruct: true, StructName: ""}).TypeNameString(); s != "" {
+		t.Fatal("empty struct tag TypeNameString invent", s)
+	}
+	if !HasError() {
+		t.Fatal("empty struct tag TypeNameString must SetError sticky")
+	}
+	ClearError()
+	if s := (&Type{isUnion: true, StructName: ""}).TypeNameString(); s != "" {
+		t.Fatal("empty union tag TypeNameString invent", s)
+	}
+	if !HasError() {
+		t.Fatal("empty union tag TypeNameString must SetError sticky")
+	}
+	ClearError()
+	if (&Type{isStruct: true, StructName: "S0"}).TypeNameString() != "S0" {
+		t.Fatal("struct tag")
+	}
 }
 
 func TestSignedOverflowPossible(t *testing.T) {

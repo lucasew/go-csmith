@@ -173,6 +173,38 @@ func TestMakeStructConstant(t *testing.T) {
 	ClearError()
 }
 
+func TestCheckImplicitNontrivialAssignOps(t *testing.T) {
+	// non-C++ complete false
+	opts := Defaults()
+	opts.LangCPP = false
+	fields := []StructField{{Name: "f0", Type: GetIntType()}}
+	if CheckImplicitNontrivialAssignOps(opts, fields) {
+		t.Fatal("C mode")
+	}
+	// C++ with simple field → no
+	opts.LangCPP = true
+	if CheckImplicitNontrivialAssignOps(opts, fields) {
+		t.Fatal("simple field")
+	}
+	// field with flag → yes
+	fields = []StructField{{
+		Name: "f0",
+		Type: &Type{isStruct: true, StructName: "S", HasImplicitNontrivialAssignOps: true},
+	}}
+	if !CheckImplicitNontrivialAssignOps(opts, fields) {
+		t.Fatal("flagged field")
+	}
+	// nil field Type sticky true (no invent no-nontrivial soft-skip past hole)
+	ClearError()
+	if !CheckImplicitNontrivialAssignOps(opts, []StructField{{Name: "f0", Type: nil}}) {
+		t.Fatal("nil field Type must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type CheckImplicitNontrivialAssignOps must SetError sticky")
+	}
+	ClearError()
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

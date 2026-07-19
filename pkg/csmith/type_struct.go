@@ -226,12 +226,19 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 
 // CheckImplicitNontrivialAssignOps mirrors Type.cpp checkImplicitNontrivialAssignOps.
 // Type.cpp:259–269 — true if any field has_implicit_nontrivial_assign_ops (C++ only).
+// Type* always live on Fields; nil hole sticky true (no invent no-nontrivial /
+// soft re-pick past incomplete field Type that would skip C++ assign-op bans).
 func CheckImplicitNontrivialAssignOps(opts Options, fields []StructField) bool {
 	if !opts.LangCPP {
 		return false
 	}
 	for _, f := range fields {
-		if f.Type != nil && f.Type.HasImplicitNontrivialAssignOps {
+		if f.Type == nil {
+			// incomplete field Type sticky has-nontrivial (restrictive)
+			SetError(ErrGeneric)
+			return true
+		}
+		if f.Type.HasImplicitNontrivialAssignOps {
 			return true
 		}
 	}
