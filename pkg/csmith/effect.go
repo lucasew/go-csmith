@@ -21,6 +21,9 @@ const (
 type Effect struct {
 	pure           bool
 	sideEffectFree bool
+	// incomplete marks fail-closed IR (nil map keys / incomplete merge inputs).
+	// Distinct from complete empty (EmptyEffect): EffectComplete false.
+	incomplete bool
 	// written tracks variables written in this effect (Effect::write_vars subset).
 	written map[*Variable]bool
 	// read tracks variables read (Effect::read_vars subset).
@@ -36,10 +39,30 @@ func EmptyEffect() Effect {
 	return Effect{pure: true, sideEffectFree: true}
 }
 
+// IncompleteEffect is the fail-closed incomplete effect marker.
+// EffectComplete returns false. Distinct from EmptyEffect (complete empty).
+// Use when merge/write-set hits nil holes so callers cannot invent empty-complete
+// success via IsEmpty / pure / side-effect-free checks on leave-base returns.
+func IncompleteEffect() Effect {
+	return Effect{incomplete: true, pure: false, sideEffectFree: false}
+}
+
+// EffectComplete reports the effect is not a fail-closed incomplete marker
+// and has no nil Variable* map keys.
+func EffectComplete(e Effect) bool {
+	if e.incomplete {
+		return false
+	}
+	return effectMapKeysComplete(e.read) && effectMapKeysComplete(e.written) && effectMapKeysComplete(e.lhsWrite)
+}
+
 // Clone mirrors Effect copy ctor with deep map copies (Go maps are shared refs).
 // Effect.cpp:84–89.
 func (e Effect) Clone() Effect {
-	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree}
+	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree, incomplete: e.incomplete}
+	if e.incomplete {
+		return IncompleteEffect()
+	}
 	if len(e.read) > 0 {
 		out.read = make(map[*Variable]bool, len(e.read))
 		for k, v := range e.read {
@@ -62,10 +85,12 @@ func (e Effect) Clone() Effect {
 }
 
 // IsPure mirrors Effect::is_pure.
-func (e Effect) IsPure() bool { return e.pure }
+// Incomplete effects are not pure (no invent pure success past holes).
+func (e Effect) IsPure() bool { return !e.incomplete && e.pure }
 
 // IsSideEffectFree mirrors Effect::is_side_effect_free.
-func (e Effect) IsSideEffectFree() bool { return e.sideEffectFree }
+// Incomplete effects are not SE-free (no invent SE-free success past holes).
+func (e Effect) IsSideEffectFree() bool { return !e.incomplete && e.sideEffectFree }
 
 // WithSideEffects returns a non-SE-free effect (for tests / context).
 func WithSideEffects() Effect {
@@ -84,18 +109,22 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 // no invent partial external merge past holes). Incomplete Param/LocalVars on a
 // frame also fails closed (no invent not-on-chain via IsVarOnStack false past hole).
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
-	// incomplete effect maps / call chain fail closed (leave base — no invent partial merge)
+	// incomplete effect maps / call chain fail closed IncompleteEffect
+	// (no invent leave-base empty-complete success)
+	if !EffectComplete(e) || !EffectComplete(other) {
+		return IncompleteEffect()
+	}
 	reads := other.ReadVars()
 	writes := other.WrittenVars()
 	if !VariablesComplete(reads) || !VariablesComplete(writes) {
-		return e
+		return IncompleteEffect()
 	}
 	if !BlocksComplete(callChain) {
-		return e
+		return IncompleteEffect()
 	}
 	for _, b := range callChain {
 		if !b.StackScanComplete() {
-			return e
+			return IncompleteEffect()
 		}
 	}
 	out := e
@@ -140,39 +169,11 @@ func (e Effect) AddEffect(other Effect) Effect {
 }
 
 // AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
-// Variable* always live as map keys; nil key fails closed (return e unchanged,
-// no invent partial merge past holes).
+// Variable* always live as map keys; incomplete either side fails closed
+// IncompleteEffect (no invent leave-base empty-complete merge success).
 func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
-	// pre-validate both sides complete
-	for k := range e.read {
-		if k == nil {
-			return e
-		}
-	}
-	for k := range e.written {
-		if k == nil {
-			return e
-		}
-	}
-	for k := range e.lhsWrite {
-		if k == nil {
-			return e
-		}
-	}
-	for k := range other.read {
-		if k == nil {
-			return e
-		}
-	}
-	for k := range other.written {
-		if k == nil {
-			return e
-		}
-	}
-	for k := range other.lhsWrite {
-		if k == nil {
-			return e
-		}
+	if !EffectComplete(e) || !EffectComplete(other) {
+		return IncompleteEffect()
 	}
 	out := e
 	if other.read != nil {
@@ -227,11 +228,11 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 
 // WriteVarSet mirrors Effect::write_var_set — write each var.
 // Effect.cpp:148–152.
-// Variable* always live; incomplete list fails closed (return e unchanged —
-// no invent partial writes past a hole).
+// Variable* always live; incomplete list or base fails closed IncompleteEffect
+// (no invent partial writes / leave-base empty-complete success).
 func (e Effect) WriteVarSet(vars []*Variable) Effect {
-	if !VariablesComplete(vars) {
-		return e
+	if !EffectComplete(e) || !VariablesComplete(vars) {
+		return IncompleteEffect()
 	}
 	out := e
 	for _, v := range vars {
@@ -242,8 +243,11 @@ func (e Effect) WriteVarSet(vars []*Variable) Effect {
 
 // SetLhsWriteVars mirrors Effect::set_lhs_write_vars from current write_vars.
 // Lhs.cpp:348–351 — after successful LHS visit.
-// Variable* always live as write keys; nil hole fails closed (empty lhsWrite).
+// Incomplete write map fails closed IncompleteEffect (no invent empty lhsWrite).
 func (e Effect) SetLhsWriteVarsFromWritten() Effect {
+	if !EffectComplete(e) {
+		return IncompleteEffect()
+	}
 	out := e
 	if len(e.written) == 0 {
 		out.lhsWrite = nil
@@ -252,8 +256,7 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 	out.lhsWrite = make(map[*Variable]bool, len(e.written))
 	for k, v := range e.written {
 		if k == nil {
-			out.lhsWrite = nil
-			return out
+			return IncompleteEffect()
 		}
 		if v {
 			out.lhsWrite[k] = true
@@ -346,9 +349,12 @@ func (e Effect) IsWritten(v *Variable) bool {
 }
 
 // ReadVars mirrors Effect::get_read_vars — list of read variables (stable order by name).
-// Variable* always live as map keys; nil key fails closed as []*Variable{nil}
-// (no invent skip hole as absent read).
+// Incomplete effect / nil map keys fail closed IncompleteVariables
+// (no invent skip hole as absent read / empty-complete read set).
 func (e Effect) ReadVars() []*Variable {
+	if e.incomplete {
+		return IncompleteVariables()
+	}
 	if len(e.read) == 0 {
 		return nil
 	}
@@ -358,7 +364,7 @@ func (e Effect) ReadVars() []*Variable {
 			continue
 		}
 		if v == nil {
-			return []*Variable{nil}
+			return IncompleteVariables()
 		}
 		out = append(out, v)
 	}
@@ -367,9 +373,12 @@ func (e Effect) ReadVars() []*Variable {
 }
 
 // WrittenVars mirrors Effect::get_write_vars subset.
-// Variable* always live as map keys; nil key fails closed as []*Variable{nil}
-// (no invent skip hole as absent write).
+// Incomplete effect / nil map keys fail closed IncompleteVariables
+// (no invent skip hole as absent write / empty-complete write set).
 func (e Effect) WrittenVars() []*Variable {
+	if e.incomplete {
+		return IncompleteVariables()
+	}
 	if len(e.written) == 0 {
 		return nil
 	}
@@ -379,7 +388,7 @@ func (e Effect) WrittenVars() []*Variable {
 			continue
 		}
 		if v == nil {
-			return []*Variable{nil}
+			return IncompleteVariables()
 		}
 		out = append(out, v)
 	}
@@ -493,32 +502,18 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 
 // HasRaceWith mirrors Effect::has_race_with.
 // Effect.cpp:480–484 — non-empty intersection of read/write sets.
-// Incomplete effect lists fail closed as race (no invent race-free).
+// Incomplete either side fails closed as race (no invent race-free).
 func (e Effect) HasRaceWith(other Effect) bool {
-	// incomplete either side → race (no invent race-free incomplete maps)
+	if !EffectComplete(e) || !EffectComplete(other) {
+		return true
+	}
 	for _, v := range e.ReadVars() {
-		if v == nil {
-			return true
-		}
 		if other.IsWritten(v) {
 			return true
 		}
 	}
 	for _, v := range e.WrittenVars() {
-		if v == nil {
-			return true
-		}
 		if other.IsRead(v) || other.IsWritten(v) {
-			return true
-		}
-	}
-	for _, v := range other.ReadVars() {
-		if v == nil {
-			return true
-		}
-	}
-	for _, v := range other.WrittenVars() {
-		if v == nil {
 			return true
 		}
 	}
@@ -527,7 +522,11 @@ func (e Effect) HasRaceWith(other Effect) bool {
 
 // IsEmpty mirrors Effect::is_empty — no reads and no writes.
 // Effect.cpp:490–492.
+// Incomplete is not empty (no invent empty-complete free effect past holes).
 func (e Effect) IsEmpty() bool {
+	if e.incomplete {
+		return false
+	}
 	return len(e.ReadVars()) == 0 && len(e.WrittenVars()) == 0
 }
 
@@ -631,14 +630,14 @@ func effectMapKeysComplete(m map[*Variable]bool) bool {
 
 // Consolidate mirrors Effect::consolidate.
 // Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
-// Variable* always live as map keys; nil hole fails closed with no mutation
-// (pre-scan — no invent partial deletes before hitting a hole under random map order).
+// Incomplete maps fail closed IncompleteEffect (no invent partial deletes /
+// leave-base complete success past holes under random map order).
 func (e *Effect) Consolidate() {
 	if e == nil {
 		return
 	}
-	// two-phase: incomplete maps must not invent mid-consolidate partial drops
-	if !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
+	if e.incomplete || !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
+		*e = IncompleteEffect()
 		return
 	}
 	// remove field reads when parent is also read

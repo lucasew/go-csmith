@@ -64,15 +64,17 @@ func TestEffectConsolidate(t *testing.T) {
 
 func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	// soft invent: delete some fields then hit nil key mid-map under random order
-	// fair: pre-scan incomplete — no mutation
+	// fair: incomplete → IncompleteEffect (not invent partial consolidate / leave base complete)
 	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect().ReadVar(parent).ReadVar(field)
 	e.read[nil] = true
-	before := len(e.read)
 	e.Consolidate()
-	if !e.read[field] || !e.read[parent] || len(e.read) != before {
-		t.Fatal("incomplete effect map must not invent partial consolidate", e.read)
+	if EffectComplete(e) {
+		t.Fatal("incomplete effect map must fail closed IncompleteEffect", e)
+	}
+	if e.IsEmpty() || e.IsPure() {
+		t.Fatal("IncompleteEffect must not invent empty/pure", e)
 	}
 }
 

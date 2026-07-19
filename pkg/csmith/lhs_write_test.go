@@ -35,12 +35,15 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if len(merged2.LhsWriteVars()) != 0 {
 		t.Fatal("lhs should skip")
 	}
-	// nil map key fails closed — leave base unchanged
+	// nil map key fails closed IncompleteEffect (not invent leave-base complete)
 	hole := EmptyEffect()
 	hole.written = map[*Variable]bool{nil: true}
 	got := base.ReadVar(v).AddEffectOpts(hole, false)
-	if !got.IsRead(v) || got.IsWritten(v) {
-		t.Fatal("nil effect key must not invent partial merge", got)
+	if EffectComplete(got) {
+		t.Fatal("nil effect key merge must fail closed incomplete", got)
+	}
+	if got.IsPure() || got.IsSideEffectFree() || got.IsEmpty() {
+		t.Fatal("IncompleteEffect must not invent pure/SE-free/empty", got)
 	}
 	// HasRaceWith / HasGlobalEffect nil keys fail closed as conflict/global
 	if !EmptyEffect().HasRaceWith(hole) {
@@ -56,8 +59,15 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if hole.CommentOutput() != "" {
 		t.Fatal("nil key CommentOutput must fail closed empty")
 	}
-	if EmptyEffect().WriteVarSet([]*Variable{v, nil}).IsWritten(v) {
-		t.Fatal("WriteVarSet nil hole must leave base unchanged")
+	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {
+		t.Fatal("WriteVarSet nil hole must fail closed incomplete")
+	}
+	// consolidate incomplete → IncompleteEffect
+	c := EmptyEffect()
+	c.read = map[*Variable]bool{nil: true}
+	c.Consolidate()
+	if EffectComplete(c) {
+		t.Fatal("Consolidate incomplete must yield IncompleteEffect")
 	}
 }
 
