@@ -247,13 +247,18 @@ func binaryCastOp(cast, a0, op, a1 string) string {
 }
 
 // ReachMaxFunctions mirrors Function::reach_max_functions_cnt.
+// Function* always live on Funcs; nil hole fails closed as at-max
+// (no invent undercount that allows more functions).
 func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 	if list == nil {
 		return false
 	}
 	n := 0
 	for _, f := range list.Funcs {
-		if f != nil && !f.IsBuiltin {
+		if f == nil {
+			return true
+		}
+		if !f.IsBuiltin {
 			n++
 		}
 	}
@@ -571,7 +576,12 @@ func BuildInvocationAndFunction(
 	if callerFM != nil {
 		RenewFacts(&callerFM.GlobalFacts, retFacts)
 		// FunctionInvocationUser.cpp:234–238 — new globals facts
+		// Variable* always live on NewGlobals; nil hole fails closed (mark failed)
 		for _, v := range callee.NewGlobals {
+			if v == nil {
+				fi.Failed = true
+				return fi
+			}
 			callerFM.AddNewVarFactAndUpdate(nil, v)
 		}
 	}

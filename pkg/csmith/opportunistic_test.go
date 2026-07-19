@@ -33,6 +33,34 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	}
 }
 
+func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
+	opts := Defaults()
+	opts.CompatibleCheck = true
+	// enabled + incomplete IR rejects (no invent non-error)
+	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+		t.Fatal("nil var must reject when compatible-check on")
+	}
+	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+		t.Fatal("nil expr must reject when compatible-check on")
+	}
+	opts.CompatibleCheck = false
+	if CompatibleCheckExprVar(opts, nil, nil) {
+		t.Fatal("disabled must not reject")
+	}
+}
+
+func TestIsNonReadableNilHole(t *testing.T) {
+	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	cg := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
+	if !cg.IsNonReadable(g) {
+		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
+	}
+	cg2 := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
+	if !cg2.IsNonWritable(g) {
+		t.Fatal("nil NoWriteVars hole must fail closed as nonwritable")
+	}
+}
+
 func TestVariableCompatible(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

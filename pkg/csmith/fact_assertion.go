@@ -23,7 +23,11 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 		return true
 	}
 	for _, p := range f.PointTo {
-		if p == nil || IsSpecialPtr(p) {
+		// Variable* always live in PointTo; nil hole fails closed as invisible
+		if p == nil {
+			return true
+		}
+		if IsSpecialPtr(p) {
 			continue
 		}
 		if !p.IsVisible(stParent) {

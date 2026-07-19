@@ -74,6 +74,15 @@ func TestIsVisibleLocal(t *testing.T) {
 	}
 }
 
+func TestIsPointingToLocalsNilHole(t *testing.T) {
+	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// incomplete PointTo fails closed as pointing-to-locals
+	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}
+	if !IsPointingToLocals(ptr, &Block{}, 0, facts) {
+		t.Fatal("nil pointee hole must fail closed as pointing-to-locals")
+	}
+}
+
 func TestIsPointingToLocals(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}

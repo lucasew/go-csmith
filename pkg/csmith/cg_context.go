@@ -162,8 +162,12 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		return ScopeInactive
 	}
 	// params → 0
+	// Variable* always live on Param; nil hole fails closed as inactive
 	for _, p := range f.Param {
-		if p != nil && p.Match(v) {
+		if p == nil {
+			return ScopeInactive
+		}
+		if p.Match(v) {
 			return 0
 		}
 	}
@@ -171,8 +175,13 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 	b := c.CurrentBlock()
 	idx := 1
 	for b != nil {
-		if IsVariableInSet(b.LocalVars, v) {
-			return idx
+		for _, loc := range b.LocalVars {
+			if loc == nil {
+				return ScopeInactive
+			}
+			if loc == v {
+				return idx
+			}
 		}
 		b = b.Parent
 		idx++
@@ -180,9 +189,17 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 	// exist on one of the stack frames (caller) → INVISIBLE
 	for i := len(c.CallChain) - 1; i >= 0; i-- {
 		b = c.CallChain[i]
+		if b == nil {
+			return ScopeInactive
+		}
 		for b != nil {
-			if IsVariableInSet(b.LocalVars, v) {
-				return ScopeInvisible
+			for _, loc := range b.LocalVars {
+				if loc == nil {
+					return ScopeInactive
+				}
+				if loc == v {
+					return ScopeInvisible
+				}
 			}
 			b = b.Parent
 		}
@@ -363,12 +380,16 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 
 // IsNonReadable mirrors CGContext::is_nonreadable.
 // CGContext.cpp:118–128 — match against no_read_vars.
+// Variable* always live on NoReadVars; nil hole fails closed as nonreadable.
 func (c CGContext) IsNonReadable(v *Variable) bool {
 	if c.RW == nil || v == nil {
 		return false
 	}
 	for _, nr := range c.RW.NoReadVars {
-		if nr != nil && nr.Match(v) {
+		if nr == nil {
+			return true
+		}
+		if nr.Match(v) {
 			return true
 		}
 	}
@@ -377,20 +398,27 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 
 // IsNonWritable mirrors CGContext::is_nonwritable.
 // CGContext.cpp:133–149 — loose_match no_write_vars; IV bounds.
+// Variable* always live on NoWriteVars/IVBounds; nil hole fails closed as nonwritable.
 func (c CGContext) IsNonWritable(v *Variable) bool {
 	if v == nil {
 		return false
 	}
 	if c.RW != nil {
 		for _, nw := range c.RW.NoWriteVars {
-			if nw != nil && (nw.LooseMatch(v) || v.LooseMatch(nw)) {
+			if nw == nil {
+				return true
+			}
+			if nw.LooseMatch(v) || v.LooseMatch(nw) {
 				return true
 			}
 		}
 	}
 	// not writing to loop IVs (avoid infinite loops)
 	for iv := range c.IVBounds {
-		if iv != nil && v.LooseMatch(iv) {
+		if iv == nil {
+			return true
+		}
+		if v.LooseMatch(iv) {
 			return true
 		}
 	}
@@ -643,7 +671,8 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		if len(tmp) == 0 ||
+		// nil = incomplete pointees; empty / null/dead disallowed → fail
+		if tmp == nil || len(tmp) == 0 ||
 			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
 			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
 			if accumCopy != nil && c.EffectAccum != nil {
@@ -652,7 +681,14 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 			return false
 		}
 		for _, pointee := range tmp {
-			if pointee == nil || IsSpecialPtr(pointee) {
+			// Variable* always live; nil hole fails closed
+			if pointee == nil {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+			if IsSpecialPtr(pointee) {
 				continue
 			}
 			if !c.CheckReadVar(pointee, facts) {
@@ -691,7 +727,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		if len(tmp) == 0 ||
+		if tmp == nil || len(tmp) == 0 ||
 			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
 			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
 			if accumCopy != nil && c.EffectAccum != nil {
@@ -700,7 +736,14 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 			return false
 		}
 		for _, pointee := range tmp {
-			if pointee == nil || IsSpecialPtr(pointee) {
+			// Variable* always live; nil hole fails closed
+			if pointee == nil {
+				if accumCopy != nil && c.EffectAccum != nil {
+					*c.EffectAccum = *accumCopy
+				}
+				return false
+			}
+			if IsSpecialPtr(pointee) {
 				continue
 			}
 			var succ bool

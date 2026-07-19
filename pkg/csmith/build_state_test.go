@@ -81,6 +81,12 @@ func TestStatementFilterMaxFuncs(t *testing.T) {
 	if !ReachMaxFunctions(list, opts) {
 		t.Fatal("max")
 	}
+	// nil Function* hole fails closed as at-max (no invent undercount)
+	opts.MaxFuncs = 100
+	list.Funcs = []*Function{{Name: "f", IsBuilt: true}, nil}
+	if !ReachMaxFunctions(list, opts) {
+		t.Fatal("nil hole must fail closed as at-max")
+	}
 }
 
 func TestMakeFirstMarksBuilt(t *testing.T) {

@@ -963,6 +963,8 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals.
 // FactPointTo.cpp:487–526.
+// Variable* always live in pointees; nil hole fails closed as true
+// (no invent "not pointing to locals" past incomplete sets).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
 		return false
@@ -982,9 +984,16 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		pointees = ft.PointTo
 	} else {
 		pointees = MergePointeesOfPointer(v, indirection, facts)
+		// nil = incomplete merge
+		if pointees == nil {
+			return true
+		}
 	}
 	for _, p := range pointees {
-		if p == nil || IsSpecialPtr(p) {
+		if p == nil {
+			return true
+		}
+		if IsSpecialPtr(p) {
 			continue
 		}
 		if p.IsVisibleLocal(b) {
@@ -992,10 +1001,19 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		}
 		// recurse one level of pointees that are pointers
 		if p.IsPointer() {
+			if p.Type == nil {
+				return true
+			}
 			for j := 0; j < p.Type.IndirectLevel(); j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
+				if nested == nil {
+					return true
+				}
 				for _, n := range nested {
-					if n != nil && !IsSpecialPtr(n) && n.IsVisibleLocal(b) {
+					if n == nil {
+						return true
+					}
+					if !IsSpecialPtr(n) && n.IsVisibleLocal(b) {
 						return true
 					}
 				}

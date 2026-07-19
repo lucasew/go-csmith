@@ -493,9 +493,16 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:637–641 — pointer params → tbd (GenerateBody; known-params already handed over)
+	// Variable* always live on Param; nil hole fails closed (abort generate)
 	if !knownParams {
 		for _, p := range f.Param {
-			if p != nil && p.IsPointer() {
+			if p == nil {
+				SetError(ErrGeneric)
+				f.BuildState = BuildUnbuilt
+				f.IsBuilt = false
+				return
+			}
+			if p.IsPointer() {
 				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
 					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, MakeFactPointTo(p, TBDPtr))
 				}
@@ -529,12 +536,25 @@ func (f *Function) generateBodyCore(
 	f.EmitConcise = opts.Concise
 
 	// mark_func_end: locals die after function (DFA cleanup)
+	// Block*/Variable*/Fact* always live; nil holes fail closed (abort cleanup invent)
 	if cg.FM != nil && len(f.Blocks) > 0 {
 		var locals []*Variable
 		for _, blk := range f.Blocks {
-			if blk != nil {
-				locals = append(locals, blk.LocalVars...)
+			if blk == nil {
+				SetError(ErrGeneric)
+				return
 			}
+			for _, loc := range blk.LocalVars {
+				if loc == nil {
+					SetError(ErrGeneric)
+					return
+				}
+				locals = append(locals, loc)
+			}
+		}
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return
 		}
 		for i, fact := range cg.FM.GlobalFacts {
 			if nf := fact.MarkFuncEndLocals(locals); nf != nil {

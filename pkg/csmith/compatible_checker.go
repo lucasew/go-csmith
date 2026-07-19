@@ -12,8 +12,9 @@ func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
 	// CompatibleChecker.cpp:46–49 — assert(v); assert(exp); assert(0)
 	// This overload always aborts when enabled (dead code after assert).
 	// Fail closed: reject assignment rather than invent exp.compatible(v).
+	// incomplete IR also rejects (no invent "compatible OK")
 	if v == nil || exp == nil {
-		return false
+		return true
 	}
 	return true
 }
@@ -25,8 +26,9 @@ func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
 	if !opts.CompatibleCheck {
 		return false
 	}
+	// incomplete Expression* fails closed as reject (no invent non-error)
 	if a == nil || b == nil {
-		return false
+		return true
 	}
 	return a.CompatibleWithExpr(b, opts.ExpandStruct) || b.CompatibleWithExpr(a, opts.ExpandStruct)
 }
