@@ -784,6 +784,8 @@ func (t *Type) IsUnamedPadding(index int) bool {
 // HasPadding mirrors Type::has_padding.
 // Type.cpp:1305–1314 — unpacked struct, bitfield member, or nested padding.
 // Type* always live; sticky true (no invent padding-free soft-skip past hole).
+// Type* always live on Fields; nil field hole sticky true (no invent padding-free
+// soft-skip nested HasPadding past incomplete field Type).
 func (t *Type) HasPadding() bool {
 	if t == nil {
 		SetError(ErrGeneric)
@@ -796,7 +798,12 @@ func (t *Type) HasPadding() bool {
 		if t.IsBitfieldIndex(i) {
 			return true
 		}
-		if f.Type != nil && f.Type.HasPadding() {
+		if f.Type == nil {
+			// incomplete field Type sticky has-padding (restrictive)
+			SetError(ErrGeneric)
+			return true
+		}
+		if f.Type.HasPadding() {
 			return true
 		}
 	}
@@ -1001,9 +1008,16 @@ func (t *Type) SizeofString() string {
 
 // HasAggregateField mirrors Type::has_aggregate_field.
 // Type.cpp:1057–1064.
+// Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick
+// past incomplete field Type that would soft-skip ccomp packing bans).
 func HasAggregateField(fields []StructField) bool {
 	for _, f := range fields {
-		if f.Type != nil && f.Type.IsAggregate() {
+		if f.Type == nil {
+			// incomplete field Type sticky has-aggregate (restrictive)
+			SetError(ErrGeneric)
+			return true
+		}
+		if f.Type.IsAggregate() {
 			return true
 		}
 	}

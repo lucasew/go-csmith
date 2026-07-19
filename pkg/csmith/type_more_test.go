@@ -367,6 +367,15 @@ func TestHasAggregateAndLongLongField(t *testing.T) {
 	if !HasAggregateField(fields) {
 		t.Fatal("agg")
 	}
+	// nil field Type sticky has-aggregate (no invent none / soft re-pick past hole)
+	ClearError()
+	if !HasAggregateField([]StructField{{Name: "f0", Type: nil}}) {
+		t.Fatal("nil field Type must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type HasAggregateField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsUnnamedPadding(t *testing.T) {

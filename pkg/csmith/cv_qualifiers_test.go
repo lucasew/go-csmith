@@ -218,6 +218,18 @@ func TestHasPadding(t *testing.T) {
 	if !st3.HasPadding() {
 		t.Fatal("bitfield")
 	}
+	// packed nested field Type hole sticky has-padding (no invent padding-free soft-skip)
+	ClearError()
+	st4 := &Type{isStruct: true, Packed: true, Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if !st4.HasPadding() {
+		t.Fatal("nil field Type must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type HasPadding must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomQualifiersSimpleNoVolatile(t *testing.T) {
