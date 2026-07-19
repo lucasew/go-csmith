@@ -32,7 +32,14 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
+		// Type* always live; Type-nil non-special sticky incomplete
+		// (no invent complete no-ptrs soft-success past type hole via IsPointer false)
 		if e.Var == nil {
+			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
+			return false
+		}
+		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
 			*ptrs = IncompleteVariables()
 			SetError(ErrGeneric)
 			return false
@@ -159,12 +166,26 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			}
 		}
 	}
-	if st.LhsVar != nil && st.LhsVar.IsPointer() {
-		*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
+	if st.LhsVar != nil {
+		// Type* always live; Type-nil non-special sticky (no invent complete no-ptrs)
+		if st.LhsVar.Type == nil && !IsSpecialPtr(st.LhsVar) {
+			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
+			return false
+		}
+		if st.LhsVar.IsPointer() {
+			*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
+		}
 	}
 	if st.Lhs != nil {
 		// Lhs always has live Var in C++; incomplete Lhs.Var sticky
 		if st.Lhs.Var == nil {
+			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
+			return false
+		}
+		// Type-nil non-special sticky (no invent complete no-ptrs via IsPointer false)
+		if st.Lhs.Var.Type == nil && !IsSpecialPtr(st.Lhs.Var) {
 			*ptrs = IncompleteVariables()
 			SetError(ErrGeneric)
 			return false

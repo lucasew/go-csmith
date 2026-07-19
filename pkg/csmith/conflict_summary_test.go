@@ -255,6 +255,32 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("nil Expr CollectReferencedPtrsStmt must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Variable sticky (no invent complete no-ptrs via IsPointer false)
+	var ptrs4 []*Variable
+	CollectReferencedPtrsExpression(&Expression{
+		Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil},
+	}, &ptrs4)
+	if VariablesComplete(ptrs4) {
+		t.Fatal("Type-nil Var collect must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Var CollectReferencedPtrsExpression must SetError sticky")
+	}
+	ClearError()
+	// Type-nil LhsVar sticky
+	var ptrs5 []*Variable
+	CollectReferencedPtrsStmt(&Stmt{
+		Kind: StmtAssign, StmID: 10,
+		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		LhsVar: &Variable{Name: "g_hole", Type: nil},
+	}, &ptrs5)
+	if VariablesComplete(ptrs5) {
+		t.Fatal("Type-nil LhsVar collect must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil LhsVar CollectReferencedPtrsStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
