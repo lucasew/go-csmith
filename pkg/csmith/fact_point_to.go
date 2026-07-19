@@ -105,7 +105,11 @@ func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 // IsValidPtr mirrors FactPointTo::is_valid_ptr(Variable*, facts).
 // FactPointTo.cpp:411–419 — needs related fact; null/dead forbidden when probs are 0.
 // opts.NullPointerDerefProb / DeadPointerDerefProb default 0 (upstream CGOptions).
+// Incomplete fact maps fail closed as invalid (no invent valid via skip holes).
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
+	if !FactsComplete(facts) {
+		return false
+	}
 	fact := FindRelatedPointTo(facts, p)
 	if fact == nil {
 		return false
@@ -650,6 +654,7 @@ func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 
 // MarkDeadVar mirrors FactPointTo::mark_dead_var.
 // FactPointTo.cpp:106–123 — replace/remove pointee v with garbage_ptr.
+// Variable* always live in PointTo; nil hole fails closed (nil — no invent skip).
 func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 	if f == nil || v == nil {
 		return nil
@@ -657,7 +662,10 @@ func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 	set := append([]*Variable(nil), f.PointTo...)
 	pos := -1
 	for i, p := range set {
-		if p == v || (p != nil && v.HasFieldVar(p)) || (p != nil && p.FieldVarOf != nil && isAncestorField(p, v)) {
+		if p == nil {
+			return nil
+		}
+		if p == v || v.HasFieldVar(p) || (p.FieldVarOf != nil && isAncestorField(p, v)) {
 			pos = i
 			break
 		}
@@ -866,9 +874,13 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		}
 		var modified []int
 		// prefer IndexExprs UseVar (FactPointTo.cpp:726–730); fall back to string
+		// Expression* always live in IndexExprs; nil hole fails closed
 		if len(av.IndexExprs) > 0 {
 			for k, exp := range av.IndexExprs {
-				if exp != nil && exp.UseVar(indexVar) {
+				if exp == nil {
+					return nil
+				}
+				if exp.UseVar(indexVar) {
 					modified = append(modified, k)
 				}
 			}

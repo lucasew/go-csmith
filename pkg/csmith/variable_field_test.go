@@ -30,6 +30,15 @@ func TestCreateFieldVars(t *testing.T) {
 	}
 }
 
+func TestHasFieldVarNilHole(t *testing.T) {
+	parent := &Variable{Name: "s", Type: &Type{isStruct: true}}
+	child := &Variable{Name: "s.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent.FieldVars = []*Variable{nil, child}
+	if parent.HasFieldVar(child) {
+		t.Fatal("nil FieldVars hole must fail closed (no invent skip to later)")
+	}
+}
+
 func TestCollectExpandable(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

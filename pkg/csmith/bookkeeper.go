@@ -418,6 +418,8 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) {
 
 // StatExprDepths mirrors Bookkeeper::stat_expr_depths over non-builtin funcs.
 // Bookkeeper.cpp:224–230.
+// Function* always live; nil hole clears counts. Builtins without body skip.
+// Incomplete expressions (ExpressionComplexity 0 on holes) already fail closed per-expr.
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
 	for _, f := range funcs {
@@ -426,8 +428,13 @@ func StatExprDepths(funcs []*Function) {
 			exprDepthCnts = nil
 			return
 		}
-		if f.IsBuiltin || f.Body == nil {
+		if f.IsBuiltin {
 			continue
+		}
+		// user func body always live after build; nil fails closed clear
+		if f.Body == nil {
+			exprDepthCnts = nil
+			return
 		}
 		for i := range f.Body.Stmts {
 			var exprs []*Expression
@@ -479,8 +486,13 @@ func StatBlkDepths(funcs []*Function) int {
 			blkDepthCnts = nil
 			return 0
 		}
-		if f.IsBuiltin || f.Body == nil {
+		if f.IsBuiltin {
 			continue
+		}
+		// user func body always live after build; nil fails closed
+		if f.Body == nil {
+			blkDepthCnts = nil
+			return 0
 		}
 		// body is a Block; count its statements with parent=body
 		for i := range f.Body.Stmts {

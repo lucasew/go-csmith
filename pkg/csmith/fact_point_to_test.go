@@ -130,6 +130,13 @@ func TestMarkFuncEnd(t *testing.T) {
 	if ft.MarkFuncEndLocals([]*Variable{nil}) != nil {
 		t.Fatal("nil locals hole must fail closed")
 	}
+	if ft3.MarkDeadVar(loc) != nil {
+		t.Fatal("MarkDeadVar nil PointTo hole must fail closed")
+	}
+	// incomplete facts IsValidPtr fails closed
+	if IsValidPtr(p, []*FactPointTo{nil}, 0, 0) {
+		t.Fatal("IsValidPtr incomplete facts must fail closed")
+	}
 }
 
 func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {

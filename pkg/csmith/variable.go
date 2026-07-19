@@ -1036,6 +1036,8 @@ func (v *Variable) Match(other *Variable) bool {
 }
 
 // HasFieldVar mirrors Variable::has_field_var — other is this or nested field.
+// Variable* always live in FieldVars; nil hole fails closed as false
+// (no invent skip hole and match a later field).
 func (v *Variable) HasFieldVar(other *Variable) bool {
 	if v == nil || other == nil {
 		return false
@@ -1044,6 +1046,9 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 		return true
 	}
 	for _, f := range v.FieldVars {
+		if f == nil {
+			return false
+		}
 		if f.HasFieldVar(other) {
 			return true
 		}
@@ -1139,6 +1144,8 @@ func (v *Variable) FindPointerFields() []*Variable {
 
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
+// Incomplete field Types / make_random fail closed: clear partial FieldVars
+// (no invent half-built field list).
 func (v *Variable) CreateFieldVars() {
 	// Variable.cpp:338 — assert(type->is_aggregate())
 	if v == nil || v.Type == nil || !v.Type.IsAggregate() {
@@ -1151,9 +1158,13 @@ func (v *Variable) CreateFieldVars() {
 	isVol := v.IsVolatile()
 	isConst := v.IsConst()
 	j := 0
+	fail := func() {
+		v.FieldVars = nil
+	}
 	for _, f := range v.Type.Fields {
 		if f.Type == nil {
-			// incomplete type IR — fail closed stop (no invent field types)
+			// incomplete type IR — fail closed clear (no invent partial fields)
+			fail()
 			return
 		}
 		// Type::is_unamed_padding — zero-length bitfield skipped (Variable.cpp:351–352)
@@ -1191,17 +1202,20 @@ func (v *Variable) CreateFieldVars() {
 			init = MakeRandom(f.Type, ProcessOptions(), ProcessProbabilities(), createVarRng())
 			// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random nullptr
 			if HasError() || init == nil {
+				fail()
 				return
 			}
 		}
 		// Variable.cpp:397 — ERROR_GUARD during field CreateVariable
 		if HasError() {
+			fail()
 			return
 		}
 		qfer := NewCVQualifiers(consts, vols)
 		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
 		if !qfer.SanityCheck(f.Type) {
 			// fail closed — no soft invent bad-qfer field var
+			fail()
 			return
 		}
 		fv := &Variable{
@@ -1218,6 +1232,7 @@ func (v *Variable) CreateFieldVars() {
 			fv.CreateFieldVars()
 		}
 		if HasError() {
+			fail()
 			return
 		}
 		v.FieldVars = append(v.FieldVars, fv)

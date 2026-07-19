@@ -163,6 +163,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 
 // FindParentBlockOfStmID walks function blocks for the parent of stm_id.
 // Used when StatementGoto::dest parent is not stored on Stmt.
+// Block* always live on Function.Blocks; nil hole fails closed (nil — no invent skip).
 func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 	if f == nil || stmID <= 0 {
 		return nil
@@ -187,6 +188,9 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 		return nil
 	}
 	for _, b := range f.Blocks {
+		if b == nil {
+			return nil
+		}
 		if p := walk(b); p != nil {
 			return p
 		}
