@@ -508,6 +508,8 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 		expanded := false
 		for _, e := range fm.CFGEdges {
 			if e == nil {
+				// incomplete CFG list hole — sticky (no invent soft-skip edge)
+				SetError(ErrGeneric)
 				return nil
 			}
 			if e.SrcID <= 0 {
@@ -1919,6 +1921,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	varQfer.Restrict(access, cg)
 	// VariableSelector.cpp:939 — assert(var_qfer.sanity_check(t)); no soft invent bad qfer
 	if !varQfer.SanityCheck(t) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	name := vs.RandomLocalName()
@@ -2062,6 +2065,11 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		// VariableSelector.cpp:1348–1354 — RandomLocalName + rnd_upto(stack.size())
 		// empty stack: C++ OOB / ERROR; no soft invent blk=nil local array
 		if cg.CurrentFunc == nil || len(cg.CurrentFunc.Stack) == 0 {
+			return nil
+		}
+		// incomplete Stack fails closed sticky (no invent soft-skip nil frame)
+		if !BlocksComplete(cg.CurrentFunc.Stack) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		name = vs.RandomLocalName()

@@ -72,6 +72,7 @@ func TestExpandBlockForGotoAssertB(t *testing.T) {
 
 func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	// CFGEdge* always live; nil hole must not invent skip as absent edge
+	ClearError()
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f, StmID: 1}
 	inner := &Block{Func: f, Parent: outer, StmID: 2}
@@ -84,6 +85,10 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	if ExpandBlockForGoto(inner, cg) != nil {
 		t.Fatal("nil CFG hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil CFG hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {

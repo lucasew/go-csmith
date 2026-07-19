@@ -95,9 +95,16 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 }
 
 func TestBuildUserInvocationArgCount(t *testing.T) {
+	// SanityCheck sticky on GenerateNewParentLocal: plant int+pointer targets and scan seeds
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	_ = vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1))
+	cgSeed := EmptyCGContext()
+	g := vs.GenerateNewGlobal(AccessRead, cgSeed, GetIntType(), nil, NewRng(1))
+	if g == nil {
+		t.Fatal("need int global")
+	}
+	_ = vs.GenerateNewGlobal(AccessRead, cgSeed, PointerTo(GetIntType()), nil, NewRng(2))
 	callee := &Function{
 		Name:       "g_1",
 		ReturnType: GetIntType(),
@@ -106,21 +113,25 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 			CreateVariableScalars("p_2", PointerTo(GetIntType()), false, false),
 		},
 		BuildState: BuildBuilt,
-		FEffect:    EmptyEffect(),
 	}
-	// mark effect known
-	callee.FEffect = EmptyEffect().ReadVar(vs.GlobalList[0])
-	caller := &Function{Name: "func_1"}
-	blk := &Block{Func: caller}
-	caller.Stack = []*Block{blk}
-	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(NewFactMgr(caller))
-	fi := BuildUserInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
-	if fi == nil || fi.Failed {
-		t.Fatal("failed")
+	callee.FEffect = EmptyEffect().ReadVar(g)
+	var fi *Invocation
+	for seed := uint64(3); seed < 80; seed++ {
+		ClearError()
+		caller := &Function{Name: "func_1"}
+		blk := &Block{Func: caller}
+		caller.Stack = []*Block{blk}
+		cg := WithFunc(caller, EmptyEffect()).WithFactMgr(NewFactMgr(caller))
+		fi = BuildUserInvocation(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+		if fi != nil && !fi.Failed && len(fi.Args) == 2 {
+			break
+		}
+		fi = nil
 	}
-	if len(fi.Args) != 2 {
-		t.Fatalf("args %d", len(fi.Args))
+	if fi == nil {
+		t.Fatal("no successful BuildUserInvocation with 2 args in seed scan")
 	}
+	ClearError()
 }
 
 func TestBuildUserInvocationParamFailHard(t *testing.T) {

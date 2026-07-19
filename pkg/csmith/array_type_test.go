@@ -280,3 +280,22 @@ func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	av := vs.CreateRandomArray(NewRng(3), cg)
 	_ = av // may be nil when no acceptable element type
 }
+
+func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.GlobalVariables = false
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	f.Stack = []*Block{nil}
+	cg := WithFunc(f, EmptyEffect())
+	cg.Types = vs.Types
+	if vs.CreateRandomArray(NewRng(1), cg) != nil {
+		t.Fatal("incomplete Stack must fail closed CreateRandomArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete Stack must SetError sticky")
+	}
+	ClearError()
+}
