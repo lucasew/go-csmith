@@ -4,16 +4,23 @@ package csmith
 
 // CollectReferencedPtrsExpression mirrors Expression::get_referenced_ptrs.
 // ExpressionVariable.cpp:230–235 — pointer vars; comma/assign recurse; invoke args + callee.
-// Incomplete IR fails closed: clears *ptrs and returns false (no invent partial lists).
+// Incomplete IR fails closed: *ptrs → IncompleteVariables (not bare nil —
+// VariablesComplete(nil)/len==0 invents empty-complete ptr list success).
 func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
-	_ = collectReferencedPtrsExpression(e, ptrs)
+	if ptrs == nil {
+		return
+	}
+	if !collectReferencedPtrsExpression(e, ptrs) {
+		*ptrs = IncompleteVariables()
+	}
 }
 
-// collectReferencedPtrsExpression returns false on incomplete IR (*ptrs cleared).
+// collectReferencedPtrsExpression returns false on incomplete IR.
+// On failure *ptrs is IncompleteVariables (caller may also overwrite).
 func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	if e == nil || ptrs == nil {
 		if ptrs != nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 		}
 		return false
 	}
@@ -21,7 +28,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		if e.Var.IsPointer() {
@@ -31,7 +38,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	case TermCommaExpr:
 		// both sides always live
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		if !collectReferencedPtrsExpression(e.CommaLHS, ptrs) {
@@ -40,20 +47,20 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		return collectReferencedPtrsExpression(e.CommaRHS, ptrs)
 	case TermAssignment:
 		if e.Assign == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		return collectReferencedPtrsStmt(e.Assign, ptrs)
 	case TermFunction:
 		// ExpressionFuncall.cpp:165–177 — param_value then eFuncCall → assert(fiu) + callee
 		if e.Invoke == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		for _, a := range e.Invoke.Args {
 			// Expression* args always live after ERROR_GUARD
 			if a == nil {
-				*ptrs = nil
+				*ptrs = IncompleteVariables()
 				return false
 			}
 			if !collectReferencedPtrsExpression(a, ptrs) {
@@ -62,12 +69,12 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		}
 		// ExpressionFuncall.cpp:172–177 — only user FuncCall walks callee refs
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
+			// incomplete callee ReferencedPtrs fails closed (no invent skip hole)
+			if !VariablesComplete(e.Invoke.User.ReferencedPtrs) {
+				*ptrs = IncompleteVariables()
+				return false
+			}
 			for _, p := range e.Invoke.User.ReferencedPtrs {
-				// Variable* always live on ReferencedPtrs
-				if p == nil {
-					*ptrs = nil
-					return false
-				}
 				*ptrs = appendUniqueVar(*ptrs, p)
 			}
 		}
@@ -76,21 +83,27 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		return true
 	default:
 		// unknown term — incomplete IR
-		*ptrs = nil
+		*ptrs = IncompleteVariables()
 		return false
 	}
 }
 
 // CollectReferencedPtrsStmt mirrors Statement::get_referenced_ptrs.
 // Statement.cpp:331–345 — exprs + nested blocks.
+// Incomplete IR → IncompleteVariables (not bare nil invent empty-complete).
 func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
-	_ = collectReferencedPtrsStmt(st, ptrs)
+	if ptrs == nil {
+		return
+	}
+	if !collectReferencedPtrsStmt(st, ptrs) {
+		*ptrs = IncompleteVariables()
+	}
 }
 
 func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	if st == nil || ptrs == nil {
 		if ptrs != nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 		}
 		return false
 	}
@@ -101,7 +114,7 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		// Incomplete Loop without TestExpr fails closed (no invent skip for-test
 		// ptrs / soft-claim IV alone as the only for-related pointer).
 		if st.Loop == nil || st.Loop.TestExpr == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
@@ -113,7 +126,7 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			// C++ get_exprs always yields live Expression* for these kinds
 			// incomplete nil Expr fails closed (no invent partial ptr list as success)
 			if st.Expr == nil {
-				*ptrs = nil
+				*ptrs = IncompleteVariables()
 				return false
 			}
 			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
@@ -133,7 +146,7 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	if st.Lhs != nil {
 		// Lhs always has live Var in C++; incomplete Lhs.Var fails closed
 		if st.Lhs.Var == nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 		if st.Lhs.Var.IsPointer() {
@@ -145,7 +158,7 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	for _, b := range blks {
 		if b == nil {
 			// incomplete arm — fail closed (no invent partial ptr list past hole)
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 			return false
 		}
 	}
@@ -158,14 +171,20 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 }
 
 // CollectReferencedPtrsBlock walks all statements in a block.
+// Incomplete IR → IncompleteVariables (not bare nil invent empty-complete).
 func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
-	_ = collectReferencedPtrsBlock(b, ptrs)
+	if ptrs == nil {
+		return
+	}
+	if !collectReferencedPtrsBlock(b, ptrs) {
+		*ptrs = IncompleteVariables()
+	}
 }
 
 func collectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) bool {
 	if b == nil || ptrs == nil {
 		if ptrs != nil {
-			*ptrs = nil
+			*ptrs = IncompleteVariables()
 		}
 		return false
 	}
@@ -315,7 +334,8 @@ func ReadUnionFieldBlock(b *Block) bool {
 // ComputeSummary mirrors Function::compute_summary.
 // Function.cpp:773–784 — referenced_ptrs + feffect external + union_field_read.
 // bodyEffect is the accumulated effect of the function body (map_stm_effect[body]).
-// Incomplete body IR fails closed UnionFieldRead (no invent clean empty summary).
+// Incomplete body IR fails closed UnionFieldRead + IncompleteVariables ReferencedPtrs
+// (no invent clean empty summary / IsPointerReferenced false via bare nil).
 func (f *Function) ComputeSummary(bodyEffect Effect) {
 	if f == nil {
 		return
@@ -326,7 +346,8 @@ func (f *Function) ComputeSummary(bodyEffect Effect) {
 		var ptrs []*Variable
 		if !collectReferencedPtrsBlock(f.Body, &ptrs) {
 			// incomplete referenced-ptrs walk — fail closed needs-revisit path
-			// (no invent empty ReferencedPtrs + false UnionFieldRead as clean)
+			// IncompleteVariables so IsPointerReferenced cannot invent false via len(nil)==0
+			f.ReferencedPtrs = IncompleteVariables()
 			f.UnionFieldRead = true
 		} else {
 			f.ReferencedPtrs = ptrs

@@ -140,17 +140,22 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	if collectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs) {
 		t.Fatal("assign without Expr must fail closed")
 	}
-	if ptrs != nil {
-		t.Fatal("incomplete collect must clear ptrs", ptrs)
+	// IncompleteVariables marker — not bare nil invent empty-complete
+	if VariablesComplete(ptrs) {
+		t.Fatal("incomplete collect must IncompleteVariables, not empty-complete", ptrs)
 	}
 	ptrs = []*Variable{}
 	if collectReferencedPtrsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs) {
 		t.Fatal("invoke without Expr must fail closed")
 	}
+	if VariablesComplete(ptrs) {
+		t.Fatal("incomplete invoke must IncompleteVariables")
+	}
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	// incomplete for in body — no invent clean empty summary (false UnionFieldRead)
+	// nor IsPointerReferenced false via bare-nil ReferencedPtrs
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Body = &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}},
@@ -158,6 +163,15 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	f.ComputeSummary(EmptyEffect())
 	if !f.UnionFieldRead {
 		t.Fatal("incomplete for must fail closed UnionFieldRead")
+	}
+	if VariablesComplete(f.ReferencedPtrs) {
+		t.Fatal("incomplete for must IncompleteVariables ReferencedPtrs, not empty-complete")
+	}
+	if !f.IsPointerReferenced() {
+		t.Fatal("incomplete ReferencedPtrs must fail closed IsPointerReferenced true")
+	}
+	if !f.NeedsRevisit() {
+		t.Fatal("incomplete summary must NeedsRevisit")
 	}
 }
 

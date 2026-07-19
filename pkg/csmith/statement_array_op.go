@@ -39,17 +39,11 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 }
 
 // CombineVariableSets mirrors combine_variable_sets.
-// Variable* always live in sets; nil hole fails closed (nil out, no invent partial).
+// Variable* always live in sets; incomplete list fails closed IncompleteVariables
+// (not bare nil invent empty-complete combined set via VariablesComplete(nil)).
 func CombineVariableSets(a, b []*Variable) []*Variable {
-	for _, v := range a {
-		if v == nil {
-			return nil
-		}
-	}
-	for _, v := range b {
-		if v == nil {
-			return nil
-		}
+	if !VariablesComplete(a) || !VariablesComplete(b) {
+		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), a...)
 	for _, v := range b {
@@ -141,6 +135,11 @@ func MakeRandomArrayLoop(
 	if cg.RW != nil {
 		allMustReads = CombineVariableSets(cg.RW.MustReadVars, mustReads)
 		allMustWrites = CombineVariableSets(cg.RW.MustWriteVars, mustWrites)
+		// incomplete combine / existing No* lists fail closed (no invent partial RW)
+		if !VariablesComplete(allMustReads) || !VariablesComplete(allMustWrites) ||
+			!VariablesComplete(cg.RW.NoReadVars) || !VariablesComplete(cg.RW.NoWriteVars) {
+			return nil
+		}
 		noReads = append([]*Variable(nil), cg.RW.NoReadVars...)
 		noWrites = append([]*Variable(nil), cg.RW.NoWriteVars...)
 	} else {

@@ -113,9 +113,10 @@ func TestCombineVariableSets(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
 	}
-	// nil hole fails closed
-	if CombineVariableSets([]*Variable{a, nil}, []*Variable{b}) != nil {
-		t.Fatal("nil hole must fail closed")
+	// nil hole fails closed IncompleteVariables (not bare nil invent empty-complete)
+	bad := CombineVariableSets([]*Variable{a, nil}, []*Variable{b})
+	if VariablesComplete(bad) {
+		t.Fatal("nil hole must IncompleteVariables, not empty-complete")
 	}
 }
 

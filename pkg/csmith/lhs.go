@@ -117,8 +117,14 @@ func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 
 // GetReferencedPtrs mirrors Lhs::get_referenced_ptrs.
 // Lhs.cpp:234–238 — pointer vars only.
+// Incomplete Lhs/Var fails closed IncompleteVariables (not bare nil invent
+// empty-complete "no ptrs" via VariablesComplete(nil)/len==0).
+// Non-pointer live Var → complete empty nil.
 func (l *Lhs) GetReferencedPtrs() []*Variable {
-	if l == nil || l.Var == nil || !l.Var.IsPointer() {
+	if l == nil || l.Var == nil {
+		return IncompleteVariables()
+	}
+	if !l.Var.IsPointer() {
 		return nil
 	}
 	return []*Variable{l.Var}

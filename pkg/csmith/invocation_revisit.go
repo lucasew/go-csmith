@@ -301,8 +301,16 @@ func (f *Function) NeedsRevisit() bool {
 
 // IsPointerReferenced mirrors Function::is_pointer_referenced.
 // Function.h:110.
+// Incomplete ReferencedPtrs fails closed true (NeedsRevisit — no invent
+// "no pointers" via VariablesComplete(nil)/len==0 empty-complete).
 func (f *Function) IsPointerReferenced() bool {
-	return f != nil && len(f.ReferencedPtrs) > 0
+	if f == nil {
+		return false
+	}
+	if !VariablesComplete(f.ReferencedPtrs) {
+		return true
+	}
+	return len(f.ReferencedPtrs) > 0
 }
 
 // RevisitUserInvocation mirrors FunctionInvocationUser::revisit.
