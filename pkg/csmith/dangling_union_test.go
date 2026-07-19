@@ -96,13 +96,18 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	if len(f.DeadGlobals) != 0 {
 		t.Fatal("const")
 	}
-	// incomplete GlobalFacts must IncompleteVariables DeadGlobals
+	// incomplete GlobalFacts must IncompleteVariables DeadGlobals sticky
 	// (not invent empty-complete "no dangling")
+	ClearError()
 	fm.GlobalFacts = IncompleteFactSlice()
 	fm.FindDanglingGlobalPtrs(f)
 	if VariablesComplete(f.DeadGlobals) {
 		t.Fatal("incomplete facts must IncompleteVariables DeadGlobals")
 	}
+	if !HasError() {
+		t.Fatal("incomplete facts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputPtrResets(t *testing.T) {

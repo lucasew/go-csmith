@@ -315,6 +315,7 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	// StatementFor.cpp:456 — inputs = map_facts_in[&body]
 	// incomplete body in after fixed-point must fail closed (not invent keep prior)
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -344,9 +345,11 @@ func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
 	if VisitFactsStatementFor(st, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts/body path must fail closed")
 	}
+	ClearError()
 }
 
 func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
+	ClearError()
 	// StatementFor.cpp:456–458 — !must_return → map_facts_in[body], not merge post
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)

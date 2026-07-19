@@ -1265,10 +1265,13 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		return false, false
 	}
 	if !FactsComplete(*facts) {
+		// incomplete subject map wiped — sticky (no invent soft re-pick past wiped FM)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false, false
 	}
 	// incomplete abstract must not invent empty-apply success (len(nil)==0)
+	// leave prior complete *facts for factory soft re-pick (no sticky)
 	if !FactsComplete(newFacts) {
 		return false, false
 	}
@@ -1280,6 +1283,7 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	// or len(nil)==0 merge-as-empty success
 	if !VariablesComplete(lvars) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false, false
 	}
 	lvarCnt := len(lvars)
@@ -1294,6 +1298,7 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 			merged := MergeFactInto(*facts, newFacts[j])
 			if !FactsComplete(merged) {
 				*facts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return false, false
 			}
 			*facts = merged
@@ -1304,6 +1309,7 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		merged := MergeFactInto(*facts, f)
 		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false, false
 		}
 		*facts = merged
@@ -1328,6 +1334,10 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 		// incomplete newFacts alone leaves complete GlobalFacts for factory re-pick
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
+		}
+		// sticky already set when map wiped; ensure sticky if apply left HasError
+		if !HasError() && !FactsComplete(fm.GlobalFacts) {
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -1458,9 +1468,10 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	if facts == nil {
 		return
 	}
-	// Variable* always live; nil v hole fails closed (clear — no invent skip as absent)
+	// Variable* always live; nil v hole fails closed sticky (clear — no invent skip as absent)
 	if v == nil {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
@@ -1472,12 +1483,16 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		for _, f := range v.FieldVars {
 			if f == nil {
 				*facts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			AddNewVarFactInto(f, facts)
 			// incomplete hole marker is non-nil; FactsComplete false
 			if !FactsComplete(*facts) {
 				*facts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		}
@@ -1490,21 +1505,24 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	pt, _ := AbstractFactForVarInit(v)
-	// incomplete abstract must not invent skip (no fact to add)
+	// incomplete abstract must not invent skip (no fact to add) sticky
 	if !FactsComplete(pt) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
-	// Fact* always live from abstract; nil hole fails closed (*facts cleared)
+	// Fact* always live from abstract; nil hole fails closed (*facts cleared) sticky
 	for _, f := range pt {
 		if f == nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		cl := f.Clone()
 		if cl == nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {
@@ -1523,7 +1541,9 @@ func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	}
 	f.DeadGlobals = f.DeadGlobals[:0]
 	if !FactsComplete(fm.GlobalFacts) {
+		// incomplete map fails closed sticky (no invent empty DeadGlobals success)
 		f.DeadGlobals = IncompleteVariables()
+		SetError(ErrGeneric)
 		return
 	}
 	for _, fact := range fm.GlobalFacts {

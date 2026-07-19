@@ -72,6 +72,7 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// soft invent: MergeFactInto nil still return true with partial maps
 	// fair: incomplete newFacts fails closed ok=false without poisoning prior map
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -82,7 +83,8 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if !FactsComplete(facts) || FindRelatedPointTo(facts, p) == nil {
 		t.Fatal("incomplete newFacts must not wipe prior complete facts", facts)
 	}
-	// incomplete subject map — wipe to hole marker
+	// incomplete subject map — wipe sticky
+	ClearError()
 	facts = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
 		t.Fatal("nil subject map hole must fail closed ok=false")
@@ -90,6 +92,10 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete subject must clear", facts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete subject wipe must SetError sticky")
+	}
+	ClearError()
 	// empty newFacts is ok no-op (not incomplete)
 	facts = []*FactPointTo{MakeFactPointTo(p, a)}
 	ch, ok := applyPointToAssignFacts(&facts, p, 0, nil)
@@ -105,6 +111,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("IncompleteFactSlice newFacts must not wipe prior", facts)
 	}
 	// incomplete lhs pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
+	ClearError()
 	facts = []*FactPointTo{MakeFactPointTo(p, a)}
 	if VariablesComplete(lhsAssignPointees(facts, nil, 0)) {
 		t.Fatal("nil lhs must IncompleteVariables")
@@ -115,17 +122,22 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete lhs assign must wipe subject facts")
 	}
+	if !HasError() {
+		t.Fatal("incomplete lhs wipe must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
-	// incomplete point-to apply must not invent union merge success
+	// incomplete point-to apply must not invent union merge success sticky
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	fm := NewFactMgr(nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	fm.UnionFacts = []*FactUnion{}
 	rhs := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
-	// assign through incomplete GlobalFacts — apply fails closed
+	// assign through incomplete GlobalFacts — apply fails closed sticky
 	if fm.UpdateFactForAssign(p, 0, rhs) {
 		t.Fatal("incomplete GlobalFacts assign must fail closed false")
 	}
@@ -135,10 +147,15 @@ func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	if UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("must not invent keep UnionFacts after point-to fail", fm.UnionFacts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts assign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateFactForAssignRenewsDefinitive(t *testing.T) {
 	// FactMgr.cpp:376–380 — lvar_cnt==1 non-array → renew (replace, not join)
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)

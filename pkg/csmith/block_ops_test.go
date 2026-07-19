@@ -471,11 +471,18 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
 	}
-	// nil Variable* subject fails closed (no invent skip as absent)
+	if !HasError() {
+		t.Fatal("nil FieldVars hole must SetError sticky")
+	}
+	ClearError()
+	// nil Variable* subject fails closed sticky (no invent skip as absent)
 	facts2 := []*FactPointTo{prior}
 	AddNewVarFactInto(nil, &facts2)
 	if FactsComplete(facts2) {
 		t.Fatal("nil v must fail closed clear facts", facts2)
+	}
+	if !HasError() {
+		t.Fatal("nil v must SetError sticky")
 	}
 	ClearError()
 }
