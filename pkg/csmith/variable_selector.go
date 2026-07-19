@@ -353,8 +353,9 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		if DepthGuardByDepth(ProcessOptions(), 1) == BadDepth {
 			return nil
 		}
-		// VariableSelector.cpp:326–329 — rnd_upto(len); no soft invent vars[0] without RNG
+		// VariableSelector.cpp:326–329 — rnd_upto(len); sticky no invent vars[0] without RNG
 		if r == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		idx := r.RndUpto(uint32(n))
@@ -365,9 +366,10 @@ func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 		v = vars[idx]
 	}
 	// if collective array, return itemized member (VariableSelector.cpp:332–337)
-	// C++ always itemize(); no soft return collective on itemize fail
+	// C++ always itemize(); sticky no soft return collective on itemize fail / missing RNG
 	if v != nil && v.IsArray && v.AsArray != nil && v.AsArray.Collective == nil {
 		if r == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		item := v.AsArray.Itemize(r)

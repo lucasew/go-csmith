@@ -123,15 +123,17 @@ func BinaryOpsFilter(opts Options) Filter {
 // PickBinaryOp mirrors rnd_upto(MAX_BINARY_OP, BINARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:179–183 — filter from Probabilities pBinaryOpsProb.
 func PickBinaryOp(r *Rng, opts Options) BinaryOp {
-	// FunctionInvocation.cpp:179–183 — always rnd_upto; no soft invent eAdd
+	// FunctionInvocation.cpp:179–183 — always rnd_upto; sticky no invent eAdd without draw
 	if r == nil {
+		SetError(ErrGeneric)
 		return BinaryOp(MaxBinaryOp)
 	}
 	// BINARY_OPS_PROB_FILTER uses process Probabilities group (no invent opts-only
 	// filter when session singleton is live).
 	probs := ProcessProbabilities()
 	if probs == nil {
-		// library path without NewProgramGenerator — fail closed MAX
+		// library path without NewProgramGenerator — fail closed MAX (non-sticky:
+		// sticky poisons unit paths that omit process Probabilities singleton)
 		_ = opts
 		return BinaryOp(MaxBinaryOp)
 	}
@@ -209,13 +211,15 @@ func UnaryOpsFilter(opts Options) Filter {
 // PickUnaryOp mirrors rnd_upto(MAX_UNARY_OP, UNARY_OPS_PROB_FILTER()).
 // FunctionInvocation.cpp:146–148 — filter from Probabilities pUnaryOpsProb.
 func PickUnaryOp(r *Rng, opts Options) UnaryOp {
-	// FunctionInvocation.cpp:146–148 — always rnd_upto; no soft invent eMinus
+	// FunctionInvocation.cpp:146–148 — always rnd_upto; sticky no invent eMinus without draw
 	if r == nil {
+		SetError(ErrGeneric)
 		return UnaryOp(MaxUnaryOp)
 	}
 	probs := ProcessProbabilities()
 	if probs == nil {
-		// library path without session probs — fail closed MAX
+		// library path without session probs — fail closed MAX (non-sticky soft
+		// re-pick for unit paths without process Probabilities)
 		_ = opts
 		return UnaryOp(MaxUnaryOp)
 	}

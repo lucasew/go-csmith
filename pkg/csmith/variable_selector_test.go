@@ -9,10 +9,24 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	if av == nil {
 		t.Fatal("create")
 	}
-	// r nil with multi-cand would fail earlier; single collective with nil r → fail closed
+	// single collective with nil r → sticky fail closed (itemize needs RNG)
 	if ChooseOKVar(nil, []*Variable{&av.Variable}) != nil {
 		t.Fatal("itemize needs RNG; no soft return collective")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG itemize ChooseOKVar must SetError sticky")
+	}
+	ClearError()
+	// multi-cand without RNG sticky — no invent vars[0]
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	if ChooseOKVar(nil, []*Variable{a, b}) != nil {
+		t.Fatal("nil RNG multi ChooseOKVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG multi ChooseOKVar must SetError sticky")
+	}
+	ClearError()
 	got := ChooseOKVar(NewRng(3), []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
 		t.Fatalf("want itemized member, got %+v", got)

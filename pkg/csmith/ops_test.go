@@ -42,6 +42,7 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 
 func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 	// no soft invent BinaryOpsFilter(opts) when process Probabilities unset
+	// non-sticky MAX (sticky poisons unit paths without process singleton)
 	prev := ProcessProbabilities()
 	SetProcessProbabilities(nil)
 	defer SetProcessProbabilities(prev)
@@ -49,6 +50,25 @@ func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 	if int(op) != MaxBinaryOp {
 		t.Fatalf("want MAX without process probs, got %v", op)
 	}
+}
+
+func TestPickBinaryUnaryOpNilRNGSticky(t *testing.T) {
+	// always rnd_upto; sticky no invent eAdd/eMinus without RNG
+	ClearError()
+	if int(PickBinaryOp(nil, Defaults())) != MaxBinaryOp {
+		t.Fatal("nil RNG PickBinaryOp must fail closed MAX")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG PickBinaryOp must SetError sticky")
+	}
+	ClearError()
+	if int(PickUnaryOp(nil, Defaults())) != MaxUnaryOp {
+		t.Fatal("nil RNG PickUnaryOp must fail closed MAX")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG PickUnaryOp must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBinaryOpCTokens(t *testing.T) {

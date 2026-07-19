@@ -140,7 +140,9 @@ func MakeDummyBlock(f *Function) *Block {
 // Fail wipes Param to IncompleteVariables sticky (not bare nil invent empty-complete
 // void-param list after partial append / soft re-pick past VariablesComplete(nil)).
 func GenerateParameterListFromString(f *Function, params string) bool {
+	// Function always live; sticky no invent param list without it
 	if f == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	vs := SplitString(params, ',')
