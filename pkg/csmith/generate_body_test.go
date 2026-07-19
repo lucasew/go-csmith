@@ -112,6 +112,32 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 		t.Fatal("Param nil hole must SetError")
 	}
 	ClearError()
+	// Type-nil param soft invent: IsPointer residual ERROR+false skip TBD seed
+	// then soft-continue later params / partial makeup. Fair: sticky abort first.
+	fTy := &Function{
+		Name:       "func_ty",
+		ReturnType: GetIntType(),
+		Param: []*Variable{
+			{Name: "p_typeless"}, // Type nil non-special
+			CreateVariableScalars("p_ok", PointerTo(GetIntType()), false, false),
+		},
+	}
+	fmTy := fTy.ensurePairedFactMgr()
+	fTy.GenerateBody(NewRng(5), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(fmTy))
+	if fTy.BuildState == BuildBuilt || fTy.IsBuilt {
+		t.Fatal("Type-nil param must not invent Built")
+	}
+	if fTy.BuildState == BuildBuilding {
+		t.Fatal("Type-nil param must not leave stuck Building")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil param GenerateBody must SetError sticky")
+	}
+	// no invent partial TBD seed for later pointer param past Type-nil shell
+	if FindRelatedPointTo(fmTy.GlobalFacts, fTy.Param[1]) != nil {
+		t.Fatal("Type-nil param must not soft-seed later pointer TBD past hole")
+	}
+	ClearError()
 	// incomplete GlobalFacts at mark_func_end when Blocks non-empty
 	f2 := &Function{Name: "func_v", ReturnType: GetIntType(), IsBuiltin: true}
 	fm2 := f2.ensurePairedFactMgr()

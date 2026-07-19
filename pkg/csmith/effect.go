@@ -378,6 +378,8 @@ func (e Effect) ReadVar(v *Variable) Effect {
 // IsWritten mirrors Effect::is_written — exact or parent field_var_of.
 // Effect.cpp:333–345.
 // Incomplete effect sticky true (no invent not-written / conflict-free past holes).
+// Type-nil parent sticky written true (restrictive — no invent not-written /
+// conflict-free soft-skip past incomplete parent type shell; mirrors IsRead).
 func (e Effect) IsWritten(v *Variable) bool {
 	// Variable always live; sticky incomplete no invent not-written soft-skip
 	if v == nil {
@@ -393,7 +395,13 @@ func (e Effect) IsWritten(v *Variable) bool {
 		return true
 	}
 	// if we write a struct/union, all fields are written too
+	// Type-nil parent sticky written true (restrictive — no invent not-written
+	// / conflict-free soft-skip past incomplete parent type shell)
 	if v.FieldVarOf != nil {
+		if v.FieldVarOf.Type == nil {
+			SetError(ErrGeneric)
+			return true
+		}
 		return e.IsWritten(v.FieldVarOf)
 	}
 	return false

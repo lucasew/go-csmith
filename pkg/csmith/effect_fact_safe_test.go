@@ -82,6 +82,14 @@ func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
 		t.Fatal("Type-nil parent IsRead must SetError sticky")
 	}
 	ClearError()
+	// Type-nil parent sticky written true (mirrors IsRead; no invent not-written)
+	if !e.IsWritten(field) {
+		t.Fatal("Type-nil parent IsWritten must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsWritten must SetError sticky")
+	}
+	ClearError()
 	// complete non-field not-read
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	if e.IsRead(v) {
@@ -89,6 +97,13 @@ func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
 	}
 	if HasError() {
 		t.Fatal("complete not-read must not sticky")
+	}
+	ClearError()
+	if e.IsWritten(v) {
+		t.Fatal("unrelated var must be not-written complete")
+	}
+	if HasError() {
+		t.Fatal("complete not-written must not sticky")
 	}
 	ClearError()
 }

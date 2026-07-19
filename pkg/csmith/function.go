@@ -585,10 +585,19 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:637–641 — pointer params → tbd (GenerateBody; known-params already handed over)
-	// Variable* always live on Param; nil hole fails closed (abort generate)
+	// Variable* always live on Param; nil hole fails closed (abort generate).
+	// Type* always live for non-special params; Type-nil sticky abort (IsPointer
+	// residual ERROR+false soft-skips seed then continues later params / invents
+	// partial TBD makeup past Type-nil shell before ERROR_RETURN).
 	if !knownParams {
 		for _, p := range f.Param {
 			if p == nil {
+				SetError(ErrGeneric)
+				f.BuildState = BuildUnbuilt
+				f.IsBuilt = false
+				return
+			}
+			if p.Type == nil && !IsSpecialPtr(p) {
 				SetError(ErrGeneric)
 				f.BuildState = BuildUnbuilt
 				f.IsBuilt = false
