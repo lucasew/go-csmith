@@ -34,9 +34,13 @@ func (g *GenSym) Reset() {
 // Next mirrors gensym(basename): basename + (++count).
 // util.cpp: ss << basename; ss << ++gensym_count;
 // Nil receiver uses package defaultGenSym (not a one-shot local counter).
+// empty basename is broken IR — no invent bare "1"/"2" numeric names
 func (g *GenSym) Next(basename string) string {
 	if g == nil {
 		return Gensym(basename)
+	}
+	if basename == "" {
+		return ""
 	}
 	g.count++
 	return fmt.Sprintf("%s%d", basename, g.count)

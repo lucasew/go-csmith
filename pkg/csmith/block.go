@@ -216,10 +216,15 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 // sym is ignored; kept for call-site compatibility.
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	_ = sym
+	// Block.cpp:216–219 — this always live; gensym + macro_tmp_vars insert together
+	// no invent bare t_N without block registration (would emit undeclared use)
+	if b == nil {
+		return ""
+	}
 	// Block.cpp:217 — const string var_name = gensym("t_");
 	name := Gensym("t_")
-	if b == nil {
-		return name
+	if name == "" {
+		return ""
 	}
 	if b.TmpVars == nil {
 		b.TmpVars = make(map[string]ESimpleType)

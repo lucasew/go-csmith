@@ -123,12 +123,19 @@ func BookkeeperDoFinalization() {
 }
 
 func formattedOutput(b *strings.Builder, msg string, num int) {
+	// Bookkeeper.cpp always has live message string; no invent "XXX %d" shell
+	if b == nil || msg == "" {
+		return
+	}
 	b.WriteString("XXX ")
 	b.WriteString(msg)
 	b.WriteString(fmt.Sprintf("%d\n", num))
 }
 
 func formattedOutputf(b *strings.Builder, msg string, num float64) {
+	if b == nil || msg == "" {
+		return
+	}
 	b.WriteString("XXX ")
 	b.WriteString(msg)
 	// Bookkeeper uses default precision; ~3 digits like upstream out.precision(3)

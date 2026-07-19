@@ -354,6 +354,11 @@ func TestFindJumpLabel(t *testing.T) {
 	if got := FindJumpLabel(fm, 99); got != "lbl_reg" {
 		t.Fatal(got)
 	}
+	// empty registry entry — no invent empty label token
+	stmLabels[100] = ""
+	if got := FindJumpLabel(fm, 100); got != "" {
+		t.Fatal("empty registry label must fail closed", got)
+	}
 }
 
 func TestFindStmtByID(t *testing.T) {
