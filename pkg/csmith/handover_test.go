@@ -78,6 +78,27 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 		t.Fatal("nil fact hole must SetError sticky")
 	}
 	ClearError()
+	// FactMgr + Func + inputs always live; sticky no invent soft-skip handover past hole
+	(*FactMgr)(nil).CallerToCalleeHandover(nil, &facts)
+	if !HasError() {
+		t.Fatal("nil FM CallerToCalleeHandover must SetError sticky")
+	}
+	ClearError()
+	fm.CallerToCalleeHandover(nil, nil)
+	if !HasError() {
+		t.Fatal("nil inputs CallerToCalleeHandover must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).RemoveRVFacts(&facts)
+	if !HasError() {
+		t.Fatal("nil FM RemoveRVFacts must SetError sticky")
+	}
+	ClearError()
+	fm.RemoveRVFacts(nil)
+	if !HasError() {
+		t.Fatal("nil facts RemoveRVFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {

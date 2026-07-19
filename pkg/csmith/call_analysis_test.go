@@ -272,6 +272,18 @@ func TestCombineBranchFacts(t *testing.T) {
 	// MustReturn needs return as last
 	_ = thenB
 	_ = elseB
+	// Statement + FactMgr always live; sticky no invent soft-skip combine past hole
+	ClearError()
+	CombineBranchFacts(nil, pre, fm)
+	if !HasError() {
+		t.Fatal("nil Stmt CombineBranchFacts must SetError sticky")
+	}
+	ClearError()
+	CombineBranchFacts(st, pre, nil)
+	if !HasError() {
+		t.Fatal("nil FM CombineBranchFacts must SetError sticky")
+	}
+	ClearError()
 	CombineBranchFacts(st, pre, fm)
 	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
 		// both must return → pre facts

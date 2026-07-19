@@ -176,8 +176,10 @@ func (q CVQualifiers) Match(other CVQualifiers, matchExact bool) bool {
 
 // AddQualifiers mirrors CVQualifiers::add_qualifiers — push one level.
 // CVQualifiers.cpp:460–463.
+// CVQualifiers always live; sticky (no invent soft-skip add past hole).
 func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 	if q == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	q.IsConsts = append(q.IsConsts, isConst)
@@ -186,8 +188,14 @@ func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 
 // RemoveQualifiers mirrors CVQualifiers::remove_qualifiers — pop_back len times.
 // CVQualifiers.cpp:497–502.
+// CVQualifiers always live; sticky (no invent soft-skip remove past hole).
+// length<=0 is complete no-op.
 func (q *CVQualifiers) RemoveQualifiers(length int) {
-	if q == nil || length <= 0 {
+	if q == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if length <= 0 {
 		return
 	}
 	for i := 0; i < length; i++ {
@@ -607,8 +615,10 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 // SetConst mirrors CVQualifiers::set_const.
 // CVQualifiers.cpp:588–593 — is_consts[len - pos - 1] = is_const; pos default 0
 // is storage (last). No soft invent grow when empty or pos OOB.
+// CVQualifiers always live; sticky (no invent soft-skip set past hole).
 func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 	if q == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	n := len(q.IsConsts)
@@ -627,8 +637,10 @@ func (q *CVQualifiers) SetConst(isConst bool, pos int) {
 
 // SetVolatile mirrors CVQualifiers::set_volatile.
 // CVQualifiers.cpp:595–600 — is_volatiles[len - pos - 1]; no invent grow.
+// CVQualifiers always live; sticky (no invent soft-skip set past hole).
 func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
 	if q == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	n := len(q.IsVolatiles)
@@ -648,8 +660,14 @@ func (q *CVQualifiers) SetVolatile(isVol bool, pos int) {
 // Restrict mirrors CVQualifiers::restrict.
 // CVQualifiers.cpp:602–609 — WRITE → set_const(false); non-SE-free → set_volatile(false).
 // Only storage slot (pos=0 → last); no dual-clear invent of first+last.
+// CVQualifiers always live; sticky (no invent soft-skip restrict past hole).
+// Wildcard is complete no-op (not incomplete IR).
 func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
-	if q == nil || q.Wildcard {
+	if q == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if q.Wildcard {
 		return
 	}
 	// incomplete ambient fails closed sticky (no invent clear-vol via IncompleteEffect SE-false)

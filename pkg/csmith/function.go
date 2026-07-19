@@ -106,8 +106,10 @@ func (f *Function) IsEffectKnown() bool {
 }
 
 // markBuilt sets Built state and IsBuilt flag.
+// Function always live; sticky (no invent soft-skip Built past hole).
 func (f *Function) markBuilt() {
 	if f == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	f.BuildState = BuildBuilt
@@ -728,8 +730,14 @@ func (f *Function) generateBodyCore(
 // MakeReturnConst mirrors Function::make_return_const.
 // Function.cpp:608–615 — depth_protect + need_return_stmt → random constant.
 // probs is session Probabilities (C++ singleton); no invent NewProbabilities(opts).
+// Function always live; sticky (no invent soft-skip ret_c past hole).
+// DepthProtect off / no return needed is complete no-op.
 func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
-	if f == nil || !opts.DepthProtect || !f.NeedReturnStmt() {
+	if f == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if !opts.DepthProtect || !f.NeedReturnStmt() {
 		return
 	}
 	// Function.cpp:610–612 — assert(return_type); assert simple != eVoid

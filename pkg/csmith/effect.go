@@ -750,8 +750,10 @@ func (e Effect) HasGlobalEffect() bool {
 
 // UpdatePurity mirrors Effect::update_purity.
 // Effect.cpp:535–538 — pure cleared when has_global_effect.
+// Effect always live; sticky (no invent soft-skip purity update past hole).
 func (e *Effect) UpdatePurity() {
 	if e == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if e.HasGlobalEffect() {

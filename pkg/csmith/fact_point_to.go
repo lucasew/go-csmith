@@ -1098,8 +1098,10 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 // FactMgr.cpp:196–204.
 // Fact* always live; incomplete facts or stack lists fail closed (nil facts —
 // no invent partial mark / leave stack pointees live past Param/LocalVars holes).
+// facts slice always live; sticky (no invent soft-skip mark past hole).
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	if facts == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete maps/stack fail closed sticky (no invent keep facts past holes)
@@ -1236,8 +1238,10 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 // UpdateFactsWithModifiedIndex mirrors FactPointTo::update_facts_with_modified_index.
 // FactPointTo.cpp:751–761 — rewrite each point-to fact when indexVar is modified.
 // Fact* always live; nil hole or failed rewrite fails closed sticky (facts incomplete).
+// facts + indexVar always live; sticky (no invent soft-skip update past hole).
 func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 	if facts == nil || indexVar == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !FactsComplete(*facts) {

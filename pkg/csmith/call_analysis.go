@@ -457,8 +457,14 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 // StatementIf.cpp:208–236 — merge then/else outs with must_return precision.
 // Fact maps always complete; nil holes fail closed (GlobalFacts nil, no invent
 // partial then/else join).
+// Statement + FactMgr always live; sticky (no invent soft-skip combine past hole).
+// Non-if Kind is complete no-op.
 func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
-	if st == nil || fm == nil || st.Kind != StmtIfElse {
+	if st == nil || fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if st.Kind != StmtIfElse {
 		return
 	}
 	// StatementIf always has live if_true / if_false blocks after make_random

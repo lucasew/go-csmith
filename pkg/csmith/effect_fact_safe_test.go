@@ -37,6 +37,13 @@ func TestEffectUpdatePurity(t *testing.T) {
 	if e.IsPure() {
 		t.Fatal("not pure after global")
 	}
+	// Effect always live; sticky no invent soft-skip purity update past hole
+	ClearError()
+	(*Effect)(nil).UpdatePurity()
+	if !HasError() {
+		t.Fatal("nil UpdatePurity must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectConsolidate(t *testing.T) {

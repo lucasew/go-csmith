@@ -15,6 +15,33 @@ func TestAddRemoveQualifiers(t *testing.T) {
 	if len(q.IsConsts) != 1 || !q.IsConsts[0] {
 		t.Fatal(q)
 	}
+	// CVQualifiers always live; sticky no invent soft-skip mutators past hole
+	ClearError()
+	(*CVQualifiers)(nil).AddQualifiers(false, false)
+	if !HasError() {
+		t.Fatal("nil AddQualifiers must SetError sticky")
+	}
+	ClearError()
+	(*CVQualifiers)(nil).RemoveQualifiers(1)
+	if !HasError() {
+		t.Fatal("nil RemoveQualifiers must SetError sticky")
+	}
+	ClearError()
+	(*CVQualifiers)(nil).SetConst(true, 0)
+	if !HasError() {
+		t.Fatal("nil SetConst must SetError sticky")
+	}
+	ClearError()
+	(*CVQualifiers)(nil).SetVolatile(true, 0)
+	if !HasError() {
+		t.Fatal("nil SetVolatile must SetError sticky")
+	}
+	ClearError()
+	(*CVQualifiers)(nil).Restrict(AccessWrite, EmptyCGContext())
+	if !HasError() {
+		t.Fatal("nil Restrict must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {

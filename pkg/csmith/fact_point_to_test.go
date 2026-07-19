@@ -450,6 +450,17 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 		t.Fatal("incomplete UpdateFactsWithModifiedIndex must SetError sticky")
 	}
 	ClearError()
+	// facts + indexVar always live; sticky no invent soft-skip update past hole
+	UpdateFactsWithModifiedIndex(nil, idx)
+	if !HasError() {
+		t.Fatal("nil facts UpdateFactsWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
+	UpdateFactsWithModifiedIndex(&facts, nil)
+	if !HasError() {
+		t.Fatal("nil indexVar UpdateFactsWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
 	// offset form "(i + 2)"
 	item2 := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},

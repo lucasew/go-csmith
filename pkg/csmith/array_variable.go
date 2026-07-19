@@ -582,8 +582,10 @@ func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 }
 
 // AddIndex mirrors ArrayVariable::add_index (string helper).
+// ArrayVariable always live; sticky (no invent soft-skip add past hole).
 func (av *ArrayVariable) AddIndex(expr string) {
 	if av == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if expr == "" {
@@ -599,8 +601,10 @@ func (av *ArrayVariable) AddIndex(expr string) {
 
 // AddIndexExpr appends an index Expression (ArrayVariable::add_index).
 // ArrayVariable.cpp:227 — indices.push_back(e); sticky no soft invent "0".
+// ArrayVariable always live; sticky (no invent soft-skip add past hole).
 func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 	if av == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if e == nil {

@@ -243,6 +243,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 // Statement::stm_id always live; StmID 0 is incomplete (no invent soft no-op success
 // that leaves map_stm_effect unset while callers treat effect as recorded).
 // Incomplete pre/block effects store IncompleteEffect (AddEffect already fails closed).
+// Nil FM / StmID≤0 is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext, preStm Effect) {
 	if st == nil || cg == nil || cg.FM == nil || st.StmID <= 0 {
 		return
@@ -267,6 +268,7 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 // Statement.cpp:844–900 — combine branches / makeup; effect; assign/return facts;
 // func_1 uncertain-call revalidate; set in/out/visited.
 // opts is the session Options (CGOptions); no soft invent Defaults().
+// Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext, opts Options) {
 	if st == nil || cg == nil || cg.FM == nil {
 		return

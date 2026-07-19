@@ -467,6 +467,17 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatal("empty AddIndex must SetError sticky")
 	}
 	ClearError()
+	// ArrayVariable always live; sticky no invent soft-skip add past hole
+	(*ArrayVariable)(nil).AddIndex("i")
+	if !HasError() {
+		t.Fatal("nil av AddIndex must SetError sticky")
+	}
+	ClearError()
+	(*ArrayVariable)(nil).AddIndexExpr(&Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
+	if !HasError() {
+		t.Fatal("nil av AddIndexExpr must SetError sticky")
+	}
+	ClearError()
 	av.SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
 	if len(av.Indices) != 1 || av.Indices[0] != "3" {
 		t.Fatal(av.Indices)

@@ -55,6 +55,12 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 		t.Fatal("MarkFuncEndOnFacts incomplete stack must SetError sticky")
 	}
 	ClearError()
+	// facts slice always live; sticky no invent soft-skip mark past hole
+	MarkFuncEndOnFacts(nil, f, blk)
+	if !HasError() {
+		t.Fatal("nil facts MarkFuncEndOnFacts must SetError sticky")
+	}
+	ClearError()
 	facts2 := []*FactPointTo{MakeFactPointTo(p, loc)}
 	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
 	if FactsComplete(out) {

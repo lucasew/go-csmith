@@ -1920,9 +1920,10 @@ func (f *FactPointTo) PointsTo(v *Variable) bool {
 // Fact* always live; nil hole fails closed (inputs nil, no invent clean partition).
 // Incomplete Param list fails closed (nil inputs — no invent drop param facts
 // because IsVariableInSet returned false past a Param hole).
+// FactMgr + Func + inputs always live; sticky (no invent soft-skip handover past hole).
 func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
-	// FactMgr always bound to a Function; nil Func is broken IR (no invent param partition)
 	if fm == nil || inputs == nil || fm.Func == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete inputs fail closed sticky before partition (no invent drop via hole skip)
@@ -1978,8 +1979,10 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 // RemoveRVFacts mirrors FactMgr::remove_rv_facts.
 // FactMgr.cpp:358–368 — drop other functions' return variables.
 // Fact* always live; nil hole fails closed (facts nil, no invent clean filter).
+// FactMgr + facts always live; sticky (no invent soft-skip filter past hole).
 func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 	if fm == nil || facts == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !FactsComplete(*facts) {
