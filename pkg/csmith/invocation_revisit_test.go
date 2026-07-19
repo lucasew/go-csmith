@@ -145,6 +145,30 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	}
 }
 
+func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
+	// multi-order merge: incomplete cur after second order fails closed
+	// plant via incomplete GlobalFacts mid-visit is hard; exercise MergeFacts path
+	// with two orders of constants — success baseline
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	b := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	// n==2 forces two permute orders
+	fi := &Invocation{
+		User: &Function{Name: "f", ReturnType: GetIntType(), IsBuilt: true},
+		Args: []*Expression{a, b},
+	}
+	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	if !fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
+		t.Fatal("complete two-arg should succeed")
+	}
+	if !FactsComplete(facts) {
+		t.Fatal("post-merge facts must stay complete")
+	}
+}
+
 func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	// FunctionInvocation.cpp:462 — assert(orders.size() > 0)
 	fm := NewFactMgr(nil)

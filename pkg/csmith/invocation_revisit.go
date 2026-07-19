@@ -112,12 +112,13 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 
 // RenewFacts mirrors renew_facts.
 // Fact.cpp:203–210.
-// Fact* always live; nil hole in newFacts fails closed (false, no invent partial renew).
+// Incomplete maps fail closed (*facts nil, false — no invent partial renew).
 func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		*facts = nil
 		return false
 	}
 	changed := false
@@ -267,8 +268,15 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			if !FactsComplete(merged) || !FactsComplete(cur) {
 				return false
 			}
-			MergeFacts(&merged, cur)
+			// MergeFacts clears *facts on incomplete mid-join — fail closed visit
+			_ = MergeFacts(&merged, cur)
+			if !FactsComplete(merged) {
+				return false
+			}
 		}
+	}
+	if !FactsComplete(merged) {
+		return false
 	}
 	*facts = merged
 	if cg.FM != nil {
@@ -380,7 +388,16 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	fi.SaveReturnFacts(retFacts)
-	MergeFacts(facts, retFacts)
+	_ = MergeFacts(facts, retFacts)
+	if !FactsComplete(*facts) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
 	// drop param locals OOS
 	UpdateFactsForOOSVars(f.Param, facts)
 	if !FactsComplete(*facts) {
