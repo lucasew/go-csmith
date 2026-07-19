@@ -32,8 +32,9 @@ func MakeRandomContinue(
 		return Stmt{}
 	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
-	// StatementContinue.cpp:71 — assert(b); no soft invent continue without looping block
+	// StatementContinue.cpp:71 — assert(b) sticky; no soft invent continue without looping block
 	if loop == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementContinue.cpp:72 — clear effect_stm before condition

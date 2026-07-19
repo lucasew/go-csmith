@@ -5,8 +5,12 @@ package csmith
 // MakeRandomIterCtrl mirrors StatementArrayOp::make_random_iter_ctrl.
 // StatementArrayOp.cpp:64–70 — pure_rnd flip for init 0 or upto(size); incr 1 or upto(size)+1.
 func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
-	// StatementArrayOp.cpp:64–70 — pure_rnd_upto(size); no soft invent incr=1 without RNG/size
-	if r == nil || size < 1 {
+	// StatementArrayOp.cpp:64–70 — pure_rnd_upto(size); sticky no invent incr=1 without RNG
+	if r == nil {
+		SetError(ErrGeneric)
+		return 0, 0
+	}
+	if size < 1 {
 		return 0, 0
 	}
 	if r.RndFlipcoin(50) {
@@ -334,13 +338,16 @@ func MakeRandomArrayInit(
 			return Stmt{}
 		}
 		invalid[iv] = true
-		// StatementArrayOp.cpp:129–131 — read_indices + write_var; assert(read)
+		// StatementArrayOp.cpp:129–131 — read_indices + write_var; assert(read) sticky
 		// no soft invent success when ReadIndices fails
 		if !cg.ReadIndices(iv, facts) {
 			for _, d := range dims {
 				if d != nil && d.IV != nil {
 					cg.RemoveIVBound(d.IV)
 				}
+			}
+			if !HasError() {
+				SetError(ErrGeneric)
 			}
 			return Stmt{}
 		}

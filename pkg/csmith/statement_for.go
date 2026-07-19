@@ -34,8 +34,9 @@ type LoopControl struct {
 // Sticky ERROR_RETURN leaves partial values; callers must check HasError.
 func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
 	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
-	// C++ always has RNG; no invent fixed init/limit/incr when r nil
+	// C++ always has RNG; sticky no invent fixed init/limit/incr when r nil
 	if r == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if r.RndFlipcoin(50) {
@@ -120,7 +121,12 @@ func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, in
 // returns adjusted IV bound (out-param `bound` in C++).
 func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp, outBound int) {
 	// StatementFor.cpp:128+ — pure_rnd_*; bound is unsigned in C++ (0 allowed after --size)
-	if r == nil || bound < 0 {
+	// sticky no invent fixed array-loop control when RNG missing
+	if r == nil {
+		SetError(ErrGeneric)
+		return 0, 0, 0, 0, 0, 0
+	}
+	if bound < 0 {
 		return 0, 0, 0, 0, 0, 0
 	}
 	// StatementFor.cpp:133 — pure_rnd_flipcoin(array_oob_prob) (random mode == rnd)
@@ -382,9 +388,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		SafeFlags: flags1,
 		StmID:     AllocStmID(),
 	}
-	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited)
+	// init->visit_facts (StatementFor.cpp:244–245) — assert(visited) sticky
 	if !VisitFactsStatementAssign(initSt, cg, opts) {
-		// C++ assert(visited); treat as make_iteration failure
+		// C++ assert(visited); sticky make_iteration failure (no invent soft re-pick past fail)
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 

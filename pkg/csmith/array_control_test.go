@@ -42,6 +42,16 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	if OOBCount() != 1 {
 		t.Fatalf("still 1 after no-oob %d", OOBCount())
 	}
+	// nil RNG sticky — no invent fixed array-loop control
+	ClearError()
+	init, limit, incr, testOp, incrOp, outBound := MakeRandomArrayControl(nil, 8, false, 0)
+	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 || outBound != 0 {
+		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v %d", init, limit, incr, testOp, incrOp, outBound)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomArrayControl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeIterationUsesMustUseArrays(t *testing.T) {

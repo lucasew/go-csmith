@@ -80,9 +80,12 @@ func MakeRandomIf(
 		}
 		cg.FM.GlobalFacts = CloneFactSlice(func1PreFacts)
 		if !VisitFactsExpression(test, cg, opts) {
-			// StatementIf.cpp:84–88 — assert(ok); treat as make_random failure
+			// StatementIf.cpp:84–88 — assert(ok) sticky; no invent soft re-pick past visit fail
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = func1PreEffect.Clone()
+			}
+			if !HasError() {
+				SetError(ErrGeneric)
 			}
 			return nil
 		}

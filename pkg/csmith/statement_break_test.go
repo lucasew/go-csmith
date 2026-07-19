@@ -259,6 +259,7 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	// empty block → nullptr (empty Stmt; no Kind shell invent)
+	// first-stmt reject is non-sticky soft re-pick (StatementContinue.cpp:63–66)
 	blk := &Block{}
 	st := MakeRandomContinue(NewRng(3), opts, vs, tables, func() *CGContext { c := EmptyCGContext(); return &c }(), blk)
 	if st.Kind != 0 || st.Expr != nil {
@@ -267,6 +268,30 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK must reject first-stmt continue")
 	}
+	if HasError() {
+		t.Fatal("first-stmt continue must stay non-sticky soft re-pick")
+	}
+}
+
+func TestMakeRandomContinueRequiresLoop(t *testing.T) {
+	// StatementContinue.cpp:71 assert(b) sticky — no soft invent without looping parent
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// prior stmt so first-stmt gate passes; non-looping parent only
+	blk := &Block{Func: f, Looping: false, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	cg.Flags |= FlagInLoop
+	st := MakeRandomContinue(NewRng(1), opts, vs, NewExprTables(opts), &cg, blk)
+	if st.Expr != nil || stmtOK(st) {
+		t.Fatalf("no looping parent must fail closed, got %+v", st)
+	}
+	if !HasError() {
+		t.Fatal("no looping parent continue must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomContinueWithPrior(t *testing.T) {

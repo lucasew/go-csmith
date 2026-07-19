@@ -131,6 +131,16 @@ func TestMakeRandomIterCtrl(t *testing.T) {
 			t.Fatalf("init %d", init)
 		}
 	}
+	// nil RNG sticky — no invent incr=1 shell
+	ClearError()
+	init, incr = MakeRandomIterCtrl(nil, 10)
+	if init != 0 || incr != 0 {
+		t.Fatalf("nil RNG must fail closed zeros, got %d %d", init, incr)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomIterCtrl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
