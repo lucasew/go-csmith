@@ -338,6 +338,8 @@ func FindExprKeyVar(e *Expression) *Variable {
 // IsVariant mirrors ArrayVariable::is_variant.
 // ArrayVariable.cpp:394–412 — same collective; each dim has exactly one key var
 // and those key vars match across the two itemized members.
+// Incomplete IndexExprs fails closed false (no invent soft-skip nil hole then
+// string Indices match as complete variant; no invent mixed expr/string dual path).
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av == nil || other == nil || !other.IsArray {
 		return false
@@ -353,45 +355,35 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av.Collective != ov.Collective {
 		return false
 	}
-	// prefer IndexExprs (Expression*); fall back to Indices arity
-	n := len(av.IndexExprs)
-	if n == 0 {
-		n = len(av.Indices)
-	}
-	on := len(ov.IndexExprs)
-	if on == 0 {
-		on = len(ov.Indices)
-	}
-	if n == 0 || n != on {
+	// incomplete IndexExprs holes — fail closed before string soft-fallback
+	if !ExpressionsComplete(av.IndexExprs) || !ExpressionsComplete(ov.IndexExprs) {
 		return false
 	}
-	for i := 0; i < n; i++ {
-		var e, oe *Expression
-		if i < len(av.IndexExprs) {
-			e = av.IndexExprs[i]
+	// Expression* path when either side has IndexExprs — both must use same complete list
+	// (no invent half IndexExprs + half Indices string match past a lag hole)
+	if len(av.IndexExprs) > 0 || len(ov.IndexExprs) > 0 {
+		if len(av.IndexExprs) != len(ov.IndexExprs) {
+			return false
 		}
-		if i < len(ov.IndexExprs) {
-			oe = ov.IndexExprs[i]
-		}
-		if e != nil && oe != nil {
-			// ArrayVariable.cpp:403–405 — Expression path
+		for i := range av.IndexExprs {
+			e, oe := av.IndexExprs[i], ov.IndexExprs[i]
+			// ArrayVariable.cpp:403–405 — Expression path; live Expression* only
 			if CountExprKeyVar(e) != 1 || CountExprKeyVar(oe) != 1 {
 				return false
 			}
 			if FindExprKeyVar(e) != FindExprKeyVar(oe) {
 				return false
 			}
-			continue
 		}
-		// string-only Indices: equal strings share key identity (no Variable* handle)
-		si, sj := "", ""
-		if i < len(av.Indices) {
-			si = av.Indices[i]
-		}
-		if i < len(ov.Indices) {
-			sj = ov.Indices[i]
-		}
-		if si != sj {
+		return true
+	}
+	// string-only Indices: equal strings share key identity (no Variable* handle)
+	n := len(av.Indices)
+	if n == 0 || n != len(ov.Indices) {
+		return false
+	}
+	for i := 0; i < n; i++ {
+		if av.Indices[i] != ov.Indices[i] {
 			return false
 		}
 	}
@@ -857,15 +849,16 @@ func (av *ArrayVariable) OutputAccess() string {
 		// fail closed — no soft invent bare collective name for broken itemized IR
 		return ""
 	}
+	// incomplete IndexExprs fails closed whole access (no invent soft-skip hole mid indices)
+	if !ExpressionsComplete(av.IndexExprs) {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(name)
 	if len(av.IndexExprs) > 0 {
 		for _, e := range av.IndexExprs {
 			// ArrayVariable.cpp:548–552 — indices[i]->Output always live Expression*
-			// no invent empty brackets "[]" for nil/empty index Output
-			if e == nil {
-				return ""
-			}
+			// no invent empty brackets "[]" for empty index Output
 			idx := e.Output()
 			if idx == "" {
 				return ""
