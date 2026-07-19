@@ -30,13 +30,18 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if fp == nil {
 		t.Fatal("p gone")
 	}
-	// nil fact hole fails closed — hole marker (not bare nil / empty complete)
+	// nil fact hole fails closed sticky — hole marker (not bare nil / empty complete)
+	ClearError()
 	var out2 []*FactPointTo
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, &out2, f, nil)
 	if FactsComplete(out2) {
 		t.Fatal("nil hole must fail closed incomplete dest facts", out2)
 	}
-	// nil PointTo hole on live fact fails closed
+	if !HasError() {
+		t.Fatal("nil hole UpdateFactsForDest must SetError sticky")
+	}
+	ClearError()
+	// nil PointTo hole on live fact fails closed sticky
 	var out3 []*FactPointTo
 	bad := MakeFactPointTo(p, NullPtr)
 	bad.PointTo = []*Variable{nil, loc}
@@ -44,12 +49,20 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if FactsComplete(out3) {
 		t.Fatal("nil pointee hole must fail closed incomplete dest facts", out3)
 	}
-	// missing function fails closed incomplete (no invent empty dest)
+	if !HasError() {
+		t.Fatal("nil pointee UpdateFactsForDest must SetError sticky")
+	}
+	ClearError()
+	// missing function fails closed sticky incomplete (no invent empty dest)
 	var out4 []*FactPointTo
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, &out4, nil, nil)
 	if FactsComplete(out4) {
 		t.Fatal("nil func must fail closed incomplete dest facts", out4)
 	}
+	if !HasError() {
+		t.Fatal("nil func UpdateFactsForDest must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestClearMapVisited(t *testing.T) {

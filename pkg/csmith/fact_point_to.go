@@ -626,14 +626,15 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 
 // JoinVisitsInto merges newFacts into facts with join_visits semantics.
 // Used when combining results of multiple visits to the same function.
-// Incomplete maps fail closed: *facts = IncompleteFactSlice(), false
-// (no invent no-change success via FactsComplete(nil) or soft-append nil Clone).
+// Incomplete maps fail closed sticky: *facts = IncompleteFactSlice(), false
+// (no invent no-change success via FactsComplete(nil) or soft re-pick past wipe).
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	changed := false
@@ -643,6 +644,7 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 			cl := nf.Clone()
 			if cl == nil {
 				*facts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return false
 			}
 			*facts = append(*facts, cl)
@@ -653,6 +655,7 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		cp := cur.Clone()
 		if cp == nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
 		if cp.JoinVisits(nf) {
@@ -1102,13 +1105,14 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 
 // UpdateFactsWithModifiedIndex mirrors FactPointTo::update_facts_with_modified_index.
 // FactPointTo.cpp:751–761 — rewrite each point-to fact when indexVar is modified.
-// Fact* always live; nil hole or failed rewrite fails closed (facts nil).
+// Fact* always live; nil hole or failed rewrite fails closed sticky (facts incomplete).
 func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 	if facts == nil || indexVar == nil {
 		return
 	}
 	if !FactsComplete(*facts) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	for i, fp := range *facts {
@@ -1116,6 +1120,7 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 		// UpdateWithModifiedIndex nil = incomplete pointees
 		if newFP == nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		if newFP != fp {

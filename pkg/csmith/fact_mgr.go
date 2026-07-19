@@ -412,8 +412,8 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 
 // UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
 // FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
-// Incomplete inputs fail closed via IncompleteFactSlice (not bare nil —
-// FactsComplete(nil)==true invents empty-complete dest facts / SetMapFactsOut).
+// Incomplete inputs fail closed sticky via IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-complete dest facts / soft re-pick past wipe).
 func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
 	if factsOut == nil {
 		return
@@ -422,12 +422,14 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 	// no soft invent dest facts without function (OOS walk needs f)
 	if f == nil {
 		*factsOut = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
-	// Fact* always live; nil hole fails closed (no invent skip partial dest update)
+	// Fact* always live; nil hole fails closed sticky (no invent skip partial dest update)
 	for _, fact := range factsIn {
 		if fact == nil || fact.Var == nil {
 			*factsOut = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 	}
@@ -449,10 +451,11 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			addOOS(fact.Var)
 		}
 		for _, p := range fact.PointTo {
-			// Variable* always live in PointTo; nil hole fails closed whole dest update
+			// Variable* always live in PointTo; nil hole fails closed whole dest update sticky
 			// (no invent soft-skip hole and still OOS-scan later pointees)
 			if p == nil {
 				*factsOut = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
@@ -462,6 +465,9 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		merged := MergeFactInto(*factsOut, fact)
 		if !FactsComplete(merged) {
 			*factsOut = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 		*factsOut = merged
@@ -1580,7 +1586,7 @@ func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
 
 // UpdateFactForReturnStmt mirrors FactMgr::update_fact_for_return.
 // FactMgr.cpp:406–421 — abstract_fact_for_return into global_facts; set_fact_out(sr).
-// Incomplete assign fails closed (false; no invent SetMapFactsOut from wiped map).
+// Incomplete assign fails closed sticky (false; no invent SetMapFactsOut from wiped map).
 func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Expression) bool {
 	// Expression* always live on StatementReturn; nil expr fails closed
 	// (no invent garbage RHS transfer as stand-in for missing return value IR)
@@ -1590,9 +1596,12 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)
 	// FactMgr.cpp:408–416 — merge into inputs; fact_changed on merge
 	changed := fm.UpdateFactForAssign(rv, 0, expr)
-	// incomplete GlobalFacts after assign — do not invent return out map
+	// incomplete GlobalFacts after assign — sticky; do not invent return out map
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// FactMgr.cpp:418–420 — incorporate current facts into return outs

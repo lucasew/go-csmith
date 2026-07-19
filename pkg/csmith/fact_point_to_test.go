@@ -338,11 +338,22 @@ func TestUpdateWithModifiedIndex(t *testing.T) {
 		t.Fatal("j should not rewrite")
 	}
 	// bulk update
+	ClearError()
 	facts := []*FactPointTo{f.Clone()}
 	UpdateFactsWithModifiedIndex(&facts, idx)
 	if facts[0] == f || facts[0].PointTo[0].AsArray.Indices[0] != "-1" {
 		t.Fatal("bulk", facts[0])
 	}
+	// incomplete facts fail closed sticky
+	hole := []*FactPointTo{f.Clone(), nil}
+	UpdateFactsWithModifiedIndex(&hole, idx)
+	if FactsComplete(hole) {
+		t.Fatal("incomplete bulk must wipe IncompleteFactSlice", hole)
+	}
+	if !HasError() {
+		t.Fatal("incomplete UpdateFactsWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
 	// offset form "(i + 2)"
 	item2 := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},

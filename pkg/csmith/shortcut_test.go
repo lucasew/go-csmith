@@ -528,5 +528,26 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	if EffectComplete(fm.GetMapAccumEffect(90)) {
 		t.Fatal("map_accum must stay incomplete marker")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	// StmID 0 fails closed sticky (no invent soft-skip map_accum/visited)
+	st0 := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts0 := []*FactPointTo{}
+	if StmVisitFacts(st0, &facts0, &cg, Defaults()) {
+		t.Fatal("StmID 0 must fail closed StmVisitFacts")
+	}
+	if FactsComplete(facts0) {
+		t.Fatal("StmID 0 must wipe facts incomplete")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 must SetError sticky")
+	}
 	ClearError()
 }

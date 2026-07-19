@@ -28,11 +28,25 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 		t.Fatal("nil rhs must abstract as garbage like C++", facts)
 	}
 	// return always has Expression*; nil expr fails closed before garbage invent
+	ClearError()
 	fm := NewFactMgr(nil)
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
 		t.Fatal("nil return expr must fail closed")
 	}
+	// incomplete GlobalFacts after assign path fails closed sticky
+	fm.GlobalFacts = IncompleteFactSlice()
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, rhs) {
+		t.Fatal("incomplete GlobalFacts must fail closed UpdateFactForReturnStmt")
+	}
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("must stay incomplete GlobalFacts")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts return update must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferAddrOf(t *testing.T) {
