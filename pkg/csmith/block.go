@@ -923,13 +923,13 @@ func (b *Block) Output(indent int) string {
 		switch st.Kind {
 		case StmtReturn:
 			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
+			// incomplete fails whole block (no invent soft-skip stmt and still emit later)
 			if st.Expr == nil {
-				break
+				return ""
 			}
 			exprOut := st.Expr.Output()
 			if exprOut == "" {
-				// incomplete expr IR — no invent "return ;"
-				break
+				return ""
 			}
 			// DEPTH-- before return when depth_protect
 			if b.EmitDepthProtect {
@@ -946,10 +946,11 @@ func (b *Block) Output(indent int) string {
 				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 				ty := st.LhsVar.Type.CName()
 				rhs := st.Expr.Output()
-				if ty != "" && rhs != "" {
-					content.WriteString(ty + " tmp = " + rhs + ";\n")
-					content.WriteString(inner + st.ArrayAccess + " = tmp;\n")
+				if ty == "" || rhs == "" {
+					return ""
 				}
+				content.WriteString(ty + " tmp = " + rhs + ";\n")
+				content.WriteString(inner + st.ArrayAccess + " = tmp;\n")
 				break
 			}
 			// StatementAssign::OutputAsExpr — CGOptions::identify_wrappers process-wide
@@ -961,19 +962,22 @@ func (b *Block) Output(indent int) string {
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
 				rhs := st.Expr.Output()
-				if rhs != "" {
-					content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
+				if rhs == "" {
+					return ""
 				}
+				content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
+			} else {
+				// incomplete assign IR — fail whole block (no invent soft-skip)
+				return ""
 			}
-			// incomplete assign IR — no soft invent /* assign */
 		case StmtBreak:
 			// StatementBreak.cpp:117–118 — test.Output always live; no invent if () break
 			if st.Expr == nil {
-				break
+				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
-				break
+				return ""
 			}
 			content.WriteString("if (")
 			content.WriteString(test)
@@ -982,11 +986,11 @@ func (b *Block) Output(indent int) string {
 		case StmtContinue:
 			// StatementContinue.cpp — test.Output always live; no invent if () continue
 			if st.Expr == nil {
-				break
+				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
-				break
+				return ""
 			}
 			content.WriteString("if (")
 			content.WriteString(test)
@@ -996,12 +1000,12 @@ func (b *Block) Output(indent int) string {
 			// StatementFor::Output — header + body Block always live
 			// no invent for(;;) / header without body / body without header
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				break
+				return ""
 			}
 			hdr := forHeaderOutput(st.Loop)
 			bodyOut := st.Then.Output(indent + 1)
 			if hdr == "" || bodyOut == "" {
-				break
+				return ""
 			}
 			content.WriteString(hdr + "\n")
 			content.WriteString(bodyOut)
@@ -1009,13 +1013,13 @@ func (b *Block) Output(indent int) string {
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
 			// no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
-				break
+				return ""
 			}
 			test := st.Expr.Output()
 			thenOut := st.Then.Output(indent + 1)
 			elseOut := st.Else.Output(indent + 1)
 			if test == "" || thenOut == "" || elseOut == "" {
-				break
+				return ""
 			}
 			content.WriteString("if (")
 			content.WriteString(test)
@@ -1026,11 +1030,11 @@ func (b *Block) Output(indent int) string {
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output always live; no invent if () goto
 			if st.Label == "" || st.Expr == nil {
-				break
+				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
-				break
+				return ""
 			}
 			content.WriteString("if (")
 			content.WriteString(test)
@@ -1041,26 +1045,41 @@ func (b *Block) Output(indent int) string {
 			// nested dims carry Then; array-loop path reuses for body as Then
 			// no invent header without body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				break
+				return ""
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
 			bodyOut := st.Then.Output(indent + 1)
 			if hdr == "" || bodyOut == "" {
-				break
+				return ""
 			}
 			content.WriteString(hdr + "\n")
 			content.WriteString(bodyOut)
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
-			// no soft invent /* invoke */ or empty ";" when expr Output empty
-			if st.Expr != nil {
-				out := st.Expr.Output()
-				if out != "" {
-					content.WriteString(out + ";\n")
-				}
+			// incomplete fails whole block (no invent soft-skip empty invoke)
+			if st.Expr == nil {
+				return ""
 			}
+			out := st.Expr.Output()
+			if out == "" {
+				return ""
+			}
+			content.WriteString(out + ";\n")
+		case StmtBlock:
+			// Statement.cpp:281–282 — nested Block::Output always live
+			if st.Then == nil {
+				return ""
+			}
+			bodyOut := st.Then.Output(indent + 1)
+			if bodyOut == "" {
+				return ""
+			}
+			content.WriteString(bodyOut)
 		default:
-			// incomplete IR — no soft invent comment stub
+			// unknown/zero Kind in live body is incomplete IR — fail whole block
+			// (no invent soft-skip hole and still emit later stmts)
+			// StmtLabel handled earlier via continue
+			return ""
 		}
 		if content.Len() > 0 {
 			sb.WriteString(inner)

@@ -52,14 +52,17 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 	if strings.Contains(out, "invoke-stub") {
 		t.Fatal("still stub")
 	}
-	// incomplete invoke Output must not invent indent-only / bare ";"
+	// incomplete invoke Output fails whole block (no invent soft-skip empty invoke)
 	empty := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}}
 	out2 := (&Block{Stmts: []Stmt{empty}}).Output(0)
-	if strings.Contains(out2, ";") && !strings.Contains(out2, "/*") {
-		// only block braces — no statement semicolon from empty invoke
-		if strings.Count(out2, ";") > 0 && strings.Contains(out2, "    ;") {
-			t.Fatal("empty invoke must not invent bare ;", out2)
-		}
+	if out2 != "" {
+		t.Fatal("incomplete invoke must fail closed whole block", out2)
+	}
+	// incomplete among live stmts fails whole block (no invent skip hole)
+	good := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
+	out3 := (&Block{Stmts: []Stmt{empty, good}}).Output(0)
+	if out3 != "" {
+		t.Fatal("mixed incomplete must fail closed whole block", out3)
 	}
 }
 
