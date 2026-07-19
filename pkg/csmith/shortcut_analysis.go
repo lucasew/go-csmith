@@ -359,12 +359,14 @@ var FailedStm *Stmt
 // no invent cleaned clone of holes while still reporting visit success.
 func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// Statement.cpp:609+ — always live Statement* + inputs + cg_context
-	// no soft invent true on incomplete call
+	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// Fact* always live; incomplete working set fails closed before visit
+	// Fact* always live; incomplete working set sticky before visit
 	if !FactsComplete(*facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
@@ -425,18 +427,21 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 // Incomplete working facts fail closed (false) — no invent pre-visit copy past holes.
 func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
 	// Statement.cpp:574+ — always live this + inputs + cg_context
-	// no soft invent true on incomplete call
+	// incomplete call sticky (no soft invent true / soft re-pick past holes)
 	if st == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// sync FM global facts with working set
 	if cg.FM != nil {
-		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// Statement::stm_id always live; StmID 0 sticky (no invent
 		// validate success without set_fact_in/out)
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		cg.FM.GlobalFacts = *facts
@@ -444,8 +449,11 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	sc := ShortcutAnalysis(st, facts, cg, opts)
 	switch sc {
 	case ShortcutOK:
-		// incomplete clone of out fails closed (no invent shortcut success)
+		// incomplete clone of out sticky (no invent shortcut success / soft re-pick)
 		if !FactsComplete(*facts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		// Statement.cpp:580–595 — mark contained gotos visited on shortcut reuse

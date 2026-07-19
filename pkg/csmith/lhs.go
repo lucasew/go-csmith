@@ -138,9 +138,12 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 // VisitIndices mirrors Lhs::visit_indices.
 // Lhs.cpp:264–284 — visit array IndexExprs under RHS effect context
 // (effect_context + effect_stm, null accum).
+// Incomplete Lhs / ambient / IndexExprs sticky (no invent soft-skip past holes).
 func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	// Lhs.cpp:264+ — get_var()->get_array may be null → true without using cg
+	// incomplete Lhs shell sticky (visit always has live Lhs* in C++)
 	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	av := l.Var.AsArray
@@ -148,14 +151,16 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		// Lhs.cpp:267–268 — av == 0 → true (non-array / string-only Indices)
 		return true
 	}
-	// need cg to visit Expression indices
+	// need cg to visit Expression indices; nil cg sticky hard IR
 	if cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
-	// Incomplete ambient fails closed (no invent index visit under incomplete context)
+	// Incomplete ambient sticky (no invent index visit under incomplete context)
 	eff := cg.EffectContext().AddEffect(cg.EffectStm)
 	if !EffectComplete(eff) {
+		SetError(ErrGeneric)
 		return false
 	}
 	rhsCG := CGContext{
@@ -171,8 +176,9 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		IVBounds:      cg.IVBounds,
 		CallChain:     cg.CallChain,
 	}
-	// incomplete IndexExprs — fail closed (no invent soft-skip nil index)
+	// incomplete IndexExprs sticky (no invent soft-skip nil index)
 	if !ExpressionsComplete(av.IndexExprs) {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, e := range av.IndexExprs {

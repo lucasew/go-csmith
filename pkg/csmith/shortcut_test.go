@@ -350,7 +350,8 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 }
 
 func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
-	// Fact* always live; incomplete working set must not invent visit success
+	// Fact* always live; incomplete working set sticky (no invent visit success)
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -364,13 +365,18 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	if StmVisitFacts(st, &facts, &cg, Defaults()) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("incomplete inputs StmVisitFacts must SetError sticky")
+	}
 	if fm.MapVisited[88] {
 		t.Fatal("must not mark visited when inputs incomplete before visit")
 	}
+	ClearError()
 }
 
 func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
-	// incomplete pre-visit inputs must not invent set_fact_in from cleaned clone
+	// incomplete pre-visit inputs sticky (no invent set_fact_in from cleaned clone)
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -384,9 +390,13 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	if ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("incomplete inputs must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("incomplete inputs ValidateAndUpdateFacts must SetError sticky")
+	}
 	if _, ok := fm.MapFactsIn[90]; ok {
 		t.Fatal("must not invent MapFactsIn from incomplete inputs")
 	}
+	ClearError()
 }
 
 func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
@@ -415,6 +425,7 @@ func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
 
 func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 	// nil fact hole in MapFactsOut — no invent clone-to-nil while ShortcutOK
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{

@@ -4,29 +4,36 @@ package csmith
 
 // VisitFactsStatementReturn mirrors StatementReturn::visit_facts.
 // StatementReturn.cpp:76–97 — no_return_dead_ptr filter; var.visit_facts; update return.
+// Hard IR incomplete sticky (nil expr/FM/rv, StmID 0, incomplete facts/effect);
+// policy rejects (pointing-to-locals) stay non-sticky false.
 func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtReturn {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementReturn always has ExpressionVariable; nil expr is incomplete IR
+	// StatementReturn always has ExpressionVariable; nil expr sticky hard IR
 	if st.Expr == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// no_return_dead_ptr: reject returning local-pointing ptrs
 	if opts.NoReturnDeadPointer && st.Expr.Term == TermVariable && st.Expr.Var != nil {
-		// StatementReturn.cpp:83–84 — assert(b); curr_blk required for local check
+		// StatementReturn.cpp:83–84 — assert(b); curr_blk required sticky when missing
 		b := cg.CurrentBlock()
 		if b == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		v := st.Expr.Var
-		// incomplete type IR must not invent level-0 (no local pointees) skip
+		// incomplete type IR sticky (no invent level-0 skip / soft re-pick)
 		ind, iok := st.Expr.IndirectLevelComplete()
 		if !iok {
+			SetError(ErrGeneric)
 			return false
 		}
 		facts := cg.pointToFacts()
 		if IsPointingToLocals(v, b, ind, facts) {
+			// policy reject — non-sticky
 			return false
 		}
 	}
@@ -34,22 +41,27 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94
-	// get_fact_mgr + curr_func + rv always live in C++; no invent visit success without them
+	// get_fact_mgr + curr_func + rv always live; sticky without them
 	if cg.FM == nil || cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// Statement::stm_id always live; StmID 0 fails closed (no invent visit
-	// success without map_stm_effect[this])
+	// Statement::stm_id always live; StmID 0 sticky
 	if st.StmID <= 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	_ = cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
-	// incomplete return assign must not invent visit success / effect map
+	// incomplete return assign sticky (no invent visit success / soft re-pick)
 	if !FactsComplete(cg.FM.GlobalFacts) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
-	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if !EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm

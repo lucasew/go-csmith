@@ -4,9 +4,10 @@ package csmith
 
 // VisitFactsStmt dispatches Statement::visit_facts by kind.
 // Statement subclasses — assign/if/for/block/return/jump/expr.
-// Incomplete IR fails — no soft invent true (C++ always visits live Statement*).
+// Incomplete IR fails closed sticky (no soft invent true / soft re-pick past holes).
 func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch st.Kind {
@@ -25,11 +26,11 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	case StmtGoto:
 		return VisitFactsStatementGoto(st, cg, opts)
 	case StmtLabel:
-		// Statement::stm_id always live; StmID 0 + FM fails closed
-		// (no invent visit success without recording effect)
-		// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+		// Statement::stm_id always live; StmID 0 + FM fails closed sticky
+		// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 		if cg.FM != nil {
 			if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+				SetError(ErrGeneric)
 				return false
 			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -39,11 +40,13 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 		return VisitFactsStatementExpr(st, cg, opts)
 	case StmtBlock:
 		if st.Then == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return VisitFactsBlock(st.Then, cg, opts)
 	default:
-		// unknown kind; no soft invent success
+		// unknown kind hard IR sticky
+		SetError(ErrGeneric)
 		return false
 	}
 }
@@ -52,16 +55,22 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementBreak.cpp:126–134 / StatementContinue.cpp:125–133 — test then effect_stm.
 func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// C++ always has live test Expression*
-	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
+	// C++ always has live test Expression*; nil Expr sticky hard IR
+	if st.Expr == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// Statement::stm_id always live; StmID 0 + FM fails closed
-	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+	if !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	// Statement::stm_id always live; StmID 0 + FM fails closed sticky
+	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
 		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -73,28 +82,39 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementGoto.cpp:364–402 — test; check_write skipped vars; subset re-analysis of dest.
 func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementGoto.cpp:366–368 — test.visit_facts always
-	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementGoto.cpp:366–368 — test.visit_facts always; nil Expr sticky
+	if st.Expr == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	// check write on skipped vars (re-init at dest)
-	// StatementGoto.cpp — vars[i] always live; no invent skip nil holes
+	// StatementGoto.cpp — vars[i] always live; nil hole sticky via CheckWriteVar
 	facts := cg.pointToFacts()
-	// incomplete working facts fail closed (no invent write-check past holes)
+	// incomplete working facts sticky (no invent write-check past holes / soft re-pick)
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, v := range st.InitSkippedVars {
-		if v == nil || !cg.CheckWriteVar(v, facts) {
+		if v == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		if !cg.CheckWriteVar(v, facts) {
 			return false
 		}
 	}
 	fm := cg.FM
 	if fm != nil {
-		// Statement::stm_id always live; StmID 0 fails closed
+		// Statement::stm_id always live; StmID 0 sticky
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		// StatementGoto.cpp:390–398 — force dest re-analysis when current outs
@@ -105,8 +125,11 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 			visitedDest := fm.MapVisited != nil && fm.MapVisited[destID]
 			prevOut := fm.GetMapFactsOut(st.StmID)
 			cur := facts
-			// incomplete prev outs fail closed — do not invent subset/clear path
+			// incomplete prev outs sticky (GetMapFactsOut may already SetError)
 			if !FactsComplete(prevOut) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			if !visitedThis && !visitedDest &&
@@ -116,8 +139,9 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 				delete(fm.MapFactsOut, destID)
 			}
 		}
-		// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+		// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 		if !EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
 			return false
 		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -129,16 +153,22 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 // StatementExpr.cpp:104–110 — expr.visit_facts; store effect_stm.
 func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// StatementExpr.cpp:106 — expr always live
-	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementExpr.cpp:106 — expr always live; nil Expr sticky
+	if st.Expr == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// Statement::stm_id always live; StmID 0 + FM fails closed
-	// Incomplete EffectStm fails closed (no invent visit true with incomplete map)
+	if !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	// Statement::stm_id always live; StmID 0 + FM sticky
+	// Incomplete EffectStm sticky (no invent visit true with incomplete map)
 	if cg.FM != nil {
 		if st.StmID <= 0 || !EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -150,12 +180,14 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 // Block.cpp:466–479.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	var inputs []*FactPointTo
 	if cg.FM != nil {
-		// incomplete GlobalFacts fail closed (no invent fixed-point on partial maps)
+		// incomplete GlobalFacts sticky (no invent fixed-point / soft re-pick past holes)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return false
 		}
 		inputs = CloneFactSlice(cg.FM.GlobalFacts)
@@ -170,18 +202,24 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 // When both arms must_return, outputs restore pre-condition inputs (inputs_copy).
 func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	if st == nil || cg == nil || st.Kind != StmtIfElse {
+		SetError(ErrGeneric)
 		return false
 	}
 	// StatementIf.cpp:164 — inputs_copy before condition
 	var inputsCopy []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return false
 		}
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
-	// StatementIf.cpp:165–168 — evaluate condition first (always live test)
-	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
+	// StatementIf.cpp:165–168 — evaluate condition first; nil test sticky
+	if st.Expr == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
 	// StatementIf.cpp:169 — effect_stm after condition
@@ -190,6 +228,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	var postCond []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		postCond = CloneFactSlice(cg.FM.GlobalFacts)
@@ -199,8 +240,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		preAccum = cg.EffectAccum.Clone()
 	}
 
-	// StatementIf.cpp:170–177 — both arms always live Blocks
+	// StatementIf.cpp:170–177 — both arms always live Blocks sticky
 	if st.Then == nil || st.Else == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// StatementIf.cpp:170–173 — true branch from post-cond facts
@@ -238,29 +280,40 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block(eff, &if_true/false)
 	// eff is mutated across both calls: cond + then + else map_stm_effect[block]
 	// Block stm_id always live; StmID 0 fails closed (no invent EffectStm soft fallback)
-	// Incomplete arm effects fail closed visit false (no invent SetMapStmEffect incomplete
-	// then still return true success)
+	// Incomplete arm effects sticky (no invent SetMapStmEffect incomplete then true)
 	if cg.FM != nil {
 		if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		if !EffectComplete(condEff) {
+			SetError(ErrGeneric)
 			return false
 		}
 		thenE := cg.FM.GetMapStmEffect(st.Then.StmID)
 		elseE := cg.FM.GetMapStmEffect(st.Else.StmID)
 		if !EffectComplete(thenE) || !EffectComplete(elseE) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		acc := condEff.AddEffect(thenE)
 		if !EffectComplete(acc) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		acc = acc.AddEffect(elseE)
 		if !EffectComplete(acc) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		cg.FM.SetMapStmEffect(st.StmID, acc)

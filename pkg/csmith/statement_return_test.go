@@ -97,7 +97,8 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 }
 
 func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
-	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live
+	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live sticky
+	ClearError()
 	opts := Defaults()
 	st := &Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
 	// no CurrentFunc
@@ -105,6 +106,10 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg, opts) {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil CurrentFunc return visit must SetError sticky")
+	}
+	ClearError()
 	// CurrentFunc without RV
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -112,11 +117,16 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("nil RV must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil RV return visit must SetError sticky")
+	}
+	ClearError()
 	// complete path
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
 	if !VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("live return must visit")
 	}
+	ClearError()
 }
 
 func TestGenerateReturnUsesVar(t *testing.T) {

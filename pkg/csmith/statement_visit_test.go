@@ -30,10 +30,15 @@ func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
 	if VisitFactsStatementIf(&st, &cg, opts) {
 		t.Fatal("incomplete GlobalFacts must fail closed if visit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts if visit must SetError sticky")
+	}
+	ClearError()
 	_ = p
 }
 
 func TestVisitFactsStatementIfMerge(t *testing.T) {
+	ClearError()
 	BookkeeperDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -119,7 +124,7 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 }
 
 func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
-	// SetMapStmEffect with incomplete EffectStm must not invent visit true
+	// incomplete EffectStm sticky (no invent visit true / soft re-pick past holes)
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
@@ -129,12 +134,26 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	if VisitFactsStatementJump(&Stmt{Kind: StmtBreak, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed jump visit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm jump visit must SetError sticky")
+	}
+	ClearError()
+	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStmt(&Stmt{Kind: StmtLabel, StmID: 2}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed label visit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm label visit must SetError sticky")
+	}
+	ClearError()
+	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStatementExpr(&Stmt{Kind: StmtInvoke, StmID: 3, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed expr visit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm expr visit must SetError sticky")
+	}
+	ClearError()
 	// Return
 	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
 	f.RV = rv
@@ -146,6 +165,10 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed return visit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm return visit must SetError sticky")
+	}
+	ClearError()
 	// Assign
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg.EffectStm = IncompleteEffect()
@@ -481,8 +504,9 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 }
 
 func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
-	// Statement::stm_id always live; StmID 0 + FM fails closed
-	// (no invent visit success without map_stm_effect)
+	// Statement::stm_id always live; StmID 0 + FM sticky
+	// (no invent visit success without map_stm_effect / soft re-pick)
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	fm := NewFactMgr(f)
@@ -495,6 +519,8 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	if VisitFactsStatementAssign(asg, &cg, Defaults()) {
 		t.Fatal("assign StmID 0 must fail closed")
 	}
+	// assign path may sticky via visit factories
+	ClearError()
 	ret := &Stmt{
 		Kind: StmtReturn,
 		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: GetIntType()},
@@ -502,6 +528,10 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	if VisitFactsStatementReturn(ret, &cg, Defaults()) {
 		t.Fatal("return StmID 0 must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("return StmID 0 must SetError sticky")
+	}
+	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	body := &Block{StmID: 0, Func: f}
 	st := &Stmt{
@@ -513,6 +543,30 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 		t.Fatal("arrayop body StmID 0 must fail closed")
 	}
 	// body StmID 0 may set sticky ERROR via find_fixed_point — clear for suite
+	ClearError()
+}
+
+func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
+	ClearError()
+	facts := []*FactPointTo{}
+	cg := EmptyCGContext()
+	if ValidateAndUpdateFacts(nil, &facts, &cg, Defaults(), nil) {
+		t.Fatal("nil st must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil st ValidateAndUpdateFacts must SetError sticky")
+	}
+	ClearError()
+	st := &Stmt{Kind: StmtLabel, StmID: 1}
+	fm := NewFactMgr(nil)
+	cg = EmptyCGContext().WithFactMgr(fm)
+	hole := IncompleteFactSlice()
+	if ValidateAndUpdateFacts(st, &hole, &cg, Defaults(), nil) {
+		t.Fatal("incomplete facts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete facts ValidateAndUpdateFacts must SetError sticky")
+	}
 	ClearError()
 }
 
