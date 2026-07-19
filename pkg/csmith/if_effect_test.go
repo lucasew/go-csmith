@@ -99,6 +99,18 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
+	// StatementIf.cpp always has RNG + CGContext; no invent if shell
+	opts := Defaults()
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+		t.Fatal("nil RNG+cg")
+	}
+	cg := EmptyCGContext()
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+		t.Fatal("nil RNG")
+	}
+}
+
 func TestRandomParentBlockERRORGuard(t *testing.T) {
 	ClearError()
 	b := &Block{}

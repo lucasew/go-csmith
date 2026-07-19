@@ -14,7 +14,8 @@ func MakeRandomIf(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
-	if cg == nil {
+	// StatementIf.cpp always has RNG + CGContext; no invent if shell without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// StatementIf.cpp:58 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementIf, nullptr)

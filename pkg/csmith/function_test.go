@@ -160,6 +160,29 @@ func TestMakeRandomSignatureERRORGuard(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
+	// Function.cpp always has RNG + Probabilities; no invent signature shells
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	cg := EmptyCGContext()
+	if MakeRandomSignature(nil, opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("nil RNG must not invent signature")
+	}
+	if MakeRandomSignature(NewRng(2), opts, nil, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("nil probs must not invent signature")
+	}
+	// MakeFirst same contract
+	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+		t.Fatal("nil RNG must not invent first")
+	}
+	if MakeFirst(NewRng(2), opts, nil, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+		t.Fatal("nil probs must not invent first")
+	}
+}
+
 func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	// StatementFor.cpp:304 ERROR_GUARD after body
 	ClearError()

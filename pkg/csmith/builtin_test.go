@@ -86,6 +86,10 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	if MakeBuiltinFunction(opts, nil, nil, list, nil, "Int; __builtin_clzs; (UShort); clang") != nil {
 		t.Fatal("clang should skip")
 	}
+	// empty name token — no invent shell
+	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "Int; ; (UInt); x86") != nil {
+		t.Fatal("empty builtin name must fail closed")
+	}
 }
 
 func TestInitializeBuiltinFunctions(t *testing.T) {

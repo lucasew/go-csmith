@@ -185,6 +185,10 @@ func MakeRandomSignature(
 		return nil
 	}
 	name := RandomFunctionName(sym)
+	// gensym always live; no invent empty-name signature / "_alias" shell
+	if name == "" {
+		return nil
+	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType}
 	// rv dummy: CVQualifiers::random_qualifiers(type, READ, cg, true) if qfer nil;
 	// else qfer->random_qualifiers(true, READ, cg) (Function.cpp:416–418).
@@ -310,6 +314,10 @@ func MakeFirst(
 		return nil
 	}
 	name := RandomFunctionName(sym)
+	// gensym always live; no invent empty-name function / "_alias" shell
+	if name == "" {
+		return nil
+	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}
 	// Function.cpp:452–453 — CVQualifiers::random_qualifiers(ty); ERROR_GUARD
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)

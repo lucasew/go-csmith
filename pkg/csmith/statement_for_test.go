@@ -79,6 +79,11 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
+	// always has RNG; no invent for shell without it
+	cgEmpty := EmptyCGContext()
+	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
+		t.Fatal("nil RNG")
+	}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

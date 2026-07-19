@@ -198,6 +198,10 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 		return nil
 	}
 	name := parts[1]
+	// Function.cpp always has live name token; no invent empty-name builtin shell
+	if name == "" {
+		return nil
+	}
 	f := &Function{
 		Name:       name,
 		ReturnType: ty,

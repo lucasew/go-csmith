@@ -580,7 +580,8 @@ func MakeRandomExpression(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
-	if cg == nil {
+	// Expression.cpp always has RNG + live CGContext; no invent leaf shells without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)

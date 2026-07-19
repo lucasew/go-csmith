@@ -421,7 +421,8 @@ func MakeRandomFor(
 	cg *CGContext,
 ) *Stmt {
 	// StatementFor.cpp nullptr factory — nil (no invent Kind-only shell)
-	if cg == nil {
+	// always has RNG + CGContext; no invent for shell without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// StatementFor.cpp:288–289 — assert(fm); get_fact_mgr always live
