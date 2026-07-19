@@ -339,6 +339,33 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if facts != nil {
 		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
 	}
+	// nil Variable* subject fails closed (no invent skip as absent)
+	facts2 := []*FactPointTo{prior}
+	AddNewVarFactInto(nil, &facts2)
+	if facts2 != nil {
+		t.Fatal("nil v must fail closed clear facts", facts2)
+	}
+}
+
+func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {
+	// soft invent: AddNewVarFactTo(nil) no-op skip LocalVars hole
+	// fair: nil LocalVars fails closed fixed-point
+	ClearError()
+	defer ClearError()
+	b := &Block{
+		StmID:     60,
+		LocalVars: []*Variable{nil},
+		Stmts:     []Stmt{},
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	inputs := []*FactPointTo{}
+	_, _, ok := FindFixedPointBlock(b, inputs, &cg, Defaults(), true)
+	if ok {
+		t.Fatal("nil LocalVars hole must fail closed fixed-point")
+	}
 }
 
 func TestFindFixedPointShortcut(t *testing.T) {

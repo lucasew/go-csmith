@@ -122,14 +122,17 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
 		return
 	}
+	// CFGEdge* always live; pre-scan for holes so we never invent partial
+	// mark-as-visited before hitting a nil edge (two-phase: validate then mark).
+	for _, e := range fm.CFGEdges {
+		if e == nil {
+			return
+		}
+	}
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
 	for _, e := range fm.CFGEdges {
-		// CFGEdge* always live; nil hole → stop (no invent partial mark-as-visited)
-		if e == nil {
-			return
-		}
 		if e.SrcID <= 0 {
 			continue
 		}
@@ -389,6 +392,10 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	sc := ShortcutAnalysis(st, facts, cg, opts)
 	switch sc {
 	case ShortcutOK:
+		// incomplete clone of out fails closed (no invent shortcut success)
+		if !FactsComplete(*facts) {
+			return false
+		}
 		// Statement.cpp:580–595 — mark contained gotos visited on shortcut reuse
 		if cg.FM != nil {
 			MarkContainedGotosVisited(st, cg.FM)
@@ -400,6 +407,10 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	// Statement.cpp:600–605 — copy pre-visit inputs; stm_visit; set in/out only on success
 	inputsCopy := CloneFactSlice(*facts)
 	if !StmVisitFacts(st, facts, cg, opts) {
+		return false
+	}
+	// incomplete post-visit must not invent set_fact_in/out success
+	if !FactsComplete(*facts) {
 		return false
 	}
 	if cg.FM != nil && st.StmID > 0 {

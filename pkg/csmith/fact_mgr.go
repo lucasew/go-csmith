@@ -858,8 +858,9 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 // AddNewVarFact mirrors FactMgr::add_new_var_fact for point-to/union init.
 // FactMgr.cpp:118–131 + Fact::abstract_fact_for_var_init via meta_facts loop.
 // AddNewVarFact abstracts init facts for a new variable into GlobalFacts.
-// Variable* FieldVars always live; nil hole fails closed (stop — no invent skip).
-// Fact* from abstract always live; nil hole fails closed (stop).
+// Variable* FieldVars always live; nil hole fails closed (GlobalFacts cleared —
+// no invent soft-skip field hole and still keep partial prior field merges).
+// Fact* from abstract always live; nil hole fails closed (GlobalFacts cleared).
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -868,9 +869,16 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
 		for _, f := range v.FieldVars {
 			if f == nil {
+				// incomplete FieldVars — clear partial aggregate makeup
+				fm.GlobalFacts = nil
 				return
 			}
 			fm.AddNewVarFact(f)
+			// child may have cleared on hole / merge fail
+			if !FactsComplete(fm.GlobalFacts) {
+				fm.GlobalFacts = nil
+				return
+			}
 		}
 		return
 	}
@@ -1185,7 +1193,12 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // Variable* FieldVars always live; nil hole fails closed (*facts = nil — no invent
 // soft-skip hole and still makeup later fields as complete).
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
-	if v == nil || facts == nil {
+	if facts == nil {
+		return
+	}
+	// Variable* always live; nil v hole fails closed (clear — no invent skip as absent)
+	if v == nil {
+		*facts = nil
 		return
 	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered

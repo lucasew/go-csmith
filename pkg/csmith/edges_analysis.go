@@ -400,8 +400,18 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 		outputs := CloneFactSlice(currentInputs)
 		// Block.cpp:546–549 — facts for locals
+		// Variable* always live on LocalVars; nil hole fails closed (no invent skip)
 		for _, v := range b.LocalVars {
+			if v == nil {
+				SetError(ErrGeneric)
+				return nil, -1, false
+			}
 			AddNewVarFactTo(v, &outputs)
+			// AddNewVarFactInto may clear on field/abstract holes
+			if !FactsComplete(outputs) {
+				SetError(ErrGeneric)
+				return nil, -1, false
+			}
 		}
 		// incomplete after local makeup fails closed
 		if !FactsComplete(outputs) {

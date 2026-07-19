@@ -716,6 +716,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if !RevisitUserInvocation(fi, &facts, cg, opts) {
 				return false
 			}
+			// incomplete post-revisit must not invent GlobalFacts assignment
+			if !FactsComplete(facts) {
+				return false
+			}
 			cg.FM.GlobalFacts = facts
 			// fold feffect from accum during revisit
 			if cg.InConflict(fi.User.FEffect) {
