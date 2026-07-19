@@ -963,9 +963,12 @@ func (e *Expression) Output() string {
 	body := e.outputBody()
 	if e.CastType != nil {
 		// Expression.cpp:228–231 — cast_type->Output + body; both always live
-		// no invent "() body" / "(type) " empty body
+		// sticky no invent "() body" / "(type) " empty body
 		cn := e.CastType.CName()
 		if cn == "" || body == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return "(" + cn + ") " + body
@@ -985,12 +988,15 @@ func (e *Expression) outputBody() string {
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant::Output always live value; no invent empty token for incomplete Constant
+		// Constant::Output always live value; sticky no invent empty token for incomplete Constant
 		if e.Con != nil && e.Con.Value != "" {
 			return e.Con.Value
 		}
+		SetError(ErrGeneric)
+		return ""
 	case TermVariable:
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		// ExpressionVariable::Output — *…var or &var from indirect level.
@@ -1000,6 +1006,8 @@ func (e *Expression) outputBody() string {
 		if e.Invoke != nil {
 			return e.Invoke.Output()
 		}
+		SetError(ErrGeneric)
+		return ""
 	case TermAssignment:
 		if e.Assign != nil {
 			// ExpressionAssign::Output → (assign as expr)
@@ -1008,22 +1016,33 @@ func (e *Expression) outputBody() string {
 			if as != "" {
 				return "(" + as + ")"
 			}
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
 		}
+		SetError(ErrGeneric)
+		return ""
 	case TermCommaExpr:
 		// ExpressionComma.cpp:137–144 — "(" + lhs + " , " + rhs + ")"
-		// C++ always has live lhs/rhs Output; no invent "( , )" / "(x , )" / "( , y)"
+		// C++ always has live lhs/rhs Output; sticky no invent "( , )" / "(x , )" / "( , y)"
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		lhs := e.CommaLHS.Output()
 		rhs := e.CommaRHS.Output()
 		if lhs == "" || rhs == "" {
-			// incomplete side IR — fail closed whole comma
+			// incomplete side IR — sticky fail closed whole comma
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return "(" + lhs + " , " + rhs + ")"
 	}
-	// Expression.cpp:195–200 default: no emit invent; incomplete IR → empty
+	// Expression.cpp:195–200 default: no emit invent; incomplete IR sticky empty
+	SetError(ErrGeneric)
 	return ""
 }
 

@@ -376,38 +376,61 @@ func TestOutputHeaderAliasNoInvent(t *testing.T) {
 }
 
 func TestExpressionCastNoInventEmpty(t *testing.T) {
-	// cast_type + body both required
+	// cast_type + body both required sticky
+	ClearError()
 	e := &Expression{Term: TermConstant, Con: MakeInt(1), CastType: &Type{isStruct: true}}
 	if out := e.Output(); out != "" {
 		t.Fatal("cast with incomplete type must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("cast incomplete type must SetError sticky")
+	}
+	ClearError()
 	e2 := &Expression{Term: TermConstant, CastType: GetIntType()}
 	if out := e2.Output(); out != "" {
 		t.Fatal("cast with empty body must fail closed", out)
 	}
-	// Constant with empty Value — no invent empty token
+	if !HasError() {
+		t.Fatal("cast empty body must SetError sticky")
+	}
+	// Constant with empty Value — sticky no invent empty token
+	ClearError()
 	e3 := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: ""}}
 	if out := e3.Output(); out != "" {
 		t.Fatal("empty Constant.Value must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty Constant.Value must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionCommaNoInventEmptySide(t *testing.T) {
-	// ExpressionComma.cpp:109–115 — both sides Output live; no invent "( , x)"
+	// ExpressionComma.cpp:109–115 — both sides Output live; sticky no invent "( , x)"
+	ClearError()
 	good := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	bad := &Expression{Term: TermConstant} // nil Con → empty Output
+	bad := &Expression{Term: TermConstant} // nil Con → empty Output sticky
 	e := &Expression{Term: TermCommaExpr, CommaLHS: bad, CommaRHS: good}
 	if out := e.Output(); out != "" {
 		t.Fatal("empty lhs Output must fail closed comma", out)
 	}
+	if !HasError() {
+		t.Fatal("empty lhs comma must SetError sticky")
+	}
+	ClearError()
 	e.CommaLHS, e.CommaRHS = good, bad
 	if out := e.Output(); out != "" {
 		t.Fatal("empty rhs Output must fail closed comma", out)
 	}
+	if !HasError() {
+		t.Fatal("empty rhs comma must SetError sticky")
+	}
+	ClearError()
 	e.CommaLHS, e.CommaRHS = good, &Expression{Term: TermConstant, Con: MakeInt(2)}
 	if out := e.Output(); out != "(1 , 2)" {
 		t.Fatal(out)
 	}
+	ClearError()
 }
 
 func TestOutputDeclNoInventEmptyType(t *testing.T) {

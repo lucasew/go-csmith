@@ -32,15 +32,24 @@ func TestMakeExpressionComma(t *testing.T) {
 	if !strings.HasPrefix(out, "(") || !strings.HasSuffix(out, ")") {
 		t.Fatal(out)
 	}
-	// ExpressionComma always has live lhs/rhs; no invent "( , )" for missing sides
+	// ExpressionComma always has live lhs/rhs; sticky no invent "( , )" for missing sides
+	ClearError()
 	bare := &Expression{Term: TermCommaExpr}
 	if bare.Output() != "" {
 		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.Output())
 	}
+	if !HasError() {
+		t.Fatal("incomplete comma Output must SetError sticky")
+	}
+	ClearError()
 	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	if oneSide.Output() != "" {
 		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.Output())
 	}
+	if !HasError() {
+		t.Fatal("one-side comma Output must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomParamNilType(t *testing.T) {

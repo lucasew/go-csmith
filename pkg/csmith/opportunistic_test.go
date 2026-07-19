@@ -43,19 +43,33 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 }
 
 func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.CompatibleCheck = true
-	// enabled + incomplete IR rejects (no invent non-error)
+	// enabled + incomplete IR rejects sticky (no invent non-error)
 	if !CompatibleCheckExprVar(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
 		t.Fatal("nil var must reject when compatible-check on")
 	}
+	if !HasError() {
+		t.Fatal("nil var CompatibleCheck must SetError sticky")
+	}
+	ClearError()
 	if !CompatibleCheckExprs(opts, nil, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
 		t.Fatal("nil expr must reject when compatible-check on")
 	}
+	if !HasError() {
+		t.Fatal("nil expr CompatibleCheck must SetError sticky")
+	}
+	ClearError()
 	opts.CompatibleCheck = false
 	if CompatibleCheckExprVar(opts, nil, nil) {
 		t.Fatal("disabled must not reject")
 	}
+	// disabled incomplete stays non-sticky (feature off, not broken IR path)
+	if HasError() {
+		t.Fatal("disabled CompatibleCheck must not SetError")
+	}
+	ClearError()
 }
 
 func TestIsNonReadableNilHole(t *testing.T) {

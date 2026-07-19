@@ -212,18 +212,25 @@ func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
 // Lhs.cpp:207–218.
 func (l *Lhs) Output(wrapVolatiles bool) string {
 	if l == nil || l.Var == nil {
+		if l != nil && l.Var == nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// ExpressionVariable::Output for (var, type)
 	ev := outputExpressionVariable(l.Var, l.Type)
 	if wrapVolatiles && l.Var.IsVolatile() {
-		// Lhs.cpp:211–216 — type->Output always live; no invent "int"
+		// Lhs.cpp:211–216 — type->Output always live; sticky no invent "int"
 		t := l.GetType()
 		if t == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		ty := t.CName()
 		if ty == "" || ev == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return "VOL_LVAL(" + ev + ", " + ty + ")"
@@ -235,6 +242,7 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 // ExpressionVariable.cpp:202–219 — (*…)/& + Variable::Output.
 func outputExpressionVariable(v *Variable, want *Type) string {
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	ind := 0
@@ -246,8 +254,11 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		ind = v.Type.IndirectLevel() - wt.IndirectLevel()
 	}
 	base := v.OutputC()
-	// ExpressionVariable always has live var Output; no invent "(***)" / "&" without base
+	// ExpressionVariable always has live var Output; sticky no invent "(***)" / "&" without base
 	if base == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if ind > 0 {
@@ -255,13 +266,15 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 	}
 	if ind < 0 {
 		// ExpressionVariable.cpp:210–212 — assert(indirect_level == -1)
-		// multi-level & is broken IR; no soft invent single &
+		// multi-level & is broken IR sticky; no soft invent single &
 		if ind != -1 {
+			SetError(ErrGeneric)
 			return ""
 		}
-		// no invent bare "&" when get_actual_name empty
+		// sticky no invent bare "&" when get_actual_name empty
 		nm := v.GetActualName(false)
 		if nm == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "&" + nm

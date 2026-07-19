@@ -23,17 +23,23 @@ func TestOutputAssignSimple(t *testing.T) {
 }
 
 func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
-	// StatementAssign.cpp:515–537 — expr.Output always; no invent "g_1 = "
+	// StatementAssign.cpp:515–537 — expr.Output always; sticky no invent "g_1 = "
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
 	if out := OutputAssignSimple(st, false); out != "" {
 		t.Fatal("nil Expr must fail closed", out)
 	}
-	st.Expr = &Expression{Term: TermConstant} // nil Con → empty Output
+	ClearError()
+	st.Expr = &Expression{Term: TermConstant} // nil Con → empty Output sticky
 	if out := OutputAssignSimple(st, false); out != "" {
 		t.Fatal("empty RHS must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty RHS Output must SetError sticky")
+	}
 	// pre/post incr need no RHS
+	ClearError()
 	st.AssignOp = AssignPreIncr
 	st.Expr = nil
 	if out := OutputAssignSimple(st, false); out != "++g_1" {
@@ -52,11 +58,12 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 }
 
 func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
-	// ccomp volatile rewrite needs live rhs; no invent "g = g & "
+	// ccomp volatile rewrite needs live rhs; sticky no invent "g = g & "
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), true, true)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignBitAnd,
-		Expr:      &Expression{Term: TermConstant}, // empty Output
+		Expr:      &Expression{Term: TermConstant}, // empty Output sticky
 		SafeFlags: &SafeOpFlags{Size: SafeInt32, Op1Signed: true, Op2Signed: true},
 	}
 	opts := Defaults()
@@ -65,6 +72,10 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
 		t.Fatal("empty ccomp rhs must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty ccomp rhs must SetError sticky")
+	}
+	ClearError()
 	// nil Expr on simple assign — no invent bare lhs
 	st2 := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
 	if out := OutputAssignAsExprOpts(st2, false, opts); out != "" {
