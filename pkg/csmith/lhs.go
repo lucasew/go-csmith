@@ -103,14 +103,14 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 
 // GetLvars mirrors Lhs::get_lvars.
 // Lhs.cpp:181–185 — merge pointees of var at indirect level.
-// Incomplete Lhs type IR fails closed (nil — no invent merge at invented level 0).
+// Incomplete Lhs type IR fails closed IncompleteVariables (no invent level-0 merge).
 func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 	if l == nil || l.Var == nil {
-		return nil
+		return IncompleteVariables()
 	}
 	n, ok := l.IndirectLevelComplete()
 	if !ok {
-		return nil
+		return IncompleteVariables()
 	}
 	return MergePointeesOfPointer(l.Var.GetCollective(), n, facts)
 }

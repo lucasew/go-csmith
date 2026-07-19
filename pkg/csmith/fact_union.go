@@ -370,8 +370,8 @@ func RhsToLhsTransferUnion(
 			return IncompleteUnionFactSlice()
 		}
 		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
-		// nil = incomplete pointees (not complete empty)
-		if rvars == nil || !VariablesComplete(rvars) {
+		// incomplete pointees (not complete empty)
+		if !VariablesComplete(rvars) {
 			return IncompleteUnionFactSlice()
 		}
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
@@ -422,8 +422,8 @@ func AbstractFactUnionForAssign(
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, ptFacts)
-	// nil from merge at indir>0 is incomplete; indir 0 yields [lhs] or nil ptr
-	if lvars == nil {
+	// incomplete merge at indir>0; indir 0 yields [lhs]
+	if !VariablesComplete(lvars) {
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvarCnt = len(lvars)

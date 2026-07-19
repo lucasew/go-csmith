@@ -93,8 +93,8 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
 	blk, rem := LowerBlockForVars([]*Block{inner}, []*Variable{a})
-	if blk != nil || rem != nil {
-		t.Fatal("incomplete LocalVars must fail closed", blk, rem)
+	if blk != nil || VariablesComplete(rem) {
+		t.Fatal("incomplete LocalVars must fail closed incomplete remaining", blk, rem)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestLowerBlockForVars(t *testing.T) {
 	}
 	// nil block hole fails closed
 	blk, rem = LowerBlockForVars([]*Block{nil, outer}, []*Variable{a, b})
-	if blk != nil || rem != nil {
-		t.Fatal("nil block hole must fail closed", blk, rem)
+	if blk != nil || VariablesComplete(rem) {
+		t.Fatal("nil block hole must fail closed incomplete remaining", blk, rem)
 	}
 }
 

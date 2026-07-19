@@ -333,16 +333,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
 			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
-			// nil = incomplete pointees
-			if vars == nil {
+			// incomplete pointees
+			if !VariablesComplete(vars) {
 				return IncompleteFactSlice()
 			}
 			var ret []*FactPointTo
 			for _, vv := range vars {
-				// Variable* always live from merge_pointees; nil hole fails closed
-				if vv == nil {
-					return IncompleteFactSlice()
-				}
 				ptrs := vv.FindPointerFields()
 				// FindPointerFields nil = incomplete FieldVars
 				if ptrs == nil {
@@ -356,8 +352,8 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				for j := 0; j < len(lvars); j++ {
 					set := MergePointeesOfPointer(ptrs[j], 1, facts)
 					// C++ make_fact with set as-is (may be empty); no invent garbage
-					// set nil only when incomplete — fail closed whole transfer
-					if set == nil {
+					// incomplete set — fail closed whole transfer
+					if !VariablesComplete(set) {
 						return IncompleteFactSlice()
 					}
 					fp := MakeFactPointToSet(lvars[j], set)
@@ -370,9 +366,9 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return ret
 		}
 		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
-		// empty set is valid (no soft invent GarbagePtr); nil set = incomplete
+		// empty set is valid (no soft invent GarbagePtr); incomplete set fails closed
 		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
-		if set == nil {
+		if !VariablesComplete(set) {
 			return IncompleteFactSlice()
 		}
 		return MakeFactsPointToSet(lvars, set)
@@ -450,6 +446,9 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	}
 	// find all pointed variables on LHS (merge_pointees of collective)
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, factsIn)
+	if !VariablesComplete(lvars) {
+		return IncompleteFactSlice()
+	}
 	// FactPointTo.cpp:275–278 — if (lhs->get_type().eType == ePointer)
 	// Lhs type is var type after get_indirect_level peels; mirror by peeling ptrTo.
 	lhsTy := lhs.Type
@@ -465,12 +464,8 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	// FactPointTo.cpp:280–293 — merge_pointees already yields collective at indir 0
 	// FactPointTo.cpp:280–293 — union field assign: walk to container union, then
 	// find_pointer_fields on that union (all pointer fields share storage).
-	// Variable* always live in lvars; nil hole fails closed (no invent skip).
 	var out []*FactPointTo
 	for _, v := range lvars {
-		if v == nil {
-			return IncompleteFactSlice()
-		}
 		// FactPointTo.cpp:283–288 — is_inside_union_field → walk to eUnion container
 		u := v
 		if u.IsInsideUnionField() {
@@ -495,8 +490,12 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		ptrs := u.FindPointerFields()
 		if v.IsPointer() && lhsIndir > 0 {
 			// assigning *p = rhs: also update pointer pointees
-			for _, p := range MergePointeesOfPointer(v, 1, factsIn) {
-				if p != nil && p.IsPointer() {
+			more := MergePointeesOfPointer(v, 1, factsIn)
+			if !VariablesComplete(more) {
+				return IncompleteFactSlice()
+			}
+			for _, p := range more {
+				if p.IsPointer() {
 					ptrs = append(ptrs, p)
 				}
 			}
@@ -1101,30 +1100,30 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 // MergePointeesOfPointers mirrors FactPointTo::merge_pointees_of_pointers.
 // FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
 // FactPointTo.cpp:694 — assert(exist_fact): missing related fact fails closed
-// (nil out — no invent soft-skip partial pointees mid-create or otherwise).
-// Fact* always live; incomplete fact map or nil ptr/pointee holes fail closed.
+// IncompleteVariables (not bare nil — VariablesComplete(nil)/len==0 invent empty skip).
+// Complete empty (specials-only / no pointees) returns non-nil empty slice.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
 	// incomplete fact map fails closed (FindRelated would nil on first hole)
 	if !FactsComplete(facts) {
-		return nil
+		return IncompleteVariables()
+	}
+	if !VariablesComplete(ptrs) {
+		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
 	seen := make(map[*Variable]bool)
 	for _, p := range ptrs {
-		if p == nil {
-			return nil
-		}
 		if IsSpecialPtr(p) {
 			continue
 		}
 		ft := FindRelatedPointTo(facts, p)
 		// FactPointTo.cpp:694 assert(exist_fact) — fail closed, no invent skip
 		if ft == nil {
-			return nil
+			return IncompleteVariables()
 		}
 		for _, pointee := range ft.PointTo {
 			if pointee == nil {
-				return nil
+				return IncompleteVariables()
 			}
 			if seen[pointee] {
 				continue
@@ -1138,17 +1137,17 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 
 // MergePointeesOfPointer mirrors FactPointTo::merge_pointees_of_pointer.
 // FactPointTo.cpp:669–676 — start from ptr, indirect steps of merge_pointees.
-// Intermediate nil from MergePointeesOfPointers propagates (fail closed).
+// Incomplete merge → IncompleteVariables (not bare nil invent empty complete).
 func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
 	if ptr == nil {
-		return nil
+		return IncompleteVariables()
 	}
 	tmp := []*Variable{ptr}
 	for indirect > 0 {
 		tmp = MergePointeesOfPointers(tmp, facts)
-		// nil = incomplete merge (missing fact / holes) — stop, do not invent empty
-		if tmp == nil {
-			return nil
+		// incomplete merge (missing fact / holes) — stop, do not invent empty
+		if !VariablesComplete(tmp) {
+			return IncompleteVariables()
 		}
 		indirect--
 	}

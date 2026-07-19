@@ -99,8 +99,8 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if _, ok := broken.IndirectLevelComplete(); ok {
 		t.Fatal("nil Var.Type must fail closed Incomplete")
 	}
-	if broken.GetLvars(nil) != nil {
-		t.Fatal("GetLvars incomplete must fail closed nil")
+	if VariablesComplete(broken.GetLvars(nil)) {
+		t.Fatal("GetLvars incomplete must fail closed incomplete")
 	}
 	eBroken := &Expression{Term: TermVariable, Var: &Variable{Name: "y"}}
 	if _, ok := eBroken.IndirectLevelComplete(); ok {

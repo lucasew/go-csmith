@@ -650,8 +650,8 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 		return IncompleteFactSlice()
 	}
 	locals := collectLoopLocalVars(blk)
-	// nil locals = incomplete LocalVars hole — fail closed
-	if locals == nil {
+	// incomplete LocalVars hole — fail closed
+	if !VariablesComplete(locals) {
 		return IncompleteFactSlice()
 	}
 	out := CloneFactSlice(facts)
@@ -679,16 +679,15 @@ func RemoveLoopLocalFactsForStmt(facts []*FactPointTo, st *Stmt, parent *Block) 
 
 // collectLoopLocalVars walks blk → parents until a looping block (inclusive).
 // FactMgr.cpp:605–610.
-// Variable* always live on LocalVars; nil hole fails closed (nil — no invent skip).
+// Variable* always live on LocalVars; nil hole fails closed IncompleteVariables
+// (not bare nil invent empty-complete loop-local set).
 // Empty complete walk returns non-nil empty slice.
 func collectLoopLocalVars(blk *Block) []*Variable {
 	locals := make([]*Variable, 0)
 	b := blk
 	for b != nil {
-		for _, v := range b.LocalVars {
-			if v == nil {
-				return nil
-			}
+		if !VariablesComplete(b.LocalVars) {
+			return IncompleteVariables()
 		}
 		locals = append(locals, b.LocalVars...)
 		if b.Looping {

@@ -383,8 +383,8 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 		CreateVariableScalars("l_1", GetIntType(), false, false),
 		nil,
 	}}
-	if collectLoopLocalVars(loop) != nil {
-		t.Fatal("nil LocalVars hole must fail closed")
+	if VariablesComplete(collectLoopLocalVars(loop)) {
+		t.Fatal("nil LocalVars hole must fail closed incomplete")
 	}
 	// complete empty
 	empty := &Block{Looping: true}

@@ -92,10 +92,7 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 			return IncompleteVariables()
 		}
 		vars = MergePointeesOfPointer(e.Var.GetCollective(), ind, facts)
-		// nil = incomplete merge; empty non-nil = no pointees
-		if vars == nil {
-			return IncompleteVariables()
-		}
+		// incomplete merge; empty non-nil = no pointees
 		if !VariablesComplete(vars) {
 			return IncompleteVariables()
 		}

@@ -242,47 +242,48 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	if f.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("nil pointee hole must fail closed")
 	}
-	if MergePointeesOfPointers([]*Variable{nil}, nil) != nil {
-		t.Fatal("nil ptr hole MergePointees must fail closed")
+	if VariablesComplete(MergePointeesOfPointers([]*Variable{nil}, nil)) {
+		t.Fatal("nil ptr hole MergePointees must fail closed incomplete")
 	}
 }
 
 func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 	// FactPointTo.cpp:694 assert(exist_fact) — missing related fact fails closed
-	// (no invent soft-skip partial pointees)
+	// (no invent soft-skip partial pointees / empty complete)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// facts empty / no related fact for p
-	if MergePointeesOfPointers([]*Variable{p}, nil) != nil {
-		t.Fatal("missing exist_fact must fail closed nil, not invent empty skip")
+	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, nil)) {
+		t.Fatal("missing exist_fact must fail closed incomplete, not invent empty skip")
 	}
-	if MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{}) != nil {
-		t.Fatal("empty facts without related must fail closed")
+	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{})) {
+		t.Fatal("empty facts without related must fail closed incomplete")
 	}
 	// incomplete fact map
-	if MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}) != nil {
-		t.Fatal("incomplete facts must fail closed")
+	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
+		t.Fatal("incomplete facts must fail closed incomplete")
 	}
 	// complete related fact still works
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	got := MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
-	if len(got) != 1 || got[0] != tgt {
+	if !VariablesComplete(got) || len(got) != 1 || got[0] != tgt {
 		t.Fatalf("complete related fact: %+v", got)
 	}
 	// specials still skip without fact
-	if MergePointeesOfPointers([]*Variable{NullPtr}, nil) == nil {
-		t.Fatal("specials-only must yield empty non-nil, not fail closed")
+	sp := MergePointeesOfPointers([]*Variable{NullPtr}, nil)
+	if !VariablesComplete(sp) || len(sp) != 0 {
+		t.Fatal("specials-only must yield empty complete, not fail closed", sp)
 	}
 }
 
 func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// indirect 1 with missing fact → nil (not invent empty step)
-	if MergePointeesOfPointer(p, 1, nil) != nil {
-		t.Fatal("missing fact at indir 1 must propagate nil")
+	// indirect 1 with missing fact → incomplete (not invent empty step)
+	if VariablesComplete(MergePointeesOfPointer(p, 1, nil)) {
+		t.Fatal("missing fact at indir 1 must propagate incomplete")
 	}
 	// indirect 0 does not look up facts
 	got := MergePointeesOfPointer(p, 0, nil)
-	if len(got) != 1 || got[0] != p {
+	if !VariablesComplete(got) || len(got) != 1 || got[0] != p {
 		t.Fatalf("indir0: %+v", got)
 	}
 }
