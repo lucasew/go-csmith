@@ -64,6 +64,38 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	}
 }
 
+func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient/facts must sticky ERROR (no invent return soft re-pick)
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	fm := NewFactMgr(f)
+	vs := NewVariableSelector(opts)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	st := MakeRandomReturn(NewRng(1), opts, vs, &cg)
+	if st.Expr != nil || stmtOK(st) {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomReturn")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	st2 := MakeRandomReturn(NewRng(2), opts, vs, &cg2)
+	if st2.Expr != nil || stmtOK(st2) {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomReturn")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live
 	opts := Defaults()

@@ -70,6 +70,13 @@ func MakeRandomReturn(
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
 		return Stmt{}
 	}
+	// incomplete ambient fails closed sticky (no invent return / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// StatementReturn.cpp:55 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementReturn, nullptr)
 	if DepthGuardByType(opts, DtStatementReturn) == BadDepth {
 		return Stmt{}
@@ -77,6 +84,11 @@ func MakeRandomReturn(
 	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)
 	// fail closed without FactMgr invent (C++ get_fact_mgr always live)
 	if cg.FM == nil {
+		return Stmt{}
+	}
+	// incomplete GlobalFacts fail closed sticky (no invent cleaned return expr under holes)
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementReturn.cpp:56–62 — curr_func->return_type; no invent

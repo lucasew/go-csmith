@@ -20,6 +20,13 @@ func MakeRandomContinue(
 	if r == nil || cg == nil {
 		return Stmt{}
 	}
+	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b); no soft invent continue without looping block
 	if loop == nil {

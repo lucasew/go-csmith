@@ -165,6 +165,40 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	}
 }
 
+func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient must sticky ERROR before EffectStm clear / soft re-pick
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Stack = []*Block{loop}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect())
+	cg.EffectAccum = &inc
+	cg.Flags |= FlagInLoop
+	st := MakeRandomBreak(NewRng(1), opts, vs, NewExprTables(opts), &cg)
+	if st.Expr != nil || stmtOK(st) {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBreak")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky MakeRandomBreak")
+	}
+	ClearError()
+	cg2 := WithFunc(f, IncompleteEffect())
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	cg2.Flags |= FlagInLoop
+	st2 := MakeRandomContinue(NewRng(2), opts, vs, NewExprTables(opts), &cg2, loop)
+	if st2.Expr != nil || stmtOK(st2) {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomContinue")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky MakeRandomContinue")
+	}
+	ClearError()
+}
+
 func TestArrayOpHeaderNumeric(t *testing.T) {
 	// StatementArrayOp::output_header uses numeric init/limit/incr (not InitStmt)
 	iv := CreateVariableScalars("i", GetIntType(), false, false)

@@ -15,6 +15,13 @@ func MakeRandomBreak(
 	if r == nil || cg == nil {
 		return Stmt{}
 	}
+	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementBreak.cpp:72 — assert(b); no soft invent break without looping block

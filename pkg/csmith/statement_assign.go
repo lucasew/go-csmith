@@ -196,6 +196,7 @@ func MakeRandomAssignQfer(
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
 			if !EffectComplete(runningEff) {
+				SetError(ErrGeneric)
 				return Stmt{}
 			}
 			if !callerQf {
@@ -205,6 +206,7 @@ func MakeRandomAssignQfer(
 		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
 		if !EffectComplete(runningEff) {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		if !callerQf && qfer.IsVolatile() {
@@ -227,6 +229,7 @@ func MakeRandomAssignQfer(
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
 			if !EffectComplete(runningEff) {
+				SetError(ErrGeneric)
 				return Stmt{}
 			}
 			if !callerQf {
@@ -236,7 +239,11 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:181 — merge_param_context(rhs_cg_context, true)
 	cg.MergeParamContext(rhsCG, true)
-	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+	// incomplete effect after RHS merge fails closed sticky (no invent LHS / soft re-pick)
+	if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return Stmt{}
 	}
 
@@ -245,8 +252,9 @@ func MakeRandomAssignQfer(
 	// when LhsWriteVars used bare nil on incomplete rhs_accum).
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
-		// Incomplete fold fails closed (no invent LHS under incomplete running)
+		// Incomplete fold fails closed sticky (no invent LHS under incomplete running)
 		if !EffectComplete(runningEff) {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 	}
