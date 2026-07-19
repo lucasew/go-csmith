@@ -105,12 +105,19 @@ func (f *FactPointTo) IsDead() bool {
 }
 
 // IsTBDOnly mirrors FactPointTo::is_tbd_only.
-// Incomplete PointTo (nil hole) fails closed false — not a pure TBD-only set.
+// Incomplete Fact/PointTo sticky false (no invent TBD-only / soft re-pick past holes).
 func (f *FactPointTo) IsTBDOnly() bool {
-	if f == nil || len(f.PointTo) != 1 {
+	// Fact always live; sticky incomplete no invent TBD-only soft-skip
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(f.PointTo) != 1 {
 		return false
 	}
 	if f.PointTo[0] == nil {
+		// incomplete PointTo hole sticky not-TBD-only
+		SetError(ErrGeneric)
 		return false
 	}
 	return f.PointTo[0] == TBDPtr
@@ -584,7 +591,12 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 // Equal reports same var and same points-to set.
 // Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).
 func (f *FactPointTo) Equal(other *FactPointTo) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both Fact* always live; sticky incomplete no invent not-equal soft-skip
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	// Variable* always live in PointTo; scan holes before len (len may differ with holes)
@@ -619,7 +631,12 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 // FactPointTo.cpp:602–609.
 // Incomplete PointTo (nil hole) fails closed sticky as not-imply (no invent cover / soft re-pick).
 func (f *FactPointTo) Imply(other *FactPointTo) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both Fact* always live; sticky incomplete no invent not-imply soft-skip
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	set := make(map[*Variable]bool, len(f.PointTo))
@@ -647,7 +664,12 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 // Incomplete PointTo (nil hole) fails closed sticky false without partial absorb
 // (no invent soft-skip hole and still join later pointees / soft re-pick).
 func (f *FactPointTo) Join(other *FactPointTo) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both Fact* always live; sticky incomplete no invent join no-op soft-skip
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	set := make(map[*Variable]bool, len(f.PointTo))

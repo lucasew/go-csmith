@@ -118,12 +118,20 @@ func (b *Block) GetLastStm() *Stmt {
 
 // FromTailToHead mirrors Block::from_tail_to_head.
 // Block.cpp:362–372 — looping body may fall through to head if last does not must_jump.
+// Incomplete Block/last sticky false (no invent fall-through / soft re-pick past holes).
 func (b *Block) FromTailToHead() bool {
-	if b == nil || !b.Looping || len(b.Stmts) == 0 {
+	// Block always live; sticky incomplete no invent fall-through soft-skip
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !b.Looping || len(b.Stmts) == 0 {
 		return false
 	}
 	s := b.GetLastStm()
 	if s == nil {
+		// incomplete last stmt sticky no fall-through
+		SetError(ErrGeneric)
 		return false
 	}
 	if s.MustJump() {

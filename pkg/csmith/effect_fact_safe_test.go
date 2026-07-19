@@ -289,3 +289,56 @@ func TestSafeOpFlagsDummyAndFloat(t *testing.T) {
 		t.Fatal("~ not for float")
 	}
 }
+
+func TestIsPureIsEmptyIncompleteSticky(t *testing.T) {
+	ClearError()
+	inc := IncompleteEffect()
+	if inc.IsPure() {
+		t.Fatal("IncompleteEffect IsPure must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect IsPure must SetError sticky")
+	}
+	ClearError()
+	if inc.IsSideEffectFree() {
+		t.Fatal("IncompleteEffect IsSideEffectFree must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect IsSideEffectFree must SetError sticky")
+	}
+	ClearError()
+	if inc.IsEmpty() {
+		t.Fatal("IncompleteEffect IsEmpty must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect IsEmpty must SetError sticky")
+	}
+	ClearError()
+	if !EmptyEffect().IsPure() || !EmptyEffect().IsSideEffectFree() || !EmptyEffect().IsEmpty() {
+		t.Fatal("EmptyEffect pure SE-free empty")
+	}
+	if HasError() {
+		t.Fatal("EmptyEffect predicates must not sticky")
+	}
+	ClearError()
+}
+
+func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*FactPointTo)(nil).IsTBDOnly() {
+		t.Fatal("nil Fact IsTBDOnly must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact IsTBDOnly must SetError sticky")
+	}
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
+	if f.IsTBDOnly() {
+		t.Fatal("PointTo hole IsTBDOnly must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("PointTo hole IsTBDOnly must SetError sticky")
+	}
+	ClearError()
+}

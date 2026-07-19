@@ -85,12 +85,24 @@ func (e Effect) Clone() Effect {
 }
 
 // IsPure mirrors Effect::is_pure.
-// Incomplete effects are not pure (no invent pure success past holes).
-func (e Effect) IsPure() bool { return !e.incomplete && e.pure }
+// Incomplete effects sticky not-pure (no invent pure success / soft re-pick past holes).
+func (e Effect) IsPure() bool {
+	if e.incomplete {
+		SetError(ErrGeneric)
+		return false
+	}
+	return e.pure
+}
 
 // IsSideEffectFree mirrors Effect::is_side_effect_free.
-// Incomplete effects are not SE-free (no invent SE-free success past holes).
-func (e Effect) IsSideEffectFree() bool { return !e.incomplete && e.sideEffectFree }
+// Incomplete effects sticky not SE-free (no invent SE-free success / soft re-pick past holes).
+func (e Effect) IsSideEffectFree() bool {
+	if e.incomplete {
+		SetError(ErrGeneric)
+		return false
+	}
+	return e.sideEffectFree
+}
 
 // WithSideEffects returns a non-SE-free effect (for tests / context).
 func WithSideEffects() Effect {
@@ -620,9 +632,11 @@ func (e Effect) HasRaceWith(other Effect) bool {
 
 // IsEmpty mirrors Effect::is_empty — no reads and no writes.
 // Effect.cpp:490–492.
-// Incomplete is not empty (no invent empty-complete free effect past holes).
+// Incomplete sticky not-empty (no invent empty-complete free effect past holes).
 func (e Effect) IsEmpty() bool {
 	if e.incomplete {
+		// IncompleteEffect sticky not-empty (restrictive — no invent empty-complete)
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(e.ReadVars()) == 0 && len(e.WrittenVars()) == 0
