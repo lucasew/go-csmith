@@ -126,9 +126,16 @@ func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
 
 // OutputDefFull mirrors Variable::OutputDef with optional __attribute__.
 // Variable.cpp:640–665 — decl, attr_generator.Output, init, volatile comment.
+// IsArray without AsArray sticky empty (no invent scalar "int g_a = 0;" past array shell).
 func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng) string {
 	// Variable* always live at OutputDef; sticky no invent def shell without it
 	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent scalar OutputDef for IsArray shell — use ArrayVariable::OutputDef)
+	if v.IsArray && v.AsArray == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -916,6 +923,12 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 	}
 	if v.Name == vname {
 		return v
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky miss
+	// (no invent bare-name OutputC match past broken array shell)
+	if v.IsArray && v.AsArray == nil {
+		SetError(ErrGeneric)
+		return nil
 	}
 	// array / array field: compare Output text
 	if v.IsArray || v.IsArrayField() {

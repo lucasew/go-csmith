@@ -197,6 +197,16 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 		t.Fatal("mixed incomplete globals must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was scalar OutputDef for array shell
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	g.VS.GlobalList = []*Variable{shell}
+	if out3 := g.OutputGlobals(); out3 != "" {
+		t.Fatal("IsArray without AsArray must fail closed globals", out3)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputGlobals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
@@ -606,6 +616,15 @@ func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("missing init OutputDef must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray soft invent was scalar "int g_a = 0;"
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Init: MakeInt(0)}
+	if shell.OutputDef(true) != "" {
+		t.Fatal("IsArray without AsArray OutputDef must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputDef must SetError sticky")
 	}
 	ClearError()
 }

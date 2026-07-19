@@ -107,7 +107,13 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 func TestGetAllArrayVars(t *testing.T) {
 	ClearError()
 	vs := NewVariableSelector(Defaults())
-	a := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	// live AsArray required (no invent complete pool of IsArray shells without AsArray)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	a := &av.Variable
 	s := CreateVariableScalars("g_s", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{a, s}
 	got := vs.GetAllArrayVars()
@@ -121,6 +127,17 @@ func TestGetAllArrayVars(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("Arrays nil hole must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray sticky incomplete pool
+	vs.Arrays = nil
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	vs.GlobalList = []*Variable{shell}
+	if VariablesComplete(vs.GetAllArrayVars()) {
+		t.Fatal("IsArray without AsArray GetAllArrayVars must fail closed Incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray GetAllArrayVars must SetError sticky")
 	}
 	ClearError()
 }

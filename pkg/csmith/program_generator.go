@@ -399,6 +399,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			SetError(ErrGeneric)
 			return ""
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent scalar OutputDef for IsArray shell not in Arrays map)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
 		if av := arrayByName[v.Name]; av != nil {
 			if emittedArray[v.Name] {
 				// dual-count collective+itemized — intentional C++ list shape, skip re-emit
@@ -407,6 +413,23 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			emittedArray[v.Name] = true
 			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
 			def := av.OutputDef()
+			if def == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return ""
+			}
+			if g.Opts.ForceGlobalsStatic {
+				body.WriteString("static ")
+			}
+			body.WriteString(def)
+			body.WriteString("\n")
+			continue
+		}
+		// IsArray with AsArray but missing from Arrays map still must use array OutputDef
+		// (no invent scalar OutputDefFull for live array not registered on VS.Arrays)
+		if v.IsArray && v.AsArray != nil {
+			def := v.AsArray.OutputDef()
 			if def == "" {
 				if !HasError() {
 					SetError(ErrGeneric)

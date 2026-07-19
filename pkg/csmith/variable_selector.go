@@ -705,6 +705,8 @@ func GetAllLocalVars(b *Block) []*Variable {
 // VariableSelector.cpp:737–745 — collect array globals (invalid for ccomp pointer init).
 // Variable* always live; nil hole fails closed IncompleteVariables
 // (not bare nil invent empty-complete array list).
+// IsArray without AsArray sticky IncompleteVariables (no invent complete pool of
+// broken array shells that later soft-skip itemize / emit paths).
 func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 	out := make([]*Variable, 0)
 	if vs == nil {
@@ -716,9 +718,15 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 		return IncompleteVariables()
 	}
 	for _, v := range vs.GlobalList {
-		if v.IsArray {
-			out = append(out, v)
+		if !v.IsArray {
+			continue
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky incomplete pool
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return IncompleteVariables()
+		}
+		out = append(out, v)
 	}
 	// Arrays list may hold collectives not yet on GlobalList
 	// ArrayVariable* always live; bare nil return invents VariablesComplete(nil) empty-complete

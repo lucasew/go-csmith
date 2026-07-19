@@ -207,4 +207,14 @@ func TestMatchVarNameNilSticky(t *testing.T) {
 		t.Fatal("empty name MatchVarName must stay non-sticky soft miss")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was bare-name OutputC match on array path
+	// (Name identity is complete; query non-exact name hits array Output branch)
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if shell.MatchVarName("g_b[0]") != nil {
+		t.Fatal("IsArray without AsArray array-output MatchVarName must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray MatchVarName must SetError sticky")
+	}
+	ClearError()
 }
