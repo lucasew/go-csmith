@@ -566,10 +566,8 @@ func (e *Expression) UseVar(v *Variable) bool {
 
 // ToString mirrors Expression::to_string — Output without stream.
 // Expression.cpp:120–124.
+// Expression always live; sticky empty via Output (no invent soft-skip past hole).
 func (e *Expression) ToString() string {
-	if e == nil {
-		return ""
-	}
 	return e.Output()
 }
 

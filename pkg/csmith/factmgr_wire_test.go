@@ -581,6 +581,28 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM RestoreStmFactMaps must SetError sticky")
 	}
 	ClearError()
+	(*FactMgr)(nil).AddNewVarFactAndUpdate(nil, CreateVariableScalars("g_y", GetIntType(), false, false))
+	if !HasError() {
+		t.Fatal("nil FM AddNewVarFactAndUpdate must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).UpdateFactsForOOSVars([]*Variable{CreateVariableScalars("g_z", GetIntType(), false, false)})
+	if !HasError() {
+		t.Fatal("nil FM UpdateFactsForOOSVars must SetError sticky")
+	}
+	ClearError()
+	// empty OOS list complete no-op
+	fm.UpdateFactsForOOSVars(nil)
+	if HasError() {
+		t.Fatal("empty UpdateFactsForOOSVars must not sticky")
+	}
+	ClearError()
+	facts := []*FactPointTo{}
+	(*FactMgr)(nil).AddParamFacts(nil, &facts)
+	if !HasError() {
+		t.Fatal("nil FM AddParamFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindParentBlockNilSticky(t *testing.T) {

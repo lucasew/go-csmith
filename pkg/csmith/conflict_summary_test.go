@@ -237,6 +237,12 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 		t.Fatal("incomplete referenced-ptrs walk must SetError sticky")
 	}
 	ClearError()
+	// Function always live; sticky no invent soft-skip summary past hole
+	(*Function)(nil).ComputeSummary(EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil Function ComputeSummary must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsFrameVar(t *testing.T) {

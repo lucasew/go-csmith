@@ -154,4 +154,13 @@ func TestExpressionToString(t *testing.T) {
 	if e.ToString() != "42" && e.ToString() != e.Output() {
 		t.Fatal(e.ToString())
 	}
+	// Expression always live; sticky empty via Output (no invent soft-skip past hole)
+	ClearError()
+	if (*Expression)(nil).ToString() != "" {
+		t.Fatal("nil ToString must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil ToString must SetError sticky")
+	}
+	ClearError()
 }

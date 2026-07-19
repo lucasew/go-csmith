@@ -1289,8 +1289,10 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 // Incomplete GlobalFacts / Clone fail closed sticky (IncompleteFactSlice on
 // GlobalFacts + SetError; incomplete map entries stay incomplete local markers —
 // no invent append past hole / soft re-pick past wiped GlobalFacts).
+// FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).
 func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if fm == nil || v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// FactMgr.cpp:72 — assert(var->is_global()) when blk==nullptr
@@ -1785,8 +1787,14 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
 // FactMgr.cpp:141–172 — drop facts for oos vars; mark pointees garbage.
 // Delegates to package UpdateFactsForOOSVars (fail closed on fact/var holes).
+// FactMgr always live; sticky (no invent soft-skip OOS update past hole).
+// Empty vars is complete no-op.
 func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
-	if fm == nil || len(vars) == 0 {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if len(vars) == 0 {
 		return
 	}
 	// reuse slice-level fail-closed filter (nil holes → GlobalFacts nil)
@@ -1801,8 +1809,10 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 // (FactPointTo.cpp:168–169 → garbage for pointers), same as C++ nullptr value.
 // Variable* params always live; nil param hole or incomplete assign fails closed
 // (*facts nil, stop — no invent skip remaining params / re-accumulate after wipe).
+// FactMgr + Func + facts always live; sticky (no invent soft-skip param facts past hole).
 func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	if fm == nil || fm.Func == nil || facts == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	for i, p := range fm.Func.Param {

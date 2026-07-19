@@ -1650,8 +1650,15 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 }
 
 // outputValueDumpArray expands array into all index combinations and dumps elements.
+// outputValueDumpArray expands array into all index combinations and dumps elements.
+// Variable always live; sticky empty (no invent soft-skip dump past hole).
+// Zero-rank ArraySizes is complete empty (not incomplete IR).
 func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
-	if v == nil || len(v.ArraySizes) == 0 {
+	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if len(v.ArraySizes) == 0 {
 		return ""
 	}
 	// base name always live sticky; no invent printf with bare "[0]" access
@@ -1900,8 +1907,15 @@ func hashArrayHasPayload(v *Variable) bool {
 // (ArrayVariable.cpp:741–752).
 // Skips arrays with no hashable payload (e.g. pointer element type).
 // ArrayVariable.cpp:763 — get_last_ctrl_vars only (no letter-name soft-fallback).
+// hashArrayVariable emits looped transparent_crc for array elements.
+// Variable always live; sticky empty (no invent soft-skip hash past hole).
+// Zero-rank / no payload is complete empty (not incomplete IR shell).
 func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
-	if v == nil || len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
+	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if len(v.ArraySizes) == 0 || !hashArrayHasPayload(v) {
 		return ""
 	}
 	if ctrl == nil {

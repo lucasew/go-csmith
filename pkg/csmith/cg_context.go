@@ -75,9 +75,11 @@ func (c CGContext) AccumEffect() Effect {
 
 // NoteWrite records a variable write into EffectAccum if present.
 // Also updates CurrentFunc.FEffect for globals (Function::feffect external).
+// Variable always live; sticky (no invent soft-skip write past hole).
 // Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteWrite(v *Variable) {
 	if v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
@@ -103,9 +105,11 @@ func (c CGContext) NoteWrite(v *Variable) {
 }
 
 // NoteRead records a variable read into EffectAccum and FEffect for globals.
+// Variable always live; sticky (no invent soft-skip read past hole).
 // Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteRead(v *Variable) {
 	if v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if c.EffectAccum != nil {
@@ -264,8 +268,10 @@ func (c CGContext) WithRW(rw *RWDirective) CGContext {
 }
 
 // ClearEffectStm mirrors get_effect_stm().clear().
+// CGContext always live; sticky (no invent soft-skip clear past hole).
 func (c *CGContext) ClearEffectStm() {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	c.EffectStm = EmptyEffect()
@@ -273,8 +279,10 @@ func (c *CGContext) ClearEffectStm() {
 
 // ResetEffectAccum mirrors CGContext::reset_effect_accum.
 // CGContext.h:156 — replace effect_accum with a snapshot (e.g. after failed DFA).
+// CGContext always live; sticky (no invent soft-skip reset past hole).
 func (c *CGContext) ResetEffectAccum(e Effect) {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	cp := e.Clone()
@@ -339,8 +347,10 @@ func (c CGContext) OutputCallChain() string {
 // CGContext.cpp:399–404 — merge global-only effects into accum and stm.
 // Incomplete e or base fails closed sticky error (no invent silent IncompleteEffect poison
 // as successful merge / under-report callee effects).
+// CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) AddExternalEffect(e Effect) {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
@@ -382,8 +392,11 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 // CGContext.cpp:411–417 — callers = call_chain then b.
 // Block* always live on call_chain; nil hole or incomplete Param/LocalVars fails
 // closed sticky error (no invent soft-skip merge as no-effect success / partial merge).
+// AddVisibleEffectAt merges caller-visible external effect.
+// CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
@@ -434,8 +447,11 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 // AddEffect mirrors CGContext::add_effect — fold into accum and effect_stm.
 // CGContext.cpp:382–388.
 // Incomplete e or base fails closed sticky error (no invent silent IncompleteEffect poison).
+// AddEffect folds e into accum and effect_stm.
+// CGContext always live; sticky (no invent soft-skip fold past hole).
 func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
@@ -462,8 +478,11 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 // Does not merge param.effect_stm (only accum is folded via add_effect).
 // Incomplete effect merge fails closed sticky (AddEffect SetError); do not invent
 // expr_depth handoff after a failed effect merge.
+// MergeParamContext folds param accum into caller and copies expr_depth.
+// CGContext always live; sticky (no invent soft-skip merge past hole).
 func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if param.EffectAccum != nil {
@@ -573,8 +592,10 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 }
 
 // AddIVBound records a loop induction variable (StatementFor.cpp:441–443).
+// CGContext + IV always live; sticky (no invent soft-skip IV bound past hole).
 func (c *CGContext) AddIVBound(iv *Variable, bound int) {
 	if c == nil || iv == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if c.IVBounds == nil {
@@ -584,8 +605,14 @@ func (c *CGContext) AddIVBound(iv *Variable, bound int) {
 }
 
 // RemoveIVBound clears a loop induction variable (StatementFor.cpp:447, 470).
+// CGContext + IV always live; sticky (no invent soft-skip remove past hole).
+// Nil IVBounds is complete no-op (no bounds to clear).
 func (c *CGContext) RemoveIVBound(iv *Variable) {
-	if c == nil || c.IVBounds == nil || iv == nil {
+	if c == nil || iv == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if c.IVBounds == nil {
 		return
 	}
 	delete(c.IVBounds, iv)
@@ -690,8 +717,11 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 // CGContext.cpp:175–185.
 // Incomplete GetCollective fails closed (no invent read/write on nil collective shell).
 // Incomplete EffectStm/accum fails closed sticky error (no invent silent grow on hole shell).
+// ReadVar forces a read into accum + stm.
+// CGContext + Variable always live; sticky (no invent soft-skip read past hole).
 func (c *CGContext) ReadVar(v *Variable) {
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
@@ -726,8 +756,11 @@ func (c *CGContext) ReadVar(v *Variable) {
 // CGContext.cpp:307–317.
 // Incomplete GetCollective fails closed (no invent write on nil collective shell).
 // Incomplete EffectStm/accum fails closed sticky error (no invent silent grow on hole shell).
+// WriteVar forces a write into accum + stm.
+// CGContext + Variable always live; sticky (no invent soft-skip write past hole).
 func (c *CGContext) WriteVar(v *Variable) {
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {

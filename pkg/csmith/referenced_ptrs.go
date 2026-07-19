@@ -358,8 +358,10 @@ func ReadUnionFieldBlock(b *Block) bool {
 // bodyEffect is the accumulated effect of the function body (map_stm_effect[body]).
 // Incomplete body IR fails closed sticky UnionFieldRead + IncompleteVariables
 // ReferencedPtrs (no invent clean empty summary / soft re-pick past hole walk).
+// Function always live; sticky (no invent soft-skip summary past hole).
 func (f *Function) ComputeSummary(bodyEffect Effect) {
 	if f == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	f.ReferencedPtrs = nil

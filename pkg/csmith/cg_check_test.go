@@ -515,6 +515,83 @@ func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 		t.Fatal("NoteRead incomplete accum must SetError")
 	}
 	ClearError()
+	// Variable always live; sticky no invent soft-skip write/read past hole
+	cg.NoteWrite(nil)
+	if !HasError() {
+		t.Fatal("nil Variable NoteWrite must SetError sticky")
+	}
+	ClearError()
+	cg.NoteRead(nil)
+	if !HasError() {
+		t.Fatal("nil Variable NoteRead must SetError sticky")
+	}
+	ClearError()
+	// CGContext always live on mutators
+	(*CGContext)(nil).ClearEffectStm()
+	if !HasError() {
+		t.Fatal("nil CGContext ClearEffectStm must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).ResetEffectAccum(EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil CGContext ResetEffectAccum must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).AddExternalEffect(EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil CGContext AddExternalEffect must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).AddVisibleEffectAt(EmptyEffect(), nil)
+	if !HasError() {
+		t.Fatal("nil CGContext AddVisibleEffectAt must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).AddEffect(EmptyEffect(), false)
+	if !HasError() {
+		t.Fatal("nil CGContext AddEffect must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).MergeParamContext(EmptyCGContext(), false)
+	if !HasError() {
+		t.Fatal("nil CGContext MergeParamContext must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).ReadVar(g)
+	if !HasError() {
+		t.Fatal("nil CGContext ReadVar must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).WriteVar(g)
+	if !HasError() {
+		t.Fatal("nil CGContext WriteVar must SetError sticky")
+	}
+	ClearError()
+	cg.ReadVar(nil)
+	if !HasError() {
+		t.Fatal("nil Variable CGContext.ReadVar must SetError sticky")
+	}
+	ClearError()
+	cg.WriteVar(nil)
+	if !HasError() {
+		t.Fatal("nil Variable CGContext.WriteVar must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).AddIVBound(g, 1)
+	if !HasError() {
+		t.Fatal("nil CGContext AddIVBound must SetError sticky")
+	}
+	ClearError()
+	cg.AddIVBound(nil, 1)
+	if !HasError() {
+		t.Fatal("nil IV AddIVBound must SetError sticky")
+	}
+	ClearError()
+	(*CGContext)(nil).RemoveIVBound(g)
+	if !HasError() {
+		t.Fatal("nil CGContext RemoveIVBound must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddEffectIncompleteFailClosed(t *testing.T) {
