@@ -55,6 +55,11 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("f1 after bitfield in packed struct")
 	}
+	// incomplete FieldVars hole before f1: fail closed packed-after (restrictive)
+	parent.FieldVars = []*Variable{f0, nil, f1}
+	if !f1.IsPackedAfterBitfield() {
+		t.Fatal("FieldVars hole must fail closed as packed-after-bitfield")
+	}
 }
 
 func TestGetSeqNum(t *testing.T) {

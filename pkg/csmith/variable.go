@@ -650,12 +650,17 @@ func (v *Variable) IsPackedAggregateFieldVar() bool {
 
 // IsPackedAfterBitfield mirrors Variable::is_packed_after_bitfield.
 // Variable.cpp:1240–1258 — packed struct field after a bitfield has unstable offset.
+// Incomplete parent FieldVars fail closed true (restrictive — no invent not-packed
+// by soft-skipping FieldVars holes before this field).
 func (v *Variable) IsPackedAfterBitfield() bool {
 	if v == nil || v.FieldVarOf == nil {
 		return false
 	}
 	parent := v.FieldVarOf
 	if parent.Type != nil && parent.Type.IsStruct() && parent.Type.Packed {
+		if !parent.FieldVarsComplete() {
+			return true
+		}
 		for i, f := range parent.FieldVars {
 			if f == v {
 				break
@@ -663,7 +668,7 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 			if parent.Type.IsBitfieldIndex(i) {
 				return true
 			}
-			if f != nil && f.Type != nil && f.Type.HasBitfields() {
+			if f.Type != nil && f.Type.HasBitfields() {
 				return true
 			}
 		}

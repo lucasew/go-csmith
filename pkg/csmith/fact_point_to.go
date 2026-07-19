@@ -201,16 +201,20 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 
 // MakeFactsPointTo mirrors FactPointTo::make_facts(vars, point_to).
 // FactPointTo.cpp:340–348 — vars[i] always live; skip only type==null specials.
-// no invent skip of nil Variable* holes as partial success
+// no invent skip of nil Variable* holes as partial success; non-special Type-nil
+// is incomplete IR (fail closed whole batch — no invent soft-skip broken lvars).
 func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
 			return nil
 		}
-		// if type is null, special variables (most likely tbd_ptr) — skip
+		// type null: specials (null/garbage/tbd) skipped; other broken IR fails closed
 		if v.Type == nil {
-			continue
+			if IsSpecialPtr(v) {
+				continue
+			}
+			return nil
 		}
 		f := MakeFactPointTo(v, pointTo)
 		if f == nil {
@@ -233,7 +237,10 @@ func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 			return nil
 		}
 		if v.Type == nil {
-			continue
+			if IsSpecialPtr(v) {
+				continue
+			}
+			return nil
 		}
 		f := MakeFactPointToSet(v, set)
 		if f == nil {

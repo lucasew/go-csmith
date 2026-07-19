@@ -68,6 +68,17 @@ func TestFactPointToNullDead(t *testing.T) {
 	if MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr}) != nil {
 		t.Fatal("nil hole in lvars must fail closed MakeFactsPointToSet")
 	}
+	// specials Type-nil skipped; non-special Type-nil fails closed whole batch
+	if MakeFactsPointTo([]*Variable{NullPtr, p}, NullPtr) == nil {
+		t.Fatal("special Type-nil must soft-skip not fail batch")
+	}
+	broken := &Variable{Name: "broken"} // Type nil, not special
+	if MakeFactsPointTo([]*Variable{broken, p}, NullPtr) != nil {
+		t.Fatal("non-special Type-nil must fail closed whole MakeFactsPointTo")
+	}
+	if MakeFactsPointToSet([]*Variable{broken, p}, []*Variable{NullPtr}) != nil {
+		t.Fatal("non-special Type-nil must fail closed whole MakeFactsPointToSet")
+	}
 }
 
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {
