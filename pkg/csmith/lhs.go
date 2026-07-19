@@ -393,6 +393,11 @@ func MakeRandomLhs(
 		var v *Variable
 		// Lhs.cpp:73–76 — try must_use WRITE first
 		v = vs.SelectMustUseVar(r, AccessWrite, *cg, typ, &q)
+		// residual ERROR sticky — no invent fall through to soft select past must-use hole
+		if HasError() {
+			restore()
+			return nil
+		}
 		// Lhs.cpp:77–87 — flipcoin SelectDerefPointerProb
 		if v == nil {
 			derefProb := 0
@@ -401,6 +406,11 @@ func MakeRandomLhs(
 			}
 			if derefProb > 0 && r.RndFlipcoin(uint32(derefProb)) {
 				v = selectDerefPointerInv(r, opts, probs, vs, *cg, typ, &q, AccessWrite, dummy)
+				// residual ERROR sticky — no invent soft-continue past deref select hole
+				if HasError() {
+					restore()
+					return nil
+				}
 			}
 		}
 		// Lhs.cpp:89–100 — select(WRITE, restricted qfer, dummy, eDerefExact)
@@ -410,25 +420,48 @@ func MakeRandomLhs(
 			if !newQ.Wildcard {
 				newQ.Restrict(AccessWrite, *cg)
 			}
+			// residual Restrict sticky — no invent soft select past qfer hole
+			if HasError() {
+				restore()
+				return nil
+			}
 			v = vs.SelectWithInvalid(AccessWrite, *cg, typ, &newQ, r, MatchDerefExact, dummy)
 			// Lhs.cpp:94 — ERROR_GUARD(nullptr); select may create vars itself
+			// residual ERROR sticky — no invent soft-continue / create past select hole
+			if HasError() {
+				restore()
+				return nil
+			}
 		}
 		if v == nil {
 			// Lhs.cpp:101 assert(var) / ERROR_GUARD — no separate SelectGlobal soft path
+			// complete soft miss (no residual): restore and re-pick
 			restore()
 			continue
 		}
-		// Variable::type always live; incomplete type IR fails closed (no invent
-		// skip const-after-deref filter and still accept the candidate)
+		// Variable::type always live; incomplete type IR fails closed sticky
+		// (no invent soft-skip const-after-deref filter then accept later create)
 		if v.Type == nil {
-			dummy = append(dummy, v)
+			SetError(ErrGeneric)
 			restore()
-			continue
+			return nil
+		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent WRITE Lhs past broken array shell)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			restore()
+			return nil
 		}
 		// Lhs.cpp:85–86 / 97–99 — assert(!qfer.is_const_after_deref(deref_level))
 		// select+restrict should exclude const WRITE; reject if violated
 		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
 		if v.IsConstAfterDeref(deref) {
+			// residual ERROR sticky — no invent soft-continue past incomplete const peel
+			if HasError() {
+				restore()
+				return nil
+			}
 			dummy = append(dummy, v)
 			restore()
 			continue
@@ -440,10 +473,20 @@ func MakeRandomLhs(
 			if OpportunisticValidate(r, v, typ, cg.FM.GlobalFacts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) == 0 {
 				valid = false
 			}
+			// residual ERROR sticky — no invent soft-continue past validate hole
+			if HasError() {
+				restore()
+				return nil
+			}
 		}
 		// Lhs.cpp:105 — !effect_stm.is_written(var)
 		if valid && cg.EffectStm.IsWritten(v) {
 			valid = false
+		}
+		// residual ERROR sticky — no invent soft-continue past IsWritten hole
+		if HasError() {
+			restore()
+			return nil
 		}
 		// Lhs.cpp:110–113 — no_signed_overflow rejects signed base / bitfield for ++/--
 		if valid && typ.IsSimple() && noSignedOverflow {
@@ -478,10 +521,15 @@ func MakeRandomLhs(
 		}
 
 		lhs := finishLhs(v, typ, compoundAssign, cg, opts)
+		// residual ERROR sticky — no invent soft-continue past visit_facts hard IR hole
+		if HasError() {
+			restore()
+			return nil
+		}
 		if lhs != nil {
 			return lhs
 		}
-		// visit_facts failed — Lhs.cpp:135–139
+		// visit_facts failed soft — Lhs.cpp:135–139
 		dummy = append(dummy, v)
 		restore()
 	}

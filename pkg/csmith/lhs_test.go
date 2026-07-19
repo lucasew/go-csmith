@@ -67,7 +67,8 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	vs.GlobalList = []*Variable{broken}
 	vs.AllVars = []*Variable{broken}
 	cg := EmptyCGContext()
-	// may create a new var instead of broken; must never accept Type-nil
+	// Type-nil in pool stickies select residual; whole MakeRandomLhs fails closed
+	// (no invent soft fall-through create/accept past incomplete type IR)
 	for seed := uint64(1); seed < 20; seed++ {
 		ClearError()
 		lhs := MakeRandomLhs(NewRng(seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
@@ -76,6 +77,51 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 		}
 	}
 	// sticky after incomplete type IR in select — clear for suite
+	ClearError()
+}
+
+func TestMakeRandomLhsResidualSticky(t *testing.T) {
+	// residual ERROR soft-continue invents Lhs via fall-through select / later try.
+	// Fair: sticky fail closed whole MakeRandomLhs.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{}
+	// must_use Type-nil stickies SelectMustUseVar residual; must not invent soft select Lhs
+	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken.Type = nil
+	good := CreateVariableScalars("g_good", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{good}
+	vs.AllVars = []*Variable{good}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	rw := &RWDirective{MustWriteVars: []*Variable{broken, good}}
+	cg := WithFunc(f, EmptyEffect()).WithRW(rw)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if MakeRandomLhs(NewRng(1), opts, probs, vs, &cg, GetIntType(), false, false, nil) != nil {
+		t.Fatal("must-use Type-nil residual must fail closed MakeRandomLhs")
+	}
+	if !HasError() {
+		t.Fatal("must-use residual MakeRandomLhs must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray shell in must-use: SelectMustUse stickies residual;
+	// soft invent was fall through soft select invent Lhs from good global.
+	shell := &Variable{
+		Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	rw2 := &RWDirective{MustWriteVars: []*Variable{shell, good}}
+	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw2)
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	if MakeRandomLhs(NewRng(2), opts, probs, vs, &cg2, GetIntType(), false, false, nil) != nil {
+		t.Fatal("IsArray without AsArray must-use residual must fail closed MakeRandomLhs")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray residual MakeRandomLhs must SetError sticky")
+	}
 	ClearError()
 }
 
