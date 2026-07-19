@@ -65,6 +65,11 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
 		t.Fatal("empty ccomp rhs must fail closed", out)
 	}
+	// nil Expr on simple assign — no invent bare lhs
+	st2 := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
+	if out := OutputAssignAsExprOpts(st2, false, opts); out != "" {
+		t.Fatal("nil Expr simple must fail closed", out)
+	}
 }
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {

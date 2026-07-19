@@ -82,6 +82,7 @@ func (b *Block) MustJump() bool {
 // hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.
 // Block.cpp:318–326 / 346–353 — continue into loop body can bypass end return.
 // Incomplete CFG (nil hole) fails closed as possible escape — no invent "no edge".
+// Nil FactMgr: no edges known (C++ find_edges_in empty) → no escape (not invent escape).
 func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false

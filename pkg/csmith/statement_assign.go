@@ -501,10 +501,14 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	if lhs == "" {
 		return ""
 	}
-	// StatementAssign.cpp: expr.Output always; no soft invent "0" for nil RHS
-	rhs := ""
+	// StatementAssign.cpp: expr.Output always for ops that need RHS
+	// no soft invent "0" / bare lhs when Expr missing or Output empty
+	var rhs string
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
+	}
+	if !st.AssignOp.NeedNoRHS() && (st.Expr == nil || rhs == "") {
+		return ""
 	}
 	// StatementAssign.cpp:543 — if (avoid_signed_overflow() && op_flags)
 	// no soft invent safe rewrite when SafeMath off or flags missing
@@ -516,9 +520,6 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			// no invent "lhs = lhs + " with empty rhs Output
 			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
 				if assignLhsIsVolatile(st) {
-					if rhs == "" {
-						return ""
-					}
 					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
 				}
 			}

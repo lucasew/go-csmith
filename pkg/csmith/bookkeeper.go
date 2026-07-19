@@ -421,16 +421,28 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
 		return false
 	}
-	// StatementFor::get_exprs — push test only (init/incr are separate StatementAssigns
-	// not walked via get_exprs). Incomplete Loop IR fails closed (no invent skip for-test).
-	if st.Kind == StmtFor || st.Loop != nil {
+	// StatementFor/ArrayOp::get_exprs — push test only (init/incr are separate
+	// StatementAssigns not walked via get_exprs). Kind-gated (no invent
+	// Loop-on-wrong-kind). Incomplete Loop IR fails closed.
+	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			return false
 		}
 		*out = append(*out, st.Loop.TestExpr)
-	} else if st.Expr != nil {
-		// if/assign/return/expr/break/continue/goto — test/rhs/var on Expr
-		*out = append(*out, st.Expr)
+	} else {
+		switch st.Kind {
+		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+			// C++ get_exprs always yields live Expression* for these kinds
+			// incomplete nil Expr fails closed (no invent empty get_exprs success)
+			if st.Expr == nil {
+				return false
+			}
+			*out = append(*out, st.Expr)
+		default:
+			if st.Expr != nil {
+				*out = append(*out, st.Expr)
+			}
+		}
 	}
 	// get_blocks → recurse (Block* always live; nil hole fails closed)
 	for _, b := range GetBlocksStmt(st) {

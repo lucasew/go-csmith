@@ -180,3 +180,15 @@ func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 		t.Fatal("for without TestExpr must fail closed clear, not invent skip", exprDepthCnts)
 	}
 }
+
+func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
+	// C++ get_exprs always live for assign; nil Expr must not invent empty success stats
+	exprDepthCnts = []int{99}
+	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 1},
+	}}}
+	StatExprDepths([]*Function{f})
+	if exprDepthCnts != nil {
+		t.Fatal("assign without Expr must fail closed clear depths", exprDepthCnts)
+	}
+}
