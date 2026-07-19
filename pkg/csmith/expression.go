@@ -121,6 +121,7 @@ func (e *Expression) checkAndSetCastCore(desired *Type) {
 }
 
 // GetTypeUncast is get_type ignoring cast_type (for check_and_set_cast).
+// Incomplete IR fails closed nil (no invent ExprType shell without live invoke/assign/rhs).
 func (e *Expression) GetTypeUncast() *Type {
 	if e == nil {
 		return nil
@@ -130,38 +131,46 @@ func (e *Expression) GetTypeUncast() *Type {
 		if e.Con != nil {
 			return e.Con.Type
 		}
-	case TermVariable:
+		return nil
+	case TermVariable, TermLhs:
+		// ExpressionVariable always has live type; ExprType preferred then Var.Type
 		if e.ExprType != nil {
 			return e.ExprType
 		}
 		if e.Var != nil {
 			return e.Var.Type
 		}
+		return nil
 	case TermFunction:
-		if e.Invoke != nil {
-			return e.Invoke.GetType()
+		// ExpressionFuncall.cpp:122–124 — invoke.get_type(); no invent ExprType without invoke
+		if e.Invoke == nil {
+			return nil
 		}
-		if e.ExprType != nil {
-			return e.ExprType
-		}
+		return e.Invoke.GetType()
 	case TermCommaExpr:
-		if e.CommaRHS != nil {
-			return e.CommaRHS.GetTypeUncast()
+		// value type is RHS; incomplete without CommaRHS fails closed
+		if e.CommaRHS == nil {
+			return nil
 		}
+		return e.CommaRHS.GetTypeUncast()
 	case TermAssignment:
-		if e.Assign != nil {
-			if e.Assign.Lhs != nil {
-				if t := e.Assign.Lhs.GetType(); t != nil {
-					return t
-				}
+		// ExpressionAssign::get_type — LHS type only; no invent ExprType without Assign
+		if e.Assign == nil {
+			return nil
+		}
+		if e.Assign.Lhs != nil {
+			if t := e.Assign.Lhs.GetType(); t != nil {
+				return t
 			}
-			if e.Assign.LhsVar != nil {
-				return e.Assign.LhsVar.Type
+			// incomplete Lhs without type
+			if e.Assign.Lhs.Var == nil {
+				return nil
 			}
 		}
-		if e.ExprType != nil {
-			return e.ExprType
+		if e.Assign.LhsVar != nil {
+			return e.Assign.LhsVar.Type
 		}
+		return nil
 	}
 	return nil
 }
@@ -181,6 +190,7 @@ func (e *Expression) IndirectLevel() int {
 // GetType mirrors Expression::get_type.
 // ExpressionFuncall.cpp:122–124 — invoke.get_type();
 // ExpressionAssign — LHS type; Constant / Variable as typed.
+// Incomplete IR fails closed nil (no invent type shell / panic on nil CommaRHS).
 func (e *Expression) GetType() *Type {
 	if e == nil {
 		return nil
@@ -188,45 +198,7 @@ func (e *Expression) GetType() *Type {
 	if e.CastType != nil {
 		return e.CastType
 	}
-	switch e.Term {
-	case TermConstant:
-		if e.Con != nil {
-			return e.Con.Type
-		}
-	case TermVariable:
-		if e.ExprType != nil {
-			return e.ExprType
-		}
-		if e.Var != nil {
-			return e.Var.Type
-		}
-	case TermFunction:
-		// ExpressionFuncall.cpp:122–124
-		if e.Invoke != nil {
-			return e.Invoke.GetType()
-		}
-		if e.ExprType != nil {
-			return e.ExprType
-		}
-	case TermCommaExpr:
-		return e.CommaRHS.GetType()
-	case TermAssignment:
-		// ExpressionAssign::get_type — LHS type
-		if e.Assign != nil {
-			if e.Assign.Lhs != nil {
-				if t := e.Assign.Lhs.GetType(); t != nil {
-					return t
-				}
-			}
-			if e.Assign.LhsVar != nil {
-				return e.Assign.LhsVar.Type
-			}
-		}
-		if e.ExprType != nil {
-			return e.ExprType
-		}
-	}
-	return nil
+	return e.GetTypeUncast()
 }
 
 // GetQualifiers mirrors Expression::get_qualifiers.
@@ -266,6 +238,7 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 
 // EqualsInt mirrors Expression::equals(int).
 // Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
+// Incomplete IR fails closed false (no invent fold / panic on nil CommaRHS/Assign.Expr).
 func (e *Expression) EqualsInt(num int) bool {
 	if e == nil {
 		return false
@@ -274,15 +247,26 @@ func (e *Expression) EqualsInt(num int) bool {
 	case TermConstant:
 		return e.Con != nil && e.Con.Equals(num)
 	case TermFunction:
-		return e.Invoke != nil && e.Invoke.EqualsInt(num)
+		// ExpressionFuncall always has live invoke for fold
+		if e.Invoke == nil {
+			return false
+		}
+		return e.Invoke.EqualsInt(num)
 	case TermCommaExpr:
-		// comma value is RHS
+		// comma value is RHS; incomplete without RHS fails closed
+		if e.CommaRHS == nil {
+			return false
+		}
 		return e.CommaRHS.EqualsInt(num)
 	case TermAssignment:
 		// ExpressionAssign::equals — simple assign && expr.equals(num)
-		if e.Assign != nil && e.Assign.AssignOp == AssignSimple {
-			return e.Assign.Expr.EqualsInt(num)
+		if e.Assign == nil || e.Assign.AssignOp != AssignSimple {
+			return false
 		}
+		if e.Assign.Expr == nil {
+			return false
+		}
+		return e.Assign.Expr.EqualsInt(num)
 	}
 	return false
 }

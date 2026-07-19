@@ -115,6 +115,44 @@ func TestExpressionGetQualifiersIndirect(t *testing.T) {
 	}
 }
 
+func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
+	// no invent ExprType shell without live invoke / assign / comma RHS
+	if (&Expression{Term: TermFunction, ExprType: GetIntType()}).GetType() != nil {
+		t.Fatal("nil Invoke must not invent type from ExprType")
+	}
+	if (&Expression{Term: TermAssignment, ExprType: GetIntType()}).GetType() != nil {
+		t.Fatal("nil Assign must not invent type from ExprType")
+	}
+	if (&Expression{Term: TermCommaExpr}).GetType() != nil {
+		t.Fatal("nil CommaRHS must fail closed nil type, not panic")
+	}
+	if (&Expression{Term: TermVariable}).GetType() != nil {
+		t.Fatal("nil Var must fail closed")
+	}
+	// complete still works
+	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if (&Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}).GetType() != GetIntType() {
+		t.Fatal("complete variable type")
+	}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	if (&Expression{Term: TermCommaExpr, CommaLHS: rhs, CommaRHS: rhs}).GetType() != GetIntType() {
+		t.Fatal("complete comma RHS type")
+	}
+}
+
+func TestExpressionEqualsIntIncompleteFailClosed(t *testing.T) {
+	// incomplete must not panic or invent fold as equals
+	if (&Expression{Term: TermCommaExpr}).EqualsInt(0) {
+		t.Fatal("nil CommaRHS must fail closed false")
+	}
+	if (&Expression{Term: TermAssignment, Assign: &Stmt{AssignOp: AssignSimple}}).EqualsInt(0) {
+		t.Fatal("nil Assign.Expr must fail closed false")
+	}
+	if (&Expression{Term: TermFunction}).EqualsInt(0) {
+		t.Fatal("nil Invoke must fail closed false")
+	}
+}
+
 func TestExpressionLessThanAndIs0Or1(t *testing.T) {
 	if !(&Expression{Term: TermConstant, Con: MakeInt(3)}).LessThan(5) {
 		t.Fatal("3 < 5")
