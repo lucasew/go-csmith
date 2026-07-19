@@ -147,3 +147,28 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", exprDepthCnts)
 	}
 }
+
+func TestStatExprDepthsForTestExpr(t *testing.T) {
+	// StatementFor::get_exprs pushes test; soft invent skip would leave counts empty
+	BookkeeperDoFinalization()
+	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
+		{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}},
+	}}}
+	StatExprDepths([]*Function{f})
+	if len(exprDepthCnts) < 1 || exprDepthCnts[0] < 1 {
+		t.Fatalf("for-test must count: %+v", exprDepthCnts)
+	}
+}
+
+func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
+	// incomplete for Loop without TestExpr — no invent empty partial stats as success
+	exprDepthCnts = []int{99}
+	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
+		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalars("i", GetIntType(), false, false)}, Then: &Block{}},
+	}}}
+	StatExprDepths([]*Function{f})
+	if exprDepthCnts != nil {
+		t.Fatal("for without TestExpr must fail closed clear, not invent skip", exprDepthCnts)
+	}
+}

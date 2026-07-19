@@ -100,6 +100,22 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	}
 }
 
+func TestIsPtrUsedForTestExpr(t *testing.T) {
+	// StatementFor::get_exprs → test; ptr in for-test must count (no invent skip)
+	pt := PointerTo(GetIntType())
+	pv := CreateVariableScalars("p", pt, false, false)
+	test := &Expression{Term: TermVariable, Var: pv, ExprType: pt}
+	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}}
+	if !IsPtrUsed(st) {
+		t.Fatal("for-test pointer must be used")
+	}
+	// incomplete for without TestExpr fails closed as true (IsPtrUsed)
+	st2 := &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}
+	if !IsPtrUsed(st2) {
+		t.Fatal("incomplete for must fail closed ptr-used true")
+	}
+}
+
 func TestIsPtrUsed(t *testing.T) {
 	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: p, Expr: &Expression{Term: TermVariable, Var: p}}

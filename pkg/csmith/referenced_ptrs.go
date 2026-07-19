@@ -122,8 +122,17 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			return false
 		}
 	}
-	if st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.IsPointer() {
-		*ptrs = appendUniqueVar(*ptrs, st.Loop.IV)
+	// StatementFor::get_exprs → test; get_referenced_ptrs walks that expr.
+	// Incomplete Loop without TestExpr fails closed (no invent skip for-test
+	// ptrs / soft-claim IV alone as the only for-related pointer).
+	if st.Kind == StmtFor || st.Loop != nil {
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			*ptrs = nil
+			return false
+		}
+		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
+			return false
+		}
 	}
 	return true
 }

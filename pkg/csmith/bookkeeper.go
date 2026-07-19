@@ -408,34 +408,43 @@ func ExpressionComplexity(e *Expression) int {
 	}
 }
 
-// collectStmtExprs appends expressions reachable from one Stmt.
-func collectStmtExprs(st *Stmt, out *[]*Expression) {
+// collectStmtExprs appends expressions like Statement::get_exprs + get_blocks.
+// Bookkeeper.cpp:209–221 / Statement.cpp get_exprs virtuals.
+// Returns false on incomplete IR (no invent partial expr list past holes).
+func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
-		return
+		return false
 	}
-	if st.Expr != nil {
+	// StatementFor::get_exprs — push test only (init/incr are separate StatementAssigns
+	// not walked via get_exprs). Incomplete Loop IR fails closed (no invent skip for-test).
+	if st.Kind == StmtFor || st.Loop != nil {
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			return false
+		}
+		*out = append(*out, st.Loop.TestExpr)
+	} else if st.Expr != nil {
+		// if/assign/return/expr/break/continue/goto — test/rhs/var on Expr
 		*out = append(*out, st.Expr)
 	}
-	if st.Loop != nil {
-		// LoopControl may hold expressions via fields we walk if present
-	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			collectStmtExprs(&st.Then.Stmts[i], out)
+	// get_blocks → recurse (Block* always live; nil hole fails closed)
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return false
+		}
+		for i := range b.Stmts {
+			if !collectStmtExprs(&b.Stmts[i], out) {
+				return false
+			}
 		}
 	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			collectStmtExprs(&st.Else.Stmts[i], out)
-		}
-	}
+	return true
 }
 
 // StatExprDepths mirrors Bookkeeper::stat_expr_depths over non-builtin funcs.
 // Bookkeeper.cpp:224–230.
 // Function* always live; nil hole clears counts. Builtins without body skip.
-// Incomplete expressions (ExpressionComplexity < 0) clear counts — no invent
-// counting broken IR as leaf depth 0.
+// Incomplete expressions (ExpressionComplexity < 0) or incomplete stmt IR clear
+// counts — no invent counting broken IR as leaf depth 0 / skipping for-test.
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
 	for _, f := range funcs {
@@ -454,7 +463,10 @@ func StatExprDepths(funcs []*Function) {
 		}
 		for i := range f.Body.Stmts {
 			var exprs []*Expression
-			collectStmtExprs(&f.Body.Stmts[i], &exprs)
+			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
+				exprDepthCnts = nil
+				return
+			}
 			for _, e := range exprs {
 				c := ExpressionComplexity(e)
 				if c < 0 {
