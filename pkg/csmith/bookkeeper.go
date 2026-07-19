@@ -341,55 +341,70 @@ func OOBCount() int { return oobCnt }
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
 // plus sum of arg complexities; assign/comma nest.
+// Incomplete IR fails closed as -1 (no invent leaf depth 0 / partial nest counts).
 func ExpressionComplexity(e *Expression) int {
 	if e == nil {
-		return 0
+		return -1
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant always has live Value; incomplete shell → 0 (not invent depth 1)
+		// Constant always has live Value; incomplete shell → -1 (not invent depth 0 leaf)
 		if e.Con == nil || e.Con.Value == "" {
-			return 0
+			return -1
 		}
 		return 0
 	case TermVariable:
-		// ExpressionVariable always has live Variable*; incomplete → 0
+		// ExpressionVariable always has live Variable*; incomplete → -1
 		if e.Var == nil {
-			return 0
+			return -1
 		}
 		return 0
 	case TermFunction:
 		// ExpressionFuncall::get_complexity — live invoke only
-		// no soft invent complexity 1 for nil Invoke IR
+		// no soft invent complexity 0/1 for nil Invoke IR
 		if e.Invoke == nil {
-			return 0
+			return -1
 		}
 		comp := 0
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
 			comp++ // function call itself
 		}
 		for _, a := range e.Invoke.Args {
-			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed 0 total
+			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed
 			if a == nil {
-				return 0
+				return -1
 			}
-			comp += ExpressionComplexity(a)
+			c := ExpressionComplexity(a)
+			if c < 0 {
+				return -1
+			}
+			comp += c
 		}
 		return comp
 	case TermAssignment:
 		// incomplete Assign IR — no invent complexity 1 shell
 		if e.Assign == nil || e.Assign.Expr == nil {
-			return 0
+			return -1
 		}
-		return 1 + ExpressionComplexity(e.Assign.Expr)
+		c := ExpressionComplexity(e.Assign.Expr)
+		if c < 0 {
+			return -1
+		}
+		return 1 + c
 	case TermCommaExpr:
-		// both sides always live; incomplete → 0
+		// both sides always live; incomplete → -1
 		if e.CommaLHS == nil || e.CommaRHS == nil {
-			return 0
+			return -1
 		}
-		return 1 + ExpressionComplexity(e.CommaLHS) + ExpressionComplexity(e.CommaRHS)
+		cl := ExpressionComplexity(e.CommaLHS)
+		cr := ExpressionComplexity(e.CommaRHS)
+		if cl < 0 || cr < 0 {
+			return -1
+		}
+		return 1 + cl + cr
 	default:
-		return 0
+		// unknown term kind — incomplete IR
+		return -1
 	}
 }
 
@@ -419,7 +434,8 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) {
 // StatExprDepths mirrors Bookkeeper::stat_expr_depths over non-builtin funcs.
 // Bookkeeper.cpp:224–230.
 // Function* always live; nil hole clears counts. Builtins without body skip.
-// Incomplete expressions (ExpressionComplexity 0 on holes) already fail closed per-expr.
+// Incomplete expressions (ExpressionComplexity < 0) clear counts — no invent
+// counting broken IR as leaf depth 0.
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
 	for _, f := range funcs {
@@ -440,7 +456,12 @@ func StatExprDepths(funcs []*Function) {
 			var exprs []*Expression
 			collectStmtExprs(&f.Body.Stmts[i], &exprs)
 			for _, e := range exprs {
-				IncrCounter(&exprDepthCnts, ExpressionComplexity(e))
+				c := ExpressionComplexity(e)
+				if c < 0 {
+					exprDepthCnts = nil
+					return
+				}
+				IncrCounter(&exprDepthCnts, c)
 			}
 		}
 	}

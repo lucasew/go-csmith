@@ -135,3 +135,15 @@ func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 		t.Fatalf("depth1 %+v", blkDepthCnts)
 	}
 }
+
+func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
+	// incomplete IR must not invent depth-0 counts
+	exprDepthCnts = []int{99}
+	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
+		{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}}, // nil Invoke
+	}}}
+	StatExprDepths([]*Function{f})
+	if exprDepthCnts != nil {
+		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", exprDepthCnts)
+	}
+}

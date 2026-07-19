@@ -166,21 +166,28 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	if ExpressionComplexity(e2) != 2 {
 		t.Fatal(ExpressionComplexity(e2))
 	}
-	// nil Invoke — no soft invent complexity 1
-	if ExpressionComplexity(&Expression{Term: TermFunction}) != 0 {
-		t.Fatal("nil invoke must not invent complexity")
+	// nil Invoke — fail closed -1 (no invent leaf depth 0)
+	if ExpressionComplexity(&Expression{Term: TermFunction}) >= 0 {
+		t.Fatal("nil invoke must fail closed -1, not invent depth 0")
 	}
-	// incomplete assign / comma / nil arg — no invent complexity shells
-	if ExpressionComplexity(&Expression{Term: TermAssignment}) != 0 {
-		t.Fatal("nil Assign")
+	// incomplete assign / comma / nil arg — fail closed -1
+	if ExpressionComplexity(&Expression{Term: TermAssignment}) >= 0 {
+		t.Fatal("nil Assign must fail closed -1")
 	}
-	if ExpressionComplexity(&Expression{Term: TermCommaExpr, CommaLHS: inner}) != 0 {
-		t.Fatal("nil CommaRHS")
+	if ExpressionComplexity(&Expression{Term: TermCommaExpr, CommaLHS: inner}) >= 0 {
+		t.Fatal("nil CommaRHS must fail closed -1")
 	}
 	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{
 		User: &Function{Name: "h"}, Args: []*Expression{inner, nil},
-	}}) != 0 {
-		t.Fatal("nil arg hole")
+	}}) >= 0 {
+		t.Fatal("nil arg hole must fail closed -1")
+	}
+	// incomplete constant / variable leaf
+	if ExpressionComplexity(&Expression{Term: TermConstant}) >= 0 {
+		t.Fatal("nil Con must fail closed -1")
+	}
+	if ExpressionComplexity(&Expression{Term: TermVariable}) >= 0 {
+		t.Fatal("nil Var must fail closed -1")
 	}
 }
 
