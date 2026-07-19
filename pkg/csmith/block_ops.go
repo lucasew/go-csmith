@@ -401,10 +401,11 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 			continue
 		}
 		// Statement.cpp:501 — e->src->eType == eGoto (src always live Statement*)
-		// unresolved SrcID with Func set = incomplete IR (no invent skip as non-goto)
+		// unresolved SrcID with Func set = incomplete IR sticky (no invent skip as non-goto)
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
 			if src == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			if src.Kind != StmtGoto {
@@ -434,8 +435,9 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 		}
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
-			// unresolved src = incomplete function tree; no invent skip hole to registry
+			// unresolved src = incomplete function tree sticky; no invent skip hole to registry
 			if src == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			if src.Kind != StmtGoto {

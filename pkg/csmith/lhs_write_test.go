@@ -81,8 +81,12 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if !hole.UnionFieldIsRead() {
 		t.Fatal("nil read key must fail closed as union field read")
 	}
+	ClearError()
 	if hole.CommentOutput() != "" {
 		t.Fatal("nil key CommentOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil key CommentOutput must SetError sticky")
 	}
 	ClearError()
 	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {

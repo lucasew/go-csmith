@@ -652,16 +652,25 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 	if got := fm.FindJumpSources(50); got == nil || len(got) != 0 {
 		t.Fatal("break must not be jump source", got)
 	}
-	// dangling SrcID with Func set — no invent skip as non-goto
+	// dangling SrcID with Func set sticky — no invent skip as non-goto
+	ClearError()
 	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{SrcID: 99, DestStmID: 10})
 	if fm.FindJumpSources(10) != nil {
 		t.Fatal("unresolved SrcID must fail closed nil sources")
 	}
+	if !HasError() {
+		t.Fatal("unresolved SrcID FindJumpSources must SetError sticky")
+	}
+	ClearError()
 	// only unresolved edge for dest 11 — no invent skip hole to registry/label
 	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 11}}
 	if FindJumpLabel(fm, 11) != "" {
 		t.Fatal("unresolved SrcID must fail closed empty label")
 	}
+	if !HasError() {
+		t.Fatal("unresolved SrcID FindJumpLabel must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindJumpLabel(t *testing.T) {

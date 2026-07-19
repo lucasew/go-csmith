@@ -292,6 +292,7 @@ func TestReadIndicesConstantOK(t *testing.T) {
 
 func TestReadIndicesVarRecordsRead(t *testing.T) {
 	// Variable index: visit_facts records read of IV
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -340,6 +341,7 @@ func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
 
 func TestVisitIndicesEffectContext(t *testing.T) {
 	// Lhs.cpp:273–284 — IV ok under empty RHS context
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
 		Sizes:    []int{3},
@@ -371,11 +373,13 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 	if lhs.VisitIndices(&cg3, Defaults()) {
 		t.Fatal("incomplete EffectContext must fail closed VisitIndices")
 	}
+	ClearError()
 	cg4 := EmptyCGContext()
 	cg4.EffectStm = IncompleteEffect()
 	if lhs.VisitIndices(&cg4, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed VisitIndices")
 	}
+	ClearError()
 }
 
 func TestExtendCallChainNilHoleFailClosed(t *testing.T) {

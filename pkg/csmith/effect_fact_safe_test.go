@@ -107,6 +107,20 @@ func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 	if EffectComplete(IncompleteEffect().AccessDerefVolatile(v, 1, true)) {
 		t.Fatal("AccessDerefVolatile incomplete base must stay incomplete")
 	}
+	if !HasError() {
+		t.Fatal("AccessDerefVolatile incomplete base must SetError sticky")
+	}
+	ClearError()
+	// Clear incomplete base stays IncompleteEffect sticky (no invent wipe to empty pure)
+	inc := IncompleteEffect()
+	inc.Clear()
+	if EffectComplete(inc) {
+		t.Fatal("Clear incomplete base must stay IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("Clear incomplete base must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {

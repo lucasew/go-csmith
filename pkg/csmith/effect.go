@@ -605,14 +605,15 @@ func (e Effect) IsEmpty() bool {
 
 // Clear mirrors Effect::clear — empty pure SE-free effect.
 // Effect.cpp:497–501.
-// Clear mirrors Effect::clear — empty complete effect.
-// Incomplete base stays IncompleteEffect (no invent wipe hole shell to empty pure).
+// Incomplete base stays IncompleteEffect sticky (no invent wipe hole shell to empty pure
+// / soft re-pick past incomplete clear).
 func (e *Effect) Clear() {
 	if e == nil {
 		return
 	}
 	if e.incomplete {
 		*e = IncompleteEffect()
+		SetError(ErrGeneric)
 		return
 	}
 	*e = EmptyEffect()
@@ -620,9 +621,10 @@ func (e *Effect) Clear() {
 
 // AccessDerefVolatile mirrors Effect::access_deref_volatile.
 // Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
-// Incomplete base fails closed IncompleteEffect (no invent SE-free tweak on hole shell).
+// Incomplete base fails closed sticky IncompleteEffect (no invent SE-free tweak on hole shell).
 func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	if !strictVolatile || v == nil {
@@ -795,9 +797,10 @@ func (e Effect) IsWrittenByName(name string) bool {
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
 // Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
 // Write names sorted for deterministic emit (Go map iteration is random).
-// Incomplete effect / nil key fails closed as empty comment (no invent partial list).
+// Incomplete effect / nil key fails closed sticky as empty comment (no invent partial list).
 func (e Effect) CommentOutput() string {
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -807,6 +810,7 @@ func (e Effect) CommentOutput() string {
 	for v := range e.read {
 		// Effect.cpp: names from live Variable*; no invent blank tokens for empty Name
 		if v == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if e.read[v] && v.Name != "" {
@@ -823,6 +827,7 @@ func (e Effect) CommentOutput() string {
 	names := make([]string, 0, len(e.written))
 	for v := range e.written {
 		if v == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if e.written[v] && v.Name != "" {
