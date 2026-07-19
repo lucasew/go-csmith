@@ -593,33 +593,51 @@ func TestMakeRandomExpressionNoInventSessionProbs(t *testing.T) {
 }
 
 func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
-	// Expression.cpp:154–157, 186–187 — asserts; no soft invent rewrite/emit
+	// Expression.cpp:154–157, 186–187 — asserts sticky; no soft invent rewrite/emit
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	cg := EmptyCGContext()
 	// no_const && eConstant
+	ClearError()
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, false, true, TermConstant, 0) != nil {
 		t.Fatal("no_const + Constant must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("no_const + Constant must SetError sticky")
+	}
 	// no_func && eFunction
+	ClearError()
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, true, false, TermFunction, 0) != nil {
 		t.Fatal("no_func + Function must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("no_func + Function must SetError sticky")
+	}
 	// struct + eConstant (was soft invent TermVariable)
+	ClearError()
 	st := &Type{isStruct: true, StructName: "SAssert", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, st, nil, false, false, TermConstant, 0) != nil {
 		t.Fatal("struct + Constant must fail closed, not rewrite to Variable")
 	}
+	if !HasError() {
+		t.Fatal("struct + Constant must SetError sticky")
+	}
 	// void simple constant
+	ClearError()
 	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetSimpleType(EVoid), nil, false, false, TermConstant, 0) != nil {
 		t.Fatal("void Constant must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("void Constant must SetError sticky")
+	}
 	// Expression.cpp:188 + ERROR_GUARD — MakeRandom nil → no invent TermConstant shell
+	ClearError()
 	if e := MakeRandomExpression(nil, opts, tables, nil, &cg, GetIntType(), nil, true, false, TermConstant, 0); e != nil {
 		t.Fatal("nil RNG must not invent TermConstant shell", e)
 	}
+	ClearError()
 }
 
 func TestMakeExpressionFuncallForcesUserForAggregate(t *testing.T) {

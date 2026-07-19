@@ -113,7 +113,8 @@ func TestGenerateEmitsBitfieldSyntax(t *testing.T) {
 }
 
 func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
-	// Type.cpp:641 — int_size()*8; IntSize 0 must not invent maxLen=32
+	// Type.cpp:641 — int_size()*8; IntSize 0 sticky fail closed (no invent maxLen=32)
+	ClearError()
 	opts := Defaults()
 	opts.IntSize = 0
 	probs := NewProbabilities(opts)
@@ -121,7 +122,11 @@ func TestMakeOneBitfieldNoInventMaxLen(t *testing.T) {
 	if f.Type != nil || f.BitWidth >= 0 {
 		t.Fatalf("IntSize 0 must fail closed, got %+v", f)
 	}
-	// normal IntSize still works
+	if !HasError() {
+		t.Fatal("IntSize 0 MakeOneBitfield must SetError sticky")
+	}
+	// normal IntSize still works after ClearError
+	ClearError()
 	opts.IntSize = 4
 	f2 := MakeOneBitfield(NewRng(2), opts, probs, 0, true)
 	if f2.Type == nil || f2.BitWidth < 1 || f2.BitWidth > 32 {

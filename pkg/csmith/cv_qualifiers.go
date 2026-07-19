@@ -228,16 +228,18 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 // SanityCheck mirrors CVQualifiers::sanity_check.
 // CVQualifiers.cpp:526–531 — assert(t); assert(level>=0); depth == indirect+1.
 func (q CVQualifiers) SanityCheck(t *Type) bool {
-	// CVQualifiers.cpp:527 assert(t)
+	// CVQualifiers.cpp:527 assert(t) sticky
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if q.Wildcard {
 		return true
 	}
 	level := t.IndirectLevel()
-	// CVQualifiers.cpp:529 assert(level >= 0)
+	// CVQualifiers.cpp:529 assert(level >= 0) sticky
 	if level < 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(q.IsConsts) == len(q.IsVolatiles) &&

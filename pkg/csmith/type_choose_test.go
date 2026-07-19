@@ -6,6 +6,7 @@ import (
 )
 
 func TestChooseRandomFromAllTypes(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{}
@@ -33,6 +34,7 @@ func TestChooseRandomFromAllTypes(t *testing.T) {
 }
 
 func TestRandomReturnTypeUsesEnv(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{}
@@ -48,6 +50,7 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	if RandomReturnType(nil, probs, env, opts) != nil {
 		t.Fatal("nil RNG RandomReturnType must fail closed")
 	}
+	ClearError()
 }
 
 func TestMakeRandomParamNoConstant(t *testing.T) {

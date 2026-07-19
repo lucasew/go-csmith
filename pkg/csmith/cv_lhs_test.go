@@ -66,6 +66,7 @@ func TestNewCVQualifiersUnequalLenFailClosed(t *testing.T) {
 }
 
 func TestSanityCheck(t *testing.T) {
+	ClearError()
 	// int: level 0 → need 1 qualifier slot
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if !q.SanityCheck(GetIntType()) {
@@ -80,6 +81,14 @@ func TestSanityCheck(t *testing.T) {
 	if !q2.SanityCheck(pt) {
 		t.Fatal("ptr ok")
 	}
+	// CVQualifiers.cpp:527 assert(t) sticky
+	if q.SanityCheck(nil) {
+		t.Fatal("nil type SanityCheck invent")
+	}
+	if !HasError() {
+		t.Fatal("nil type SanityCheck must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomAddQualifiers(t *testing.T) {

@@ -575,8 +575,9 @@ func MakeRandomParam(
 			return nil
 		}
 	}
-	// Expression.cpp:241–242 — assert(type); DEPTH_GUARD after type known
+	// Expression.cpp:241–242 — assert(type) sticky; DEPTH_GUARD after type known
 	if typ == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:242–243 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpressionRandomParam, tt, …)
@@ -719,20 +720,27 @@ func MakeRandomExpression(
 				break
 			}
 		}
+		// choose_random_nonvoid ERROR_GUARD sticky — no invent expression without type
 		if typ == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 	}
-	// Expression.cpp:154–157 — asserts on illegal term/type; fail closed (no soft invent rewrite)
+	// Expression.cpp:154–157 — asserts on illegal term/type sticky (no soft invent rewrite)
 	// no_func && eFunction / no_const && eConstant / struct && eConstant
 	if noFunc && tt == TermFunction {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if noConst && tt == TermConstant {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if typ != nil && typ.IsStruct() && tt == TermConstant {
-		// was soft invent TermVariable — C++ assert, not rewrite
+		// was soft invent TermVariable — C++ assert sticky, not rewrite
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:176–178 / 213 — always cg_context.expr_depth (not a separate local)
@@ -753,8 +761,9 @@ func MakeRandomExpression(
 	var e *Expression
 	switch tt {
 	case TermConstant:
-		// Expression.cpp:185–188 — assert simple != eVoid
+		// Expression.cpp:185–188 — assert simple != eVoid sticky
 		if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+			SetError(ErrGeneric)
 			return nil
 		}
 		// Expression.cpp:188 — Constant::make_random; ERROR_GUARD after

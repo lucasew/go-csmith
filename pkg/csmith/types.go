@@ -465,9 +465,10 @@ func TypeDoFinalization() {
 }
 
 // PointerTo builds/caches a pointer type (find_pointer_type-ish for one level).
-// Type.cpp:423+ find_pointer_type — pointee Type* always live; no invent int* for nil.
+// Type.cpp:423+ find_pointer_type — pointee Type* always live; sticky no invent int* for nil.
 func PointerTo(pointee *Type) *Type {
 	if pointee == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if p, ok := pointerCache[pointee]; ok {

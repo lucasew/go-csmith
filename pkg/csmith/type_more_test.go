@@ -112,10 +112,15 @@ func TestSizeofString(t *testing.T) {
 }
 
 func TestPointerToNoInventIntStar(t *testing.T) {
-	// Type.cpp find_pointer_type — no soft invent int* for nil pointee
+	// Type.cpp find_pointer_type sticky — no soft invent int* for nil pointee
+	ClearError()
 	if p := PointerTo(nil); p != nil {
 		t.Fatal("PointerTo(nil) must fail closed nil, got", p.CName())
 	}
+	if !HasError() {
+		t.Fatal("PointerTo(nil) must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {

@@ -30,8 +30,9 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 // Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
 // On ERROR_RETURN / choose fail returns zero field (Type==nil); callers abort.
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
-	// Type.cpp always has RNG + Probabilities; no invent field shell without them
+	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
+		SetError(ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:687–691 — ChooseRandomTypeFilter(for_field_var=true) over AllTypes
@@ -68,10 +69,12 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 	fail := StructField{BitWidth: -1}
 	maxLen := opts.IntSize * 8
 	if maxLen < 1 {
-		// broken options IR — empty field (no invent maxLen=32)
+		// broken options IR sticky — empty field (no invent maxLen=32)
+		SetError(ErrGeneric)
 		return fail
 	}
 	if r == nil || probs == nil {
+		SetError(ErrGeneric)
 		return fail
 	}
 	sign := r.RndFlipcoin(uint32(probs.Single(PBitFieldsSignedProb)))
@@ -472,8 +475,9 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 // Type.cpp:699–763 — bitfield optional; else non-pointer / no-bitfield structs;
 // no union-in-union; 15% struct fields.
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
-	// Type.cpp always has RNG + Probabilities; no invent field shell without them
+	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
+		SetError(ErrGeneric)
 		return StructField{}
 	}
 	// Type.cpp:702–706 — bitfield when bitfields && !ccomp

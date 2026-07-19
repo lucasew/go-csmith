@@ -53,16 +53,22 @@ func TestMakeExpressionComma(t *testing.T) {
 }
 
 func TestMakeRandomParamNilType(t *testing.T) {
-	// Expression.cpp:241 — assert(type); no GetIntType soft invent
+	// Expression.cpp:241 — assert(type) sticky; no GetIntType soft invent
+	ClearError()
 	opts := Defaults()
 	c := EmptyCGContext()
 	if e := MakeRandomParam(NewRng(1), opts, NewExprTables(opts), NewVariableSelector(opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
+	if !HasError() {
+		t.Fatal("nil type MakeRandomParam must SetError sticky")
+	}
+	ClearError()
 	// Expression.cpp always has RNG; no invent param shell
 	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(opts), &c, GetIntType(), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
+	ClearError()
 }
 
 func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
