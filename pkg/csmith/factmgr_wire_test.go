@@ -86,14 +86,17 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 }
 
 func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
-	// array of pointers with alt init "0" → null
+	// array of pointers with alt init Expression "0" → null
+	// Fact.cpp:100–106 — get_more_init_values Expression*; no invent from InitValues
+	ptType := PointerTo(GetIntType())
+	nullAlt := &Expression{Term: TermConstant, Con: &Constant{Type: ptType, Value: "0"}, ExprType: ptType}
 	parent := &ArrayVariable{
 		Variable: Variable{
-			Name: "g_ap", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2},
-			Init: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
+			Name: "g_ap", Type: ptType, IsArray: true, ArraySizes: []int{2},
+			Init: &Constant{Type: ptType, Value: "0"},
 		},
-		Sizes:      []int{2},
-		InitValues: []string{"0"},
+		Sizes:     []int{2},
+		InitExprs: []*Expression{nullAlt},
 	}
 	parent.AsArray = parent
 	pt, _ := AbstractFactForVarInit(&parent.Variable)
@@ -109,6 +112,21 @@ func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("%+v", pt)
+	}
+	// InitValues alone must not invent Constant alts
+	onlyStr := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_ap2", Type: ptType, IsArray: true, ArraySizes: []int{2},
+			Init: &Constant{Type: ptType, Value: "0"},
+		},
+		Sizes:      []int{2},
+		InitValues: []string{"0"},
+	}
+	onlyStr.AsArray = onlyStr
+	pt2, _ := AbstractFactForVarInit(&onlyStr.Variable)
+	// primary init still null; InitValues ignored
+	if len(pt2) == 0 {
+		t.Fatal("want primary init facts")
 	}
 }
 

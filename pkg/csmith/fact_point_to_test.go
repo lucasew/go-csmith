@@ -27,6 +27,13 @@ func TestFactPointToNullDead(t *testing.T) {
 	if NewFactPointTo(nil) != nil || MakeFactPointTo(nil, NullPtr) != nil || MakeFactPointToSet(nil, nil) != nil {
 		t.Fatal("nil subject must fail closed fact ctor")
 	}
+	// MakeFacts — no invent skip of nil holes as partial success
+	if MakeFactsPointTo([]*Variable{p, nil}, NullPtr) != nil {
+		t.Fatal("nil hole in lvars must fail closed MakeFactsPointTo")
+	}
+	if MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr}) != nil {
+		t.Fatal("nil hole in lvars must fail closed MakeFactsPointToSet")
+	}
 }
 
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {
