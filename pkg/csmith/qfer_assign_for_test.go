@@ -68,9 +68,22 @@ func TestMatchIndirect(t *testing.T) {
 	if !want.MatchIndirect(have, false) {
 		t.Fatal("indirect")
 	}
+	// multi-level address gap complete false (C++ return false, no assert)
+	ClearError()
+	deep := NewCVQualifiers([]bool{false, false, false}, []bool{false, false, false})
+	shallow := NewCVQualifiers([]bool{false}, []bool{false})
+	// want deep vs shallow: deref = 1-3 = -2
+	if deep.MatchIndirect(shallow, false) {
+		t.Fatal("deref < -1 must fail closed false")
+	}
+	if HasError() {
+		t.Fatal("deref < -1 MatchIndirect must stay non-sticky complete false")
+	}
+	ClearError()
 }
 
 func TestIndirectQualifiers(t *testing.T) {
+	ClearError()
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
 	// address — push_back false,false
 	addr := q.IndirectQualifiers(-1)
@@ -83,6 +96,16 @@ func TestIndirectQualifiers(t *testing.T) {
 	if len(d.IsConsts) != 1 || d.IsConsts[0] != true {
 		t.Fatalf("%v", d.IsConsts)
 	}
+	// over-deref sticky empty (no invent partial pop)
+	ClearError()
+	got := q.IndirectQualifiers(5)
+	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
+		t.Fatal("over-deref must fail closed empty", got)
+	}
+	if !HasError() {
+		t.Fatal("over-deref IndirectQualifiers must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindPointerFieldsNilHole(t *testing.T) {

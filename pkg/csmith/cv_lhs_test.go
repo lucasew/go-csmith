@@ -15,8 +15,18 @@ func TestAddRemoveQualifiers(t *testing.T) {
 	if len(q.IsConsts) != 1 || !q.IsConsts[0] {
 		t.Fatal(q)
 	}
-	// CVQualifiers always live; sticky no invent soft-skip mutators past hole
+	// over-pop sticky (no invent soft-break partial pop as complete)
 	ClearError()
+	q.RemoveQualifiers(5)
+	if !HasError() {
+		t.Fatal("over-pop RemoveQualifiers must SetError sticky")
+	}
+	// vector emptied up to fail; residual ERROR sticky
+	if len(q.IsConsts) != 0 {
+		t.Fatalf("over-pop must stop at empty, got %v", q.IsConsts)
+	}
+	ClearError()
+	// CVQualifiers always live; sticky no invent soft-skip mutators past hole
 	(*CVQualifiers)(nil).AddQualifiers(false, false)
 	if !HasError() {
 		t.Fatal("nil AddQualifiers must SetError sticky")

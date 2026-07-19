@@ -187,9 +187,9 @@ func (q *CVQualifiers) AddQualifiers(isConst, isVolatile bool) {
 }
 
 // RemoveQualifiers mirrors CVQualifiers::remove_qualifiers — pop_back len times.
-// CVQualifiers.cpp:497–502.
+// CVQualifiers.cpp:497–502 — pop_back on both vectors; over-pop is broken IR.
 // CVQualifiers always live; sticky (no invent soft-skip remove past hole).
-// length<=0 is complete no-op.
+// length<=0 is complete no-op. Over-pop sticky (no invent partial truncate success).
 func (q *CVQualifiers) RemoveQualifiers(length int) {
 	if q == nil {
 		SetError(ErrGeneric)
@@ -199,18 +199,20 @@ func (q *CVQualifiers) RemoveQualifiers(length int) {
 		return
 	}
 	for i := 0; i < length; i++ {
-		if len(q.IsConsts) == 0 {
-			break
+		// C++ pop_back both vectors; empty vector is assert/UB — sticky incomplete
+		// (no invent soft-break partial pop as complete qfer after over-deref)
+		if len(q.IsConsts) == 0 || len(q.IsVolatiles) == 0 {
+			SetError(ErrGeneric)
+			return
 		}
 		q.IsConsts = q.IsConsts[:len(q.IsConsts)-1]
-		if len(q.IsVolatiles) > 0 {
-			q.IsVolatiles = q.IsVolatiles[:len(q.IsVolatiles)-1]
-		}
+		q.IsVolatiles = q.IsVolatiles[:len(q.IsVolatiles)-1]
 	}
 }
 
 // IndirectQualifiers mirrors CVQualifiers::indirect_qualifiers.
 // CVQualifiers.cpp:504–521 — level<0 address (add); level>0 deref (remove_qualifiers).
+// Over-deref (level > depth) sticky empty via RemoveQualifiers (no invent partial pop).
 func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 	if level == 0 || q.Wildcard {
 		return q
@@ -222,18 +224,34 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 			return CVQualifiers{}
 		}
 		// address-of: add one false,false level (push_back)
+		// unpaired base sticky empty (no invent add-level past broken qfer)
+		if len(q.IsConsts) != len(q.IsVolatiles) {
+			SetError(ErrGeneric)
+			return CVQualifiers{}
+		}
 		out := q
 		out.IsConsts = append(append([]bool(nil), q.IsConsts...), false)
 		out.IsVolatiles = append(append([]bool(nil), q.IsVolatiles...), false)
 		return out
 	}
-	// dereference: pop_back `level` times
+	// dereference: pop_back `level` times; unpaired / over-pop sticky empty
+	if len(q.IsConsts) != len(q.IsVolatiles) {
+		SetError(ErrGeneric)
+		return CVQualifiers{}
+	}
 	out := NewCVQualifiers(
 		append([]bool(nil), q.IsConsts...),
 		append([]bool(nil), q.IsVolatiles...),
 	)
+	// NewCVQualifiers may sticky on mismatch; length-equal path is fine
+	if HasError() {
+		return CVQualifiers{}
+	}
 	out.AcceptStricter = q.AcceptStricter
 	out.RemoveQualifiers(level)
+	if HasError() {
+		return CVQualifiers{}
+	}
 	return out
 }
 
@@ -598,14 +616,22 @@ func GetAllQualifiers(constProb, volatileProb uint32) []CVQualifiers {
 
 // MatchIndirect mirrors CVQualifiers::match_indirect.
 // CVQualifiers.cpp:155–166.
+// Unpaired const/vol depths sticky false (no invent match soft-skip past hole).
+// Multi-level address gap (deref < -1) is complete false (C++ returns false, no assert).
 func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 	if q.Wildcard {
 		return true
+	}
+	// both sides paired depths; unpaired sticky (Match also stickies)
+	if len(q.IsConsts) != len(q.IsVolatiles) || len(other.IsConsts) != len(other.IsVolatiles) {
+		SetError(ErrGeneric)
+		return false
 	}
 	if len(q.IsConsts) == len(other.IsConsts) {
 		return q.Match(other, matchExact)
 	}
 	deref := len(other.IsConsts) - len(q.IsConsts)
+	// CVQualifiers.cpp:162–163 — if (deref < -1) return false; complete not-match
 	if deref < -1 {
 		return false
 	}
