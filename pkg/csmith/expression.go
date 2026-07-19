@@ -332,7 +332,12 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 		}
 		return e.CommaRHS.GetQualifiers()
 	case TermConstant:
-		// Constant default empty quals — complete empty success
+		// Constant default empty quals when Con live; incomplete shell sticky
+		// (no invent complete empty-qfer success past missing Constant IR)
+		if e.Con == nil {
+			SetError(ErrGeneric)
+			return CVQualifiers{}
+		}
 		return CVQualifiers{}
 	}
 	// unknown term sticky incomplete

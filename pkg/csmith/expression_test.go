@@ -306,6 +306,30 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 		t.Fatal("nil Con ExpressionComplexity must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Constant shell sticky (no invent leaf complexity 0)
+	if ExpressionComplexity(&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) >= 0 {
+		t.Fatal("nil Con.Type must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("nil Con.Type ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
+	// non-std nil User sticky (no invent complexity 0 as non-call)
+	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{}}) >= 0 {
+		t.Fatal("non-std nil User must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("non-std nil User ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
+	// std binary without User is complete leaf complexity 0
+	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}) != 0 {
+		t.Fatal("std binary ExpressionComplexity must be 0")
+	}
+	if HasError() {
+		t.Fatal("std binary ExpressionComplexity must not sticky")
+	}
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermVariable}) >= 0 {
 		t.Fatal("nil Var must fail closed -1")
 	}
@@ -1018,6 +1042,14 @@ func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("Funcall without Invoke EqualsInt must SetError sticky")
+	}
+	ClearError()
+	// incomplete Constant shell sticky (no invent complete empty-qfer past hole)
+	if q := (&Expression{Term: TermConstant}).GetQualifiers(); len(q.IsConsts) != 0 {
+		t.Fatal("nil Con GetQualifiers must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Con GetQualifiers must SetError sticky")
 	}
 	ClearError()
 	// Constant complete empty quals OK

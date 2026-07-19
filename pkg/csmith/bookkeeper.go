@@ -404,8 +404,9 @@ func ExpressionComplexity(e *Expression) int {
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant always has live Value; incomplete shell sticky → -1
-		if e.Con == nil || e.Con.Value == "" {
+		// Constant always has live Type* + Value; incomplete shell sticky → -1
+		// (no invent leaf complexity 0 for Type-nil / empty-value shell)
+		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 			SetError(ErrGeneric)
 			return -1
 		}
@@ -425,7 +426,15 @@ func ExpressionComplexity(e *Expression) int {
 			return -1
 		}
 		comp := 0
-		if e.Invoke.User != nil && !e.Invoke.IsStd {
+		if e.Invoke.IsStd {
+			// std unary/binary: no +1 for call itself
+		} else {
+			// user-defined path: Function* always live; incomplete sticky
+			// (no invent complexity 0 shell past missing User as non-call)
+			if e.Invoke.User == nil {
+				SetError(ErrGeneric)
+				return -1
+			}
 			comp++ // function call itself
 		}
 		for _, a := range e.Invoke.Args {
