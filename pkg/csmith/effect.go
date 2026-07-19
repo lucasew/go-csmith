@@ -622,19 +622,30 @@ func (e Effect) UnionFieldIsRead() bool {
 	return false
 }
 
+// effectMapKeysComplete reports map has no nil Variable* keys.
+func effectMapKeysComplete(m map[*Variable]bool) bool {
+	for v := range m {
+		if v == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // Consolidate mirrors Effect::consolidate.
 // Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
-// Variable* always live as map keys; nil hole fails closed (no invent clean filter).
+// Variable* always live as map keys; nil hole fails closed with no mutation
+// (pre-scan — no invent partial deletes before hitting a hole under random map order).
 func (e *Effect) Consolidate() {
 	if e == nil {
 		return
 	}
+	// two-phase: incomplete maps must not invent mid-consolidate partial drops
+	if !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
+		return
+	}
 	// remove field reads when parent is also read
 	for v := range e.read {
-		if v == nil {
-			// incomplete map — leave as-is (no invent drop-only-holes clean)
-			return
-		}
 		if !e.read[v] || !v.IsFieldVar() {
 			continue
 		}
@@ -645,9 +656,6 @@ func (e *Effect) Consolidate() {
 	}
 	// remove field writes when parent is also written
 	for v := range e.written {
-		if v == nil {
-			return
-		}
 		if !e.written[v] || !v.IsFieldVar() {
 			continue
 		}

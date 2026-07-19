@@ -45,8 +45,13 @@ func GetBlocksStmt(st *Stmt) []*Block {
 // Returns count of matches appended to stms, or -1 on incomplete IR
 // (nil Block hole — no invent partial typed-stmt list past hole; *stms cleared).
 func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
-	if st == nil || stms == nil {
-		return 0
+	if stms == nil {
+		return -1
+	}
+	if st == nil {
+		// incomplete Statement* — fail closed clear (no invent empty match success)
+		*stms = nil
+		return -1
 	}
 	for _, k := range kinds {
 		if st.Kind == k {
@@ -72,8 +77,12 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 // FindTypedStmtsInBlock walks a block's statements for typed collection.
 // Returns -1 on incomplete IR (same as FindTypedStmts).
 func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
-	if b == nil || stms == nil {
-		return 0
+	if stms == nil {
+		return -1
+	}
+	if b == nil {
+		*stms = nil
+		return -1
 	}
 	for i := range b.Stmts {
 		if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
