@@ -303,12 +303,13 @@ func (e Effect) LhsWriteVars() []*Variable {
 // WriteVar mirrors Effect::write_var.
 // Effect.cpp:137–146 — record write; SE-free &= !volatile && !access_once;
 // pure left unchanged (upstream "pure = pure").
-// Incomplete base fails closed IncompleteEffect (no invent grow write map on hole shell).
+// Incomplete base fails closed sticky IncompleteEffect (no invent grow write map on hole shell).
 func (e Effect) WriteVar(v *Variable) Effect {
 	if v == nil {
 		return e
 	}
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	if e.written == nil {
@@ -331,12 +332,13 @@ func (e Effect) WriteVar(v *Variable) Effect {
 // ReadVar mirrors Effect::read_var.
 // Effect.cpp:116–122 — record read; pure &= const&&!vol&&!access_once;
 // SE-free &= !vol&&!access_once.
-// Incomplete base fails closed IncompleteEffect (no invent grow read map on hole shell).
+// Incomplete base fails closed sticky IncompleteEffect (no invent grow read map on hole shell).
 func (e Effect) ReadVar(v *Variable) Effect {
 	if v == nil {
 		return e
 	}
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	nr := make(map[*Variable]bool, len(e.read)+1)
@@ -377,10 +379,11 @@ func (e Effect) IsWritten(v *Variable) bool {
 }
 
 // ReadVars mirrors Effect::get_read_vars — list of read variables (stable order by name).
-// Incomplete effect / nil map keys fail closed IncompleteVariables
-// (no invent skip hole as absent read / empty-complete read set).
+// Incomplete effect / nil map keys fail closed sticky IncompleteVariables
+// (no invent skip hole as absent read / soft re-pick empty-complete read set).
 func (e Effect) ReadVars() []*Variable {
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	if len(e.read) == 0 {
@@ -392,6 +395,7 @@ func (e Effect) ReadVars() []*Variable {
 			continue
 		}
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)
@@ -401,10 +405,11 @@ func (e Effect) ReadVars() []*Variable {
 }
 
 // WrittenVars mirrors Effect::get_write_vars subset.
-// Incomplete effect / nil map keys fail closed IncompleteVariables
-// (no invent skip hole as absent write / empty-complete write set).
+// Incomplete effect / nil map keys fail closed sticky IncompleteVariables
+// (no invent skip hole as absent write / soft re-pick empty-complete write set).
 func (e Effect) WrittenVars() []*Variable {
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	if len(e.written) == 0 {
@@ -416,6 +421,7 @@ func (e Effect) WrittenVars() []*Variable {
 			continue
 		}
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)

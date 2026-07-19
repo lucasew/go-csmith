@@ -178,6 +178,7 @@ func TestGetDirectInvocation(t *testing.T) {
 }
 
 func TestFindContainedLabels(t *testing.T) {
+	ClearError()
 	thenB := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 2, SourceLabel: "lbl_2"},
 	}}
@@ -187,15 +188,23 @@ func TestFindContainedLabels(t *testing.T) {
 	if len(labs) < 2 {
 		t.Fatal(labs)
 	}
-	// incomplete if — fail closed incomplete (no invent empty/partial labels)
+	// incomplete if — fail closed sticky incomplete (no invent empty/partial labels)
 	if LabelsComplete(FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB})) {
 		t.Fatal("nil Else must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil Else FindContainedLabels must SetError sticky")
+	}
+	ClearError()
 	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
 	fm := NewFactMgr(nil)
 	if LabelsComplete(FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "x"}, fm)) {
 		t.Fatal("StmID 0 under FM must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 FindContainedLabelsFM must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCombineBranchFacts(t *testing.T) {
@@ -365,9 +374,14 @@ func TestFindContainedLabelsFM(t *testing.T) {
 	if labs2 := FindContainedLabelsFM(stSrc, fm); len(labs2) != 0 {
 		t.Fatal("SourceLabel must not invent under live FM", labs2)
 	}
-	// incomplete CFGEdges hole fails whole collect
+	// incomplete CFGEdges hole fails whole collect sticky
+	ClearError()
 	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}, nil}
 	if LabelsComplete(FindContainedLabelsFM(st, fm)) {
 		t.Fatal("nil CFG edge hole must fail closed incomplete labels")
 	}
+	if !HasError() {
+		t.Fatal("nil CFG edge hole must SetError sticky")
+	}
+	ClearError()
 }

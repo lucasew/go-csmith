@@ -84,17 +84,26 @@ func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 }
 
 func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
-	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete Effect
+	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete Effect sticky
 	// (membership on incomplete is fail-closed true separately)
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	w := IncompleteEffect().WriteVar(v)
 	if EffectComplete(w) {
 		t.Fatal("WriteVar incomplete base must stay IncompleteEffect")
 	}
+	if !HasError() {
+		t.Fatal("WriteVar incomplete base must SetError sticky")
+	}
+	ClearError()
 	r := IncompleteEffect().ReadVar(v)
 	if EffectComplete(r) {
 		t.Fatal("ReadVar incomplete base must stay IncompleteEffect")
 	}
+	if !HasError() {
+		t.Fatal("ReadVar incomplete base must SetError sticky")
+	}
+	ClearError()
 	if EffectComplete(IncompleteEffect().AccessDerefVolatile(v, 1, true)) {
 		t.Fatal("AccessDerefVolatile incomplete base must stay incomplete")
 	}

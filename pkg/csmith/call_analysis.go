@@ -370,18 +370,21 @@ func IncompleteLabelsSlice() []string {
 // Statement.cpp:706–720 — find_jump_label (CFG goto) then nested blocks.
 // When fm is nil, falls back to SourceLabel set during generation (no CFG).
 // With FactMgr: same as PreOutput — only CFG/registry labels; no invent SourceLabel
-// when find_jump_label is empty. Incomplete CFG/tree fails closed IncompleteLabelsSlice
-// (not bare nil — len(nil)==0 invents empty-complete label list).
+// when find_jump_label is empty. Incomplete CFG/tree fails closed sticky
+// IncompleteLabelsSlice (not bare nil invent empty-complete / soft re-pick past hole).
 func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
+		SetError(ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
-	// incomplete CFG fails whole label collect (no invent partial / empty complete)
+	// incomplete CFG fails whole label collect sticky (no invent partial / empty complete)
 	if fm != nil && !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	var labels []string
 	if !findContainedLabels(st, &labels, fm) {
+		SetError(ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	return labels
