@@ -80,6 +80,10 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
 		t.Fatal("incomplete for must fail closed uncertain")
 	}
+	if !HasError() {
+		t.Fatal("incomplete for must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
@@ -108,12 +112,24 @@ func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtAssign, StmID: 3}) {
 		t.Fatal("nil Expr assign must fail closed uncertain")
 	}
+	if !HasError() {
+		t.Fatal("nil Expr assign must SetError sticky")
+	}
+	ClearError()
 	if !HasUncertainCallRecursiveExpr(nil) {
 		t.Fatal("nil expr must fail closed uncertain")
 	}
+	if !HasError() {
+		t.Fatal("nil expr must SetError sticky")
+	}
+	ClearError()
 	if !(*Invocation)(nil).HasUncertainCall() {
 		t.Fatal("nil invoke must fail closed HasUncertainCall")
 	}
+	if !HasError() {
+		t.Fatal("nil invoke HasUncertainCall must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasUncertainCall(t *testing.T) {
@@ -152,16 +168,25 @@ func TestHasSimpleParams(t *testing.T) {
 	if fi.HasSimpleParams() {
 		t.Fatal("has call")
 	}
-	// nil arg hole — no invent simple
+	// nil arg hole — sticky not-simple
+	ClearError()
 	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil}
 	if fi.HasSimpleParams() {
 		t.Fatal("nil arg must fail closed not-simple")
 	}
-	// nil invoke shell — no invent simple-params success
+	if !HasError() {
+		t.Fatal("nil arg HasSimpleParams must SetError sticky")
+	}
+	ClearError()
+	// nil invoke shell — sticky not-simple
 	if (*Invocation)(nil).HasSimpleParams() {
 		t.Fatal("nil invoke must fail closed not-simple")
 	}
-	// incomplete FuncCount → uncertain
+	if !HasError() {
+		t.Fatal("nil invoke HasSimpleParams must SetError sticky")
+	}
+	ClearError()
+	// incomplete FuncCount → uncertain sticky
 	fiHole := &Invocation{Args: []*Expression{
 		userCall("a"),
 		{Term: TermFunction}, // nil Invoke
@@ -169,6 +194,10 @@ func TestHasSimpleParams(t *testing.T) {
 	if !fiHole.HasUncertainCall() {
 		t.Fatal("incomplete arg must fail closed uncertain")
 	}
+	if !HasError() {
+		t.Fatal("incomplete arg HasUncertainCall must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetDirectInvocation(t *testing.T) {

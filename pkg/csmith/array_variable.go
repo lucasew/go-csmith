@@ -455,8 +455,14 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 
 // ItemizeConstIndices mirrors ArrayVariable::itemize(const vector<int>&).
 // ArrayVariable.cpp:280–295 — fixed const indices; create_field_vars for aggregates.
+// ArrayVariable always live; sticky nil (no invent itemize soft-skip past hole).
+// Itemized member (Collective set) is complete soft miss (not incomplete IR).
 func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
-	if av == nil || av.Collective != nil {
+	if av == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if av.Collective != nil {
 		return nil
 	}
 	if len(constIndices) != len(av.Sizes) {

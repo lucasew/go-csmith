@@ -608,6 +608,18 @@ func TestSizeInBytesArray(t *testing.T) {
 	}
 }
 
+func TestItemizeConstIndicesNilSticky(t *testing.T) {
+	// ArrayVariable always live at itemize; sticky no invent soft-skip past hole
+	ClearError()
+	if (*ArrayVariable)(nil).ItemizeConstIndices([]int{0}, nil) != nil {
+		t.Fatal("nil ItemizeConstIndices must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil ItemizeConstIndices must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestArrayVariableNilPredicatesSticky(t *testing.T) {
 	// ArrayVariable always live; sticky no invent dim0 / empty-size / not-global / zero-bytes
 	ClearError()

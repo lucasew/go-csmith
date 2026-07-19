@@ -267,14 +267,24 @@ func (t *Type) ContainPointerField() bool {
 }
 
 // IsFloat mirrors Type::is_float.
+// Type* always live; sticky false (no invent not-float soft-skip past hole).
 func (t *Type) IsFloat() bool {
-	return t != nil && t.IsSimple() && t.simple == EFloat
+	if t == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return t.IsSimple() && t.simple == EFloat
 }
 
 // IsSignedChar mirrors Type::is_signed_char.
 // Type.h:265–268 — eSimple && eChar (signed char).
+// Type* always live; sticky false (no invent not-char soft-skip past hole).
 func (t *Type) IsSignedChar() bool {
-	return t != nil && t.IsSimple() && t.simple == EChar
+	if t == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return t.IsSimple() && t.simple == EChar
 }
 
 // IsFullBitfieldsStruct mirrors Type::is_full_bitfields_struct.
@@ -517,9 +527,11 @@ func PointerTo(pointee *Type) *Type {
 }
 
 // Match mirrors Type::match (Type.cpp:1475–1488).
+// Type* always live on both sides; sticky false (no invent equal/not-match soft-skip past hole).
 func (t *Type) Match(other *Type, mt MatchType) bool {
 	if t == nil || other == nil {
-		return t == other
+		SetError(ErrGeneric)
+		return false
 	}
 	switch mt {
 	case MatchExact:
@@ -540,8 +552,13 @@ func (t *Type) Match(other *Type, mt MatchType) bool {
 
 // IsPromotable mirrors Type::is_promotable.
 // Type.cpp:1387–1416 — integer rank promotion among simples.
+// Type* always live; sticky false (no invent not-promotable soft-skip past hole).
 func (t *Type) IsPromotable(other *Type) bool {
-	if t == nil || other == nil || !t.IsSimple() || !other.IsSimple() {
+	if t == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !t.IsSimple() || !other.IsSimple() {
 		return false
 	}
 	switch t.simple {
@@ -616,8 +633,13 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 }
 
 // IsDereferencedFrom mirrors Type::is_dereferenced_from.
+// Type* always live; sticky false (no invent not-deref soft-skip past hole).
 func (t *Type) IsDereferencedFrom(other *Type) bool {
-	if other == nil || other.ptrTo == nil {
+	if t == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if other.ptrTo == nil {
 		return false
 	}
 	for pt := other.ptrTo; pt != nil; pt = pt.ptrTo {
@@ -629,7 +651,12 @@ func (t *Type) IsDereferencedFrom(other *Type) bool {
 }
 
 // IsDerivable mirrors Type::is_derivable.
+// Type* always live; sticky false (no invent not-derivable / equal-nil soft-skip past hole).
 func (t *Type) IsDerivable(other *Type) bool {
+	if t == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	if t == other {
 		return true
 	}
@@ -638,9 +665,11 @@ func (t *Type) IsDerivable(other *Type) bool {
 
 // IsEquivalent mirrors Type::is_equivalent — same size and signedness for simples.
 // Type.cpp:1455–1464.
+// Type* always live; sticky false (no invent equal-nil soft-skip past hole).
 func (t *Type) IsEquivalent(other *Type) bool {
 	if t == nil || other == nil {
-		return t == other
+		SetError(ErrGeneric)
+		return false
 	}
 	if t == other {
 		return true

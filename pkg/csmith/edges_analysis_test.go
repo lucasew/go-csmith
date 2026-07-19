@@ -114,11 +114,16 @@ func TestFindEdgesInNilHoleFailClosed(t *testing.T) {
 }
 
 func TestHasEdgeInNilFMFailClosed(t *testing.T) {
-	// assert(fm) path — no invent no-edge without FactMgr
+	// assert(fm) path — sticky has-edge (no invent no-edge without FactMgr)
+	ClearError()
 	var fm *FactMgr
 	if !fm.HasEdgeIn(1, false, true) {
 		t.Fatal("nil FM must HasEdgeIn true")
 	}
+	if !HasError() {
+		t.Fatal("nil FM HasEdgeIn must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {

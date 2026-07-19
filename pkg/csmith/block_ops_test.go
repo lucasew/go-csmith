@@ -764,6 +764,22 @@ func TestFindStmtByID(t *testing.T) {
 	if FindStmtByID(f, 3) != nil {
 		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
+	// Function + live StmID always required; sticky no invent miss soft-success
+	ClearError()
+	if FindStmtByID(nil, 3) != nil {
+		t.Fatal("nil Function FindStmtByID must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function FindStmtByID must SetError sticky")
+	}
+	ClearError()
+	if FindStmtByID(f, 0) != nil {
+		t.Fatal("stmID 0 FindStmtByID must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("stmID 0 FindStmtByID must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetDimension(t *testing.T) {

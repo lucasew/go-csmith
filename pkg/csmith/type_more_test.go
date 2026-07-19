@@ -165,6 +165,55 @@ func TestTypeNilHardQuerySticky(t *testing.T) {
 		t.Fatal("nil IsSigned must SetError sticky")
 	}
 	ClearError()
+	if (*Type)(nil).IsFloat() {
+		t.Fatal("nil IsFloat must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsFloat must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsSignedChar() {
+		t.Fatal("nil IsSignedChar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsSignedChar must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).Match(GetIntType(), MatchExact) {
+		t.Fatal("nil Match must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Match must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsPromotable(GetIntType()) {
+		t.Fatal("nil IsPromotable must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsPromotable must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsEquivalent(GetIntType()) {
+		t.Fatal("nil IsEquivalent must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsEquivalent must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsDereferencedFrom(PointerTo(GetIntType())) {
+		t.Fatal("nil IsDereferencedFrom must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsDereferencedFrom must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsDerivable(GetIntType()) {
+		t.Fatal("nil IsDerivable must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsDerivable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {

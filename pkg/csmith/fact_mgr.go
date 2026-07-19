@@ -335,8 +335,10 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 
 // FindStmtByID returns the statement with stm_id in f's block tree.
 // Complements FindParentBlockOfStmID for CFG edge source resolution.
+// Function + live StmID always required; sticky nil (no invent miss soft-success past hole).
 func FindStmtByID(f *Function, stmID int) *Stmt {
 	if f == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	b := FindParentBlockOfStmID(f, stmID)

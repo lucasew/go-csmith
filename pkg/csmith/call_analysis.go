@@ -177,19 +177,25 @@ func FuncCount(e *Expression) int {
 
 // HasUncertainCall mirrors FunctionInvocation::has_uncertain_call.
 // FunctionInvocation.cpp:383–394 — ≥2 params each containing a call.
-// Nil invoke / nil arg / incomplete FuncCount fails closed true
-// (no invent certain order / no-call).
+// Nil invoke / nil arg / incomplete FuncCount sticky true
+// (no invent certain order / no-call soft-skip past hole).
 func (fi *Invocation) HasUncertainCall() bool {
 	if fi == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	cnt := 0
 	for _, a := range fi.Args {
 		if a == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		n := FuncCount(a)
 		if n < 0 {
+			// FuncCount incomplete already stickies when needed; keep restrictive true
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return true
 		}
 		if n > 0 {
@@ -201,17 +207,20 @@ func (fi *Invocation) HasUncertainCall() bool {
 
 // HasUncertainCallRecursive mirrors FunctionInvocation::has_uncertain_call_recursive.
 // FunctionInvocation.cpp:396–406.
-// Nil invoke / nil arg fails closed true (no invent skip hole as non-call).
+// Nil invoke / nil arg sticky true (no invent skip hole as non-call).
 func (fi *Invocation) HasUncertainCallRecursive() bool {
 	if fi == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, a := range fi.Args {
 		if a == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if a.Term == TermFunction {
 			if a.Invoke == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			if a.Invoke.HasUncertainCallRecursive() {
@@ -224,16 +233,18 @@ func (fi *Invocation) HasUncertainCallRecursive() bool {
 
 // HasSimpleParams mirrors FunctionInvocation::has_simple_params.
 // FunctionInvocation.cpp:408–416 — no TermFunction args.
-// Nil arg fails closed false (no invent simple past hole).
+// Nil invoke / nil arg sticky false (no invent simple past hole).
 func (fi *Invocation) HasSimpleParams() bool {
-	// C++ always has live FunctionInvocation*; nil shell fails closed not-simple
+	// C++ always has live FunctionInvocation*; nil shell sticky not-simple
 	// (no invent simple-params success without args IR)
 	if fi == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, a := range fi.Args {
-		// param_value[i] always live; nil hole fails closed not-simple
+		// param_value[i] always live; nil hole sticky not-simple
 		if a == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if a.Term == TermFunction {
@@ -245,24 +256,28 @@ func (fi *Invocation) HasSimpleParams() bool {
 
 // HasUncertainCallRecursiveExpr mirrors Expression::has_uncertain_call_recursive.
 // ExpressionFuncall / Comma / Assign overrides; default false.
-// Incomplete IR fails closed true (no invent "no uncertain call").
+// Incomplete IR sticky true (no invent "no uncertain call" soft-skip past hole).
 func HasUncertainCallRecursiveExpr(e *Expression) bool {
 	if e == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	switch e.Term {
 	case TermFunction:
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.Invoke.HasUncertainCallRecursive()
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return HasUncertainCallRecursiveExpr(e.CommaLHS) || HasUncertainCallRecursiveExpr(e.CommaRHS)
 	case TermAssignment:
 		if e.Assign == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return HasUncertainCallRecursiveStmt(e.Assign)
@@ -273,29 +288,33 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 
 // HasUncertainCallRecursiveStmt mirrors Statement::has_uncertain_call_recursive.
 // Assign/Invoke/If via expr; for via get_exprs test; default false.
-// Incomplete for/expr fails closed true (no invent skip for-test calls).
+// Incomplete for/expr sticky true (no invent skip for-test calls).
 func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 	if st == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	switch st.Kind {
 	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
 		// C++ always has live get_exprs entries for these kinds
 		if st.Expr == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return HasUncertainCallRecursiveExpr(st.Expr)
 	case StmtFor, StmtArrayOp:
 		// StatementFor::get_exprs → test (not st.Expr)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if HasUncertainCallRecursiveExpr(st.Loop.TestExpr) {
 			return true
 		}
-		// get_blocks body only — no invent soft-skip nil body as "no uncertain call"
+		// get_blocks body only — sticky no invent soft-skip nil body as "no uncertain call"
 		for _, b := range GetBlocksStmt(st) {
 			if b == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			for i := range b.Stmts {
