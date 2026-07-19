@@ -214,6 +214,7 @@ func FindContainerStm(b *Block) *Stmt {
 // Same-parent incomplete IDs resolve by parent membership when possible; unresolved
 // membership fails closed sticky false (no invent dominate true via 0<=0 / soft re-pick).
 // Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
+// Incomplete get_blocks arms sticky false (no invent match Then then soft-skip nil Else).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	// both Statement* always live; sticky incomplete no invent not-dominate soft-skip
 	if a == nil || s == nil {
@@ -222,10 +223,25 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	}
 	// s is nested inside a (get_blocks of a includes s's parent block)
 	if sParent != nil {
-		for _, nb := range GetBlocksStmt(a) {
-			if nb == sParent {
-				return true
+		blks := GetBlocksStmt(a)
+		incomplete := false
+		matched := false
+		for _, nb := range blks {
+			if nb == nil {
+				// incomplete arm sticky — no invent dominate via Then past nil Else
+				incomplete = true
+				continue
 			}
+			if nb == sParent {
+				matched = true
+			}
+		}
+		if incomplete {
+			SetError(ErrGeneric)
+			return false
+		}
+		if matched {
+			return true
 		}
 	}
 	// same parent: earlier stm_id dominates later (Statement.cpp:399–401)
@@ -250,10 +266,14 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 		return a.StmID <= s.StmID
 	}
 	// walk container of s (if/for that owns sParent)
+	// FindContainerStm stickies incomplete arms; residual ERROR fails closed
 	if sParent != nil {
 		container := FindContainerStm(sParent)
 		if container != nil {
 			return Dominate(a, aParent, container, sParent.Parent)
+		}
+		if HasError() {
+			return false
 		}
 	}
 	return false

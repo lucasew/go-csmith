@@ -164,6 +164,16 @@ func TestFindContainerAndDominate(t *testing.T) {
 		t.Fatal("nil Else FindContainerStm must SetError sticky")
 	}
 	ClearError()
+	// Dominate via incomplete if get_blocks sticky (no invent match Then past nil Else)
+	inner2 := Stmt{Kind: StmtAssign, StmID: 32}
+	body2.Stmts = []Stmt{inner2}
+	if Dominate(&outer2.Stmts[0], outer2, &body2.Stmts[0], body2) {
+		t.Fatal("nil Else Dominate must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Else Dominate must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
