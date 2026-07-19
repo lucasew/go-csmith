@@ -5,17 +5,28 @@ package csmith
 
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
-// Fact* always live in maps; nil subject/jump holes fail closed (no invent skip).
-// Returns false when maps are incomplete OR when the join does not change facts.
+// Fact* always live in maps; nil subject/jump holes fail closed (*facts nil —
+// no invent skip holes or leave partial mid-join). Returns whether any fact changed.
+// Incomplete / mid-join failure clears *facts and returns false (same as no-change);
+// callers that need to distinguish use tryMergeJumpFacts.
 func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
+	changed, ok := tryMergeJumpFacts(facts, jumpFacts)
+	return ok && changed
+}
+
+// tryMergeJumpFacts merges jump outs into facts; fails closed on incomplete maps.
+// Distinguishes incomplete (ok=false, *facts nil) from complete no-change
+// (ok=true, changed=false). Mid-join MergeFactInto nil clears *facts (no invent
+// leave partial join as ok success).
+func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
 	if facts == nil {
-		return false
+		return false, false
 	}
 	// pre-validate: incomplete maps must not soft-join past holes
 	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
-		return false
+		*facts = nil
+		return false, false
 	}
-	changed := false
 	// iterate a snapshot of subjects so we can grow via MergeFactInto
 	subjects := append([]*FactPointTo(nil), *facts...)
 	for _, f := range subjects {
@@ -31,7 +42,9 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 		before := FindRelatedPointTo(*facts, f.Var)
 		merged := MergeFactInto(*facts, jumpF)
 		if merged == nil {
-			return false
+			// mid-join incomplete — clear partial, no invent keep half-merged map
+			*facts = nil
+			return false, false
 		}
 		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
@@ -39,19 +52,7 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 			changed = true
 		}
 	}
-	return changed
-}
-
-// tryMergeJumpFacts merges jump outs into facts; fails closed on incomplete maps.
-// Distinguishes incomplete (ok=false) from complete no-change (ok=true, changed=false).
-func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
-	if facts == nil {
-		return false, false
-	}
-	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
-		return false, false
-	}
-	return MergeJumpFacts(facts, jumpFacts), true
+	return changed, true
 }
 
 func isReturnVar(v *Variable) bool {

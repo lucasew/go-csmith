@@ -34,7 +34,11 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 	if cg.FM == nil || cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
 		return false
 	}
-	cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
+	_ = cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
+	// incomplete return assign must not invent visit success / effect map
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		return false
+	}
 	// StatementReturn.cpp:93–94 — map_stm_effect[this] = effect_stm
 	if st.StmID > 0 {
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)

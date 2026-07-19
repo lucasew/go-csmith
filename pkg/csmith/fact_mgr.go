@@ -891,10 +891,13 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
 		for _, f := range pt {
 			if f == nil {
+				// incomplete abstract list — clear partial GlobalFacts, no invent keep half-merge
+				fm.GlobalFacts = nil
 				return
 			}
 			merged := MergeFactInto(fm.GlobalFacts, f)
 			if merged == nil {
+				fm.GlobalFacts = nil
 				return
 			}
 			fm.GlobalFacts = merged
@@ -903,10 +906,12 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if wantUn {
 		for _, uf := range un {
 			if uf == nil {
+				fm.UnionFacts = nil
 				return
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if merged == nil {
+				fm.UnionFacts = nil
 				return
 			}
 			fm.UnionFacts = merged
@@ -1252,6 +1257,7 @@ func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
 
 // UpdateFactForReturnStmt mirrors FactMgr::update_fact_for_return.
 // FactMgr.cpp:406–421 — abstract_fact_for_return into global_facts; set_fact_out(sr).
+// Incomplete assign fails closed (false; no invent SetMapFactsOut from wiped map).
 func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Expression) bool {
 	if fm == nil || rv == nil {
 		return false
@@ -1259,6 +1265,11 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)
 	// FactMgr.cpp:408–416 — merge into inputs; fact_changed on merge
 	changed := fm.UpdateFactForAssign(rv, 0, expr)
+	// incomplete GlobalFacts after assign — do not invent return out map
+	if !FactsComplete(fm.GlobalFacts) {
+		fm.GlobalFacts = nil
+		return false
+	}
 	// FactMgr.cpp:418–420 — incorporate current facts into return outs
 	if st != nil {
 		// set_fact_out for return drops function-locals (FactMgr.cpp:270–272)

@@ -101,14 +101,44 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	if MergeJumpFacts(&facts, jump) {
 		t.Fatal("nil subject hole must fail closed")
 	}
-	// still only original non-merged? — fail closed leaves map untouched
-	if len(facts) != 2 || facts[0] == nil || len(facts[0].PointTo) != 1 {
-		t.Fatal("must not invent partial merge", facts)
+	// fail closed clears *facts — no invent leave partial / hole-bearing map
+	if facts != nil {
+		t.Fatal("incomplete must clear facts", facts)
+	}
+	holeSubj := []*FactPointTo{MakeFactPointTo(p, a), nil}
+	if _, ok := tryMergeJumpFacts(&holeSubj, jump); ok {
+		t.Fatal("tryMerge incomplete subject must ok=false")
+	}
+	if holeSubj != nil {
+		t.Fatal("tryMerge must clear incomplete subject", holeSubj)
 	}
 	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
 	jumpHole := []*FactPointTo{nil}
 	if MergeJumpFacts(&facts2, jumpHole) {
 		t.Fatal("nil jump hole must fail closed")
+	}
+	if facts2 != nil {
+		t.Fatal("incomplete jump must clear facts2", facts2)
+	}
+}
+
+func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
+	// incomplete GlobalFacts after return update must not invent visit success
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	st := &Stmt{
+		Kind: StmtReturn, StmID: 5,
+		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: f.RV.Type},
+	}
+	if VisitFactsStatementReturn(st, &cg, Defaults()) {
+		t.Fatal("incomplete GlobalFacts return visit must fail closed")
 	}
 }
 

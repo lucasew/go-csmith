@@ -44,7 +44,11 @@ func MakeExpressionAssign(
 		if st.Lhs != nil {
 			indir = st.Lhs.IndirectLevel()
 		}
-		cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
+		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
+		// incomplete assign must not invent ExpressionAssign shell with wiped facts
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return nil
+		}
 	}
 	// ExpressionAssign value type is LHS type (ExpressionAssign.h:get_type)
 	exprType := typ

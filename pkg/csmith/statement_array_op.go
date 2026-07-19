@@ -363,10 +363,16 @@ func MakeRandomArrayInit(
 	// StatementArrayOp.cpp:145–150 — StatementArrayOp + update_fact_for_assign
 	if cg.FM != nil {
 		// LHS is the collective array variable
-		if cg.FM.UpdateFactForAssign(&av.Variable, 0, rhs) {
-			if cg.CurrentFunc != nil {
-				cg.CurrentFunc.FactChanged = true
+		// UpdateFactForAssign sets Func.FactChanged when lattice changes
+		_ = cg.FM.UpdateFactForAssign(&av.Variable, 0, rhs)
+		// incomplete assign must not invent array-op stmt with wiped GlobalFacts
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			for _, d := range dims {
+				if d != nil && d.IV != nil {
+					cg.RemoveIVBound(d.IV)
+				}
 			}
+			return Stmt{}
 		}
 	}
 
