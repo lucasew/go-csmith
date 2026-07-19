@@ -143,12 +143,38 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 		return false
 	}
 	for i, f := range *facts {
+		// Fact* always live after FactsComplete
+		if f == nil || f.Var == nil {
+			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+			return false
+		}
 		if f.Var == nf.Var || f.Var.Match(nf.Var) {
+			// residual ERROR sticky — no invent soft-continue later match past Match hole
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return false
+			}
 			if f.Equal(nf) {
+				// residual ERROR sticky — no invent no-change soft-success past Equal hole
+				if HasError() {
+					*facts = IncompleteFactSlice()
+					return false
+				}
+				return false
+			}
+			// residual ERROR sticky — no invent replace past Equal hole
+			if HasError() {
+				*facts = IncompleteFactSlice()
 				return false
 			}
 			(*facts)[i] = nf
 			return true
+		}
+		// residual ERROR sticky — no invent soft-skip not-match then renew later
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
 		}
 	}
 	*facts = append(*facts, nf)
@@ -173,7 +199,16 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	changed := false
 	for _, nf := range newFacts {
 		if RenewFact(facts, nf) {
+			// residual ERROR sticky — no invent soft-continue partial renew past hole
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return false
+			}
 			changed = true
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip failed renew then renew later
+			*facts = IncompleteFactSlice()
+			return false
 		}
 	}
 	return changed

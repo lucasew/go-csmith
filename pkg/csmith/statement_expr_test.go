@@ -34,6 +34,8 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 }
 
 func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
+	// suite hygiene: prior sticky tests leave residual ERROR; clear before complete emit
+	ClearError()
 	// complete binary IR (live args) — no invent bare ";" for empty Output
 	fi := &Invocation{
 		IsStd:  true,

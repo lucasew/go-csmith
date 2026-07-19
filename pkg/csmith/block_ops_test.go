@@ -514,6 +514,26 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 		t.Fatal("IsArray without AsArray Block.Output must SetError sticky")
 	}
 	ClearError()
+	// PreOutput residual soft invent was soft-continue then emit later stmts.
+	// Fair: sticky fail closed whole Block.Output (StmID 0 under FM stickies PreOutput).
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	good := CreateVariableScalars("g_1", GetIntType(), false, false)
+	b4 := &Block{
+		Func:   f,
+		EmitFM: fm,
+		Stmts: []Stmt{
+			{Kind: StmtAssign, StmID: 0, LhsVar: good}, // StmID 0 under FM sticky PreOutput
+			{Kind: StmtAssign, StmID: 2, LhsVar: good, Expr: &Expression{Term: TermVariable, Var: good, ExprType: GetIntType()}},
+		},
+	}
+	if out := b4.Output(0); out != "" {
+		t.Fatal("PreOutput residual must fail closed whole block", out)
+	}
+	if !HasError() {
+		t.Fatal("PreOutput residual Block.Output must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddNewVarFactTo(t *testing.T) {

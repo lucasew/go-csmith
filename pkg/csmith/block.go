@@ -1096,6 +1096,10 @@ func (b *Block) Output(indent int) string {
 		// Statement::pre_output — label from jump sources / SourceLabel, else step_hash
 		// Statement.cpp:905–917 — goto target skips output_hash
 		pre, isGotoTarget := PreOutput(&st, b.EmitFM, b.EmitStepHash, b.EmitLabelAttrs, b.LabelAttrRng, inner)
+		// residual ERROR sticky — no invent soft-continue stmt emit past PreOutput hole
+		if HasError() {
+			return ""
+		}
 		if pre != "" {
 			sb.WriteString(pre)
 		}
@@ -1325,7 +1329,12 @@ func (b *Block) Output(indent int) string {
 		}
 		// Statement::post_output — paranoid fact assertions (Statement.cpp:919–924)
 		if b.EmitParanoid && b.EmitFM != nil {
-			sb.WriteString(PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner))
+			post := PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner)
+			// residual ERROR sticky — no invent soft-continue stmt emit past PostOutput hole
+			if HasError() {
+				return ""
+			}
+			sb.WriteString(post)
 		}
 	}
 	// Block.cpp:266–267

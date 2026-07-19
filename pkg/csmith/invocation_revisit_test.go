@@ -58,6 +58,34 @@ func TestRenewFacts(t *testing.T) {
 		t.Fatal("nil nf RenewFact must SetError sticky")
 	}
 	ClearError()
+	// Match residual: Type-nil Var on existing fact soft invent was soft-skip not-match
+	// then append nf inventing partial renew. Fair: sticky wipe incomplete fail closed.
+	brokenSubj := &Variable{Name: "g_broken"} // Type nil
+	factsMatch := []*FactPointTo{{Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
+	nfMatch := MakeFactPointTo(p, GarbagePtr)
+	if RenewFact(&factsMatch, nfMatch) {
+		t.Fatal("Match residual must fail closed RenewFact, not invent append")
+	}
+	if FactsComplete(factsMatch) {
+		t.Fatal("Match residual RenewFact must wipe incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Match residual RenewFact must SetError sticky")
+	}
+	ClearError()
+	// RenewFacts residual: Type-nil subject among facts when renewing later complete nf
+	p2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	factsRF := []*FactPointTo{MakeFactPointTo(p, NullPtr), {Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
+	if RenewFacts(&factsRF, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), MakeFactPointTo(p2, NullPtr)}) {
+		t.Fatal("Match residual must fail closed RenewFacts")
+	}
+	if FactsComplete(factsRF) {
+		t.Fatal("Match residual RenewFacts must wipe incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Match residual RenewFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestReturnFactRegistry(t *testing.T) {
