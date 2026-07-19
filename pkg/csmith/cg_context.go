@@ -884,6 +884,9 @@ func (c CGContext) InConflict(eff Effect) bool {
 
 // IsFrameVar mirrors CGContext::is_frame_var — visible local in current/call_chain.
 // CGContext.cpp:492–504.
+// Incomplete Param/LocalVars on current or call_chain frames: membership false
+// (IsVisibleLocal short-circuits); FindReachableFrameVars fails closed on incomplete
+// stacks so under-reporting frame pointees is not invented as complete empty.
 func (c CGContext) IsFrameVar(v *Variable) bool {
 	if v == nil {
 		return false
@@ -894,13 +897,16 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	if b == nil {
 		return false
 	}
+	if !b.StackScanComplete() {
+		return false
+	}
 	if v.IsVisibleLocal(b) {
 		return true
 	}
 	for _, cb := range c.CallChain {
-		// Block* always live on call_chain; nil hole fails closed (not frame)
-		// no invent skip hole and still match a later frame
-		if cb == nil {
+		// Block* always live on call_chain; nil / incomplete stack fails closed
+		// (no invent skip hole and still match a later frame)
+		if cb == nil || !cb.StackScanComplete() {
 			return false
 		}
 		if v.IsVisibleLocal(cb) {
@@ -910,12 +916,35 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	return false
 }
 
+// frameStacksComplete reports current block + call_chain stacks have no holes.
+// No current block: no frames are scanned (IsFrameVar fails closed without curr_blk);
+// that empty-frame env is complete. Incomplete stacks only when a live frame is present.
+func (c CGContext) frameStacksComplete() bool {
+	b := c.CurrentBlock()
+	if b == nil {
+		return true
+	}
+	if !b.StackScanComplete() {
+		return false
+	}
+	for _, cb := range c.CallChain {
+		if cb == nil || !cb.StackScanComplete() {
+			return false
+		}
+	}
+	return true
+}
+
 // FindReachableFrameVars mirrors CGContext::find_reachable_frame_vars.
 // CGContext.cpp:566–578 — pointees that are frame locals.
-// Fact* always live; incomplete map/pointees fail closed (nil out).
+// Fact* always live; incomplete map/pointees or incomplete frame stacks fail closed
+// (nil out — no invent empty frame set when IsFrameVar is false past a hole).
 // Complete empty returns non-nil empty slice (no invent nil==incomplete).
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	if !FactsComplete(facts) {
+		return nil
+	}
+	if !c.frameStacksComplete() {
 		return nil
 	}
 	out := make([]*Variable, 0)

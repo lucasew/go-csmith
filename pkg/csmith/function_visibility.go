@@ -164,7 +164,9 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
 // FactMgr.cpp:141–170 — drop facts for vars; mark pointees as garbage/dead.
 // Fact* always live; nil hole fails closed (nil facts, no invent clean filter).
-// Variable* in OOS list always live; nil hole fails closed same way.
+// Variable* in OOS list always live with complete FieldVars; nil / incomplete
+// FieldVars fail closed (nil facts — no invent leave field pointees live when
+// MarkDeadVar cannot see past a FieldVars hole).
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if facts == nil || len(vars) == 0 {
 		return
@@ -174,7 +176,7 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		return
 	}
 	for _, v := range vars {
-		if v == nil {
+		if v == nil || !v.FieldVarsComplete() {
 			*facts = nil
 			return
 		}

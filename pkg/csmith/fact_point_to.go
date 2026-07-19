@@ -741,8 +741,13 @@ func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 // MarkDeadVar mirrors FactPointTo::mark_dead_var.
 // FactPointTo.cpp:106–123 — replace/remove pointee v with garbage_ptr.
 // Variable* always live in PointTo; nil hole fails closed (nil — no invent skip).
+// Incomplete FieldVars on v fails closed (nil — no invent leave stack field
+// pointees live because HasFieldVar returned false past a hole).
 func (f *FactPointTo) MarkDeadVar(v *Variable) *FactPointTo {
 	if f == nil || v == nil {
+		return nil
+	}
+	if !v.FieldVarsComplete() {
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)

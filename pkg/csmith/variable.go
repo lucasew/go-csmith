@@ -1035,9 +1035,25 @@ func (v *Variable) Match(other *Variable) bool {
 	return false
 }
 
+// FieldVarsComplete reports nested FieldVars have no nil holes.
+// Incomplete aggregates must not invent not-has-field / not-match past a hole
+// for mark_dead_var and similar; callers fail closed when false.
+func (v *Variable) FieldVarsComplete() bool {
+	if v == nil {
+		return true
+	}
+	for _, f := range v.FieldVars {
+		if f == nil || !f.FieldVarsComplete() {
+			return false
+		}
+	}
+	return true
+}
+
 // HasFieldVar mirrors Variable::has_field_var — other is this or nested field.
 // Variable* always live in FieldVars; nil hole fails closed as false
-// (no invent skip hole and match a later field).
+// (no invent skip hole and match a later field). Callers that must not invent
+// "no field" for OOS/mark use FieldVarsComplete first.
 func (v *Variable) HasFieldVar(other *Variable) bool {
 	if v == nil || other == nil {
 		return false
@@ -1045,10 +1061,10 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 	if v == other {
 		return true
 	}
+	if !v.FieldVarsComplete() {
+		return false
+	}
 	for _, f := range v.FieldVars {
-		if f == nil {
-			return false
-		}
 		if f.HasFieldVar(other) {
 			return true
 		}

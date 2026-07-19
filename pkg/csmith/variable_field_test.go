@@ -34,8 +34,32 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	parent := &Variable{Name: "s", Type: &Type{isStruct: true}}
 	child := &Variable{Name: "s.f0", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{nil, child}
+	if parent.FieldVarsComplete() {
+		t.Fatal("FieldVars hole must be incomplete")
+	}
 	if parent.HasFieldVar(child) {
 		t.Fatal("nil FieldVars hole must fail closed (no invent skip to later)")
+	}
+	// MarkDeadVar / OOS must not invent leave field pointees live past hole
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	facts := []*FactPointTo{MakeFactPointTo(p, child)}
+	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
+	if facts != nil {
+		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
+	}
+}
+
+func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
+	// soft invent: LocalVars hole → IsFrameVar false → empty frame set as complete
+	f := &Function{Name: "f"}
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
+	if got := cg.FindReachableFrameVars(facts); got != nil {
+		t.Fatal("incomplete frame stack must fail closed nil, not invent empty", got)
 	}
 }
 
