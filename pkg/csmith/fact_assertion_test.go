@@ -21,6 +21,11 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	if !strings.Contains(fd.OutputCondition(), "dangling") {
 		t.Fatal(fd.OutputCondition())
 	}
+	// point_to_vars always live; no invent skip nil holes in OR list
+	broken := &FactPointTo{Var: p, PointTo: []*Variable{tgt, nil}}
+	if cond := broken.OutputCondition(); cond != "" {
+		t.Fatal("nil pointee must fail closed", cond)
+	}
 }
 
 func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {

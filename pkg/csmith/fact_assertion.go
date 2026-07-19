@@ -57,8 +57,9 @@ func (f *FactPointTo) OutputCondition() string {
 	}
 	var parts []string
 	for _, pointee := range f.PointTo {
+		// FactPointTo.cpp: point_to_vars[i] always live; no invent skip nil holes
 		if pointee == nil {
-			continue
+			return ""
 		}
 		lhs := outputFactVar(f.Var)
 		if pointee.IsArray || (pointee.AsArray != nil) {

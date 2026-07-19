@@ -84,6 +84,21 @@ func TestPointerToNoInventIntStar(t *testing.T) {
 	}
 }
 
+func TestPrintfDirectiveNoInventFieldHoles(t *testing.T) {
+	// Type.cpp fields[i]->printf_directive always live; no invent empty holes
+	st := &Type{
+		isStruct:   true,
+		StructName: "S0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: nil, BitWidth: -1},
+		},
+	}
+	if s := st.PrintfDirective(); s != "" {
+		t.Fatal("nil field type must fail closed", s)
+	}
+}
+
 func TestHasAggregateAndLongLongField(t *testing.T) {
 	fields := []StructField{
 		{Name: "f0", Type: GetIntType()},

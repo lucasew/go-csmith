@@ -39,6 +39,10 @@ func (a *BooleanAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil {
 		return ""
 	}
+	// Attribute name from ctor; no invent empty __attribute__ token
+	if a.Name == "" {
+		return ""
+	}
 	if r.RndFlipcoin(uint32(clampProb(a.Prob))) {
 		return a.Name
 	}
@@ -56,6 +60,10 @@ type MultiChoiceAttribute struct {
 // MakeRandom implements Attribute.
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil || len(a.Choices) == 0 {
+		return ""
+	}
+	// Attribute name from ctor; no invent ("choice") without name
+	if a.Name == "" {
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -77,6 +85,10 @@ type AlignedAttribute struct {
 // MakeRandom implements Attribute.
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil {
+		return ""
+	}
+	// Attribute name from ctor; no invent bare "(N)" without name
+	if a.Name == "" {
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {

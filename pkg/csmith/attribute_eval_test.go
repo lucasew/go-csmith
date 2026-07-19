@@ -68,6 +68,19 @@ func TestSectionAttributeNoInventName(t *testing.T) {
 	}
 }
 
+func TestAttributeNoInventEmptyName(t *testing.T) {
+	// Boolean / MultiChoice / Aligned require live name from ctor
+	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandom(NewRng(1)); s != "" {
+		t.Fatal("boolean empty name", s)
+	}
+	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandom(NewRng(1)); s != "" {
+		t.Fatal("multichoice empty name", s)
+	}
+	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandom(NewRng(1)); s != "" {
+		t.Fatal("aligned empty name", s)
+	}
+}
+
 func TestSectionAttribute(t *testing.T) {
 	a := &SectionAttribute{Name: "section", Prob: 100}
 	s := a.MakeRandom(NewRng(3))

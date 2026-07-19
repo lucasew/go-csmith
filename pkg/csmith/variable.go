@@ -270,10 +270,11 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 }
 
 // NewCtrlVars mirrors Variable::new_ctrl_vars — i,j,k… (±suffix when fresh).
-// Variable.cpp:747–767. maxDim is CGOptions::max_array_dimensions().
+// Variable.cpp:747–767. maxDim is CGOptions::max_array_dimensions() as-is
+// (no soft invent maxDim=1 when option is 0 — empty loop / empty vector).
 func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
-	if maxDim < 1 {
-		maxDim = 1
+	if maxDim < 0 {
+		maxDim = 0
 	}
 	suffix := ctrlVarsCount
 	ctrl := make([]*Variable, 0, maxDim)
@@ -386,8 +387,13 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 		return ""
 	}
 	ctrl := GetNewCtrlVars(opts)
+	// Variable.cpp:802 assert(dimen <= ctrl_vars.size()); no invent inits without decl
+	decl := OutputArrayCtrlVars(ctrl, dimen, indent)
+	if decl == "" {
+		return ""
+	}
 	var b strings.Builder
-	b.WriteString(OutputArrayCtrlVars(ctrl, dimen, indent))
+	b.WriteString(decl)
 	names := CtrlVarNames(ctrl)
 	for _, v := range vars {
 		if v == nil || !v.IsArray {

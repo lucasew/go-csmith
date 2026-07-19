@@ -780,15 +780,22 @@ func (t *Type) PrintfDirective() string {
 		return "0x%0x"
 	}
 	if t.IsAggregate() {
+		// Type.cpp:1945–1951 — fields[i]->printf_directive always live Type*
+		// no invent empty holes for nil field types
 		var b strings.Builder
 		b.WriteString("{")
 		for i, f := range t.Fields {
+			if f.Type == nil {
+				return ""
+			}
+			part := f.Type.PrintfDirective()
+			if part == "" {
+				return ""
+			}
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			if f.Type != nil {
-				b.WriteString(f.Type.PrintfDirective())
-			}
+			b.WriteString(part)
 		}
 		b.WriteString("}")
 		return b.String()

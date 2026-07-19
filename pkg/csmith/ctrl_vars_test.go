@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestNewCtrlVarsNoInventDimOne(t *testing.T) {
+	// Variable.cpp:755 — for i < max_array_dimensions(); no invent maxDim=1 when 0
+	CtrlVarsDoFinalization()
+	ctrl := NewCtrlVars(0, false)
+	if len(ctrl) != 0 {
+		t.Fatalf("maxDim 0 must yield empty ctrl, got %d", len(ctrl))
+	}
+	// OutputArrayInitializers must not invent inits without matching ctrl decl
+	opts := Defaults()
+	opts.MaxArrayDim = 0
+	v := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if out := OutputArrayInitializers([]*Variable{v}, opts, "    "); out != "" {
+		t.Fatal("must fail closed without ctrl decl", out)
+	}
+	CtrlVarsDoFinalization()
+}
+
 func TestNewCtrlVarsLetters(t *testing.T) {
 	CtrlVarsDoFinalization()
 	opts := Defaults()
