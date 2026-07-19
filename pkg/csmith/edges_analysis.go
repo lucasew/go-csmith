@@ -184,8 +184,14 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 // Statement.cpp:515–520 — eff += block effect; store as this statement's effect.
 // Statement::stm_id always live; StmID 0 is incomplete (no invent soft no-op success
 // that leaves map_stm_effect unset while callers treat effect as recorded).
+// Incomplete pre/block effects store IncompleteEffect (AddEffect already fails closed).
 func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext, preStm Effect) {
 	if st == nil || cg == nil || cg.FM == nil || st.StmID <= 0 {
+		return
+	}
+	// incomplete inputs fail closed IncompleteEffect map entry (no invent pure merge)
+	if !EffectComplete(preStm) || !EffectComplete(blockEffect) {
+		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
 		return
 	}
 	eff := preStm.AddEffect(blockEffect)
