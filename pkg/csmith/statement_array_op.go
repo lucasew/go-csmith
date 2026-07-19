@@ -201,6 +201,17 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 	if r == nil || vs == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent array-loop setup past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	maxN := opts.MaxArrayNumInLoop
 	if maxN < 0 {
 		maxN = 0

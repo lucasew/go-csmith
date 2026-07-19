@@ -604,8 +604,12 @@ func (f *Function) generateBodyCore(
 			return
 		}
 		for i, fact := range cg.FM.GlobalFacts {
+			// nil without error = no lattice change; nil with sticky = incomplete fail closed
 			if nf := fact.MarkFuncEndLocals(locals); nf != nil {
 				cg.FM.GlobalFacts[i] = nf
+			} else if HasError() {
+				abortUnbuilt()
+				return
 			}
 		}
 		if opts.DanglingGlobalPointers {

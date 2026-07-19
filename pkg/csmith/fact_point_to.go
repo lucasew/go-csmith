@@ -859,12 +859,15 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	}
 	localSet := make(map[*Variable]bool, len(locals))
 	for _, l := range locals {
+		// incomplete locals fails closed sticky (no invent "no change" past hole)
 		if l == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		localSet[l] = true
 		exp := l.CollectExpandable()
 		if !VariablesComplete(exp) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		for _, fv := range exp {
@@ -874,7 +877,9 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	set := append([]*Variable(nil), f.PointTo...)
 	hasGarbage := false
 	for _, p := range set {
+		// incomplete PointTo fails closed sticky (no invent soft-skip as no change)
 		if p == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if p == GarbagePtr {
@@ -914,13 +919,16 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	if f == nil || fn == nil {
 		return nil
 	}
+	// incomplete stack lists fail closed sticky (no invent leave stack pointees live)
 	if !fn.StackScanComplete(stParent) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	set := append([]*Variable(nil), f.PointTo...)
 	hasGarbage := false
 	for _, p := range set {
 		if p == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if p == GarbagePtr {

@@ -193,14 +193,23 @@ func TestMarkFuncEnd(t *testing.T) {
 	if ft2.MarkFuncEnd(f, body) != nil {
 		t.Fatal("global pointee")
 	}
-	// nil pointee hole fails closed
+	// nil pointee hole fails closed sticky
+	ClearError()
 	ft3 := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	if ft3.MarkFuncEnd(f, body) != nil {
 		t.Fatal("nil PointTo hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil PointTo hole MarkFuncEnd must SetError sticky")
+	}
+	ClearError()
 	if ft.MarkFuncEndLocals([]*Variable{nil}) != nil {
 		t.Fatal("nil locals hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil locals hole MarkFuncEndLocals must SetError sticky")
+	}
+	ClearError()
 	if ft3.MarkDeadVar(loc) != nil {
 		t.Fatal("MarkDeadVar nil PointTo hole must fail closed")
 	}
@@ -208,6 +217,7 @@ func TestMarkFuncEnd(t *testing.T) {
 	if IsValidPtr(p, []*FactPointTo{nil}, 0, 0) {
 		t.Fatal("IsValidPtr incomplete facts must fail closed")
 	}
+	ClearError()
 }
 
 func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {

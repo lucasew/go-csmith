@@ -296,3 +296,19 @@ func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if MakeRandomArrayLoopSetup(NewRng(1), opts, vs, cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoopSetup")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+}
