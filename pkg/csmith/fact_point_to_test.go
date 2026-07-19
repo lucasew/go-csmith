@@ -39,6 +39,17 @@ func TestFactPointToNullDead(t *testing.T) {
 	if MakeFactPointToSet(p, []*Variable{NullPtr, nil}) != nil {
 		t.Fatal("nil hole in set must fail closed MakeFactPointToSet")
 	}
+	// nil set is incomplete merge — no invent empty IsTop from nil
+	if MakeFactPointToSet(p, nil) != nil {
+		t.Fatal("nil set must fail closed MakeFactPointToSet")
+	}
+	if MakeFactsPointToSet([]*Variable{p}, nil) != nil {
+		t.Fatal("nil set must fail closed MakeFactsPointToSet")
+	}
+	// empty non-nil is valid top
+	if MakeFactPointToSet(p, []*Variable{}) == nil {
+		t.Fatal("empty non-nil set must succeed as top")
+	}
 	// Clone of incomplete PointTo fails closed
 	if (&FactPointTo{Var: p, PointTo: []*Variable{nil}}).Clone() != nil {
 		t.Fatal("Clone incomplete PointTo must fail closed")

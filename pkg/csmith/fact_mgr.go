@@ -1279,11 +1279,20 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 }
 
 // PointsTo reports whether this fact's set contains v.
+// Incomplete PointTo (nil hole) fails closed true — no invent not-points-to past holes.
 func (f *FactPointTo) PointsTo(v *Variable) bool {
 	if f == nil || v == nil {
 		return false
 	}
-	return IsVariableInSet(f.PointTo, v)
+	for _, p := range f.PointTo {
+		if p == nil {
+			return true
+		}
+		if p == v {
+			return true
+		}
+	}
+	return false
 }
 
 // CallerToCalleeHandover mirrors FactMgr::caller_to_callee_handover.

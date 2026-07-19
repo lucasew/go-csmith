@@ -40,10 +40,11 @@ func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
 }
 
 // MakeFactPointToSet mirrors FactPointTo::make_fact(v, set).
-// no invent fact without live subject; nil pointee hole fails closed nil fact
-// (no invent incomplete PointTo shell that later soft-skips as complete).
+// no invent fact without live subject; nil set or nil pointee hole fails closed
+// (nil set is incomplete merge_pointees — no invent empty IsTop PointTo from nil).
+// Valid empty sets use non-nil empty slice []*Variable{}.
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
-	if v == nil {
+	if v == nil || set == nil {
 		return nil
 	}
 	for _, p := range set {
@@ -212,8 +213,11 @@ func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 }
 
 // MakeFactsPointToSet mirrors FactPointTo::make_facts(vars, set).
-// same live-vars rules as MakeFactsPointTo
+// same live-vars rules as MakeFactsPointTo; nil set fails closed (no invent empty).
 func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
+	if set == nil {
+		return nil
+	}
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
@@ -326,14 +330,21 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 					if set == nil {
 						return nil
 					}
-					ret = append(ret, MakeFactPointToSet(lvars[j], set))
+					fp := MakeFactPointToSet(lvars[j], set)
+					if fp == nil {
+						return nil
+					}
+					ret = append(ret, fp)
 				}
 			}
 			return ret
 		}
 		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
-		// empty set is valid (no soft invent GarbagePtr)
+		// empty set is valid (no soft invent GarbagePtr); nil set = incomplete
 		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
+		if set == nil {
+			return nil
+		}
 		return MakeFactsPointToSet(lvars, set)
 	case TermFunction:
 		// FactPointTo.cpp:230–231 — assert(fi); no soft invent empty on missing invoke
@@ -359,7 +370,16 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				if rvFact == nil {
 					return nil
 				}
-				ret = append(ret, MakeFactPointToSet(lvars[i], rvFact.PointTo))
+				// PointTo may be empty top; nil slice incomplete; holes fail MakeFactPointToSet
+				set := rvFact.PointTo
+				if set == nil {
+					set = []*Variable{}
+				}
+				fp := MakeFactPointToSet(lvars[i], set)
+				if fp == nil {
+					return nil
+				}
+				ret = append(ret, fp)
 			}
 			return ret
 		}
@@ -371,7 +391,11 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		if rvFact == nil {
 			return nil
 		}
-		return MakeFactsPointToSet(lvars, rvFact.PointTo)
+		set := rvFact.PointTo
+		if set == nil {
+			set = []*Variable{}
+		}
+		return MakeFactsPointToSet(lvars, set)
 	case TermAssignment:
 		// FactPointTo.cpp:256–258 — peel embedded assign RHS
 		if rhs.Assign == nil {
@@ -597,11 +621,16 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 
 // Clone shallow-copies the fact (new PointTo slice).
 // Incomplete PointTo (nil hole) fails closed nil — no invent clone of broken set.
+// Empty top (nil PointTo) clones as empty non-nil set.
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {
 		return nil
 	}
-	return MakeFactPointToSet(f.Var, f.PointTo)
+	set := f.PointTo
+	if set == nil {
+		set = []*Variable{}
+	}
+	return MakeFactPointToSet(f.Var, set)
 }
 
 // FactsComplete reports whether every Fact* is live with complete PointTo sets.
