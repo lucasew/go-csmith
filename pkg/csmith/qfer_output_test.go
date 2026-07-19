@@ -186,6 +186,22 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	if s := v.HashOutput(); s != "" {
 		t.Fatal("empty name must fail closed hash", s)
 	}
+	// array dump/hash without name — no invent bare "[0]" / for ( = 0; …)
+	arr := &Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if s := arr.OutputValueDump("c ", 1, nil); s != "" {
+		t.Fatal("empty array name must fail closed dump", s)
+	}
+	ctrl := []*Variable{
+		{Name: "i", Type: GetIntType()},
+	}
+	if s := hashArrayVariable(arr, ctrl, nil); s != "" {
+		t.Fatal("empty array name must fail closed hash", s)
+	}
+	// empty ctrl name — no invent for ( = 0; …)
+	arr.Name = "g_a"
+	if s := hashArrayVariable(arr, []*Variable{{Type: GetIntType()}}, nil); s != "" {
+		t.Fatal("empty ctrl name must fail closed array hash", s)
+	}
 }
 
 func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {

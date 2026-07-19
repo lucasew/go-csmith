@@ -364,6 +364,11 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	default:
 		return ""
 	}
+	// SafeOpFlags.cpp:239 assert invalid size; no invent safe_add_func__s_s
+	sz := f.SizeToken()
+	if sz == "" {
+		return ""
+	}
 	// safe_add_func_int32_t_s_s  /  safe_lshift_func_int32_t_s_u
 	var b strings.Builder
 	b.WriteString(prefix)
@@ -372,7 +377,7 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	} else {
 		b.WriteString("macro_")
 	}
-	b.WriteString(f.SizeToken())
+	b.WriteString(sz)
 	if f.Op1Signed {
 		b.WriteString("_s")
 	} else {

@@ -98,6 +98,17 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 	}
 }
 
+func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
+	// SafeOpFlags.cpp:239 assert invalid size; no invent safe_add_func__s_s
+	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeOpSize(99)}
+	if got := f.BinaryFuncName("+"); got != "" {
+		t.Fatal("invalid size must fail closed BinaryFuncName", got)
+	}
+	if got := f.BinaryFuncName("<<"); got != "" {
+		t.Fatal("invalid size shift must fail closed", got)
+	}
+}
+
 func TestBinaryFuncNameFloat(t *testing.T) {
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat}
 	if got := f.BinaryFuncName("+"); got != "safe_add_func_float_f_f" {

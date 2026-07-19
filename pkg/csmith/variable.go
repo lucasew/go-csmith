@@ -1239,16 +1239,24 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 	if v == nil || len(v.ArraySizes) == 0 {
 		return ""
 	}
+	// base name always live; no invent printf with bare "[0]" access
+	base := v.GetActualName(false)
+	if base == "" {
+		return ""
+	}
 	all := expandWithinRanges(v.ArraySizes)
 	var b strings.Builder
 	for _, idx := range all {
 		// build access name g_a[0][1]
-		name := v.GetActualName(false)
+		name := base
 		for _, i := range idx {
 			name += "[" + itoa(i) + "]"
 		}
 		if v.Type != nil && v.Type.IsSimple() {
 			dir := v.Type.PrintfDirective()
+			if dir == "" {
+				continue
+			}
 			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
 			continue
 		}
@@ -1272,6 +1280,9 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 				}
 				acc := name + suffix
 				dir := f.Type.PrintfDirective()
+				if dir == "" {
+					continue
+				}
 				b.WriteString(OutputTab(indent) + "printf(\"" + prefix + acc + " = " + dir + "\\n\", " + acc + ");\n")
 			}
 		}
@@ -1444,12 +1455,21 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		// C++ assumes last_ctrl_vars sized for dimension after OutputArrayInitializers
 		return ""
 	}
+	// array name always live; no invent transparent_crc([i], …) / for ( = 0; …)
+	access := v.GetActualName(false)
+	if access == "" {
+		return ""
+	}
 	names := make([]string, len(v.ArraySizes))
 	for i := range v.ArraySizes {
 		if ctrl[i] == nil {
 			return ""
 		}
 		names[i] = ctrl[i].GetActualName(false)
+		if names[i] == "" {
+			// ctrl get_actual_name always live; no invent empty index id
+			return ""
+		}
 	}
 	var b strings.Builder
 	indent := "    "
@@ -1460,7 +1480,6 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		indent += "    "
 	}
 	// ArrayVariable::output_with_indices
-	access := v.GetActualName(false)
 	nameStr := access
 	for _, iv := range names {
 		access += "[" + iv + "]"
