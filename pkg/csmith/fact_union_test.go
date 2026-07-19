@@ -284,3 +284,28 @@ func TestFindRelatedUnionNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFactUnionEqualImplyJoinIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*FactUnion)(nil).Equal(&FactUnion{}) {
+		t.Fatal("nil Equal must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Equal must SetError sticky")
+	}
+	ClearError()
+	if (*FactUnion)(nil).Imply(&FactUnion{}) {
+		t.Fatal("nil Imply must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Imply must SetError sticky")
+	}
+	ClearError()
+	if (*FactUnion)(nil).Join(&FactUnion{}) {
+		t.Fatal("nil Join must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Join must SetError sticky")
+	}
+	ClearError()
+}

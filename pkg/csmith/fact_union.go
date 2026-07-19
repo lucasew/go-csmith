@@ -119,8 +119,14 @@ func (f *FactUnion) Clone() *FactUnion {
 
 // Equal mirrors FactUnion::equal.
 // FactUnion.cpp:195–201.
+// Incomplete FactUnion sticky false (no invent not-equal / soft re-pick past holes).
 func (f *FactUnion) Equal(other *FactUnion) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both FactUnion* always live; sticky incomplete no invent not-equal
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	return f.LastWrittenFID == other.LastWrittenFID
@@ -128,8 +134,14 @@ func (f *FactUnion) Equal(other *FactUnion) bool {
 
 // Imply mirrors FactUnion::imply.
 // FactUnion.cpp:249–259 — bottom implies all; equal fid implies; else false.
+// Incomplete FactUnion sticky false (no invent not-imply / soft re-pick past holes).
 func (f *FactUnion) Imply(other *FactUnion) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both FactUnion* always live; sticky incomplete no invent not-imply
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	if f.IsBottom() {
@@ -143,8 +155,14 @@ func (f *FactUnion) Imply(other *FactUnion) bool {
 
 // Join mirrors FactUnion::join — merge lattice; return true if changed.
 // FactUnion.cpp:207–221.
+// Incomplete FactUnion sticky false (no invent join no-op / soft re-pick past holes).
 func (f *FactUnion) Join(other *FactUnion) bool {
-	if f == nil || other == nil || f.Var != other.Var {
+	// both FactUnion* always live; sticky incomplete no invent join no-op success
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if f.Var != other.Var {
 		return false
 	}
 	if f.Imply(other) {
@@ -223,19 +241,30 @@ func IncompleteUnionFactSlice() []*FactUnion {
 
 // IsFieldReadable mirrors FactUnion::is_field_readable.
 // FactUnion.cpp:262–270.
-// Incomplete facts fail closed false (no invent readable past UnionFacts hole).
+// Incomplete facts fail closed sticky false (no invent readable past UnionFacts hole).
 func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
-	if v == nil || v.Type == nil || !v.Type.IsUnion() || fid < 0 {
+	// subject always live union; incomplete subject sticky not-readable
+	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !v.Type.IsUnion() || fid < 0 {
 		return false
 	}
 	if !UnionFactsComplete(facts) {
+		// incomplete map sticky (no invent readable / soft re-pick past hole)
+		SetError(ErrGeneric)
 		return false
 	}
-	if v.Type != nil && fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
+	if fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
 		return false
 	}
 	tmp := MakeFactUnion(v, fid)
 	if tmp == nil {
+		// MakeFactUnion may already sticky non-union; ensure sticky
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	fu := FindRelatedUnion(facts, v)

@@ -90,6 +90,10 @@ func TestIsNonreadableField(t *testing.T) {
 	if IsFieldReadable(uv, 0, hole) {
 		t.Fatal("incomplete UnionFacts must not invent field readable")
 	}
+	if !HasError() {
+		t.Fatal("incomplete UnionFacts IsFieldReadable must SetError sticky")
+	}
+	ClearError()
 	if !IsNonreadableField(f0, hole) {
 		t.Fatal("incomplete UnionFacts must fail closed nonreadable")
 	}

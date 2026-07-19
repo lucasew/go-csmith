@@ -437,3 +437,30 @@ func TestLhsGetVarGetTypeNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsAsExpressionIncompleteSticky(t *testing.T) {
+	ClearError()
+	if LhsAsExpression(nil) != nil {
+		t.Fatal("nil Lhs LhsAsExpression must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs LhsAsExpression must SetError sticky")
+	}
+	ClearError()
+	if LhsAsExpression(&Lhs{}) != nil {
+		t.Fatal("Lhs without Var LhsAsExpression must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Lhs without Var LhsAsExpression must SetError sticky")
+	}
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
+	if e == nil || e.Var != v {
+		t.Fatal("complete LhsAsExpression must return TermVariable")
+	}
+	if HasError() {
+		t.Fatal("complete LhsAsExpression must not sticky")
+	}
+	ClearError()
+}

@@ -30,12 +30,15 @@ func StmtInBlock(stParent, b *Block) bool {
 // nil arms are incomplete IR so walkers fail closed (no invent soft-skip missing arm).
 // StatementFor always pushes body; ArrayOp/Block push Then when non-nil (C++ if(body)).
 func GetBlocksStmt(st *Stmt) []*Block {
+	// Statement always live; sticky incomplete IncompleteBlocks (no invent empty-complete)
 	if st == nil {
-		return nil
+		SetError(ErrGeneric)
+		return IncompleteBlocks()
 	}
 	switch st.Kind {
 	case StmtIfElse:
 		// StatementIf.h — blks.push_back(&if_true); blks.push_back(&if_false);
+		// both arms always live in C++; nil arm is incomplete IR left for walkers
 		return []*Block{st.Then, st.Else}
 	case StmtFor:
 		// StatementFor.h — blks.push_back(&body);
@@ -181,7 +184,9 @@ func FindContainerStm(b *Block) *Stmt {
 // membership fails closed sticky false (no invent dominate true via 0<=0 / soft re-pick).
 // Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
+	// both Statement* always live; sticky incomplete no invent not-dominate soft-skip
 	if a == nil || s == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// s is nested inside a (get_blocks of a includes s's parent block)
@@ -235,11 +240,16 @@ func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, 
 		SetError(ErrGeneric)
 		return true
 	}
+	// FactMgr always live for CFG jump sources; sticky fail closed jump-target
+	// (no invent "not target" without CFG / soft re-pick past hole)
 	if fm == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	srcs := fm.FindJumpSources(destStmID)
+	// incomplete CFG (nil sources) sticky fail closed as jump-target
 	if srcs == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, srcID := range srcs {
@@ -293,7 +303,9 @@ func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 // Incomplete Block* hole fails closed sticky false (no invent membership / soft re-pick).
 // Walks only get_blocks kinds (no invent search via stray Then on assign).
 func ContainsStmtTree(root, s *Stmt) bool {
+	// both Statement* always live; sticky incomplete no invent not-contain soft-skip
 	if root == nil || s == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if root == s || (root.StmID > 0 && root.StmID == s.StmID) {

@@ -182,8 +182,11 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 }
 
 // LhsAsExpression builds a TermVariable expression for Lhs (for overlap checks).
+// Incomplete Lhs shell sticky nil (no invent soft-skip / empty expression past hole).
 func LhsAsExpression(lhs *Lhs) *Expression {
+	// Lhs always live with Variable*; sticky incomplete no invent nil soft-skip
 	if lhs == nil || lhs.Var == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	ty := lhs.Type

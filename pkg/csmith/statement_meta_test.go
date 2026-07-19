@@ -163,9 +163,13 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	if IsJumpTargetFromOtherBlocks(5, destParent, fm, nil) {
 		t.Fatal("sibling not other block")
 	}
-	// nil FM — no invent "not a jump target"
+	// nil FM sticky — no invent "not a jump target"
+	ClearError()
 	if !IsJumpTargetFromOtherBlocks(5, destParent, nil, nil) {
 		t.Fatal("nil FM must fail closed jump-target")
+	}
+	if !HasError() {
+		t.Fatal("nil FM IsJumpTarget must SetError sticky")
 	}
 	// StmID 0 fails closed sticky as jump-target (no invent not-target)
 	ClearError()
@@ -174,6 +178,22 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("StmID 0 IsJumpTarget must SetError sticky")
+	}
+	ClearError()
+	// Dominate nil sticky
+	if Dominate(nil, nil, &Stmt{StmID: 1}, nil) {
+		t.Fatal("nil Dominate a must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Dominate a must SetError sticky")
+	}
+	ClearError()
+	// GetBlocksStmt nil sticky IncompleteBlocks
+	if BlocksComplete(GetBlocksStmt(nil)) {
+		t.Fatal("nil Stmt GetBlocksStmt must fail closed IncompleteBlocks")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt GetBlocksStmt must SetError sticky")
 	}
 	ClearError()
 }

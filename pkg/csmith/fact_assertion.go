@@ -9,8 +9,14 @@ import (
 
 // IsTop mirrors FactPointTo::is_top — empty points-to set.
 // FactPointTo.h:93.
+// Incomplete Fact shell sticky false (no invent TOP / soft re-pick past hole).
 func (f *FactPointTo) IsTop() bool {
-	return f == nil || len(f.PointTo) == 0
+	// Fact always live; sticky incomplete no invent empty-complete TOP
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return len(f.PointTo) == 0
 }
 
 // HasInvisible mirrors FactPointTo::has_invisible.
@@ -129,7 +135,9 @@ func (f *FactPointTo) OutputCondition() string {
 }
 
 func outputFactVar(v *Variable) string {
+	// Variable always live at fact emit; sticky no invent empty lhs token
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	s := v.GetActualName(false)

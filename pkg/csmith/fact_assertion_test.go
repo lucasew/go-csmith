@@ -206,10 +206,22 @@ func TestPostOutputInBlock(t *testing.T) {
 }
 
 func TestIsTopEmpty(t *testing.T) {
+	ClearError()
 	f := &FactPointTo{Var: CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)}
 	if !f.IsTop() {
 		t.Fatal("empty is top")
 	}
+	if HasError() {
+		t.Fatal("empty PointTo IsTop must not sticky")
+	}
+	// nil Fact sticky false (no invent TOP)
+	if (*FactPointTo)(nil).IsTop() {
+		t.Fatal("nil Fact IsTop must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact IsTop must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPreOutputLabelSkipsStepHash(t *testing.T) {
