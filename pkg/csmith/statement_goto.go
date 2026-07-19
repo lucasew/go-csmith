@@ -132,18 +132,19 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 	}
 	var b strings.Builder
 	for _, v := range st.InitSkippedVars {
+		// StatementGoto.cpp:271 — vars[i] always live; no invent skip nil holes
 		if v == nil {
-			continue
+			return ""
 		}
 		// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
 		init := variableInitOutput(v)
 		if init == "" {
-			continue
+			return ""
 		}
 		// get_actual_name always live; no invent " = init;" without identifier
 		name := v.GetActualName(false)
 		if name == "" {
-			continue
+			return ""
 		}
 		b.WriteString(indent)
 		b.WriteString(name)

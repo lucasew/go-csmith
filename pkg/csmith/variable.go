@@ -382,9 +382,10 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen > len(ctrl) {
 		return ""
 	}
-	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); fail closed if any nil
+	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); always live names
+	// no invent "int ;" / "int , j;" for nil or empty-name slots
 	for i := 0; i < dimen; i++ {
-		if ctrl[i] == nil {
+		if ctrl[i] == nil || ctrl[i].GetActualName(false) == "" {
 			return ""
 		}
 	}

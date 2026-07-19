@@ -875,8 +875,12 @@ func (vs *VariableSelector) SelectMustUseVar(
 			continue
 		}
 		var out *Variable
-		if v.IsArray && v.AsArray != nil && r != nil {
-			// VariableSelector.cpp:1545–1546 — itemize_array only (no random fallback)
+		if v.IsArray && v.AsArray != nil {
+			// VariableSelector.cpp:1528–1530 — always itemize_array; no bare collective
+			// (C++ var = itemize_array(...); if null, try next — never return collective)
+			if r == nil {
+				continue
+			}
 			item := vs.ItemizeArray(r, cg, v.AsArray)
 			if item != nil {
 				out = &item.Variable
@@ -887,6 +891,7 @@ func (vs *VariableSelector) SelectMustUseVar(
 		}
 		if out != nil {
 			// 75% erase from must-use list (VariableSelector.cpp:1552–1555)
+			// C++ always has RNG for flip; no invent forced erase without draw
 			if r != nil && r.RndFlipcoin(75) {
 				*list = append((*list)[:i], (*list)[i+1:]...)
 			}

@@ -72,6 +72,16 @@ func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
 	}
 }
 
+func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
+	// Function.cpp non-builtin make_random body always has process RNG
+	f := &Function{Name: "func_x", ReturnType: GetIntType()}
+	_ = f.ensurePairedFactMgr()
+	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	if f.Body != nil || f.BuildState != BuildUnbuilt {
+		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
+	}
+}
+
 func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 	// Function.cpp:422 — FMList.push_back at make_random_signature
 	opts := Defaults()

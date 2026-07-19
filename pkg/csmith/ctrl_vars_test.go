@@ -49,6 +49,10 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	if out := OutputArrayCtrlVars(broken, 2, ""); out != "" {
 		t.Fatal("nil ctrl slot must fail closed", out)
 	}
+	emptyName := []*Variable{c1[0], {Name: "", Type: GetIntType()}}
+	if out := OutputArrayCtrlVars(emptyName, 2, ""); out != "" {
+		t.Fatal("empty ctrl name must fail closed", out)
+	}
 	CtrlVarsDoFinalization()
 	if GetLastCtrlVars() != nil {
 		t.Fatal("cleared")

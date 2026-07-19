@@ -52,6 +52,10 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 	if v.AsArray == nil || v.AsArray.Collective != av {
 		t.Fatalf("want itemized member, got %v asArray=%v", v, v.AsArray)
 	}
+	// VariableSelector.cpp:1528–1530 — always itemize; no bare collective without RNG
+	if bare := vs.SelectMustUseVar(nil, AccessRead, cg, GetIntType(), nil); bare != nil {
+		t.Fatalf("nil RNG must not invent bare collective array, got %v", bare)
+	}
 }
 
 func TestMakeRandomLhsMustUse(t *testing.T) {

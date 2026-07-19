@@ -448,6 +448,11 @@ func (f *Function) generateBodyCore(
 	if f.BuildState != BuildUnbuilt {
 		return
 	}
+	// Function.cpp:643–648 — non-builtin make_random body always has process RNG
+	// no invent Building/Built shell without RNG (MakeRandomBlock would nil anyway)
+	if !f.IsBuiltin && r == nil {
+		return
+	}
 	f.BuildState = BuildBuilding
 
 	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)

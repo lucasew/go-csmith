@@ -123,7 +123,8 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 }
 
 func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
-	// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
+	// StatementGoto.cpp:271 — assert(v->init); vars[i] always live
+	// incomplete entry fails whole emit (no invent skip holes / partial list)
 	v := CreateVariableWithInit("l_miss", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	v.Name = "l_miss"
 	good := CreateVariableScalars("l_ok", GetIntType(), false, false)
@@ -131,23 +132,22 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	good.Init = MakeInt(4)
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{v, good}}
 	out := OutputSkippedVarInits(st, "")
-	if strings.Contains(out, "l_miss") {
-		t.Fatal("must not emit incomplete re-init without init", out)
+	if out != "" {
+		t.Fatal("incomplete re-init list must fail closed whole emit", out)
 	}
-	if !strings.Contains(out, "l_ok = 4;") {
-		t.Fatal(out)
-	}
-	// no invent " = 4;" without identifier
+	// no invent " = 5;" without identifier / partial good siblings
 	anon := CreateVariableScalars("l_x", GetIntType(), false, false)
 	anon.Name = ""
 	anon.Init = MakeInt(5)
 	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{anon, good}}
 	out2 := OutputSkippedVarInits(st2, "")
-	if strings.Contains(out2, " = 5;") || strings.HasPrefix(strings.TrimSpace(out2), "=") {
-		t.Fatal("empty name must not invent re-init", out2)
+	if out2 != "" {
+		t.Fatal("empty name must fail closed whole emit", out2)
 	}
-	if !strings.Contains(out2, "l_ok = 4;") {
-		t.Fatal(out2)
+	// complete list still emits
+	st3 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{good}}
+	if out3 := OutputSkippedVarInits(st3, ""); !strings.Contains(out3, "l_ok = 4;") {
+		t.Fatal(out3)
 	}
 }
 
