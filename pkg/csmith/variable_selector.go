@@ -348,13 +348,26 @@ func ChooseOKVarExactType(r *Rng, vars []*Variable, want *Type) *Variable {
 
 // FindAllVisibleVars mirrors VariableSelector::find_all_visible_vars.
 // VariableSelector.cpp:752–759 — GlobalList + block chain locals (no params).
+// FindAllVisibleVars mirrors VariableSelector::find_all_visible_vars.
+// Variable* always live on GlobalList/LocalVars; nil hole fails closed
+// (nil out — no invent partial visible pool by soft-skipping holes).
 func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
-	var vars []*Variable
+	vars := make([]*Variable, 0)
 	if vs != nil {
-		vars = append(vars, vs.GlobalList...)
+		for _, v := range vs.GlobalList {
+			if v == nil {
+				return nil
+			}
+			vars = append(vars, v)
+		}
 	}
 	for b != nil {
-		vars = append(vars, b.LocalVars...)
+		for _, v := range b.LocalVars {
+			if v == nil {
+				return nil
+			}
+			vars = append(vars, v)
+		}
 		b = b.Parent
 	}
 	return vars
@@ -1829,6 +1842,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	}
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllVisibleVars(blk)
+	// nil vars = incomplete GlobalList/LocalVars hole — fail closed
+	if vars == nil {
+		return nil
+	}
 	// also include Arrays list members that may not be on GlobalList yet
 	seen := map[*ArrayVariable]bool{}
 	var arrayVars []*ArrayVariable
@@ -1859,15 +1876,23 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		seen[av] = true
 		arrayVars = append(arrayVars, av)
 	}
+	// Variable* always live in visible list; nil hole fails closed (FindAll already)
 	for _, v := range vars {
-		if v == nil || !v.IsArray {
+		if v == nil {
+			return nil
+		}
+		if !v.IsArray {
 			continue
 		}
 		if v.AsArray != nil {
 			add(v.AsArray)
 		}
 	}
+	// ArrayVariable* on Arrays list; nil hole fails closed
 	for _, av := range vs.Arrays {
+		if av == nil {
+			return nil
+		}
 		add(av)
 	}
 	n := len(arrayVars)

@@ -432,20 +432,14 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 		return
 	}
 	av.Indices[index] = expr
-	// keep IndexExprs in sync
-	for len(av.IndexExprs) <= index {
-		// only pad when overwriting within Indices length but IndexExprs lag
-		// (should not invent beyond Indices)
-		if len(av.IndexExprs) >= len(av.Indices) {
-			break
-		}
-		av.IndexExprs = append(av.IndexExprs, nil)
-	}
+	// keep IndexExprs in sync without inventing nil pad slots when lists lag
+	// (incomplete dual-list IR fails closed — no soft invent empty expr holes)
 	if index < len(av.IndexExprs) {
 		av.IndexExprs[index] = con
 	} else if index == len(av.IndexExprs) {
 		av.IndexExprs = append(av.IndexExprs, con)
 	}
+	// index > len(IndexExprs): lag hole — leave IndexExprs unchanged (fail closed)
 }
 
 // SetIndexExpr mirrors ArrayVariable::set_index(size_t, const Expression*).

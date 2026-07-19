@@ -154,3 +154,30 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
+	vs := NewVariableSelector(Defaults())
+	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false), nil}
+	if vs.FindAllVisibleVars(nil) != nil {
+		t.Fatal("GlobalList nil hole must fail closed")
+	}
+	vs.GlobalList = nil
+	blk := &Block{LocalVars: []*Variable{CreateVariableScalars("l_1", GetIntType(), false, false), nil}}
+	if vs.FindAllVisibleVars(blk) != nil {
+		t.Fatal("LocalVars nil hole must fail closed")
+	}
+}
+
+func TestSelectArrayNilHoleFailClosed(t *testing.T) {
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	vs.GlobalList = []*Variable{nil}
+	if vs.SelectArray(NewRng(1), EmptyCGContext()) != nil {
+		t.Fatal("visible list hole must fail closed SelectArray")
+	}
+	vs.GlobalList = nil
+	vs.Arrays = []*ArrayVariable{nil}
+	if vs.SelectArray(NewRng(2), EmptyCGContext()) != nil {
+		t.Fatal("Arrays list hole must fail closed SelectArray")
+	}
+}

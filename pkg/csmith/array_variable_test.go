@@ -588,3 +588,23 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 		t.Fatal(VolatileAvailCount())
 	}
 }
+
+func TestSetIndexNoInventNilPad(t *testing.T) {
+	// IndexExprs lag Indices: must not invent nil pad slots
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Indices:  []string{"0", "1"},
+		// IndexExprs empty lag
+	}
+	av.SetIndex(1, "i")
+	// Indices[1] updated; IndexExprs must not grow with nil pads to index 1
+	if len(av.IndexExprs) > 0 && av.IndexExprs[0] == nil {
+		t.Fatal("must not invent nil pad at IndexExprs[0]")
+	}
+	// only append when index == len
+	av.IndexExprs = nil
+	av.SetIndex(0, "0")
+	if len(av.IndexExprs) != 1 || av.IndexExprs[0] == nil {
+		t.Fatal("append at len must store live expr")
+	}
+}

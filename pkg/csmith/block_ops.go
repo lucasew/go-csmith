@@ -130,50 +130,61 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	var gotoSrcIDs []int
 	if fm != nil {
 		// Block.cpp:617–629 — remove edges with control stmt inside s as src
-		// CFGEdge* always live; nil hole fails closed — keep hole (no invent clean CFG)
-		ne := fm.CFGEdges[:0]
+		// CFGEdge* always live; nil hole fails closed (nil whole CFG — no invent
+		// keep-hole partial scrub that soft-skips past incomplete edges)
+		ne := make([]*CFGEdge, 0, len(fm.CFGEdges))
 		for _, e := range fm.CFGEdges {
 			if e == nil {
-				ne = append(ne, nil)
-				continue
+				fm.CFGEdges = nil
+				gotoSrcIDs = nil
+				ne = nil
+				break
 			}
 			if cfgIDs[e.SrcID] {
 				continue
 			}
 			ne = append(ne, e)
 		}
-		fm.CFGEdges = ne
+		if ne != nil {
+			fm.CFGEdges = ne
+		}
 
 		// Block.cpp:632–652 — remove edges with dest inside s; cascade-delete gotos
-		ne = fm.CFGEdges[:0]
-		for _, e := range fm.CFGEdges {
-			if e == nil {
-				ne = append(ne, nil)
-				continue
-			}
-			destIn := e.DestStmID > 0 && ids[e.DestStmID]
-			if !destIn && e.DestBlock != nil {
-				// dest block nested under removed stmt
-				destIn = blockUnderStmt(removed, e.DestBlock)
-			}
-			if destIn {
-				// Block.cpp:641–646 — if src is goto, remove_stmt(src)
-				if e.SrcID > 0 && !ids[e.SrcID] {
-					isGoto := true
-					if fm.Func != nil {
-						if src := FindStmtByID(fm.Func, e.SrcID); src != nil {
-							isGoto = src.Kind == StmtGoto
+		if fm.CFGEdges != nil {
+			ne = make([]*CFGEdge, 0, len(fm.CFGEdges))
+			for _, e := range fm.CFGEdges {
+				if e == nil {
+					fm.CFGEdges = nil
+					gotoSrcIDs = nil
+					ne = nil
+					break
+				}
+				destIn := e.DestStmID > 0 && ids[e.DestStmID]
+				if !destIn && e.DestBlock != nil {
+					// dest block nested under removed stmt
+					destIn = blockUnderStmt(removed, e.DestBlock)
+				}
+				if destIn {
+					// Block.cpp:641–646 — if src is goto, remove_stmt(src)
+					if e.SrcID > 0 && !ids[e.SrcID] {
+						isGoto := true
+						if fm.Func != nil {
+							if src := FindStmtByID(fm.Func, e.SrcID); src != nil {
+								isGoto = src.Kind == StmtGoto
+							}
+						}
+						if isGoto {
+							gotoSrcIDs = append(gotoSrcIDs, e.SrcID)
 						}
 					}
-					if isGoto {
-						gotoSrcIDs = append(gotoSrcIDs, e.SrcID)
-					}
+					continue
 				}
-				continue
+				ne = append(ne, e)
 			}
-			ne = append(ne, e)
+			if ne != nil {
+				fm.CFGEdges = ne
+			}
 		}
-		fm.CFGEdges = ne
 	}
 
 	// Block.cpp:655–663 — delete blocks inside s from Function.Blocks
@@ -182,19 +193,25 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		f = fm.Func
 	}
 	if f != nil {
-		// Block* always live on Function.Blocks; nil hole kept (no invent clean list)
-		nb := f.Blocks[:0]
+		// Block* always live on Function.Blocks; nil hole fails closed
+		// (nil whole list — no invent keep-hole partial scrub)
+		nb := make([]*Block, 0, len(f.Blocks))
+		incomplete := false
 		for _, blk := range f.Blocks {
 			if blk == nil {
-				nb = append(nb, nil)
-				continue
+				incomplete = true
+				break
 			}
 			if blockUnderStmt(removed, blk) {
 				continue
 			}
 			nb = append(nb, blk)
 		}
-		f.Blocks = nb
+		if incomplete {
+			f.Blocks = nil
+		} else {
+			f.Blocks = nb
+		}
 	}
 
 	// clear fact maps for removed tree
