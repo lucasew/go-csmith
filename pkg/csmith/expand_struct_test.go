@@ -92,13 +92,13 @@ func TestExpandStructUnionVars(t *testing.T) {
 	if len(keep) != 1 || keep[0] != sv {
 		t.Fatalf("keep aggregate: %+v", keep)
 	}
-	// nil candidate / field hole fails closed
-	if ExpandStructUnionVars([]*Variable{nil}, GetIntType()) != nil {
-		t.Fatal("nil var hole must fail closed")
+	// nil candidate / field hole fails closed incomplete (not invent empty complete)
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntType())) {
+		t.Fatal("nil var hole must fail closed incomplete")
 	}
 	sv.FieldVars = append(sv.FieldVars, nil)
-	if ExpandStructUnionVars([]*Variable{sv}, GetIntType()) != nil {
-		t.Fatal("nil FieldVars hole must fail closed")
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntType())) {
+		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
 }
 

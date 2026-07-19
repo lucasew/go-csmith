@@ -881,10 +881,13 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 
 // HasEligibleVolatileVarQfer is has_eligible_volatile_var with CVQualifiers filter.
 // VariableSelector.cpp:294–316.
-// Variable* always live; nil hole fails closed as false (no invent skip as absent).
+// Incomplete candidate list fails closed false (no invent skip hole as absent).
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
+	if !VariablesComplete(vars) {
+		return false
+	}
 	for _, v := range vars {
-		if v == nil || v.Type == nil {
+		if v.Type == nil {
 			return false
 		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
@@ -911,9 +914,12 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 
 // HasDereferenceableVar mirrors VariableSelector::has_dereferenceable_var.
 // VariableSelector.cpp:198–210 — type is_dereferenced_from + is_valid_ptr.
-// Variable* always live; nil hole fails closed as false (no invent skip).
+// Incomplete candidate list fails closed false (no invent skip hole).
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
 	if typ == nil {
+		return false
+	}
+	if !VariablesComplete(vars) {
 		return false
 	}
 	var facts []*FactPointTo
@@ -921,7 +927,7 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 		facts = cg.FM.GlobalFacts
 	}
 	for _, v := range vars {
-		if v == nil || v.Type == nil {
+		if v.Type == nil {
 			return false
 		}
 		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
@@ -1058,13 +1064,13 @@ func ChooseVarFull(
 	invalidVars []*Variable,
 	noBitfield, noExpandStructUnion, noUnion bool,
 ) *Variable {
+	// incomplete candidate / invalid lists — fail closed (no invent choose past hole)
+	if !VariablesComplete(vars) || !VariablesComplete(invalidVars) {
+		return nil
+	}
 	if want == nil {
 		var ok []*Variable
 		for _, v := range vars {
-			// Variable* always live in candidate lists; nil hole fails closed
-			if v == nil {
-				return nil
-			}
 			// Variable::type always live; Type-nil fails closed (no invent eligible
 			// without type IR via soft-skip)
 			if v.Type == nil {
@@ -1089,6 +1095,9 @@ func ChooseVarFull(
 	// VariableSelector.cpp:405–410 — expand when type simple/aggregate
 	if !noExpandStructUnion && (want.IsSimple() || want.IsAggregate()) {
 		cands = ExpandStructUnionVars(vars, want)
+		if !VariablesComplete(cands) {
+			return nil
+		}
 	}
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
 	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
@@ -1103,10 +1112,6 @@ func ChooseVarFull(
 	matchExact := opts.MatchExactQualifiers
 	var ok []*Variable
 	for _, x := range cands {
-		// Variable* always live in candidate lists; nil hole fails closed
-		if x == nil {
-			return nil
-		}
 		if x.Type == nil {
 			// incomplete type IR — fail closed (no invent skip candidate)
 			return nil
@@ -1185,25 +1190,23 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 
 // ExpandStructUnionVars mirrors VariableSelector::expand_struct_union_vars.
 // VariableSelector.cpp:156–173 — replace non-matching aggregates with field_vars.
-// ExpandStructUnionVars expands aggregate candidates into field vars.
-// Variable* always live; nil hole fails closed (nil out, no invent skip).
+// Variable* always live; nil hole / incomplete FieldVars fails closed
+// IncompleteVariables (not bare nil invent empty-complete expand pool).
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
+	if !VariablesComplete(vars) {
+		return IncompleteVariables()
+	}
 	out := append([]*Variable(nil), vars...)
 	for i := 0; i < len(out); i++ {
 		v := out[i]
-		if v == nil {
-			return nil
-		}
 		if v.IsVirtual() {
 			continue
 		}
 		// don't break up a struct if it matches the given type
 		if v.Type != nil && v.Type.IsAggregate() && v.Type != want {
-			// FieldVars always live; nil hole fails closed
-			for _, f := range v.FieldVars {
-				if f == nil {
-					return nil
-				}
+			// FieldVars always live; incomplete fails closed
+			if !v.FieldVarsComplete() {
+				return IncompleteVariables()
 			}
 			// erase i, append field_vars at end (upstream insert end + i--)
 			fields := v.FieldVars
@@ -1226,15 +1229,12 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 	if want.IsSimple() || want.IsAggregate() {
 		cands = ExpandStructUnionVars(vars, want)
 	}
-	// ExpandStructUnionVars nil = incomplete candidate list
-	if cands == nil && vars != nil {
+	// incomplete expand / candidate list — fail closed
+	if !VariablesComplete(cands) {
 		return nil
 	}
 	var ok []*Variable
 	for _, x := range cands {
-		if x == nil {
-			return nil
-		}
 		if x.Type == nil {
 			return nil
 		}
