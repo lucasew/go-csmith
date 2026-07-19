@@ -367,11 +367,14 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// collect IVs from nested ArrayOp Loop chain
+	// StatementArrayOp always has live ctrl_vars[i] for each dimension
+	// incomplete Loop/IV fails closed (no invent soft-skip level and still visit)
 	var ivs []*Variable
 	for cur := st; cur != nil && cur.Kind == StmtArrayOp; {
-		if cur.Loop != nil && cur.Loop.IV != nil {
-			ivs = append(ivs, cur.Loop.IV)
+		if cur.Loop == nil || cur.Loop.IV == nil {
+			return false
 		}
+		ivs = append(ivs, cur.Loop.IV)
 		// nested: Then may hold next ArrayOp as first stmt
 		if cur.Then == nil || len(cur.Then.Stmts) == 0 {
 			break

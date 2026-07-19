@@ -204,7 +204,8 @@ func TestCGContextAddEffect(t *testing.T) {
 
 func TestContainsStmt(t *testing.T) {
 	inner := Stmt{Kind: StmtAssign, StmID: 2}
-	outer := Stmt{Kind: StmtIfElse, StmID: 1, Then: &Block{Stmts: []Stmt{inner}}}
+	// StatementIf always has both arms
+	outer := Stmt{Kind: StmtIfElse, StmID: 1, Then: &Block{Stmts: []Stmt{inner}}, Else: &Block{}}
 	if !ContainsStmt(&outer, &inner) {
 		t.Fatal("contains")
 	}

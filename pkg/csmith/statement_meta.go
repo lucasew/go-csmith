@@ -244,7 +244,9 @@ func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 }
 
 // ContainsStmtTree mirrors Statement::contains_stmt for compound statements.
-// Statement.cpp:684–705 — self or nested Then/Else trees by StmID.
+// Statement.cpp:684–705 — self or nested get_blocks trees by StmID.
+// Incomplete Block* hole fails closed false (no invent membership past holes).
+// Walks only get_blocks kinds (no invent search via stray Then on assign).
 func ContainsStmtTree(root, s *Stmt) bool {
 	if root == nil || s == nil {
 		return false
@@ -252,13 +254,21 @@ func ContainsStmtTree(root, s *Stmt) bool {
 	if root == s || (root.StmID > 0 && root.StmID == s.StmID) {
 		return true
 	}
-	if root.Then != nil && (blockHasStmtIDDeep(root.Then, s.StmID) || root.Then == s.Then) {
-		if s.StmID > 0 && blockHasStmtIDDeep(root.Then, s.StmID) {
-			return true
+	if s.StmID <= 0 {
+		return false
+	}
+	blks := GetBlocksStmt(root)
+	// pre-validate complete get_blocks (if always has both arms)
+	// nil hole fails closed before invent membership from a partial arm scan
+	for _, b := range blks {
+		if b == nil {
+			return false
 		}
 	}
-	if root.Else != nil && s.StmID > 0 && blockHasStmtIDDeep(root.Else, s.StmID) {
-		return true
+	for _, b := range blks {
+		if blockHasStmtIDDeep(b, s.StmID) {
+			return true
+		}
 	}
 	return false
 }
@@ -274,11 +284,15 @@ func blockHasStmtIDDeep(b *Block, id int) bool {
 		if b.Stmts[i].StmID == id {
 			return true
 		}
-		if b.Stmts[i].Then != nil && blockHasStmtIDDeep(b.Stmts[i].Then, id) {
-			return true
-		}
-		if b.Stmts[i].Else != nil && blockHasStmtIDDeep(b.Stmts[i].Else, id) {
-			return true
+		// recurse via get_blocks only (kind-gated)
+		for _, nb := range GetBlocksStmt(&b.Stmts[i]) {
+			if nb == nil {
+				// incomplete arm — not invent soft-skip to later siblings
+				return false
+			}
+			if blockHasStmtIDDeep(nb, id) {
+				return true
+			}
 		}
 	}
 	return false

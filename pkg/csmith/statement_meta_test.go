@@ -176,12 +176,22 @@ func TestIsPtrUsed(t *testing.T) {
 func TestContainsStmtTree(t *testing.T) {
 	inner := Stmt{Kind: StmtAssign, StmID: 2}
 	thenB := &Block{Stmts: []Stmt{inner}}
-	root := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	elseB := &Block{}
+	root := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: elseB}
 	if !ContainsStmtTree(root, root) {
 		t.Fatal("self")
 	}
 	if !ContainsStmtTree(root, &thenB.Stmts[0]) {
 		t.Fatal("nested")
+	}
+	// assign with stray Then must not invent contains via non-get_blocks Then
+	stray := &Stmt{Kind: StmtAssign, StmID: 5, Then: thenB}
+	if ContainsStmtTree(stray, &thenB.Stmts[0]) {
+		t.Fatal("assign must not invent contains via stray Then")
+	}
+	// nil if arm fails closed false (incomplete)
+	if ContainsStmtTree(&Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}, &thenB.Stmts[0]) {
+		t.Fatal("nil Else must fail closed (no invent membership)")
 	}
 }
 

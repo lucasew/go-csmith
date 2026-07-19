@@ -91,6 +91,8 @@ func ContainsStmt(root, target *Stmt) bool {
 }
 
 // FindStmtInTree finds a statement by stm_id inside root's tree (self + nested blocks).
+// Walks get_blocks only (kind-gated) — no invent search via stray Then on non-compound.
+// Incomplete Block* hole fails closed nil (no invent soft-skip arm and match later).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
 		return nil
@@ -98,16 +100,16 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	if root.StmID == stmID {
 		return root
 	}
-	if root.Then != nil {
-		for i := range root.Then.Stmts {
-			if s := FindStmtInTree(&root.Then.Stmts[i], stmID); s != nil {
-				return s
-			}
+	blks := GetBlocksStmt(root)
+	// pre-validate complete get_blocks before invent match past incomplete arm
+	for _, b := range blks {
+		if b == nil {
+			return nil
 		}
 	}
-	if root.Else != nil {
-		for i := range root.Else.Stmts {
-			if s := FindStmtInTree(&root.Else.Stmts[i], stmID); s != nil {
+	for _, b := range blks {
+		for i := range b.Stmts {
+			if s := FindStmtInTree(&b.Stmts[i], stmID); s != nil {
 				return s
 			}
 		}
@@ -169,7 +171,10 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 		return true
 	}
 	ids := map[int]bool{}
-	collectStmIDs(root, ids)
+	if !collectStmIDs(root, ids) {
+		// incomplete get_blocks tree — fail closed unfixed
+		return true
+	}
 	return containsUnfixedGotoIDs(ids, fm)
 }
 
@@ -188,7 +193,9 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 		ids[b.StmID] = true
 	}
 	for i := range b.Stmts {
-		collectStmIDs(&b.Stmts[i], ids)
+		if !collectStmIDs(&b.Stmts[i], ids) {
+			return true
+		}
 	}
 	return containsUnfixedGotoIDs(ids, fm)
 }
@@ -251,23 +258,27 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	return false
 }
 
-func collectStmIDs(st *Stmt, ids map[int]bool) {
+// collectStmIDs records StmIDs under st via get_blocks. Returns false on incomplete
+// Block* hole (no invent partial id set then claim all gotos fixed).
+func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 	if st == nil {
-		return
+		return false
 	}
 	if st.StmID > 0 {
 		ids[st.StmID] = true
 	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			collectStmIDs(&st.Then.Stmts[i], ids)
+	// get_blocks only — no invent collect via stray Then on assign/break
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return false
+		}
+		for i := range b.Stmts {
+			if !collectStmIDs(&b.Stmts[i], ids) {
+				return false
+			}
 		}
 	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			collectStmIDs(&st.Else.Stmts[i], ids)
-		}
-	}
+	return true
 }
 
 // ShortcutAnalysis mirrors Statement::shortcut_analysis.

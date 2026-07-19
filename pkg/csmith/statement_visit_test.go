@@ -393,6 +393,22 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	}
 }
 
+func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {
+	// StatementArrayOp always has live ctrl_vars; nil Loop/IV fails closed
+	// (no invent soft-skip dimension and still visit)
+	cg := EmptyCGContext()
+	if VisitFactsStatementArrayOp(&Stmt{Kind: StmtArrayOp, Then: &Block{}}, &cg, Defaults()) {
+		t.Fatal("nil Loop must fail closed")
+	}
+	if VisitFactsStatementArrayOp(&Stmt{
+		Kind: StmtArrayOp,
+		Loop: &LoopControl{}, // IV nil
+		Then: &Block{Stmts: []Stmt{{Kind: StmtAssign, LhsVar: CreateVariableScalars("g", GetIntType(), false, false), Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+	}, &cg, Defaults()) {
+		t.Fatal("nil IV must fail closed")
+	}
+}
+
 func TestVisitFactsStatementArrayOpBodyBreak(t *testing.T) {
 	// StatementArrayOp.cpp:292–297 — merge post_dest edges into arrayop
 	f := &Function{Name: "f", ReturnType: GetIntType()}
