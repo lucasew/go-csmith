@@ -80,12 +80,21 @@ func TestMakeRandomIntSmallPathSeed2(t *testing.T) {
 }
 
 func TestMakeRandomUpto(t *testing.T) {
+	ClearError()
 	r := NewRng(2)
 	// first RndUpto(10) = 3 for seed2
 	c := MakeRandomUpto(10, r)
 	if c.Value != "3" || c.Type != GetSimpleType(EUInt) {
 		t.Fatalf("%+v", c)
 	}
+	// Constant.cpp always has RNG; sticky no invent NewRng(0)
+	if MakeRandomUpto(10, nil) != nil {
+		t.Fatal("nil RNG MakeRandomUpto must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomUpto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeInt(t *testing.T) {

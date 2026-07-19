@@ -142,17 +142,18 @@ func GenerateParameterListFromString(f *Function, params string) bool {
 		return false
 	}
 	vs := SplitString(params, ',')
-	// Function.cpp:350 — assert(params_cnt > 0)
+	fail := func() {
+		f.Param = IncompleteVariables()
+		SetError(ErrGeneric)
+	}
+	// Function.cpp:350 — assert(params_cnt > 0) sticky (no invent empty-complete Param)
 	if len(vs) == 0 {
+		fail()
 		return false
 	}
 	// Function.cpp:351–352 — sole "Void" → no params
 	if len(vs) == 1 && strings.TrimSpace(vs[0]) == "Void" {
 		return true
-	}
-	fail := func() {
-		f.Param = IncompleteVariables()
-		SetError(ErrGeneric)
 	}
 	for i, ts := range vs {
 		ts = strings.TrimSpace(ts)

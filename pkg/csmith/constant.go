@@ -39,9 +39,10 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 }
 
 // MakeRandomUpto mirrors Constant::make_random_upto — rnd_upto(limit) as eUInt decimal.
-// Constant.cpp:429–433 — always has RNG; no soft invent NewRng(0).
+// Constant.cpp:429–433 — always has RNG; sticky no soft invent NewRng(0).
 func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	n := r.RndUpto(limit)

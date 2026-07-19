@@ -660,8 +660,12 @@ func (t *Type) HasBitfields() bool {
 // IsBitfieldIndex mirrors Type::is_bitfield(index).
 // Type.cpp:1286–1288 — assert(index < bitfields_length_.size()); BitWidth >= 0.
 func (t *Type) IsBitfieldIndex(index int) bool {
-	// OOB is assert path — fail closed false (not invent non-bitfield)
-	if t == nil || index < 0 || index >= len(t.Fields) {
+	// OOB is assert path sticky — fail closed false (not invent non-bitfield / soft skip)
+	if t == nil {
+		return false
+	}
+	if index < 0 || index >= len(t.Fields) {
+		SetError(ErrGeneric)
 		return false
 	}
 	return t.Fields[index].BitWidth >= 0
@@ -670,7 +674,12 @@ func (t *Type) IsBitfieldIndex(index int) bool {
 // IsUnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1278–1283 — assert(index < sz); bitfields_length_[index] == 0.
 func (t *Type) IsUnamedPadding(index int) bool {
-	if t == nil || index < 0 || index >= len(t.Fields) {
+	if t == nil {
+		return false
+	}
+	// assert OOB sticky — no invent "not padding" soft success past hole
+	if index < 0 || index >= len(t.Fields) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// only bitfield slots can be zero-width padding
@@ -865,13 +874,17 @@ func (t *Type) PrintfDirective() string {
 }
 
 // SizeofString mirrors Type::get_type_sizeof_string.
-// Type.cpp:1708–1714 — Output on live Type*; no invent sizeof(void)/sizeof().
+// Type.cpp:1708–1714 — Output on live Type*; sticky no invent sizeof()/sizeof(void).
 func (t *Type) SizeofString() string {
 	if t == nil {
 		return ""
 	}
 	cn := t.CName()
 	if cn == "" {
+		// incomplete CName IR sticky (CName may already SetError)
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	return "sizeof(" + cn + ")"
@@ -910,7 +923,12 @@ func HasLongLongField(fields []StructField) bool {
 // Type.cpp:1280+ — zero-width bitfield without a name used as padding.
 // Our StructField always has names; treat BitWidth==0 as unnamed padding candidate.
 func (t *Type) IsUnnamedPadding(index int) bool {
-	if t == nil || index < 0 || index >= len(t.Fields) {
+	if t == nil {
+		return false
+	}
+	// assert OOB sticky — no invent "not padding" soft success past hole
+	if index < 0 || index >= len(t.Fields) {
+		SetError(ErrGeneric)
 		return false
 	}
 	f := t.Fields[index]

@@ -94,16 +94,21 @@ func TestPrintfDirective(t *testing.T) {
 }
 
 func TestSizeofString(t *testing.T) {
+	ClearError()
 	if GetIntType().SizeofString() != "sizeof(int)" {
 		t.Fatal(GetIntType().SizeofString())
 	}
-	// Type* always live; no invent sizeof(void)/sizeof()
+	// Type* always live; sticky no invent sizeof(void)/sizeof()
 	if s := (*Type)(nil).SizeofString(); s != "" {
 		t.Fatal("nil sizeof invent", s)
 	}
 	if s := (&Type{isStruct: true}).SizeofString(); s != "" {
 		t.Fatal("unnamed struct sizeof invent", s)
 	}
+	if !HasError() {
+		t.Fatal("unnamed struct sizeof must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPointerToNoInventIntStar(t *testing.T) {
@@ -151,6 +156,7 @@ func TestHasAggregateAndLongLongField(t *testing.T) {
 }
 
 func TestIsUnnamedPadding(t *testing.T) {
+	ClearError()
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: 0},
 		{Name: "f1", Type: GetIntType(), BitWidth: 3},
@@ -161,6 +167,21 @@ func TestIsUnnamedPadding(t *testing.T) {
 	if st.IsUnnamedPadding(1) {
 		t.Fatal("named bitfield")
 	}
+	// Type.cpp assert OOB sticky
+	if st.IsBitfieldIndex(99) {
+		t.Fatal("OOB IsBitfieldIndex invent")
+	}
+	if !HasError() {
+		t.Fatal("OOB IsBitfieldIndex must SetError sticky")
+	}
+	ClearError()
+	if st.IsUnamedPadding(-1) {
+		t.Fatal("neg IsUnamedPadding invent")
+	}
+	if !HasError() {
+		t.Fatal("OOB IsUnamedPadding must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {

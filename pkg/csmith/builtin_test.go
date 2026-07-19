@@ -53,6 +53,13 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	if GenerateParameterListFromString(f, "") {
 		t.Fatal("empty params")
 	}
+	if VariablesComplete(f.Param) {
+		t.Fatal("empty params fail must IncompleteVariables Param, not empty-complete")
+	}
+	if !HasError() {
+		t.Fatal("empty params fail must SetError sticky")
+	}
+	ClearError()
 	f2 := &Function{Name: "b2"}
 	if GenerateParameterListFromString(f2, "UInt, Void") {
 		t.Fatal("mid Void")

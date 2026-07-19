@@ -72,7 +72,11 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 // OutputCondition mirrors FactPointTo::Output — C expression for the fact.
 // FactPointTo.cpp:627–658.
 func (f *FactPointTo) OutputCondition() string {
+	// Fact subject always live; sticky no invent bare pointee compare without var
 	if f == nil || f.Var == nil {
+		if f != nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	lhs := outputFactVar(f.Var)
@@ -160,6 +164,10 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 	}
 	cond := f.OutputCondition()
 	if cond == "" {
+		// incomplete condition IR sticky (OutputCondition may already SetError)
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	prefix := ""
