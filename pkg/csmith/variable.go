@@ -843,15 +843,16 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 	if v.Qfer.IsConstAfterDeref(derefLevel) {
 		return true
 	}
+	// incomplete type / OOB peel: fail closed as const (no invent non-const WRITE)
 	if v.Type == nil {
-		return false
+		return true
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
-		// Variable.cpp:535 assert(t); broken peel → fail closed not const invent
+		// Variable.cpp:535 assert(t); broken peel → fail closed const
 		if t == nil {
-			return false
+			return true
 		}
 	}
 	return t.IsConstStructUnion()
@@ -859,6 +860,7 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 
 // IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref.
 // Variable.cpp:561–578 — qfer then peel type; assert(t) after peel.
+// Incomplete type / OOB peel fails closed as volatile (no invent non-vol access).
 func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 	if v == nil || derefLevel < 0 {
 		return false
@@ -867,14 +869,14 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 		return true
 	}
 	if v.Type == nil {
-		return false
+		return true
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
-		// Variable.cpp:575 assert(t); OOB peel → fail closed not volatile invent
+		// Variable.cpp:575 assert(t); OOB peel → fail closed volatile
 		if t == nil {
-			return false
+			return true
 		}
 	}
 	return t.IsVolatileStructUnion()
@@ -882,6 +884,7 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 
 // IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
 // Variable.cpp:541–558 — not fully volatile at level, but pointee is volatile struct/union.
+// Incomplete type / OOB peel fails closed as partial-vol (restrictive IsEligibleVar).
 func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 	if v == nil || derefLevel < 0 {
 		return false
@@ -891,14 +894,14 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 		return false
 	}
 	if v.Type == nil {
-		return false
+		return true
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
 		// Variable.cpp:555 assert(t)
 		if t == nil {
-			return false
+			return true
 		}
 	}
 	return t.IsVolatileStructUnion()
@@ -1116,15 +1119,17 @@ func (v *Variable) IsInsideUnionField() bool {
 
 // GetFieldID mirrors Variable::get_field_id — index in parent FieldVars, or -1.
 // Variable.cpp:323–333.
-// Variable* always live in FieldVars; nil hole fails closed as -1 (no invent skip).
+// Variable* always live in FieldVars; nil hole fails closed as -1 (no invent skip
+// hole and match a later sibling index). Callers that need complete parent field
+// lists should use FieldVarOf.FieldVarsComplete().
 func (v *Variable) GetFieldID() int {
 	if v == nil || v.FieldVarOf == nil {
 		return -1
 	}
+	if !v.FieldVarOf.FieldVarsComplete() {
+		return -1
+	}
 	for i, f := range v.FieldVarOf.FieldVars {
-		if f == nil {
-			return -1
-		}
 		if f == v {
 			return i
 		}

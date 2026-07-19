@@ -175,3 +175,35 @@ func TestLhsIsVolatileAfterDeref(t *testing.T) {
 	lhs := &Lhs{Var: p, Type: GetIntType()}
 	_ = lhs.IsVolatile() // exercise path
 }
+
+func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
+	// soft invent: Type nil / OOB peel → not const/vol → allow write/access
+	// fair: incomplete fails closed const/vol true
+	// 2-level non-vol qfer so Qfer path does not OOB-fail-closed as full vol first
+	v := &Variable{Name: "g_p", Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false})}
+	// Type nil
+	if !v.IsConstAfterDeref(1) {
+		t.Fatal("nil Type must fail closed as const after deref")
+	}
+	if !v.IsVolatileAfterDeref(1) {
+		t.Fatal("nil Type must fail closed as volatile after deref")
+	}
+	if !v.IsPartialVolatileAfterDeref(1) {
+		t.Fatal("nil Type must fail closed as partial volatile")
+	}
+	// OOB peel: pointer type peels once then nil at high deref
+	v.Type = PointerTo(GetIntType())
+	if !v.IsConstAfterDeref(3) {
+		t.Fatal("OOB peel must fail closed as const")
+	}
+	if !v.IsVolatileAfterDeref(3) {
+		t.Fatal("OOB peel must fail closed as volatile")
+	}
+	// GetFieldID incomplete parent FieldVars
+	parent := &Variable{Name: "u", Type: &Type{isUnion: true}}
+	f0 := &Variable{Name: "u.f0", Type: GetIntType(), FieldVarOf: parent}
+	parent.FieldVars = []*Variable{nil, f0}
+	if f0.GetFieldID() != -1 {
+		t.Fatal("FieldVars hole must fail closed GetFieldID -1")
+	}
+}
