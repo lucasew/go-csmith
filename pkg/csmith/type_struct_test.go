@@ -40,6 +40,33 @@ func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
 	}
 }
 
+func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
+	// C++ always has RNG + Probabilities; no invent fields/aggregates without them
+	opts := Defaults()
+	if MoreTypesProbability(nil, NewProbabilities(opts), 20) {
+		t.Fatal("nil RNG past threshold must fail closed false")
+	}
+	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+		t.Fatal("nil RNG MakeOneStructField must fail closed")
+	}
+	if f := MakeOneStructField(NewRng(1), opts, nil, &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+		t.Fatal("nil probs MakeOneStructField must fail closed")
+	}
+	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
+		t.Fatal("nil RNG MakeOneUnionField must fail closed")
+	}
+	var env TypeEnv
+	opts.Structs = true
+	opts.Unions = true
+	GenerateAllTypesEnv(nil, opts, NewProbabilities(opts), &env)
+	if len(env.StructTypes) != 0 || len(env.UnionTypes) != 0 {
+		t.Fatal("nil RNG must not invent aggregate types", len(env.StructTypes), len(env.UnionTypes))
+	}
+	if len(env.AllTypes) == 0 {
+		t.Fatal("simples still seeded")
+	}
+}
+
 func TestGenerateEmitsStructDecl(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2

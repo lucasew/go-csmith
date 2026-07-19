@@ -13,6 +13,10 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	if typeCount < 10 {
 		return true
 	}
+	// C++ always has RNG; no invent always-true past threshold when r nil
+	if r == nil {
+		return false
+	}
 	p := 50
 	if probs != nil {
 		p = probs.Single(PMoreStructUnionProb)
@@ -25,6 +29,10 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 // Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
 // On ERROR_RETURN / choose fail returns zero field (Type==nil); callers abort.
 func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
+	// Type.cpp always has RNG + Probabilities; no invent field shell without them
+	if r == nil || probs == nil {
+		return StructField{}
+	}
 	// Type.cpp:687–691 — ChooseRandomTypeFilter(for_field_var=true) over AllTypes
 	// (no soft invent 15% nested-struct path then simple-only)
 	var ft *Type
@@ -243,7 +251,8 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 			env.AllTypes = append(env.AllTypes, GetSimpleType(st))
 		}
 	}
-	if opts.Structs {
+	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them
+	if opts.Structs && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
 			tag := fmt.Sprintf("S%d", len(env.StructTypes))
@@ -255,7 +264,7 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 			}
 		}
 	}
-	if opts.Unions {
+	if opts.Unions && r != nil && probs != nil {
 		for MoreTypesProbability(r, probs, len(env.AllTypes)) {
 			tag := fmt.Sprintf("U%d", len(env.UnionTypes))
 			if MakeRandomUnionType(r, opts, probs, env, tag) == nil || HasError() {
@@ -460,6 +469,10 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 // Type.cpp:699–763 — bitfield optional; else non-pointer / no-bitfield structs;
 // no union-in-union; 15% struct fields.
 func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
+	// Type.cpp always has RNG + Probabilities; no invent field shell without them
+	if r == nil || probs == nil {
+		return StructField{}
+	}
 	// Type.cpp:702–706 — bitfield when bitfields && !ccomp
 	if opts.Bitfields && !opts.CComp && r.RndFlipcoin(uint32(probs.Single(PBitFieldInNormalStructProb))) {
 		return MakeOneBitfield(r, opts, probs, fieldIdx, true)

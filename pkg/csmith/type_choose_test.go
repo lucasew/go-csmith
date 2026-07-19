@@ -44,6 +44,10 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	if ty.IsSimple() && ty.Simple() == EVoid {
 		t.Fatal("void return")
 	}
+	// no invent default int without RNG
+	if RandomReturnType(nil, probs, env, opts) != nil {
+		t.Fatal("nil RNG RandomReturnType must fail closed")
+	}
 }
 
 func TestMakeRandomParamNoConstant(t *testing.T) {

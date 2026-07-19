@@ -121,8 +121,9 @@ func RandomFunctionName(sym *GenSym) string {
 // RandomReturnType mirrors Function.cpp RandomReturnType → Type::choose_random.
 // Function.cpp:256–259 — no soft invent nonvoid simple when AllTypes empty.
 func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) *Type {
-	// Type::choose_random requires AllTypes; ERROR_GUARD path → nil
-	if env == nil || len(env.AllTypes) == 0 {
+	// Type::choose_random requires AllTypes + RNG; ERROR_GUARD path → nil
+	// no invent default int when r nil or env empty
+	if r == nil || env == nil || len(env.AllTypes) == 0 {
 		return nil
 	}
 	return env.ChooseRandom(r, opts, probs, false)
