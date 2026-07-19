@@ -84,24 +84,22 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 // no invent partial external merge past holes). Incomplete Param/LocalVars on a
 // frame also fails closed (no invent not-on-chain via IsVarOnStack false past hole).
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
-	for _, v := range other.ReadVars() {
-		if v == nil {
-			return e
-		}
+	// incomplete effect maps / call chain fail closed (leave base — no invent partial merge)
+	reads := other.ReadVars()
+	writes := other.WrittenVars()
+	if !VariablesComplete(reads) || !VariablesComplete(writes) {
+		return e
 	}
-	for _, v := range other.WrittenVars() {
-		if v == nil {
-			return e
-		}
+	if !BlocksComplete(callChain) {
+		return e
 	}
-	// Block* always live on call_chain when used; nil / incomplete stack fails closed
 	for _, b := range callChain {
-		if b == nil || !b.StackScanComplete() {
+		if !b.StackScanComplete() {
 			return e
 		}
 	}
 	out := e
-	for _, v := range other.ReadVars() {
+	for _, v := range reads {
 		if v.IsGlobal() {
 			out = out.ReadVar(v)
 			continue
@@ -110,7 +108,7 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 			out = out.ReadVar(v)
 		}
 	}
-	for _, v := range other.WrittenVars() {
+	for _, v := range writes {
 		if v.IsGlobal() {
 			out = out.WriteVar(v)
 			out.pure = false
@@ -229,12 +227,11 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 
 // WriteVarSet mirrors Effect::write_var_set — write each var.
 // Effect.cpp:148–152.
-// Variable* always live; nil hole fails closed (return e unchanged, no invent partial).
+// Variable* always live; incomplete list fails closed (return e unchanged —
+// no invent partial writes past a hole).
 func (e Effect) WriteVarSet(vars []*Variable) Effect {
-	for _, v := range vars {
-		if v == nil {
-			return e
-		}
+	if !VariablesComplete(vars) {
+		return e
 	}
 	out := e
 	for _, v := range vars {

@@ -151,14 +151,18 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	if FindRelatedPointTo(fm.MapFactsOut[21], p) == nil {
 		t.Fatal("restored out")
 	}
-	// incomplete if — nested backup skipped (no invent soft-skip nil Else)
+	// incomplete if — whole backup fail closed (no invent root-only complete tree)
 	in2 := map[int][]*FactPointTo{}
 	out2 := map[int][]*FactPointTo{}
 	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	fm.BackupStmFactMaps(bad, in2, out2)
 	if _, ok := out2[21]; ok {
 		t.Fatal("incomplete if must not invent nested backup past nil Else")
+	}
+	if FactsComplete(in2[10]) || FactsComplete(out2[10]) {
+		t.Fatal("incomplete if must backup root as IncompleteFactSlice, not invent complete", in2[10], out2[10])
 	}
 }
 

@@ -488,9 +488,9 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 
 // BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
 // FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
-// Incomplete source maps store nil (no invent cleaned partial clone of holes).
-// Nested walk uses get_blocks only; incomplete if-arm skips nested backup
-// (no invent soft-skip hole then backup sibling as complete tree).
+// Incomplete source maps store hole markers (no invent cleaned partial clones).
+// Incomplete get_blocks tree (nil if-arm) fails closed: root maps backed as
+// IncompleteFactSlice (no invent root-only complete backup while nested skipped).
 func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
@@ -506,10 +506,16 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 			break
 		}
 	}
-	if !incomplete {
-		for _, b := range blks {
-			fm.backupBlockFactMaps(b, factsIn, factsOut)
+	if incomplete {
+		// fail closed whole stm backup — not invent complete root + missing nested
+		if st.StmID > 0 {
+			factsIn[st.StmID] = IncompleteFactSlice()
+			factsOut[st.StmID] = IncompleteFactSlice()
 		}
+		return
+	}
+	for _, b := range blks {
+		fm.backupBlockFactMaps(b, factsIn, factsOut)
 	}
 	if st.StmID > 0 {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
@@ -540,12 +546,18 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 
 // RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
 // FactMgr.cpp:533–548.
-// Incomplete backup entries restore as nil (no invent cleaned partial clone).
-// Nested walk uses get_blocks only; incomplete if-arm skips nested restore
-// (no invent soft-skip hole then restore sibling as complete tree).
+// Incomplete backup entries restore as hole markers (storeFactMapEntry).
+// Incomplete get_blocks tree fails closed: root maps set IncompleteFactSlice
+// (no invent soft-skip nil arm then restore root/sibling as complete tree).
 func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
+	}
+	if fm.MapFactsIn == nil {
+		fm.MapFactsIn = make(map[int][]*FactPointTo)
+	}
+	if fm.MapFactsOut == nil {
+		fm.MapFactsOut = make(map[int][]*FactPointTo)
 	}
 	blks := GetBlocksStmt(st)
 	incomplete := false
@@ -555,10 +567,15 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 			break
 		}
 	}
-	if !incomplete {
-		for _, b := range blks {
-			fm.restoreBlockFactMaps(b, factsIn, factsOut)
+	if incomplete {
+		if st.StmID > 0 {
+			fm.MapFactsIn[st.StmID] = IncompleteFactSlice()
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		}
+		return
+	}
+	for _, b := range blks {
+		fm.restoreBlockFactMaps(b, factsIn, factsOut)
 	}
 	if st.StmID > 0 {
 		if in, ok := factsIn[st.StmID]; ok {

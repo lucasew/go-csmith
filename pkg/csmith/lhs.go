@@ -156,11 +156,12 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		IVBounds:      cg.IVBounds,
 		CallChain:     cg.CallChain,
 	}
+	// incomplete IndexExprs — fail closed (no invent soft-skip nil index)
+	if !ExpressionsComplete(av.IndexExprs) {
+		return false
+	}
 	for _, e := range av.IndexExprs {
 		// Lhs.cpp:278–280 — get_indices()[i] always live Expression*
-		if e == nil {
-			return false
-		}
 		if !VisitFactsExpression(e, &rhsCG, opts) {
 			return false
 		}

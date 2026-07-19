@@ -39,6 +39,23 @@ type Expression struct {
 	CastType *Type
 }
 
+// ExpressionsComplete reports every Expression* is live (no nil holes).
+// Note: ExpressionsComplete(nil)==true (complete empty). Fail-closed incomplete
+// IndexExprs / arg lists must not invent visit success past a nil slot.
+func ExpressionsComplete(exprs []*Expression) bool {
+	for _, e := range exprs {
+		if e == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteExpressions is the fail-closed incomplete Expression* list marker.
+func IncompleteExpressions() []*Expression {
+	return []*Expression{nil}
+}
+
 // CompatibleWithVar mirrors Expression::compatible(Variable*).
 // ExpressionVariable.cpp:288–291 — var.compatible(v);
 // ExpressionFuncall.cpp:206–207 — invoke.compatible(v) (unary operand only);

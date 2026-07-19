@@ -530,11 +530,11 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		// Expression::visit_facts reads process CGOptions; no Defaults invent
 		opts := ProcessOptions()
 		// CGContext.cpp:356–363 — visit each index expression (live Expression*)
+		// incomplete IndexExprs fails closed (no invent soft-skip nil index)
+		if !ExpressionsComplete(av.IndexExprs) {
+			return false
+		}
 		for _, e := range av.IndexExprs {
-			// C++ av->get_indices()[i] always non-null; no soft skip
-			if e == nil {
-				return false
-			}
 			// work on a context copy so index visits don't clobber caller stm incorrectly
 			// (upstream mutates facts_copy; VisitFactsExpression uses GlobalFacts on FM)
 			if !VisitFactsExpression(e, c, opts) {
