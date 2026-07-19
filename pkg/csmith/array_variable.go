@@ -48,7 +48,8 @@ func CreateArrayVariable(
 	qfer CVQualifiers,
 ) *ArrayVariable {
 	// ArrayVariable.cpp:127–129 — assert(type); assert simple != eVoid
-	if r == nil || elem == nil {
+	// name always live from gensym; no invent empty-name array shell
+	if r == nil || elem == nil || name == "" {
 		return nil
 	}
 	if elem.IsSimple() && elem.Simple() == EVoid {

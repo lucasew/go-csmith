@@ -17,6 +17,11 @@ func TestMakeRandomLoopControlRanges(t *testing.T) {
 		_ = limit
 		_ = incrOp
 	}
+	// nil RNG — no invent fixed init/limit/incr shell
+	init, limit, incr, testOp, incrOp := MakeRandomLoopControl(nil, opts, true)
+	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 {
+		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v", init, limit, incr, testOp, incrOp)
+	}
 }
 
 func TestMakeRandomIfHasBranches(t *testing.T) {

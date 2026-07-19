@@ -1131,6 +1131,10 @@ func (vs *VariableSelector) createAndInitialize(
 	if vs == nil || t == nil || r == nil {
 		return nil
 	}
+	// name always live from gensym; no invent empty-name create path
+	if name == "" {
+		return nil
+	}
 	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize
 	if vs.Opts.Arrays && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
 		// VariableSelector.cpp:526–529 — strict_const → Constant::make_random; else make_init_value
@@ -1695,6 +1699,9 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		return nil
 	}
 	name := vs.RandomLocalName()
+	if name == "" {
+		return nil
+	}
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
 	if v == nil || HasError() {
 		return nil
@@ -1794,6 +1801,10 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	if HasError() {
 		return nil
 	}
+	// Go MaxGlobals library cap applies to global array creates too
+	if asGlobal && vs.atMaxGlobals() {
+		return nil
+	}
 	var name string
 	var blk *Block
 	if asGlobal {
@@ -1815,6 +1826,10 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		if blk == nil {
 			return nil
 		}
+	}
+	// gensym always live; no invent empty-name array
+	if name == "" {
+		return nil
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
 	// C++ loops until success or ERROR_GUARD; cap high (no soft invent nil early)

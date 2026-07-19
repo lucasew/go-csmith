@@ -34,6 +34,10 @@ type LoopControl struct {
 // Sticky ERROR_RETURN leaves partial values; callers must check HasError.
 func MakeRandomLoopControl(r *Rng, opts Options, ivSigned bool) (init, limit, incr int, testOp BinaryOp, incrOp AssignOp) {
 	// pure_rnd_* == rnd_* in random mode (ERROR_RETURN still honors sticky Error)
+	// C++ always has RNG; no invent fixed init/limit/incr when r nil
+	if r == nil {
+		return
+	}
 	if r.RndFlipcoin(50) {
 		init = 0
 	} else {

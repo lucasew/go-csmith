@@ -90,6 +90,30 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	if len(vs.GlobalList) != 1 {
 		t.Fatal(len(vs.GlobalList))
 	}
+	// CreateRandomArray global path also respects MaxGlobals
+	opts2 := Defaults()
+	opts2.MaxGlobals = 1
+	opts2.GlobalVariables = true
+	vs2 := NewVariableSelector(opts2)
+	vs2.GlobalList = []*Variable{v}
+	vs2.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	// force asGlobal by only allowing global path — stack empty + GlobalVariables
+	// CreateRandomArray: asGlobal = GlobalVariables && flipcoin(25); may pick local
+	// empty stack + GlobalVariables false for local fail; with GlobalVariables and at max
+	for seed := uint64(1); seed < 40; seed++ {
+		if av := vs2.CreateRandomArray(NewRng(seed), EmptyCGContext()); av != nil && av.IsGlobal() {
+			t.Fatal("CreateRandomArray global at MaxGlobals must fail closed", av.Name)
+		}
+	}
+}
+
+func TestCreateArrayVariableEmptyNameFailClosed(t *testing.T) {
+	// name always live from gensym; no invent empty-name array shell
+	opts := Defaults()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
+		t.Fatal("empty name must fail closed")
+	}
 }
 
 func TestSelectGlobalEmptyCreates(t *testing.T) {
