@@ -2330,10 +2330,22 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 			continue
 		}
 		if !v.Type.HasIntField() {
+			// residual ERROR sticky — no invent soft-continue then pick later past HasIntField hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		if v.Type.IsUnion() && v.Type.ContainPointerField() {
+			// residual ERROR sticky — no invent soft-continue then pick later past ContainPointer hole
+			if HasError() {
+				return nil
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent keep after true ContainPointer/HasInt residual path
+		if HasError() {
+			return nil
 		}
 		filtered = append(filtered, v)
 	}

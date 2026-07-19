@@ -202,6 +202,23 @@ func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
+	// StmtBreak with nil Expr: MustJump stickies residual ERROR+false.
+	// Soft invent was treat as not-must-jump then invent "no nested" (false) past hole.
+	// Fair: residual sticky restrictive need nested true.
+	ClearError()
+	defer ClearError()
+	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtBreak}}} // nil Expr
+	cg := CGContext{} // RW nil would soft invent false after residual
+	if !b.NeedNestedLoop(cg, NewRng(1)) {
+		t.Fatal("MustJump residual must fail closed true need-nested, not invent none")
+	}
+	if !HasError() {
+		t.Fatal("MustJump residual NeedNestedLoop must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 	fm := NewFactMgr(nil)
 	b := &Block{

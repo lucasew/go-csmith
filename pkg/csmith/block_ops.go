@@ -52,6 +52,11 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	if s != nil && s.MustJump() {
 		return false
 	}
+	// residual ERROR sticky — no invent not-must-jump soft-skip past MustJump hole
+	// incomplete last jump sticky restrictive need nested (no invent "no nested" past hole)
+	if HasError() {
+		return true
+	}
 	if cg.RW == nil {
 		return false
 	}

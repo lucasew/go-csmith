@@ -243,6 +243,52 @@ func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestSelectLoopCtrlVarHasIntFieldResidualSticky(t *testing.T) {
+	// Type-nil field: HasIntField stickies residual ERROR+false.
+	// Soft invent was soft-continue filter then ChooseVarFull/GenerateNewGlobal later good int.
+	// Fair: sticky fail closed whole SelectLoopCtrlVar.
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	holeTy := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
+	hole := &Variable{Name: "g_hole", Type: holeTy}
+	good := &Variable{Name: "g_1", Type: GetIntType()}
+	vs.GlobalList = []*Variable{hole, good}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	if vs.SelectLoopCtrlVar(NewRng(2), cg, nil) != nil {
+		t.Fatal("HasIntField residual must fail closed SelectLoopCtrlVar, not invent later good")
+	}
+	if !HasError() {
+		t.Fatal("HasIntField residual SelectLoopCtrlVar must SetError sticky")
+	}
+	ClearError()
+	// Union + int field then Type-nil: HasIntField true, ContainPointerField residual.
+	// Soft invent was soft-continue filter then pick later good int.
+	// Fair: sticky fail closed whole SelectLoopCtrlVar.
+	unionOKThenHole := &Type{isUnion: true, Fields: []StructField{
+		{Name: "i", Type: GetIntType(), BitWidth: -1},
+		{Name: "x", Type: nil, BitWidth: -1},
+	}}
+	uvar := &Variable{Name: "g_u", Type: unionOKThenHole}
+	vs2 := NewVariableSelector(opts)
+	vs2.GlobalList = []*Variable{uvar, good}
+	f2 := &Function{Name: "f", ReturnType: GetIntType()}
+	blk2 := &Block{Func: f2}
+	f2.Stack = []*Block{blk2}
+	cg3 := WithFunc(f2, EmptyEffect())
+	if vs2.SelectLoopCtrlVar(NewRng(3), cg3, nil) != nil {
+		t.Fatal("ContainPointer residual must fail closed SelectLoopCtrlVar, not invent later good")
+	}
+	if !HasError() {
+		t.Fatal("ContainPointer residual SelectLoopCtrlVar must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
