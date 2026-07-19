@@ -718,17 +718,27 @@ func makeRandomStmt(
 			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
-		// incomplete GlobalFacts fail closed (no invent cleaned pre-stmt snapshot)
+		// incomplete GlobalFacts/accum fail closed sticky (no invent cleaned pre-stmt snapshot
+		// or soft re-pick past holes)
 		var preFacts []*FactPointTo
 		if cg.FM != nil {
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
 				return Stmt{}
 			}
 			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		}
 		preEffect := EmptyEffect()
 		if cg.EffectAccum != nil {
+			if !EffectComplete(*cg.EffectAccum) {
+				SetError(ErrGeneric)
+				return Stmt{}
+			}
 			preEffect = cg.EffectAccum.Clone()
+		}
+		if !EffectComplete(preEffect) {
+			SetError(ErrGeneric)
+			return Stmt{}
 		}
 		// Statement.cpp:267–269 / 306–308 — compound stmts bump blk_depth around factory
 		if IsCompound(kind) {
@@ -744,7 +754,14 @@ func makeRandomStmt(
 		}
 		if stmtOK(st) {
 			// Statement.cpp:320 — post_creation_analysis(pre_facts, pre_effect)
+			// incomplete post-creation must not invent stmt success past wiped facts
 			PostCreationAnalysis(&st, preFacts, preEffect, cg, opts)
+			if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return Stmt{}
+			}
 			return st
 		}
 		// s == 0 without error — re-pick type (Statement.cpp:314–316)

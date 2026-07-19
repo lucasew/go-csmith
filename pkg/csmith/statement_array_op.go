@@ -376,6 +376,7 @@ func MakeRandomArrayInit(
 					cg.RemoveIVBound(d.IV)
 				}
 			}
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 	}

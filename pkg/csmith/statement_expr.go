@@ -22,14 +22,19 @@ func MakeRandomExprStmt(
 		return Stmt{}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
+	// incomplete accum/facts fail closed sticky (no invent expr stmt under hole shells)
 	var preEffect Effect
 	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			SetError(ErrGeneric)
+			return Stmt{}
+		}
 		preEffect = cg.EffectAccum.Clone()
 	}
-	// incomplete GlobalFacts fail closed (no invent cleaned rollback snapshot)
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)

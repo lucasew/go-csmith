@@ -322,7 +322,10 @@ func MakeRandomAssignQfer(
 
 	// StatementAssign.cpp:225 — merge_param_context(lhs_cg_context, true)
 	cg.MergeParamContext(lhsCG, true)
-	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+	if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return Stmt{}
 	}
 
@@ -339,15 +342,22 @@ func MakeRandomAssignQfer(
 	if cg.FM != nil && st.LhsVar != nil {
 		// false may be no lattice change or incomplete abstract; only poison is incomplete FM
 		_ = cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.GetAssignRhs())
-		// incomplete GlobalFacts fail closed (no invent assign with wiped facts)
+		// incomplete GlobalFacts fail closed sticky (no invent assign with wiped facts)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		// incomplete abstract alone leaves complete FM but no lattice update —
 		// still emit assign (C++ updates when abstract succeeds; empty abstract ok)
 		cg.NoteWrite(st.LhsVar)
+		if HasError() {
+			return Stmt{}
+		}
 	} else if st.LhsVar != nil {
 		cg.NoteWrite(st.LhsVar)
+		if HasError() {
+			return Stmt{}
+		}
 	}
 	return st
 }

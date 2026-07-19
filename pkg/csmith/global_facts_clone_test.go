@@ -128,6 +128,21 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if st.Kind != 0 || st.StmID != 0 {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomExprStmt")
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	// incomplete EffectAccum must not invent expr stmt under hole shell
+	inc := IncompleteEffect()
+	cg3 := EmptyCGContext()
+	cg3.EffectAccum = &inc
+	st3 := MakeRandomExprStmt(NewRng(6), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3)
+	if st3.Kind != 0 || st3.StmID != 0 {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomExprStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
 	ClearError()
 }
 

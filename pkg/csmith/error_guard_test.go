@@ -110,3 +110,39 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
+	// incomplete GlobalFacts/accum pre-snapshot must sticky ERROR (no invent re-pick past holes)
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	st := makeRandomStmt(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk)
+	if stmtOK(st) {
+		t.Fatal("incomplete GlobalFacts must fail closed makeRandomStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	inc := IncompleteEffect()
+	fm2 := NewFactMgr(f)
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2.EffectAccum = &inc
+	st2 := makeRandomStmt(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, blk)
+	if stmtOK(st2) {
+		t.Fatal("incomplete EffectAccum must fail closed makeRandomStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+}
