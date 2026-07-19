@@ -245,6 +245,23 @@ func TestAccessDerefVolatile(t *testing.T) {
 	if !e3.IsSideEffectFree() {
 		t.Fatal("non-strict")
 	}
+	// under strictVolatile, Variable always live; sticky IncompleteEffect
+	ClearError()
+	if EffectComplete(e.AccessDerefVolatile(nil, 1, true)) {
+		t.Fatal("nil Variable strict AccessDerefVolatile must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable strict AccessDerefVolatile must SetError sticky")
+	}
+	ClearError()
+	// non-strict nil subject complete identity
+	if !EffectComplete(e.AccessDerefVolatile(nil, 1, false)) {
+		t.Fatal("non-strict nil subject must stay complete identity")
+	}
+	if HasError() {
+		t.Fatal("non-strict nil subject must not sticky")
+	}
+	ClearError()
 }
 
 func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {

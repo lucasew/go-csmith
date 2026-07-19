@@ -149,7 +149,10 @@ func (e *Expression) CheckAndSetCastOpts(desired *Type, opts Options) {
 }
 
 func (e *Expression) checkAndSetCastCore(desired *Type) {
+	// Expression + desired Type always live at check_and_set_cast; sticky no invent
+	// skip-cast soft-success past hole.
 	if e == nil || desired == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Expression.cpp:222 — get_type() before cast is applied

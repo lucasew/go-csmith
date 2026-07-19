@@ -52,6 +52,22 @@ func TestUnionFieldHelpers(t *testing.T) {
 	if f0.GetFieldID() != 0 {
 		t.Fatalf("fid %d", f0.GetFieldID())
 	}
+	// Variable always live; sticky false (no invent not-union-field soft-skip)
+	ClearError()
+	if (*Variable)(nil).IsUnionField() {
+		t.Fatal("nil IsUnionField must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsUnionField must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).IsInsideUnionField() {
+		t.Fatal("nil IsInsideUnionField must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsInsideUnionField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsNonreadableField(t *testing.T) {

@@ -43,6 +43,15 @@ func TestClosestLoopingBlock(t *testing.T) {
 	if ClosestLoopingBlock(&Block{}) != nil {
 		t.Fatal("none")
 	}
+	// Block always live; sticky nil (no invent no-loop soft-skip past hole)
+	ClearError()
+	if ClosestLoopingBlock(nil) != nil {
+		t.Fatal("nil ClosestLoopingBlock must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil ClosestLoopingBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBreakContinueCFGEdges(t *testing.T) {

@@ -119,16 +119,21 @@ func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 }
 
 // GetMapFactsIn returns map_facts_in for a live stm_id.
+// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 // StmID ≤0 fails closed sticky IncompleteFactSlice (no invent MapFactsIn[0] miss as
 // empty-complete merge/visit / soft re-pick past incomplete keys).
 // Missing live key → complete empty {}. Incomplete stored slots stay markers
 // (non-sticky local map holes for soft re-pick factories).
 func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if fm == nil || fm.MapFactsIn == nil {
+	if fm.MapFactsIn == nil {
 		return []*FactPointTo{}
 	}
 	if facts, ok := fm.MapFactsIn[stmID]; ok {
@@ -141,15 +146,20 @@ func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
 }
 
 // GetMapFactsOut returns map_facts_out for a live stm_id.
+// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 // StmID ≤0 fails closed sticky IncompleteFactSlice (no invent MapFactsOut[0]
 // empty-complete / soft re-pick past incomplete keys).
 // Missing live key → complete empty {}. Incomplete stored slots stay markers.
 func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if fm == nil || fm.MapFactsOut == nil {
+	if fm.MapFactsOut == nil {
 		return []*FactPointTo{}
 	}
 	if facts, ok := fm.MapFactsOut[stmID]; ok {
@@ -162,12 +172,17 @@ func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
 }
 
 // GetMapFactsInFinal is GetMapFactsIn for map_facts_in_final.
+// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if fm == nil || fm.MapFactsInFinal == nil {
+	if fm.MapFactsInFinal == nil {
 		return []*FactPointTo{}
 	}
 	if facts, ok := fm.MapFactsInFinal[stmID]; ok {
@@ -180,12 +195,17 @@ func (fm *FactMgr) GetMapFactsInFinal(stmID int) []*FactPointTo {
 }
 
 // GetMapFactsOutFinal is GetMapFactsOut for map_facts_out_final.
+// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete past hole).
 func (fm *FactMgr) GetMapFactsOutFinal(stmID int) []*FactPointTo {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
-	if fm == nil || fm.MapFactsOutFinal == nil {
+	if fm.MapFactsOutFinal == nil {
 		return []*FactPointTo{}
 	}
 	if facts, ok := fm.MapFactsOutFinal[stmID]; ok {

@@ -135,6 +135,23 @@ func TestFindContainerAndDominate(t *testing.T) {
 	if Dominate(&outer.Stmts[1], outer, &Stmt{Kind: StmtAssign, StmID: 100}, stray) {
 		t.Fatal("assign must not invent dominate via stray Then")
 	}
+	// Block always live; sticky nil (no invent soft-skip missing container past hole)
+	ClearError()
+	if FindContainerStm(nil) != nil {
+		t.Fatal("nil FindContainerStm must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FindContainerStm must SetError sticky")
+	}
+	ClearError()
+	// root complete nil
+	if FindContainerStm(&Block{StmID: 1}) != nil {
+		t.Fatal("root FindContainerStm must complete nil")
+	}
+	if HasError() {
+		t.Fatal("root FindContainerStm must not sticky")
+	}
+	ClearError()
 }
 
 func TestDominateIncompleteStmIDNoInvent(t *testing.T) {

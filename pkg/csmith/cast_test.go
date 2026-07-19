@@ -88,6 +88,19 @@ func TestCheckAndSetCast(t *testing.T) {
 			t.Fatal("expected cast")
 		}
 	}
+	// Expression + desired Type always live; sticky no invent skip-cast soft-success
+	ClearError()
+	(*Expression)(nil).CheckAndSetCast(want)
+	if !HasError() {
+		t.Fatal("nil Expression CheckAndSetCast must SetError sticky")
+	}
+	ClearError()
+	e2 := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
+	e2.CheckAndSetCast(nil)
+	if !HasError() {
+		t.Fatal("nil desired CheckAndSetCast must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {

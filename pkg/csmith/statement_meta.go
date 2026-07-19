@@ -167,10 +167,16 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 // FindContainerStm mirrors Statement::find_container_stm for a nested block.
 // Statement.cpp:414–430 — parent-block statement whose get_blocks contains b.
 // Kind-gated get_blocks only (no invent container via stray Then on assign).
+// Block always live; sticky nil (no invent soft-skip missing container past hole).
+// Missing parent is complete nil (root block — not incomplete).
 // Incomplete parent get_blocks hole sticky nil (no invent soft-skip missing container).
 func FindContainerStm(b *Block) *Stmt {
-	// root / missing parent is complete nil (not incomplete)
-	if b == nil || b.Parent == nil {
+	if b == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// root is complete nil (not incomplete)
+	if b.Parent == nil {
 		return nil
 	}
 	for i := range b.Parent.Stmts {

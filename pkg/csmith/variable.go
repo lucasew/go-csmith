@@ -1362,12 +1362,22 @@ func (v *Variable) LooseMatch(other *Variable) bool {
 }
 
 // IsUnionField mirrors Variable::is_union_field — direct field of a union.
+// Variable always live; sticky false (no invent not-union-field soft-skip past hole).
 func (v *Variable) IsUnionField() bool {
-	return v != nil && v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsUnion()
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsUnion()
 }
 
 // IsInsideUnionField mirrors Variable::is_inside_union_field.
+// Variable always live; sticky false (no invent not-inside soft-skip past hole).
 func (v *Variable) IsInsideUnionField() bool {
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	for p := v; p != nil; p = p.FieldVarOf {
 		if p.IsUnionField() {
 			return true

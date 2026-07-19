@@ -121,6 +121,17 @@ func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 		t.Fatal("Clear incomplete base must SetError sticky")
 	}
 	ClearError()
+	// Effect* always live at Clear/Consolidate; sticky no invent soft-skip past hole
+	(*Effect)(nil).Clear()
+	if !HasError() {
+		t.Fatal("nil Effect Clear must SetError sticky")
+	}
+	ClearError()
+	(*Effect)(nil).Consolidate()
+	if !HasError() {
+		t.Fatal("nil Effect Consolidate must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {

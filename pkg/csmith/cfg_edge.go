@@ -19,11 +19,19 @@ type CFGEdge struct {
 
 // ClosestLoopingBlock walks parents until looping is true.
 // StatementBreak.cpp:71–75 / StatementContinue.cpp:73–76.
+// Block always live at break/continue; sticky nil (no invent no-loop soft-skip past hole).
+// Non-looping chain end (Parent nil) is complete miss (not incomplete IR).
 func ClosestLoopingBlock(b *Block) *Block {
-	for b != nil && !b.Looping {
-		b = b.Parent
+	if b == nil {
+		SetError(ErrGeneric)
+		return nil
 	}
-	return b
+	for cur := b; cur != nil; cur = cur.Parent {
+		if cur.Looping {
+			return cur
+		}
+	}
+	return nil
 }
 
 // CFGEdgesComplete reports every CFGEdge* is live (no nil holes).

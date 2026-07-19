@@ -463,6 +463,36 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	if FactsComplete(fm.GetMapFactsOut(7)) {
 		t.Fatal("stored incomplete must stay incomplete via getter")
 	}
+	// FactMgr always live; sticky IncompleteFactSlice (no invent empty-complete)
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).GetMapFactsIn(1)) {
+		t.Fatal("nil FM GetMapFactsIn must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapFactsIn must SetError sticky")
+	}
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).GetMapFactsOut(1)) {
+		t.Fatal("nil FM GetMapFactsOut must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapFactsOut must SetError sticky")
+	}
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).GetMapFactsInFinal(1)) {
+		t.Fatal("nil FM GetMapFactsInFinal must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapFactsInFinal must SetError sticky")
+	}
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).GetMapFactsOutFinal(1)) {
+		t.Fatal("nil FM GetMapFactsOutFinal must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapFactsOutFinal must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindParentBlockNilSticky(t *testing.T) {

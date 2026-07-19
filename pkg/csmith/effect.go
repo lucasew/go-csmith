@@ -660,10 +660,12 @@ func (e Effect) IsEmpty() bool {
 
 // Clear mirrors Effect::clear — empty pure SE-free effect.
 // Effect.cpp:497–501.
+// Effect* always live at clear; sticky (no invent soft-skip clear past hole).
 // Incomplete base stays IncompleteEffect sticky (no invent wipe hole shell to empty pure
 // / soft re-pick past incomplete clear).
 func (e *Effect) Clear() {
 	if e == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if e.incomplete {
@@ -677,13 +679,18 @@ func (e *Effect) Clear() {
 // AccessDerefVolatile mirrors Effect::access_deref_volatile.
 // Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
 // Incomplete base fails closed sticky IncompleteEffect (no invent SE-free tweak on hole shell).
+// Under strictVolatile, Variable always live; sticky IncompleteEffect (no invent SE-free skip).
 func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
 	if e.incomplete {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if !strictVolatile || v == nil {
+	if !strictVolatile {
 		return e
+	}
+	if v == nil {
+		SetError(ErrGeneric)
+		return IncompleteEffect()
 	}
 	out := e
 	level := derefLevel
@@ -786,10 +793,12 @@ func effectMapKeysComplete(m map[*Variable]bool) bool {
 
 // Consolidate mirrors Effect::consolidate.
 // Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
+// Effect* always live; sticky (no invent soft-skip consolidate past hole).
 // Incomplete maps fail closed sticky IncompleteEffect (no invent partial deletes /
 // leave-base complete success past holes under random map order / soft re-pick).
 func (e *Effect) Consolidate() {
 	if e == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if e.incomplete || !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
