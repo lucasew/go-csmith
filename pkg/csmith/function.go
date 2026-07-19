@@ -383,9 +383,18 @@ func MakeFirst(
 	fm.SetupInOutMaps(true)
 
 	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
-	if f.Body != nil && f.Body.StmID > 0 {
-		if out, ok := fm.MapFactsOut[f.Body.StmID]; ok {
-			fm.GlobalFacts = CloneFactSlice(out)
+	// C++ map[] always assigns (missing → empty); no invent keep prior GlobalFacts
+	// Incomplete out fails closed (nil — no invent cleaned clone of holes)
+	if f.Body != nil {
+		if f.Body.StmID > 0 {
+			out := fm.MapFactsOut[f.Body.StmID]
+			if !FactsComplete(out) {
+				fm.GlobalFacts = nil
+			} else {
+				fm.GlobalFacts = CloneFactSlice(out)
+			}
+		} else {
+			fm.GlobalFacts = nil
 		}
 		AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts)
 	}
@@ -589,8 +598,20 @@ func (f *Function) generateBodyCore(
 		*prev.EffectAccum = bodyEff
 	}
 
-	// add_back_return_facts into global_facts (Function.cpp:470 path / handoff)
+	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
+	// (generate_body_with_known_params / GenerateBody post-body handoff)
+	// no invent keep mid-build GlobalFacts when body out missing/incomplete
 	if cg.FM != nil && f.Body != nil {
+		if f.Body.StmID > 0 {
+			out := cg.FM.MapFactsOut[f.Body.StmID]
+			if !FactsComplete(out) {
+				cg.FM.GlobalFacts = nil
+			} else {
+				cg.FM.GlobalFacts = CloneFactSlice(out)
+			}
+		} else {
+			cg.FM.GlobalFacts = nil
+		}
 		AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts)
 	}
 	// Function.cpp:661–662 — Mark Built

@@ -554,15 +554,16 @@ func BuildInvocationAndFunction(
 	// RWDirective + call chain set inside GenerateBodyWithKnownParams
 	callee.GenerateBodyWithKnownParams(r, opts, probs, vs, tables, stmtTab, bodyCG)
 
-	// FunctionInvocationUser.cpp:212–215 — ret_facts from body + add_back_return_facts
-	retFacts := []*FactPointTo{}
+	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
+	// C++ map[] missing → empty; no invent GlobalFacts fallback when out missing
+	// Incomplete out fails closed (nil — no invent cleaned clone of holes)
+	var retFacts []*FactPointTo
 	if callee.Body != nil && callee.Body.StmID > 0 {
-		if out, ok := calFM.MapFactsOut[callee.Body.StmID]; ok {
+		out := calFM.MapFactsOut[callee.Body.StmID]
+		if FactsComplete(out) {
 			retFacts = CloneFactSlice(out)
 		}
-	}
-	if len(retFacts) == 0 {
-		retFacts = CloneFactSlice(calFM.GlobalFacts)
+		// incomplete → nil retFacts (fail closed)
 	}
 	if callee.Body != nil {
 		AddBackReturnFacts(callee.Body, calFM, &retFacts)

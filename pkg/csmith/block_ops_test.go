@@ -322,6 +322,42 @@ func TestFindFixedPointShortcut(t *testing.T) {
 	_ = out
 }
 
+func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
+	// Block.cpp:729 — global_facts = map_facts_out[this] after fixed-point path.
+	// After ResetBlockFactMaps deletes out maps, assign must clear GlobalFacts
+	// (C++ map[] empty), not invent keep prior.
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	parent := &Block{StmID: 1, Func: f}
+	// incomplete assign fails visit → remove → empty stmts → break without re-set out
+	b := &Block{StmID: 70, Func: f, Parent: parent, Looping: true, NeedRevisit: true,
+		Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}},
+	}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	prior := MakeFactPointTo(p, GarbagePtr)
+	fm.GlobalFacts = []*FactPointTo{prior}
+	fm.SetMapFactsIn(70, []*FactPointTo{prior})
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	pre := EmptyEffect()
+	b.PostCreationAnalysis(&cg, Defaults(), pre, nil, nil)
+	// MapFactsOut[70] was set then likely reset on fail; if missing, GlobalFacts must be nil
+	if _, ok := fm.MapFactsOut[70]; !ok {
+		if fm.GlobalFacts != nil {
+			t.Fatal("missing MapFactsOut must not invent keep prior GlobalFacts")
+		}
+		return
+	}
+	// if out present, must be complete (no hole invent) and not silently keep only prior
+	// when out was incomplete
+	if !FactsComplete(fm.MapFactsOut[70]) {
+		if fm.GlobalFacts != nil {
+			t.Fatal("incomplete MapFactsOut must fail closed nil GlobalFacts")
+		}
+	}
+}
+
 func TestPostCreationAppendsReturn(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1

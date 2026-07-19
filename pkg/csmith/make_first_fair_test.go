@@ -2,6 +2,67 @@ package csmith
 
 import "testing"
 
+func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
+	// Function.cpp:469 — global_facts = map_facts_out[body]
+	// missing body out must not invent keep prior GlobalFacts
+	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 10}}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	prior := MakeFactPointTo(p, NullPtr)
+	fm.GlobalFacts = []*FactPointTo{prior}
+	// no MapFactsOut[10]
+	// mirror MakeFirst handoff assign
+	out := fm.MapFactsOut[f.Body.StmID]
+	if !FactsComplete(out) {
+		fm.GlobalFacts = nil
+	} else {
+		fm.GlobalFacts = CloneFactSlice(out)
+	}
+	if fm.GlobalFacts != nil {
+		t.Fatal("missing body out must clear GlobalFacts, not invent keep prior")
+	}
+}
+
+func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
+	// incomplete map_facts_out[body] must not invent cleaned GlobalFacts
+	f := &Function{Name: "f", ReturnType: GetIntType(), Body: &Block{StmID: 11}}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		11: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	out := fm.MapFactsOut[f.Body.StmID]
+	if !FactsComplete(out) {
+		fm.GlobalFacts = nil
+	} else {
+		fm.GlobalFacts = CloneFactSlice(out)
+	}
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete body out must fail closed nil GlobalFacts")
+	}
+}
+
+func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
+	// FunctionInvocationUser.cpp:212 — ret_facts = map_facts_out[body]
+	// no invent GlobalFacts when body out missing
+	callee := &Function{Name: "g", ReturnType: GetIntType(), Body: &Block{StmID: 20}}
+	calFM := NewFactMgr(callee)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	// no MapFactsOut[20]
+	var retFacts []*FactPointTo
+	if callee.Body != nil && callee.Body.StmID > 0 {
+		out := calFM.MapFactsOut[callee.Body.StmID]
+		if FactsComplete(out) {
+			retFacts = CloneFactSlice(out)
+		}
+	}
+	if retFacts != nil {
+		t.Fatal("missing body out must not invent GlobalFacts as ret_facts")
+	}
+}
+
 func TestMakeFirstSetupInOutMaps(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 2

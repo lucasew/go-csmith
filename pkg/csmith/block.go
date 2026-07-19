@@ -499,7 +499,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				break
 			}
 		}
-		if out, ok := fm.MapFactsOut[b.StmID]; ok {
+		// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
+		// incomplete out fails closed (nil — no invent keep prior GlobalFacts)
+		out := fm.MapFactsOut[b.StmID]
+		if !FactsComplete(out) {
+			fm.GlobalFacts = nil
+		} else {
 			fm.GlobalFacts = CloneFactSlice(out)
 		}
 	} else if b.Looping && b.FromTailToHead() {
@@ -513,11 +518,16 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			return
 		}
 		// Block.cpp:740 — set_fact_out(this, map_facts_out[sr])
+		// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
 		if len(b.Stmts) > 0 {
 			sr := &b.Stmts[len(b.Stmts)-1]
 			if sr.StmID > 0 {
-				if out, ok := fm.MapFactsOut[sr.StmID]; ok {
+				out := fm.MapFactsOut[sr.StmID]
+				if FactsComplete(out) {
 					fm.SetMapFactsOut(b.StmID, out)
+				} else {
+					// incomplete sr out — fail closed empty body out (no invent skip)
+					fm.SetMapFactsOut(b.StmID, nil)
 				}
 			}
 		}
