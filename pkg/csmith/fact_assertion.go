@@ -76,22 +76,29 @@ func (f *FactPointTo) OutputCondition() string {
 		return ""
 	}
 	lhs := outputFactVar(f.Var)
-	// subject always live Output; no invent " == 0" / " >= &" without lhs
+	// subject always live Output; sticky no invent " == 0" / " >= &" without lhs
 	if lhs == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var parts []string
 	for _, pointee := range f.PointTo {
-		// FactPointTo.cpp: point_to_vars[i] always live; no invent skip nil holes
+		// FactPointTo.cpp: point_to_vars[i] always live; sticky no invent skip nil holes
 		if pointee == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if pointee.IsArray || (pointee.AsArray != nil) {
 			// range form: (p >= &lo && p <= &hi)
-			// OutputLower/UpperBound always live; no invent "(p >= & && p <= &)"
+			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
 			hi := pointee.OutputUpperBound(false)
 			if lo == "" || hi == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			parts = append(parts, "("+lhs+" >= &"+lo+" && "+lhs+" <= &"+hi+")")
@@ -106,9 +113,10 @@ func (f *FactPointTo) OutputCondition() string {
 		case pointee == NullPtr:
 			rhs = "0"
 		default:
-			// pointee->Output always live name; no invent bare "&"
+			// pointee->Output always live name; sticky no invent bare "&"
 			nm := pointee.GetActualName(false)
 			if nm == "" {
+				SetError(ErrGeneric)
 				return ""
 			}
 			rhs = "&" + nm
@@ -123,8 +131,9 @@ func outputFactVar(v *Variable) string {
 		return ""
 	}
 	s := v.GetActualName(false)
-	// no invent "[0]" indices without identifier
+	// sticky no invent "[0]" indices without identifier
 	if s == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()

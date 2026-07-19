@@ -104,14 +104,22 @@ func TestOutputVariableList(t *testing.T) {
 	if ia < 0 || ib < 0 || ia > ib {
 		t.Fatal(out)
 	}
-	// incomplete OutputDef — no invent indent-only blank lines
+	// incomplete OutputDef — sticky no invent indent-only blank lines
+	ClearError()
 	broken := &Variable{Name: "g_x", Type: GetIntType()} // no init
 	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
 		t.Fatal("empty defs must fail closed empty list", s)
 	}
+	if !HasError() {
+		t.Fatal("empty-def OutputVariableList must SetError sticky")
+	}
 	// incomplete entry fails whole list (no invent skip holes)
+	ClearError()
 	if s := OutputVariableList([]*Variable{a, broken}, "  ", true); s != "" {
 		t.Fatal("mixed incomplete must fail closed whole list", s)
+	}
+	if !HasError() {
+		t.Fatal("mixed incomplete OutputVariableList must SetError sticky")
 	}
 	ClearError()
 	if s := OutputVariableList([]*Variable{a, nil}, "  ", true); s != "" {

@@ -228,14 +228,20 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 	if out != "for (i = 0; i < 10; i = i + 1)" {
 		t.Fatal(out)
 	}
-	// empty IV OutputC — no invent for ( = 0; …)
+	// empty IV OutputC — sticky no invent for ( = 0; …)
+	ClearError()
 	anon := &Variable{Type: GetIntType()}
 	if s := arrayOpHeaderOutput(&LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
 		t.Fatal("empty IV name must fail closed arrayop header", s)
 	}
+	if !HasError() {
+		t.Fatal("empty IV arrayop header must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
@@ -251,6 +257,7 @@ func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {
 }
 
 func TestMakeRandomContinueWithPrior(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
@@ -258,6 +265,9 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	probs := NewProbabilities(opts)
 	seedTypesForTest(NewRng(2), opts, probs, vs, nil)
 	f := MakeFirst(NewRng(2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	if f == nil {
+		t.Fatal("MakeFirst nil", HasError(), GetError())
+	}
 	cg := WithFunc(f, EmptyEffect())
 	cg.Flags |= 2
 	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
@@ -266,6 +276,7 @@ func TestMakeRandomContinueWithPrior(t *testing.T) {
 	if st.Kind != StmtContinue {
 		t.Fatalf("got %v", st.Kind)
 	}
+	ClearError()
 }
 
 func TestGenerateEmitsIfBreakOrContinue(t *testing.T) {

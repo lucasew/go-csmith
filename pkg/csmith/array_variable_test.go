@@ -265,7 +265,8 @@ func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
 }
 
 func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
-	// ArrayVariable.cpp:250 — assert(collective == 0) on the receiver
+	// ArrayVariable.cpp:250 — assert(collective == 0) on the receiver sticky
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
@@ -279,9 +280,21 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	if parent.Itemize(NewRng(2)) == nil {
 		t.Fatal("parent collective may itemize again")
 	}
+	ClearError()
 	if item.Itemize(NewRng(3)) != nil {
 		t.Fatal("re-itemize of itemized must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("re-itemize of itemized must SetError sticky")
+	}
+	ClearError()
+	if parent.ItemizeInto(nil, nil) != nil {
+		t.Fatal("nil RNG Itemize must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG Itemize must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestArrayCDeclTypeNoInventInt(t *testing.T) {
@@ -506,15 +519,21 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 	if !strings.Contains(got, "% 10") {
 		t.Fatal(got)
 	}
-	// incomplete index Output — no invent "(( % 10)"
+	// incomplete index Output — sticky no invent "(( % 10)"
+	ClearError()
 	bad := &Expression{Term: TermConstant}
 	if out := av.OutputIndexModulo(0, bad); out != "" {
 		t.Fatal("empty index Output must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty index OutputIndexModulo must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	// ArrayVariable.cpp:261–264 — itemize expands field vars for aggregate element type
+	ClearError()
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},

@@ -81,14 +81,16 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	if v == nil {
 		return ""
 	}
-	// Variable.cpp:670–676 — output_qualified_type always live type; no invent " name"
+	// Variable.cpp:670–676 — output_qualified_type always live type; sticky no invent " name"
 	ty := v.Qfer.OutputQualifiedType(v.Type)
 	if ty == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	name := v.GetActualName(prefixName)
-	// name always live; no invent "int " without identifier
+	// name always live; sticky no invent "int " without identifier
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -118,7 +120,7 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	if v == nil {
 		return ""
 	}
-	// Variable.cpp:659 — assert(init); no soft invent empty "= ;" RHS
+	// Variable.cpp:659 — assert(init); sticky no soft invent empty "= ;" RHS
 	var initOut string
 	if v.InitExpr != nil {
 		initOut = v.InitExpr.Output()
@@ -126,13 +128,17 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 		initOut = v.Init.Value
 	}
 	if initOut == "" {
-		// missing init is broken IR (union-field CreateVariable uses null init
+		// missing init is broken IR sticky (union-field CreateVariable uses null init
 		// and those fields are not OutputDef'd as standalone defs)
+		SetError(ErrGeneric)
 		return ""
 	}
-	// Variable.cpp:640–660 — OutputDecl always live; no invent " = init;" without decl
+	// Variable.cpp:640–660 — OutputDecl always live; sticky no invent " = init;" without decl
 	decl := v.OutputDeclOpts(forceStatic, prefixName)
 	if decl == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder
@@ -172,17 +178,20 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
-	// Variable always has live get_actual_name; no invent VOL_RVAL(, T) / ACCESS_ONCE()
+	// Variable always has live get_actual_name; sticky no invent VOL_RVAL(, T) / ACCESS_ONCE()
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.UseVolRVal && v.IsVolatile() {
-		// Variable.cpp:690–693 — type->Output always live; no invent "int"
+		// Variable.cpp:690–693 — type->Output always live; sticky no invent "int"
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
 		if ty == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "VOL_RVAL(" + name + ", " + ty + ")"
@@ -211,17 +220,20 @@ func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 		return v.AsArray.OutputAccess()
 	}
 	name := v.GetActualName(prefixName)
-	// no invent VOL_LVAL(, T) / empty LHS identifier
+	// sticky no invent VOL_LVAL(, T) / empty LHS identifier
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.UseVolRVal && v.IsVolatile() {
-		// Lhs/Variable type->Output always live; no invent "int"
+		// Lhs/Variable type->Output always live; sticky no invent "int"
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
 		if ty == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "VOL_LVAL(" + name + ", " + ty + ")"
@@ -238,7 +250,8 @@ func (v *Variable) OutputAddrOf(prefixName bool) string {
 	}
 	name := v.GetActualName(prefixName)
 	if name == "" {
-		// no invent bare "&"
+		// sticky no invent bare "&"
+		SetError(ErrGeneric)
 		return ""
 	}
 	return "&" + name
@@ -263,19 +276,24 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 		return v.AsArray.OutputUpperBoundArray()
 	}
 	if v.FieldVarOf != nil {
-		// Variable.cpp:724–727 — assert(dot != npos); no invent base-only without ".fN"
+		// Variable.cpp:724–727 — assert(dot != npos); sticky no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputUpperBound(prefixName)
 		if base == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		dot := strings.LastIndex(v.Name, ".")
 		if dot < 0 {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return base + v.Name[dot:]
 	}
 	name := v.GetActualName(prefixName)
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return name
@@ -291,19 +309,24 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 		return v.AsArray.OutputLowerBound()
 	}
 	if v.FieldVarOf != nil {
-		// Variable.cpp:737–740 — assert(dot != npos); no invent base-only without ".fN"
+		// Variable.cpp:737–740 — assert(dot != npos); sticky no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputLowerBound(prefixName)
 		if base == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		dot := strings.LastIndex(v.Name, ".")
 		if dot < 0 {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return base + v.Name[dot:]
 	}
 	name := v.GetActualName(prefixName)
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return name

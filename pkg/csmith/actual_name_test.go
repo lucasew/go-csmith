@@ -37,6 +37,7 @@ func TestOutputDefVolatileComment(t *testing.T) {
 }
 
 func TestOutputAddrOf(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	v.UseVolRVal = true
 	// even with wrap, AddrOf uses bare name
@@ -47,25 +48,40 @@ func TestOutputAddrOf(t *testing.T) {
 	if s := (*Variable)(nil).OutputAddrOf(false); s != "" {
 		t.Fatal("nil must fail closed, got", s)
 	}
+	ClearError()
 	if s := (&Variable{}).OutputAddrOf(false); s != "" {
 		t.Fatal("empty name must fail closed bare &, got", s)
 	}
+	if !HasError() {
+		t.Fatal("empty name OutputAddrOf must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputBoundNoInventFieldWithoutDot(t *testing.T) {
-	// Variable.cpp:724–727 assert(dot != npos); no invent base-only field path
+	// Variable.cpp:724–727 assert(dot != npos); sticky no invent base-only field path
+	ClearError()
 	parent := CreateVariableScalars("g_s", GetIntType(), false, false)
 	f := &Variable{Name: "broken_field", Type: GetIntType(), FieldVarOf: parent}
 	if s := f.OutputUpperBound(false); s != "" {
 		t.Fatal("field without '.' must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("field without '.' OutputUpperBound must SetError sticky")
+	}
+	ClearError()
 	if s := f.OutputLowerBound(false); s != "" {
 		t.Fatal("field without '.' must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("field without '.' OutputLowerBound must SetError sticky")
+	}
+	ClearError()
 	f.Name = "g_s.f0"
 	if s := f.OutputUpperBound(false); s != "g_s.f0" {
 		t.Fatal(s)
 	}
+	ClearError()
 }
 
 func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {

@@ -696,9 +696,10 @@ func (av *ArrayVariable) OutputLowerBound() string {
 	if av == nil {
 		return ""
 	}
-	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live
+	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live sticky
 	name := av.GetActualName(false)
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	s := name
@@ -824,10 +825,15 @@ func (av *ArrayVariable) Itemize(r *Rng) *ArrayVariable {
 func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariable {
 	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
 	if av == nil || r == nil {
+		// nil receiver/RNG incomplete sticky (no invent itemize without live array/rng)
+		if av != nil && r == nil {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
-	// ArrayVariable.cpp:250 — assert(collective == 0); no soft invent re-itemize self
+	// ArrayVariable.cpp:250 — assert(collective == 0); sticky no soft invent re-itemize self
 	if av.Collective != nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	item := &ArrayVariable{
@@ -983,8 +989,9 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 		size = av.Sizes[i]
 	}
 	body := idx.Output()
-	// index Output always live; no invent "(( % n)" empty shell
+	// index Output always live; sticky no invent "(( % n)" empty shell
 	if body == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// cast signed index type to unsigned before %

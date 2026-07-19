@@ -6,6 +6,7 @@ import (
 )
 
 func TestFactPointToOutputCondition(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
 	f := MakeFactPointTo(p, tgt)
@@ -21,31 +22,49 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	if !strings.Contains(fd.OutputCondition(), "dangling") {
 		t.Fatal(fd.OutputCondition())
 	}
-	// point_to_vars always live; no invent skip nil holes in OR list
+	// point_to_vars always live; sticky no invent skip nil holes in OR list
+	ClearError()
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{tgt, nil}}
 	if cond := broken.OutputCondition(); cond != "" {
 		t.Fatal("nil pointee must fail closed", cond)
 	}
-	// no invent " == 0" without subject name
+	if !HasError() {
+		t.Fatal("nil pointee OutputCondition must SetError sticky")
+	}
+	// sticky no invent " == 0" without subject name
+	ClearError()
 	anon := &FactPointTo{Var: &Variable{Type: PointerTo(GetIntType())}, PointTo: []*Variable{NullPtr}}
 	if cond := anon.OutputCondition(); cond != "" {
 		t.Fatal("empty subject name must fail closed", cond)
 	}
+	if !HasError() {
+		t.Fatal("empty subject OutputCondition must SetError sticky")
+	}
 	// no invent "(p >= & && p <= &)" with empty array bounds
 	arr := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	// empty name array bounds fail closed
+	// empty name array bounds fail closed sticky via OutputUpper/LowerBound
+	ClearError()
 	arrNoName := &Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arrNoName}}).OutputCondition(); cond != "" {
 		t.Fatal("empty array bound name must fail closed", cond)
 	}
+	if !HasError() {
+		t.Fatal("empty array bound name must SetError sticky")
+	}
 	// live array range form (bounds via OutputLower/UpperBound)
+	ClearError()
 	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arr}}).OutputCondition(); !strings.Contains(cond, "g_p >= &g_a") {
 		t.Fatal("want array range form", cond)
 	}
-	// no invent bare "&" pointee
+	// sticky no invent bare "&" pointee
+	ClearError()
 	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{{Type: GetIntType()}}}).OutputCondition(); cond != "" {
 		t.Fatal("empty pointee name must fail closed", cond)
 	}
+	if !HasError() {
+		t.Fatal("empty pointee name OutputCondition must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {

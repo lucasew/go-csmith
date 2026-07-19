@@ -139,31 +139,45 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 }
 
 func TestOutputDeclNoInventEmptyName(t *testing.T) {
-	// Variable always has live name; no invent "int "
+	// Variable always has live name; sticky no invent "int "
+	ClearError()
 	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if out := v.OutputDecl(false); out != "" {
 		t.Fatal("empty name must fail closed decl", out)
 	}
+	if !HasError() {
+		t.Fatal("empty name OutputDecl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	// incomplete OutputDef must not invent "static \n" / blank lines / section-only
+	ClearError()
 	opts := Defaults()
 	opts.ForceGlobalsStatic = true
 	g := NewProgramGenerator(opts)
-	// global without init → OutputDef empty
+	// global without init → OutputDef empty sticky
 	v := &Variable{Name: "g_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	g.VS.GlobalList = []*Variable{v}
 	out := g.OutputGlobals()
 	if out != "" {
 		t.Fatal("all-empty globals must fail closed empty section", out)
 	}
+	if !HasError() {
+		t.Fatal("empty-def globals Output must SetError sticky")
+	}
 	// incomplete among live fails whole section (no invent skip holes)
+	ClearError()
 	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
 	g.VS.GlobalList = []*Variable{good, v}
 	if out2 := g.OutputGlobals(); out2 != "" {
 		t.Fatal("mixed incomplete globals must fail closed", out2)
 	}
+	if !HasError() {
+		t.Fatal("mixed incomplete globals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
@@ -219,14 +233,17 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	}
 	ClearError()
 	// empty-name incomplete among live fails whole (no invent skip)
+	ClearError()
 	g.Funcs.Funcs = []*Function{good, {Name: "", ReturnType: GetIntType()}}
 	if out := g.OutputFunctions(); out != "" {
 		t.Fatal("mixed incomplete must fail closed", out)
 	}
+	ClearError()
 }
 
 func TestBlockLocalNoInventEmptyDef(t *testing.T) {
-	// incomplete local OutputDef fails whole block (no invent blank lines / partial)
+	// incomplete local OutputDef fails whole block sticky (no invent blank lines / partial)
+	ClearError()
 	b := &Block{LocalVars: []*Variable{
 		{Name: "l_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // no init
 	}}
@@ -234,13 +251,21 @@ func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 	if out != "" {
 		t.Fatal("incomplete local must fail closed whole block", out)
 	}
-	// good local still emits
+	if !HasError() {
+		t.Fatal("incomplete local block Output must SetError sticky")
+	}
+	// good local still emits after clear
+	ClearError()
 	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	if ok == nil {
+		t.Fatal("CreateVariableScalars after ClearError")
+	}
 	ok.Init = MakeInt(1)
 	b2 := &Block{LocalVars: []*Variable{ok}}
 	if out2 := b2.Output(0); !strings.Contains(out2, "l_ok") {
 		t.Fatal(out2)
 	}
+	ClearError()
 }
 
 func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
@@ -299,24 +324,41 @@ func TestCNameNoInventBareAggregateOrDefaultInt(t *testing.T) {
 }
 
 func TestVolWrapNoInventIntType(t *testing.T) {
-	// Variable.cpp:690–693 — type->Output; no invent "int" when Type nil
+	// Variable.cpp:690–693 — type->Output; sticky no invent "int" when Type nil
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	v.UseVolRVal = true
 	v.Type = nil
 	if out := v.OutputC(); out != "" {
 		t.Fatal("nil Type VOL_RVAL must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("nil Type VOL_RVAL must SetError sticky")
+	}
+	ClearError()
 	if out := v.OutputLhsC(); out != "" {
 		t.Fatal("nil Type VOL_LVAL must fail closed", out)
 	}
-	// no invent VOL_RVAL(, int) / VOL_LVAL(, int) with empty name
+	if !HasError() {
+		t.Fatal("nil Type VOL_LVAL must SetError sticky")
+	}
+	// sticky no invent VOL_RVAL(, int) / VOL_LVAL(, int) with empty name
+	ClearError()
 	v2 := &Variable{Type: GetIntType(), UseVolRVal: true, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
 	if out := v2.OutputC(); out != "" {
 		t.Fatal("empty name VOL_RVAL must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty name VOL_RVAL must SetError sticky")
+	}
+	ClearError()
 	if out := v2.OutputLhsC(); out != "" {
 		t.Fatal("empty name VOL_LVAL must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty name VOL_LVAL must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputHeaderAliasNoInvent(t *testing.T) {
@@ -369,11 +411,16 @@ func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 }
 
 func TestOutputDeclNoInventEmptyType(t *testing.T) {
-	// Variable::OutputDecl — qualified type always live; no invent " name"
+	// Variable::OutputDecl — qualified type always live; sticky no invent " name"
+	ClearError()
 	v := &Variable{Name: "g_x"}
 	if out := v.OutputDecl(false); out != "" {
 		t.Fatal("nil type must fail closed decl", out)
 	}
+	if !HasError() {
+		t.Fatal("nil type OutputDecl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
@@ -410,19 +457,29 @@ func TestVariableOutputDef(t *testing.T) {
 }
 
 func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
-	// Variable.cpp:659 — assert(init); no soft invent "= ;"
+	// Variable.cpp:659 — assert(init); sticky no soft invent "= ;"
+	ClearError()
 	v := &Variable{Name: "g_u", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	if v.OutputDef(true) != "" {
 		t.Fatal("missing init must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("missing init OutputDef must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVariableOutputDefMissingDeclFailClosed(t *testing.T) {
-	// Variable.cpp:640–660 — no invent " = 3;" without live decl/type
+	// Variable.cpp:640–660 — sticky no invent " = 3;" without live decl/type
+	ClearError()
 	v := &Variable{Name: "g_u", Init: MakeInt(3)}
 	if v.OutputDef(true) != "" {
 		t.Fatal("missing type must fail closed", v.OutputDef(true))
 	}
+	if !HasError() {
+		t.Fatal("missing type OutputDef must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
