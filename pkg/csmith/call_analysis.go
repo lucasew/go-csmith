@@ -5,15 +5,34 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+// InvocationsComplete reports every Invocation* is live (no nil holes).
+// Note: InvocationsComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteInvocationsSlice() so len(nil)==0 cannot invent empty success.
+func InvocationsComplete(calls []*Invocation) bool {
+	for _, c := range calls {
+		if c == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteInvocationsSlice is the fail-closed incomplete call-list marker.
+// InvocationsComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteInvocationsSlice() []*Invocation {
+	return []*Invocation{nil}
+}
+
 // CollectCalledInvocationsExpr mirrors Expression::get_called_funcs for user calls.
 // FunctionInvocation.cpp:369–381 — recurse args, then push user call.
-// Incomplete IR clears *out (no invent partial call list past holes).
+// Incomplete IR sets *out to IncompleteInvocationsSlice (not bare nil —
+// len(nil)==0 invents empty-complete call list success).
 func CollectCalledInvocationsExpr(e *Expression, out *[]*Invocation) {
 	if out == nil {
 		return
 	}
 	if !collectCalledInvocationsExpr(e, out) {
-		*out = nil
+		*out = IncompleteInvocationsSlice()
 	}
 }
 
@@ -63,13 +82,13 @@ func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
 
 // CollectCalledInvocationsStmt mirrors Statement::get_called_funcs.
 // Statement.cpp:748–762 — get_exprs + get_blocks.
-// Incomplete IR clears *out (no invent partial call list / skip for-test).
+// Incomplete IR sets *out to IncompleteInvocationsSlice (not bare nil invent empty).
 func CollectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) {
 	if out == nil {
 		return
 	}
 	if !collectCalledInvocationsStmt(st, out) {
-		*out = nil
+		*out = IncompleteInvocationsSlice()
 	}
 }
 
@@ -119,12 +138,13 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 }
 
 // CollectCalledInvocationsBlock walks all statements in a block.
+// Incomplete IR sets *out to IncompleteInvocationsSlice (not bare nil invent empty).
 func CollectCalledInvocationsBlock(b *Block, out *[]*Invocation) {
 	if out == nil {
 		return
 	}
 	if !collectCalledInvocationsBlock(b, out) {
-		*out = nil
+		*out = IncompleteInvocationsSlice()
 	}
 }
 
@@ -145,7 +165,8 @@ func collectCalledInvocationsBlock(b *Block, out *[]*Invocation) bool {
 // Incomplete IR fails closed as -1 (no invent empty call count past holes).
 func FuncCount(e *Expression) int {
 	var calls []*Invocation
-	if !collectCalledInvocationsExpr(e, &calls) {
+	CollectCalledInvocationsExpr(e, &calls)
+	if !InvocationsComplete(calls) {
 		return -1
 	}
 	return len(calls)
@@ -326,26 +347,46 @@ func FindContainedLabels(st *Stmt) []string {
 	return FindContainedLabelsFM(st, nil)
 }
 
+// LabelsComplete reports every label string slot is present (no nil-like hole
+// marker). Incomplete lists use IncompleteLabelsSlice() so len(nil)==0 cannot
+// invent empty-complete label success.
+func LabelsComplete(labels []string) bool {
+	// incomplete marker is a single empty string with a sentinel prefix
+	if len(labels) == 1 && labels[0] == incompleteLabelSentinel {
+		return false
+	}
+	return true
+}
+
+// incompleteLabelSentinel is not a valid C identifier/label token from CFG.
+const incompleteLabelSentinel = "\x00incomplete_labels"
+
+// IncompleteLabelsSlice is the fail-closed incomplete label-list marker.
+func IncompleteLabelsSlice() []string {
+	return []string{incompleteLabelSentinel}
+}
+
 // FindContainedLabelsFM mirrors Statement::find_contained_labels.
 // Statement.cpp:706–720 — find_jump_label (CFG goto) then nested blocks.
 // When fm is nil, falls back to SourceLabel set during generation (no CFG).
 // With FactMgr: same as PreOutput — only CFG/registry labels; no invent SourceLabel
-// when find_jump_label is empty. Incomplete CFGEdges holes fail closed (nil list).
+// when find_jump_label is empty. Incomplete CFG/tree fails closed IncompleteLabelsSlice
+// (not bare nil — len(nil)==0 invents empty-complete label list).
 func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
-		return nil
+		return IncompleteLabelsSlice()
 	}
 	// CFGEdge* always live; nil hole fails whole label collect (no invent partial)
 	if fm != nil {
 		for _, e := range fm.CFGEdges {
 			if e == nil {
-				return nil
+				return IncompleteLabelsSlice()
 			}
 		}
 	}
 	var labels []string
 	if !findContainedLabels(st, &labels, fm) {
-		return nil
+		return IncompleteLabelsSlice()
 	}
 	return labels
 }

@@ -47,8 +47,8 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsExpr(&Expression{Term: TermFunction}, &calls)
-	if calls != nil {
-		t.Fatal("incomplete collect must clear out, not invent partial", calls)
+	if InvocationsComplete(calls) {
+		t.Fatal("incomplete collect must fail closed incomplete, not invent empty complete", calls)
 	}
 }
 
@@ -61,11 +61,11 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	if len(calls) != 1 || calls[0].User == nil || calls[0].User.Name != "func_in_test" {
 		t.Fatalf("for-test calls: %+v", calls)
 	}
-	// incomplete for without TestExpr clears
+	// incomplete for without TestExpr → incomplete marker
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}, &calls)
-	if calls != nil {
-		t.Fatal("for without TestExpr must clear, not invent skip", calls)
+	if InvocationsComplete(calls) {
+		t.Fatal("for without TestExpr must fail closed incomplete, not invent empty", calls)
 	}
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
 		t.Fatal("incomplete for must fail closed uncertain")
@@ -78,13 +78,13 @@ func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &calls)
-	if calls != nil {
-		t.Fatal("assign without Expr must clear, not invent empty success", calls)
+	if InvocationsComplete(calls) {
+		t.Fatal("assign without Expr must fail closed incomplete, not invent empty success", calls)
 	}
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &calls)
-	if calls != nil {
-		t.Fatal("invoke without Expr must clear")
+	if InvocationsComplete(calls) {
+		t.Fatal("invoke without Expr must fail closed incomplete")
 	}
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtAssign, StmID: 3}) {
 		t.Fatal("nil Expr assign must fail closed uncertain")
@@ -187,14 +187,14 @@ func TestFindContainedLabels(t *testing.T) {
 	if len(labs) < 2 {
 		t.Fatal(labs)
 	}
-	// incomplete if — fail closed nil (no invent partial labels soft-skipping hole)
-	if FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB}) != nil {
-		t.Fatal("nil Else must fail closed")
+	// incomplete if — fail closed incomplete (no invent empty/partial labels)
+	if LabelsComplete(FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB})) {
+		t.Fatal("nil Else must fail closed incomplete")
 	}
 	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
 	fm := NewFactMgr(nil)
-	if FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "x"}, fm) != nil {
-		t.Fatal("StmID 0 under FM must fail closed")
+	if LabelsComplete(FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "x"}, fm)) {
+		t.Fatal("StmID 0 under FM must fail closed incomplete")
 	}
 }
 
@@ -354,7 +354,7 @@ func TestFindContainedLabelsFM(t *testing.T) {
 	}
 	// incomplete CFGEdges hole fails whole collect
 	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}, nil}
-	if FindContainedLabelsFM(st, fm) != nil {
-		t.Fatal("nil CFG edge hole must fail closed nil labels")
+	if LabelsComplete(FindContainedLabelsFM(st, fm)) {
+		t.Fatal("nil CFG edge hole must fail closed incomplete labels")
 	}
 }
