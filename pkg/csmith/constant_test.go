@@ -18,11 +18,16 @@ func TestMakeRandomPointerIsZero(t *testing.T) {
 }
 
 func TestMakeRandomVoidFailClosed(t *testing.T) {
-	// Constant.cpp:312 — assert(st != eVoid); dead switch "/* void */" not a soft invent path
+	// Constant.cpp:312 — assert(st != eVoid) sticky; no invent "/* void */" / soft success
+	ClearError()
 	c := MakeRandom(GetSimpleType(EVoid), Defaults(), nil, NewRng(1))
 	if c != nil {
 		t.Fatalf("void constant must fail closed, got %+v", c)
 	}
+	if !HasError() {
+		t.Fatal("void MakeRandom must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomIntHexPathSeed2(t *testing.T) {

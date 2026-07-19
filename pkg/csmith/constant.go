@@ -19,8 +19,10 @@ type Constant struct {
 // probs is the session Probabilities (C++ singleton); nil allowed for simple/pointer
 // only — aggregate constants need live probs (no invent NewProbabilities(opts)).
 func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
-	// Constant.cpp:312 — assert(st != eVoid) before simple emit
+	// Constant.cpp:312 — assert(st != eVoid) before simple emit sticky
+	// (no invent soft re-pick past void as empty success / "/* void */")
 	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	v := generateRandomConstant(typ, opts, probs, r)

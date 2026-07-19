@@ -91,7 +91,8 @@ func (op BinaryOp) BinaryOpC() string {
 	case BinLShift:
 		return "<<"
 	default:
-		// invalid op; no soft invent "+"
+		// invalid op sticky; no soft invent "+"
+		SetError(ErrGeneric)
 		return ""
 	}
 }
@@ -102,7 +103,8 @@ func (op BinaryOp) CmpOpC() string {
 	case BinCmpLt, BinCmpLe, BinCmpGt, BinCmpGe, BinCmpEq, BinCmpNe:
 		return op.BinaryOpC()
 	default:
-		// invalid cmp; no soft invent "<"
+		// invalid cmp sticky; no soft invent "<"
+		SetError(ErrGeneric)
 		return ""
 	}
 }
@@ -188,7 +190,8 @@ func (op UnaryOp) UnaryOpC() string {
 	case UnBitNot:
 		return "~"
 	default:
-		// invalid unary; no soft invent "-"
+		// invalid unary sticky; no soft invent "-"
+		SetError(ErrGeneric)
 		return ""
 	}
 }

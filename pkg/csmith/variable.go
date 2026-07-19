@@ -426,7 +426,9 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 		return ""
 	}
 	for i := 0; i < dimen; i++ {
+		// Variable.cpp:806 — get_actual_name always live; sticky no invent "int i, ;"
 		if ctrl[i].GetActualName(false) == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}

@@ -52,12 +52,35 @@ func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 }
 
 func TestBinaryOpCTokens(t *testing.T) {
+	ClearError()
 	if BinAdd.BinaryOpC() != "+" || BinAnd.BinaryOpC() != "&&" || BinLShift.BinaryOpC() != "<<" {
 		t.Fatal("token map")
 	}
 	if BinCmpLt.CmpOpC() != "<" {
 		t.Fatal("cmp")
 	}
+	// invalid op tokens sticky — no invent "+" / "<" / "-"
+	if BinaryOp(MaxBinaryOp).BinaryOpC() != "" {
+		t.Fatal("invalid BinaryOpC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("invalid BinaryOpC must SetError sticky")
+	}
+	ClearError()
+	if BinAdd.CmpOpC() != "" {
+		t.Fatal("non-cmp CmpOpC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("non-cmp CmpOpC must SetError sticky")
+	}
+	ClearError()
+	if UnaryOp(MaxUnaryOp).UnaryOpC() != "" {
+		t.Fatal("invalid UnaryOpC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("invalid UnaryOpC must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSafeShiftFuncNameUsesOp2(t *testing.T) {

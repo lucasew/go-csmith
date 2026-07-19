@@ -58,6 +58,10 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	if out := OutputArrayCtrlVars(emptyName, 2, ""); out != "" {
 		t.Fatal("empty ctrl name must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("empty ctrl name must SetError sticky")
+	}
+	ClearError()
 	CtrlVarsDoFinalization()
 	if GetLastCtrlVars() != nil {
 		t.Fatal("cleared")
