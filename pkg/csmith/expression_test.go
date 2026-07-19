@@ -73,6 +73,19 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	}
 }
 
+func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
+	// ExpressionVariable always has live Variable*; nil hole fails closed reject
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	live := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
+	hole := &Expression{Term: TermVariable, Var: nil}
+	if hole.CompatibleWithExpr(live, false) {
+		t.Fatal("nil Var lhs must fail closed")
+	}
+	if live.CompatibleWithExpr(hole, false) {
+		t.Fatal("nil Var rhs must fail closed")
+	}
+}
+
 func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
 	// Constant.cpp:488–493 — expand_struct → true; else false
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)

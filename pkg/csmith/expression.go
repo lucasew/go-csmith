@@ -74,17 +74,25 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 // CompatibleWithExpr mirrors Expression::compatible(Expression*).
 // ExpressionVariable.cpp:276–282 — exp.compatible(&var);
 // ExpressionFuncall.cpp:210–212 — always false for Expression*.
+// Incomplete Variable/Lhs shells fail closed false (no invent soft-skip nil Var).
 func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
 	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR
 	if e == nil || other == nil {
 		return false
 	}
+	// incomplete ExpressionVariable / Lhs — assert(var) path fails closed reject
+	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var == nil {
+		return false
+	}
+	if (other.Term == TermVariable || other.Term == TermLhs) && other.Var == nil {
+		return false
+	}
 	// Variable / Lhs → other.compatible(this.var)
 	// ExpressionVariable.cpp:289 — assert(v) on Variable* overload via CompatibleWithVar
-	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var != nil {
+	if e.Term == TermVariable || e.Term == TermLhs {
 		return other.CompatibleWithVar(e.Var, expandStruct)
 	}
-	if (other.Term == TermVariable || other.Term == TermLhs) && other.Var != nil {
+	if other.Term == TermVariable || other.Term == TermLhs {
 		return e.CompatibleWithVar(other.Var, expandStruct)
 	}
 	// Funcall::compatible(Expression*) is false (ExpressionFuncall.cpp:210–212)

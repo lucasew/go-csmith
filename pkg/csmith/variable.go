@@ -1267,15 +1267,24 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
+		// Variable* always live in FieldVars; nil hole fails closed whole dump
+		// (no invent soft-skip hole and still dump later fields)
 		var b strings.Builder
 		for _, f := range v.FieldVars {
+			if f == nil {
+				return ""
+			}
 			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
 		}
 		return b.String()
 	}
 	if v.Type.IsUnion() {
+		// Variable* always live in FieldVars; nil hole fails closed whole dump
 		var b strings.Builder
 		for i, f := range v.FieldVars {
+			if f == nil {
+				return ""
+			}
 			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
 			if !IsFieldReadable(v, i, unionFacts) {
 				continue

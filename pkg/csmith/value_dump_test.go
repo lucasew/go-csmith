@@ -14,6 +14,30 @@ func TestOutputValueDumpSimple(t *testing.T) {
 	}
 }
 
+func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
+	// Variable* always live in FieldVars; soft invent skip would dump later fields
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	f0 := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: v}
+	v.FieldVars = []*Variable{nil, f0}
+	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
+		t.Fatal("nil FieldVars hole must fail closed whole dump, not soft-skip", s)
+	}
+	// union hole
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
+		{Name: "a", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv.FieldVars = []*Variable{nil}
+	facts := []*FactUnion{MakeFactUnion(uv, 0)}
+	if s := uv.OutputValueDump("c ", 1, facts); s != "" {
+		t.Fatal("nil union FieldVars hole must fail closed", s)
+	}
+}
+
 func TestOutputValueDumpStructFields(t *testing.T) {
 	st := &Type{
 		isStruct: true, StructName: "S0",
