@@ -893,8 +893,11 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 
 // ReadPointed mirrors CGContext::read_pointed — recursive pointee reads.
 // CGContext.cpp:216–252.
+// Hard IR (nil subject, incomplete collective, nil pointee holes) sticky;
+// empty/null/dead policy rejects and incomplete MergePointees stay non-sticky.
 func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo, opts Options) bool {
 	if c == nil || v == nil || indirect <= 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	var accumCopy *Effect
@@ -908,11 +911,14 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	if !c.ReadIndices(v, facts) {
 		return false
 	}
-	// incomplete collective path fails closed (no invent MergePointees from nil shell)
+	// incomplete collective sticky via GetCollective
 	coll := v.GetCollective()
 	if coll == nil {
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
+		}
+		if !HasError() {
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -920,8 +926,15 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		// nil = incomplete pointees; empty / null/dead disallowed → fail
-		if tmp == nil || len(tmp) == 0 ||
+		// incomplete pointees non-sticky hole; empty/null/dead policy non-sticky
+		if !VariablesComplete(tmp) {
+			if accumCopy != nil && c.EffectAccum != nil {
+				*c.EffectAccum = *accumCopy
+			}
+			// MergePointees incomplete stays non-sticky for fact-map soft re-pick
+			return false
+		}
+		if len(tmp) == 0 ||
 			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
 			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
 			if accumCopy != nil && c.EffectAccum != nil {
@@ -930,13 +943,7 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 			return false
 		}
 		for _, pointee := range tmp {
-			// Variable* always live; nil hole fails closed
-			if pointee == nil {
-				if accumCopy != nil && c.EffectAccum != nil {
-					*c.EffectAccum = *accumCopy
-				}
-				return false
-			}
+			// Variable* always live after VariablesComplete
 			if IsSpecialPtr(pointee) {
 				continue
 			}
@@ -953,12 +960,20 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 
 // WritePointed mirrors CGContext::write_pointed — last hop is write, intermediates read.
 // CGContext.cpp:255–304.
+// Hard IR (nil lhs, incomplete collective) sticky; MergePointees incomplete non-sticky.
 func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	indirect := lhs.IndirectLevel()
+	// incomplete Lhs type IR sticky (no invent non-deref write-pointed)
+	indirect, ok := lhs.IndirectLevelComplete()
+	if !ok {
+		SetError(ErrGeneric)
+		return false
+	}
 	if indirect <= 0 {
+		// not a deref write — complete false (caller uses CheckWriteVar)
 		return false
 	}
 	var accumCopy *Effect
@@ -970,11 +985,14 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	if !c.ReadIndices(lhs.Var, facts) {
 		return false
 	}
-	// incomplete collective fails closed (no invent MergePointees from nil shell)
+	// incomplete collective sticky via GetCollective
 	coll := lhs.Var.GetCollective()
 	if coll == nil {
 		if accumCopy != nil && c.EffectAccum != nil {
 			*c.EffectAccum = *accumCopy
+		}
+		if !HasError() {
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -984,7 +1002,14 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		if tmp == nil || len(tmp) == 0 ||
+		if !VariablesComplete(tmp) {
+			if accumCopy != nil && c.EffectAccum != nil {
+				*c.EffectAccum = *accumCopy
+			}
+			// incomplete MergePointees non-sticky
+			return false
+		}
+		if len(tmp) == 0 ||
 			(!allowNull && IsVariableInSet(tmp, NullPtr)) ||
 			(!allowDead && IsVariableInSet(tmp, GarbagePtr)) {
 			if accumCopy != nil && c.EffectAccum != nil {
@@ -993,13 +1018,7 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 			return false
 		}
 		for _, pointee := range tmp {
-			// Variable* always live; nil hole fails closed
-			if pointee == nil {
-				if accumCopy != nil && c.EffectAccum != nil {
-					*c.EffectAccum = *accumCopy
-				}
-				return false
-			}
+			// Variable* always live after VariablesComplete
 			if IsSpecialPtr(pointee) {
 				continue
 			}
@@ -1023,18 +1042,22 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 // VisitFactsExpressionVariable mirrors ExpressionVariable::visit_facts.
 // ExpressionVariable.cpp:237–274.
 func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bool {
+	// incomplete ExpressionVariable shell sticky
 	if c == nil || e == nil || e.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	facts := c.pointToFacts()
-	// incomplete type IR must not invent non-deref level-0 visit success
+	// incomplete type IR sticky (no invent non-deref level-0 visit success)
 	deref, ok := e.IndirectLevelComplete()
 	if !ok {
+		SetError(ErrGeneric)
 		return false
 	}
 	v := e.Var
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			// invalid ptr policy / incomplete maps (IsValidPtr may sticky)
 			return false
 		}
 		if !c.CheckReadVar(v, facts) {
@@ -1046,7 +1069,7 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 		return c.CheckDerefVolatile(v, deref, opts)
 	}
 	if deref < 0 {
-		// address-of: forbid bitfields
+		// address-of: forbid bitfields — policy non-sticky
 		if v.IsBitfield {
 			return false
 		}
@@ -1057,9 +1080,10 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 
 // AllowVolatile mirrors CGContext::allow_volatile.
 // CGContext.cpp:517–518 — only when effect_context is side-effect free.
-// Incomplete ambient fails closed false (IsSideEffectFree already; explicit for clarity).
+// Incomplete ambient sticky false (no invent allow-vol under IncompleteEffect).
 func (c CGContext) AllowVolatile() bool {
 	if !EffectComplete(c.EffectContext()) {
+		SetError(ErrGeneric)
 		return false
 	}
 	return c.EffectContext().IsSideEffectFree()
@@ -1073,13 +1097,14 @@ func (c CGContext) AllowConst(access Access) bool {
 
 // AcceptType mirrors CGContext::accept_type.
 // CGContext.cpp:525–528 — reject volatile aggregates when not SE-free.
-// Nil type / incomplete ambient fails closed false (no invent accept nil Type
-// shell or soft-accept non-vol types under IncompleteEffect as SE-free path).
+// Nil type sticky; incomplete ambient sticky (no invent accept under IncompleteEffect).
 func (c CGContext) AcceptType(t *Type) bool {
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectContext()) {
+		SetError(ErrGeneric)
 		return false
 	}
 	return c.EffectContext().IsSideEffectFree() || !t.IsVolatileStructUnion()

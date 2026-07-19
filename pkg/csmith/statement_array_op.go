@@ -30,7 +30,9 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 	if set == nil || v == nil {
 		return
 	}
+	// incomplete *set sticky no-op (no invent append/dup past membership hole)
 	if !VariablesComplete(*set) {
+		SetError(ErrGeneric)
 		return
 	}
 	if !IsVariableInSet(*set, v) {

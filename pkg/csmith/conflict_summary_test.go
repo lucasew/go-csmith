@@ -24,20 +24,34 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 	if cg2.AcceptType(st) && st.IsVolatileStructUnion() {
 		t.Fatal("should reject vol struct")
 	}
-	// nil type / incomplete ambient must not invent accept
+	// nil type / incomplete ambient sticky (no invent accept / soft re-pick)
+	ClearError()
 	if cg.AcceptType(nil) {
 		t.Fatal("nil type must fail closed AcceptType")
 	}
+	if !HasError() {
+		t.Fatal("nil type AcceptType must SetError sticky")
+	}
+	ClearError()
 	cgi := WithEffectContext(IncompleteEffect())
 	if cgi.AllowVolatile() {
 		t.Fatal("incomplete ambient must not AllowVolatile")
 	}
+	if !HasError() {
+		t.Fatal("incomplete ambient AllowVolatile must SetError sticky")
+	}
+	ClearError()
 	if cgi.AcceptType(GetIntType()) {
 		t.Fatal("incomplete ambient must not invent AcceptType int")
 	}
+	if !HasError() {
+		t.Fatal("incomplete ambient AcceptType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestInConflictReadWrite(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	// context already wrote g
 	ctx := WithEffectContext(EmptyEffect().WriteVar(g))

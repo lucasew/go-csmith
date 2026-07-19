@@ -126,10 +126,11 @@ func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 
 // IsValidPtr mirrors FactPointTo::is_valid_ptr(Variable*, facts).
 // FactPointTo.cpp:411–419 — needs related fact; null/dead forbidden when probs are 0.
-// opts.NullPointerDerefProb / DeadPointerDerefProb default 0 (upstream CGOptions).
-// Incomplete fact maps fail closed as invalid (no invent valid via skip holes).
+// Incomplete fact maps fail closed sticky invalid (no invent valid / soft re-pick past holes).
+// Missing related fact / null/dead policy rejects stay non-sticky false.
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	fact := FindRelatedPointTo(facts, p)
@@ -147,10 +148,11 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 
 // IsDanglingPtr mirrors FactPointTo::is_dangling_ptr.
 // FactPointTo.cpp:476–482 — related fact is dead (and dead deref not allowed).
-// Incomplete fact maps fail closed as dangling (true — no invent not-dangling
-// when FindRelatedPointTo returns nil past a hole before the related fact).
+// Incomplete fact maps fail closed sticky as dangling (true — no invent not-dangling
+// / soft re-pick past holes when FindRelated would skip holes).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return true
 	}
 	fact := FindRelatedPointTo(facts, p)

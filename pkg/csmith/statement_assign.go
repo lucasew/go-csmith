@@ -666,14 +666,16 @@ func expressionQualifiers(e *Expression) *CVQualifiers {
 // Constant always true; Variable/Lhs paths; comma sequential; assign delegates.
 // Incomplete IR (nil/missing sides) fails — no soft invent true (C++ always has live Expression*).
 func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
+	// incomplete call / shells sticky (no soft invent visit success / soft re-pick)
 	if e == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant.cpp always has live value string; incomplete Con fails visit
-		// no soft invent visit success for TermConstant shell without Value
+		// Constant.cpp always has live value string; incomplete Con sticky
 		if e.Con == nil || e.Con.Value == "" {
+			SetError(ErrGeneric)
 			return false
 		}
 		return true
@@ -681,6 +683,7 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 		return cg.VisitFactsExpressionVariable(e, opts)
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if !VisitFactsExpression(e.CommaLHS, cg, opts) {
@@ -689,16 +692,19 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 		return VisitFactsExpression(e.CommaRHS, cg, opts)
 	case TermAssignment:
 		if e.Assign == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return VisitFactsStatementAssign(e.Assign, cg, opts)
 	case TermFunction:
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return VisitFactsInvocation(e.Invoke, cg, opts)
 	default:
-		// unknown term; no soft invent success
+		// unknown term hard IR sticky
+		SetError(ErrGeneric)
 		return false
 	}
 }

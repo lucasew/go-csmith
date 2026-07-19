@@ -249,9 +249,13 @@ func TestMarkFuncEnd(t *testing.T) {
 	if ft3.MarkDeadVar(loc) != nil {
 		t.Fatal("MarkDeadVar nil PointTo hole must fail closed")
 	}
-	// incomplete facts IsValidPtr fails closed
+	// incomplete facts IsValidPtr sticky
+	ClearError()
 	if IsValidPtr(p, []*FactPointTo{nil}, 0, 0) {
 		t.Fatal("IsValidPtr incomplete facts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsValidPtr incomplete facts must SetError sticky")
 	}
 	ClearError()
 }
