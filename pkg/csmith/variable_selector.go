@@ -2435,15 +2435,31 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		// VariableSelector.cpp:1393–1412
 		if cg.EffectContext().IsReadPartially(&av.Variable) ||
 			cg.EffectContext().IsWrittenPartially(&av.Variable) {
+			// residual ERROR sticky — no invent soft-skip past partial-RW hole then pick another
+			if HasError() {
+				return false
+			}
 			return true
 		}
 		if !cg.EffectContext().IsSideEffectFree() && av.IsVolatile() {
+			// residual ERROR sticky — no invent soft-skip past IsVolatile hole
+			if HasError() {
+				return false
+			}
 			return true
 		}
 		if av.IsConst() {
+			// residual ERROR sticky — no invent soft-skip past IsConst hole
+			if HasError() {
+				return false
+			}
 			return true
 		}
 		if cg.IsNonWritable(&av.Variable) {
+			// residual ERROR sticky — no invent soft-skip past IsNonWritable hole then pick another
+			if HasError() {
+				return false
+			}
 			return true
 		}
 		// VariableSelector.cpp:1405 — av->type->is_const_struct_union() always live Type*
@@ -2456,6 +2472,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return true
 		}
 		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
+			// residual ERROR sticky — no invent soft-skip past strict-vol hole
+			if HasError() {
+				return false
+			}
 			return true
 		}
 		seen[av] = true

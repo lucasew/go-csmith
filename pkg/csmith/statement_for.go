@@ -259,8 +259,18 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		}
 		// reject volatile IVs (infinite-loop / SE issues)
 		if iv.IsVolatile() {
+			// residual ERROR sticky — no invent soft-continue past IsVolatile hole
+			if HasError() {
+				return nil
+			}
 			invalid[iv] = true
 			continue
+		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky on loop-ctrl pick
+		// (no invent IV shell past broken array IR)
+		if iv.IsArray && iv.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
 		}
 		break
 	}

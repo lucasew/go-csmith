@@ -332,12 +332,28 @@ func MakeRandomArrayInit(
 				continue
 			}
 			if iv.IsVolatile() {
+				// residual ERROR sticky — no invent soft-continue past IsVolatile hole
+				if HasError() {
+					iv = nil
+					break
+				}
 				volCount++
 			}
 			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
+			packed := opts.CComp && iv.IsPackedAggregateFieldVar()
+			// residual ERROR sticky — no invent soft-continue past packed-field IR hole
+			if HasError() {
+				iv = nil
+				break
+			}
 			if (opts.StrictVolatileRule && volCount > 1 && iv.IsVolatile()) ||
-				(opts.CComp && iv.IsPackedAggregateFieldVar()) ||
+				packed ||
 				(!opts.SignedCharIndex && iv.Type.IsSignedChar()) {
+				// residual from second IsVolatile sticky
+				if HasError() {
+					iv = nil
+					break
+				}
 				invalid[iv] = true
 				continue
 			}
