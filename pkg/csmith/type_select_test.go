@@ -6,6 +6,7 @@ import (
 )
 
 func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
+	ClearError()
 	var env TypeEnv
 	p1 := env.FindPointerType(GetIntType(), true)
 	p2 := env.FindPointerType(GetIntType(), true)
@@ -23,6 +24,10 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 	if env.FindPointerType(GetIntType(), true) != nil {
 		t.Fatal("incomplete DerivedTypes FindPointerType(add) must fail closed nil")
 	}
+	if !HasError() {
+		t.Fatal("incomplete DerivedTypes FindPointerType(add) must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
@@ -128,39 +133,63 @@ func TestChooseRandomErrorGuard(t *testing.T) {
 
 func TestChooseRandomNilTypeHole(t *testing.T) {
 	// Type* always live on AllTypes; filter-out hole is soft invent of partial pool
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil, GetSimpleType(EShort)}}
 	if env.ChooseRandom(NewRng(1), opts, probs, false) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandom")
 	}
+	if !HasError() {
+		t.Fatal("nil AllTypes hole must SetError sticky ChooseRandom")
+	}
+	ClearError()
 	if env.ChooseRandomNonvoid(NewRng(2), opts, probs) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoid")
 	}
+	if !HasError() {
+		t.Fatal("nil AllTypes hole must SetError sticky ChooseRandomNonvoid")
+	}
+	ClearError()
 	if env.ChooseRandomNonvoidNonvolatile(NewRng(3), opts, probs) != nil {
 		t.Fatal("nil AllTypes hole must fail closed ChooseRandomNonvoidNonvolatile")
 	}
+	if !HasError() {
+		t.Fatal("nil AllTypes hole must SetError sticky ChooseRandomNonvoidNonvolatile")
+	}
+	ClearError()
 }
 
 func TestChooseRandomPointerTypeNilHole(t *testing.T) {
 	// Type* always live on derived_types; no invent pick past hole
+	ClearError()
 	intStar := PointerTo(GetIntType())
 	env := &TypeEnv{DerivedTypes: []*Type{intStar, nil}}
 	if env.ChooseRandomPointerType(NewRng(1)) != nil {
 		t.Fatal("nil DerivedTypes hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil DerivedTypes hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestChooseRandomStructUnionTypeNilHole(t *testing.T) {
+	ClearError()
 	st := &Type{isStruct: true, StructName: "S0"}
 	if ChooseRandomStructUnionType(NewRng(1), []*Type{st, nil}) != nil {
 		t.Fatal("nil ok_types hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil ok_types hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	// derived_types hole must not soft invent skip + fall through to choose_random
 	// as if the hole were absent. Incomplete AllTypes also fails ChooseRandom.
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	intStar := PointerTo(GetIntType())
@@ -169,10 +198,15 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 		DerivedTypes: []*Type{intStar, nil},
 	}
 	for seed := uint64(1); seed < 30; seed++ {
+		ClearError()
 		if envBad.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
 			t.Fatalf("incomplete type pools must fail closed MakeRandomPointerType seed=%d", seed)
 		}
 	}
+	if !HasError() {
+		t.Fatal("incomplete type pools must SetError sticky")
+	}
+	ClearError()
 	// incomplete derived only: when 20% path hits, fail closed (nil); never soft-skip hole
 	envDerived := &TypeEnv{
 		AllTypes:     []*Type{GetIntType()},
@@ -180,6 +214,7 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 	}
 	sawNilOnDerivedPath := false
 	for seed := uint64(1); seed < 200; seed++ {
+		ClearError()
 		r := NewRng(seed)
 		// peek same flip as MakeRandomPointerType first coin
 		if !r.RndFlipcoin(20) {
@@ -189,12 +224,16 @@ func TestMakeRandomPointerTypeDerivedNilHole(t *testing.T) {
 		if envDerived.MakeRandomPointerType(NewRng(seed), opts, probs) != nil {
 			t.Fatalf("derived nil hole + flipcoin(20) must fail closed seed=%d", seed)
 		}
+		if !HasError() {
+			t.Fatalf("derived nil hole must SetError sticky seed=%d", seed)
+		}
 		sawNilOnDerivedPath = true
 		break
 	}
 	if !sawNilOnDerivedPath {
 		t.Fatal("expected a seed hitting flipcoin(20) derived path")
 	}
+	ClearError()
 }
 
 func TestSelectLTypeCanBePointer(t *testing.T) {

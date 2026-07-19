@@ -98,3 +98,19 @@ func TestGenerateCanEmitCommaExpr(t *testing.T) {
 		t.Log("comma expr rare (weight 10 in term table + depth gates)")
 	}
 }
+
+func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType(), nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionComma")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+}

@@ -22,6 +22,17 @@ func MakeExpressionComma(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent comma / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// ExpressionComma.cpp:58–61 — same CGContext&; make_random bumps expr_depth for siblings
 	// ExpressionComma.cpp:58–59 — lhs type nullptr, no_func=false, no_const=true
 	lhs := MakeRandomExpression(r, opts, tables, vs, cg, nil, nil, false, true, MaxTermTypes, cg.ExprDepth)

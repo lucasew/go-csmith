@@ -25,8 +25,9 @@ func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 	// PointerTo already caches by pointee identity.
 	p := PointerTo(t)
 	if env != nil && add {
-		// Type* always live on derived_types; hole → fail closed whole registry
+		// Type* always live on derived_types; hole → fail closed sticky (no invent soft-skip hole)
 		if !typesComplete(env.DerivedTypes) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		found := false
@@ -62,6 +63,7 @@ func (env *TypeEnv) FindType(t *Type) *Type {
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for _, x := range env.AllTypes {
@@ -138,6 +140,7 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 		return nil
 	}
 	if !typesComplete(ok) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	rv := ok[r.RndUpto(uint32(len(ok)))]
@@ -165,8 +168,9 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 		}
 	}
 	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
-	// incomplete AllTypes pool — fail closed (no invent pick from partial)
+	// incomplete AllTypes pool — fail closed sticky (no invent pick from partial)
 	if !typesComplete(ok) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
@@ -187,6 +191,7 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 		return nil
 	}
 	if !typesComplete(env.DerivedTypes) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	p := env.DerivedTypes[r.RndUpto(uint32(len(env.DerivedTypes)))]
@@ -212,6 +217,7 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1206–1216 — rnd_upto(AllTypes.size(), ChooseRandomTypeFilter)
@@ -339,6 +345,7 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	filt := filterFunc(func(v uint32) bool {
@@ -391,6 +398,7 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	// and fall through to choose_random as if derived were empty).
 	if r.RndFlipcoin(20) && len(env.DerivedTypes) > 0 {
 		if !typesComplete(env.DerivedTypes) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		idx := r.RndUpto(uint32(len(env.DerivedTypes)))

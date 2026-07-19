@@ -23,6 +23,17 @@ func MakeExpressionAssign(
 	if cg.FM == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent assign expr / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// ExpressionAssign.cpp:49+ — type from Expression::make_random (may be non-null);
 	// StatementAssign::make_random SelectLType when type nullptr — pass through nil, no invent.
 	// ExpressionAssign.cpp:52–55 — WRITE qfer when nil (random_qualifiers WRITE, no_volatile)

@@ -171,11 +171,16 @@ func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
 
 func TestFindTypeNilHole(t *testing.T) {
 	// Type* always live on AllTypes; no invent soft-skip hole then match later
+	ClearError()
 	intT := GetIntType()
 	env := &TypeEnv{AllTypes: []*Type{nil, intT}}
 	if env.FindType(intT) != nil {
 		t.Fatal("nil AllTypes hole must fail closed FindType (not soft-skip to match)")
 	}
+	if !HasError() {
+		t.Fatal("nil AllTypes hole must SetError sticky")
+	}
+	ClearError()
 	// complete pool still finds
 	envOK := &TypeEnv{AllTypes: []*Type{GetSimpleType(EShort), intT}}
 	if envOK.FindType(intT) != intT {
