@@ -26,8 +26,12 @@ func MakeRandomExprStmt(
 	if cg.EffectAccum != nil {
 		preEffect = cg.EffectAccum.Clone()
 	}
+	// incomplete GlobalFacts fail closed (no invent cleaned rollback snapshot)
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return Stmt{}
+		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	list := cg.Funcs

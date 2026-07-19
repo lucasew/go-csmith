@@ -187,9 +187,22 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		return
 	}
 	fm := cg.FM
+	// incomplete pre-facts: fail closed empty env (no invent cleaned post-creation)
+	// No sticky ERROR — incomplete pre can appear after fail-closed subpaths; wiping
+	// GlobalFacts signals incomplete without aborting whole generation.
+	if !FactsComplete(preFacts) {
+		fm.GlobalFacts = nil
+		return
+	}
+	// incomplete GlobalFacts: makeup/branch combine must not invent past holes
+	if !FactsComplete(fm.GlobalFacts) {
+		fm.GlobalFacts = nil
+		return
+	}
 	if st.Kind == StmtIfElse {
 		CombineBranchFacts(st, preFacts, fm)
 	} else {
+		// MakeupNewVarFacts fails closed (nils preFacts) on holes; pre already complete
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
 	}
 	// simple statements: save effect_stm
@@ -202,6 +215,11 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
 	if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop() {
 		if HasUncertainCallRecursiveStmt(st) {
+			// preFacts complete above; still re-check after makeup
+			if !FactsComplete(preFacts) {
+				fm.GlobalFacts = nil
+				return
+			}
 			outputs := CloneFactSlice(preFacts)
 			if cg.EffectAccum != nil {
 				*cg.EffectAccum = preEffect.Clone()
@@ -264,6 +282,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	if b == nil || cg == nil {
 		return inputs, -1, false
 	}
+	// incomplete input env fails closed (no invent cleaned fixed-point from holes)
+	if !FactsComplete(inputs) {
+		return inputs, -1, false
+	}
 	fm := cg.FM
 	currentInputs := CloneFactSlice(inputs)
 	// push block
@@ -318,6 +340,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		}
 		// Block.cpp:537–541 — shortcut when inputs match previous
 		if !visitOnce && fm != nil {
+			// currentInputs kept complete; incomplete after merge fails closed above
+			if !FactsComplete(currentInputs) {
+				SetError(ErrGeneric)
+				return currentInputs, -1, false
+			}
 			work := CloneFactSlice(currentInputs)
 			sc := ShortcutAnalysisBlock(b, &work, cg)
 			switch sc {
@@ -330,10 +357,19 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return currentInputs, 0, false
 			}
 		}
+		if !FactsComplete(currentInputs) {
+			SetError(ErrGeneric)
+			return currentInputs, -1, false
+		}
 		outputs := CloneFactSlice(currentInputs)
 		// Block.cpp:546–549 — facts for locals
 		for _, v := range b.LocalVars {
 			AddNewVarFactTo(v, &outputs)
+		}
+		// incomplete after local makeup fails closed
+		if !FactsComplete(outputs) {
+			SetError(ErrGeneric)
+			return outputs, -1, false
 		}
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
@@ -344,6 +380,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		if fm != nil && b.StmID > 0 {
 			fm.SetMapFactsIn(b.StmID, currentInputs)
 			// OOS locals for fact_out (Block.cpp:560–561)
+			// incomplete outputs after analyze fail closed (no invent cleaned out)
+			if !FactsComplete(outputs) {
+				SetError(ErrGeneric)
+				return outputs, -1, false
+			}
 			outCopy := CloneFactSlice(outputs)
 			if len(b.LocalVars) > 0 {
 				tmp := outCopy
@@ -353,6 +394,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				fm.UpdateFactsForOOSVars(b.LocalVars)
 				outCopy = fm.GlobalFacts
 				fm.GlobalFacts = saved
+				// OOS may nil on incomplete; fail closed
+				if !FactsComplete(outCopy) {
+					SetError(ErrGeneric)
+					return outCopy, -1, false
+				}
 			}
 			fm.SetMapFactsOut(b.StmID, outCopy)
 			if fm.MapVisited == nil {
