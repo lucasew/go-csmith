@@ -471,18 +471,18 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 
 // FindUpdatedFacts mirrors FactMgr::find_updated_facts.
 // FactMgr.cpp:652–665 — facts_out that differ from related facts_in.
+// Incomplete in/out maps fail closed (nil — no invent empty-update via hole skip).
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
 	}
 	in := fm.MapFactsIn[stmID]
 	out := fm.MapFactsOut[stmID]
+	if !FactsComplete(in) || !FactsComplete(out) {
+		return nil
+	}
 	var updated []*FactPointTo
 	for _, f := range out {
-		// Fact* always live in map_facts_out; no invent skip nil holes
-		if f == nil || f.Var == nil {
-			return nil
-		}
 		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
 		// no soft invent "new out-only fact" as updated
 		prev := FindRelatedPointTo(in, f.Var)
@@ -498,18 +498,18 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 
 // FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
 // FactMgr.cpp:667–686 — final maps; always include rv facts.
+// Incomplete in/out maps fail closed (nil — no invent empty-update via hole skip).
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
 	}
 	in := fm.MapFactsInFinal[stmID]
 	out := fm.MapFactsOutFinal[stmID]
+	if !FactsComplete(in) || !FactsComplete(out) {
+		return nil
+	}
 	var updated []*FactPointTo
 	for _, f := range out {
-		// Fact* always live; no invent skip nil holes
-		if f == nil || f.Var == nil {
-			return nil
-		}
 		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
 		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
 			updated = append(updated, f)

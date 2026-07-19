@@ -113,6 +113,24 @@ func TestCombineVariableSets(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
 	}
+	// nil hole fails closed
+	if CombineVariableSets([]*Variable{a, nil}, []*Variable{b}) != nil {
+		t.Fatal("nil hole must fail closed")
+	}
+}
+
+func TestVectorFilterNilTableFailClosed(t *testing.T) {
+	// incomplete filter must not invent domain 100 / accept-all
+	f := &VectorFilter{table: nil, filterOut: map[int]bool{}}
+	if f.MaxProb() != 0 {
+		t.Fatal("nil table MaxProb must be 0, not invent 100")
+	}
+	if f.Lookup(5) != -1 {
+		t.Fatal("nil table Lookup must fail closed -1")
+	}
+	if !f.Filter(0) {
+		t.Fatal("nil table Filter must reject all")
+	}
 }
 
 func TestMakeRandomArrayLoopNoSoftSkipNilSelect(t *testing.T) {

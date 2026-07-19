@@ -23,6 +23,7 @@ func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 }
 
 // AddVariableToSet mirrors add_variable_to_set — append if not already present.
+// Variable* always live; nil v is not a list hole (no-op single arg).
 func AddVariableToSet(set *[]*Variable, v *Variable) {
 	if set == nil || v == nil {
 		return
@@ -33,7 +34,18 @@ func AddVariableToSet(set *[]*Variable, v *Variable) {
 }
 
 // CombineVariableSets mirrors combine_variable_sets.
+// Variable* always live in sets; nil hole fails closed (nil out, no invent partial).
 func CombineVariableSets(a, b []*Variable) []*Variable {
+	for _, v := range a {
+		if v == nil {
+			return nil
+		}
+	}
+	for _, v := range b {
+		if v == nil {
+			return nil
+		}
+	}
 	out := append([]*Variable(nil), a...)
 	for _, v := range b {
 		AddVariableToSet(&out, v)
