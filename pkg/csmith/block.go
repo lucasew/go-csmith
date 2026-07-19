@@ -232,8 +232,11 @@ func (b *Block) MustBreakOrReturn() bool {
 
 // StackScanComplete reports Param + LocalVars parent-chain have no nil holes.
 // Incomplete lists must not invent not-on-stack membership for selection/mark paths.
+// Block always live at stack scan; nil shell sticky false (no invent incomplete-scan
+// soft-miss without ERROR so soft re-pick cannot treat hole as clean incomplete).
 func (b *Block) StackScanComplete() bool {
 	if b == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	f := b.Func

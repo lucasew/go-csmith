@@ -235,6 +235,20 @@ func TestCreateSafeTmpsIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("createBinarySafeTmps incomplete ambient must SetError sticky")
 	}
 	ClearError()
+	// shift always needs flags_to_type(op2); sticky no invent type1 stand-in for type2.
+	// Signed float LHS is simple; unsigned float RHS fails FlagsToType (assert path).
+	badShift := &SafeOpFlags{Op1Signed: true, Op2Signed: false, IsFunc: true, Size: SafeFloat}
+	f2 := &Function{Name: "f2", ReturnType: GetIntType()}
+	blk2 := &Block{Func: f2}
+	f2.Stack = []*Block{blk2}
+	cg2 := WithFunc(f2, EmptyEffect())
+	if t1, t2 := createBinarySafeTmps(cg2, NewVariableSelector(Defaults()), badShift, BinLShift); t1 != "" || t2 != "" {
+		t.Fatalf("bad shift RHS type must fail closed, got %q %q", t1, t2)
+	}
+	if !HasError() {
+		t.Fatal("shift without simple RHS type must SetError sticky")
+	}
+	ClearError()
 	if tmp := createUnarySafeTmp(cg, NewVariableSelector(Defaults()), flags); tmp != "" {
 		t.Fatalf("incomplete EffectContext must fail closed createUnarySafeTmp, got %q", tmp)
 	}

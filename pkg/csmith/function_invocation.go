@@ -1390,10 +1390,15 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	}
 	tmp1 = blk.CreateNewTmpVar(sym, st)
 	st2 := st
+	// FunctionInvocationBinary.cpp:64–78 — flags_to_type(op2) always live for shifts;
+	// sticky no invent type1 stand-in for type2 past missing/non-simple RHS type shell
 	if op == BinLShift || op == BinRShift {
-		if ty := flags.RHSType(); ty != nil && ty.IsSimple() {
-			st2 = ty.Simple()
+		ty := flags.RHSType()
+		if ty == nil || !ty.IsSimple() {
+			SetError(ErrGeneric)
+			return "", ""
 		}
+		st2 = ty.Simple()
 	}
 	tmp2 = blk.CreateNewTmpVar(sym, st2)
 	return tmp1, tmp2

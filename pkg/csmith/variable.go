@@ -50,9 +50,15 @@ type Variable struct {
 
 // GetActualName mirrors Variable::get_actual_name.
 // Variable.cpp:678–686 — globals may get_prefixed_name; default RNG returns name as-is.
+// Variable always has live name for emit; empty Name sticky (no invent empty
+// identifier soft-skip past incomplete name shell; callers previously sticky only).
 func (v *Variable) GetActualName(prefixName bool) string {
 	// Variable* always live for name emit; sticky no invent empty identifier
 	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if v.Name == "" {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -910,8 +916,19 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 
 // IsSeenName mirrors Variable::is_seen_name.
 // Variable.cpp:1048–1058 — name starts with seen+"[".
+// Seen entries and subject name always live; empty entry invents prefix "[" and
+// empty name invents not-seen soft-miss — sticky false (no invent complete membership).
 func IsSeenName(seen []string, name string) bool {
+	if name == "" {
+		SetError(ErrGeneric)
+		return false
+	}
 	for _, n := range seen {
+		if n == "" {
+			// incomplete seen entry sticky (no invent is-seen via bare "[" prefix)
+			SetError(ErrGeneric)
+			return false
+		}
 		prefix := n + "["
 		if len(name) >= len(prefix) && name[:len(prefix)] == prefix {
 			return true

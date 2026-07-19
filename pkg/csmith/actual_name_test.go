@@ -6,6 +6,7 @@ import (
 )
 
 func TestGetActualNameAndPrefix(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if g.GetActualName(false) != "g_1" {
 		t.Fatal(g.GetActualName(false))
@@ -18,6 +19,14 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 	if l.GetActualName(true) != "l_1" {
 		t.Fatal("local")
 	}
+	// empty Name sticky (no invent empty identifier soft-skip past incomplete name)
+	if s := (&Variable{Name: "", Type: GetIntType()}).GetActualName(false); s != "" {
+		t.Fatal("empty Name GetActualName invent", s)
+	}
+	if !HasError() {
+		t.Fatal("empty Name GetActualName must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputDefVolatileComment(t *testing.T) {

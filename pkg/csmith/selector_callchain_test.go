@@ -65,12 +65,29 @@ func TestFindVarByName(t *testing.T) {
 }
 
 func TestIsSeenName(t *testing.T) {
+	ClearError()
 	if !IsSeenName([]string{"g_a"}, "g_a[0]") {
 		t.Fatal("seen")
 	}
 	if IsSeenName([]string{"g_a"}, "g_b[0]") {
 		t.Fatal("not")
 	}
+	// empty name sticky (no invent not-seen soft-miss past incomplete subject)
+	if IsSeenName([]string{"g_a"}, "") {
+		t.Fatal("empty name must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("empty name IsSeenName must SetError sticky")
+	}
+	ClearError()
+	// empty seen entry sticky (no invent is-seen via bare "[" prefix)
+	if IsSeenName([]string{""}, "g_a[0]") {
+		t.Fatal("empty seen entry must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("empty seen entry IsSeenName must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestItemizeArrayWithIV(t *testing.T) {
