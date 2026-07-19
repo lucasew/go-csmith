@@ -236,7 +236,13 @@ func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
 // Incomplete Blocks list fails closed sticky (no invent soft-skip hole / re-pick past hole).
 func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
-	if r == nil || len(blocks) == 0 {
+	// StatementGoto always has process RNG; sticky no invent jump block without it
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// empty blocks pool: soft re-pick (no candidates)
+	if len(blocks) == 0 {
 		return nil
 	}
 	// incomplete Blocks pool fails closed sticky (no invent soft-skip nil hole as absent)

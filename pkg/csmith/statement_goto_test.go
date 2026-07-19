@@ -393,6 +393,19 @@ func TestResetEffectAccum(t *testing.T) {
 	}
 }
 
+func TestFindGoodJumpBlockNilRNGSticky(t *testing.T) {
+	// StatementGoto always has process RNG; sticky no invent jump block without it
+	ClearError()
+	good := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	if FindGoodJumpBlock(nil, []*Block{good}, good, false) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG FindGoodJumpBlock must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestFindGoodJumpBlockNilHoleFailClosed(t *testing.T) {
 	// Block* always live; nil hole fails closed sticky (no invent soft-skip / re-pick)
 	good := &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}

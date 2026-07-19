@@ -79,6 +79,10 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	if MoreTypesProbability(nil, NewProbabilities(opts), 20) {
 		t.Fatal("nil RNG past threshold must fail closed false")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MoreTypesProbability must SetError sticky")
+	}
+	ClearError()
 	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{AllTypes: []*Type{GetIntType()}}, 0); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}

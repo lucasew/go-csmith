@@ -37,12 +37,56 @@ func TestFindPointerTypeCachesAndRegisters(t *testing.T) {
 
 func TestChooseRandomStructUnionTypeEmptyPool(t *testing.T) {
 	// Type.cpp:523 assert(sz > 0) — empty ok_types must not invent a type
+	ClearError()
 	if ChooseRandomStructUnionType(NewRng(1), nil) != nil {
 		t.Fatal("empty pool")
 	}
+	// empty pool non-sticky soft (no candidates)
+	if HasError() {
+		t.Fatal("empty pool must stay non-sticky soft")
+	}
+	ClearError()
 	if ChooseRandomStructUnionType(nil, []*Type{GetIntType()}) != nil {
 		t.Fatal("nil rng")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG ChooseRandomStructUnionType must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestChooseRandomNilRNGSticky(t *testing.T) {
+	// Type.cpp always has process RNG; sticky no invent AllTypes[0] / derived pick
+	ClearError()
+	env := &TypeEnv{AllTypes: []*Type{GetIntType()}, DerivedTypes: []*Type{PointerTo(GetIntType())}}
+	if env.ChooseRandom(nil, Defaults(), NewProbabilities(Defaults()), false) != nil {
+		t.Fatal("nil RNG ChooseRandom must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ChooseRandom must SetError sticky")
+	}
+	ClearError()
+	if env.ChooseRandomNonvoid(nil, Defaults(), NewProbabilities(Defaults())) != nil {
+		t.Fatal("nil RNG ChooseRandomNonvoid must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ChooseRandomNonvoid must SetError sticky")
+	}
+	ClearError()
+	if env.ChooseRandomPointerType(nil) != nil {
+		t.Fatal("nil RNG ChooseRandomPointerType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ChooseRandomPointerType must SetError sticky")
+	}
+	ClearError()
+	if env.MakeRandomPointerType(nil, Defaults(), NewProbabilities(Defaults())) != nil {
+		t.Fatal("nil RNG MakeRandomPointerType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomPointerType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomPointerTypeIntStar(t *testing.T) {

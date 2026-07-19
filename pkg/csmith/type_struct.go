@@ -13,8 +13,9 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	if typeCount < 10 {
 		return true
 	}
-	// C++ always has RNG; no invent always-true past threshold when r nil
+	// C++ always has RNG; sticky no invent always-true past threshold when r nil
 	if r == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)

@@ -824,9 +824,15 @@ func makeExpressionVariableFlags(
 	qfer *CVQualifiers,
 	asParam, asReturn bool,
 ) *Expression {
-	// ExpressionVariable.cpp always has RNG + live selector/context + Type*
-	// no invent var shell without them; nil typ must not soft-skip type filters
-	if r == nil || vs == nil || cg == nil || typ == nil {
+	// ExpressionVariable.cpp always has RNG + live context + Type*
+	// sticky no invent var shell without them; nil typ must not soft-skip type filters
+	if r == nil || cg == nil || typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// nil VS: non-sticky soft re-pick (unit MaxTermTypes / return factory soft nil;
+	// sticky poisons leaf term pick when caller omits selector)
+	if vs == nil {
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent var expr / soft re-pick past holes)
@@ -1072,10 +1078,13 @@ func makeExpressionFuncall(
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Expression {
+	// ExpressionFuncall always has RNG + CGContext; sticky no invent funcall shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// ExpressionFuncall.cpp:75 — get_fact_mgr always live; fail closed without invent
+	// ExpressionFuncall.cpp:75 — get_fact_mgr always live; non-sticky soft re-pick without FM
+	// (sticky poisons term re-pick when FactMgr not yet wired)
 	if cg.FM == nil {
 		return nil
 	}

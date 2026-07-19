@@ -42,7 +42,8 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	fm := NewFactMgr(f)
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
-	// nil vs → ExpressionVariable::make_random cannot select → nullptr
+	// nil vs → ExpressionVariable soft nil (non-sticky) → empty return re-pick
+	ClearError()
 	st := MakeRandomReturn(NewRng(1), opts, nil, &cg)
 	if st.Expr != nil {
 		t.Fatal("nil vs must yield nullptr-style empty return")
@@ -50,6 +51,10 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK must reject")
 	}
+	if HasError() {
+		t.Fatal("nil vs MakeRandomReturn must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {

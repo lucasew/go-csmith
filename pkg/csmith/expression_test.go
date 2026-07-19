@@ -344,14 +344,31 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if ev != nil && ev.Var == fv {
 		t.Fatal("must not use float for int want")
 	}
-	// ExpressionVariable.cpp always has RNG; no invent var shell
+	// ExpressionVariable.cpp always has RNG; sticky no invent var shell
+	ClearError()
 	if e := makeExpressionVariableFlags(nil, vs, &cg, GetIntType(), nil, false, false); e != nil {
 		t.Fatal("nil RNG must not invent ExpressionVariable")
 	}
-	// Type* always live; nil want must not soft-skip type filters
+	if !HasError() {
+		t.Fatal("nil RNG makeExpressionVariableFlags must SetError sticky")
+	}
+	ClearError()
+	// Type* always live; nil want must not soft-skip type filters sticky
 	if e := makeExpressionVariableFlags(NewRng(1), vs, &cg, nil, nil, false, false); e != nil {
 		t.Fatal("nil typ must not invent ExpressionVariable")
 	}
+	if !HasError() {
+		t.Fatal("nil typ makeExpressionVariableFlags must SetError sticky")
+	}
+	ClearError()
+	// nil VS is soft re-pick (not sticky) — MaxTermTypes unit paths omit selector
+	if e := makeExpressionVariableFlags(NewRng(1), nil, &cg, GetIntType(), nil, false, false); e != nil {
+		t.Fatal("nil vs must not invent ExpressionVariable")
+	}
+	if HasError() {
+		t.Fatal("nil vs makeExpressionVariableFlags must stay non-sticky soft re-pick")
+	}
+	ClearError()
 	// Variable::type always live; Type-nil candidate must not soft-skip filters to success
 	ClearError()
 	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)

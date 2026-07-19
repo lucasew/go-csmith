@@ -141,8 +141,13 @@ func IncompleteTypes() []*Type {
 // Type.cpp:521–533 — rnd_upto(ok_types); ERROR_GUARD(0); mark used.
 // Type* always live on ok_types; nil hole fails closed (nil — no invent pick past hole).
 func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
-	// Type.cpp:523 — assert(sz > 0); empty pool is broken caller / no invent
-	if r == nil || len(ok) == 0 {
+	// Type.cpp always has process RNG; sticky no invent pick without it
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// Type.cpp:523 — assert(sz > 0); empty pool fail closed (non-sticky soft when no candidates)
+	if len(ok) == 0 {
 		return nil
 	}
 	if !typesComplete(ok) {
@@ -193,7 +198,13 @@ func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile boo
 // Type.cpp:536–539 — rnd_upto(derived_types.size()); ERROR_GUARD(nullptr).
 // Type* always live on derived_types; nil hole fails closed (nil — no invent pick past hole).
 func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
-	if env == nil || len(env.DerivedTypes) == 0 || r == nil {
+	// Type.cpp always has process RNG; sticky no invent pointer pick without it
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// empty derived: soft re-pick (no pointer types available)
+	if env == nil || len(env.DerivedTypes) == 0 {
 		return nil
 	}
 	if !typesComplete(env.DerivedTypes) {
@@ -215,11 +226,12 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 // hole as absent and still pick from remaining types).
 func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
 	if r == nil {
-		// Type.cpp always has RNG; no soft invent AllTypes[0]
+		// Type.cpp always has RNG; sticky no invent AllTypes[0]
+		SetError(ErrGeneric)
 		return nil
 	}
 	if env == nil || len(env.AllTypes) == 0 {
-		// Type.cpp:1208–1209 — rnd_upto(AllTypes.size()) + ERROR_GUARD(nullptr); no soft invent simple
+		// Type.cpp:1208–1209 — ERROR_GUARD(nullptr); non-sticky soft when env not seeded
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
@@ -351,8 +363,13 @@ func (env *TypeEnv) ChooseRandomNonvoidNonvolatile(r *Rng, opts Options, probs *
 // Type* always live on AllTypes; nil hole fails closed (nil — no invent filter-out
 // hole as absent and still pick from remaining types).
 func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilities, noVolatileAgg bool) *Type {
-	// Type.cpp:1218+ — rnd_upto(AllTypes); ERROR_GUARD(nullptr); no soft invent simple
-	if env == nil || len(env.AllTypes) == 0 || r == nil {
+	// Type.cpp:1218+ — rnd_upto(AllTypes); sticky no invent simple without RNG
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// empty env non-sticky soft re-pick (unit paths without GenerateSimpleTypes)
+	if env == nil || len(env.AllTypes) == 0 {
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {
@@ -400,8 +417,13 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 // MakeRandomPointerType mirrors Type::make_random_pointer_type.
 // Type.cpp:1141–1166.
 func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabilities) *Type {
-	if r == nil || env == nil {
-		// Type.cpp ERROR_GUARD(nullptr) paths — no soft invent int*
+	// Type.cpp always has process RNG; sticky no invent int* without it
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// nil env non-sticky soft re-pick
+	if env == nil {
 		return nil
 	}
 	// Type.cpp:1145–1154 — occasionally choose pointer to pointers (20%)
