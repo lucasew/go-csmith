@@ -716,7 +716,15 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 			}
 			more := AbstractFactForAssign(nil, v, 0, e)
 			for _, f := range more {
-				pt = MergeFactInto(pt, f)
+				// Fact* always live; MergeFactInto nil = incomplete
+				if f == nil {
+					return nil, nil
+				}
+				merged := MergeFactInto(pt, f)
+				if merged == nil {
+					return nil, nil
+				}
+				pt = merged
 			}
 		}
 	}

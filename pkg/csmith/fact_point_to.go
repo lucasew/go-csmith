@@ -86,12 +86,16 @@ func IsSpecialPtr(p *Variable) bool {
 }
 
 // FindRelatedPointTo mirrors find_related_fact for ePointTo (var identity).
+// Fact* always live; nil hole fails closed (nil — no invent skip to later match).
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 	if p == nil {
 		return nil
 	}
 	for _, f := range facts {
-		if f != nil && f.Var == p {
+		if f == nil {
+			return nil
+		}
+		if f.Var == p {
 			return f
 		}
 	}

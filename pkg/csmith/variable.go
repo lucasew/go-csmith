@@ -1095,11 +1095,15 @@ func (v *Variable) IsInsideUnionField() bool {
 
 // GetFieldID mirrors Variable::get_field_id — index in parent FieldVars, or -1.
 // Variable.cpp:323–333.
+// Variable* always live in FieldVars; nil hole fails closed as -1 (no invent skip).
 func (v *Variable) GetFieldID() int {
 	if v == nil || v.FieldVarOf == nil {
 		return -1
 	}
 	for i, f := range v.FieldVarOf.FieldVars {
+		if f == nil {
+			return -1
+		}
 		if f == v {
 			return i
 		}

@@ -354,26 +354,35 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 
 // FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
 // CGContext.cpp:610–624 — unique arrays from must_read and must_write.
+// Variable* always live on must-use lists; nil hole fails closed (nil out).
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 	if rw == nil {
 		return nil
 	}
-	var out []*ArrayVariable
+	out := make([]*ArrayVariable, 0)
 	seen := make(map[*Variable]bool)
-	add := func(v *Variable) {
-		if v == nil || !v.IsArray || seen[v] {
-			return
+	add := func(v *Variable) bool {
+		if v == nil {
+			return false
+		}
+		if !v.IsArray || seen[v] {
+			return true
 		}
 		seen[v] = true
 		if v.AsArray != nil {
 			out = append(out, v.AsArray)
 		}
+		return true
 	}
 	for _, v := range rw.MustReadVars {
-		add(v)
+		if !add(v) {
+			return nil
+		}
 	}
 	for _, v := range rw.MustWriteVars {
-		add(v)
+		if !add(v) {
+			return nil
+		}
 	}
 	return out
 }
@@ -909,6 +918,7 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 
 // GetExternalNoReadsWrites mirrors CGContext::get_external_no_reads_writes.
 // CGContext.cpp:581–607 — globals + frame_vars from RW + global IVs as no-write.
+// Variable* always live on RW/IV lists; nil hole fails closed (nil,nil — no invent partial).
 func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noWrites []*Variable) {
 	inFrame := func(v *Variable) bool {
 		if v == nil {
@@ -921,11 +931,17 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 	}
 	if c.RW != nil {
 		for _, v := range c.RW.NoReadVars {
+			if v == nil {
+				return nil, nil
+			}
 			if inFrame(v) {
 				noReads = append(noReads, v)
 			}
 		}
 		for _, v := range c.RW.NoWriteVars {
+			if v == nil {
+				return nil, nil
+			}
 			if inFrame(v) {
 				noWrites = append(noWrites, v)
 			}
@@ -933,6 +949,9 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 	}
 	// convert global / frame IVs into non-writables
 	for iv := range c.IVBounds {
+		if iv == nil {
+			return nil, nil
+		}
 		if inFrame(iv) {
 			noWrites = append(noWrites, iv)
 		}
@@ -953,6 +972,7 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 
 // PtrModifiedInRhs mirrors Lhs::ptr_modified_in_rhs.
 // Lhs.cpp:240–261 — intermediate pointers written in effect_stm from RHS.
+// Incomplete pointees fail closed as modified (no invent unmodified).
 func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
 		return false
@@ -971,8 +991,15 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	for indirect > 1 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
+		// nil = incomplete pointees
+		if tmp == nil {
+			return true
+		}
 		for _, v := range tmp {
-			if v != nil && c.EffectStm.IsWritten(v) {
+			if v == nil {
+				return true
+			}
+			if c.EffectStm.IsWritten(v) {
 				return true
 			}
 		}

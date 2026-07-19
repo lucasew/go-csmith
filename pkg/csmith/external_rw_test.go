@@ -25,6 +25,55 @@ func TestGetExternalNoReadsWrites(t *testing.T) {
 		t.Fatal("frame nr", nr)
 	}
 	_ = nw
+	// nil RW hole fails closed
+	cg2 := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil, g}})
+	nr, nw = cg2.GetExternalNoReadsWrites(nil)
+	if nr != nil || nw != nil {
+		t.Fatal("nil NoReadVars hole must fail closed", nr, nw)
+	}
+}
+
+func TestFindMustUseArraysNilHole(t *testing.T) {
+	rw := &RWDirective{MustReadVars: []*Variable{nil}}
+	if rw.FindMustUseArrays() != nil {
+		t.Fatal("nil must-use hole must fail closed")
+	}
+}
+
+func TestFindRelatedPointToNilHole(t *testing.T) {
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	facts := []*FactPointTo{nil, MakeFactPointTo(p, NullPtr)}
+	if FindRelatedPointTo(facts, p) != nil {
+		t.Fatal("nil fact hole must fail closed (no invent skip to later)")
+	}
+	if FindRelatedUnion([]*FactUnion{nil}, p) != nil {
+		t.Fatal("nil union fact hole must fail closed")
+	}
+}
+
+func TestPtrModifiedInRhsNilPointees(t *testing.T) {
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	lhs := &Lhs{Var: p, Type: GetIntType()} // indir via type peel — set IndirectLevel path
+	// force multi-level via Type pointer chain
+	pt := PointerTo(PointerTo(GetIntType()))
+	pp := CreateVariableScalars("g_pp", pt, true, false)
+	lhs2 := &Lhs{Var: pp, Type: GetIntType()}
+	// IndirectLevel for Lhs
+	if lhs2.IndirectLevel() <= 1 {
+		// still exercise MergePointees nil path via incomplete facts with hole
+		_ = lhs
+	}
+	cg := EmptyCGContext()
+	// incomplete merge via nil in pointees of related fact
+	facts := []*FactPointTo{{Var: pp, PointTo: []*Variable{nil}}}
+	// for indir > 1 need multi-level pointer
+	// Lhs IndirectLevel = var.Type.IndirectLevel - want.IndirectLevel
+	// pp is **int, Type GetIntType → indir 2
+	if lhs2.IndirectLevel() > 1 {
+		if !cg.PtrModifiedInRhs(lhs2, facts) {
+			t.Fatal("nil pointee hole must fail closed as modified")
+		}
+	}
 }
 
 func TestGetExternalNoWritesFromIV(t *testing.T) {
