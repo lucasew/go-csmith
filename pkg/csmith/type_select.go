@@ -113,12 +113,24 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 			}
 		}
 		if noConst && t.IsConstStructUnion() {
+			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
+			if HasError() {
+				return IncompleteTypes()
+			}
 			continue
 		}
 		if noVolatile && t.IsVolatileStructUnion() {
+			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
+			if HasError() {
+				return IncompleteTypes()
+			}
 			continue
 		}
 		if needIntField && !t.HasIntField() {
+			// residual ERROR sticky — no invent soft-skip then pick later past HasIntField hole
+			if HasError() {
+				return IncompleteTypes()
+			}
 			continue
 		}
 		ok = append(ok, t)
@@ -555,6 +567,10 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 				return IncompleteTypes()
 			}
 			if noVolatile && t.IsVolatileStructUnion() {
+				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
+				if HasError() {
+					return IncompleteTypes()
+				}
 				continue
 			}
 			out = append(out, t)
@@ -567,6 +583,10 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 				return IncompleteTypes()
 			}
 			if noVolatile && t.IsVolatileStructUnion() {
+				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
+				if HasError() {
+					return IncompleteTypes()
+				}
 				continue
 			}
 			out = append(out, t)

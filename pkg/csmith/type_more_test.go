@@ -494,6 +494,44 @@ func TestFindTypeNilHole(t *testing.T) {
 	}
 }
 
+func TestGetAllOKStructUnionTypesFilterResidualSticky(t *testing.T) {
+	// Type-nil field IsConstStructUnion stickies residual; soft invent was soft-skip then pick good.
+	// Fair: sticky IncompleteTypes fail closed whole filter.
+	ClearError()
+	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
+		{Name: "f0", Type: nil},
+	}}
+	good := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType()},
+	}}
+	env := &TypeEnv{AllTypes: []*Type{broken, good}}
+	if typesComplete(env.GetAllOKStructUnionTypes(true, false, false, true)) {
+		t.Fatal("IsConstStructUnion residual must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsConstStructUnion residual must SetError sticky")
+	}
+	ClearError()
+	// needIntField HasIntField residual
+	env2 := &TypeEnv{AllTypes: []*Type{broken, good}}
+	if typesComplete(env2.GetAllOKStructUnionTypes(false, false, true, true)) {
+		t.Fatal("HasIntField residual must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("HasIntField residual must SetError sticky")
+	}
+	ClearError()
+	// okStructUnionLTypes noVolatile residual
+	env3 := &TypeEnv{StructTypes: []*Type{broken, good}}
+	if typesComplete(okStructUnionLTypes(env3, true, true, false)) {
+		t.Fatal("IsVolatileStructUnion residual must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileStructUnion residual must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestGetAllOKStructUnionTypes(t *testing.T) {
 	env := &TypeEnv{}
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{

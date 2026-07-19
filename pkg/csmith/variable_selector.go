@@ -109,16 +109,30 @@ func ChooseVisibleReadVar(
 			return nil
 		}
 		if v.IsVirtual() || v.IsVolatile() {
+			// residual ERROR sticky — no invent soft-continue then pick later past hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		if !typ.Match(v.Type, MatchConvert) {
 			continue
 		}
 		onStack := b != nil && b.IsVarOnStack(v)
+		// residual ERROR sticky — no invent soft-continue past IsVarOnStack hole
+		if HasError() {
+			return nil
+		}
 		if !onStack && !v.IsGlobal() {
 			continue
 		}
-		if IsNonreadableField(v, unionFacts) {
+		nonread := IsNonreadableField(v, unionFacts)
+		// residual ERROR sticky — no invent soft-continue then pick later past hole
+		// (IsInsideUnionField may sticky residual true/false then soft-return)
+		if HasError() {
+			return nil
+		}
+		if nonread {
 			continue
 		}
 		ok = append(ok, v)
@@ -252,6 +266,10 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 			}
 			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
 			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVar() {
+				// residual ERROR sticky — no invent soft-skip then pick later IV past packed hole
+				if HasError() {
+					return nil
+				}
 				continue
 			}
 			// insert sorted by name for platform-stable order

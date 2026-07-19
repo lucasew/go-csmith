@@ -55,6 +55,8 @@ func TestChooseRandomFiltersReturnUnions(t *testing.T) {
 }
 
 func TestOkStructUnionSkipsVolatile(t *testing.T) {
+	// suite hygiene: prior sticky tests leave residual ERROR; clear before complete filter
+	ClearError()
 	env := &TypeEnv{}
 	okt := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},

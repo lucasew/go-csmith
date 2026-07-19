@@ -94,6 +94,19 @@ func TestChooseVisibleReadVar(t *testing.T) {
 		t.Fatal("IsArray without AsArray ChooseVisibleReadVar must SetError sticky")
 	}
 	ClearError()
+	// IsNonreadableField / IsInsideUnionField Type-nil ancestry residual: soft invent was
+	// continue then pick later good. Fair: sticky fail closed whole choose.
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	// empty facts: IsInsideUnionField still stickies residual before early return not-banned
+	blk.LocalVars = []*Variable{field, a}
+	if ChooseVisibleReadVar(NewRng(3), blk, []*Variable{field, a}, GetIntType(), nil) != nil {
+		t.Fatal("IsInsideUnionField residual must fail closed ChooseVisibleReadVar")
+	}
+	if !HasError() {
+		t.Fatal("IsInsideUnionField residual ChooseVisibleReadVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectReadVarsSorted(t *testing.T) {
