@@ -603,21 +603,32 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm.MapFactsOutFinal == nil {
 		fm.MapFactsOutFinal = make(map[int][]*FactPointTo)
 	}
+	// fail closed whole setup on residual: wipe finals (no invent partial complete clones
+	// under random map iteration order past a hard IR hole on another id)
+	failClosedWipe := func(badIn, badOut int) {
+		fm.MapFactsInFinal = make(map[int][]*FactPointTo)
+		fm.MapFactsOutFinal = make(map[int][]*FactPointTo)
+		if badIn != 0 {
+			fm.MapFactsInFinal[badIn] = IncompleteFactSlice()
+		}
+		if badOut != 0 {
+			fm.MapFactsOutFinal[badOut] = IncompleteFactSlice()
+		}
+		SetError(ErrGeneric)
+	}
 	if firstTime {
 		for id, facts := range fm.MapFactsIn {
-			// storeFactMapEntry: incomplete → hole marker sticky
+			// storeFactMapEntry: incomplete → hole marker sticky whole setup
 			if !FactsComplete(facts) {
-				fm.MapFactsInFinal[id] = IncompleteFactSlice()
-				SetError(ErrGeneric)
-				continue
+				failClosedWipe(id, 0)
+				return
 			}
 			fm.MapFactsInFinal[id] = storeFactMapEntry(facts)
 		}
 		for id, facts := range fm.MapFactsOut {
 			if !FactsComplete(facts) {
-				fm.MapFactsOutFinal[id] = IncompleteFactSlice()
-				SetError(ErrGeneric)
-				continue
+				failClosedWipe(0, id)
+				return
 			}
 			fm.MapFactsOutFinal[id] = storeFactMapEntry(facts)
 		}
@@ -625,40 +636,37 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	}
 	// combine current maps into final
 	// Fact* always live; incomplete maps or failed merge fail closed sticky
-	// (no invent partial join or bare-nil complete empty)
+	// (no invent partial join or bare-nil complete empty / soft-continue other ids)
 	for id, facts2 := range fm.MapFactsIn {
 		facts1 := fm.MapFactsInFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
-			// hole marker sticky (not bare nil — FactsComplete(nil) invents empty complete)
-			fm.MapFactsInFinal[id] = IncompleteFactSlice()
-			SetError(ErrGeneric)
-			continue
+			failClosedWipe(id, 0)
+			return
 		}
 		// MergeFacts clears *facts sticky on incomplete mid-join
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
-			fm.MapFactsInFinal[id] = IncompleteFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
-			continue
+			failClosedWipe(id, 0)
+			return
 		}
 		fm.MapFactsInFinal[id] = storeFactMapEntry(facts1)
 	}
 	for id, facts2 := range fm.MapFactsOut {
 		facts1 := fm.MapFactsOutFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
-			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
-			SetError(ErrGeneric)
-			continue
+			failClosedWipe(0, id)
+			return
 		}
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
-			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
-			continue
+			failClosedWipe(0, id)
+			return
 		}
 		fm.MapFactsOutFinal[id] = storeFactMapEntry(facts1)
 	}

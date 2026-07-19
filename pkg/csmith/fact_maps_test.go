@@ -121,11 +121,26 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsInFinal[1]) {
 		t.Fatal("incomplete MapFactsIn must not invent cleaned/complete InFinal")
 	}
-	if FactsComplete(fm.MapFactsOutFinal[2]) {
-		t.Fatal("incomplete MapFactsOut must not invent cleaned/complete OutFinal")
+	// residual soft-continue invents later MapFactsOut complete clone past In hole
+	// fair: sticky fail closed wipe finals (OutFinal must not invent complete entry 2)
+	if out2, ok := fm.MapFactsOutFinal[2]; ok && FactsComplete(out2) && len(out2) > 0 && out2[0] != nil {
+		t.Fatal("incomplete MapFactsIn residual must not invent complete OutFinal[2]", out2)
 	}
 	if !HasError() {
 		t.Fatal("incomplete first_time SetupInOutMaps must SetError sticky")
+	}
+	ClearError()
+	// incomplete Out only: still sticky
+	fmOut := NewFactMgr(nil)
+	fmOut.MapFactsOut = map[int][]*FactPointTo{
+		2: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	fmOut.SetupInOutMaps(true)
+	if FactsComplete(fmOut.MapFactsOutFinal[2]) {
+		t.Fatal("incomplete MapFactsOut must not invent cleaned/complete OutFinal")
+	}
+	if !HasError() {
+		t.Fatal("incomplete MapFactsOut SetupInOutMaps must SetError sticky")
 	}
 	ClearError()
 	// complete sibling still clones
@@ -137,6 +152,28 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	if len(fm2.MapFactsInFinal[3]) != 1 {
 		t.Fatal("complete first_time must still clone")
 	}
+}
+
+func TestSetupInOutMapsSiblingResidualSticky(t *testing.T) {
+	// incomplete id soft invent was continue then clone later complete sibling final.
+	// Fair: sticky fail closed whole SetupInOutMaps — wipe finals (no invent partial complete).
+	ClearError()
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	good := MakeFactPointTo(p, NullPtr)
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		1: {good, nil}, // incomplete
+		2: {good},      // complete sibling
+	}
+	fm.SetupInOutMaps(true)
+	// whole setup wiped — sibling must not invent complete final under any map order
+	if in2, ok := fm.MapFactsInFinal[2]; ok && FactsComplete(in2) && len(in2) > 0 && in2[0] != nil {
+		t.Fatal("sibling residual must not invent complete InFinal[2]", in2)
+	}
+	if !HasError() {
+		t.Fatal("sibling residual SetupInOutMaps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {

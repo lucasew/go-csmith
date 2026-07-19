@@ -1160,7 +1160,13 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 		if IsSpecialPtr(v) {
 			continue
 		}
-		if !fn.IsVarOnStack(v, stParent) {
+		onStack := fn.IsVarOnStack(v, stParent)
+		// residual ERROR sticky — no invent soft-skip stack scan past hard IR hole
+		// (IsVarOnStack may sticky residual false then leave later stack pointees live)
+		if HasError() {
+			return nil
+		}
+		if !onStack {
 			continue
 		}
 		if hasGarbage {
