@@ -179,7 +179,8 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 		t.Fatal("nil vs/cg arrayop must SetError sticky")
 	}
 	ClearError()
-	// goto: no FM
+	// goto: no FM (non-sticky soft re-pick)
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	f.Stack = []*Block{blk}
@@ -188,6 +189,9 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	st := MakeRandomGoto(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("goto without FM invent %#v", st)
+	}
+	if HasError() {
+		t.Fatal("nil FM goto must stay non-sticky soft re-pick")
 	}
 }
 

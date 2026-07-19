@@ -694,8 +694,9 @@ func makeRandomStmt(
 	cg *CGContext,
 	b *Block,
 ) Stmt {
-	// Statement.cpp always has RNG + CGContext; no invent MAX-kind shell without them
+	// Statement.cpp always has RNG + CGContext; sticky no invent MAX-kind shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient EffectContext fails closed sticky before re-pick loop
@@ -709,11 +710,12 @@ func makeRandomStmt(
 	if DepthGuardByTypeFlag(opts, DtStatement, int(MaxStatementType)) == BadDepth {
 		return Stmt{}
 	}
-	// Statement static ProbabilityTable always live; no soft invent NewStatementThresholdTable
+	// Statement static ProbabilityTable always live; sticky no invent NewStatementThresholdTable
 	if stmtTab == nil {
 		stmtTab = ProcessStmtTab()
 	}
 	if stmtTab == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementFilter (Statement.cpp:150–182)
@@ -916,8 +918,9 @@ func stmtOK(st Stmt) bool {
 
 // Output emits C for the block with indent levels.
 func (b *Block) Output(indent int) string {
-	// Block.cpp:248+ — always live this; no invent empty "{}" shell for nil
+	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
 	if b == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	pad := strings.Repeat("    ", indent)
@@ -1278,9 +1281,10 @@ func (b *Block) Output(indent int) string {
 			}
 			content.WriteString(bodyOut)
 		default:
-			// unknown/zero Kind in live body is incomplete IR — fail whole block
+			// unknown/zero Kind in live body is incomplete IR sticky — fail whole block
 			// (no invent soft-skip hole and still emit later stmts)
 			// StmtLabel handled earlier via continue
+			SetError(ErrGeneric)
 			return ""
 		}
 		if content.Len() > 0 {

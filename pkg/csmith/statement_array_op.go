@@ -116,7 +116,9 @@ func MakeRandomArrayLoop(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
+	// StatementFor array-loop always has RNG + VS + CG; sticky no invent shell without them
 	if r == nil || vs == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent array loop / soft re-pick past holes)

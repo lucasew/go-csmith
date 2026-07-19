@@ -53,17 +53,20 @@ func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
 		t.Fatal("still stub")
 	}
 	// incomplete invoke Output fails whole block (no invent soft-skip empty invoke)
+	ClearError()
 	empty := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}}
 	out2 := (&Block{Stmts: []Stmt{empty}}).Output(0)
 	if out2 != "" {
 		t.Fatal("incomplete invoke must fail closed whole block", out2)
 	}
+	ClearError()
 	// incomplete among live stmts fails whole block (no invent skip hole)
 	good := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
 	out3 := (&Block{Stmts: []Stmt{empty, good}}).Output(0)
 	if out3 != "" {
 		t.Fatal("mixed incomplete must fail closed whole block", out3)
 	}
+	ClearError()
 }
 
 func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {

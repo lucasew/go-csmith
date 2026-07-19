@@ -163,7 +163,8 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 }
 
 func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
-	// StatementGoto.cpp:66–67 get_fact_mgr; no soft invent goto without FM
+	// StatementGoto.cpp:66–67 get_fact_mgr; non-sticky soft re-pick without FM
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -176,6 +177,17 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("goto without FactMgr must fail closed")
 	}
+	if HasError() {
+		t.Fatal("nil FM goto must stay non-sticky soft re-pick")
+	}
+	// sticky without RNG / cg / curr_func
+	if stmtOK(MakeRandomGoto(nil, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)) {
+		t.Fatal("nil RNG goto must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG goto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeBinaryForCompare(t *testing.T) {

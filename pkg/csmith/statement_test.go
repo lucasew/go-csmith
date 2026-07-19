@@ -64,17 +64,25 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 		t.Fatal("unknown kind must set sticky error like assert")
 	}
 	ClearError()
-	// nil CGContext — no invent Kind-only shell
+	// nil CGContext sticky — no invent Kind-only shell
 	st2 := makeRandomStmtKind(NewRng(1), opts, nil, nil, nil, nil, nil, nil, StmtAssign)
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil cg soft invent %#v", st2)
 	}
-	// nil RNG — no invent Kind-only shell
+	if !HasError() {
+		t.Fatal("nil cg makeRandomStmtKind must SetError sticky")
+	}
+	ClearError()
+	// nil RNG sticky — no invent Kind-only shell
 	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(opts),
 		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk, StmtAssign)
 	if stmtOK(st3) || st3.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st3)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG makeRandomStmtKind must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStmtOKBlockRequiresThen(t *testing.T) {

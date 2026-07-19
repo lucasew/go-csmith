@@ -324,11 +324,13 @@ func MakeRandomGoto(
 	blk *Block,
 ) Stmt {
 	_ = probs
+	// StatementGoto always has RNG + CG + curr_func; sticky no invent shell without them
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
+		SetError(ErrGeneric)
 		return makeGotoFailed()
 	}
 	// StatementGoto.cpp:66–67 — FactMgr always present (get_fact_mgr);
-	// no soft invent goto without cfg/facts (choose_visible_read_var + create_cfg_edge)
+	// non-sticky soft re-pick when FM missing (sticky poisons MakeRandomGoto soft factory)
 	if cg.FM == nil {
 		return makeGotoFailed()
 	}

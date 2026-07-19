@@ -1965,12 +1965,14 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 		return nil
 	}
 	name := vs.RandomParamName()
-	// gensym always live; no invent empty-name parameter shell
+	// gensym always live; sticky no invent empty-name parameter shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	v := CreateVariableQfer(name, typ, qfer)
 	if v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	vs.AllVars = append(vs.AllVars, v)
@@ -1981,7 +1983,9 @@ func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQua
 // VariableSelector.cpp:963–981 — 40% pointer when derived exist; else nonvoid nonvolatile;
 // ERROR_RETURN after each RNG; no make_random_pointer / simple invent.
 func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Variable {
+	// VariableSelector always has VS + Function + RNG; sticky no invent param without them
 	if vs == nil || f == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:967 ERROR_RETURN after flipcoin setup

@@ -20,11 +20,15 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 		t.Fatal("error must remain sticky")
 	}
 	ClearError()
-	// Statement.cpp always has RNG; no invent MAX-kind shell without it
+	// Statement.cpp always has RNG sticky; no invent MAX-kind shell without it
 	st2 := makeRandomStmt(nil, opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, blk)
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st2)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG makeRandomStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomBlockRequiresCurrentFunc(t *testing.T) {
