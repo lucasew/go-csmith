@@ -119,7 +119,9 @@ func MakeOneBitfield(r *Rng, opts Options, probs *Probabilities, fieldIdx int, p
 // MakeRandomStructType mirrors Type::make_random_struct_type.
 // Type.cpp:1075–1130 — BitFieldsCreationProb chooses full-bitfields vs normal fields.
 func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
+	// Type.cpp always has process RNG; sticky no invent struct type without it
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1077–1081 — max_struct_fields as-is; no soft invent maxCnt=1
@@ -133,7 +135,8 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		fieldCnt = int(r.RndUpto(uint32(maxCnt))) + 1
 	}
 	if fieldCnt < 1 {
-		// fixed + max 0 → empty type IR; fail closed
+		// fixed + max 0 → empty type IR; sticky no invent zero-field struct shell
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1082 — ERROR_GUARD(nullptr) after field_cnt draw
@@ -391,16 +394,20 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	// Constant.cpp:222–246 — GenerateRandomConstantInRange
 	// Constant.cpp:223 — assert(type->eType == eSimple)
 	// Constant.cpp:226–245 — only eInt / eUInt; else assert(0)
+	// sticky no invent empty/default constant past broken range IR
 	if r == nil || typ == nil || !typ.IsSimple() {
+		SetError(ErrGeneric)
 		return ""
 	}
 	st := typ.Simple()
 	if st != EInt && st != EUInt {
-		// assert(0) for other simples — no soft invent generic decimal
+		// assert(0) for other simples — sticky no soft invent generic decimal
+		SetError(ErrGeneric)
 		return ""
 	}
 	if bound <= 0 {
-		// invalid bitfield width; no soft invent "0" for broken range
+		// invalid bitfield width; sticky no invent "0" for broken range
+		SetError(ErrGeneric)
 		return ""
 	}
 	// b = 2^(bound/2); clamp
@@ -414,6 +421,7 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	bmax := uint32(1) << uint(exp)
 	// Constant.cpp: pure_rnd_upto(b); no invent bmax=1 when shift underflows (exp clamped)
 	if bmax == 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	num := int(r.RndUpto(bmax))
@@ -464,8 +472,11 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 				val = c.Value
 			}
 		}
-		// Constant.cpp ERROR_GUARD("") on empty field — fail whole struct, no invent hole
+		// Constant.cpp ERROR_GUARD("") on empty field — sticky fail whole struct, no invent hole
 		if val == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		if !first {
@@ -569,7 +580,9 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 // MakeRandomUnionType mirrors Type::make_random_union_type.
 // Type.cpp:1132–1150.
 func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, tag string) *Type {
+	// Type.cpp always has process RNG; sticky no invent union type without it
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type.cpp:1133–1135 — max_union_fields as-is; no soft invent maxCnt=1
@@ -583,6 +596,8 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		return nil
 	}
 	if fieldCnt < 1 {
+		// sticky no invent zero-field union shell
+		SetError(ErrGeneric)
 		return nil
 	}
 	fields := make([]StructField, 0, fieldCnt)

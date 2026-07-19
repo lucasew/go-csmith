@@ -16,6 +16,40 @@ func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 	}
 }
 
+func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
+	// Constant.cpp assert path sticky — no invent empty/default past broken range IR
+	ClearError()
+	opts := Defaults()
+	if GenerateRandomConstantInRange(GetIntType(), 8, opts, nil) != "" {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG GenerateRandomConstantInRange must SetError sticky")
+	}
+	ClearError()
+	if GenerateRandomConstantInRange(nil, 8, opts, NewRng(1)) != "" {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type GenerateRandomConstantInRange must SetError sticky")
+	}
+	ClearError()
+	if GenerateRandomConstantInRange(GetIntType(), 0, opts, NewRng(1)) != "" {
+		t.Fatal("bound 0 must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("bound 0 GenerateRandomConstantInRange must SetError sticky")
+	}
+	ClearError()
+	if GenerateRandomConstantInRange(GetSimpleType(EChar), 8, opts, NewRng(1)) != "" {
+		t.Fatal("non int/uint simple must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("char GenerateRandomConstantInRange must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeStructConstantSkipsZeroWidthBitfield(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

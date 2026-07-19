@@ -1528,7 +1528,9 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 // partial makeup, or re-accumulate later vars after *oldFacts was cleared).
 // Returns true when makeup completed with a complete *oldFacts accumulator.
 func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	// FactMgr always has live old_facts accumulator; sticky no invent soft-skip makeup
 	if oldFacts == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// incomplete working/snapshot sets fail closed sticky before partial makeup

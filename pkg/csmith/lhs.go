@@ -452,7 +452,9 @@ func MakeRandomLhs(
 // finishLhs builds Lhs, optional visit_facts, records write dereference / volatile access.
 // Lhs.cpp:106–140 — visit_facts then bookkeeping.
 func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Options) *Lhs {
+	// Lhs always has live var + CG after select; sticky no invent LHS shell without them
 	if v == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	lhs := &Lhs{Var: v, Type: typ, CompoundAssign: compound}

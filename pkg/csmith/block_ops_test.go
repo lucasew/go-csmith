@@ -320,6 +320,14 @@ func TestMakeDummyBlockCG(t *testing.T) {
 		t.Fatal("nil CurrentFunc must SetError sticky")
 	}
 	ClearError()
+	// MakeDummyBlock without CG still needs live Function sticky
+	if MakeDummyBlock(nil) != nil {
+		t.Fatal("nil Function MakeDummyBlock must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function MakeDummyBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {

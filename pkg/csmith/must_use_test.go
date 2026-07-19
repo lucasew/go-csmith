@@ -120,10 +120,38 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 	if v.AsArray == nil || v.AsArray.Collective != av {
 		t.Fatalf("want itemized member, got %v asArray=%v", v, v.AsArray)
 	}
-	// VariableSelector.cpp:1528–1530 — always itemize; no bare collective without RNG
+	// VariableSelector.cpp:1528–1530 — always itemize; sticky no bare collective without RNG
+	ClearError()
 	if bare := vs.SelectMustUseVar(nil, AccessRead, cg, GetIntType(), nil); bare != nil {
 		t.Fatalf("nil RNG must not invent bare collective array, got %v", bare)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG SelectMustUseVar must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestSelectMustUseVarNilDepsSticky(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	rw := &RWDirective{}
+	cg := EmptyCGContext().WithRW(rw)
+	if vs.SelectMustUseVar(NewRng(1), AccessWrite, cg, nil, nil) != nil {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type SelectMustUseVar must SetError sticky")
+	}
+	ClearError()
+	// nil RW is soft re-pick (no must-use list)
+	if vs.SelectMustUseVar(NewRng(1), AccessWrite, EmptyCGContext(), GetIntType(), nil) != nil {
+		t.Fatal("nil RW must fail closed")
+	}
+	if HasError() {
+		t.Fatal("nil RW SelectMustUseVar must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestMakeRandomLhsMustUse(t *testing.T) {

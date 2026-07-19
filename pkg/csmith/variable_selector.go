@@ -1041,7 +1041,18 @@ func (vs *VariableSelector) SelectMustUseVar(
 	typ *Type,
 	qfer *CVQualifiers,
 ) *Variable {
-	if vs == nil || cg.RW == nil || typ == nil {
+	// VariableSelector always has VS + type; sticky no invent must-use shell without them
+	if vs == nil || typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// no RWDirective: soft re-pick (must-use list absent — not broken IR)
+	if cg.RW == nil {
+		return nil
+	}
+	// itemize / choose always has process RNG sticky
+	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before must-use scan (no invent soft re-pick)
@@ -1748,7 +1759,9 @@ func (vs *VariableSelector) SelectGlobalMT(
 	mt MatchType,
 	invalidVars []*Variable,
 ) *Variable {
+	// VariableSelector always live; sticky no invent SelectGlobal without VS
 	if vs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)

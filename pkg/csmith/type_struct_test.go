@@ -30,6 +30,38 @@ func TestMakeRandomStructType(t *testing.T) {
 	}
 }
 
+func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
+	// Type.cpp always has process RNG; sticky no invent aggregate type shells
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	var env TypeEnv
+	env.AllTypes = []*Type{GetIntType()}
+	if MakeRandomStructType(nil, opts, probs, &env, "S0") != nil {
+		t.Fatal("nil RNG struct must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomStructType must SetError sticky")
+	}
+	ClearError()
+	if MakeRandomUnionType(nil, opts, probs, &env, "U0") != nil {
+		t.Fatal("nil RNG union must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomUnionType must SetError sticky")
+	}
+	ClearError()
+	opts.FixedStructFields = true
+	opts.MaxStructFields = 0
+	if MakeRandomStructType(NewRng(1), opts, probs, &env, "Sempty") != nil {
+		t.Fatal("zero fields must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("zero-field MakeRandomStructType must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

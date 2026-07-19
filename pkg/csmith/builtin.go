@@ -123,7 +123,9 @@ func EnabledBuiltin(opts Options, kinds string) bool {
 // Prefer MakeDummyBlockCG when CGContext is available (fact_in + post_creation).
 // Block.cpp:95–110 — empty block, stack push/pop, fact_in, post_creation_analysis.
 func MakeDummyBlock(f *Function) *Block {
+	// Block always has live Function; sticky no invent dummy body without it
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Library path without CGContext: still register block (no soft invent body stmts)

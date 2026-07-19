@@ -862,9 +862,10 @@ func MakeRandomBinaryInvocation(
 			return nil
 		}
 	}
-	// PickBinaryOp MAX / empty token — no invent infix shell without live op
+	// PickBinaryOp MAX / empty token — sticky no invent infix shell without live op
 	opStr := op.BinaryOpC()
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:188–207 — always SafeOpFlags::make_random_binary; operands use get_lhs/rhs_type
@@ -1045,7 +1046,13 @@ func MakeRandomBinaryPtrComparison(
 	cg *CGContext,
 	env *TypeEnv,
 ) *Invocation {
-	if r == nil || cg == nil || env == nil || !env.HasPointerType() {
+	// FunctionInvocation always has RNG + CGContext; sticky no invent ptr-cmp shell without them
+	if r == nil || cg == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// no pointer types: soft re-pick scalar binary (not broken IR)
+	if env == nil || !env.HasPointerType() {
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent ptr cmp / soft re-pick past holes)
@@ -1189,9 +1196,10 @@ func MakeBinary(
 	if DepthGuardByType(opts, DtFunctionInvocationBinary) == BadDepth {
 		return nil
 	}
-	// invalid / MAX op — no invent empty Binary token shell
+	// invalid / MAX op — sticky no invent empty Binary token shell
 	opStr := op.BinaryOpC()
 	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
@@ -1267,9 +1275,10 @@ func MakeRandomUnaryInvocation(
 	if !validU {
 		return nil
 	}
-	// PickUnaryOp MAX / empty token — no invent unary shell without live op
+	// PickUnaryOp MAX / empty token — sticky no invent unary shell without live op
 	op := uop.UnaryOpC()
 	if int(uop) < 0 || int(uop) >= MaxUnaryOp || op == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:151–155 — always make_random_unary then operand type from flags
