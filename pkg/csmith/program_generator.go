@@ -773,8 +773,14 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	var b strings.Builder
 	for _, v := range ptrs {
 		// pre-validated VariablesComplete
-		sizes := v.ArraySizes
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent synthetic shell from ArraySizes / soft re-pick partial resets)
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
 		av := v.AsArray
+		sizes := v.ArraySizes
 		if av != nil && len(av.Sizes) > 0 {
 			sizes = av.Sizes
 		}
@@ -788,12 +794,6 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 				return ""
 			}
 			// ArrayVariable::output_init(out, &zero, ctrl_vars, 1) — always loop form
-			if av == nil {
-				av = &ArrayVariable{
-					Variable: *v,
-					Sizes:    sizes,
-				}
-			}
 			// force loop even if NoLoopInitializer (globals); pass live zero, not invent
 			savedInit, savedExpr := av.Init, av.InitExpr
 			av.Init = zero

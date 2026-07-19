@@ -153,6 +153,15 @@ func TestOutputPtrResets(t *testing.T) {
 		t.Fatal("nil hole OutputPtrResets must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was synthetic ArrayVariable shell
+	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
+	if OutputPtrResets([]*Variable{shell}, Defaults()) != "" {
+		t.Fatal("IsArray without AsArray must fail closed whole resets")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputPtrResets must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStepHashBody(t *testing.T) {

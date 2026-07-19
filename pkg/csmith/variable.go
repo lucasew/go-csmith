@@ -297,9 +297,16 @@ func (v *Variable) OutputForComment(prefixName bool) string {
 
 // OutputUpperBound mirrors Variable::OutputUpperBound — field path for bounds.
 // Variable.cpp:721–732; ArrayVariable.cpp:572–577 for arrays.
+// IsArray without AsArray sticky empty (no invent bare-name upper bound past shell).
 func (v *Variable) OutputUpperBound(prefixName bool) string {
 	// Variable* always live at bound emit; sticky no invent empty upper bound
 	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent scalar name as upper bound past broken array shell)
+	if v.IsArray && v.AsArray == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -333,9 +340,16 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 // OutputLowerBound mirrors Variable::OutputLowerBound.
 // Variable.cpp:734–745. Arrays override separately.
 // Incomplete Variable sticky empty (no invent empty bound soft-skip past hole).
+// IsArray without AsArray sticky empty (no invent bare-name lower bound past shell).
 func (v *Variable) OutputLowerBound(prefixName bool) string {
 	// Variable always live at bound emit; sticky incomplete no invent empty token
 	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent scalar name as lower bound past broken array shell)
+	if v.IsArray && v.AsArray == nil {
 		SetError(ErrGeneric)
 		return ""
 	}

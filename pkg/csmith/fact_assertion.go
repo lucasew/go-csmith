@@ -65,6 +65,12 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 		SetError(ErrGeneric)
 		return false
 	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky not-assertable
+	// (no invent complete not-array assertable past broken shell)
+	if f.Var.IsArray && f.Var.AsArray == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	// get_array != null → not assertable
 	if f.Var.IsArray || f.Var.AsArray != nil {
 		return false
@@ -99,6 +105,12 @@ func (f *FactPointTo) OutputCondition() string {
 			return ""
 		}
 		if pointee.IsArray || (pointee.AsArray != nil) {
+			// C++ isArray always ArrayVariable*; missing AsArray sticky
+			// (no invent bare-name bounds range form past broken array shell)
+			if pointee.IsArray && pointee.AsArray == nil {
+				SetError(ErrGeneric)
+				return ""
+			}
 			// range form: (p >= &lo && p <= &hi)
 			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
@@ -148,12 +160,16 @@ func outputFactVar(v *Variable) string {
 	}
 	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
 	// no soft invent dim=1 when sizes empty
+	// C++ isArray always ArrayVariable*; missing AsArray sticky empty
+	// (no invent [0] indices from ArraySizes alone past broken shell)
+	if v.IsArray && v.AsArray == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	if v.IsArray || v.AsArray != nil {
 		dim := 0
 		if v.AsArray != nil {
 			dim = len(v.AsArray.Sizes)
-		} else if len(v.ArraySizes) > 0 {
-			dim = len(v.ArraySizes)
 		}
 		for i := 0; i < dim; i++ {
 			s += "[0]"

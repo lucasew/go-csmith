@@ -40,20 +40,37 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	if !HasError() {
 		t.Fatal("empty subject OutputCondition must SetError sticky")
 	}
-	// no invent "(p >= & && p <= &)" with empty array bounds
-	arr := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	// no invent "(p >= & && p <= &)" with empty array bounds / missing AsArray
 	// empty name array bounds fail closed sticky via OutputUpper/LowerBound
 	ClearError()
-	arrNoName := &Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arrNoName}}).OutputCondition(); cond != "" {
+	arrNoName := &ArrayVariable{
+		Variable: Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	arrNoName.AsArray = arrNoName
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arrNoName.Variable}}).OutputCondition(); cond != "" {
 		t.Fatal("empty array bound name must fail closed", cond)
 	}
 	if !HasError() {
 		t.Fatal("empty array bound name must SetError sticky")
 	}
+	// IsArray without AsArray sticky (no invent bare-name range form)
+	ClearError()
+	shell := &Variable{Name: "g_shell", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{shell}}).OutputCondition(); cond != "" {
+		t.Fatal("IsArray without AsArray must fail closed", cond)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputCondition must SetError sticky")
+	}
 	// live array range form (bounds via OutputLower/UpperBound)
 	ClearError()
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{arr}}).OutputCondition(); !strings.Contains(cond, "g_p >= &g_a") {
+	arr := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	arr.AsArray = arr
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arr.Variable}}).OutputCondition(); !strings.Contains(cond, "g_p >= &g_a") {
 		t.Fatal("want array range form", cond)
 	}
 	// sticky no invent bare "&" pointee
@@ -94,6 +111,16 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 		t.Fatal("incomplete PointTo IsAssertable must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray subject sticky not-assertable
+	arrShell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if (&FactPointTo{Var: arrShell, PointTo: []*Variable{NullPtr}}).IsAssertable(nil) {
+		t.Fatal("IsArray without AsArray subject must fail closed not-assertable")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray IsAssertable must SetError sticky")
+	}
+	ClearError()
+
 	// incomplete stack at parent: HasInvisible sticky true
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	loc.Name = "l_1"
