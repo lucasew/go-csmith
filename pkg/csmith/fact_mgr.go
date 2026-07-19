@@ -1037,12 +1037,32 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 	}
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, fact := range facts {
+		// Fact* always live after FactsComplete
+		if fact == nil || fact.Var == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
 		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
 		if f != nil && stParent != nil && f.IsVarOnStack(fact.Var, stParent) {
+			// residual ERROR sticky — no invent soft-skip stack fact past hard IR hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue keep fact past IsVarOnStack hole
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.Match(fact.Var)) {
+			// residual ERROR sticky — no invent soft-skip RV past Match hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			continue
+		}
+		if HasError() {
+			return IncompleteFactSlice()
 		}
 		cl := fact.Clone()
 		if cl == nil {

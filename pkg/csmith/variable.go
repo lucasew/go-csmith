@@ -1817,7 +1817,8 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		var b strings.Builder
 		for _, f := range v.FieldVars {
 			part := f.OutputValueDump(prefix, indent, unionFacts)
-			if part == "" && HasError() {
+			// residual ERROR sticky — no invent partial field dump past hard IR hole
+			if HasError() {
 				return ""
 			}
 			b.WriteString(part)
@@ -1834,10 +1835,19 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		for i, f := range v.FieldVars {
 			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
 			if !IsFieldReadable(v, i, unionFacts) {
+				// residual ERROR sticky — no invent soft-skip then partial dump past hole
+				if HasError() {
+					return ""
+				}
 				continue
 			}
+			// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
+			if HasError() {
+				return ""
+			}
 			part := f.OutputValueDump(prefix, indent, unionFacts)
-			if part == "" && HasError() {
+			// residual ERROR sticky — no invent partial field dump past hard IR hole
+			if HasError() {
 				return ""
 			}
 			b.WriteString(part)
@@ -1910,7 +1920,15 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 					return ""
 				}
 				if v.Type.IsUnion() && !IsFieldReadable(v, fi, unionFacts) {
+					// residual ERROR sticky — no invent soft-skip then partial dump past hole
+					if HasError() {
+						return ""
+					}
 					continue
+				}
+				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
+				if HasError() {
+					return ""
 				}
 				if !f.Type.IsSimple() {
 					continue

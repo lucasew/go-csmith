@@ -91,6 +91,16 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 	if strings.Contains(out, "g_u.f1") {
 		t.Fatal("f1 unreadable", out)
 	}
+	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial dump.
+	// Fair: sticky fail closed empty whole dump.
+	ClearError()
+	if s := uv.OutputValueDump("c ", 1, IncompleteUnionFactSlice()); s != "" {
+		t.Fatal("incomplete UnionFacts OutputValueDump must fail closed empty", s)
+	}
+	if !HasError() {
+		t.Fatal("incomplete UnionFacts OutputValueDump must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputValueDumpArrayExpand(t *testing.T) {
