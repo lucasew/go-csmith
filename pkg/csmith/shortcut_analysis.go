@@ -14,22 +14,16 @@ const (
 
 // SameFacts mirrors same_facts for FactPointTo slices.
 // Fact.cpp:237–246 — same size and each fact of facts1 found in facts2.
-// Fact* always live; nil hole fails closed (no invent same-as-skip).
+// Incomplete maps/PointTo fail closed (no invent same-as-skip past holes).
 func SameFacts(a, b []*FactPointTo) bool {
+	if !FactsComplete(a) || !FactsComplete(b) {
+		return false
+	}
 	if len(a) != len(b) {
 		return false
 	}
 	for _, f := range a {
-		if f == nil {
-			return false
-		}
 		if FindFact(b, f) < 0 {
-			return false
-		}
-	}
-	// also reject holes in b (size-matched but incomplete)
-	for _, f := range b {
-		if f == nil {
 			return false
 		}
 	}
@@ -38,17 +32,16 @@ func SameFacts(a, b []*FactPointTo) bool {
 
 // FindFact mirrors find_fact — equal fact in vector, or -1.
 // Fact.cpp find_fact by equal().
-// Fact* always live; nil want or hole is not a match (no invent equal-to-nil).
+// Incomplete map fails closed -1 (no invent soft-skip hole and match later).
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
-	if want == nil {
+	if want == nil || !FactsComplete(facts) {
+		return -1
+	}
+	// want must be a complete fact for Equal to be meaningful
+	if !FactsComplete([]*FactPointTo{want}) {
 		return -1
 	}
 	for i, f := range facts {
-		if f == nil {
-			// incomplete list — no invent skip hole as non-match only at this index
-			// still scan rest for live equals; callers of SameFacts pre-reject holes
-			continue
-		}
 		if f.Equal(want) {
 			return i
 		}
@@ -58,17 +51,16 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 
 // SubsetFacts mirrors subset_facts — each f1 is implied by related f2.
 // Fact.cpp:249–260.
-// Fact* always live; nil hole fails closed (no invent skip as subset).
+// Incomplete maps/PointTo fail closed (no invent subset past holes).
 func SubsetFacts(a, b []*FactPointTo) bool {
+	if !FactsComplete(a) || !FactsComplete(b) {
+		return false
+	}
 	if len(a) != len(b) {
 		// upstream requires same size
 		return false
 	}
 	for _, f1 := range a {
-		// no invent treat nil hole as absent fact that is "subset"
-		if f1 == nil {
-			return false
-		}
 		f2 := FindRelatedPointTo(b, f1.Var)
 		if f2 == nil || !f2.Imply(f1) {
 			return false

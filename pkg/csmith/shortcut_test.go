@@ -20,6 +20,14 @@ func TestSameFacts(t *testing.T) {
 	if SameFacts(hole, hole) {
 		t.Fatal("nil hole must not be same")
 	}
+	// incomplete PointTo fails closed
+	ptHole := []*FactPointTo{{Var: p, PointTo: []*Variable{nil}}}
+	if SameFacts(ptHole, ptHole) {
+		t.Fatal("nil pointee must not invent SameFacts")
+	}
+	if FindFact(ptHole, MakeFactPointTo(p, NullPtr)) >= 0 {
+		t.Fatal("FindFact incomplete map must fail closed -1")
+	}
 }
 
 func TestSubsetFacts(t *testing.T) {
