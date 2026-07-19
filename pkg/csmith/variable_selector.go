@@ -54,6 +54,16 @@ func (vs *VariableSelector) RandomParamName() string {
 	return Gensym("p_")
 }
 
+// atMaxGlobals reports whether GlobalList has hit the library MaxGlobals cap.
+// Go-only Options.MaxGlobals (not CGOptions); fail closed create at cap —
+// no invent unbounded GlobalList growth past the configured limit.
+func (vs *VariableSelector) atMaxGlobals() bool {
+	if vs == nil || vs.Opts.MaxGlobals < 1 {
+		return false
+	}
+	return len(vs.GlobalList) >= vs.Opts.MaxGlobals
+}
+
 // ChooseVisibleReadVar mirrors VariableSelector::choose_visible_read_var.
 // VariableSelector.cpp:361–377 — expand structs; match convert; on stack or global; not vol.
 func ChooseVisibleReadVar(
@@ -1213,6 +1223,9 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if !vs.Opts.GlobalVariables {
 		return nil
 	}
+	if vs.atMaxGlobals() {
+		return nil
+	}
 	// VariableSelector.cpp:580 ERROR_GUARD
 	if HasError() {
 		return nil
@@ -1228,6 +1241,9 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		return nil
 	}
 	name := vs.RandomGlobalName()
+	if name == "" {
+		return nil
+	}
 	vs.TmpCount++
 	// VariableSelector.cpp:589–592 — make_init then new_variable (skip array flip)
 	// use &varQfer (C++ may pass original qfer; assert requires non-null qf)
@@ -1276,6 +1292,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if !vs.Opts.GlobalVariables {
 		return nil
 	}
+	if vs.atMaxGlobals() {
+		return nil
+	}
 	// VariableSelector.cpp:550 ERROR_GUARD
 	if HasError() {
 		return nil
@@ -1292,6 +1311,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		return nil
 	}
 	name := vs.RandomGlobalName()
+	if name == "" {
+		return nil
+	}
 	vs.TmpCount++
 	v := vs.createAndInitialize(access, cg, t, varQfer, nil, name, r)
 	if v == nil || HasError() {

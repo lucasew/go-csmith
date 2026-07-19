@@ -69,6 +69,29 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	}
 }
 
+func TestMaxGlobalsFailClosed(t *testing.T) {
+	// Go MaxGlobals library cap — no invent unbounded GlobalList past limit
+	ResetDefaultGensym()
+	opts := Defaults()
+	opts.Arrays = false
+	opts.MaxGlobals = 1
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(2))
+	if v == nil {
+		t.Fatal("first global")
+	}
+	if vs.GenerateNewGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(3)) != nil {
+		t.Fatal("at MaxGlobals must fail closed")
+	}
+	if vs.GenerateNewNonArrayGlobal(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(4)) != nil {
+		t.Fatal("NonArray at MaxGlobals must fail closed")
+	}
+	if len(vs.GlobalList) != 1 {
+		t.Fatal(len(vs.GlobalList))
+	}
+}
+
 func TestSelectGlobalEmptyCreates(t *testing.T) {
 	// SelectGlobal empty → GenerateNewGlobal
 	ResetDefaultGensym()

@@ -461,7 +461,8 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 // Variable.cpp:405–421.
 func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
 	// Variable.cpp:412–414 — assert(type); assert simple != eVoid
-	if typ == nil {
+	// name always live from gensym/caller; no invent empty-name Variable shell
+	if typ == nil || name == "" {
 		return nil
 	}
 	if typ.IsSimple() && typ.Simple() == EVoid {
@@ -496,7 +497,8 @@ func createVarRng() *Rng {
 // unless outermost container is union (Variable.cpp:395).
 func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
 	// Variable.cpp:388–390 — assert(type); assert simple != eVoid
-	if typ == nil {
+	// name always live; no invent empty-name Variable shell
+	if typ == nil || name == "" {
 		return nil
 	}
 	if typ.IsSimple() && typ.Simple() == EVoid {

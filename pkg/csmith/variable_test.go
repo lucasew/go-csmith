@@ -28,6 +28,13 @@ func TestCreateVariableRejectsVoid(t *testing.T) {
 	if CreateVariableWithInit("g_n", nil, MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("CreateVariableWithInit nil type")
 	}
+	// name always live; no invent empty-name Variable shell
+	if CreateVariableScalars("", GetIntType(), false, false) != nil {
+		t.Fatal("empty name must fail closed CreateVariableScalars")
+	}
+	if CreateVariableWithInit("", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+		t.Fatal("empty name must fail closed CreateVariableWithInit")
+	}
 }
 
 func TestCreateVariableErrorGuardAfterInit(t *testing.T) {
