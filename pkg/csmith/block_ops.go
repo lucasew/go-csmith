@@ -614,6 +614,8 @@ func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
 
 // ShortcutAnalysisBlock mirrors Statement::shortcut_analysis for a Block.
 // Statement.cpp:545–567 — same_facts && !is_ctrl_stmt && !contains_unfixed_goto.
+// Incomplete or missing map_facts_out fails closed (ShortcutNone) — no invent
+// reuse success while leaving inputs unchanged or cloning past nil holes.
 func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if b == nil || facts == nil || cg == nil || cg.FM == nil || b.StmID == 0 {
 		return ShortcutNone
@@ -621,6 +623,10 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	fm := cg.FM
 	in, ok := fm.MapFactsIn[b.StmID]
 	if !ok {
+		return ShortcutNone
+	}
+	// Fact* always live in maps; incomplete in/inputs fail closed
+	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
 	if !SameFacts(*facts, in) {
@@ -635,9 +641,12 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if cg.InConflict(eff) {
 		return ShortcutConflict
 	}
-	if out, ok := fm.MapFactsOut[b.StmID]; ok {
-		*facts = CloneFactSlice(out)
+	// Statement.cpp:559 — inputs = map_facts_out[this]; out must be present and complete
+	out, ok := fm.MapFactsOut[b.StmID]
+	if !ok || !FactsComplete(out) {
+		return ShortcutNone
 	}
+	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
 	if fm.MapAccumEffect == nil {
 		fm.MapAccumEffect = make(map[int]Effect)

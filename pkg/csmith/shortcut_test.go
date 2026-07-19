@@ -315,3 +315,90 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 		t.Fatal("unfixed goto must block shortcut")
 	}
 }
+
+func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
+	// Statement.cpp:559 — inputs = map_facts_out[this]
+	// missing out must not invent ShortcutOK while leaving inputs unchanged
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	facts := []*FactPointTo{}
+	fm.SetMapFactsIn(7, facts)
+	// no MapFactsOut[7]
+	fm.SetMapStmEffect(7, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("missing MapFactsOut must fail closed ShortcutNone")
+	}
+	if fm.MapVisited[7] {
+		t.Fatal("must not mark visited on incomplete shortcut")
+	}
+}
+
+func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
+	// nil fact hole in MapFactsOut — no invent clone-to-nil while ShortcutOK
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 8, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.SetMapFactsIn(8, in)
+	// plant hole bypassing SetMapFactsOut (CloneFactSlice strips holes)
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		8: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	fm.SetMapStmEffect(8, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := CloneFactSlice(in)
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("incomplete MapFactsOut must fail closed ShortcutNone")
+	}
+	// inputs must not be replaced with invent-cleaned clone
+	if !SameFacts(facts, in) {
+		t.Fatal("facts must stay pre-shortcut inputs on fail closed")
+	}
+}
+
+func TestShortcutAnalysisBlockMissingOutFailClosed(t *testing.T) {
+	body := &Block{StmID: 60, Stmts: []Stmt{{Kind: StmtAssign, StmID: 61}}}
+	fm := NewFactMgr(nil)
+	facts := []*FactPointTo{}
+	fm.SetMapFactsIn(60, facts)
+	// no MapFactsOut[60]
+	fm.SetMapStmEffect(60, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutNone {
+		t.Fatal("block missing MapFactsOut must fail closed")
+	}
+}
+
+func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	body := &Block{StmID: 70, Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}}}
+	fm := NewFactMgr(nil)
+	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.SetMapFactsIn(70, in)
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		70: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	fm.SetMapStmEffect(70, EmptyEffect())
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := CloneFactSlice(in)
+	if ShortcutAnalysisBlock(body, &facts, &cg) != ShortcutNone {
+		t.Fatal("block incomplete MapFactsOut must fail closed")
+	}
+}

@@ -277,6 +277,8 @@ func collectStmIDs(st *Stmt, ids map[int]bool) {
 // ShortcutAnalysis mirrors Statement::shortcut_analysis.
 // Statement.cpp:545–567 — 0 reuse, 1 conflict, 2 none.
 // facts is updated to map_facts_out on success (0).
+// Incomplete or missing map_facts_out fails closed (ShortcutNone) — no invent
+// reuse success while leaving inputs unchanged or cloning past nil holes.
 func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) int {
 	if st == nil || facts == nil || cg == nil || cg.FM == nil {
 		return ShortcutNone
@@ -284,6 +286,10 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	fm := cg.FM
 	in, ok := fm.MapFactsIn[st.StmID]
 	if !ok {
+		return ShortcutNone
+	}
+	// Fact* always live in maps; incomplete in/inputs fail closed (SameFacts also rejects holes)
+	if !FactsComplete(*facts) || !FactsComplete(in) {
 		return ShortcutNone
 	}
 	if !SameFacts(*facts, in) || IsCtrlStmt(st) {
@@ -297,10 +303,13 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if cg.InConflict(eff) {
 		return ShortcutConflict
 	}
-	// reuse outputs
-	if out, ok := fm.MapFactsOut[st.StmID]; ok {
-		*facts = CloneFactSlice(out)
+	// Statement.cpp:559 — inputs = map_facts_out[this]; out must be present and complete
+	// no invent ShortcutOK when out missing (would keep inputs) or has nil holes
+	out, ok := fm.MapFactsOut[st.StmID]
+	if !ok || !FactsComplete(out) {
+		return ShortcutNone
 	}
+	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
 	if fm.MapAccumEffect == nil {
 		fm.MapAccumEffect = make(map[int]Effect)
