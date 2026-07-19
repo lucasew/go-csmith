@@ -309,3 +309,36 @@ func TestFactUnionEqualImplyJoinIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*FactUnion)(nil).IsTop() {
+		t.Fatal("nil IsTop must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsTop must SetError sticky")
+	}
+	ClearError()
+	if (*FactUnion)(nil).IsBottom() {
+		t.Fatal("nil IsBottom must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsBottom must SetError sticky")
+	}
+	ClearError()
+	if (*FactUnion)(nil).Clone() != nil {
+		t.Fatal("nil Clone must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil Clone must SetError sticky")
+	}
+	ClearError()
+	f := &FactUnion{LastWrittenFID: FactUnionTop}
+	if !f.IsTop() || f.IsBottom() {
+		t.Fatal("TOP lattice")
+	}
+	if HasError() {
+		t.Fatal("complete IsTop must not sticky")
+	}
+	ClearError()
+}

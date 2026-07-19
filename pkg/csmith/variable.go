@@ -691,13 +691,20 @@ func (v *Variable) IsTmpVar() bool {
 
 // IsValidVolatile mirrors Variable::is_valid_volatile.
 // Variable.cpp:1061–1072 — union fields recurse; const null pointer init invalid.
+// Incomplete Variable/Type/init sticky false (no invent valid-volatile soft re-pick).
 func (v *Variable) IsValidVolatile() bool {
+	// Variable always live; sticky incomplete no invent valid-vol soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsInsideUnionField() {
 		uv := v.GetContainerUnion()
 		if uv == nil {
+			// incomplete container sticky invalid
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		return uv.IsValidVolatile()
@@ -706,15 +713,21 @@ func (v *Variable) IsValidVolatile() bool {
 	if !v.IsConst() {
 		return true
 	}
-	if v.Type == nil || !v.Type.IsPointerLike() {
+	if v.Type == nil {
+		// incomplete type sticky invalid for const vol check
+		SetError(ErrGeneric)
+		return false
+	}
+	if !v.Type.IsPointerLike() {
 		return true
 	}
 	// const pointer: invalid when init is null (equals 0)
-	// C++ assert(init) — missing init is broken IR, treat as invalid (no soft invent true)
+	// C++ assert(init) — missing init sticky invalid (no invent valid true)
 	if v.InitExpr != nil {
 		return v.InitExpr.NotEquals(0)
 	}
 	if v.Init == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return v.Init.NotEqualsZero()

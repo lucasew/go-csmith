@@ -51,8 +51,14 @@ type ThresholdTable struct {
 }
 
 // Add mirrors sorted insert of (threshold, value).
+// Incomplete table sticky no-op (no invent grow past missing table shell).
 func (t *ThresholdTable) Add(key, value int) {
-	if t == nil || key <= 0 {
+	// ThresholdTable always live when building stmt tables; sticky incomplete no invent
+	if t == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if key <= 0 {
 		return
 	}
 	i := 0
@@ -69,8 +75,11 @@ func (t *ThresholdTable) Add(key, value int) {
 }
 
 // GetValue mirrors ProbabilityTable::get_value — first key > k.
+// Incomplete table sticky -1 (no invent miss soft-success past missing table shell).
 func (t *ThresholdTable) GetValue(k int) int {
+	// ThresholdTable always live for draws; sticky incomplete no invent -1 soft-skip
 	if t == nil {
+		SetError(ErrGeneric)
 		return -1
 	}
 	for i, key := range t.keys {

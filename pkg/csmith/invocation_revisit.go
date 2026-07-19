@@ -47,9 +47,11 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
 // FunctionInvocationUser.cpp:76–91 — assert parallel sizes.
-// Incomplete registry slot fails closed sticky nil (no invent soft-skip hole to later match).
+// Incomplete Invocation/Variable/registry sticky nil (no invent soft-skip hole to later match).
 func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
+	// Invocation + subject always live; sticky incomplete no invent miss soft-skip
 	if fi == nil || v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if len(returnFactInvocations) != len(returnFactPoints) {
@@ -163,7 +165,9 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // Empty result matches C++ when n!=2 and no call-bearing params (permute empty base).
 // FunctionInvocation.cpp:462 — assert(orders.size() > 0) on visit_unordered path.
 func (fi *Invocation) PermuteParamOrders() [][]int {
+	// Invocation always live; sticky incomplete no invent empty orders soft-skip
 	if fi == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	n := len(fi.Args)
@@ -177,13 +181,17 @@ func (fi *Invocation) PermuteParamOrders() [][]int {
 	retBase := make([]int, n)
 	for i := 0; i < n; i++ {
 		retBase[i] = i
-		// param_value[i] always live; nil / incomplete FuncCount fails closed
+		// param_value[i] always live; nil / incomplete FuncCount sticky fail closed
 		// (no invent skip hole as non-call when building permute slots)
 		if fi.Args[i] == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		fc := FuncCount(fi.Args[i])
 		if fc < 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		if fc > 0 {

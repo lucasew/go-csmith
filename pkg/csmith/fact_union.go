@@ -86,32 +86,53 @@ func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
 }
 
 // IsTop mirrors FactUnion::is_top.
+// Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).
 func (f *FactUnion) IsTop() bool {
-	return f != nil && f.LastWrittenFID == FactUnionTop
+	// FactUnion always live; sticky incomplete no invent TOP soft-skip
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.LastWrittenFID == FactUnionTop
 }
 
 // IsBottom mirrors FactUnion::is_bottom.
+// Incomplete FactUnion sticky false (no invent BOTTOM / soft re-pick past hole).
 func (f *FactUnion) IsBottom() bool {
-	return f != nil && f.LastWrittenFID == FactUnionBottom
+	// FactUnion always live; sticky incomplete no invent BOTTOM soft-skip
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.LastWrittenFID == FactUnionBottom
 }
 
 // SetTop mirrors FactUnion::set_top.
+// Incomplete FactUnion sticky no-op (no invent soft-set TOP past missing shell).
 func (f *FactUnion) SetTop() {
-	if f != nil {
-		f.LastWrittenFID = FactUnionTop
+	if f == nil {
+		SetError(ErrGeneric)
+		return
 	}
+	f.LastWrittenFID = FactUnionTop
 }
 
 // SetBottom mirrors FactUnion::set_bottom.
+// Incomplete FactUnion sticky no-op (no invent soft-set BOTTOM past missing shell).
 func (f *FactUnion) SetBottom() {
-	if f != nil {
-		f.LastWrittenFID = FactUnionBottom
+	if f == nil {
+		SetError(ErrGeneric)
+		return
 	}
+	f.LastWrittenFID = FactUnionBottom
 }
 
 // Clone mirrors FactUnion::clone.
+// Incomplete FactUnion sticky nil (no invent empty clone shell past hole).
 func (f *FactUnion) Clone() *FactUnion {
+	// FactUnion always live; sticky incomplete no invent nil clone soft-skip
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return &FactUnion{Var: f.Var, LastWrittenFID: f.LastWrittenFID}

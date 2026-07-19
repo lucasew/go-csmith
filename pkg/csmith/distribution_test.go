@@ -64,3 +64,19 @@ func TestThresholdNumberToType(t *testing.T) {
 		t.Fatal("assign")
 	}
 }
+
+func TestThresholdTableNilSticky(t *testing.T) {
+	ClearError()
+	(*ThresholdTable)(nil).Add(1, 2)
+	if !HasError() {
+		t.Fatal("nil ThresholdTable Add must SetError sticky")
+	}
+	ClearError()
+	if (*ThresholdTable)(nil).GetValue(0) != -1 {
+		t.Fatal("nil GetValue must return -1")
+	}
+	if !HasError() {
+		t.Fatal("nil GetValue must SetError sticky")
+	}
+	ClearError()
+}
