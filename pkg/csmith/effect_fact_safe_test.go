@@ -289,6 +289,14 @@ func TestJoinVisits(t *testing.T) {
 		t.Fatal("incomplete newFacts JoinVisitsInto must SetError sticky")
 	}
 	ClearError()
+	// facts always live; sticky (no invent soft-skip join-visits past hole)
+	if JoinVisitsInto(nil, []*FactPointTo{MakeFactPointTo(p, b)}) {
+		t.Fatal("nil facts JoinVisitsInto must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil facts JoinVisitsInto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSafeOpFlagsDummyAndFloat(t *testing.T) {

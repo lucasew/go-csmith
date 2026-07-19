@@ -264,6 +264,24 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 		t.Fatal("StmID 0 must SetError sticky")
 	}
 	ClearError()
+	// Statement + CGContext always live; sticky (no invent soft-skip past hole)
+	// Nil FM is non-sticky soft re-pick
+	PostCreationAnalysis(nil, []*FactPointTo{}, EmptyEffect(), &cg, Defaults())
+	if !HasError() {
+		t.Fatal("nil stmt PostCreationAnalysis must SetError sticky")
+	}
+	ClearError()
+	PostCreationAnalysis(st, []*FactPointTo{}, EmptyEffect(), nil, Defaults())
+	if !HasError() {
+		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
+	}
+	ClearError()
+	cgNoFM := EmptyCGContext()
+	PostCreationAnalysis(st, []*FactPointTo{}, EmptyEffect(), &cgNoFM, Defaults())
+	if HasError() {
+		t.Fatal("nil FM PostCreationAnalysis must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {

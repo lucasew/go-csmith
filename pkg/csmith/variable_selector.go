@@ -1423,8 +1423,14 @@ func typesMatchExact(a, b *Type) bool {
 }
 
 // applyInitExpr stores make_init_value result on Variable (Constant and/or full expr).
+// Variable always live; sticky (no invent soft-skip init bind past hole).
+// Nil init is complete no-op (nothing to store).
 func applyInitExpr(v *Variable, init *Expression) {
-	if v == nil || init == nil {
+	if v == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if init == nil {
 		return
 	}
 	v.InitExpr = init

@@ -128,6 +128,20 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 		t.Fatal("nil FactMgrMap must SetError sticky")
 	}
 	ClearError()
+	// incomplete map_facts_out / GlobalFacts sticky clear (UpdatePtrAliases SetError)
+	fmBad := NewFactMgr(nil)
+	fmBad.GlobalFacts = []*FactPointTo{nil}
+	fBad := &Function{Name: "f_bad", BuildState: BuildBuilt, IsBuilt: true}
+	fmsBad := NewFactMgrMap()
+	fmsBad.byFunc = map[*Function]*FactMgr{fBad: fmBad}
+	AggregateAllPointToSets([]*Function{fBad}, fmsBad)
+	if len(AllPtrs) != 0 {
+		t.Fatal("incomplete GlobalFacts must clear aggregates", AllPtrs)
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts AggregateAllPointToSets must SetError sticky")
+	}
+	ClearError()
 	ClearPointToAggregates()
 }
 

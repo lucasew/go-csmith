@@ -59,8 +59,14 @@ var (
 
 // IncrCounter mirrors incr_counter — grow vector and ++ at pos.
 // Bookkeeper.cpp:527–537.
+// Counters always live; sticky (no invent soft-skip stats past hole).
+// pos < 0 is complete no-op (out-of-range index, not hard IR).
 func IncrCounter(counters *[]int, pos int) {
-	if counters == nil || pos < 0 {
+	if counters == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if pos < 0 {
 		return
 	}
 	for len(*counters) <= pos {

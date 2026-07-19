@@ -167,6 +167,21 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil jump hole must SetError sticky")
 	}
 	ClearError()
+	// facts out always live; sticky (no invent soft-skip jump merge past hole)
+	if MergeJumpFacts(nil, jump) {
+		t.Fatal("nil facts MergeJumpFacts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil facts MergeJumpFacts must SetError sticky")
+	}
+	ClearError()
+	if _, ok := tryMergeJumpFacts(nil, jump); ok {
+		t.Fatal("nil facts tryMergeJumpFacts must ok=false")
+	}
+	if !HasError() {
+		t.Fatal("nil facts tryMergeJumpFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
@@ -399,6 +414,29 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete block effect must SetError sticky")
+	}
+	ClearError()
+	// Statement + CGContext always live; sticky
+	// Nil FM / StmID≤0 stay non-sticky soft re-pick
+	SetAccumulatedEffectAfterBlock(nil, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil stmt SetAccumulatedEffectAfterBlock must SetError sticky")
+	}
+	ClearError()
+	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), nil, EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil cg SetAccumulatedEffectAfterBlock must SetError sticky")
+	}
+	ClearError()
+	cgNoFM := EmptyCGContext()
+	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cgNoFM, EmptyEffect())
+	if HasError() {
+		t.Fatal("nil FM SetAccumulatedEffectAfterBlock must stay non-sticky soft re-pick")
+	}
+	ClearError()
+	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	if HasError() {
+		t.Fatal("StmID 0 SetAccumulatedEffectAfterBlock must stay non-sticky soft re-pick")
 	}
 	ClearError()
 }

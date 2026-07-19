@@ -734,8 +734,10 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 // Used when combining results of multiple visits to the same function.
 // Incomplete maps fail closed sticky: *facts = IncompleteFactSlice(), false
 // (no invent no-change success via FactsComplete(nil) or soft re-pick past wipe).
+// facts always live; sticky (no invent soft-skip join-visits past hole).
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
@@ -1521,16 +1523,24 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		for _, facts := range fm.MapFactsOut {
 			if !UpdatePtrAliases(facts, &AllPtrs, &AllAliases) {
 				ClearPointToAggregates()
+				// UpdatePtrAliases already sticky; keep cleared (no invent partial AllPtrs)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		}
 		if !UpdatePtrAliases(fm.GlobalFacts, &AllPtrs, &AllAliases) {
 			ClearPointToAggregates()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	}
-	// FactPointTo.cpp:803 — sizes must stay paired (no soft invent desync)
+	// FactPointTo.cpp:803 — sizes must stay paired sticky (no invent desync success)
 	if len(AllPtrs) != len(AllAliases) {
 		ClearPointToAggregates()
+		SetError(ErrGeneric)
 	}
 }

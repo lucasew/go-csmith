@@ -19,7 +19,9 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 // (ok=true, changed=false). Mid-join MergeFactInto nil clears *facts (no invent
 // leave partial join as ok success).
 func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed, ok bool) {
+	// facts out always live; sticky (no invent soft-skip jump merge past hole)
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false, false
 	}
 	// pre-validate: incomplete maps must not soft-join past holes — sticky ERROR
@@ -243,9 +245,14 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 // Statement::stm_id always live; StmID 0 is incomplete (no invent soft no-op success
 // that leaves map_stm_effect unset while callers treat effect as recorded).
 // Incomplete pre/block effects store IncompleteEffect (AddEffect already fails closed).
+// Statement + CGContext always live; sticky (no invent soft-skip effect record past hole).
 // Nil FM / StmID≤0 is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext, preStm Effect) {
-	if st == nil || cg == nil || cg.FM == nil || st.StmID <= 0 {
+	if st == nil || cg == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if cg.FM == nil || st.StmID <= 0 {
 		return
 	}
 	// incomplete inputs fail closed sticky IncompleteEffect map entry (no invent pure merge
@@ -268,9 +275,14 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 // Statement.cpp:844–900 — combine branches / makeup; effect; assign/return facts;
 // func_1 uncertain-call revalidate; set in/out/visited.
 // opts is the session Options (CGOptions); no soft invent Defaults().
+// Statement + CGContext always live; sticky (no invent soft-skip post-creation past hole).
 // Nil FM is non-sticky soft re-pick (sticky poisons soft factories without FM).
 func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, cg *CGContext, opts Options) {
-	if st == nil || cg == nil || cg.FM == nil {
+	if st == nil || cg == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if cg.FM == nil {
 		return
 	}
 	fm := cg.FM

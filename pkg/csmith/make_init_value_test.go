@@ -57,6 +57,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 }
 
 func TestApplyInitExprOutputDef(t *testing.T) {
+	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	pt := PointerTo(GetIntType())
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
@@ -66,6 +67,18 @@ func TestApplyInitExprOutputDef(t *testing.T) {
 	if !strings.Contains(def, "g_p") || !strings.Contains(def, "&") {
 		t.Fatal(def)
 	}
+	// Variable always live; sticky (no invent soft-skip init bind past hole)
+	// Nil init complete no-op
+	applyInitExpr(nil, &Expression{Term: TermConstant, Con: MakeInt(1)})
+	if !HasError() {
+		t.Fatal("nil var applyInitExpr must SetError sticky")
+	}
+	ClearError()
+	applyInitExpr(pv, nil)
+	if HasError() {
+		t.Fatal("nil init applyInitExpr must complete no-op")
+	}
+	ClearError()
 }
 
 func TestGenerateNewNonArrayGlobal(t *testing.T) {

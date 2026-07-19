@@ -6,6 +6,7 @@ import (
 )
 
 func TestIncrCounterAndCalcTotal(t *testing.T) {
+	ClearError()
 	var c []int
 	IncrCounter(&c, 0)
 	IncrCounter(&c, 2)
@@ -16,6 +17,21 @@ func TestIncrCounterAndCalcTotal(t *testing.T) {
 	if CalcTotal(c) != 3 {
 		t.Fatal(CalcTotal(c))
 	}
+	// Counters always live; sticky (no invent soft-skip stats past hole)
+	IncrCounter(nil, 0)
+	if !HasError() {
+		t.Fatal("nil counters IncrCounter must SetError sticky")
+	}
+	ClearError()
+	// pos < 0 complete no-op
+	IncrCounter(&c, -1)
+	if HasError() {
+		t.Fatal("neg pos IncrCounter must complete no-op")
+	}
+	if len(c) != 3 {
+		t.Fatal("neg pos must not mutate", c)
+	}
+	ClearError()
 }
 
 func TestRecordAddressTaken(t *testing.T) {
