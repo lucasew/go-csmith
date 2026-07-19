@@ -122,6 +122,10 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	}
 	var inputs []*FactPointTo
 	if cg.FM != nil {
+		// incomplete GlobalFacts fail closed (no invent fixed-point on partial maps)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		inputs = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	_, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
@@ -139,6 +143,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementIf.cpp:164 — inputs_copy before condition
 	var inputsCopy []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		inputsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	// StatementIf.cpp:165–168 — evaluate condition first (always live test)
@@ -150,6 +157,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// post-condition env shared as entry to both arms
 	var postCond []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		postCond = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	preAccum := EmptyEffect()
@@ -170,6 +180,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
 		// StatementIf.cpp:174 — false starts from same post-cond inputs (not after true)
 		cg.FM.GlobalFacts = CloneFactSlice(postCond)
@@ -184,6 +197,9 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	var elseFacts []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 
@@ -252,6 +268,9 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementFor.cpp:433–434 — facts_copy / effect_stm after init
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 	eff := cg.EffectStm.Clone()
@@ -284,6 +303,9 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		} else if st.Then != nil && st.Then.StmID > 0 {
 			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
 			if in, ok := cg.FM.MapFactsIn[st.Then.StmID]; ok {
+				if !FactsComplete(in) {
+					return false
+				}
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
 		}
@@ -297,7 +319,10 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			}
 			for _, e := range edges {
 				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-					MergeJumpFacts(&cg.FM.GlobalFacts, out)
+					// incomplete jump facts fail closed
+					if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+						return false
+					}
 				}
 			}
 		}

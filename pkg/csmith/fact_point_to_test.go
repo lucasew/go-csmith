@@ -122,6 +122,14 @@ func TestMarkFuncEnd(t *testing.T) {
 	if ft2.MarkFuncEnd(f, body) != nil {
 		t.Fatal("global pointee")
 	}
+	// nil pointee hole fails closed
+	ft3 := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
+	if ft3.MarkFuncEnd(f, body) != nil {
+		t.Fatal("nil PointTo hole must fail closed")
+	}
+	if ft.MarkFuncEndLocals([]*Variable{nil}) != nil {
+		t.Fatal("nil locals hole must fail closed")
+	}
 }
 
 func TestRemoveFunctionLocalFactsMarksGarbage(t *testing.T) {

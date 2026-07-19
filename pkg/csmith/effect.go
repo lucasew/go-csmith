@@ -142,7 +142,40 @@ func (e Effect) AddEffect(other Effect) Effect {
 }
 
 // AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
+// Variable* always live as map keys; nil key fails closed (return e unchanged,
+// no invent partial merge past holes).
 func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
+	// pre-validate both sides complete
+	for k := range e.read {
+		if k == nil {
+			return e
+		}
+	}
+	for k := range e.written {
+		if k == nil {
+			return e
+		}
+	}
+	for k := range e.lhsWrite {
+		if k == nil {
+			return e
+		}
+	}
+	for k := range other.read {
+		if k == nil {
+			return e
+		}
+	}
+	for k := range other.written {
+		if k == nil {
+			return e
+		}
+	}
+	for k := range other.lhsWrite {
+		if k == nil {
+			return e
+		}
+	}
 	out := e
 	if other.read != nil {
 		if out.read == nil {
@@ -359,11 +392,15 @@ func (e Effect) IsRead(v *Variable) bool {
 
 // FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
 // Effect.cpp:389–399.
+// Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
 func (e Effect) FieldIsRead(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
 	}
 	for _, f := range v.FieldVars {
+		if f == nil {
+			return true
+		}
 		if e.IsRead(f) || e.FieldIsRead(f) {
 			return true
 		}
@@ -373,11 +410,15 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
+// Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
 func (e Effect) FieldIsWritten(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
 	}
 	for _, f := range v.FieldVars {
+		if f == nil {
+			return true
+		}
 		if e.IsWritten(f) || e.FieldIsWritten(f) {
 			return true
 		}

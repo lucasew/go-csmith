@@ -99,25 +99,37 @@ func appendUniqueVar(s []*Variable, v *Variable) []*Variable {
 
 // ReadUnionFieldExpr reports whether expression reads a union field.
 // Statement.cpp:665+ subset via IsInsideUnionField.
+// Incomplete IR fails closed as true (no invent "no union field read").
 func ReadUnionFieldExpr(e *Expression) bool {
 	if e == nil {
 		return false
 	}
 	switch e.Term {
 	case TermVariable:
-		return e.Var != nil && e.Var.IsInsideUnionField()
+		if e.Var == nil {
+			return true
+		}
+		return e.Var.IsInsideUnionField()
 	case TermCommaExpr:
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return true
+		}
 		return ReadUnionFieldExpr(e.CommaLHS) || ReadUnionFieldExpr(e.CommaRHS)
 	case TermAssignment:
-		if e.Assign != nil {
-			return ReadUnionFieldStmt(e.Assign)
+		if e.Assign == nil {
+			return true
 		}
+		return ReadUnionFieldStmt(e.Assign)
 	case TermFunction:
-		if e.Invoke != nil {
-			for _, a := range e.Invoke.Args {
-				if ReadUnionFieldExpr(a) {
-					return true
-				}
+		if e.Invoke == nil {
+			return true
+		}
+		for _, a := range e.Invoke.Args {
+			if a == nil {
+				return true
+			}
+			if ReadUnionFieldExpr(a) {
+				return true
 			}
 		}
 	}

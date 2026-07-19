@@ -188,6 +188,16 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	if !eff.IsWritten(v) {
 		t.Fatal("write")
 	}
+	// incomplete GlobalFacts fail closed
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	cg2 := EmptyCGContext().WithFactMgr(fm)
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	if VisitFactsBlock(b, &cg2, Defaults()) {
+		t.Fatal("nil fact hole must fail closed VisitFactsBlock")
+	}
 }
 
 func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {

@@ -689,22 +689,32 @@ func isAncestorField(field, root *Variable) bool {
 
 // MarkFuncEndLocals marks any pointee in locals as dead (mark_func_end subset).
 // FactPointTo.cpp:130–152 without Statement — locals list is the out-of-scope set.
+// MarkFuncEndLocals marks pointees that are locals as garbage/dead at function end.
+// Variable* always live in locals/PointTo; nil hole fails closed (nil fact).
 func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	if f == nil || len(locals) == 0 {
 		return nil
 	}
 	localSet := make(map[*Variable]bool, len(locals))
 	for _, l := range locals {
-		if l != nil {
-			localSet[l] = true
-			for _, fv := range l.CollectExpandable() {
-				localSet[fv] = true
-			}
+		if l == nil {
+			return nil
+		}
+		localSet[l] = true
+		exp := l.CollectExpandable()
+		if exp == nil {
+			return nil
+		}
+		for _, fv := range exp {
+			localSet[fv] = true
 		}
 	}
 	set := append([]*Variable(nil), f.PointTo...)
 	hasGarbage := false
 	for _, p := range set {
+		if p == nil {
+			return nil
+		}
 		if p == GarbagePtr {
 			hasGarbage = true
 			break
@@ -713,7 +723,7 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 	changed := false
 	for i := 0; i < len(set); i++ {
 		p := set[i]
-		if p == nil || IsSpecialPtr(p) || !localSet[p] {
+		if IsSpecialPtr(p) || !localSet[p] {
 			continue
 		}
 		if hasGarbage {
@@ -734,6 +744,8 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 // MarkFuncEnd mirrors FactPointTo::mark_func_end.
 // FactPointTo.cpp:129–154 — pointees on stack at stm become garbage.
 // stParent is the statement's parent block (for is_var_on_stack).
+// MarkFuncEnd marks stack pointees as garbage at function end.
+// Variable* always live in PointTo; nil hole fails closed (nil fact).
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	if f == nil || fn == nil {
 		return nil
@@ -741,6 +753,9 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	set := append([]*Variable(nil), f.PointTo...)
 	hasGarbage := false
 	for _, p := range set {
+		if p == nil {
+			return nil
+		}
 		if p == GarbagePtr {
 			hasGarbage = true
 			break
@@ -749,7 +764,7 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 	changed := false
 	for i := 0; i < len(set); i++ {
 		v := set[i]
-		if v == nil || IsSpecialPtr(v) {
+		if IsSpecialPtr(v) {
 			continue
 		}
 		if !fn.IsVarOnStack(v, stParent) {

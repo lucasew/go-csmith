@@ -35,6 +35,13 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if len(merged2.LhsWriteVars()) != 0 {
 		t.Fatal("lhs should skip")
 	}
+	// nil map key fails closed — leave base unchanged
+	hole := EmptyEffect()
+	hole.written = map[*Variable]bool{nil: true}
+	got := base.ReadVar(v).AddEffectOpts(hole, false)
+	if !got.IsRead(v) || got.IsWritten(v) {
+		t.Fatal("nil effect key must not invent partial merge", got)
+	}
 }
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
