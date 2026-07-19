@@ -179,6 +179,15 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 	if b.MustBreakOrReturnFull(fm) {
 		t.Fatal("back edge escapes return")
 	}
+	// Block always live; sticky no invent not-must-break soft-skip past hole
+	ClearError()
+	if (*Block)(nil).MustBreakOrReturnFull(fm) {
+		t.Fatal("nil MustBreakOrReturnFull must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil MustBreakOrReturnFull must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectCloneIndependent(t *testing.T) {

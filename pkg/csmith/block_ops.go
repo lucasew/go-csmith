@@ -5,8 +5,13 @@ package csmith
 // MustBreakOrReturnFull mirrors Block::must_break_or_return.
 // Block.cpp:342–357 — last must_return unless continue-like back edge from outside.
 // Note: unlike must_return, does not require break_stms empty.
+// Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
-	if b == nil || len(b.Stmts) == 0 {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(b.Stmts) == 0 {
 		return false
 	}
 	last := b.GetLastStm()

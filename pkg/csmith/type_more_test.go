@@ -53,6 +53,97 @@ func TestSignedOverflowPossible(t *testing.T) {
 	if GetIntType().SignedOverflowPossible(0) {
 		t.Fatal("intSize 0 must fail closed false")
 	}
+	// Type* always live; sticky true (no invent overflow-free soft-skip)
+	ClearError()
+	if !(*Type)(nil).SignedOverflowPossible(4) {
+		t.Fatal("nil SignedOverflowPossible must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil SignedOverflowPossible must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestTypeNilHardQuerySticky(t *testing.T) {
+	// Type* always live at hard query/emit; sticky no invent soft success past hole
+	ClearError()
+	if (*Type)(nil).Simple() != EVoid {
+		t.Fatal("nil Simple must fail closed EVoid")
+	}
+	if !HasError() {
+		t.Fatal("nil Simple must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).PtrType() != nil {
+		t.Fatal("nil PtrType must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil PtrType must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).ToUnsigned() != nil {
+		t.Fatal("nil ToUnsigned must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil ToUnsigned must SetError sticky")
+	}
+	ClearError()
+	if !(*Type)(nil).ContainPointerField() {
+		t.Fatal("nil ContainPointerField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil ContainPointerField must SetError sticky")
+	}
+	ClearError()
+	if !(*Type)(nil).HasBitfields() {
+		t.Fatal("nil HasBitfields must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil HasBitfields must SetError sticky")
+	}
+	ClearError()
+	if !(*Type)(nil).HasPadding() {
+		t.Fatal("nil HasPadding must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil HasPadding must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsBitfieldIndex(0) {
+		t.Fatal("nil IsBitfieldIndex must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsBitfieldIndex must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsUnamedPadding(0) {
+		t.Fatal("nil IsUnamedPadding must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsUnamedPadding must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).IsUnnamedPadding(0) {
+		t.Fatal("nil IsUnnamedPadding must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsUnnamedPadding must SetError sticky")
+	}
+	ClearError()
+	if s := (*Type)(nil).TypeNameString(); s != "" {
+		t.Fatal("nil TypeNameString invent", s)
+	}
+	if !HasError() {
+		t.Fatal("nil TypeNameString must SetError sticky")
+	}
+	ClearError()
+	if s := (*Type)(nil).PrintfDirective(); s != "" {
+		t.Fatal("nil PrintfDirective invent", s)
+	}
+	if !HasError() {
+		t.Fatal("nil PrintfDirective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {

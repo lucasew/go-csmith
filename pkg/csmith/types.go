@@ -189,8 +189,10 @@ func (t *Type) StructDepth() int {
 }
 
 // Simple returns the eSimpleType (only meaningful if IsSimple).
+// Type* always live at Simple sites; sticky EVoid (no invent void soft-skip past hole).
 func (t *Type) Simple() ESimpleType {
 	if t == nil {
+		SetError(ErrGeneric)
 		return EVoid
 	}
 	return t.simple
@@ -238,10 +240,12 @@ func (t *Type) HasIntField() bool {
 
 // ContainPointerField mirrors Type::contain_pointer_field.
 // Type.cpp:1664–1674 — ePointer, or any aggregate field that does.
-// Type* always live on Fields; nil hole sticky true (no invent pointer-free).
+// Type* always live; nil Type sticky true (no invent pointer-free soft-skip).
+// Type* always live on Fields; nil field hole sticky true (no invent pointer-free).
 func (t *Type) ContainPointerField() bool {
 	if t == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if t.ptrTo != nil {
 		return true
@@ -302,8 +306,13 @@ func (t *Type) IsSigned() bool {
 
 // ToUnsigned mirrors Type::to_unsigned.
 // Type.cpp:1349–1377 — map signed simple types to unsigned counterparts.
+// Type* always live at to_unsigned; sticky nil (no invent soft-skip past hole).
 func (t *Type) ToUnsigned() *Type {
-	if t == nil || !t.IsSimple() {
+	if t == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !t.IsSimple() {
 		return nil
 	}
 	switch t.simple {
@@ -451,8 +460,10 @@ func (t *Type) CName() string {
 }
 
 // PtrType returns Type::ptr_type (pointee), or nil if not a pointer.
+// Type* always live at ptr_type; sticky nil (no invent not-pointer soft-skip past hole).
 func (t *Type) PtrType() *Type {
 	if t == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return t.ptrTo
@@ -662,10 +673,12 @@ func (t *Type) NeedsCast(other *Type) bool {
 
 // HasBitfields mirrors Type::has_bitfields.
 // Type.cpp:1290–1301.
-// Type* always live on Fields; nil hole sticky true (no invent bitfield-free).
+// Type* always live; nil Type sticky true (no invent bitfield-free soft-skip).
+// Type* always live on Fields; nil field hole sticky true (no invent bitfield-free).
 func (t *Type) HasBitfields() bool {
 	if t == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	for _, f := range t.Fields {
 		if f.BitWidth >= 0 {
@@ -686,10 +699,12 @@ func (t *Type) HasBitfields() bool {
 // IsBitfieldIndex mirrors Type::is_bitfield(index).
 // Type.cpp:1286–1288 — assert(index < bitfields_length_.size()); BitWidth >= 0.
 func (t *Type) IsBitfieldIndex(index int) bool {
-	// OOB is assert path sticky — fail closed false (not invent non-bitfield / soft skip)
+	// Type* always live; sticky false (no invent non-bitfield soft-skip past hole)
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
+	// OOB is assert path sticky — fail closed false (not invent non-bitfield / soft skip)
 	if index < 0 || index >= len(t.Fields) {
 		SetError(ErrGeneric)
 		return false
@@ -700,7 +715,9 @@ func (t *Type) IsBitfieldIndex(index int) bool {
 // IsUnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1278–1283 — assert(index < sz); bitfields_length_[index] == 0.
 func (t *Type) IsUnamedPadding(index int) bool {
+	// Type* always live; sticky false (no invent not-padding soft success past hole)
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
@@ -714,9 +731,11 @@ func (t *Type) IsUnamedPadding(index int) bool {
 
 // HasPadding mirrors Type::has_padding.
 // Type.cpp:1305–1314 — unpacked struct, bitfield member, or nested padding.
+// Type* always live; sticky true (no invent padding-free soft-skip past hole).
 func (t *Type) HasPadding() bool {
 	if t == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if t.IsStruct() && !t.Packed {
 		return true
@@ -751,8 +770,13 @@ func GetIntType() *Type { return GetSimpleType(EInt) }
 
 // SignedOverflowPossible mirrors Type::signed_overflow_possible.
 // Type.cpp:482–484 — signed simple with size >= int_size.
+// Type* always live; sticky true (no invent overflow-free soft-skip past hole).
 func (t *Type) SignedOverflowPossible(intSize int) bool {
-	if t == nil || !t.IsSimple() || !t.IsSigned() {
+	if t == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !t.IsSimple() || !t.IsSigned() {
 		return false
 	}
 	// CGOptions::int_size always positive; no invent platform size when arg is 0
@@ -802,8 +826,10 @@ func GetTypeFromString(typeString string) *Type {
 }
 
 // TypeNameString is the reverse of get_type_from_string for simple types.
+// Type* always live at name emit; sticky empty (no invent empty type-name past hole).
 func (t *Type) TypeNameString() string {
 	if t == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
@@ -853,8 +879,10 @@ func (t *Type) TypeNameString() string {
 
 // PrintfDirective mirrors Type::printf_directive.
 // Type.cpp:1932–1957.
+// Type* always live at printf emit; sticky empty (no invent empty directive past hole).
 func (t *Type) PrintfDirective() string {
 	if t == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
@@ -953,8 +981,10 @@ func HasLongLongField(fields []StructField) bool {
 // IsUnnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1280+ — zero-width bitfield without a name used as padding.
 // Our StructField always has names; treat BitWidth==0 as unnamed padding candidate.
+// Type* always live; sticky false (no invent not-padding soft success past hole).
 func (t *Type) IsUnnamedPadding(index int) bool {
 	if t == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
