@@ -231,6 +231,53 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	}
 }
 
+func TestRhsToLhsTransferUnionCommaNilRHSFailClosed(t *testing.T) {
+	// incomplete CommaRHS must not soft-re-pick via bare nil-rhs peel path
+	ClearError()
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	dst := &Variable{Name: "g_dst", Type: ut}
+	rhs := &Expression{
+		Term:     TermCommaExpr,
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		// CommaRHS nil
+	}
+	out := RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, rhs)
+	if UnionFactsComplete(out) {
+		t.Fatal("nil CommaRHS must fail closed incomplete", out)
+	}
+	if !HasError() {
+		t.Fatal("nil CommaRHS RhsToLhsTransferUnion must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestRhsToLhsTransferUnionAssignNilExprFailClosed(t *testing.T) {
+	// incomplete Assign.Expr must not soft-re-pick via bare nil-rhs peel path
+	ClearError()
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	dst := &Variable{Name: "g_dst", Type: ut}
+	assign := &Stmt{
+		Kind:     StmtAssign,
+		LhsVar:   dst,
+		Lhs:      &Lhs{Var: dst, Type: ut},
+		AssignOp: AssignSimple,
+		// Expr nil
+	}
+	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: ut}
+	out := RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, rhs)
+	if UnionFactsComplete(out) {
+		t.Fatal("nil Assign.Expr must fail closed incomplete", out)
+	}
+	if !HasError() {
+		t.Fatal("nil Assign.Expr RhsToLhsTransferUnion must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestAbstractFactUnionForAssignField(t *testing.T) {
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},

@@ -498,12 +498,25 @@ func RhsToLhsTransferUnion(
 		// FactUnion.cpp:107 assert(rv_fact) path — non-sticky generation hole
 		return IncompleteUnionFactSlice()
 	case TermAssignment:
+		// FactUnion.cpp:110–112 — peel embedded assign RHS
+		// incomplete Assign/Expr sticky — no invent empty/non-sticky via nil-rhs peel
+		// (generation AddParamFacts missing-arg path is bare rhs=nil, not compound shell)
 		if rhs.Assign == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if rhs.Assign.Expr == nil {
 			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.Assign.Expr)
 	case TermCommaExpr:
+		// FactUnion.cpp:113–115 — peel comma RHS
+		// incomplete CommaRHS sticky — no invent empty/non-sticky via nil-rhs peel
+		if rhs.CommaRHS == nil {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.CommaRHS)
 	default:
 		// unknown term — non-sticky hole
