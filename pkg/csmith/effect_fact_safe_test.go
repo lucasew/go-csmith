@@ -115,6 +115,21 @@ func TestJoinVisits(t *testing.T) {
 	if fp == nil || !IsVariableInSet(fp.PointTo, b) {
 		t.Fatal(fp)
 	}
+	// incomplete maps fail closed IncompleteFactSlice (not invent no-change complete)
+	factsHole := []*FactPointTo{MakeFactPointTo(p, a), nil}
+	if JoinVisitsInto(&factsHole, []*FactPointTo{MakeFactPointTo(p, b)}) {
+		t.Fatal("incomplete subject must fail closed false")
+	}
+	if FactsComplete(factsHole) {
+		t.Fatal("incomplete subject must wipe IncompleteFactSlice", factsHole)
+	}
+	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
+	if JoinVisitsInto(&facts2, []*FactPointTo{MakeFactPointTo(p, b), nil}) {
+		t.Fatal("incomplete newFacts must fail closed false")
+	}
+	if FactsComplete(facts2) {
+		t.Fatal("incomplete newFacts must wipe IncompleteFactSlice", facts2)
+	}
 }
 
 func TestSafeOpFlagsDummyAndFloat(t *testing.T) {

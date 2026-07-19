@@ -89,12 +89,17 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 // RenewFact mirrors renew_fact — replace related or append.
 // Fact.cpp:175–191.
 // Fact* always live; incomplete subject map or nf PointTo fails closed
-// (false — no invent renew with broken pointee sets).
+// (*facts IncompleteFactSlice, false — no invent renew / leave incomplete as no-op).
 func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
-	if facts == nil || nf == nil || nf.Var == nil {
+	if facts == nil {
+		return false
+	}
+	if nf == nil || nf.Var == nil {
+		*facts = IncompleteFactSlice()
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete([]*FactPointTo{nf}) {
+		*facts = IncompleteFactSlice()
 		return false
 	}
 	for i, f := range *facts {

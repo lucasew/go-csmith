@@ -618,24 +618,35 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 
 // JoinVisitsInto merges newFacts into facts with join_visits semantics.
 // Used when combining results of multiple visits to the same function.
-// Fact* always live; nil holes fail closed (false, no invent partial join).
+// Incomplete maps fail closed: *facts = IncompleteFactSlice(), false
+// (no invent no-change success via FactsComplete(nil) or soft-append nil Clone).
 func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		*facts = IncompleteFactSlice()
 		return false
 	}
 	changed := false
 	for _, nf := range newFacts {
 		cur := FindRelatedPointTo(*facts, nf.Var)
 		if cur == nil {
-			*facts = append(*facts, nf.Clone())
+			cl := nf.Clone()
+			if cl == nil {
+				*facts = IncompleteFactSlice()
+				return false
+			}
+			*facts = append(*facts, cl)
 			changed = true
 			continue
 		}
 		// join into clone then replace
 		cp := cur.Clone()
+		if cp == nil {
+			*facts = IncompleteFactSlice()
+			return false
+		}
 		if cp.JoinVisits(nf) {
 			// replace in slice
 			for i, f := range *facts {
