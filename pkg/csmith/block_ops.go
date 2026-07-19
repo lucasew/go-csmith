@@ -736,9 +736,16 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 		return ShortcutNone
 	}
 	// block is not is_ctrl_stmt
-	// Incomplete map_stm_effect fails closed (no invent ShortcutOK with poison AddEffect)
+	// Incomplete map_stm_effect / accum fails closed before AddEffect
+	// (no invent ShortcutOK with poison; no sticky SetError on intentional none)
 	eff := fm.GetMapStmEffect(b.StmID)
 	if !EffectComplete(eff) {
+		return ShortcutNone
+	}
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		return ShortcutNone
+	}
+	if !EffectComplete(cg.EffectStm) {
 		return ShortcutNone
 	}
 	if cg.InConflict(eff) {

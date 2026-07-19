@@ -478,6 +478,7 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 
 func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	// incomplete map_stm_effect / accum must not invent ShortcutOK
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -501,10 +502,12 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("incomplete EffectAccum must fail closed ShortcutNone")
 	}
+	ClearError()
 }
 
 func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	// incomplete EffectAccum must not invent StmVisitFacts true while recording map_accum
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -525,4 +528,5 @@ func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	if EffectComplete(fm.GetMapAccumEffect(90)) {
 		t.Fatal("map_accum must stay incomplete marker")
 	}
+	ClearError()
 }

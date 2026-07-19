@@ -307,9 +307,16 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if ContainsUnfixedGoto(st, fm) {
 		return ShortcutNone
 	}
-	// Incomplete map_stm_effect fails closed (no invent ShortcutOK with poison AddEffect)
+	// Incomplete map_stm_effect / accum fails closed before AddEffect
+	// (no invent ShortcutOK with poison; no sticky SetError on intentional none)
 	eff := fm.GetMapStmEffect(st.StmID)
 	if !EffectComplete(eff) {
+		return ShortcutNone
+	}
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		return ShortcutNone
+	}
+	if !EffectComplete(cg.EffectStm) {
 		return ShortcutNone
 	}
 	if cg.InConflict(eff) {

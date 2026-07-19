@@ -391,6 +391,7 @@ func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
 
 func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	// incomplete call_chain must not invent partial external merge
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVar(g)
 	cg := EmptyCGContext()
@@ -398,8 +399,53 @@ func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	cg.CallChain = []*Block{nil}
 	cg.AddVisibleEffectAt(e, &Block{StmID: 1})
-	// fail closed: accum unchanged (no invent merge past hole)
+	// fail closed: accum unchanged + sticky error (no invent merge past hole)
 	if eff.IsWritten(g) {
 		t.Fatal("nil CallChain hole must not invent external write merge")
 	}
+	if !HasError() {
+		t.Fatal("nil CallChain hole must SetError")
+	}
+	ClearError()
+}
+
+func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
+	// NoteWrite/NoteRead must not invent silent grow on incomplete accum
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect())
+	inc := IncompleteEffect()
+	cg.EffectAccum = &inc
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	cg.NoteWrite(g)
+	if !HasError() {
+		t.Fatal("NoteWrite incomplete accum must SetError")
+	}
+	ClearError()
+	inc2 := IncompleteEffect()
+	cg2 := WithFunc(f, EmptyEffect())
+	cg2.EffectAccum = &inc2
+	cg2.NoteRead(g)
+	if !HasError() {
+		t.Fatal("NoteRead incomplete accum must SetError")
+	}
+	ClearError()
+}
+
+func TestAddEffectIncompleteFailClosed(t *testing.T) {
+	ClearError()
+	cg := EmptyCGContext()
+	cg.EffectStm = IncompleteEffect()
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	cg.AddEffect(EmptyEffect().WriteVar(v), false)
+	if !HasError() {
+		t.Fatal("AddEffect incomplete stm must SetError")
+	}
+	ClearError()
+	cg2 := EmptyCGContext()
+	cg2.AddEffect(IncompleteEffect(), false)
+	if !HasError() {
+		t.Fatal("AddEffect incomplete e must SetError")
+	}
+	ClearError()
 }

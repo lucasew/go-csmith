@@ -75,28 +75,58 @@ func (c CGContext) AccumEffect() Effect {
 
 // NoteWrite records a variable write into EffectAccum if present.
 // Also updates CurrentFunc.FEffect for globals (Function::feffect external).
+// Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteWrite(v *Variable) {
 	if v == nil {
 		return
 	}
 	if c.EffectAccum != nil {
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+			return
+		}
 		*c.EffectAccum = c.EffectAccum.WriteVar(v)
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+		}
 	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+		}
 	}
 }
 
 // NoteRead records a variable read into EffectAccum and FEffect for globals.
+// Incomplete accum fails closed sticky error (no invent silent grow on hole shell).
 func (c CGContext) NoteRead(v *Variable) {
 	if v == nil {
 		return
 	}
 	if c.EffectAccum != nil {
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+			return
+		}
 		*c.EffectAccum = c.EffectAccum.ReadVar(v)
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+		}
 	}
 	if c.CurrentFunc != nil && v.IsGlobal() {
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+		}
 	}
 }
 
@@ -293,16 +323,38 @@ func (c CGContext) OutputCallChain() string {
 
 // AddExternalEffect mirrors CGContext::add_external_effect.
 // CGContext.cpp:399–404 — merge global-only effects into accum and stm.
+// Incomplete e or base fails closed sticky error (no invent silent IncompleteEffect poison
+// as successful merge / under-report callee effects).
 func (c *CGContext) AddExternalEffect(e Effect) {
 	if c == nil {
 		return
 	}
+	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
+		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddExternalEffect(e)
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+			return
+		}
 	}
 	c.EffectStm = c.EffectStm.AddExternalEffect(e)
+	if !EffectComplete(c.EffectStm) {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.CurrentFunc != nil {
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+		}
 	}
 }
 
@@ -315,18 +367,25 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 // AddVisibleEffectAt mirrors CGContext::add_visible_effect(e, b).
 // CGContext.cpp:411–417 — callers = call_chain then b.
 // Block* always live on call_chain; nil hole or incomplete Param/LocalVars fails
-// closed (skip merge — no invent partial external effect / not-on-chain past holes).
+// closed sticky error (no invent soft-skip merge as no-effect success / partial merge).
 func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
 		return
 	}
+	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
+		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
+		return
+	}
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
-			// incomplete call_chain / stack lists — fail closed without inventing merge
+			// incomplete call_chain / stack lists — fail closed sticky (no invent skip merge)
+			SetError(ErrGeneric)
 			return
 		}
 	}
 	if b != nil && !b.StackScanComplete() {
+		SetError(ErrGeneric)
 		return
 	}
 	callers := append([]*Block(nil), c.CallChain...)
@@ -335,25 +394,53 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddExternalEffectWithCallers(e, callers)
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+			return
+		}
 	}
 	c.EffectStm = c.EffectStm.AddExternalEffectWithCallers(e, callers)
+	if !EffectComplete(c.EffectStm) {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.CurrentFunc != nil {
 		// FEffect remains global-external summary for the function
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+			return
+		}
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.AddExternalEffect(e)
+		if !EffectComplete(c.CurrentFunc.FEffect) {
+			SetError(ErrGeneric)
+		}
 	}
 }
 
 // AddEffect mirrors CGContext::add_effect — fold into accum and effect_stm.
 // CGContext.cpp:382–388.
+// Incomplete e or base fails closed sticky error (no invent silent IncompleteEffect poison).
 func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 	if c == nil {
 		return
 	}
+	if !EffectComplete(e) || !EffectComplete(c.EffectStm) ||
+		(c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AddEffectOpts(e, includeLHS)
+		if !EffectComplete(*c.EffectAccum) {
+			SetError(ErrGeneric)
+			return
+		}
 	}
 	// CGContext.cpp:386 — effect_stm.add_effect(e) always default include_lhs=false
 	c.EffectStm = c.EffectStm.AddEffectOpts(e, false)
+	if !EffectComplete(c.EffectStm) {
+		SetError(ErrGeneric)
+	}
 }
 
 // MergeParamContext mirrors CGContext::merge_param_context.

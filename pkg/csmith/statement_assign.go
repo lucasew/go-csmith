@@ -797,9 +797,16 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
-	// Incomplete ambient fails closed (no invent visit under incomplete running)
+	// Incomplete ambient/stm/accum fails closed (no invent visit under incomplete;
+	// no MergeParamContext AddEffect sticky SetError on intentional false)
 	runningEff := cg.EffectContext()
 	if !EffectComplete(runningEff) {
+		return false
+	}
+	if !EffectComplete(cg.EffectStm) {
+		return false
+	}
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
 		return false
 	}
 	rhsAccum := EmptyEffect()
@@ -807,9 +814,6 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = cg.EffectStm
-	if !EffectComplete(cg.EffectStm) {
-		return false
-	}
 
 	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false
