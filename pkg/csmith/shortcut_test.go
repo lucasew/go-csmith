@@ -5,6 +5,7 @@ import (
 )
 
 func TestSameFacts(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	b := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -15,22 +16,36 @@ func TestSameFacts(t *testing.T) {
 	if SameFacts(a, b2) {
 		t.Fatal("diff")
 	}
-	// nil hole fails closed — no invent same-as-skip
+	// nil hole sticky — no invent same-as-skip
+	ClearError()
 	hole := []*FactPointTo{nil}
 	if SameFacts(hole, hole) {
 		t.Fatal("nil hole must not be same")
 	}
-	// incomplete PointTo fails closed
+	if !HasError() {
+		t.Fatal("SameFacts nil hole must SetError sticky")
+	}
+	ClearError()
+	// incomplete PointTo sticky
 	ptHole := []*FactPointTo{{Var: p, PointTo: []*Variable{nil}}}
 	if SameFacts(ptHole, ptHole) {
 		t.Fatal("nil pointee must not invent SameFacts")
 	}
+	if !HasError() {
+		t.Fatal("SameFacts nil pointee must SetError sticky")
+	}
+	ClearError()
 	if FindFact(ptHole, MakeFactPointTo(p, NullPtr)) >= 0 {
 		t.Fatal("FindFact incomplete map must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("FindFact incomplete map must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSubsetFacts(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// wider set implies narrower
 	wide := []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}
@@ -57,11 +72,16 @@ func TestSubsetFacts(t *testing.T) {
 			t.Fatal("subset")
 		}
 	}
-	// nil fact hole fails closed — no invent skip as subset
+	// nil fact hole sticky — no invent skip as subset
+	ClearError()
 	hole := []*FactPointTo{nil}
 	if SubsetFacts(hole, hole) {
 		t.Fatal("nil hole must not be subset")
 	}
+	if !HasError() {
+		t.Fatal("SubsetFacts nil hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsCtrlStmt(t *testing.T) {
@@ -98,6 +118,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 }
 
 func TestShortcutConflict(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
 	fm := NewFactMgr(nil)

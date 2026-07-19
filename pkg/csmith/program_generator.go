@@ -266,13 +266,18 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 	if !g.hashHelpersEnabled() {
 		return false
 	}
-	// incomplete GlobalList fails closed not-ready (GetMaxArrayDimension -1 must not
-	// invent ready via dimen<=0; no invent hash-func shell past holes)
+	// incomplete GlobalList sticky not-ready (GetMaxArrayDimension -1 must not
+	// invent ready via dimen<=0 / soft re-pick hash-func shell past holes)
 	if g.VS == nil || !VariablesComplete(g.VS.GlobalList) {
+		SetError(ErrGeneric)
 		return false
 	}
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
 	if dimen < 0 {
+		// incomplete array sizes sticky
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if dimen == 0 {

@@ -1340,11 +1340,20 @@ func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 // PtrModifiedInRhs mirrors Lhs::ptr_modified_in_rhs.
 // Lhs.cpp:240–261 — intermediate pointers written in effect_stm from RHS.
 // Incomplete pointees fail closed as modified (no invent unmodified).
+// PtrModifiedInRhs mirrors Lhs.cpp:233–257 — intermediate pointer levels written by RHS.
+// Hard IR incomplete sticky as modified (no invent unmodified / soft re-pick past holes);
+// MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	indirect := lhs.IndirectLevel()
+	// incomplete Lhs type IR sticky as modified (no invent non-deref path)
+	indirect, ok := lhs.IndirectLevelComplete()
+	if !ok {
+		SetError(ErrGeneric)
+		return true
+	}
 	// Lhs.cpp:243 — assert(indirect > 0); non-deref LHS is not this path
 	if indirect <= 0 {
 		return false
@@ -1353,9 +1362,12 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	if c.EffectStm.IsWritten(lhs.Var) {
 		return true
 	}
-	// incomplete collective fails closed as modified (no invent unmodified / panic)
+	// incomplete collective sticky as modified (GetCollective already SetError)
 	coll := lhs.Var.GetCollective()
 	if coll == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	tmp := []*Variable{coll}
@@ -1363,8 +1375,8 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	for indirect > 1 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		// nil / incomplete pointees
-		if tmp == nil || !VariablesComplete(tmp) {
+		// incomplete pointees non-sticky true (fact-map soft re-pick)
+		if !VariablesComplete(tmp) {
 			return true
 		}
 		for _, v := range tmp {

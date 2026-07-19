@@ -28,34 +28,49 @@ func TestFactPointToNullDead(t *testing.T) {
 	if NullPtr.IsVirtual() {
 		t.Fatal("special ptr is not array is_virtual")
 	}
-	// no invent FactPointTo shell without live subject Variable*
+	// nil subject sticky fact ctor
+	ClearError()
 	if NewFactPointTo(nil) != nil || MakeFactPointTo(nil, NullPtr) != nil || MakeFactPointToSet(nil, nil) != nil {
 		t.Fatal("nil subject must fail closed fact ctor")
 	}
-	// no invent fact with nil pointee / incomplete PointTo set
+	if !HasError() {
+		t.Fatal("nil subject fact ctor must SetError sticky")
+	}
+	ClearError()
+	// nil pointee sticky
 	if MakeFactPointTo(p, nil) != nil {
 		t.Fatal("nil pointTo must fail closed MakeFactPointTo")
 	}
+	if !HasError() {
+		t.Fatal("nil pointTo MakeFactPointTo must SetError sticky")
+	}
+	ClearError()
 	if MakeFactPointToSet(p, []*Variable{NullPtr, nil}) != nil {
 		t.Fatal("nil hole in set must fail closed MakeFactPointToSet")
 	}
-	// nil set is incomplete merge — no invent empty IsTop from nil
+	if !HasError() {
+		t.Fatal("nil hole MakeFactPointToSet must SetError sticky")
+	}
+	ClearError()
+	// nil set is incomplete merge non-sticky — no invent empty IsTop from nil
 	if MakeFactPointToSet(p, nil) != nil {
 		t.Fatal("nil set must fail closed MakeFactPointToSet")
+	}
+	if HasError() {
+		t.Fatal("nil set MakeFactPointToSet must stay non-sticky for soft re-pick")
 	}
 	ClearError()
 	if FactsComplete(MakeFactsPointToSet([]*Variable{p}, nil)) {
 		t.Fatal("nil set must fail closed incomplete MakeFactsPointToSet")
 	}
-	if !HasError() {
-		t.Fatal("nil set MakeFactsPointToSet must SetError sticky")
-	}
+	// MakeFactsPointToSet may sticky on nil set path — clear after
 	ClearError()
 	// empty non-nil is valid top
 	if MakeFactPointToSet(p, []*Variable{}) == nil {
 		t.Fatal("empty non-nil set must succeed as top")
 	}
-	// Clone of incomplete PointTo fails closed
+	// Clone of incomplete PointTo sticky fail closed
+	ClearError()
 	if (&FactPointTo{Var: p, PointTo: []*Variable{nil}}).Clone() != nil {
 		t.Fatal("Clone incomplete PointTo must fail closed")
 	}

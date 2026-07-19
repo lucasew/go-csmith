@@ -14,9 +14,10 @@ const (
 
 // SameFacts mirrors same_facts for FactPointTo slices.
 // Fact.cpp:237–246 — same size and each fact of facts1 found in facts2.
-// Incomplete maps/PointTo fail closed (no invent same-as-skip past holes).
+// Incomplete maps/PointTo fail closed sticky (no invent same-as-skip / soft re-pick past holes).
 func SameFacts(a, b []*FactPointTo) bool {
 	if !FactsComplete(a) || !FactsComplete(b) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {
@@ -32,13 +33,18 @@ func SameFacts(a, b []*FactPointTo) bool {
 
 // FindFact mirrors find_fact — equal fact in vector, or -1.
 // Fact.cpp find_fact by equal().
-// Incomplete map fails closed -1 (no invent soft-skip hole and match later).
+// Incomplete map fails closed sticky -1 (no invent soft-skip hole and match later).
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
-	if want == nil || !FactsComplete(facts) {
+	if want == nil {
 		return -1
 	}
-	// want must be a complete fact for Equal to be meaningful
+	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
+		return -1
+	}
+	// want must be a complete fact for Equal to be meaningful sticky
 	if !FactsComplete([]*FactPointTo{want}) {
+		SetError(ErrGeneric)
 		return -1
 	}
 	for i, f := range facts {
@@ -51,9 +57,10 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 
 // SubsetFacts mirrors subset_facts — each f1 is implied by related f2.
 // Fact.cpp:249–260.
-// Incomplete maps/PointTo fail closed (no invent subset past holes).
+// Incomplete maps/PointTo fail closed sticky (no invent subset / soft re-pick past holes).
 func SubsetFacts(a, b []*FactPointTo) bool {
 	if !FactsComplete(a) || !FactsComplete(b) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if len(a) != len(b) {

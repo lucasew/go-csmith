@@ -22,33 +22,41 @@ type FactPointTo struct {
 
 // NewFactPointTo mirrors FactPointTo(const Variable*) — starts as garbage.
 // FactPointTo.cpp:354–359 — Variable* always live at construction sites.
-// no invent FactPointTo{nil, garbage} shell for nil subject
+// nil subject sticky (no invent FactPointTo{nil, garbage} shell / soft re-pick).
 func NewFactPointTo(v *Variable) *FactPointTo {
 	if v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{GarbagePtr}}
 }
 
 // MakeFactPointTo mirrors FactPointTo::make_fact(v, point_to).
-// no invent fact without live subject Variable* / live pointee (use NullPtr etc.)
+// nil subject/pointee sticky (no invent fact without live Variable* / soft re-pick).
 func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
 	if v == nil || pointTo == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{pointTo}}
 }
 
 // MakeFactPointToSet mirrors FactPointTo::make_fact(v, set).
-// no invent fact without live subject; nil set or nil pointee hole fails closed
-// (nil set is incomplete merge_pointees — no invent empty IsTop PointTo from nil).
+// nil subject sticky; nil set non-sticky incomplete merge_pointees (soft re-pick —
+// no invent empty IsTop PointTo from nil); nil pointee hole sticky.
 // Valid empty sets use non-nil empty slice []*Variable{}.
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
-	if v == nil || set == nil {
+	if v == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// nil set = incomplete merge_pointees path — non-sticky hole for soft re-pick
+	if set == nil {
 		return nil
 	}
 	for _, p := range set {
 		if p == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 	}
@@ -660,8 +668,12 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 // JoinVisits mirrors FactPointTo::join_visits.
 // FactPointTo.cpp:584–605 — merge across revisits; ignore TBD-only other;
 // clear TBD-only self before absorbing concrete pointees.
+// Nil shells sticky; Join already sticky on PointTo holes.
 func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
+		if f == nil || other == nil {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if other.IsTBDOnly() {
@@ -722,8 +734,8 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 }
 
 // Clone shallow-copies the fact (new PointTo slice).
-// Incomplete PointTo (nil hole) fails closed nil — no invent clone of broken set.
-// Empty top (nil PointTo) clones as empty non-nil set.
+// Incomplete PointTo (nil hole) fails closed sticky nil — no invent clone of broken set
+// / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {
 		return nil
@@ -732,6 +744,7 @@ func (f *FactPointTo) Clone() *FactPointTo {
 	if set == nil {
 		set = []*Variable{}
 	}
+	// MakeFactPointToSet sticky on nil pointee holes / nil Var
 	return MakeFactPointToSet(f.Var, set)
 }
 
