@@ -182,19 +182,26 @@ func FindContainerStm(b *Block) *Stmt {
 	for i := range b.Parent.Stmts {
 		s := &b.Parent.Stmts[i]
 		blks := GetBlocksStmt(s)
-		// incomplete get_blocks (if arms / for body holes) sticky no invent miss
+		// incomplete get_blocks (if arms / for body / block holes) sticky no invent miss
+		// scan all arms first — no invent match Then then soft-skip nil Else
+		incomplete := false
+		matched := false
 		for _, nb := range blks {
 			if nb == nil {
-				// StmtIf always both arms; nil arm incomplete IR sticky
-				if s.Kind == StmtIfElse || s.Kind == StmtFor {
-					SetError(ErrGeneric)
-					return nil
-				}
+				incomplete = true
 				continue
 			}
 			if nb == b {
-				return s
+				matched = true
 			}
+		}
+		if incomplete {
+			// get_blocks arms always live when Kind exposes them; nil hole sticky
+			SetError(ErrGeneric)
+			return nil
+		}
+		if matched {
+			return s
 		}
 	}
 	return nil

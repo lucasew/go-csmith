@@ -152,6 +152,18 @@ func TestFindContainerAndDominate(t *testing.T) {
 		t.Fatal("root FindContainerStm must not sticky")
 	}
 	ClearError()
+	// incomplete if-arm sticky (no invent soft-continue past nil Else)
+	body2 := &Block{StmID: 30}
+	outer2 := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 31, Then: body2, Else: nil}}}
+	body2.Parent = outer2
+	outer2.Stmts[0].Then = body2
+	if FindContainerStm(body2) != nil {
+		t.Fatal("nil Else FindContainerStm must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Else FindContainerStm must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestDominateIncompleteStmIDNoInvent(t *testing.T) {

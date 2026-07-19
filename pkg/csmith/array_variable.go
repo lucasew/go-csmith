@@ -350,8 +350,14 @@ func FindExprKeyVar(e *Expression) *Variable {
 	switch e.Term {
 	case TermVariable:
 		// incomplete Variable* shell sticky → nil
+		// Type-nil non-special sticky (no invent key var soft-success past type hole)
 		if e.Var == nil {
 			SetError(ErrGeneric)
+			return nil
+		}
+		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
+			SetError(ErrGeneric)
+			return nil
 		}
 		return e.Var
 	case TermFunction:
@@ -1094,19 +1100,34 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	// cast signed index type to unsigned before %
-	if t := idx.GetType(); t != nil && t.IsSigned() {
-		if u := t.ToUnsigned(); u != nil {
-			cn := u.CName()
-			if cn == "" {
-				// incomplete unsigned CName sticky — no invent bare cast shell
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return ""
-			}
-			return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)
+	// index Type* always live for signed cast path; Type-nil sticky empty
+	// (no invent bare modulo soft-success past incomplete index type shell)
+	t := idx.GetType()
+	if t == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
 		}
+		return ""
+	}
+	// cast signed index type to unsigned before %
+	if t.IsSigned() {
+		u := t.ToUnsigned()
+		if u == nil {
+			// incomplete to_unsigned sticky — no invent bare modulo past hole
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		cn := u.CName()
+		if cn == "" {
+			// incomplete unsigned CName sticky — no invent bare cast shell
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)
 	}
 	return fmt.Sprintf("((%s) %% %d)", body, size)
 }

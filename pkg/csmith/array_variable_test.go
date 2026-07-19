@@ -596,6 +596,15 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 		t.Fatal("empty index OutputIndexModulo must SetError sticky")
 	}
 	ClearError()
+	// Type-nil index sticky empty (no invent bare modulo past incomplete type)
+	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "j", Type: nil}}
+	if out := av.OutputIndexModulo(0, hole); out != "" {
+		t.Fatal("Type-nil index OutputIndexModulo invent", out)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil index OutputIndexModulo must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
@@ -804,6 +813,14 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("nil arg FindExprKeyVar must SetError sticky")
+	}
+	ClearError()
+	// Type-nil Variable sticky (no invent key soft-success past type hole)
+	if FindExprKeyVar(&Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) != nil {
+		t.Fatal("Type-nil Var FindExprKeyVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Var FindExprKeyVar must SetError sticky")
 	}
 	ClearError()
 }
