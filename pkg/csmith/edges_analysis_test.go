@@ -57,6 +57,22 @@ func TestFindEdgesIn(t *testing.T) {
 	if none == nil || len(none) != 0 {
 		t.Fatal("complete empty must be non-nil empty", none)
 	}
+	// StmID ≤0 incomplete key sticky
+	ClearError()
+	if got := fm.FindEdgesIn(0, false, false); got != nil {
+		t.Fatal("destStmID 0 must fail closed", got)
+	}
+	if !HasError() {
+		t.Fatal("destStmID 0 FindEdgesIn must SetError sticky")
+	}
+	ClearError()
+	if got := fm.FindEdgesInToBlock(nil, false, false); got != nil {
+		t.Fatal("nil dest block must fail closed", got)
+	}
+	if !HasError() {
+		t.Fatal("nil dest FindEdgesInToBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindEdgesInNilHoleFailClosed(t *testing.T) {

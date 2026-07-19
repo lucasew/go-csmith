@@ -135,7 +135,8 @@ func MinimalDepth(dType string, flag int) int {
 		DtFunctionInvocationBinary, DtFunctionInvocationUnary:
 		return 1
 	default:
-		// DepthSpec.cpp:381–382 assert(0) for unknown dType — no invent depth 1
+		// DepthSpec.cpp:381–382 assert(0) for unknown dType — sticky no invent depth 1
+		SetError(ErrGeneric)
 		return -1
 	}
 }
@@ -167,8 +168,12 @@ func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
-	// DepthSpec.cpp:381–382 — unknown dType assert(0) → BAD_DEPTH fail closed
+	// DepthSpec.cpp:381–382 — unknown dType assert(0) → BAD_DEPTH sticky fail closed
 	if MinimalDepth(dType, flag) < 0 {
+		// MinimalDepth already SetError on unknown; ensure sticky if that path skipped
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return BadDepth
 	}
 	// DFS backtracking not implemented; known types report GOOD (no false BAD)

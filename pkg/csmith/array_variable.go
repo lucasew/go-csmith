@@ -217,12 +217,17 @@ func (av *ArrayVariable) IsGlobal() bool {
 
 // CDeclType returns C type with dimensions, e.g. int x[2][3].
 func (av *ArrayVariable) CDeclType() string {
-	// ArrayVariable / Variable decl always has live type; no invent "int"
-	if av == nil || av.Type == nil {
+	// ArrayVariable / Variable decl always has live type; sticky (no invent "int")
+	if av == nil {
+		return ""
+	}
+	if av.Type == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	cn := av.Type.CName()
 	if cn == "" || av.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -608,9 +613,13 @@ func (av *ArrayVariable) OutputDef() string {
 	if av.Collective != nil {
 		return ""
 	}
-	// ArrayVariable.cpp:494–507 — OutputDecl always live; no invent bare ";" / " = …"
+	// ArrayVariable.cpp:494–507 — OutputDecl always live; sticky no invent bare ";" / " = …"
 	decl := av.CDeclType()
 	if decl == "" {
+		// CDeclType already sticks incomplete Type/name; keep sticky if empty for other reasons
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder
@@ -630,13 +639,15 @@ func (av *ArrayVariable) OutputDef() string {
 		}
 	}
 	vals = append(vals, av.InitValues...)
-	// assert(init) — no soft invent "0" brace list
+	// assert(init) — sticky no soft invent "0" brace list
 	if len(vals) == 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
-	// no invent empty holes in brace initializer list
+	// sticky no invent empty holes in brace initializer list
 	for _, v := range vals {
 		if v == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}
@@ -646,6 +657,7 @@ func (av *ArrayVariable) OutputDef() string {
 		seed := uint32(0xABCDEF)
 		init := av.buildInitRecursive(0, vals, &seed)
 		if init == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(" = ")
@@ -704,14 +716,17 @@ func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 	}
 	name := av.GetActualName(false)
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
-	// C++ cvs sized for get_dimension(); no invent empty "[]" when ctrl short/empty
+	// C++ cvs sized for get_dimension(); sticky no invent empty "[]" when ctrl short/empty
 	if len(ctrl) < len(av.Sizes) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}
@@ -743,16 +758,18 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	if av.Collective != nil {
 		return ""
 	}
-	// C++ requires cvs sized for get_dimension(); undersized → no invent i/j/k
+	// C++ requires cvs sized for get_dimension(); undersized sticky → no invent i/j/k
 	if len(ctrl) < len(av.Sizes) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	for i := range av.Sizes {
 		if ctrl[i] == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 	}
-	// ArrayVariable.cpp:649 — init->Output; always live Expression* (no invent "0")
+	// ArrayVariable.cpp:649 — init->Output; always live Expression* sticky (no invent "0")
 	var initVal string
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
@@ -760,12 +777,16 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 		initVal = av.Init.Value
 	}
 	if initVal == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:649 + output_with_indices — access always live
-	// no invent for-loops + " = init;" without LHS
+	// sticky no invent for-loops + " = init;" without LHS
 	access := av.OutputWithIndices(ctrl)
 	if access == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder
@@ -874,7 +895,8 @@ func (av *ArrayVariable) OutputAccess() string {
 	}
 	name := av.GetActualName(false)
 	if name == "" {
-		// name always live; no invent bare indices without identifier
+		// name always live; sticky no invent bare indices without identifier
+		SetError(ErrGeneric)
 		return ""
 	}
 	if av.Collective == nil {
@@ -883,7 +905,8 @@ func (av *ArrayVariable) OutputAccess() string {
 	// ArrayVariable.cpp:544–545 — assert(!indices.empty())
 	// IndexExprs preferred (Expression::Output); Indices is const-itemize string form.
 	if len(av.IndexExprs) == 0 && len(av.Indices) == 0 {
-		// fail closed — no soft invent bare collective name for broken itemized IR
+		// sticky fail closed — no soft invent bare collective name for broken itemized IR
+		SetError(ErrGeneric)
 		return ""
 	}
 	// incomplete IndexExprs fails closed sticky whole access (no invent soft-skip hole mid indices)
@@ -896,9 +919,10 @@ func (av *ArrayVariable) OutputAccess() string {
 	if len(av.IndexExprs) > 0 {
 		for _, e := range av.IndexExprs {
 			// ArrayVariable.cpp:548–552 — indices[i]->Output always live Expression*
-			// no invent empty brackets "[]" for empty index Output
+			// sticky no invent empty brackets "[]" for empty index Output
 			idx := e.Output()
 			if idx == "" {
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString("[")
@@ -910,6 +934,7 @@ func (av *ArrayVariable) OutputAccess() string {
 	for _, s := range av.Indices {
 		// const-itemize string indices always non-empty in C++
 		if s == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString("[")
@@ -927,11 +952,13 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 	}
 	name := av.GetActualName(false)
 	if name == "" {
-		// name always live; no invent bare "[n]" bounds
+		// name always live; sticky no invent bare "[n]" bounds
+		SetError(ErrGeneric)
 		return ""
 	}
 	if len(av.Sizes) == 0 {
-		// no soft invent bare name without dimensions
+		// sticky no invent bare name without dimensions
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -975,17 +1002,19 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 
 // RndMutate mirrors ArrayVariable::rnd_mutate.
 // ArrayVariable.cpp:336–337 — assert(0 && "invalid call to rnd_mutate"); dead API.
-// Fail closed: always nil (no invent variant/offset mutation).
+// Fail closed sticky: always nil (no invent variant/offset mutation / soft re-pick).
 func (av *ArrayVariable) RndMutate(r *Rng) *ArrayVariable {
 	_ = r
+	SetError(ErrGeneric)
 	return nil
 }
 
 // CreateMutatedArrayVar mirrors VariableSelector::create_mutated_array_var.
 // VariableSelector.cpp:1552–1554 — assert(0 && "invalid call…"); dead API.
-// Fail closed: always nil (no invent new itemized member from index rewrite).
+// Fail closed sticky: always nil (no invent new itemized member from index rewrite).
 func CreateMutatedArrayVar(av *ArrayVariable, newIndices []*Expression) *ArrayVariable {
 	_ = av
 	_ = newIndices
+	SetError(ErrGeneric)
 	return nil
 }

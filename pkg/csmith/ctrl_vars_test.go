@@ -134,7 +134,8 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 		t.Fatal("nil hole must SetError sticky")
 	}
 	ClearError()
-	// incomplete loop-init (local non-const without init) fails closed
+	// incomplete loop-init (local non-const without init) fails closed sticky
+	ClearError()
 	blk := &Block{}
 	loc := &ArrayVariable{
 		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
@@ -146,4 +147,8 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if s := OutputArrayInitializers([]*Variable{&loc.Variable}, opts, "    "); s != "" {
 		t.Fatal("incomplete array init must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("incomplete loop-init OutputArrayInitializers must SetError sticky")
+	}
+	ClearError()
 }

@@ -248,14 +248,20 @@ func TestOutputAccessItemizedNoSizesOnlySoft(t *testing.T) {
 		Collective: parent,
 	}
 	item.AsArray = item
+	ClearError()
 	if out := item.OutputAccess(); out != "" {
 		t.Fatalf("empty indices must fail closed, got %q", out)
 	}
+	if !HasError() {
+		t.Fatal("empty indices itemized OutputAccess must SetError sticky")
+	}
 	// Indices string path (ItemizeConstIndices) still works without IndexExprs
+	ClearError()
 	item.Indices = []string{"1", "2"}
 	if got := item.OutputAccess(); got != "g_a[1][2]" {
 		t.Fatal(got)
 	}
+	ClearError()
 }
 
 func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
@@ -279,14 +285,23 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 }
 
 func TestArrayCDeclTypeNoInventInt(t *testing.T) {
-	// ArrayVariable decl always has live type; no invent "int"
+	// ArrayVariable decl always has live type; sticky no invent "int"
+	ClearError()
 	av := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
 	if s := av.CDeclType(); s != "" {
 		t.Fatal("nil Type must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("nil Type CDeclType must SetError sticky")
+	}
+	ClearError()
 	if s := av.OutputDef(); s != "" {
 		t.Fatal("incomplete array def must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("incomplete OutputDef must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
@@ -298,8 +313,12 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 		Collective: parent,
 		IndexExprs: []*Expression{{Term: TermConstant}}, // nil Con → empty Output
 	}
+	ClearError()
 	if s := item.OutputAccess(); s != "" {
 		t.Fatal("empty index Output must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("empty index Output must SetError sticky")
 	}
 	// incomplete IndexExprs hole fails closed sticky
 	ClearError()
@@ -315,24 +334,36 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 	if s := item.OutputAccess(); s != "g_a[0]" {
 		t.Fatal(s)
 	}
+	ClearError()
 }
 
 func TestOutputWithIndicesNoInventEmptyBracket(t *testing.T) {
-	// ArrayVariable.cpp:708 — cvs[i] always live; no invent "g_a[]"
+	// ArrayVariable.cpp:708 — cvs[i] always live; sticky no invent "g_a[]"
+	ClearError()
 	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
 	if s := av.OutputWithIndices([]string{"i"}); s != "" {
 		t.Fatal("short ctrl must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("short ctrl must SetError sticky")
+	}
+	ClearError()
 	if s := av.OutputWithIndices([]string{"i", ""}); s != "" {
 		t.Fatal("empty ctrl name must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("empty ctrl name must SetError sticky")
+	}
+	ClearError()
 	if s := av.OutputWithIndices([]string{"i", "j"}); s != "g_a[i][j]" {
 		t.Fatal(s)
 	}
+	ClearError()
 }
 
 func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
+	ClearError()
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -342,6 +373,10 @@ func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	if av.OutputDef() != "" {
 		t.Fatal("missing init on brace path must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("missing init OutputDef must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputUpperBoundArray(t *testing.T) {
@@ -403,6 +438,7 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 
 func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	// ArrayVariable.cpp:703–711 — cvs[i] only; no soft i/j/k invent
+	ClearError()
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
 		Sizes:    []int{2, 3},
@@ -411,17 +447,40 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	if got := av.OutputWithIndices([]string{"i", "j"}); got != "g_a[i][j]" {
 		t.Fatal(got)
 	}
-	// undersized / empty ctrl: fail closed empty (no invent letters or "g_a[][]")
+	// undersized / empty ctrl: sticky fail closed empty (no invent letters or "g_a[][]")
+	ClearError()
 	if got := av.OutputWithIndices(nil); got != "" {
 		t.Fatalf("no letter invent, got %q", got)
 	}
-	// OutputInit without full ctrl aborts (no soft letters)
-	if got := av.OutputInit("    ", nil); got != "" {
+	if !HasError() {
+		t.Fatal("nil ctrl OutputWithIndices must SetError sticky")
+	}
+	// local non-NoLoop array: OutputInit short ctrl sticky (no soft letters)
+	// Array IsGlobal is Block==nil; attach a block so loop-initializer path is live.
+	ClearError()
+	loc := &ArrayVariable{
+		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}, Init: MakeInt(0)},
+		Sizes:    []int{2, 3},
+		Block:    &Block{},
+	}
+	loc.AsArray = loc
+	if loc.NoLoopInitializer() {
+		t.Fatal("local scalar init array should use loop initializer path")
+	}
+	if got := loc.OutputInit("    ", nil); got != "" {
 		t.Fatalf("want empty init without ctrl, got %q", got)
 	}
-	if got := av.OutputInit("    ", []string{"i"}); got != "" {
+	if !HasError() {
+		t.Fatal("OutputInit nil ctrl must SetError sticky")
+	}
+	ClearError()
+	if got := loc.OutputInit("    ", []string{"i"}); got != "" {
 		t.Fatalf("want empty when ctrl short, got %q", got)
 	}
+	if !HasError() {
+		t.Fatal("OutputInit short ctrl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestToUnsignedSimple(t *testing.T) {

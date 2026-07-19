@@ -71,7 +71,12 @@ func isReturnVar(v *Variable) bool {
 // Incomplete CFG fails closed sticky nil (no invent soft re-pick empty edges past holes).
 // Complete scan with no matches returns empty non-nil slice.
 func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdge {
-	if fm == nil || destStmID <= 0 {
+	if fm == nil {
+		return nil
+	}
+	// StmID ≤0 incomplete key sticky (no invent Map miss as empty edges / soft re-pick)
+	if destStmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
@@ -90,7 +95,12 @@ func (fm *FactMgr) FindEdgesIn(destStmID int, postDest, backLink bool) []*CFGEdg
 // FindEdgesInToBlock finds edges whose DestBlock matches (break/continue).
 // Incomplete CFGEdges → sticky nil (fail closed). Complete empty → non-nil [].
 func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*CFGEdge {
-	if fm == nil || dest == nil {
+	if fm == nil {
+		return nil
+	}
+	// nil DestBlock incomplete sticky (no invent empty edges past hole / soft re-pick)
+	if dest == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if !CFGEdgesComplete(fm.CFGEdges) {
