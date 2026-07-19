@@ -202,17 +202,19 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	if name == "" {
 		return nil
 	}
+	// Function.cpp:752 — CVQualifiers::random_qualifiers always has process RNG
+	// no invent fixed non-const RV / NewProbabilities when session missing
+	if r == nil {
+		return nil
+	}
 	f := &Function{
 		Name:       name,
 		ReturnType: ty,
 		IsBuiltin:  true,
 		BuildState: BuildBuilding,
 	}
-	// return dummy variable
-	retQ := NewCVQualifiers([]bool{false}, []bool{false})
-	if probs != nil && r != nil {
-		retQ = RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
-	}
+	// return dummy variable — Probabilities singleton always live; nil probs → 0% quals
+	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	if f.RV == nil {
 		return nil

@@ -56,6 +56,13 @@ func TestOutputVariableList(t *testing.T) {
 	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
 		t.Fatal("empty defs must fail closed empty list", s)
 	}
+	// incomplete entry fails whole list (no invent skip holes)
+	if s := OutputVariableList([]*Variable{a, broken}, "  ", true); s != "" {
+		t.Fatal("mixed incomplete must fail closed whole list", s)
+	}
+	if s := OutputVariableList([]*Variable{a, nil}, "  ", true); s != "" {
+		t.Fatal("nil hole must fail closed whole list", s)
+	}
 }
 
 func TestOutputGlobalVariables(t *testing.T) {

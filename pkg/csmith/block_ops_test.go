@@ -1,6 +1,9 @@
 package csmith
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRemoveStmtScrubsCFGAndBreaks(t *testing.T) {
 	fm := NewFactMgr(nil)
@@ -221,6 +224,22 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	}
 	if len(f.Stack) != 0 {
 		t.Fatal("stack not popped")
+	}
+}
+
+func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
+	// Block.cpp always live this; no invent empty braces for nil
+	if out := (*Block)(nil).Output(0); out != "" {
+		t.Fatal("nil block must fail closed empty, got", out)
+	}
+	// empty live block still emits braces
+	if out := (&Block{}).Output(0); !strings.Contains(out, "{") || !strings.Contains(out, "}") {
+		t.Fatal("empty live block", out)
+	}
+	// macro_tmp_vars name+type always live; no invent partial tmp list
+	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
+	if out := b.Output(0); out != "" {
+		t.Fatal("empty tmp name must fail closed whole block", out)
 	}
 }
 

@@ -275,6 +275,10 @@ func MakeRandomFunction(
 	if HasError() {
 		return nil
 	}
+	// no invent unbuilt/null-body success pointer (C++ would crash on body->)
+	if f.Body == nil || f.BuildState != BuildBuilt {
+		return nil
+	}
 	return f
 }
 

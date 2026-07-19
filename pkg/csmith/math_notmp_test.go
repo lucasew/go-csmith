@@ -56,14 +56,11 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	if i1 < 0 || i2 < 0 || i3 < 0 || !(i1 < i2 && i2 < i3) {
 		t.Fatal(out)
 	}
-	// empty tmp name — no invent "int  = 0;"
+	// empty tmp name — fail closed whole block (no invent skip hole / partial tmp list)
 	b2 := &Block{TmpVars: map[string]ESimpleType{"": EInt, "t_ok": EInt}}
 	out2 := b2.Output(0)
-	if strings.Contains(out2, "int  = 0") || strings.Contains(out2, "  = 0") {
-		t.Fatal("empty tmp name must not invent decl", out2)
-	}
-	if !strings.Contains(out2, "t_ok") {
-		t.Fatal(out2)
+	if out2 != "" {
+		t.Fatal("empty tmp name must fail closed whole block", out2)
 	}
 }
 

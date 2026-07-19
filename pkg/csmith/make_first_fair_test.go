@@ -56,6 +56,10 @@ func TestMakeRandomFunction(t *testing.T) {
 		// actually max=0 → i=0 only → 1 param; max can be 0 with ParamListProbability
 		t.Log("params", len(f.Param))
 	}
+	// no invent unbuilt success when GenerateBody cannot run (nil RNG)
+	if MakeRandomFunction(nil, opts, NewProbabilities(opts), vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list) != nil {
+		t.Fatal("nil RNG must not invent unbuilt function")
+	}
 }
 
 func TestMakeFirstERRORGuard(t *testing.T) {

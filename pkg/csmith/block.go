@@ -703,8 +703,9 @@ func stmtOK(st Stmt) bool {
 
 // Output emits C for the block with indent levels.
 func (b *Block) Output(indent int) string {
+	// Block.cpp:248+ — always live this; no invent empty "{}" shell for nil
 	if b == nil {
-		return "{\n}\n"
+		return ""
 	}
 	pad := strings.Repeat("    ", indent)
 	inner := strings.Repeat("    ", indent+1)
@@ -729,13 +730,13 @@ func (b *Block) Output(indent int) string {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			// macro_tmp_vars name + type always live; no invent "int  = 0;" / "  t = 0;"
+			// macro_tmp_vars name + type always live; no invent "int  = 0;" / skip holes
 			if name == "" {
-				continue
+				return ""
 			}
 			cn := GetSimpleType(b.TmpVars[name]).CName()
 			if cn == "" {
-				continue
+				return ""
 			}
 			sb.WriteString(inner)
 			sb.WriteString(cn + " " + name + " = 0;\n")

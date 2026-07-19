@@ -90,6 +90,10 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "Int; ; (UInt); x86") != nil {
 		t.Fatal("empty builtin name must fail closed")
 	}
+	// Function.cpp always has RNG for random_qualifiers; no invent fixed RV qfer
+	if MakeBuiltinFunction(opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
+		t.Fatal("nil RNG must not invent builtin")
+	}
 }
 
 func TestInitializeBuiltinFunctions(t *testing.T) {

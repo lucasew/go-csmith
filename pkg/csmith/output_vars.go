@@ -26,8 +26,9 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 	})
 	var b strings.Builder
 	for _, v := range cp {
+		// Variable* always live in C++ list; no invent skip nil / incomplete holes
 		if v == nil {
-			continue
+			return ""
 		}
 		// OutputDef always live; no invent indent-only / blank lines for incomplete IR
 		var def string
@@ -37,7 +38,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 			def = v.OutputDef(forceStatic)
 		}
 		if def == "" {
-			continue
+			return ""
 		}
 		b.WriteString(indent)
 		b.WriteString(def)
