@@ -290,6 +290,10 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	if st == nil || facts == nil || cg == nil || cg.FM == nil {
 		return ShortcutNone
 	}
+	// Statement::stm_id always live; StmID 0 is not a map key (no invent reuse via 0)
+	if st.StmID <= 0 {
+		return ShortcutNone
+	}
 	fm := cg.FM
 	in, ok := fm.MapFactsIn[st.StmID]
 	if !ok {
@@ -371,16 +375,21 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			cg.FM.RemoveRVFacts(facts)
 			cg.FM.GlobalFacts = *facts
 		}
-		if st.StmID > 0 {
-			if cg.FM.MapAccumEffect == nil {
-				cg.FM.MapAccumEffect = make(map[int]Effect)
-			}
-			cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
-			if cg.FM.MapVisited == nil {
-				cg.FM.MapVisited = make(map[int]bool)
-			}
-			cg.FM.MapVisited[st.StmID] = true
+		// Statement::stm_id always live; StmID 0 fails closed (C++ always
+		// records map_accum_effect / map_visited — no invent soft-skip maps)
+		if st.StmID <= 0 {
+			*facts = nil
+			cg.FM.GlobalFacts = nil
+			return false
 		}
+		if cg.FM.MapAccumEffect == nil {
+			cg.FM.MapAccumEffect = make(map[int]Effect)
+		}
+		cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		if cg.FM.MapVisited == nil {
+			cg.FM.MapVisited = make(map[int]bool)
+		}
+		cg.FM.MapVisited[st.StmID] = true
 	}
 	return ok
 }
@@ -399,6 +408,11 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	}
 	// sync FM global facts with working set
 	if cg.FM != nil {
+		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// validate success without set_fact_in/out)
+		if st.StmID <= 0 {
+			return false
+		}
 		cg.FM.GlobalFacts = *facts
 	}
 	sc := ShortcutAnalysis(st, facts, cg, opts)
@@ -425,7 +439,7 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	if !FactsComplete(*facts) {
 		return false
 	}
-	if cg.FM != nil && st.StmID > 0 {
+	if cg.FM != nil {
 		// Statement.cpp:604–605 — set_fact_in(pre); set_fact_out(post)
 		cg.FM.SetMapFactsIn(st.StmID, inputsCopy)
 		cg.FM.SetMapFactsOutForStmt(st, *facts, blk)

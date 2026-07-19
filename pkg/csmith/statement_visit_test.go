@@ -78,6 +78,8 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	if VisitFactsStatementIf(&st, &cg, Defaults()) {
 		t.Fatal("Else StmID 0 must fail closed")
 	}
+	// VisitFactsBlock under incomplete arm may set sticky ERROR — clear for suite
+	ClearError()
 	// true must return → facts from else (pre) kept
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || !fp.IsNull() && len(fp.PointTo) > 0 && fp.PointTo[0] != a {
@@ -99,8 +101,13 @@ func testForInit(iv *Variable, n int) *Stmt {
 }
 
 func TestVisitFactsStatementForIV(t *testing.T) {
+	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if iv == nil {
+		t.Fatal("iv")
+	}
 	// body tries to write IV — should fail VisitFactsStatementAssign inside
+	// body + for need live StmID when FM is present; this test has no FM
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
@@ -433,6 +440,8 @@ func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
 	if VisitFactsStatementArrayOp(st, &cg, Defaults()) {
 		t.Fatal("arrayop body StmID 0 must fail closed")
 	}
+	// body StmID 0 may set sticky ERROR via find_fixed_point — clear for suite
+	ClearError()
 }
 
 func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {

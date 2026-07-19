@@ -142,6 +142,26 @@ func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
 	}
 }
 
+func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
+	ClearError()
+	// Statement::stm_id always live; StmID 0 + FM fails closed
+	// (no invent soft-skip edge merge then validate as complete)
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{}
+	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
+		t.Fatal("StmID 0 must fail closed")
+	}
+	ClearError()
+}
+
 func TestAnalyzeWithEdgesInNilCFGFailClosed(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
@@ -239,7 +259,8 @@ func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
 func TestFindFixedPointBlock(t *testing.T) {
 	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	b := &Block{Stmts: []Stmt{{
+	// Block::stm_id always live when FM bound
+	b := &Block{StmID: 10, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)}, AssignOp: AssignSimple,
 	}}}
@@ -255,9 +276,23 @@ func TestFindFixedPointBlock(t *testing.T) {
 	if !fm.MapVisited[1] {
 		t.Fatal("visited")
 	}
+	// StmID 0 + FM fails closed (no invent soft single-pass success)
+	ClearError()
+	bad := &Block{Stmts: []Stmt{{
+		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}}}
+	if _, _, ok := FindFixedPointBlock(bad, nil, &cg, Defaults(), false); ok {
+		t.Fatal("block StmID 0 must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("expect sticky error on incomplete block id")
+	}
+	ClearError()
 }
 
 func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
+	ClearError()
 	st := &Stmt{Kind: StmtIfElse, StmID: 7}
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
@@ -265,5 +300,11 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
 	if !fm.GetMapStmEffect(7).IsWritten(v) {
 		t.Fatal("effect")
+	}
+	// StmID 0 — no invent soft no-op that leaves effect unrecorded as success
+	st0 := &Stmt{Kind: StmtFor, StmID: 0}
+	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
+	if fm.GetMapStmEffect(0).IsWritten(v) {
+		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
 }

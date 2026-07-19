@@ -181,12 +181,14 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 }
 
 func TestVisitFactsBlockRecordsMaps(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
-	b := &Block{Stmts: []Stmt{st}}
+	// Block::stm_id always live when FM bound
+	b := &Block{StmID: 5, Stmts: []Stmt{st}}
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	eff := EmptyEffect()

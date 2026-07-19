@@ -155,5 +155,15 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	if fm.GlobalFacts != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed nil")
 	}
+	// StmID 0 — no invent post_creation success without maps
+	st0 := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, EmptyEffect(), &cg, Defaults())
+	if fm.GlobalFacts != nil {
+		t.Fatal("StmID 0 must fail closed nil GlobalFacts")
+	}
 	ClearError()
 }

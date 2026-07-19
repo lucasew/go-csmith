@@ -130,7 +130,12 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 		return false
 	}
 	fm := cg.FM
-	if fm != nil && st.StmID > 0 {
+	if fm != nil {
+		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// soft-skip edge merge then validate as complete analysis)
+		if st.StmID <= 0 {
+			return false
+		}
 		// back edges only if already visited
 		if fm.MapVisited != nil && fm.MapVisited[st.StmID] {
 			back := fm.FindEdgesIn(st.StmID, false, true)
@@ -180,14 +185,14 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 
 // SetAccumulatedEffectAfterBlock mirrors Statement::set_accumulated_effect_after_block.
 // Statement.cpp:515–520 — eff += block effect; store as this statement's effect.
+// Statement::stm_id always live; StmID 0 is incomplete (no invent soft no-op success
+// that leaves map_stm_effect unset while callers treat effect as recorded).
 func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext, preStm Effect) {
-	if st == nil || cg == nil || cg.FM == nil {
+	if st == nil || cg == nil || cg.FM == nil || st.StmID <= 0 {
 		return
 	}
 	eff := preStm.AddEffect(blockEffect)
-	if st.StmID > 0 {
-		cg.FM.SetMapStmEffect(st.StmID, eff)
-	}
+	cg.FM.SetMapStmEffect(st.StmID, eff)
 }
 
 // PostCreationAnalysis mirrors Statement::post_creation_analysis.
@@ -211,6 +216,12 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		fm.GlobalFacts = nil
 		return
 	}
+	// Statement::stm_id always live; StmID 0 fails closed (no invent post_creation
+	// success without map_facts_in/out / map_visited)
+	if st.StmID <= 0 {
+		fm.GlobalFacts = nil
+		return
+	}
 	if st.Kind == StmtIfElse {
 		CombineBranchFacts(st, preFacts, fm)
 	} else {
@@ -222,9 +233,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	}
 	// simple statements: save effect_stm
 	if !IsCompound(st.Kind) {
-		if st.StmID > 0 {
-			fm.SetMapStmEffect(st.StmID, cg.EffectStm)
-		}
+		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	specialHandled := false
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
@@ -295,18 +304,16 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		fm.GlobalFacts = nil
 		return
 	}
-	if st.StmID > 0 {
-		fm.SetMapFactsIn(st.StmID, preFacts)
-		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
-		if fm.MapAccumEffect == nil {
-			fm.MapAccumEffect = make(map[int]Effect)
-		}
-		fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
-		if fm.MapVisited == nil {
-			fm.MapVisited = make(map[int]bool)
-		}
-		fm.MapVisited[st.StmID] = true
+	fm.SetMapFactsIn(st.StmID, preFacts)
+	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
+	if fm.MapAccumEffect == nil {
+		fm.MapAccumEffect = make(map[int]Effect)
 	}
+	fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+	if fm.MapVisited == nil {
+		fm.MapVisited = make(map[int]bool)
+	}
+	fm.MapVisited[st.StmID] = true
 }
 
 // FindFixedPointBlock mirrors Block::find_fixed_point.
@@ -431,45 +438,47 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return outputs, i, false
 			}
 		}
-		if fm != nil && b.StmID > 0 {
-			fm.SetMapFactsIn(b.StmID, currentInputs)
-			// OOS locals for fact_out (Block.cpp:560–561)
-			// incomplete outputs after analyze fail closed (no invent cleaned out)
-			if !FactsComplete(outputs) {
+		if fm == nil {
+			// no DFA maps — single pass
+			return outputs, -1, true
+		}
+		// Block::stm_id always live when FM bound; StmID 0 fails closed
+		// (no invent soft single-pass success without map_facts_in/out)
+		if b.StmID <= 0 {
+			SetError(ErrGeneric)
+			return outputs, -1, false
+		}
+		fm.SetMapFactsIn(b.StmID, currentInputs)
+		// OOS locals for fact_out (Block.cpp:560–561)
+		// incomplete outputs after analyze fail closed (no invent cleaned out)
+		if !FactsComplete(outputs) {
+			SetError(ErrGeneric)
+			return outputs, -1, false
+		}
+		outCopy := CloneFactSlice(outputs)
+		if len(b.LocalVars) > 0 {
+			tmp := outCopy
+			// UpdateFactsForOOSVars mutates GlobalFacts; apply via temp
+			saved := fm.GlobalFacts
+			fm.GlobalFacts = tmp
+			fm.UpdateFactsForOOSVars(b.LocalVars)
+			outCopy = fm.GlobalFacts
+			fm.GlobalFacts = saved
+			// OOS may nil on incomplete; fail closed
+			if !FactsComplete(outCopy) {
 				SetError(ErrGeneric)
-				return outputs, -1, false
+				return outCopy, -1, false
 			}
-			outCopy := CloneFactSlice(outputs)
-			if len(b.LocalVars) > 0 {
-				tmp := outCopy
-				// UpdateFactsForOOSVars mutates GlobalFacts; apply via temp
-				saved := fm.GlobalFacts
-				fm.GlobalFacts = tmp
-				fm.UpdateFactsForOOSVars(b.LocalVars)
-				outCopy = fm.GlobalFacts
-				fm.GlobalFacts = saved
-				// OOS may nil on incomplete; fail closed
-				if !FactsComplete(outCopy) {
-					SetError(ErrGeneric)
-					return outCopy, -1, false
-				}
-			}
-			fm.SetMapFactsOut(b.StmID, outCopy)
-			if fm.MapVisited == nil {
-				fm.MapVisited = make(map[int]bool)
-			}
-			fm.MapVisited[b.StmID] = true
-			b.SetAccumulatedEffect(fm)
-			fm.GlobalFacts = outCopy
-			facts = outCopy
-		} else {
-			facts = outputs
 		}
+		fm.SetMapFactsOut(b.StmID, outCopy)
+		if fm.MapVisited == nil {
+			fm.MapVisited = make(map[int]bool)
+		}
+		fm.MapVisited[b.StmID] = true
+		b.SetAccumulatedEffect(fm)
+		fm.GlobalFacts = outCopy
+		facts = outCopy
 		visitOnce = false
-		// Without FM maps, single pass is enough
-		if fm == nil || b.StmID == 0 {
-			return facts, -1, true
-		}
 		// next loop: merge edges + shortcut when inputs stable
 	}
 }
