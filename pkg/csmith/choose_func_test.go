@@ -134,6 +134,27 @@ func TestChooseFuncContextIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete ambient must SetError sticky")
 	}
 	ClearError()
+	// incomplete EffectStm / GlobalFacts also sticky
+	cgStm := EmptyCGContext()
+	cgStm.EffectStm = IncompleteEffect()
+	if ChooseFuncContext(NewRng(3), []*Function{good}, GetIntType(), nil, &cgStm, Defaults(), nil) != nil {
+		t.Fatal("incomplete EffectStm must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm must SetError sticky")
+	}
+	ClearError()
+	f := &Function{Name: "caller"}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cgFacts := EmptyCGContext().WithFactMgr(fm)
+	if ChooseFuncContext(NewRng(4), []*Function{good}, GetIntType(), nil, &cgFacts, Defaults(), nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
 	// complete ambient still chooses
 	cg2 := EmptyCGContext()
 	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, &cg2, Defaults(), nil) != good {

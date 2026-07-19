@@ -198,6 +198,32 @@ func TestMakeBinaryForCompare(t *testing.T) {
 	}
 }
 
+func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient must not invent binary shell / soft re-pick past holes
+	ClearError()
+	opts := Defaults()
+	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), WithEffectContext(IncompleteEffect()), BinAdd, lhs, rhs); fi != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeBinary")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	if fi := MakeBinary(NewRng(2), opts, NewProbabilities(opts), cg, BinAdd, lhs, rhs); fi != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeBinary")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	// FunctionInvocation.cpp:565+ — always has RNG; no invent empty Binary token
 	opts := Defaults()

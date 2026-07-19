@@ -1149,6 +1149,18 @@ func ChooseVarFull(
 	invalidVars []*Variable,
 	noBitfield, noExpandStructUnion, noUnion bool,
 ) *Variable {
+	// incomplete ambient / facts fail closed sticky before eligibility scan
+	// (no invent soft-skip as absent / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// incomplete candidate / invalid lists — fail closed sticky (no invent choose past hole)
 	if !VariablesComplete(vars) || !VariablesComplete(invalidVars) {
 		SetError(ErrGeneric)
@@ -1241,6 +1253,8 @@ func ChooseVarFull(
 func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable {
 	for _, vv := range ok {
 		if vv == nil || vv.Type == nil {
+			// incomplete ok pool fails closed sticky (no invent soft-skip / empty pick)
+			SetError(ErrGeneric)
 			return nil
 		}
 	}

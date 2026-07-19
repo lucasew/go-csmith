@@ -901,6 +901,16 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("nil RNG must not invent nested for")
 	}
+	ClearError()
+	// incomplete ambient must not invent nested for past holes
+	cgInc := WithFunc(f, IncompleteEffect())
+	if b.AppendNestedLoop(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgInc) != nil {
+		t.Fatal("incomplete EffectContext must fail closed AppendNestedLoop")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {

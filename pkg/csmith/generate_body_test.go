@@ -112,6 +112,25 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 	ClearError()
 }
 
+func TestGenerateBodyIncompleteAmbientSticky(t *testing.T) {
+	// incomplete prev ambient must not invent Building/Built body under hole shells
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "func_amb", ReturnType: GetIntType()}
+	_ = f.ensurePairedFactMgr()
+	prev := WithFunc(f, IncompleteEffect()).WithFactMgr(f.PairedFactMgr())
+	f.GenerateBody(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	if f.BuildState == BuildBuilt || f.IsBuilt || f.BuildState == BuildBuilding {
+		t.Fatal("incomplete EffectContext must not invent Built/Building")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 	// Function.cpp:422 — FMList.push_back at make_random_signature
 	opts := Defaults()

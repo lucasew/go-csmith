@@ -220,6 +220,41 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / GlobalFacts must not invent choose / soft re-pick past holes
+	ClearError()
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vars := []*Variable{g}
+	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+		t.Fatal("incomplete EffectContext must fail closed ChooseVarFull")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	if ChooseVarFull(NewRng(2), vars, AccessRead, cg, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed ChooseVarFull")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	inc := IncompleteEffect()
+	cg2 := EmptyCGContext()
+	cg2.EffectStm = inc
+	if ChooseVarFull(NewRng(3), vars, AccessRead, cg2, GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+		t.Fatal("incomplete EffectStm must fail closed ChooseVarFull")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	// assert(qf.sanity_check(t)) — incomplete/mismatched qfer fails closed sticky
 	ClearError()

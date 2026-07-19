@@ -471,6 +471,13 @@ func (b *Block) AppendNestedLoop(
 	if b == nil || r == nil || cg == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky before EffectStm clear (no invent nested for)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var preFacts []*FactPointTo
 	if cg.FM != nil {
 		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-for snapshot)

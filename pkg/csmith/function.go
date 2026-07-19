@@ -498,12 +498,25 @@ func (f *Function) generateBodyCore(
 	if !f.IsBuiltin && r == nil {
 		return
 	}
+	// incomplete ambient fails closed sticky before BuildBuilding
+	// (no invent body under hole shells / soft re-pick past incomplete prev)
+	if !EffectComplete(prev.EffectContext()) ||
+		(prev.EffectAccum != nil && !EffectComplete(*prev.EffectAccum)) ||
+		!EffectComplete(prev.EffectStm) {
+		SetError(ErrGeneric)
+		return
+	}
+	if prev.FM != nil && !FactsComplete(prev.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return
+	}
 	f.BuildState = BuildBuilding
 
 	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)
 	bodyEff := EmptyEffect()
 	if prev.EffectAccum != nil {
 		// known-params path: caller already points EffectAccum at callee accum
+		// pre-validated EffectComplete(*EffectAccum)
 		bodyEff = *prev.EffectAccum
 	}
 	cg := prev

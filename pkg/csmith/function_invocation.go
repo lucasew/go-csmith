@@ -284,9 +284,17 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent conflict-filter under hole shells)
-	if cg != nil && !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
-		return nil
+	if cg != nil {
+		if !EffectComplete(cg.EffectContext()) ||
+			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+			!EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
 	}
 	var ok, okBuiltin []*Function
 	for _, f := range funcs {
@@ -1132,6 +1140,17 @@ func MakeBinary(
 ) *Invocation {
 	// FunctionInvocation.cpp:565+ — always has RNG; no invent binary shell without it
 	if r == nil || lhs == nil || rhs == nil {
+		return nil
+	}
+	// incomplete ambient fails closed sticky (no invent binary shell / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
