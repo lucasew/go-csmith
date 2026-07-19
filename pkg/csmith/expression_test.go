@@ -920,3 +920,36 @@ func TestGetTypeIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
+	ClearError()
+	if q := (*Expression)(nil).GetQualifiers(); len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
+		t.Fatal("nil Expression GetQualifiers must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression GetQualifiers must SetError sticky")
+	}
+	ClearError()
+	if q := (&Expression{Term: TermFunction}).GetQualifiers(); len(q.IsConsts) != 0 {
+		t.Fatal("Funcall without Invoke GetQualifiers must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke GetQualifiers must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermFunction}).EqualsInt(0) {
+		t.Fatal("Funcall without Invoke EqualsInt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke EqualsInt must SetError sticky")
+	}
+	ClearError()
+	// Constant complete empty quals OK
+	if q := (&Expression{Term: TermConstant, Con: MakeInt(1)}).GetQualifiers(); len(q.IsConsts) != 0 {
+		t.Fatal("Constant GetQualifiers should be empty complete")
+	}
+	if HasError() {
+		t.Fatal("Constant GetQualifiers must not sticky")
+	}
+	ClearError()
+}

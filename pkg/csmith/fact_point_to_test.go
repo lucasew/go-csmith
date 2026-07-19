@@ -437,3 +437,28 @@ func TestFindRelatedPointToNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
+	ClearError()
+	if !(*FactPointTo)(nil).IsNull() {
+		t.Fatal("nil Fact IsNull must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact IsNull must SetError sticky")
+	}
+	ClearError()
+	if !(*FactPointTo)(nil).IsDead() {
+		t.Fatal("nil Fact IsDead must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact IsDead must SetError sticky")
+	}
+	ClearError()
+	if !(*FactPointTo)(nil).PointsTo(CreateVariableScalars("g_x", GetIntType(), false, false)) {
+		t.Fatal("nil Fact PointsTo must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact PointsTo must SetError sticky")
+	}
+	ClearError()
+}

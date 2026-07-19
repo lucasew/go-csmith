@@ -261,39 +261,60 @@ func (e *Expression) GetType() *Type {
 // ExpressionVariable.cpp:194–196; ExpressionAssign.cpp:85–86;
 // ExpressionFuncall.cpp:187–188; ExpressionComma / Constant default empty.
 func (e *Expression) GetQualifiers() CVQualifiers {
+	// Expression always live; sticky no invent empty quals shell without it
 	if e == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	switch e.Term {
 	case TermVariable:
 		if e.Var == nil {
+			// incomplete Variable IR sticky — no invent empty storage quals
+			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
 		// ExpressionVariable::get_qualifiers — qfer.indirect_qualifiers(indirect)
 		// incomplete type IR must not invent storage-level quals via level 0
 		n, ok := e.IndirectLevelComplete()
 		if !ok {
+			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
 		return e.Var.Qfer.IndirectQualifiers(n)
 	case TermAssignment:
-		if e.Assign != nil && e.Assign.Lhs != nil {
+		if e.Assign == nil {
+			SetError(ErrGeneric)
+			return CVQualifiers{}
+		}
+		if e.Assign.Lhs != nil {
 			return e.Assign.Lhs.GetQualifiers()
 		}
-		if e.Assign != nil && e.Assign.LhsVar != nil {
+		if e.Assign.LhsVar != nil {
 			return e.Assign.LhsVar.Qfer
 		}
+		// incomplete assign LHS sticky
+		SetError(ErrGeneric)
+		return CVQualifiers{}
 	case TermFunction:
-		if e.Invoke != nil {
-			return e.Invoke.GetQualifiers()
+		if e.Invoke == nil {
+			// incomplete Funcall IR sticky — no invent empty invoke quals
+			SetError(ErrGeneric)
+			return CVQualifiers{}
 		}
+		return e.Invoke.GetQualifiers()
 	case TermCommaExpr:
-		// ExpressionComma has no override in header → default empty-ish;
-		// value type is RHS — use RHS qualifiers when present.
-		if e.CommaRHS != nil {
-			return e.CommaRHS.GetQualifiers()
+		// ExpressionComma value is RHS — sticky incomplete without RHS
+		if e.CommaRHS == nil {
+			SetError(ErrGeneric)
+			return CVQualifiers{}
 		}
+		return e.CommaRHS.GetQualifiers()
+	case TermConstant:
+		// Constant default empty quals — complete empty success
+		return CVQualifiers{}
 	}
+	// unknown term sticky incomplete
+	SetError(ErrGeneric)
 	return CVQualifiers{}
 }
 
@@ -301,30 +322,45 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 // Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
 // Incomplete IR fails closed false (no invent fold / panic on nil CommaRHS/Assign.Expr).
 func (e *Expression) EqualsInt(num int) bool {
+	// Expression always live for fold; sticky no invent "not equal" past missing shell
 	if e == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermConstant:
-		return e.Con != nil && e.Con.Equals(num)
+		// incomplete Constant without Con sticky — no invent not-equal fold
+		if e.Con == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		return e.Con.Equals(num)
 	case TermFunction:
 		// ExpressionFuncall always has live invoke for fold
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return e.Invoke.EqualsInt(num)
 	case TermCommaExpr:
-		// comma value is RHS; incomplete without RHS fails closed
+		// comma value is RHS; sticky incomplete without RHS
 		if e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return e.CommaRHS.EqualsInt(num)
 	case TermAssignment:
 		// ExpressionAssign::equals — simple assign && expr.equals(num)
-		if e.Assign == nil || e.Assign.AssignOp != AssignSimple {
+		if e.Assign == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		if e.Assign.AssignOp != AssignSimple {
 			return false
 		}
 		if e.Assign.Expr == nil {
+			// incomplete assign RHS sticky — no invent not-equal fold
+			SetError(ErrGeneric)
 			return false
 		}
 		return e.Assign.Expr.EqualsInt(num)

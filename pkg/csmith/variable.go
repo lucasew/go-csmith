@@ -534,9 +534,11 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 			continue
 		}
 		initOut := av.OutputInit(indent, names)
-		// incomplete loop-init IR — fail closed whole initializers
-		// (OutputInit already sticky; no double-config sticky for soft re-pick)
+		// incomplete loop-init IR sticky — fail closed whole initializers
 		if initOut == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		b.WriteString(initOut)

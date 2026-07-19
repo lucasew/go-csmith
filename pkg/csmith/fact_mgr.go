@@ -1811,11 +1811,15 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 // PointsTo reports whether this fact's set contains v.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-points-to past holes.
 func (f *FactPointTo) PointsTo(v *Variable) bool {
+	// Fact + subject always live; sticky incomplete — fail closed as points-to
+	// (no invent not-points-to / soft re-pick past hole)
 	if f == nil || v == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if p == v {

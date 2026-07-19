@@ -67,11 +67,14 @@ func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
 // IsNull mirrors FactPointTo::is_null — any null_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-null past holes.
 func (f *FactPointTo) IsNull() bool {
+	// Fact always live; sticky incomplete fails closed true (no invent not-null)
 	if f == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if p == NullPtr {
@@ -84,11 +87,14 @@ func (f *FactPointTo) IsNull() bool {
 // IsDead mirrors FactPointTo::is_dead — garbage_ptr in the set.
 // Incomplete PointTo (nil hole) fails closed true — no invent not-dead past holes.
 func (f *FactPointTo) IsDead() bool {
+	// Fact always live; sticky incomplete fails closed true (no invent not-dead)
 	if f == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if p == GarbagePtr {
