@@ -438,6 +438,7 @@ func TestInvocationSafeInvocation(t *testing.T) {
 }
 
 func TestInvocationCompatibleVarUnary(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
@@ -447,11 +448,31 @@ func TestInvocationCompatibleVarUnary(t *testing.T) {
 	if fi.CompatibleVar(CreateVariableScalars("g_2", GetIntType(), true, false), false) {
 		t.Fatal("other")
 	}
-	// binary never compatible
+	// binary never compatible (complete false, not sticky)
 	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ev}}
 	if fi2.CompatibleVar(v, false) {
 		t.Fatal("binary")
 	}
+	if HasError() {
+		t.Fatal("complete CompatibleVar paths must not sticky")
+	}
+	// incomplete unary operand sticky
+	ClearError()
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: nil}).CompatibleVar(v, false) {
+		t.Fatal("missing unary arg must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("missing unary arg CompatibleVar must SetError sticky")
+	}
+	ClearError()
+	// incomplete EqualsInt args sticky
+	if (&Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: nil}).EqualsInt(0) {
+		t.Fatal("missing unary arg EqualsInt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("missing unary arg EqualsInt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {

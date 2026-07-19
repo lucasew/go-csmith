@@ -90,20 +90,30 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 }
 
 func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
-	// ExpressionVariable always has live Variable*; nil hole fails closed reject
+	// ExpressionVariable always has live Variable*; nil hole sticky fail closed reject
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	live := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	hole := &Expression{Term: TermVariable, Var: nil}
 	if hole.CompatibleWithExpr(live, false) {
 		t.Fatal("nil Var lhs must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil Var lhs CompatibleWithExpr must SetError sticky")
+	}
+	ClearError()
 	if live.CompatibleWithExpr(hole, false) {
 		t.Fatal("nil Var rhs must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil Var rhs CompatibleWithExpr must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
 	// Constant.cpp:488–493 — expand_struct → true; else false
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	c := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	if c.CompatibleWithVar(v, false) {
@@ -112,15 +122,20 @@ func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
 	if !c.CompatibleWithVar(v, true) {
 		t.Fatal("expand_struct → true")
 	}
-	// assert(v) — nil var fail closed
+	// assert(v) — nil var sticky fail closed
 	if c.CompatibleWithVar(nil, true) {
 		t.Fatal("nil var")
 	}
+	if !HasError() {
+		t.Fatal("nil var CompatibleWithVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionGetQualifiersIndirect(t *testing.T) {
 	// ExpressionVariable.cpp:194–196 — qfer.indirect_qualifiers(deref)
 	// Layout [ptr_level, storage]; deref pops storage (Lhs test: remaining [false])
+	ClearError()
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false, true}, []bool{false, false})
 	v := CreateVariableQfer("g_p", pt, q)
@@ -950,6 +965,40 @@ func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
 	}
 	if HasError() {
 		t.Fatal("Constant GetQualifiers must not sticky")
+	}
+	ClearError()
+}
+
+func TestCompatibleWithIncompleteSticky(t *testing.T) {
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if (*Expression)(nil).CompatibleWithVar(v, false) {
+		t.Fatal("nil Expression CompatibleWithVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression CompatibleWithVar must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermVariable}).CompatibleWithVar(v, false) {
+		t.Fatal("Var without Variable CompatibleWithVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Var without Variable CompatibleWithVar must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermFunction}).CompatibleWithVar(v, false) {
+		t.Fatal("Funcall without Invoke CompatibleWithVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke CompatibleWithVar must SetError sticky")
+	}
+	ClearError()
+	// Constant expand_struct complete true
+	if !(&Expression{Term: TermConstant, Con: MakeInt(1)}).CompatibleWithVar(v, true) {
+		t.Fatal("Constant expand_struct must be true complete")
+	}
+	if HasError() {
+		t.Fatal("Constant CompatibleWithVar must not sticky")
 	}
 	ClearError()
 }

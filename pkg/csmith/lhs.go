@@ -80,8 +80,11 @@ func (l *Lhs) GetType() *Type {
 // Incomplete Lhs type IR fails closed sticky as volatile (restrictive — no invent
 // non-vol eligibility via invented level 0 / soft re-pick).
 func (l *Lhs) IsVolatile() bool {
+	// Lhs always live; sticky incomplete fails closed true (restrictive volatile)
+	// (no invent non-vol eligibility / soft re-pick past hole)
 	if l == nil || l.Var == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	n, ok := l.IndirectLevelComplete()
 	if !ok {
@@ -96,7 +99,9 @@ func (l *Lhs) IsVolatile() bool {
 // Incomplete Lhs type IR fails closed sticky error + empty qfer (no invent
 // storage-level quals via invented level 0).
 func (l *Lhs) GetQualifiers() CVQualifiers {
+	// Lhs always live; sticky incomplete empty qfer (no invent storage quals)
 	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	n, ok := l.IndirectLevelComplete()

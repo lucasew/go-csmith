@@ -62,20 +62,31 @@ func IncompleteExpressions() []*Expression {
 // default / other terms false.
 func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 	// Constant.cpp:489 / ExpressionVariable.cpp:289 — assert(v)
+	// Expression always live; sticky incomplete — fail closed false
+	// (no invent soft-skip compatibility / soft re-pick past hole)
 	if e == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermVariable:
+		// ExpressionVariable always has live Variable*; incomplete sticky reject
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return e.Var.Compatible(v, expandStruct)
 	case TermFunction:
-		// ExpressionFuncall.cpp:206–207
-		return e.Invoke != nil && e.Invoke.CompatibleVar(v, expandStruct)
+		// ExpressionFuncall.cpp:206–207 — invoke always live
+		if e.Invoke == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		return e.Invoke.CompatibleVar(v, expandStruct)
 	case TermLhs:
+		// Lhs shell always has live Variable*
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return e.Var.Compatible(v, expandStruct)
@@ -91,17 +102,20 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 // CompatibleWithExpr mirrors Expression::compatible(Expression*).
 // ExpressionVariable.cpp:276–282 — exp.compatible(&var);
 // ExpressionFuncall.cpp:210–212 — always false for Expression*.
-// Incomplete Variable/Lhs shells fail closed false (no invent soft-skip nil Var).
+// Incomplete Variable/Lhs shells fail closed sticky false (no invent soft-skip nil Var).
 func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
-	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR
+	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR sticky
 	if e == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// incomplete ExpressionVariable / Lhs — assert(var) path fails closed reject
+	// incomplete ExpressionVariable / Lhs — assert(var) path sticky reject
 	if (e.Term == TermVariable || e.Term == TermLhs) && e.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if (other.Term == TermVariable || other.Term == TermLhs) && other.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// Variable / Lhs → other.compatible(this.var)

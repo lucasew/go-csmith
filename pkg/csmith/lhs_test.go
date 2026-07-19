@@ -111,6 +111,21 @@ func TestLhsIndirectLevel(t *testing.T) {
 		t.Fatal("incomplete Lhs IsVolatile must SetError sticky")
 	}
 	ClearError()
+	// nil Lhs shell sticky restrictive volatile + empty quals
+	if !(*Lhs)(nil).IsVolatile() {
+		t.Fatal("nil Lhs IsVolatile must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs IsVolatile must SetError sticky")
+	}
+	ClearError()
+	if q := (*Lhs)(nil).GetQualifiers(); len(q.IsConsts) != 0 {
+		t.Fatal("nil Lhs GetQualifiers must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs GetQualifiers must SetError sticky")
+	}
+	ClearError()
 	if VariablesComplete(broken.GetLvars(nil)) {
 		t.Fatal("GetLvars incomplete must fail closed incomplete")
 	}
@@ -129,6 +144,7 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if _, ok := eBroken.IndirectLevelComplete(); ok {
 		t.Fatal("expr incomplete type must fail closed")
 	}
+	ClearError()
 }
 
 func TestPickUnaryOp(t *testing.T) {

@@ -54,9 +54,15 @@ func GetBinopString(op BinaryOp) string {
 
 // IsReturnTypeFloat mirrors FunctionInvocationBinary::is_return_type_float.
 // FunctionInvocationBinary.cpp:184–187 — assert(op_flags); size is sFloat.
+// Missing Safe is complete non-float (not sticky) — Safe is optional on std binary
+// shells; invent would be treating nil as float, not non-float.
 func (fi *Invocation) IsReturnTypeFloat() bool {
-	// assert(op_flags) — missing Safe → false (not invent float return)
-	if fi == nil || fi.Safe == nil {
+	// nil inv sticky incomplete; missing Safe alone → complete false (not float)
+	if fi == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if fi.Safe == nil {
 		return false
 	}
 	return fi.Safe.Size == SafeFloat
@@ -185,11 +191,24 @@ func (fi *Invocation) SafeInvocation() bool {
 
 // CompatibleVar mirrors FunctionInvocationUnary::compatible.
 // FunctionInvocationUnary.cpp:137–141 — operand[0].compatible(v); binary/user false.
+// Incomplete unary operand sticky false (no invent soft-skip / soft re-pick past hole).
 func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
-	if fi == nil || v == nil || !fi.IsStd || !fi.IsUnary {
+	// Invocation always live; non-unary-std complete false (C++ binary/user)
+	if fi == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if v == nil {
+		// FunctionInvocationUnary.cpp assert path via operand.compatible(v)
+		SetError(ErrGeneric)
+		return false
+	}
+	if !fi.IsStd || !fi.IsUnary {
 		return false
 	}
 	if len(fi.Args) == 0 || fi.Args[0] == nil {
+		// incomplete unary operand sticky — no invent not-compatible soft-skip
+		SetError(ErrGeneric)
 		return false
 	}
 	return fi.Args[0].CompatibleWithVar(v, expandStruct)
@@ -220,14 +239,21 @@ func (fi *Invocation) Is0Or1() bool {
 
 // EqualsInt mirrors FunctionInvocationBinary::equals / FunctionInvocationUnary::equals.
 // FunctionInvocationBinary.cpp:154–177; FunctionInvocationUnary.cpp:144–156.
+// Incomplete param IR sticky false (no invent not-equal fold / soft re-pick past holes).
 func (fi *Invocation) EqualsInt(num int) bool {
-	if fi == nil || !fi.IsStd {
+	// Invocation always live for fold; sticky incomplete no invent not-equal
+	if fi == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !fi.IsStd {
 		return false
 	}
 	// FunctionInvocationUnary.cpp:145 — assert(!param_value.empty())
 	// FunctionInvocationBinary.cpp:155 — assert(param_value.size() == 2)
 	if fi.IsUnary {
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		a0 := fi.Args[0]
@@ -242,7 +268,9 @@ func (fi *Invocation) EqualsInt(num int) bool {
 		}
 		return false
 	}
-	if len(fi.Args) < 2 {
+	if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
+		// incomplete binary operands sticky — no invent not-equal fold
+		SetError(ErrGeneric)
 		return false
 	}
 	a0, a1 := fi.Args[0], fi.Args[1]
