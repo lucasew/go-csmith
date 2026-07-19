@@ -420,7 +420,11 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil {
-			cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
+			_ = cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
+			// incomplete assign must not invent visit success / effect map
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				return false
+			}
 			if st.StmID > 0 {
 				cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
 			}

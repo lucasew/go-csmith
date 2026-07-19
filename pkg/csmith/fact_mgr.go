@@ -1002,15 +1002,19 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 
 // applyPointToAssignFacts applies point-to facts from abstract_fact_for_assign.
 // FactMgr.cpp:376–388 — renew when definitive single non-array LHS; else merge.
-// Incomplete facts/newFacts or MergeFactInto nil fails closed (*facts nil, false)
-// — no invent success past holes / soft-continue merge list.
-func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) bool {
-	if facts == nil || len(newFacts) == 0 {
-		return false
+// Returns (changed, ok). ok=false means incomplete map/merge — *facts cleared
+// (no invent success past holes / soft-continue merge list / treat incomplete as no-op).
+// empty newFacts is ok with changed=false.
+func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) (changed bool, ok bool) {
+	if facts == nil {
+		return false, false
+	}
+	if len(newFacts) == 0 {
+		return false, true
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		*facts = nil
-		return false
+		return false, false
 	}
 	lvarCnt := len(lhsAssignPointees(*facts, lhs, lhsIndir))
 	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
@@ -1024,34 +1028,42 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 			merged := MergeFactInto(*facts, newFacts[j])
 			if merged == nil {
 				*facts = nil
-				return false
+				return false, false
 			}
 			*facts = merged
 		}
-		return true
+		return true, true
 	}
 	for _, f := range newFacts {
 		merged := MergeFactInto(*facts, f)
 		if merged == nil {
 			*facts = nil
-			return false
+			return false, false
 		}
 		*facts = merged
 	}
-	return true
+	return true, true
 }
 
 // UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts).
 // FactMgr.cpp:370–395 — renew vs merge; FactUnion abstract_fact_for_assign.
-// Incomplete union merge fails closed (UnionFacts nil, false) — no invent
-// success with wiped or partial union maps past MergeUnionFact holes.
+// Incomplete point-to apply or union merge fails closed (false; GlobalFacts and/or
+// UnionFacts cleared — no invent continue union after wiped point-to or partial maps).
 func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
 	if fm == nil || lhs == nil {
 		return false
 	}
 	changed := false
 	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
-	if applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts) {
+	// incomplete abstract (lvars/transfer hole) — nil newFacts with pointer lhs
+	// that expected transfer must not invent empty apply success then union merge
+	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts)
+	if !ptOK {
+		// point-to incomplete — fail closed, do not invent union merge on wiped map
+		fm.UnionFacts = nil
+		return false
+	}
+	if ptChanged {
 		changed = true
 	}
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
@@ -1272,7 +1284,8 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 // FactMgr.cpp:108–116 — update_fact_for_assign each param from arg expression.
 // No invent NewFactPointTo when arg missing: nil rhs goes through abstract
 // (FactPointTo.cpp:168–169 → garbage for pointers), same as C++ nullptr value.
-// Variable* params always live; nil param hole fails closed (stop, no invent skip).
+// Variable* params always live; nil param hole or incomplete assign fails closed
+// (*facts nil, stop — no invent skip remaining params / re-accumulate after wipe).
 func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	if fm == nil || fm.Func == nil || facts == nil {
 		return
@@ -1280,6 +1293,7 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	for i, p := range fm.Func.Param {
 		if p == nil {
 			// incomplete Param list — no invent skip remaining params
+			*facts = nil
 			return
 		}
 		var arg *Expression
@@ -1287,20 +1301,33 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 			arg = args[i]
 		}
 		// FactMgr.cpp:113–114 — always update_fact_for_assign (all params, not pointer-only)
-		fm.UpdateFactForAssignInto(p, 0, arg, facts)
+		// false alone may mean no lattice change; incomplete clears *facts
+		_ = fm.UpdateFactForAssignInto(p, 0, arg, facts)
+		if !FactsComplete(*facts) {
+			*facts = nil
+			return
+		}
 	}
 }
 
 // UpdateFactForAssignInto is UpdateFactForAssign writing into a fact slice.
 // FactMgr.cpp:370–395 — same renew/merge rules as UpdateFactForAssign.
-// Incomplete union merge fails closed like UpdateFactForAssign.
+// Incomplete point-to apply or union merge fails closed like UpdateFactForAssign
+// (no invent continue union after wiped *facts).
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
 	if facts == nil || lhs == nil {
 		return false
 	}
 	changed := false
 	newFacts := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
-	if applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts) {
+	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts)
+	if !ptOK {
+		if fm != nil {
+			fm.UnionFacts = nil
+		}
+		return false
+	}
+	if ptChanged {
 		changed = true
 	}
 	if fm != nil {

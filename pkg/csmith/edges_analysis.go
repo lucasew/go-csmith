@@ -263,17 +263,30 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				return
 			}
 			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
-			fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
+			// incomplete assign fails closed — no invent mark visited with wiped facts
+			_ = fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
+			if !FactsComplete(fm.GlobalFacts) {
+				fm.GlobalFacts = nil
+				return
+			}
 		case StmtReturn:
 			// curr_func + rv always live for return after make; incomplete → ERROR
 			if cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
 				SetError(ErrGeneric)
 				return
 			}
-			fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
+			_ = fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
+			if !FactsComplete(fm.GlobalFacts) {
+				fm.GlobalFacts = nil
+				return
+			}
 		}
 	}
 	fm.RemoveRVFacts(&fm.GlobalFacts)
+	if !FactsComplete(fm.GlobalFacts) {
+		fm.GlobalFacts = nil
+		return
+	}
 	if st.StmID > 0 {
 		fm.SetMapFactsIn(st.StmID, preFacts)
 		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())

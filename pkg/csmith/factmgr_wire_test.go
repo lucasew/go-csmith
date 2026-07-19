@@ -71,24 +71,50 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// soft invent: MergeFactInto nil still return true with partial maps
-	// fair: incomplete newFacts / merge hole fails closed false + clear
+	// fair: incomplete newFacts / merge hole fails closed ok=false + clear
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	// nil hole in newFacts
-	if applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}) {
-		t.Fatal("nil newFact hole must fail closed false")
+	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}); ok {
+		t.Fatal("nil newFact hole must fail closed ok=false")
 	}
 	if facts != nil {
 		t.Fatal("incomplete assign facts must clear", facts)
 	}
 	// incomplete subject map
 	facts = []*FactPointTo{MakeFactPointTo(p, a), nil}
-	if applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}) {
-		t.Fatal("nil subject map hole must fail closed false")
+	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
+		t.Fatal("nil subject map hole must fail closed ok=false")
 	}
 	if facts != nil {
 		t.Fatal("incomplete subject must clear", facts)
+	}
+	// empty newFacts is ok no-op (not incomplete)
+	facts = []*FactPointTo{MakeFactPointTo(p, a)}
+	ch, ok := applyPointToAssignFacts(&facts, p, 0, nil)
+	if !ok || ch {
+		t.Fatal("empty newFacts must be ok with no change", ch, ok)
+	}
+}
+
+func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
+	// incomplete point-to apply must not invent union merge success
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a), nil}
+	fm.UnionFacts = []*FactUnion{}
+	rhs := &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()}
+	// assign through incomplete GlobalFacts — apply fails closed
+	if fm.UpdateFactForAssign(p, 0, rhs) {
+		t.Fatal("incomplete GlobalFacts assign must fail closed false")
+	}
+	if fm.GlobalFacts != nil {
+		t.Fatal("point-to hole must clear GlobalFacts", fm.GlobalFacts)
+	}
+	if fm.UnionFacts != nil {
+		t.Fatal("must not invent keep UnionFacts after point-to fail", fm.UnionFacts)
 	}
 }
 
