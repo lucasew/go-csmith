@@ -647,6 +647,12 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	if initVal == "" {
 		return ""
 	}
+	// ArrayVariable.cpp:649 + output_with_indices — access always live
+	// no invent for-loops + " = init;" without LHS
+	access := av.OutputWithIndices(ctrl)
+	if access == "" {
+		return ""
+	}
 	var b strings.Builder
 	// nested fors for each dimension
 	pad := indent
@@ -663,7 +669,7 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 		}
 	}
 	// a[i][j] = init;
-	b.WriteString(pad + "    " + av.OutputWithIndices(ctrl) + " = " + initVal + ";\n")
+	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
 	for i := len(av.Sizes) - 1; i >= 1; i-- {
 		pad = pad[:len(pad)-4]
 		b.WriteString(pad + "}\n")

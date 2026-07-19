@@ -340,46 +340,47 @@ func (g *ProgramGenerator) OutputGlobals() string {
 // OutputFunctions mirrors OutputForwardDeclarations + OutputFunctions.
 // Function.cpp:812–830 — optional FORWARD ALIAS DECLARATIONS when func_attr_flag.
 func (g *ProgramGenerator) OutputFunctions() string {
-	var b strings.Builder
-	b.WriteString("\n\n/* --- FORWARD DECLARATIONS --- */\n")
+	var forwards, aliases, bodies strings.Builder
 	for _, f := range g.Funcs.Funcs {
 		if f == nil || f.IsBuiltin {
 			continue
 		}
 		// incomplete header IR — no invent bare blank lines
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
-		if d == "" {
-			continue
+		if d != "" {
+			forwards.WriteString(d)
+			forwards.WriteString("\n")
 		}
-		b.WriteString(d)
-		b.WriteString("\n")
-	}
-	// Function.cpp:820–826 — alias decls when FunctionAttributes
-	if g.Opts.FunctionAttributes {
-		b.WriteString("\n\n/* --- FORWARD ALIAS DECLARATIONS --- */\n")
-		for _, f := range g.Funcs.Funcs {
-			if f == nil || f.IsBuiltin {
-				continue
+		// Function.cpp:820–826 — alias decls when FunctionAttributes
+		if g.Opts.FunctionAttributes {
+			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
+			if a != "" {
+				aliases.WriteString(a)
+				aliases.WriteString("\n")
 			}
-			d := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
-			if d == "" {
-				continue
-			}
-			b.WriteString(d)
-			b.WriteString("\n")
-		}
-	}
-	b.WriteString("\n\n/* --- FUNCTIONS --- */\n")
-	for _, f := range g.Funcs.Funcs {
-		if f == nil || f.IsBuiltin {
-			continue
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
-		if body == "" {
-			continue
+		if body != "" {
+			bodies.WriteString(body)
+			bodies.WriteString("\n")
 		}
-		b.WriteString(body)
-		b.WriteString("\n")
+	}
+	// no invent section headers without live content
+	if forwards.Len() == 0 && aliases.Len() == 0 && bodies.Len() == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if forwards.Len() > 0 {
+		b.WriteString("\n\n/* --- FORWARD DECLARATIONS --- */\n")
+		b.WriteString(forwards.String())
+	}
+	if aliases.Len() > 0 {
+		b.WriteString("\n\n/* --- FORWARD ALIAS DECLARATIONS --- */\n")
+		b.WriteString(aliases.String())
+	}
+	if bodies.Len() > 0 {
+		b.WriteString("\n\n/* --- FUNCTIONS --- */\n")
+		b.WriteString(bodies.String())
 	}
 	return b.String()
 }
@@ -649,8 +650,11 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 			pad += "    "
 		}
 	}
-	// ArrayVariable::output_with_indices
+	// ArrayVariable::output_with_indices always live access; no invent " = init;" without LHS
 	access := av.OutputWithIndices(ctrl)
+	if access == "" {
+		return ""
+	}
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")
 	for i := len(av.Sizes) - 1; i >= 1; i-- {
 		pad = pad[:len(pad)-4]

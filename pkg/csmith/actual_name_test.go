@@ -43,6 +43,13 @@ func TestOutputAddrOf(t *testing.T) {
 	if v.OutputAddrOf(false) != "&g_1" {
 		t.Fatal(v.OutputAddrOf(false))
 	}
+	// Variable.cpp:707 — always live Variable*; no invent "&0"
+	if s := (*Variable)(nil).OutputAddrOf(false); s != "" {
+		t.Fatal("nil must fail closed, got", s)
+	}
+	if s := (&Variable{}).OutputAddrOf(false); s != "" {
+		t.Fatal("empty name must fail closed bare &, got", s)
+	}
 }
 
 func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {

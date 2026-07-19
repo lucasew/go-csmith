@@ -155,6 +155,17 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	}
 }
 
+func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
+	// incomplete funcs must not invent FORWARD/FUNCTIONS section-only shells
+	g := NewProgramGenerator(Defaults())
+	g.Funcs.Funcs = []*Function{
+		{Name: "", ReturnType: GetIntType()}, // empty name → empty header
+	}
+	if out := g.OutputFunctions(); out != "" {
+		t.Fatal("empty function IR must fail closed sections", out)
+	}
+}
+
 func TestBlockLocalNoInventEmptyDef(t *testing.T) {
 	// incomplete local OutputDef must not invent blank indent lines
 	b := &Block{LocalVars: []*Variable{
