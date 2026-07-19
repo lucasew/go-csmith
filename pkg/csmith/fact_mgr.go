@@ -655,8 +655,8 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 		return IncompleteFactSlice()
 	}
 	out := CloneFactSlice(facts)
-	// complete empty clones as non-nil empty; nil clone of non-empty incomplete
-	if out == nil && facts != nil && len(facts) > 0 {
+	// incomplete clone is hole marker (not bare nil invent empty complete)
+	if !FactsComplete(out) {
 		return IncompleteFactSlice()
 	}
 	// Statement.cpp set_fact_out / FactMgr.cpp:607–611

@@ -754,17 +754,24 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 }
 
 // CloneFactSlice deep-clones a FactPointTo slice.
+// Complete empty: nil in → nil out; non-nil {} → non-nil {}.
+// Incomplete maps fail closed IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-complete clone success).
 func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 	if facts == nil {
 		return nil
 	}
+	if !FactsComplete(facts) {
+		return IncompleteFactSlice()
+	}
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
-		// Fact* always live in fact maps; no invent skip nil holes as partial clone
-		if f == nil {
-			return nil
+		// Fact* always live after FactsComplete; Clone nil = incomplete PointTo
+		cl := f.Clone()
+		if cl == nil {
+			return IncompleteFactSlice()
 		}
-		out = append(out, f.Clone())
+		out = append(out, cl)
 	}
 	return out
 }

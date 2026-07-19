@@ -445,8 +445,9 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		}
 	default:
 		fm.GlobalFacts = CloneFactSlice(thenOut)
-		// incomplete clone or else merge must not invent partial global
-		if thenOut != nil && fm.GlobalFacts == nil {
+		// incomplete clone must not invent empty-complete GlobalFacts (bare nil)
+		if !FactsComplete(fm.GlobalFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 		if !FactsComplete(elseOut) {
