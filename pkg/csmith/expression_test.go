@@ -217,29 +217,54 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 	if ExpressionComplexity(e2) != 2 {
 		t.Fatal(ExpressionComplexity(e2))
 	}
-	// nil Invoke — fail closed -1 (no invent leaf depth 0)
+	// nil Invoke — fail closed sticky -1 (no invent leaf depth 0)
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil invoke must fail closed -1, not invent depth 0")
 	}
-	// incomplete assign / comma / nil arg — fail closed -1
+	if !HasError() {
+		t.Fatal("nil invoke ExpressionComplexity must SetError sticky")
+	}
+	// incomplete assign / comma / nil arg — fail closed sticky -1
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermAssignment}) >= 0 {
 		t.Fatal("nil Assign must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Assign ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermCommaExpr, CommaLHS: inner}) >= 0 {
 		t.Fatal("nil CommaRHS must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil CommaRHS ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{
 		User: &Function{Name: "h"}, Args: []*Expression{inner, nil},
 	}}) >= 0 {
 		t.Fatal("nil arg hole must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil arg ExpressionComplexity must SetError sticky")
+	}
 	// incomplete constant / variable leaf
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermConstant}) >= 0 {
 		t.Fatal("nil Con must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Con ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
 	if ExpressionComplexity(&Expression{Term: TermVariable}) >= 0 {
 		t.Fatal("nil Var must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Var ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionIndentedOutput(t *testing.T) {

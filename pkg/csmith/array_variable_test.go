@@ -525,31 +525,57 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 		t.Fatal("two vars")
 	}
 	// incomplete IR fails closed -1 / nil (no invent leaf 0 or key-var 1)
+	ClearError()
 	if CountExprKeyVar(nil) >= 0 {
 		t.Fatal("nil expr must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil expr CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if CountExprKeyVar(&Expression{Term: TermVariable}) >= 0 {
 		t.Fatal("nil Var must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Var CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if CountExprKeyVar(&Expression{Term: TermConstant}) >= 0 {
 		t.Fatal("nil Con must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Con CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if CountExprKeyVar(&Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil Invoke must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil Invoke CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if CountExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
 		IsStd: true, Binary: "+", Args: []*Expression{ev, nil},
 	}}) >= 0 {
 		t.Fatal("nil arg hole must fail closed -1")
 	}
+	if !HasError() {
+		t.Fatal("nil arg CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if FindExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
 		IsStd: true, Binary: "+", Args: []*Expression{nil, c},
 	}}) != nil {
 		t.Fatal("nil arg FindExprKeyVar must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil arg FindExprKeyVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsVariantKeyVars(t *testing.T) {
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
 		Sizes:    []int{8},
@@ -604,6 +630,7 @@ func TestItemizeConstIndices(t *testing.T) {
 }
 
 func TestHasEligibleVolatileVarIncrements(t *testing.T) {
+	ClearError()
 	BookkeeperDoFinalization()
 	defer BookkeeperDoFinalization()
 	vol := CreateVariableScalars("g_v", GetIntType(), true, false)

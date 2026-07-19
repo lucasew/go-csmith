@@ -347,28 +347,33 @@ func OOBCount() int { return oobCnt }
 // ExpressionComplexity mirrors Expression::get_complexity.
 // ExpressionVariable/Constant: 0; ExpressionFuncall.cpp:131–143 — user call +1
 // plus sum of arg complexities; assign/comma nest.
-// Incomplete IR fails closed as -1 (no invent leaf depth 0 / partial nest counts).
+// Incomplete IR fails closed sticky as -1 (no invent leaf depth 0 / soft re-pick
+// stats past partial nest counts).
 func ExpressionComplexity(e *Expression) int {
 	if e == nil {
+		SetError(ErrGeneric)
 		return -1
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant always has live Value; incomplete shell → -1 (not invent depth 0 leaf)
+		// Constant always has live Value; incomplete shell sticky → -1
 		if e.Con == nil || e.Con.Value == "" {
+			SetError(ErrGeneric)
 			return -1
 		}
 		return 0
 	case TermVariable:
-		// ExpressionVariable always has live Variable*; incomplete → -1
+		// ExpressionVariable always has live Variable*; incomplete sticky → -1
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		return 0
 	case TermFunction:
 		// ExpressionFuncall::get_complexity — live invoke only
-		// no soft invent complexity 0/1 for nil Invoke IR
+		// no soft invent complexity 0/1 for nil Invoke IR sticky
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		comp := 0
@@ -376,56 +381,73 @@ func ExpressionComplexity(e *Expression) int {
 			comp++ // function call itself
 		}
 		for _, a := range e.Invoke.Args {
-			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed
+			// param_value[i] always live after ERROR_GUARD; nil hole → fail closed sticky
 			if a == nil {
+				SetError(ErrGeneric)
 				return -1
 			}
 			c := ExpressionComplexity(a)
 			if c < 0 {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return -1
 			}
 			comp += c
 		}
 		return comp
 	case TermAssignment:
-		// incomplete Assign IR — no invent complexity 1 shell
+		// incomplete Assign IR sticky — no invent complexity 1 shell
 		if e.Assign == nil || e.Assign.Expr == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		c := ExpressionComplexity(e.Assign.Expr)
 		if c < 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return -1
 		}
 		return 1 + c
 	case TermCommaExpr:
-		// both sides always live; incomplete → -1
+		// both sides always live; incomplete sticky → -1
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		cl := ExpressionComplexity(e.CommaLHS)
 		cr := ExpressionComplexity(e.CommaRHS)
 		if cl < 0 || cr < 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return -1
 		}
 		return 1 + cl + cr
 	default:
-		// unknown term kind — incomplete IR
+		// unknown term kind — incomplete IR sticky
+		SetError(ErrGeneric)
 		return -1
 	}
 }
 
 // collectStmtExprs appends expressions like Statement::get_exprs + get_blocks.
 // Bookkeeper.cpp:209–221 / Statement.cpp get_exprs virtuals.
-// Returns false on incomplete IR (no invent partial expr list past holes).
+// Returns false on incomplete IR sticky (no invent partial expr list / soft re-pick past holes).
 func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 	if st == nil || out == nil {
+		if out != nil {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// StatementFor/ArrayOp::get_exprs — push test only (init/incr are separate
 	// StatementAssigns not walked via get_exprs). Kind-gated (no invent
-	// Loop-on-wrong-kind). Incomplete Loop IR fails closed.
+	// Loop-on-wrong-kind). Incomplete Loop IR fails closed sticky.
 	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
 		if st.Loop == nil || st.Loop.TestExpr == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Loop.TestExpr)
@@ -433,8 +455,9 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 		switch st.Kind {
 		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
 			// C++ get_exprs always yields live Expression* for these kinds
-			// incomplete nil Expr fails closed (no invent empty get_exprs success)
+			// incomplete nil Expr fails closed sticky (no invent empty get_exprs success)
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return false
 			}
 			*out = append(*out, st.Expr)
@@ -444,9 +467,10 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 			}
 		}
 	}
-	// get_blocks → recurse (Block* always live; nil hole fails closed)
+	// get_blocks → recurse (Block* always live; nil hole fails closed sticky)
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		for i := range b.Stmts {

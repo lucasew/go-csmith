@@ -252,27 +252,32 @@ func (av *ArrayVariable) NoLoopInitializer() bool {
 
 // CountExprKeyVar mirrors count_expr_key_var (ArrayVariable.cpp:66–90).
 // Variable: 1; Constant: 0; user call: 2; unary: recurse; binary: sum.
-// Incomplete IR fails closed as -1 (no invent constant-0 / var-1 for broken shells).
+// Incomplete IR fails closed sticky as -1 (no invent constant-0 / var-1 / soft re-pick
+// variant match past broken shells).
 func CountExprKeyVar(e *Expression) int {
 	if e == nil {
-		// ArrayVariable.cpp:89 assert(0) for unexpected; nil is broken IR
+		// ArrayVariable.cpp:89 assert(0) for unexpected; nil is broken IR sticky
+		SetError(ErrGeneric)
 		return -1
 	}
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		return 1
 	case TermConstant:
-		// live Constant*; incomplete shell fails closed
+		// live Constant*; incomplete shell fails closed sticky
 		if e.Con == nil || e.Con.Value == "" {
+			SetError(ErrGeneric)
 			return -1
 		}
 		return 0
 	case TermFunction:
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return -1
 		}
 		// user call → 2 (ArrayVariable.cpp:76–77)
@@ -281,8 +286,9 @@ func CountExprKeyVar(e *Expression) int {
 		}
 		n := len(e.Invoke.Args)
 		if n == 1 {
-			// param always live; nil arg fails closed
+			// param always live; nil arg fails closed sticky
 			if e.Invoke.Args[0] == nil {
+				SetError(ErrGeneric)
 				return -1
 			}
 			return CountExprKeyVar(e.Invoke.Args[0])
@@ -290,41 +296,56 @@ func CountExprKeyVar(e *Expression) int {
 		// ArrayVariable.cpp:84 — assert(param_value.size() == 2) for binary
 		if n == 2 {
 			if e.Invoke.Args[0] == nil || e.Invoke.Args[1] == nil {
+				SetError(ErrGeneric)
 				return -1
 			}
 			a := CountExprKeyVar(e.Invoke.Args[0])
 			b := CountExprKeyVar(e.Invoke.Args[1])
 			if a < 0 || b < 0 {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return -1
 			}
 			return a + b
 		}
-		// wrong arity — fail closed -1 (no invent sum of first two)
+		// wrong arity — fail closed sticky -1 (no invent sum of first two)
+		SetError(ErrGeneric)
 		return -1
 	default:
 		// ArrayVariable.cpp:89 assert(0)
+		SetError(ErrGeneric)
 		return -1
 	}
 }
 
 // FindExprKeyVar mirrors find_expr_key_var (ArrayVariable.cpp:98–119).
 // Sole key variable of an index expression, or nil if none / ambiguous.
-// Incomplete IR (nil Invoke/args) fails closed nil (no invent key from partial).
+// Incomplete IR (nil Invoke/args) fails closed sticky nil (no invent key from partial).
 func FindExprKeyVar(e *Expression) *Variable {
 	if e == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	switch e.Term {
 	case TermVariable:
-		// incomplete Variable* shell → nil
+		// incomplete Variable* shell sticky → nil
+		if e.Var == nil {
+			SetError(ErrGeneric)
+		}
 		return e.Var
 	case TermFunction:
-		if e.Invoke == nil || (e.Invoke.User != nil && !e.Invoke.IsStd) {
+		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return nil
+		}
+		if e.Invoke.User != nil && !e.Invoke.IsStd {
+			return nil // user call: no single key var (complete empty)
 		}
 		n := len(e.Invoke.Args)
 		if n == 1 {
 			if e.Invoke.Args[0] == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			return FindExprKeyVar(e.Invoke.Args[0])
@@ -332,6 +353,7 @@ func FindExprKeyVar(e *Expression) *Variable {
 		// ArrayVariable.cpp:110 — assert(param_value.size() == 2)
 		if n == 2 {
 			if e.Invoke.Args[0] == nil || e.Invoke.Args[1] == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			v0 := FindExprKeyVar(e.Invoke.Args[0])
