@@ -137,6 +137,34 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 	}
 }
 
+func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
+	// incomplete FieldVars → GetCollective nil must not invent eligible / panic
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		}}, IsArray: true, ArraySizes: []int{2}},
+		Sizes: []int{2},
+	}
+	parent.AsArray = parent
+	parent.CreateFieldVars()
+	item := parent.ItemizeConstIndices([]int{0}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	item.CreateFieldVars()
+	if len(item.FieldVars) == 0 {
+		t.Fatal("fields")
+	}
+	fld := item.FieldVars[0]
+	item.FieldVars = append(item.FieldVars, nil)
+	if IsEligibleVar(fld, 0, AccessRead, EmptyCGContext()) {
+		t.Fatal("incomplete collective must fail closed not eligible")
+	}
+	if fld.LooseMatch(fld) {
+		t.Fatal("incomplete LooseMatch must fail closed false")
+	}
+}
+
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

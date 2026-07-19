@@ -1122,12 +1122,16 @@ func (v *Variable) GetContainerUnion() *Variable {
 
 // LooseMatch mirrors Variable::loose_match.
 // Variable.cpp:239–250 — match collective, or same container union.
+// Incomplete GetCollective fails closed false (no invent match / panic on nil).
 func (v *Variable) LooseMatch(other *Variable) bool {
 	if v == nil || other == nil {
 		return false
 	}
 	me := v.GetCollective()
 	you := other.GetCollective()
+	if me == nil || you == nil {
+		return false
+	}
 	if me.Match(you) {
 		return true
 	}

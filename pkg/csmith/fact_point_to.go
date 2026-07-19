@@ -332,6 +332,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		}
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
+			// incomplete collective fails closed (MergePointees(nil) is IncompleteVariables)
 			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
 			// incomplete pointees
 			if !VariablesComplete(vars) {

@@ -456,11 +456,16 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 // SiblingUnionFieldIsRead mirrors Effect::sibling_union_field_is_read.
 // Effect.cpp:416–428 — another field of the same container union was read.
 // Variable* always live as map keys; nil hole fails closed as true (no invent none).
+// Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	if v == nil {
 		return false
 	}
-	you := v.GetCollective().GetContainerUnion()
+	youColl := v.GetCollective()
+	if youColl == nil {
+		return true
+	}
+	you := youColl.GetContainerUnion()
 	if you == nil {
 		return false
 	}
@@ -471,7 +476,11 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 		if !e.read[r] {
 			continue
 		}
-		me := r.GetCollective().GetContainerUnion()
+		rColl := r.GetCollective()
+		if rColl == nil {
+			return true
+		}
+		me := rColl.GetContainerUnion()
 		if me == you {
 			return true
 		}
@@ -482,11 +491,16 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 // SiblingUnionFieldIsWritten mirrors Effect::sibling_union_field_is_written.
 // Effect.cpp:430–441.
 // Variable* always live as map keys; nil hole fails closed as true (no invent none).
+// Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	if v == nil {
 		return false
 	}
-	you := v.GetCollective().GetContainerUnion()
+	youColl := v.GetCollective()
+	if youColl == nil {
+		return true
+	}
+	you := youColl.GetContainerUnion()
 	if you == nil {
 		return false
 	}
@@ -497,7 +511,11 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 		if !e.written[w] {
 			continue
 		}
-		me := w.GetCollective().GetContainerUnion()
+		wColl := w.GetCollective()
+		if wColl == nil {
+			return true
+		}
+		me := wColl.GetContainerUnion()
 		if me == you {
 			return true
 		}

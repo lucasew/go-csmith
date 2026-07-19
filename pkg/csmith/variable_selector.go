@@ -820,7 +820,11 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		return false
 	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
+	// Incomplete GetCollective fails closed (no invent eligibility / panic on nil coll)
 	coll := v.GetCollective()
+	if coll == nil {
+		return false
+	}
 	if coll != v {
 		cgp := cg
 		var facts []*FactPointTo

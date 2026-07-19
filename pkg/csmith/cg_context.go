@@ -804,7 +804,15 @@ func (c *CGContext) WritePointed(lhs *Lhs, facts []*FactPointTo, opts Options) b
 	if !c.ReadIndices(lhs.Var, facts) {
 		return false
 	}
-	tmp := []*Variable{lhs.Var.GetCollective()}
+	// incomplete collective fails closed (no invent MergePointees from nil shell)
+	coll := lhs.Var.GetCollective()
+	if coll == nil {
+		if accumCopy != nil && c.EffectAccum != nil {
+			*c.EffectAccum = *accumCopy
+		}
+		return false
+	}
+	tmp := []*Variable{coll}
 	allowNull := opts.NullPointerDerefProb > 0
 	allowDead := opts.DeadPointerDerefProb > 0
 	for indirect > 0 {
@@ -1128,19 +1136,21 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 	if c.EffectStm.IsWritten(lhs.Var) {
 		return true
 	}
-	tmp := []*Variable{lhs.Var.GetCollective()}
+	// incomplete collective fails closed as modified (no invent unmodified / panic)
+	coll := lhs.Var.GetCollective()
+	if coll == nil {
+		return true
+	}
+	tmp := []*Variable{coll}
 	// only intermediate pointer levels (not ultimate pointees)
 	for indirect > 1 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)
-		// nil = incomplete pointees
-		if tmp == nil {
+		// nil / incomplete pointees
+		if tmp == nil || !VariablesComplete(tmp) {
 			return true
 		}
 		for _, v := range tmp {
-			if v == nil {
-				return true
-			}
 			if c.EffectStm.IsWritten(v) {
 				return true
 			}
