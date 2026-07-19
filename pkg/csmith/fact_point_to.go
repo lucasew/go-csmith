@@ -446,11 +446,19 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 	if len(f.PointTo) != len(other.PointTo) {
 		return false
 	}
+	// Variable* always live in PointTo; nil hole fails closed as unequal
+	// (no invent soft-skip hole as absent / equal past incomplete sets)
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
+		if p == nil {
+			return false
+		}
 		set[p] = true
 	}
 	for _, p := range other.PointTo {
+		if p == nil {
+			return false
+		}
 		if !set[p] {
 			return false
 		}
@@ -460,15 +468,22 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 
 // Imply mirrors FactPointTo::imply — other.point_to ⊆ this.point_to.
 // FactPointTo.cpp:602–609.
+// Incomplete PointTo (nil hole) fails closed as not-imply — no invent cover past holes.
 func (f *FactPointTo) Imply(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		return false
 	}
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
+		if p == nil {
+			return false
+		}
 		set[p] = true
 	}
 	for _, p := range other.PointTo {
+		if p == nil {
+			return false
+		}
 		if !set[p] {
 			return false
 		}
@@ -478,17 +493,28 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 
 // Join mirrors FactPointTo::join — union of points-to sets; returns true if changed.
 // FactPointTo.cpp:563–578.
+// Incomplete PointTo (nil hole) fails closed false without partial absorb
+// (no invent soft-skip hole and still join later pointees).
 func (f *FactPointTo) Join(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		return false
 	}
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
+		if p == nil {
+			return false
+		}
 		set[p] = true
+	}
+	// pre-scan other for holes before mutating self
+	for _, p := range other.PointTo {
+		if p == nil {
+			return false
+		}
 	}
 	changed := false
 	for _, p := range other.PointTo {
-		if p == nil || set[p] {
+		if set[p] {
 			continue
 		}
 		set[p] = true

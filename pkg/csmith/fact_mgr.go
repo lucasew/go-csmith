@@ -312,7 +312,13 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			addOOS(fact.Var)
 		}
 		for _, p := range fact.PointTo {
-			if p != nil && !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
+			// Variable* always live in PointTo; nil hole fails closed whole dest update
+			// (no invent soft-skip hole and still OOS-scan later pointees)
+			if p == nil {
+				*factsOut = nil
+				return
+			}
+			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
 				addOOS(p)
 			}
 		}

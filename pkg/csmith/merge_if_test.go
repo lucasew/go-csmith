@@ -26,6 +26,32 @@ func TestFactPointToImplyJoin(t *testing.T) {
 	}
 }
 
+func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
+	// soft invent: Join soft-skips nil PointTo and still absorbs later pointees
+	// fair: incomplete PointTo fails closed (no partial join / no invent cover)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	base := MakeFactPointTo(p, a)
+	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, b}}
+	cp := base.Clone()
+	if cp.Join(hole) {
+		t.Fatal("Join must fail closed on nil pointee hole, not soft-skip")
+	}
+	if len(cp.PointTo) != 1 || cp.PointTo[0] != a {
+		t.Fatal("Join must not partially absorb past hole", cp.PointTo)
+	}
+	if base.Imply(hole) {
+		t.Fatal("Imply must fail closed on other nil pointee")
+	}
+	if hole.Imply(base) {
+		t.Fatal("Imply must fail closed on self nil pointee")
+	}
+	if base.Equal(hole) || hole.Equal(base) {
+		t.Fatal("Equal must fail closed on nil pointee")
+	}
+}
+
 func TestMergeFactLattice(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)

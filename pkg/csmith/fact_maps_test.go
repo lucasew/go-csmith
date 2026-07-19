@@ -36,6 +36,14 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if out2 != nil {
 		t.Fatal("nil hole must fail closed dest facts", out2)
 	}
+	// nil PointTo hole on live fact fails closed
+	var out3 []*FactPointTo
+	bad := MakeFactPointTo(p, NullPtr)
+	bad.PointTo = []*Variable{nil, loc}
+	UpdateFactsForDest([]*FactPointTo{bad}, &out3, f, nil)
+	if out3 != nil {
+		t.Fatal("nil pointee hole must fail closed dest facts", out3)
+	}
 }
 
 func TestClearMapVisited(t *testing.T) {
