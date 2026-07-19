@@ -95,6 +95,38 @@ func TestBuildCalleeRWDirective(t *testing.T) {
 	}
 }
 
+func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
+	// complete empty must be non-nil empty (not invent nil==incomplete)
+	cg := EmptyCGContext()
+	got := cg.FindReachableFrameVars(nil)
+	if got == nil {
+		t.Fatal("complete empty must be non-nil empty slice")
+	}
+	if len(got) != 0 {
+		t.Fatal(got)
+	}
+	// incomplete fact map fails closed nil
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}) != nil {
+		t.Fatal("incomplete facts must fail closed nil")
+	}
+}
+
+func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
+	// soft invent: incomplete frame → nil RW (no restrictions)
+	// fair: inherit full NoWrite without inventing unrestricted nil
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
+	if rwd == nil {
+		t.Fatal("incomplete must not invent nil unrestricted RW")
+	}
+	if len(rwd.NoWriteVars) != 1 || rwd.NoWriteVars[0] != g {
+		t.Fatal(rwd)
+	}
+}
+
 func TestVisitFactsInvocationParams(t *testing.T) {
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)

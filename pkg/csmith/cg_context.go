@@ -909,20 +909,21 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 
 // FindReachableFrameVars mirrors CGContext::find_reachable_frame_vars.
 // CGContext.cpp:566–578 — pointees that are frame locals.
-// Fact* always live; nil hole fails closed (nil out, no invent partial frames).
+// Fact* always live; incomplete map/pointees fail closed (nil out).
+// Complete empty returns non-nil empty slice (no invent nil==incomplete).
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 	if !FactsComplete(facts) {
 		return nil
 	}
-	var out []*Variable
+	out := make([]*Variable, 0)
 	seen := map[*Variable]bool{}
 	for _, f := range facts {
 		for _, p := range f.PointTo {
 			// pointee Variable* always live in point-to sets (specials are non-nil)
-			if p == nil || IsSpecialPtr(p) || seen[p] {
-				if p == nil {
-					return nil
-				}
+			if p == nil {
+				return nil
+			}
+			if IsSpecialPtr(p) || seen[p] {
 				continue
 			}
 			if c.IsFrameVar(p) {
@@ -979,9 +980,38 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 
 // BuildCalleeRWDirective builds RW for generate_body_with_known_params path.
 // Function.cpp:675–681 — inherit external no-read/write from caller.
+// Incomplete frame facts fail closed: inherit full caller NoRead/NoWrite without
+// inventing nil (no restrictions) from incomplete reachable frames.
 func (c CGContext) BuildCalleeRWDirective(facts []*FactPointTo) *RWDirective {
 	frame := c.FindReachableFrameVars(facts)
+	if frame == nil {
+		// incomplete facts — fail closed full external lists (no invent empty RW)
+		if c.RW == nil {
+			return &RWDirective{}
+		}
+		// copy lists; nil holes already fail GetExternal path — copy as-is
+		nr := append([]*Variable(nil), c.RW.NoReadVars...)
+		nw := append([]*Variable(nil), c.RW.NoWriteVars...)
+		for _, v := range nr {
+			if v == nil {
+				return &RWDirective{}
+			}
+		}
+		for _, v := range nw {
+			if v == nil {
+				return &RWDirective{}
+			}
+		}
+		if len(nr) == 0 && len(nw) == 0 {
+			return &RWDirective{}
+		}
+		return &RWDirective{NoReadVars: nr, NoWriteVars: nw}
+	}
 	nr, nw := c.GetExternalNoReadsWrites(frame)
+	// GetExternal nil,nil = incomplete RW/IV lists
+	if nr == nil && nw == nil && c.RW != nil {
+		return &RWDirective{}
+	}
 	if len(nr) == 0 && len(nw) == 0 {
 		return nil
 	}

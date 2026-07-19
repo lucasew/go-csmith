@@ -50,11 +50,15 @@ func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
 }
 
 // IsNull mirrors FactPointTo::is_null — any null_ptr in the set.
+// Incomplete PointTo (nil hole) fails closed true — no invent not-null past holes.
 func (f *FactPointTo) IsNull() bool {
 	if f == nil {
 		return false
 	}
 	for _, p := range f.PointTo {
+		if p == nil {
+			return true
+		}
 		if p == NullPtr {
 			return true
 		}
@@ -63,11 +67,15 @@ func (f *FactPointTo) IsNull() bool {
 }
 
 // IsDead mirrors FactPointTo::is_dead — garbage_ptr in the set.
+// Incomplete PointTo (nil hole) fails closed true — no invent not-dead past holes.
 func (f *FactPointTo) IsDead() bool {
 	if f == nil {
 		return false
 	}
 	for _, p := range f.PointTo {
+		if p == nil {
+			return true
+		}
 		if p == GarbagePtr {
 			return true
 		}
@@ -76,8 +84,15 @@ func (f *FactPointTo) IsDead() bool {
 }
 
 // IsTBDOnly mirrors FactPointTo::is_tbd_only.
+// Incomplete PointTo (nil hole) fails closed false — not a pure TBD-only set.
 func (f *FactPointTo) IsTBDOnly() bool {
-	return f != nil && len(f.PointTo) == 1 && f.PointTo[0] == TBDPtr
+	if f == nil || len(f.PointTo) != 1 {
+		return false
+	}
+	if f.PointTo[0] == nil {
+		return false
+	}
+	return f.PointTo[0] == TBDPtr
 }
 
 // IsSpecialPtr mirrors FactPointTo::is_special_ptr.

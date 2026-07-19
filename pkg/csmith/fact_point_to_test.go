@@ -6,6 +6,11 @@ func TestFactPointToNullDead(t *testing.T) {
 	p := CreateVariableScalars("g_p", GetIntType(), false, false)
 	// default NewFactPointTo starts garbage
 	f := NewFactPointTo(p)
+	// nil PointTo hole fails closed as dead/null (no invent not-dead/not-null)
+	hole := &FactPointTo{Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false), PointTo: []*Variable{nil}}
+	if !hole.IsDead() || !hole.IsNull() {
+		t.Fatal("nil pointee hole must fail closed IsDead/IsNull")
+	}
 	if !f.IsDead() || f.IsNull() {
 		t.Fatal("init garbage")
 	}
