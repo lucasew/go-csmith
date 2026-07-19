@@ -265,22 +265,32 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 
 // MergeUnionFactInto merges nf into facts slice (join if related).
 // FactUnion* always live; nil nf or map hole fails closed (nil out, no invent skip).
+// Incomplete map must not invent early-match join past later holes.
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	if nf == nil {
 		return nil
 	}
-	for i, old := range facts {
+	for _, old := range facts {
 		if old == nil {
 			return nil
 		}
+	}
+	for i, old := range facts {
 		if old.Var == nf.Var {
 			cp := old.Clone()
+			if cp == nil {
+				return nil
+			}
 			cp.Join(nf)
 			facts[i] = cp
 			return facts
 		}
 	}
-	return append(facts, nf.Clone())
+	cl := nf.Clone()
+	if cl == nil {
+		return nil
+	}
+	return append(facts, cl)
 }
 
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.

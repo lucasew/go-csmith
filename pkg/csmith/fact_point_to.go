@@ -31,19 +31,25 @@ func NewFactPointTo(v *Variable) *FactPointTo {
 }
 
 // MakeFactPointTo mirrors FactPointTo::make_fact(v, point_to).
-// no invent fact without live subject Variable*
+// no invent fact without live subject Variable* / live pointee (use NullPtr etc.)
 func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
-	if v == nil {
+	if v == nil || pointTo == nil {
 		return nil
 	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{pointTo}}
 }
 
 // MakeFactPointToSet mirrors FactPointTo::make_fact(v, set).
-// no invent fact without live subject Variable*
+// no invent fact without live subject; nil pointee hole fails closed nil fact
+// (no invent incomplete PointTo shell that later soft-skips as complete).
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
 	if v == nil {
 		return nil
+	}
+	for _, p := range set {
+		if p == nil {
+			return nil
+		}
 	}
 	cp := append([]*Variable(nil), set...)
 	return &FactPointTo{Var: v, PointTo: cp}
@@ -590,6 +596,7 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 }
 
 // Clone shallow-copies the fact (new PointTo slice).
+// Incomplete PointTo (nil hole) fails closed nil — no invent clone of broken set.
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {
 		return nil
@@ -597,12 +604,18 @@ func (f *FactPointTo) Clone() *FactPointTo {
 	return MakeFactPointToSet(f.Var, f.PointTo)
 }
 
-// FactsComplete reports whether every Fact* in the slice is live (non-nil Var).
-// Incomplete maps must not soft-join or soft-filter past holes.
+// FactsComplete reports whether every Fact* is live with complete PointTo sets.
+// Incomplete maps/pointees must not soft-join or soft-filter past holes.
+// Empty PointTo (IsTop) is complete; nil pointee slots are not.
 func FactsComplete(facts []*FactPointTo) bool {
 	for _, f := range facts {
 		if f == nil || f.Var == nil {
 			return false
+		}
+		for _, p := range f.PointTo {
+			if p == nil {
+				return false
+			}
 		}
 	}
 	return true
@@ -629,12 +642,20 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 			}
 			// join: copy f, join old into it
 			cp := f.Clone()
+			if cp == nil {
+				// incomplete PointTo on f — fail closed
+				return nil
+			}
 			_ = cp.Join(old)
 			facts[i] = cp
 			return facts
 		}
 	}
-	return append(facts, f.Clone())
+	cl := f.Clone()
+	if cl == nil {
+		return nil
+	}
+	return append(facts, cl)
 }
 
 // MergeFacts mirrors merge_facts — merge each of new into facts.
