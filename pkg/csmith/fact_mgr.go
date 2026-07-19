@@ -999,6 +999,8 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 
 // UpdateFactForAssign mirrors FactMgr::update_fact_for_assign(Lhs, Expression, facts).
 // FactMgr.cpp:370–395 — renew vs merge; FactUnion abstract_fact_for_assign.
+// Incomplete union merge fails closed (UnionFacts nil, false) — no invent
+// success with wiped or partial union maps past MergeUnionFact holes.
 func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Expression) bool {
 	if fm == nil || lhs == nil {
 		return false
@@ -1011,7 +1013,17 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	// FactUnion::abstract_fact_for_assign (meta_facts loop)
 	ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, fm.GlobalFacts, lhs, lhsIndir, rhs)
 	for _, uf := range ufacts {
-		fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+		// FactUnion* always live from abstract; nil hole fails closed
+		if uf == nil {
+			fm.UnionFacts = nil
+			return false
+		}
+		merged := MergeUnionFact(fm.UnionFacts, uf)
+		if merged == nil {
+			fm.UnionFacts = nil
+			return false
+		}
+		fm.UnionFacts = merged
 		changed = true
 	}
 	// FactMgr.cpp:400 — assign that changes facts marks function fact_changed
@@ -1024,14 +1036,17 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 // MergeUnionFact replaces or appends FactUnion for the same union var.
 // MergeUnionFact replaces or appends a union fact by subject.
 // FactUnion* always live; nil f or map hole fails closed (nil out).
+// Incomplete map must not invent replace success when match appears before a hole.
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
 		return nil
 	}
-	for i, old := range facts {
+	for _, old := range facts {
 		if old == nil {
 			return nil
 		}
+	}
+	for i, old := range facts {
 		if old.Var == f.Var {
 			facts[i] = f
 			return facts
@@ -1225,6 +1240,7 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 
 // UpdateFactForAssignInto is UpdateFactForAssign writing into a fact slice.
 // FactMgr.cpp:370–395 — same renew/merge rules as UpdateFactForAssign.
+// Incomplete union merge fails closed like UpdateFactForAssign.
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
 	if facts == nil || lhs == nil {
 		return false
@@ -1237,7 +1253,16 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	if fm != nil {
 		ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
 		for _, uf := range ufacts {
-			fm.UnionFacts = MergeUnionFact(fm.UnionFacts, uf)
+			if uf == nil {
+				fm.UnionFacts = nil
+				return false
+			}
+			merged := MergeUnionFact(fm.UnionFacts, uf)
+			if merged == nil {
+				fm.UnionFacts = nil
+				return false
+			}
+			fm.UnionFacts = merged
 			changed = true
 		}
 		if changed && fm.Func != nil {

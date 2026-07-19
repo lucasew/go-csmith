@@ -46,6 +46,29 @@ func TestUpdateFactForReturn(t *testing.T) {
 	}
 }
 
+func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
+	// soft invent: MergeUnionFact nil still changed=true with wiped UnionFacts
+	// fair: incomplete union map hole fails closed false
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	parent := &Variable{Name: "g_u", Type: ut}
+	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	f1 := &Variable{Name: "g_u.f1", Type: GetIntType(), FieldVarOf: parent}
+	parent.FieldVars = []*Variable{f0, f1}
+	fm := NewFactMgr(nil)
+	// incomplete existing union map (nil hole)
+	fm.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0), nil}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	if fm.UpdateFactForAssign(f1, 0, rhs) {
+		t.Fatal("nil UnionFacts hole must fail closed false, not invent success")
+	}
+	if fm.UnionFacts != nil {
+		t.Fatal("incomplete union merge must clear UnionFacts", fm.UnionFacts)
+	}
+}
+
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// soft invent: MergeFactInto nil still return true with partial maps
 	// fair: incomplete newFacts / merge hole fails closed false + clear

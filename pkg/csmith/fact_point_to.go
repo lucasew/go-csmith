@@ -569,17 +569,18 @@ func FactsComplete(facts []*FactPointTo) bool {
 
 // MergeFactInto merges new fact with lattice join (Fact::merge_fact).
 // Fact.cpp:149–171 — strong replace only when not related; else join.
-// Fact* always live at call sites; nil f fails closed (no invent no-op success).
+// Fact* always live at call sites; nil f or incomplete map fails closed
+// (no invent no-op success / early match past later holes).
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	// no invent treat nil fact as empty merge that preserves facts
 	if f == nil {
 		return nil
 	}
+	// incomplete map must not invent join success when match appears before a hole
+	if !FactsComplete(facts) {
+		return nil
+	}
 	for i, old := range facts {
-		// Fact* always live in maps; nil hole fails closed (no invent skip to next)
-		if old == nil {
-			return nil
-		}
 		if old.Var == f.Var {
 			if old.Imply(f) {
 				// old already covers f
