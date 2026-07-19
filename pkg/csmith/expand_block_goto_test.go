@@ -8,7 +8,8 @@ func TestBlockContainsStmIDParentChain(t *testing.T) {
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
 	src := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	inner.Stmts = []Stmt{dest}
-	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner}, src}
+	// StatementIf always has both arms
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, src}
 
 	if !BlockContainsStmID(inner, 10) {
 		t.Fatal("inner should contain dest")
@@ -28,7 +29,7 @@ func TestExpandBlockForGotoClimbsParent(t *testing.T) {
 	dest := Stmt{Kind: StmtAssign, StmID: 10}
 	src := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	inner.Stmts = []Stmt{dest}
-	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner}, src}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, src}
 	f.Blocks = []*Block{outer}
 
 	fm := NewFactMgr(f)
@@ -75,7 +76,7 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	outer := &Block{Func: f, StmID: 1}
 	inner := &Block{Func: f, Parent: outer, StmID: 2}
 	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
-	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner}, {Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner, Else: &Block{}}, {Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}
 	f.Blocks = []*Block{outer}
 	fm := NewFactMgr(f)
 	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 20, DestStmID: 10}}
@@ -135,7 +136,7 @@ func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
 	srcID := AllocStmID()
 	src := Stmt{Kind: StmtGoto, StmID: srcID, GotoDestStmID: dest.StmID}
 	inner.Stmts = []Stmt{dest}
-	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: AllocStmID(), Then: inner}, src}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: AllocStmID(), Then: inner, Else: &Block{}}, src}
 	f.Blocks = []*Block{outer}
 	f.Stack = []*Block{outer, inner}
 

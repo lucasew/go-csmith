@@ -391,6 +391,8 @@ func rootBlock(b *Block) *Block {
 }
 
 // findParentOfStmIDInTree returns the block that directly owns stmID under root.
+// Walks get_blocks only; incomplete if-arm skips that compound's children
+// (no invent soft-skip missing arm then find under sibling arm / stray Then on assign).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 	if root == nil || stmID <= 0 {
 		return nil
@@ -405,11 +407,21 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 			if st.StmID == stmID {
 				return b
 			}
-			if p := walk(st.Then); p != nil {
-				return p
+			blks := GetBlocksStmt(st)
+			incomplete := false
+			for _, nb := range blks {
+				if nb == nil {
+					incomplete = true
+					break
+				}
 			}
-			if p := walk(st.Else); p != nil {
-				return p
+			if incomplete {
+				continue
+			}
+			for _, nb := range blks {
+				if p := walk(nb); p != nil {
+					return p
+				}
 			}
 		}
 		return nil
@@ -418,6 +430,7 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 }
 
 // findStmtByIDInTree finds a statement by stm_id under root (self + nested blocks).
+// Walks get_blocks only; incomplete if-arm skips that compound's children.
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
 		return nil
@@ -432,11 +445,21 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 			if st.StmID == stmID {
 				return st
 			}
-			if s := walk(st.Then); s != nil {
-				return s
+			blks := GetBlocksStmt(st)
+			incomplete := false
+			for _, nb := range blks {
+				if nb == nil {
+					incomplete = true
+					break
+				}
 			}
-			if s := walk(st.Else); s != nil {
-				return s
+			if incomplete {
+				continue
+			}
+			for _, nb := range blks {
+				if s := walk(nb); s != nil {
+					return s
+				}
 			}
 		}
 		return nil

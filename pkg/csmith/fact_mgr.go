@@ -181,6 +181,8 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 // FindParentBlockOfStmID walks function blocks for the parent of stm_id.
 // Used when StatementGoto::dest parent is not stored on Stmt.
 // Block* always live on Function.Blocks; nil hole fails closed (nil — no invent skip).
+// Nested walk uses get_blocks only; incomplete if-arm skips that compound's children
+// (no invent soft-skip missing arm then find under sibling arm of same if).
 func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 	if f == nil || stmID <= 0 {
 		return nil
@@ -195,11 +197,21 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 			if st.StmID == stmID {
 				return b
 			}
-			if p := walk(st.Then); p != nil {
-				return p
+			blks := GetBlocksStmt(st)
+			incomplete := false
+			for _, nb := range blks {
+				if nb == nil {
+					incomplete = true
+					break
+				}
 			}
-			if p := walk(st.Else); p != nil {
-				return p
+			if incomplete {
+				continue
+			}
+			for _, nb := range blks {
+				if p := walk(nb); p != nil {
+					return p
+				}
 			}
 		}
 		return nil
@@ -462,6 +474,8 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 // BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
 // FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
 // Incomplete source maps store nil (no invent cleaned partial clone of holes).
+// Nested walk uses get_blocks only; incomplete if-arm skips nested backup
+// (no invent soft-skip hole then backup sibling as complete tree).
 func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
@@ -469,11 +483,18 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 	if factsIn == nil || factsOut == nil {
 		return
 	}
-	if st.Then != nil {
-		fm.backupBlockFactMaps(st.Then, factsIn, factsOut)
+	blks := GetBlocksStmt(st)
+	incomplete := false
+	for _, b := range blks {
+		if b == nil {
+			incomplete = true
+			break
+		}
 	}
-	if st.Else != nil {
-		fm.backupBlockFactMaps(st.Else, factsIn, factsOut)
+	if !incomplete {
+		for _, b := range blks {
+			fm.backupBlockFactMaps(b, factsIn, factsOut)
+		}
 	}
 	if st.StmID > 0 {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
@@ -521,15 +542,24 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 // RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
 // FactMgr.cpp:533–548.
 // Incomplete backup entries restore as nil (no invent cleaned partial clone).
+// Nested walk uses get_blocks only; incomplete if-arm skips nested restore
+// (no invent soft-skip hole then restore sibling as complete tree).
 func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
 	}
-	if st.Then != nil {
-		fm.restoreBlockFactMaps(st.Then, factsIn, factsOut)
+	blks := GetBlocksStmt(st)
+	incomplete := false
+	for _, b := range blks {
+		if b == nil {
+			incomplete = true
+			break
+		}
 	}
-	if st.Else != nil {
-		fm.restoreBlockFactMaps(st.Else, factsIn, factsOut)
+	if !incomplete {
+		for _, b := range blks {
+			fm.restoreBlockFactMaps(b, factsIn, factsOut)
+		}
 	}
 	if st.StmID > 0 {
 		if in, ok := factsIn[st.StmID]; ok {

@@ -269,9 +269,13 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 		if HasUncertainCallRecursiveExpr(st.Loop.TestExpr) {
 			return true
 		}
-		if st.Then != nil {
-			for i := range st.Then.Stmts {
-				if HasUncertainCallRecursiveStmt(&st.Then.Stmts[i]) {
+		// get_blocks body only — no invent soft-skip nil body as "no uncertain call"
+		for _, b := range GetBlocksStmt(st) {
+			if b == nil {
+				return true
+			}
+			for i := range b.Stmts {
+				if HasUncertainCallRecursiveStmt(&b.Stmts[i]) {
 					return true
 				}
 			}

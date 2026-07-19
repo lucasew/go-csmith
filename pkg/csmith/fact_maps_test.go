@@ -128,7 +128,8 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	thenB := &Block{StmID: 20, Stmts: []Stmt{{StmID: 21}}}
-	st := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
+	// StatementIf always has both arms
+	st := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB, Else: &Block{}}
 	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	in := map[int][]*FactPointTo{}
@@ -143,6 +144,15 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	}
 	if FindRelatedPointTo(fm.MapFactsOut[21], p) == nil {
 		t.Fatal("restored out")
+	}
+	// incomplete if — nested backup skipped (no invent soft-skip nil Else)
+	in2 := map[int][]*FactPointTo{}
+	out2 := map[int][]*FactPointTo{}
+	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
+	fm.SetMapFactsOut(21, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	fm.BackupStmFactMaps(bad, in2, out2)
+	if _, ok := out2[21]; ok {
+		t.Fatal("incomplete if must not invent nested backup past nil Else")
 	}
 }
 

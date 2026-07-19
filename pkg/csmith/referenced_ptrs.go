@@ -140,13 +140,17 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			*ptrs = appendUniqueVar(*ptrs, st.Lhs.Var)
 		}
 	}
-	if st.Then != nil {
-		if !collectReferencedPtrsBlock(st.Then, ptrs) {
+	// get_blocks only — no invent ptrs via stray Then on assign
+	blks := GetBlocksStmt(st)
+	for _, b := range blks {
+		if b == nil {
+			// incomplete arm — fail closed (no invent partial ptr list past hole)
+			*ptrs = nil
 			return false
 		}
 	}
-	if st.Else != nil {
-		if !collectReferencedPtrsBlock(st.Else, ptrs) {
+	for _, b := range blks {
+		if !collectReferencedPtrsBlock(b, ptrs) {
 			return false
 		}
 	}

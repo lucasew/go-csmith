@@ -517,7 +517,8 @@ func TestFindJumpLabel(t *testing.T) {
 func TestFindStmtByID(t *testing.T) {
 	f := &Function{Name: "f"}
 	inner := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
-	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner}}}
+	// StatementIf always has both arms
+	outer := &Block{Func: f, Stmts: []Stmt{{Kind: StmtIfElse, StmID: 1, Then: inner, Else: &Block{}}}}
 	inner.Parent = outer
 	f.Blocks = []*Block{outer, inner}
 	st := FindStmtByID(f, 3)
@@ -526,6 +527,12 @@ func TestFindStmtByID(t *testing.T) {
 	}
 	if FindStmtByID(f, 999) != nil {
 		t.Fatal("missing")
+	}
+	// incomplete if on sole Blocks entry fails closed (no invent soft-skip nil Else)
+	f.Blocks = []*Block{outer}
+	outer.Stmts[0].Else = nil
+	if FindStmtByID(f, 3) != nil {
+		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
 }
 
