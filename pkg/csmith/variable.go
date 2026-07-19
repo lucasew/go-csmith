@@ -372,7 +372,8 @@ func CtrlVarNames(ctrl []*Variable) []string {
 
 // OutputArrayCtrlVars mirrors OutputArrayCtrlVars — "int i, j, k;".
 // Variable.cpp:800–811 — assert(dimen <= ctrl_vars.size()); get_actual_name only.
-// C++ ctrl_vars[i] always live; no invent empty names / "int , j;" for nil slots.
+// C++ ctrl_vars[i] always live; incomplete ctrl list fails closed empty
+// (no invent "int , j;" / empty-complete decl for nil slots).
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen <= 0 || len(ctrl) == 0 {
 		return ""
@@ -382,9 +383,11 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 		return ""
 	}
 	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); always live names
-	// no invent "int ;" / "int , j;" for nil or empty-name slots
+	if !VariablesComplete(ctrl[:dimen]) {
+		return ""
+	}
 	for i := 0; i < dimen; i++ {
-		if ctrl[i] == nil || ctrl[i].GetActualName(false) == "" {
+		if ctrl[i].GetActualName(false) == "" {
 			return ""
 		}
 	}
@@ -403,12 +406,13 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 // GetMaxArrayDimension mirrors Variable::GetMaxArrayDimension.
 // Variable.cpp:813–826.
 // Variable* always live; nil hole fails closed as -1 (no invent skip partial max).
+// Complete empty / no arrays → 0.
 func GetMaxArrayDimension(vars []*Variable) int {
+	if !VariablesComplete(vars) {
+		return -1
+	}
 	dimen := 0
 	for _, v := range vars {
-		if v == nil {
-			return -1
-		}
 		if !v.IsArray {
 			continue
 		}
@@ -425,10 +429,15 @@ func GetMaxArrayDimension(vars []*Variable) int {
 
 // OutputArrayInitializers mirrors OutputArrayInitializers for loop-init arrays.
 // Variable.cpp:829–841 — allocate ctrl vars, declare, emit output_init.
-// Incomplete vars list (GetMaxArrayDimension -1) fails closed empty (no invent partial).
+// Incomplete vars list (GetMaxArrayDimension -1) fails closed empty
+// (no invent treat incomplete as zero-dim empty success).
 func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
 	dimen := GetMaxArrayDimension(vars)
-	if dimen <= 0 {
+	// dimen < 0 = incomplete; dimen == 0 = complete empty / no arrays
+	if dimen < 0 {
+		return ""
+	}
+	if dimen == 0 {
 		return ""
 	}
 	ctrl := GetNewCtrlVars(opts)
@@ -440,12 +449,8 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 	var b strings.Builder
 	b.WriteString(decl)
 	names := CtrlVarNames(ctrl)
+	// vars pre-validated complete by GetMaxArrayDimension
 	for _, v := range vars {
-		// mixed GlobalList may hold non-arrays; skip them (not holes)
-		if v == nil {
-			// Variable* always live in C++ list; no invent skip nil holes
-			return ""
-		}
 		if !v.IsArray {
 			continue
 		}

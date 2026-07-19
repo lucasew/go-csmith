@@ -4,7 +4,7 @@ import "testing"
 
 func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVarVisible false → drop stack local fact
-	// fair: incomplete stack → skip append for non-global (no invent visibility)
+	// fair: incomplete stack → IncompleteFactSlice (not invent empty-complete skip)
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
@@ -12,14 +12,24 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	fm := NewFactMgr(f)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
 	fm.AddFactOut(st, body, MakeFactPointTo(loc, NullPtr))
-	if len(fm.MapFactsOut[3]) != 0 {
-		t.Fatal("incomplete stack must not invent AddFactOut for local", fm.MapFactsOut[3])
+	if FactsComplete(fm.MapFactsOut[3]) {
+		t.Fatal("incomplete stack must fail closed incomplete out, not invent empty complete", fm.MapFactsOut[3])
 	}
-	// globals still append
+	// later appends must not invent cleaned facts onto incomplete map
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
-	if len(fm.MapFactsOut[3]) != 1 {
-		t.Fatal("global must still append", fm.MapFactsOut[3])
+	if FactsComplete(fm.MapFactsOut[3]) {
+		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
+	}
+	// incomplete fact PointTo → hole marker
+	fm2 := NewFactMgr(f)
+	body2 := &Block{Func: f, LocalVars: []*Variable{loc}}
+	f.Body = body2
+	st2 := &Stmt{Kind: StmtAssign, StmID: 4}
+	hole := &FactPointTo{Var: gp, PointTo: []*Variable{nil}}
+	fm2.AddFactOut(st2, body2, hole)
+	if FactsComplete(fm2.MapFactsOut[4]) {
+		t.Fatal("incomplete fact must fail closed IncompleteFactSlice", fm2.MapFactsOut[4])
 	}
 }
 

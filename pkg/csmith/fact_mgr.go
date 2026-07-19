@@ -259,18 +259,32 @@ func FindStmtByID(f *Function, stmID int) *Stmt {
 // AddFactOut mirrors FactMgr::add_fact_out.
 // FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
 // drop non-globals on return; drop loop-invisible on break/continue.
-// Incomplete Param/LocalVars at visibility sites fail closed (no invent drop of
-// a stack local solely because IsVarOnStack returned false past a hole — and no
-// invent append when visibility cannot be decided). Non-globals require complete
-// stack scan; incomplete → skip append.
+// Incomplete Param/LocalVars at visibility sites fail closed IncompleteFactSlice
+// on map entry (no invent soft-skip append as absent / empty-complete success).
+// Incomplete fact PointTo also fails closed hole marker (no invent clone partial).
 func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	if fm == nil || st == nil || fact == nil || fact.Var == nil || st.StmID <= 0 {
+		return
+	}
+	// ensure map exists before fail-closed writes
+	if fm.MapFactsOut == nil {
+		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	}
+	// incomplete subject fact — hole marker (not soft-skip or invent cleaned clone)
+	if !FactsComplete([]*FactPointTo{fact}) {
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		return
+	}
+	// already incomplete out map — stay incomplete (no invent append onto hole)
+	if prev, ok := fm.MapFactsOut[st.StmID]; ok && !FactsComplete(prev) {
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		return
 	}
 	f := fm.Func
 	// visibility needs complete stack for non-globals
 	if f != nil && !fact.Var.IsGlobal() {
 		if !f.StackScanComplete(stParent) {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 		if !f.IsVarVisible(fact.Var, stParent) {
@@ -292,6 +306,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		}
 		if f != nil && !fact.Var.IsGlobal() {
 			if !f.StackScanComplete(b) {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 		}
@@ -307,6 +322,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		}
 		if destParent != nil && f != nil {
 			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 			if !f.IsVarVisible(fact.Var, destParent) {
@@ -314,10 +330,12 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			}
 		}
 	}
-	if fm.MapFactsOut == nil {
-		fm.MapFactsOut = make(map[int][]*FactPointTo)
+	cl := fact.Clone()
+	if cl == nil {
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		return
 	}
-	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], fact.Clone())
+	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], cl)
 }
 
 // UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
