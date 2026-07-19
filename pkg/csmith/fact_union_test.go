@@ -169,18 +169,32 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	if len(out) != 1 || out[0].LastWrittenFID != 1 || out[0].Var != dst {
 		t.Fatalf("%+v", out)
 	}
-	// incomplete union map / non-union lvar fail closed incomplete (not empty complete)
+	// incomplete union map — non-sticky hole (soft re-pick factories)
+	ClearError()
 	if UnionFactsComplete(RhsToLhsTransferUnion([]*FactUnion{MakeFactUnion(src, 0), nil}, nil, []*Variable{dst}, rhs)) {
 		t.Fatal("incomplete unionFacts must fail closed incomplete")
 	}
+	if HasError() {
+		t.Fatal("incomplete unionFacts transfer must stay non-sticky")
+	}
+	// non-union lvar hard IR sticky
+	ClearError()
 	i := CreateVariableScalars("g_i", GetIntType(), true, false)
 	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-union lvar must fail closed incomplete")
 	}
-	// nil rhs with targets fails closed incomplete
+	if !HasError() {
+		t.Fatal("non-union lvar RhsToLhsTransferUnion must SetError sticky")
+	}
+	// nil rhs with targets — incomplete non-sticky (AddParamFacts missing union args)
+	ClearError()
 	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{dst}, nil)) {
 		t.Fatal("nil rhs must fail closed incomplete")
 	}
+	if HasError() {
+		t.Fatal("nil rhs RhsToLhsTransferUnion must stay non-sticky for soft re-pick")
+	}
+	ClearError()
 	// empty lvars is complete empty
 	if RhsToLhsTransferUnion(nil, nil, nil, rhs) != nil {
 		t.Fatal("empty lvars must be complete empty")

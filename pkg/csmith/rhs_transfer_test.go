@@ -123,21 +123,18 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 }
 
 func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
-	// GetCollective nil is broken IR — no invent MakeFactsPointTo with nil pointee
+	// multi-level & hard IR sticky — no invent MakeFactsPointTo past assert(indirect==-1)
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	// Variable without name/type quirks still has collective self; use incomplete shell
-	broken := &Variable{Name: "broken"} // Type nil, GetCollective returns self but IsPointer fails on lvars
-	// address-of path requires pointer lvars; use p as lhs, rhs var with nil collective via nil GetCollective
-	// only nil GetCollective when v is nil — covered by Var==nil fail closed
-	// multi-level & invents nil
-	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(GetIntType())}
 	// force Indir < -1 by ExprType deeper than Var.Type
-	rhs.ExprType = PointerTo(PointerTo(GetIntType()))
+	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(PointerTo(GetIntType()))}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
-		// indirect != -1 fails closed incomplete
 		t.Fatal("multi-level & must fail closed incomplete")
 	}
-	_ = broken
+	if !HasError() {
+		t.Fatal("multi-level & must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferAssignPeel(t *testing.T) {
@@ -256,16 +253,22 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 }
 
 func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
-	// FactPointTo.cpp:164–167 — assert all LHS are pointers; no invent empty transfer
+	// FactPointTo.cpp:164–167 — assert all LHS are pointers; hard IR sticky
+	ClearError()
 	i := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-pointer lvar must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("non-pointer lvar RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
-	// FactPointTo.cpp:205 — assert(indirect == -1); no invent for multi-level &
+	// FactPointTo.cpp:205 — assert(indirect == -1); hard IR sticky
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	// int var with ** type → IndirectLevel = 0-2 = -2
@@ -276,10 +279,15 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level address-of must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("multi-level & RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
-	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
+	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size()) hard sticky
+	ClearError()
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
 	}}
@@ -293,10 +301,15 @@ func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)) {
 		t.Fatal("lvars/pointers length mismatch must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("len mismatch RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
-	// FactPointTo.cpp:252 — assert(rv_fact); no invent garbage points-to
+	// FactPointTo.cpp:252 — missing rv_fact: incomplete non-sticky (generation soft re-pick)
+	ClearError()
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -308,4 +321,36 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("missing rv_fact must fail closed incomplete")
 	}
+	if HasError() {
+		t.Fatal("missing rv_fact must stay non-sticky for soft re-pick")
+	}
+	ClearError()
+}
+
+func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
+	// incomplete fact map / MergePointees hole stays non-sticky for soft re-pick
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	// incomplete map: nil hole so MergePointeesOfPointer fails closed incomplete
+	hole := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
+	rhs := &Expression{Term: TermVariable, Var: q, ExprType: PointerTo(GetIntType())}
+	if FactsComplete(RhsToLhsTransfer(hole, []*Variable{p}, rhs)) {
+		t.Fatal("incomplete map transfer must fail closed incomplete")
+	}
+	if HasError() {
+		t.Fatal("incomplete map RhsToLhsTransfer must stay non-sticky for soft re-pick")
+	}
+	ClearError()
+}
+
+func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
+	ClearError()
+	if FactsComplete(AbstractFactForAssign(nil, nil, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})) {
+		t.Fatal("nil lhs AbstractFactForAssign must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil lhs AbstractFactForAssign must SetError sticky")
+	}
+	ClearError()
 }

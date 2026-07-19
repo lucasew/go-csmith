@@ -245,14 +245,17 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		t.Fatal("nil InitExprs AbstractFactForVarInit must SetError sticky")
 	}
 	ClearError()
-	// union without rhs/init — abstract hole marker (not invent empty union fact;
-	// sticky comes from AddNewVarFact, not pure abstract re-pick)
+	// union without rhs/init — incomplete abstract non-sticky (AddParamFacts soft path);
+	// AddNewVarFact sticks after incomplete abstract (no invent skip no-fact)
+	ClearError()
 	uv2 := &Variable{Name: "g_u2", Type: ut}
 	_, un3 := AbstractFactForVarInit(uv2)
 	if UnionFactsComplete(un3) {
 		t.Fatal("union without init must fail closed incomplete", un3)
 	}
-	// incomplete abstract must wipe on AddNewVarFact sticky (not invent skip no-fact)
+	if HasError() {
+		t.Fatal("union without init abstract must stay non-sticky for soft re-pick")
+	}
 	ClearError()
 	fm2 := NewFactMgr(nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(

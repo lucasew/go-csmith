@@ -265,6 +265,10 @@ func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 // RhsToLhsTransfer mirrors FactPointTo::rhs_to_lhs_transfer.
 // FactPointTo.cpp:158–263 — const/null/garbage, &var, pointer copy,
 // aggregate field transfer, function return facts, assign/comma peel.
+// Hard IR asserts (non-pointer lvars, nil Var/Invoke/Assign, multi-level &,
+// len mismatch, missing rv_fact) fail closed sticky IncompleteFactSlice so soft
+// re-pick cannot invent empty transfer success. Incomplete MergePointees /
+// FindPointerFields / fact-map holes stay non-sticky hole markers.
 func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) []*FactPointTo {
 	if len(lvars) == 0 {
 		// complete empty transfer targets (not incomplete)
@@ -273,7 +277,8 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	// FactPointTo.cpp:164–167 — assert all possible LHS are pointers
 	for _, v := range lvars {
 		if v == nil || !v.IsPointer() {
-			// fail closed IncompleteFactSlice — no invent empty transfer success
+			// hard IR sticky — no invent empty transfer / soft re-pick past assert
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 	}
@@ -314,60 +319,67 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
 		}
-		// FactPointTo.cpp:195–196 — assert(0); no soft invent garbage for other constants
+		// FactPointTo.cpp:195–196 — assert(0); hard IR sticky (no soft invent garbage)
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	case TermVariable:
-		// C++ always has ExpressionVariable; nil var is broken IR
+		// C++ always has ExpressionVariable; nil var is broken IR sticky
 		if rhs.Var == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
-		// incomplete type IR must not invent level-0 transfer / false address-of
+		// incomplete type IR sticky (no invent level-0 transfer / false address-of)
 		indirect, iok := rhs.IndirectLevelComplete()
 		if !iok {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if indirect < 0 {
 			// FactPointTo.cpp:202–207 — taking address; multi-level & not allowed
-			// assert(indirect == -1); no soft invent for indirect < -1
+			// assert(indirect == -1); hard IR sticky (no soft invent for indirect < -1)
 			if indirect != -1 {
+				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
-			// GetCollective always live for address-of; nil is broken IR
+			// GetCollective always live for address-of; nil is broken IR sticky
 			coll := rhs.Var.GetCollective()
 			if coll == nil {
+				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			return MakeFactsPointTo(lvars, coll)
 		}
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
-			// incomplete collective fails closed (MergePointees(nil) is IncompleteVariables)
+			// incomplete collective / pointees — non-sticky abstract hole marker
 			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
-			// incomplete pointees
 			if !VariablesComplete(vars) {
 				return IncompleteFactSlice()
 			}
 			var ret []*FactPointTo
 			for _, vv := range vars {
 				ptrs := vv.FindPointerFields()
-				// incomplete FieldVars
+				// incomplete FieldVars — hard IR sticky (no invent skip field hole)
 				if !VariablesComplete(ptrs) {
+					SetError(ErrGeneric)
 					return IncompleteFactSlice()
 				}
 				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
 				if len(lvars) != len(ptrs) {
-					// fail closed — no soft invent min-length pairwise transfer
+					// hard IR sticky — no soft invent min-length pairwise transfer
+					SetError(ErrGeneric)
 					return IncompleteFactSlice()
 				}
 				for j := 0; j < len(lvars); j++ {
 					set := MergePointeesOfPointer(ptrs[j], 1, facts)
-					// C++ make_fact with set as-is (may be empty); no invent garbage
-					// incomplete set — fail closed whole transfer
+					// incomplete set — non-sticky abstract hole (fact-map soft re-pick)
 					if !VariablesComplete(set) {
 						return IncompleteFactSlice()
 					}
 					fp := MakeFactPointToSet(lvars[j], set)
 					if fp == nil {
+						// broken make fact IR sticky
+						SetError(ErrGeneric)
 						return IncompleteFactSlice()
 					}
 					ret = append(ret, fp)
@@ -376,19 +388,21 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return ret
 		}
 		// FactPointTo.cpp:225–228 — merge_pointees(collective, indirect+1)
-		// empty set is valid (no soft invent GarbagePtr); incomplete set fails closed
+		// empty set is valid (no soft invent GarbagePtr); incomplete set non-sticky
 		set := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect+1, facts)
 		if !VariablesComplete(set) {
 			return IncompleteFactSlice()
 		}
 		return MakeFactsPointToSet(lvars, set)
 	case TermFunction:
-		// FactPointTo.cpp:230–231 — assert(fi); no soft invent empty on missing invoke
+		// FactPointTo.cpp:230–231 — assert(fi); hard IR sticky when Invoke nil
 		if rhs.Invoke == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		fi := rhs.Invoke
 		// TODO: support pointer arithmetics (upstream); only FuncCall transfers
+		// non-user invoke (stdlib / incomplete) — non-sticky hole for soft re-pick
 		if fi.User == nil {
 			return IncompleteFactSlice()
 		}
@@ -396,26 +410,30 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		if fn.RV != nil && fn.RV.Type != nil && fn.RV.Type.IsAggregate() {
 			ptrs := fn.RV.FindPointerFields()
 			if !VariablesComplete(ptrs) {
+				// FieldVars hole sticky
+				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
-			// pairwise like aggregate path; length mismatch is broken IR
+			// pairwise like aggregate path; length mismatch is broken IR sticky
 			if len(lvars) != len(ptrs) {
+				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
 			var ret []*FactPointTo
 			for i := 0; i < len(lvars); i++ {
 				rvFact := GetReturnFactForInvocation(fi, ptrs[i])
-				// missing return fact → fail closed (no invent GarbagePtr)
+				// missing return fact during generation — non-sticky hole (soft re-pick)
 				if rvFact == nil {
 					return IncompleteFactSlice()
 				}
-				// PointTo may be empty top; nil slice incomplete; holes fail MakeFactPointToSet
+				// PointTo may be empty top; nil slice → complete empty for set copy
 				set := rvFact.PointTo
 				if set == nil {
 					set = []*Variable{}
 				}
 				fp := MakeFactPointToSet(lvars[i], set)
 				if fp == nil {
+					SetError(ErrGeneric)
 					return IncompleteFactSlice()
 				}
 				ret = append(ret, fp)
@@ -423,9 +441,11 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return ret
 		}
 		if fn.RV == nil {
+			// incomplete RV shell — non-sticky hole (soft re-pick factories)
 			return IncompleteFactSlice()
 		}
-		// FactPointTo.cpp:250–252 — assert(rv_fact)
+		// FactPointTo.cpp:250–252 — missing rv_fact during generation is non-sticky
+		// hole (soft re-pick AddParamFacts / call factories; no invent GarbagePtr)
 		rvFact := GetReturnFactForInvocation(fi, fn.RV)
 		if rvFact == nil {
 			return IncompleteFactSlice()
@@ -438,6 +458,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	case TermAssignment:
 		// FactPointTo.cpp:256–258 — peel embedded assign RHS
 		if rhs.Assign == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		return RhsToLhsTransfer(facts, lvars, rhs.Assign.Expr)
@@ -445,6 +466,7 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:259–261 — peel comma RHS
 		return RhsToLhsTransfer(facts, lvars, rhs.CommaRHS)
 	default:
+		// unknown term — non-sticky hole (soft re-pick factories)
 		return IncompleteFactSlice()
 	}
 }
@@ -452,12 +474,16 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 // AbstractFactForAssign mirrors FactPointTo::abstract_fact_for_assign.
 // FactPointTo.cpp:266–295 — merge_pointees of LHS; pointer assign or pointer fields.
 // lhsIndir peels Lhs::get_type() (var type after deref) for the pointer-typed branch.
+// Hard IR (nil lhs/Type, broken union container, FieldVars holes) sticky; incomplete
+// MergePointees / abstract transfer results stay non-sticky hole markers.
 func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, rhs *Expression) []*FactPointTo {
 	if lhs == nil || lhs.Type == nil {
-		// incomplete LHS IR — hole marker (not bare nil invent empty abstract success)
+		// incomplete LHS IR sticky (no invent empty abstract / soft re-pick past hole)
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// find all pointed variables on LHS (merge_pointees of collective)
+	// incomplete pointees — non-sticky abstract hole (fact-map soft re-pick)
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, factsIn)
 	if !VariablesComplete(lvars) {
 		return IncompleteFactSlice()
@@ -493,19 +519,22 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 					}
 				}
 			}
-			// FactPointTo.cpp:288 — assert(v && v->type->eType == eUnion)
+			// FactPointTo.cpp:288 — assert(v && v->type->eType == eUnion) hard sticky
 			if u == nil || u.Type == nil || !u.Type.IsUnion() {
-				// fail closed — no soft invent fields from non-union container
+				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()
 		if !VariablesComplete(ptrs) {
+			// FieldVars hole sticky
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if v.IsPointer() && lhsIndir > 0 {
 			// assigning *p = rhs: also update pointer pointees
+			// incomplete more — non-sticky abstract (fact-map soft re-pick)
 			more := MergePointeesOfPointer(v, 1, factsIn)
 			if !VariablesComplete(more) {
 				return IncompleteFactSlice()
@@ -521,6 +550,7 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		}
 		part := RhsToLhsTransfer(factsIn, ptrs, rhs)
 		// incomplete transfer must not invent partial field abstract
+		// (sticky only if RhsToLhsTransfer hard path already SetError)
 		if !FactsComplete(part) {
 			return IncompleteFactSlice()
 		}

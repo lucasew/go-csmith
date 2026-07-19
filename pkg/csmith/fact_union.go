@@ -334,8 +334,9 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 // RhsToLhsTransferUnion mirrors FactUnion::rhs_to_lhs_transfer.
 // FactUnion.cpp:74–118 — constant→fid 0; variable→join RHS union facts;
 // assign/comma peel to RHS; function return uses registry when available.
-// Incomplete IR fails closed IncompleteUnionFactSlice (not bare nil invent
-// empty-complete transfer / assign apply success).
+// Hard IR asserts (nil rhs, non-union lvars, nil Var/Invoke, address-of,
+// missing rv_fact) fail closed sticky IncompleteUnionFactSlice. Incomplete
+// union/pt maps and MergePointees stay non-sticky for soft re-pick factories.
 func RhsToLhsTransferUnion(
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
@@ -346,18 +347,21 @@ func RhsToLhsTransferUnion(
 	if len(lvars) == 0 {
 		return nil
 	}
-	// FactUnion.cpp:82 — assert(rhs != nullptr)
+	// FactUnion.cpp:82 — assert(rhs != nullptr) incomplete hole
+	// Generation AddParamFacts abstracts missing union args with rhs=nil —
+	// non-sticky IncompleteUnion (soft re-pick factories; no invent empty transfer)
 	if rhs == nil {
 		return IncompleteUnionFactSlice()
 	}
-	// incomplete input maps must not invent transfer past holes
+	// incomplete input maps — non-sticky hole marker (soft re-pick factories)
 	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
 		return IncompleteUnionFactSlice()
 	}
 	// FactUnion.cpp:80–81 — assert all possible LHS are unions
 	for _, v := range lvars {
 		if v == nil || v.Type == nil || !v.Type.IsUnion() {
-			// fail closed — no soft invent transfer onto non-union
+			// hard IR sticky — no soft invent transfer onto non-union
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 	}
@@ -366,19 +370,22 @@ func RhsToLhsTransferUnion(
 		return MakeFactUnions(lvars, 0)
 	case TermVariable:
 		if rhs.Var == nil {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		// incomplete type IR must not invent level-0 union transfer
+		// incomplete type IR sticky (no invent level-0 union transfer)
 		indirect, iok := rhs.IndirectLevelComplete()
 		if !iok {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		// FactUnion.cpp:89 — assert(indirect >= 0); no soft invent clamp to 0 for &
+		// FactUnion.cpp:89 — assert(indirect >= 0); hard sticky (no invent clamp for &)
 		if indirect < 0 {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		rvars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, ptFacts)
-		// incomplete pointees (not complete empty)
+		// incomplete pointees — non-sticky abstract hole
 		if !VariablesComplete(rvars) {
 			return IncompleteUnionFactSlice()
 		}
@@ -393,7 +400,8 @@ func RhsToLhsTransferUnion(
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)
 	case TermFunction:
 		// FactUnion.cpp:99–109 — return fact for invocation RV (union category).
-		// assert(rv_fact) when FIU present — fail closed if missing (no invent fid 0)
+		// missing Invoke/User/RV or related union fact during generation —
+		// non-sticky hole (soft re-pick; no invent fid 0)
 		if rhs.Invoke == nil || rhs.Invoke.User == nil || rhs.Invoke.User.RV == nil {
 			return IncompleteUnionFactSlice()
 		}
@@ -401,16 +409,18 @@ func RhsToLhsTransferUnion(
 		if uf := FindRelatedUnion(unionFacts, rv); uf != nil {
 			return MakeFactUnions(lvars, uf.LastWrittenFID)
 		}
-		// FactUnion.cpp:107 assert(rv_fact) — no soft invent empty transfer success
+		// FactUnion.cpp:107 assert(rv_fact) path — non-sticky generation hole
 		return IncompleteUnionFactSlice()
 	case TermAssignment:
 		if rhs.Assign == nil {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.Assign.Expr)
 	case TermCommaExpr:
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs.CommaRHS)
 	default:
+		// unknown term — non-sticky hole
 		return IncompleteUnionFactSlice()
 	}
 }
@@ -418,7 +428,8 @@ func RhsToLhsTransferUnion(
 // AbstractFactUnionForAssign mirrors FactUnion::abstract_fact_for_assign.
 // FactUnion.cpp:121–154 — union-typed LHS transfers fid; union-field write
 // records parent fid; padding/packed-after-bitfield → BOTTOM on container.
-// Returns (factsOut, lvarCount). Incomplete → IncompleteUnionFactSlice.
+// Returns (factsOut, lvarCount). Hard IR (nil lhs, nil pointee, MakeFact fail)
+// sticky; incomplete maps/MergePointees stay non-sticky hole markers.
 func AbstractFactUnionForAssign(
 	unionFacts []*FactUnion,
 	ptFacts []*FactPointTo,
@@ -427,13 +438,15 @@ func AbstractFactUnionForAssign(
 	rhs *Expression,
 ) (out []*FactUnion, lvarCnt int) {
 	if lhs == nil {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice(), 0
 	}
+	// incomplete maps — non-sticky abstract hole
 	if !UnionFactsComplete(unionFacts) || !FactsComplete(ptFacts) {
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, ptFacts)
-	// incomplete merge at indir>0; indir 0 yields [lhs]
+	// incomplete merge at indir>0 — non-sticky; indir 0 yields [lhs]
 	if !VariablesComplete(lvars) {
 		return IncompleteUnionFactSlice(), 0
 	}
@@ -446,16 +459,18 @@ func AbstractFactUnionForAssign(
 		return nil, lvarCnt
 	}
 	for _, v := range lvars {
-		// pointees always live; no invent skip nil holes
+		// pointees always live; nil hole sticky (no invent skip / soft re-pick)
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 		var fu *FactUnion
 		if v.IsUnionField() {
 			// FactUnion.cpp:141–143
 			fu = MakeFactUnion(v.FieldVarOf, v.GetFieldID())
-			// FieldVarOf non-union → MakeFactUnion nil is broken IR
+			// FieldVarOf non-union → MakeFactUnion nil is broken IR sticky
 			if fu == nil && v.FieldVarOf != nil {
+				SetError(ErrGeneric)
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 		} else if v.IsInsideUnionField() {
@@ -466,6 +481,7 @@ func AbstractFactUnionForAssign(
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)
 					if fu == nil {
+						SetError(ErrGeneric)
 						return IncompleteUnionFactSlice(), lvarCnt
 					}
 				}
