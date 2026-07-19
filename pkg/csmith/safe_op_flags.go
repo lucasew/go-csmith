@@ -135,8 +135,9 @@ func MakeRandomBinary(r *Rng, opts Options, probs *Probabilities, typ *Type) *Sa
 // MakeRandomUnary mirrors SafeOpFlags::make_random_unary.
 // SafeOpFlags.cpp:139–167 — float always signed + SafeFloat; else signed coin + int size.
 func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type *Type, uop UnaryOp) *SafeOpFlags {
-	// SafeOpFlags.cpp:139–167 — always uses rnd_flipcoin / rnd_upto; no soft invent fixed flags
+	// SafeOpFlags.cpp:139–167 — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true}
@@ -181,8 +182,9 @@ func MakeRandomBinaryKind(
 	if DepthGuardByTypeFlag(opts, DtSafeOpFlags, int(opKind)) == BadDepth {
 		return nil
 	}
-	// SafeOpFlags.cpp:176+ — always uses rnd_*; no soft invent fixed flags
+	// SafeOpFlags.cpp:176+ — always uses rnd_* sticky; no soft invent fixed flags
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
@@ -231,13 +233,15 @@ func MakeRandomBinaryKind(
 // No invent opts-only weight table when probs missing.
 func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	if r == nil {
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	if probs == nil {
 		probs = ProcessProbabilities()
 	}
 	if probs == nil {
-		// Probabilities singleton always live in C++; fail closed
+		// Probabilities singleton always live in C++; sticky fail closed
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	v := r.RndUptoFilter(uint32(MaxSafeOpSizeNonFloat), probs.SafeOpsSizeFilter())

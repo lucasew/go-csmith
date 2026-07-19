@@ -37,7 +37,8 @@ func TestAccessOnceMarking(t *testing.T) {
 }
 
 func TestAccessOnceWrapRequiresOption(t *testing.T) {
-	// Variable.cpp:694–695 — no invent ACCESS_ONCE when option disabled
+	// Variable.cpp:694–695 — assert(access_once); sticky, no invent wrap when option off
+	ClearError()
 	prev := ProcessOptions()
 	opts := Defaults()
 	opts.AccessOnce = false
@@ -45,9 +46,14 @@ func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	defer SetProcessOptions(prev)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	v.IsAccessOnce = true
-	if strings.Contains(v.OutputC(), "ACCESS_ONCE") {
+	out := v.OutputC()
+	if strings.Contains(out, "ACCESS_ONCE") {
 		t.Fatal("option off must not wrap")
 	}
+	if !HasError() {
+		t.Fatal("IsAccessOnce with option off must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestForSafeIncrEmit(t *testing.T) {

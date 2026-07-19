@@ -197,8 +197,12 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
 	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
-	// assert(access_once enabled); no invent ACCESS_ONCE wrap when option off
-	if ProcessOptions().AccessOnce && v.IsAccessOnce && !v.IsAddrTaken {
+	// sticky when IsAccessOnce but option off (assert enabled; no invent silent skip wrap)
+	if v.IsAccessOnce && !v.IsAddrTaken {
+		if !ProcessOptions().AccessOnce {
+			SetError(ErrGeneric)
+			return name
+		}
 		return "ACCESS_ONCE(" + name + ")"
 	}
 	return name

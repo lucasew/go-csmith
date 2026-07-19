@@ -134,8 +134,9 @@ func MakeRandomAssignQfer(
 		}
 		op = AssignOpsProbability(r, opts, assignTab, typ)
 	}
-	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()); fail closed
+	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()) sticky
 	if typ != nil && typ.IsConstStructUnion() {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work

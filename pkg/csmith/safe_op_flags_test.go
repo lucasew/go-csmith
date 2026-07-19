@@ -133,10 +133,23 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	prev := ProcessProbabilities()
 	SetProcessProbabilities(nil)
 	defer SetProcessProbabilities(prev)
-	// nil probs arg + nil process → fail closed
+	ClearError()
+	// nil probs arg + nil process → sticky fail closed
 	if _, ok := pickSafeOpSize(NewRng(1), nil); ok {
 		t.Fatal("nil probs must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil probs pickSafeOpSize must SetError sticky")
+	}
+	ClearError()
+	// nil RNG sticky
+	if _, ok := pickSafeOpSize(nil, probs); ok {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG pickSafeOpSize must SetError sticky")
+	}
+	ClearError()
 	// explicit probs works
 	sz, ok := pickSafeOpSize(NewRng(2), probs)
 	if !ok || int(sz) < 0 || int(sz) >= MaxSafeOpSizeNonFloat {
@@ -155,4 +168,24 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 			t.Fatal("Int8 disabled")
 		}
 	}
+}
+
+func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
+	// SafeOpFlags.cpp always uses rnd_*; no invent fixed flags
+	ClearError()
+	opts := Defaults()
+	if f := MakeRandomBinaryKind(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd); f != nil {
+		t.Fatal("nil RNG binary must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomBinaryKind must SetError sticky")
+	}
+	ClearError()
+	if f := MakeRandomUnary(nil, opts, NewProbabilities(opts), GetIntType(), GetIntType(), UnMinus); f != nil {
+		t.Fatal("nil RNG unary must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomUnary must SetError sticky")
+	}
+	ClearError()
 }

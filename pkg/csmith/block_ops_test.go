@@ -946,9 +946,13 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 }
 
 func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
-	// StatementAssign.cpp:124 assert(!is_const_struct_union)
+	// StatementAssign.cpp:124 assert(!is_const_struct_union) sticky
 	ClearError()
 	opts := Defaults()
+	// ProcessAssignOpsTable required past FM gate
+	prevTab := ProcessAssignOpsTable()
+	SetProcessAssignOpsTable(NewAssignOpsTable(opts))
+	defer SetProcessAssignOpsTable(prevTab)
 	cq := NewCVQualifiers([]bool{true}, []bool{false})
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: cq},
@@ -956,11 +960,16 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	if !st.IsConstStructUnion() {
 		t.Fatal("fixture not const struct")
 	}
-	cg := EmptyCGContext()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	got := MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, st)
 	if stmtOK(got) {
 		t.Fatal("const struct assign must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("const struct assign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeDummyBlockCGFactIn(t *testing.T) {
