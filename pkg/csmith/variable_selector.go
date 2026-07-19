@@ -78,9 +78,13 @@ func ChooseVisibleReadVar(
 	if typ == nil {
 		return nil
 	}
+	// incomplete union fact map fails closed (no invent soft-filter nonreadable past holes)
+	if unionFacts != nil && !UnionFactsComplete(unionFacts) {
+		return nil
+	}
 	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
-	// nil expand = incomplete candidate list
-	if expanded == nil && len(readVars) > 0 {
+	// IncompleteVariables expand — fail closed (not invent filter past hole)
+	if !VariablesComplete(expanded) {
 		return nil
 	}
 	// incomplete stack lists must not invent filter that drops all locals
@@ -89,7 +93,8 @@ func ChooseVisibleReadVar(
 	}
 	var ok []*Variable
 	for _, v := range expanded {
-		if v == nil || v.Type == nil {
+		// pre-validated VariablesComplete; Type always live for match
+		if v.Type == nil {
 			return nil
 		}
 		if v.IsVirtual() || v.IsVolatile() {

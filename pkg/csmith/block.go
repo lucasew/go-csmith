@@ -340,10 +340,10 @@ func MakeRandomBlock(
 		EmitDepthProtect: opts.DepthProtect,
 		// step_hash def/decl/call gated with ComputeHash (hashHelpersEnabled)
 		// no invent step_hash(n) without live helper defs
-		EmitStepHash: opts.StepHashByStmt && opts.ComputeHash,
-		EmitLabelAttrs:   opts.LabelAttributes,
-		LabelAttrRng:     r,
-		StmID:            AllocStmID(),
+		EmitStepHash:   opts.StepHashByStmt && opts.ComputeHash,
+		EmitLabelAttrs: opts.LabelAttributes,
+		LabelAttrRng:   r,
+		StmID:          AllocStmID(),
 		// Block.cpp:127 — in_array_loop when induction bounds non-empty
 		InArrayLoop:  len(cg.IVBounds) > 0,
 		EmitParanoid: opts.Paranoid,
@@ -518,7 +518,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			}
 			// incomplete MapFactsIn fails closed — C++ map[] missing is empty complete;
 			// holes must not invent empty fixed-point re-analysis as success
-			in0 := fm.MapFactsIn[b.StmID]
+			in0 := fm.GetMapFactsIn(b.StmID)
 			if !FactsComplete(in0) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
@@ -566,7 +566,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				}
 				// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
 				// incomplete out fails closed (hole marker — no invent keep prior / empty)
-				out := fm.MapFactsOut[b.StmID]
+				out := fm.GetMapFactsOut(b.StmID)
 				if !FactsComplete(out) {
 					fm.GlobalFacts = IncompleteFactSlice()
 					postFacts = IncompleteFactSlice()
@@ -597,17 +597,13 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
 		if len(b.Stmts) > 0 {
 			sr := &b.Stmts[len(b.Stmts)-1]
-			// return stm_id always live after append_return; StmID 0 fails closed
-			if sr.StmID <= 0 {
-				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			// return stm_id always live after append_return; StmID 0 → Incomplete via getter
+			out := fm.GetMapFactsOut(sr.StmID)
+			if FactsComplete(out) {
+				fm.SetMapFactsOut(b.StmID, out)
 			} else {
-				out := fm.MapFactsOut[sr.StmID]
-				if FactsComplete(out) {
-					fm.SetMapFactsOut(b.StmID, out)
-				} else {
-					// incomplete sr out — fail closed hole marker (not empty complete)
-					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-				}
+				// incomplete sr out — fail closed hole marker (not empty complete)
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			}
 		}
 	}

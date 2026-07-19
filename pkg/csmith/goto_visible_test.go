@@ -47,6 +47,10 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
+	// incomplete union facts must not invent soft-filter pick
+	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
+		t.Fatal("incomplete union facts must fail closed nil pick")
+	}
 }
 
 func TestEffectReadVarsSorted(t *testing.T) {
@@ -110,7 +114,6 @@ func TestCastIfNeeded(t *testing.T) {
 		t.Fatal("no cast")
 	}
 }
-
 
 func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// StatementGoto.cpp:74/110 ERROR_GUARD after flipcoin / rnd_upto

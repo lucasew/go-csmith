@@ -514,9 +514,9 @@ func MakeRandomGoto(
 		// C++ map[] always; incomplete maps fail closed (no invent partial goto)
 		var srcFacts []*FactPointTo
 		if IsCtrlStmt(other) {
-			srcFacts = fm.MapFactsIn[other.StmID]
+			srcFacts = fm.GetMapFactsIn(other.StmID)
 		} else {
-			srcFacts = fm.MapFactsOut[other.StmID]
+			srcFacts = fm.GetMapFactsOut(other.StmID)
 		}
 		if !FactsComplete(srcFacts) {
 			return makeGotoFailed()
@@ -528,7 +528,7 @@ func MakeRandomGoto(
 		preEffect := cg.AccumEffect()
 		cg.AddEffect(fm.GetMapAccumEffect(other.StmID), true)
 		// StatementGoto.cpp:167–182
-		destIn := fm.MapFactsIn[dest.StmID]
+		destIn := fm.GetMapFactsIn(dest.StmID)
 		if !FactsComplete(destIn) {
 			return makeGotoFailed()
 		}
@@ -643,5 +643,3 @@ func MakeRandomGoto(
 	// StatementGoto.cpp:212 — return nullptr (goto already in other_blk)
 	return makeGotoFailed()
 }
-
-

@@ -148,7 +148,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				// Statement.cpp:819–820 — always merge_jump_facts / add_effect
 				// C++ map[] missing → empty; no invent skip merge when out absent
 				// Incomplete out fails closed (no invent partial jump merge)
-				out := fm.MapFactsOut[e.SrcID]
+				out := fm.GetMapFactsOut(e.SrcID)
 				if _, ok := tryMergeJumpFacts(facts, out); !ok {
 					return false
 				}
@@ -166,7 +166,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				continue
 			}
 			// Statement.cpp:830–831 — always merge_jump_facts / add_effect
-			out := fm.MapFactsOut[e.SrcID]
+			out := fm.GetMapFactsOut(e.SrcID)
 			if _, ok := tryMergeJumpFacts(facts, out); !ok {
 				return false
 			}
@@ -357,7 +357,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			for _, e := range back {
 				// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src])
 				// C++ map[] always; missing → empty merge; incomplete fails closed
-				out := fm.MapFactsOut[e.SrcID]
+				out := fm.GetMapFactsOut(e.SrcID)
 				if !FactsComplete(currentInputs) || !FactsComplete(out) {
 					SetError(ErrGeneric)
 					return currentInputs, -1, false
@@ -376,7 +376,7 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			for _, e := range toBlk {
 				// same map_facts_out[src] always-merge for edges into block
-				out := fm.MapFactsOut[e.SrcID]
+				out := fm.GetMapFactsOut(e.SrcID)
 				if !FactsComplete(currentInputs) || !FactsComplete(out) {
 					SetError(ErrGeneric)
 					return currentInputs, -1, false

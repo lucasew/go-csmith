@@ -360,3 +360,19 @@ func TestVisitFactsReturnSetsOut(t *testing.T) {
 	}
 	_ = fm.GetMapStmEffect(8)
 }
+
+func TestGetMapFactsStmID0FailClosed(t *testing.T) {
+	fm := NewFactMgr(nil)
+	// StmID 0 must IncompleteFactSlice — not invent empty-complete map miss
+	if FactsComplete(fm.GetMapFactsIn(0)) || FactsComplete(fm.GetMapFactsOut(0)) {
+		t.Fatal("StmID 0 must IncompleteFactSlice")
+	}
+	// missing live key is complete empty
+	if !FactsComplete(fm.GetMapFactsIn(42)) || len(fm.GetMapFactsIn(42)) != 0 {
+		t.Fatal("missing live id must complete empty")
+	}
+	fm.SetMapFactsOut(7, IncompleteFactSlice())
+	if FactsComplete(fm.GetMapFactsOut(7)) {
+		t.Fatal("stored incomplete must stay incomplete via getter")
+	}
+}

@@ -230,8 +230,8 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		// Statement.cpp:785–803 — visited goto into this tree; re-analyze if dest
 		// facts not implied by jump-src outs (or dest in empty while src out nonempty)
 		if visited && destInside {
-			srcOut := fm.MapFactsOut[e.SrcID]
-			destIn := fm.MapFactsIn[e.DestStmID]
+			srcOut := fm.GetMapFactsOut(e.SrcID)
+			destIn := fm.GetMapFactsIn(e.DestStmID)
 			// incomplete maps fail closed unfixed — no invent "all fixed" when
 			// FindRelatedPointTo returns nil past a hole before a related fact
 			if !FactsComplete(srcOut) || !FactsComplete(destIn) {

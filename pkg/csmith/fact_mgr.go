@@ -118,6 +118,44 @@ func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 	return cl
 }
 
+// GetMapFactsIn returns map_facts_in for a live stm_id.
+// StmID ≤0 fails closed IncompleteFactSlice (no invent MapFactsIn[0] miss as
+// empty-complete merge/visit success). Missing live key → complete empty {}.
+func (fm *FactMgr) GetMapFactsIn(stmID int) []*FactPointTo {
+	if stmID <= 0 {
+		return IncompleteFactSlice()
+	}
+	if fm == nil || fm.MapFactsIn == nil {
+		return []*FactPointTo{}
+	}
+	if facts, ok := fm.MapFactsIn[stmID]; ok {
+		if !FactsComplete(facts) {
+			return IncompleteFactSlice()
+		}
+		return facts
+	}
+	return []*FactPointTo{}
+}
+
+// GetMapFactsOut returns map_facts_out for a live stm_id.
+// StmID ≤0 fails closed IncompleteFactSlice (no invent MapFactsOut[0] empty-complete).
+// Missing live key → complete empty {}.
+func (fm *FactMgr) GetMapFactsOut(stmID int) []*FactPointTo {
+	if stmID <= 0 {
+		return IncompleteFactSlice()
+	}
+	if fm == nil || fm.MapFactsOut == nil {
+		return []*FactPointTo{}
+	}
+	if facts, ok := fm.MapFactsOut[stmID]; ok {
+		if !FactsComplete(facts) {
+			return IncompleteFactSlice()
+		}
+		return facts
+	}
+	return []*FactPointTo{}
+}
+
 // SetMapFactsOutForStmt mirrors FactMgr::set_fact_out with jump/return filtering.
 // FactMgr.cpp:257–274 — drop loop/function locals for break/continue/return/goto.
 // blk is s->parent (statement parent block).

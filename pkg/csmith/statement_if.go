@@ -94,7 +94,7 @@ func MakeRandomIf(
 	// Incomplete then-in fails closed (nil — no invent cleaned clone of holes)
 	if cg.FM != nil {
 		if thenB.StmID > 0 {
-			in := cg.FM.MapFactsIn[thenB.StmID]
+			in := cg.FM.GetMapFactsIn(thenB.StmID)
 			if !FactsComplete(in) {
 				cg.FM.GlobalFacts = IncompleteFactSlice()
 			} else {

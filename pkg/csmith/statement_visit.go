@@ -101,7 +101,7 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 		if destID > 0 {
 			visitedThis := fm.MapVisited != nil && fm.MapVisited[st.StmID]
 			visitedDest := fm.MapVisited != nil && fm.MapVisited[destID]
-			prevOut := fm.MapFactsOut[st.StmID]
+			prevOut := fm.GetMapFactsOut(st.StmID)
 			cur := facts
 			// incomplete prev outs fail closed — do not invent subset/clear path
 			if !FactsComplete(prevOut) {
@@ -344,7 +344,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		} else {
 			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
 			// C++ map[] always assigns (missing → empty); no invent keep prior
-			in := cg.FM.MapFactsIn[st.Then.StmID]
+			in := cg.FM.GetMapFactsIn(st.Then.StmID)
 			if !FactsComplete(in) {
 				return false
 			}
@@ -362,7 +362,7 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		for _, e := range edges {
-			out := cg.FM.MapFactsOut[e.SrcID]
+			out := cg.FM.GetMapFactsOut(e.SrcID)
 			// incomplete jump facts fail closed (no invent skip merge)
 			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
 				return false
@@ -484,7 +484,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			cg.FM.GlobalFacts = preFacts
 		} else {
 			// map_facts_in[&body] — C++ map[] always; missing → empty
-			in := cg.FM.MapFactsIn[inner.Then.StmID]
+			in := cg.FM.GetMapFactsIn(inner.Then.StmID)
 			if !FactsComplete(in) {
 				return false
 			}
@@ -497,7 +497,7 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		for _, e := range edges {
-			out := cg.FM.MapFactsOut[e.SrcID]
+			out := cg.FM.GetMapFactsOut(e.SrcID)
 			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
 				return false
 			}

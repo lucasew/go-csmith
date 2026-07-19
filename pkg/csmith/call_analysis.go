@@ -446,8 +446,8 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
-	thenOut := fm.MapFactsOut[st.Then.StmID]
-	elseOut := fm.MapFactsOut[st.Else.StmID]
+	thenOut := fm.GetMapFactsOut(st.Then.StmID)
+	elseOut := fm.GetMapFactsOut(st.Else.StmID)
 	// Fact* always live in maps used for branch combine
 	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
@@ -471,7 +471,7 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = CloneFactSlice(thenOut)
 		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
 		// C++ map[] always; missing → empty makeup; incomplete fails closed
-		in := fm.MapFactsIn[st.Else.StmID]
+		in := fm.GetMapFactsIn(st.Else.StmID)
 		if !FactsComplete(in) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			return
