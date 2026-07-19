@@ -398,8 +398,7 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	retFacts := CloneFactSlice(bodyOut)
-	AddBackReturnFacts(f.Body, fm, &retFacts)
-	if !FactsComplete(retFacts) || !FactsComplete(*facts) {
+	if !AddBackReturnFacts(f.Body, fm, &retFacts) || !FactsComplete(retFacts) || !FactsComplete(*facts) {
 		fm.MapFactsIn = inCopy
 		fm.MapFactsOut = outCopy
 		fm.MapStmEffect = effCopy

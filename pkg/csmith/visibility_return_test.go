@@ -82,14 +82,12 @@ func TestAddBackReturnFacts(t *testing.T) {
 		st,
 	}}
 	var facts []*FactPointTo
-	AddBackReturnFacts(body, fm, &facts)
-	if len(facts) != 1 || facts[0].Var != p {
+	if !AddBackReturnFacts(body, fm, &facts) || len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
 	}
 	// return StmID 0 fails closed (no invent soft-merge MapFactsOut[0])
 	var facts0 []*FactPointTo
-	AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0)
-	if facts0 != nil {
+	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0) || facts0 != nil {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
 }
@@ -110,8 +108,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		{Kind: StmtReturn, StmID: 20},
 	}}
 	var facts []*FactPointTo
-	AddBackReturnFacts(body, fm, &facts)
-	if facts != nil {
+	if AddBackReturnFacts(body, fm, &facts) || facts != nil {
 		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
 	}
 	// nested if Then with incomplete return must stop before Else returns
@@ -126,8 +123,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 40}}},
 	}}}
 	var facts2 []*FactPointTo
-	AddBackReturnFacts(body2, fm2, &facts2)
-	if facts2 != nil {
+	if AddBackReturnFacts(body2, fm2, &facts2) || facts2 != nil {
 		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
 	}
 }

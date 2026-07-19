@@ -384,7 +384,7 @@ func MakeFirst(
 
 	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
 	// C++ map[] always assigns (missing → empty); no invent keep prior GlobalFacts
-	// Incomplete out / StmID 0 fails closed (nil) — do not invent soft-merge
+	// Incomplete out / StmID 0 / add_back fail closed (nil) — no invent soft-merge
 	// return outs onto a wiped GlobalFacts via FactsComplete(nil)==true
 	if f.Body != nil {
 		if f.Body.StmID <= 0 {
@@ -395,7 +395,9 @@ func MakeFirst(
 				fm.GlobalFacts = nil
 			} else {
 				fm.GlobalFacts = CloneFactSlice(out)
-				AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts)
+				if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) {
+					fm.GlobalFacts = nil
+				}
 			}
 		}
 	}
@@ -604,7 +606,7 @@ func (f *Function) generateBodyCore(
 
 	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
 	// (generate_body_with_known_params / GenerateBody post-body handoff)
-	// Incomplete body out / StmID 0: wipe and skip add_back (no invent soft-merge
+	// Incomplete body out / StmID 0 / add_back fail: wipe (no invent soft-merge
 	// return facts onto wiped GlobalFacts via FactsComplete(nil)==true)
 	if cg.FM != nil && f.Body != nil {
 		if f.Body.StmID <= 0 {
@@ -615,7 +617,9 @@ func (f *Function) generateBodyCore(
 				cg.FM.GlobalFacts = nil
 			} else {
 				cg.FM.GlobalFacts = CloneFactSlice(out)
-				AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts)
+				if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) {
+					cg.FM.GlobalFacts = nil
+				}
 			}
 		}
 	}

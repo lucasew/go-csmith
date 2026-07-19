@@ -100,11 +100,16 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 // Statement.cpp:525–537 — merge map_facts_out of every return into facts.
 // Incomplete map_facts_out / mid-join / nil block hole fails closed: *facts = nil
 // and the walk stops (no invent keep merging later returns after a failed merge).
-func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) {
+// Returns false when incomplete (*facts wiped) so callers do not invent success
+// via FactsComplete(nil)==true after a fail-closed wipe.
+func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if b == nil || fm == nil || facts == nil {
-		return
+		if facts != nil {
+			*facts = nil
+		}
+		return false
 	}
-	_ = addBackReturnFactsBlock(b, fm, facts)
+	return addBackReturnFactsBlock(b, fm, facts)
 }
 
 // addBackReturnFactsBlock returns false when the accumulator is fail-closed incomplete.

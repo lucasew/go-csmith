@@ -71,10 +71,21 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	out = calFM.MapFactsOut[callee.Body.StmID]
 	if FactsComplete(out) {
 		retFacts = CloneFactSlice(out)
-		AddBackReturnFacts(callee.Body, calFM, &retFacts)
+		if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
+			retFacts = nil
+		}
 	}
 	if retFacts != nil {
 		t.Fatal("incomplete body out must not invent returns-only ret_facts", retFacts)
+	}
+	// complete body out + incomplete return out — AddBack fails closed
+	calFM.MapFactsOut = map[int][]*FactPointTo{
+		20: {MakeFactPointTo(p, NullPtr)},
+		99: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
+	if AddBackReturnFacts(callee.Body, calFM, &retFacts) || retFacts != nil {
+		t.Fatal("incomplete return out must fail closed AddBackReturnFacts", retFacts)
 	}
 }
 

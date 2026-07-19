@@ -572,19 +572,23 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
 	// then add_back_return_facts. C++ map[] missing → empty start then merge returns.
-	// Body stm_id always live after generate; StmID 0 fails closed (mark failed).
-	// Incomplete body out fails closed nil retFacts — no invent soft-merge returns
-	// onto wiped empty via FactsComplete(nil)==true
+	// Body stm_id always live after generate; StmID 0 / incomplete out / add_back
+	// fail closed Failed — no invent soft-merge returns or renew keep caller facts
+	// via FactsComplete(nil)==true / RenewFacts no-op on nil newFacts
 	var retFacts []*FactPointTo
 	if callee.Body == nil || callee.Body.StmID <= 0 {
 		fi.Failed = true
-	} else {
-		out := calFM.MapFactsOut[callee.Body.StmID]
-		if FactsComplete(out) {
-			retFacts = CloneFactSlice(out)
-			AddBackReturnFacts(callee.Body, calFM, &retFacts)
-		}
-		// incomplete out → nil retFacts (fail closed, no invent returns-only)
+		return fi
+	}
+	out := calFM.MapFactsOut[callee.Body.StmID]
+	if !FactsComplete(out) {
+		fi.Failed = true
+		return fi
+	}
+	retFacts = CloneFactSlice(out)
+	if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
+		fi.Failed = true
+		return fi
 	}
 	fi.SaveReturnFacts(retFacts)
 
@@ -593,7 +597,13 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts)
 	if callerFM != nil {
-		RenewFacts(&callerFM.GlobalFacts, retFacts)
+		// complete retFacts (may be empty nil) required; incomplete caller fails closed
+		// (no invent RenewFacts no-op success past incomplete then keep prior)
+		if !FactsComplete(callerFM.GlobalFacts) || !FactsComplete(retFacts) {
+			fi.Failed = true
+			return fi
+		}
+		_ = RenewFacts(&callerFM.GlobalFacts, retFacts)
 		// FunctionInvocationUser.cpp:234–238 — new globals facts
 		// Variable* always live on NewGlobals; nil hole fails closed (mark failed)
 		for _, v := range callee.NewGlobals {
