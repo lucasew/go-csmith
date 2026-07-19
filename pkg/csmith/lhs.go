@@ -302,8 +302,9 @@ func MakeRandomLhs(
 	noSignedOverflow bool,
 	qfer *CVQualifiers,
 ) *Lhs {
-	// Lhs::make_random always receives a type from assign/factories (no GetIntType invent)
+	// Lhs::make_random always receives type + RNG + VS + CG; sticky no invent LHS shell without them
 	if typ == nil || r == nil || vs == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent LHS / soft re-pick past holes)

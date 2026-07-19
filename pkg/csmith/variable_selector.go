@@ -1755,8 +1755,9 @@ func (vs *VariableSelector) SelectGlobalMT(
 		return nil
 	}
 	// VariableSelector.cpp always has process RNG for multi-choose / create paths
-	// n==1 ChooseOKVar can skip draw; empty or multi without r → fail closed
+	// n==1 ChooseOKVar can skip draw; multi without r sticky fail closed
 	if r == nil && len(vs.GlobalList) != 1 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// choose_var(GlobalList, …, mt, invalid_vars)
@@ -2492,8 +2493,9 @@ func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
 // VariableSelectionProbabilityCG mirrors VariableSelectionProbability(upper, filter).
 // VariableSelector.cpp:1043–1059 — do { rnd_upto(100, filter); if scope < upper return }.
 func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper VariableScope) VariableScope {
-	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ScopeNewValue
+	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE) sticky; no soft invent ScopeNewValue
 	if r == nil {
+		SetError(ErrGeneric)
 		return MaxVarScope
 	}
 	// incomplete Param fails closed sticky (no invent filter ParentParam via len-hole)
@@ -2532,8 +2534,9 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 // VariableCreationProbability mirrors VariableCreationProbability.
 // VariableSelector.cpp:1063–1070 — flipcoin(10) global if allowed else local.
 func VariableCreationProbability(r *Rng, opts Options) VariableScope {
-	// VariableSelector.cpp:1065 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ParentLocal without RNG
+	// VariableSelector.cpp:1065 — ERROR_GUARD(MAX_VAR_SCOPE) sticky; no soft invent ParentLocal without RNG
 	if r == nil {
+		SetError(ErrGeneric)
 		return MaxVarScope
 	}
 	flag := opts.GlobalVariables && r.RndFlipcoin(10)

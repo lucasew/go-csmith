@@ -473,8 +473,9 @@ func (b *Block) AppendNestedLoop(
 	cg *CGContext,
 ) *Stmt {
 	// Block.cpp:422+ — Statement::make_random(eFor) always has RNG
-	// no invent nested for shell without live block/context/RNG
+	// sticky no invent nested for shell without live block/context/RNG
 	if b == nil || r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before EffectStm clear (no invent nested for)
@@ -559,6 +560,7 @@ func (b *Block) AppendNestedLoop(
 func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg *CGContext) *Stmt {
 	// Block.cpp:378+ — Statement::make_random(eReturn) always has RNG
 	// no invent return shell without live block/context/RNG
+	// non-sticky: MakeDummyBlock PostCreation passes nil RNG (soft fail append)
 	if b == nil || r == nil || cg == nil {
 		return nil
 	}

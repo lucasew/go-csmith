@@ -304,6 +304,29 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 	}
 }
 
+func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
+	// Lhs::make_random always has type + RNG + VS + CG sticky
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomLhs must SetError sticky")
+	}
+	ClearError()
+	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, nil, false, false, nil) != nil {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type MakeRandomLhs must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR (no invent LHS / soft re-pick past holes)
 	ClearError()

@@ -30,6 +30,28 @@ func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
 	}
 }
 
+func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {
+	// VariableSelector.cpp:1053 ERROR_GUARD sticky without RNG
+	ClearError()
+	opts := Defaults()
+	InitScopeTable(opts)
+	defer SetProcessScopeTab(nil)
+	if sc := VariableSelectionProbability(nil, opts); sc != MaxVarScope {
+		t.Fatalf("nil RNG must fail closed MAX, got %v", sc)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG VariableSelectionProbability must SetError sticky")
+	}
+	ClearError()
+	if sc := VariableCreationProbability(nil, opts); sc != MaxVarScope {
+		t.Fatalf("nil RNG creation must fail closed MAX, got %v", sc)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG VariableCreationProbability must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	// VariableSelector.cpp:98–105 — ParentParam filtered when param.empty()
 	ClearError()

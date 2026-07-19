@@ -274,3 +274,21 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 		t.Fatal("formatSmallConstant float invent")
 	}
 }
+
+func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
+	// AbsRndNumGenerator always has live RNG sticky
+	ClearError()
+	if NewRng(1).RandomHexDigits(0) != "" {
+		t.Fatal("num<=0 returns empty non-sticky")
+	}
+	if HasError() {
+		t.Fatal("num<=0 must not SetError")
+	}
+	if (*Rng)(nil).RandomHexDigits(4) != "" {
+		t.Fatal("nil RNG must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomHexDigits must SetError sticky")
+	}
+	ClearError()
+}

@@ -261,7 +261,9 @@ func MakeRandomArrayInit(
 ) Stmt {
 	_ = stmtTab
 	_ = tables
+	// StatementArrayOp always has VS + RNG + CG; sticky no invent array-init shell without them
 	if vs == nil || r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky before EffectStm clear (no invent array init)
@@ -372,10 +374,19 @@ func MakeRandomArrayInit(
 	// StatementArrayOp.cpp:137 — write_var(av)
 	cg.WriteVar(&av.Variable)
 
-	// access with ctrl vars: a[i0][i1]… (C++ always has cvs[i])
+	// access with ctrl vars: a[i0][i1]… (C++ always has cvs[i] live name)
 	access := av.Name
 	for _, d := range dims {
-		// no soft invent "[0]" for missing IV
+		// sticky no invent "a[]" / "[0]" for missing IV or empty name
+		if d == nil || d.IV == nil || d.IV.Name == "" {
+			for _, x := range dims {
+				if x != nil && x.IV != nil {
+					cg.RemoveIVBound(x.IV)
+				}
+			}
+			SetError(ErrGeneric)
+			return Stmt{}
+		}
 		access += "[" + d.IV.Name + "]"
 	}
 
