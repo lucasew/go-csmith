@@ -34,6 +34,28 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	if !got2.IsRead(g) || got2.IsWritten(g) || got2.IsWritten(loc) {
 		t.Fatal("nil call_chain hole must leave base unchanged", got2)
 	}
+	// incomplete LocalVars on chain frame: no invent not-on-chain drop of local write
+	// while still merging globals — fail closed leave base unchanged
+	holeBlk := &Block{LocalVars: []*Variable{loc, nil}}
+	got3 := base.AddExternalEffectWithCallers(other, []*Block{holeBlk})
+	if !got3.IsRead(g) || got3.IsWritten(g) || got3.IsWritten(loc) {
+		t.Fatal("incomplete stack on chain must leave base unchanged", got3)
+	}
+}
+
+func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
+	// soft invent: Param hole → IsVarVisible false → not found in Blocks → not OOS
+	// fair: StackScanComplete false → OOS true
+	f := &Function{Name: "f"}
+	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	f.Param = []*Variable{p, nil}
+	body := &Block{Func: f, LocalVars: nil}
+	if f.IsVarVisible(p, body) {
+		t.Fatal("incomplete Param must not invent visible")
+	}
+	if !f.IsVarOOS(p, body) {
+		t.Fatal("incomplete stack must fail closed OOS, not invent not-OOS")
+	}
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {

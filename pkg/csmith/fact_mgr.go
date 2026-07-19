@@ -236,12 +236,24 @@ func FindStmtByID(f *Function, stmID int) *Stmt {
 // AddFactOut mirrors FactMgr::add_fact_out.
 // FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
 // drop non-globals on return; drop loop-invisible on break/continue.
+// Incomplete Param/LocalVars at visibility sites fail closed (no invent drop of
+// a stack local solely because IsVarOnStack returned false past a hole — and no
+// invent append when visibility cannot be decided). Non-globals require complete
+// stack scan; incomplete → skip append.
 func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	if fm == nil || st == nil || fact == nil || fact.Var == nil || st.StmID <= 0 {
 		return
 	}
 	f := fm.Func
-	if f != nil && !f.IsVarVisible(fact.Var, stParent) {
+	// visibility needs complete stack for non-globals
+	if f != nil && !fact.Var.IsGlobal() {
+		if !f.StackScanComplete(stParent) {
+			return
+		}
+		if !f.IsVarVisible(fact.Var, stParent) {
+			return
+		}
+	} else if f != nil && !f.IsVarVisible(fact.Var, stParent) {
 		return
 	}
 	switch st.Kind {
@@ -255,6 +267,11 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		for b != nil && !b.Looping {
 			b = b.Parent
 		}
+		if f != nil && !fact.Var.IsGlobal() {
+			if !f.StackScanComplete(b) {
+				return
+			}
+		}
 		if f != nil && !f.IsVarVisible(fact.Var, b) {
 			return
 		}
@@ -265,8 +282,13 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		if destParent == nil && st.GotoDestStmID > 0 && f != nil {
 			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
 		}
-		if destParent != nil && f != nil && !f.IsVarVisible(fact.Var, destParent) {
-			return
+		if destParent != nil && f != nil {
+			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+				return
+			}
+			if !f.IsVarVisible(fact.Var, destParent) {
+				return
+			}
 		}
 	}
 	if fm.MapFactsOut == nil {

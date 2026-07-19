@@ -2,6 +2,27 @@ package csmith
 
 import "testing"
 
+func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
+	// soft invent: LocalVars hole → IsVarVisible false → drop stack local fact
+	// fair: incomplete stack → skip append for non-global (no invent visibility)
+	f := &Function{Name: "f"}
+	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
+	f.Body = body
+	fm := NewFactMgr(f)
+	st := &Stmt{Kind: StmtAssign, StmID: 3}
+	fm.AddFactOut(st, body, MakeFactPointTo(loc, NullPtr))
+	if len(fm.MapFactsOut[3]) != 0 {
+		t.Fatal("incomplete stack must not invent AddFactOut for local", fm.MapFactsOut[3])
+	}
+	// globals still append
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
+	if len(fm.MapFactsOut[3]) != 1 {
+		t.Fatal("global must still append", fm.MapFactsOut[3])
+	}
+}
+
 func TestAddFactOutVisible(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)

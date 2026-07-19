@@ -81,7 +81,8 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 // AddExternalEffectWithCallers mirrors Effect::add_external_effect(e, call_chain).
 // Effect.cpp:221–269 — globals always; non-globals only if on a call_chain stack frame.
 // Variable* always live in effect lists; nil hole fails closed (return e unchanged,
-// no invent partial external merge past holes).
+// no invent partial external merge past holes). Incomplete Param/LocalVars on a
+// frame also fails closed (no invent not-on-chain via IsVarOnStack false past hole).
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
 	for _, v := range other.ReadVars() {
 		if v == nil {
@@ -93,9 +94,9 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 			return e
 		}
 	}
-	// Block* always live on call_chain when used; nil hole fails closed
+	// Block* always live on call_chain when used; nil / incomplete stack fails closed
 	for _, b := range callChain {
-		if b == nil {
+		if b == nil || !b.StackScanComplete() {
 			return e
 		}
 	}
@@ -126,9 +127,8 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 
 func varOnCallChain(v *Variable, chain []*Block) bool {
 	for _, b := range chain {
-		// chain pre-validated complete at AddExternalEffectWithCallers;
-		// defensive: nil frame is not on-stack
-		if b != nil && b.IsVarOnStack(v) {
+		// chain pre-validated complete at AddExternalEffectWithCallers
+		if b != nil && b.StackScanComplete() && b.IsVarOnStack(v) {
 			return true
 		}
 	}

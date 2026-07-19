@@ -53,6 +53,8 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 
 // IsVarVisible mirrors Function::is_var_visible.
 // Function.cpp:204–205 — global or on stack at statement.
+// Incomplete Param/LocalVars: non-globals not visible (membership bit false);
+// callers that must not invent not-visible for stack locals use StackScanComplete.
 func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 	if v == nil {
 		return false
@@ -60,15 +62,20 @@ func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 	if v.IsGlobal() {
 		return true
 	}
-	return f.IsVarOnStack(v, stParent)
+	return f != nil && f.IsVarOnStack(v, stParent)
 }
 
 // IsVarOOS mirrors Function::is_var_oos.
 // Function.cpp:214–224 — not visible at stm but is a local of this function.
 // Block*/Variable* always live; nil holes fail closed as OOS (no invent not-OOS).
+// Incomplete stack at stParent also fails closed OOS — no invent not-OOS when
+// IsVarVisible is false only because a Param/LocalVars hole short-circuited the scan.
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	if f == nil || v == nil {
 		return false
+	}
+	if !f.StackScanComplete(stParent) {
+		return true
 	}
 	if f.IsVarVisible(v, stParent) {
 		return false

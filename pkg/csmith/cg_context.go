@@ -314,17 +314,20 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 
 // AddVisibleEffectAt mirrors CGContext::add_visible_effect(e, b).
 // CGContext.cpp:411–417 — callers = call_chain then b.
-// Block* always live on call_chain; nil hole fails closed (skip merge —
-// no invent partial external effect past incomplete frames).
+// Block* always live on call_chain; nil hole or incomplete Param/LocalVars fails
+// closed (skip merge — no invent partial external effect / not-on-chain past holes).
 func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
 		return
 	}
 	for _, cb := range c.CallChain {
-		if cb == nil {
-			// incomplete call_chain — fail closed without inventing partial merge
+		if cb == nil || !cb.StackScanComplete() {
+			// incomplete call_chain / stack lists — fail closed without inventing merge
 			return
 		}
+	}
+	if b != nil && !b.StackScanComplete() {
+		return
 	}
 	callers := append([]*Block(nil), c.CallChain...)
 	if b != nil {
