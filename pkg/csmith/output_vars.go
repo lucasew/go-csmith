@@ -26,7 +26,7 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 	})
 	var b strings.Builder
 	for _, v := range cp {
-		// OutputDef always live; no invent indent-only / blank lines for incomplete IR
+		// OutputDef always live; sticky no invent indent-only / blank lines for incomplete IR
 		var def string
 		if v.IsArray && v.AsArray != nil {
 			def = v.AsArray.OutputDef()
@@ -34,6 +34,9 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 			def = v.OutputDef(forceStatic)
 		}
 		if def == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		b.WriteString(indent)

@@ -52,18 +52,24 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 }
 
 func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
-	// StatementFor always has init/test/incr + body; no invent for(;;) or header-only
+	// StatementFor always has init/test/incr + body; sticky no invent for(;;) or header-only
+	ClearError()
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
 	if forHeaderOutput(lc) != "" {
 		t.Fatal("forHeader must fail closed without init/test/incr IR")
 	}
+	if !HasError() {
+		t.Fatal("incomplete forHeader must SetError sticky")
+	}
+	ClearError()
 	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).Output(0)
 	if strings.Contains(out, "for") {
 		t.Fatal("for without body/IR must not invent header", out)
 	}
 	// header present but no Then body
+	ClearError()
 	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
 	goodTest := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd}
@@ -76,10 +82,12 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 		t.Fatal("for without body must not invent header-only", out)
 	}
 	// ArrayOp header without Then
+	ClearError()
 	out = (&Block{Stmts: []Stmt{{Kind: StmtArrayOp, Loop: lc}}}).Output(0)
 	if strings.Contains(out, "for") {
 		t.Fatal("arrayop without body must not invent header", out)
 	}
+	ClearError()
 }
 
 func TestArrayLoopKeepsStmtForKind(t *testing.T) {

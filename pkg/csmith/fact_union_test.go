@@ -68,6 +68,7 @@ func TestIsFieldReadable(t *testing.T) {
 }
 
 func TestFactUnionOutput(t *testing.T) {
+	ClearError()
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	uv := &Variable{Name: "g_u", Type: ut}
 	f := MakeFactUnion(uv, 2)
@@ -78,13 +79,18 @@ func TestFactUnionOutput(t *testing.T) {
 	if !strings.Contains(s, "g_u") || !strings.Contains(s, "2") {
 		t.Fatal(s)
 	}
-	// no invent " last written field: N" without identifier
+	// sticky no invent " last written field: N" without identifier
+	ClearError()
 	anon := MakeFactUnion(&Variable{Type: ut}, 0)
 	if anon != nil {
 		if out := anon.Output(); out != "" {
 			t.Fatal("empty union var name must fail closed", out)
 		}
+		if !HasError() {
+			t.Fatal("empty union var name Output must SetError sticky")
+		}
 	}
+	ClearError()
 }
 
 func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {

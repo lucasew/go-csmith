@@ -359,7 +359,8 @@ func (t *Type) SizeInBytes() int {
 	case ELongLong, EULongLong, EInt128, EUInt128:
 		return 8
 	default:
-		// unknown simple — assert path; no soft invent platform int size
+		// unknown simple — assert path sticky; no soft invent platform int size
+		SetError(ErrGeneric)
 		return 0
 	}
 }
@@ -373,21 +374,26 @@ func (t *Type) CName() string {
 	if t.ptrTo != nil {
 		inner := t.ptrTo.CName()
 		if inner == "" {
-			// incomplete pointee — no invent bare "*"
+			// incomplete pointee sticky — no invent bare "*"
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		return inner + "*"
 	}
 	if t.isStruct {
-		// Type.cpp: eStruct → "struct S" + sid; no invent bare "struct"
+		// Type.cpp: eStruct → "struct S" + sid; sticky no invent bare "struct"
 		if t.StructName == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "struct " + t.StructName
 	}
 	if t.isUnion {
-		// Type.cpp: eUnion → "union U" + sid; no invent bare "union"
+		// Type.cpp: eUnion → "union U" + sid; sticky no invent bare "union"
 		if t.StructName == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "union " + t.StructName
@@ -422,7 +428,8 @@ func (t *Type) CName() string {
 	case EUInt128:
 		return "unsigned __int128"
 	default:
-		// unknown simple — assert path; no soft invent "int"
+		// unknown simple — assert path sticky; no soft invent "int"
+		SetError(ErrGeneric)
 		return ""
 	}
 }

@@ -18,17 +18,23 @@ func TestAddRemoveQualifiers(t *testing.T) {
 }
 
 func TestIndirectQualifiersMultiLevelAddrFailClosed(t *testing.T) {
-	// CVQualifiers.cpp:510 — assert(level == -1); multi-level & → empty
+	// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky → empty
+	ClearError()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	got := q.IndirectQualifiers(-2)
 	if len(got.IsConsts) != 0 || len(got.IsVolatiles) != 0 {
 		t.Fatal("multi-level address-of must fail closed empty")
 	}
+	if !HasError() {
+		t.Fatal("multi-level address-of must SetError sticky")
+	}
 	// -1 adds one level
+	ClearError()
 	got = q.IndirectQualifiers(-1)
 	if len(got.IsConsts) != 2 || got.IsConsts[1] {
 		t.Fatal(got)
 	}
+	ClearError()
 }
 
 func TestOutputFirstQualsRespectsOptions(t *testing.T) {

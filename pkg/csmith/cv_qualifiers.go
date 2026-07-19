@@ -204,8 +204,9 @@ func (q CVQualifiers) IndirectQualifiers(level int) CVQualifiers {
 		return q
 	}
 	if level < 0 {
-		// CVQualifiers.cpp:510 — assert(level == -1); multi-level & fail closed as empty
+		// CVQualifiers.cpp:510 — assert(level == -1); multi-level & sticky fail closed as empty
 		if level != -1 {
+			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
 		// address-of: add one false,false level (push_back)
@@ -653,12 +654,14 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
 // Uses ProcessOptions for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
-	// CVQualifiers.cpp:532 — assert(t); no soft invent "void" for nil type
+	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void" for nil type
 	if t == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
-	// CVQualifiers.cpp:533 — assert(sanity_check(t)); no invent bare CName for bad layout
+	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare CName for bad layout
 	if !q.Wildcard && len(q.IsConsts) > 0 && !q.SanityCheck(t) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	opts := ProcessOptions()

@@ -179,11 +179,15 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 // FactUnion.cpp:272–275.
 func (f *FactUnion) Output() string {
 	if f == nil || f.Var == nil {
+		if f != nil && f.Var == nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
-	// var name always live; no invent " last written field: N" without identifier
+	// var name always live; sticky no invent " last written field: N" without identifier
 	name := f.Var.GetActualName(false)
 	if name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)

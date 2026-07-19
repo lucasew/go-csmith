@@ -110,14 +110,20 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 }
 
 func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
-	// CVQualifiers.cpp:532 — assert(t); no soft invent "void"
+	// CVQualifiers.cpp:532 — assert(t); sticky no soft invent "void"
+	ClearError()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if s := q.OutputQualifiedType(nil); s != "" {
 		t.Fatal("nil type must fail closed empty, got", s)
 	}
+	if !HasError() {
+		t.Fatal("nil type OutputQualifiedType must SetError sticky")
+	}
+	ClearError()
 	if s := (*Type)(nil).CName(); s != "" {
 		t.Fatal("nil Type.CName must not invent void, got", s)
 	}
+	ClearError()
 }
 
 func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
@@ -317,20 +323,37 @@ func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {
 }
 
 func TestCNameNoInventBareAggregateOrDefaultInt(t *testing.T) {
-	// Type.cpp always has sid; no invent bare "struct"/"union" or default "int"
+	// Type.cpp always has sid; sticky no invent bare "struct"/"union" or default "int"
+	ClearError()
 	if s := (&Type{isStruct: true}).CName(); s != "" {
 		t.Fatal("unnamed struct", s)
 	}
+	if !HasError() {
+		t.Fatal("unnamed struct CName must SetError sticky")
+	}
+	ClearError()
 	if s := (&Type{isUnion: true}).CName(); s != "" {
 		t.Fatal("unnamed union", s)
 	}
+	if !HasError() {
+		t.Fatal("unnamed union CName must SetError sticky")
+	}
 	// unknown simple enum value — not a known E*
+	ClearError()
 	if s := (&Type{simple: ESimpleType(99)}).CName(); s != "" {
 		t.Fatal("unknown simple must not invent int", s)
 	}
+	if !HasError() {
+		t.Fatal("unknown simple CName must SetError sticky")
+	}
+	ClearError()
 	if s := (&Type{ptrTo: &Type{isStruct: true}}).CName(); s != "" {
 		t.Fatal("ptr to unnamed struct", s)
 	}
+	if !HasError() {
+		t.Fatal("ptr to unnamed struct CName must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVolWrapNoInventIntType(t *testing.T) {
@@ -516,13 +539,18 @@ func TestVariableOutputDefMissingDeclFailClosed(t *testing.T) {
 }
 
 func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
-	// CVQualifiers.cpp:533 — assert(sanity_check(t)); no invent bare type
+	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare type
 	// pointer type needs 2-level qfer (indirect+1)
+	ClearError()
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false}) // too short
 	if s := q.OutputQualifiedType(pt); s != "" {
 		t.Fatal("bad qfer layout must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("bad qfer layout must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputGlobalsUsesOutputDef(t *testing.T) {

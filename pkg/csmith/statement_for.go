@@ -627,15 +627,21 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 // StatementFor::Output / StatementAssign OutputAsExpr paths.
 // Not used for StatementArrayOp (that uses arrayOpHeaderOutput with numeric inits).
 func forHeaderOutput(lc *LoopControl) string {
-	// StatementFor always has init/test/incr IR; incomplete → empty (no soft invent for(;;))
+	// StatementFor always has init/test/incr IR; incomplete sticky empty (no soft invent for(;;))
 	if lc == nil || lc.IV == nil {
+		if lc != nil && lc.IV == nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	init := forInitOutput(lc)
 	test := forTestOutput(lc)
 	incr := forIncrOutput(lc)
-	// StatementFor.cpp:408–414 — always live init/test/incr; no invent empty segments
+	// StatementFor.cpp:408–414 — always live init/test/incr; sticky no invent empty segments
 	if init == "" || test == "" || incr == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
