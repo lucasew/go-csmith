@@ -85,13 +85,18 @@ func TestOutputBoundNoInventFieldWithoutDot(t *testing.T) {
 }
 
 func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {
-	// incomplete break must not invent whitespace-only indented line
+	// incomplete break sticky must not invent whitespace-only indented line
+	ClearError()
 	b := &Block{Stmts: []Stmt{{Kind: StmtBreak}}} // no Expr
 	out := b.Output(1)
-	// only braces / block shell, no stray indent lines that look like empty stmts
-	if strings.Contains(out, "break") || strings.Contains(out, "if (") {
-		t.Fatal(out)
+	// incomplete stmt fails whole Output sticky empty (no invent bare break / indent-only)
+	if out != "" {
+		t.Fatal("incomplete break must fail closed whole block", out)
 	}
+	if !HasError() {
+		t.Fatal("incomplete break Block.Output must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {

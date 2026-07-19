@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestStatementProbabilitySeed2(t *testing.T) {
+	ClearError()
 	tab := NewStatementThresholdTable(Defaults())
 	r := NewRng(2)
 	// first RndUpto(100) seed2 = 1959434203 % 100 = 3 → IfElse
@@ -10,10 +11,20 @@ func TestStatementProbabilitySeed2(t *testing.T) {
 	if st != StmtIfElse {
 		t.Fatalf("got %v want IfElse", st)
 	}
+	// nil table sticky MAX
+	ClearError()
+	if StatementProbability(NewRng(1), nil) != MaxStatementType {
+		t.Fatal("nil table must fail closed MAX")
+	}
+	if !HasError() {
+		t.Fatal("nil table StatementProbability must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 	// Simulate max block depth: reject compound types via custom filter on the U100 value.
+	ClearError()
 	tab := NewStatementThresholdTable(Defaults())
 	// Filter that rejects values mapping to compound statements
 	f := filterFunc(func(v uint32) bool {
@@ -26,6 +37,7 @@ func TestStatementProbabilityFilterRejectCompound(t *testing.T) {
 			t.Fatalf("compound slipped through: %v", st)
 		}
 	}
+	ClearError()
 }
 
 func TestIsCompound(t *testing.T) {

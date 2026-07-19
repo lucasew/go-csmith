@@ -934,18 +934,23 @@ func (b *Block) Output(indent int) string {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			// macro_tmp_vars name + type always live; no invent "int  = 0;" / skip holes
+			// macro_tmp_vars name + type always live; sticky no invent "int  = 0;" / skip holes
 			if name == "" {
+				SetError(ErrGeneric)
 				return ""
 			}
-			// eSimpleType always valid in macro_tmp_vars; OOB/invalid fails closed
+			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
 			// (GetSimpleType nil — no invent "int" for broken tmp type)
 			ty := GetSimpleType(b.TmpVars[name])
 			if ty == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			cn := ty.CName()
 			if cn == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			sb.WriteString(inner)
@@ -962,6 +967,7 @@ func (b *Block) Output(indent int) string {
 	maxDim := 0
 	for _, lv := range b.LocalVars {
 		if lv.Type == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if lv.IsArray {
@@ -979,9 +985,12 @@ func (b *Block) Output(indent int) string {
 				if av.Collective != nil {
 					continue
 				}
-				// incomplete array def — fail closed whole block
+				// incomplete array def sticky — fail closed whole block
 				def := av.OutputDef()
 				if def == "" {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return ""
 				}
 				sb.WriteString(inner)
@@ -995,12 +1004,16 @@ func (b *Block) Output(indent int) string {
 				}
 				continue
 			}
-			// IsArray without AsArray/sizes — broken IR
+			// IsArray without AsArray/sizes — broken IR sticky
+			SetError(ErrGeneric)
 			return ""
 		}
 		// Variable::Output for locals (no force static)
 		def := lv.OutputDef(false)
 		if def == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		sb.WriteString(inner)
@@ -1013,9 +1026,12 @@ func (b *Block) Output(indent int) string {
 		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
 		opts := ProcessOptions()
 		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
-		// no invent inits without live ctrl decl
+		// sticky no invent inits without live ctrl decl
 		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
 		if decl == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		sb.WriteString(decl)
@@ -1023,7 +1039,10 @@ func (b *Block) Output(indent int) string {
 		for _, av := range loopInits {
 			initOut := av.OutputInit(inner, ctrl)
 			if initOut == "" {
-				// incomplete array init IR — fail closed whole block
+				// incomplete array init IR sticky — fail closed whole block
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			sb.WriteString(initOut)
@@ -1052,12 +1071,16 @@ func (b *Block) Output(indent int) string {
 		switch st.Kind {
 		case StmtReturn:
 			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
-			// incomplete fails whole block (no invent soft-skip stmt and still emit later)
+			// incomplete sticky fails whole block (no invent soft-skip stmt and still emit later)
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			exprOut := st.Expr.Output()
 			if exprOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			// DEPTH-- before return when depth_protect
@@ -1076,6 +1099,9 @@ func (b *Block) Output(indent int) string {
 				ty := st.LhsVar.Type.CName()
 				rhs := st.Expr.Output()
 				if ty == "" || rhs == "" {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return ""
 				}
 				content.WriteString(ty + " tmp = " + rhs + ";\n")
@@ -1092,20 +1118,30 @@ func (b *Block) Output(indent int) string {
 				// array_init simple: a[i] = expr
 				rhs := st.Expr.Output()
 				if rhs == "" {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return ""
 				}
 				content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
 			} else {
-				// incomplete assign IR — fail whole block (no invent soft-skip)
+				// incomplete assign IR sticky — fail whole block (no invent soft-skip)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 		case StmtBreak:
-			// StatementBreak.cpp:117–118 — test.Output always live; no invent if () break
+			// StatementBreak.cpp:117–118 — test.Output always live; sticky no invent if () break
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString("if (")
@@ -1113,12 +1149,16 @@ func (b *Block) Output(indent int) string {
 			content.WriteString(")\n")
 			content.WriteString(inner + "    break;\n")
 		case StmtContinue:
-			// StatementContinue.cpp — test.Output always live; no invent if () continue
+			// StatementContinue.cpp — test.Output always live; sticky no invent if () continue
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString("if (")
@@ -1127,27 +1167,35 @@ func (b *Block) Output(indent int) string {
 			content.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			// StatementFor::Output — header + body Block always live
-			// no invent for(;;) / header without body / body without header
+			// sticky no invent for(;;) / header without body / body without header
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			hdr := forHeaderOutput(st.Loop)
 			bodyOut := st.Then.Output(indent + 1)
 			if hdr == "" || bodyOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString(hdr + "\n")
 			content.WriteString(bodyOut)
 		case StmtIfElse:
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
-			// no invent if () / missing branches / empty test or branch Output
+			// sticky no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			thenOut := st.Then.Output(indent + 1)
 			elseOut := st.Else.Output(indent + 1)
 			if test == "" || thenOut == "" || elseOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString("if (")
@@ -1157,12 +1205,16 @@ func (b *Block) Output(indent int) string {
 			content.WriteString(inner + "else\n")
 			content.WriteString(elseOut)
 		case StmtGoto:
-			// StatementGoto.cpp:252–253 — test.Output always live; no invent if () goto
+			// StatementGoto.cpp:252–253 — test.Output always live; sticky no invent if () goto
 			if st.Label == "" || st.Expr == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			test := st.Expr.Output()
 			if test == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString("if (")
@@ -1172,35 +1224,47 @@ func (b *Block) Output(indent int) string {
 		case StmtArrayOp:
 			// StatementArrayOp::output_header + body/init block always live
 			// nested dims carry Then; array-loop path reuses for body as Then
-			// no invent header without body
+			// sticky no invent header without body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
 			bodyOut := st.Then.Output(indent + 1)
 			if hdr == "" || bodyOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString(hdr + "\n")
 			content.WriteString(bodyOut)
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
-			// incomplete fails whole block (no invent soft-skip empty invoke)
+			// incomplete sticky fails whole block (no invent soft-skip empty invoke)
 			if st.Expr == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			out := st.Expr.Output()
 			if out == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString(out + ";\n")
 		case StmtBlock:
-			// Statement.cpp:281–282 — nested Block::Output always live
+			// Statement.cpp:281–282 — nested Block::Output always live sticky
 			if st.Then == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
 			bodyOut := st.Then.Output(indent + 1)
 			if bodyOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			content.WriteString(bodyOut)

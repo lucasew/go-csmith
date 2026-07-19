@@ -68,8 +68,9 @@ func NewStatementThresholdTable(opts Options) *ThresholdTable {
 // Statement.cpp:141–147.
 func NumberToType(table *ThresholdTable, value uint32) StatementType {
 	// Statement.cpp:141–147 — assert(stmtTable_); assert(value < 100)
-	// fail closed MaxStatementType (invalid) — no invent eAssign
+	// sticky fail closed MaxStatementType (invalid) — no invent eAssign / soft re-pick
 	if table == nil || value >= 100 {
+		SetError(ErrGeneric)
 		return MaxStatementType
 	}
 	v := table.GetValue(int(value))
@@ -84,8 +85,9 @@ func NumberToType(table *ThresholdTable, value uint32) StatementType {
 // Callers that need filter pass reject via RndUptoFilter.
 func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
 	// Statement.cpp:233–234 — assert(value != -1); assert(0..99)
-	// ERROR_GUARD(MAX_STATEMENT_TYPE); no soft invent eAssign
+	// ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
+		SetError(ErrGeneric)
 		return MaxStatementType
 	}
 	v := r.RndUpto(100)
@@ -95,12 +97,13 @@ func StatementProbability(r *Rng, table *ThresholdTable) StatementType {
 // StatementProbabilityFilter mirrors StatementProbability with a Filter
 // (e.g. reject compound when at max depth — filter implemented by caller).
 func StatementProbabilityFilter(r *Rng, table *ThresholdTable, f Filter) StatementType {
-	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); no soft invent eAssign
+	// Statement.cpp ERROR_GUARD(MAX_STATEMENT_TYPE); sticky no soft invent eAssign
 	if r == nil || table == nil {
+		SetError(ErrGeneric)
 		return MaxStatementType
 	}
 	v := r.RndUptoFilter(100, f)
-	// filter rejection may yield -1 from RndUptoFilter — fail closed MAX
+	// filter rejection may yield -1 from RndUptoFilter — non-sticky MAX (soft re-pick kinds)
 	if int32(v) < 0 {
 		return MaxStatementType
 	}

@@ -386,15 +386,19 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	if out := (&Block{}).Output(0); !strings.Contains(out, "{") || !strings.Contains(out, "}") {
 		t.Fatal("empty live block", out)
 	}
-	// macro_tmp_vars name+type always live; no invent partial tmp list
+	// macro_tmp_vars name+type always live; sticky no invent partial tmp list
+	ClearError()
 	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
 	if out := b.Output(0); out != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out)
 	}
+	if !HasError() {
+		t.Fatal("empty tmp name must SetError sticky")
+	}
 	// incomplete LocalVars fails closed sticky (no invent soft-skip hole partial defs)
+	ClearError()
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	b2 := &Block{LocalVars: []*Variable{loc, nil}}
-	ClearError()
 	if out := b2.Output(0); out != "" {
 		t.Fatal("LocalVars hole must fail closed whole block", out)
 	}

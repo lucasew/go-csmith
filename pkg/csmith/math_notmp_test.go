@@ -56,17 +56,26 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	if i1 < 0 || i2 < 0 || i3 < 0 || !(i1 < i2 && i2 < i3) {
 		t.Fatal(out)
 	}
-	// empty tmp name — fail closed whole block (no invent skip hole / partial tmp list)
+	// empty tmp name — sticky fail closed whole block (no invent skip hole / partial tmp list)
+	ClearError()
 	b2 := &Block{TmpVars: map[string]ESimpleType{"": EInt, "t_ok": EInt}}
 	out2 := b2.Output(0)
 	if out2 != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out2)
 	}
-	// invalid eSimpleType — fail closed (no invent "int" for OOB tmp type)
+	if !HasError() {
+		t.Fatal("empty tmp name must SetError sticky")
+	}
+	// invalid eSimpleType — sticky fail closed (no invent "int" for OOB tmp type)
+	ClearError()
 	b3 := &Block{TmpVars: map[string]ESimpleType{"t_bad": ESimpleType(MaxSimpleTypes + 1)}}
 	if b3.Output(0) != "" {
 		t.Fatal("OOB tmp type must fail closed whole block")
 	}
+	if !HasError() {
+		t.Fatal("OOB tmp type must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestNoteReadTracksGlobal(t *testing.T) {

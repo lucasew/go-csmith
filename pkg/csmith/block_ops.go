@@ -421,7 +421,12 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 // Statement.cpp:473–487 — label of first goto that jumps to destStmID.
 // Incomplete CFG fails closed sticky (empty label — no invent scan/registry past hole).
 func FindJumpLabel(fm *FactMgr, destStmID int) string {
-	if fm == nil || destStmID <= 0 {
+	if fm == nil {
+		return ""
+	}
+	// StmID ≤0 incomplete dest sticky (no invent label for key 0 / soft re-pick)
+	if destStmID <= 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// incomplete CFG fails closed sticky (no invent label from partial scan or registry)
