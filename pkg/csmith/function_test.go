@@ -332,3 +332,14 @@ func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputHeaderNilFunctionSticky(t *testing.T) {
+	ClearError()
+	if (*Function)(nil).OutputHeader(false) != "" {
+		t.Fatal("nil Function OutputHeader must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function OutputHeader must SetError sticky")
+	}
+	ClearError()
+}

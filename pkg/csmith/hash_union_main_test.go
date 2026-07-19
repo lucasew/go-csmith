@@ -130,3 +130,14 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 		t.Fatal(s)
 	}
 }
+
+func TestHashGlobalVariablesNilVSSticky(t *testing.T) {
+	ClearError()
+	if HashGlobalVariables(nil) != "" {
+		t.Fatal("nil VS HashGlobalVariables must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil VS HashGlobalVariables must SetError sticky")
+	}
+	ClearError()
+}

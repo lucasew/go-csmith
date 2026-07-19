@@ -223,6 +223,7 @@ func (av *ArrayVariable) IsGlobal() bool {
 func (av *ArrayVariable) CDeclType() string {
 	// ArrayVariable / Variable decl always has live type; sticky (no invent "int")
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if av.Type == nil {
@@ -642,7 +643,9 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
 // ArrayVariable.cpp:491–520 — brace for globals/const/multi; bare decl for loop-init locals.
 func (av *ArrayVariable) OutputDef() string {
+	// ArrayVariable always live at OutputDef; sticky no invent empty def shell
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:493 — only collective (parent) arrays emit def
@@ -729,7 +732,9 @@ func (av *ArrayVariable) OutputDef() string {
 // OutputLowerBound mirrors ArrayVariable::OutputLowerBound — name[0][0]….
 // ArrayVariable.cpp:694–700.
 func (av *ArrayVariable) OutputLowerBound() string {
+	// ArrayVariable always live at bound emit; sticky no invent empty bounds
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live sticky
@@ -748,7 +753,9 @@ func (av *ArrayVariable) OutputLowerBound() string {
 // OutputWithIndices mirrors ArrayVariable::output_with_indices.
 // ArrayVariable.cpp:703–711 — cvs[i]->Output only (no letter-name invent).
 func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
+	// ArrayVariable always live at index emit; sticky no invent empty access
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	name := av.GetActualName(false)
@@ -932,7 +939,9 @@ func (av *ArrayVariable) SizeInBytesArray() int {
 // C++ assert(!indices.empty()) then indices[i]->Output; always `if (1)` path
 // (not signed-cast % size). No sizes-only invent and no soft "[0]".
 func (av *ArrayVariable) OutputAccess() string {
+	// ArrayVariable always live at Output; sticky no invent empty access shell
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	name := av.GetActualName(false)
@@ -989,7 +998,9 @@ func (av *ArrayVariable) OutputAccess() string {
 // OutputUpperBoundArray mirrors ArrayVariable::OutputUpperBound — name[size-1]….
 // ArrayVariable.cpp:572–577 — always (sizes[i] - 1); no soft invent "0" for empty dims.
 func (av *ArrayVariable) OutputUpperBoundArray() string {
+	// ArrayVariable always live at bound emit; sticky no invent empty upper bound
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	name := av.GetActualName(false)

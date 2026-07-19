@@ -879,7 +879,9 @@ func (t *Type) PrintfDirective() string {
 // SizeofString mirrors Type::get_type_sizeof_string.
 // Type.cpp:1708–1714 — Output on live Type*; sticky no invent sizeof()/sizeof(void).
 func (t *Type) SizeofString() string {
+	// Type* always live; sticky no invent sizeof(void)/sizeof()
 	if t == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	cn := t.CName()

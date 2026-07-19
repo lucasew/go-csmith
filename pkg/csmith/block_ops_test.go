@@ -1042,3 +1042,14 @@ func TestAppendReturnStmtVisitFailSetsError(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFindJumpLabelNilFMSticky(t *testing.T) {
+	ClearError()
+	if FindJumpLabel(nil, 1) != "" {
+		t.Fatal("nil FM FindJumpLabel must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindJumpLabel must SetError sticky")
+	}
+	ClearError()
+}

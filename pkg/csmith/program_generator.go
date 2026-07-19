@@ -500,7 +500,9 @@ func HashGlobalVariables(vs *VariableSelector) string {
 // Incomplete GlobalList / UnionFacts fails closed sticky (no invent empty-hash success
 // or skip-all-fields via IsFieldReadable soft false past holes).
 func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
+	// VariableSelector always live for global hash; sticky no invent empty hash without it
 	if vs == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)

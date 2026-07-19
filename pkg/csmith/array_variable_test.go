@@ -313,6 +313,13 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 func TestArrayCDeclTypeNoInventInt(t *testing.T) {
 	// ArrayVariable decl always has live type; sticky no invent "int"
 	ClearError()
+	if s := (*ArrayVariable)(nil).CDeclType(); s != "" {
+		t.Fatal("nil av CDeclType must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil av CDeclType must SetError sticky")
+	}
+	ClearError()
 	av := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
 	if s := av.CDeclType(); s != "" {
 		t.Fatal("nil Type must fail closed", s)
@@ -326,6 +333,13 @@ func TestArrayCDeclTypeNoInventInt(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete OutputDef must SetError sticky")
+	}
+	ClearError()
+	if s := (*ArrayVariable)(nil).OutputDef(); s != "" {
+		t.Fatal("nil av OutputDef must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil av OutputDef must SetError sticky")
 	}
 	ClearError()
 }

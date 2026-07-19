@@ -99,9 +99,14 @@ func TestSizeofString(t *testing.T) {
 		t.Fatal(GetIntType().SizeofString())
 	}
 	// Type* always live; sticky no invent sizeof(void)/sizeof()
+	ClearError()
 	if s := (*Type)(nil).SizeofString(); s != "" {
 		t.Fatal("nil sizeof invent", s)
 	}
+	if !HasError() {
+		t.Fatal("nil SizeofString must SetError sticky")
+	}
+	ClearError()
 	if s := (&Type{isStruct: true}).SizeofString(); s != "" {
 		t.Fatal("unnamed struct sizeof invent", s)
 	}

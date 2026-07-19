@@ -753,7 +753,9 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 // returnTypeC is qualified return type (from RV qfer when present).
 // Function always has return_type in C++; no soft invent "void" when missing.
 func (f *Function) returnTypeC() string {
+	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if f.RV != nil && f.RV.Type != nil {
@@ -834,7 +836,9 @@ func (f *Function) OutputHeader(forceStatic bool) string {
 
 // OutputHeaderOpts is OutputHeader with explicit Options for return/arg struct/union asserts.
 func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
+	// Function always live at emit; sticky no invent "int (void)" without it
 	if f == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Function.cpp:517–520 — assert no return struct/union when options off

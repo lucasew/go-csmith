@@ -78,7 +78,9 @@ func (v *Variable) OutputDecl(forceStatic bool) string {
 
 // OutputDeclOpts includes prefix_name option.
 func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
+	// Variable* always live at OutputDecl; sticky no invent decl shell without it
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:670–676 — output_qualified_type always live type; sticky no invent " name"
@@ -117,7 +119,9 @@ func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
 // OutputDefFull mirrors Variable::OutputDef with optional __attribute__.
 // Variable.cpp:640–665 — decl, attr_generator.Output, init, volatile comment.
 func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng) string {
+	// Variable* always live at OutputDef; sticky no invent def shell without it
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:659 — assert(init); sticky no soft invent empty "= ;" RHS
