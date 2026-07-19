@@ -358,6 +358,41 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	if st.Kind == StmtGoto && st.Label != "" {
 		t.Fatal("nil Blocks hole must fail closed MakeRandomGoto")
 	}
+	if !HasError() {
+		t.Fatal("nil Blocks hole must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete EffectAccum/EffectContext must sticky ERROR (no invent goto re-pick)
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Blocks = []*Block{blk}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	st := MakeRandomGoto(NewRng(4), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
+	if st.Kind == StmtGoto && st.Label != "" {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomGoto")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	st2 := MakeRandomGoto(NewRng(5), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg2, blk)
+	if st2.Kind == StmtGoto && st2.Label != "" {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomGoto")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
 	ClearError()
 }
 

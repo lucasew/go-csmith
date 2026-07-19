@@ -316,6 +316,13 @@ func MakeRandomGoto(
 	if cg.FM == nil {
 		return makeGotoFailed()
 	}
+	// incomplete ambient fails closed sticky (no invent goto / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return makeGotoFailed()
+	}
 
 	// 40% prefer back-edge (StatementGoto.cpp:73–84)
 	wantBack := r.RndFlipcoin(40)
@@ -323,9 +330,10 @@ func MakeRandomGoto(
 	if HasError() {
 		return makeGotoFailed()
 	}
-	// Block* always live on Function.Blocks; nil hole fails closed
+	// Block* always live on Function.Blocks; nil hole fails closed sticky
 	blocks, ok := copyBlocksNoHole(cg.CurrentFunc.Blocks)
 	if !ok {
+		SetError(ErrGeneric)
 		return makeGotoFailed()
 	}
 	// include current if not yet in Blocks list
@@ -356,6 +364,7 @@ func MakeRandomGoto(
 		backEdge = false
 		blocks, ok = copyBlocksNoHole(cg.CurrentFunc.Blocks)
 		if !ok {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		if blk != nil {
@@ -464,10 +473,11 @@ func MakeRandomGoto(
 		} else if other.StmID > 0 {
 			stmLabels[other.StmID] = label
 		}
-		// incomplete LocalVars on intermediate blocks fails closed (Collect nil)
+		// incomplete LocalVars on intermediate blocks fails closed sticky (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
 		skipped := CollectInitSkippedVars(blk, okBlk)
 		if !VariablesComplete(skipped) {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		st := Stmt{
@@ -519,26 +529,32 @@ func MakeRandomGoto(
 			srcFacts = fm.GetMapFactsOut(other.StmID)
 		}
 		if !FactsComplete(srcFacts) {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		gotoIn = CloneFactSlice(srcFacts)
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
 		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing live id)
-		// Incomplete map_accum_effect fails closed (no invent AddEffect poison then success)
+		// Incomplete map_accum_effect fails closed sticky (no invent AddEffect poison then success)
 		preEffect := cg.AccumEffect()
 		srcAcc := fm.GetMapAccumEffect(other.StmID)
 		if !EffectComplete(srcAcc) {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		cg.AddEffect(srcAcc, true)
-		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			cg.ResetEffectAccum(preEffect)
 			return makeGotoFailed()
 		}
 		// StatementGoto.cpp:167–182
 		destIn := fm.GetMapFactsIn(dest.StmID)
 		if !FactsComplete(destIn) {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		stmInMerged = CloneFactSlice(destIn)
@@ -546,6 +562,7 @@ func MakeRandomGoto(
 		// (no invent treat MergeJumpFacts false as "unchanged" after wipe)
 		changed, mok := tryMergeJumpFacts(&stmInMerged, gotoOut)
 		if !mok {
+			SetError(ErrGeneric)
 			return makeGotoFailed()
 		}
 		if changed {
@@ -558,6 +575,7 @@ func MakeRandomGoto(
 			if !FactsComplete(stmInMerged) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
+				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
 			fm.GlobalFacts = CloneFactSlice(stmInMerged)
@@ -566,10 +584,11 @@ func MakeRandomGoto(
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
-			// visit may update GlobalFacts as outs; incomplete fails closed
+			// visit may update GlobalFacts as outs; incomplete fails closed sticky
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
+				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
 			stmOut = CloneFactSlice(fm.GlobalFacts)
@@ -582,10 +601,11 @@ func MakeRandomGoto(
 	}
 
 	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
-	// incomplete LocalVars on intermediate blocks fails closed (IncompleteVariables)
+	// incomplete LocalVars on intermediate blocks fails closed sticky (IncompleteVariables)
 	// no invent forward goto with empty InitSkippedVars when skip list is incomplete
 	skippedFwd := CollectInitSkippedVars(okBlk, blk)
 	if !VariablesComplete(skippedFwd) {
+		SetError(ErrGeneric)
 		return makeGotoFailed()
 	}
 	sg := Stmt{
@@ -630,9 +650,11 @@ func MakeRandomGoto(
 		fm.CreateCFGEdgeTo(ins.StmID, blk, dest.StmID, false, false)
 		// StatementGoto.cpp:204–210 — global_facts = map_facts_out[stm]
 		// GetMapFacts*: StmID 0 Incomplete; missing live → empty complete
+		// Incomplete out/in fails closed sticky (no invent soft re-pick past wiped facts)
 		out := fm.GetMapFactsOut(dest.StmID)
 		if !FactsComplete(out) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 		} else {
 			fm.GlobalFacts = CloneFactSlice(out)
 		}
@@ -641,6 +663,7 @@ func MakeRandomGoto(
 			in := fm.GetMapFactsIn(dest.StmID)
 			if !FactsComplete(in) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 			} else {
 				fm.GlobalFacts = CloneFactSlice(in)
 			}

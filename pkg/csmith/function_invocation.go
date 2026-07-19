@@ -1153,6 +1153,13 @@ func MakeRandomUnaryInvocation(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent unary / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
 	if DepthGuardByType(opts, DtFunctionInvocationRandomUnary) == BadDepth {
 		return nil

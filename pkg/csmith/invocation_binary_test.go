@@ -149,6 +149,36 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 }
 
+func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient must sticky ERROR (no invent unary / soft re-pick past holes)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect())
+	cg.EffectAccum = &inc
+	if fi := MakeRandomUnaryInvocation(NewRng(1), opts, vs, NewExprTables(opts), &cg, GetIntType()); fi != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomUnaryInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(f, IncompleteEffect())
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	if fi := MakeRandomUnaryInvocation(NewRng(2), opts, vs, NewExprTables(opts), &cg2, GetIntType()); fi != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomUnaryInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	// FunctionInvocation.cpp:238 — ShiftByNonConstantProb(); 0% must always take constant RHS
 	// (no invent hard-coded RndFlipcoin(50) ignoring session table)
