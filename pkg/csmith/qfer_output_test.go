@@ -117,6 +117,33 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 	if !strings.Contains(out, "void func_x(void)") {
 		t.Fatal(out)
 	}
+	// no invent "void (void)" without name
+	f.Name = ""
+	if out := f.OutputHeader(false); out != "" {
+		t.Fatal("empty name must fail closed header", out)
+	}
+}
+
+func TestOutputDeclNoInventEmptyName(t *testing.T) {
+	// Variable always has live name; no invent "int "
+	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if out := v.OutputDecl(false); out != "" {
+		t.Fatal("empty name must fail closed decl", out)
+	}
+}
+
+func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
+	// incomplete OutputDef must not invent "static \n" / blank lines
+	opts := Defaults()
+	opts.ForceGlobalsStatic = true
+	g := NewProgramGenerator(opts)
+	// global without init → OutputDef empty
+	v := &Variable{Name: "g_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	g.VS.GlobalList = []*Variable{v}
+	out := g.OutputGlobals()
+	if strings.Contains(out, "static") || strings.Contains(out, "g_x") {
+		t.Fatal("empty def must not invent static shell", out)
+	}
 }
 
 func TestCNameNoInventBareAggregateOrDefaultInt(t *testing.T) {

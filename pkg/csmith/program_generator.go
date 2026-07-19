@@ -241,24 +241,37 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		unionAttr = EnsureUnionTypeAttrGenerator()
 	}
 	for _, st := range g.Types.StructTypes {
-		if st != nil {
-			if structAttr != nil {
-				b.WriteString(st.OutputStructDeclOpts(g.Rng, structAttr))
-			} else {
-				b.WriteString(st.OutputStructDecl())
-			}
-			b.WriteString("\n")
+		if st == nil {
+			continue
 		}
+		// incomplete struct IR — no invent blank lines
+		var decl string
+		if structAttr != nil {
+			decl = st.OutputStructDeclOpts(g.Rng, structAttr)
+		} else {
+			decl = st.OutputStructDecl()
+		}
+		if decl == "" {
+			continue
+		}
+		b.WriteString(decl)
+		b.WriteString("\n")
 	}
 	for _, ut := range g.Types.UnionTypes {
-		if ut != nil {
-			if unionAttr != nil {
-				b.WriteString(ut.OutputUnionDeclOpts(g.Rng, unionAttr))
-			} else {
-				b.WriteString(ut.OutputUnionDecl())
-			}
-			b.WriteString("\n")
+		if ut == nil {
+			continue
 		}
+		var decl string
+		if unionAttr != nil {
+			decl = ut.OutputUnionDeclOpts(g.Rng, unionAttr)
+		} else {
+			decl = ut.OutputUnionDecl()
+		}
+		if decl == "" {
+			continue
+		}
+		b.WriteString(decl)
+		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -287,15 +300,25 @@ func (g *ProgramGenerator) OutputGlobals() string {
 				continue
 			}
 			emittedArray[v.Name] = true
+			// ArrayVariable::OutputDef always live; no invent "static \n" for empty
+			def := av.OutputDef()
+			if def == "" {
+				continue
+			}
 			if g.Opts.ForceGlobalsStatic {
 				b.WriteString("static ")
 			}
-			b.WriteString(av.OutputDef())
+			b.WriteString(def)
 			b.WriteString("\n")
 			continue
 		}
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
-		b.WriteString(v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng))
+		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
+		if def == "" {
+			// incomplete IR — no invent blank line
+			continue
+		}
+		b.WriteString(def)
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
@@ -311,7 +334,12 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if f == nil || f.IsBuiltin {
 			continue
 		}
-		b.WriteString(f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes))
+		// incomplete header IR — no invent bare blank lines
+		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
+		if d == "" {
+			continue
+		}
+		b.WriteString(d)
 		b.WriteString("\n")
 	}
 	// Function.cpp:820–826 — alias decls when FunctionAttributes
@@ -321,7 +349,11 @@ func (g *ProgramGenerator) OutputFunctions() string {
 			if f == nil || f.IsBuiltin {
 				continue
 			}
-			b.WriteString(f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic))
+			d := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
+			if d == "" {
+				continue
+			}
+			b.WriteString(d)
 			b.WriteString("\n")
 		}
 	}
@@ -330,7 +362,11 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if f == nil || f.IsBuiltin {
 			continue
 		}
-		b.WriteString(f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng))
+		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+		if body == "" {
+			continue
+		}
+		b.WriteString(body)
 		b.WriteString("\n")
 	}
 	return b.String()

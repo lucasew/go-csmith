@@ -86,13 +86,18 @@ func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
 	if ty == "" {
 		return ""
 	}
+	name := v.GetActualName(prefixName)
+	// name always live; no invent "int " without identifier
+	if name == "" {
+		return ""
+	}
 	var b strings.Builder
 	if forceStatic && v.IsGlobal() {
 		b.WriteString("static ")
 	}
 	b.WriteString(ty)
 	b.WriteString(" ")
-	b.WriteString(v.GetActualName(prefixName))
+	b.WriteString(name)
 	return b.String()
 }
 

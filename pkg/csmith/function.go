@@ -669,6 +669,10 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 			return ""
 		}
 	}
+	// Function always has a live name; no invent "int (void)" without name
+	if f.Name == "" {
+		return ""
+	}
 	params := f.paramListCOpts(opts)
 	if params == "" {
 		// assert-path fail closed on forbidden/incomplete params
@@ -780,6 +784,11 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
+	// Function.cpp:572 — OutputHeader always live; no invent separator-only shell
+	hdr := f.OutputHeader(forceStatic)
+	if hdr == "" {
+		return ""
+	}
 	s := ""
 	// Function.cpp:567 — output_comment_line separator
 	s += OutputCommentLine("------------------------------------------", false, f.EmitConcise)
@@ -787,8 +796,7 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if !f.EmitConcise {
 		s += f.FEffect.CommentOutput()
 	}
-	// Function.cpp:572 — OutputHeader
-	s += f.OutputHeader(forceStatic)
+	s += hdr
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
 	}
