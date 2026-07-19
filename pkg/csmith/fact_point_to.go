@@ -946,11 +946,14 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 
 // MergePointeesOfPointers mirrors FactPointTo::merge_pointees_of_pointers.
 // FactPointTo.cpp:680–704 — union of points-to sets for each pointer.
-// FactPointTo.cpp:694 — assert(exist_fact) but still guarded with if (exist_fact);
-// missing facts happen mid function-create for params — skip, do not invent pointees.
-// MergePointeesOfPointers merges pointees of each pointer in ptrs.
-// Variable* always live; nil hole fails closed (nil out, no invent partial merge).
+// FactPointTo.cpp:694 — assert(exist_fact): missing related fact fails closed
+// (nil out — no invent soft-skip partial pointees mid-create or otherwise).
+// Fact* always live; incomplete fact map or nil ptr/pointee holes fail closed.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
+	// incomplete fact map fails closed (FindRelated would nil on first hole)
+	if !FactsComplete(facts) {
+		return nil
+	}
 	out := make([]*Variable, 0)
 	seen := make(map[*Variable]bool)
 	for _, p := range ptrs {
@@ -961,8 +964,9 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 			continue
 		}
 		ft := FindRelatedPointTo(facts, p)
+		// FactPointTo.cpp:694 assert(exist_fact) — fail closed, no invent skip
 		if ft == nil {
-			continue
+			return nil
 		}
 		for _, pointee := range ft.PointTo {
 			if pointee == nil {
@@ -980,6 +984,7 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 
 // MergePointeesOfPointer mirrors FactPointTo::merge_pointees_of_pointer.
 // FactPointTo.cpp:669–676 — start from ptr, indirect steps of merge_pointees.
+// Intermediate nil from MergePointeesOfPointers propagates (fail closed).
 func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
 	if ptr == nil {
 		return nil
@@ -987,6 +992,10 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 	tmp := []*Variable{ptr}
 	for indirect > 0 {
 		tmp = MergePointeesOfPointers(tmp, facts)
+		// nil = incomplete merge (missing fact / holes) — stop, do not invent empty
+		if tmp == nil {
+			return nil
+		}
 		indirect--
 	}
 	return tmp

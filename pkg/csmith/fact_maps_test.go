@@ -207,6 +207,24 @@ func TestRestoreFacts(t *testing.T) {
 	}
 }
 
+func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
+	// incomplete old/new maps must not invent partial makeup past holes
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	MakeupNewVarFacts(&old, newF)
+	if old != nil {
+		t.Fatal("incomplete oldFacts must fail closed nil")
+	}
+	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	new2 := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
+	MakeupNewVarFacts(&old2, new2)
+	if old2 != nil {
+		t.Fatal("incomplete newFacts must fail closed nil oldFacts")
+	}
+}
+
 func TestSetMapFactsOutGotoDest(t *testing.T) {
 	// FactMgr.cpp:263–266 — update_facts_for_dest via StatementGoto::dest;
 	// no soft invent RemoveFunctionLocalFacts when dest fields present.

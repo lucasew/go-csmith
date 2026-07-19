@@ -439,6 +439,11 @@ func BuildUserInvocation(
 		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
 		var facts []*FactPointTo
 		if cg.FM != nil {
+			// incomplete GlobalFacts fail closed (no invent cleaned empty for revisit)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				fi.Failed = true
+				return fi
+			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
 		}
 		ok := RevisitUserInvocation(fi, &facts, &newCG, opts)
@@ -539,6 +544,11 @@ func BuildInvocationAndFunction(
 	}
 	facts := []*FactPointTo{}
 	if callerFM != nil {
+		// incomplete caller GlobalFacts fail closed (no invent cleaned handover)
+		if !FactsComplete(callerFM.GlobalFacts) {
+			fi.Failed = true
+			return fi
+		}
 		facts = CloneFactSlice(callerFM.GlobalFacts)
 	}
 	calFM.CallerToCalleeHandover(fi.Args, &facts)
@@ -699,8 +709,12 @@ func MakeRandomBinaryInvocation(
 	cg.MergeParamContext(lhsCG, true)
 
 	// FunctionInvocation.cpp:222 — snapshot facts before RHS (ordered merge)
+	// incomplete GlobalFacts fail closed (no invent cleaned snapshot)
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return nil
+		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
 	}
 

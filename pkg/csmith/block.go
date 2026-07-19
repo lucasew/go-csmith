@@ -440,7 +440,14 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	}
 	fm.MapVisited[b.StmID] = true
 	b.SetAccumulatedEffect(fm)
-	postFacts := CloneFactSlice(fm.GlobalFacts)
+	// incomplete GlobalFacts fail closed (no invent cleaned postFacts / OOS from holes)
+	var postFacts []*FactPointTo
+	if !FactsComplete(fm.GlobalFacts) {
+		fm.GlobalFacts = nil
+		postFacts = nil
+	} else {
+		postFacts = CloneFactSlice(fm.GlobalFacts)
+	}
 	if len(b.LocalVars) > 0 {
 		fm.UpdateFactsForOOSVars(b.LocalVars)
 	}

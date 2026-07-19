@@ -669,6 +669,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if unordered {
 		var facts []*FactPointTo
 		if cg.FM != nil {
+			// incomplete GlobalFacts fail closed (no invent cleaned visit)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				return false
+			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
 		}
 		if !fi.VisitUnorderedParams(&facts, cg, opts) {
@@ -700,6 +704,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 	if isFuncCall {
 		// FunctionInvocation.cpp:530–551 — revisit user callee when DFA needed
 		if fi.User.NeedsRevisit() && fi.User.Body != nil && cg.FM != nil {
+			// incomplete GlobalFacts fail closed (no invent cleaned revisit)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				return false
+			}
 			facts := CloneFactSlice(cg.FM.GlobalFacts)
 			if !RevisitUserInvocation(fi, &facts, cg, opts) {
 				return false

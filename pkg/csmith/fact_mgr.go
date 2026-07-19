@@ -1018,14 +1018,21 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 
 // MakeupNewVarFacts mirrors FactMgr::makeup_new_var_facts.
 // FactMgr.cpp:494–507 — add facts for globals/locals created after old_facts snapshot.
-// Fact* always live; nil hole fails closed (no invent skip as absent new var).
+// Fact* always live; incomplete old/new maps fail closed (nil oldFacts —
+// no invent soft-skip holes as absent new var or partial makeup).
 func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
 	if oldFacts == nil {
 		return
 	}
+	// incomplete working/snapshot sets fail closed before partial makeup
+	if !FactsComplete(*oldFacts) || !FactsComplete(newFacts) {
+		*oldFacts = nil
+		return
+	}
 	for _, f := range newFacts {
-		// no invent soft-continue past nil fact holes
+		// no invent soft-continue past nil fact holes (also covered by FactsComplete)
 		if f == nil || f.Var == nil {
+			*oldFacts = nil
 			return
 		}
 		v := f.Var

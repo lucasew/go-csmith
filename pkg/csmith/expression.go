@@ -986,6 +986,10 @@ func makeExpressionFuncall(
 		preAccum = cg.EffectAccum.Clone()
 	}
 	preStm := cg.EffectStm.Clone()
+	// incomplete GlobalFacts fail closed (no invent cleaned snapshot for failed call restore)
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		return nil
+	}
 	factsCopy := CloneFactSlice(cg.FM.GlobalFacts)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
