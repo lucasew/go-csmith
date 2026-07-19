@@ -163,6 +163,25 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if FindRelatedUnion(fm.UnionFacts, uv) == nil || FindRelatedUnion(fm.UnionFacts, uv).LastWrittenFID != 0 {
 		t.Fatal(fm.UnionFacts)
 	}
+	// incomplete: nil Type must not invent empty init success (AddNewVarFact skip)
+	pt2, un2 := AbstractFactForVarInit(nil)
+	if FactsComplete(pt2) || UnionFactsComplete(un2) {
+		t.Fatal("nil var init must fail closed incomplete", pt2, un2)
+	}
+	// union without rhs/init — assert path incomplete (not invent empty union fact)
+	uv2 := &Variable{Name: "g_u2", Type: ut}
+	_, un3 := AbstractFactForVarInit(uv2)
+	if UnionFactsComplete(un3) {
+		t.Fatal("union without init must fail closed incomplete", un3)
+	}
+	// incomplete abstract must wipe on AddNewVarFact (not invent skip no-fact)
+	fm2 := NewFactMgr(nil)
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(
+		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr)}
+	fm2.AddNewVarFact(uv2)
+	if UnionFactsComplete(fm2.UnionFacts) {
+		t.Fatal("AddNewVarFact incomplete union must fail closed", fm2.UnionFacts)
+	}
 }
 
 func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {

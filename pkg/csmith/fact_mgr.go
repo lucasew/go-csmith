@@ -828,11 +828,16 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 
 // AbstractFactForVarInit mirrors Fact::abstract_fact_for_var_init.
 // Fact.cpp:85–112 — pointer/union only; assign from init; array alt inits merge.
+// Incomplete IR returns IncompleteFactSlice / IncompleteUnionFactSlice (not bare
+// nil — FactsComplete(nil)/UnionFactsComplete(nil) invent empty init success so
+// AddNewVarFact soft-skips as “no fact to add”).
 func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if v == nil || v.Type == nil {
-		return nil, nil
+		// incomplete var IR (not “non-pointer complete empty”)
+		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	if !v.IsPointer() && !v.Type.IsUnion() {
+		// complete empty — not a point-to/union subject
 		return nil, nil
 	}
 	var rhs *Expression
@@ -843,20 +848,23 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	}
 	if v.Type.IsUnion() {
 		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, rhs)
+		// incomplete union abstract is hole marker (not bare nil invent empty)
+		if !UnionFactsComplete(un) {
+			return nil, IncompleteUnionFactSlice()
+		}
 		return nil, un
 	}
 	// pointer (Fact.cpp:94–95)
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
 	pt = AbstractFactForAssign(nil, v, 0, rhs)
-	// incomplete abstract is hole marker (len 1 nil) — not invent single-fact init
+	// incomplete / multi / zero — hole marker (no invent empty init for AddNewVarFact)
 	if !FactsComplete(pt) || len(pt) != 1 {
-		// fail closed — no soft invent multi/zero/incomplete LHS init facts
-		return nil, nil
+		return IncompleteFactSlice(), nil
 	}
 	// Fact.cpp:97–109 — more init values on array of pointers
 	// Fact.cpp:99 — assert(av) when isArray (AsArray set)
 	if v.IsArray && v.AsArray == nil {
-		return nil, nil
+		return IncompleteFactSlice(), nil
 	}
 	if av := v.AsArray; av != nil {
 		// Fact.cpp:100–106 — get_more_init_values() Expression* only
@@ -864,20 +872,20 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		for _, e := range av.InitExprs {
 			// Expression* always live in C++; nil hole is broken IR — fail closed
 			if e == nil {
-				return nil, nil
+				return IncompleteFactSlice(), nil
 			}
 			more := AbstractFactForAssign(nil, v, 0, e)
 			if !FactsComplete(more) {
-				return nil, nil
+				return IncompleteFactSlice(), nil
 			}
 			for _, f := range more {
 				// Fact* always live; MergeFactInto incomplete = hole marker
 				if f == nil {
-					return nil, nil
+					return IncompleteFactSlice(), nil
 				}
 				merged := MergeFactInto(pt, f)
 				if !FactsComplete(merged) {
-					return nil, nil
+					return IncompleteFactSlice(), nil
 				}
 				pt = merged
 			}
@@ -927,6 +935,11 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 	pt, un := AbstractFactForVarInit(v)
 	if wantPT {
+		// incomplete abstract must not invent skip (no fact to add)
+		if !FactsComplete(pt) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
 		for _, f := range pt {
 			if f == nil {
@@ -943,6 +956,11 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		}
 	}
 	if wantUn {
+		// incomplete union abstract must not invent skip empty UnionFacts merge
+		if !UnionFactsComplete(un) {
+			fm.UnionFacts = IncompleteUnionFactSlice()
+			return
+		}
 		for _, uf := range un {
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
@@ -1253,7 +1271,9 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 				return
 			}
 			AddNewVarFactInto(f, facts)
-			if *facts == nil {
+			// incomplete hole marker is non-nil; FactsComplete false
+			if !FactsComplete(*facts) {
+				*facts = IncompleteFactSlice()
 				return
 			}
 		}
@@ -1266,6 +1286,11 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	pt, _ := AbstractFactForVarInit(v)
+	// incomplete abstract must not invent skip (no fact to add)
+	if !FactsComplete(pt) {
+		*facts = IncompleteFactSlice()
+		return
+	}
 	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
 	// Fact* always live from abstract; nil hole fails closed (*facts cleared)
 	for _, f := range pt {
@@ -1273,8 +1298,13 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 			*facts = IncompleteFactSlice()
 			return
 		}
+		cl := f.Clone()
+		if cl == nil {
+			*facts = IncompleteFactSlice()
+			return
+		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {
-			*facts = append(*facts, f.Clone())
+			*facts = append(*facts, cl)
 		}
 	}
 }
