@@ -124,6 +124,32 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
+	// IsVisibleLocal residual soft invent was soft-skip not-frame then continue later pointee.
+	// Fair: sticky IncompleteVariables fail closed whole FindReachableFrameVars.
+	ClearError()
+	f := &Function{Name: "f"}
+	// non-global local name
+	loc := &Variable{Name: "l_1", Type: GetIntType()}
+	// incomplete Param hole so IsVisibleLocal stickies when scanning non-match
+	f.Param = []*Variable{nil}
+	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// second good pointee that would invent partial frame set after residual soft-skip
+	loc2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	loc2.Name = "l_2"
+	facts := []*FactPointTo{MakeFactPointTo(p, loc), MakeFactPointTo(p, loc2)}
+	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
+		t.Fatal("IsVisibleLocal residual must fail closed incomplete frame set")
+	}
+	if !HasError() {
+		t.Fatal("IsVisibleLocal residual FindReachableFrameVars must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestCollectExpandable(t *testing.T) {
 	ClearError()
 	opts := Defaults()

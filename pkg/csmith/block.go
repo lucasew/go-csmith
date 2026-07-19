@@ -1038,10 +1038,17 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(def)
 			sb.WriteString("\n")
 			if !av.NoLoopInitializer() {
+				// residual ERROR sticky — no invent soft-continue loop-init past hole
+				if HasError() {
+					return ""
+				}
 				loopInits = append(loopInits, av)
 				if len(av.Sizes) > maxDim {
 					maxDim = len(av.Sizes)
 				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip NoLoopInitializer past hole
+				return ""
 			}
 			continue
 		}

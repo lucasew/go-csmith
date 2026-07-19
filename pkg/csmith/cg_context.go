@@ -890,15 +890,38 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	if IsNonreadableField(v, c.unionFacts()) {
+		// residual ERROR sticky — no invent read-ok past nonreadable hole
+		return false
+	}
+	// residual ERROR sticky — no invent read-ok past IsInsideUnionField residual false path
+	if HasError() {
 		return false
 	}
 	if c.IsNonReadable(v) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	if c.EffectContext().IsWrittenPartially(v) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	// Type* always live for non-special subjects; Type-nil sticky false
@@ -910,6 +933,13 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
 	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
 	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
+		// residual ERROR sticky — no invent read-ok past IsPointer/dangling hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	c.ReadVar(v)
@@ -917,6 +947,10 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
+		return false
+	}
+	// never invent read-complete success with residual ERROR set
+	if HasError() {
 		return false
 	}
 	return true
@@ -948,13 +982,32 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	if c.IsNonWritable(v) || v.IsConst() {
+		// residual ERROR sticky — no invent write-ok past nonwritable/const hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	eff := c.EffectContext()
 	if eff.IsWrittenPartially(v) || eff.IsReadPartially(v) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	if v.IsVolatile() && !eff.IsSideEffectFree() {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	// Type* always live for non-special subjects; Type-nil sticky false
@@ -965,6 +1018,12 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob
 	if c.NoDanglingPtr() && v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	c.WriteVar(v)
@@ -972,6 +1031,10 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
+		return false
+	}
+	// never invent write-complete success with residual ERROR set
+	if HasError() {
 		return false
 	}
 	return true
@@ -1264,7 +1327,15 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		return false
 	}
 	if v.IsVisibleLocal(b) {
+		// residual ERROR sticky — no invent frame-true past IsVisibleLocal hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent not-frame soft-skip past IsVisibleLocal hole
+	if HasError() {
+		return false
 	}
 	for _, cb := range c.CallChain {
 		// Block* always live on call_chain; nil / incomplete stack sticky fail closed
@@ -1274,7 +1345,13 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 			return false
 		}
 		if v.IsVisibleLocal(cb) {
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		if HasError() {
+			return false
 		}
 	}
 	return false
@@ -1326,8 +1403,15 @@ func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
 				continue
 			}
 			if c.IsFrameVar(p) {
+				// residual ERROR sticky — no invent soft-continue frame scan past hole
+				if HasError() {
+					return IncompleteVariables()
+				}
 				seen[p] = true
 				out = append(out, p)
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip not-frame past hard IR hole
+				return IncompleteVariables()
 			}
 		}
 	}

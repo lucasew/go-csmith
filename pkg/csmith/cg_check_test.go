@@ -327,18 +327,33 @@ func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum CheckWriteVar must SetError sticky")
 	}
 	ClearError()
+}
+
+func TestCheckReadVarIsInsideUnionFieldResidualSticky(t *testing.T) {
+	// IsNonreadableField / IsInsideUnionField Type-nil ancestry residual: soft invent was
+	// return CheckReadVar true past hole under empty facts path. Fair: sticky fail closed.
+	ClearError()
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	cg := EmptyCGContext()
+	if cg.CheckReadVar(field, nil) {
+		t.Fatal("IsInsideUnionField residual must fail closed CheckReadVar")
+	}
+	if !HasError() {
+		t.Fatal("IsInsideUnionField residual CheckReadVar must SetError sticky")
+	}
+	ClearError()
 	// Type-nil soft invent: IsPointer residual ERROR+false skip dangling then
 	// ReadVar/WriteVar return true. Fair: sticky false before classify.
 	shell := &Variable{Name: "g_typeless"}
-	cg3 := EmptyCGContext()
-	if cg3.CheckReadVar(shell, nil) {
+	if cg.CheckReadVar(shell, nil) {
 		t.Fatal("Type-nil must fail closed CheckReadVar, not invent read success")
 	}
 	if !HasError() {
 		t.Fatal("Type-nil CheckReadVar must SetError sticky")
 	}
 	ClearError()
-	if cg3.CheckWriteVar(shell, nil) {
+	if cg.CheckWriteVar(shell, nil) {
 		t.Fatal("Type-nil must fail closed CheckWriteVar, not invent write success")
 	}
 	if !HasError() {
