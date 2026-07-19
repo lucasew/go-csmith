@@ -68,6 +68,13 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	if len(f.DeadGlobals) != 0 {
 		t.Fatal("const")
 	}
+	// incomplete GlobalFacts must IncompleteVariables DeadGlobals
+	// (not invent empty-complete "no dangling")
+	fm.GlobalFacts = IncompleteFactSlice()
+	fm.FindDanglingGlobalPtrs(f)
+	if VariablesComplete(f.DeadGlobals) {
+		t.Fatal("incomplete facts must IncompleteVariables DeadGlobals")
+	}
 }
 
 func TestOutputPtrResets(t *testing.T) {
@@ -79,6 +86,10 @@ func TestOutputPtrResets(t *testing.T) {
 	}
 	if OutputPtrResets(nil, Defaults()) != "" {
 		t.Fatal("empty")
+	}
+	// incomplete list must fail closed empty (no invent soft-skip hole)
+	if OutputPtrResets([]*Variable{p, nil}, Defaults()) != "" {
+		t.Fatal("nil hole must fail closed whole resets")
 	}
 }
 

@@ -630,7 +630,11 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 
 // OutputPtrResets mirrors OutputMgr::OutputPtrResets.
 // OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init(&zero).
+// Incomplete dead_globals fails closed empty (no invent soft-skip hole as partial resets).
 func OutputPtrResets(ptrs []*Variable, opts Options) string {
+	if !VariablesComplete(ptrs) {
+		return ""
+	}
 	if len(ptrs) == 0 {
 		return ""
 	}
@@ -641,10 +645,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	zero := MakeInt(0)
 	var b strings.Builder
 	for _, v := range ptrs {
-		// Variable* always live in dead_globals; no invent skip nil/incomplete holes
-		if v == nil {
-			return ""
-		}
+		// pre-validated VariablesComplete
 		sizes := v.ArraySizes
 		av := v.AsArray
 		if av != nil && len(av.Sizes) > 0 {

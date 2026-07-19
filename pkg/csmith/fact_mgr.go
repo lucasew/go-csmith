@@ -1365,16 +1365,19 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 
 // FindDanglingGlobalPtrs mirrors FactMgr::find_dangling_global_ptrs.
 // FactMgr.cpp:688–700 — non-const global pointers that are dead at function exit.
-// Fact* always live; nil hole fails closed (empty DeadGlobals, no invent partial).
+// Incomplete GlobalFacts fails closed IncompleteVariables DeadGlobals
+// (not bare empty invent "no dangling" via VariablesComplete(nil)/len==0).
 func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	if fm == nil || f == nil {
 		return
 	}
 	f.DeadGlobals = f.DeadGlobals[:0]
 	if !FactsComplete(fm.GlobalFacts) {
+		f.DeadGlobals = IncompleteVariables()
 		return
 	}
 	for _, fact := range fm.GlobalFacts {
+		// FactsComplete guarantees live fact.Var
 		v := fact.Var
 		// const pointers should never be dangling; only globals
 		if v.IsConst() || !v.IsGlobal() {
