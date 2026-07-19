@@ -1125,12 +1125,21 @@ func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
 
 // IsPointer mirrors Variable::is_pointer.
 // Incomplete Variable sticky false (no invent not-pointer soft-skip past hole).
+// Special null/garbage/tbd have Type nil by design — complete not-pointer.
+// Other Type-nil shells sticky (no invent not-pointer soft-skip past incomplete IR).
 func (v *Variable) IsPointer() bool {
 	if v == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Type != nil && v.Type.PtrType() != nil
+	if IsSpecialPtr(v) {
+		return false
+	}
+	if v.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.Type.PtrType() != nil
 }
 
 // IsVirtual mirrors Variable::is_virtual.
@@ -1159,12 +1168,21 @@ func (v *Variable) IsVirtual() bool {
 
 // IsAggregate mirrors Variable::is_aggregate.
 // Incomplete Variable sticky false (no invent not-aggregate soft-skip past hole).
+// Special null/garbage/tbd have Type nil by design — complete not-aggregate.
+// Other Type-nil shells sticky (no invent not-aggregate soft-skip past incomplete IR).
 func (v *Variable) IsAggregate() bool {
 	if v == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Type != nil && v.Type.IsAggregate()
+	if IsSpecialPtr(v) {
+		return false
+	}
+	if v.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.Type.IsAggregate()
 }
 
 // MakeDummyStaticVariable mirrors VariableSelector::make_dummy_static_variable.

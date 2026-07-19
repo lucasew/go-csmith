@@ -273,6 +273,42 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 		t.Fatal("nil HashOutput must SetError sticky")
 	}
 	ClearError()
+	// special Type-nil complete not-pointer / not-aggregate
+	if NullPtr.IsPointer() || GarbagePtr.IsAggregate() {
+		t.Fatal("special Type-nil must stay complete not-pointer/not-aggregate")
+	}
+	if HasError() {
+		t.Fatal("special Type-nil IsPointer/IsAggregate must not sticky")
+	}
+	ClearError()
+	// non-special Type-nil incomplete shell sticky (no invent not-pointer soft-skip)
+	broken := &Variable{Name: "broken"}
+	if broken.IsPointer() {
+		t.Fatal("Type-nil IsPointer must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsPointer must SetError sticky")
+	}
+	ClearError()
+	if broken.IsAggregate() {
+		t.Fatal("Type-nil IsAggregate must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsAggregate must SetError sticky")
+	}
+	ClearError()
+	// complete predicates
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if !p.IsPointer() {
+		t.Fatal("pointer IsPointer must be true")
+	}
+	if p.IsAggregate() {
+		t.Fatal("pointer IsAggregate must be false")
+	}
+	if HasError() {
+		t.Fatal("complete IsPointer/IsAggregate must not sticky")
+	}
+	ClearError()
 }
 
 func TestFieldVarsCompleteNilIncomplete(t *testing.T) {
