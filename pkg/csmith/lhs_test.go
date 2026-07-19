@@ -389,3 +389,35 @@ func TestLhsOutputNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsGetVarGetTypeNilSticky(t *testing.T) {
+	ClearError()
+	if (*Lhs)(nil).GetVar() != nil {
+		t.Fatal("nil Lhs GetVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs GetVar must SetError sticky")
+	}
+	ClearError()
+	if (&Lhs{}).GetVar() != nil {
+		t.Fatal("nil Var Lhs GetVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Var Lhs GetVar must SetError sticky")
+	}
+	ClearError()
+	if (*Lhs)(nil).GetType() != nil {
+		t.Fatal("nil Lhs GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs GetType must SetError sticky")
+	}
+	ClearError()
+	if (&Lhs{Var: &Variable{Name: "x"}}).GetType() != nil {
+		t.Fatal("Lhs without type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Lhs without type GetType must SetError sticky")
+	}
+	ClearError()
+}

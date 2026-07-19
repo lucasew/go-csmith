@@ -288,7 +288,9 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 // Nested walk uses get_blocks only; incomplete if-arm skips that compound's children
 // (no invent soft-skip missing arm then find under sibling arm of same if).
 func FindParentBlockOfStmID(f *Function, stmID int) *Block {
+	// Function + live StmID always required; sticky no invent parent miss soft-success
 	if f == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Block

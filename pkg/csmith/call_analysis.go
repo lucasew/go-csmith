@@ -315,7 +315,9 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 // Expression* always live for these kinds; incomplete Expr/Invoke fails closed
 // as Failed shell (no invent nil "no call" for broken IR).
 func GetDirectInvocation(st *Stmt) *Invocation {
+	// Statement always live for call extract; sticky no invent "no call" without it
 	if st == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	switch st.Kind {

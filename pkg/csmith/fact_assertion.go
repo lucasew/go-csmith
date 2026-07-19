@@ -74,9 +74,7 @@ func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 func (f *FactPointTo) OutputCondition() string {
 	// Fact subject always live; sticky no invent bare pointee compare without var
 	if f == nil || f.Var == nil {
-		if f != nil {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	lhs := outputFactVar(f.Var)

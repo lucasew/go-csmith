@@ -397,3 +397,21 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFindEdgesInNilFMSticky(t *testing.T) {
+	ClearError()
+	if (*FactMgr)(nil).FindEdgesIn(1, false, false) != nil {
+		t.Fatal("nil FM FindEdgesIn must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindEdgesIn must SetError sticky")
+	}
+	ClearError()
+	if (*FactMgr)(nil).FindEdgesInToBlock(&Block{}, false, false) != nil {
+		t.Fatal("nil FM FindEdgesInToBlock must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindEdgesInToBlock must SetError sticky")
+	}
+	ClearError()
+}

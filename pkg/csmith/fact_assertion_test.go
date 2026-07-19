@@ -274,3 +274,14 @@ func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
 		t.Fatal("labeled target should skip hash", out)
 	}
 }
+
+func TestOutputConditionNilFactSticky(t *testing.T) {
+	ClearError()
+	if (*FactPointTo)(nil).OutputCondition() != "" {
+		t.Fatal("nil Fact OutputCondition must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Fact OutputCondition must SetError sticky")
+	}
+	ClearError()
+}

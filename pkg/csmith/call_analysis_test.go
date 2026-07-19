@@ -404,3 +404,14 @@ func TestFindContainedLabelsFM(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetDirectInvocationNilSticky(t *testing.T) {
+	ClearError()
+	if GetDirectInvocation(nil) != nil {
+		t.Fatal("nil Stmt GetDirectInvocation must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt GetDirectInvocation must SetError sticky")
+	}
+	ClearError()
+}

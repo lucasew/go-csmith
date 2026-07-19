@@ -44,7 +44,14 @@ func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
 
 // GetVar mirrors Lhs::get_var.
 func (l *Lhs) GetVar() *Variable {
+	// Lhs always live; sticky no invent missing subject shell
 	if l == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete without Var sticky (no invent soft-skip missing lhs subject)
+	if l.Var == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return l.Var
@@ -52,15 +59,19 @@ func (l *Lhs) GetVar() *Variable {
 
 // GetType mirrors Lhs::get_type.
 func (l *Lhs) GetType() *Type {
+	// Lhs always live; sticky no invent type shell without it
 	if l == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if l.Type != nil {
 		return l.Type
 	}
-	if l.Var != nil {
+	if l.Var != nil && l.Var.Type != nil {
 		return l.Var.Type
 	}
+	// incomplete Lhs type IR sticky — no invent nil type soft-success
+	SetError(ErrGeneric)
 	return nil
 }
 

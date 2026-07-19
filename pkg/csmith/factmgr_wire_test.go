@@ -464,3 +464,21 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("stored incomplete must stay incomplete via getter")
 	}
 }
+
+func TestFindParentBlockNilSticky(t *testing.T) {
+	ClearError()
+	if FindParentBlockOfStmID(nil, 1) != nil {
+		t.Fatal("nil Function FindParentBlockOfStmID must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function FindParentBlockOfStmID must SetError sticky")
+	}
+	ClearError()
+	if FindParentBlockOfStmID(&Function{Name: "f"}, 0) != nil {
+		t.Fatal("StmID 0 FindParentBlockOfStmID must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 FindParentBlockOfStmID must SetError sticky")
+	}
+	ClearError()
+}
