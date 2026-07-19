@@ -23,6 +23,10 @@ func TestFactPointToNullDead(t *testing.T) {
 	if NullPtr.IsVirtual() {
 		t.Fatal("special ptr is not array is_virtual")
 	}
+	// no invent FactPointTo shell without live subject Variable*
+	if NewFactPointTo(nil) != nil || MakeFactPointTo(nil, NullPtr) != nil || MakeFactPointToSet(nil, nil) != nil {
+		t.Fatal("nil subject must fail closed fact ctor")
+	}
 }
 
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {

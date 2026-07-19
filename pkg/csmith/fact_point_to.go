@@ -21,18 +21,30 @@ type FactPointTo struct {
 }
 
 // NewFactPointTo mirrors FactPointTo(const Variable*) — starts as garbage.
-// FactPointTo.cpp:354–359.
+// FactPointTo.cpp:354–359 — Variable* always live at construction sites.
+// no invent FactPointTo{nil, garbage} shell for nil subject
 func NewFactPointTo(v *Variable) *FactPointTo {
+	if v == nil {
+		return nil
+	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{GarbagePtr}}
 }
 
 // MakeFactPointTo mirrors FactPointTo::make_fact(v, point_to).
+// no invent fact without live subject Variable*
 func MakeFactPointTo(v *Variable, pointTo *Variable) *FactPointTo {
+	if v == nil {
+		return nil
+	}
 	return &FactPointTo{Var: v, PointTo: []*Variable{pointTo}}
 }
 
 // MakeFactPointToSet mirrors FactPointTo::make_fact(v, set).
+// no invent fact without live subject Variable*
 func MakeFactPointToSet(v *Variable, set []*Variable) *FactPointTo {
+	if v == nil {
+		return nil
+	}
 	cp := append([]*Variable(nil), set...)
 	return &FactPointTo{Var: v, PointTo: cp}
 }

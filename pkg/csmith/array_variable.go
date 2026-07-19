@@ -410,49 +410,79 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 }
 
 // SetIndex mirrors ArrayVariable::set_index (string form for emit).
-// ArrayVariable.cpp:229–231 — indices[index] = e; no soft invent "0" padding.
+// ArrayVariable.cpp:229–231 — indices[index] = e; vector already sized for dim.
+// no invent pad empty holes or empty Constant "0" stand-ins
 func (av *ArrayVariable) SetIndex(index int, expr string) {
-	if av == nil || index < 0 {
+	if av == nil || index < 0 || expr == "" {
 		return
 	}
-	// grow with empty slots (C++ assumes index already valid; no invent constants)
-	for len(av.Indices) <= index {
-		av.Indices = append(av.Indices, "")
+	// C++ indices[index] — no grow past end with empty pad slots
+	if index > len(av.Indices) {
+		return
+	}
+	con := &Expression{
+		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+	}
+	if index == len(av.Indices) {
+		av.Indices = append(av.Indices, expr)
+		av.IndexExprs = append(av.IndexExprs, con)
+		return
 	}
 	av.Indices[index] = expr
-	// keep IndexExprs in sync: constant string → TermConstant
+	// keep IndexExprs in sync
 	for len(av.IndexExprs) <= index {
+		// only pad when overwriting within Indices length but IndexExprs lag
+		// (should not invent beyond Indices)
+		if len(av.IndexExprs) >= len(av.Indices) {
+			break
+		}
 		av.IndexExprs = append(av.IndexExprs, nil)
 	}
-	av.IndexExprs[index] = &Expression{
-		Term: TermConstant, Con: &Constant{Value: expr, Type: GetIntType()}, ExprType: GetIntType(),
+	if index < len(av.IndexExprs) {
+		av.IndexExprs[index] = con
+	} else if index == len(av.IndexExprs) {
+		av.IndexExprs = append(av.IndexExprs, con)
 	}
 }
 
 // SetIndexExpr mirrors ArrayVariable::set_index(size_t, const Expression*).
 // ArrayVariable.cpp:229–231 — stores Expression*; emit string from Output only.
 func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
-	if av == nil || index < 0 {
+	if av == nil || index < 0 || e == nil {
 		return
 	}
-	for len(av.IndexExprs) <= index {
-		av.IndexExprs = append(av.IndexExprs, nil)
+	// no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
+	s := e.Output()
+	if s == "" {
+		return
+	}
+	// C++ indices[index] — no invent empty pad holes past end
+	if index > len(av.IndexExprs) {
+		return
+	}
+	if index == len(av.IndexExprs) {
+		av.IndexExprs = append(av.IndexExprs, e)
+		av.Indices = append(av.Indices, s)
+		return
 	}
 	av.IndexExprs[index] = e
-	// no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
-	s := ""
-	if e != nil {
-		s = e.Output()
-	}
 	for len(av.Indices) <= index {
+		if len(av.Indices) >= len(av.IndexExprs) {
+			break
+		}
 		av.Indices = append(av.Indices, "")
 	}
-	av.Indices[index] = s
+	if index < len(av.Indices) {
+		av.Indices[index] = s
+	} else if index == len(av.Indices) {
+		av.Indices = append(av.Indices, s)
+	}
 }
 
 // AddIndex mirrors ArrayVariable::add_index (string helper).
 func (av *ArrayVariable) AddIndex(expr string) {
-	if av == nil {
+	if av == nil || expr == "" {
+		// empty index string is broken IR; no invent empty Constant shell
 		return
 	}
 	av.Indices = append(av.Indices, expr)
@@ -464,14 +494,15 @@ func (av *ArrayVariable) AddIndex(expr string) {
 // AddIndexExpr appends an index Expression (ArrayVariable::add_index).
 // ArrayVariable.cpp:227 — indices.push_back(e); no soft invent "0".
 func (av *ArrayVariable) AddIndexExpr(e *Expression) {
-	if av == nil {
+	if av == nil || e == nil {
+		return
+	}
+	s := e.Output()
+	// incomplete index IR — no invent empty bracket token
+	if s == "" {
 		return
 	}
 	av.IndexExprs = append(av.IndexExprs, e)
-	s := ""
-	if e != nil {
-		s = e.Output()
-	}
 	av.Indices = append(av.Indices, s)
 }
 

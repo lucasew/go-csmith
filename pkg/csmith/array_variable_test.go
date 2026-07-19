@@ -356,19 +356,30 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
+	// nil / empty Output — fail closed, no invent empty index slot
 	av.AddIndexExpr(nil)
-	if len(av.Indices) != 1 || av.Indices[0] != "" {
-		t.Fatalf("want empty index string, got %q", av.Indices)
+	if len(av.Indices) != 0 {
+		t.Fatalf("nil AddIndexExpr must not invent slot, got %v", av.Indices)
+	}
+	av.AddIndex("")
+	if len(av.Indices) != 0 {
+		t.Fatalf("empty AddIndex must not invent slot, got %v", av.Indices)
 	}
 	av.SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
-	if av.Indices[0] != "3" {
-		t.Fatal(av.Indices[0])
+	if len(av.Indices) != 1 || av.Indices[0] != "3" {
+		t.Fatal(av.Indices)
 	}
-	// grow SetIndex without padding invent zeros
+	// SetIndex past end without pad — no invent empty holes
 	av2 := &ArrayVariable{Variable: Variable{Name: "g_b"}, Sizes: []int{2, 2}}
 	av2.SetIndex(1, "i")
-	if len(av2.Indices) != 2 || av2.Indices[0] != "" || av2.Indices[1] != "i" {
-		t.Fatalf("pad empty not 0: %v", av2.Indices)
+	if len(av2.Indices) != 0 {
+		t.Fatalf("SetIndex past end must fail closed, got %v", av2.Indices)
+	}
+	// append at end only
+	av2.SetIndex(0, "i")
+	av2.SetIndex(1, "j")
+	if len(av2.Indices) != 2 || av2.Indices[0] != "i" || av2.Indices[1] != "j" {
+		t.Fatalf("sequential SetIndex append: %v", av2.Indices)
 	}
 }
 
