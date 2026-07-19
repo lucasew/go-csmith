@@ -237,11 +237,12 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 
 // JoinVarFactsUnion mirrors FactUnion::join_var_facts for a set of union vars.
 // FactUnion.cpp:226–245 — merge existing facts for vars into one.
+// Variable* always live in vars; nil hole fails closed (nil join, no invent skip).
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 	var fu *FactUnion
 	for _, v := range vars {
 		if v == nil {
-			continue
+			return nil
 		}
 		exist := FindRelatedUnion(facts, v)
 		if exist == nil {

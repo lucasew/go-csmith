@@ -977,9 +977,10 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	}
 	pt, _ := AbstractFactForVarInit(v)
 	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
+	// Fact* always live from abstract; nil hole fails closed (stop, no invent partial)
 	for _, f := range pt {
 		if f == nil {
-			continue
+			return
 		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {
 			*facts = append(*facts, f.Clone())
@@ -1035,41 +1036,15 @@ func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Express
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
 // FactMgr.cpp:141–172 — drop facts for oos vars; mark pointees garbage.
+// Delegates to package UpdateFactsForOOSVars (fail closed on fact/var holes).
 func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 	if fm == nil || len(vars) == 0 {
 		return
 	}
-	// remove facts whose subject matches an oos var
-	out := fm.GlobalFacts[:0]
-	for _, f := range fm.GlobalFacts {
-		if f == nil || f.Var == nil {
-			continue
-		}
-		drop := false
-		for _, v := range vars {
-			if v != nil && v.Match(f.Var) {
-				drop = true
-				break
-			}
-		}
-		if !drop {
-			out = append(out, f)
-		}
-	}
-	fm.GlobalFacts = out
-	// mark remaining facts that point into oos vars as dead
-	for i, f := range fm.GlobalFacts {
-		if f == nil {
-			continue
-		}
-		cur := f
-		for _, v := range vars {
-			if nf := cur.MarkDeadVar(v); nf != nil {
-				cur = nf
-			}
-		}
-		fm.GlobalFacts[i] = cur
-	}
+	// reuse slice-level fail-closed filter (nil holes → GlobalFacts nil)
+	facts := fm.GlobalFacts
+	UpdateFactsForOOSVars(vars, &facts)
+	fm.GlobalFacts = facts
 }
 
 // AddParamFacts mirrors FactMgr::add_param_facts.

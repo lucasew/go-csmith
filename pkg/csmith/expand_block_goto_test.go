@@ -106,6 +106,11 @@ func TestLowerBlockForVars(t *testing.T) {
 	if blk != outer || len(rem) != 0 {
 		t.Fatalf("first cover: %v %v", blk, rem)
 	}
+	// nil block hole fails closed
+	blk, rem = LowerBlockForVars([]*Block{nil, outer}, []*Variable{a, b})
+	if blk != nil || rem != nil {
+		t.Fatal("nil block hole must fail closed", blk, rem)
+	}
 }
 
 func TestGenerateNewParentLocalExpandGoto(t *testing.T) {

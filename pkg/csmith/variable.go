@@ -1089,19 +1089,25 @@ func (v *Variable) GetFieldID() int {
 
 // FindPointerFields mirrors Variable::find_pointer_fields.
 // Variable.cpp:1228–1235 — recursive pointer fields of aggregates.
+// Variable* always live in FieldVars; nil hole fails closed (nil out, no invent partial).
 func (v *Variable) FindPointerFields() []*Variable {
 	if v == nil {
 		return nil
 	}
-	var out []*Variable
+	out := make([]*Variable, 0)
 	for _, f := range v.FieldVars {
 		if f == nil {
-			continue
+			return nil
 		}
 		if f.IsPointer() {
 			out = append(out, f)
 		} else if f.IsAggregate() {
-			out = append(out, f.FindPointerFields()...)
+			nested := f.FindPointerFields()
+			// nil = incomplete nested FieldVars (empty complete is non-nil [])
+			if nested == nil {
+				return nil
+			}
+			out = append(out, nested...)
 		}
 	}
 	return out

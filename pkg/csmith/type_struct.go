@@ -483,8 +483,9 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 	var structTypes []*Type
 	if env != nil {
 		for _, t := range env.AllTypes {
+			// Type* always live on AllTypes; nil hole fails closed (empty field shell)
 			if t == nil {
-				continue
+				return StructField{}
 			}
 			// Type.cpp:716–717 — contain_pointer_field rejected
 			if t.ContainPointerField() {

@@ -70,14 +70,15 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 
 // RenewFact mirrors renew_fact — replace related or append.
 // Fact.cpp:175–191.
+// Fact* always live; nil nf or subject-map hole fails closed (false, no invent skip).
 func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 	if facts == nil || nf == nil || nf.Var == nil {
 		return false
 	}
+	if !FactsComplete(*facts) {
+		return false
+	}
 	for i, f := range *facts {
-		if f == nil || f.Var == nil {
-			continue
-		}
 		if f.Var == nf.Var || f.Var.Match(nf.Var) {
 			if f.Equal(nf) {
 				return false
@@ -92,8 +93,12 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 
 // RenewFacts mirrors renew_facts.
 // Fact.cpp:203–210.
+// Fact* always live; nil hole in newFacts fails closed (false, no invent partial renew).
 func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
+		return false
+	}
+	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
 		return false
 	}
 	changed := false

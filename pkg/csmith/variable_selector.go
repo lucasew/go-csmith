@@ -487,11 +487,17 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // LowerBlockForVars mirrors VariableSelector::lower_block_for_vars.
 // VariableSelector.cpp:793–815 — return first block in blks that covers all
 // vars as locals; remaining uncovered vars returned for callers.
+// Block*/Variable* always live; nil hole fails closed (nil blk, nil remaining).
 func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
+	for _, v := range vars {
+		if v == nil {
+			return nil, nil
+		}
+	}
 	remaining = append([]*Variable(nil), vars...)
 	for _, b := range blks {
 		if b == nil {
-			continue
+			return nil, nil
 		}
 		var next []*Variable
 		for _, v := range remaining {
@@ -951,8 +957,9 @@ func ChooseVarFull(
 	if want == nil {
 		var ok []*Variable
 		for _, v := range vars {
+			// Variable* always live in candidate lists; nil hole fails closed
 			if v == nil {
-				continue
+				return nil
 			}
 			if IsVariableInSet(invalidVars, v) {
 				continue
@@ -987,8 +994,13 @@ func ChooseVarFull(
 	matchExact := opts.MatchExactQualifiers
 	var ok []*Variable
 	for _, x := range cands {
-		if x == nil || x.Type == nil {
-			continue
+		// Variable* always live in candidate lists; nil hole fails closed
+		if x == nil {
+			return nil
+		}
+		if x.Type == nil {
+			// incomplete type IR — fail closed (no invent skip candidate)
+			return nil
 		}
 		// VariableSelector.cpp:424–429
 		if noBitfield && x.IsBitfield {

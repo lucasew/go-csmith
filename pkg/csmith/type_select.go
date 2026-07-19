@@ -58,14 +58,15 @@ func (env *TypeEnv) FindType(t *Type) *Type {
 
 // GetAllOKStructUnionTypes mirrors Type::get_all_ok_struct_union_types.
 // Type.cpp:487–503 — filter const/volatile aggregates and optional int field.
+// Type* always live on AllTypes; nil hole fails closed (nil out, no invent partial).
 func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, wantStruct bool) []*Type {
 	if env == nil {
 		return nil
 	}
-	var ok []*Type
+	ok := make([]*Type, 0)
 	for _, t := range env.AllTypes {
 		if t == nil {
-			continue
+			return nil
 		}
 		if wantStruct {
 			if !t.IsStruct() {
@@ -425,15 +426,16 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 
 // okStructUnionLTypes filters struct/union types for SelectLType (no_volatile etc.).
 // Type.cpp get_all_ok_struct_union_types subset.
+// Type* always live; nil hole fails closed (nil out, no invent partial pool).
 func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) []*Type {
 	if env == nil {
 		return nil
 	}
-	var out []*Type
+	out := make([]*Type, 0)
 	if wantStruct {
 		for _, t := range env.StructTypes {
 			if t == nil {
-				continue
+				return nil
 			}
 			if noVolatile && t.IsVolatileStructUnion() {
 				continue
@@ -444,7 +446,7 @@ func okStructUnionLTypes(env *TypeEnv, noVolatile, wantStruct, wantUnion bool) [
 	if wantUnion {
 		for _, t := range env.UnionTypes {
 			if t == nil {
-				continue
+				return nil
 			}
 			if noVolatile && t.IsVolatileStructUnion() {
 				continue

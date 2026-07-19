@@ -140,6 +140,13 @@ func TestIsUnnamedPadding(t *testing.T) {
 	}
 }
 
+func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
+	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil}}
+	if env.GetAllOKStructUnionTypes(false, false, false, true) != nil {
+		t.Fatal("nil type hole must fail closed")
+	}
+}
+
 func TestGetAllOKStructUnionTypes(t *testing.T) {
 	env := &TypeEnv{}
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{

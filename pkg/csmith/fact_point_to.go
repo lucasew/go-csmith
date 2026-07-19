@@ -368,10 +368,11 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	// FactPointTo.cpp:280–293 — merge_pointees already yields collective at indir 0
 	// FactPointTo.cpp:280–293 — union field assign: walk to container union, then
 	// find_pointer_fields on that union (all pointer fields share storage).
+	// Variable* always live in lvars; nil hole fails closed (no invent skip).
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
-			continue
+			return nil
 		}
 		// FactPointTo.cpp:283–288 — is_inside_union_field → walk to eUnion container
 		u := v

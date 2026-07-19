@@ -85,6 +85,19 @@ func TestIndirectQualifiers(t *testing.T) {
 	}
 }
 
+func TestFindPointerFieldsNilHole(t *testing.T) {
+	sv := &Variable{
+		Name: "s", Type: &Type{isStruct: true},
+		FieldVars: []*Variable{
+			{Name: "s.p", Type: PointerTo(GetIntType())},
+			nil,
+		},
+	}
+	if sv.FindPointerFields() != nil {
+		t.Fatal("nil FieldVars hole must fail closed")
+	}
+}
+
 func TestFindPointerFields(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

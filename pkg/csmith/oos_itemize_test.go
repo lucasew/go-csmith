@@ -41,6 +41,13 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 	if fp == nil || !fp.IsDead() {
 		t.Fatalf("p fact %+v", fp)
 	}
+	// nil fact hole fails closed
+	fm2 := NewFactMgr(nil)
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm2.UpdateFactsForOOSVars([]*Variable{loc})
+	if fm2.GlobalFacts != nil {
+		t.Fatal("nil fact hole must fail closed", fm2.GlobalFacts)
+	}
 }
 
 func TestChooseOKVarItemizesArray(t *testing.T) {

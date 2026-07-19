@@ -150,9 +150,11 @@ func CreateArrayVariable(
 				return nil
 			}
 		}
-		// ArrayVariable.cpp:185 — add_init_value(e); skip null (no invent shell)
+		// ArrayVariable.cpp:185 — add_init_value(e)
+		// Expression* always live after make; nil fails closed whole array
+		// (no invent partial InitExprs / fewer inits than initNum)
 		if e == nil {
-			continue
+			return nil
 		}
 		av.InitExprs = append(av.InitExprs, e)
 		// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for brace emit
