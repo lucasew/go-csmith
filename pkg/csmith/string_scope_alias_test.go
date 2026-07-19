@@ -70,6 +70,23 @@ func TestFindVariableScope(t *testing.T) {
 	}
 	ClearError()
 	f.Param = []*Variable{p}
+	// non-global without CurrentFunc sticky (no invent "not found" past missing frame)
+	ClearError()
+	if EmptyCGContext().FindVariableScope(loc) != ScopeInactive {
+		t.Fatal("nil CurrentFunc local must fail closed ScopeInactive")
+	}
+	if !HasError() {
+		t.Fatal("nil CurrentFunc FindVariableScope must SetError sticky")
+	}
+	ClearError()
+	// global without CurrentFunc stays complete ScopeGlobalVar
+	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
+		t.Fatal("global without CurrentFunc must stay ScopeGlobalVar")
+	}
+	if HasError() {
+		t.Fatal("global without CurrentFunc must not sticky")
+	}
+	ClearError()
 }
 
 func TestUpdatePtrAliasesAndAggregate(t *testing.T) {

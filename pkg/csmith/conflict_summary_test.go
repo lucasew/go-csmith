@@ -304,11 +304,16 @@ func TestIsFrameVar(t *testing.T) {
 	if cg.IsFrameVar(g) {
 		t.Fatal("global not frame")
 	}
-	// CGContext.cpp:494 — assert(b); no invent frame without curr_blk
+	// CGContext.cpp:494 — no curr_blk: complete not-frame (not invent via call_chain only;
+	// sticky would poison FindReachableFrameVars empty-frame complete path)
+	ClearError()
 	cg2 := EmptyCGContext()
 	cg2.CallChain = []*Block{blk}
 	if cg2.IsFrameVar(loc) {
 		t.Fatal("nil curr_blk must fail closed, not invent via call_chain only")
+	}
+	if HasError() {
+		t.Fatal("nil curr_blk IsFrameVar must stay non-sticky complete not-frame")
 	}
 	// incomplete LocalVars sticky not-frame
 	ClearError()

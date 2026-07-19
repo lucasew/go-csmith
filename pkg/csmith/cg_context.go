@@ -193,8 +193,11 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 	if v.IsGlobal() {
 		return ScopeGlobalVar
 	}
+	// non-global scope needs live curr_func (CGContext.cpp always has it for locals/params);
+	// sticky ScopeInactive (no invent "not found" soft re-pick past missing frame shell)
 	f := c.CurrentFunc
 	if f == nil {
+		SetError(ErrGeneric)
 		return ScopeInactive
 	}
 	// params → 0
@@ -1227,7 +1230,8 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		return false
 	}
 	// CGContext.cpp:493–494 — get_current_block(); assert(b)
-	// no soft invent frame via call_chain only when curr_blk missing
+	// no current block: complete not-frame (FindReachableFrameVars treats empty frames
+	// as complete; sticky here poisons BuildCalleeRWDirective / generation soft paths)
 	b := c.CurrentBlock()
 	if b == nil {
 		return false
