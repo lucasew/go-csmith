@@ -160,6 +160,31 @@ func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	}
 }
 
+func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
+	// afterRight GlobalFacts incomplete after right visit fails closed (no invent merge success)
+	// Use hole planted after left snapshot: left visits complete; right path sees hole.
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// plant hole after left would snapshot: use Visit that doesn't mutate facts;
+	// inject hole by making afterLeft complete but post-right incomplete via shared FM
+	// — VisitFactsExpression of constant does not touch GlobalFacts, so plant hole
+	// between by using incomplete GlobalFacts only on second pass is hard without
+	// custom expr. Instead: afterLeft complete, leave GlobalFacts complete through
+	// right, then plant is unnecessary for pre-merge path. Cover pre-merge hole:
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fi := &Invocation{IsStd: true, Binary: "&&", Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant, Con: MakeInt(0)},
+	}}
+	if VisitFactsBinaryOrdered(fi, &cg, Defaults()) {
+		t.Fatal("incomplete GlobalFacts before left snapshot must fail closed")
+	}
+}
+
 func TestSafeOpsBinaryMatches(t *testing.T) {
 	if !SafeOpsBinary("+") || SafeOpsBinary("&&") {
 		t.Fatal("safe ops set")

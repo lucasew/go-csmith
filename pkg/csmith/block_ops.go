@@ -486,6 +486,11 @@ func (b *Block) AppendNestedLoop(
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
 		MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts)
+		// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
+		if !FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		if st.StmID > 0 {
 			cg.FM.SetMapFactsIn(st.StmID, preFacts)
 			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
@@ -536,6 +541,11 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
 		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
+		// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
+		if !FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		// Block.cpp:383–384 — sr->visit_facts; assert(visited)
 		// no soft invent success / silent drop when visit fails
 		if !VisitFactsStatementReturn(st, cg, opts) {

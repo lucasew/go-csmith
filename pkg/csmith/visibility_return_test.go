@@ -59,6 +59,44 @@ func TestAddBackReturnFacts(t *testing.T) {
 	}
 }
 
+func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
+	// incomplete map_facts_out fails closed and must not invent merge of later returns
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	// first return incomplete out
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		10: {MakeFactPointTo(p, NullPtr), nil},
+		20: {MakeFactPointTo(q, NullPtr)},
+	}
+	body := &Block{Stmts: []Stmt{
+		{Kind: StmtReturn, StmID: 10},
+		{Kind: StmtReturn, StmID: 20},
+	}}
+	var facts []*FactPointTo
+	AddBackReturnFacts(body, fm, &facts)
+	if facts != nil {
+		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
+	}
+	// nested if Then with incomplete return must stop before Else returns
+	fm2 := NewFactMgr(f)
+	fm2.MapFactsOut = map[int][]*FactPointTo{
+		30: {MakeFactPointTo(p, NullPtr), nil},
+		40: {MakeFactPointTo(q, NullPtr)},
+	}
+	body2 := &Block{Stmts: []Stmt{{
+		Kind: StmtIfElse,
+		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 30}}},
+		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 40}}},
+	}}}
+	var facts2 []*FactPointTo
+	AddBackReturnFacts(body2, fm2, &facts2)
+	if facts2 != nil {
+		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
+	}
+}
+
 func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)

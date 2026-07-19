@@ -293,7 +293,11 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeft) {
 			return false
 		}
-		MergeFacts(&cg.FM.GlobalFacts, afterLeft)
+		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit
+		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeft)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			return false
+		}
 	}
 	return true
 }

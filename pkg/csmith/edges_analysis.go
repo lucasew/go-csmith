@@ -332,7 +332,12 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					SetError(ErrGeneric)
 					return currentInputs, -1, false
 				}
-				MergeFacts(&currentInputs, out)
+				// MergeFacts clears on mid-join failure — fail closed fixed-point
+				_ = MergeFacts(&currentInputs, out)
+				if !FactsComplete(currentInputs) {
+					SetError(ErrGeneric)
+					return currentInputs, -1, false
+				}
 			}
 			toBlk := fm.FindEdgesInToBlock(b, false, true)
 			if toBlk == nil {
@@ -346,7 +351,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					SetError(ErrGeneric)
 					return currentInputs, -1, false
 				}
-				MergeFacts(&currentInputs, out)
+				_ = MergeFacts(&currentInputs, out)
+				if !FactsComplete(currentInputs) {
+					SetError(ErrGeneric)
+					return currentInputs, -1, false
+				}
 			}
 		}
 		// Block.cpp:537–541 — shortcut when inputs match previous

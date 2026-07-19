@@ -375,6 +375,11 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 			fm.GlobalFacts = nil
 			return
 		}
-		MergeFacts(&fm.GlobalFacts, elseOut)
+		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed
+		_ = MergeFacts(&fm.GlobalFacts, elseOut)
+		if !FactsComplete(fm.GlobalFacts) {
+			fm.GlobalFacts = nil
+			return
+		}
 	}
 }

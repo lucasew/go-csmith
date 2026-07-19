@@ -72,18 +72,38 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 
 // AddBackReturnFacts mirrors Statement::add_back_return_facts / Block walk.
 // Statement.cpp:525–537 — merge map_facts_out of every return into facts.
+// Incomplete map_facts_out / mid-join / nil block hole fails closed: *facts = nil
+// and the walk stops (no invent keep merging later returns after a failed merge).
 func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) {
 	if b == nil || fm == nil || facts == nil {
 		return
 	}
-	for i := range b.Stmts {
-		addBackReturnFactsStmt(&b.Stmts[i], fm, facts)
-	}
+	_ = addBackReturnFactsBlock(b, fm, facts)
 }
 
-func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) {
+// addBackReturnFactsBlock returns false when the accumulator is fail-closed incomplete.
+func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
+	if b == nil || fm == nil || facts == nil {
+		if facts != nil {
+			*facts = nil
+		}
+		return false
+	}
+	for i := range b.Stmts {
+		if !addBackReturnFactsStmt(&b.Stmts[i], fm, facts) {
+			return false
+		}
+	}
+	return true
+}
+
+// addBackReturnFactsStmt returns false when facts must stay fail-closed incomplete.
+func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if st == nil || facts == nil {
-		return
+		if facts != nil {
+			*facts = nil
+		}
+		return false
 	}
 	if st.Kind == StmtReturn {
 		// Statement.cpp:528 — merge_facts(facts, map_facts_out[this])
@@ -91,17 +111,28 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) {
 		out := fm.MapFactsOut[st.StmID]
 		if !FactsComplete(out) || !FactsComplete(*facts) {
 			*facts = nil
-			return
+			return false
 		}
-		MergeFacts(facts, out)
-		return
+		// MergeFacts clears *facts on incomplete mid-join — fail closed
+		_ = MergeFacts(facts, out)
+		if !FactsComplete(*facts) {
+			*facts = nil
+			return false
+		}
+		return true
 	}
-	if st.Then != nil {
-		AddBackReturnFacts(st.Then, fm, facts)
+	// Statement.cpp:530–535 — get_blocks then recurse (Then/Else for if/for)
+	for _, blk := range GetBlocksStmt(st) {
+		// Block* always live from get_blocks; nil hole fails closed
+		if blk == nil {
+			*facts = nil
+			return false
+		}
+		if !addBackReturnFactsBlock(blk, fm, facts) {
+			return false
+		}
 	}
-	if st.Else != nil {
-		AddBackReturnFacts(st.Else, fm, facts)
-	}
+	return true
 }
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
