@@ -233,10 +233,11 @@ func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 
 // WriteVarSet mirrors Effect::write_var_set — write each var.
 // Effect.cpp:148–152.
-// Variable* always live; incomplete list or base fails closed IncompleteEffect
-// (no invent partial writes / leave-base empty-complete success).
+// Variable* always live; incomplete list or base fails closed sticky IncompleteEffect
+// (no invent partial writes / soft re-pick leave-base empty-complete success).
 func (e Effect) WriteVarSet(vars []*Variable) Effect {
 	if !EffectComplete(e) || !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := e
@@ -248,9 +249,10 @@ func (e Effect) WriteVarSet(vars []*Variable) Effect {
 
 // SetLhsWriteVars mirrors Effect::set_lhs_write_vars from current write_vars.
 // Lhs.cpp:348–351 — after successful LHS visit.
-// Incomplete write map fails closed IncompleteEffect (no invent empty lhsWrite).
+// Incomplete write map fails closed sticky IncompleteEffect (no invent empty lhsWrite).
 func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 	if !EffectComplete(e) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := e
@@ -261,6 +263,7 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 	out.lhsWrite = make(map[*Variable]bool, len(e.written))
 	for k, v := range e.written {
 		if k == nil {
+			SetError(ErrGeneric)
 			return IncompleteEffect()
 		}
 		if v {
@@ -271,11 +274,12 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 }
 
 // LhsWriteVars returns lhs_write_vars as a slice (stable name order).
-// Incomplete effect / nil map keys fail closed IncompleteVariables
+// Incomplete effect / nil map keys fail closed sticky IncompleteVariables
 // (not bare nil invent empty-complete lhs set via VariablesComplete(nil)/len==0 —
-// assign merge uses len(lw)>0 then WriteVarSet; empty-complete would skip poison).
+// assign merge uses incomplete as WriteVarSet input; soft re-pick past hole).
 func (e Effect) LhsWriteVars() []*Variable {
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	if len(e.lhsWrite) == 0 {
@@ -287,6 +291,7 @@ func (e Effect) LhsWriteVars() []*Variable {
 			continue
 		}
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		out = append(out, v)

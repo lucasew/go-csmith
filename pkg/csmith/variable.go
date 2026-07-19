@@ -343,14 +343,15 @@ func GetNewCtrlVars(opts Options) []*Variable {
 
 // GetLastCtrlVars mirrors Variable::get_last_ctrl_vars.
 // Variable.cpp:774–776. Returns nil if none allocated.
-// Incomplete last vector fails closed IncompleteVariables (not bare nil invent
-// empty-complete ctrl set / VariablesComplete(nil) success for array inits).
+// Incomplete last vector fails closed sticky IncompleteVariables (not bare nil invent
+// empty-complete ctrl set / soft re-pick array inits past hole).
 func GetLastCtrlVars() []*Variable {
 	if len(ctrlVarsVectors) == 0 {
 		return nil
 	}
 	last := ctrlVarsVectors[len(ctrlVarsVectors)-1]
 	if !VariablesComplete(last) {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	return last
@@ -364,17 +365,19 @@ func CtrlVarsDoFinalization() {
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.
-// Variable* always live; incomplete list fails closed IncompleteLabelsSlice
-// (not bare nil invent empty-complete name list via LabelsComplete(nil)/len==0).
+// Variable* always live; incomplete list fails closed sticky IncompleteLabelsSlice
+// (not bare nil invent empty-complete name list / soft re-pick past hole).
 func CtrlVarNames(ctrl []*Variable) []string {
 	if !VariablesComplete(ctrl) {
+		SetError(ErrGeneric)
 		return IncompleteLabelsSlice()
 	}
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
 		name := v.GetActualName(false)
 		if name == "" {
-			// empty actual name is broken IR — fail closed incomplete names
+			// empty actual name is broken IR — fail closed sticky incomplete names
+			SetError(ErrGeneric)
 			return IncompleteLabelsSlice()
 		}
 		out[i] = name

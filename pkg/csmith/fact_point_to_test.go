@@ -43,9 +43,14 @@ func TestFactPointToNullDead(t *testing.T) {
 	if MakeFactPointToSet(p, nil) != nil {
 		t.Fatal("nil set must fail closed MakeFactPointToSet")
 	}
+	ClearError()
 	if FactsComplete(MakeFactsPointToSet([]*Variable{p}, nil)) {
 		t.Fatal("nil set must fail closed incomplete MakeFactsPointToSet")
 	}
+	if !HasError() {
+		t.Fatal("nil set MakeFactsPointToSet must SetError sticky")
+	}
+	ClearError()
 	// empty non-nil is valid top
 	if MakeFactPointToSet(p, []*Variable{}) == nil {
 		t.Fatal("empty non-nil set must succeed as top")
@@ -79,14 +84,23 @@ func TestFactPointToNullDead(t *testing.T) {
 	if cl := CloneFactSlice([]*FactPointTo{MakeFactPointTo(p, NullPtr)}); !FactsComplete(cl) || len(cl) != 1 {
 		t.Fatal("CloneFactSlice complete must clone", cl)
 	}
-	// MakeFacts — no invent skip of nil holes as partial success / empty complete
+	// MakeFacts — no invent skip of nil holes as partial success / empty complete sticky
+	ClearError()
 	if FactsComplete(MakeFactsPointTo([]*Variable{p, nil}, NullPtr)) {
 		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointTo")
 	}
+	if !HasError() {
+		t.Fatal("nil hole MakeFactsPointTo must SetError sticky")
+	}
+	ClearError()
 	if FactsComplete(MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr})) {
 		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointToSet")
 	}
-	// specials Type-nil skipped; non-special Type-nil fails closed whole batch
+	if !HasError() {
+		t.Fatal("nil hole MakeFactsPointToSet must SetError sticky")
+	}
+	ClearError()
+	// specials Type-nil skipped; non-special Type-nil fails closed sticky whole batch
 	if !FactsComplete(MakeFactsPointTo([]*Variable{NullPtr, p}, NullPtr)) {
 		t.Fatal("special Type-nil must soft-skip not fail batch")
 	}
@@ -94,9 +108,17 @@ func TestFactPointToNullDead(t *testing.T) {
 	if FactsComplete(MakeFactsPointTo([]*Variable{broken, p}, NullPtr)) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointTo")
 	}
+	if !HasError() {
+		t.Fatal("non-special Type-nil MakeFactsPointTo must SetError sticky")
+	}
+	ClearError()
 	if FactsComplete(MakeFactsPointToSet([]*Variable{broken, p}, []*Variable{NullPtr})) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointToSet")
 	}
+	if !HasError() {
+		t.Fatal("non-special Type-nil MakeFactsPointToSet must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestArrayIsVirtualCollectiveParent(t *testing.T) {

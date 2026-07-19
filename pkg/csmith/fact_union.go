@@ -300,19 +300,22 @@ func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
 }
 
 // MergeUnionFactInto merges nf into facts slice (join if related).
-// FactUnion* always live; nil nf or map hole fails closed IncompleteUnionFactSlice
-// (no invent empty-complete via UnionFactsComplete(nil)).
+// FactUnion* always live; nil nf or map hole fails closed sticky IncompleteUnionFactSlice
+// (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
 func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	if nf == nil {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
 		if old.Var == nf.Var {
 			cp := old.Clone()
 			if cp == nil {
+				SetError(ErrGeneric)
 				return IncompleteUnionFactSlice()
 			}
 			cp.Join(nf)
@@ -322,6 +325,7 @@ func MergeUnionFactInto(facts []*FactUnion, nf *FactUnion) []*FactUnion {
 	}
 	cl := nf.Clone()
 	if cl == nil {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	return append(facts, cl)

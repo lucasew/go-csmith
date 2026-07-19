@@ -204,23 +204,26 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 // MakeFactsPointTo mirrors FactPointTo::make_facts(vars, point_to).
 // FactPointTo.cpp:340–348 — vars[i] always live; skip only type==null specials.
 // no invent skip of nil Variable* holes as partial success; non-special Type-nil
-// is incomplete IR (fail closed whole batch — IncompleteFactSlice, not bare nil;
-// FactsComplete(nil)==true invents empty-complete make_facts success).
+// is incomplete IR (fail closed sticky whole batch — IncompleteFactSlice, not bare nil;
+// FactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).
 func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
-		// type null: specials (null/garbage/tbd) skipped; other broken IR fails closed
+		// type null: specials (null/garbage/tbd) skipped; other broken IR fails closed sticky
 		if v.Type == nil {
 			if IsSpecialPtr(v) {
 				continue
 			}
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		f := MakeFactPointTo(v, pointTo)
 		if f == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, f)
@@ -229,25 +232,29 @@ func MakeFactsPointTo(lvars []*Variable, pointTo *Variable) []*FactPointTo {
 }
 
 // MakeFactsPointToSet mirrors FactPointTo::make_facts(vars, set).
-// same live-vars rules as MakeFactsPointTo; nil set fails closed IncompleteFactSlice
-// (no invent empty complete — FactsComplete(nil)==true).
+// same live-vars rules as MakeFactsPointTo; nil set fails closed sticky IncompleteFactSlice
+// (no invent empty complete — FactsComplete(nil)==true / soft re-pick past hole).
 func MakeFactsPointToSet(lvars []*Variable, set []*Variable) []*FactPointTo {
 	if set == nil {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	var out []*FactPointTo
 	for _, v := range lvars {
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		if v.Type == nil {
 			if IsSpecialPtr(v) {
 				continue
 			}
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		f := MakeFactPointToSet(v, set)
 		if f == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, f)

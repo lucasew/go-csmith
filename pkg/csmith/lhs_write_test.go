@@ -5,6 +5,7 @@ import (
 )
 
 func TestLhsWriteVarsFromWritten(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVar(v)
 	e = e.SetLhsWriteVarsFromWritten()
@@ -12,15 +13,23 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 	if len(got) != 1 || got[0] != v {
 		t.Fatal(got)
 	}
-	// IncompleteEffect must not invent empty-complete lhs set (len(nil)==0 skip)
+	// IncompleteEffect must not invent empty-complete lhs set sticky
 	if VariablesComplete(IncompleteEffect().LhsWriteVars()) {
 		t.Fatal("IncompleteEffect LhsWriteVars must IncompleteVariables")
 	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect LhsWriteVars must SetError sticky")
+	}
+	ClearError()
 	hole := EmptyEffect()
 	hole.lhsWrite = map[*Variable]bool{nil: true}
 	if VariablesComplete(hole.LhsWriteVars()) {
 		t.Fatal("nil lhsWrite key must IncompleteVariables")
 	}
+	if !HasError() {
+		t.Fatal("nil lhsWrite key must SetError sticky")
+	}
+	ClearError()
 	if !IncompleteEffect().HasGlobalEffect() {
 		t.Fatal("IncompleteEffect must fail closed HasGlobalEffect true")
 	}
@@ -30,6 +39,7 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 }
 
 func TestWriteVarSet(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	e := EmptyEffect().WriteVarSet([]*Variable{a, b})
@@ -74,8 +84,12 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if hole.CommentOutput() != "" {
 		t.Fatal("nil key CommentOutput must fail closed empty")
 	}
+	ClearError()
 	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {
 		t.Fatal("WriteVarSet nil hole must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("WriteVarSet nil hole must SetError sticky")
 	}
 	// consolidate incomplete → sticky IncompleteEffect
 	ClearError()
