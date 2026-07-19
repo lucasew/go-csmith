@@ -279,7 +279,9 @@ func MakeRandomBlock(
 		Looping:          looping,
 		blockSize:        opts.MaxBlockSize,
 		EmitDepthProtect: opts.DepthProtect,
-		EmitStepHash:     opts.StepHashByStmt,
+		// step_hash def/decl/call gated with ComputeHash (hashHelpersEnabled)
+		// no invent step_hash(n) without live helper defs
+		EmitStepHash: opts.StepHashByStmt && opts.ComputeHash,
 		EmitLabelAttrs:   opts.LabelAttributes,
 		LabelAttrRng:     r,
 		StmID:            AllocStmID(),

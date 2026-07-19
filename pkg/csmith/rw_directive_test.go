@@ -51,6 +51,7 @@ func TestIsEligibleNonReadable(t *testing.T) {
 func TestStepHashEmittedInBlock(t *testing.T) {
 	opts := Defaults()
 	opts.StepHashByStmt = true
+	opts.ComputeHash = true
 	opts.MaxBlockSize = 2
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -63,9 +64,20 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	if b == nil {
 		t.Fatal("nil block")
 	}
+	if !b.EmitStepHash {
+		t.Fatal("StepHash+ComputeHash must set EmitStepHash")
+	}
 	out := b.Output(1)
 	if !strings.Contains(out, "step_hash(") {
 		t.Fatal(out)
+	}
+	// StepHash without ComputeHash — no invent step_hash calls
+	opts2 := Defaults()
+	opts2.StepHashByStmt = true
+	opts2.ComputeHash = false
+	b2 := MakeRandomBlock(NewRng(3), opts2, NewProbabilities(opts2), vs, NewExprTables(opts2), NewStatementThresholdTable(opts2), &cg, false)
+	if b2 != nil && b2.EmitStepHash {
+		t.Fatal("must not invent EmitStepHash without ComputeHash")
 	}
 }
 

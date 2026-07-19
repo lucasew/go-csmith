@@ -238,6 +238,8 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 	}
 	// Statement.cpp:916 — output_hash when not a jump target
 	// Statement.cpp:927–931 / OutputMgr.cpp:161–167
+	// emitStepHash is set only when StepHashByStmt && ComputeHash (Block make)
+	// so step_hash(n) is never invented without live helper defs
 	if emitStepHash && st.StmID > 0 {
 		return indent + "step_hash(" + Int2Str(st.StmID) + ");\n", false
 	}

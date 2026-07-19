@@ -245,24 +245,22 @@ func (c *CGContext) ExtendCallChain(from CGContext) {
 
 // OutputCallChain mirrors CGContext::output_call_chain.
 // CGContext.cpp:481–490 — "b%p in func -> ..." debug line.
+// C++ always has live Block* and b->func->name; incomplete frames fail closed
+// (no invent "?" / blank " in " / skip holes that soft-rewrite the chain).
 func (c CGContext) OutputCallChain() string {
 	var b strings.Builder
 	for i, blk := range c.CallChain {
-		if blk == nil {
-			continue
+		// CGContext.cpp:484 — call_chain[i] always live Block*
+		if blk == nil || blk.Func == nil || blk.Func.Name == "" {
+			return ""
 		}
 		if i > 0 {
 			b.WriteString(" -> ")
 		}
-		// pointer identity as hex-ish index; use name if no func
-		fname := "?"
-		if blk.Func != nil {
-			fname = blk.Func.Name
-		}
 		b.WriteString("b")
 		b.WriteString(fmt.Sprintf("%p", blk))
 		b.WriteString(" in ")
-		b.WriteString(fname)
+		b.WriteString(blk.Func.Name)
 	}
 	b.WriteString("\n")
 	return b.String()
