@@ -91,3 +91,51 @@ func TestGoGeneratorHasForwardAndBody(t *testing.T) {
 		t.Fatal("first func not built")
 	}
 }
+
+func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
+	// no invent program without built user function / functions section / main
+	ClearError()
+	opts := Defaults()
+	opts.Seed = 11
+	opts.MaxBlockSize = 1
+	out, err := Generate(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "FUNCTIONS") || !strings.Contains(out, "int main") {
+		t.Fatal("full program requires FUNCTIONS and main", out[:min(200, len(out))])
+	}
+	// sticky ERROR_RETURN path returns error, not partial C
+	ClearError()
+	opts2 := Defaults()
+	opts2.Seed = 12
+	g := NewProgramGenerator(opts2)
+	g.Initialize()
+	SetError(ErrGeneric)
+	// GenerateFunctions stops; without built user GoGenerator must empty
+	// (re-Initialize at start of GoGenerator clears error — call pipeline manually)
+	ClearError()
+	g2 := NewProgramGenerator(opts2)
+	g2.Initialize()
+	g2.GenerateAllTypes()
+	// empty types after GenerateAllTypes wiped
+	g2.Types = TypeEnv{}
+	g2.VS.Types = &g2.Types
+	g2.Funcs.Types = &g2.Types
+	g2.GenerateFunctions()
+	// make_first fails → no user Built
+	hasUser := false
+	for _, f := range g2.Funcs.Funcs {
+		if f != nil && !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
+			hasUser = true
+		}
+	}
+	if hasUser {
+		t.Fatal("empty AllTypes must not invent built first")
+	}
+	// assembly gate: no FUNCTIONS without user
+	if g2.OutputFunctions() != "" {
+		t.Fatal("no invent functions section without built user")
+	}
+	ClearError()
+}

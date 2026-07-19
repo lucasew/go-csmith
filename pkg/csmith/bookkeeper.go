@@ -403,7 +403,12 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) {
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin || f.Body == nil {
+		// Function* always live on Funcs; nil hole → clear (no invent partial depths)
+		if f == nil {
+			exprDepthCnts = nil
+			return
+		}
+		if f.IsBuiltin || f.Body == nil {
 			continue
 		}
 		for i := range f.Body.Stmts {
@@ -446,7 +451,12 @@ func StatBlkDepths(funcs []*Function) int {
 		}
 	}
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin || f.Body == nil {
+		// Function* always live on Funcs; nil hole → zero counts (no invent partial)
+		if f == nil {
+			blkDepthCnts = nil
+			return 0
+		}
+		if f.IsBuiltin || f.Body == nil {
 			continue
 		}
 		// body is a Block; count its statements with parent=body

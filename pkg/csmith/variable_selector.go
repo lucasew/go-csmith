@@ -95,6 +95,7 @@ func ChooseVisibleReadVar(
 		}
 		ok = append(ok, v)
 	}
+	// VariableSelector.cpp always has RNG for multi-pick; ChooseOKVar handles n==0/1/nil r
 	return ChooseOKVar(r, ok)
 }
 

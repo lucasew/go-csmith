@@ -739,6 +739,9 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 // Returns empty string when sticky ERROR_RETURN aborts generation (no soft invent
 // of partial program as success).
 func (g *ProgramGenerator) GoGenerator() string {
+	if g == nil {
+		return ""
+	}
 	g.Initialize()
 	var b strings.Builder
 	b.WriteString(g.OutputHeader())
@@ -752,10 +755,32 @@ func (g *ProgramGenerator) GoGenerator() string {
 	if HasError() {
 		return ""
 	}
+	// make_first always yields a built user function; no invent header-only program
+	hasUser := false
+	for _, f := range g.Funcs.Funcs {
+		if f != nil && !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
+			hasUser = true
+			break
+		}
+	}
+	if !hasUser {
+		return ""
+	}
+	// OutputGlobals may be empty (no globals) — C++ legitimate
 	b.WriteString(g.OutputGlobals())
-	b.WriteString(g.OutputFunctions())
+	// functions section always live after successful GenerateFunctions
+	funcsOut := g.OutputFunctions()
+	if funcsOut == "" {
+		return ""
+	}
+	b.WriteString(funcsOut)
 	b.WriteString(g.OutputHashFuncDef())
-	b.WriteString(g.OutputMain())
+	// OutputMgr always emits main unless --nomain; incomplete main fails whole program
+	mainOut := g.OutputMain()
+	if mainOut == "" && !g.Opts.NoMain {
+		return ""
+	}
+	b.WriteString(mainOut)
 	// DefaultOutputMgr.cpp:194 — OutputTail after main (statistics comment)
 	b.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
 	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes wrapper.h
