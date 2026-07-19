@@ -85,6 +85,18 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	}
 }
 
+func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
+	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
+	// fair: incomplete LocalVars → nil,nil
+	a := CreateVariableScalars("l_a", GetIntType(), false, false)
+	a.Name = "l_a"
+	inner := &Block{LocalVars: []*Variable{a, nil}}
+	blk, rem := LowerBlockForVars([]*Block{inner}, []*Variable{a})
+	if blk != nil || rem != nil {
+		t.Fatal("incomplete LocalVars must fail closed", blk, rem)
+	}
+}
+
 func TestLowerBlockForVars(t *testing.T) {
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	b := CreateVariableScalars("l_b", GetIntType(), false, false)

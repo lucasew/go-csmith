@@ -75,6 +75,36 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	}
 }
 
+func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
+	// soft invent: Param hole → IsVariableInSet false → drop param from keep
+	// fair: VariablesComplete Param fails closed nil inputs
+	callee := &Function{Name: "c", ReturnType: GetIntType()}
+	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	callee.Param = []*Variable{p, nil}
+	fm := NewFactMgr(callee)
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr), MakeFactPointTo(p, NullPtr)}
+	fm.CallerToCalleeHandover(nil, &facts)
+	if facts != nil {
+		t.Fatal("incomplete Param must fail closed nil inputs, not invent drop param", facts)
+	}
+}
+
+func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	if !VariablesComplete([]*Variable{a, b}) || VariablesComplete([]*Variable{a, nil, b}) {
+		t.Fatal("VariablesComplete")
+	}
+	if !IsVariableInSet([]*Variable{a, b}, a) {
+		t.Fatal("complete membership")
+	}
+	// incomplete: membership false (no invent skip hole to later match)
+	if IsVariableInSet([]*Variable{nil, a}, a) {
+		t.Fatal("incomplete set must not invent membership past hole")
+	}
+}
+
 func TestRemoveRVFactsNilHole(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)

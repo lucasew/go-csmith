@@ -524,7 +524,8 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // LowerBlockForVars mirrors VariableSelector::lower_block_for_vars.
 // VariableSelector.cpp:793–815 — return first block in blks that covers all
 // vars as locals; remaining uncovered vars returned for callers.
-// Block*/Variable* always live; nil hole fails closed (nil blk, nil remaining).
+// Block*/Variable* always live; nil hole or incomplete LocalVars fails closed
+// (nil blk, nil remaining — no invent uncovered-remaining past LocalVars hole).
 func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
 	for _, v := range vars {
 		if v == nil {
@@ -533,7 +534,7 @@ func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining [
 	}
 	remaining = append([]*Variable(nil), vars...)
 	for _, b := range blks {
-		if b == nil {
+		if b == nil || !VariablesComplete(b.LocalVars) {
 			return nil, nil
 		}
 		var next []*Variable

@@ -472,11 +472,28 @@ func (c *CGContext) RemoveIVBound(iv *Variable) {
 	delete(c.IVBounds, iv)
 }
 
+// VariablesComplete reports set has no nil Variable* holes.
+// Incomplete lists must not invent membership via IsVariableInSet (false past a
+// hole drops params/locals from keep sets / lower_block coverage).
+func VariablesComplete(set []*Variable) bool {
+	for _, x := range set {
+		if x == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // IsVariableInSet reports whether v appears in set (pointer equality).
 // Nil slots are never matches for a live v (pointer equality); callers that
-// need fail-closed incomplete lists must use FactsComplete-style checks.
+// need fail-closed incomplete lists must use VariablesComplete first.
 func IsVariableInSet(set []*Variable, v *Variable) bool {
 	if v == nil {
+		return false
+	}
+	if !VariablesComplete(set) {
+		// incomplete membership is false for the bit — callers that must not
+		// invent not-in-set use VariablesComplete and fail closed themselves
 		return false
 	}
 	for _, x := range set {

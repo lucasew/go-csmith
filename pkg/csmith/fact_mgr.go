@@ -746,12 +746,13 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 }
 
 // filterFactsNotInVars drops subjects in drop. Fact* always live;
-// incomplete maps/pointees fail closed (nil out, no invent clean filter past holes).
+// incomplete maps/pointees or incomplete drop list fail closed (nil out —
+// no invent keep subjects that match only after a drop-list hole).
 func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
 		return facts
 	}
-	if !FactsComplete(facts) {
+	if !FactsComplete(facts) || !VariablesComplete(drop) {
 		return nil
 	}
 	out := make([]*FactPointTo, 0, len(facts))
@@ -1422,9 +1423,15 @@ func (f *FactPointTo) PointsTo(v *Variable) bool {
 // CallerToCalleeHandover mirrors FactMgr::caller_to_callee_handover.
 // FactMgr.cpp:312–353 — param facts; keep globals/params and transitively pointed stack vars.
 // Fact* always live; nil hole fails closed (inputs nil, no invent clean partition).
+// Incomplete Param list fails closed (nil inputs — no invent drop param facts
+// because IsVariableInSet returned false past a Param hole).
 func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPointTo) {
 	// FactMgr always bound to a Function; nil Func is broken IR (no invent param partition)
 	if fm == nil || inputs == nil || fm.Func == nil {
+		return
+	}
+	if !VariablesComplete(fm.Func.Param) {
+		*inputs = nil
 		return
 	}
 	fm.AddParamFacts(args, inputs)
