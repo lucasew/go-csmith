@@ -79,22 +79,33 @@ func TestMakeRandomForHasLoopAndBody(t *testing.T) {
 }
 
 func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
-	// StatementFor.cpp:288 assert(fm); nullptr not Kind-only StmtFor
+	// StatementFor.cpp always has RNG+CG sticky; nil FM soft re-pick
+	ClearError()
 	opts := Defaults()
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
-	// always has RNG; no invent for shell without it
+	if !HasError() {
+		t.Fatal("nil cg MakeRandomFor must SetError sticky")
+	}
+	ClearError()
 	cgEmpty := EmptyCGContext()
 	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomFor must SetError sticky")
+	}
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()) // no FM
 	if st := MakeRandomFor(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatalf("nil FM must return nil, got %#v", st)
+	}
+	if HasError() {
+		t.Fatal("nil FM MakeRandomFor must stay non-sticky soft re-pick")
 	}
 }
 

@@ -6,7 +6,8 @@ import (
 )
 
 func TestMakeIterationRequiresFactMgr(t *testing.T) {
-	// StatementFor.cpp:170 assert(fm); no soft invent without FactMgr
+	// StatementFor.cpp:170 assert(fm); soft re-pick without FactMgr
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -18,6 +19,17 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	if MakeIteration(NewRng(1), opts, NewProbabilities(opts), vs, &cg) != nil {
 		t.Fatal("nil FM must fail closed")
 	}
+	if HasError() {
+		t.Fatal("nil FM MakeIteration must stay non-sticky soft re-pick")
+	}
+	// sticky without RNG
+	if MakeIteration(nil, opts, NewProbabilities(opts), vs, &cg) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeIteration must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {

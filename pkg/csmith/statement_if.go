@@ -14,8 +14,9 @@ func MakeRandomIf(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
-	// StatementIf.cpp always has RNG + CGContext; no invent if shell without them
+	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)

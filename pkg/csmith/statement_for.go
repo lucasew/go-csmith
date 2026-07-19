@@ -224,11 +224,13 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 // StatementAssign init (SafeOpFlags binary), visit_facts; test binary;
 // compound/simple incr assign.
 func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelector, cg *CGContext) *LoopControl {
+	// StatementFor always has RNG + VS + CG; sticky no invent iteration shell without them
 	if r == nil || vs == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:170–172 — assert(fm); assert(blk)
-	// no soft invent iteration without FactMgr / current block
+	// non-sticky soft re-pick without FactMgr / current block (sticky poisons for soft factory)
 	if cg.FM == nil || cg.CurrentBlock() == nil {
 		return nil
 	}
@@ -463,12 +465,13 @@ func MakeRandomFor(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) *Stmt {
-	// StatementFor.cpp nullptr factory — nil (no invent Kind-only shell)
-	// always has RNG + CGContext; no invent for shell without them
+	// StatementFor.cpp nullptr factory sticky — nil (no invent Kind-only shell)
+	// always has RNG + CGContext sticky
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// StatementFor.cpp:288–289 — assert(fm); get_fact_mgr always live
+	// StatementFor.cpp:288–289 — assert(fm); non-sticky soft re-pick without FactMgr
 	if cg.FM == nil {
 		return nil
 	}

@@ -190,15 +190,24 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 }
 
 func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
-	// StatementIf.cpp always has RNG + CGContext; no invent if shell
+	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
+	ClearError()
 	opts := Defaults()
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil RNG+cg")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG+cg MakeRandomIf must SetError sticky")
+	}
+	ClearError()
 	cg := EmptyCGContext()
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomIf must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomParentBlockERRORGuard(t *testing.T) {
