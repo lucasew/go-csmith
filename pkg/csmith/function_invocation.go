@@ -571,9 +571,10 @@ func BuildInvocationAndFunction(
 	callee.GenerateBodyWithKnownParams(r, opts, probs, vs, tables, stmtTab, bodyCG)
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
-	// C++ map[] missing → empty; no invent GlobalFacts fallback when out missing
-	// Body stm_id always live after generate; StmID 0 fails closed (mark failed)
-	// Incomplete out fails closed (nil — no invent cleaned clone of holes)
+	// then add_back_return_facts. C++ map[] missing → empty start then merge returns.
+	// Body stm_id always live after generate; StmID 0 fails closed (mark failed).
+	// Incomplete body out fails closed nil retFacts — no invent soft-merge returns
+	// onto wiped empty via FactsComplete(nil)==true
 	var retFacts []*FactPointTo
 	if callee.Body == nil || callee.Body.StmID <= 0 {
 		fi.Failed = true
@@ -581,9 +582,9 @@ func BuildInvocationAndFunction(
 		out := calFM.MapFactsOut[callee.Body.StmID]
 		if FactsComplete(out) {
 			retFacts = CloneFactSlice(out)
+			AddBackReturnFacts(callee.Body, calFM, &retFacts)
 		}
-		// incomplete → nil retFacts (fail closed)
-		AddBackReturnFacts(callee.Body, calFM, &retFacts)
+		// incomplete out → nil retFacts (fail closed, no invent returns-only)
 	}
 	fi.SaveReturnFacts(retFacts)
 

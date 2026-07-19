@@ -360,9 +360,12 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 	lab := ""
 	if fm != nil {
 		// PreOutput: with FM, never fall back to SourceLabel
-		if st.StmID > 0 {
-			lab = FindJumpLabel(fm, st.StmID)
+		// Statement::stm_id always live; StmID 0 fails closed (no invent skip
+		// self-label and still claim complete label list from children only)
+		if st.StmID <= 0 {
+			return false
 		}
+		lab = FindJumpLabel(fm, st.StmID)
 	} else if st.SourceLabel != "" {
 		lab = st.SourceLabel
 	}

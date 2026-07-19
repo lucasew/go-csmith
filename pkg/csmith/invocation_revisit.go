@@ -384,7 +384,20 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	cg.AddEffect(fm.GetMapStmEffect(f.Body.StmID), false)
-	var retFacts []*FactPointTo
+	// FunctionInvocationUser.cpp: ret from map_facts_out[body] + add_back_return_facts
+	// Start from complete body out (missing → empty), not bare nil wipe then invent
+	// returns-only via FactsComplete(nil)==true
+	bodyOut := fm.MapFactsOut[f.Body.StmID]
+	if !FactsComplete(bodyOut) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
+	retFacts := CloneFactSlice(bodyOut)
 	AddBackReturnFacts(f.Body, fm, &retFacts)
 	if !FactsComplete(retFacts) || !FactsComplete(*facts) {
 		fm.MapFactsIn = inCopy

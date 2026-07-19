@@ -52,14 +52,29 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	calFM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	// no MapFactsOut[20]
 	var retFacts []*FactPointTo
-	if callee.Body != nil && callee.Body.StmID > 0 {
-		out := calFM.MapFactsOut[callee.Body.StmID]
-		if FactsComplete(out) {
-			retFacts = CloneFactSlice(out)
-		}
+	out := calFM.MapFactsOut[callee.Body.StmID]
+	if FactsComplete(out) {
+		retFacts = CloneFactSlice(out)
+		AddBackReturnFacts(callee.Body, calFM, &retFacts)
 	}
 	if retFacts != nil {
 		t.Fatal("missing body out must not invent GlobalFacts as ret_facts")
+	}
+	// incomplete body out — no invent soft-merge returns onto wiped empty
+	ret := Stmt{Kind: StmtReturn, StmID: 99}
+	callee.Body.Stmts = []Stmt{ret}
+	calFM.MapFactsOut = map[int][]*FactPointTo{
+		20: {MakeFactPointTo(p, NullPtr), nil},
+		99: {MakeFactPointTo(p, GarbagePtr)},
+	}
+	retFacts = nil
+	out = calFM.MapFactsOut[callee.Body.StmID]
+	if FactsComplete(out) {
+		retFacts = CloneFactSlice(out)
+		AddBackReturnFacts(callee.Body, calFM, &retFacts)
+	}
+	if retFacts != nil {
+		t.Fatal("incomplete body out must not invent returns-only ret_facts", retFacts)
 	}
 }
 

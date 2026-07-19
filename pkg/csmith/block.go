@@ -370,7 +370,8 @@ func MakeRandomBlock(
 	if cg.EffectAccum != nil {
 		preEffect = cg.EffectAccum.Clone()
 	}
-	if cg.FM != nil && b.StmID > 0 {
+	// StmID always allocated at make; FM path always records map_facts_in
+	if cg.FM != nil {
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
 	// Forward goto: prefer labeling the next real statement; no-op if goto is last.

@@ -191,6 +191,11 @@ func TestFindContainedLabels(t *testing.T) {
 	if FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB}) != nil {
 		t.Fatal("nil Else must fail closed")
 	}
+	// FM + StmID 0 — no invent complete child labels while soft-skipping self id
+	fm := NewFactMgr(nil)
+	if FindContainedLabelsFM(&Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "x"}, fm) != nil {
+		t.Fatal("StmID 0 under FM must fail closed")
+	}
 }
 
 func TestCombineBranchFacts(t *testing.T) {
