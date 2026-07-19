@@ -6,6 +6,7 @@ import (
 )
 
 func TestAddExternalEffectWithCallers(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
@@ -22,7 +23,7 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	if !e2.IsWritten(g) || !e2.written[loc] {
 		t.Fatal("chain includes local", e2)
 	}
-	// nil effect hole / nil chain hole fails closed IncompleteEffect
+	// nil effect hole / nil chain hole fails closed sticky IncompleteEffect
 	// (no invent leave-base empty-complete / partial merge)
 	// IncompleteEffect IsRead/IsWritten are fail-closed true — probe completeness / maps
 	base := EmptyEffect().ReadVar(g)
@@ -32,21 +33,34 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	if EffectComplete(got) || got.IsEmpty() || got.read[g] || got.written[g] {
 		t.Fatal("nil effect hole must fail closed IncompleteEffect", got)
 	}
+	if !HasError() {
+		t.Fatal("nil effect hole must SetError sticky")
+	}
+	ClearError()
 	got2 := base.AddExternalEffectWithCallers(other, []*Block{nil, blk})
 	if EffectComplete(got2) || got2.written[g] || got2.written[loc] {
 		t.Fatal("nil call_chain hole must fail closed IncompleteEffect", got2)
 	}
+	if !HasError() {
+		t.Fatal("nil call_chain hole must SetError sticky")
+	}
+	ClearError()
 	// incomplete LocalVars on chain frame: no invent partial global merge
 	holeBlk := &Block{LocalVars: []*Variable{loc, nil}}
 	got3 := base.AddExternalEffectWithCallers(other, []*Block{holeBlk})
 	if EffectComplete(got3) || got3.written[g] || got3.written[loc] {
 		t.Fatal("incomplete stack on chain must fail closed IncompleteEffect", got3)
 	}
+	if !HasError() {
+		t.Fatal("incomplete stack chain must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVarVisible false → not found in Blocks → not OOS
 	// fair: StackScanComplete false → OOS true
+	ClearError()
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p, nil}
@@ -60,8 +74,12 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "func_1"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	if loc == nil {
+		t.Fatal("loc")
+	}
 	loc.Name = "l_1"
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}

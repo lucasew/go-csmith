@@ -217,7 +217,8 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 
 func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	// soft invent: FindUnionPointees nil → len==0 → no overlap success
-	// fair: incomplete facts/pointees fail closed as overlap
+	// fair: incomplete facts/pointees fail closed sticky as overlap
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
@@ -228,6 +229,10 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	if VariablesComplete(FindUnionPointees(holeFacts, e1)) {
 		t.Fatal("FindUnionPointees incomplete must fail closed incomplete, not invent empty complete")
 	}
+	if !HasError() {
+		t.Fatal("FindUnionPointees incomplete must SetError sticky")
+	}
+	ClearError()
 	// complete empty: non-pointer term → empty unions, no overlap
 	c := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	empty := FindUnionPointees(nil, c)

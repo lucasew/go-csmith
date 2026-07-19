@@ -134,8 +134,8 @@ func MakeDummyBlock(f *Function) *Block {
 // GenerateParameterListFromString mirrors Function GenerateParameterListFromString.
 // Function.cpp:345–363.
 // Returns false on assert-path failure (empty list, mid Void, bad type, nil var).
-// Fail wipes Param to IncompleteVariables (not bare nil invent empty-complete
-// void-param list after partial append / VariablesComplete(nil)).
+// Fail wipes Param to IncompleteVariables sticky (not bare nil invent empty-complete
+// void-param list after partial append / soft re-pick past VariablesComplete(nil)).
 func GenerateParameterListFromString(f *Function, params string) bool {
 	if f == nil {
 		return false
@@ -151,6 +151,7 @@ func GenerateParameterListFromString(f *Function, params string) bool {
 	}
 	fail := func() {
 		f.Param = IncompleteVariables()
+		SetError(ErrGeneric)
 	}
 	for i, ts := range vs {
 		ts = strings.TrimSpace(ts)

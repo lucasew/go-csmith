@@ -49,21 +49,30 @@ func TestSetAccumulatedEffect(t *testing.T) {
 	if !fm.GetMapStmEffect(10).IsWritten(v) {
 		t.Fatal("block effect")
 	}
-	// StmID 0 incomplete — IncompleteEffect (not EmptyEffect invent pure/empty success)
+	// StmID 0 incomplete sticky — IncompleteEffect (not EmptyEffect invent pure/empty success)
+	ClearError()
 	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: 0}}}
 	fm.SetMapStmEffect(11, EmptyEffect().WriteVar(v))
 	eff2 := b2.SetAccumulatedEffect(fm)
 	if EffectComplete(eff2) || eff2.IsEmpty() || eff2.IsPure() {
 		t.Fatal("StmID 0 must fail closed IncompleteEffect, not invent empty/pure", eff2)
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 SetAccumulatedEffect must SetError sticky")
+	}
 	// IncompleteEffect: IsWritten is fail-closed true — probe completeness / map shell only
 	if EffectComplete(fm.GetMapStmEffect(11)) || fm.GetMapStmEffect(11).written[v] {
 		t.Fatal("block map must IncompleteEffect, not invent partial write map entry")
 	}
-	// nil block/fm must IncompleteEffect (not invent EmptyEffect pure)
+	ClearError()
+	// nil block/fm must IncompleteEffect sticky (not invent EmptyEffect pure)
 	if EffectComplete(((*Block)(nil)).SetAccumulatedEffect(fm)) {
 		t.Fatal("nil block must IncompleteEffect")
 	}
+	if !HasError() {
+		t.Fatal("nil block SetAccumulatedEffect must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomParentBlock(t *testing.T) {

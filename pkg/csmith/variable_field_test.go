@@ -78,6 +78,7 @@ func TestHasFieldVarNilHole(t *testing.T) {
 
 func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsFrameVar false → empty frame set as complete
+	ClearError()
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
@@ -88,6 +89,10 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
 		t.Fatal("incomplete frame stack must fail closed incomplete, not invent empty complete")
 	}
+	if !HasError() {
+		t.Fatal("incomplete frame stack must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCollectExpandable(t *testing.T) {

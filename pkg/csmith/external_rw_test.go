@@ -77,6 +77,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 }
 
 func TestGetExternalNoWritesFromIV(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_i", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	cg.AddIVBound(g, 10)
@@ -87,6 +88,7 @@ func TestGetExternalNoWritesFromIV(t *testing.T) {
 }
 
 func TestBuildCalleeRWDirective(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	rwd := cg.BuildCalleeRWDirective(nil)

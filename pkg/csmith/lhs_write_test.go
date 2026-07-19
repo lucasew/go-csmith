@@ -77,16 +77,22 @@ func TestAddEffectOptsIncludeLHS(t *testing.T) {
 	if EffectComplete(EmptyEffect().WriteVarSet([]*Variable{v, nil})) {
 		t.Fatal("WriteVarSet nil hole must fail closed incomplete")
 	}
-	// consolidate incomplete → IncompleteEffect
+	// consolidate incomplete → sticky IncompleteEffect
+	ClearError()
 	c := EmptyEffect()
 	c.read = map[*Variable]bool{nil: true}
 	c.Consolidate()
 	if EffectComplete(c) {
 		t.Fatal("Consolidate incomplete must yield IncompleteEffect")
 	}
+	if !HasError() {
+		t.Fatal("Consolidate incomplete must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	cg := EmptyCGContext()

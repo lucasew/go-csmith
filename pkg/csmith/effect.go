@@ -105,25 +105,29 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 
 // AddExternalEffectWithCallers mirrors Effect::add_external_effect(e, call_chain).
 // Effect.cpp:221–269 — globals always; non-globals only if on a call_chain stack frame.
-// Variable* always live in effect lists; nil hole fails closed (return e unchanged,
-// no invent partial external merge past holes). Incomplete Param/LocalVars on a
-// frame also fails closed (no invent not-on-chain via IsVarOnStack false past hole).
+// Variable* always live in effect lists; nil hole fails closed sticky IncompleteEffect
+// (no invent partial external merge past holes / soft re-pick). Incomplete Param/LocalVars
+// on a frame also fails closed sticky (no invent not-on-chain via IsVarOnStack false past hole).
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
-	// incomplete effect maps / call chain fail closed IncompleteEffect
+	// incomplete effect maps / call chain fail closed sticky IncompleteEffect
 	// (no invent leave-base empty-complete success)
 	if !EffectComplete(e) || !EffectComplete(other) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	reads := other.ReadVars()
 	writes := other.WrittenVars()
 	if !VariablesComplete(reads) || !VariablesComplete(writes) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	if !BlocksComplete(callChain) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	for _, b := range callChain {
 		if !b.StackScanComplete() {
+			SetError(ErrGeneric)
 			return IncompleteEffect()
 		}
 	}
@@ -169,10 +173,11 @@ func (e Effect) AddEffect(other Effect) Effect {
 }
 
 // AddEffectOpts mirrors Effect::add_effect(e, include_lhs_effects).
-// Variable* always live as map keys; incomplete either side fails closed
-// IncompleteEffect (no invent leave-base empty-complete merge success).
+// Variable* always live as map keys; incomplete either side fails closed sticky
+// IncompleteEffect (no invent leave-base empty-complete merge / soft re-pick past hole).
 func (e Effect) AddEffectOpts(other Effect, includeLHS bool) Effect {
 	if !EffectComplete(e) || !EffectComplete(other) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := e
@@ -707,14 +712,15 @@ func effectMapKeysComplete(m map[*Variable]bool) bool {
 
 // Consolidate mirrors Effect::consolidate.
 // Effect.cpp:456–475 — drop field reads/writes covered by parent aggregate access.
-// Incomplete maps fail closed IncompleteEffect (no invent partial deletes /
-// leave-base complete success past holes under random map order).
+// Incomplete maps fail closed sticky IncompleteEffect (no invent partial deletes /
+// leave-base complete success past holes under random map order / soft re-pick).
 func (e *Effect) Consolidate() {
 	if e == nil {
 		return
 	}
 	if e.incomplete || !effectMapKeysComplete(e.read) || !effectMapKeysComplete(e.written) {
 		*e = IncompleteEffect()
+		SetError(ErrGeneric)
 		return
 	}
 	// remove field reads when parent is also read
@@ -824,11 +830,12 @@ func (e Effect) CommentOutput() string {
 
 // MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).
 // Approximates StatementIf fact/effect merge without FactMgr.
-// Incomplete either arm fails closed IncompleteEffect (no invent pure/empty-complete
+// Incomplete either arm fails closed sticky IncompleteEffect (no invent pure/empty-complete
 // merge past incomplete map_stm_effect / accum holes — VisitFacts / generation would
-// treat merged as success and poison parent accum as complete).
+// treat merged as success and poison parent accum as complete / soft re-pick).
 func MergeEffects(a, b Effect) Effect {
 	if !EffectComplete(a) || !EffectComplete(b) {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	out := Effect{
@@ -839,6 +846,7 @@ func MergeEffects(a, b Effect) Effect {
 		out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
 		for k, v := range a.written {
 			if k == nil {
+				SetError(ErrGeneric)
 				return IncompleteEffect()
 			}
 			if v {
@@ -847,6 +855,7 @@ func MergeEffects(a, b Effect) Effect {
 		}
 		for k, v := range b.written {
 			if k == nil {
+				SetError(ErrGeneric)
 				return IncompleteEffect()
 			}
 			if v {
@@ -858,6 +867,7 @@ func MergeEffects(a, b Effect) Effect {
 		out.read = make(map[*Variable]bool, len(a.read)+len(b.read))
 		for k, v := range a.read {
 			if k == nil {
+				SetError(ErrGeneric)
 				return IncompleteEffect()
 			}
 			if v {
@@ -866,6 +876,7 @@ func MergeEffects(a, b Effect) Effect {
 		}
 		for k, v := range b.read {
 			if k == nil {
+				SetError(ErrGeneric)
 				return IncompleteEffect()
 			}
 			if v {

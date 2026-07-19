@@ -70,31 +70,36 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 
 // FindUnionPointees mirrors FactPointTo::find_union_pointees.
 // FactPointTo.cpp:807–829 — union fields referred via pointer expression.
-// Incomplete facts/pointees/expr fail closed IncompleteVariables (not bare nil —
-// VariablesComplete(nil)/len(nil)==0 invent empty-complete "no union" success).
+// Incomplete facts/pointees/expr fail closed sticky IncompleteVariables (not bare nil —
+// VariablesComplete(nil)/len(nil)==0 invent empty-complete "no union" success / soft re-pick).
 // Complete empty (no union pointees) returns non-nil empty.
 func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	if e == nil {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
-	// incomplete fact map fails closed before merge_pointees
+	// incomplete fact map fails closed sticky before merge_pointees
 	if facts != nil && !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	var vars []*Variable
 	switch e.Term {
 	case TermVariable, TermLhs:
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		// incomplete type IR must not invent level-0 merge as empty unions
 		ind, iok := e.IndirectLevelComplete()
 		if !iok {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = MergePointeesOfPointer(e.Var.GetCollective(), ind, facts)
 		// incomplete merge; empty non-nil = no pointees
 		if !VariablesComplete(vars) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 	default:
@@ -104,6 +109,7 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	unions := make([]*Variable, 0)
 	for _, v := range vars {
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		u := v.GetContainerUnion()

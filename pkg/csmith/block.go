@@ -135,15 +135,17 @@ func (b *Block) FromTailToHead() bool {
 // SetAccumulatedEffect mirrors Block::set_accumulated_effect.
 // Block.cpp:571–580 — union of map_stm_effect for each statement.
 // Statement::stm_id always live after create; StmID 0 is incomplete IR.
-// Incomplete stmts / effects fail closed IncompleteEffect (not EmptyEffect —
+// Incomplete stmts / effects fail closed sticky IncompleteEffect (not EmptyEffect —
 // IsEmpty/pure invent empty-complete block accum past StmID 0 soft-skip).
 func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 	if b == nil || fm == nil {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	// Block::stm_id always live; StmID 0 fails closed incomplete (no invent
+	// Block::stm_id always live; StmID 0 fails closed sticky incomplete (no invent
 	// empty-complete accum return without map_stm_effect[block] recorded)
 	if b.StmID <= 0 {
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	eff := EmptyEffect()
@@ -152,19 +154,24 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 		if st.StmID <= 0 {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
+			SetError(ErrGeneric)
 			return inc
 		}
-		// map_stm_effect[] defaults empty Effect in C++; incomplete map keys fail closed
+		// map_stm_effect[] defaults empty Effect in C++; incomplete map keys fail closed sticky
 		se := fm.GetMapStmEffect(st.StmID)
 		if !EffectComplete(se) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
+			SetError(ErrGeneric)
 			return inc
 		}
 		eff = eff.AddEffect(se)
 		if !EffectComplete(eff) {
 			inc := IncompleteEffect()
 			fm.SetMapStmEffect(b.StmID, inc)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return inc
 		}
 	}

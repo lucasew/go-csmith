@@ -42,7 +42,8 @@ func TestEnabledBuiltinKinds(t *testing.T) {
 }
 
 func TestGenerateParameterListFromStringAsserts(t *testing.T) {
-	// Function.cpp:350/355 — empty / mid Void fail closed
+	// Function.cpp:350/355 — empty / mid Void fail closed sticky
+	ClearError()
 	f := &Function{Name: "b"}
 	if GenerateParameterListFromString(f, "") {
 		t.Fatal("empty params")
@@ -51,10 +52,14 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 	if GenerateParameterListFromString(f2, "UInt, Void") {
 		t.Fatal("mid Void")
 	}
-	// IncompleteVariables — not bare nil invent empty-complete void Param
+	// IncompleteVariables sticky — not bare nil invent empty-complete void Param
 	if VariablesComplete(f2.Param) {
 		t.Fatal("mid Void fail must IncompleteVariables Param, not empty-complete")
 	}
+	if !HasError() {
+		t.Fatal("mid Void fail must SetError sticky")
+	}
+	ClearError()
 	f3 := &Function{Name: "b3"}
 	if !GenerateParameterListFromString(f3, "Void") {
 		t.Fatal("sole Void ok")
