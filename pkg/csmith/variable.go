@@ -1165,9 +1165,13 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		}
 	}
 	if v.Type.IsSimple() {
-		// Variable.cpp:1184–1188
+		// Variable.cpp:1184–1188 — name + printf_directive always live
+		// no invent printf with empty name/directive
 		name := v.GetActualName(false)
 		dir := v.Type.PrintfDirective()
+		if name == "" || dir == "" {
+			return ""
+		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
@@ -1192,6 +1196,9 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 	if v.Type.IsPointerLike() {
 		name := v.GetActualName(false)
 		dir := v.Type.PrintfDirective()
+		if name == "" || dir == "" {
+			return ""
+		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	return ""
@@ -1353,7 +1360,11 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return b.String()
 	}
 	if v.Type.IsSimple() {
+		// Variable.cpp:900–920 — name always live; no invent empty transparent_crc
 		name := v.GetActualName(false)
+		if name == "" || v.Name == "" {
+			return ""
+		}
 		if v.Type.IsFloat() {
 			return "    transparent_crc_bytes (&" + name + ", sizeof(" + name + "), \"" + v.Name + "\", print_hash_value);\n"
 		}

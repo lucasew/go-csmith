@@ -191,6 +191,10 @@ func outputExpressionVariable(v *Variable, want *Type) string {
 		ind = v.Type.IndirectLevel() - wt.IndirectLevel()
 	}
 	base := v.OutputC()
+	// ExpressionVariable always has live var Output; no invent "(***)" / "&" without base
+	if base == "" {
+		return ""
+	}
 	if ind > 0 {
 		return "(" + strings.Repeat("*", ind) + base + ")"
 	}

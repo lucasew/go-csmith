@@ -133,7 +133,7 @@ func TestOutputDeclNoInventEmptyName(t *testing.T) {
 }
 
 func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
-	// incomplete OutputDef must not invent "static \n" / blank lines
+	// incomplete OutputDef must not invent "static \n" / blank lines / section-only
 	opts := Defaults()
 	opts.ForceGlobalsStatic = true
 	g := NewProgramGenerator(opts)
@@ -141,8 +141,30 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	v := &Variable{Name: "g_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	g.VS.GlobalList = []*Variable{v}
 	out := g.OutputGlobals()
-	if strings.Contains(out, "static") || strings.Contains(out, "g_x") {
-		t.Fatal("empty def must not invent static shell", out)
+	if out != "" {
+		t.Fatal("all-empty globals must fail closed empty section", out)
+	}
+}
+
+func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
+	// Variable.cpp:1184 — name + directive always live
+	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
+		t.Fatal("empty name must fail closed dump", s)
+	}
+	if s := v.HashOutput(); s != "" {
+		t.Fatal("empty name must fail closed hash", s)
+	}
+}
+
+func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {
+	// ExpressionVariable Output requires live Variable::Output base
+	// UseVolRVal + volatile + nil type → OutputC empty; multi * must not invent
+	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, true)
+	v.UseVolRVal = true
+	v.Type = nil // force VOL_RVAL fail closed empty
+	if s := outputExpressionVariable(v, GetIntType()); s != "" {
+		t.Fatal("empty base must fail closed", s)
 	}
 }
 

@@ -281,8 +281,6 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	if g == nil || g.VS == nil || len(g.VS.GlobalList) == 0 {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString("/* --- GLOBAL VARIABLES --- */\n\n")
 	arrayByName := map[string]*ArrayVariable{}
 	for _, av := range g.VS.Arrays {
 		if av != nil {
@@ -291,6 +289,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	}
 	// C++ GlobalList may hold collective + itemized member; emit array def once
 	emittedArray := map[string]bool{}
+	var body strings.Builder
 	for _, v := range g.VS.GlobalList {
 		if v == nil || v.Type == nil {
 			continue
@@ -306,10 +305,10 @@ func (g *ProgramGenerator) OutputGlobals() string {
 				continue
 			}
 			if g.Opts.ForceGlobalsStatic {
-				b.WriteString("static ")
+				body.WriteString("static ")
 			}
-			b.WriteString(def)
-			b.WriteString("\n")
+			body.WriteString(def)
+			body.WriteString("\n")
 			continue
 		}
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
@@ -318,9 +317,16 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			// incomplete IR — no invent blank line
 			continue
 		}
-		b.WriteString(def)
-		b.WriteString("\n")
+		body.WriteString(def)
+		body.WriteString("\n")
 	}
+	// no invent section header without any live global defs
+	if body.Len() == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("/* --- GLOBAL VARIABLES --- */\n\n")
+	b.WriteString(body.String())
 	b.WriteString("\n")
 	return b.String()
 }
@@ -510,10 +516,16 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	var b strings.Builder
 	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
 	// OutputMgr.cpp:213–218 — GetMaxArrayDimension + get_new_ctrl_vars + OutputArrayCtrlVars
+	// no invent hash body without live ctrl decl when arrays need indices
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
 	if dimen > 0 {
 		ctrl := GetNewCtrlVars(g.Opts)
-		b.WriteString(OutputArrayCtrlVars(ctrl, dimen, "    "))
+		decl := OutputArrayCtrlVars(ctrl, dimen, "    ")
+		if decl == "" {
+			// incomplete ctrl IR (e.g. max_array_dimensions < dimen) — fail closed empty
+			return ""
+		}
+		b.WriteString(decl)
 	}
 	b.WriteString(g.hashGlobals())
 	b.WriteString("}\n")
@@ -568,11 +580,21 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			savedInit, savedExpr := av.Init, av.InitExpr
 			av.Init = zero
 			av.InitExpr = nil
-			b.WriteString(outputArrayInitForced(av, "    ", names, opts.PostIncrOperator))
+			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
+			// incomplete array init IR — no invent blank
+			if initOut == "" {
+				continue
+			}
+			b.WriteString(initOut)
 			continue
 		}
-		b.WriteString("    " + v.OutputC() + " = 0;\n")
+		// OutputMgr.cpp:337 — Variable::Output always live; no invent " = 0;" without name
+		out := v.OutputC()
+		if out == "" {
+			continue
+		}
+		b.WriteString("    " + out + " = 0;\n")
 	}
 	return b.String()
 }

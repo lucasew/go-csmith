@@ -741,6 +741,10 @@ func (av *ArrayVariable) OutputAccess() string {
 		return ""
 	}
 	name := av.GetActualName(false)
+	if name == "" {
+		// name always live; no invent bare indices without identifier
+		return ""
+	}
 	if av.Collective == nil {
 		return name
 	}
@@ -754,17 +758,26 @@ func (av *ArrayVariable) OutputAccess() string {
 	b.WriteString(name)
 	if len(av.IndexExprs) > 0 {
 		for _, e := range av.IndexExprs {
-			b.WriteString("[")
-			// ArrayVariable.cpp:548–552 — indices[i]->Output (if (1) path)
-			// nil index Expression* is broken IR — empty bracket fail closed
-			if e != nil {
-				b.WriteString(e.Output())
+			// ArrayVariable.cpp:548–552 — indices[i]->Output always live Expression*
+			// no invent empty brackets "[]" for nil/empty index Output
+			if e == nil {
+				return ""
 			}
+			idx := e.Output()
+			if idx == "" {
+				return ""
+			}
+			b.WriteString("[")
+			b.WriteString(idx)
 			b.WriteString("]")
 		}
 		return b.String()
 	}
 	for _, s := range av.Indices {
+		// const-itemize string indices always non-empty in C++
+		if s == "" {
+			return ""
+		}
 		b.WriteString("[")
 		b.WriteString(s)
 		b.WriteString("]")

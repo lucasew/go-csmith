@@ -281,6 +281,24 @@ func TestArrayCDeclTypeNoInventInt(t *testing.T) {
 	}
 }
 
+func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
+	// ArrayVariable.cpp:548 — indices[i]->Output always live; no invent "g_a[]"
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	item := &ArrayVariable{
+		Variable:  Variable{Name: "g_a", Type: GetIntType()},
+		Sizes:     []int{2},
+		Collective: parent,
+		IndexExprs: []*Expression{{Term: TermConstant}}, // nil Con → empty Output
+	}
+	if s := item.OutputAccess(); s != "" {
+		t.Fatal("empty index Output must fail closed", s)
+	}
+	item.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0)}}
+	if s := item.OutputAccess(); s != "g_a[0]" {
+		t.Fatal(s)
+	}
+}
+
 func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
 	av := &ArrayVariable{
