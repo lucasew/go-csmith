@@ -1039,11 +1039,14 @@ func (t *Type) IsUnnamedPadding(index int) bool {
 
 // IfStructWillHaveAssignOps mirrors Type::if_struct_will_have_assign_ops.
 // Type.cpp:505–510 — C++ only; flipcoin RegularVolatileProb.
+// Non-C++ is complete false. RNG always live under C++; sticky false (no invent
+// no-assign-ops soft-skip past hole). Nil probs → 0% (no invent default 50).
 func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool {
 	if !opts.LangCPP {
 		return false
 	}
 	if r == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)

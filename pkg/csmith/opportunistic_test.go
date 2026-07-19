@@ -164,6 +164,15 @@ func TestHasDereferenceableVar(t *testing.T) {
 	if HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
 		t.Fatal("dead")
 	}
+	// Type* always live; sticky no invent no-deref soft-skip
+	ClearError()
+	if HasDereferenceableVar([]*Variable{p}, nil, cg, opts) {
+		t.Fatal("nil typ HasDereferenceableVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil typ HasDereferenceableVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPartialVolatileAfterDeref(t *testing.T) {

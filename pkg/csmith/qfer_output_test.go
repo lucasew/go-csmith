@@ -534,6 +534,29 @@ func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
 		t.Fatal("incomplete alias decl must SetError sticky")
 	}
 	ClearError()
+	// Function always live at emit; sticky empty (no invent bare ";")
+	if out := (*Function)(nil).OutputForwardDecl(); out != "" {
+		t.Fatal("nil OutputForwardDecl must fail closed", out)
+	}
+	if !HasError() {
+		t.Fatal("nil OutputForwardDecl must SetError sticky")
+	}
+	ClearError()
+	if out := (*Function)(nil).OutputForwardDeclAlias(false); out != "" {
+		t.Fatal("nil OutputForwardDeclAlias must fail closed", out)
+	}
+	if !HasError() {
+		t.Fatal("nil OutputForwardDeclAlias must SetError sticky")
+	}
+	ClearError()
+	// builtins complete empty (compiler-provided)
+	if out := (&Function{Name: "abs", IsBuiltin: true}).OutputForwardDecl(); out != "" {
+		t.Fatal("builtin OutputForwardDecl must stay complete empty", out)
+	}
+	if HasError() {
+		t.Fatal("builtin OutputForwardDecl must not sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomLoopControlErrorReturn(t *testing.T) {

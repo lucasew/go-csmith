@@ -18,6 +18,23 @@ func TestHasInitSkippedVars(t *testing.T) {
 	if HasInitSkippedVars(inner, inner) {
 		t.Fatal("same")
 	}
+	// src nil sticky has-skipped (no invent none soft-skip past hole)
+	ClearError()
+	if !HasInitSkippedVars(nil, inner) {
+		t.Fatal("nil src HasInitSkippedVars must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil src HasInitSkippedVars must SetError sticky")
+	}
+	ClearError()
+	// destParent nil complete false
+	if HasInitSkippedVars(outer, nil) {
+		t.Fatal("nil dest complete false")
+	}
+	if HasError() {
+		t.Fatal("nil dest HasInitSkippedVars must stay non-sticky")
+	}
+	ClearError()
 }
 
 func TestFindGoodJumpBlock(t *testing.T) {

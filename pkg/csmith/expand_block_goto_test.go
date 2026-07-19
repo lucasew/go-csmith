@@ -52,6 +52,15 @@ func TestExpandBlockForGotoNilFM(t *testing.T) {
 	if ExpandBlockForGoto(b, EmptyCGContext()) != b {
 		t.Fatal("no-op without FM")
 	}
+	// Block always live; sticky no invent soft-skip expand past hole
+	ClearError()
+	if ExpandBlockForGoto(nil, EmptyCGContext()) != nil {
+		t.Fatal("nil ExpandBlockForGoto must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil ExpandBlockForGoto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpandBlockForGotoAssertB(t *testing.T) {

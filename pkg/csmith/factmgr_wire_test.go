@@ -481,4 +481,13 @@ func TestFindParentBlockNilSticky(t *testing.T) {
 		t.Fatal("StmID 0 FindParentBlockOfStmID must SetError sticky")
 	}
 	ClearError()
+	// Block* always live on Function.Blocks; nil hole sticky miss
+	f := &Function{Name: "f", Blocks: []*Block{nil}}
+	if FindParentBlockOfStmID(f, 1) != nil {
+		t.Fatal("nil Blocks hole FindParentBlockOfStmID must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Blocks hole FindParentBlockOfStmID must SetError sticky")
+	}
+	ClearError()
 }

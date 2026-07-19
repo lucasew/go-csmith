@@ -28,13 +28,18 @@ func TestMakeExpressionAssign(t *testing.T) {
 }
 
 func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
-	// no soft invent ExpressionAssign without FactMgr
+	// non-sticky soft re-pick without FactMgr (no invent assign Expression shell)
+	ClearError()
 	opts := Defaults()
 	c := EmptyCGContext()
 	e := MakeExpressionAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil)
 	if e != nil {
 		t.Fatal("nil FM must fail closed")
 	}
+	if HasError() {
+		t.Fatal("nil FM MakeExpressionAssign must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {

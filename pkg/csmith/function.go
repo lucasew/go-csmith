@@ -916,8 +916,14 @@ func (f *Function) OutputForwardDecl() string {
 
 // OutputForwardDeclOpts adds optional func __attribute__ and force_static.
 // Function.cpp:547–553 — OutputHeader + attrs + ";".
+// Function always live at emit; sticky empty (no invent bare ";" past hole).
+// Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs bool) string {
-	if f == nil || f.IsBuiltin {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if f.IsBuiltin {
 		return ""
 	}
 	s := f.OutputHeader(forceStatic)
@@ -980,8 +986,14 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 
 // OutputForwardDeclAlias mirrors Function::OutputForwardDeclAlias.
 // Function.cpp:555–559 — OutputHeaderAlias + ";".
+// Function always live at emit; sticky empty (no invent bare ";" past hole).
+// Builtins are complete empty (compiler-provided; not incomplete IR).
 func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
-	if f == nil || f.IsBuiltin {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if f.IsBuiltin {
 		return ""
 	}
 	s := f.OutputHeaderAlias(forceStatic)

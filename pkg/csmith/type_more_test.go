@@ -488,6 +488,15 @@ func TestIfStructAssignOps(t *testing.T) {
 			t.Fatal("nil probs must not invent assign-ops true at 50%")
 		}
 	}
+	// RNG always live under C++; sticky false (no invent no-assign-ops soft-skip)
+	ClearError()
+	if IfStructWillHaveAssignOps(nil, opts, NewProbabilities(opts)) {
+		t.Fatal("nil RNG IfStructWillHaveAssignOps must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG IfStructWillHaveAssignOps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMoreTypesProbabilityNilProbs(t *testing.T) {

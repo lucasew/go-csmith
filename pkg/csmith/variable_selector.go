@@ -528,8 +528,10 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 // ExpandBlockForGoto mirrors VariableSelector::expand_block_for_goto.
 // VariableSelector.cpp:765–787 — climb parents so new locals are visible at
 // both a goto dest inside b and the goto source outside b.
+// Block always live; sticky nil (no invent soft-skip expand past hole).
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	fm := cg.FM
@@ -1012,9 +1014,11 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 
 // HasDereferenceableVar mirrors VariableSelector::has_dereferenceable_var.
 // VariableSelector.cpp:198–210 — type is_dereferenced_from + is_valid_ptr.
-// Incomplete candidate list fails closed false (no invent skip hole).
+// Type* always live; sticky false (no invent no-deref soft-skip past hole).
+// Incomplete candidate list fails closed sticky false (no invent skip hole).
 func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Options) bool {
 	if typ == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// incomplete candidate list fails closed sticky (no invent skip hole)

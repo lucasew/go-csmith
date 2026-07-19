@@ -323,7 +323,9 @@ func FindParentBlockOfStmID(f *Function, stmID int) *Block {
 		return nil
 	}
 	for _, b := range f.Blocks {
+		// Block* always live on Function.Blocks; nil hole sticky miss (no invent soft-success)
 		if b == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if p := walk(b); p != nil {

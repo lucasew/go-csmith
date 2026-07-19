@@ -20,7 +20,9 @@ func MakeExpressionAssign(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// ExpressionAssign.cpp:56–57 / 61–62 — get_fact_mgr always live; no invent without FM
+	// ExpressionAssign.cpp:56–57 / 61–62 — get_fact_mgr always live in C++.
+	// non-sticky soft re-pick without FactMgr (sticky poisons soft factories / block
+	// gen under nil FM; invent would be empty assign Expression shell, not soft miss).
 	if cg.FM == nil {
 		return nil
 	}
