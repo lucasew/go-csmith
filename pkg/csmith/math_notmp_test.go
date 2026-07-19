@@ -79,4 +79,22 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	if !strings.Contains(out, "reads :") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)
 	}
+	// no invent blank name tokens in reads/writes lists
+	anon := &Variable{Type: GetIntType()}
+	eff := EmptyEffect().ReadVar(anon).WriteVar(g)
+	c := eff.CommentOutput()
+	if strings.Contains(c, "reads :  ") || strings.Contains(c, "reads :\n") {
+		// empty name skipped; only g_1 on writes
+	}
+	if strings.Contains(c, "reads : ") && !strings.Contains(c, "g_1") {
+		// reads list should not invent empty token alone with spurious content
+	}
+	if strings.Count(c, "writes:") != 1 || !strings.Contains(c, "g_1") {
+		t.Fatal(c)
+	}
+	// reads of empty name only → no blank token after colon beyond single space path
+	onlyAnon := EmptyEffect().ReadVar(anon).CommentOutput()
+	if strings.Contains(onlyAnon, "reads :  ") {
+		t.Fatal("empty name must not invent blank read token", onlyAnon)
+	}
 }

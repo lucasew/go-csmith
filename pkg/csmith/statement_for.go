@@ -536,7 +536,11 @@ func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 	if lc == nil || lc.IV == nil {
 		return ""
 	}
+	// StatementArrayOp.cpp:194–220 — cv->Output always live; no invent for ( = 0; …)
 	iv := lc.IV.OutputC()
+	if iv == "" {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString("for (")
 	b.WriteString(iv)

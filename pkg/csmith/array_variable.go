@@ -492,10 +492,20 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 			// magic index pick (ArrayVariable.cpp:448–452)
 			s := *seed
 			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
-			b.WriteString(initStrings[rnd])
+			// init string always live; no invent empty holes in brace list
+			part := initStrings[rnd]
+			if part == "" {
+				return ""
+			}
+			b.WriteString(part)
 			*seed = s + 1
 		} else {
-			b.WriteString(av.buildInitRecursive(dimen+1, initStrings, seed))
+			// nested braces always live; no invent "{, }" with empty child
+			part := av.buildInitRecursive(dimen+1, initStrings, seed)
+			if part == "" {
+				return ""
+			}
+			b.WriteString(part)
 		}
 	}
 	b.WriteString("}")
@@ -538,12 +548,22 @@ func (av *ArrayVariable) OutputDef() string {
 	if len(vals) == 0 {
 		return ""
 	}
+	// no invent empty holes in brace initializer list
+	for _, v := range vals {
+		if v == "" {
+			return ""
+		}
+	}
 	b.WriteString(decl)
 	// multi-dim or multi-value: recursive full initializer when total size small
 	if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
 		seed := uint32(0xABCDEF)
+		init := av.buildInitRecursive(0, vals, &seed)
+		if init == "" {
+			return ""
+		}
 		b.WriteString(" = ")
-		b.WriteString(av.buildInitRecursive(0, vals, &seed))
+		b.WriteString(init)
 	} else {
 		b.WriteString(" = {")
 		maxEmit := av.TotalSize()
@@ -561,9 +581,13 @@ func (av *ArrayVariable) OutputDef() string {
 	b.WriteString(";")
 	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
 	if av.IsGlobal() && av.IsVolatile() {
-		b.WriteString(" /* VOLATILE GLOBAL ")
-		b.WriteString(av.GetActualName(false))
-		b.WriteString(" */")
+		// name always live (CDeclType already requires Name); comment uses actual_name
+		nm := av.GetActualName(false)
+		if nm != "" {
+			b.WriteString(" /* VOLATILE GLOBAL ")
+			b.WriteString(nm)
+			b.WriteString(" */")
+		}
 	}
 	return b.String()
 }

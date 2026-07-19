@@ -261,6 +261,11 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	if out := e2.Output(); out != "" {
 		t.Fatal("cast with empty body must fail closed", out)
 	}
+	// Constant with empty Value — no invent empty token
+	e3 := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: ""}}
+	if out := e3.Output(); out != "" {
+		t.Fatal("empty Constant.Value must fail closed", out)
+	}
 }
 
 func TestExpressionCommaNoInventEmptySide(t *testing.T) {

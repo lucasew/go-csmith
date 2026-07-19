@@ -561,7 +561,8 @@ func (e Effect) CommentOutput() string {
 	b.WriteString(" * reads :")
 	rnames := make([]string, 0, len(e.read))
 	for v := range e.read {
-		if v != nil && e.read[v] {
+		// Effect.cpp: names from live Variable*; no invent blank tokens for empty Name
+		if v != nil && e.read[v] && v.Name != "" {
 			rnames = append(rnames, v.Name)
 		}
 	}
@@ -574,7 +575,7 @@ func (e Effect) CommentOutput() string {
 	b.WriteString(" * writes:")
 	names := make([]string, 0, len(e.written))
 	for v := range e.written {
-		if v != nil && e.written[v] {
+		if v != nil && e.written[v] && v.Name != "" {
 			names = append(names, v.Name)
 		}
 	}

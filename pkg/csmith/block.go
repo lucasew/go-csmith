@@ -896,27 +896,30 @@ func (b *Block) Output(indent int) string {
 				break
 			}
 			hdr := forHeaderOutput(st.Loop)
-			if hdr == "" {
+			bodyOut := st.Then.Output(indent + 1)
+			if hdr == "" || bodyOut == "" {
 				break
 			}
 			content.WriteString(hdr + "\n")
-			content.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(bodyOut)
 		case StmtIfElse:
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
-			// no invent if () / missing branches / empty test Output
+			// no invent if () / missing branches / empty test or branch Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
 				break
 			}
 			test := st.Expr.Output()
-			if test == "" {
+			thenOut := st.Then.Output(indent + 1)
+			elseOut := st.Else.Output(indent + 1)
+			if test == "" || thenOut == "" || elseOut == "" {
 				break
 			}
 			content.WriteString("if (")
 			content.WriteString(test)
 			content.WriteString(")\n")
-			content.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(thenOut)
 			content.WriteString(inner + "else\n")
-			content.WriteString(st.Else.Output(indent + 1))
+			content.WriteString(elseOut)
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output always live; no invent if () goto
 			if st.Label == "" || st.Expr == nil {
@@ -938,11 +941,12 @@ func (b *Block) Output(indent int) string {
 				break
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
-			if hdr == "" {
+			bodyOut := st.Then.Output(indent + 1)
+			if hdr == "" || bodyOut == "" {
 				break
 			}
 			content.WriteString(hdr + "\n")
-			content.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(bodyOut)
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
 			// no soft invent /* invoke */ or empty ";" when expr Output empty

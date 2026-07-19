@@ -179,6 +179,11 @@ func TestArrayOpHeaderNumeric(t *testing.T) {
 	if out != "for (i = 0; i < 10; i = i + 1)" {
 		t.Fatal(out)
 	}
+	// empty IV OutputC — no invent for ( = 0; …)
+	anon := &Variable{Type: GetIntType()}
+	if s := arrayOpHeaderOutput(&LoopControl{IV: anon, InitN: 0, LimitN: 3, IncrN: 1}, Defaults()); s != "" {
+		t.Fatal("empty IV name must fail closed arrayop header", s)
+	}
 }
 
 func TestMakeRandomContinueNotFirstFallsBack(t *testing.T) {

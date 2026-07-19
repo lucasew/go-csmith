@@ -878,7 +878,8 @@ func (e *Expression) outputBody() string {
 	}
 	switch e.Term {
 	case TermConstant:
-		if e.Con != nil {
+		// Constant::Output always live value; no invent empty token for incomplete Constant
+		if e.Con != nil && e.Con.Value != "" {
 			return e.Con.Value
 		}
 	case TermVariable:
