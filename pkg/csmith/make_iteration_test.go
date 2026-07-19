@@ -183,13 +183,21 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 }
 
 func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
-	// ArrayVariable* always live on must-use list; nil hole fails closed
+	// ArrayVariable* always live on must-use list; nil hole fails closed sticky
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
-	fm := NewFactMgr(nil)
-	cg := EmptyCGContext().WithFactMgr(fm)
+	// need live block for MakeIteration
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	// seed a loop-ctrl candidate so we reach must-use hole (not fail earlier on nil IV)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// plant incomplete MustUseArrays
@@ -197,11 +205,51 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	if MakeIteration(NewRng(1), opts, probs, vs, &cg) != nil {
 		t.Fatal("nil must-use array hole must fail closed MakeIteration")
 	}
+	if !HasError() {
+		t.Fatal("nil must-use array hole must SetError sticky")
+	}
+	ClearError()
 	// incomplete RW FindMustUseArrays
 	cg.MustUseArrays = nil
 	cg.RW = &RWDirective{MustReadVars: []*Variable{nil}}
 	if MakeIteration(NewRng(2), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete FindMustUseArrays must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete FindMustUseArrays must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestMakeIterationIncompleteAmbientFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if MakeIteration(NewRng(3), opts, probs, vs, &cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeIteration")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	if MakeIteration(NewRng(4), opts, probs, vs, &cg2) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeIteration")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearError()
 }

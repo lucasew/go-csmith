@@ -226,6 +226,17 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if cg.FM == nil || cg.CurrentBlock() == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky before EffectStm clear (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// StatementFor.cpp:176 — clear effect_stm before select
 	cg.EffectStm = EmptyEffect()
 
@@ -255,13 +266,23 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	}
 	if !cg.ReadIndices(iv, facts) {
 		// assert(read); no soft invent continue after failed index visit
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	cg.WriteVar(iv)
+	if HasError() {
+		return nil
+	}
 	cg.ReadVar(iv)
+	if HasError() {
+		return nil
+	}
 
 	// StatementFor.cpp:222 — assert(var->type)
 	if iv.Type == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	signed := iv.Type.IsSigned()
@@ -275,19 +296,21 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		found := cg.RW.FindMustUseArrays()
 		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
 		if found == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		mustArr = found
 	}
 	// StatementFor.cpp:208–214 — choose_ok_var among must-use arrays; assert(av)
 	// no soft invent scan-all-arrays when choose_ok_var returns nil
-	// ArrayVariable* always live on must-use list; nil hole fails closed
+	// ArrayVariable* always live on must-use list; nil hole fails closed sticky
 	// (no invent soft-skip hole as absent must-use array)
 	bound := InvalidIVBound
 	if len(mustArr) > 0 {
 		arrVars := make([]*Variable, 0, len(mustArr))
 		for _, av := range mustArr {
 			if av == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			arrVars = append(arrVars, &av.Variable)
@@ -295,6 +318,9 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		pick := ChooseOKVar(r, arrVars)
 		// StatementFor.cpp:210–211 — assert(av); library fail closed
 		if pick == nil || pick.AsArray == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		for _, sz := range pick.AsArray.Sizes {

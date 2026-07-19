@@ -313,9 +313,10 @@ func cgHasSignedCharIndex(vs *VariableSelector) bool {
 // ChooseOKVar mirrors VariableSelector::choose_ok_var(vector<Variable*>).
 // VariableSelector.cpp:318–337 — rnd pick; collective array → itemize.
 // ChooseOKVar picks one eligible variable (optionally itemizing arrays).
-// Incomplete candidate list fails closed (nil pick — no invent skip hole).
+// Incomplete candidate list fails closed sticky (nil pick — no invent skip hole).
 func ChooseOKVar(r *Rng, vars []*Variable) *Variable {
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	n := len(vars)
@@ -724,8 +725,9 @@ func (vs *VariableSelector) MakeInitValue(
 		return nil
 	}
 	vars := vs.FindAllVisibleVars(b)
-	// incomplete visible pool — fail closed (no invent choose from partial)
+	// incomplete visible pool — fail closed sticky (no invent choose from partial)
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	noUnion := !vs.Opts.TakeUnionFieldAddr
@@ -735,6 +737,7 @@ func (vs *VariableSelector) MakeInitValue(
 	if b == nil && vs.Opts.CComp {
 		invalid = vs.GetAllArrayVars()
 		if !VariablesComplete(invalid) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		chosen = ChooseVarFull(r, vars, access, cg, pointee, &qfer, MatchExact,
@@ -743,6 +746,7 @@ func (vs *VariableSelector) MakeInitValue(
 		if !vs.Opts.AddrTakenOfLocals {
 			invalid = GetAllLocalVars(b)
 			if !VariablesComplete(invalid) {
+				SetError(ErrGeneric)
 				return nil
 			}
 		}
@@ -975,22 +979,30 @@ func (vs *VariableSelector) SelectMustUseVar(
 	blk := cg.CurrentBlock()
 	// incomplete Param/LocalVars must not invent IsVisible false and skip must-use vars
 	if blk != nil && !blk.StackScanComplete() {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete must-use list fails closed sticky (no invent partial scan)
+	if !VariablesComplete(*list) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for i := 0; i < len(*list); i++ {
 		v := (*list)[i]
-		// Variable* always live in must-use lists; nil hole fails closed
+		// Variable* always live in must-use lists; nil hole fails closed sticky
 		// (no invent skip to next entry / partial must-use)
 		if v == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		// is_visible (VariableSelector.cpp:1523)
 		if !v.IsVisible(blk) {
 			continue
 		}
-		// Variable::type always live; Type-nil fails closed (no invent soft-skip
+		// Variable::type always live; Type-nil fails closed sticky (no invent soft-skip
 		// incomplete must-use entry and still pick a later list member)
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if !typ.Match(v.Type, mt) {
@@ -1075,16 +1087,18 @@ func ChooseVarFull(
 	invalidVars []*Variable,
 	noBitfield, noExpandStructUnion, noUnion bool,
 ) *Variable {
-	// incomplete candidate / invalid lists — fail closed (no invent choose past hole)
+	// incomplete candidate / invalid lists — fail closed sticky (no invent choose past hole)
 	if !VariablesComplete(vars) || !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if want == nil {
 		var ok []*Variable
 		for _, v := range vars {
-			// Variable::type always live; Type-nil fails closed (no invent eligible
+			// Variable::type always live; Type-nil fails closed sticky (no invent eligible
 			// without type IR via soft-skip)
 			if v.Type == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			if IsVariableInSet(invalidVars, v) {
@@ -1107,6 +1121,7 @@ func ChooseVarFull(
 	if !noExpandStructUnion && (want.IsSimple() || want.IsAggregate()) {
 		cands = ExpandStructUnionVars(vars, want)
 		if !VariablesComplete(cands) {
+			SetError(ErrGeneric)
 			return nil
 		}
 	}
@@ -1124,7 +1139,8 @@ func ChooseVarFull(
 	var ok []*Variable
 	for _, x := range cands {
 		if x.Type == nil {
-			// incomplete type IR — fail closed (no invent skip candidate)
+			// incomplete type IR — fail closed sticky (no invent skip candidate)
+			SetError(ErrGeneric)
 			return nil
 		}
 		// VariableSelector.cpp:424–429

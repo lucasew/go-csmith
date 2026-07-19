@@ -182,3 +182,22 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 		t.Log(v.Name)
 	}
 }
+
+func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
+	ClearError()
+	if ChooseOKVar(NewRng(1), []*Variable{nil}) != nil {
+		t.Fatal("incomplete list must fail closed ChooseOKVar")
+	}
+	if !HasError() {
+		t.Fatal("ChooseOKVar incomplete must SetError sticky")
+	}
+	ClearError()
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext(), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
+		t.Fatal("incomplete vars must fail closed ChooseVarFull")
+	}
+	if !HasError() {
+		t.Fatal("ChooseVarFull incomplete must SetError sticky")
+	}
+	ClearError()
+}

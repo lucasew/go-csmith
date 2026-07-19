@@ -57,6 +57,7 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 
 func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	// Variable::type always live; Type-nil candidate must not soft-skip filters
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -68,11 +69,14 @@ func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
 	cg := EmptyCGContext()
 	// may create a new var instead of broken; must never accept Type-nil
 	for seed := uint64(1); seed < 20; seed++ {
+		ClearError()
 		lhs := MakeRandomLhs(NewRng(seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
 		if lhs != nil && lhs.Var == broken {
 			t.Fatal("Type-nil var must not be accepted as Lhs")
 		}
 	}
+	// sticky after incomplete type IR in select — clear for suite
+	ClearError()
 }
 
 func TestLhsOutputVolLval(t *testing.T) {

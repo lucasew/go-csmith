@@ -21,6 +21,7 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 
 func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	// VariableSelector::choose_ok_var
+	ClearError()
 	a := CreateVariableScalars("g_1", GetSimpleType(EInt), false, false)
 	b := CreateVariableScalars("g_2", GetSimpleType(EInt), false, false)
 	c := CreateVariableScalars("g_3", GetSimpleType(EInt), false, false)
@@ -28,10 +29,14 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	if ChooseOKVar(NewRng(2), nil) != nil {
 		t.Fatal("empty")
 	}
-	// nil hole fails closed — no invent skip as absent candidate
+	// nil hole fails closed sticky — no invent skip as absent candidate
 	if ChooseOKVar(NewRng(2), []*Variable{a, nil, b}) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil hole must SetError sticky")
+	}
+	ClearError()
 	if ChooseOKVar(NewRng(2), []*Variable{a}) != a {
 		t.Fatal("sole")
 	}

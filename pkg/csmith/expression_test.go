@@ -312,6 +312,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 		t.Fatal("nil typ must not invent ExpressionVariable")
 	}
 	// Variable::type always live; Type-nil candidate must not soft-skip filters to success
+	ClearError()
 	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
 	broken.Type = nil
 	vs.GlobalList = []*Variable{broken}
@@ -321,6 +322,8 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if evBroken != nil && evBroken.Var == broken {
 		t.Fatal("Type-nil var must not be accepted as ExpressionVariable")
 	}
+	// sticky ERROR_GUARD after incomplete type IR (ChooseVarFull) — clear for suite
+	ClearError()
 }
 
 func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {

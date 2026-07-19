@@ -35,6 +35,7 @@ func TestSelectMustUseVar(t *testing.T) {
 
 func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	// Variable::type always live; Type-nil must not soft-skip to a later candidate
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f"}
@@ -48,10 +49,15 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
 		t.Fatal("Type-nil must-use entry must fail closed whole select")
 	}
+	if !HasError() {
+		t.Fatal("Type-nil must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestChooseVarFullWantNilTypeNil(t *testing.T) {
-	// want==nil path: Type-nil candidate must fail closed, not invent eligible
+	// want==nil path: Type-nil candidate must fail closed sticky, not invent eligible
+	ClearError()
 	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
 	broken.Type = nil
 	good := CreateVariableScalars("g_good", GetIntType(), false, false)
@@ -59,6 +65,10 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 		nil, nil, MatchFlexible, nil, false, false, false) != nil {
 		t.Fatal("Type-nil with want==nil must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("Type-nil must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSelectMustUseArrayItemize(t *testing.T) {
