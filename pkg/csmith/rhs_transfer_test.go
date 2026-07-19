@@ -299,6 +299,44 @@ func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 	}
 }
 
+func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
+	// RV Type* always live; Type-nil no invent scalar rv soft-transfer past hole
+	ClearError()
+	InvocationReturnFactsDoFinalization()
+	defer InvocationReturnFactsDoFinalization()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
+	fn.RV = &Variable{Name: "f_rv", Type: nil}
+	fi := &Invocation{User: fn}
+	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+		t.Fatal("Type-nil RV must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil RV RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestRhsToLhsTransferUnionParentTypeNilSticky(t *testing.T) {
+	// union constant field0 path: parent Type* always live
+	ClearError()
+	parent := &Variable{Name: "g_u", Type: nil}
+	f0 := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: parent}
+	parent.FieldVars = []*Variable{f0}
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
+	}}
+	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: ut, Value: "{0}"}, ExprType: ut}
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{f0}, rhs)) {
+		t.Fatal("Type-nil union parent must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil union parent RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRhsToLhsTransferUnionAggregateFields(t *testing.T) {
 	// FactPointTo.cpp:172 + 210–224 — only pointer/union pass early type gate;
 	// union RHS maps pointer fields pairwise (struct RHS is garbage early).

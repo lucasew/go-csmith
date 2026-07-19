@@ -134,6 +134,15 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil lhs lhsAssignPointees must SetError sticky")
 	}
 	ClearError()
+	// Type-nil non-special sticky (no invent empty lvars soft-complete past hole)
+	hole := &Variable{Name: "g_hole", Type: nil}
+	if VariablesComplete(lhsAssignPointees(facts, hole, 0)) {
+		t.Fatal("Type-nil lhs must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil lhs lhsAssignPointees must SetError sticky")
+	}
+	ClearError()
 	if _, ok := applyPointToAssignFacts(&facts, nil, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
 		t.Fatal("nil lhs pointees must fail closed ok=false, not invent renew/merge")
 	}

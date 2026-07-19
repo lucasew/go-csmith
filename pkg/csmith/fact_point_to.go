@@ -360,14 +360,22 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:186–193 — union constant field0 "0" → null on field0 pointers
 		if rt.IsUnion() {
 			lv0 := lvars[0]
-			if lv0 != nil && lv0.FieldVarOf != nil && lv0.FieldVarOf.Type != nil &&
-				lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
-				// Constant::get_field(0) == "0"
-				if rhs.Con != nil && rhs.Con.GetField(0) == "0" {
-					return MakeFactsPointTo(lvars, NullPtr)
-				}
-				if rhs.EqualsInt(0) {
-					return MakeFactsPointTo(lvars, NullPtr)
+			if lv0 != nil && lv0.FieldVarOf != nil {
+				// parent Type* always live; Type-nil sticky (no invent GarbagePtr
+				// complete soft-skip past incomplete union-parent shell)
+				if lv0.FieldVarOf.Type == nil {
+					if !IsSpecialPtr(lv0.FieldVarOf) {
+						SetError(ErrGeneric)
+						return IncompleteFactSlice()
+					}
+				} else if lv0.FieldVarOf.Type.IsUnion() && lv0.GetFieldID() == 0 {
+					// Constant::get_field(0) == "0"
+					if rhs.Con != nil && rhs.Con.GetField(0) == "0" {
+						return MakeFactsPointTo(lvars, NullPtr)
+					}
+					if rhs.EqualsInt(0) {
+						return MakeFactsPointTo(lvars, NullPtr)
+					}
 				}
 			}
 			return MakeFactsPointTo(lvars, GarbagePtr)
@@ -460,7 +468,19 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return IncompleteFactSlice()
 		}
 		fn := fi.User
-		if fn.RV != nil && fn.RV.Type != nil && fn.RV.Type.IsAggregate() {
+		if fn.RV == nil {
+			// incomplete RV shell — non-sticky hole (soft re-pick factories)
+			return IncompleteFactSlice()
+		}
+		// FactPointTo.cpp:236 — fiu->get_type() / rv always live Type*; Type-nil sticky
+		// (no invent scalar rv_fact soft-transfer past incomplete aggregate RV type)
+		// Special null/garbage/tbd have Type nil by design — complete non-aggregate path.
+		if fn.RV.Type == nil {
+			if !IsSpecialPtr(fn.RV) {
+				SetError(ErrGeneric)
+				return IncompleteFactSlice()
+			}
+		} else if fn.RV.Type.IsAggregate() {
 			ptrs := fn.RV.FindPointerFields()
 			if !VariablesComplete(ptrs) {
 				// FieldVars hole sticky
@@ -492,10 +512,6 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				ret = append(ret, fp)
 			}
 			return ret
-		}
-		if fn.RV == nil {
-			// incomplete RV shell — non-sticky hole (soft re-pick factories)
-			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:250–252 — missing rv_fact during generation is non-sticky
 		// hole (soft re-pick AddParamFacts / call factories; no invent GarbagePtr)
@@ -575,8 +591,17 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 				u = cu
 			} else {
 				// walk FieldVarOf until Type is union
+				// Type* always live on ancestry; Type-nil non-special sticky
+				// (no invent soft-skip incomplete parent past walk to assert)
 				for cur := u; cur != nil; cur = cur.FieldVarOf {
-					if cur.Type != nil && cur.Type.IsUnion() {
+					if cur.Type == nil {
+						if !IsSpecialPtr(cur) {
+							SetError(ErrGeneric)
+							return IncompleteFactSlice()
+						}
+						continue
+					}
+					if cur.Type.IsUnion() {
 						u = cur
 						break
 					}

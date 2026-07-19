@@ -1432,6 +1432,13 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
+	// Type* always live for abstract LHS; Type-nil non-special sticky
+	// (no invent complete [lhs] soft-success / empty lvars past incomplete type shell)
+	// Special null/garbage/tbd have Type nil by design — complete path below.
+	if lhs.Type == nil && !IsSpecialPtr(lhs) {
+		SetError(ErrGeneric)
+		return IncompleteVariables()
+	}
 	// incomplete map non-sticky hole (fact-map soft re-pick factories)
 	if !FactsComplete(facts) {
 		return IncompleteVariables()
@@ -1447,7 +1454,8 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 		// missing exist_fact / incomplete merge non-sticky (soft re-pick)
 		return IncompleteVariables()
 	}
-	if lhsIndir == 0 && lhs.Type != nil && lhs.Type.ptrTo != nil && len(lvars) == 0 {
+	// FactMgr / abstract LHS pointer fallback when merge empty at indir 0
+	if lhsIndir == 0 && len(lvars) == 0 && lhs.Type != nil && lhs.Type.ptrTo != nil {
 		lvars = []*Variable{coll}
 	}
 	return lvars
