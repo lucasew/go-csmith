@@ -787,16 +787,18 @@ func (b *Block) Output(indent int) string {
 		sb.WriteString(inner)
 		switch st.Kind {
 		case StmtReturn:
-			// StatementReturn.cpp:125–134 — DEPTH-- before return when depth_protect
+			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
+			if st.Expr == nil {
+				// incomplete IR — no soft invent "return;" without var
+				break
+			}
+			// DEPTH-- before return when depth_protect
 			if b.EmitDepthProtect {
 				sb.WriteString("DEPTH--;\n")
 				sb.WriteString(inner)
 			}
-			sb.WriteString("return")
-			if st.Expr != nil {
-				sb.WriteString(" " + st.Expr.Output())
-			}
-			sb.WriteString(";\n")
+			// StatementReturn.cpp:131–133 — "return " + var.Output + ";"
+			sb.WriteString("return " + st.Expr.Output() + ";\n")
 		case StmtAssign:
 			// StatementArrayOp init body: aggregate constant needs tmp
 			// StatementArrayOp.cpp:237–248
@@ -820,19 +822,23 @@ func (b *Block) Output(indent int) string {
 			}
 			// incomplete assign IR — no soft invent /* assign */
 		case StmtBreak:
-			// StatementBreak.cpp:117–118 — test.Output; no soft invent "1"
-			sb.WriteString("if (")
-			if st.Expr != nil {
-				sb.WriteString(st.Expr.Output())
+			// StatementBreak.cpp:117–118 — test.Output always live; no invent if () break
+			if st.Expr == nil {
+				// incomplete IR — no soft invent "if () break"
+				break
 			}
+			sb.WriteString("if (")
+			sb.WriteString(st.Expr.Output())
 			sb.WriteString(")\n")
 			sb.WriteString(inner + "    break;\n")
 		case StmtContinue:
-			// StatementContinue.cpp — if (test) continue; no soft invent "1"
-			sb.WriteString("if (")
-			if st.Expr != nil {
-				sb.WriteString(st.Expr.Output())
+			// StatementContinue.cpp — test.Output always live; no invent if () continue
+			if st.Expr == nil {
+				// incomplete IR — no soft invent "if () continue"
+				break
 			}
+			sb.WriteString("if (")
+			sb.WriteString(st.Expr.Output())
 			sb.WriteString(")\n")
 			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
@@ -847,30 +853,27 @@ func (b *Block) Output(indent int) string {
 			// incomplete for IR — no soft invent /* for-stub */
 		case StmtIfElse:
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
-			// no soft invent "0" test or empty "{}" branches
+			// no invent if () / missing branches
+			if st.Expr == nil || st.Then == nil || st.Else == nil {
+				// incomplete IR — no soft invent partial if
+				break
+			}
 			sb.WriteString("if (")
-			if st.Expr != nil {
-				sb.WriteString(st.Expr.Output())
-			}
+			sb.WriteString(st.Expr.Output())
 			sb.WriteString(")\n")
-			if st.Then != nil {
-				sb.WriteString(st.Then.Output(indent + 1))
-			}
-			if st.Else != nil {
-				sb.WriteString(inner + "else\n")
-				sb.WriteString(st.Else.Output(indent + 1))
-			}
+			sb.WriteString(st.Then.Output(indent + 1))
+			sb.WriteString(inner + "else\n")
+			sb.WriteString(st.Else.Output(indent + 1))
 		case StmtGoto:
-			// StatementGoto.cpp:252–253 — test.Output; no soft invent "0"
-			if st.Label != "" {
-				sb.WriteString("if (")
-				if st.Expr != nil {
-					sb.WriteString(st.Expr.Output())
-				}
-				sb.WriteString(")\n")
-				sb.WriteString(inner + "    goto " + st.Label + ";\n")
+			// StatementGoto.cpp:252–253 — test.Output always live; no invent if () goto
+			if st.Label == "" || st.Expr == nil {
+				// incomplete goto IR — no soft invent /* goto-stub */ or if () goto
+				break
 			}
-			// incomplete goto IR — no soft invent /* goto-stub */
+			sb.WriteString("if (")
+			sb.WriteString(st.Expr.Output())
+			sb.WriteString(")\n")
+			sb.WriteString(inner + "    goto " + st.Label + ";\n")
 		case StmtArrayOp:
 			// StatementArrayOp::output_header + body/init block always live
 			// not StatementFor StatementAssign IR (InitStmt empty on array dims)

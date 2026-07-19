@@ -32,10 +32,14 @@ func TestMakeExpressionComma(t *testing.T) {
 	if !strings.HasPrefix(out, "(") || !strings.HasSuffix(out, ")") {
 		t.Fatal(out)
 	}
-	// no soft invent "0" for missing sides
+	// ExpressionComma always has live lhs/rhs; no invent "( , )" for missing sides
 	bare := &Expression{Term: TermCommaExpr}
-	if bare.Output() != "( , )" {
-		t.Fatalf("want empty sides, got %q", bare.Output())
+	if bare.Output() != "" {
+		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.Output())
+	}
+	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)}}
+	if oneSide.Output() != "" {
+		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.Output())
 	}
 }
 

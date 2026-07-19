@@ -51,6 +51,35 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 	}
 }
 
+func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
+	// StatementBreak/Continue/Goto/If always have live test Expression*; no invent if ()
+	out := (&Block{Stmts: []Stmt{{Kind: StmtBreak}}}).Output(0)
+	if strings.Contains(out, "break") || strings.Contains(out, "if (") {
+		t.Fatal("incomplete break must not invent if () break", out)
+	}
+	out = (&Block{Stmts: []Stmt{{Kind: StmtContinue}}}).Output(0)
+	if strings.Contains(out, "continue") || strings.Contains(out, "if (") {
+		t.Fatal("incomplete continue must not invent if () continue", out)
+	}
+	out = (&Block{Stmts: []Stmt{{Kind: StmtGoto, Label: "lbl"}}}).Output(0)
+	if strings.Contains(out, "goto") || strings.Contains(out, "if (") {
+		t.Fatal("incomplete goto must not invent if () goto", out)
+	}
+	// StatementIf always has test + both branches
+	out = (&Block{Stmts: []Stmt{{
+		Kind: StmtIfElse,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{},
+	}}}).Output(0)
+	if strings.Contains(out, "if (") {
+		t.Fatal("if without else must not invent partial if", out)
+	}
+	out = (&Block{Stmts: []Stmt{{Kind: StmtReturn}}}).Output(0)
+	if strings.Contains(out, "return") {
+		t.Fatal("incomplete return must not invent bare return;", out)
+	}
+}
+
 func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	// StatementBreak.cpp:72 assert(b) — no soft invent break without looping parent
 	opts := Defaults()

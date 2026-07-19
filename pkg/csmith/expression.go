@@ -898,15 +898,11 @@ func (e *Expression) outputBody() string {
 		}
 	case TermCommaExpr:
 		// ExpressionComma.cpp:137–144 — "(" + lhs + " , " + rhs + ")"
-		// no soft invent "0" for nil sides (C++ always has live lhs/rhs)
-		l, r := "", ""
-		if e.CommaLHS != nil {
-			l = e.CommaLHS.Output()
+		// C++ always has live lhs/rhs references; no invent "( , )" for nil sides
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return ""
 		}
-		if e.CommaRHS != nil {
-			r = e.CommaRHS.Output()
-		}
-		return "(" + l + " , " + r + ")"
+		return "(" + e.CommaLHS.Output() + " , " + e.CommaRHS.Output() + ")"
 	}
 	// Expression.cpp:195–200 default: no emit invent; incomplete IR → empty
 	return ""
