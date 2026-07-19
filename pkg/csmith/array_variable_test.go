@@ -299,6 +299,20 @@ func TestArrayOutputAccessNoInventEmptyIndex(t *testing.T) {
 	}
 }
 
+func TestOutputWithIndicesNoInventEmptyBracket(t *testing.T) {
+	// ArrayVariable.cpp:708 — cvs[i] always live; no invent "g_a[]"
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
+	if s := av.OutputWithIndices([]string{"i"}); s != "" {
+		t.Fatal("short ctrl must fail closed", s)
+	}
+	if s := av.OutputWithIndices([]string{"i", ""}); s != "" {
+		t.Fatal("empty ctrl name must fail closed", s)
+	}
+	if s := av.OutputWithIndices([]string{"i", "j"}); s != "g_a[i][j]" {
+		t.Fatal(s)
+	}
+}
+
 func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
 	av := &ArrayVariable{
@@ -368,8 +382,8 @@ func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
 	if got := av.OutputWithIndices([]string{"i", "j"}); got != "g_a[i][j]" {
 		t.Fatal(got)
 	}
-	// undersized / empty ctrl: empty slots, not invent letters
-	if got := av.OutputWithIndices(nil); got != "g_a[][]" {
+	// undersized / empty ctrl: fail closed empty (no invent letters or "g_a[][]")
+	if got := av.OutputWithIndices(nil); got != "" {
 		t.Fatalf("no letter invent, got %q", got)
 	}
 	// OutputInit without full ctrl aborts (no soft letters)

@@ -233,13 +233,12 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	if len(g.Types.StructTypes) == 0 && len(g.Types.UnionTypes) == 0 {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString("/* --- STRUCT/UNION TYPES --- */\n\n")
 	var structAttr, unionAttr *AttributeGenerator
 	if g.Opts.TypeAttributes {
 		structAttr = EnsureStructTypeAttrGenerator()
 		unionAttr = EnsureUnionTypeAttrGenerator()
 	}
+	var body strings.Builder
 	for _, st := range g.Types.StructTypes {
 		if st == nil {
 			continue
@@ -254,8 +253,8 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		if decl == "" {
 			continue
 		}
-		b.WriteString(decl)
-		b.WriteString("\n")
+		body.WriteString(decl)
+		body.WriteString("\n")
 	}
 	for _, ut := range g.Types.UnionTypes {
 		if ut == nil {
@@ -270,9 +269,16 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		if decl == "" {
 			continue
 		}
-		b.WriteString(decl)
-		b.WriteString("\n")
+		body.WriteString(decl)
+		body.WriteString("\n")
 	}
+	// no invent section header without live type decls
+	if body.Len() == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("/* --- STRUCT/UNION TYPES --- */\n\n")
+	b.WriteString(body.String())
 	return b.String()
 }
 
@@ -513,20 +519,21 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	if g == nil || !g.Opts.StepHashByStmt || !g.Opts.ComputeHash {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
 	// OutputMgr.cpp:213–218 — GetMaxArrayDimension + get_new_ctrl_vars + OutputArrayCtrlVars
-	// no invent hash body without live ctrl decl when arrays need indices
+	// prepare ctrl decl first; no invent partial function shell on incomplete ctrl IR
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
+	var ctrlDecl string
 	if dimen > 0 {
 		ctrl := GetNewCtrlVars(g.Opts)
-		decl := OutputArrayCtrlVars(ctrl, dimen, "    ")
-		if decl == "" {
+		ctrlDecl = OutputArrayCtrlVars(ctrl, dimen, "    ")
+		if ctrlDecl == "" {
 			// incomplete ctrl IR (e.g. max_array_dimensions < dimen) — fail closed empty
 			return ""
 		}
-		b.WriteString(decl)
 	}
+	var b strings.Builder
+	b.WriteString("\nvoid csmith_compute_hash(void)\n{\n")
+	b.WriteString(ctrlDecl)
 	b.WriteString(g.hashGlobals())
 	b.WriteString("}\n")
 	// OutputMgr::OutputStepHashFuncDef — OutputMgr.cpp:170–201

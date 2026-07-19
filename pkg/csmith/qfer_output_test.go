@@ -146,6 +146,26 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	}
 }
 
+func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
+	// incomplete / empty decls must not invent section-only header
+	g := NewProgramGenerator(Defaults())
+	g.Types.StructTypes = []*Type{{isStruct: true}} // unnamed → empty decl
+	if out := g.OutputStructTypes(); out != "" {
+		t.Fatal("empty struct decls must fail closed section", out)
+	}
+}
+
+func TestBlockLocalNoInventEmptyDef(t *testing.T) {
+	// incomplete local OutputDef must not invent blank indent lines
+	b := &Block{LocalVars: []*Variable{
+		{Name: "l_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // no init
+	}}
+	out := b.Output(0)
+	if strings.Contains(out, "l_x") {
+		t.Fatal("empty local def must not invent", out)
+	}
+}
+
 func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 	// Variable.cpp:1184 — name + directive always live
 	v := &Variable{Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}

@@ -733,7 +733,6 @@ func (b *Block) Output(indent int) string {
 		if lv == nil || lv.Type == nil {
 			continue
 		}
-		sb.WriteString(inner)
 		if lv.IsArray {
 			av := lv.AsArray
 			if av == nil && len(lv.ArraySizes) > 0 {
@@ -744,7 +743,13 @@ func (b *Block) Output(indent int) string {
 				}
 			}
 			if av != nil {
-				sb.WriteString(av.OutputDef())
+				// incomplete array def — no invent indent-only / blank lines
+				def := av.OutputDef()
+				if def == "" {
+					continue
+				}
+				sb.WriteString(inner)
+				sb.WriteString(def)
 				sb.WriteString("\n")
 				if !av.NoLoopInitializer() {
 					loopInits = append(loopInits, av)
@@ -756,7 +761,13 @@ func (b *Block) Output(indent int) string {
 			}
 		}
 		// Variable::Output for locals (no force static)
-		sb.WriteString(lv.OutputDef(false))
+		def := lv.OutputDef(false)
+		if def == "" {
+			// incomplete IR — no invent blank local line
+			continue
+		}
+		sb.WriteString(inner)
+		sb.WriteString(def)
 		sb.WriteString("\n")
 	}
 	// OutputArrayInitializers for locals without brace init
@@ -765,10 +776,18 @@ func (b *Block) Output(indent int) string {
 		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
 		opts := ProcessOptions()
 		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
-		sb.WriteString(OutputArrayCtrlVars(ctrlVars, maxDim, inner))
-		ctrl := CtrlVarNames(ctrlVars)
-		for _, av := range loopInits {
-			sb.WriteString(av.OutputInit(inner, ctrl))
+		// no invent inits without live ctrl decl
+		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
+		if decl != "" {
+			sb.WriteString(decl)
+			ctrl := CtrlVarNames(ctrlVars)
+			for _, av := range loopInits {
+				initOut := av.OutputInit(inner, ctrl)
+				if initOut == "" {
+					continue
+				}
+				sb.WriteString(initOut)
+			}
 		}
 	}
 	for _, st := range b.Stmts {
@@ -781,7 +800,12 @@ func (b *Block) Output(indent int) string {
 		// Statement.cpp:911–913 — output_skipped_var_inits after label is commented out upstream
 		_ = isGotoTarget
 		if st.Kind == StmtLabel {
-			sb.WriteString(inner + "    ;\n")
+			// Statement label is empty statement after pre_output label:
+			// only emit ";" when a label was actually written (goto target)
+			// no invent bare ";" without label
+			if pre != "" {
+				sb.WriteString(inner + "    ;\n")
+			}
 			continue
 		}
 		sb.WriteString(inner)

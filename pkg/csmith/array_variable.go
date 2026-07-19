@@ -587,14 +587,25 @@ func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 	if av == nil {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString(av.GetActualName(false))
+	name := av.GetActualName(false)
+	if name == "" {
+		return ""
+	}
+	// C++ cvs sized for get_dimension(); no invent empty "[]" when ctrl short/empty
+	if len(ctrl) < len(av.Sizes) {
+		return ""
+	}
 	for i := range av.Sizes {
-		b.WriteString("[")
-		// ArrayVariable.cpp:708–709 — cvs[i]->Output(out); no soft i/j/k
-		if i < len(ctrl) {
-			b.WriteString(ctrl[i])
+		if ctrl[i] == "" {
+			return ""
 		}
+	}
+	var b strings.Builder
+	b.WriteString(name)
+	for i := range av.Sizes {
+		// ArrayVariable.cpp:708–709 — cvs[i]->Output(out); always live
+		b.WriteString("[")
+		b.WriteString(ctrl[i])
 		b.WriteString("]")
 	}
 	return b.String()
