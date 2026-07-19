@@ -28,16 +28,29 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 }
 
 func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
-	// ArrayVariable.cpp:127–133 — assert type/void; ERROR_GUARD after rnd_upto(99)
-	// void/nil/empty name fail closed non-sticky (Create soft re-pick factory path)
+	// ArrayVariable.cpp:127–133 — assert type/void sticky; ERROR_GUARD after rnd_upto(99)
 	ClearError()
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("void element must SetError sticky")
+	}
+	ClearError()
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeInt(0), q) != nil {
 		t.Fatal("nil element must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil element must SetError sticky")
+	}
+	ClearError()
+	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntType(), MakeInt(0), q) != nil {
+		t.Fatal("empty name must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty name must SetError sticky")
 	}
 	ClearError()
 	SetError(ErrGeneric)

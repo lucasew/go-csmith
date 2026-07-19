@@ -78,8 +78,9 @@ func MakeRandomReturn(
 	vs *VariableSelector,
 	cg *CGContext,
 ) Stmt {
-	// StatementReturn.cpp nullptr — empty Stmt (no invent Kind-only return shell)
+	// StatementReturn.cpp nullptr sticky — empty Stmt (no invent Kind-only return shell)
 	if r == nil || cg == nil || cg.CurrentFunc == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent return / soft re-pick past holes)

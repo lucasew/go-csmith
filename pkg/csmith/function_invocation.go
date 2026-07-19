@@ -805,8 +805,9 @@ func MakeRandomBinaryInvocation(
 	cg *CGContext,
 	typ *Type,
 ) *Invocation {
-	// FunctionInvocation.cpp always has RNG + CGContext; no invent binary shell without them
+	// FunctionInvocation.cpp always has RNG + CGContext sticky; no invent binary shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent binary / soft re-pick past holes)
@@ -1227,8 +1228,9 @@ func MakeRandomUnaryInvocation(
 	cg *CGContext,
 	typ *Type,
 ) *Invocation {
-	// FunctionInvocation.cpp always has RNG + CGContext; no invent unary shell without them
+	// FunctionInvocation.cpp always has RNG + CGContext sticky; no invent unary shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent unary / soft re-pick past holes)

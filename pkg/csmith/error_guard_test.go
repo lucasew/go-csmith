@@ -32,12 +32,24 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 }
 
 func TestMakeRandomBlockRequiresCurrentFunc(t *testing.T) {
-	// Block.cpp:120 — assert(curr_func); no soft invent parentless block
+	// Block.cpp:120 — assert(curr_func) sticky; no soft invent parentless block
+	ClearError()
 	opts := Defaults()
 	cg := EmptyCGContext()
 	if MakeRandomBlock(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil CurrentFunc must SetError sticky")
+	}
+	ClearError()
+	if MakeRandomBlock(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomBlockAbortsOnStickyError(t *testing.T) {

@@ -47,12 +47,14 @@ func CreateArrayVariable(
 	init *Constant,
 	qfer CVQualifiers,
 ) *ArrayVariable {
-	// ArrayVariable.cpp:127–129 — assert(type); assert simple != eVoid
-	// name always live from gensym; no invent empty-name array shell
+	// ArrayVariable.cpp:127–129 — assert(type); assert simple != eVoid sticky
+	// name always live from gensym; sticky no invent empty-name array shell
 	if r == nil || elem == nil || name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if elem.IsSimple() && elem.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky when CG is live (make_init_value path)

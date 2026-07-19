@@ -57,6 +57,14 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	// (sticky poisons MakeRandomFor / generation when return path re-picks)
 	ClearError()
 	opts := Defaults()
+	// sticky without RNG
+	if stmtOK(MakeRandomReturn(nil, opts, NewVariableSelector(opts), nil)) {
+		t.Fatal("nil RNG/cg must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomReturn must SetError sticky")
+	}
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect())

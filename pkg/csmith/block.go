@@ -335,12 +335,15 @@ func MakeRandomBlock(
 	cg *CGContext,
 	looping bool,
 ) *Block {
+	// Block::make_random always has RNG + CGContext sticky
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// Block.cpp:120 — assert(curr_func); no soft invent parentless block
+	// Block.cpp:120 — assert(curr_func) sticky; no soft invent parentless block
 	f := cg.CurrentFunc
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before stack push (no invent block past holes)

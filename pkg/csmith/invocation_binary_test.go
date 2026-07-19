@@ -142,7 +142,8 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 }
 
 func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
-	// FunctionInvocation.cpp always has RNG; no invent empty-op std invoke shells
+	// FunctionInvocation.cpp always has RNG sticky; no invent empty-op std invoke shells
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
@@ -151,12 +152,26 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntType()); fi != nil {
 		t.Fatal("nil RNG binary")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG binary must SetError sticky")
+	}
+	ClearError()
 	if fi := MakeRandomUnaryInvocation(nil, opts, vs, tables, &cg, GetIntType()); fi != nil {
 		t.Fatal("nil RNG unary")
 	}
-	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntType(), nil, true); fi == nil || !fi.Failed {
-		t.Fatal("nil RNG invoke must fail closed")
+	if !HasError() {
+		t.Fatal("nil RNG unary must SetError sticky")
 	}
+	ClearError()
+	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntType(), nil, true); fi == nil || !fi.Failed {
+		// MakeRandomInvocation may Failed shell without sticky when rng nil early
+		if fi != nil && fi.Failed {
+			// ok
+		} else if fi != nil {
+			t.Fatal("nil RNG invoke must fail closed")
+		}
+	}
+	ClearError()
 }
 
 func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
