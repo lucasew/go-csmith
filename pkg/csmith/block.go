@@ -482,96 +482,106 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	fm.MapVisited[b.StmID] = true
 	b.SetAccumulatedEffect(fm)
 	// incomplete GlobalFacts fail closed (no invent cleaned postFacts / OOS from holes)
+	// Use IncompleteFactSlice — bare nil invents empty success via FactsComplete(nil)
 	var postFacts []*FactPointTo
 	if !FactsComplete(fm.GlobalFacts) {
-		fm.GlobalFacts = nil
-		postFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
+		postFacts = IncompleteFactSlice()
+		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 	} else {
 		postFacts = CloneFactSlice(fm.GlobalFacts)
-	}
-	if len(b.LocalVars) > 0 {
-		fm.UpdateFactsForOOSVars(b.LocalVars)
-	}
-	fm.RemoveRVFacts(&fm.GlobalFacts)
-	fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
-
-	// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
-	mustBR := b.MustBreakOrReturnFull(fm)
-	isLoopBody := !mustBR && b.Looping
-	// FindEdgesInToBlock nil = incomplete CFG; fail closed as hasBack (no invent none)
-	toBlk := fm.FindEdgesInToBlock(b, false, true)
-	hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
-		toBlk == nil || len(toBlk) > 0 ||
-		b.ContainsBackEdge(fm)
-	if isLoopBody || b.NeedRevisit || hasBack {
-		selfBack := false
-		if isLoopBody && b.FromTailToHead() {
-			selfBack = true
-			fm.CreateCFGEdge(b.StmID, b, false, true)
+		if len(b.LocalVars) > 0 {
+			fm.UpdateFactsForOOSVars(b.LocalVars)
 		}
-		// incomplete MapFactsIn fails closed — C++ map[] missing is empty complete;
-		// holes must not invent empty fixed-point re-analysis as success
-		in0 := fm.MapFactsIn[b.StmID]
-		if !FactsComplete(in0) {
-			fm.GlobalFacts = nil
-			postFacts = nil
-		} else {
-			factsCopy := CloneFactSlice(in0)
-			// reset accum to pre-block effect
-			if cg.EffectAccum != nil {
-				*cg.EffectAccum = preEffect.Clone()
+		fm.RemoveRVFacts(&fm.GlobalFacts)
+		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
+
+		// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
+		mustBR := b.MustBreakOrReturnFull(fm)
+		isLoopBody := !mustBR && b.Looping
+		// FindEdgesInToBlock nil = incomplete CFG; fail closed as hasBack (no invent none)
+		toBlk := fm.FindEdgesInToBlock(b, false, true)
+		hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
+			toBlk == nil || len(toBlk) > 0 ||
+			b.ContainsBackEdge(fm)
+		if isLoopBody || b.NeedRevisit || hasBack {
+			selfBack := false
+			if isLoopBody && b.FromTailToHead() {
+				selfBack = true
+				fm.CreateCFGEdge(b.StmID, b, false, true)
 			}
-			for {
-				out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
-				if ok {
-					postFacts = out
-					break
-				}
-				// remove from fail index through end (Block.cpp:709–714)
-				if failIdx < 0 {
-					failIdx = 0
-				}
-				for failIdx < len(b.Stmts) {
-					id := b.Stmts[failIdx].StmID
-					if id == 0 {
-						// incomplete stm_id — fail closed strip tail (no invent
-						// soft-skip hole and keep later stmts as complete block)
-						b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
-						continue
-					}
-					if n := b.RemoveStmt(id, fm); n == 0 {
-						b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
-					}
-				}
-				b.NeedRevisit = true
-				fm.ResetBlockFactMaps(b)
-				if !selfBack && b.FromTailToHead() {
-					selfBack = true
-					fm.CreateCFGEdge(b.StmID, b, false, true)
-				}
+			// incomplete MapFactsIn fails closed — C++ map[] missing is empty complete;
+			// holes must not invent empty fixed-point re-analysis as success
+			in0 := fm.MapFactsIn[b.StmID]
+			if !FactsComplete(in0) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				postFacts = IncompleteFactSlice()
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			} else {
+				factsCopy := CloneFactSlice(in0)
+				// reset accum to pre-block effect
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preEffect.Clone()
 				}
-				if len(b.Stmts) == 0 {
-					break
+				for {
+					out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+					if ok {
+						postFacts = out
+						break
+					}
+					// remove from fail index through end (Block.cpp:709–714)
+					if failIdx < 0 {
+						failIdx = 0
+					}
+					for failIdx < len(b.Stmts) {
+						id := b.Stmts[failIdx].StmID
+						if id == 0 {
+							// incomplete stm_id — fail closed strip tail (no invent
+							// soft-skip hole and keep later stmts as complete block)
+							b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+							continue
+						}
+						if n := b.RemoveStmt(id, fm); n == 0 {
+							b.Stmts = append(b.Stmts[:failIdx], b.Stmts[failIdx+1:]...)
+						}
+					}
+					b.NeedRevisit = true
+					fm.ResetBlockFactMaps(b)
+					if !selfBack && b.FromTailToHead() {
+						selfBack = true
+						fm.CreateCFGEdge(b.StmID, b, false, true)
+					}
+					if cg.EffectAccum != nil {
+						*cg.EffectAccum = preEffect.Clone()
+					}
+					if len(b.Stmts) == 0 {
+						break
+					}
+				}
+				// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
+				// incomplete out fails closed (hole marker — no invent keep prior / empty)
+				out := fm.MapFactsOut[b.StmID]
+				if !FactsComplete(out) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				} else {
+					fm.GlobalFacts = CloneFactSlice(out)
+					postFacts = fm.GlobalFacts
 				}
 			}
-			// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
-			// incomplete out fails closed (nil — no invent keep prior GlobalFacts)
-			out := fm.MapFactsOut[b.StmID]
-			if !FactsComplete(out) {
-				fm.GlobalFacts = nil
-				postFacts = nil
-			} else {
-				fm.GlobalFacts = CloneFactSlice(out)
-				postFacts = fm.GlobalFacts
-			}
+		} else if b.Looping && b.FromTailToHead() {
+			fm.CreateCFGEdge(b.StmID, b, false, true)
 		}
-	} else if b.Looping && b.FromTailToHead() {
-		fm.CreateCFGEdge(b.StmID, b, false, true)
 	}
 	// Block.cpp:734–741 — append return for top-level body when still missing
+	// incomplete postFacts must not invent return gen via FactsComplete(nil) empty
 	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() && !b.MustReturn() {
+		if !FactsComplete(postFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
 		fm.GlobalFacts = postFacts
 		if b.AppendReturnStmt(r, opts, vs, cg) == nil {
 			// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
@@ -582,16 +592,15 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		if len(b.Stmts) > 0 {
 			sr := &b.Stmts[len(b.Stmts)-1]
 			// return stm_id always live after append_return; StmID 0 fails closed
-			// (no invent soft-skip body out update)
 			if sr.StmID <= 0 {
-				fm.SetMapFactsOut(b.StmID, nil)
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			} else {
 				out := fm.MapFactsOut[sr.StmID]
 				if FactsComplete(out) {
 					fm.SetMapFactsOut(b.StmID, out)
 				} else {
-					// incomplete sr out — fail closed empty body out
-					fm.SetMapFactsOut(b.StmID, nil)
+					// incomplete sr out — fail closed hole marker (not empty complete)
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 				}
 			}
 		}

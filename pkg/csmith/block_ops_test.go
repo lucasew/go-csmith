@@ -469,8 +469,8 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	b.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
-	if fm.GlobalFacts != nil {
-		t.Fatal("incomplete MapFactsIn must fail closed nil GlobalFacts, not invent empty FP", fm.GlobalFacts)
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("incomplete MapFactsIn must fail closed incomplete GlobalFacts, not invent empty FP", fm.GlobalFacts)
 	}
 	ClearError()
 }

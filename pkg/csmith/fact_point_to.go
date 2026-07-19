@@ -663,6 +663,8 @@ func (f *FactPointTo) Clone() *FactPointTo {
 // FactsComplete reports whether every Fact* is live with complete PointTo sets.
 // Incomplete maps/pointees must not soft-join or soft-filter past holes.
 // Empty PointTo (IsTop) is complete; nil pointee slots are not.
+// Note: FactsComplete(nil)==true (complete empty). Fail-closed incomplete wipes
+// must use IncompleteFactSlice() so later checks do not invent empty success.
 func FactsComplete(facts []*FactPointTo) bool {
 	for _, f := range facts {
 		if f == nil || f.Var == nil {
@@ -675,6 +677,13 @@ func FactsComplete(facts []*FactPointTo) bool {
 		}
 	}
 	return true
+}
+
+// IncompleteFactSlice is the fail-closed incomplete fact-list marker.
+// FactsComplete returns false. Distinct from complete empty (nil or non-nil {}).
+// Use for GlobalFacts / map entry wipes so FactsComplete(nil) cannot invent success.
+func IncompleteFactSlice() []*FactPointTo {
+	return []*FactPointTo{nil}
 }
 
 // MergeFactInto merges new fact with lattice join (Fact::merge_fact).

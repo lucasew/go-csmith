@@ -109,7 +109,7 @@ func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 // Complete empty uses a non-nil empty slice (FactsComplete true).
 func storeFactMapEntry(facts []*FactPointTo) []*FactPointTo {
 	if !FactsComplete(facts) {
-		return []*FactPointTo{nil}
+		return IncompleteFactSlice()
 	}
 	cl := CloneFactSlice(facts)
 	if cl == nil {
@@ -149,7 +149,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
-		fm.MapFactsOut[st.StmID] = []*FactPointTo{nil}
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		return
 	}
 	cp := CloneFactSlice(facts)
@@ -439,13 +439,13 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 		facts1 := fm.MapFactsInFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
 			// hole marker (not bare nil — FactsComplete(nil) invents empty complete)
-			fm.MapFactsInFinal[id] = []*FactPointTo{nil}
+			fm.MapFactsInFinal[id] = IncompleteFactSlice()
 			continue
 		}
 		// MergeFacts clears *facts on incomplete mid-join; false alone may mean no lattice change
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
-			fm.MapFactsInFinal[id] = []*FactPointTo{nil}
+			fm.MapFactsInFinal[id] = IncompleteFactSlice()
 			continue
 		}
 		fm.MapFactsInFinal[id] = storeFactMapEntry(facts1)
@@ -453,12 +453,12 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	for id, facts2 := range fm.MapFactsOut {
 		facts1 := fm.MapFactsOutFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
-			fm.MapFactsOutFinal[id] = []*FactPointTo{nil}
+			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
 			continue
 		}
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
-			fm.MapFactsOutFinal[id] = []*FactPointTo{nil}
+			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
 			continue
 		}
 		fm.MapFactsOutFinal[id] = storeFactMapEntry(facts1)
