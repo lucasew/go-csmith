@@ -40,6 +40,17 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError")
 	}
 	ClearError()
+	// incomplete EffectContext fails closed sticky before EffectStm clear
+	cg2 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	eff2 := EmptyEffect()
+	cg2.EffectAccum = &eff2
+	if b.AppendReturnStmt(NewRng(3), opts, vs, &cg2) != nil {
+		t.Fatal("incomplete EffectContext must fail closed AppendReturnStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {

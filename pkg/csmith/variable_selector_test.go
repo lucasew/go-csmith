@@ -417,4 +417,38 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky SelectWithInvalid")
 	}
 	ClearError()
+	// incomplete ambient on SelectParentLocalInv
+	f3 := &Function{Name: "f3", ReturnType: GetIntType()}
+	blk3 := &Block{Func: f3}
+	f3.Stack = []*Block{blk3}
+	inc2 := IncompleteEffect()
+	cg5 := WithFunc(f3, EmptyEffect())
+	cg5.EffectAccum = &inc2
+	if vs.SelectParentLocalInv(AccessRead, cg5, GetIntType(), nil, NewRng(6), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed SelectParentLocalInv")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky SelectParentLocalInv")
+	}
+	ClearError()
+	// incomplete Param on SelectParentParamInv
+	f4 := &Function{Name: "f4", ReturnType: GetIntType(), Param: []*Variable{nil}}
+	cg6 := WithFunc(f4, EmptyEffect())
+	if vs.SelectParentParamInv(AccessRead, cg6, GetIntType(), nil, NewRng(7), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete Param must fail closed SelectParentParamInv")
+	}
+	if !HasError() {
+		t.Fatal("incomplete Param must SetError sticky SelectParentParamInv")
+	}
+	ClearError()
+	// incomplete GlobalList on SelectGlobalMT
+	vs2 := NewVariableSelector(opts)
+	vs2.GlobalList = []*Variable{nil}
+	if vs2.SelectGlobalMT(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(8), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete GlobalList must fail closed SelectGlobalMT")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalList must SetError sticky SelectGlobalMT")
+	}
+	ClearError()
 }

@@ -1654,6 +1654,22 @@ func (vs *VariableSelector) SelectGlobalMT(
 	if vs == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete GlobalList / invalid_vars fail closed sticky (no invent soft-skip holes)
+	if !VariablesComplete(vs.GlobalList) || !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp always has process RNG for multi-choose / create paths
 	// n==1 ChooseOKVar can skip draw; empty or multi without r → fail closed
 	if r == nil && len(vs.GlobalList) != 1 {
@@ -2057,6 +2073,17 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 // VariableSelector.cpp:1384–1436 — visible collective arrays with effect filters.
 func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
+		return nil
+	}
+	// incomplete ambient / facts fail closed sticky before filters (no invent soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	blk := cg.CurrentBlock()
@@ -2493,6 +2520,17 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	if vs == nil || cg.CurrentFunc == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before stack pick (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:989 — DEPTH_GUARD_BY_TYPE_RETURN(dtSelectParentLocal, nullptr)
 	if DepthGuardByType(vs.Opts, DtSelectParentLocal) == BadDepth {
 		return nil
@@ -2595,6 +2633,27 @@ func (vs *VariableSelector) SelectParentParamInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if cg.CurrentFunc == nil {
+		return nil
+	}
+	// incomplete ambient / facts fail closed sticky before param choose (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete Param list fails closed sticky (no invent soft-skip hole as absent param)
+	if !VariablesComplete(cg.CurrentFunc.Param) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete invalid_vars fails closed sticky
+	if !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp always has process RNG for multi-choose / parent-local create

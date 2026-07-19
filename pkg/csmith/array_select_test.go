@@ -189,4 +189,25 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 		t.Fatal("Arrays list hole must SetError sticky")
 	}
 	ClearError()
+	// incomplete ambient fails closed sticky before filters
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if vs.SelectArray(NewRng(3), cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed SelectArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky SelectArray")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := EmptyCGContext().WithFactMgr(fm)
+	if vs.SelectArray(NewRng(4), cg2) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed SelectArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky SelectArray")
+	}
+	ClearError()
 }
