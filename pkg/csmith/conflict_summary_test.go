@@ -177,7 +177,8 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	// incomplete for in body — no invent clean empty summary (false UnionFieldRead)
-	// nor IsPointerReferenced false via bare-nil ReferencedPtrs
+	// nor IsPointerReferenced false via bare-nil ReferencedPtrs — sticky
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Body = &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}},
@@ -195,6 +196,10 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	if !f.NeedsRevisit() {
 		t.Fatal("incomplete summary must NeedsRevisit")
 	}
+	if !HasError() {
+		t.Fatal("incomplete referenced-ptrs walk must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsFrameVar(t *testing.T) {

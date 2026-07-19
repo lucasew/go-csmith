@@ -100,7 +100,8 @@ func TestSetupInOutMaps(t *testing.T) {
 
 func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// FactMgr.cpp:208–222 — first_time copy_facts; Fact* always live
-	// incomplete hole must not invent cleaned final map entry
+	// incomplete hole must not invent cleaned final map entry — sticky
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	// plant holes bypassing SetMapFacts* (CloneFactSlice strips holes)
@@ -117,6 +118,10 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsOutFinal[2]) {
 		t.Fatal("incomplete MapFactsOut must not invent cleaned/complete OutFinal")
 	}
+	if !HasError() {
+		t.Fatal("incomplete first_time SetupInOutMaps must SetError sticky")
+	}
+	ClearError()
 	// complete sibling still clones
 	fm2 := NewFactMgr(nil)
 	fm2.MapFactsIn = map[int][]*FactPointTo{
@@ -129,7 +134,8 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 }
 
 func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
-	// second visit: incomplete current map must not invent join into final
+	// second visit: incomplete current map must not invent join into final — sticky
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	f1 := MakeFactPointTo(p, NullPtr)
@@ -141,6 +147,10 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsInFinal[1]) {
 		t.Fatal("incomplete combine must fail closed incomplete final, not invent partial join")
 	}
+	if !HasError() {
+		t.Fatal("incomplete combine SetupInOutMaps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBackupRestoreStmFactMaps(t *testing.T) {
@@ -164,7 +174,8 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	if FindRelatedPointTo(fm.MapFactsOut[21], p) == nil {
 		t.Fatal("restored out")
 	}
-	// incomplete if — whole backup fail closed (no invent root-only complete tree)
+	// incomplete if — whole backup fail closed sticky (no invent root-only complete tree)
+	ClearError()
 	in2 := map[int][]*FactPointTo{}
 	out2 := map[int][]*FactPointTo{}
 	bad := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB}
@@ -177,6 +188,10 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	if FactsComplete(in2[10]) || FactsComplete(out2[10]) {
 		t.Fatal("incomplete if must backup root as IncompleteFactSlice, not invent complete", in2[10], out2[10])
 	}
+	if !HasError() {
+		t.Fatal("incomplete if BackupStmFactMaps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {

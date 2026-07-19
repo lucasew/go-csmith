@@ -4,7 +4,8 @@ import "testing"
 
 func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVarVisible false → drop stack local fact
-	// fair: incomplete stack → IncompleteFactSlice (not invent empty-complete skip)
+	// fair: incomplete stack → sticky IncompleteFactSlice (not invent empty-complete skip)
+	ClearError()
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
@@ -15,13 +16,21 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("incomplete stack must fail closed incomplete out, not invent empty complete", fm.MapFactsOut[3])
 	}
+	if !HasError() {
+		t.Fatal("incomplete stack AddFactOut must SetError sticky")
+	}
+	ClearError()
 	// later appends must not invent cleaned facts onto incomplete map
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
 	}
-	// incomplete fact PointTo → hole marker
+	if !HasError() {
+		t.Fatal("append onto incomplete map must SetError sticky")
+	}
+	ClearError()
+	// incomplete fact PointTo → sticky hole marker
 	fm2 := NewFactMgr(f)
 	body2 := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Body = body2
@@ -31,6 +40,10 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	if FactsComplete(fm2.MapFactsOut[4]) {
 		t.Fatal("incomplete fact must fail closed IncompleteFactSlice", fm2.MapFactsOut[4])
 	}
+	if !HasError() {
+		t.Fatal("incomplete fact PointTo must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddFactOutVisible(t *testing.T) {

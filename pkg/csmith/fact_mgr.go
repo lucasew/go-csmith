@@ -345,25 +345,32 @@ func FindStmtByID(f *Function, stmID int) *Stmt {
 // AddFactOut mirrors FactMgr::add_fact_out.
 // FactMgr.cpp:281–308 — append one fact to map_facts_out if visible at stm;
 // drop non-globals on return; drop loop-invisible on break/continue.
-// Incomplete Param/LocalVars at visibility sites fail closed IncompleteFactSlice
-// on map entry (no invent soft-skip append as absent / empty-complete success).
-// Incomplete fact PointTo also fails closed hole marker (no invent clone partial).
+// Incomplete Param/LocalVars at visibility sites fail closed sticky IncompleteFactSlice
+// on map entry (no invent soft-skip append as absent / soft re-pick past incomplete out).
+// Incomplete fact PointTo also fails closed sticky hole marker (no invent clone partial).
 func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
-	if fm == nil || st == nil || fact == nil || fact.Var == nil || st.StmID <= 0 {
+	if fm == nil || st == nil || fact == nil || fact.Var == nil {
+		return
+	}
+	// StmID 0 fails closed sticky (no invent silent add_fact_out without map entry)
+	if st.StmID <= 0 {
+		SetError(ErrGeneric)
 		return
 	}
 	// ensure map exists before fail-closed writes
 	if fm.MapFactsOut == nil {
 		fm.MapFactsOut = make(map[int][]*FactPointTo)
 	}
-	// incomplete subject fact — hole marker (not soft-skip or invent cleaned clone)
+	// incomplete subject fact — sticky hole marker (not soft-skip or invent cleaned clone)
 	if !FactsComplete([]*FactPointTo{fact}) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
-	// already incomplete out map — stay incomplete (no invent append onto hole)
+	// already incomplete out map — stay incomplete sticky (no invent append onto hole)
 	if prev, ok := fm.MapFactsOut[st.StmID]; ok && !FactsComplete(prev) {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	f := fm.Func
@@ -371,6 +378,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	if f != nil && !fact.Var.IsGlobal() {
 		if !f.StackScanComplete(stParent) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		if !f.IsVarVisible(fact.Var, stParent) {
@@ -393,6 +401,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		if f != nil && !fact.Var.IsGlobal() {
 			if !f.StackScanComplete(b) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 		}
@@ -409,6 +418,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		if destParent != nil && f != nil {
 			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			if !f.IsVarVisible(fact.Var, destParent) {
@@ -419,6 +429,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	cl := fact.Clone()
 	if cl == nil {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	fm.MapFactsOut[st.StmID] = append(fm.MapFactsOut[st.StmID], cl)
@@ -528,8 +539,8 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
 // FactMgr.cpp:208–246 — first_time clones into final; else combine.
-// Fact* always live; incomplete source maps fail closed (nil final entry —
-// no invent cleaned partial clone of holes on first_time or soft-join later).
+// Fact* always live; incomplete source maps fail closed sticky (final hole marker —
+// no invent cleaned partial clone / soft re-pick past incomplete finals).
 func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm == nil {
 		return
@@ -542,28 +553,42 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	}
 	if firstTime {
 		for id, facts := range fm.MapFactsIn {
-			// storeFactMapEntry: incomplete → hole marker (not bare nil invent empty)
+			// storeFactMapEntry: incomplete → hole marker sticky
+			if !FactsComplete(facts) {
+				fm.MapFactsInFinal[id] = IncompleteFactSlice()
+				SetError(ErrGeneric)
+				continue
+			}
 			fm.MapFactsInFinal[id] = storeFactMapEntry(facts)
 		}
 		for id, facts := range fm.MapFactsOut {
+			if !FactsComplete(facts) {
+				fm.MapFactsOutFinal[id] = IncompleteFactSlice()
+				SetError(ErrGeneric)
+				continue
+			}
 			fm.MapFactsOutFinal[id] = storeFactMapEntry(facts)
 		}
 		return
 	}
 	// combine current maps into final
-	// Fact* always live; incomplete maps or failed merge fail closed (hole marker final,
-	// no invent partial join or bare-nil complete empty)
+	// Fact* always live; incomplete maps or failed merge fail closed sticky
+	// (no invent partial join or bare-nil complete empty)
 	for id, facts2 := range fm.MapFactsIn {
 		facts1 := fm.MapFactsInFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
-			// hole marker (not bare nil — FactsComplete(nil) invents empty complete)
+			// hole marker sticky (not bare nil — FactsComplete(nil) invents empty complete)
 			fm.MapFactsInFinal[id] = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			continue
 		}
-		// MergeFacts clears *facts on incomplete mid-join; false alone may mean no lattice change
+		// MergeFacts clears *facts sticky on incomplete mid-join
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
 			fm.MapFactsInFinal[id] = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			continue
 		}
 		fm.MapFactsInFinal[id] = storeFactMapEntry(facts1)
@@ -572,11 +597,15 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 		facts1 := fm.MapFactsOutFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
 			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			continue
 		}
 		_ = MergeFacts(&facts1, facts2)
 		if !FactsComplete(facts1) {
 			fm.MapFactsOutFinal[id] = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			continue
 		}
 		fm.MapFactsOutFinal[id] = storeFactMapEntry(facts1)
@@ -586,8 +615,8 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 // BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
 // FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
 // Incomplete source maps store hole markers (no invent cleaned partial clones).
-// Incomplete get_blocks tree (nil if-arm) fails closed: root maps backed as
-// IncompleteFactSlice (no invent root-only complete backup while nested skipped).
+// Incomplete get_blocks tree (nil if-arm) fails closed sticky: root maps backed as
+// IncompleteFactSlice (no invent root-only complete backup / soft re-pick past hole).
 func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
@@ -604,11 +633,12 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 		}
 	}
 	if incomplete {
-		// fail closed whole stm backup — not invent complete root + missing nested
+		// fail closed sticky whole stm backup — not invent complete root + missing nested
 		if st.StmID > 0 {
 			factsIn[st.StmID] = IncompleteFactSlice()
 			factsOut[st.StmID] = IncompleteFactSlice()
 		}
+		SetError(ErrGeneric)
 		return
 	}
 	for _, b := range blks {
@@ -644,7 +674,7 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 // RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
 // FactMgr.cpp:533–548.
 // Incomplete backup entries restore as hole markers (storeFactMapEntry).
-// Incomplete get_blocks tree fails closed: root maps set IncompleteFactSlice
+// Incomplete get_blocks tree fails closed sticky: root maps set IncompleteFactSlice
 // (no invent soft-skip nil arm then restore root/sibling as complete tree).
 func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
@@ -669,6 +699,7 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 			fm.MapFactsIn[st.StmID] = IncompleteFactSlice()
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		}
+		SetError(ErrGeneric)
 		return
 	}
 	for _, b := range blks {

@@ -334,8 +334,8 @@ func ReadUnionFieldBlock(b *Block) bool {
 // ComputeSummary mirrors Function::compute_summary.
 // Function.cpp:773–784 — referenced_ptrs + feffect external + union_field_read.
 // bodyEffect is the accumulated effect of the function body (map_stm_effect[body]).
-// Incomplete body IR fails closed UnionFieldRead + IncompleteVariables ReferencedPtrs
-// (no invent clean empty summary / IsPointerReferenced false via bare nil).
+// Incomplete body IR fails closed sticky UnionFieldRead + IncompleteVariables
+// ReferencedPtrs (no invent clean empty summary / soft re-pick past hole walk).
 func (f *Function) ComputeSummary(bodyEffect Effect) {
 	if f == nil {
 		return
@@ -345,10 +345,11 @@ func (f *Function) ComputeSummary(bodyEffect Effect) {
 	if f.Body != nil {
 		var ptrs []*Variable
 		if !collectReferencedPtrsBlock(f.Body, &ptrs) {
-			// incomplete referenced-ptrs walk — fail closed needs-revisit path
+			// incomplete referenced-ptrs walk — fail closed sticky needs-revisit path
 			// IncompleteVariables so IsPointerReferenced cannot invent false via len(nil)==0
 			f.ReferencedPtrs = IncompleteVariables()
 			f.UnionFieldRead = true
+			SetError(ErrGeneric)
 		} else {
 			f.ReferencedPtrs = ptrs
 		}
