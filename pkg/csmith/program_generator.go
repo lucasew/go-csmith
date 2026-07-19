@@ -264,10 +264,10 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 	}
 	var body strings.Builder
 	for _, st := range g.Types.StructTypes {
+		// Type* always live in AllTypes/StructTypes; no invent skip nil/incomplete holes
 		if st == nil {
-			continue
+			return ""
 		}
-		// incomplete struct IR — no invent blank lines
 		var decl string
 		if structAttr != nil {
 			decl = st.OutputStructDeclOpts(g.Rng, structAttr)
@@ -275,14 +275,14 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 			decl = st.OutputStructDecl()
 		}
 		if decl == "" {
-			continue
+			return ""
 		}
 		body.WriteString(decl)
 		body.WriteString("\n")
 	}
 	for _, ut := range g.Types.UnionTypes {
 		if ut == nil {
-			continue
+			return ""
 		}
 		var decl string
 		if unionAttr != nil {
@@ -291,7 +291,7 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 			decl = ut.OutputUnionDecl()
 		}
 		if decl == "" {
-			continue
+			return ""
 		}
 		body.WriteString(decl)
 		body.WriteString("\n")
@@ -321,18 +321,20 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	emittedArray := map[string]bool{}
 	var body strings.Builder
 	for _, v := range g.VS.GlobalList {
+		// Variable* always live; no invent skip nil/incomplete holes as partial section
 		if v == nil || v.Type == nil {
-			continue
+			return ""
 		}
 		if av := arrayByName[v.Name]; av != nil {
 			if emittedArray[v.Name] {
+				// dual-count collective+itemized — intentional C++ list shape, skip re-emit
 				continue
 			}
 			emittedArray[v.Name] = true
 			// ArrayVariable::OutputDef always live; no invent "static \n" for empty
 			def := av.OutputDef()
 			if def == "" {
-				continue
+				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
 				body.WriteString("static ")
@@ -344,8 +346,7 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
 		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
 		if def == "" {
-			// incomplete IR — no invent blank line
-			continue
+			return ""
 		}
 		body.WriteString(def)
 		body.WriteString("\n")
@@ -425,9 +426,11 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 	ctrl := GetLastCtrlVars()
 	var b strings.Builder
 	for _, v := range vs.GlobalList {
+		// Variable* always live in GlobalList; no invent skip nil holes
 		if v == nil {
-			continue
+			return ""
 		}
+		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
 		b.WriteString(v.hashOutput(ctrl, unionFacts))
 	}
 	return b.String()

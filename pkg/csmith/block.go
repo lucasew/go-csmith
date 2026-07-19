@@ -743,11 +743,12 @@ func (b *Block) Output(indent int) string {
 		}
 	}
 	// OutputVariableList(local_vars) — Variable.cpp Output
+	// Variable* always live; no invent skip nil/incomplete holes as partial block
 	var loopInits []*ArrayVariable
 	maxDim := 0
 	for _, lv := range b.LocalVars {
 		if lv == nil || lv.Type == nil {
-			continue
+			return ""
 		}
 		if lv.IsArray {
 			av := lv.AsArray
@@ -759,10 +760,15 @@ func (b *Block) Output(indent int) string {
 				}
 			}
 			if av != nil {
-				// incomplete array def — no invent indent-only / blank lines
+				// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
+				// (C++ LocalVars may hold itemize() member alongside parent)
+				if av.Collective != nil {
+					continue
+				}
+				// incomplete array def — fail closed whole block
 				def := av.OutputDef()
 				if def == "" {
-					continue
+					return ""
 				}
 				sb.WriteString(inner)
 				sb.WriteString(def)
@@ -775,12 +781,13 @@ func (b *Block) Output(indent int) string {
 				}
 				continue
 			}
+			// IsArray without AsArray/sizes — broken IR
+			return ""
 		}
 		// Variable::Output for locals (no force static)
 		def := lv.OutputDef(false)
 		if def == "" {
-			// incomplete IR — no invent blank local line
-			continue
+			return ""
 		}
 		sb.WriteString(inner)
 		sb.WriteString(def)
@@ -794,16 +801,18 @@ func (b *Block) Output(indent int) string {
 		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
 		// no invent inits without live ctrl decl
 		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
-		if decl != "" {
-			sb.WriteString(decl)
-			ctrl := CtrlVarNames(ctrlVars)
-			for _, av := range loopInits {
-				initOut := av.OutputInit(inner, ctrl)
-				if initOut == "" {
-					continue
-				}
-				sb.WriteString(initOut)
+		if decl == "" {
+			return ""
+		}
+		sb.WriteString(decl)
+		ctrl := CtrlVarNames(ctrlVars)
+		for _, av := range loopInits {
+			initOut := av.OutputInit(inner, ctrl)
+			if initOut == "" {
+				// incomplete array init IR — fail closed whole block
+				return ""
 			}
+			sb.WriteString(initOut)
 		}
 	}
 	for _, st := range b.Stmts {

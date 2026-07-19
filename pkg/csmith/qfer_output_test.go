@@ -144,6 +144,12 @@ func TestOutputGlobalsNoInventEmptyDef(t *testing.T) {
 	if out != "" {
 		t.Fatal("all-empty globals must fail closed empty section", out)
 	}
+	// incomplete among live fails whole section (no invent skip holes)
+	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	g.VS.GlobalList = []*Variable{good, v}
+	if out2 := g.OutputGlobals(); out2 != "" {
+		t.Fatal("mixed incomplete globals must fail closed", out2)
+	}
 }
 
 func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
@@ -152,6 +158,11 @@ func TestOutputStructTypesNoInventEmptySection(t *testing.T) {
 	g.Types.StructTypes = []*Type{{isStruct: true}} // unnamed → empty decl
 	if out := g.OutputStructTypes(); out != "" {
 		t.Fatal("empty struct decls must fail closed section", out)
+	}
+	// nil hole fails closed
+	g.Types.StructTypes = []*Type{nil}
+	if out := g.OutputStructTypes(); out != "" {
+		t.Fatal("nil struct hole must fail closed", out)
 	}
 }
 
@@ -167,13 +178,20 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 }
 
 func TestBlockLocalNoInventEmptyDef(t *testing.T) {
-	// incomplete local OutputDef must not invent blank indent lines
+	// incomplete local OutputDef fails whole block (no invent blank lines / partial)
 	b := &Block{LocalVars: []*Variable{
 		{Name: "l_x", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // no init
 	}}
 	out := b.Output(0)
-	if strings.Contains(out, "l_x") {
-		t.Fatal("empty local def must not invent", out)
+	if out != "" {
+		t.Fatal("incomplete local must fail closed whole block", out)
+	}
+	// good local still emits
+	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	ok.Init = MakeInt(1)
+	b2 := &Block{LocalVars: []*Variable{ok}}
+	if out2 := b2.Output(0); !strings.Contains(out2, "l_ok") {
+		t.Fatal(out2)
 	}
 }
 

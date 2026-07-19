@@ -403,6 +403,11 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	if q.Wildcard {
 		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
 	}
+	// CVQualifiers.cpp always has process RNG for random_* paths
+	// no invent fixed non-stricter/looser shells when RNG missing
+	if r == nil {
+		return CVQualifiers{}
+	}
 	var vols []bool
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
@@ -453,6 +458,10 @@ func (q CVQualifiers) RandomLooseQualifiers(
 ) CVQualifiers {
 	if q.Wildcard {
 		return CVQualifiers{Wildcard: true, AcceptStricter: q.AcceptStricter}
+	}
+	// CVQualifiers.cpp always has process RNG; no invent fixed looser shells
+	if r == nil {
+		return CVQualifiers{}
 	}
 	var vols []bool
 	if noVolatile {

@@ -37,6 +37,25 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	}
 }
 
+func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
+	// CVQualifiers.cpp always has process RNG; no invent fixed looser/stricter shells
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	base := NewCVQualifiers([]bool{false}, []bool{false})
+	base.AcceptStricter = true
+	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+		t.Fatalf("nil RNG From must fail closed empty, got %+v", out)
+	}
+	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+		t.Fatalf("nil RNG Loose must fail closed empty, got %+v", out)
+	}
+	// wildcard still works without RNG
+	w := CVQualifiers{Wildcard: true}
+	if out := w.RandomQualifiersFrom(true, AccessRead, EmptyCGContext(), opts, probs, nil); !out.Wildcard {
+		t.Fatal("wildcard")
+	}
+}
+
 func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 	// CVQualifiers.cpp:194–225 — no_volatile clears all vols
 	opts := Defaults()

@@ -81,6 +81,10 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 		t.Fatal("sticky error")
 	}
 	ClearError()
+	// no invent Unbuilt success when body cannot generate
+	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+		t.Fatal("nil RNG must not invent first")
+	}
 }
 
 func TestGenerateFunctionsStopsOnERROR(t *testing.T) {

@@ -366,8 +366,8 @@ func MakeFirst(
 		cg.Types = env
 	}
 	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
-	// sticky error from body — do not invent Built first function
-	if HasError() || f.Body == nil {
+	// sticky error / null body / Unbuilt — do not invent success first function
+	if HasError() || f.Body == nil || f.BuildState != BuildBuilt {
 		return nil
 	}
 
