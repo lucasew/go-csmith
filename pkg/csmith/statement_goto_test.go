@@ -230,16 +230,33 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 }
 
 func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
-	// FunctionInvocation.cpp:565+ — always has RNG; no invent empty Binary token
+	// FunctionInvocation.cpp:565+ — always has RNG + operands sticky; no invent Binary shell
+	ClearError()
 	opts := Defaults()
 	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
 	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("nil RNG")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeBinary must SetError sticky")
+	}
+	ClearError()
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, nil, rhs); fi != nil {
+		t.Fatal("nil lhs")
+	}
+	if !HasError() {
+		t.Fatal("nil lhs MakeBinary must SetError sticky")
+	}
+	ClearError()
 	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinaryOp(MaxBinaryOp), lhs, rhs); fi != nil {
 		t.Fatal("MAX binary op must fail closed")
 	}
+	// MAX op BinaryOpC sticky
+	if !HasError() {
+		t.Fatal("MAX binary op MakeBinary must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGotoLabelsClearedOnFinalization(t *testing.T) {

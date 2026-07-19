@@ -1160,8 +1160,10 @@ func MakeBinary(
 	op BinaryOp,
 	lhs, rhs *Expression,
 ) *Invocation {
-	// FunctionInvocation.cpp:565+ — always has RNG; no invent binary shell without it
+	// FunctionInvocation.cpp:565+ — always has RNG + live operands sticky
+	// (no invent binary shell without them / soft re-pick past holes)
 	if r == nil || lhs == nil || rhs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent binary shell / soft re-pick past holes)

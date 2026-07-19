@@ -70,6 +70,7 @@ func TestMakeRandomStructTypeFailClosedEmptyEnv(t *testing.T) {
 }
 
 func TestBitfieldDeclEmit(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// craft struct with bitfield
@@ -88,6 +89,30 @@ func TestBitfieldDeclEmit(t *testing.T) {
 	if strings.Contains(decl, "f1 :") {
 		t.Fatal("non-bitfield should not have width")
 	}
+	// Type.cpp assert(eSimple) sticky — bad bitfield type fails closed whole decl
+	bad := &Type{
+		isStruct:   true,
+		StructName: "Sbad",
+		Fields: []StructField{
+			{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: 3},
+		},
+	}
+	if s := bad.OutputStructDecl(); s != "" {
+		t.Fatal("non-simple bitfield must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("non-simple bitfield OutputStructDecl must SetError sticky")
+	}
+	ClearError()
+	// empty sid sticky
+	anon := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	if s := anon.OutputStructDecl(); s != "" {
+		t.Fatal("empty StructName must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("empty StructName OutputStructDecl must SetError sticky")
+	}
+	ClearError()
 	_ = probs
 	_ = opts
 }

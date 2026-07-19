@@ -289,12 +289,13 @@ func (t *Type) OutputStructDecl() string {
 // OutputStructDeclOpts optionally emits type attributes (Type.cpp type_attr_generator).
 // Type.cpp:1836–1884 — OutputStructUnion field loop with bitfield asserts.
 func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
-	// Type.cpp:1838 — assert(type->is_aggregate())
+	// Type.cpp:1838 — assert(type->is_aggregate()); nil/non-struct soft empty
 	if t == nil || !t.isStruct {
 		return ""
 	}
-	// Type.cpp always has sid name (S#); no invent "struct  {"
+	// Type.cpp always has sid name (S#); sticky no invent "struct  {"
 	if t.StructName == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -313,11 +314,12 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		// Type.cpp:1866+ — bitfield fields: signed/unsigned only, not invent "int"
 		if f.BitWidth >= 0 {
 			if f.Type == nil || !f.Type.IsSimple() {
-				// Type.cpp:1866 assert(eSimple); fail closed whole decl
+				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
+				SetError(ErrGeneric)
 				return ""
 			}
 			st := f.Type.Simple()
-			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0)
+			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0) sticky
 			var signedKW string
 			switch st {
 			case EInt:
@@ -325,6 +327,7 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			case EUInt:
 				signedKW = "unsigned"
 			default:
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
@@ -350,12 +353,16 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		}
 		// non-bitfield: qualified type + fN
 		if f.Type == nil {
-			// Type.cpp always has field type; no soft invent "int"
+			// Type.cpp always has field type sticky; no soft invent "int"
+			SetError(ErrGeneric)
 			return ""
 		}
-		// Type.cpp:1879–1880 — output_qualified_type always live; no invent " fN;"
+		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
 		ty := f.Qfer.OutputQualifiedType(f.Type)
 		if ty == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		b.WriteString("   ")
@@ -625,8 +632,9 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isUnion {
 		return ""
 	}
-	// Type.cpp always has sid name (U#); no invent "union  {"
+	// Type.cpp always has sid name (U#); sticky no invent "union  {"
 	if t.StructName == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -639,8 +647,9 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	j := 0
 	for _, f := range t.Fields {
 		if f.BitWidth >= 0 {
-			// unions rarely have bitfields; same assert rules as struct
+			// unions rarely have bitfields; same assert rules as struct sticky
 			if f.Type == nil || !f.Type.IsSimple() {
+				SetError(ErrGeneric)
 				return ""
 			}
 			st := f.Type.Simple()
@@ -651,6 +660,7 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			case EUInt:
 				signedKW = "unsigned"
 			default:
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString("   ")
@@ -670,11 +680,15 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			continue
 		}
 		if f.Type == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
-		// output_qualified_type always live; no invent " fN;" without type
+		// output_qualified_type always live sticky; no invent " fN;" without type
 		ty := f.Qfer.OutputQualifiedType(f.Type)
 		if ty == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		b.WriteString("   ")
