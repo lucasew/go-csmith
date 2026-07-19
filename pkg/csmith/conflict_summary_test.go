@@ -210,6 +210,22 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("invoke without Expr must SetError sticky")
 	}
 	ClearError()
+	// ptrs always live; sticky (no invent soft-skip collect past hole)
+	CollectReferencedPtrsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, nil)
+	if !HasError() {
+		t.Fatal("nil ptrs CollectReferencedPtrsExpression must SetError sticky")
+	}
+	ClearError()
+	CollectReferencedPtrsStmt(&Stmt{Kind: StmtBreak, StmID: 3}, nil)
+	if !HasError() {
+		t.Fatal("nil ptrs CollectReferencedPtrsStmt must SetError sticky")
+	}
+	ClearError()
+	CollectReferencedPtrsBlock(&Block{}, nil)
+	if !HasError() {
+		t.Fatal("nil ptrs CollectReferencedPtrsBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {

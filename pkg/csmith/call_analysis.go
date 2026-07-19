@@ -27,8 +27,10 @@ func IncompleteInvocationsSlice() []*Invocation {
 // FunctionInvocation.cpp:369–381 — recurse args, then push user call.
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil —
 // len(nil)==0 invents empty-complete call list / soft re-pick past holes).
+// out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsExpr(e *Expression, out *[]*Invocation) {
 	if out == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsExpr(e, out) {
@@ -84,8 +86,10 @@ func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
 // CollectCalledInvocationsStmt mirrors Statement::get_called_funcs.
 // Statement.cpp:748–762 — get_exprs + get_blocks.
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
+// out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) {
 	if out == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsStmt(st, out) {
@@ -141,8 +145,10 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 
 // CollectCalledInvocationsBlock walks all statements in a block.
 // Incomplete IR sets *out sticky IncompleteInvocationsSlice (not bare nil invent empty).
+// out always live; sticky (no invent soft-skip collect past hole).
 func CollectCalledInvocationsBlock(b *Block, out *[]*Invocation) {
 	if out == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectCalledInvocationsBlock(b, out) {

@@ -630,7 +630,10 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 	if tables == nil {
 		tables = ProcessExprTables()
 	}
+	// tables always live after InitProbabilityTables; sticky MaxTermTypes
+	// (no invent soft term pick without session tables)
 	if tables == nil {
+		SetError(ErrGeneric)
 		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Expr)
@@ -667,7 +670,10 @@ func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, expr
 	if tables == nil {
 		tables = ProcessExprTables()
 	}
+	// tables always live after InitProbabilityTables; sticky MaxTermTypes
+	// (no invent soft param term pick without session tables)
 	if tables == nil {
+		SetError(ErrGeneric)
 		return MaxTermTypes
 	}
 	f := NewVectorFilter(&tables.Param)

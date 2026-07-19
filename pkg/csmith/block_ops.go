@@ -835,8 +835,15 @@ func AddNewVarFactTo(v *Variable, facts *[]*FactPointTo) {
 // Statement.cpp:545–567 — same_facts && !is_ctrl_stmt && !contains_unfixed_goto.
 // Incomplete or missing map_facts_out fails closed (ShortcutNone) — no invent
 // reuse success while leaving inputs unchanged or cloning past nil holes.
+// Block + facts + CGContext always live; sticky ShortcutNone
+// (no invent soft-skip shortcut past hole).
+// Nil FM / StmID 0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
 func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
-	if b == nil || facts == nil || cg == nil || cg.FM == nil || b.StmID == 0 {
+	if b == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
+		return ShortcutNone
+	}
+	if cg.FM == nil || b.StmID == 0 {
 		return ShortcutNone
 	}
 	fm := cg.FM

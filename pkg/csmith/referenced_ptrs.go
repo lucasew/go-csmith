@@ -6,8 +6,10 @@ package csmith
 // ExpressionVariable.cpp:230–235 — pointer vars; comma/assign recurse; invoke args + callee.
 // Incomplete IR fails closed sticky: *ptrs → IncompleteVariables (not bare nil —
 // VariablesComplete(nil)/len==0 invents empty-complete ptr list / soft re-pick past hole).
+// ptrs always live; sticky (no invent soft-skip collect past hole).
 func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
 	if ptrs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectReferencedPtrsExpression(e, ptrs) {
@@ -92,8 +94,10 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 // CollectReferencedPtrsStmt mirrors Statement::get_referenced_ptrs.
 // Statement.cpp:331–345 — exprs + nested blocks.
 // Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
+// ptrs always live; sticky (no invent soft-skip collect past hole).
 func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
 	if ptrs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectReferencedPtrsStmt(st, ptrs) {
@@ -174,8 +178,11 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 
 // CollectReferencedPtrsBlock walks all statements in a block.
 // Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
+// CollectReferencedPtrsBlock walks all statements in a block for referenced pointers.
+// ptrs always live; sticky (no invent soft-skip collect past hole).
 func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
 	if ptrs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if !collectReferencedPtrsBlock(b, ptrs) {

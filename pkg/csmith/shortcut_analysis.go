@@ -318,8 +318,15 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 // facts is updated to map_facts_out on success (0).
 // Incomplete or missing map_facts_out fails closed (ShortcutNone) — no invent
 // reuse success while leaving inputs unchanged or cloning past nil holes.
+// Statement + facts + CGContext always live; sticky ShortcutNone
+// (no invent soft-skip shortcut past hole).
+// Nil FM / StmID≤0 is non-sticky ShortcutNone (intentional reuse miss / soft re-pick).
 func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) int {
-	if st == nil || facts == nil || cg == nil || cg.FM == nil {
+	if st == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
+		return ShortcutNone
+	}
+	if cg.FM == nil {
 		return ShortcutNone
 	}
 	// Statement::stm_id always live; StmID 0 is not a map key (no invent reuse via 0)

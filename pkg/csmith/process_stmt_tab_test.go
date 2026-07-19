@@ -4,7 +4,8 @@ import "testing"
 
 func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	// Expression::InitProbabilityTables always live; no invent NewExprTables
-	// when both arg and process tables are missing
+	// when both arg and process tables are missing — sticky MaxTermTypes
+	ClearError()
 	prev := ProcessExprTables()
 	SetProcessExprTables(nil)
 	defer SetProcessExprTables(prev)
@@ -12,10 +13,18 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 	if tt != MaxTermTypes {
 		t.Fatalf("want MaxTermTypes, got %v", tt)
 	}
+	if !HasError() {
+		t.Fatal("nil tables PickTermType must SetError sticky")
+	}
+	ClearError()
 	tt = PickParamTermType(NewRng(1), nil, Defaults(), GetIntType(), 0)
 	if tt != MaxTermTypes {
 		t.Fatalf("param want MaxTermTypes, got %v", tt)
 	}
+	if !HasError() {
+		t.Fatal("nil tables PickParamTermType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {

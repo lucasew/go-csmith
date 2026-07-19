@@ -55,6 +55,22 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete collect must SetError sticky")
 	}
 	ClearError()
+	// out always live; sticky (no invent soft-skip collect past hole)
+	CollectCalledInvocationsExpr(&Expression{Term: TermConstant, Con: MakeInt(1)}, nil)
+	if !HasError() {
+		t.Fatal("nil out CollectCalledInvocationsExpr must SetError sticky")
+	}
+	ClearError()
+	CollectCalledInvocationsStmt(&Stmt{Kind: StmtBreak, StmID: 1}, nil)
+	if !HasError() {
+		t.Fatal("nil out CollectCalledInvocationsStmt must SetError sticky")
+	}
+	ClearError()
+	CollectCalledInvocationsBlock(&Block{}, nil)
+	if !HasError() {
+		t.Fatal("nil out CollectCalledInvocationsBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCollectCalledForTestExpr(t *testing.T) {

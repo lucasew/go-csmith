@@ -124,6 +124,65 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	if ShortcutAnalysis(st2, &facts, &cg, Defaults()) != ShortcutNone {
 		t.Fatal("ctrl")
 	}
+	// Statement + facts + CGContext always live; sticky
+	// Nil FM / StmID≤0 stay non-sticky ShortcutNone
+	ClearError()
+	if ShortcutAnalysis(nil, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("nil stmt must ShortcutNone")
+	}
+	if !HasError() {
+		t.Fatal("nil stmt ShortcutAnalysis must SetError sticky")
+	}
+	ClearError()
+	if ShortcutAnalysis(st, nil, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("nil facts must ShortcutNone")
+	}
+	if !HasError() {
+		t.Fatal("nil facts ShortcutAnalysis must SetError sticky")
+	}
+	ClearError()
+	if ShortcutAnalysis(st, &facts, nil, Defaults()) != ShortcutNone {
+		t.Fatal("nil cg must ShortcutNone")
+	}
+	if !HasError() {
+		t.Fatal("nil cg ShortcutAnalysis must SetError sticky")
+	}
+	ClearError()
+	cgNoFM := EmptyCGContext()
+	if ShortcutAnalysis(st, &facts, &cgNoFM, Defaults()) != ShortcutNone {
+		t.Fatal("nil FM must ShortcutNone")
+	}
+	if HasError() {
+		t.Fatal("nil FM ShortcutAnalysis must stay non-sticky soft re-pick")
+	}
+	ClearError()
+	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	if ShortcutAnalysis(st0, &facts, &cg, Defaults()) != ShortcutNone {
+		t.Fatal("StmID 0 must ShortcutNone")
+	}
+	if HasError() {
+		t.Fatal("StmID 0 ShortcutAnalysis must stay non-sticky soft re-pick")
+	}
+	ClearError()
+	// Block shortcut: hard IR sticky; FM/StmID 0 non-sticky
+	b := &Block{StmID: 9}
+	fm.SetMapFactsIn(9, facts)
+	fm.SetMapFactsOut(9, facts)
+	fm.SetMapStmEffect(9, EmptyEffect())
+	if ShortcutAnalysisBlock(nil, &facts, &cg) != ShortcutNone {
+		t.Fatal("nil block must ShortcutNone")
+	}
+	if !HasError() {
+		t.Fatal("nil block ShortcutAnalysisBlock must SetError sticky")
+	}
+	ClearError()
+	if ShortcutAnalysisBlock(b, &facts, &cgNoFM) != ShortcutNone {
+		t.Fatal("nil FM block shortcut must ShortcutNone")
+	}
+	if HasError() {
+		t.Fatal("nil FM ShortcutAnalysisBlock must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestShortcutConflict(t *testing.T) {
