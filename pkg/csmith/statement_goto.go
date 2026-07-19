@@ -127,10 +127,15 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		if v == nil {
 			continue
 		}
+		// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
+		init := variableInitOutput(v)
+		if init == "" {
+			continue
+		}
 		b.WriteString(indent)
 		b.WriteString(v.GetActualName(false))
 		b.WriteString(" = ")
-		b.WriteString(variableInitOutput(v))
+		b.WriteString(init)
 		b.WriteString(";\n")
 	}
 	return b.String()
@@ -145,7 +150,11 @@ func variableInitOutput(v *Variable) string {
 	}
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
-		return v.InitExpr.Output()
+		out := v.InitExpr.Output()
+		// incomplete InitExpr IR — fail closed empty (no invent "0")
+		if out != "" {
+			return out
+		}
 	}
 	if v.Init != nil && v.Init.Value != "" {
 		return v.Init.Value

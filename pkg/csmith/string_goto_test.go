@@ -122,6 +122,23 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 	}
 }
 
+func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
+	// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
+	v := CreateVariableWithInit("l_miss", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
+	v.Name = "l_miss"
+	good := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	good.Name = "l_ok"
+	good.Init = MakeInt(4)
+	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{v, good}}
+	out := OutputSkippedVarInits(st, "")
+	if strings.Contains(out, "l_miss") {
+		t.Fatal("must not emit incomplete re-init without init", out)
+	}
+	if !strings.Contains(out, "l_ok = 4;") {
+		t.Fatal(out)
+	}
+}
+
 func TestVariableInitOutput(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); no soft invent "0" when missing
 	v := CreateVariableWithInit("l_1", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
