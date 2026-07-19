@@ -519,6 +519,27 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must SetError sticky")
 	}
 	ClearError()
+	// nil blk soft invent was complete passthrough keep-all-facts (including loop locals)
+	// fair: sticky IncompleteFactSlice so break/continue cannot invent cleaned out map
+	prior := MakeFactPointTo(p, NullPtr)
+	gotNil := RemoveLoopLocalFacts([]*FactPointTo{prior}, nil)
+	if FactsComplete(gotNil) {
+		t.Fatal("nil blk RemoveLoopLocalFacts must fail closed, not keep-all passthrough", gotNil)
+	}
+	if !HasError() {
+		t.Fatal("nil blk RemoveLoopLocalFacts must SetError sticky")
+	}
+	ClearError()
+	// RemoveLoopLocalFactsForStmt with nil parent (non-block) same sticky hole
+	br := &Stmt{Kind: StmtBreak, StmID: 9}
+	gotFor := RemoveLoopLocalFactsForStmt([]*FactPointTo{prior}, br, nil)
+	if FactsComplete(gotFor) {
+		t.Fatal("nil parent RemoveLoopLocalFactsForStmt must fail closed", gotFor)
+	}
+	if !HasError() {
+		t.Fatal("nil parent RemoveLoopLocalFactsForStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {

@@ -876,11 +876,15 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 // RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts for a block.
 // FactMgr.cpp:601–612 — collect locals from blk up through enclosing loop,
 // then update_facts_for_oos_vars (drop subjects + mark pointees garbage).
+// Block always live for break/continue OOS walk; nil blk sticky IncompleteFactSlice
+// (no invent complete keep-all-facts soft-success past missing parent / loop chain).
 // Incomplete facts/locals/clone fail closed sticky (no invent cleaned OOS filter
 // / soft re-pick past wiped break-continue out maps).
 func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
+	// Block* always live for loop-local OOS; sticky no invent passthrough keep locals
 	if blk == nil {
-		return facts
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
 	}
 	// incomplete facts fail closed sticky before OOS
 	if !FactsComplete(facts) {
