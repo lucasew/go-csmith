@@ -179,3 +179,52 @@ func TestVariableInitOutput(t *testing.T) {
 		t.Fatal(variableInitOutput(v))
 	}
 }
+
+func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
+	// CollectInitSkippedVars nil (LocalVars hole) must not invent goto with empty skip list
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	// outer with hole in LocalVars; nested dest so Collect climbs past hole
+	outer := &Block{Func: f, StmID: 1, LocalVars: []*Variable{nil}, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 10},
+	}}
+	inner := &Block{Func: f, Parent: outer, StmID: 2, Stmts: []Stmt{
+		{Kind: StmtAssign, StmID: 20},
+	}}
+	f.Blocks = []*Block{outer, inner}
+	f.Stack = []*Block{outer, inner}
+	fm := NewFactMgr(f)
+	// need read vars for cond
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	fm.GlobalFacts = []*FactPointTo{}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect().ReadVar(g)
+	cg.EffectAccum = &eff
+	// force map accum effect for forward path cond
+	fm.MapAccumEffect = map[int]Effect{10: EmptyEffect().ReadVar(g)}
+	// plant globals for ChooseVisibleReadVar
+	vs := NewVariableSelector(opts)
+	vs.GlobalList = []*Variable{g}
+	// many seeds: if any succeeds with Kind Goto, fail
+	for seed := uint64(1); seed < 40; seed++ {
+		// reset blocks each time (forward path mutates)
+		outer.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
+		inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 20}}
+		st := MakeRandomGoto(NewRng(seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, inner)
+		if st.Kind == StmtGoto {
+			// if Collect was incomplete, must have failed closed
+			// hole on outer LocalVars when dest is outer and src is inner:
+			// CollectInitSkippedVars(inner, outer) — dest outer, climb outer, LocalVars hole → nil
+			// path depends on back vs forward
+			if st.InitSkippedVars == nil {
+				t.Fatal("must not invent nil InitSkippedVars from incomplete Collect")
+			}
+		}
+	}
+	// Direct: Collect nil when hole
+	if CollectInitSkippedVars(inner, outer) != nil {
+		t.Fatal("outer LocalVars hole must yield nil Collect")
+	}
+	ClearError()
+}

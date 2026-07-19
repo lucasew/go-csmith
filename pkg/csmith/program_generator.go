@@ -769,9 +769,14 @@ func (g *ProgramGenerator) GoGenerator() string {
 		return ""
 	}
 	// make_first always yields a built user function; no invent header-only program
+	// Function* always live on Funcs; nil hole fails closed whole program emit
+	// (no invent soft-skip hole and still claim hasUser from a later slot)
 	hasUser := false
 	for _, f := range g.Funcs.Funcs {
-		if f != nil && !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
+		if f == nil {
+			return ""
+		}
+		if !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
 			hasUser = true
 			break
 		}

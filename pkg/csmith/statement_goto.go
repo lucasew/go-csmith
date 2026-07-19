@@ -454,12 +454,18 @@ func MakeRandomGoto(
 		} else if other.StmID > 0 {
 			stmLabels[other.StmID] = label
 		}
+		// incomplete LocalVars on intermediate blocks fails closed (Collect nil)
+		// no invent goto with empty InitSkippedVars when skip list is incomplete
+		skipped := CollectInitSkippedVars(blk, okBlk)
+		if skipped == nil {
+			return makeGotoFailed()
+		}
 		st := Stmt{
 			Kind: StmtGoto, Expr: cond, Label: label, StmID: AllocStmID(),
-			GotoBack:       true,
-			GotoDestStmID:  other.StmID,
-			GotoDestParent: okBlk,
-			InitSkippedVars: CollectInitSkippedVars(blk, okBlk),
+			GotoBack:        true,
+			GotoDestStmID:   other.StmID,
+			GotoDestParent:  okBlk,
+			InitSkippedVars: skipped,
 		}
 		// StatementGoto.cpp:139 — create_cfg_edge(sg, other_stm, false, true)
 		if cg.FM != nil {
@@ -553,6 +559,12 @@ func MakeRandomGoto(
 	}
 
 	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
+	// incomplete LocalVars on intermediate blocks fails closed (Collect nil)
+	// no invent forward goto with empty InitSkippedVars when skip list is incomplete
+	skippedFwd := CollectInitSkippedVars(okBlk, blk)
+	if skippedFwd == nil {
+		return makeGotoFailed()
+	}
 	sg := Stmt{
 		Kind:            StmtGoto,
 		Expr:            cond,
@@ -561,7 +573,7 @@ func MakeRandomGoto(
 		GotoForward:     true,
 		GotoDestStmID:   dest.StmID,
 		GotoDestParent:  blk,
-		InitSkippedVars: CollectInitSkippedVars(okBlk, blk),
+		InitSkippedVars: skippedFwd,
 	}
 	// re-resolve other index (slice stable until insert)
 	insertAt := -1

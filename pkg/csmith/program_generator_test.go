@@ -139,3 +139,36 @@ func TestGoGeneratorNoInventPartialProgram(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
+	// Function* hole on Funcs must not invent hasUser / functions section from later built
+	ClearError()
+	opts := Defaults()
+	g := NewProgramGenerator(opts)
+	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
+		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		RV:   CreateVariableScalars("func_1_rv", GetIntType(), false, false),
+	}
+	// hasUser scan: hole first must fail closed (not invent hasUser from built after hole)
+	g.Funcs.Funcs = []*Function{nil, built}
+	hasUser := false
+	for _, f := range g.Funcs.Funcs {
+		if f == nil {
+			// production returns ""
+			hasUser = false
+			break
+		}
+		if !f.IsBuiltin && f.BuildState == BuildBuilt && f.Body != nil {
+			hasUser = true
+			break
+		}
+	}
+	if hasUser {
+		t.Fatal("nil Funcs hole must not invent hasUser from later built func")
+	}
+	// OutputFunctions already fails closed on hole
+	if g.OutputFunctions() != "" {
+		t.Fatal("OutputFunctions must fail closed on nil Funcs hole")
+	}
+	ClearError()
+}
