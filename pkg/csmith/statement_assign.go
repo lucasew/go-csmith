@@ -613,6 +613,11 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 	}
 	switch e.Term {
 	case TermConstant:
+		// Constant.cpp always has live value string; incomplete Con fails visit
+		// no soft invent visit success for TermConstant shell without Value
+		if e.Con == nil || e.Con.Value == "" {
+			return false
+		}
 		return true
 	case TermVariable:
 		return cg.VisitFactsExpressionVariable(e, opts)

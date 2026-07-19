@@ -988,15 +988,24 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
 	for _, f := range funcs {
-		if f == nil || f.IsBuiltin {
+		// Function* always live on Funcs; no invent skip nil holes mid aggregate
+		if f == nil {
+			ClearPointToAggregates()
+			return
+		}
+		if f.IsBuiltin {
 			continue
 		}
-		var fm *FactMgr
-		if fms != nil {
-			fm = fms.ForFunc(f)
+		// FactMgr always paired for user funcs after make_random_signature / make_first
+		// no invent skip missing FM (partial aggregate)
+		if fms == nil {
+			ClearPointToAggregates()
+			return
 		}
+		fm := fms.ForFunc(f)
 		if fm == nil {
-			continue
+			ClearPointToAggregates()
+			return
 		}
 		// prefer map_facts_out values; also include GlobalFacts
 		for _, facts := range fm.MapFactsOut {

@@ -122,6 +122,16 @@ func TestVisitFactsExpressionComma(t *testing.T) {
 	if !eff.IsRead(a) || !eff.IsRead(b) {
 		t.Fatal("reads", eff.IsRead(a), eff.IsRead(b))
 	}
+	// incomplete TermConstant shell must not invent visit success
+	if VisitFactsExpression(&Expression{Term: TermConstant}, &cg, Defaults()) {
+		t.Fatal("nil Con constant must fail visit")
+	}
+	if VisitFactsExpression(&Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}, &cg, Defaults()) {
+		t.Fatal("empty Value constant must fail visit")
+	}
+	if !VisitFactsExpression(&Expression{Term: TermConstant, Con: MakeInt(0)}, &cg, Defaults()) {
+		t.Fatal("live constant must visit")
+	}
 }
 
 func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {

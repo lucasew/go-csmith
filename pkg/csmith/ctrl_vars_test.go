@@ -101,4 +101,20 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if !strings.Contains(out, "int i") {
 		t.Fatal(out)
 	}
+	// nil hole fails closed
+	if s := OutputArrayInitializers([]*Variable{v, nil}, opts, "    "); s != "" {
+		t.Fatal("nil hole must fail closed", s)
+	}
+	// incomplete loop-init (local non-const without init) fails closed
+	blk := &Block{}
+	loc := &ArrayVariable{
+		Variable: Variable{Name: "l_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+		Block:    blk, // non-nil → not IsGlobal; needs loop init
+		// no Init / InitValues → OutputInit empty
+	}
+	loc.AsArray = loc
+	if s := OutputArrayInitializers([]*Variable{&loc.Variable}, opts, "    "); s != "" {
+		t.Fatal("incomplete array init must fail closed", s)
+	}
 }

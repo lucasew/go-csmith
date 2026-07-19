@@ -437,17 +437,31 @@ func OutputArrayInitializers(vars []*Variable, opts Options, indent string) stri
 	b.WriteString(decl)
 	names := CtrlVarNames(ctrl)
 	for _, v := range vars {
-		if v == nil || !v.IsArray {
+		// mixed GlobalList may hold non-arrays; skip them (not holes)
+		if v == nil {
+			// Variable* always live in C++ list; no invent skip nil holes
+			return ""
+		}
+		if !v.IsArray {
 			continue
 		}
 		av := v.AsArray
 		if av == nil {
 			av = &ArrayVariable{Variable: *v, Sizes: v.ArraySizes, InitValues: v.ArrayInits}
 		}
+		// itemized dual-count members — skip (collective emits init once)
+		if av.Collective != nil {
+			continue
+		}
 		if av.NoLoopInitializer() {
 			continue
 		}
-		b.WriteString(av.OutputInit(indent, names))
+		initOut := av.OutputInit(indent, names)
+		// incomplete loop-init IR — fail closed whole initializers
+		if initOut == "" {
+			return ""
+		}
+		b.WriteString(initOut)
 	}
 	return b.String()
 }
