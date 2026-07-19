@@ -346,3 +346,14 @@ func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRenewFactNilFactsSticky(t *testing.T) {
+	ClearError()
+	if RenewFact(nil, MakeFactPointTo(CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false), NullPtr)) {
+		t.Fatal("nil facts RenewFact must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil facts RenewFact must SetError sticky")
+	}
+	ClearError()
+}

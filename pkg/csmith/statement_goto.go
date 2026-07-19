@@ -227,12 +227,14 @@ func variableInitOutput(v *Variable) string {
 	return ""
 }
 
-// copyBlocksNoHole copies blocks; nil hole fails closed (ok=false).
+// copyBlocksNoHole copies blocks; nil hole sticky fails closed (ok=false).
 // Block* always live on Function.Blocks; no invent soft-skip holes as absent.
 func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
 	out = make([]*Block, 0, len(blocks))
 	for _, b := range blocks {
 		if b == nil {
+			// incomplete Blocks sticky fail closed (no invent soft-skip hole as absent)
+			SetError(ErrGeneric)
 			return nil, false
 		}
 		out = append(out, b)

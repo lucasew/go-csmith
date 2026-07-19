@@ -269,3 +269,14 @@ func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {
 		t.Fatal("nil probs must not invent non-zero regular const/vol")
 	}
 }
+
+func TestOutputAssignSimpleNilSticky(t *testing.T) {
+	ClearError()
+	if OutputAssignSimple(nil, false) != "" {
+		t.Fatal("nil OutputAssignSimple must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputAssignSimple must SetError sticky")
+	}
+	ClearError()
+}

@@ -197,3 +197,28 @@ func TestOutputMainNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestProgramGeneratorNilEmitSticky(t *testing.T) {
+	ClearError()
+	if (*ProgramGenerator)(nil).OutputHeader() != "" {
+		t.Fatal("nil OutputHeader must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputHeader must SetError sticky")
+	}
+	ClearError()
+	if (*ProgramGenerator)(nil).GoGenerator() != "" {
+		t.Fatal("nil GoGenerator must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil GoGenerator must SetError sticky")
+	}
+	ClearError()
+	if (*ProgramGenerator)(nil).OutputFunctions() != "" {
+		t.Fatal("nil OutputFunctions must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputFunctions must SetError sticky")
+	}
+	ClearError()
+}

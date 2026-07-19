@@ -100,7 +100,9 @@ func (g *ProgramGenerator) GenerateAllTypes() {
 // Function.cpp:790–809 — interested facts; builtins; make_first; generate unbuilt;
 // aggregate_all_pointto_sets.
 func (g *ProgramGenerator) GenerateFunctions() {
+	// ProgramGenerator always live for GenerateFunctions; sticky incomplete no invent no-op
 	if g == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Function::FMList is session state from NewProgramGenerator; no invent mid-run
@@ -177,7 +179,13 @@ func (g *ProgramGenerator) GenerateFunctions() {
 
 // OutputHeader mirrors OutputMgr::OutputHeader (non-concise path).
 // OutputMgr.cpp:235–311.
+// Incomplete ProgramGenerator sticky empty (no invent header soft-skip past hole).
 func (g *ProgramGenerator) OutputHeader() string {
+	// ProgramGenerator always live at emit; sticky incomplete no invent empty header
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	var b strings.Builder
 	if g.Opts.Concise {
 		b.WriteString("// Options: ")
@@ -289,7 +297,9 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 // OutputStructTypes emits struct/union definitions (before globals/functions).
 // Incomplete StructTypes/UnionTypes fails closed sticky (no invent empty-section past holes).
 func (g *ProgramGenerator) OutputStructTypes() string {
+	// ProgramGenerator always live at emit; sticky incomplete no invent empty types section
 	if g == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if len(g.Types.StructTypes) == 0 && len(g.Types.UnionTypes) == 0 {
@@ -356,7 +366,13 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 // Incomplete GlobalList / Arrays fails closed sticky (no invent empty-section success
 // past nil holes via soft return "").
 func (g *ProgramGenerator) OutputGlobals() string {
-	if g == nil || g.VS == nil || len(g.VS.GlobalList) == 0 {
+	// ProgramGenerator always live at emit; sticky incomplete no invent empty globals section
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// complete empty globals (no VS or empty list) soft empty section
+	if g.VS == nil || len(g.VS.GlobalList) == 0 {
 		return ""
 	}
 	// incomplete GlobalList fails closed sticky (no invent partial section / empty shell)
@@ -430,7 +446,9 @@ func (g *ProgramGenerator) OutputGlobals() string {
 // Function.cpp:812–830 — optional FORWARD ALIAS DECLARATIONS when func_attr_flag.
 // Incomplete Funcs fails closed sticky (no invent empty-section / soft-skip hole).
 func (g *ProgramGenerator) OutputFunctions() string {
+	// ProgramGenerator always live at emit; sticky incomplete no invent empty functions section
 	if g == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// incomplete Funcs list fails closed sticky (no invent partial section past hole)
@@ -538,7 +556,9 @@ func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactU
 
 // hashGlobals is HashGlobalVariables using first function's UnionFacts when available.
 func (g *ProgramGenerator) hashGlobals() string {
+	// ProgramGenerator always live at hash emit; sticky incomplete no invent empty hash
 	if g == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var uf []*FactUnion
@@ -691,6 +711,11 @@ func (g *ProgramGenerator) OutputMain() string {
 // OutputHashFuncDef mirrors OutputMgr::OutputHashFuncDef.
 // OutputMgr.cpp:209–220 — declare ctrl vars then HashGlobalVariables.
 func (g *ProgramGenerator) OutputHashFuncDef() string {
+	// ProgramGenerator always live at emit; sticky incomplete no invent empty hash def
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	// no invent function shells when helpers disabled or ctrl IR incomplete
 	if !g.hashFuncDefReady() {
 		return ""
@@ -801,7 +826,9 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 // Used by OutputPtrResets (upstream always loops for array dead_globals).
 // ArrayVariable.cpp:619–655 — init->Output only; no invent "0" when init missing.
 func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, postIncr bool) string {
+	// ArrayVariable always live for forced init; sticky incomplete no invent empty reset
 	if av == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip (policy empty)
@@ -867,7 +894,9 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 // Returns empty string when sticky ERROR_RETURN aborts generation (no soft invent
 // of partial program as success).
 func (g *ProgramGenerator) GoGenerator() string {
+	// ProgramGenerator always live for goGenerator; sticky incomplete no invent empty program
 	if g == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	g.Initialize()
@@ -953,7 +982,13 @@ func (g *ProgramGenerator) GoGenerator() string {
 // WrapperHeader returns wrapper.h content when identify_wrappers is set.
 // DefaultProgramGenerator.cpp:73–77.
 func (g *ProgramGenerator) WrapperHeader() string {
-	if g == nil || !g.Opts.IdentifyWrappers {
+	// ProgramGenerator always live; sticky incomplete no invent empty wrapper header
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// --identify-wrappers off: complete empty (soft option omit)
+	if !g.Opts.IdentifyWrappers {
 		return ""
 	}
 	return OutputWrapperH()

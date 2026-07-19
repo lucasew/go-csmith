@@ -110,7 +110,9 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 // Fact* always live; incomplete subject map or nf PointTo fails closed
 // (*facts IncompleteFactSlice, false — no invent renew / leave incomplete as no-op).
 func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
+	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if nf == nil || nf.Var == nil {
@@ -141,7 +143,9 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 // Fact.cpp:203–210.
 // Incomplete maps fail closed (*facts nil, false — no invent partial renew).
 func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
+	// facts pointer always live for renew; sticky incomplete no invent no-op soft-skip
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {

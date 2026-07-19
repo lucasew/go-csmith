@@ -502,6 +502,7 @@ func (st *Stmt) GetAssignRhs() *Expression {
 }
 
 // gensymFromVS returns &vs.Sym for create_new_tmp_var / gensym share with g_/l_.
+// Nil VS is complete soft miss (callers use package Gensym) — not incomplete IR.
 func gensymFromVS(vs *VariableSelector) *GenSym {
 	if vs == nil {
 		return nil
@@ -511,8 +512,11 @@ func gensymFromVS(vs *VariableSelector) *GenSym {
 
 // OutputAssignSimple mirrors StatementAssign::OutputSimple.
 // StatementAssign.cpp:515–537 — lhs op rhs or pre/post incr forms.
+// Incomplete Statement sticky empty (no invent empty assign shell past hole).
 func OutputAssignSimple(st *Stmt, wrapVol bool) string {
+	// Statement always live at assign emit; sticky incomplete no invent empty token
 	if st == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	lhs := assignLhsText(st, wrapVol)
