@@ -98,10 +98,17 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if lhs.Output(false) != "(*g_p)" {
 		t.Fatal(lhs.Output(false))
 	}
-	// incomplete Lhs type IR: Complete false (no invent level 0 as complete)
+	// incomplete Lhs type IR: Complete false sticky (no invent level 0 as complete)
 	broken := &Lhs{Var: &Variable{Name: "x"}} // Type nil
 	if _, ok := broken.IndirectLevelComplete(); ok {
 		t.Fatal("nil Var.Type must fail closed Incomplete")
+	}
+	ClearError()
+	if !broken.IsVolatile() {
+		t.Fatal("incomplete Lhs IsVolatile must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("incomplete Lhs IsVolatile must SetError sticky")
 	}
 	ClearError()
 	if VariablesComplete(broken.GetLvars(nil)) {

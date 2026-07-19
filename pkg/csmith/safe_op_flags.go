@@ -274,7 +274,8 @@ func (f *SafeOpFlags) SizeToken() string {
 	case SafeFloat:
 		return "float"
 	default:
-		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); no soft invent int32_t
+		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); sticky no soft invent int32_t
+		SetError(ErrGeneric)
 		return ""
 	}
 	return b.String()
@@ -297,7 +298,8 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 		case SafeFloat:
 			return GetSimpleType(EFloat)
 		default:
-			// assert(0) path — no soft invent GetIntType for unknown size
+			// assert(0) path sticky — no soft invent GetIntType for unknown size
+			SetError(ErrGeneric)
 			return nil
 		}
 	}
@@ -311,7 +313,8 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 	case SafeInt64:
 		return GetSimpleType(EULongLong)
 	default:
-		// assert(0) path — no soft invent EUInt for unknown size
+		// assert(0) path sticky — no soft invent EUInt for unknown size
+		SetError(ErrGeneric)
 		return nil
 	}
 }
@@ -364,11 +367,16 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 		prefix = "safe_rshift_"
 		shift = true
 	default:
+		// invalid binary op sticky (no invent empty wrapper name)
+		SetError(ErrGeneric)
 		return ""
 	}
-	// SafeOpFlags.cpp:239 assert invalid size; no invent safe_add_func__s_s
+	// SafeOpFlags.cpp:239 assert invalid size; sticky no invent safe_add_func__s_s
 	sz := f.SizeToken()
 	if sz == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// safe_add_func_int32_t_s_s  /  safe_lshift_func_int32_t_s_u
@@ -414,6 +422,7 @@ func safeFloatFuncString(op string) string {
 	case "/":
 		prefix = "safe_div_"
 	default:
+		// float has no mod/shift wrappers — non-sticky empty (not broken IR invent)
 		return ""
 	}
 	return prefix + "func_float_f_f"
@@ -426,13 +435,17 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	if f == nil {
 		return ""
 	}
-	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); no invent int32 fallback
+	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); non-sticky empty
+	// (emit falls through to cast form — soft re-pick / alternate emit path)
 	if f.Size == SafeFloat {
 		return ""
 	}
 	sz := f.SizeToken()
 	if sz == "" {
-		// invalid size assert path
+		// invalid size assert path sticky
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder

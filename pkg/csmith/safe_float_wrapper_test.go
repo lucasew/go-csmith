@@ -49,13 +49,19 @@ func TestMakeRandomUnaryFloatPath(t *testing.T) {
 	if !f.Op1Signed || !f.Op2Signed {
 		t.Fatal("float unary always signed")
 	}
-	// SafeOpFlags.cpp:325 — assert no float unary; fail closed empty (no invent int32)
+	// SafeOpFlags.cpp:325 — assert no float unary; fail closed empty non-sticky (no invent int32)
+	ClearError()
 	if name := f.UnaryMinusFuncName(); name != "" {
 		t.Fatalf("float unary must fail closed, got %q", name)
 	}
+	if HasError() {
+		t.Fatal("float UnaryMinusFuncName must stay non-sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomUnaryIntPath(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.EnableFloat = false
 	f := MakeRandomUnary(NewRng(3), opts, NewProbabilities(opts), GetIntType(), nil, UnMinus)
@@ -112,17 +118,27 @@ func TestCastOpNoInventEmptySizeToken(t *testing.T) {
 }
 
 func TestBinaryFuncNameInvalidSizeFailClosed(t *testing.T) {
-	// SafeOpFlags.cpp:239 assert invalid size; no invent safe_add_func__s_s
+	// SafeOpFlags.cpp:239 assert invalid size; sticky no invent safe_add_func__s_s
+	ClearError()
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeOpSize(99)}
 	if got := f.BinaryFuncName("+"); got != "" {
 		t.Fatal("invalid size must fail closed BinaryFuncName", got)
 	}
+	if !HasError() {
+		t.Fatal("invalid size BinaryFuncName must SetError sticky")
+	}
+	ClearError()
 	if got := f.BinaryFuncName("<<"); got != "" {
 		t.Fatal("invalid size shift must fail closed", got)
 	}
+	if !HasError() {
+		t.Fatal("invalid size shift must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBinaryFuncNameFloat(t *testing.T) {
+	ClearError()
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat}
 	if got := f.BinaryFuncName("+"); got != "safe_add_func_float_f_f" {
 		t.Fatalf("add %q", got)
@@ -139,6 +155,18 @@ func TestBinaryFuncNameFloat(t *testing.T) {
 	if got := f.BinaryFuncName("%"); got != "" {
 		t.Fatalf("mod should be empty for float, got %q", got)
 	}
+	// float mod empty is non-sticky (no wrapper, not broken IR)
+	if HasError() {
+		t.Fatal("float mod empty must stay non-sticky")
+	}
+	// float unary minus name non-sticky empty (cast emit fallthrough)
+	if f.UnaryMinusFuncName() != "" {
+		t.Fatal("float unary safe name must fail closed")
+	}
+	if HasError() {
+		t.Fatal("float UnaryMinusFuncName must stay non-sticky")
+	}
+	ClearError()
 }
 
 func TestUnaryMinusOutputFloatUsesStandard(t *testing.T) {

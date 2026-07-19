@@ -74,8 +74,9 @@ func ChooseVisibleReadVar(
 	typ *Type,
 	unionFacts []*FactUnion,
 ) *Variable {
-	// VariableSelector.cpp:363 — type from caller (goto uses get_int_type); no invent
+	// VariableSelector.cpp:363 — type from caller (goto uses get_int_type); sticky no invent
 	if typ == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete union fact map fails closed sticky (no invent soft-filter nonreadable past holes)
@@ -124,11 +125,18 @@ func ChooseVisibleReadVar(
 // VariableSelector.cpp:1571–1579 — scan AllVars via match_var_name.
 // Variable* always live on AllVars; nil hole fails closed (no invent skip).
 func (vs *VariableSelector) FindVarByName(name string) *Variable {
-	if vs == nil || name == "" {
+	if vs == nil {
+		return nil
+	}
+	// empty name incomplete sticky (no invent match-all / soft re-pick)
+	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for _, v := range vs.AllVars {
+		// Variable* always live on AllVars; nil hole sticky fail closed
 		if v == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if m := v.MatchVarName(name); m != nil {
@@ -136,9 +144,10 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 		}
 	}
 	// also search arrays' Variable wrappers
-	// ArrayVariable* always live on Arrays; nil hole fails closed (no invent skip)
+	// ArrayVariable* always live on Arrays; nil hole sticky fail closed
 	for _, av := range vs.Arrays {
 		if av == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if m := av.Variable.MatchVarName(name); m != nil {

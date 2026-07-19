@@ -41,15 +41,21 @@ func TestSplitIntString(t *testing.T) {
 }
 
 func TestBreakupAssigns(t *testing.T) {
+	ClearError()
 	vs, vals := BreakupAssigns("a = 1; b=2;")
 	if len(vs) != 2 || vs[0] != "a" || vals[0] != "1" || vs[1] != "b" || vals[1] != "2" {
 		t.Fatal(vs, vals)
 	}
-	// StringUtils.cpp:222 assert(pair.size()==2); no soft invent skip
+	// StringUtils.cpp:222 assert(pair.size()==2); sticky no soft invent skip
+	ClearError()
 	vs, vals = BreakupAssigns("a=1; broken; c=3")
 	if vs != nil || vals != nil {
 		t.Fatal("malformed assign must fail whole parse")
 	}
+	if !HasError() {
+		t.Fatal("malformed BreakupAssigns must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStr2Int64(t *testing.T) {

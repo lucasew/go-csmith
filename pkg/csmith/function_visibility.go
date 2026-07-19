@@ -232,7 +232,9 @@ func OutputCommentLine(comment string, quiet, concise bool) string {
 	if quiet || concise {
 		return "\n"
 	}
+	// empty comment sticky (no invent "/*  */" / soft re-pick blank shell)
 	if comment == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return "/* " + comment + " */\n"

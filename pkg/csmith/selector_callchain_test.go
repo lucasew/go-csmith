@@ -26,6 +26,7 @@ func TestMatchVarName(t *testing.T) {
 }
 
 func TestFindVarByName(t *testing.T) {
+	ClearError()
 	vs := NewVariableSelector(Defaults())
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, v)
@@ -35,6 +36,24 @@ func TestFindVarByName(t *testing.T) {
 	if vs.FindVarByName("g_y") != nil {
 		t.Fatal("miss")
 	}
+	// empty name sticky
+	ClearError()
+	if vs.FindVarByName("") != nil {
+		t.Fatal("empty name must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty name FindVarByName must SetError sticky")
+	}
+	// nil hole sticky
+	ClearError()
+	vs.AllVars = []*Variable{v, nil}
+	if vs.FindVarByName("g_y") != nil {
+		t.Fatal("nil hole must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil hole FindVarByName must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsSeenName(t *testing.T) {

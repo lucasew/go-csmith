@@ -192,6 +192,7 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 }
 
 func TestOutputCommentLine(t *testing.T) {
+	ClearError()
 	s := OutputCommentLine("hello", false, false)
 	if s != "/* hello */\n" {
 		t.Fatal(s)
@@ -199,10 +200,15 @@ func TestOutputCommentLine(t *testing.T) {
 	if OutputCommentLine("x", true, false) != "\n" {
 		t.Fatal("quiet")
 	}
-	// empty comment — no invent "/*  */"
+	// empty comment sticky — no invent "/*  */"
+	ClearError()
 	if OutputCommentLine("", false, false) != "" {
 		t.Fatal("empty comment must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("empty comment must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFunctionOutputSeparator(t *testing.T) {

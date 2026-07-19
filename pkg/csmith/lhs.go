@@ -66,14 +66,15 @@ func (l *Lhs) GetType() *Type {
 
 // IsVolatile mirrors Lhs::is_volatile.
 // Lhs.cpp:220–222 — volatile after deref of indirect level.
-// Incomplete Lhs type IR fails closed as volatile (restrictive — no invent
-// non-vol eligibility via invented level 0).
+// Incomplete Lhs type IR fails closed sticky as volatile (restrictive — no invent
+// non-vol eligibility via invented level 0 / soft re-pick).
 func (l *Lhs) IsVolatile() bool {
 	if l == nil || l.Var == nil {
 		return false
 	}
 	n, ok := l.IndirectLevelComplete()
 	if !ok {
+		SetError(ErrGeneric)
 		return true
 	}
 	return l.Var.IsVolatileAfterDeref(n)

@@ -219,7 +219,8 @@ func BreakupAssigns(assigns string) (vars, values []string) {
 		// C++ split_string on '='; assert exactly two parts
 		pair := SplitString(st, '=')
 		if len(pair) != 2 {
-			// fail closed — no soft invent skip of broken assignment
+			// sticky fail closed — no soft invent skip of broken assignment
+			SetError(ErrGeneric)
 			return nil, nil
 		}
 		vars = append(vars, Chop(pair[0]))

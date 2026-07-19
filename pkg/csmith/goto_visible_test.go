@@ -20,10 +20,19 @@ func TestIsVarOnStack(t *testing.T) {
 }
 
 func TestChooseVisibleReadVar(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	// nil type sticky
+	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, nil, nil) != nil {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type ChooseVisibleReadVar must SetError sticky")
+	}
+	ClearError()
 	// only a in read set and global
 	got := ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, b}, GetIntType(), nil)
 	if got != a && got != b {
