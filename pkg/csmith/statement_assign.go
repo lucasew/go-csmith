@@ -37,12 +37,14 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	if typ != nil && (!typ.IsSimple() || typ.IsFloat()) {
 		return AssignSimple
 	}
-	// C++ always has RNG + assignOpsTable_; no soft invent table or simple without pick
+	// C++ always has RNG + assignOpsTable_ sticky; no invent table or simple without pick
 	if r == nil {
+		SetError(ErrGeneric)
 		return AssignOp(-1)
 	}
 	if table == nil {
-		// StatementAssign::InitProbabilityTable always live; fail closed invalid op
+		// StatementAssign::InitProbabilityTable always live; sticky fail closed invalid op
+		SetError(ErrGeneric)
 		return AssignOp(-1)
 	}
 	f := NewVectorFilter(table)
@@ -115,13 +117,15 @@ func MakeRandomAssignQfer(
 	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
-	// StatementAssign::assignOpsTable_ from InitProbabilityTable (no invent per assign)
+	// StatementAssign::assignOpsTable_ from InitProbabilityTable sticky (no invent per assign)
 	assignTab := ProcessAssignOpsTable()
 	if assignTab == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	op := AssignOpsProbability(r, opts, assignTab, typ)
 	if op < 0 {
+		// AssignOpsProbability already stickies on nil r/table; other invalid op soft
 		return Stmt{}
 	}
 	if typ == nil {

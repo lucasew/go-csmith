@@ -2507,8 +2507,9 @@ func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper V
 	// (no invent NewScopeThresholdTable per draw)
 	tab := ProcessScopeTab()
 	if tab == nil {
-		// library path without InitScopeTable — fail closed MAX
+		// library path without InitScopeTable — sticky ERROR_GUARD MAX
 		_ = opts
+		SetError(ErrGeneric)
 		return MaxVarScope
 	}
 	filt := variableSelectFilter(tab, cg)
@@ -2574,7 +2575,9 @@ func (vs *VariableSelector) SelectWithInvalid(
 	mt MatchType,
 	invalidVars []*Variable,
 ) *Variable {
+	// select always has VS + RNG sticky; no invent select shell without them
 	if vs == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before scope pick (no invent select past holes)

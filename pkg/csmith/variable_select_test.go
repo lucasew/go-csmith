@@ -20,7 +20,8 @@ func TestVariableSelectionProbabilityRange(t *testing.T) {
 }
 
 func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
-	// VariableSelector.cpp:1050 InitScopeTable required; no invent NewScopeThresholdTable
+	// VariableSelector.cpp:1050 InitScopeTable required sticky ERROR_GUARD MAX
+	ClearError()
 	prev := ProcessScopeTab()
 	SetProcessScopeTab(nil)
 	defer SetProcessScopeTab(prev)
@@ -28,6 +29,10 @@ func TestVariableSelectionProbabilityNilScopeTabFailClosed(t *testing.T) {
 	if sc != MaxVarScope {
 		t.Fatalf("want MAX without InitScopeTable, got %v", sc)
 	}
+	if !HasError() {
+		t.Fatal("nil ProcessScopeTab must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVariableSelectionProbabilityNilRNGSticky(t *testing.T) {

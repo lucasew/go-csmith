@@ -19,7 +19,8 @@ func TestPickTermTypeNilTablesFailClosed(t *testing.T) {
 }
 
 func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
-	// StatementAssign::assignOpsTable_ from InitProbabilityTable; no invent per assign
+	// StatementAssign::assignOpsTable_ sticky; no invent per assign
+	ClearError()
 	prev := ProcessAssignOpsTable()
 	SetProcessAssignOpsTable(nil)
 	defer SetProcessAssignOpsTable(prev)
@@ -30,18 +31,35 @@ func TestMakeRandomAssignUsesProcessAssignOpsTable(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("nil assignOpsTable must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil assignOpsTable must SetError sticky")
+	}
+	ClearError()
 	InitSessionProbabilityTables(opts)
 	st = MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType())
 	// may still fail for other reasons; at least table is live
 	_ = st
+	ClearError()
 }
 
 func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
-	// StatementAssign::assignOpsTable_ always live; no invent NewAssignOpsTable
+	// StatementAssign::assignOpsTable_ always live sticky; no invent NewAssignOpsTable
+	ClearError()
 	op := AssignOpsProbability(NewRng(1), Defaults(), nil, GetIntType())
 	if op != AssignOp(-1) {
 		t.Fatalf("want invalid op, got %v", op)
 	}
+	if !HasError() {
+		t.Fatal("nil table AssignOpsProbability must SetError sticky")
+	}
+	ClearError()
+	if AssignOpsProbability(nil, Defaults(), NewAssignOpsTable(Defaults()), GetIntType()) != AssignOp(-1) {
+		t.Fatal("nil RNG AssignOpsProbability must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG AssignOpsProbability must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
