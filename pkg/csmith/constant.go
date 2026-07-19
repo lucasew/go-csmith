@@ -71,8 +71,9 @@ func MakeInt(v int) *Constant {
 // Constant.cpp:509–510.
 // Incomplete Constant shell sticky false (no invent not-equal fold / soft re-pick).
 func (c *Constant) Equals(num int) bool {
-	// Constant always live for fold; sticky incomplete no invent not-equal
-	if c == nil {
+	// Constant always live with non-empty Value for fold; sticky incomplete
+	// (no invent not-equal soft-skip past empty-value shell / soft re-pick)
+	if c == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -83,6 +84,7 @@ func (c *Constant) Equals(num int) bool {
 			u, e2 := strconv.ParseUint(c.Value[2:], 16, 64)
 			return e2 == nil && int(u) == num
 		}
+		// non-numeric complete value → not equal (not incomplete IR)
 		return false
 	}
 	return n == num
@@ -98,8 +100,9 @@ func (c *Constant) NotEqualsZero() bool {
 // Constant.cpp:505–507.
 // Incomplete Constant sticky false (no invent equals fold / soft re-pick).
 func (c *Constant) NotEquals(num int) bool {
-	// nil → Equals stickies false; !false invents "not equals" — fail closed false sticky
-	if c == nil {
+	// nil / empty Value → Equals stickies false; !false invents "not equals"
+	// — fail closed false sticky before complement
+	if c == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -110,8 +113,9 @@ func (c *Constant) NotEquals(num int) bool {
 // Constant.cpp:501–503 — str2int(value) < num.
 // Incomplete Constant sticky false (no invent compare fold / soft re-pick).
 func (c *Constant) LessThan(num int) bool {
-	// Constant always live for fold; sticky incomplete no invent less-than
-	if c == nil {
+	// Constant always live with non-empty Value for fold; sticky incomplete
+	// (no invent not-less soft-skip past empty-value shell / soft re-pick)
+	if c == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -124,6 +128,7 @@ func (c *Constant) LessThan(num int) bool {
 			}
 			return int(u) < num
 		}
+		// non-numeric complete value → not less (not incomplete IR)
 		return false
 	}
 	return n < num
@@ -131,10 +136,10 @@ func (c *Constant) LessThan(num int) bool {
 
 // GetField mirrors Constant::get_field.
 // Constant.cpp:513–522 — split union/struct brace init by "{}," pick field fid.
-// Constant always live; sticky empty (no invent empty field soft-skip past hole).
-// Negative fid is complete empty (not incomplete IR).
+// Constant always live with non-empty Value; sticky empty (no invent empty field
+// soft-skip past empty-value shell). Negative fid is complete empty (not incomplete).
 func (c *Constant) GetField(fid int) string {
-	if c == nil {
+	if c == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return ""
 	}

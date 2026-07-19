@@ -341,6 +341,14 @@ func TestConstantGetField(t *testing.T) {
 		t.Fatal("nil GetField must SetError sticky")
 	}
 	ClearError()
+	// empty Value incomplete shell sticky (no invent empty field soft-skip)
+	if (&Constant{Type: GetIntType(), Value: ""}).GetField(0) != "" {
+		t.Fatal("empty Value GetField must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("empty Value GetField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionTypeProbabilityForceFunction(t *testing.T) {
