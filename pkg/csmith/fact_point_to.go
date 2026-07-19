@@ -562,26 +562,32 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 }
 
 // Equal reports same var and same points-to set.
+// Incomplete PointTo nil hole fails closed sticky as unequal (no invent equal / soft re-pick).
 func (f *FactPointTo) Equal(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		return false
 	}
-	if len(f.PointTo) != len(other.PointTo) {
-		return false
-	}
-	// Variable* always live in PointTo; nil hole fails closed as unequal
-	// (no invent soft-skip hole as absent / equal past incomplete sets)
-	set := make(map[*Variable]bool, len(f.PointTo))
+	// Variable* always live in PointTo; scan holes before len (len may differ with holes)
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
-		set[p] = true
 	}
 	for _, p := range other.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
+	}
+	if len(f.PointTo) != len(other.PointTo) {
+		return false
+	}
+	set := make(map[*Variable]bool, len(f.PointTo))
+	for _, p := range f.PointTo {
+		set[p] = true
+	}
+	for _, p := range other.PointTo {
 		if !set[p] {
 			return false
 		}
@@ -591,7 +597,7 @@ func (f *FactPointTo) Equal(other *FactPointTo) bool {
 
 // Imply mirrors FactPointTo::imply — other.point_to ⊆ this.point_to.
 // FactPointTo.cpp:602–609.
-// Incomplete PointTo (nil hole) fails closed as not-imply — no invent cover past holes.
+// Incomplete PointTo (nil hole) fails closed sticky as not-imply (no invent cover / soft re-pick).
 func (f *FactPointTo) Imply(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		return false
@@ -599,12 +605,14 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		set[p] = true
 	}
 	for _, p := range other.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if !set[p] {
@@ -616,8 +624,8 @@ func (f *FactPointTo) Imply(other *FactPointTo) bool {
 
 // Join mirrors FactPointTo::join — union of points-to sets; returns true if changed.
 // FactPointTo.cpp:563–578.
-// Incomplete PointTo (nil hole) fails closed false without partial absorb
-// (no invent soft-skip hole and still join later pointees).
+// Incomplete PointTo (nil hole) fails closed sticky false without partial absorb
+// (no invent soft-skip hole and still join later pointees / soft re-pick).
 func (f *FactPointTo) Join(other *FactPointTo) bool {
 	if f == nil || other == nil || f.Var != other.Var {
 		return false
@@ -625,13 +633,15 @@ func (f *FactPointTo) Join(other *FactPointTo) bool {
 	set := make(map[*Variable]bool, len(f.PointTo))
 	for _, p := range f.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		set[p] = true
 	}
-	// pre-scan other for holes before mutating self
+	// pre-scan other for holes before mutating self sticky
 	for _, p := range other.PointTo {
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 	}

@@ -484,34 +484,43 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 
 // StatExprDepths mirrors Bookkeeper::stat_expr_depths over non-builtin funcs.
 // Bookkeeper.cpp:224–230.
-// Function* always live; incomplete Funcs list clears counts (FunctionsComplete).
-// Builtins without body skip. Incomplete expressions (ExpressionComplexity < 0)
-// or incomplete stmt IR clear counts — no invent counting broken IR as leaf
-// depth 0 / skipping for-test / soft-skip nil Funcs mid walk.
+// Function* always live; incomplete Funcs list sticky clears counts.
+// Builtins without body skip. Incomplete expressions / stmt IR sticky clear counts —
+// no invent counting broken IR as leaf depth 0 / soft re-pick past holes.
 func StatExprDepths(funcs []*Function) {
 	exprDepthCnts = nil
 	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
 		return
 	}
 	for _, f := range funcs {
 		if f.IsBuiltin {
 			continue
 		}
-		// user func body always live after build; nil fails closed clear
+		// user func body always live after build; nil sticky clear
 		if f.Body == nil {
 			exprDepthCnts = nil
+			SetError(ErrGeneric)
 			return
 		}
 		for i := range f.Body.Stmts {
 			var exprs []*Expression
 			if !collectStmtExprs(&f.Body.Stmts[i], &exprs) {
+				// collectStmtExprs may already sticky
 				exprDepthCnts = nil
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 			for _, e := range exprs {
 				c := ExpressionComplexity(e)
 				if c < 0 {
+					// ExpressionComplexity may already sticky
 					exprDepthCnts = nil
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return
 				}
 				IncrCounter(&exprDepthCnts, c)
@@ -522,11 +531,12 @@ func StatExprDepths(funcs []*Function) {
 
 // StatBlkDepths mirrors Bookkeeper::stat_blk_depths.
 // Bookkeeper.cpp:128–152 — non-block stmts counted at get_blk_depth()-1.
-// Incomplete Funcs list fails closed zero counts (no invent partial depths past hole).
+// Incomplete Funcs / Block* holes fail closed sticky zero counts (no invent partial depths).
 func StatBlkDepths(funcs []*Function) int {
 	blkDepthCnts = nil
 	cnt := 0
 	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
 		return 0
 	}
 	incomplete := false
@@ -545,12 +555,13 @@ func StatBlkDepths(funcs []*Function) int {
 		IncrCounter(&blkDepthCnts, depth)
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
-		// Block* always live; nil hole fails closed (clear counts, no invent partial)
+		// Block* always live; nil hole sticky clear counts
 		for _, blk := range GetBlocksStmt(st) {
 			if blk == nil {
 				incomplete = true
 				blkDepthCnts = nil
 				cnt = 0
+				SetError(ErrGeneric)
 				return
 			}
 			for i := range blk.Stmts {
@@ -563,9 +574,10 @@ func StatBlkDepths(funcs []*Function) int {
 		if f.IsBuiltin {
 			continue
 		}
-		// user func body always live after build; nil fails closed
+		// user func body always live after build; nil sticky
 		if f.Body == nil {
 			blkDepthCnts = nil
+			SetError(ErrGeneric)
 			return 0
 		}
 		// body is a Block; count its statements with parent=body

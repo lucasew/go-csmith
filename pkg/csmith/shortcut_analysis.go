@@ -92,7 +92,7 @@ func ContainsStmt(root, target *Stmt) bool {
 
 // FindStmtInTree finds a statement by stm_id inside root's tree (self + nested blocks).
 // Walks get_blocks only (kind-gated) — no invent search via stray Then on non-compound.
-// Incomplete Block* hole fails closed nil (no invent soft-skip arm and match later).
+// Incomplete Block* hole fails closed sticky nil (no invent soft-skip arm / soft re-pick).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
 		return nil
@@ -101,9 +101,10 @@ func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 		return root
 	}
 	blks := GetBlocksStmt(root)
-	// pre-validate complete get_blocks before invent match past incomplete arm
+	// pre-validate complete get_blocks before invent match past incomplete arm sticky
 	for _, b := range blks {
 		if b == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 	}
@@ -124,8 +125,9 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
 		return
 	}
-	// incomplete CFG: no invent partial mark-as-visited past edge holes
+	// incomplete CFG sticky (no invent partial mark-as-visited / soft re-pick past holes)
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapVisited == nil {
@@ -160,16 +162,20 @@ func BlockContainsStmt(b *Block, target *Stmt) bool {
 // dest facts are not implied by jump-src outs.
 func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 	// Statement.cpp:770–771 — get_fact_mgr_for_func; assert(fm)
-	// fail closed: nil FM is unfixed (no invent "all gotos fixed")
+	// fail closed sticky: nil FM is unfixed (no invent "all gotos fixed" / soft re-pick)
 	if root == nil {
 		return false
 	}
 	if fm == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
 	if !collectStmIDs(root, ids) {
-		// incomplete get_blocks tree — fail closed unfixed
+		// incomplete get_blocks tree sticky unfixed
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	return containsUnfixedGotoIDs(ids, fm)
@@ -178,11 +184,12 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 // ContainsUnfixedGotoBlock mirrors contains_unfixed_goto when root is a Block.
 // Block is a Statement in C++; walk nested stmts for contains_stmt(goto/dest).
 func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
-	// assert(fm) — fail closed unfixed without FactMgr
+	// assert(fm) sticky unfixed without FactMgr
 	if b == nil {
 		return false
 	}
 	if fm == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	ids := map[int]bool{}
@@ -191,6 +198,9 @@ func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
 	}
 	for i := range b.Stmts {
 		if !collectStmIDs(&b.Stmts[i], ids) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return true
 		}
 	}
@@ -202,8 +212,9 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	if fm == nil || len(ids) == 0 {
 		return false
 	}
-	// incomplete CFG is unfixed (no invent skip holes as fixed)
+	// incomplete CFG sticky unfixed (no invent skip holes as fixed / soft re-pick)
 	if !CFGEdgesComplete(fm.CFGEdges) {
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, e := range fm.CFGEdges {
@@ -232,9 +243,11 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		if visited && destInside {
 			srcOut := fm.GetMapFactsOut(e.SrcID)
 			destIn := fm.GetMapFactsIn(e.DestStmID)
-			// incomplete maps fail closed unfixed — no invent "all fixed" when
-			// FindRelatedPointTo returns nil past a hole before a related fact
+			// incomplete maps sticky unfixed (GetMap may already SetError)
 			if !FactsComplete(srcOut) || !FactsComplete(destIn) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return true
 			}
 			if len(srcOut) > 0 && len(destIn) == 0 {
@@ -256,7 +269,7 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 }
 
 // collectStmIDs records StmIDs under st via get_blocks. Returns false on incomplete
-// Block* hole (no invent partial id set then claim all gotos fixed).
+// Block* hole sticky (no invent partial id set then claim all gotos fixed / soft re-pick).
 func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 	if st == nil {
 		return false
@@ -267,6 +280,7 @@ func collectStmIDs(st *Stmt, ids map[int]bool) bool {
 	// get_blocks only — no invent collect via stray Then on assign/break
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		for i := range b.Stmts {

@@ -146,7 +146,8 @@ func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 }
 
 func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
-	// incomplete IR must not invent depth-0 counts
+	// incomplete IR sticky clear depths (no invent leaf 0 / soft re-pick)
+	ClearError()
 	exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}}, // nil Invoke
@@ -155,7 +156,11 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	if exprDepthCnts != nil {
 		t.Fatal("incomplete expr must clear depth counts, not invent leaf 0", exprDepthCnts)
 	}
-	// incomplete Funcs list must not invent soft-skip hole and count later funcs
+	if !HasError() {
+		t.Fatal("incomplete expr StatExprDepths must SetError sticky")
+	}
+	ClearError()
+	// incomplete Funcs list sticky
 	exprDepthCnts = []int{99}
 	good := &Function{Name: "g", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
@@ -164,13 +169,22 @@ func TestStatExprDepthsIncompleteExprFailClosed(t *testing.T) {
 	if exprDepthCnts != nil {
 		t.Fatal("Funcs hole must clear depths, not invent count past hole", exprDepthCnts)
 	}
+	if !HasError() {
+		t.Fatal("Funcs hole StatExprDepths must SetError sticky")
+	}
+	ClearError()
 	if StatBlkDepths([]*Function{nil, good}) != 0 || blkDepthCnts != nil {
 		t.Fatal("Funcs hole must zero StatBlkDepths")
 	}
+	if !HasError() {
+		t.Fatal("Funcs hole StatBlkDepths must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStatExprDepthsForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs pushes test; soft invent skip would leave counts empty
+	ClearError()
 	BookkeeperDoFinalization()
 	test := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
@@ -183,7 +197,8 @@ func TestStatExprDepthsForTestExpr(t *testing.T) {
 }
 
 func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
-	// incomplete for Loop without TestExpr — no invent empty partial stats as success
+	// incomplete for Loop without TestExpr sticky clear
+	ClearError()
 	exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{IV: CreateVariableScalars("i", GetIntType(), false, false)}, Then: &Block{}},
@@ -192,10 +207,15 @@ func TestStatExprDepthsForMissingTestFailClosed(t *testing.T) {
 	if exprDepthCnts != nil {
 		t.Fatal("for without TestExpr must fail closed clear, not invent skip", exprDepthCnts)
 	}
+	if !HasError() {
+		t.Fatal("for without TestExpr StatExprDepths must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
-	// C++ get_exprs always live for assign; nil Expr must not invent empty success stats
+	// C++ get_exprs always live for assign; nil Expr sticky clear
+	ClearError()
 	exprDepthCnts = []int{99}
 	f := &Function{Name: "f", Body: &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
@@ -204,4 +224,8 @@ func TestStatExprDepthsAssignNilExprFailClosed(t *testing.T) {
 	if exprDepthCnts != nil {
 		t.Fatal("assign without Expr must fail closed clear depths", exprDepthCnts)
 	}
+	if !HasError() {
+		t.Fatal("assign without Expr StatExprDepths must SetError sticky")
+	}
+	ClearError()
 }

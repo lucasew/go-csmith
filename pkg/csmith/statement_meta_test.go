@@ -126,6 +126,7 @@ func TestFindContainerAndDominate(t *testing.T) {
 }
 
 func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
+	ClearError()
 	// StmID 0 is incomplete IR; orphans not in parent must not invent dominate via 0<=0
 	parent := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
 	orphanA := &Stmt{Kind: StmtAssign, StmID: 0}
@@ -133,6 +134,10 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	if Dominate(orphanA, parent, orphanB, parent) {
 		t.Fatal("orphan StmID 0 pair must fail closed not dominate")
 	}
+	if !HasError() {
+		t.Fatal("orphan StmID 0 Dominate must SetError sticky")
+	}
+	ClearError()
 	// same-parent members with StmID 0 still order by index
 	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: 0}, {Kind: StmtAssign, StmID: 0}}
 	if !Dominate(&parent.Stmts[0], parent, &parent.Stmts[1], parent) {
@@ -141,6 +146,7 @@ func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
 	if Dominate(&parent.Stmts[1], parent, &parent.Stmts[0], parent) {
 		t.Fatal("later must not dominate earlier")
 	}
+	ClearError()
 }
 
 func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
@@ -208,6 +214,7 @@ func TestIsPtrUsed(t *testing.T) {
 }
 
 func TestContainsStmtTree(t *testing.T) {
+	ClearError()
 	inner := Stmt{Kind: StmtAssign, StmID: 2}
 	thenB := &Block{Stmts: []Stmt{inner}}
 	elseB := &Block{}
@@ -223,10 +230,14 @@ func TestContainsStmtTree(t *testing.T) {
 	if ContainsStmtTree(stray, &thenB.Stmts[0]) {
 		t.Fatal("assign must not invent contains via stray Then")
 	}
-	// nil if arm fails closed false (incomplete)
+	// nil if arm sticky fail closed false
 	if ContainsStmtTree(&Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}, &thenB.Stmts[0]) {
 		t.Fatal("nil Else must fail closed (no invent membership)")
 	}
+	if !HasError() {
+		t.Fatal("nil Else ContainsStmtTree must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {

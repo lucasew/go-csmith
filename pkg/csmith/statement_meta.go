@@ -178,7 +178,7 @@ func FindContainerStm(b *Block) *Stmt {
 // aParent / sParent are parent blocks of a and s (Stmt has no Parent field).
 // Statement::stm_id is always live after create; StmID 0 is incomplete IR.
 // Same-parent incomplete IDs resolve by parent membership when possible; unresolved
-// membership fails closed false (no invent dominate true via 0<=0 for orphans).
+// membership fails closed sticky false (no invent dominate true via 0<=0 / soft re-pick).
 // Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	if a == nil || s == nil {
@@ -207,7 +207,8 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 			if ia >= 0 && is >= 0 {
 				return ia <= is
 			}
-			// incomplete StmID and not both in parent — fail closed
+			// incomplete StmID and not both in parent — sticky fail closed
+			SetError(ErrGeneric)
 			return false
 		}
 		return a.StmID <= s.StmID
@@ -289,7 +290,7 @@ func ContainsStmtInBlock(b *Block, stParent *Block) bool {
 
 // ContainsStmtTree mirrors Statement::contains_stmt for compound statements.
 // Statement.cpp:684–705 — self or nested get_blocks trees by StmID.
-// Incomplete Block* hole fails closed false (no invent membership past holes).
+// Incomplete Block* hole fails closed sticky false (no invent membership / soft re-pick).
 // Walks only get_blocks kinds (no invent search via stray Then on assign).
 func ContainsStmtTree(root, s *Stmt) bool {
 	if root == nil || s == nil {
@@ -303,9 +304,10 @@ func ContainsStmtTree(root, s *Stmt) bool {
 	}
 	blks := GetBlocksStmt(root)
 	// pre-validate complete get_blocks (if always has both arms)
-	// nil hole fails closed before invent membership from a partial arm scan
+	// nil hole sticky before invent membership from a partial arm scan
 	for _, b := range blks {
 		if b == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 	}

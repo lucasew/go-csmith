@@ -444,7 +444,8 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 }
 
 func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
-	// incomplete working facts or prev outs fail closed
+	// incomplete working facts or prev outs sticky fail closed
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -455,6 +456,10 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("incomplete GlobalFacts must fail closed VisitFactsGoto")
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts VisitFactsGoto must SetError sticky")
+	}
+	ClearError()
 	// complete facts, incomplete prev out
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.MapFactsOut = map[int][]*FactPointTo{
@@ -463,4 +468,8 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	if VisitFactsStatementGoto(st, &cg, Defaults()) {
 		t.Fatal("incomplete prev MapFactsOut must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("incomplete prev MapFactsOut VisitFactsGoto must SetError sticky")
+	}
+	ClearError()
 }

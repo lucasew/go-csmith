@@ -174,7 +174,8 @@ func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 
 func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	// soft invent: mark first goto then stop on nil CFG edge
-	// fair: pre-scan holes — mark none when CFG incomplete
+	// fair: incomplete CFG sticky — mark none (no invent partial / soft re-pick)
+	ClearError()
 	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	root := &Stmt{Kind: StmtFor, StmID: 10, Then: &Block{Stmts: []Stmt{gotoSt}}}
 	fm := NewFactMgr(nil)
@@ -189,9 +190,14 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	if fm.MapVisited[20] {
 		t.Fatal("incomplete CFG must not invent partial goto visited mark")
 	}
+	if !HasError() {
+		t.Fatal("incomplete CFG MarkContainedGotosVisited must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCGContextAddEffect(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	eff := EmptyEffect()
