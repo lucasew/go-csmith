@@ -139,6 +139,7 @@ func TestCreateRandomArrayAddsFacts(t *testing.T) {
 
 func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	// FactMgr.cpp:69–110 — assert global when blk nil; push into map_facts_in/out
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	// seed map slots for a statement
@@ -161,13 +162,24 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	if len(fm.MapFactsIn[sid]) == 0 || len(fm.MapFactsOut[sid]) == 0 {
 		t.Fatal("blk==nil must append fact to all map_facts_in/out")
 	}
-	// incomplete map slot must not invent soft-append past hole
+	// incomplete map slot must not invent soft-append past hole (local marker, non-sticky)
 	fm.MapFactsIn[sid] = IncompleteFactSlice()
 	g2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFactAndUpdate(nil, g2)
 	if FactsComplete(fm.MapFactsIn[sid]) {
 		t.Fatal("incomplete map slot must stay incomplete after AddNewVarFactAndUpdate")
 	}
+	// incomplete GlobalFacts fails closed sticky before add
+	fm.GlobalFacts = IncompleteFactSlice()
+	g3 := CreateVariableScalars("g_r", PointerTo(GetIntType()), false, false)
+	fm.AddNewVarFactAndUpdate(nil, g3)
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("incomplete GlobalFacts must stay wiped")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts AddNewVarFactAndUpdate must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {

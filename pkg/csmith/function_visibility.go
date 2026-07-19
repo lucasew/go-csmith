@@ -98,14 +98,16 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 
 // AddBackReturnFacts mirrors Statement::add_back_return_facts / Block walk.
 // Statement.cpp:525–537 — merge map_facts_out of every return into facts.
-// Incomplete map_facts_out / mid-join / nil block hole fails closed: *facts = IncompleteFactSlice()
-// and the walk stops (no invent keep merging later returns after a failed merge).
+// Incomplete map_facts_out / mid-join / nil block hole fails closed sticky:
+// *facts = IncompleteFactSlice() + SetError and the walk stops (no invent keep
+// merging later returns after a failed merge / soft re-pick past wiped facts).
 // Returns false when incomplete (*facts wiped) so callers do not invent success
 // via FactsComplete(nil)==true after a fail-closed wipe.
 func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if b == nil || fm == nil || facts == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -117,6 +119,7 @@ func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool 
 	if b == nil || fm == nil || facts == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -133,6 +136,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if st == nil || facts == nil {
 		if facts != nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 		}
 		return false
 	}
@@ -142,21 +146,26 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 		out := fm.GetMapFactsOut(st.StmID)
 		if !FactsComplete(out) || !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
-		// MergeFacts clears *facts on incomplete mid-join — fail closed
+		// MergeFacts clears *facts sticky on incomplete mid-join
 		_ = MergeFacts(facts, out)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		return true
 	}
 	// Statement.cpp:530–535 — get_blocks then recurse (Then/Else for if/for)
 	for _, blk := range GetBlocksStmt(st) {
-		// Block* always live from get_blocks; nil hole fails closed
+		// Block* always live from get_blocks; nil hole fails closed sticky
 		if blk == nil {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
 		if !addBackReturnFactsBlock(blk, fm, facts) {

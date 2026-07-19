@@ -482,7 +482,8 @@ func (fm *FactMgr) ClearMapVisited() {
 
 // RestoreFacts mirrors FactMgr::restore_facts.
 // FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
-// Incomplete oldFacts / makeup fail closed (no invent clean clone + partial makeup).
+// Incomplete oldFacts / makeup fail closed sticky (no invent clean clone + partial
+// makeup, no soft re-pick past wiped GlobalFacts).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	if fm == nil {
 		return
@@ -490,12 +491,16 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	// nil oldFacts is empty restore; non-nil with holes → CloneFactSlice nil
 	if oldFacts != nil && !FactsComplete(oldFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	cp := CloneFactSlice(oldFacts)
 	if !MakeupNewVarFacts(&cp, fm.GlobalFacts) {
-		// incomplete GlobalFacts or mid-makeup hole — fail closed, no invent partial
+		// incomplete GlobalFacts or mid-makeup hole — fail closed sticky
 		fm.GlobalFacts = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	fm.GlobalFacts = cp
@@ -1124,8 +1129,9 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 // AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps.
 // FactMgr.cpp:69–110 — abstract_fact_for_var_init into global_facts and
 // map_facts_in/out for statements under blk (or all when blk is nil).
-// Incomplete GlobalFacts / Clone / map slots fail closed (IncompleteFactSlice on
-// GlobalFacts; incomplete map entries stay incomplete — no invent append past hole).
+// Incomplete GlobalFacts / Clone fail closed sticky (IncompleteFactSlice on
+// GlobalFacts + SetError; incomplete map entries stay incomplete local markers —
+// no invent append past hole / soft re-pick past wiped GlobalFacts).
 func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -1135,31 +1141,37 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if blk == nil && !v.IsGlobal() {
 		return
 	}
-	// incomplete subject map before add — fail closed (no invent push onto holes)
+	// incomplete subject map before add — fail closed sticky (no invent push onto holes)
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// snapshot length to detect newly merged facts
 	beforePT := len(fm.GlobalFacts)
 	fm.AddNewVarFact(v)
-	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push
+	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push sticky
 	if !FactsComplete(fm.GlobalFacts) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	// FactMgr.cpp:77–104 — push each new init fact into maps
-	// Fact* always live after add; nil / incomplete Clone fails closed wipe GlobalFacts
+	// Fact* always live after add; nil / incomplete Clone fails closed sticky wipe
 	// no invent MapFactsIn-only push when MapFactsOut is nil (one-sided invent)
 	for i := beforePT; i < len(fm.GlobalFacts); i++ {
 		f := fm.GlobalFacts[i]
 		if f == nil {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		cl := f.Clone()
 		if cl == nil {
-			// incomplete PointTo on new fact — fail closed
+			// incomplete PointTo on new fact — fail closed sticky
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		// map_facts_in: stm in_block(blk) || blk==null
@@ -1194,6 +1206,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				c2 := f.Clone()
 				if c2 == nil {
 					fm.GlobalFacts = IncompleteFactSlice()
+					SetError(ErrGeneric)
 					return
 				}
 				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)

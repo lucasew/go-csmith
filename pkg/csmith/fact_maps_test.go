@@ -241,6 +241,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 }
 
 func TestRestoreFacts(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
@@ -254,6 +255,17 @@ func TestRestoreFacts(t *testing.T) {
 	if FindRelatedPointTo(fm.GlobalFacts, q) == nil {
 		t.Fatal("makeup q")
 	}
+	// incomplete oldFacts fails closed sticky (no invent soft re-pick past wipe)
+	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	fm.RestoreFacts(hole)
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("incomplete oldFacts must wipe GlobalFacts incomplete")
+	}
+	if !HasError() {
+		t.Fatal("incomplete oldFacts RestoreFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {

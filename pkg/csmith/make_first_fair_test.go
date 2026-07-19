@@ -90,9 +90,14 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 		99: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
 	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
+	ClearError()
 	if AddBackReturnFacts(callee.Body, calFM, &retFacts) || FactsComplete(retFacts) {
 		t.Fatal("incomplete return out must fail closed AddBackReturnFacts", retFacts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete return out must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeFirstSetupInOutMaps(t *testing.T) {

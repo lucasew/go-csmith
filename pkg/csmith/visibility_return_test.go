@@ -77,6 +77,7 @@ func TestFunctionIsVarOOS(t *testing.T) {
 }
 
 func TestAddBackReturnFacts(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -91,15 +92,20 @@ func TestAddBackReturnFacts(t *testing.T) {
 	if !AddBackReturnFacts(body, fm, &facts) || len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
 	}
-	// return StmID 0 fails closed (no invent soft-merge MapFactsOut[0])
+	// return StmID 0 fails closed sticky (no invent soft-merge MapFactsOut[0])
 	var facts0 []*FactPointTo
 	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0) || FactsComplete(facts0) {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
+	if !HasError() {
+		t.Fatal("return StmID 0 must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
-	// incomplete map_facts_out fails closed and must not invent merge of later returns
+	// incomplete map_facts_out fails closed sticky — no invent merge of later returns
+	ClearError()
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -117,6 +123,10 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	if AddBackReturnFacts(body, fm, &facts) || FactsComplete(facts) {
 		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete out must SetError sticky")
+	}
+	ClearError()
 	// nested if Then with incomplete return must stop before Else returns
 	fm2 := NewFactMgr(f)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
@@ -132,6 +142,10 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 	if AddBackReturnFacts(body2, fm2, &facts2) || FactsComplete(facts2) {
 		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
 	}
+	if !HasError() {
+		t.Fatal("nested incomplete must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
