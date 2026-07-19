@@ -309,14 +309,18 @@ func RandomTypeFromType(
 			return nil
 		}
 		st := ChooseRandomNonvoidSimple(r, probs)
-		// Type.cpp:603–605 — assert(simple != eVoid); no soft invent int for void
+		// Type.cpp:603–605 — assert(simple != eVoid) sticky; no soft invent int for void
 		if st == EVoid {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		return GetSimpleType(st)
 	}
-	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple)
+	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple) sticky
 	if typ.IsSimple() && typ.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return typ

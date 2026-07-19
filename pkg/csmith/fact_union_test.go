@@ -94,10 +94,14 @@ func TestFactUnionOutput(t *testing.T) {
 }
 
 func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
-	// FactUnion.cpp:163 assert union type — no invent FactUnion on int
+	// FactUnion.cpp:163 assert union type sticky — no invent FactUnion on int
+	ClearError()
 	v := CreateVariableScalars("g_i", GetIntType(), true, false)
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union must not invent FactUnion")
+	}
+	if !HasError() {
+		t.Fatal("non-union MakeFactUnion must SetError sticky")
 	}
 	// MakeFactUnions fails closed sticky incomplete on non-union / nil hole
 	ClearError()
@@ -133,7 +137,8 @@ func TestJoinVarFactsUnion(t *testing.T) {
 }
 
 func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
-	// FactUnion.cpp:65 assert union; OOB fid fail closed
+	// FactUnion.cpp:65 assert union; OOB fid fail closed sticky
+	ClearError()
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
@@ -148,6 +153,10 @@ func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 	if f.GetLastWrittenType() != nil {
 		t.Fatal("OOB fid")
 	}
+	if !HasError() {
+		t.Fatal("OOB fid GetLastWrittenType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferUnionConstant(t *testing.T) {

@@ -89,7 +89,11 @@ func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {
 
 func TestAddVisibleEffectAtUsesBlock(t *testing.T) {
 	// non-global on call chain block is tracked
+	ClearError()
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	if loc == nil {
+		t.Fatal("create local")
+	}
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	cg := EmptyCGContext()

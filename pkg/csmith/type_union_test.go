@@ -6,6 +6,7 @@ import (
 )
 
 func TestMakeRandomUnionType(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv
@@ -22,6 +23,7 @@ func TestMakeRandomUnionType(t *testing.T) {
 }
 
 func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	ut := &Type{
@@ -33,6 +35,9 @@ func TestMakeUnionConstantFirstFieldOnly(t *testing.T) {
 		},
 	}
 	c := MakeUnionConstant(NewRng(2), opts, probs, ut)
+	if c == nil {
+		t.Fatal("union constant")
+	}
 	// single initializer value inside braces
 	if !strings.HasPrefix(c.Value, "{") || strings.Count(c.Value, ",") != 0 {
 		// first field only → no comma unless nested struct

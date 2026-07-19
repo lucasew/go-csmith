@@ -422,9 +422,10 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 // MakeStructConstant mirrors GenerateRandomStructConstant.
 // Constant.cpp:253–284 — skip zero-width bitfields; bitfields use in-range constants.
 func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *Constant {
-	// Constant.cpp:255 — assert(eStruct); always has RNG for field constants
+	// Constant.cpp:255 — assert(eStruct); always has RNG for field constants sticky
 	// no invent "{}" shell without live RNG / fields path
 	if r == nil || st == nil || !st.isStruct {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var b strings.Builder
@@ -690,9 +691,10 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 // MakeUnionConstant mirrors GenerateRandomUnionConstant — initialize first field only.
 // Constant.cpp:288–294.
 func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Constant {
-	// Constant.cpp:289–291 — assert union with fields; always has RNG
+	// Constant.cpp:289–291 — assert union with fields; always has RNG sticky
 	// no soft invent MakeInt(0) / "{}" without live RNG
 	if r == nil || ut == nil || !ut.isUnion || len(ut.Fields) == 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f0 := ut.Fields[0]
@@ -711,8 +713,11 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 			val = c.Value
 		}
 	}
-	// ERROR_GUARD on empty first field — no invent "{}"
+	// ERROR_GUARD on empty first field sticky — no invent "{}"
 	if val == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	return &Constant{Type: ut, Value: "{" + val + "}"}

@@ -24,9 +24,10 @@ type FactUnion struct {
 // MakeFactUnion mirrors FactUnion::make_fact(v, fid).
 // FactUnion.cpp:162–167 — assert(v==null || union type); default fid 0 when omitted.
 func MakeFactUnion(v *Variable, fid int) *FactUnion {
-	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion)
+	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion) sticky
 	// no soft invent FactUnion on scalar/struct vars
 	if v != nil && (v.Type == nil || !v.Type.IsUnion()) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return &FactUnion{Var: v, LastWrittenFID: fid}
@@ -159,17 +160,21 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 	if f == nil || f.Var == nil || f.IsTop() || f.IsBottom() {
 		return nil
 	}
-	// FactUnion.cpp:65 — assert(var->type && eUnion); fail closed nil if not union
+	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
 	if f.Var.Type == nil || !f.Var.Type.IsUnion() {
+		SetError(ErrGeneric)
 		return nil
 	}
 	fid := f.LastWrittenFID
-	// FactUnion.cpp:68–69 — assert fid in [0, field_vars.size())
+	// FactUnion.cpp:68–69 — assert fid in [0, field_vars.size()) sticky
 	if fid < 0 || fid >= len(f.Var.FieldVars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	fv := f.Var.FieldVars[fid]
+	// field Variable* always live; sticky no invent nil type via hole
 	if fv == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return fv.Type

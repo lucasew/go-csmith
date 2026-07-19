@@ -96,16 +96,25 @@ func TestMakeStructConstant(t *testing.T) {
 	if c == nil || !strings.HasPrefix(c.Value, "{") {
 		t.Fatal(c)
 	}
-	// Constant.cpp always has RNG; no invent "{}" aggregate shell
+	// Constant.cpp always has RNG sticky; no invent "{}" aggregate shell
+	ClearError()
 	if MakeStructConstant(nil, opts, probs, st) != nil {
 		t.Fatal("nil RNG struct constant")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeStructConstant must SetError sticky")
+	}
+	ClearError()
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	if MakeUnionConstant(nil, opts, probs, ut) != nil {
 		t.Fatal("nil RNG union constant")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeUnionConstant must SetError sticky")
+	}
+	ClearError()
 }
 
 func min(a, b int) int {

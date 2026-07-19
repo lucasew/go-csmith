@@ -18,22 +18,41 @@ func TestCreateVariableAndPredicates(t *testing.T) {
 }
 
 func TestCreateVariableRejectsVoid(t *testing.T) {
+	// Variable.cpp:388/412 — assert(type)/void sticky; empty name soft factory non-sticky
+	ClearError()
 	if CreateVariableScalars("g_1", GetSimpleType(EVoid), false, false) != nil {
 		t.Fatal("void simple must be rejected")
 	}
-	// Variable.cpp:388/412 — assert(type); no soft invent
+	if !HasError() {
+		t.Fatal("void CreateVariableScalars must SetError sticky")
+	}
+	ClearError()
 	if CreateVariableScalars("g_n", nil, false, false) != nil {
 		t.Fatal("nil type must be rejected")
 	}
+	if !HasError() {
+		t.Fatal("nil type CreateVariableScalars must SetError sticky")
+	}
+	ClearError()
 	if CreateVariableWithInit("g_n", nil, MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("CreateVariableWithInit nil type")
 	}
-	// name always live; no invent empty-name Variable shell
+	if !HasError() {
+		t.Fatal("nil type CreateVariableWithInit must SetError sticky")
+	}
+	ClearError()
+	// name always live; empty name soft factory (non-sticky re-pick gate)
 	if CreateVariableScalars("", GetIntType(), false, false) != nil {
 		t.Fatal("empty name must fail closed CreateVariableScalars")
 	}
+	if HasError() {
+		t.Fatal("empty name CreateVariableScalars must stay non-sticky soft factory")
+	}
 	if CreateVariableWithInit("", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false})) != nil {
 		t.Fatal("empty name must fail closed CreateVariableWithInit")
+	}
+	if HasError() {
+		t.Fatal("empty name CreateVariableWithInit must stay non-sticky soft factory")
 	}
 }
 

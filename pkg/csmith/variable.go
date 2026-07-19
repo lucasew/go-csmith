@@ -527,12 +527,17 @@ func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
 // CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421.
 func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
-	// Variable.cpp:412–414 — assert(type); assert simple != eVoid
-	// name always live from gensym/caller; no invent empty-name Variable shell
-	if typ == nil || name == "" {
+	// Variable.cpp:412–414 — assert(type); assert simple != eVoid sticky
+	// name always live from gensym/caller; empty name non-sticky soft factory gate
+	if name == "" {
+		return nil
+	}
+	if typ == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if typ.IsSimple() && typ.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	v := &Variable{
@@ -563,12 +568,17 @@ func createVarRng() *Rng {
 // Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
 // unless outermost container is union (Variable.cpp:395).
 func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
-	// Variable.cpp:388–390 — assert(type); assert simple != eVoid
-	// name always live; no invent empty-name Variable shell
-	if typ == nil || name == "" {
+	// Variable.cpp:388–390 — assert(type); assert simple != eVoid sticky
+	// name always live; empty name non-sticky soft factory gate
+	if name == "" {
+		return nil
+	}
+	if typ == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if typ.IsSimple() && typ.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	qfer := NewCVQualifiers([]bool{isConst}, []bool{isVolatile})
