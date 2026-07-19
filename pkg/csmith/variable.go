@@ -1517,6 +1517,8 @@ func (v *Variable) GetFieldID() int {
 // Variable.cpp:1228–1235 — recursive pointer fields of aggregates.
 // Variable* always live in FieldVars; nil hole fails closed sticky IncompleteVariables
 // (not bare nil invent empty-complete no-pointer-fields / soft re-pick past hole).
+// Type* always live for non-special fields; Type-nil sticky IncompleteVariables
+// (no invent soft-skip shell as neither pointer nor aggregate then complete empty/partial).
 // Complete empty (no pointer fields) returns non-nil empty slice.
 func (v *Variable) FindPointerFields() []*Variable {
 	if v == nil {
@@ -1528,6 +1530,15 @@ func (v *Variable) FindPointerFields() []*Variable {
 		if f == nil {
 			SetError(ErrGeneric)
 			return IncompleteVariables()
+		}
+		// Type* always live for non-special field subjects; Type-nil sticky
+		// (IsPointer/IsAggregate residual ERROR still soft-skips as complete none)
+		if f.Type == nil {
+			if !IsSpecialPtr(f) {
+				SetError(ErrGeneric)
+				return IncompleteVariables()
+			}
+			continue
 		}
 		if f.IsPointer() {
 			out = append(out, f)

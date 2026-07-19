@@ -132,6 +132,23 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 		t.Fatal("nil subject FindPointerFields must SetError sticky")
 	}
 	ClearError()
+	// Type-nil field soft invent: IsPointer/IsAggregate residual ERROR then skip as
+	// neither → complete empty (or later fields only). Fair: sticky Incomplete.
+	tyNil := &Variable{
+		Name: "s2", Type: &Type{isStruct: true},
+		FieldVars: []*Variable{
+			{Name: "s2.typeless"}, // Type nil non-special
+			{Name: "s2.p", Type: PointerTo(GetIntType())},
+		},
+	}
+	gotTy := tyNil.FindPointerFields()
+	if VariablesComplete(gotTy) {
+		t.Fatal("Type-nil field must fail closed incomplete, not soft-skip complete", gotTy)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil field FindPointerFields must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindPointerFields(t *testing.T) {
