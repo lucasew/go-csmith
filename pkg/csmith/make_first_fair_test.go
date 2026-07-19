@@ -180,6 +180,33 @@ func TestMakeFirstERRORGuard(t *testing.T) {
 	}
 }
 
+func TestMakeFirstIncompleteGlobalListFailClosed(t *testing.T) {
+	// AddNewVarFact(nil) no-ops — incomplete GlobalList must not invent partial FM seed + body
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	list := &FunctionList{}
+	seedTypesForTest(NewRng(4), opts, probs, vs, list)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g, nil}
+	if MakeFirst(NewRng(5), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), list, nil) != nil {
+		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
+	}
+	ClearError()
+	// MakeRandomFunction same seed path
+	vs2 := NewVariableSelector(opts)
+	list2 := &FunctionList{}
+	seedTypesForTest(NewRng(6), opts, probs, vs2, list2)
+	vs2.GlobalList = []*Variable{CreateVariableScalars("g_2", GetIntType(), false, false), nil}
+	cg := EmptyCGContext().WithFuncList(list2)
+	if MakeRandomFunction(NewRng(7), opts, probs, vs2, &vs2.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, list2) != nil {
+		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
+	}
+	ClearError()
+}
+
 func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	// Function.cpp:797/805 ERROR_RETURN after make_first / GenerateBody
 	ClearError()

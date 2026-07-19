@@ -259,9 +259,17 @@ func MakeRandomFunction(
 	if fm == nil {
 		return nil
 	}
+	// Variable* always live on GlobalList; nil hole fails closed
+	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
+		if !VariablesComplete(vs.GlobalList) {
+			return nil
+		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
+			if !FactsComplete(fm.GlobalFacts) {
+				return nil
+			}
 		}
 	}
 	bodyCG := cg
@@ -341,9 +349,17 @@ func MakeFirst(
 		_ = fmMap.ForFunc(f)
 	}
 	// seed existing globals so first function sees them (generation convenience)
+	// Variable* always live on GlobalList; nil hole fails closed
+	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
+		if !VariablesComplete(vs.GlobalList) {
+			return nil
+		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
+			if !FactsComplete(fm.GlobalFacts) {
+				return nil
+			}
 		}
 	}
 
