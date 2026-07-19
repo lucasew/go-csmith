@@ -500,6 +500,17 @@ func TestSetIndexExprNoSoftZero(t *testing.T) {
 		t.Fatalf("sequential SetIndex append: %v", av2.Indices)
 	}
 	ClearError()
+	// ArrayVariable always live; sticky (no invent soft-skip index set past hole)
+	(*ArrayVariable)(nil).SetIndex(0, "i")
+	if !HasError() {
+		t.Fatal("nil av SetIndex must SetError sticky")
+	}
+	ClearError()
+	(*ArrayVariable)(nil).SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()})
+	if !HasError() {
+		t.Fatal("nil av SetIndexExpr must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputWithIndicesNoLetterInvent(t *testing.T) {

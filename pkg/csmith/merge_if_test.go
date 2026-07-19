@@ -127,13 +127,20 @@ func TestMergeFacts(t *testing.T) {
 		t.Fatal("incomplete MergeFacts must SetError sticky")
 	}
 	ClearError()
+	ClearError()
 	if FactsComplete(MergeFactInto(facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil fact MergeFactInto must SetError sticky")
 	}
 	// MergeFactInto incomplete map marker stays non-sticky (soft re-pick); MergeFacts sticks.
 	ClearError()
 	if FactsComplete(MergeFactInto([]*FactPointTo{MakeFactPointTo(p, a), nil}, MakeFactPointTo(p, a))) {
 		t.Fatal("incomplete map MergeFactInto must fail closed")
+	}
+	if HasError() {
+		t.Fatal("incomplete map MergeFactInto must stay non-sticky soft re-pick")
 	}
 	ClearError()
 }

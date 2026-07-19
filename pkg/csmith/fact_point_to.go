@@ -825,14 +825,18 @@ func IncompleteFactSlice() []*FactPointTo {
 
 // MergeFactInto merges new fact with lattice join (Fact::merge_fact).
 // Fact.cpp:149–171 — strong replace only when not related; else join.
-// Fact* always live at call sites; nil f or incomplete map fails closed
-// IncompleteFactSlice (no invent no-op / empty-complete via FactsComplete(nil)).
+// Fact* always live at call sites; nil f sticky IncompleteFactSlice
+// (no invent no-op / empty-complete via FactsComplete(nil)).
+// Incomplete map is non-sticky IncompleteFactSlice (soft re-pick; MergeFacts sticks).
+// Clone fail sticky IncompleteFactSlice (hard incomplete PointTo).
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
-	// no invent treat nil fact as empty merge that preserves facts
+	// Fact* always live; sticky (no invent soft-skip nil fact as empty merge)
 	if f == nil {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// incomplete map must not invent join success when match appears before a hole
+	// non-sticky marker — soft re-pick factories; MergeFacts sticks at accumulator
 	if !FactsComplete(facts) {
 		return IncompleteFactSlice()
 	}
@@ -845,7 +849,10 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 			// join: copy f, join old into it
 			cp := f.Clone()
 			if cp == nil {
-				// incomplete PointTo on f — fail closed
+				// incomplete PointTo on f — fail closed sticky
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return IncompleteFactSlice()
 			}
 			_ = cp.Join(old)
@@ -855,6 +862,9 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 	}
 	cl := f.Clone()
 	if cl == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	return append(facts, cl)
@@ -1271,11 +1281,13 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 // IncompleteVariables (not bare nil — VariablesComplete(nil)/len==0 invent empty skip).
 // Complete empty (specials-only / no pointees) returns non-nil empty slice.
 func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable {
-	// incomplete fact map fails closed (FindRelated would nil on first hole)
+	// incomplete fact map fails closed non-sticky (fact-map soft re-pick factories)
 	if !FactsComplete(facts) {
 		return IncompleteVariables()
 	}
+	// Variable* always live; sticky IncompleteVariables (no invent soft-skip ptr hole)
 	if !VariablesComplete(ptrs) {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
@@ -1285,12 +1297,15 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 			continue
 		}
 		ft := FindRelatedPointTo(facts, p)
-		// FactPointTo.cpp:694 assert(exist_fact) — fail closed, no invent skip
+		// FactPointTo.cpp:694 assert(exist_fact) — non-sticky IncompleteVariables
+		// (generation soft re-pick before fact is installed; no invent empty skip)
 		if ft == nil {
 			return IncompleteVariables()
 		}
 		for _, pointee := range ft.PointTo {
+			// PointTo Variable* always live; sticky (no invent soft-skip pointee hole)
 			if pointee == nil {
+				SetError(ErrGeneric)
 				return IncompleteVariables()
 			}
 			if seen[pointee] {
@@ -1306,8 +1321,11 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 // MergePointeesOfPointer mirrors FactPointTo::merge_pointees_of_pointer.
 // FactPointTo.cpp:669–676 — start from ptr, indirect steps of merge_pointees.
 // Incomplete merge → IncompleteVariables (not bare nil invent empty complete).
+// Variable always live; sticky IncompleteVariables (no invent soft-skip past hole).
+// Missing fact / incomplete map stays non-sticky IncompleteVariables (soft re-pick).
 func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) []*Variable {
 	if ptr == nil {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	tmp := []*Variable{ptr}

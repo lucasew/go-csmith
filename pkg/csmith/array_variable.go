@@ -505,8 +505,10 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 // SetIndex mirrors ArrayVariable::set_index (string form for emit).
 // ArrayVariable.cpp:229–231 — indices[index] = e; vector already sized for dim.
 // sticky no invent pad empty holes or empty Constant "0" stand-ins
+// ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndex(index int, expr string) {
 	if av == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if index < 0 || expr == "" {
@@ -541,8 +543,10 @@ func (av *ArrayVariable) SetIndex(index int, expr string) {
 
 // SetIndexExpr mirrors ArrayVariable::set_index(size_t, const Expression*).
 // ArrayVariable.cpp:229–231 — stores Expression*; emit string from Output only.
+// ArrayVariable always live; sticky (no invent soft-skip index set past hole).
 func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 	if av == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if index < 0 || e == nil {

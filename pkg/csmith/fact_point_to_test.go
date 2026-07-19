@@ -353,26 +353,44 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 		t.Fatal("nil indexVar UpdateWithModifiedIndex must SetError sticky")
 	}
 	ClearError()
+	ClearError()
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{nil}, nil)) {
 		t.Fatal("nil ptr hole MergePointees must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil ptr hole MergePointees must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 	// FactPointTo.cpp:694 assert(exist_fact) — missing related fact fails closed
 	// (no invent soft-skip partial pointees / empty complete)
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// facts empty / no related fact for p
+	// facts empty / no related fact for p — non-sticky soft re-pick
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, nil)) {
 		t.Fatal("missing exist_fact must fail closed incomplete, not invent empty skip")
 	}
+	if HasError() {
+		t.Fatal("missing exist_fact must stay non-sticky soft re-pick")
+	}
+	ClearError()
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{})) {
 		t.Fatal("empty facts without related must fail closed incomplete")
 	}
-	// incomplete fact map
+	if HasError() {
+		t.Fatal("empty facts missing related must stay non-sticky")
+	}
+	ClearError()
+	// incomplete fact map non-sticky
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
+	if HasError() {
+		t.Fatal("incomplete facts MergePointees must stay non-sticky soft re-pick")
+	}
+	ClearError()
 	// complete related fact still works
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
 	got := MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{MakeFactPointTo(p, tgt)})
@@ -384,19 +402,42 @@ func TestMergePointeesMissingFactFailClosed(t *testing.T) {
 	if !VariablesComplete(sp) || len(sp) != 0 {
 		t.Fatal("specials-only must yield empty complete, not fail closed", sp)
 	}
+	// PointTo nil hole is FactsComplete-false → non-sticky incomplete map path
+	bad := MakeFactPointTo(p, tgt)
+	bad.PointTo = []*Variable{nil}
+	if VariablesComplete(MergePointeesOfPointers([]*Variable{p}, []*FactPointTo{bad})) {
+		t.Fatal("nil pointee hole must fail closed incomplete")
+	}
+	if HasError() {
+		t.Fatal("nil pointee via incomplete facts must stay non-sticky soft re-pick")
+	}
+	ClearError()
 }
 
 func TestMergePointeesOfPointerPropagatesNil(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	// indirect 1 with missing fact → incomplete (not invent empty step)
+	// indirect 1 with missing fact → incomplete non-sticky (not invent empty step)
 	if VariablesComplete(MergePointeesOfPointer(p, 1, nil)) {
 		t.Fatal("missing fact at indir 1 must propagate incomplete")
 	}
+	if HasError() {
+		t.Fatal("missing fact MergePointeesOfPointer must stay non-sticky soft re-pick")
+	}
+	ClearError()
 	// indirect 0 does not look up facts
 	got := MergePointeesOfPointer(p, 0, nil)
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != p {
 		t.Fatalf("indir0: %+v", got)
 	}
+	// Variable always live; sticky
+	if VariablesComplete(MergePointeesOfPointer(nil, 0, nil)) {
+		t.Fatal("nil ptr must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("nil ptr MergePointeesOfPointer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateWithModifiedIndex(t *testing.T) {

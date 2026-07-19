@@ -130,6 +130,10 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if VariablesComplete(lhsAssignPointees(facts, nil, 0)) {
 		t.Fatal("nil lhs must IncompleteVariables")
 	}
+	if !HasError() {
+		t.Fatal("nil lhs lhsAssignPointees must SetError sticky")
+	}
+	ClearError()
 	if _, ok := applyPointToAssignFacts(&facts, nil, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
 		t.Fatal("nil lhs pointees must fail closed ok=false, not invent renew/merge")
 	}
@@ -138,6 +142,14 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete lhs wipe must SetError sticky")
+	}
+	ClearError()
+	// facts accumulator always live; sticky
+	if _, ok := applyPointToAssignFacts(nil, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
+		t.Fatal("nil facts applyPointToAssignFacts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil facts applyPointToAssignFacts must SetError sticky")
 	}
 	ClearError()
 }

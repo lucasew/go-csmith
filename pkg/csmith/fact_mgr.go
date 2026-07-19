@@ -1406,20 +1406,26 @@ func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 // Used to decide renew (lvar_cnt==1) vs merge (may-point-to).
 // Incomplete lhs/facts/merge fails closed IncompleteVariables (not bare nil invent
 // lvar_cnt==0, and not IncompleteVariables len==1 invent definitive renew without check).
+// Variable always live; sticky IncompleteVariables (no invent soft-skip lhs past hole).
+// Incomplete fact map / merge result stays non-sticky IncompleteVariables (soft re-pick).
 func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
 	if lhs == nil {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
+	// incomplete map non-sticky hole (fact-map soft re-pick factories)
 	if !FactsComplete(facts) {
 		return IncompleteVariables()
 	}
 	coll := lhs.GetCollective()
 	if coll == nil {
-		// incomplete field path collective — no invent level-0 merge of self
+		// incomplete field path collective sticky (hard IR hole)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	lvars := MergePointeesOfPointer(coll, lhsIndir, facts)
 	if !VariablesComplete(lvars) {
+		// missing exist_fact / incomplete merge non-sticky (soft re-pick)
 		return IncompleteVariables()
 	}
 	if lhsIndir == 0 && lhs.Type != nil && lhs.Type.ptrTo != nil && len(lvars) == 0 {
@@ -1435,7 +1441,9 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 // closed without wiping prior complete *facts (factory re-pick must not poison FM).
 // empty complete newFacts is ok with changed=false.
 func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) (changed bool, ok bool) {
+	// facts accumulator always live; sticky (no invent soft-skip assign apply past hole)
 	if facts == nil {
+		SetError(ErrGeneric)
 		return false, false
 	}
 	if !FactsComplete(*facts) {
