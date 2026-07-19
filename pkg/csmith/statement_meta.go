@@ -147,8 +147,14 @@ func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 
 // Is1stStm mirrors Statement::is_1st_stm.
 // Statement.cpp:649–651 — first statement of parent block.
+// Incomplete Statement/parent sticky false (no invent is-first / soft re-pick past holes).
 func Is1stStm(st *Stmt, parent *Block) bool {
-	if st == nil || parent == nil || len(parent.Stmts) == 0 {
+	// Statement + parent always live; sticky incomplete no invent is-first soft-skip
+	if st == nil || parent == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(parent.Stmts) == 0 {
 		return false
 	}
 	first := &parent.Stmts[0]
@@ -161,13 +167,25 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 // FindContainerStm mirrors Statement::find_container_stm for a nested block.
 // Statement.cpp:414–430 — parent-block statement whose get_blocks contains b.
 // Kind-gated get_blocks only (no invent container via stray Then on assign).
+// Incomplete parent get_blocks hole sticky nil (no invent soft-skip missing container).
 func FindContainerStm(b *Block) *Stmt {
+	// root / missing parent is complete nil (not incomplete)
 	if b == nil || b.Parent == nil {
 		return nil
 	}
 	for i := range b.Parent.Stmts {
 		s := &b.Parent.Stmts[i]
-		for _, nb := range GetBlocksStmt(s) {
+		blks := GetBlocksStmt(s)
+		// incomplete get_blocks (if arms / for body holes) sticky no invent miss
+		for _, nb := range blks {
+			if nb == nil {
+				// StmtIf always both arms; nil arm incomplete IR sticky
+				if s.Kind == StmtIfElse || s.Kind == StmtFor {
+					SetError(ErrGeneric)
+					return nil
+				}
+				continue
+			}
 			if nb == b {
 				return s
 			}

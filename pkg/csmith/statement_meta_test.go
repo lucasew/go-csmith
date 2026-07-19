@@ -77,6 +77,7 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 }
 
 func TestIs1stStm(t *testing.T) {
+	ClearError()
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
 		{Kind: StmtAssign, StmID: 2},
@@ -87,6 +88,17 @@ func TestIs1stStm(t *testing.T) {
 	if Is1stStm(&b.Stmts[1], b) {
 		t.Fatal("second")
 	}
+	if HasError() {
+		t.Fatal("complete Is1stStm must not sticky")
+	}
+	ClearError()
+	if Is1stStm(nil, b) {
+		t.Fatal("nil stmt Is1stStm must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil stmt Is1stStm must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindContainerAndDominate(t *testing.T) {

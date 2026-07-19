@@ -181,7 +181,9 @@ const (
 // FindVariableScope mirrors CGContext::find_variable_scope.
 // CGContext.cpp:431–468 — -1 global; 0 param; 1+ block depth; INVISIBLE/INACTIVE.
 func (c CGContext) FindVariableScope(v *Variable) int {
+	// Variable always live; sticky incomplete ScopeInactive (no invent soft re-pick)
 	if v == nil {
+		SetError(ErrGeneric)
 		return ScopeInactive
 	}
 	if v.IsGlobal() {
@@ -192,9 +194,10 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		return ScopeInactive
 	}
 	// params → 0
-	// Variable* always live on Param; nil hole fails closed as inactive
+	// Variable* always live on Param; nil hole sticky fail closed as inactive
 	for _, p := range f.Param {
 		if p == nil {
+			SetError(ErrGeneric)
 			return ScopeInactive
 		}
 		if p.Match(v) {
@@ -207,6 +210,8 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 	for b != nil {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
+				// incomplete LocalVars sticky ScopeInactive
+				SetError(ErrGeneric)
 				return ScopeInactive
 			}
 			if loc == v {
@@ -220,11 +225,14 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 	for i := len(c.CallChain) - 1; i >= 0; i-- {
 		b = c.CallChain[i]
 		if b == nil {
+			// incomplete call_chain sticky ScopeInactive
+			SetError(ErrGeneric)
 			return ScopeInactive
 		}
 		for b != nil {
 			for _, loc := range b.LocalVars {
 				if loc == nil {
+					SetError(ErrGeneric)
 					return ScopeInactive
 				}
 				if loc == v {
@@ -1162,7 +1170,9 @@ func (c CGContext) InConflict(eff Effect) bool {
 // (IsVisibleLocal short-circuits); FindReachableFrameVars fails closed on incomplete
 // stacks so under-reporting frame pointees is not invented as complete empty.
 func (c CGContext) IsFrameVar(v *Variable) bool {
+	// Variable always live; sticky incomplete no invent not-frame soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:493–494 — get_current_block(); assert(b)
@@ -1172,15 +1182,18 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		return false
 	}
 	if !b.StackScanComplete() {
+		// incomplete stack sticky (no invent not-frame / soft re-pick past hole)
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsVisibleLocal(b) {
 		return true
 	}
 	for _, cb := range c.CallChain {
-		// Block* always live on call_chain; nil / incomplete stack fails closed
+		// Block* always live on call_chain; nil / incomplete stack sticky fail closed
 		// (no invent skip hole and still match a later frame)
 		if cb == nil || !cb.StackScanComplete() {
+			SetError(ErrGeneric)
 			return false
 		}
 		if v.IsVisibleLocal(cb) {

@@ -296,9 +296,14 @@ func RecordTypeWithBitfields(t *Type) {
 		return
 	}
 	// Bookkeeper.cpp:482–483 — assert(len == fields.size()); Fields carry BitWidth
-	// incomplete field IR (nil types) fail closed stop — no invent zero counts past gaps
+	// incomplete field IR (nil Type) sticky stop — no invent zero counts past gaps
 	structsWithBitfields++
 	for _, f := range t.Fields {
+		// StructField Type always live for bitfield stats; nil hole sticky stop
+		if f.Type == nil {
+			SetError(ErrGeneric)
+			return
+		}
 		// Bookkeeper.cpp:485 — if (!is_bitfield(i)) continue
 		if f.BitWidth < 0 {
 			continue

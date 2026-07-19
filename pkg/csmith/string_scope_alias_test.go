@@ -28,6 +28,7 @@ func TestGetSubstring(t *testing.T) {
 }
 
 func TestFindVariableScope(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if EmptyCGContext().FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global")
@@ -55,6 +56,20 @@ func TestFindVariableScope(t *testing.T) {
 	if cg.FindVariableScope(CreateVariableScalars("l_x", GetIntType(), false, false)) != ScopeInactive {
 		t.Fatal("inactive")
 	}
+	if HasError() {
+		t.Fatal("complete FindVariableScope paths must not sticky")
+	}
+	// incomplete Param sticky ScopeInactive
+	ClearError()
+	f.Param = []*Variable{p, nil}
+	if cg.FindVariableScope(loc) != ScopeInactive {
+		t.Fatal("Param hole must fail closed ScopeInactive")
+	}
+	if !HasError() {
+		t.Fatal("Param hole FindVariableScope must SetError sticky")
+	}
+	ClearError()
+	f.Param = []*Variable{p}
 }
 
 func TestUpdatePtrAliasesAndAggregate(t *testing.T) {

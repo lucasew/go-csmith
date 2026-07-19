@@ -265,30 +265,41 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 // Label resolution: Statement.cpp:908–914 — find_jump_sources only (gotos[0]->label).
 // SourceLabel is generation-side dest mirror used when FactMgr is absent (no CFG).
 func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
+	// Statement always live at pre_output; sticky incomplete no invent empty pre shell
 	if st == nil {
+		SetError(ErrGeneric)
 		return "", false
 	}
 	label := ""
 	// Statement.cpp:908–914 — find_jump_sources → first goto label
 	if fm != nil {
-		// Statement::stm_id always live under FM; StmID 0 fails closed
+		// Statement::stm_id always live under FM; StmID 0 sticky fail closed
 		// (no invent SourceLabel / step_hash soft-fallback for incomplete id)
-		if st.StmID > 0 {
-			srcs := fm.FindJumpSources(st.StmID)
-			// nil = incomplete CFG; no invent label from partial sources
-			// empty non-nil = no gotos (do not fall back to SourceLabel)
-			if srcs != nil && len(srcs) > 0 {
-				label = FindJumpLabel(fm, st.StmID)
-				// resolve from source stmt when FindJumpLabel missed registry
-				if label == "" && fm.Func != nil {
-					if src := FindStmtByID(fm.Func, srcs[0]); src != nil {
-						label = src.Label
-					}
+		if st.StmID <= 0 {
+			SetError(ErrGeneric)
+			return "", false
+		}
+		srcs := fm.FindJumpSources(st.StmID)
+		// nil = incomplete CFG (FindJumpSources may already sticky); no invent label
+		// empty non-nil = no gotos (do not fall back to SourceLabel)
+		if srcs == nil {
+			// incomplete CFG sticky — no invent step_hash soft-fallback past hole
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return "", false
+		}
+		if len(srcs) > 0 {
+			label = FindJumpLabel(fm, st.StmID)
+			// resolve from source stmt when FindJumpLabel missed registry
+			if label == "" && fm.Func != nil {
+				if src := FindStmtByID(fm.Func, srcs[0]); src != nil {
+					label = src.Label
 				}
 			}
-			// with FactMgr: do not fall back to SourceLabel without jump sources
-			// (C++ only labels when find_jump_sources non-empty)
 		}
+		// with FactMgr: do not fall back to SourceLabel without jump sources
+		// (C++ only labels when find_jump_sources non-empty)
 	} else if st.SourceLabel != "" {
 		// no DFA / no FM: emit generation-time dest label
 		label = st.SourceLabel

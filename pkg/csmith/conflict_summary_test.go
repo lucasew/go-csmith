@@ -240,6 +240,7 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 }
 
 func TestIsFrameVar(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
@@ -258,6 +259,19 @@ func TestIsFrameVar(t *testing.T) {
 	if cg2.IsFrameVar(loc) {
 		t.Fatal("nil curr_blk must fail closed, not invent via call_chain only")
 	}
+	// incomplete LocalVars sticky not-frame
+	ClearError()
+	blkHole := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
+	f.Stack = []*Block{blkHole}
+	cg3 := WithFunc(f, EmptyEffect())
+	if cg3.IsFrameVar(loc) {
+		t.Fatal("incomplete stack IsFrameVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("incomplete stack IsFrameVar must SetError sticky")
+	}
+	ClearError()
+	f.Stack = []*Block{blk}
 }
 
 func TestDoFinalization(t *testing.T) {

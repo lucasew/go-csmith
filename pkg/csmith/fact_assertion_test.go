@@ -226,6 +226,7 @@ func TestIsTopEmpty(t *testing.T) {
 
 func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 	// Statement.cpp:905–917 — jump target emits label, not step_hash
+	ClearError()
 	st := &Stmt{Kind: StmtAssign, StmID: 5, SourceLabel: "lbl_1"}
 	out, tgt := PreOutput(st, nil, true, false, nil, "    ")
 	if !tgt || !strings.Contains(out, "lbl_1:") {
@@ -234,24 +235,39 @@ func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 	if strings.Contains(out, "step_hash") {
 		t.Fatal("goto target must not step_hash", out)
 	}
+	// nil Stmt sticky
+	ClearError()
+	if o, g := PreOutput(nil, nil, true, false, nil, ""); o != "" || g {
+		t.Fatal("nil Stmt PreOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt PreOutput must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
+	ClearError()
 	st := &Stmt{Kind: StmtAssign, StmID: 9}
 	out, tgt := PreOutput(st, nil, true, false, nil, "  ")
 	if tgt || out != "  step_hash(9);\n" {
 		t.Fatal(out, tgt)
 	}
-	// FM + StmID 0 — no invent SourceLabel / step_hash for incomplete id
+	// FM + StmID 0 sticky — no invent SourceLabel / step_hash for incomplete id
 	fm := NewFactMgr(nil)
 	st0 := &Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "lbl_invent"}
 	out0, tgt0 := PreOutput(st0, fm, true, false, nil, "  ")
 	if out0 != "" || tgt0 {
 		t.Fatal("StmID 0 under FM must not invent SourceLabel/step_hash", out0, tgt0)
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 under FM PreOutput must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPreOutputFromCFGJumpSources(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	body := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
@@ -265,9 +281,14 @@ func TestPreOutputFromCFGJumpSources(t *testing.T) {
 	if !tgt || !strings.Contains(out, "lbl_cfg:") {
 		t.Fatal(out, tgt)
 	}
+	if HasError() {
+		t.Fatal("complete CFG PreOutput must not sticky")
+	}
+	ClearError()
 }
 
 func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
+	ClearError()
 	b := &Block{
 		EmitStepHash: true,
 		Stmts: []Stmt{
