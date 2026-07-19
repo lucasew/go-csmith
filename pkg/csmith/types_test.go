@@ -56,3 +56,22 @@ func TestIsSigned(t *testing.T) {
 		t.Fatal("signedness")
 	}
 }
+
+func TestStructDepthIncompleteSticky(t *testing.T) {
+	ClearError()
+	st := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil}}}
+	if st.StructDepth() != incompleteStructDepth {
+		t.Fatal("nil field Type must fail closed incompleteStructDepth")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type StructDepth must SetError sticky")
+	}
+	ClearError()
+	if !HasLongLongField([]StructField{{Type: nil}}) {
+		t.Fatal("nil field Type HasLongLongField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type HasLongLongField must SetError sticky")
+	}
+	ClearError()
+}

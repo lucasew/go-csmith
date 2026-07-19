@@ -283,3 +283,41 @@ func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
 		t.Fatal(n, stms)
 	}
 }
+
+func TestMustReturnIncompleteSticky(t *testing.T) {
+	ClearError()
+	// if with nil Then sticky not-must-return
+	st := Stmt{Kind: StmtIfElse, Then: nil, Else: &Block{}}
+	if st.MustReturn() {
+		t.Fatal("nil Then MustReturn must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Then MustReturn must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestNeedReturnStmtIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*Function)(nil).NeedReturnStmt() {
+		t.Fatal("nil Function NeedReturnStmt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Function NeedReturnStmt must SetError sticky")
+	}
+	ClearError()
+	if !(&Function{Name: "f"}).NeedReturnStmt() {
+		t.Fatal("nil ReturnType must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil ReturnType NeedReturnStmt must SetError sticky")
+	}
+	ClearError()
+	if (&Function{Name: "f", ReturnType: GetSimpleType(EVoid)}).NeedReturnStmt() {
+		t.Fatal("void must not need return")
+	}
+	if HasError() {
+		t.Fatal("void NeedReturnStmt must not sticky")
+	}
+	ClearError()
+}

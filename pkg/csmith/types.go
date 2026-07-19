@@ -167,8 +167,8 @@ const incompleteStructDepth = 256
 
 // StructDepth mirrors Type::get_struct_depth.
 // Type.cpp:1261–1275 — 0 if not struct; else 1 + max field depth.
-// Type* always live on Fields; nil hole fails closed as incompleteStructDepth
-// (no invent depth 0 that soft-skips nested-struct caps).
+// Type* always live on Fields; nil hole sticky incompleteStructDepth
+// (no invent depth 0 that soft-skips nested-struct caps / soft re-pick).
 func (t *Type) StructDepth() int {
 	if t == nil || !t.IsStruct() {
 		return 0
@@ -177,6 +177,8 @@ func (t *Type) StructDepth() int {
 	maxField := 0
 	for _, f := range t.Fields {
 		if f.Type == nil {
+			// incomplete field Type sticky deep (restrictive nesting filter)
+			SetError(ErrGeneric)
 			return incompleteStructDepth
 		}
 		if d := f.Type.StructDepth(); d > maxField {
@@ -928,10 +930,12 @@ func HasAggregateField(fields []StructField) bool {
 
 // HasLongLongField mirrors Type::has_longlong_field.
 // Type.cpp:1066–1073.
-// Type* always live on Fields; nil hole fails closed as true (no invent none).
+// Type* always live on Fields; nil hole sticky true (no invent none / soft re-pick).
 func HasLongLongField(fields []StructField) bool {
 	for _, f := range fields {
 		if f.Type == nil {
+			// incomplete field Type sticky has-longlong (restrictive)
+			SetError(ErrGeneric)
 			return true
 		}
 		if f.Type.IsSimple() && (f.Type.simple == ELongLong || f.Type.simple == EULongLong) {

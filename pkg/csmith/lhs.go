@@ -28,8 +28,11 @@ func (l *Lhs) IndirectLevel() int {
 
 // IndirectLevelComplete is get_indirect_level with ok=false on incomplete Lhs IR
 // (no invent treat broken Lhs as bare non-deref level 0 for visit/validate).
+// Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
 func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
+	// Lhs always live with Variable+Type; sticky incomplete no invent level 0 complete
 	if l == nil || l.Var == nil || l.Var.Type == nil {
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	want := l.Type
@@ -37,6 +40,7 @@ func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
 		want = l.Var.Type
 	}
 	if want == nil {
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	return l.Var.Type.IndirectLevel() - want.IndirectLevel(), true

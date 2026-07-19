@@ -241,8 +241,11 @@ func (e *Expression) IndirectLevel() int {
 
 // IndirectLevelComplete is get_indirect_level with ok=false on incomplete expr IR
 // (no invent treat broken Variable/type as level 0 for transfer/visit/overlap).
+// Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
 func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
+	// Expression Variable/Lhs always live with type; sticky incomplete no invent level 0
 	if e == nil || e.Var == nil || e.Var.Type == nil {
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	want := e.ExprType
@@ -250,6 +253,7 @@ func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
 		want = e.Var.Type
 	}
 	if want == nil {
+		SetError(ErrGeneric)
 		return 0, false
 	}
 	return e.Var.Type.IndirectLevel() - want.IndirectLevel(), true
