@@ -266,8 +266,13 @@ func (e Effect) SetLhsWriteVarsFromWritten() Effect {
 }
 
 // LhsWriteVars returns lhs_write_vars as a slice (stable name order).
-// Variable* always live; nil key fails closed as []*Variable{nil}.
+// Incomplete effect / nil map keys fail closed IncompleteVariables
+// (not bare nil invent empty-complete lhs set via VariablesComplete(nil)/len==0 —
+// assign merge uses len(lw)>0 then WriteVarSet; empty-complete would skip poison).
 func (e Effect) LhsWriteVars() []*Variable {
+	if e.incomplete {
+		return IncompleteVariables()
+	}
 	if len(e.lhsWrite) == 0 {
 		return nil
 	}
@@ -277,7 +282,7 @@ func (e Effect) LhsWriteVars() []*Variable {
 			continue
 		}
 		if v == nil {
-			return []*Variable{nil}
+			return IncompleteVariables()
 		}
 		out = append(out, v)
 	}
@@ -571,8 +576,12 @@ func (e Effect) IsWrittenPartially(v *Variable) bool {
 
 // HasGlobalEffect mirrors Effect::has_global_effect.
 // Effect.cpp:543–562 — any global in read or write sets.
-// Variable* always live as map keys; nil hole fails closed as true (no invent pure).
+// Incomplete effect / nil map keys fail closed as true (no invent pure /
+// no-global success on IncompleteEffect empty maps via pure flag alone).
 func (e Effect) HasGlobalEffect() bool {
+	if e.incomplete {
+		return true
+	}
 	for v := range e.read {
 		if v == nil {
 			return true
@@ -605,8 +614,12 @@ func (e *Effect) UpdatePurity() {
 
 // UnionFieldIsRead mirrors Effect::union_field_is_read.
 // Effect.cpp:565–572 — any read var is_inside_union_field.
-// Variable* always live; nil key fails closed as true (no invent none).
+// Incomplete effect / nil key fails closed as true (no invent none on
+// IncompleteEffect empty maps).
 func (e Effect) UnionFieldIsRead() bool {
+	if e.incomplete {
+		return true
+	}
 	for v := range e.read {
 		if v == nil {
 			return true
@@ -664,8 +677,11 @@ func (e *Effect) Consolidate() {
 
 // IsReadByName mirrors Effect::is_read(string).
 // Effect.cpp:295–308.
-// Variable* always live; nil key fails closed as true (no invent not-read).
+// Incomplete effect / nil key fails closed as true (no invent not-read).
 func (e Effect) IsReadByName(name string) bool {
+	if e.incomplete {
+		return true
+	}
 	for v := range e.read {
 		if v == nil {
 			return true
@@ -679,8 +695,11 @@ func (e Effect) IsReadByName(name string) bool {
 
 // IsWrittenByName mirrors Effect::is_written(string).
 // Effect.cpp:351–364.
-// Variable* always live; nil key fails closed as true (no invent not-written).
+// Incomplete effect / nil key fails closed as true (no invent not-written).
 func (e Effect) IsWrittenByName(name string) bool {
+	if e.incomplete {
+		return true
+	}
 	for v := range e.written {
 		if v == nil {
 			return true
@@ -695,8 +714,11 @@ func (e Effect) IsWrittenByName(name string) bool {
 // CommentOutput mirrors Effect::Output as a C block-comment line for Function::Output.
 // Effect.cpp:507–529 — " * reads :" / " * writes:" lists.
 // Write names sorted for deterministic emit (Go map iteration is random).
-// Variable* always live; nil key fails closed as empty comment (no invent partial list).
+// Incomplete effect / nil key fails closed as empty comment (no invent partial list).
 func (e Effect) CommentOutput() string {
+	if e.incomplete {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString("/*\n")
 	b.WriteString(" * reads :")

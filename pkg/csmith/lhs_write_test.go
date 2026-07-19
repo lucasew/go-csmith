@@ -12,6 +12,21 @@ func TestLhsWriteVarsFromWritten(t *testing.T) {
 	if len(got) != 1 || got[0] != v {
 		t.Fatal(got)
 	}
+	// IncompleteEffect must not invent empty-complete lhs set (len(nil)==0 skip)
+	if VariablesComplete(IncompleteEffect().LhsWriteVars()) {
+		t.Fatal("IncompleteEffect LhsWriteVars must IncompleteVariables")
+	}
+	hole := EmptyEffect()
+	hole.lhsWrite = map[*Variable]bool{nil: true}
+	if VariablesComplete(hole.LhsWriteVars()) {
+		t.Fatal("nil lhsWrite key must IncompleteVariables")
+	}
+	if !IncompleteEffect().HasGlobalEffect() {
+		t.Fatal("IncompleteEffect must fail closed HasGlobalEffect true")
+	}
+	if !IncompleteEffect().UnionFieldIsRead() {
+		t.Fatal("IncompleteEffect must fail closed UnionFieldIsRead true")
+	}
 }
 
 func TestWriteVarSet(t *testing.T) {

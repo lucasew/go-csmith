@@ -216,7 +216,9 @@ func MakeRandomAssignQfer(
 	cg.MergeParamContext(rhsCG, true)
 
 	// StatementAssign.cpp:183 — write_var_set(rhs_accum.get_lhs_write_vars())
-	if lw := rhsAccum.LhsWriteVars(); len(lw) > 0 {
+	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge
+	// when LhsWriteVars used bare nil on incomplete rhs_accum).
+	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
 	}
 
@@ -785,7 +787,8 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	cg.MergeParamContext(rhsCG, true)
 	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
-	if lw := rhsAccum.LhsWriteVars(); len(lw) > 0 {
+	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge)
+	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
 	}
 
