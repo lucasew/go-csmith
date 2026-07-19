@@ -250,9 +250,22 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	if out := fi.Output(); out != "" {
 		t.Fatal("nil arg must fail closed empty, got", out)
 	}
+	// incomplete arg Output (nil Con) — no invent empty slot
+	fi.Args = []*Expression{a0, {Term: TermConstant}}
+	if out := fi.Output(); out != "" {
+		t.Fatal("empty arg Output must fail closed, got", out)
+	}
 	fi.Args = []*Expression{a0, &Expression{Term: TermConstant, Con: MakeInt(2)}}
 	out := fi.Output()
 	if out != "func_2(1, 2)" {
 		t.Fatal(out)
+	}
+	// binary incomplete operand Output
+	bin := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{
+		{Term: TermConstant, Con: MakeInt(1)},
+		{Term: TermConstant},
+	}}
+	if out := bin.Output(); out != "" {
+		t.Fatal("empty binary operand must fail closed", out)
 	}
 }

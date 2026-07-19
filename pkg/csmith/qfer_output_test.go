@@ -95,6 +95,30 @@ func TestOutputQualifiedTypeNoInventWhenOptionsOff(t *testing.T) {
 	}
 }
 
+func TestOutputQualifiedTypeNoInventVoidForNil(t *testing.T) {
+	// CVQualifiers.cpp:532 — assert(t); no soft invent "void"
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if s := q.OutputQualifiedType(nil); s != "" {
+		t.Fatal("nil type must fail closed empty, got", s)
+	}
+	if s := (*Type)(nil).CName(); s != "" {
+		t.Fatal("nil Type.CName must not invent void, got", s)
+	}
+}
+
+func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
+	// Function always has return_type; no invent void when missing
+	f := &Function{Name: "func_x"}
+	if out := f.OutputHeader(false); out != "" {
+		t.Fatal("missing return type must fail closed header", out)
+	}
+	f.ReturnType = GetSimpleType(EVoid)
+	out := f.OutputHeader(false)
+	if !strings.Contains(out, "void func_x(void)") {
+		t.Fatal(out)
+	}
+}
+
 func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 	// StatementFor.cpp:79/82/102 ERROR_RETURN on sticky error
 	ClearError()

@@ -589,17 +589,23 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 }
 
 // returnTypeC is qualified return type (from RV qfer when present).
+// Function always has return_type in C++; no soft invent "void" when missing.
 func (f *Function) returnTypeC() string {
 	if f == nil {
-		return "void"
+		return ""
 	}
 	if f.RV != nil && f.RV.Type != nil {
-		return f.RV.Qfer.OutputQualifiedType(f.RV.Type)
+		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
+		if out == "" {
+			return ""
+		}
+		return out
 	}
 	if f.ReturnType != nil {
 		return f.ReturnType.CName()
 	}
-	return "void"
+	// incomplete IR — no invent void
+	return ""
 }
 
 // paramListC emits parameter list with qualified types.
@@ -668,6 +674,11 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 		// assert-path fail closed on forbidden/incomplete params
 		return ""
 	}
+	rtName := f.returnTypeC()
+	if rtName == "" {
+		// incomplete return type IR — no invent void header
+		return ""
+	}
 	var b strings.Builder
 	// Function.cpp:521–522
 	if f.IsInlined {
@@ -678,7 +689,7 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 		b.WriteString("static ")
 	}
 	// Function.cpp:527–530
-	b.WriteString(f.returnTypeC())
+	b.WriteString(rtName)
 	b.WriteString(" ")
 	b.WriteString(f.Name)
 	b.WriteString("(")

@@ -66,20 +66,27 @@ func (fi *Invocation) Output() string {
 	}
 	if fi.User != nil {
 		// FunctionInvocationUser::Output — param_value[i] always live Expression*
-		// no invent empty slots "f(a, , c)" or soft "0" for nil args
+		// no invent empty slots "f(a, , c)" or soft "0" for nil/empty args
+		var parts []string
 		for _, a := range fi.Args {
 			if a == nil {
 				return ""
 			}
+			out := a.Output()
+			if out == "" {
+				// incomplete arg IR — fail closed whole call
+				return ""
+			}
+			parts = append(parts, out)
 		}
 		var b strings.Builder
 		b.WriteString(fi.User.Name)
 		b.WriteString("(")
-		for i, a := range fi.Args {
+		for i, p := range parts {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			b.WriteString(a.Output())
+			b.WriteString(p)
 		}
 		b.WriteString(")")
 		return b.String()
@@ -97,9 +104,13 @@ func (fi *Invocation) Output() string {
 			if len(fi.Args) < 1 || fi.Args[0] == nil {
 				return ""
 			}
-			return fi.outputUnary(fi.Args[0].Output())
+			a0 := fi.Args[0].Output()
+			if a0 == "" {
+				return ""
+			}
+			return fi.outputUnary(a0)
 		}
-		// binary: need two live args
+		// binary: need two live args with non-empty Output
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
 			return ""
 		}
@@ -107,7 +118,12 @@ func (fi *Invocation) Output() string {
 			// invalid op (except bare + for array mutate without flags)
 			return ""
 		}
-		return fi.outputBinary(fi.Args[0].Output(), fi.Args[1].Output())
+		a0 := fi.Args[0].Output()
+		a1 := fi.Args[1].Output()
+		if a0 == "" || a1 == "" {
+			return ""
+		}
+		return fi.outputBinary(a0, a1)
 	}
 	return ""
 }

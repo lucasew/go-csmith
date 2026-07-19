@@ -319,7 +319,7 @@ func CtrlVarNames(ctrl []*Variable) []string {
 
 // OutputArrayCtrlVars mirrors OutputArrayCtrlVars — "int i, j, k;".
 // Variable.cpp:800–811 — assert(dimen <= ctrl_vars.size()); get_actual_name only.
-// No letter-name invent for nil slots.
+// C++ ctrl_vars[i] always live; no invent empty names / "int , j;" for nil slots.
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen <= 0 || len(ctrl) == 0 {
 		return ""
@@ -328,16 +328,19 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 	if dimen > len(ctrl) {
 		return ""
 	}
+	// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); fail closed if any nil
+	for i := 0; i < dimen; i++ {
+		if ctrl[i] == nil {
+			return ""
+		}
+	}
 	var b strings.Builder
 	b.WriteString(indent + "int ")
 	for i := 0; i < dimen; i++ {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		// Variable.cpp:806 — ctrl_vars[i]->get_actual_name(); no soft i/j/k
-		if ctrl[i] != nil {
-			b.WriteString(ctrl[i].GetActualName(false))
-		}
+		b.WriteString(ctrl[i].GetActualName(false))
 	}
 	b.WriteString(";\n")
 	return b.String()

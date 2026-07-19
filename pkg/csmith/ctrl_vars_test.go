@@ -27,6 +27,11 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	if decl != "    int i, j;\n" {
 		t.Fatal(decl)
 	}
+	// Variable.cpp:806 — ctrl_vars[i] always live; no invent empty names
+	broken := []*Variable{c1[0], nil}
+	if out := OutputArrayCtrlVars(broken, 2, ""); out != "" {
+		t.Fatal("nil ctrl slot must fail closed", out)
+	}
 	CtrlVarsDoFinalization()
 	if GetLastCtrlVars() != nil {
 		t.Fatal("cleared")

@@ -618,9 +618,9 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 // CVQualifiers.cpp:530–556 — const/volatile interleaved with * and base type first.
 // Uses ProcessOptions for CGOptions::consts/volatiles (assert when bit set but option off).
 func (q CVQualifiers) OutputQualifiedType(t *Type) string {
-	// CVQualifiers.cpp:532 — assert(t)
+	// CVQualifiers.cpp:532 — assert(t); no soft invent "void" for nil type
 	if t == nil {
-		return "void"
+		return ""
 	}
 	// CVQualifiers.cpp:533 — assert(sanity_check(t)); fail closed bare type (no invent bad layout)
 	if !q.Wildcard && len(q.IsConsts) > 0 && !q.SanityCheck(t) {
