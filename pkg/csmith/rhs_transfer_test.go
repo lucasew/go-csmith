@@ -87,8 +87,9 @@ func TestUpdateFactForAssign(t *testing.T) {
 func TestAbstractFactNonPointerLHS(t *testing.T) {
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	if AbstractFactForAssign(nil, v, 0, rhs) != nil {
-		t.Fatal("non-ptr")
+	// non-pointer scalar: complete empty (no pointer facts), not incomplete marker
+	if out := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
+		t.Fatal("non-ptr must be complete empty", out)
 	}
 }
 
@@ -118,9 +119,9 @@ func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(GetIntType())}
 	// force Indir < -1 by ExprType deeper than Var.Type
 	rhs.ExprType = PointerTo(PointerTo(GetIntType()))
-	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
-		// indirect != -1 fails closed
-		t.Fatal("multi-level & must fail closed")
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+		// indirect != -1 fails closed incomplete
+		t.Fatal("multi-level & must fail closed incomplete")
 	}
 	_ = broken
 }
@@ -241,11 +242,11 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 }
 
 func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
-	// FactPointTo.cpp:164–167 — assert all LHS are pointers; no invent transfer
+	// FactPointTo.cpp:164–167 — assert all LHS are pointers; no invent empty transfer
 	i := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
-	if RhsToLhsTransfer(nil, []*Variable{i}, rhs) != nil {
-		t.Fatal("non-pointer lvar must fail closed")
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{i}, rhs)) {
+		t.Fatal("non-pointer lvar must fail closed incomplete")
 	}
 }
 
@@ -258,8 +259,8 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	if rhs.IndirectLevel() != -2 {
 		t.Fatalf("want indir -2 got %d", rhs.IndirectLevel())
 	}
-	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
-		t.Fatal("multi-level address-of must fail closed")
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+		t.Fatal("multi-level address-of must fail closed incomplete")
 	}
 }
 
@@ -275,8 +276,8 @@ func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
 	lhs1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
 	// two LHS pointers vs one field pointer
-	if RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs) != nil {
-		t.Fatal("lvars/pointers length mismatch must fail closed")
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)) {
+		t.Fatal("lvars/pointers length mismatch must fail closed incomplete")
 	}
 }
 
@@ -290,7 +291,7 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	fi := &Invocation{User: fn}
 	// no AddReturnFactForInvocation
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
-	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
-		t.Fatal("missing rv_fact must fail closed")
+	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
+		t.Fatal("missing rv_fact must fail closed incomplete")
 	}
 }

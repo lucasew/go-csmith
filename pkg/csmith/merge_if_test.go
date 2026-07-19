@@ -92,8 +92,8 @@ func TestMergeFacts(t *testing.T) {
 	if FindRelatedPointTo(base, p) != nil {
 		t.Fatal("must not invent partial merge past hole")
 	}
-	if MergeFactInto(facts, nil) != nil {
-		t.Fatal("nil fact MergeFactInto must fail closed")
+	if FactsComplete(MergeFactInto(facts, nil)) {
+		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
 	}
 }
 

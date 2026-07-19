@@ -370,7 +370,7 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			}
 		}
 		merged := MergeFactInto(*factsOut, fact)
-		if merged == nil {
+		if !FactsComplete(merged) {
 			*factsOut = IncompleteFactSlice()
 			return
 		}
@@ -848,8 +848,9 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	// pointer (Fact.cpp:94–95)
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
 	pt = AbstractFactForAssign(nil, v, 0, rhs)
-	if len(pt) != 1 {
-		// fail closed — no soft invent multi/zero LHS init facts
+	// incomplete abstract is hole marker (len 1 nil) — not invent single-fact init
+	if !FactsComplete(pt) || len(pt) != 1 {
+		// fail closed — no soft invent multi/zero/incomplete LHS init facts
 		return nil, nil
 	}
 	// Fact.cpp:97–109 — more init values on array of pointers
@@ -866,13 +867,16 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 				return nil, nil
 			}
 			more := AbstractFactForAssign(nil, v, 0, e)
+			if !FactsComplete(more) {
+				return nil, nil
+			}
 			for _, f := range more {
-				// Fact* always live; MergeFactInto nil = incomplete
+				// Fact* always live; MergeFactInto incomplete = hole marker
 				if f == nil {
 					return nil, nil
 				}
 				merged := MergeFactInto(pt, f)
-				if merged == nil {
+				if !FactsComplete(merged) {
 					return nil, nil
 				}
 				pt = merged
@@ -931,7 +935,7 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				return
 			}
 			merged := MergeFactInto(fm.GlobalFacts, f)
-			if merged == nil {
+			if !FactsComplete(merged) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
@@ -1042,19 +1046,24 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 
 // applyPointToAssignFacts applies point-to facts from abstract_fact_for_assign.
 // FactMgr.cpp:376–388 — renew when definitive single non-array LHS; else merge.
-// Returns (changed, ok). ok=false means incomplete map/merge — *facts cleared
-// (no invent success past holes / soft-continue merge list / treat incomplete as no-op).
-// empty newFacts is ok with changed=false.
+// Returns (changed, ok). ok=false means incomplete map/merge — no invent apply success.
+// Incomplete *facts is wiped to IncompleteFactSlice. Incomplete newFacts alone fails
+// closed without wiping prior complete *facts (factory re-pick must not poison FM).
+// empty complete newFacts is ok with changed=false.
 func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) (changed bool, ok bool) {
 	if facts == nil {
 		return false, false
 	}
-	if len(newFacts) == 0 {
-		return false, true
-	}
-	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+	if !FactsComplete(*facts) {
 		*facts = IncompleteFactSlice()
 		return false, false
+	}
+	// incomplete abstract must not invent empty-apply success (len(nil)==0)
+	if !FactsComplete(newFacts) {
+		return false, false
+	}
+	if len(newFacts) == 0 {
+		return false, true
 	}
 	lvarCnt := len(lhsAssignPointees(*facts, lhs, lhsIndir))
 	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
@@ -1066,7 +1075,7 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		_ = RenewFact(facts, newFacts[0])
 		for j := 1; j < len(newFacts); j++ {
 			merged := MergeFactInto(*facts, newFacts[j])
-			if merged == nil {
+			if !FactsComplete(merged) {
 				*facts = IncompleteFactSlice()
 				return false, false
 			}
@@ -1076,7 +1085,7 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	}
 	for _, f := range newFacts {
 		merged := MergeFactInto(*facts, f)
-		if merged == nil {
+		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
@@ -1095,12 +1104,14 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	}
 	changed := false
 	newFacts := AbstractFactForAssign(fm.GlobalFacts, lhs, lhsIndir, rhs)
-	// incomplete abstract (lvars/transfer hole) — nil newFacts with pointer lhs
-	// that expected transfer must not invent empty apply success then union merge
+	// incomplete abstract must not invent empty apply success then union merge
 	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts)
 	if !ptOK {
-		// point-to incomplete — fail closed, do not invent union merge on wiped map
-		fm.UnionFacts = IncompleteUnionFactSlice()
+		// if GlobalFacts was wiped (was already incomplete), also wipe union;
+		// incomplete newFacts alone leaves complete GlobalFacts for factory re-pick
+		if !FactsComplete(fm.GlobalFacts) {
+			fm.UnionFacts = IncompleteUnionFactSlice()
+		}
 		return false
 	}
 	if ptChanged {
@@ -1375,7 +1386,9 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	newFacts := AbstractFactForAssign(*facts, lhs, lhsIndir, rhs)
 	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts)
 	if !ptOK {
-		if fm != nil {
+		// only wipe union when *facts was incomplete (wiped); incomplete abstract alone
+		// leaves prior complete map for factory re-pick
+		if fm != nil && !FactsComplete(*facts) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 		}
 		return false

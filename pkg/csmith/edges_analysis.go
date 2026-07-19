@@ -41,7 +41,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		}
 		before := FindRelatedPointTo(*facts, f.Var)
 		merged := MergeFactInto(*facts, jumpF)
-		if merged == nil {
+		if !FactsComplete(merged) {
 			// mid-join incomplete — clear partial, no invent keep half-merged map
 			*facts = IncompleteFactSlice()
 			return false, false

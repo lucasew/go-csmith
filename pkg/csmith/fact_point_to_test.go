@@ -43,8 +43,8 @@ func TestFactPointToNullDead(t *testing.T) {
 	if MakeFactPointToSet(p, nil) != nil {
 		t.Fatal("nil set must fail closed MakeFactPointToSet")
 	}
-	if MakeFactsPointToSet([]*Variable{p}, nil) != nil {
-		t.Fatal("nil set must fail closed MakeFactsPointToSet")
+	if FactsComplete(MakeFactsPointToSet([]*Variable{p}, nil)) {
+		t.Fatal("nil set must fail closed incomplete MakeFactsPointToSet")
 	}
 	// empty non-nil is valid top
 	if MakeFactPointToSet(p, []*Variable{}) == nil {
@@ -79,23 +79,23 @@ func TestFactPointToNullDead(t *testing.T) {
 	if cl := CloneFactSlice([]*FactPointTo{MakeFactPointTo(p, NullPtr)}); !FactsComplete(cl) || len(cl) != 1 {
 		t.Fatal("CloneFactSlice complete must clone", cl)
 	}
-	// MakeFacts — no invent skip of nil holes as partial success
-	if MakeFactsPointTo([]*Variable{p, nil}, NullPtr) != nil {
-		t.Fatal("nil hole in lvars must fail closed MakeFactsPointTo")
+	// MakeFacts — no invent skip of nil holes as partial success / empty complete
+	if FactsComplete(MakeFactsPointTo([]*Variable{p, nil}, NullPtr)) {
+		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointTo")
 	}
-	if MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr}) != nil {
-		t.Fatal("nil hole in lvars must fail closed MakeFactsPointToSet")
+	if FactsComplete(MakeFactsPointToSet([]*Variable{nil, p}, []*Variable{NullPtr})) {
+		t.Fatal("nil hole in lvars must fail closed incomplete MakeFactsPointToSet")
 	}
 	// specials Type-nil skipped; non-special Type-nil fails closed whole batch
-	if MakeFactsPointTo([]*Variable{NullPtr, p}, NullPtr) == nil {
+	if !FactsComplete(MakeFactsPointTo([]*Variable{NullPtr, p}, NullPtr)) {
 		t.Fatal("special Type-nil must soft-skip not fail batch")
 	}
 	broken := &Variable{Name: "broken"} // Type nil, not special
-	if MakeFactsPointTo([]*Variable{broken, p}, NullPtr) != nil {
-		t.Fatal("non-special Type-nil must fail closed whole MakeFactsPointTo")
+	if FactsComplete(MakeFactsPointTo([]*Variable{broken, p}, NullPtr)) {
+		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointTo")
 	}
-	if MakeFactsPointToSet([]*Variable{broken, p}, []*Variable{NullPtr}) != nil {
-		t.Fatal("non-special Type-nil must fail closed whole MakeFactsPointToSet")
+	if FactsComplete(MakeFactsPointToSet([]*Variable{broken, p}, []*Variable{NullPtr})) {
+		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointToSet")
 	}
 }
 

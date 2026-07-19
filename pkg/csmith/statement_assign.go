@@ -303,11 +303,14 @@ func MakeRandomAssignQfer(
 	}
 	// FactMgr::update_fact_for_assign(sa) — get_rhs() (canonized ExpressionFuncall)
 	if cg.FM != nil && st.LhsVar != nil {
+		// false may be no lattice change or incomplete abstract; only poison is incomplete FM
 		_ = cg.FM.UpdateFactForAssign(st.LhsVar, lhsIndir, st.GetAssignRhs())
-		// incomplete assign must not invent assign stmt with wiped GlobalFacts
+		// incomplete GlobalFacts fail closed (no invent assign with wiped facts)
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			return Stmt{}
 		}
+		// incomplete abstract alone leaves complete FM but no lattice update —
+		// still emit assign (C++ updates when abstract succeeds; empty abstract ok)
 		cg.NoteWrite(st.LhsVar)
 	} else if st.LhsVar != nil {
 		cg.NoteWrite(st.LhsVar)

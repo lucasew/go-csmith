@@ -71,18 +71,18 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	// soft invent: MergeFactInto nil still return true with partial maps
-	// fair: incomplete newFacts / merge hole fails closed ok=false + clear
+	// fair: incomplete newFacts fails closed ok=false without poisoning prior map
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	// nil hole in newFacts
+	// nil hole in newFacts — fail closed, keep prior complete facts for factory re-pick
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}); ok {
 		t.Fatal("nil newFact hole must fail closed ok=false")
 	}
-	if FactsComplete(facts) {
-		t.Fatal("incomplete assign facts must clear", facts)
+	if !FactsComplete(facts) || FindRelatedPointTo(facts, p) == nil {
+		t.Fatal("incomplete newFacts must not wipe prior complete facts", facts)
 	}
-	// incomplete subject map
+	// incomplete subject map — wipe to hole marker
 	facts = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
 		t.Fatal("nil subject map hole must fail closed ok=false")
@@ -95,6 +95,14 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	ch, ok := applyPointToAssignFacts(&facts, p, 0, nil)
 	if !ok || ch {
 		t.Fatal("empty newFacts must be ok with no change", ch, ok)
+	}
+	// IncompleteFactSlice newFacts must not invent empty-apply success
+	facts = []*FactPointTo{MakeFactPointTo(p, a)}
+	if _, ok := applyPointToAssignFacts(&facts, p, 0, IncompleteFactSlice()); ok {
+		t.Fatal("IncompleteFactSlice newFacts must fail closed ok=false")
+	}
+	if !FactsComplete(facts) {
+		t.Fatal("IncompleteFactSlice newFacts must not wipe prior", facts)
 	}
 }
 
