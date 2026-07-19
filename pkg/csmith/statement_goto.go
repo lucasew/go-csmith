@@ -9,16 +9,24 @@ import "strings"
 var stmLabels = map[int]string{}
 
 // LabelForGotoDest returns existing or new gensym label for a jump destination.
-// StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present.
+// StatementGoto.cpp:224–229 — reuse stm_labels[dest] when present; else gensym("lbl_").
+// no invent fixed "lbl_1" when nextLabel is nil
 func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 	if destStmID > 0 {
 		if lab, ok := stmLabels[destStmID]; ok && lab != "" {
 			return lab
 		}
 	}
-	lab := "lbl_1"
+	// StatementGoto.cpp:227 — gensym("lbl_"); process-wide util.cpp counter
+	lab := ""
 	if nextLabel != nil {
 		lab = nextLabel()
+	} else {
+		lab = Gensym("lbl_")
+	}
+	// incomplete empty label is broken IR — fail closed (no invent "goto :")
+	if lab == "" {
+		return ""
 	}
 	if destStmID > 0 {
 		stmLabels[destStmID] = lab

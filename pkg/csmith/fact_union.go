@@ -42,13 +42,20 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 }
 
 // MakeFactUnions mirrors FactUnion::make_facts.
-// FactUnion.cpp:169–176.
+// FactUnion.cpp:169–176 — vars[i] always live; make_fact asserts union type.
+// no invent skip of nil Variable* holes as partial success
 func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
-		if f := MakeFactUnion(v, fid); f != nil {
-			out = append(out, f)
+		if v == nil {
+			return nil
 		}
+		f := MakeFactUnion(v, fid)
+		// non-union subject is assert path — fail closed whole batch
+		if f == nil {
+			return nil
+		}
+		out = append(out, f)
 	}
 	return out
 }
@@ -352,8 +359,9 @@ func AbstractFactUnionForAssign(
 		return nil, lvarCnt
 	}
 	for _, v := range lvars {
+		// pointees always live; no invent skip nil holes
 		if v == nil {
-			continue
+			return nil, lvarCnt
 		}
 		var fu *FactUnion
 		if v.IsUnionField() {

@@ -106,6 +106,21 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 	if c == a || c != "lbl_2" {
 		t.Fatalf("%q %q", a, c)
 	}
+	// nil nextLabel → process gensym; no invent fixed "lbl_1"
+	GotoLabelsDoFinalization()
+	ResetDefaultGensym()
+	g1 := LabelForGotoDest(7, nil)
+	g2 := LabelForGotoDest(8, nil)
+	if g1 == "" || g2 == "" || g1 == g2 {
+		t.Fatalf("gensym labels want distinct non-empty, got %q %q", g1, g2)
+	}
+	if g1 == "lbl_1" && g2 == "lbl_1" {
+		t.Fatal("must not invent same fixed lbl_1")
+	}
+	// empty nextLabel — fail closed, no invent empty label token
+	if LabelForGotoDest(9, func() string { return "" }) != "" {
+		t.Fatal("empty gensym must fail closed")
+	}
 }
 
 func TestMarkNeedRevisitLCA(t *testing.T) {
