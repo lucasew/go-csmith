@@ -116,6 +116,15 @@ func TestPermuteParamOrdersEmptyBaseFailClosed(t *testing.T) {
 	if len(fi2.PermuteParamOrders()) != 2 {
 		t.Fatal("2-arg shortcut")
 	}
+	// n!=2 with nil arg hole — no invent skip hole as non-call permute slot
+	fiHole := &Invocation{Args: []*Expression{
+		userCall("a"),
+		{Term: TermConstant, Con: MakeInt(1)},
+		nil,
+	}}
+	if got := fiHole.PermuteParamOrders(); got != nil {
+		t.Fatalf("nil arg must fail closed nil orders, got %v", got)
+	}
 }
 
 func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {

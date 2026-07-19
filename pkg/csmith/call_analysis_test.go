@@ -34,6 +34,44 @@ func TestFuncCountAndCollectCalls(t *testing.T) {
 	}
 }
 
+func TestFuncCountIncompleteFailClosed(t *testing.T) {
+	// nil Invoke / nil arg hole — no invent empty call count
+	if FuncCount(&Expression{Term: TermFunction}) >= 0 {
+		t.Fatal("nil Invoke must FuncCount -1")
+	}
+	if FuncCount(&Expression{Term: TermFunction, Invoke: &Invocation{
+		User: &Function{Name: "h"}, Args: []*Expression{userCall("a"), nil},
+	}}) >= 0 {
+		t.Fatal("nil arg hole must FuncCount -1")
+	}
+	var calls []*Invocation
+	calls = []*Invocation{{User: &Function{Name: "stale"}}}
+	CollectCalledInvocationsExpr(&Expression{Term: TermFunction}, &calls)
+	if calls != nil {
+		t.Fatal("incomplete collect must clear out, not invent partial", calls)
+	}
+}
+
+func TestCollectCalledForTestExpr(t *testing.T) {
+	// StatementFor::get_exprs → test; soft invent skip would miss for-test calls
+	call := userCall("func_in_test")
+	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: call}, Then: &Block{}}
+	var calls []*Invocation
+	CollectCalledInvocationsStmt(st, &calls)
+	if len(calls) != 1 || calls[0].User == nil || calls[0].User.Name != "func_in_test" {
+		t.Fatalf("for-test calls: %+v", calls)
+	}
+	// incomplete for without TestExpr clears
+	calls = []*Invocation{{User: &Function{Name: "stale"}}}
+	CollectCalledInvocationsStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}, &calls)
+	if calls != nil {
+		t.Fatal("for without TestExpr must clear, not invent skip", calls)
+	}
+	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
+		t.Fatal("incomplete for must fail closed uncertain")
+	}
+}
+
 func TestHasUncertainCall(t *testing.T) {
 	// two args each with a call → uncertain
 	a := userCall("func_a")
@@ -69,6 +107,19 @@ func TestHasSimpleParams(t *testing.T) {
 	fi.Args[0] = userCall("f")
 	if fi.HasSimpleParams() {
 		t.Fatal("has call")
+	}
+	// nil arg hole — no invent simple
+	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil}
+	if fi.HasSimpleParams() {
+		t.Fatal("nil arg must fail closed not-simple")
+	}
+	// incomplete FuncCount → uncertain
+	fiHole := &Invocation{Args: []*Expression{
+		userCall("a"),
+		{Term: TermFunction}, // nil Invoke
+	}}
+	if !fiHole.HasUncertainCall() {
+		t.Fatal("incomplete arg must fail closed uncertain")
 	}
 }
 

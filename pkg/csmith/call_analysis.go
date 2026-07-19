@@ -7,77 +7,151 @@ package csmith
 
 // CollectCalledInvocationsExpr mirrors Expression::get_called_funcs for user calls.
 // FunctionInvocation.cpp:369–381 — recurse args, then push user call.
+// Incomplete IR clears *out (no invent partial call list past holes).
 func CollectCalledInvocationsExpr(e *Expression, out *[]*Invocation) {
-	if e == nil || out == nil {
+	if out == nil {
 		return
 	}
+	if !collectCalledInvocationsExpr(e, out) {
+		*out = nil
+	}
+}
+
+// collectCalledInvocationsExpr returns false on incomplete IR (*out cleared by caller).
+func collectCalledInvocationsExpr(e *Expression, out *[]*Invocation) bool {
+	if e == nil || out == nil {
+		return false
+	}
 	switch e.Term {
+	case TermConstant, TermVariable:
+		return true
 	case TermFunction:
-		if e.Invoke != nil {
-			for _, a := range e.Invoke.Args {
-				CollectCalledInvocationsExpr(a, out)
+		// ExpressionFuncall always has live invoke; param_value[i] always live
+		if e.Invoke == nil {
+			return false
+		}
+		for _, a := range e.Invoke.Args {
+			if a == nil {
+				return false
 			}
-			if e.Invoke.User != nil {
-				*out = append(*out, e.Invoke)
+			if !collectCalledInvocationsExpr(a, out) {
+				return false
 			}
 		}
+		if e.Invoke.User != nil {
+			*out = append(*out, e.Invoke)
+		}
+		return true
 	case TermCommaExpr:
-		CollectCalledInvocationsExpr(e.CommaLHS, out)
-		CollectCalledInvocationsExpr(e.CommaRHS, out)
-	case TermAssignment:
-		if e.Assign != nil {
-			CollectCalledInvocationsStmt(e.Assign, out)
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return false
 		}
+		if !collectCalledInvocationsExpr(e.CommaLHS, out) {
+			return false
+		}
+		return collectCalledInvocationsExpr(e.CommaRHS, out)
+	case TermAssignment:
+		if e.Assign == nil {
+			return false
+		}
+		return collectCalledInvocationsStmt(e.Assign, out)
+	default:
+		// unknown term — incomplete IR
+		return false
 	}
 }
 
 // CollectCalledInvocationsStmt mirrors Statement::get_called_funcs.
-// Statement.cpp:748–762 — exprs + nested blocks.
+// Statement.cpp:748–762 — get_exprs + get_blocks.
+// Incomplete IR clears *out (no invent partial call list / skip for-test).
 func CollectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) {
-	if st == nil || out == nil {
+	if out == nil {
 		return
 	}
-	if st.Expr != nil {
-		CollectCalledInvocationsExpr(st.Expr, out)
+	if !collectCalledInvocationsStmt(st, out) {
+		*out = nil
 	}
-	if st.Lhs != nil {
-		// Lhs is not an Expression with calls
+}
+
+func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
+	if st == nil || out == nil {
+		return false
 	}
-	if st.Then != nil {
-		CollectCalledInvocationsBlock(st.Then, out)
+	// StatementFor::get_exprs → test only
+	if st.Kind == StmtFor || st.Loop != nil {
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			return false
+		}
+		if !collectCalledInvocationsExpr(st.Loop.TestExpr, out) {
+			return false
+		}
+	} else if st.Expr != nil {
+		if !collectCalledInvocationsExpr(st.Expr, out) {
+			return false
+		}
 	}
-	if st.Else != nil {
-		CollectCalledInvocationsBlock(st.Else, out)
+	// get_blocks → Then/Else
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return false
+		}
+		if !collectCalledInvocationsBlock(b, out) {
+			return false
+		}
 	}
+	return true
 }
 
 // CollectCalledInvocationsBlock walks all statements in a block.
 func CollectCalledInvocationsBlock(b *Block, out *[]*Invocation) {
-	if b == nil || out == nil {
+	if out == nil {
 		return
 	}
-	for i := range b.Stmts {
-		CollectCalledInvocationsStmt(&b.Stmts[i], out)
+	if !collectCalledInvocationsBlock(b, out) {
+		*out = nil
 	}
+}
+
+func collectCalledInvocationsBlock(b *Block, out *[]*Invocation) bool {
+	if b == nil || out == nil {
+		return false
+	}
+	for i := range b.Stmts {
+		if !collectCalledInvocationsStmt(&b.Stmts[i], out) {
+			return false
+		}
+	}
+	return true
 }
 
 // FuncCount mirrors Expression::func_count.
 // Expression.cpp:114–118.
+// Incomplete IR fails closed as -1 (no invent empty call count past holes).
 func FuncCount(e *Expression) int {
 	var calls []*Invocation
-	CollectCalledInvocationsExpr(e, &calls)
+	if !collectCalledInvocationsExpr(e, &calls) {
+		return -1
+	}
 	return len(calls)
 }
 
 // HasUncertainCall mirrors FunctionInvocation::has_uncertain_call.
 // FunctionInvocation.cpp:383–394 — ≥2 params each containing a call.
+// Nil arg / incomplete FuncCount fails closed true (no invent certain order).
 func (fi *Invocation) HasUncertainCall() bool {
 	if fi == nil {
 		return false
 	}
 	cnt := 0
 	for _, a := range fi.Args {
-		if FuncCount(a) > 0 {
+		if a == nil {
+			return true
+		}
+		n := FuncCount(a)
+		if n < 0 {
+			return true
+		}
+		if n > 0 {
 			cnt++
 		}
 	}
@@ -86,12 +160,19 @@ func (fi *Invocation) HasUncertainCall() bool {
 
 // HasUncertainCallRecursive mirrors FunctionInvocation::has_uncertain_call_recursive.
 // FunctionInvocation.cpp:396–406.
+// Nil arg fails closed true (no invent skip hole as non-call).
 func (fi *Invocation) HasUncertainCallRecursive() bool {
 	if fi == nil {
 		return false
 	}
 	for _, a := range fi.Args {
-		if a != nil && a.Term == TermFunction && a.Invoke != nil {
+		if a == nil {
+			return true
+		}
+		if a.Term == TermFunction {
+			if a.Invoke == nil {
+				return true
+			}
 			if a.Invoke.HasUncertainCallRecursive() {
 				return true
 			}
@@ -102,12 +183,16 @@ func (fi *Invocation) HasUncertainCallRecursive() bool {
 
 // HasSimpleParams mirrors FunctionInvocation::has_simple_params.
 // FunctionInvocation.cpp:408–416 — no TermFunction args.
+// Nil arg fails closed false (no invent simple past hole).
 func (fi *Invocation) HasSimpleParams() bool {
 	if fi == nil {
 		return true
 	}
 	for _, a := range fi.Args {
-		if a != nil && a.Term == TermFunction {
+		if a == nil {
+			return false
+		}
+		if a.Term == TermFunction {
 			return false
 		}
 	}
@@ -116,16 +201,26 @@ func (fi *Invocation) HasSimpleParams() bool {
 
 // HasUncertainCallRecursiveExpr mirrors Expression::has_uncertain_call_recursive.
 // ExpressionFuncall / Comma / Assign overrides; default false.
+// Incomplete IR fails closed true (no invent "no uncertain call").
 func HasUncertainCallRecursiveExpr(e *Expression) bool {
 	if e == nil {
 		return false
 	}
 	switch e.Term {
 	case TermFunction:
-		return e.Invoke != nil && e.Invoke.HasUncertainCallRecursive()
+		if e.Invoke == nil {
+			return true
+		}
+		return e.Invoke.HasUncertainCallRecursive()
 	case TermCommaExpr:
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return true
+		}
 		return HasUncertainCallRecursiveExpr(e.CommaLHS) || HasUncertainCallRecursiveExpr(e.CommaRHS)
 	case TermAssignment:
+		if e.Assign == nil {
+			return true
+		}
 		return HasUncertainCallRecursiveStmt(e.Assign)
 	default:
 		return false
@@ -133,17 +228,25 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 }
 
 // HasUncertainCallRecursiveStmt mirrors Statement::has_uncertain_call_recursive.
-// Assign/Invoke/If via expr; default false.
+// Assign/Invoke/If via expr; for via get_exprs test; default false.
+// Incomplete for/expr fails closed true (no invent skip for-test calls).
 func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 	if st == nil {
 		return false
 	}
 	switch st.Kind {
 	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+		// C++ always has live get_exprs entries for these kinds
+		if st.Expr == nil {
+			return true
+		}
 		return HasUncertainCallRecursiveExpr(st.Expr)
 	case StmtFor, StmtArrayOp:
-		// init/test may carry calls via Loop — only body/expr in our model
-		if HasUncertainCallRecursiveExpr(st.Expr) {
+		// StatementFor::get_exprs → test (not st.Expr)
+		if st.Loop == nil || st.Loop.TestExpr == nil {
+			return true
+		}
+		if HasUncertainCallRecursiveExpr(st.Loop.TestExpr) {
 			return true
 		}
 		if st.Then != nil {

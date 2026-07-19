@@ -130,7 +130,16 @@ func (fi *Invocation) PermuteParamOrders() [][]int {
 	retBase := make([]int, n)
 	for i := 0; i < n; i++ {
 		retBase[i] = i
-		if fi.Args[i] != nil && FuncCount(fi.Args[i]) > 0 {
+		// param_value[i] always live; nil / incomplete FuncCount fails closed
+		// (no invent skip hole as non-call when building permute slots)
+		if fi.Args[i] == nil {
+			return nil
+		}
+		fc := FuncCount(fi.Args[i])
+		if fc < 0 {
+			return nil
+		}
+		if fc > 0 {
 			base = append(base, i)
 		}
 	}
