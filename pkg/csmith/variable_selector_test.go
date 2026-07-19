@@ -65,6 +65,22 @@ func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	}
 }
 
+func TestChooseOKVarMatchTypeNilSticky(t *testing.T) {
+	// Type-nil candidate: soft invent was soft-skip as absent then pick later good.
+	// Fair: sticky fail closed whole ChooseOKVarMatch.
+	ClearError()
+	defer ClearError()
+	good := CreateVariableScalars("g_1", GetIntType(), false, false)
+	hole := &Variable{Name: "g_hole", Type: nil}
+	if ChooseOKVarMatch(NewRng(1), []*Variable{hole, good}, GetIntType(), MatchFlexible, false) != nil {
+		t.Fatal("Type-nil candidate must fail closed ChooseOKVarMatch, not invent later good")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil candidate ChooseOKVarMatch must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	// GenerateNewGlobal: gensym g_1, push GlobalList, random_qualifiers draws.
 	ResetDefaultGensym()

@@ -148,6 +148,41 @@ func TestOutputValueDumpTypeNilSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
+	// Aggregate field Type with nested Type-nil: PrintfDirective stickies residual "".
+	// Field is simple? No — IsAggregate true → soft-skip non-simple without residual.
+	// Soft invent residual: Type-nil field on union dump via IsFieldReadable already sticky.
+	// Here: ambient residual ERROR before directive soft invents soft-continue later field.
+	// Fair: residual sticky whole dump fail closed (empty dir + residual → "").
+	ClearError()
+	defer ClearError()
+	st := &Type{isStruct: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	f0 := &Variable{Name: "g_s.f0", Type: GetIntType()}
+	f1 := &Variable{Name: "g_s.f1", Type: GetIntType()}
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_s", Type: st, IsArray: true, ArraySizes: []int{1},
+			FieldVars: []*Variable{f0, f1},
+			Qfer:      NewCVQualifiers([]bool{false}, []bool{false}),
+		},
+		Sizes: []int{1},
+	}
+	av.AsArray = av
+	// Force residual from PrintfDirective path: nil Type field already sticky earlier.
+	// Use Type-nil field Variable which stickies before PrintfDirective.
+	f0.Type = nil
+	if av.Variable.OutputValueDump("c ", 1, nil) != "" {
+		t.Fatal("Type-nil field must fail closed array dump, not invent later field")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil field array dump must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestExpandWithinRanges(t *testing.T) {
 	got := expandWithinRanges([]int{2, 2})
 	if len(got) != 4 {

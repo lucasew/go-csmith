@@ -1130,8 +1130,24 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:93–94 — no float var for non-float want
 		if !typ.IsFloat() && v.Type.IsFloat() {
+			// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 			dummy = append(dummy, v)
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue non-float filter past IsFloat residual false path
+		if HasError() {
+			if cg.EffectAccum != nil {
+				*cg.EffectAccum = preAccum
+			}
+			cg.EffectStm = preStm
+			return nil
 		}
 		// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)

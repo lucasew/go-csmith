@@ -1945,7 +1945,13 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 				acc := name + suffix
 				dir := f.Type.PrintfDirective()
 				if dir == "" {
-					continue
+					// residual ERROR sticky — no invent soft-skip then partial dump past hole
+					if HasError() {
+						return ""
+					}
+					// empty directive without residual: fail closed whole dump (no invent skip field)
+					SetError(ErrGeneric)
+					return ""
 				}
 				b.WriteString(OutputTab(indent) + "printf(\"" + prefix + acc + " = " + dir + "\\n\", " + acc + ");\n")
 			}

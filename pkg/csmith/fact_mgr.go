@@ -1853,9 +1853,25 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		}
 		v := f.Var
 		if !v.IsGlobal() && !v.IsLocal() {
+			// residual ERROR sticky — no invent soft-continue makeup past IsGlobal/IsLocal hole
+			if HasError() {
+				*oldFacts = IncompleteFactSlice()
+				return false
+			}
 			continue
 		}
-		if FindRelatedPointTo(*oldFacts, v) == nil {
+		// residual ERROR sticky — no invent soft-continue non-global past IsGlobal residual false path
+		if HasError() {
+			*oldFacts = IncompleteFactSlice()
+			return false
+		}
+		related := FindRelatedPointTo(*oldFacts, v)
+		// residual ERROR sticky — no invent soft-continue makeup later past FindRelated hole
+		if HasError() {
+			*oldFacts = IncompleteFactSlice()
+			return false
+		}
+		if related == nil {
 			// FactMgr.cpp:504 — add_new_var_fact(v, old_facts) → abstract_fact_for_var_init
 			// no invent NewFactPointTo garbage (tbd/garbage default) for live inits
 			AddNewVarFactInto(v, oldFacts)
@@ -1866,6 +1882,11 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
+				return false
+			}
+			// residual ERROR sticky — no invent soft-continue later makeup past AddNewVar hole
+			if HasError() {
+				*oldFacts = IncompleteFactSlice()
 				return false
 			}
 		}

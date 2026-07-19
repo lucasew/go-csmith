@@ -1612,9 +1612,18 @@ func ChooseOKVarMatch(r *Rng, vars []*Variable, want *Type, mt MatchType, skipCo
 			return nil
 		}
 		if skipConst && x.IsConst() {
+			// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
-		if want.Match(x.Type, mt) {
+		matched := want.Match(x.Type, mt)
+		// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+		if HasError() {
+			return nil
+		}
+		if matched {
 			ok = append(ok, x)
 		}
 	}

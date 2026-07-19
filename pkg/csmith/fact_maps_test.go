@@ -479,6 +479,28 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeupNewVarFactsAmbientResidualSticky(t *testing.T) {
+	// Ambient residual ERROR soft invent was soft-continue makeup later complete vars.
+	// Fair: sticky wipe IncompleteFactSlice whole MakeupNewVarFacts.
+	ClearError()
+	defer ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	SetError(ErrGeneric)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
+	if MakeupNewVarFacts(&old, newF) {
+		t.Fatal("ambient residual must fail closed MakeupNewVarFacts")
+	}
+	if FactsComplete(old) {
+		t.Fatal("ambient residual must wipe IncompleteFactSlice, not invent later makeup")
+	}
+	if !HasError() {
+		t.Fatal("ambient residual MakeupNewVarFacts must keep SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSetMapFactsOutGotoDest(t *testing.T) {
 	// FactMgr.cpp:263–266 — update_facts_for_dest via StatementGoto::dest;
 	// no soft invent RemoveFunctionLocalFacts when dest fields present.
