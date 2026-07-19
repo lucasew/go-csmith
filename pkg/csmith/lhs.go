@@ -281,6 +281,17 @@ func MakeRandomLhs(
 	if typ == nil || r == nil || vs == nil || cg == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent LHS / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// Lhs.cpp:qfer from caller; default non-const non-vol storage
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if qfer != nil {

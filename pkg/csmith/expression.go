@@ -562,6 +562,19 @@ func MakeRandomParam(
 	if r == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky when live cg (no invent param past holes)
+	if cg != nil {
+		if !EffectComplete(cg.EffectContext()) ||
+			(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+			!EffectComplete(cg.EffectStm) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
+	}
 	// Expression.cpp:241–242 — assert(type); DEPTH_GUARD after type known
 	if typ == nil {
 		return nil
@@ -637,6 +650,17 @@ func MakeRandomExpression(
 ) *Expression {
 	// Expression.cpp always has RNG + live CGContext; no invent leaf shells without them
 	if r == nil || cg == nil {
+		return nil
+	}
+	// incomplete ambient fails closed sticky (no invent leaf / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Expression.cpp:144–145 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtExpression, tt, nullptr)

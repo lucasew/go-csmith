@@ -249,6 +249,9 @@ func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
 			t.Fatal("incomplete GlobalList seed must not invent built body")
 		}
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalList seed must SetError sticky")
+	}
 	ClearError()
 }
 

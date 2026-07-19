@@ -674,3 +674,51 @@ func TestExpressionVariableIsDereferencedFromOrder(t *testing.T) {
 		t.Fatal("int* is not obtained by deref of int")
 	}
 }
+
+func TestMakeRandomExpressionIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient must sticky ERROR (no invent leaf / soft re-pick past holes)
+	ClearError()
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if MakeRandomExpression(NewRng(1), opts, tables, nil, &cg, GetIntType(), nil, false, false, TermConstant, 0) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomExpression")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(nil, IncompleteEffect())
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	if MakeRandomExpression(NewRng(2), opts, tables, nil, &cg2, GetIntType(), nil, false, false, TermConstant, 0) != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomExpression")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg3 := EmptyCGContext().WithFactMgr(fm)
+	if MakeRandomExpression(NewRng(3), opts, tables, nil, &cg3, GetIntType(), nil, false, false, TermConstant, 0) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomExpression")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	// MakeRandomParam same ambient gate
+	inc2 := IncompleteEffect()
+	cg4 := EmptyCGContext()
+	cg4.EffectAccum = &inc2
+	if MakeRandomParam(NewRng(4), opts, tables, nil, &cg4, GetIntType(), nil, 0) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomParam")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky MakeRandomParam")
+	}
+	ClearError()
+}

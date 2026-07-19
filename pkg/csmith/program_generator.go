@@ -127,8 +127,9 @@ func (g *ProgramGenerator) GenerateFunctions() {
 	// Function.cpp:801–807 — create body of each unbuilt function (list may grow)
 	for i := 0; i < len(g.Funcs.Funcs); i++ {
 		f := g.Funcs.Funcs[i]
-		// Function* always live on Funcs; no invent skip nil holes mid generation
+		// Function* always live on Funcs; nil hole fails closed sticky (no invent skip mid generation)
 		if f == nil {
+			SetError(ErrGeneric)
 			return
 		}
 		if f.IsBuilt || f.BuildState == BuildBuilt {
@@ -140,15 +141,16 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		if fm := g.FactMgrs.ForFunc(f); fm != nil {
 			// seed global pointer facts already known
 			// Variable* always live on GlobalList; nil hole / incomplete AddNewVarFact
-			// fails closed (AddNewVarFact(nil) no-ops; incomplete GlobalFacts must not
-			// invent soft-continue GenerateBody)
+			// fails closed sticky (no invent soft-continue GenerateBody past holes)
 			if g.VS != nil {
 				if !VariablesComplete(g.VS.GlobalList) {
+					SetError(ErrGeneric)
 					return
 				}
 				for _, gv := range g.VS.GlobalList {
 					fm.AddNewVarFact(gv)
 					if !FactsComplete(fm.GlobalFacts) {
+						SetError(ErrGeneric)
 						return
 					}
 				}

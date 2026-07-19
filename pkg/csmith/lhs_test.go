@@ -276,3 +276,35 @@ func TestMakeRandomLhsMutatesCallerEffect(t *testing.T) {
 		t.Fatalf("expected write effect after lhs make (var %s indir=%d)", lhs.Var.Name, lhs.IndirectLevel())
 	}
 }
+
+func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient must sticky ERROR (no invent LHS / soft re-pick past holes)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if MakeRandomLhs(NewRng(1), opts, NewProbabilities(opts), vs, &cg, GetIntType(), false, false, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomLhs")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	if MakeRandomLhs(NewRng(2), opts, NewProbabilities(opts), vs, &cg2, GetIntType(), false, false, nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomLhs")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
