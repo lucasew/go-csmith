@@ -953,3 +953,45 @@ func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestUseVarIncompleteSticky(t *testing.T) {
+	ClearError()
+	subj := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if !(*Expression)(nil).UseVar(subj) {
+		t.Fatal("nil Expression UseVar must fail closed true (uses)")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression UseVar must SetError sticky")
+	}
+	ClearError()
+	if !(&Expression{Term: TermVariable}).UseVar(subj) {
+		t.Fatal("Var without Variable UseVar must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Var without Variable UseVar must SetError sticky")
+	}
+	ClearError()
+	if !(&Expression{Term: TermFunction}).UseVar(subj) {
+		t.Fatal("Funcall without Invoke UseVar must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke UseVar must SetError sticky")
+	}
+	ClearError()
+	// Constant complete — does not use vars
+	if (&Expression{Term: TermConstant, Con: MakeInt(1)}).UseVar(subj) {
+		t.Fatal("Constant UseVar must be false complete")
+	}
+	if HasError() {
+		t.Fatal("Constant UseVar must not sticky")
+	}
+	ClearError()
+	// live Variable that is the subject
+	if !(&Expression{Term: TermVariable, Var: subj}).UseVar(subj) {
+		t.Fatal("matching Variable UseVar must be true")
+	}
+	if HasError() {
+		t.Fatal("matching Variable UseVar must not sticky")
+	}
+	ClearError()
+}

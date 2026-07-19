@@ -15,6 +15,7 @@ func TestExpressionNotEquals(t *testing.T) {
 }
 
 func TestExpressionUseVar(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	w := CreateVariableScalars("g_2", GetIntType(), true, false)
 	e := &Expression{Term: TermVariable, Var: v}
@@ -38,16 +39,28 @@ func TestExpressionUseVar(t *testing.T) {
 	if !comma.UseVar(v) {
 		t.Fatal("comma")
 	}
-	// incomplete IR fails closed as uses (no invent conflict-free non-use)
+	// incomplete IR fails closed sticky as uses (no invent conflict-free non-use)
 	if !(&Expression{Term: TermFunction, Invoke: &Invocation{Args: []*Expression{nil}}}).UseVar(v) {
 		t.Fatal("nil arg hole must fail closed as uses")
 	}
+	if !HasError() {
+		t.Fatal("nil arg hole UseVar must SetError sticky")
+	}
+	ClearError()
 	if !(&Expression{Term: TermCommaExpr, CommaLHS: nil, CommaRHS: e}).UseVar(v) {
 		t.Fatal("nil comma side must fail closed as uses")
 	}
+	if !HasError() {
+		t.Fatal("nil comma side UseVar must SetError sticky")
+	}
+	ClearError()
 	if !(&Expression{Term: TermVariable, Var: nil}).UseVar(v) {
 		t.Fatal("nil TermVariable must fail closed as uses")
 	}
+	if !HasError() {
+		t.Fatal("nil TermVariable UseVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMustJumpUsesNotEquals(t *testing.T) {

@@ -408,25 +408,33 @@ func (e *Expression) Is0Or1() bool {
 
 // UseVar mirrors Expression::use_var.
 // Expression.h:143 default false; Variable/Funcall/Comma/Assign overrides.
-// Incomplete IR fails closed as true (uses v) — no invent conflict-free non-use.
+// Incomplete IR fails closed sticky true (uses v) — no invent conflict-free non-use
+// / soft re-pick past holes.
 func (e *Expression) UseVar(v *Variable) bool {
+	// Expression + subject always live; sticky incomplete — fail closed as uses
+	// (no invent conflict-free non-use / soft re-pick past hole)
 	if e == nil || v == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	switch e.Term {
 	case TermVariable:
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.Var == v || e.Var.Match(v)
 	case TermFunction:
 		// ExpressionFuncall always has live invoke + args after ERROR_GUARD
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		for _, a := range e.Invoke.Args {
 			if a == nil {
+				// incomplete arg IR sticky — no invent skip hole as non-use
+				SetError(ErrGeneric)
 				return true
 			}
 			if a.UseVar(v) {
@@ -436,11 +444,15 @@ func (e *Expression) UseVar(v *Variable) bool {
 		return false
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
+			// incomplete comma sides sticky — no invent non-use past hole
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.CommaLHS.UseVar(v) || e.CommaRHS.UseVar(v)
 	case TermAssignment:
 		if e.Assign == nil {
+			// incomplete Assign shell sticky — no invent non-use
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.Assign.LhsVar != nil && (e.Assign.LhsVar == v || e.Assign.LhsVar.Match(v)) {
@@ -448,24 +460,38 @@ func (e *Expression) UseVar(v *Variable) bool {
 		}
 		if e.Assign.Lhs != nil {
 			if e.Assign.Lhs.Var == nil {
+				// incomplete Lhs.Var sticky
+				SetError(ErrGeneric)
 				return true
 			}
 			if e.Assign.Lhs.Var == v || e.Assign.Lhs.Var.Match(v) {
 				return true
 			}
+		} else if e.Assign.LhsVar == nil {
+			// C++ ExpressionAssign always has live lhs; neither side → incomplete
+			SetError(ErrGeneric)
+			return true
 		}
 		if e.Assign.Expr == nil {
+			// incomplete assign RHS sticky — no invent non-use past hole
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.Assign.Expr.UseVar(v)
 	case TermLhs:
 		// Lhs as expression term if ever used
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		return e.Var == v || e.Var.Match(v)
-	default:
+	case TermConstant:
+		// constants do not use variables — complete default false
 		return false
+	default:
+		// unknown term sticky incomplete (no invent default non-use)
+		SetError(ErrGeneric)
+		return true
 	}
 }
 
