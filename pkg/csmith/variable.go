@@ -343,11 +343,17 @@ func GetNewCtrlVars(opts Options) []*Variable {
 
 // GetLastCtrlVars mirrors Variable::get_last_ctrl_vars.
 // Variable.cpp:774–776. Returns nil if none allocated.
+// Incomplete last vector fails closed IncompleteVariables (not bare nil invent
+// empty-complete ctrl set / VariablesComplete(nil) success for array inits).
 func GetLastCtrlVars() []*Variable {
 	if len(ctrlVarsVectors) == 0 {
 		return nil
 	}
-	return ctrlVarsVectors[len(ctrlVarsVectors)-1]
+	last := ctrlVarsVectors[len(ctrlVarsVectors)-1]
+	if !VariablesComplete(last) {
+		return IncompleteVariables()
+	}
+	return last
 }
 
 // CtrlVarsDoFinalization mirrors Variable::doFinalization for ctrl var pool.

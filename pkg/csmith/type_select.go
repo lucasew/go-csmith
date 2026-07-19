@@ -16,6 +16,8 @@ type TypeEnv struct {
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).
 // Type.cpp:423+ — return existing pointer-to-t or create if add.
+// Incomplete DerivedTypes fails closed nil when add (no invent soft-skip hole
+// then match/append as if the pool were complete).
 func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 	if t == nil {
 		return nil
@@ -23,6 +25,10 @@ func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 	// PointerTo already caches by pointee identity.
 	p := PointerTo(t)
 	if env != nil && add {
+		// Type* always live on derived_types; hole → fail closed whole registry
+		if !typesComplete(env.DerivedTypes) {
+			return nil
+		}
 		found := false
 		for _, d := range env.DerivedTypes {
 			if d == p {
@@ -38,8 +44,13 @@ func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 }
 
 // HasPointerType mirrors Type::has_pointer_type.
+// Incomplete DerivedTypes fails closed false (no invent "has pointers" / ready
+// pool via len>0 while typesComplete is false).
 func (env *TypeEnv) HasPointerType() bool {
-	return env != nil && len(env.DerivedTypes) > 0
+	if env == nil || !typesComplete(env.DerivedTypes) {
+		return false
+	}
+	return len(env.DerivedTypes) > 0
 }
 
 // FindType mirrors Type::find_type — pointer identity in AllTypes.

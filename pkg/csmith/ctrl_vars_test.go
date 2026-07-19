@@ -57,6 +57,13 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 	if GetLastCtrlVars() != nil {
 		t.Fatal("cleared")
 	}
+	// incomplete last vector must IncompleteVariables (not bare nil empty-complete)
+	_ = NewCtrlVars(2, false)
+	ctrlVarsVectors[len(ctrlVarsVectors)-1] = append(ctrlVarsVectors[len(ctrlVarsVectors)-1], nil)
+	if VariablesComplete(GetLastCtrlVars()) {
+		t.Fatal("incomplete last ctrl must IncompleteVariables")
+	}
+	CtrlVarsDoFinalization()
 }
 
 func TestOutputLowerBoundArray(t *testing.T) {
