@@ -30,9 +30,12 @@ func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant
 	if HasError() {
 		return nil
 	}
-	// assert / nil-probs / field fail paths yield ""; do not invent Constant{"", …}
+	// assert / nil-probs / field fail paths yield ""; sticky no invent Constant{"", …}
 	// success: simple non-void non-empty, pointer "0", aggregate at least "{}"
 	if v == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	return &Constant{Type: typ, Value: v}
@@ -156,21 +159,30 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		return "0"
 	}
 	if typ.IsStruct() {
-		// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+		// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 		if r == nil || probs == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
 			return c.Value
 		}
+		// incomplete struct const IR sticky (MakeStruct may already SetError)
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if typ.IsUnion() {
 		if r == nil || probs == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
 			return c.Value
+		}
+		if !HasError() {
+			SetError(ErrGeneric)
 		}
 		return ""
 	}
@@ -178,16 +190,19 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 	if typ.PtrType() != nil {
 		return "0"
 	}
-	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union
+	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union sticky
 	if !typ.IsSimple() {
+		SetError(ErrGeneric)
 		return ""
 	}
-	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal
+	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal sticky
 	if typ.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return ""
 	}
-	// simple non-void needs process RNG (no invent NewRng for nil)
+	// simple non-void needs process RNG sticky (no invent NewRng for nil)
 	if r == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	st := typ.Simple()
@@ -226,7 +241,8 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		case EFloat:
 			v = generateRandomFloatHexConstant(r)
 		default:
-			// Constant.cpp:407 — assert(0 && "Unsupported type!"); no soft invent int
+			// Constant.cpp:407 — assert(0 && "Unsupported type!") sticky; no soft invent int
+			SetError(ErrGeneric)
 			return ""
 		}
 	}

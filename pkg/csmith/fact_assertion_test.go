@@ -146,6 +146,16 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	if s := fm2.OutputAssertions(st2, nil, "    ", true); s != "" {
 		t.Fatal("filtered facts must not invent comment-only shell", s)
 	}
+	// StmID 0 sticky — no invent empty assertion section past incomplete stmt id
+	ClearError()
+	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	if s := fm.OutputAssertions(st0, nil, "    ", true); s != "" {
+		t.Fatal("StmID 0 OutputAssertions must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 OutputAssertions must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostOutputInBlock(t *testing.T) {

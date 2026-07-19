@@ -28,6 +28,22 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 		t.Fatal("void MakeRandom must SetError sticky")
 	}
 	ClearError()
+	// simple non-void needs RNG sticky (no invent NewRng)
+	if MakeRandom(GetIntType(), Defaults(), nil, nil) != nil {
+		t.Fatal("nil RNG simple MakeRandom must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG simple MakeRandom must SetError sticky")
+	}
+	ClearError()
+	// Constant.cpp:411 unsupported kind sticky
+	if MakeRandom(&Type{}, Defaults(), nil, NewRng(1)) != nil {
+		t.Fatal("non-simple/non-ptr MakeRandom must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("unsupported type MakeRandom must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomIntHexPathSeed2(t *testing.T) {

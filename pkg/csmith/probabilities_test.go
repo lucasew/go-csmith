@@ -112,4 +112,20 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	if st != ESimpleType(v) {
 		t.Fatalf("first choose: got %v want %v", st, ESimpleType(v))
 	}
+	// C++ always has RNG+probs sticky — no invent EInt when missing
+	ClearError()
+	if ChooseRandomNonvoidSimple(nil, p) != EVoid {
+		t.Fatal("nil RNG must fail closed EVoid")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ChooseRandomNonvoidSimple must SetError sticky")
+	}
+	ClearError()
+	if ChooseRandomNonvoidSimple(NewRng(1), nil) != EVoid {
+		t.Fatal("nil probs must fail closed EVoid")
+	}
+	if !HasError() {
+		t.Fatal("nil probs ChooseRandomNonvoidSimple must SetError sticky")
+	}
+	ClearError()
 }

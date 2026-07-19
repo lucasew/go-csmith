@@ -79,7 +79,7 @@ func TestCreateVariableScalarsUsesProcessProbs(t *testing.T) {
 }
 
 func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
-	// no invent NewProbabilities when process singleton unset
+	// no invent NewProbabilities when process singleton unset — sticky
 	prev := ProcessProbabilities()
 	SetProcessProbabilities(nil)
 	defer SetProcessProbabilities(prev)
@@ -90,6 +90,10 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 	if CreateVariableScalars("g_s", st, false, false) != nil {
 		t.Fatal("nil process probs must not invent aggregate init")
 	}
+	if !HasError() {
+		t.Fatal("nil process probs aggregate must SetError sticky")
+	}
+	ClearError()
 	// simple non-aggregate still works with process RNG (probs optional for simple)
 	if CreateVariableScalars("g_i", GetIntType(), false, false) == nil {
 		t.Fatal("simple with process RNG")
@@ -97,15 +101,19 @@ func TestCreateVariableScalarsNilProcessProbsAggregateFailClosed(t *testing.T) {
 }
 
 func TestCreateVariableScalarsNilProcessRngFailClosed(t *testing.T) {
-	// Variable.cpp:395 — Constant::make_random uses process RNG; no invent private stream
+	// Variable.cpp:395 — Constant::make_random uses process RNG; sticky no invent private stream
 	prevR := ProcessRng()
 	SetProcessRng(nil)
 	defer SetProcessRng(prevR)
 	ClearError()
-	// simple needs pure_rnd — fail closed without invent nextCreateVarRng
+	// simple needs pure_rnd — fail closed sticky without invent nextCreateVarRng
 	if CreateVariableScalars("g_i", GetIntType(), false, false) != nil {
 		t.Fatal("simple must fail closed without ProcessRng")
 	}
+	if !HasError() {
+		t.Fatal("simple without ProcessRng must SetError sticky")
+	}
+	ClearError()
 	// pointer constant is "0" without RNG draws (Constant.cpp:308–310)
 	if CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false) == nil {
 		t.Fatal("pointer init must not require RNG")

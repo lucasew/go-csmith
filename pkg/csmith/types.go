@@ -710,8 +710,9 @@ func (t *Type) HasPadding() bool {
 // Type.cpp:618–635 — rnd_upto(MAX_SIMPLE_TYPES, SIMPLE_TYPES_PROB_FILTER); no soft invent eInt.
 // Type.cpp:1246 — assert(ty != eVoid) on choose_random_simple; filter zeros void weight.
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
-	// C++ always has RNG + probs; no soft invent EInt when missing
+	// C++ always has RNG + probs; sticky no soft invent EInt when missing
 	if r == nil || probs == nil {
+		SetError(ErrGeneric)
 		return EVoid
 	}
 	v := r.RndUptoFilter(uint32(MaxSimpleTypes), probs.SimpleTypesFilter())

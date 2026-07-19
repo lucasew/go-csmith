@@ -180,7 +180,12 @@ func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
 // OutputAssertions mirrors FactMgr::output_assertions.
 // FactMgr.cpp:614–649 — post_condition uses updated final facts; filter unused globals.
 func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
-	if fm == nil || st == nil || st.StmID <= 0 {
+	if fm == nil || st == nil {
+		return ""
+	}
+	// Statement::stm_id always live; StmID 0 sticky (no invent empty assertion section)
+	if st.StmID <= 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var facts []*FactPointTo
