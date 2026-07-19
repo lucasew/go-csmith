@@ -92,11 +92,11 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 		2: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
 	fm.SetupInOutMaps(true)
-	if fm.MapFactsInFinal[1] != nil {
-		t.Fatal("incomplete MapFactsIn must not invent cleaned InFinal")
+	if FactsComplete(fm.MapFactsInFinal[1]) {
+		t.Fatal("incomplete MapFactsIn must not invent cleaned/complete InFinal")
 	}
-	if fm.MapFactsOutFinal[2] != nil {
-		t.Fatal("incomplete MapFactsOut must not invent cleaned OutFinal")
+	if FactsComplete(fm.MapFactsOutFinal[2]) {
+		t.Fatal("incomplete MapFactsOut must not invent cleaned/complete OutFinal")
 	}
 	// complete sibling still clones
 	fm2 := NewFactMgr(nil)
@@ -119,8 +119,8 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	// plant incomplete current MapFactsIn
 	fm.MapFactsIn[1] = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr}), nil}
 	fm.SetupInOutMaps(false)
-	if fm.MapFactsInFinal[1] != nil {
-		t.Fatal("incomplete combine must fail closed nil final, not invent partial join")
+	if FactsComplete(fm.MapFactsInFinal[1]) {
+		t.Fatal("incomplete combine must fail closed incomplete final, not invent partial join")
 	}
 }
 
@@ -170,20 +170,20 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 	in := map[int][]*FactPointTo{}
 	out := map[int][]*FactPointTo{}
 	fm.BackupStmFactMaps(st, in, out)
-	if in[15] != nil {
-		t.Fatal("incomplete MapFactsIn must backup as nil, not invent cleaned")
+	if FactsComplete(in[15]) {
+		t.Fatal("incomplete MapFactsIn must backup incomplete, not invent cleaned")
 	}
-	if out[15] != nil {
-		t.Fatal("incomplete MapFactsOut must backup as nil, not invent cleaned")
+	if FactsComplete(out[15]) {
+		t.Fatal("incomplete MapFactsOut must backup incomplete, not invent cleaned")
 	}
-	// restore incomplete backup → nil maps (not invent cleaned)
+	// restore incomplete backup → incomplete maps (not invent cleaned)
 	fm.MapFactsIn[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	fm.MapFactsOut[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	in[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	out[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm.RestoreStmFactMaps(st, in, out)
-	if fm.MapFactsIn[15] != nil || fm.MapFactsOut[15] != nil {
-		t.Fatal("restore incomplete backup must fail closed nil")
+	if FactsComplete(fm.MapFactsIn[15]) || FactsComplete(fm.MapFactsOut[15]) {
+		t.Fatal("restore incomplete backup must fail closed incomplete")
 	}
 }
 
@@ -207,15 +207,15 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
-	// nil fact hole fails closed at clone store and find_updated
+	// nil fact hole fails closed at store and find_updated
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
-	// CloneFactSlice drops incomplete store → MapFactsOut[1] nil
-	if fm.MapFactsOut[1] != nil {
-		t.Fatal("SetMapFactsOut must not invent cleaned list from nil hole")
+	// incomplete store is hole marker (FactsComplete false), not cleaned list
+	if FactsComplete(fm.MapFactsOut[1]) {
+		t.Fatal("SetMapFactsOut must not invent cleaned/complete list from nil hole")
 	}
 	if fm.FindUpdatedFacts(1) != nil {
-		t.Fatal("nil out map must fail closed")
+		t.Fatal("incomplete out map must fail closed")
 	}
 	// direct find with hole in out (bypass Set)
 	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
@@ -347,15 +347,21 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 
 func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
 	// incomplete facts must not invent cleaned MapFactsIn/Out entry
+	// stored as hole marker (FactsComplete false), not bare nil (FactsComplete true)
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
-	if fm.MapFactsIn[1] != nil {
-		t.Fatal("SetMapFactsIn incomplete must store nil")
+	if FactsComplete(fm.MapFactsIn[1]) {
+		t.Fatal("SetMapFactsIn incomplete must not invent complete empty")
 	}
 	fm.SetMapFactsOut(2, []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil})
-	if fm.MapFactsOut[2] != nil {
-		t.Fatal("SetMapFactsOut incomplete must store nil")
+	if FactsComplete(fm.MapFactsOut[2]) {
+		t.Fatal("SetMapFactsOut incomplete must not invent complete empty")
+	}
+	// complete empty is non-nil empty slice (FactsComplete true)
+	fm.SetMapFactsIn(3, nil)
+	if !FactsComplete(fm.MapFactsIn[3]) || fm.MapFactsIn[3] == nil {
+		t.Fatal("complete empty must store non-nil empty, not hole/bare nil", fm.MapFactsIn[3])
 	}
 }
 
@@ -389,7 +395,7 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	fm.SetMapFactsOutForStmt(st, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, nil)
-	if fm.MapFactsOut[5] != nil {
-		t.Fatal("incomplete set_fact_out must store nil")
+	if FactsComplete(fm.MapFactsOut[5]) {
+		t.Fatal("incomplete set_fact_out must not invent complete empty")
 	}
 }

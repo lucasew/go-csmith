@@ -454,12 +454,8 @@ func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	}
 	out := make(map[int][]*FactPointTo, len(m))
 	for k, v := range m {
-		// incomplete source map stores nil (no invent cleaned backup clone)
-		if !FactsComplete(v) {
-			out[k] = nil
-			continue
-		}
-		out[k] = CloneFactSlice(v)
+		// incomplete → hole marker (not bare nil invent empty complete)
+		out[k] = storeFactMapEntry(v)
 	}
 	return out
 }
