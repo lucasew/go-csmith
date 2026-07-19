@@ -510,6 +510,7 @@ func (f *Function) GenerateBodyWithKnownParams(
 }
 
 // generateBodyCore shared path for GenerateBody / generate_body_with_known_params.
+// Function always live; sticky (no invent soft-skip body gen past hole).
 func (f *Function) generateBodyCore(
 	r *Rng,
 	opts Options,
@@ -521,6 +522,7 @@ func (f *Function) generateBodyCore(
 	knownParams bool,
 ) {
 	if f == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Function.cpp:626–629 / 668–671 — ignore regenerate

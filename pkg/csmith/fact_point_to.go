@@ -1140,8 +1140,14 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 
 // indexExprUsesVar reports whether a string index expression refers to indexVar.
 // Indices are stored as strings (e.g. "i", "(i + 2)"); approximate Expression::use_var.
+// Variable always live; sticky false (no invent not-used soft-skip past hole).
+// Empty idx is complete not-used.
 func indexExprUsesVar(idx string, indexVar *Variable) bool {
-	if indexVar == nil || idx == "" {
+	if indexVar == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if idx == "" {
 		return false
 	}
 	name := indexVar.Name

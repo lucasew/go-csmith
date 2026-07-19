@@ -74,12 +74,23 @@ func TestGenerateBodyFailsClosedWithoutFactMgr(t *testing.T) {
 
 func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	// Function.cpp non-builtin make_random body always has process RNG
+	ClearError()
 	f := &Function{Name: "func_x", ReturnType: GetIntType()}
 	_ = f.ensurePairedFactMgr()
 	f.GenerateBody(nil, Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
 	if f.Body != nil || f.BuildState != BuildUnbuilt {
 		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG GenerateBody must SetError sticky")
+	}
+	ClearError()
+	// Function always live; sticky (no invent soft-skip body gen past hole)
+	(*Function)(nil).GenerateBody(NewRng(1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(Defaults()), NewExprTables(Defaults()), NewStatementThresholdTable(Defaults()), EmptyCGContext())
+	if !HasError() {
+		t.Fatal("nil Function GenerateBody must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {

@@ -602,6 +602,14 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete Param must SetError sticky SelectParentParamInv")
 	}
 	ClearError()
+	// Function always live for parent-param select; sticky
+	if vs.SelectParentParamInv(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(7), MatchFlexible, nil) != nil {
+		t.Fatal("nil CurrentFunc must fail closed SelectParentParamInv")
+	}
+	if !HasError() {
+		t.Fatal("nil CurrentFunc SelectParentParamInv must SetError sticky")
+	}
+	ClearError()
 	// incomplete GlobalList on SelectGlobalMT
 	vs2 := NewVariableSelector(opts)
 	vs2.GlobalList = []*Variable{nil}

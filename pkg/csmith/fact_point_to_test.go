@@ -353,6 +353,20 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 		t.Fatal("nil indexVar UpdateWithModifiedIndex must SetError sticky")
 	}
 	ClearError()
+	// Variable always live for string index use; sticky false
+	if indexExprUsesVar("i", nil) {
+		t.Fatal("nil indexVar indexExprUsesVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil indexVar indexExprUsesVar must SetError sticky")
+	}
+	ClearError()
+	if indexExprUsesVar("", idx) {
+		t.Fatal("empty idx must complete not-used")
+	}
+	if HasError() {
+		t.Fatal("empty idx indexExprUsesVar must not sticky")
+	}
 	ClearError()
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{nil}, nil)) {
 		t.Fatal("nil ptr hole MergePointees must fail closed incomplete")

@@ -75,6 +75,22 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	if RandomTypeFromType(nil, nil, opts, probs, st, false, false) != st {
 		t.Fatal("struct keep without RNG")
 	}
+	ClearError()
+	// TypeEnv + AllTypes always live after GenerateAllTypes; sticky nil
+	if RandomTypeFromType(NewRng(1), nil, opts, probs, nil, false, false) != nil {
+		t.Fatal("nil env + nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil env RandomTypeFromType must SetError sticky")
+	}
+	ClearError()
+	if RandomTypeFromType(NewRng(1), &TypeEnv{}, opts, probs, nil, false, false) != nil {
+		t.Fatal("empty AllTypes + nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty AllTypes RandomTypeFromType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGenerateMainHasReturn0(t *testing.T) {

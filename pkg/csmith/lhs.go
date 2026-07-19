@@ -611,6 +611,7 @@ func selectDerefPointer(
 }
 
 // selectDerefPointerInv is select_deref_pointer with invalid_vars.
+// Type + RNG always live; sticky nil (no invent soft-skip deref select past hole).
 func selectDerefPointerInv(
 	r *Rng,
 	opts Options,
@@ -623,6 +624,7 @@ func selectDerefPointerInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if typ == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)
@@ -636,8 +638,9 @@ func selectDerefPointerInv(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); no invent
+	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); sticky no invent
 	if qfer == nil || !qfer.SanityCheck(typ) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky

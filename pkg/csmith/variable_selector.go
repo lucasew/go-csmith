@@ -2861,6 +2861,7 @@ func (vs *VariableSelector) SelectParentParam(
 
 // SelectParentParamInv is SelectParentParam with invalid_vars.
 // VariableSelector.cpp:1074–1087.
+// Function always live for parent-param select; sticky nil (no invent soft miss past hole).
 func (vs *VariableSelector) SelectParentParamInv(
 	access Access,
 	cg CGContext,
@@ -2871,6 +2872,7 @@ func (vs *VariableSelector) SelectParentParamInv(
 	invalidVars []*Variable,
 ) *Variable {
 	if cg.CurrentFunc == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before param choose (no invent soft re-pick)

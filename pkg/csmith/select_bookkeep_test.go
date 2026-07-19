@@ -191,4 +191,28 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("incomplete GlobalNonvolatilesList must SetError sticky")
 	}
 	ClearError()
+	// Type + RNG always live; sticky
+	vs.GlobalNonvolatilesList = []*Variable{pv}
+	if selectDerefPointerInv(nil, opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
+		t.Fatal("nil RNG selectDerefPointerInv must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG selectDerefPointerInv must SetError sticky")
+	}
+	ClearError()
+	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, nil, &q, AccessRead, nil) != nil {
+		t.Fatal("nil type selectDerefPointerInv must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type selectDerefPointerInv must SetError sticky")
+	}
+	ClearError()
+	// assert(qfer) sticky
+	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), nil, AccessRead, nil) != nil {
+		t.Fatal("nil qfer selectDerefPointerInv must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil qfer selectDerefPointerInv must SetError sticky")
+	}
+	ClearError()
 }

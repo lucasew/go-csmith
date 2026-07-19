@@ -710,8 +710,11 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 	}
 }
 
+// backupBlockFactMaps walks one block tree for BackupStmFactMaps.
+// Block always live after parent incomplete check; sticky (no invent soft-skip backup past hole).
 func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
 	if b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if b.StmID > 0 {
@@ -777,8 +780,11 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 	}
 }
 
+// restoreBlockFactMaps walks one block tree for RestoreStmFactMaps.
+// Block always live after parent incomplete check; sticky (no invent soft-skip restore past hole).
 func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*FactPointTo) {
 	if b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if b.StmID > 0 {

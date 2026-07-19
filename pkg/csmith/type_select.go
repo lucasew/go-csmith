@@ -311,7 +311,9 @@ func RandomTypeFromType(
 			return nil
 		}
 		// Type.cpp:594–597 — choose_random_nonvoid(_nonvolatile) + ERROR_GUARD; no soft invent simple
+		// TypeEnv + AllTypes always live after GenerateAllTypes; sticky nil (no invent empty pick)
 		if env == nil || len(env.AllTypes) == 0 {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if noVolatile {
