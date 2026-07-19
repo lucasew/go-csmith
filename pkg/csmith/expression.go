@@ -373,8 +373,9 @@ func (e *Expression) EqualsInt(num int) bool {
 	}
 	switch e.Term {
 	case TermConstant:
-		// incomplete Constant without Con sticky — no invent not-equal fold
-		if e.Con == nil {
+		// Constant always has live Type* + Value; incomplete shell sticky
+		// (no invent fold soft-success past Type-nil / empty-value via Con path alone)
+		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 			SetError(ErrGeneric)
 			return false
 		}
@@ -425,8 +426,8 @@ func (e *Expression) NotEquals(num int) bool {
 		// Expression.h default false for non-Constant
 		return false
 	}
-	// incomplete Constant without Con sticky — no invent equals fold
-	if e.Con == nil {
+	// Constant Type* + Value always live; incomplete sticky (no invent fold past hole)
+	if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -446,8 +447,8 @@ func (e *Expression) LessThan(num int) bool {
 		// Expression.h default false for non-Constant
 		return false
 	}
-	// incomplete Constant without Con sticky — no invent less-than fold
-	if e.Con == nil {
+	// Constant Type* + Value always live; incomplete sticky (no invent fold past hole)
+	if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}

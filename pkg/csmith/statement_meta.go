@@ -38,10 +38,20 @@ func GetBlocksStmt(st *Stmt) []*Block {
 	switch st.Kind {
 	case StmtIfElse:
 		// StatementIf.h — blks.push_back(&if_true); blks.push_back(&if_false);
-		// both arms always live in C++; nil arm is incomplete IR left for walkers
+		// both arms always live in C++; nil arm sticky IncompleteBlocks
+		// (no invent []*Block{Then,nil} soft list for walkers to soft-continue past)
+		if st.Then == nil || st.Else == nil {
+			SetError(ErrGeneric)
+			return IncompleteBlocks()
+		}
 		return []*Block{st.Then, st.Else}
 	case StmtFor:
-		// StatementFor.h — blks.push_back(&body);
+		// StatementFor.h — blks.push_back(&body); body always live
+		// sticky IncompleteBlocks (no invent []*Block{nil} soft for-body hole)
+		if st.Then == nil {
+			SetError(ErrGeneric)
+			return IncompleteBlocks()
+		}
 		return []*Block{st.Then}
 	case StmtArrayOp:
 		// StatementArrayOp.h — if (body) blks.push_back(body);

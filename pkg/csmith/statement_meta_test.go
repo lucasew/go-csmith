@@ -47,13 +47,23 @@ func TestFindTypedStmts(t *testing.T) {
 }
 
 func TestGetBlocksStmtKindGated(t *testing.T) {
-	// StatementIf always exposes both arms — nil arm is incomplete hole
-	ifBlks := GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})
-	if len(ifBlks) != 2 || ifBlks[0] == nil || ifBlks[1] != nil {
+	// complete if both arms
+	ClearError()
+	thenB, elseB := &Block{StmID: 1}, &Block{StmID: 2}
+	ifBlks := GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: thenB, Else: elseB})
+	if len(ifBlks) != 2 || ifBlks[0] != thenB || ifBlks[1] != elseB {
 		t.Fatalf("if arms: %+v", ifBlks)
 	}
-	// missing Else fails typed walk sticky (no invent soft-skip absent arm / empty complete)
+	// missing Else sticky IncompleteBlocks (no invent soft list with nil hole)
 	ClearError()
+	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})) {
+		t.Fatal("nil Else GetBlocksStmt must fail closed IncompleteBlocks")
+	}
+	if !HasError() {
+		t.Fatal("nil Else GetBlocksStmt must SetError sticky")
+	}
+	ClearError()
+	// missing Else fails typed walk sticky
 	var stms []*Stmt
 	if FindTypedStmts(&Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
 		t.Fatal("nil Else arm must fail closed typed walk")
@@ -65,10 +75,19 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 		t.Fatal("nil Else FindTypedStmts must SetError sticky")
 	}
 	ClearError()
-	// for always pushes body slot
-	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor})
-	if len(forBlks) != 1 || forBlks[0] != nil {
-		t.Fatalf("for body slot: %+v", forBlks)
+	// for without body sticky IncompleteBlocks
+	if BlocksComplete(GetBlocksStmt(&Stmt{Kind: StmtFor})) {
+		t.Fatal("nil for body GetBlocksStmt must fail closed IncompleteBlocks")
+	}
+	if !HasError() {
+		t.Fatal("nil for body GetBlocksStmt must SetError sticky")
+	}
+	ClearError()
+	// for with body
+	body := &Block{StmID: 3}
+	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor, Then: body})
+	if len(forBlks) != 1 || forBlks[0] != body {
+		t.Fatalf("for body: %+v", forBlks)
 	}
 	// assign has empty get_blocks even if Then is wrongly set
 	if blks := GetBlocksStmt(&Stmt{Kind: StmtAssign, Then: &Block{}}); len(blks) != 0 {

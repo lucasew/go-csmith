@@ -1179,6 +1179,15 @@ func TestIs0Or1NotEqualsLessThanIncompleteSticky(t *testing.T) {
 		t.Fatal("Constant without Con LessThan must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Constant fold sticky (no invent fold soft-success past type hole)
+	noTy := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
+	if noTy.EqualsInt(0) || noTy.NotEquals(1) || noTy.LessThan(1) {
+		t.Fatal("Type-nil Constant fold must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Constant fold must SetError sticky")
+	}
+	ClearError()
 	// Variable term complete default false for NotEquals (Expression.h)
 	if (&Expression{Term: TermVariable}).NotEquals(0) {
 		t.Fatal("Variable NotEquals must default false")
