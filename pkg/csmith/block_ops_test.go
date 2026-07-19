@@ -426,13 +426,20 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	// fair: incomplete FieldVars clears *facts
 	metaFactPointToEnabled = true
 	defer ClearMetaFacts()
+	ClearError()
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "p", Type: PointerTo(GetIntType()), BitWidth: -1},
 		{Name: "q", Type: PointerTo(GetIntType()), BitWidth: -1},
 	}}
 	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	if v == nil || HasError() {
+		t.Fatal("CreateVariableQfer struct with pointer fields", v, HasError())
+	}
 	// CreateFieldVars may have filled; force nil hole + later live pointer field
 	q := CreateVariableScalars("g_s.q", PointerTo(GetIntType()), false, false)
+	if q == nil {
+		t.Fatal("live pointer field var")
+	}
 	v.FieldVars = []*Variable{nil, q}
 	// seed a prior fact so clear is observable vs empty start
 	prior := MakeFactPointTo(CreateVariableScalars("g_other", PointerTo(GetIntType()), false, false), NullPtr)
@@ -447,6 +454,7 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts2) {
 		t.Fatal("nil v must fail closed clear facts", facts2)
 	}
+	ClearError()
 }
 
 func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {

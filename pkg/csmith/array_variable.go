@@ -863,8 +863,9 @@ func (av *ArrayVariable) OutputAccess() string {
 		// fail closed — no soft invent bare collective name for broken itemized IR
 		return ""
 	}
-	// incomplete IndexExprs fails closed whole access (no invent soft-skip hole mid indices)
+	// incomplete IndexExprs fails closed sticky whole access (no invent soft-skip hole mid indices)
 	if !ExpressionsComplete(av.IndexExprs) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder

@@ -113,7 +113,14 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if !strings.Contains(out, "int i") {
 		t.Fatal(out)
 	}
-	// nil hole fails closed sticky
+	// nil hole fails closed sticky (GetMaxArrayDimension + OutputArrayInitializers)
+	ClearError()
+	if GetMaxArrayDimension([]*Variable{v, nil}) >= 0 {
+		t.Fatal("nil hole GetMaxArrayDimension must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("nil hole GetMaxArrayDimension must SetError sticky")
+	}
 	ClearError()
 	if s := OutputArrayInitializers([]*Variable{v, nil}, opts, "    "); s != "" {
 		t.Fatal("nil hole must fail closed", s)

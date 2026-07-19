@@ -32,12 +32,13 @@ func TestCreateFieldVars(t *testing.T) {
 
 func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	// soft invent: fail() wiped FieldVars=nil → FieldVarsComplete invents zero fields
-	// while Type.Fields still non-empty; fair: IncompleteVariables marker
+	// while Type.Fields still non-empty; fair: IncompleteVariables + sticky ERROR
 	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
 	}}
 	v := &Variable{Name: "g_bad", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	ClearError()
 	v.CreateFieldVars()
 	if v.FieldVarsComplete() {
 		t.Fatal("CreateFieldVars fail must IncompleteVariables, not empty-complete nil")
@@ -45,6 +46,10 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	if VariablesComplete(v.FieldVars) {
 		t.Fatal("want IncompleteVariables marker")
 	}
+	if !HasError() {
+		t.Fatal("CreateFieldVars fail must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasFieldVarNilHole(t *testing.T) {

@@ -664,6 +664,12 @@ func makeRandomStmt(
 	if r == nil || cg == nil {
 		return Stmt{}
 	}
+	// incomplete ambient EffectContext fails closed sticky before re-pick loop
+	// (no invent stmt under incomplete context shells; EffectStm is cleared per try)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// Statement.cpp:243–244 — DEPTH_GUARD_BY_TYPE_RETURN_WITH_FLAG(dtStatement, t, nullptr)
 	// t is MAX_STATEMENT_TYPE when choosing randomly (flag = MaxStatementType).
 	if DepthGuardByTypeFlag(opts, DtStatement, int(MaxStatementType)) == BadDepth {

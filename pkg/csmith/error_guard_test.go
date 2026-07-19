@@ -112,7 +112,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 }
 
 func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
-	// incomplete GlobalFacts/accum pre-snapshot must sticky ERROR (no invent re-pick past holes)
+	// incomplete GlobalFacts/accum/context pre-snapshot must sticky ERROR (no invent re-pick past holes)
 	ClearError()
 	opts := Defaults()
 	opts.MaxBlockSize = 1
@@ -143,6 +143,18 @@ func TestMakeRandomStmtIncompletePreFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	// incomplete EffectContext fails closed sticky before re-pick loop
+	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	eff3 := EmptyEffect()
+	cg3.EffectAccum = &eff3
+	st3 := makeRandomStmt(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg3, blk)
+	if stmtOK(st3) {
+		t.Fatal("incomplete EffectContext must fail closed makeRandomStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearError()
 }

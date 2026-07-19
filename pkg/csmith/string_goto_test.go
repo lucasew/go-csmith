@@ -143,6 +143,16 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	if out != "" {
 		t.Fatal("incomplete re-init list must fail closed whole emit", out)
 	}
+	// nil hole fails closed sticky
+	ClearError()
+	stHole := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{good, nil}}
+	if out := OutputSkippedVarInits(stHole, ""); out != "" {
+		t.Fatal("nil InitSkippedVars hole must fail closed", out)
+	}
+	if !HasError() {
+		t.Fatal("nil InitSkippedVars hole must SetError sticky")
+	}
+	ClearError()
 	// no invent " = 5;" without identifier / partial good siblings
 	anon := CreateVariableScalars("l_x", GetIntType(), false, false)
 	anon.Name = ""

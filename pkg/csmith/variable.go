@@ -418,10 +418,11 @@ func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
 
 // GetMaxArrayDimension mirrors Variable::GetMaxArrayDimension.
 // Variable.cpp:813–826.
-// Variable* always live; nil hole fails closed as -1 (no invent skip partial max).
-// Complete empty / no arrays → 0.
+// Incomplete vars list fails closed sticky as -1 (no invent skip partial max /
+// soft re-pick zero-dim success past holes). Complete empty / no arrays → 0.
 func GetMaxArrayDimension(vars []*Variable) int {
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return -1
 	}
 	dimen := 0
@@ -1223,11 +1224,13 @@ func (v *Variable) CreateFieldVars() {
 	isConst := v.IsConst()
 	j := 0
 	fail := func() {
+		// sticky ERROR so soft re-pick cannot invent empty-complete zero fields past hole
+		SetError(ErrGeneric)
 		v.FieldVars = IncompleteVariables()
 	}
 	for _, f := range v.Type.Fields {
 		if f.Type == nil {
-			// incomplete type IR — fail closed clear (no invent partial fields)
+			// incomplete type IR — fail closed sticky clear (no invent partial fields)
 			fail()
 			return
 		}
@@ -1237,13 +1240,27 @@ func (v *Variable) CreateFieldVars() {
 		}
 		fname := v.Name + ".f" + itoa(j)
 		j++
+		// CVQualifiers length = IndirectLevel+1 (pointer levels + storage).
+		// Empty field qfer → all-false at each level (no invent 1-bool then SanityCheck fail
+		// → IncompleteVariables soft shell without sticky ERROR_GUARD).
+		need := f.Type.IndirectLevel() + 1
+		if need < 1 {
+			need = 1
+		}
 		consts := append([]bool(nil), f.Qfer.IsConsts...)
 		vols := append([]bool(nil), f.Qfer.IsVolatiles...)
 		if len(consts) == 0 {
-			consts = []bool{false}
+			consts = make([]bool, need)
+		} else if len(consts) != need {
+			// incomplete field qfer depth — fail closed sticky
+			fail()
+			return
 		}
 		if len(vols) == 0 {
-			vols = []bool{false}
+			vols = make([]bool, need)
+		} else if len(vols) != need {
+			fail()
+			return
 		}
 		// quals.set_const(is_const_var || quals.is_const()) on storage (last)
 		if isConst {
