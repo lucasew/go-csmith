@@ -425,7 +425,11 @@ func GetFirstFunction(list *FunctionList) *Function {
 	if list == nil || len(list.Funcs) == 0 {
 		return nil
 	}
-	// C++ first_function is funcs[0]; incomplete IR at front is fail closed
+	// C++ first_function is funcs[0]; incomplete IR at front sticky fail closed
+	if list.Funcs[0] == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	return list.Funcs[0]
 }
 

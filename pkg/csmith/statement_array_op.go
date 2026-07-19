@@ -72,7 +72,9 @@ func MakeRandomArrayOp(
 	stmtTab *ThresholdTable,
 	cg *CGContext,
 ) Stmt {
+	// StatementArrayOp always has VS + RNG + CG; sticky no invent array-op shell without them
 	if vs == nil || r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent array-op / soft re-pick past holes)

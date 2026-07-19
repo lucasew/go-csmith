@@ -127,15 +127,24 @@ func TestOutputCallChain(t *testing.T) {
 	if !strings.Contains(s, "func_1") || !strings.Contains(s, " -> ") {
 		t.Fatal(s)
 	}
-	// incomplete frame — no invent "?" / blank " in "
+	// incomplete frame sticky — no invent "?" / blank " in "
+	ClearError()
 	cg.CallChain = []*Block{b1, {Func: nil}}
 	if out := cg.OutputCallChain(); out != "" {
 		t.Fatal("nil Func must fail closed call chain", out)
 	}
+	if !HasError() {
+		t.Fatal("nil Func call chain must SetError sticky")
+	}
+	ClearError()
 	cg.CallChain = []*Block{{Func: &Function{Name: ""}}}
 	if out := cg.OutputCallChain(); out != "" {
 		t.Fatal("empty func name must fail closed call chain", out)
 	}
+	if !HasError() {
+		t.Fatal("empty func name call chain must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVariableSelectorDoFinalization(t *testing.T) {

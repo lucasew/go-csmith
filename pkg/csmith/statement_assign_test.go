@@ -170,10 +170,15 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	if stmtOK(MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType())) {
 		t.Fatal("nil cg assign")
 	}
-	// array op: nil vs
+	// array op: nil vs sticky
+	ClearError()
 	if st := MakeRandomArrayOp(NewRng(1), opts, NewProbabilities(opts), nil, NewExprTables(opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil arrayop invent %#v", st)
 	}
+	if !HasError() {
+		t.Fatal("nil vs/cg arrayop must SetError sticky")
+	}
+	ClearError()
 	// goto: no FM
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}

@@ -305,8 +305,10 @@ func (c *CGContext) ExtendCallChain(from CGContext) {
 func (c CGContext) OutputCallChain() string {
 	var b strings.Builder
 	for i, blk := range c.CallChain {
-		// CGContext.cpp:484 — call_chain[i] always live Block*
+		// CGContext.cpp:484 — call_chain[i] always live Block*; incomplete sticky
+		// (no invent "?" / blank " in " / skip holes that soft-rewrite the chain)
 		if blk == nil || blk.Func == nil || blk.Func.Name == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if i > 0 {
