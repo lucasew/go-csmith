@@ -349,7 +349,12 @@ func TestExpressionIndentedOutput(t *testing.T) {
 
 func TestConstantGetField(t *testing.T) {
 	// Constant.cpp:513–522
-	c := &Constant{Value: "{0, 1, 2}"}
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		{Name: "f2", Type: GetIntType(), BitWidth: -1},
+	}}
+	c := &Constant{Type: ut, Value: "{0, 1, 2}"}
 	if c.GetField(0) != "0" || c.GetField(1) != "1" || c.GetField(2) != "2" {
 		t.Fatal(c.GetField(0), c.GetField(1), c.GetField(2))
 	}
@@ -371,6 +376,14 @@ func TestConstantGetField(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("empty Value GetField must SetError sticky")
+	}
+	ClearError()
+	// Type-nil incomplete shell sticky (no invent field split past hole)
+	if (&Constant{Value: "{0, 1}"}).GetField(0) != "" {
+		t.Fatal("nil Type GetField must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Type GetField must SetError sticky")
 	}
 	ClearError()
 }

@@ -491,7 +491,13 @@ func (t *Type) PtrType() *Type {
 }
 
 // IndirectLevel mirrors Type::get_indirect_level.
+// Type* always live at get_indirect_level; sticky 0 (no invent level-0 non-deref
+// soft-skip past missing Type shell / soft re-pick).
 func (t *Type) IndirectLevel() int {
+	if t == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
 	n := 0
 	for cur := t; cur != nil && cur.ptrTo != nil; cur = cur.ptrTo {
 		n++
@@ -681,8 +687,14 @@ func (t *Type) IsEquivalent(other *Type) bool {
 }
 
 // BaseType walks pointers to the ultimate pointee (Type::get_base_type).
+// Type* always live at get_base_type; sticky nil (no invent missing base soft-skip
+// past hole / soft re-pick).
 func (t *Type) BaseType() *Type {
-	for t != nil && t.ptrTo != nil {
+	if t == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	for t.ptrTo != nil {
 		t = t.ptrTo
 	}
 	return t

@@ -240,6 +240,37 @@ func TestSizeInBytesNilSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestIndirectLevelBaseTypeNilSticky(t *testing.T) {
+	// Type* always live; sticky no invent level-0 / missing base soft-skip past hole
+	ClearError()
+	if (*Type)(nil).IndirectLevel() != 0 {
+		t.Fatal("nil IndirectLevel must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil IndirectLevel must SetError sticky")
+	}
+	ClearError()
+	if (*Type)(nil).BaseType() != nil {
+		t.Fatal("nil BaseType must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil BaseType must SetError sticky")
+	}
+	ClearError()
+	// complete pointer still peels
+	p := PointerTo(GetIntType())
+	if p.IndirectLevel() != 1 {
+		t.Fatal(p.IndirectLevel())
+	}
+	if p.BaseType() != GetIntType() {
+		t.Fatal(p.BaseType())
+	}
+	if HasError() {
+		t.Fatal("complete IndirectLevel/BaseType must not sticky")
+	}
+	ClearError()
+}
+
 func TestPrintfDirective(t *testing.T) {
 	// pin platform so int is 4-byte (Generate may leave host int size)
 	SetPlatformSizes(4, 8)

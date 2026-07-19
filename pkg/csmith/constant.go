@@ -71,9 +71,9 @@ func MakeInt(v int) *Constant {
 // Constant.cpp:509–510.
 // Incomplete Constant shell sticky false (no invent not-equal fold / soft re-pick).
 func (c *Constant) Equals(num int) bool {
-	// Constant always live with non-empty Value for fold; sticky incomplete
-	// (no invent not-equal soft-skip past empty-value shell / soft re-pick)
-	if c == nil || c.Value == "" {
+	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
+	// (no invent not-equal / fold success past Type-nil or empty-value shell)
+	if c == nil || c.Type == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -100,9 +100,9 @@ func (c *Constant) NotEqualsZero() bool {
 // Constant.cpp:505–507.
 // Incomplete Constant sticky false (no invent equals fold / soft re-pick).
 func (c *Constant) NotEquals(num int) bool {
-	// nil / empty Value → Equals stickies false; !false invents "not equals"
+	// nil / Type-nil / empty Value → Equals stickies false; !false invents "not equals"
 	// — fail closed false sticky before complement
-	if c == nil || c.Value == "" {
+	if c == nil || c.Type == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -113,9 +113,9 @@ func (c *Constant) NotEquals(num int) bool {
 // Constant.cpp:501–503 — str2int(value) < num.
 // Incomplete Constant sticky false (no invent compare fold / soft re-pick).
 func (c *Constant) LessThan(num int) bool {
-	// Constant always live with non-empty Value for fold; sticky incomplete
-	// (no invent not-less soft-skip past empty-value shell / soft re-pick)
-	if c == nil || c.Value == "" {
+	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
+	// (no invent not-less soft-skip past Type-nil or empty-value shell)
+	if c == nil || c.Type == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -139,7 +139,9 @@ func (c *Constant) LessThan(num int) bool {
 // Constant always live with non-empty Value; sticky empty (no invent empty field
 // soft-skip past empty-value shell). Negative fid is complete empty (not incomplete).
 func (c *Constant) GetField(fid int) string {
-	if c == nil || c.Value == "" {
+	// Type* + Value always live for aggregate field split; sticky empty
+	// (no invent empty field soft-skip past Type-nil / empty-value shell)
+	if c == nil || c.Type == nil || c.Value == "" {
 		SetError(ErrGeneric)
 		return ""
 	}

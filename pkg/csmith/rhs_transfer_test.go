@@ -55,6 +55,29 @@ func TestConstantEquals(t *testing.T) {
 		t.Fatal("empty Value LessThan must SetError sticky")
 	}
 	ClearError()
+	// Type-nil incomplete shell sticky (no invent fold success past hole)
+	noTy := &Constant{Value: "0"}
+	if noTy.Equals(0) {
+		t.Fatal("nil Type Equals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type Equals must SetError sticky")
+	}
+	ClearError()
+	if noTy.NotEquals(1) {
+		t.Fatal("nil Type NotEquals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type NotEquals must SetError sticky")
+	}
+	ClearError()
+	if noTy.LessThan(1) {
+		t.Fatal("nil Type LessThan must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type LessThan must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferNullConst(t *testing.T) {

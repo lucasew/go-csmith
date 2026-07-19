@@ -1184,8 +1184,9 @@ func (e *Expression) outputBody() string {
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant::Output always live value; sticky no invent empty token for incomplete Constant
-		if e.Con != nil && e.Con.Value != "" {
+		// Constant::Output always live Type* + value; sticky no invent empty token
+		// or emit past Type-nil incomplete Constant shell
+		if e.Con != nil && e.Con.Type != nil && e.Con.Value != "" {
 			return e.Con.Value
 		}
 		SetError(ErrGeneric)
