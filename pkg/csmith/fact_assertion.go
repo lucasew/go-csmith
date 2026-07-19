@@ -167,10 +167,14 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		facts = fm.MapFactsInFinal[st.StmID]
 	} else {
 		facts = fm.FindUpdatedFinalFacts(st.StmID)
-		// fall back to non-final updated if final empty
-		if len(facts) == 0 {
+		// fall back to non-final updated if final empty (complete empty only)
+		if FactsComplete(facts) && len(facts) == 0 {
 			facts = fm.FindUpdatedFacts(st.StmID)
 		}
+	}
+	// incomplete maps fail closed (no invent empty assertion block / soft-skip holes)
+	if !FactsComplete(facts) {
+		return ""
 	}
 	if len(facts) == 0 {
 		return ""

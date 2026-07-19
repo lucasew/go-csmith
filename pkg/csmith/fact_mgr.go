@@ -171,9 +171,10 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 			dp = FindParentBlockOfStmID(fm.Func, st.GotoDestStmID)
 		}
 		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
-		// when dest unknown (wrong filter vs update_facts_for_dest)
+		// when dest unknown (wrong filter vs update_facts_for_dest).
+		// IncompleteFactSlice — bare nil + SetMapFactsOut invents complete empty.
 		if fm.Func == nil {
-			cp = nil
+			cp = IncompleteFactSlice()
 		} else {
 			out := []*FactPointTo{}
 			UpdateFactsForDest(cp, &out, fm.Func, dp)
@@ -321,6 +322,8 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 
 // UpdateFactsForDest mirrors FactMgr::update_facts_for_dest.
 // FactMgr.cpp:424–456 — merge facts; OOS locals at dest become garbage/dropped.
+// Incomplete inputs fail closed via IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-complete dest facts / SetMapFactsOut).
 func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Function, destParent *Block) {
 	if factsOut == nil {
 		return
@@ -328,13 +331,13 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 	// FactMgr.cpp:427–428 — dest->func; assert(func)
 	// no soft invent dest facts without function (OOS walk needs f)
 	if f == nil {
-		*factsOut = nil
+		*factsOut = IncompleteFactSlice()
 		return
 	}
 	// Fact* always live; nil hole fails closed (no invent skip partial dest update)
 	for _, fact := range factsIn {
 		if fact == nil || fact.Var == nil {
-			*factsOut = nil
+			*factsOut = IncompleteFactSlice()
 			return
 		}
 	}
@@ -359,7 +362,7 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			// Variable* always live in PointTo; nil hole fails closed whole dest update
 			// (no invent soft-skip hole and still OOS-scan later pointees)
 			if p == nil {
-				*factsOut = nil
+				*factsOut = IncompleteFactSlice()
 				return
 			}
 			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
@@ -368,7 +371,7 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		}
 		merged := MergeFactInto(*factsOut, fact)
 		if merged == nil {
-			*factsOut = nil
+			*factsOut = IncompleteFactSlice()
 			return
 		}
 		*factsOut = merged
@@ -576,7 +579,8 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 
 // FindUpdatedFacts mirrors FactMgr::find_updated_facts.
 // FactMgr.cpp:652–665 — facts_out that differ from related facts_in.
-// Incomplete in/out maps fail closed (nil — no invent empty-update via hole skip).
+// Incomplete in/out maps fail closed IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-update success via hole skip).
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
@@ -584,7 +588,7 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	in := fm.MapFactsIn[stmID]
 	out := fm.MapFactsOut[stmID]
 	if !FactsComplete(in) || !FactsComplete(out) {
-		return nil
+		return IncompleteFactSlice()
 	}
 	var updated []*FactPointTo
 	for _, f := range out {
@@ -603,7 +607,8 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 
 // FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
 // FactMgr.cpp:667–686 — final maps; always include rv facts.
-// Incomplete in/out maps fail closed (nil — no invent empty-update via hole skip).
+// Incomplete in/out maps fail closed IncompleteFactSlice (not bare nil —
+// FactsComplete(nil)==true invents empty-update success via hole skip).
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
 		return nil
@@ -611,7 +616,7 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	in := fm.MapFactsInFinal[stmID]
 	out := fm.MapFactsOutFinal[stmID]
 	if !FactsComplete(in) || !FactsComplete(out) {
-		return nil
+		return IncompleteFactSlice()
 	}
 	var updated []*FactPointTo
 	for _, f := range out {

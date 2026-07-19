@@ -30,19 +30,25 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if fp == nil {
 		t.Fatal("p gone")
 	}
-	// nil fact hole fails closed — no invent partial dest update
+	// nil fact hole fails closed — hole marker (not bare nil / empty complete)
 	var out2 []*FactPointTo
 	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, &out2, f, nil)
-	if out2 != nil {
-		t.Fatal("nil hole must fail closed dest facts", out2)
+	if FactsComplete(out2) {
+		t.Fatal("nil hole must fail closed incomplete dest facts", out2)
 	}
 	// nil PointTo hole on live fact fails closed
 	var out3 []*FactPointTo
 	bad := MakeFactPointTo(p, NullPtr)
 	bad.PointTo = []*Variable{nil, loc}
 	UpdateFactsForDest([]*FactPointTo{bad}, &out3, f, nil)
-	if out3 != nil {
-		t.Fatal("nil pointee hole must fail closed dest facts", out3)
+	if FactsComplete(out3) {
+		t.Fatal("nil pointee hole must fail closed incomplete dest facts", out3)
+	}
+	// missing function fails closed incomplete (no invent empty dest)
+	var out4 []*FactPointTo
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr)}, &out4, nil, nil)
+	if FactsComplete(out4) {
+		t.Fatal("nil func must fail closed incomplete dest facts", out4)
 	}
 }
 
@@ -214,13 +220,19 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete(fm.MapFactsOut[1]) {
 		t.Fatal("SetMapFactsOut must not invent cleaned/complete list from nil hole")
 	}
-	if fm.FindUpdatedFacts(1) != nil {
-		t.Fatal("incomplete out map must fail closed")
+	if FactsComplete(fm.FindUpdatedFacts(1)) {
+		t.Fatal("incomplete out map must fail closed incomplete, not invent empty complete")
 	}
 	// direct find with hole in out (bypass Set)
 	fm.MapFactsOut[1] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), nil}
-	if fm.FindUpdatedFacts(1) != nil {
-		t.Fatal("nil fact hole in out must fail closed")
+	if FactsComplete(fm.FindUpdatedFacts(1)) {
+		t.Fatal("nil fact hole in out must fail closed incomplete")
+	}
+	// final maps: incomplete → IncompleteFactSlice (not bare nil invent empty)
+	fm.MapFactsInFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, NullPtr)}}
+	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: {MakeFactPointTo(p, GarbagePtr), nil}}
+	if FactsComplete(fm.FindUpdatedFinalFacts(1)) {
+		t.Fatal("incomplete final out must fail closed incomplete")
 	}
 }
 
