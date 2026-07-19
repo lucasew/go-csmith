@@ -224,8 +224,11 @@ func (v *Variable) OutputLhsC() string {
 
 // OutputLhsCOpts is OutputLhs with prefix_name.
 // Itemized arrays use ArrayVariable::Output (indices) as LHS text.
+// Incomplete Variable sticky empty (no invent empty LHS soft-skip past hole).
 func (v *Variable) OutputLhsCOpts(prefixName bool) string {
+	// Variable always live at LHS emit; sticky incomplete no invent empty token
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {
@@ -642,8 +645,11 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 }
 
 // IsGlobal mirrors Variable::is_global — name prefix "g_" (or field of global).
+// Incomplete Variable sticky false (no invent not-global soft-skip past hole).
 func (v *Variable) IsGlobal() bool {
+	// Variable always live; sticky incomplete no invent not-global soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.FieldVarOf != nil {
@@ -657,24 +663,33 @@ func (v *Variable) IsGlobal() bool {
 }
 
 // IsLocal mirrors Variable::is_local — name prefix "l_".
+// Incomplete Variable sticky false (no invent not-local soft-skip past hole).
 func (v *Variable) IsLocal() bool {
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(v.Name) >= 2 && v.Name[0] == 'l' && v.Name[1] == '_'
 }
 
 // IsArgument mirrors Variable::is_argument — name prefix "p_".
+// Incomplete Variable sticky false (no invent not-arg soft-skip past hole).
 func (v *Variable) IsArgument() bool {
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(v.Name) >= 2 && v.Name[0] == 'p' && v.Name[1] == '_'
 }
 
 // IsRV mirrors Variable::is_rv — return dummy name ends with "_rv".
+// Incomplete Variable sticky false (no invent not-rv soft-skip past hole).
 func (v *Variable) IsRV() bool {
-	if v == nil || len(v.Name) < 3 {
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(v.Name) < 3 {
 		return false
 	}
 	return v.Name[len(v.Name)-3:] == "_rv"
@@ -682,8 +697,10 @@ func (v *Variable) IsRV() bool {
 
 // IsTmpVar mirrors Variable::is_tmp_var — name prefix "t_".
 // Variable.cpp:512–514.
+// Incomplete Variable sticky false (no invent not-tmp soft-skip past hole).
 func (v *Variable) IsTmpVar() bool {
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return len(v.Name) >= 2 && v.Name[0] == 't' && v.Name[1] == '_'
@@ -861,30 +878,44 @@ func IsSeenName(seen []string, name string) bool {
 }
 
 // IsConst mirrors Variable::is_const → qfer is_const_after_deref(0).
+// Incomplete Variable sticky false (no invent non-const soft-skip past hole).
 func (v *Variable) IsConst() bool {
+	// Variable always live; sticky incomplete no invent non-const soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return v.Qfer.IsConst()
 }
 
 // IsVolatile mirrors Variable::is_volatile.
+// Incomplete Variable sticky false (no invent non-vol soft-skip past hole).
 func (v *Variable) IsVolatile() bool {
+	// Variable always live; sticky incomplete no invent non-vol soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return v.Qfer.IsVolatile()
 }
 
 // IsFieldVar mirrors Variable::is_field_var.
+// Incomplete Variable sticky false (no invent not-field soft-skip past hole).
 func (v *Variable) IsFieldVar() bool {
-	return v != nil && v.FieldVarOf != nil
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.FieldVarOf != nil
 }
 
 // IsVisible mirrors Variable::is_visible — global or is_visible_local.
 // Variable.h / usage in select_must_use_var.
+// Incomplete Variable sticky false (no invent not-visible soft-skip past hole).
 func (v *Variable) IsVisible(blk *Block) bool {
+	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsGlobal() {
@@ -1734,7 +1765,9 @@ func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
 }
 
 func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
+	// Variable + Type always live at hash emit; sticky incomplete no invent empty hash
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.IsArray && len(v.ArraySizes) > 0 {
@@ -1775,9 +1808,11 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 }
 
 // hashArrayHasPayload reports whether array hashing would emit any transparent_crc.
-// Type* always live on Fields; nil hole fails closed as false (no invent has-payload).
+// Type* always live on Fields; nil hole sticky false (no invent has-payload / soft re-pick).
 func hashArrayHasPayload(v *Variable) bool {
+	// Variable + Type always live; sticky incomplete no invent no-payload soft-skip
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.Type.IsSimple() {
@@ -1787,6 +1822,8 @@ func hashArrayHasPayload(v *Variable) bool {
 		j := 0
 		for _, f := range v.Type.Fields {
 			if f.Type == nil {
+				// incomplete field Type sticky no-payload (restrictive — no invent payload)
+				SetError(ErrGeneric)
 				return false
 			}
 			if f.BitWidth == 0 {

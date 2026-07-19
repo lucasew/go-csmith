@@ -181,7 +181,9 @@ const InvalidIVBound = -1
 // VariableSelector.cpp:1440–1500 — per-dim IV in bounds (sorted by name);
 // optional +offset as FunctionInvocationBinary eAdd.
 func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable) *ArrayVariable {
+	// ArrayVariable + Rng always live; sticky incomplete no invent soft-miss itemize
 	if av == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if av.Collective != nil {
@@ -327,8 +329,10 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 }
 
 func cgHasSignedCharIndex(vs *VariableSelector) bool {
+	// VariableSelector always live for opts; sticky incomplete no invent signed-char-on
 	if vs == nil {
-		return true
+		SetError(ErrGeneric)
+		return false
 	}
 	return vs.Opts.SignedCharIndex
 }

@@ -235,3 +235,42 @@ func TestHasFieldVarLooseMatchIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVariableKindPredicatesNilSticky(t *testing.T) {
+	ClearError()
+	if (*Variable)(nil).IsGlobal() {
+		t.Fatal("nil IsGlobal must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsGlobal must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).IsConst() || (*Variable)(nil).IsVolatile() {
+		t.Fatal("nil IsConst/IsVolatile must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsConst/IsVolatile must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).IsVisible(nil) {
+		t.Fatal("nil IsVisible must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsVisible must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).OutputLhsC() != "" {
+		t.Fatal("nil OutputLhsC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputLhsC must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).HashOutput() != "" {
+		t.Fatal("nil HashOutput must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil HashOutput must SetError sticky")
+	}
+	ClearError()
+}
