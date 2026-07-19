@@ -161,6 +161,45 @@ func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	ClearError()
 }
 
+func TestSelectMustUseVarResidualSticky(t *testing.T) {
+	// residual ERROR soft-continue invents later must-use pick. Fair: sticky whole select.
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	good := CreateVariableScalars("g_good", GetIntType(), false, false)
+	// ItemizeArray Type-nil IV residual: soft invent was try-next then pick good.
+	av := CreateArrayVariable(NewRng(3), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("array")
+	}
+	ivBroken := &Variable{Name: "i_broken"} // Type nil
+	rwArr := &RWDirective{MustReadVars: []*Variable{&av.Variable, good}}
+	cgArr := WithFunc(f, EmptyEffect()).WithRW(rwArr)
+	cgArr.IVBounds = map[*Variable]int{ivBroken: 0}
+	if vs.SelectMustUseVar(NewRng(5), AccessRead, cgArr, GetIntType(), nil) != nil {
+		t.Fatal("ItemizeArray Type-nil IV residual must fail closed SelectMustUseVar")
+	}
+	if !HasError() {
+		t.Fatal("ItemizeArray residual SelectMustUseVar must SetError sticky")
+	}
+	ClearError()
+	// unpaired qfer Match residual: Match stickies on len(consts)!=len(vols)
+	brokenQ := CreateVariableScalars("g_q", GetIntType(), false, false)
+	badQfer := CVQualifiers{IsConsts: []bool{false, false}, IsVolatiles: []bool{true}} // len mismatch
+	rwQ := &RWDirective{MustWriteVars: []*Variable{brokenQ, good}}
+	cgQ := WithFunc(f, EmptyEffect()).WithRW(rwQ)
+	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cgQ, GetIntType(), &badQfer) != nil {
+		t.Fatal("Match residual must fail closed SelectMustUseVar")
+	}
+	if !HasError() {
+		t.Fatal("Match residual SelectMustUseVar must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

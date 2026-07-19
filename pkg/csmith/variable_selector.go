@@ -1176,6 +1176,10 @@ func (vs *VariableSelector) SelectMustUseVar(
 		}
 		// is_visible (VariableSelector.cpp:1523)
 		if !v.IsVisible(blk) {
+			// residual ERROR sticky — no invent soft-continue then pick later past hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		// Variable::type always live; Type-nil fails closed sticky (no invent soft-skip
@@ -1190,12 +1194,20 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if qfer != nil && !qfer.Wildcard {
 			// qfer->match(v->qfer)
 			if !qfer.Match(v.Qfer, false) {
+				// residual ERROR sticky — no invent soft-continue past Match hole
+				if HasError() {
+					return nil
+				}
 				continue
 			}
 		}
 		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
 		// VariableSelector.cpp:1529–1532 — WRITE rejects const after deref
-		if access == AccessWrite && v.Qfer.IsConstAfterDeref(deref) {
+		if access == AccessWrite && v.IsConstAfterDeref(deref) {
+			// residual ERROR sticky — no invent soft-continue past incomplete const peel
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		var out *Variable
@@ -1216,8 +1228,12 @@ func (vs *VariableSelector) SelectMustUseVar(
 			item := vs.ItemizeArray(r, cg, v.AsArray)
 			if item != nil {
 				out = &item.Variable
+			} else if HasError() {
+				// hard IR residual from ItemizeArray sticky
+				// (no invent soft-skip failed itemize then pick later list member)
+				return nil
 			}
-			// if itemize fails, try next must-use entry (do not fall back to bare array)
+			// if itemize soft-fails (no IVs), try next must-use entry (not bare array)
 		} else {
 			out = v
 		}
