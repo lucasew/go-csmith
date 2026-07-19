@@ -95,15 +95,24 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	if !strings.Contains(out, "total number of pointers: 1") {
 		t.Fatal(out)
 	}
-	// nil Function hole / missing FM fails closed (clears aggregates)
+	// nil Function hole / missing FM fails closed sticky (clears aggregates)
+	ClearError()
 	AggregateAllPointToSets([]*Function{f, nil}, fms)
 	if len(AllPtrs) != 0 {
 		t.Fatal("nil hole must clear aggregates", AllPtrs)
 	}
+	if !HasError() {
+		t.Fatal("nil Function hole must SetError sticky")
+	}
+	ClearError()
 	AggregateAllPointToSets([]*Function{f}, nil)
 	if len(AllPtrs) != 0 {
 		t.Fatal("nil FactMgrMap must clear aggregates", AllPtrs)
 	}
+	if !HasError() {
+		t.Fatal("nil FactMgrMap must SetError sticky")
+	}
+	ClearError()
 	ClearPointToAggregates()
 }
 

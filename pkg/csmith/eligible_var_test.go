@@ -139,6 +139,7 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 
 func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	// incomplete FieldVars → GetCollective nil must not invent eligible / panic
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -160,6 +161,10 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	if IsEligibleVar(fld, 0, AccessRead, EmptyCGContext()) {
 		t.Fatal("incomplete collective must fail closed not eligible")
 	}
+	if !HasError() {
+		t.Fatal("incomplete collective must SetError sticky")
+	}
+	ClearError()
 	if fld.LooseMatch(fld) {
 		t.Fatal("incomplete LooseMatch must fail closed false")
 	}
@@ -198,6 +203,21 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("ChooseVarFull incomplete must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestMakeInitValueSanityCheckSticky(t *testing.T) {
+	// assert(qf.sanity_check(t)) — incomplete/mismatched qfer fails closed sticky
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	// nil qfer
+	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
+		t.Fatal("nil qfer must fail closed MakeInitValue")
+	}
+	if !HasError() {
+		t.Fatal("nil qfer must SetError sticky")
 	}
 	ClearError()
 }

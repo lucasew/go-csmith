@@ -168,7 +168,9 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 	if v == nil || v.Type == nil || typ == nil {
 		return 0
 	}
+	// incomplete facts fail closed sticky (no invent soft re-pick as "not valid ptr")
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return 0
 	}
 	// no extra indirection needed
@@ -1338,7 +1340,9 @@ func IncompleteFunctions() []*Function {
 // Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
+	// incomplete Funcs list fails closed sticky (no invent partial aggregate success)
 	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
 		return
 	}
 	for _, f := range funcs {
@@ -1349,11 +1353,13 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		// no invent skip missing FM (partial aggregate)
 		if fms == nil {
 			ClearPointToAggregates()
+			SetError(ErrGeneric)
 			return
 		}
 		fm := fms.ForFunc(f)
 		if fm == nil {
 			ClearPointToAggregates()
+			SetError(ErrGeneric)
 			return
 		}
 		// prefer map_facts_out values; also include GlobalFacts

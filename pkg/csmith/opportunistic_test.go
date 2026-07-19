@@ -10,15 +10,20 @@ func TestOpportunisticValidateNoDeref(t *testing.T) {
 }
 
 func TestOpportunisticValidateNullDead(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// nil facts is complete empty — no related fact → 0
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), nil, 0, 0) != 0 {
 		t.Fatal("no fact")
 	}
-	// incomplete map hole → 0 (not invent ok past hole)
+	// incomplete map hole → 0 sticky (not invent ok / soft re-pick past hole)
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), []*FactPointTo{nil}, 0, 0) != 0 {
 		t.Fatal("incomplete must reject")
 	}
+	if !HasError() {
+		t.Fatal("incomplete facts must SetError sticky")
+	}
+	ClearError()
 	// null, prob 0 → 0
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), facts, 0, 0) != 0 {

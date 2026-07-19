@@ -692,6 +692,7 @@ func (vs *VariableSelector) MakeInitValue(
 	}
 	// VariableSelector.cpp:830 — assert(qf && qf->sanity_check(t)); no invent empty qfer
 	if qf == nil || !qf.SanityCheck(t) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	qfer := *qf
@@ -830,18 +831,25 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 		return false
 	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
-	// Incomplete GetCollective fails closed (no invent eligibility / panic on nil coll)
+	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
 	coll := v.GetCollective()
 	if coll == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if coll != v {
 		cgp := cg
 		var facts []*FactPointTo
 		if cg.FM != nil {
+			// incomplete GlobalFacts fail closed sticky (no invent ReadIndices past holes)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
+				return false
+			}
 			facts = cg.FM.GlobalFacts
 		}
 		if !cgp.ReadIndices(v, facts) {
+			// ReadIndices may leave sticky; fail closed as not eligible
 			return false
 		}
 		v = coll

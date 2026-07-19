@@ -170,6 +170,7 @@ func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
 }
 
 func TestLhsBookkeepingWriteDeref(t *testing.T) {
+	ClearError()
 	BookkeeperDoFinalization()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
@@ -177,11 +178,14 @@ func TestLhsBookkeepingWriteDeref(t *testing.T) {
 	env := &TypeEnv{}
 	vs.Types = env
 	p := env.FindPointerType(GetIntType(), true)
-	q := NewCVQualifiers([]bool{false}, []bool{false})
+	// pointer type needs two-level qfer for SanityCheck / MakeInitValue
+	q := NewCVQualifiers([]bool{false, false}, []bool{false, false})
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), p, &q, NewRng(1))
+	ClearError() // sticky ERROR_GUARD on failed qfer/create must not poison Lhs make
 	// bump deref prob
 	probs.single[PSelectDerefPointerProb] = 100
 	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
 		_ = MakeRandomLhs(NewRng(seed), opts, probs, vs, func() *CGContext { c := EmptyCGContext(); return &c }(), GetIntType(), false, false, nil)
 	}
 	if CalcTotal(writeDereferenceCnts) == 0 && writeVolatileCnt+writeNonVolatileCnt == 0 {

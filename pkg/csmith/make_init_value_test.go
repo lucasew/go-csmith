@@ -6,6 +6,7 @@ import (
 )
 
 func TestMakeInitValueNonPointerConstant(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// VariableSelector.cpp:830 assert(qf); no invent empty qfer on nil
@@ -17,6 +18,10 @@ func TestMakeInitValueNonPointerConstant(t *testing.T) {
 	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), nil, nil, NewRng(1)) != nil {
 		t.Fatal("nil qfer must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil qfer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeInitValuePointerAddressOf(t *testing.T) {
