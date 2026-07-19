@@ -328,8 +328,18 @@ func MakeRandomArrayInit(
 				break
 			}
 			if iv.Type.IsFloat() {
+				// residual ERROR sticky — no invent soft-continue then later IV past IsFloat hole
+				if HasError() {
+					iv = nil
+					break
+				}
 				invalid[iv] = true
 				continue
+			}
+			// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
+			if HasError() {
+				iv = nil
+				break
 			}
 			if iv.IsVolatile() {
 				// residual ERROR sticky — no invent soft-continue past IsVolatile hole

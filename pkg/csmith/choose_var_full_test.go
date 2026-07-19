@@ -72,6 +72,24 @@ func TestChooseVarFullNoExpandKeepsStruct(t *testing.T) {
 	}
 }
 
+func TestChooseVarFullAmbientResidualSticky(t *testing.T) {
+	// Ambient residual ERROR: HasEligibleVolatileVarQfer may soft-return false while residual sticks.
+	// Soft invent was soft-continue choose then pick later good. Fair: sticky fail closed whole choose.
+	ClearError()
+	defer ClearError()
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	SetError(ErrGeneric)
+	if ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext(),
+		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
+		t.Fatal("ambient residual must fail closed ChooseVarFull, not invent later pick")
+	}
+	if !HasError() {
+		t.Fatal("ambient residual ChooseVarFull must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 	ut := &Type{
 		isUnion:    true,

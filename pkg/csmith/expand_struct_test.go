@@ -144,6 +144,19 @@ func TestExpandStructUnionVars(t *testing.T) {
 		t.Fatal("IsArray without AsArray ExpandStructUnionVars must SetError sticky")
 	}
 	ClearError()
+	// FieldVarOf ancestry IsArray-without-AsArray: IsVirtual residual ERROR+false.
+	// Soft invent was soft-continue keep child then expand later good as complete pool.
+	// Fair: sticky IncompleteVariables whole expand.
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	child := &Variable{Name: "g_arr.f0", Type: GetIntType(), FieldVarOf: shell}
+	good := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntType())) {
+		t.Fatal("IsVirtual ancestry residual must fail closed incomplete, not invent later good")
+	}
+	if !HasError() {
+		t.Fatal("IsVirtual ancestry residual ExpandStructUnionVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {

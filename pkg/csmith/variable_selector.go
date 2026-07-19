@@ -258,11 +258,27 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				return nil
 			}
 			if iv.Type.IsFloat() {
+				// residual ERROR sticky — no invent soft-continue then pick later IV past IsFloat hole
+				if HasError() {
+					return nil
+				}
 				continue
+			}
+			// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
+			if HasError() {
+				return nil
 			}
 			// VariableSelector.cpp:1455–1456 — signed char index option
 			if !cgHasSignedCharIndex(vs) && iv.Type.IsSignedChar() {
+				// residual ERROR sticky — no invent soft-continue then pick later IV past IsSignedChar hole
+				if HasError() {
+					return nil
+				}
 				continue
+			}
+			// residual ERROR sticky — no invent soft-continue past IsSignedChar residual false path
+			if HasError() {
+				return nil
 			}
 			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
 			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVar() {
@@ -1428,11 +1444,19 @@ func ChooseVarFull(
 	}
 	// VariableSelector.cpp:420–421 — has_eligible_volatile_var (side-effect: volatile_avail)
 	_ = HasEligibleVolatileVarQfer(cands, want, qfer, access, cg)
+	// residual ERROR sticky — no invent soft-continue choose past HasEligible residual hole
+	if HasError() {
+		return nil
+	}
 	// VariableSelector.cpp:412–419 — pointer_avail_for_dereference bookkeeping
 	// FactPointTo::is_valid_ptr reads process CGOptions null/dead deref probs
 	opts := ProcessOptions()
 	if HasDereferenceableVar(cands, want, cg, opts) {
 		RecordPointerAvailForDeref()
+	}
+	// residual ERROR sticky — no invent soft-continue choose past HasDereferenceable residual
+	if HasError() {
+		return nil
 	}
 	// CVQualifiers::match_indirect → match → CGOptions::match_exact_qualifiers()
 	// no soft invent matchExact:=false ignoring process / StatementAssign force
@@ -1462,6 +1486,10 @@ func ChooseVarFull(
 			continue
 		}
 		if !want.Match(x.Type, mt) {
+			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
@@ -1559,7 +1587,13 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
-		if v.IsVirtual() {
+		virt := v.IsVirtual()
+		// residual ERROR sticky — no invent soft-continue keep shell past IsVirtual hole
+		// (FieldVarOf ancestry IsArray-without-AsArray residual ERROR+false soft-continues)
+		if HasError() {
+			return IncompleteVariables()
+		}
+		if virt {
 			continue
 		}
 		// Variable Type* always live in expand pool; Type-nil sticky incomplete

@@ -328,8 +328,16 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 	for _, f := range funcs {
 		// pre-validated FunctionsComplete
 		if f == exclude || !f.IsEffectKnown() {
+			// residual ERROR sticky — no invent soft-continue then pick later past IsEffectKnown hole
+			if HasError() {
+				return nil
+			}
 			// is_effect_known() == false for Unbuilt/Building
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue known-true past IsEffectKnown residual
+		if HasError() {
+			return nil
 		}
 		// Function.cpp:288–289 — type->is_convertable(return_type)
 		// C++ always has live return_type*; nil is incomplete IR
@@ -376,7 +384,15 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		// Function.cpp:307–313 — strict_volatile_rule
 		if opts.StrictVolatileRule && cg != nil {
 			if !f.FEffect.IsSideEffectFree() && !cg.EffectContext().IsSideEffectFree() {
+				// residual ERROR sticky — no invent soft-continue then pick later past SE residual
+				if HasError() {
+					return nil
+				}
 				continue
+			}
+			// residual ERROR sticky — no invent soft-continue SE-free path past residual hole
+			if HasError() {
+				return nil
 			}
 		}
 		// Function.cpp:318–326 — has_race_with is commented out upstream; do not filter
