@@ -888,3 +888,35 @@ func TestExpressionOutputNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetTypeIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*Expression)(nil).GetType() != nil {
+		t.Fatal("nil Expression GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression GetType must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermFunction}).GetType() != nil {
+		t.Fatal("Funcall without Invoke GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke GetType must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermCommaExpr}).GetType() != nil {
+		t.Fatal("comma without RHS GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("comma without RHS GetType must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermAssignment}).GetType() != nil {
+		t.Fatal("assign without Assign GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("assign without Assign GetType must SetError sticky")
+	}
+	ClearError()
+}

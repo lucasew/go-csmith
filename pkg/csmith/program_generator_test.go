@@ -176,3 +176,24 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputMainNilSticky(t *testing.T) {
+	ClearError()
+	if (*ProgramGenerator)(nil).OutputMain() != "" {
+		t.Fatal("nil generator OutputMain must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil generator OutputMain must SetError sticky")
+	}
+	ClearError()
+	// --nomain soft empty
+	g := NewProgramGenerator(Defaults())
+	g.Opts.NoMain = true
+	if g.OutputMain() != "" {
+		t.Fatal("--nomain OutputMain must soft empty")
+	}
+	if HasError() {
+		t.Fatal("--nomain OutputMain must stay non-sticky")
+	}
+	ClearError()
+}

@@ -447,6 +447,10 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		// incomplete header IR — fail closed whole functions section
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
 		if d == "" {
+			// incomplete header IR sticky — no invent partial functions section
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		forwards.WriteString(d)
@@ -455,7 +459,10 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		if g.Opts.FunctionAttributes {
 			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
 			if a == "" {
-				// alias expected when FunctionAttributes; incomplete AliasName
+				// alias expected when FunctionAttributes; incomplete AliasName sticky
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			aliases.WriteString(a)
@@ -463,6 +470,10 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
 		if body == "" {
+			// incomplete body IR sticky — no invent forward-only section
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		bodies.WriteString(body)
@@ -542,10 +553,13 @@ func (g *ProgramGenerator) hashGlobals() string {
 // OutputMain mirrors OutputMgr::OutputMain (no extension).
 // OutputMgr.cpp:92–153.
 func (g *ProgramGenerator) OutputMain() string {
-	if g == nil || g.Opts.NoMain {
+	// --nomain: soft empty (optionally omit main)
+	if g != nil && g.Opts.NoMain {
 		return ""
 	}
-	if g.VS == nil {
+	// ProgramGenerator + VS always live for main emit; sticky no invent main shell without them
+	if g == nil || g.VS == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -565,8 +579,9 @@ func (g *ProgramGenerator) OutputMain() string {
 	var firstInv string
 	var f0 *Function
 	if len(g.Funcs.Funcs) > 0 {
-		// Function* always live; no invent main without first call shell
+		// Function* always live; sticky no invent main without first call shell
 		if g.Funcs.Funcs[0] == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		f0 = g.Funcs.Funcs[0]
@@ -576,11 +591,21 @@ func (g *ProgramGenerator) OutputMain() string {
 			cg.Types = &g.Types
 			inv := BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
 			// no soft invent name()+"()" or main without call when build/output fails
-			if inv == nil || inv.Failed {
+			// Failed soft re-pick; nil/empty output sticky incomplete IR
+			if inv == nil {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return ""
+			}
+			if inv.Failed {
 				return ""
 			}
 			firstInv = inv.Output()
 			if firstInv == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 		}
@@ -599,11 +624,16 @@ func (g *ProgramGenerator) OutputMain() string {
 			}
 		}
 		for _, v := range g.VS.GlobalList {
-			// Variable* always live; no invent skip nil holes in dump list
+			// Variable* always live; sticky no invent skip nil holes in dump list
 			if v == nil {
+				SetError(ErrGeneric)
 				return ""
 			}
-			b.WriteString(v.OutputValueDump("checksum ", 1, endUnion))
+			dump := v.OutputValueDump("checksum ", 1, endUnion)
+			if dump == "" && HasError() {
+				return ""
+			}
+			b.WriteString(dump)
 		}
 		b.WriteString("    return 0;\n")
 		b.WriteString("}\n")
@@ -625,8 +655,11 @@ func (g *ProgramGenerator) OutputMain() string {
 		// OutputMgr.cpp:136–140 — OutputPtrResets when !dangling_global_ptrs
 		if f0 != nil && !g.Opts.DanglingGlobalPointers {
 			resets := OutputPtrResets(f0.DeadGlobals, g.Opts)
-			// incomplete dead_globals IR fails closed whole main
+			// incomplete dead_globals IR fails closed sticky whole main
 			if len(f0.DeadGlobals) > 0 && resets == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			b.WriteString(resets)

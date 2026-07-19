@@ -148,7 +148,9 @@ func (e *Expression) checkAndSetCastCore(desired *Type) {
 // GetTypeUncast is get_type ignoring cast_type (for check_and_set_cast).
 // Incomplete IR fails closed nil (no invent ExprType shell without live invoke/assign/rhs).
 func (e *Expression) GetTypeUncast() *Type {
+	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	switch e.Term {
@@ -156,47 +158,59 @@ func (e *Expression) GetTypeUncast() *Type {
 		if e.Con != nil {
 			return e.Con.Type
 		}
+		// incomplete Constant IR sticky — no invent untyped constant
+		SetError(ErrGeneric)
 		return nil
 	case TermVariable, TermLhs:
 		// ExpressionVariable always has live type; ExprType preferred then Var.Type
 		if e.ExprType != nil {
 			return e.ExprType
 		}
-		if e.Var != nil {
+		if e.Var != nil && e.Var.Type != nil {
 			return e.Var.Type
 		}
+		// incomplete Variable IR sticky — no invent untyped variable
+		SetError(ErrGeneric)
 		return nil
 	case TermFunction:
-		// ExpressionFuncall.cpp:122–124 — invoke.get_type(); no invent ExprType without invoke
+		// ExpressionFuncall.cpp:122–124 — invoke.get_type(); sticky no invent without invoke
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		return e.Invoke.GetType()
 	case TermCommaExpr:
-		// value type is RHS; incomplete without CommaRHS fails closed
+		// value type is RHS; sticky incomplete without CommaRHS
 		if e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		return e.CommaRHS.GetTypeUncast()
 	case TermAssignment:
-		// ExpressionAssign::get_type — LHS type only; no invent ExprType without Assign
+		// ExpressionAssign::get_type — LHS type only; sticky no invent without Assign
 		if e.Assign == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if e.Assign.Lhs != nil {
 			if t := e.Assign.Lhs.GetType(); t != nil {
 				return t
 			}
-			// incomplete Lhs without type
-			if e.Assign.Lhs.Var == nil {
-				return nil
+			// Lhs.GetType sticky incomplete already; re-assert sticky
+			if !HasError() {
+				SetError(ErrGeneric)
 			}
+			return nil
 		}
-		if e.Assign.LhsVar != nil {
+		if e.Assign.LhsVar != nil && e.Assign.LhsVar.Type != nil {
 			return e.Assign.LhsVar.Type
 		}
+		// incomplete assign LHS sticky
+		SetError(ErrGeneric)
 		return nil
 	}
+	// unknown term sticky incomplete
+	SetError(ErrGeneric)
 	return nil
 }
 
@@ -232,7 +246,9 @@ func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
 // ExpressionAssign — LHS type; Constant / Variable as typed.
 // Incomplete IR fails closed nil (no invent type shell / panic on nil CommaRHS).
 func (e *Expression) GetType() *Type {
+	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if e.CastType != nil {

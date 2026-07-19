@@ -182,3 +182,21 @@ func TestOutputGlobalsIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputCNilSticky(t *testing.T) {
+	ClearError()
+	if (*Variable)(nil).OutputC() != "" {
+		t.Fatal("nil Variable OutputC must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable OutputC must SetError sticky")
+	}
+	ClearError()
+	if (*Variable)(nil).OutputValueDump("x ", 0, nil) != "" {
+		t.Fatal("nil Variable OutputValueDump must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable OutputValueDump must SetError sticky")
+	}
+	ClearError()
+}

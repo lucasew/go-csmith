@@ -176,7 +176,9 @@ func (v *Variable) OutputC() string {
 // ArrayVariable::Output overrides Variable::Output for itemized members
 // (ArrayVariable.cpp:539–571) — name + indices, no VOL_RVAL wrap.
 func (v *Variable) OutputCOpts(prefixName bool) string {
+	// Variable* always live at Output; sticky no invent empty C name without it
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
@@ -1413,7 +1415,9 @@ func (v *Variable) CreateFieldVars() {
 // Variable.cpp:1173–1203 — printf checksum lines for simples; recurse aggregates;
 // arrays expand all index combinations; unions only readable fields.
 func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*FactUnion) string {
+	// Variable + Type always live at dump emit; sticky no invent empty dump shell
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
