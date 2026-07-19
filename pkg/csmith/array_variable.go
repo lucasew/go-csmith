@@ -493,7 +493,13 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
 		})
 	}
-	if item.Type != nil && item.Type.IsAggregate() {
+	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
+	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
+	if item.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
 	}
 	if vs != nil {
@@ -945,8 +951,13 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 			Term: TermConstant, Con: MakeInt(idx), ExprType: GetIntType(),
 		})
 	}
-	// ArrayVariable.cpp:261–264 — only expand struct/union for itemized member
-	if item.Type != nil && item.Type.IsAggregate() {
+	// ArrayVariable.cpp:261–264 — type always live; only expand aggregate itemized
+	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
+	if item.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
 	}
 	if vs != nil {

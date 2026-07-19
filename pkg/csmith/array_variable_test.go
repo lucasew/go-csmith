@@ -643,6 +643,26 @@ func TestItemizeConstIndicesNilSticky(t *testing.T) {
 		t.Fatal("nil ItemizeConstIndices must SetError sticky")
 	}
 	ClearError()
+	// Type-nil shell sticky — no invent itemize soft-success past incomplete type
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: nil, IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	if av.ItemizeConstIndices([]int{0}, nil) != nil {
+		t.Fatal("Type-nil ItemizeConstIndices must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil ItemizeConstIndices must SetError sticky")
+	}
+	ClearError()
+	if av.ItemizeInto(NewRng(1), nil) != nil {
+		t.Fatal("Type-nil ItemizeInto must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil ItemizeInto must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestArrayVariableNilPredicatesSticky(t *testing.T) {

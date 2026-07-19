@@ -550,7 +550,15 @@ func AbstractFactUnionForAssign(
 		return IncompleteUnionFactSlice(), 0
 	}
 	lvarCnt = len(lvars)
-	if lhs.Type != nil && lhs.Type.IsUnion() {
+	// FactUnion.cpp:129 — lhs->get_type() always live Type&; Type-nil shell sticky
+	// (no invent non-union complete transfer soft-skip past incomplete LHS type)
+	// Special null/garbage/tbd have Type nil by design — complete non-union path.
+	if lhs.Type == nil {
+		if !IsSpecialPtr(lhs) {
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice(), lvarCnt
+		}
+	} else if lhs.Type.IsUnion() {
 		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs), lvarCnt
 	}
 	if rhs == nil {
@@ -573,9 +581,15 @@ func AbstractFactUnionForAssign(
 				return IncompleteUnionFactSlice(), lvarCnt
 			}
 		} else if v.IsInsideUnionField() {
-			// FactUnion.cpp:144–146 — padding or packed-after-bitfield → BOTTOM
+			// FactUnion.cpp:144–146 — v->type->has_padding() always live Type*
+			// Type-nil non-special sticky (no invent skip BOTTOM / soft re-pick)
 			typ := v.Type
-			if (typ != nil && typ.HasPadding()) || v.IsPackedAfterBitfield() {
+			if typ == nil {
+				if !IsSpecialPtr(v) {
+					SetError(ErrGeneric)
+					return IncompleteUnionFactSlice(), lvarCnt
+				}
+			} else if typ.HasPadding() || v.IsPackedAfterBitfield() {
 				cu := v.GetContainerUnion()
 				if cu != nil {
 					fu = MakeFactUnion(cu, FactUnionBottom)

@@ -328,6 +328,30 @@ func TestAbstractFactUnionPaddingBottom(t *testing.T) {
 	}
 }
 
+func TestAbstractFactUnionTypeNilSticky(t *testing.T) {
+	// FactUnion.cpp:129 — lhs->get_type() always live; Type-nil sticky incomplete
+	ClearError()
+	lhs := &Variable{Name: "g_x", Type: nil}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	out, _ := AbstractFactUnionForAssign(nil, nil, lhs, 0, rhs)
+	if UnionFactsComplete(out) {
+		t.Fatal("Type-nil LHS must IncompleteUnionFactSlice, not invent non-union complete")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil LHS AbstractFactUnionForAssign must SetError sticky")
+	}
+	ClearError()
+	// special null Type-nil is complete non-union path (by design)
+	out2, n := AbstractFactUnionForAssign(nil, nil, NullPtr, 0, rhs)
+	if !UnionFactsComplete(out2) || n != 1 {
+		t.Fatalf("special Type-nil must complete non-union path n=%d out=%+v", n, out2)
+	}
+	if HasError() {
+		t.Fatal("special Type-nil must not SetError")
+	}
+	ClearError()
+}
+
 func TestFindRelatedUnionNilSticky(t *testing.T) {
 	ClearError()
 	if FindRelatedUnion(nil, nil) != nil {
