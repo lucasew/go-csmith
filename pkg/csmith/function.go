@@ -259,15 +259,17 @@ func MakeRandomFunction(
 	if fm == nil {
 		return nil
 	}
-	// Variable* always live on GlobalList; nil hole fails closed
+	// Variable* always live on GlobalList; nil hole fails closed sticky
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			if !FactsComplete(fm.GlobalFacts) {
+				SetError(ErrGeneric)
 				return nil
 			}
 		}
@@ -349,15 +351,17 @@ func MakeFirst(
 		_ = fmMap.ForFunc(f)
 	}
 	// seed existing globals so first function sees them (generation convenience)
-	// Variable* always live on GlobalList; nil hole fails closed
+	// Variable* always live on GlobalList; nil hole fails closed sticky
 	// (AddNewVarFact(nil) no-ops — invent partial FM seed then GenerateBody)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		for _, gv := range vs.GlobalList {
 			fm.AddNewVarFact(gv)
 			if !FactsComplete(fm.GlobalFacts) {
+				SetError(ErrGeneric)
 				return nil
 			}
 		}
@@ -400,16 +404,19 @@ func MakeFirst(
 
 	// Function.cpp:468–470 — global_facts = map_facts_out[body] + add_back_return_facts
 	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
-	// Incomplete out / add_back fail closed — no invent soft-merge returns
+	// Incomplete out / add_back fail closed sticky — no invent soft-merge / success first
 	if f.Body != nil {
 		out := fm.GetMapFactsOut(f.Body.StmID)
 		if !FactsComplete(out) {
 			fm.GlobalFacts = IncompleteFactSlice()
-		} else {
-			fm.GlobalFacts = CloneFactSlice(out)
-			if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) {
-				fm.GlobalFacts = IncompleteFactSlice()
-			}
+			SetError(ErrGeneric)
+			return nil
+		}
+		fm.GlobalFacts = CloneFactSlice(out)
+		if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) || !FactsComplete(fm.GlobalFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+			return nil
 		}
 	}
 

@@ -183,6 +183,36 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 	}
 }
 
+func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T) {
+	// incomplete GlobalList seed must sticky ERROR (no invent partial FM / body success)
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	// plant incomplete GlobalList hole
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g, nil}
+	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalList must SetError sticky MakeFirst")
+	}
+	ClearError()
+	// MakeRandomFunction same seed gate
+	cg := EmptyCGContext()
+	cg.Types = vs.Types
+	if MakeRandomFunction(NewRng(4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalList must SetError sticky MakeRandomFunction")
+	}
+	ClearError()
+}
+
 func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	// StatementFor.cpp:304 ERROR_GUARD after body
 	ClearError()
