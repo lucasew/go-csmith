@@ -50,6 +50,16 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 		t.Fatal("CreateFieldVars fail must SetError sticky")
 	}
 	ClearError()
+	// Variable.cpp:338 assert aggregate sticky — no invent fields on scalar
+	scalar := CreateVariableScalars("g_i", GetIntType(), false, false)
+	scalar.CreateFieldVars()
+	if !HasError() {
+		t.Fatal("non-aggregate CreateFieldVars must SetError sticky")
+	}
+	if len(scalar.FieldVars) != 0 {
+		t.Fatal("non-aggregate must not invent FieldVars", scalar.FieldVars)
+	}
+	ClearError()
 }
 
 func TestHasFieldVarNilHole(t *testing.T) {

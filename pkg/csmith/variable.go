@@ -1269,8 +1269,12 @@ func (v *Variable) FindPointerFields() []*Variable {
 // (not bare nil — FieldVarsComplete(nil)==true invents empty-complete zero fields
 // when type still has Fields / half-built list was wiped).
 func (v *Variable) CreateFieldVars() {
-	// Variable.cpp:338 — assert(type->is_aggregate())
-	if v == nil || v.Type == nil || !v.Type.IsAggregate() {
+	// Variable.cpp:338 — assert(type->is_aggregate()) sticky for live non-aggregate
+	if v == nil {
+		return
+	}
+	if v.Type == nil || !v.Type.IsAggregate() {
+		SetError(ErrGeneric)
 		return
 	}
 	if len(v.FieldVars) > 0 {

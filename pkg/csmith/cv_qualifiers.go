@@ -255,8 +255,9 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 	if opts.MatchExactQualifiers {
 		return append([]bool(nil), q.IsConsts...)
 	}
-	// CVQualifiers.cpp always has process RNG for flipcoin paths
+	// CVQualifiers.cpp always has process RNG sticky; no invent identity without draw
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// nil probs → 0% (no invent NewProbabilities / hard-coded 50)
@@ -289,7 +290,7 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 
 // RandomStricterVolatiles mirrors CVQualifiers::random_stricter_volatiles.
 // CVQualifiers.cpp:399–420.
-// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
@@ -297,6 +298,7 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	p := 0
@@ -330,7 +332,7 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 
 // RandomLooserConsts mirrors CVQualifiers::random_looser_consts.
 // CVQualifiers.cpp:422–439.
-// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
@@ -338,6 +340,7 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 		return append([]bool(nil), q.IsConsts...)
 	}
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	p := 0
@@ -364,7 +367,7 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 
 // RandomLooserVolatiles mirrors CVQualifiers::random_looser_volatiles.
 // CVQualifiers.cpp:441–457.
-// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// C++ always has process RNG + Probabilities; nil r sticky fail closed nil.
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
@@ -372,6 +375,7 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	p := 0
