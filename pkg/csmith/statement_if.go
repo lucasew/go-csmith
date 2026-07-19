@@ -54,12 +54,14 @@ func MakeRandomIf(
 	// StatementIf.cpp:74–91 — re-analyze uncertain calls in func_1
 	if func1Hack && cg.FM != nil && HasUncertainCallRecursiveExpr(test) {
 		// makeup_new_var_facts(pre_facts, global); reset accum; visit(pre_facts)
-		// incomplete current GlobalFacts fail closed (makeup would nil snapshot)
+		// incomplete current GlobalFacts fail closed sticky (makeup would nil snapshot)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if !MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts) {
-			// incomplete makeup / snapshot — fail closed
+			// incomplete makeup / snapshot — fail closed sticky
+			SetError(ErrGeneric)
 			return nil
 		}
 		if cg.EffectAccum != nil {

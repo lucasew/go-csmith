@@ -21,6 +21,7 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 }
 
 func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
@@ -35,6 +36,39 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	if b.AppendReturnStmt(NewRng(2), opts, vs, &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed AppendReturnStmt")
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError")
+	}
+	ClearError()
+}
+
+func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
+	// incomplete ambient/facts must not invent assign shell
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	vs := NewVariableSelector(opts)
+	if stmtOK(MakeRandomAssign(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())) {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomAssign")
+	}
+	if !HasError() {
+		t.Fatal("must SetError")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	if stmtOK(MakeRandomAssign(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())) {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomAssign")
+	}
+	if !HasError() {
+		t.Fatal("must SetError GlobalFacts")
+	}
+	ClearError()
 }
 
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {

@@ -102,6 +102,19 @@ func MakeRandomAssignQfer(
 	if cg.FM == nil {
 		return Stmt{}
 	}
+	// Incomplete ambient/facts fail closed sticky (no invent assign under hole shells)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// do not ClearError here — sticky Error::r_error_ is checked by ERROR_GUARD
 	// after Statement::make_random (Statement.cpp:309)
 	// StatementAssign::assignOpsTable_ from InitProbabilityTable (no invent per assign)

@@ -47,6 +47,7 @@ func MakeExpressionAssign(
 		_ = cg.FM.UpdateFactForAssign(st.LhsVar, indir, st.GetAssignRhs())
 		// incomplete assign must not invent ExpressionAssign shell with wiped facts
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 	}

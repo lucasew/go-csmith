@@ -801,10 +801,11 @@ func MakeRandomBinaryInvocation(
 	}
 
 	// FunctionInvocation.cpp:222 — snapshot facts before RHS (ordered merge)
-	// incomplete GlobalFacts fail closed (no invent cleaned snapshot)
+	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot)
 	var factsCopy []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
@@ -887,11 +888,13 @@ func MakeRandomBinaryInvocation(
 	if IsOrderedBinary(op) && cg.FM != nil && factsCopy != nil {
 		if !MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts) ||
 			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) {
-			// incomplete makeup/merge base — fail closed, no invent bare binary
+			// incomplete makeup/merge base — fail closed sticky, no invent bare binary
+			SetError(ErrGeneric)
 			return nil
 		}
 		_ = MergeFacts(&cg.FM.GlobalFacts, factsCopy)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 	}

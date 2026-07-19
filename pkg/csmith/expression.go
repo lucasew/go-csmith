@@ -1020,8 +1020,17 @@ func makeExpressionFuncall(
 		preAccum = cg.EffectAccum.Clone()
 	}
 	preStm := cg.EffectStm.Clone()
-	// incomplete GlobalFacts fail closed (no invent cleaned snapshot for failed call restore)
+	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot for failed call restore)
 	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	factsCopy := CloneFactSlice(cg.FM.GlobalFacts)

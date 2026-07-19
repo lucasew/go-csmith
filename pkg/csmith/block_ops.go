@@ -471,8 +471,9 @@ func (b *Block) AppendNestedLoop(
 	}
 	var preFacts []*FactPointTo
 	if cg.FM != nil {
-		// incomplete GlobalFacts fail closed (no invent cleaned pre-for snapshot)
+		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-for snapshot)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -498,6 +499,7 @@ func (b *Block) AppendNestedLoop(
 			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
 			return nil
 		}
 		cg.FM.SetMapFactsIn(st.StmID, preFacts)
@@ -548,8 +550,9 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	fm := cg.FM
 	var preFacts []*FactPointTo
 	if fm != nil {
-		// incomplete GlobalFacts fail closed (no invent cleaned pre-return snapshot)
+		// incomplete GlobalFacts fail closed sticky (no invent cleaned pre-return snapshot)
 		if !FactsComplete(fm.GlobalFacts) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		preFacts = CloneFactSlice(fm.GlobalFacts)
@@ -576,6 +579,7 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
 			return nil
 		}
 		// Block.cpp:383–384 — sr->visit_facts; assert(visited)
