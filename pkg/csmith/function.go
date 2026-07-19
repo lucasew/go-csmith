@@ -560,23 +560,29 @@ func (f *Function) generateBodyCore(
 
 	// mark_func_end: locals die after function (DFA cleanup)
 	// Block*/Variable*/Fact* always live; nil holes fail closed (abort cleanup invent)
+	// Early SetError must leave Unbuilt (no invent stuck Building / later markBuilt success)
+	abortUnbuilt := func() {
+		SetError(ErrGeneric)
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+	}
 	if cg.FM != nil && len(f.Blocks) > 0 {
 		var locals []*Variable
 		for _, blk := range f.Blocks {
 			if blk == nil {
-				SetError(ErrGeneric)
+				abortUnbuilt()
 				return
 			}
 			for _, loc := range blk.LocalVars {
 				if loc == nil {
-					SetError(ErrGeneric)
+					abortUnbuilt()
 					return
 				}
 				locals = append(locals, loc)
 			}
 		}
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			SetError(ErrGeneric)
+			abortUnbuilt()
 			return
 		}
 		for i, fact := range cg.FM.GlobalFacts {
@@ -590,17 +596,26 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:652–656 — get_referenced_ptrs + feffect from map_stm_effect[body]
-	// C++ always map_stm_effect[body] (default empty Effect) — no invent soft-prefer
-	// generation bodyEff when map empty or body StmID 0
+	// C++ always has live body stm_id; StmID 0 / incomplete map effect fails closed
+	// (no invent EmptyEffect soft-prefer generation bodyEff then Built success)
 	summaryEff := bodyEff
 	if cg.FM != nil && f.Body != nil {
 		if f.Body.StmID <= 0 {
-			summaryEff = EmptyEffect()
-		} else {
-			summaryEff = cg.FM.GetMapStmEffect(f.Body.StmID)
+			abortUnbuilt()
+			return
+		}
+		summaryEff = cg.FM.GetMapStmEffect(f.Body.StmID)
+		if !EffectComplete(summaryEff) {
+			abortUnbuilt()
+			return
 		}
 	}
 	f.ComputeSummary(summaryEff)
+	if HasError() {
+		f.BuildState = BuildUnbuilt
+		f.IsBuilt = false
+		return
+	}
 
 	// Function.cpp:658 / 694 — make_return_const; ERROR_RETURN
 	f.MakeReturnConst(opts, probs, r)
@@ -611,21 +626,30 @@ func (f *Function) generateBodyCore(
 	}
 
 	// keep EffectAccum in sync for caller of known-params
+	// Incomplete body accum fails closed (no invent caller handoff of incomplete shell)
 	if prev.EffectAccum != nil {
+		if !EffectComplete(bodyEff) {
+			abortUnbuilt()
+			return
+		}
 		*prev.EffectAccum = bodyEff
 	}
 
 	// Function.cpp:764–766 — global_facts = map_facts_out[body] + add_back_return_facts
 	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
+	// Incomplete outs fail closed Unbuilt (no invent markBuilt with IncompleteFactSlice)
 	if cg.FM != nil && f.Body != nil {
 		out := cg.FM.GetMapFactsOut(f.Body.StmID)
 		if !FactsComplete(out) {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
-		} else {
-			cg.FM.GlobalFacts = CloneFactSlice(out)
-			if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) {
-				cg.FM.GlobalFacts = IncompleteFactSlice()
-			}
+			abortUnbuilt()
+			return
+		}
+		cg.FM.GlobalFacts = CloneFactSlice(out)
+		if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+			cg.FM.GlobalFacts = IncompleteFactSlice()
+			abortUnbuilt()
+			return
 		}
 	}
 	// Function.cpp:661–662 — Mark Built

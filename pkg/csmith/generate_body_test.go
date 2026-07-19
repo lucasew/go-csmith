@@ -82,6 +82,36 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	}
 }
 
+func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
+	// incomplete Param hole / mark_func_end must not invent Built or stuck Building
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "func_w", ReturnType: GetIntType(), Param: []*Variable{nil}}
+	_ = f.ensurePairedFactMgr()
+	f.GenerateBody(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(f.PairedFactMgr()))
+	if f.BuildState == BuildBuilt || f.IsBuilt {
+		t.Fatal("Param nil hole must not invent Built")
+	}
+	if f.BuildState == BuildBuilding {
+		t.Fatal("must not leave stuck Building after fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Param nil hole must SetError")
+	}
+	ClearError()
+	// incomplete GlobalFacts at mark_func_end when Blocks non-empty
+	f2 := &Function{Name: "func_v", ReturnType: GetIntType(), IsBuiltin: true}
+	fm2 := f2.ensurePairedFactMgr()
+	fm2.GlobalFacts = IncompleteFactSlice()
+	f2.GenerateBody(NewRng(3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithFactMgr(fm2))
+	if len(f2.Blocks) > 0 && (f2.BuildState == BuildBuilt || f2.IsBuilt) {
+		t.Fatal("incomplete GlobalFacts at mark_func_end must not invent Built")
+	}
+	ClearError()
+}
+
 func TestMakeRandomSignaturePairsFactMgr(t *testing.T) {
 	// Function.cpp:422 — FMList.push_back at make_random_signature
 	opts := Defaults()
