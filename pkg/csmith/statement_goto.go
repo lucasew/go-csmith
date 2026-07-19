@@ -24,8 +24,9 @@ func LabelForGotoDest(destStmID int, nextLabel func() string) string {
 	} else {
 		lab = Gensym("lbl_")
 	}
-	// incomplete empty label is broken IR — fail closed (no invent "goto :")
+	// incomplete empty label is broken IR sticky — fail closed (no invent "goto :")
 	if lab == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if destStmID > 0 {
@@ -165,14 +166,18 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 	var b strings.Builder
 	for _, v := range st.InitSkippedVars {
 		// pre-validated VariablesComplete
-		// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
+		// StatementGoto.cpp:271 — assert(v->init); sticky no invent "name = ;" for missing init
 		init := variableInitOutput(v)
 		if init == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
-		// get_actual_name always live; no invent " = init;" without identifier
+		// get_actual_name always live; sticky no invent " = init;" without identifier
 		name := v.GetActualName(false)
 		if name == "" {
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString(indent)
@@ -189,20 +194,26 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 // StatementGoto.cpp:271 — assert(v->init); v->init->Output(out) — no soft invent "0".
 func variableInitOutput(v *Variable) string {
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
 		out := v.InitExpr.Output()
-		// incomplete InitExpr IR — fail closed empty (no invent "0")
+		// incomplete InitExpr IR sticky — fail closed empty (no invent "0")
 		if out != "" {
 			return out
 		}
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return ""
 	}
 	if v.Init != nil && v.Init.Value != "" {
 		return v.Init.Value
 	}
-	// C++ assert(v->init); missing init is broken IR
+	// C++ assert(v->init); missing init is broken IR sticky
+	SetError(ErrGeneric)
 	return ""
 }
 

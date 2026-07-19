@@ -123,8 +123,12 @@ func BookkeeperDoFinalization() {
 }
 
 func formattedOutput(b *strings.Builder, msg string, num int) {
-	// Bookkeeper.cpp always has live message string; no invent "XXX %d" shell
-	if b == nil || msg == "" {
+	// Bookkeeper.cpp always has live message string; sticky no invent "XXX %d" shell
+	if b == nil {
+		return
+	}
+	if msg == "" {
+		SetError(ErrGeneric)
 		return
 	}
 	b.WriteString("XXX ")
@@ -133,7 +137,11 @@ func formattedOutput(b *strings.Builder, msg string, num int) {
 }
 
 func formattedOutputf(b *strings.Builder, msg string, num float64) {
-	if b == nil || msg == "" {
+	if b == nil {
+		return
+	}
+	if msg == "" {
+		SetError(ErrGeneric)
 		return
 	}
 	b.WriteString("XXX ")

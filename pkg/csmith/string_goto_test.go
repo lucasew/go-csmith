@@ -137,7 +137,8 @@ func TestOutputSkippedVarInitsUsesInitExpr(t *testing.T) {
 
 func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	// StatementGoto.cpp:271 — assert(v->init); vars[i] always live
-	// incomplete entry fails whole emit (no invent skip holes / partial list)
+	// incomplete entry fails whole emit sticky (no invent skip holes / partial list)
+	ClearError()
 	v := CreateVariableWithInit("l_miss", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	v.Name = "l_miss"
 	good := CreateVariableScalars("l_ok", GetIntType(), false, false)
@@ -147,6 +148,9 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	out := OutputSkippedVarInits(st, "")
 	if out != "" {
 		t.Fatal("incomplete re-init list must fail closed whole emit", out)
+	}
+	if !HasError() {
+		t.Fatal("missing init re-init list must SetError sticky")
 	}
 	// nil hole fails closed sticky
 	ClearError()
@@ -158,7 +162,7 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 		t.Fatal("nil InitSkippedVars hole must SetError sticky")
 	}
 	ClearError()
-	// no invent " = 5;" without identifier / partial good siblings
+	// sticky no invent " = 5;" without identifier / partial good siblings
 	anon := CreateVariableScalars("l_x", GetIntType(), false, false)
 	anon.Name = ""
 	anon.Init = MakeInt(5)
@@ -167,20 +171,30 @@ func TestOutputSkippedVarInitsNoInventEmptyRHS(t *testing.T) {
 	if out2 != "" {
 		t.Fatal("empty name must fail closed whole emit", out2)
 	}
+	if !HasError() {
+		t.Fatal("empty name re-init must SetError sticky")
+	}
 	// complete list still emits
+	ClearError()
 	st3 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{good}}
 	if out3 := OutputSkippedVarInits(st3, ""); !strings.Contains(out3, "l_ok = 4;") {
 		t.Fatal(out3)
 	}
+	ClearError()
 }
 
 func TestVariableInitOutput(t *testing.T) {
-	// StatementGoto.cpp:271 — assert(v->init); no soft invent "0" when missing
+	// StatementGoto.cpp:271 — assert(v->init); sticky no soft invent "0" when missing
+	ClearError()
 	v := CreateVariableWithInit("l_1", GetIntType(), nil, NewCVQualifiers([]bool{false}, []bool{false}))
 	if variableInitOutput(v) != "" {
 		t.Fatal("nil init must not invent 0", variableInitOutput(v))
 	}
+	if !HasError() {
+		t.Fatal("nil init variableInitOutput must SetError sticky")
+	}
 	// Variable.cpp:395 — CreateVariableScalars always Constant::make_random
+	ClearError()
 	v2 := CreateVariableScalars("l_2", GetIntType(), false, false)
 	if variableInitOutput(v2) == "" {
 		t.Fatal("scalars path always has init")
@@ -193,6 +207,7 @@ func TestVariableInitOutput(t *testing.T) {
 	if variableInitOutput(v) != "7" {
 		t.Fatal(variableInitOutput(v))
 	}
+	ClearError()
 }
 
 func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {

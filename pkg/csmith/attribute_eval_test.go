@@ -18,6 +18,7 @@ func TestBooleanAttribute(t *testing.T) {
 }
 
 func TestAttributeGeneratorOutput(t *testing.T) {
+	ClearError()
 	g := &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 		&BooleanAttribute{Name: "used", Prob: 100},
@@ -29,6 +30,16 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 	if !strings.HasSuffix(out, "))") {
 		t.Fatal(out)
 	}
+	// nil Attribute* hole sticky
+	ClearError()
+	gHole := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}, nil}}
+	if gHole.Output(NewRng(1)) != "" {
+		t.Fatal("nil Attribute hole must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Attribute hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMultiChoiceAttribute(t *testing.T) {
@@ -53,36 +64,63 @@ func TestAlignedAttribute(t *testing.T) {
 	if err != nil || n < 1 || (n&(n-1)) != 0 {
 		t.Fatal("want power of 2", s)
 	}
-	// no soft invent alignment=1 when ctor left Alignment 0
+	// sticky no soft invent alignment=1 when ctor left Alignment 0
+	ClearError()
 	a0 := &AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 0}
 	if a0.MakeRandom(NewRng(1)) != "" {
 		t.Fatal("Alignment 0 must not invent aligned(1)")
 	}
+	if !HasError() {
+		t.Fatal("Alignment 0 must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSectionAttributeNoInventName(t *testing.T) {
-	// Attribute name from ctor; no invent "section" when empty
+	// Attribute name from ctor; sticky no invent "section" when empty
+	ClearError()
 	a := &SectionAttribute{Name: "", Prob: 100}
 	if s := a.MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("empty name must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("empty section name must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAttributeNoInventEmptyName(t *testing.T) {
-	// Boolean / MultiChoice / Aligned require live name from ctor
+	// Boolean / MultiChoice / Aligned require live name from ctor sticky
+	ClearError()
 	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("boolean empty name", s)
 	}
+	if !HasError() {
+		t.Fatal("boolean empty name must SetError sticky")
+	}
+	ClearError()
 	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("multichoice empty name", s)
 	}
+	if !HasError() {
+		t.Fatal("multichoice empty name must SetError sticky")
+	}
+	ClearError()
 	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("aligned empty name", s)
 	}
-	// empty choice slot — no invent visibility("")
+	if !HasError() {
+		t.Fatal("aligned empty name must SetError sticky")
+	}
+	// empty choice slot sticky — no invent visibility("")
+	ClearError()
 	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandom(NewRng(1)); s != "" {
 		t.Fatal("empty choice must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("empty choice must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSectionAttribute(t *testing.T) {

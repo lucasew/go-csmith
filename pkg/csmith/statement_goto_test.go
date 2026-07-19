@@ -117,10 +117,15 @@ func TestLabelForGotoDestReuses(t *testing.T) {
 	if g1 == "lbl_1" && g2 == "lbl_1" {
 		t.Fatal("must not invent same fixed lbl_1")
 	}
-	// empty nextLabel — fail closed, no invent empty label token
+	// empty nextLabel — sticky fail closed, no invent empty label token
+	ClearError()
 	if LabelForGotoDest(9, func() string { return "" }) != "" {
 		t.Fatal("empty gensym must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("empty gensym must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMarkNeedRevisitLCA(t *testing.T) {

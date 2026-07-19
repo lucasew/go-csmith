@@ -39,8 +39,9 @@ func (a *BooleanAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil {
 		return ""
 	}
-	// Attribute name from ctor; no invent empty __attribute__ token
+	// Attribute name from ctor; sticky no invent empty __attribute__ token
 	if a.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -62,8 +63,9 @@ func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil || len(a.Choices) == 0 {
 		return ""
 	}
-	// Attribute name from ctor; no invent ("choice") without name
+	// Attribute name from ctor; sticky no invent ("choice") without name
 	if a.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -71,8 +73,9 @@ func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
 	}
 	i := int(r.RndUpto(uint32(len(a.Choices))))
 	// Attribute.cpp:66 — name + "(\"" + choice + "\")"; choice always live string
-	// no invent name("") for empty choice slot
+	// sticky no invent name("") for empty choice slot
 	if a.Choices[i] == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return a.Name + "(\"" + a.Choices[i] + "\")"
@@ -91,8 +94,9 @@ func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	if a == nil || r == nil {
 		return ""
 	}
-	// Attribute name from ctor; no invent bare "(N)" without name
+	// Attribute name from ctor; sticky no invent bare "(N)" without name
 	if a.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -101,7 +105,8 @@ func (a *AlignedAttribute) MakeRandom(r *Rng) string {
 	// Attribute.cpp:82–84 — 1 << rnd_upto(alignment); alignment from ctor (no invent 1)
 	n := a.Alignment
 	if n < 1 {
-		// broken Attribute IR — emit nothing (no soft invent alignment=1)
+		// broken Attribute IR sticky — emit nothing (no soft invent alignment=1)
+		SetError(ErrGeneric)
 		return ""
 	}
 	exp := int(r.RndUpto(uint32(n)))
@@ -129,8 +134,9 @@ func (a *SectionAttribute) MakeRandom(r *Rng) string {
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
 		return ""
 	}
-	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor (no invent "section")
+	// Attribute.cpp:97–99 — rnd_upto(10); name from ctor sticky (no invent "section")
 	if a.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	n := int(r.RndUpto(10))
@@ -151,8 +157,9 @@ func (g *AttributeGenerator) Output(r *Rng) string {
 	}
 	var parts []string
 	for _, a := range g.Attributes {
-		// Attribute* always live in C++; no invent skip nil holes
+		// Attribute* always live in C++; sticky no invent skip nil holes
 		if a == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		s := a.MakeRandom(r)
