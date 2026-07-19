@@ -20,7 +20,11 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		v := st.Expr.Var
-		ind := st.Expr.IndirectLevel()
+		// incomplete type IR must not invent level-0 (no local pointees) skip
+		ind, iok := st.Expr.IndirectLevelComplete()
+		if !iok {
+			return false
+		}
 		facts := cg.pointToFacts()
 		if IsPointingToLocals(v, b, ind, facts) {
 			return false

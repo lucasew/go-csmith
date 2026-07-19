@@ -86,7 +86,11 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 		if e.Var == nil {
 			return nil
 		}
-		ind := e.IndirectLevel()
+		// incomplete type IR must not invent level-0 merge as empty unions
+		ind, iok := e.IndirectLevelComplete()
+		if !iok {
+			return nil
+		}
 		vars = MergePointeesOfPointer(e.Var.GetCollective(), ind, facts)
 		// nil = incomplete merge; empty non-nil = no pointees
 		if vars == nil {
@@ -188,11 +192,12 @@ func collectDereferencedPtrs(e *Expression) (out []*Expression, ok bool) {
 	case TermConstant:
 		return []*Expression{}, true
 	case TermVariable, TermLhs:
-		// Variable* always live
-		if e.Var == nil || e.Var.Type == nil {
+		// Variable* always live; incomplete type IR fails closed
+		ind, iok := e.IndirectLevelComplete()
+		if !iok {
 			return nil, false
 		}
-		if e.IndirectLevel() > 0 {
+		if ind > 0 {
 			return []*Expression{e}, true
 		}
 		return []*Expression{}, true

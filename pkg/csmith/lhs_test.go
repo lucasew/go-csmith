@@ -74,6 +74,18 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if lhs.Output(false) != "(*g_p)" {
 		t.Fatal(lhs.Output(false))
 	}
+	// incomplete Lhs type IR: Complete false (no invent level 0 as complete)
+	broken := &Lhs{Var: &Variable{Name: "x"}} // Type nil
+	if _, ok := broken.IndirectLevelComplete(); ok {
+		t.Fatal("nil Var.Type must fail closed Incomplete")
+	}
+	if broken.GetLvars(nil) != nil {
+		t.Fatal("GetLvars incomplete must fail closed nil")
+	}
+	eBroken := &Expression{Term: TermVariable, Var: &Variable{Name: "y"}}
+	if _, ok := eBroken.IndirectLevelComplete(); ok {
+		t.Fatal("expr incomplete type must fail closed")
+	}
 }
 
 func TestPickUnaryOp(t *testing.T) {

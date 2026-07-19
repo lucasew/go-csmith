@@ -320,7 +320,11 @@ func RhsToLhsTransferUnion(
 		if rhs.Var == nil {
 			return nil
 		}
-		indirect := rhs.IndirectLevel()
+		// incomplete type IR must not invent level-0 union transfer
+		indirect, iok := rhs.IndirectLevelComplete()
+		if !iok {
+			return nil
+		}
 		// FactUnion.cpp:89 — assert(indirect >= 0); no soft invent clamp to 0 for &
 		if indirect < 0 {
 			return nil

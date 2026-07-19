@@ -257,7 +257,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			indir := 0
 			if st.Lhs != nil {
 				lhs = st.Lhs.Var
-				indir = st.Lhs.IndirectLevel()
+				// incomplete Lhs type IR must not invent indir 0 assign facts
+				n, iok := st.Lhs.IndirectLevelComplete()
+				if !iok {
+					SetError(ErrGeneric)
+					return
+				}
+				indir = n
 			}
 			if lhs == nil {
 				SetError(ErrGeneric)

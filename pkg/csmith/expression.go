@@ -184,15 +184,30 @@ func (e *Expression) GetTypeUncast() *Type {
 }
 
 // IndirectLevel mirrors ExpressionVariable::get_indirect_level.
+// Incomplete expr IR returns 0 for the bit; callers that must not invent bare
+// level-0 / non-address-of use IndirectLevelComplete.
 func (e *Expression) IndirectLevel() int {
-	if e == nil || e.Var == nil || e.Var.Type == nil {
+	n, ok := e.IndirectLevelComplete()
+	if !ok {
 		return 0
+	}
+	return n
+}
+
+// IndirectLevelComplete is get_indirect_level with ok=false on incomplete expr IR
+// (no invent treat broken Variable/type as level 0 for transfer/visit/overlap).
+func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
+	if e == nil || e.Var == nil || e.Var.Type == nil {
+		return 0, false
 	}
 	want := e.ExprType
 	if want == nil {
 		want = e.Var.Type
 	}
-	return e.Var.Type.IndirectLevel() - want.IndirectLevel()
+	if want == nil {
+		return 0, false
+	}
+	return e.Var.Type.IndirectLevel() - want.IndirectLevel(), true
 }
 
 // GetType mirrors Expression::get_type.
@@ -851,12 +866,13 @@ func makeExpressionVariableFlags(
 			continue
 		}
 		// ExpressionVariable.cpp:122–123
+		// VisitFactsExpressionVariable already required complete probe type
 		ev := probe
-		if probe.IndirectLevel() == 0 {
+		if ind0, iok := probe.IndirectLevelComplete(); iok && ind0 == 0 {
 			ev = &Expression{Term: TermVariable, Var: v, ExprType: v.Type}
 		}
 		// ExpressionVariable.cpp:137–142 — bookkeeping on successful make
-		deref := ev.IndirectLevel()
+		deref, _ := ev.IndirectLevelComplete()
 		if deref > 0 {
 			IncrCounter(&readDereferenceCnts, deref)
 		} else if deref < 0 {

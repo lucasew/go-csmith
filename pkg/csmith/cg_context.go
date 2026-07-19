@@ -817,7 +817,11 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 		return false
 	}
 	facts := c.pointToFacts()
-	deref := e.IndirectLevel()
+	// incomplete type IR must not invent non-deref level-0 visit success
+	deref, ok := e.IndirectLevelComplete()
+	if !ok {
+		return false
+	}
 	v := e.Var
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {

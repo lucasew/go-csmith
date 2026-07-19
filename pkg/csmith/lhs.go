@@ -90,11 +90,16 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 
 // GetLvars mirrors Lhs::get_lvars.
 // Lhs.cpp:181–185 — merge pointees of var at indirect level.
+// Incomplete Lhs type IR fails closed (nil — no invent merge at invented level 0).
 func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 	if l == nil || l.Var == nil {
 		return nil
 	}
-	return MergePointeesOfPointer(l.Var.GetCollective(), l.IndirectLevel(), facts)
+	n, ok := l.IndirectLevelComplete()
+	if !ok {
+		return nil
+	}
+	return MergePointeesOfPointer(l.Var.GetCollective(), n, facts)
 }
 
 // GetReferencedPtrs mirrors Lhs::get_referenced_ptrs.
@@ -392,7 +397,8 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 		}
 	}
 	// Lhs.cpp:132–140 — bookkeeping on successful make
-	deref := lhs.IndirectLevel()
+	// VisitFactsLhs already required complete Lhs; still use Complete for safety
+	deref, _ := lhs.IndirectLevelComplete()
 	if deref > 0 {
 		IncrCounter(&writeDereferenceCnts, deref)
 	}

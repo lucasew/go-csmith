@@ -300,7 +300,11 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		if rhs.Var == nil {
 			return nil
 		}
-		indirect := rhs.IndirectLevel()
+		// incomplete type IR must not invent level-0 transfer / false address-of
+		indirect, iok := rhs.IndirectLevelComplete()
+		if !iok {
+			return nil
+		}
 		if indirect < 0 {
 			// FactPointTo.cpp:202–207 — taking address; multi-level & not allowed
 			// assert(indirect == -1); no soft invent for indirect < -1
