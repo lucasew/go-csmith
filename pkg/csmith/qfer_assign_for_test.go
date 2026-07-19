@@ -86,6 +86,8 @@ func TestIndirectQualifiers(t *testing.T) {
 }
 
 func TestFindPointerFieldsNilHole(t *testing.T) {
+	// nil FieldVars hole sticky (no invent empty-complete pointer fields / soft re-pick)
+	ClearError()
 	sv := &Variable{
 		Name: "s", Type: &Type{isStruct: true},
 		FieldVars: []*Variable{
@@ -96,6 +98,17 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 	if VariablesComplete(sv.FindPointerFields()) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil FieldVars FindPointerFields must SetError sticky")
+	}
+	ClearError()
+	if VariablesComplete(((*Variable)(nil)).FindPointerFields()) {
+		t.Fatal("nil subject FindPointerFields must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil subject FindPointerFields must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindPointerFields(t *testing.T) {

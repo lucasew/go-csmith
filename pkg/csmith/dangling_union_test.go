@@ -54,7 +54,8 @@ func TestSiblingUnionPartial(t *testing.T) {
 	if !e2.SiblingUnionFieldIsWritten(f1) {
 		t.Fatal("nil write key must fail closed true")
 	}
-	// incomplete FieldVars collective on written key fails closed true
+	// incomplete FieldVars collective on written key fails closed sticky true
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: ut, IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -72,10 +73,14 @@ func TestSiblingUnionPartial(t *testing.T) {
 	fld := item.FieldVars[0]
 	item.FieldVars = append(item.FieldVars, nil)
 	e3 := EmptyEffect().WriteVar(f0)
-	// subject with incomplete collective must fail closed true
+	// subject with incomplete collective must fail closed true sticky
 	if !e3.SiblingUnionFieldIsWritten(fld) {
 		t.Fatal("incomplete collective subject must fail closed true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete collective SiblingUnionFieldIsWritten must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindDanglingGlobalPtrs(t *testing.T) {

@@ -992,10 +992,11 @@ func MakeDummyStaticVariable(name string) *Variable {
 
 // GetCollective mirrors Variable::get_collective.
 // Variable.cpp:581–615 — itemized array → parent; array field maps onto collective fields.
-// Incomplete FieldVars / missing parent / OOB field path fails closed nil
-// (no invent return self as collective when field map cannot be decided).
+// Incomplete FieldVars / missing parent / OOB field path fails closed sticky nil
+// (no invent return self as collective / soft re-pick past broken field map).
 func (v *Variable) GetCollective() *Variable {
 	if v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// special handling for array fields (Variable.cpp:583–612)
@@ -1005,17 +1006,23 @@ func (v *Variable) GetCollective() *Variable {
 		for parent != nil && !parent.IsArray && parent.AsArray == nil {
 			parent = parent.FieldVarOf
 		}
-		// Variable.cpp:589 assert(parent) — incomplete ancestry fails closed
+		// Variable.cpp:589 assert(parent) — incomplete ancestry sticky
 		if parent == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
-		// incomplete field IR on path or parent — no invent soft self-collective
+		// incomplete field IR on path or parent sticky (no invent soft self-collective)
 		if !v.FieldVarsComplete() || !parent.FieldVarsComplete() {
+			SetError(ErrGeneric)
 			return nil
 		}
 		// if parent is already collective parent, this field is on collective
 		pColl := parent.GetCollective()
 		if pColl == nil {
+			// child already sticky when ancestry/fields incomplete
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		if pColl == parent {
@@ -1027,15 +1034,17 @@ func (v *Variable) GetCollective() *Variable {
 		var path []int
 		for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
 			fid := cur.GetFieldID()
-			// incomplete FieldVars → GetFieldID -1 — fail closed (no invent self)
+			// incomplete FieldVars → GetFieldID -1 — sticky (no invent self)
 			if fid < 0 {
+				SetError(ErrGeneric)
 				return nil
 			}
 			path = append([]int{fid}, path...)
 		}
 		for _, idx := range path {
-			// Variable.cpp:608 assert(index < coll->field_vars.size())
+			// Variable.cpp:608 assert(index < coll->field_vars.size()) sticky
 			if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
+				SetError(ErrGeneric)
 				return nil
 			}
 			coll = coll.FieldVars[idx]
@@ -1183,16 +1192,18 @@ func (v *Variable) GetFieldID() int {
 
 // FindPointerFields mirrors Variable::find_pointer_fields.
 // Variable.cpp:1228–1235 — recursive pointer fields of aggregates.
-// Variable* always live in FieldVars; nil hole fails closed IncompleteVariables
-// (not bare nil invent empty-complete no-pointer-fields success).
+// Variable* always live in FieldVars; nil hole fails closed sticky IncompleteVariables
+// (not bare nil invent empty-complete no-pointer-fields / soft re-pick past hole).
 // Complete empty (no pointer fields) returns non-nil empty slice.
 func (v *Variable) FindPointerFields() []*Variable {
 	if v == nil {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := make([]*Variable, 0)
 	for _, f := range v.FieldVars {
 		if f == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		if f.IsPointer() {
@@ -1201,6 +1212,10 @@ func (v *Variable) FindPointerFields() []*Variable {
 			nested := f.FindPointerFields()
 			// incomplete nested FieldVars (empty complete is non-nil [])
 			if !VariablesComplete(nested) {
+				// nested already SetError sticky
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return IncompleteVariables()
 			}
 			out = append(out, nested...)

@@ -99,13 +99,25 @@ func TestGetCollectiveArrayField(t *testing.T) {
 	if got != parent.FieldVars[0] {
 		t.Fatalf("want parent field, got %v", got)
 	}
-	// incomplete FieldVars on path fails closed nil (no invent self as collective)
+	// incomplete FieldVars on path fails closed sticky nil (no invent self as collective)
+	ClearError()
 	item.FieldVars[0].FieldVarOf.FieldVars = append(item.FieldVars[0].FieldVarOf.FieldVars, nil)
 	// force hole on parent of field (item itself)
 	item.FieldVars = append(item.FieldVars, nil)
 	if item.FieldVars[0].GetCollective() != nil {
 		t.Fatal("incomplete FieldVars must fail closed GetCollective nil, not invent self")
 	}
+	if !HasError() {
+		t.Fatal("incomplete FieldVars GetCollective must SetError sticky")
+	}
+	ClearError()
+	if ((*Variable)(nil)).GetCollective() != nil {
+		t.Fatal("nil subject GetCollective must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil subject GetCollective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsArrayField(t *testing.T) {
