@@ -178,6 +178,30 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
+	// StatementBreak/Continue always have RNG + CGContext; sticky no invent shells
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	loop := &Block{Func: f, Looping: true, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	f.Stack = []*Block{loop}
+	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTables(opts), &CGContext{})) {
+		t.Fatal("nil RNG break must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomBreak must SetError sticky")
+	}
+	ClearError()
+	if stmtOK(MakeRandomContinue(nil, opts, vs, NewExprTables(opts), &CGContext{}, loop)) {
+		t.Fatal("nil RNG continue must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomContinue must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete ambient must sticky ERROR before EffectStm clear / soft re-pick
 	ClearError()

@@ -132,3 +132,23 @@ func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
+	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
+	ClearError()
+	opts := Defaults()
+	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &CGContext{}, GetIntType(), nil) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
+	}
+	ClearError()
+	if MakeExpressionComma(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), nil, GetIntType(), nil) != nil {
+		t.Fatal("nil cg must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil cg MakeExpressionComma must SetError sticky")
+	}
+	ClearError()
+}

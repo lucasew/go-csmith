@@ -11,8 +11,9 @@ func MakeRandomBreak(
 	tables *ExprTables,
 	cg *CGContext,
 ) Stmt {
-	// StatementBreak.cpp nullptr — empty Stmt (no invent Kind-only shell)
+	// StatementBreak always has RNG + CGContext; sticky no invent Kind-only shell
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)

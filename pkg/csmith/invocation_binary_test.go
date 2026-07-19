@@ -130,7 +130,8 @@ func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
 }
 
 func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
-	// StatementAssign.cpp always has RNG; no invent assign when CompoundAssignment off
+	// StatementAssign.cpp always has RNG; sticky no invent assign shell
+	ClearError()
 	opts := Defaults()
 	opts.CompoundAssignment = false
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -139,6 +140,10 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomAssign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {

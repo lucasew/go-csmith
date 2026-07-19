@@ -151,9 +151,22 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 }
 
 func TestMakeRandomExprStmtNilCGFailClosed(t *testing.T) {
-	// StatementExpr.cpp always has CGContext; nil → nullptr not Kind shell
+	// StatementExpr.cpp always has CGContext; sticky no invent Kind shell
+	ClearError()
 	st := MakeRandomExprStmt(NewRng(1), Defaults(), nil, nil, nil, nil)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil cg invent %#v", st)
 	}
+	if !HasError() {
+		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
+	}
+	ClearError()
+	st2 := MakeRandomExprStmt(nil, Defaults(), nil, nil, nil, &CGContext{})
+	if st2.Kind != 0 || stmtOK(st2) {
+		t.Fatalf("nil RNG invent %#v", st2)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomExprStmt must SetError sticky")
+	}
+	ClearError()
 }

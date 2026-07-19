@@ -38,13 +38,18 @@ func TestMakeExpressionAssignRequiresFactMgr(t *testing.T) {
 }
 
 func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {
-	// ExpressionAssign.cpp always has RNG; no invent empty-qfer then assign shell
+	// ExpressionAssign.cpp always has RNG; sticky no invent empty-qfer then assign shell
+	ClearError()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	c := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
 	if e := MakeExpressionAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &c, GetIntType(), nil); e != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeExpressionAssign must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPickTermAssignmentDepthOk(t *testing.T) {

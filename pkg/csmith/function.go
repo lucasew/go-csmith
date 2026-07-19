@@ -275,8 +275,10 @@ func MakeRandomFunction(
 		return nil
 	}
 	// Function.cpp:422 FMList entry from signature — get_fact_mgr_for_func (no invent second)
+	// sticky no invent GenerateBody without live FactMgr
 	fm := f.PairedFactMgr()
 	if fm == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Variable* always live on GlobalList; nil hole fails closed sticky
@@ -513,8 +515,9 @@ func (f *Function) generateBodyCore(
 		return
 	}
 	// Function.cpp:643–648 — non-builtin make_random body always has process RNG
-	// no invent Building/Built shell without RNG (MakeRandomBlock would nil anyway)
+	// sticky no invent Building/Built shell without RNG
 	if !f.IsBuiltin && r == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete ambient fails closed sticky before BuildBuilding
@@ -552,7 +555,8 @@ func (f *Function) generateBodyCore(
 		cg.FM = f.PairedFactMgr()
 	}
 	if cg.FM == nil {
-		// get_fact_mgr_for_func returned null — fail closed (no soft invent FM)
+		// get_fact_mgr_for_func returned null — sticky fail closed (no soft invent FM)
+		SetError(ErrGeneric)
 		f.BuildState = BuildUnbuilt
 		f.IsBuilt = false
 		return

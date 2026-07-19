@@ -17,7 +17,9 @@ func MakeRandomContinue(
 	if blk != nil && blk.GetLastStm() == nil {
 		return Stmt{}
 	}
+	// StatementContinue always has RNG + CGContext; sticky no invent continue shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)

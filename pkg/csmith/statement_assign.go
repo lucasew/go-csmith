@@ -96,8 +96,9 @@ func MakeRandomAssignQfer(
 	typ *Type,
 	qf *CVQualifiers,
 ) Stmt {
-	// StatementAssign.cpp always has RNG + CGContext; no invent assign shell without them
+	// StatementAssign.cpp always has RNG + CGContext; sticky no invent assign shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementAssign.cpp:127 — assert(fm); nullptr empty Stmt (no Kind shell)

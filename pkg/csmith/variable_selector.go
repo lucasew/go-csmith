@@ -1519,7 +1519,9 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
+	// VariableSelector always has VS + type + RNG; sticky no invent global shell without them
 	if vs == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:129 assert global_variables; library → nil
@@ -1555,7 +1557,9 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		return nil
 	}
 	name := vs.RandomGlobalName()
+	// gensym always live; sticky no invent empty-name non-array global shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	vs.TmpCount++
@@ -1623,7 +1627,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
+	// VariableSelector always has VS + type + RNG; sticky no invent global shell without them
 	if vs == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if !vs.Opts.GlobalVariables {
@@ -1659,7 +1665,9 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		return nil
 	}
 	name := vs.RandomGlobalName()
+	// gensym always live; sticky no invent empty-name global shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	vs.TmpCount++
@@ -2113,7 +2121,9 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
+	// VariableSelector always has VS + block + type + RNG; sticky no invent local shell without them
 	if vs == nil || block == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:920 ERROR_GUARD
@@ -2159,7 +2169,9 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		return nil
 	}
 	name := vs.RandomLocalName()
+	// gensym always live; sticky no invent empty-name parent-local shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	v := vs.createAndInitialize(access, cg, t, varQfer, block, name, r)
@@ -2203,7 +2215,9 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 // SelectArray mirrors VariableSelector::select_array.
 // VariableSelector.cpp:1384–1436 — visible collective arrays with effect filters.
 func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
+	// VariableSelector always has VS + RNG; sticky no invent array select without them
 	if vs == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before filters (no invent soft re-pick past holes)
@@ -2300,7 +2314,9 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 // skip const struct/union and !accept_type; DFA new-var facts.
 // CreateArrayVariable (C++ ArrayVariable.cpp:190–191) also registers GlobalList/local.
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
+	// VariableSelector always has VS + RNG; sticky no invent random array without them
 	if vs == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before flipcoin (no invent soft re-pick)
@@ -2350,8 +2366,9 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			return nil
 		}
 	}
-	// gensym always live; no invent empty-name array
+	// gensym always live; sticky no invent empty-name array shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1356–1361 — do while const_struct_union || !accept_type
@@ -2846,8 +2863,9 @@ func (vs *VariableSelector) GenerateNewVariable(
 	qfer *CVQualifiers,
 	r *Rng,
 ) *Variable {
-	// VariableSelector.cpp:1090+ — always has RNG; no invent scope/type without it
+	// VariableSelector.cpp:1090+ — always has VS + type + RNG; sticky no invent without them
 	if vs == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before scope pick (no invent new var past holes)

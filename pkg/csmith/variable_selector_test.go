@@ -368,6 +368,62 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestCreateSelectArrayNilDepsSticky(t *testing.T) {
+	// VariableSelector always has VS + RNG; sticky no invent select/create array shells
+	ClearError()
+	if (*VariableSelector)(nil).SelectArray(NewRng(1), EmptyCGContext()) != nil {
+		t.Fatal("nil VS SelectArray must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil VS SelectArray must SetError sticky")
+	}
+	ClearError()
+	vs := NewVariableSelector(Defaults())
+	if vs.SelectArray(nil, EmptyCGContext()) != nil {
+		t.Fatal("nil RNG SelectArray must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG SelectArray must SetError sticky")
+	}
+	ClearError()
+	if vs.CreateRandomArray(nil, EmptyCGContext()) != nil {
+		t.Fatal("nil RNG CreateRandomArray must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG CreateRandomArray must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestGenerateNewParentLocalNilDepsSticky(t *testing.T) {
+	// parent-local always has VS + block + type + RNG; sticky no invent shells
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	blk := &Block{}
+	if vs.GenerateNewParentLocal(nil, AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1)) != nil {
+		t.Fatal("nil block must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil block GenerateNewParentLocal must SetError sticky")
+	}
+	ClearError()
+	if vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext(), nil, nil, NewRng(1)) != nil {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type GenerateNewParentLocal must SetError sticky")
+	}
+	ClearError()
+	if vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext(), GetIntType(), nil, nil) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG GenerateNewParentLocal must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	// VariableSelector.cpp:531–533 — make_init_value then new_variable;
 	// make_init_value always Expression* or ERROR_GUARD — no invent uninit shell.

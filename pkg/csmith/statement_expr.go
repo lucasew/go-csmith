@@ -13,8 +13,9 @@ func MakeRandomExprStmt(
 	tables *ExprTables,
 	cg *CGContext,
 ) Stmt {
-	// StatementExpr.cpp nullptr factory — empty Stmt (no invent Kind-only shell)
+	// StatementExpr.cpp always has RNG + CGContext; sticky no invent Kind-only shell
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// incomplete ambient fails closed sticky (no invent expr stmt / soft re-pick past holes)

@@ -19,7 +19,9 @@ func MakeExpressionComma(
 	typ *Type,
 	qfer *CVQualifiers,
 ) *Expression {
+	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent comma / soft re-pick past holes)
