@@ -855,8 +855,13 @@ func (e *Expression) Output() string {
 	}
 	body := e.outputBody()
 	if e.CastType != nil {
-		// Expression.cpp:228–231 — "(" + type + ") " (space after close paren)
-		return "(" + e.CastType.CName() + ") " + body
+		// Expression.cpp:228–231 — cast_type->Output + body; both always live
+		// no invent "() body" / "(type) " empty body
+		cn := e.CastType.CName()
+		if cn == "" || body == "" {
+			return ""
+		}
+		return "(" + cn + ") " + body
 	}
 	return body
 }

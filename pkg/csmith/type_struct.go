@@ -280,6 +280,10 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isStruct {
 		return ""
 	}
+	// Type.cpp always has sid name (S#); no invent "struct  {"
+	if t.StructName == "" {
+		return ""
+	}
 	var b strings.Builder
 	if t.Packed {
 		// Type.cpp:1849–1854 — pack pragmas
@@ -592,6 +596,10 @@ func (t *Type) OutputUnionDecl() string {
 // Type.cpp:1836+ OutputStructUnion for unions (same field loop).
 func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	if t == nil || !t.isUnion {
+		return ""
+	}
+	// Type.cpp always has sid name (U#); no invent "union  {"
+	if t.StructName == "" {
 		return ""
 	}
 	var b strings.Builder

@@ -119,6 +119,62 @@ func TestFunctionHeaderNoInventVoidReturn(t *testing.T) {
 	}
 }
 
+func TestCNameNoInventBareAggregateOrDefaultInt(t *testing.T) {
+	// Type.cpp always has sid; no invent bare "struct"/"union" or default "int"
+	if s := (&Type{isStruct: true}).CName(); s != "" {
+		t.Fatal("unnamed struct", s)
+	}
+	if s := (&Type{isUnion: true}).CName(); s != "" {
+		t.Fatal("unnamed union", s)
+	}
+	// unknown simple enum value — not a known E*
+	if s := (&Type{simple: ESimpleType(99)}).CName(); s != "" {
+		t.Fatal("unknown simple must not invent int", s)
+	}
+	if s := (&Type{ptrTo: &Type{isStruct: true}}).CName(); s != "" {
+		t.Fatal("ptr to unnamed struct", s)
+	}
+}
+
+func TestVolWrapNoInventIntType(t *testing.T) {
+	// Variable.cpp:690–693 — type->Output; no invent "int" when Type nil
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v.UseVolRVal = true
+	v.Type = nil
+	if out := v.OutputC(); out != "" {
+		t.Fatal("nil Type VOL_RVAL must fail closed", out)
+	}
+	if out := v.OutputLhsC(); out != "" {
+		t.Fatal("nil Type VOL_LVAL must fail closed", out)
+	}
+}
+
+func TestOutputHeaderAliasNoInvent(t *testing.T) {
+	// no invent Name+"_alias" when AliasName empty
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	if out := f.OutputHeaderAlias(false); out != "" {
+		t.Fatal("missing AliasName must fail closed", out)
+	}
+	f.AliasName = "func_1_alias"
+	out := f.OutputHeaderAlias(true)
+	if !strings.Contains(out, "static int func_1_alias(void)") ||
+		!strings.Contains(out, `alias("func_1")`) {
+		t.Fatal(out)
+	}
+}
+
+func TestExpressionCastNoInventEmpty(t *testing.T) {
+	// cast_type + body both required
+	e := &Expression{Term: TermConstant, Con: MakeInt(1), CastType: &Type{isStruct: true}}
+	if out := e.Output(); out != "" {
+		t.Fatal("cast with incomplete type must fail closed", out)
+	}
+	e2 := &Expression{Term: TermConstant, CastType: GetIntType()}
+	if out := e2.Output(); out != "" {
+		t.Fatal("cast with empty body must fail closed", out)
+	}
+}
+
 func TestMakeRandomLoopControlErrorReturn(t *testing.T) {
 	// StatementFor.cpp:79/82/102 ERROR_RETURN on sticky error
 	ClearError()

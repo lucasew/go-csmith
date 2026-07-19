@@ -724,19 +724,27 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 	if f == nil {
 		return ""
 	}
-	alias := f.AliasName
-	if alias == "" {
-		alias = f.Name + "_alias"
+	// Function::alias_name set at create (name + "_alias"); no invent when missing
+	if f.AliasName == "" || f.Name == "" {
+		return ""
+	}
+	rtName := f.returnTypeC()
+	if rtName == "" {
+		return ""
+	}
+	params := f.paramListC()
+	if params == "" {
+		return ""
 	}
 	var b strings.Builder
 	if forceStatic {
 		b.WriteString("static ")
 	}
-	b.WriteString(f.returnTypeC())
+	b.WriteString(rtName)
 	b.WriteString(" ")
-	b.WriteString(alias)
+	b.WriteString(f.AliasName)
 	b.WriteString("(")
-	b.WriteString(f.paramListC())
+	b.WriteString(params)
 	b.WriteString(") __attribute__((alias(\"")
 	b.WriteString(f.Name)
 	b.WriteString("\")))")

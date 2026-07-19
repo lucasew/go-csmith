@@ -162,9 +162,14 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 	// ExpressionVariable::Output for (var, type)
 	ev := outputExpressionVariable(l.Var, l.Type)
 	if wrapVolatiles && l.Var.IsVolatile() {
-		ty := "int"
-		if t := l.GetType(); t != nil {
-			ty = t.CName()
+		// Lhs.cpp:211–216 — type->Output always live; no invent "int"
+		t := l.GetType()
+		if t == nil {
+			return ""
+		}
+		ty := t.CName()
+		if ty == "" || ev == "" {
+			return ""
 		}
 		return "VOL_LVAL(" + ev + ", " + ty + ")"
 	}

@@ -158,9 +158,13 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 	}
 	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
-		ty := "int"
-		if v.Type != nil {
-			ty = v.Type.CName()
+		// Variable.cpp:690–693 — type->Output always live; no invent "int"
+		if v.Type == nil {
+			return ""
+		}
+		ty := v.Type.CName()
+		if ty == "" {
+			return ""
 		}
 		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
@@ -189,9 +193,13 @@ func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 	}
 	name := v.GetActualName(prefixName)
 	if v.UseVolRVal && v.IsVolatile() {
-		ty := "int"
-		if v.Type != nil {
-			ty = v.Type.CName()
+		// Lhs/Variable type->Output always live; no invent "int"
+		if v.Type == nil {
+			return ""
+		}
+		ty := v.Type.CName()
+		if ty == "" {
+			return ""
 		}
 		return "VOL_LVAL(" + name + ", " + ty + ")"
 	}

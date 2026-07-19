@@ -344,19 +344,26 @@ func (t *Type) CName() string {
 		return ""
 	}
 	if t.ptrTo != nil {
-		return t.ptrTo.CName() + "*"
+		inner := t.ptrTo.CName()
+		if inner == "" {
+			// incomplete pointee — no invent bare "*"
+			return ""
+		}
+		return inner + "*"
 	}
 	if t.isStruct {
-		if t.StructName != "" {
-			return "struct " + t.StructName
+		// Type.cpp: eStruct → "struct S" + sid; no invent bare "struct"
+		if t.StructName == "" {
+			return ""
 		}
-		return "struct"
+		return "struct " + t.StructName
 	}
 	if t.isUnion {
-		if t.StructName != "" {
-			return "union " + t.StructName
+		// Type.cpp: eUnion → "union U" + sid; no invent bare "union"
+		if t.StructName == "" {
+			return ""
 		}
-		return "union"
+		return "union " + t.StructName
 	}
 	switch t.simple {
 	case EVoid:
@@ -388,7 +395,8 @@ func (t *Type) CName() string {
 	case EUInt128:
 		return "unsigned __int128"
 	default:
-		return "int"
+		// unknown simple — assert path; no soft invent "int"
+		return ""
 	}
 }
 
