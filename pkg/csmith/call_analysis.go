@@ -340,13 +340,17 @@ func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 		}
 	}
 	var labels []string
-	findContainedLabels(st, &labels, fm)
+	if !findContainedLabels(st, &labels, fm) {
+		return nil
+	}
 	return labels
 }
 
-func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) {
+// findContainedLabels walks get_blocks for labels. Returns false on incomplete
+// Block* hole (no invent partial label list past missing if-arm).
+func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) bool {
 	if st == nil || labels == nil {
-		return
+		return false
 	}
 	// Statement.cpp:707–710 — find_jump_label()
 	lab := ""
@@ -361,16 +365,21 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) {
 	if lab != "" {
 		*labels = append(*labels, lab)
 	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			findContainedLabels(&st.Then.Stmts[i], labels, fm)
+	// get_blocks only — no invent labels via stray Then on assign
+	blks := GetBlocksStmt(st)
+	for _, b := range blks {
+		if b == nil {
+			return false
 		}
 	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			findContainedLabels(&st.Else.Stmts[i], labels, fm)
+	for _, b := range blks {
+		for i := range b.Stmts {
+			if !findContainedLabels(&b.Stmts[i], labels, fm) {
+				return false
+			}
 		}
 	}
+	return true
 }
 
 // CombineBranchFacts mirrors StatementIf::combine_branch_facts.

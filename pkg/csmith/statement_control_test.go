@@ -27,6 +27,11 @@ func TestIfMustReturnBothBranches(t *testing.T) {
 	if st.MustReturn() {
 		t.Fatal("only then")
 	}
+	// incomplete if — nil arm fails closed (no invent must_return soft-skip hole)
+	st.Else = nil
+	if st.MustReturn() {
+		t.Fatal("nil Else must fail closed")
+	}
 }
 
 func TestBlockMustReturnLast(t *testing.T) {

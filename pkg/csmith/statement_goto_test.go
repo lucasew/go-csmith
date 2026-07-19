@@ -127,8 +127,9 @@ func TestMarkNeedRevisitLCA(t *testing.T) {
 	// outer → then(inner with assign) — back-edge LCA is outer when dest in then
 	dest := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: 7}
 	inner := &Block{Stmts: []Stmt{dest}}
+	// StatementIf always has live if_true/if_false
 	outer := &Block{
-		Stmts: []Stmt{{Kind: StmtIfElse, Then: inner, StmID: 1}},
+		Stmts: []Stmt{{Kind: StmtIfElse, Then: inner, Else: &Block{}, StmID: 1}},
 	}
 	inner.Parent = outer
 	// dest pointer must be into slice

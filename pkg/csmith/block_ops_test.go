@@ -637,7 +637,8 @@ func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
 	inner := &Block{Func: f, StmID: 5, Stmts: []Stmt{{Kind: StmtAssign, StmID: 6}}}
-	ifSt := Stmt{Kind: StmtIfElse, StmID: 4, Then: inner}
+	// StatementIf always has live if_true/if_false
+	ifSt := Stmt{Kind: StmtIfElse, StmID: 4, Then: inner, Else: &Block{Func: f, StmID: 8}}
 	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{ifSt, {Kind: StmtAssign, StmID: 7}}}
 	inner.Parent = outer
 	f.Blocks = []*Block{outer, inner}

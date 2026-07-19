@@ -88,15 +88,23 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		}
 	}
 	if idx < 0 {
-		// search nested Then/Else blocks
+		// search nested get_blocks only (kind-gated; no invent Then on assign)
 		for i := range b.Stmts {
-			if b.Stmts[i].Then != nil {
-				if n := b.Stmts[i].Then.RemoveStmt(stmID, fm); n > 0 {
-					return n
+			blks := GetBlocksStmt(&b.Stmts[i])
+			// pre-validate complete arms — nil hole fails closed (no invent
+			// soft-skip missing arm then search sibling arm as complete tree)
+			incomplete := false
+			for _, blk := range blks {
+				if blk == nil {
+					incomplete = true
+					break
 				}
 			}
-			if b.Stmts[i].Else != nil {
-				if n := b.Stmts[i].Else.RemoveStmt(stmID, fm); n > 0 {
+			if incomplete {
+				continue
+			}
+			for _, blk := range blks {
+				if n := blk.RemoveStmt(stmID, fm); n > 0 {
 					return n
 				}
 			}
@@ -104,18 +112,20 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		return 0
 	}
 	ids := map[int]bool{}
-	collectStmIDs(removed, ids)
-	// also collect nested block stm ids for Func.Blocks scrub
-	if removed.Then != nil {
-		collectBlockStmIDs(removed.Then, ids)
-	}
-	if removed.Else != nil {
-		collectBlockStmIDs(removed.Else, ids)
-	}
+	// get_blocks tree of stm+nested block ids; incomplete → partial known only
+	// (no invent ids via stray Then/Else on non-compound kinds)
+	_ = collectTreeStmAndBlockIDs(removed, ids)
 
 	// Statement.cpp find_typed_stmts: continue/break/goto inside s
 	cfgIDs := map[int]bool{}
-	collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs)
+	if !collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs) {
+		// incomplete IR under removed — fail closed wipe CFG (no invent
+		// partial control-stmt scrub as complete edge set)
+		if fm != nil {
+			fm.CFGEdges = nil
+		}
+		cfgIDs = map[int]bool{}
+	}
 
 	// Block.cpp:602–616 — scrub break_stms on enclosing loop
 	loop := b
@@ -256,46 +266,40 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 }
 
 // collectTypedStmIDs collects stm_ids of given kinds under st (find_typed_stmts light).
-func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) {
+// Uses kind-gated get_blocks; returns false on incomplete Block* hole
+// (no invent partial typed list past missing if-arm as complete).
+func collectTypedStmIDs(st *Stmt, kinds []StatementType, ids map[int]bool) bool {
 	if st == nil || ids == nil {
-		return
+		return false
 	}
-	for _, k := range kinds {
-		if st.Kind == k && st.StmID > 0 {
-			ids[st.StmID] = true
-			break
+	var stms []*Stmt
+	if FindTypedStmts(st, &stms, kinds) < 0 {
+		return false
+	}
+	for _, s := range stms {
+		if s != nil && s.StmID > 0 {
+			ids[s.StmID] = true
 		}
 	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			collectTypedStmIDs(&st.Then.Stmts[i], kinds, ids)
-		}
-	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			collectTypedStmIDs(&st.Else.Stmts[i], kinds, ids)
-		}
-	}
+	return true
 }
 
-// blockUnderStmt reports whether blk is the Then/Else of st or nested under them.
+// blockUnderStmt reports whether blk is a get_blocks child of st or nested under them.
+// Incomplete get_blocks hole fails closed true (no invent "not under" while soft-skipping
+// a nil if-arm — scrub aggressively / treat as contained for remove_stmt).
 func blockUnderStmt(st *Stmt, blk *Block) bool {
 	if st == nil || blk == nil {
 		return false
 	}
-	if st.Then == blk || st.Else == blk {
-		return true
-	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			if blockUnderStmt(&st.Then.Stmts[i], blk) {
-				return true
-			}
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return true
 		}
-	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			if blockUnderStmt(&st.Else.Stmts[i], blk) {
+		if b == blk {
+			return true
+		}
+		for i := range b.Stmts {
+			if blockUnderStmt(&b.Stmts[i], blk) {
 				return true
 			}
 		}
@@ -303,23 +307,27 @@ func blockUnderStmt(st *Stmt, blk *Block) bool {
 	return false
 }
 
+// stmtTreeContainsID reports whether id appears under st via get_blocks.
+// Incomplete arm fails closed false (no invent membership past holes).
 func stmtTreeContainsID(st *Stmt, id int) bool {
-	if st == nil {
+	if st == nil || id <= 0 {
 		return false
 	}
 	if st.StmID == id {
 		return true
 	}
-	if st.Then != nil {
-		for i := range st.Then.Stmts {
-			if stmtTreeContainsID(&st.Then.Stmts[i], id) {
-				return true
-			}
+	blks := GetBlocksStmt(st)
+	for _, b := range blks {
+		if b == nil {
+			return false
 		}
 	}
-	if st.Else != nil {
-		for i := range st.Else.Stmts {
-			if stmtTreeContainsID(&st.Else.Stmts[i], id) {
+	for _, b := range blks {
+		if b.StmID == id {
+			return true
+		}
+		for i := range b.Stmts {
+			if stmtTreeContainsID(&b.Stmts[i], id) {
 				return true
 			}
 		}
@@ -328,19 +336,13 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 }
 
 // ResetStmFactMaps mirrors FactMgr::reset_stm_fact_maps for a statement tree.
-// FactMgr.cpp:553–567.
+// FactMgr.cpp:553–567 — walk get_blocks only (no invent via stray Then on assign).
 func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 	if fm == nil || st == nil {
 		return
 	}
 	ids := map[int]bool{}
-	collectStmIDs(st, ids)
-	if st.Then != nil {
-		collectBlockStmIDs(st.Then, ids)
-	}
-	if st.Else != nil {
-		collectBlockStmIDs(st.Else, ids)
-	}
+	_ = collectTreeStmAndBlockIDs(st, ids)
 	for id := range ids {
 		delete(fm.MapFactsIn, id)
 		delete(fm.MapFactsOut, id)
@@ -354,29 +356,48 @@ func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 		return
 	}
 	ids := map[int]bool{}
-	collectBlockStmIDs(b, ids)
+	_ = collectBlockStmIDs(b, ids)
 	for id := range ids {
 		delete(fm.MapFactsIn, id)
 		delete(fm.MapFactsOut, id)
 	}
 }
 
-func collectBlockStmIDs(b *Block, ids map[int]bool) {
-	if b == nil {
-		return
+// collectTreeStmAndBlockIDs records st's StmID and nested get_blocks Block/Stmt ids.
+// Returns false on incomplete Block* hole (no invent partial tree as complete).
+func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
+	if st == nil || ids == nil {
+		return false
+	}
+	if st.StmID > 0 {
+		ids[st.StmID] = true
+	}
+	for _, b := range GetBlocksStmt(st) {
+		if b == nil {
+			return false
+		}
+		if !collectBlockStmIDs(b, ids) {
+			return false
+		}
+	}
+	return true
+}
+
+// collectBlockStmIDs records b.StmID and nested get_blocks trees.
+// Returns false on incomplete hole.
+func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
+	if b == nil || ids == nil {
+		return false
 	}
 	if b.StmID > 0 {
 		ids[b.StmID] = true
 	}
 	for i := range b.Stmts {
-		collectStmIDs(&b.Stmts[i], ids)
-		if b.Stmts[i].Then != nil {
-			collectBlockStmIDs(b.Stmts[i].Then, ids)
-		}
-		if b.Stmts[i].Else != nil {
-			collectBlockStmIDs(b.Stmts[i].Else, ids)
+		if !collectTreeStmAndBlockIDs(&b.Stmts[i], ids) {
+			return false
 		}
 	}
+	return true
 }
 
 // FindJumpSources mirrors Statement::find_jump_sources.

@@ -51,8 +51,10 @@ func goodGotoTarget(st Stmt) bool {
 	}
 }
 
-// ContainsStmt reports whether b (or nested Then/Else blocks) holds st.
+// ContainsStmt reports whether b (or nested get_blocks) holds st.
 // Block::contains_stmt light — used for NeedRevisit LCA on back-edge goto.
+// Kind-gated get_blocks only; nil arm fails closed false (no invent membership
+// by soft-skipping a missing if-arm / stray Then on assign).
 func (b *Block) ContainsStmt(st *Stmt) bool {
 	if b == nil || st == nil {
 		return false
@@ -65,11 +67,16 @@ func (b *Block) ContainsStmt(st *Stmt) bool {
 		if st.StmID > 0 && s.StmID == st.StmID {
 			return true
 		}
-		if s.Then != nil && s.Then.ContainsStmt(st) {
-			return true
+		blks := GetBlocksStmt(s)
+		for _, nb := range blks {
+			if nb == nil {
+				return false
+			}
 		}
-		if s.Else != nil && s.Else.ContainsStmt(st) {
-			return true
+		for _, nb := range blks {
+			if nb.ContainsStmt(st) {
+				return true
+			}
 		}
 	}
 	return false

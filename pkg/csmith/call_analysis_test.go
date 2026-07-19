@@ -181,10 +181,15 @@ func TestFindContainedLabels(t *testing.T) {
 	thenB := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 2, SourceLabel: "lbl_2"},
 	}}
-	st := &Stmt{Kind: StmtIfElse, StmID: 1, SourceLabel: "lbl_1", Then: thenB}
+	// StatementIf always has both arms; nil Else is incomplete IR
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, SourceLabel: "lbl_1", Then: thenB, Else: &Block{}}
 	labs := FindContainedLabels(st)
 	if len(labs) < 2 {
 		t.Fatal(labs)
+	}
+	// incomplete if — fail closed nil (no invent partial labels soft-skipping hole)
+	if FindContainedLabels(&Stmt{Kind: StmtIfElse, StmID: 9, SourceLabel: "x", Then: thenB}) != nil {
+		t.Fatal("nil Else must fail closed")
 	}
 }
 
@@ -309,7 +314,8 @@ func TestFindContainedLabelsFM(t *testing.T) {
 		{Kind: StmtAssign, StmID: 2},
 		{Kind: StmtGoto, StmID: 3, Label: "lbl_cfg", GotoDestStmID: 2},
 	}}
-	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	// StatementIf always has both arms
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: &Block{}}
 	f.Blocks = []*Block{thenB}
 	fm := NewFactMgr(f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}}
