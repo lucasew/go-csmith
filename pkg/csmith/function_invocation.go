@@ -602,14 +602,22 @@ func BuildInvocationAndFunction(
 			return fi
 		}
 		_ = RenewFacts(&callerFM.GlobalFacts, retFacts)
+		if !FactsComplete(callerFM.GlobalFacts) {
+			fi.Failed = true
+			return fi
+		}
 		// FunctionInvocationUser.cpp:234–238 — new globals facts
-		// Variable* always live on NewGlobals; nil hole fails closed (mark failed)
+		// Incomplete NewGlobals fails closed Failed (no invent soft-skip hole / partial push)
+		if !VariablesComplete(callee.NewGlobals) {
+			fi.Failed = true
+			return fi
+		}
 		for _, v := range callee.NewGlobals {
-			if v == nil {
+			callerFM.AddNewVarFactAndUpdate(nil, v)
+			if !FactsComplete(callerFM.GlobalFacts) {
 				fi.Failed = true
 				return fi
 			}
-			callerFM.AddNewVarFactAndUpdate(nil, v)
 		}
 	}
 
@@ -622,6 +630,10 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:230–233 — new_globals hand-over
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
+		if !VariablesComplete(callee.NewGlobals) {
+			fi.Failed = true
+			return fi
+		}
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, callee.NewGlobals...)
 	}
 

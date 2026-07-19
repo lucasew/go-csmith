@@ -161,6 +161,13 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	if len(fm.MapFactsIn[sid]) == 0 || len(fm.MapFactsOut[sid]) == 0 {
 		t.Fatal("blk==nil must append fact to all map_facts_in/out")
 	}
+	// incomplete map slot must not invent soft-append past hole
+	fm.MapFactsIn[sid] = IncompleteFactSlice()
+	g2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	fm.AddNewVarFactAndUpdate(nil, g2)
+	if FactsComplete(fm.MapFactsIn[sid]) {
+		t.Fatal("incomplete map slot must stay incomplete after AddNewVarFactAndUpdate")
+	}
 }
 
 func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {

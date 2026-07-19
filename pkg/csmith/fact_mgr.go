@@ -1108,6 +1108,8 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 // AddNewVarFactAndUpdate mirrors add_new_var_fact_and_update_inout_maps.
 // FactMgr.cpp:69–110 — abstract_fact_for_var_init into global_facts and
 // map_facts_in/out for statements under blk (or all when blk is nil).
+// Incomplete GlobalFacts / Clone / map slots fail closed (IncompleteFactSlice on
+// GlobalFacts; incomplete map entries stay incomplete — no invent append past hole).
 func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if fm == nil || v == nil {
 		return
@@ -1117,23 +1119,45 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	if blk == nil && !v.IsGlobal() {
 		return
 	}
+	// incomplete subject map before add — fail closed (no invent push onto holes)
+	if !FactsComplete(fm.GlobalFacts) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	// snapshot length to detect newly merged facts
 	beforePT := len(fm.GlobalFacts)
 	fm.AddNewVarFact(v)
+	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push
+	if !FactsComplete(fm.GlobalFacts) {
+		return
+	}
 	// FactMgr.cpp:77–104 — push each new init fact into maps
-	// Fact* always live after add; nil hole fails closed (no invent partial map push)
+	// Fact* always live after add; nil / incomplete Clone fails closed wipe GlobalFacts
 	// no invent MapFactsIn-only push when MapFactsOut is nil (one-sided invent)
 	for i := beforePT; i < len(fm.GlobalFacts); i++ {
 		f := fm.GlobalFacts[i]
 		if f == nil {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
+		cl := f.Clone()
+		if cl == nil {
+			// incomplete PointTo on new fact — fail closed
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 		// map_facts_in: stm in_block(blk) || blk==null
 		if fm.MapFactsIn != nil {
 			for id := range fm.MapFactsIn {
-				if blk == nil || stmtIDInBlock(fm.Func, id, blk) {
-					fm.MapFactsIn[id] = append(fm.MapFactsIn[id], f.Clone())
+				if blk != nil && !stmtIDInBlock(fm.Func, id, blk) {
+					continue
 				}
+				// incomplete map slot — stay incomplete (no invent soft-append past hole)
+				if !FactsComplete(fm.MapFactsIn[id]) {
+					fm.MapFactsIn[id] = IncompleteFactSlice()
+					continue
+				}
+				fm.MapFactsIn[id] = append(fm.MapFactsIn[id], cl)
 			}
 		}
 		// map_facts_out — required when In was updated for dual-map coherence
@@ -1147,19 +1171,30 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		if blk == nil {
 			// FactMgr.cpp:102–103 — append to all outs
 			for id := range fm.MapFactsOut {
-				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], f.Clone())
+				if !FactsComplete(fm.MapFactsOut[id]) {
+					fm.MapFactsOut[id] = IncompleteFactSlice()
+					continue
+				}
+				c2 := f.Clone()
+				if c2 == nil {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
+				fm.MapFactsOut[id] = append(fm.MapFactsOut[id], c2)
 			}
 		} else {
 			// FactMgr.cpp:99–100 — add_fact_out(stm, f) with visibility filters
-			// Statement* always resolvable for ids under blk; nil fails closed
-			// (stop map push — no invent skip stale/missing stm as absent)
+			// Statement* always resolvable for ids under blk; unresolved id fails closed
+			// IncompleteFactSlice on that out slot only (no invent skip as absent, and no
+			// wipe GlobalFacts mid-generation which would poison ERROR_GUARD paths).
 			for id := range fm.MapFactsOut {
 				if !stmtIDInBlock(fm.Func, id, blk) {
 					continue
 				}
 				st := FindStmtByID(fm.Func, id)
 				if st == nil {
-					return
+					fm.MapFactsOut[id] = IncompleteFactSlice()
+					continue
 				}
 				parent := FindParentBlockOfStmID(fm.Func, id)
 				fm.AddFactOut(st, parent, f)
