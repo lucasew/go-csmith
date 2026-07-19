@@ -773,13 +773,20 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 
 // returnTypeC is qualified return type (from RV qfer when present).
 // Function always has return_type in C++; no soft invent "void" when missing.
+// RV present with Type-nil sticky (no invent fall through to ReturnType / void past
+// incomplete return-variable type shell).
 func (f *Function) returnTypeC() string {
 	// Function always live at emit; sticky no invent "void" without it
 	if f == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
-	if f.RV != nil && f.RV.Type != nil {
+	if f.RV != nil {
+		// RV Type* always live when rv is present; Type-nil sticky incomplete
+		if f.RV.Type == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
 		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
 		if out == "" {
 			if !HasError() {
@@ -810,8 +817,14 @@ func (f *Function) paramListC() string {
 }
 
 // paramListCOpts returns param C list, or "" if IR violates arg_structs/arg_unions asserts.
+// Function always live at emit; nil shell sticky empty (no invent "void" param list
+// past missing Function IR). Empty Param is complete "void".
 func (f *Function) paramListCOpts(opts Options) string {
-	if f == nil || len(f.Param) == 0 {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if len(f.Param) == 0 {
 		// Function.cpp:502–504 — assert(Type::void_type); emit void
 		return "void"
 	}
@@ -864,8 +877,13 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	}
 	// Function.cpp:517–520 — assert no return struct/union when options off
 	// sticky fail closed: empty header (no invent alternate scalar return)
+	// RV present with Type-nil sticky (no invent skip option checks past incomplete rv type)
 	rt := f.ReturnType
-	if f.RV != nil && f.RV.Type != nil {
+	if f.RV != nil {
+		if f.RV.Type == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
 		rt = f.RV.Type
 	}
 	if rt != nil {

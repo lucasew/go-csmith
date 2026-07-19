@@ -344,6 +344,56 @@ func TestOutputHeaderNilFunctionSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestReturnTypeCAndParamListSticky(t *testing.T) {
+	// RV Type-nil sticky (no invent fall through to ReturnType / void)
+	ClearError()
+	f := &Function{
+		Name: "f", ReturnType: GetIntType(),
+		RV: &Variable{Name: "rv", Type: nil},
+	}
+	if s := f.returnTypeC(); s != "" {
+		t.Fatal("RV Type-nil returnTypeC invent", s)
+	}
+	if !HasError() {
+		t.Fatal("RV Type-nil returnTypeC must SetError sticky")
+	}
+	ClearError()
+	if s := f.OutputHeader(false); s != "" {
+		t.Fatal("RV Type-nil OutputHeader invent", s)
+	}
+	if !HasError() {
+		t.Fatal("RV Type-nil OutputHeader must SetError sticky")
+	}
+	ClearError()
+	// nil Function paramList sticky empty (no invent "void")
+	if s := (*Function)(nil).paramListC(); s != "" {
+		t.Fatal("nil Function paramListC invent", s)
+	}
+	if !HasError() {
+		t.Fatal("nil Function paramListC must SetError sticky")
+	}
+	ClearError()
+	// empty Param is complete void
+	if s := (&Function{Name: "g"}).paramListC(); s != "void" {
+		t.Fatal("empty Param want void, got", s)
+	}
+	if HasError() {
+		t.Fatal("empty Param paramListC must not SetError")
+	}
+	// live RV path
+	f2 := &Function{
+		Name: "h", ReturnType: GetIntType(),
+		RV: CreateVariableScalars("rv", GetIntType(), false, false),
+	}
+	if s := f2.returnTypeC(); s == "" {
+		t.Fatal("live RV returnTypeC empty")
+	}
+	if HasError() {
+		t.Fatal("live RV returnTypeC must not leave sticky")
+	}
+	ClearError()
+}
+
 func TestFunctionOutputNilSticky(t *testing.T) {
 	ClearError()
 	if (*Function)(nil).Output() != "" {
