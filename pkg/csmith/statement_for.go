@@ -488,8 +488,14 @@ func MakeRandomFor(
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
 	postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
 	// merge body effect into parent accum
+	// Incomplete parent/body fails closed (no invent pure MergeEffects past holes)
 	if cg.EffectAccum != nil {
-		*cg.EffectAccum = MergeEffects(*cg.EffectAccum, bodyEff)
+		merged := MergeEffects(*cg.EffectAccum, bodyEff)
+		if !EffectComplete(merged) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		*cg.EffectAccum = merged
 	}
 	return st
 }

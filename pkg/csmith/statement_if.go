@@ -124,8 +124,14 @@ func MakeRandomIf(
 	SetAccumulatedEffectAfterBlock(st, elseCG.EffectStm, cg, condEff)
 
 	// branch accumulators still observed on parent (generation-time effect merge)
+	// Incomplete arm accum fails closed (no invent pure MergeEffects past holes)
 	if cg.EffectAccum != nil {
-		*cg.EffectAccum = MergeEffects(thenEff, elseEff)
+		merged := MergeEffects(thenEff, elseEff)
+		if !EffectComplete(merged) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		*cg.EffectAccum = merged
 	}
 	return st
 }

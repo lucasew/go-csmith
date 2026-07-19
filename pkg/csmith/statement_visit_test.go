@@ -90,6 +90,34 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	}
 }
 
+func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
+	// Incomplete parent EffectAccum → MergeEffects IncompleteEffect must not invent visit true
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
+	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
+	ret := Stmt{
+		Kind: StmtReturn, StmID: 2,
+		Expr: &Expression{Term: TermVariable, Var: rv, ExprType: GetIntType()},
+	}
+	st := Stmt{
+		Kind: StmtIfElse, StmID: 1,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{StmID: 3, Stmts: []Stmt{ret}},
+		Else: &Block{StmID: 4, Stmts: []Stmt{}},
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
+	inc := IncompleteEffect()
+	cg.EffectAccum = &inc
+	if VisitFactsStatementIf(&st, &cg, Defaults()) {
+		t.Fatal("incomplete EffectAccum must fail closed if visit")
+	}
+	ClearError()
+}
+
 // testForInit builds a simple StatementAssign init (StatementFor always has live init).
 // StmID is always live after create — required when FM path records map_stm_effect.
 func testForInit(iv *Variable, n int) *Stmt {

@@ -778,7 +778,13 @@ func (e Effect) CommentOutput() string {
 
 // MergeEffects combines two post-branch effects (union of reads/writes; SE-free only if both are).
 // Approximates StatementIf fact/effect merge without FactMgr.
+// Incomplete either arm fails closed IncompleteEffect (no invent pure/empty-complete
+// merge past incomplete map_stm_effect / accum holes — VisitFacts / generation would
+// treat merged as success and poison parent accum as complete).
 func MergeEffects(a, b Effect) Effect {
+	if !EffectComplete(a) || !EffectComplete(b) {
+		return IncompleteEffect()
+	}
 	out := Effect{
 		pure:           a.pure && b.pure,
 		sideEffectFree: a.sideEffectFree && b.sideEffectFree,
@@ -786,11 +792,17 @@ func MergeEffects(a, b Effect) Effect {
 	if len(a.written)+len(b.written) > 0 {
 		out.written = make(map[*Variable]bool, len(a.written)+len(b.written))
 		for k, v := range a.written {
+			if k == nil {
+				return IncompleteEffect()
+			}
 			if v {
 				out.written[k] = true
 			}
 		}
 		for k, v := range b.written {
+			if k == nil {
+				return IncompleteEffect()
+			}
 			if v {
 				out.written[k] = true
 			}
@@ -799,11 +811,17 @@ func MergeEffects(a, b Effect) Effect {
 	if len(a.read)+len(b.read) > 0 {
 		out.read = make(map[*Variable]bool, len(a.read)+len(b.read))
 		for k, v := range a.read {
+			if k == nil {
+				return IncompleteEffect()
+			}
 			if v {
 				out.read[k] = true
 			}
 		}
 		for k, v := range b.read {
+			if k == nil {
+				return IncompleteEffect()
+			}
 			if v {
 				out.read[k] = true
 			}

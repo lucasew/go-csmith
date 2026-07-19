@@ -51,6 +51,27 @@ func TestMergeEffectsUnion(t *testing.T) {
 	}
 }
 
+func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
+	// incomplete arm must not invent pure/empty-complete merge success
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	ok := EmptyEffect().WriteVar(a)
+	m := MergeEffects(ok, IncompleteEffect())
+	if EffectComplete(m) {
+		t.Fatal("incomplete b must fail closed MergeEffects")
+	}
+	m2 := MergeEffects(IncompleteEffect(), ok)
+	if EffectComplete(m2) {
+		t.Fatal("incomplete a must fail closed MergeEffects")
+	}
+	// nil map key on complete-looking shell
+	bad := EmptyEffect()
+	bad.read = map[*Variable]bool{nil: true}
+	m3 := MergeEffects(ok, bad)
+	if EffectComplete(m3) {
+		t.Fatal("nil key must fail closed MergeEffects")
+	}
+}
+
 func TestArrayBuildInitRecursive(t *testing.T) {
 	opts := Defaults()
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_1", GetIntType(), MakeInt(1), NewCVQualifiers([]bool{false}, []bool{false}))

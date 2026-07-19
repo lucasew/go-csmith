@@ -231,6 +231,8 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block(eff, &if_true/false)
 	// eff is mutated across both calls: cond + then + else map_stm_effect[block]
 	// Block stm_id always live; StmID 0 fails closed (no invent EffectStm soft fallback)
+	// Incomplete arm effects fail closed visit false (no invent SetMapStmEffect incomplete
+	// then still return true success)
 	if cg.FM != nil {
 		if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
 			return false
@@ -238,9 +240,22 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if st.StmID <= 0 {
 			return false
 		}
-		acc := condEff
-		acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Then.StmID))
-		acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Else.StmID))
+		if !EffectComplete(condEff) {
+			return false
+		}
+		thenE := cg.FM.GetMapStmEffect(st.Then.StmID)
+		elseE := cg.FM.GetMapStmEffect(st.Else.StmID)
+		if !EffectComplete(thenE) || !EffectComplete(elseE) {
+			return false
+		}
+		acc := condEff.AddEffect(thenE)
+		if !EffectComplete(acc) {
+			return false
+		}
+		acc = acc.AddEffect(elseE)
+		if !EffectComplete(acc) {
+			return false
+		}
 		cg.FM.SetMapStmEffect(st.StmID, acc)
 	}
 
@@ -278,8 +293,13 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 	// parent accum: both arms observed (generation-time separates; visit matches merge)
+	// Incomplete arm accum fails closed (MergeEffects IncompleteEffect — no invent pure merge)
 	if cg.EffectAccum != nil {
-		*cg.EffectAccum = MergeEffects(thenAccum, elseAccum)
+		merged := MergeEffects(thenAccum, elseAccum)
+		if !EffectComplete(merged) {
+			return false
+		}
+		*cg.EffectAccum = merged
 	}
 	return true
 }
@@ -371,11 +391,23 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	// StatementFor.cpp:468 — set_accumulated_effect_after_block(eff, &body, …)
 	// body stm_id always live when FM path runs
+	// Incomplete body/pre effect fails closed (no invent visit true with IncompleteEffect map)
 	bodyEff := EmptyEffect()
 	if cg.FM != nil {
+		if st.Then.StmID <= 0 || st.StmID <= 0 {
+			return false
+		}
 		bodyEff = cg.FM.GetMapStmEffect(st.Then.StmID)
+		if !EffectComplete(bodyEff) || !EffectComplete(eff) {
+			return false
+		}
+	} else if !EffectComplete(eff) {
+		return false
 	}
 	SetAccumulatedEffectAfterBlock(st, bodyEff, cg, eff)
+	if cg.FM != nil && !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+		return false
+	}
 	return true
 }
 
@@ -504,8 +536,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
 		// map_stm_effect[body] only (no invent EffectStm soft fallback when empty)
+		// Incomplete body/pre fails closed (no invent visit true with IncompleteEffect map)
 		bodyEff := cg.FM.GetMapStmEffect(inner.Then.StmID)
+		if !EffectComplete(bodyEff) || !EffectComplete(preStm) {
+			return false
+		}
 		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
+		if !EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+			return false
+		}
 	}
 	return true
 }
