@@ -90,6 +90,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 
 func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	// Variable* always live as IVBounds keys; nil key must not soft-skip to other IVs
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	av := &ArrayVariable{
@@ -103,6 +104,33 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("nil IVBounds key must fail closed whole itemize")
 	}
+	if !HasError() {
+		t.Fatal("nil IVBounds key must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	cg.IVBounds = map[*Variable]int{iv: 0}
+	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed ItemizeArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky ItemizeArray")
+	}
+	ClearError()
 }
 
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {

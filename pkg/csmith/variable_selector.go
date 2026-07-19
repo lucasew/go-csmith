@@ -176,6 +176,17 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 	if av.Collective != nil {
 		return av
 	}
+	// incomplete ambient / facts fail closed sticky before IV pick (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	dims := len(av.Sizes)
 	if dims == 0 {
 		return nil
@@ -192,9 +203,10 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		var ok []*Variable
 		boundOf := map[*Variable]int{}
 		for iv, bound := range cg.IVBounds {
-			// Variable* always live as IVBounds keys; nil key fails closed
+			// Variable* always live as IVBounds keys; nil key fails closed sticky
 			// (no invent partial ok_ivs pool by soft-skipping holes)
 			if iv == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			if bound == InvalidIVBound {
@@ -1919,6 +1931,17 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	if vs == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before filter (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	ty := GetIntType()
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
@@ -2166,6 +2189,17 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 // CreateArrayVariable (C++ ArrayVariable.cpp:190–191) also registers GlobalList/local.
 func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariable {
 	if vs == nil || r == nil {
+		return nil
+	}
+	// incomplete ambient / facts fail closed sticky before flipcoin (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1341–1342 — global_variables && rnd_flipcoin(25); ERROR_GUARD

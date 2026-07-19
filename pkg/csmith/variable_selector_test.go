@@ -315,6 +315,32 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	}
 }
 
+func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if vs.CreateRandomArray(NewRng(1), cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed CreateRandomArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := EmptyCGContext().WithFactMgr(fm)
+	if vs.CreateRandomArray(NewRng(2), cg2) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed CreateRandomArray")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 	// VariableSelector.cpp:1364 — Constant::make_random; no invent CreateArray with nil init
 	opts := Defaults()

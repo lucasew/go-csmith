@@ -453,6 +453,17 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 // selectWritable gathers non-const matching variables from stack, params, globals.
 // Stack/Param/Global Variable* always live; nil holes fail closed (nil select).
 func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compound bool) *Variable {
+	// incomplete ambient / facts fail closed sticky before pool scan (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var ok []*Variable
 	incomplete := false
 	add := func(v *Variable) {
@@ -491,10 +502,20 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		}
 	}
 	if cg.CurrentFunc != nil {
+		// incomplete Stack fails closed sticky (no invent soft-skip nil frame)
+		if !BlocksComplete(cg.CurrentFunc.Stack) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if !VariablesComplete(cg.CurrentFunc.Param) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		for i := len(cg.CurrentFunc.Stack) - 1; i >= 0; i-- {
 			blk := cg.CurrentFunc.Stack[i]
-			// Block* always live on Stack; nil hole fails closed
-			if blk == nil {
+			// pre-validated BlocksComplete
+			if !VariablesComplete(blk.LocalVars) {
+				SetError(ErrGeneric)
 				return nil
 			}
 			for _, v := range blk.LocalVars {
@@ -506,11 +527,17 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 		}
 	}
 	if vs != nil {
+		if !VariablesComplete(vs.GlobalList) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		for _, v := range vs.GlobalList {
 			add(v)
 		}
 	}
 	if incomplete {
+		// incomplete expand/type IR fails closed sticky (no invent soft re-pick past hole)
+		SetError(ErrGeneric)
 		return nil
 	}
 	return ChooseOKVar(r, ok)

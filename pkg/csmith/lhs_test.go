@@ -315,4 +315,17 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete GlobalFacts must SetError sticky")
 	}
 	ClearError()
+	// incomplete GlobalList hole fails closed sticky via selectWritable pool scan
+	vs2 := NewVariableSelector(opts)
+	vs2.GlobalList = []*Variable{g, nil}
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	if MakeRandomLhs(NewRng(3), opts, NewProbabilities(opts), vs2, &cg3, GetIntType(), false, false, nil) != nil {
+		t.Fatal("incomplete GlobalList must fail closed MakeRandomLhs/selectWritable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalList must SetError sticky")
+	}
+	ClearError()
 }

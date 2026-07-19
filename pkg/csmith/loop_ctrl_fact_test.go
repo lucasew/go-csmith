@@ -131,6 +131,35 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 	}
 }
 
+func TestSelectLoopCtrlVarIncompleteAmbientSticky(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect())
+	cg.EffectAccum = &inc
+	if vs.SelectLoopCtrlVar(NewRng(1), cg, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed SelectLoopCtrlVar")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if vs.SelectLoopCtrlVar(NewRng(2), cg2, nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed SelectLoopCtrlVar")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgr(f)
