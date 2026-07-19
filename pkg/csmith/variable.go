@@ -248,8 +248,9 @@ func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 // OutputAddrOf mirrors Variable::OutputAddrOf — always &actual_name (no VOL_RVAL).
 // Variable.cpp:707–710.
 func (v *Variable) OutputAddrOf(prefixName bool) string {
-	// Variable* always live; no soft invent "&0" for nil
+	// Variable* always live; sticky no invent "&0" for nil
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	name := v.GetActualName(prefixName)

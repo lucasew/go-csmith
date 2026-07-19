@@ -1756,7 +1756,9 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 // Incomplete point-to apply or union merge fails closed like UpdateFactForAssign
 // (no invent continue union after wiped *facts).
 func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Expression, facts *[]*FactPointTo) bool {
+	// FactMgr assign-into always has live lhs + facts accumulator; sticky no invent soft-skip
 	if facts == nil || lhs == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	changed := false

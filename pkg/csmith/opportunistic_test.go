@@ -3,10 +3,26 @@ package csmith
 import "testing"
 
 func TestOpportunisticValidateNoDeref(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	if OpportunisticValidate(NewRng(1), v, GetIntType(), nil, 0, 0) != 1 {
 		t.Fatal("same level")
 	}
+	// nil var/type sticky — no invent not-valid soft success past hole
+	if OpportunisticValidate(NewRng(1), nil, GetIntType(), nil, 0, 0) != 0 {
+		t.Fatal("nil var must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil var OpportunisticValidate must SetError sticky")
+	}
+	ClearError()
+	if OpportunisticValidate(NewRng(1), v, nil, nil, 0, 0) != 0 {
+		t.Fatal("nil type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type OpportunisticValidate must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOpportunisticValidateNullDead(t *testing.T) {

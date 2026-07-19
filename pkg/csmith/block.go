@@ -283,8 +283,9 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	_ = sym
 	// Block.cpp:216–219 — this always live; gensym + macro_tmp_vars insert together
-	// no invent bare t_N without block registration (would emit undeclared use)
+	// sticky no invent bare t_N without block registration (would emit undeclared use)
 	if b == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Block.cpp:217 — const string var_name = gensym("t_"); sticky no invent bare ""

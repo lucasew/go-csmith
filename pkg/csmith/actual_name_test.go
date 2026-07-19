@@ -44,9 +44,13 @@ func TestOutputAddrOf(t *testing.T) {
 	if v.OutputAddrOf(false) != "&g_1" {
 		t.Fatal(v.OutputAddrOf(false))
 	}
-	// Variable.cpp:707 — always live Variable*; no invent "&0"
+	// Variable.cpp:707 — always live Variable*; sticky no invent "&0"
+	ClearError()
 	if s := (*Variable)(nil).OutputAddrOf(false); s != "" {
 		t.Fatal("nil must fail closed, got", s)
+	}
+	if !HasError() {
+		t.Fatal("nil OutputAddrOf must SetError sticky")
 	}
 	ClearError()
 	if s := (&Variable{}).OutputAddrOf(false); s != "" {

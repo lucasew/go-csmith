@@ -348,7 +348,9 @@ func (f *SafeOpFlags) RHSType() *Type {
 // BinaryFuncName mirrors SafeOpFlags::to_string(eBinaryOps) for safe arithmetic/shifts.
 // SafeOpFlags.cpp:285–320 — float uses safe_*_func_float_f_f.
 func (f *SafeOpFlags) BinaryFuncName(op string) string {
+	// live flags required; sticky no invent safe_* name for nil
 	if f == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:286–287 — float size short-circuit
@@ -439,8 +441,9 @@ func safeFloatFuncString(op string) string {
 // UnaryMinusFuncName mirrors to_string(eMinus).
 // SafeOpFlags.cpp:323–341 — no float unary safe function.
 func (f *SafeOpFlags) UnaryMinusFuncName() string {
-	// live flags required; no soft invent int32 name for nil
+	// live flags required; sticky no invent int32 name for nil
 	if f == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// SafeOpFlags.cpp:325 — assert(op_size_ != sFloat); non-sticky empty

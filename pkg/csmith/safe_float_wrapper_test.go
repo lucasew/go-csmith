@@ -84,7 +84,16 @@ func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 	if f.UnaryMinusFuncName() != "" {
 		t.Fatal("nil flags must fail closed")
 	}
-	// UnaryMinusFuncName may leave sticky from SizeToken
+	if !HasError() {
+		t.Fatal("nil UnaryMinusFuncName must SetError sticky")
+	}
+	ClearError()
+	if f.BinaryFuncName("+") != "" {
+		t.Fatal("nil BinaryFuncName must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil BinaryFuncName must SetError sticky")
+	}
 	ClearError()
 	if f.SizeToken() != "" {
 		t.Fatal("nil SizeToken must fail closed")

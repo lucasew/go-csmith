@@ -175,7 +175,9 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 // r may be nil when both probs are 0 (deterministic reject on null/dead).
 // Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
+	// live Variable* + Type* required; sticky no invent "not valid" soft success past hole
 	if v == nil || v.Type == nil || typ == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	// incomplete facts fail closed sticky (no invent soft re-pick as "not valid ptr")

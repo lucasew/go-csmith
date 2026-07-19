@@ -368,8 +368,9 @@ func (t *Type) SizeInBytes() int {
 
 // CName is a minimal C spelling for simple/pointer types.
 func (t *Type) CName() string {
-	// Type* always live at Output sites in C++; no soft invent "void" for nil
+	// Type* always live at Output sites in C++; sticky no invent "void" for nil
 	if t == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if t.ptrTo != nil {
