@@ -339,12 +339,20 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	if _, ok := fm.MapStmEffect[0]; ok {
 		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
-	// GetMapStmEffect(0) IncompleteEffect — not invent empty pure default
+	// GetMapStmEffect(0) IncompleteEffect sticky — not invent empty pure default
+	ClearError()
 	if EffectComplete(fm.GetMapStmEffect(0)) || fm.GetMapStmEffect(0).IsEmpty() {
 		t.Fatal("StmID 0 GetMapStmEffect must IncompleteEffect")
 	}
+	if !HasError() {
+		t.Fatal("StmID 0 GetMapStmEffect must SetError sticky")
+	}
+	ClearError()
 	if EffectComplete(fm.GetMapAccumEffect(0)) || fm.GetMapAccumEffect(0).IsPure() {
 		t.Fatal("StmID 0 GetMapAccumEffect must IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 GetMapAccumEffect must SetError sticky")
 	}
 	// incomplete pre/block effect must sticky Incomplete map entry
 	ClearError()

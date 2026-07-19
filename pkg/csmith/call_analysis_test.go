@@ -44,16 +44,22 @@ func TestFuncCountIncompleteFailClosed(t *testing.T) {
 	}}) >= 0 {
 		t.Fatal("nil arg hole must FuncCount -1")
 	}
+	ClearError()
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsExpr(&Expression{Term: TermFunction}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("incomplete collect must fail closed incomplete, not invent empty complete", calls)
 	}
+	if !HasError() {
+		t.Fatal("incomplete collect must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCollectCalledForTestExpr(t *testing.T) {
 	// StatementFor::get_exprs → test; soft invent skip would miss for-test calls
+	ClearError()
 	call := userCall("func_in_test")
 	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: call}, Then: &Block{}}
 	var calls []*Invocation
@@ -61,12 +67,16 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	if len(calls) != 1 || calls[0].User == nil || calls[0].User.Name != "func_in_test" {
 		t.Fatalf("for-test calls: %+v", calls)
 	}
-	// incomplete for without TestExpr → incomplete marker
+	// incomplete for without TestExpr → incomplete marker sticky
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("for without TestExpr must fail closed incomplete, not invent empty", calls)
 	}
+	if !HasError() {
+		t.Fatal("for without TestExpr must SetError sticky")
+	}
+	ClearError()
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
 		t.Fatal("incomplete for must fail closed uncertain")
 	}
@@ -74,18 +84,27 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 
 func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {
 	// C++ get_exprs always yields live Expression* for assign/invoke
-	// soft invent skip nil Expr would invent empty call list as success
+	// soft invent skip nil Expr would invent empty call list as success sticky
+	ClearError()
 	var calls []*Invocation
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("assign without Expr must fail closed incomplete, not invent empty success", calls)
 	}
+	if !HasError() {
+		t.Fatal("assign without Expr must SetError sticky")
+	}
+	ClearError()
 	calls = []*Invocation{{User: &Function{Name: "stale"}}}
 	CollectCalledInvocationsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &calls)
 	if InvocationsComplete(calls) {
 		t.Fatal("invoke without Expr must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("invoke without Expr must SetError sticky")
+	}
+	ClearError()
 	if !HasUncertainCallRecursiveStmt(&Stmt{Kind: StmtAssign, StmID: 3}) {
 		t.Fatal("nil Expr assign must fail closed uncertain")
 	}

@@ -4,50 +4,58 @@ package csmith
 
 // GetEvalToSubexps mirrors Expression::get_eval_to_subexps.
 // Variable/Constant: self; Comma: rhs only; Assign: lhs; Funcall: self (result).
-// Incomplete IR fails closed IncompleteExpressions (not bare nil —
-// ExpressionsComplete(nil)/len==0 invents empty-complete eval list / skip overlap).
+// Incomplete IR fails closed sticky IncompleteExpressions (not bare nil —
+// ExpressionsComplete(nil)/len==0 invents empty-complete eval list / soft re-pick skip overlap).
 // Complete expressions always yield ≥1 subexp.
 func GetEvalToSubexps(e *Expression) []*Expression {
 	if e == nil {
+		SetError(ErrGeneric)
 		return IncompleteExpressions()
 	}
 	switch e.Term {
 	case TermConstant:
 		// Constant always has live Value
 		if e.Con == nil || e.Con.Value == "" {
+			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermVariable, TermLhs:
 		// ExpressionVariable / Lhs always have live Variable*
 		if e.Var == nil {
+			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermFunction:
 		// ExpressionFuncall always live invoke (eval is the call itself)
 		if e.Invoke == nil {
+			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return []*Expression{e}
 	case TermCommaExpr:
 		// ExpressionComma.cpp:102–105 — only RHS evaluates to the value
 		if e.CommaRHS == nil {
+			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
 		return GetEvalToSubexps(e.CommaRHS)
 	case TermAssignment:
 		// ExpressionAssign.cpp:107–111 — get_lhs()->get_eval_to_subexps (Lhs pushes self)
 		if e.Assign == nil {
+			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
 		if e.Assign.Lhs != nil {
 			// Lhs always live Var
 			if e.Assign.Lhs.Var == nil {
+				SetError(ErrGeneric)
 				return IncompleteExpressions()
 			}
 			sub := LhsAsExpression(e.Assign.Lhs)
 			if sub == nil {
+				SetError(ErrGeneric)
 				return IncompleteExpressions()
 			}
 			return []*Expression{sub}
@@ -60,10 +68,12 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 				ExprType: ty,
 			}}
 		}
-		// assign without lhs — incomplete IR
+		// assign without lhs — incomplete IR sticky
+		SetError(ErrGeneric)
 		return IncompleteExpressions()
 	default:
-		// unknown term — incomplete IR (no invent self-eval shell)
+		// unknown term — incomplete IR sticky (no invent self-eval shell)
+		SetError(ErrGeneric)
 		return IncompleteExpressions()
 	}
 }
@@ -175,12 +185,13 @@ func LhsAsExpression(lhs *Lhs) *Expression {
 
 // GetDereferencedPtrs mirrors ExpressionVariable::get_dereferenced_ptrs.
 // ExpressionVariable.cpp:221–227 — self if indirect_level > 0.
-// Incomplete IR fails closed IncompleteExpressions (not bare nil invent
-// empty-complete deref list via ExpressionsComplete(nil)/len==0).
+// Incomplete IR fails closed sticky IncompleteExpressions (not bare nil invent
+// empty-complete deref list / soft re-pick past holes).
 // Complete no-deref cases return empty non-nil slice so callers can distinguish.
 func GetDereferencedPtrs(e *Expression) []*Expression {
 	out, ok := collectDereferencedPtrs(e)
 	if !ok {
+		SetError(ErrGeneric)
 		return IncompleteExpressions()
 	}
 	return out

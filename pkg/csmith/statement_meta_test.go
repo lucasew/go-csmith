@@ -52,7 +52,8 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	if len(ifBlks) != 2 || ifBlks[0] == nil || ifBlks[1] != nil {
 		t.Fatalf("if arms: %+v", ifBlks)
 	}
-	// missing Else fails typed walk (no invent soft-skip absent arm / empty complete)
+	// missing Else fails typed walk sticky (no invent soft-skip absent arm / empty complete)
+	ClearError()
 	var stms []*Stmt
 	if FindTypedStmts(&Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
 		t.Fatal("nil Else arm must fail closed typed walk")
@@ -60,6 +61,10 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	if StmtsComplete(stms) {
 		t.Fatal("nil Else arm must leave IncompleteStmtsSlice, not invent empty complete", stms)
 	}
+	if !HasError() {
+		t.Fatal("nil Else FindTypedStmts must SetError sticky")
+	}
+	ClearError()
 	// for always pushes body slot
 	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor})
 	if len(forBlks) != 1 || forBlks[0] != nil {

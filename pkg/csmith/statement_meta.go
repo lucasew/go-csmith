@@ -79,15 +79,16 @@ func IncompleteStmtsSlice() []*Stmt {
 
 // FindTypedStmts mirrors Statement::find_typed_stmts.
 // Statement.cpp:631–646 — collect statements whose Kind is in kinds (recursive).
-// Returns count of matches appended to stms, or -1 on incomplete IR
-// (nil Block hole — *stms IncompleteStmtsSlice; no invent empty match via bare nil).
+// Returns count of matches appended to stms, or -1 on incomplete IR sticky
+// (nil Block hole — *stms IncompleteStmtsSlice; no invent empty match / soft re-pick).
 func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
 	}
 	if st == nil {
-		// incomplete Statement* — fail closed hole marker
+		// incomplete Statement* — fail closed sticky hole marker
 		*stms = IncompleteStmtsSlice()
+		SetError(ErrGeneric)
 		return -1
 	}
 	for _, k := range kinds {
@@ -97,16 +98,20 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		}
 	}
 	for _, b := range GetBlocksStmt(st) {
-		// Block* always live from get_blocks; nil hole fails closed
+		// Block* always live from get_blocks; nil hole fails closed sticky
 		if b == nil {
 			*stms = IncompleteStmtsSlice()
+			SetError(ErrGeneric)
 			return -1
 		}
 		for i := range b.Stmts {
 			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
-				// child already set IncompleteStmtsSlice when it failed closed
+				// child already set IncompleteStmtsSlice sticky when it failed closed
 				if StmtsComplete(*stms) {
 					*stms = IncompleteStmtsSlice()
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 				}
 				return -1
 			}
@@ -116,13 +121,14 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 }
 
 // FindTypedStmtsInBlock walks a block's statements for typed collection.
-// Returns -1 on incomplete IR (same as FindTypedStmts).
+// Returns -1 on incomplete IR sticky (same as FindTypedStmts).
 func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 	if stms == nil {
 		return -1
 	}
 	if b == nil {
 		*stms = IncompleteStmtsSlice()
+		SetError(ErrGeneric)
 		return -1
 	}
 	for i := range b.Stmts {

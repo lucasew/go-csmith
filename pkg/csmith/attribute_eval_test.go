@@ -176,7 +176,8 @@ func TestGetEvalToSubexpsComma(t *testing.T) {
 }
 
 func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
-	// incomplete IR must IncompleteExpressions (not bare nil invent empty-complete)
+	// incomplete IR must IncompleteExpressions sticky (not bare nil invent empty-complete)
+	ClearError()
 	cases := []*Expression{
 		{Term: TermCommaExpr},
 		{Term: TermAssignment},
@@ -186,10 +187,15 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 		nil,
 	}
 	for _, e := range cases {
+		ClearError()
 		if ExpressionsComplete(GetEvalToSubexps(e)) {
 			t.Fatalf("incomplete eval must IncompleteExpressions, got complete for %#v", e)
 		}
+		if !HasError() {
+			t.Fatalf("incomplete eval must SetError sticky for %#v", e)
+		}
 	}
+	ClearError()
 }
 
 func TestHaveOverlappingFieldsUnion(t *testing.T) {
