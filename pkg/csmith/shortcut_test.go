@@ -317,6 +317,11 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	if ContainsUnfixedGoto(root, fm) {
 		t.Fatal("equal should be fixed")
 	}
+	// incomplete srcOut hole: fail closed unfixed (no invent fixed past hole)
+	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointTo(p, a), nil}
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("incomplete MapFactsOut must fail closed unfixed")
+	}
 }
 
 func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {

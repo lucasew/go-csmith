@@ -80,6 +80,14 @@ func TestIsNonreadableField(t *testing.T) {
 	if !IsNonreadableField(f1, facts) {
 		t.Fatal("f1 blocked")
 	}
+	// incomplete UnionFacts hole: fail closed nonreadable / not-readable
+	hole := []*FactUnion{MakeFactUnion(uv, 0), nil}
+	if IsFieldReadable(uv, 0, hole) {
+		t.Fatal("incomplete UnionFacts must not invent field readable")
+	}
+	if !IsNonreadableField(f0, hole) {
+		t.Fatal("incomplete UnionFacts must fail closed nonreadable")
+	}
 }
 
 func TestUpdateAssignUnionFact(t *testing.T) {

@@ -228,14 +228,15 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		if visited && destInside {
 			srcOut := fm.MapFactsOut[e.SrcID]
 			destIn := fm.MapFactsIn[e.DestStmID]
+			// incomplete maps fail closed unfixed — no invent "all fixed" when
+			// FindRelatedPointTo returns nil past a hole before a related fact
+			if !FactsComplete(srcOut) || !FactsComplete(destIn) {
+				return true
+			}
 			if len(srcOut) > 0 && len(destIn) == 0 {
 				return true
 			}
 			for _, f := range destIn {
-				// Fact* always live; nil hole is unfixed
-				if f == nil || f.Var == nil {
-					return true
-				}
 				if f.Var.IsRV() {
 					continue
 				}

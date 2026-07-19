@@ -186,10 +186,25 @@ func (f *FactUnion) Output() string {
 	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)
 }
 
+// UnionFactsComplete reports FactUnion* maps have no nil holes.
+// Incomplete lists must not invent readable/related matches past a hole.
+func UnionFactsComplete(facts []*FactUnion) bool {
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // IsFieldReadable mirrors FactUnion::is_field_readable.
 // FactUnion.cpp:262–270.
+// Incomplete facts fail closed false (no invent readable past UnionFacts hole).
 func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 	if v == nil || v.Type == nil || !v.Type.IsUnion() || fid < 0 {
+		return false
+	}
+	if !UnionFactsComplete(facts) {
 		return false
 	}
 	if v.Type != nil && fid >= len(v.Type.Fields) && fid >= len(v.FieldVars) {
@@ -206,6 +221,8 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 // IsNonreadableField mirrors FactUnion::is_nonreadable_field.
 // FactUnion.cpp:178–192 — when analysis active (facts non-empty), unread union fields blocked.
 // When facts empty, returns false (analysis not engaged).
+// Incomplete FactUnion maps fail closed nonreadable (no invent readable while
+// FindRelatedUnion returns nil past a hole before a matching parent fact).
 func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	if v == nil || !v.IsInsideUnionField() {
 		return false
@@ -213,6 +230,9 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	if len(facts) == 0 {
 		// no FactUnion tracking yet — do not ban all union fields
 		return false
+	}
+	if !UnionFactsComplete(facts) {
+		return true
 	}
 	// walk to the union field variable
 	// FactUnion.cpp:181–184 — for (; !is_union_field(); field_var_of); assert(is_union_field)
@@ -226,6 +246,7 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 	}
 	parent := uf.FieldVarOf
 	fid := uf.GetFieldID()
+	// incomplete parent FieldVars → GetFieldID -1 → MakeFactUnion fails → nonreadable
 	tmp := MakeFactUnion(parent, fid)
 	if tmp == nil {
 		// parent not union type — fail closed nonreadable
