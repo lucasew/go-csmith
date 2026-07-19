@@ -49,6 +49,24 @@ func TestReturnFactRegistry(t *testing.T) {
 	}
 }
 
+func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
+	// soft invent: skip nil fact hole and still register later RV match
+	InvocationReturnFactsDoFinalization()
+	defer InvocationReturnFactsDoFinalization()
+	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fi := &Invocation{User: &Function{Name: "f", RV: rv}}
+	good := MakeFactPointTo(rv, NullPtr)
+	fi.SaveReturnFacts([]*FactPointTo{nil, good})
+	if GetReturnFactForInvocation(fi, rv) != nil {
+		t.Fatal("incomplete SaveReturnFacts must not invent registry entry")
+	}
+	// incomplete PointTo on matching fact
+	fi.SaveReturnFacts([]*FactPointTo{{Var: rv, PointTo: []*Variable{nil}}})
+	if GetReturnFactForInvocation(fi, rv) != nil {
+		t.Fatal("incomplete PointTo must not invent registry")
+	}
+}
+
 func TestNeedsRevisit(t *testing.T) {
 	f := &Function{}
 	if f.NeedsRevisit() {

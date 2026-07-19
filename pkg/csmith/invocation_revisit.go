@@ -12,8 +12,9 @@ var (
 
 // AddReturnFactForInvocation mirrors add_return_fact_for_invocation.
 // FunctionInvocationUser.cpp:91–102 — assert(invocations.size() == return_facts.size()).
+// Incomplete PointTo fails closed (no invent registry of broken facts).
 func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
-	if fi == nil || f == nil {
+	if fi == nil || f == nil || !FactsComplete([]*FactPointTo{f}) {
 		return
 	}
 	// keep parallel slices; desync is broken IR — reset rather than invent
@@ -22,7 +23,13 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 		returnFactPoints = nil
 	}
 	for i, inv := range returnFactInvocations {
-		if inv == fi && returnFactPoints[i] != nil && returnFactPoints[i].Var == f.Var {
+		// nil registry slot is incomplete — fail closed clear, no invent re-seed
+		if returnFactPoints[i] == nil {
+			returnFactInvocations = nil
+			returnFactPoints = nil
+			return
+		}
+		if inv == fi && returnFactPoints[i].Var == f.Var {
 			returnFactPoints[i] = f
 			return
 		}
@@ -33,6 +40,7 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
 // FunctionInvocationUser.cpp:76–91 — assert parallel sizes.
+// Incomplete registry slot fails closed nil (no invent soft-skip hole to later match).
 func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 	if fi == nil || v == nil {
 		return nil
@@ -41,7 +49,13 @@ func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 		return nil
 	}
 	for i, inv := range returnFactInvocations {
-		if inv == fi && returnFactPoints[i] != nil && returnFactPoints[i].Var == v {
+		if inv != fi {
+			continue
+		}
+		if returnFactPoints[i] == nil {
+			return nil
+		}
+		if returnFactPoints[i].Var == v {
 			return returnFactPoints[i]
 		}
 	}
@@ -57,12 +71,16 @@ func InvocationReturnFactsDoFinalization() {
 
 // SaveReturnFacts mirrors FunctionInvocationUser::save_return_fact.
 // FunctionInvocationUser.cpp:358–365 — facts matching func.rv.
+// Incomplete maps fail closed (no invent soft-skip holes and still save later).
 func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 	if fi == nil || fi.User == nil || fi.User.RV == nil {
 		return
 	}
+	if !FactsComplete(facts) {
+		return
+	}
 	for _, f := range facts {
-		if f != nil && f.Var != nil && fi.User.RV.Match(f.Var) {
+		if fi.User.RV.Match(f.Var) {
 			AddReturnFactForInvocation(fi, f)
 		}
 	}

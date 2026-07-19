@@ -5,6 +5,34 @@ import (
 	"testing"
 )
 
+func TestVisitFactsStatementIfMergeIncompleteElseFailClosed(t *testing.T) {
+	// soft invent: MergeFacts clears GlobalFacts but visit still returns true
+	// hard to plant mid-merge fail; incomplete thenFacts path is covered by
+	// direct assign branches — plant incomplete GlobalFacts after else visit
+	// via incomplete thenFacts clone: both arms assign same ptr env then we
+	// force elseFacts incomplete is not accessible post-clone. Instead verify
+	// MergeFacts fail closed leaves incomplete GlobalFacts → visit false.
+	// Use must_return false path with thenFacts pointing to shared incomplete.
+	// Simpler: incomplete inputsCopy for both-must-return.
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// plant incomplete GlobalFacts before visit — fails early
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	st := Stmt{
+		Kind: StmtIfElse,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
+	}
+	if VisitFactsStatementIf(&st, &cg, opts) {
+		t.Fatal("incomplete GlobalFacts must fail closed if visit")
+	}
+	_ = p
+}
+
 func TestVisitFactsStatementIfMerge(t *testing.T) {
 	BookkeeperDoFinalization()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)

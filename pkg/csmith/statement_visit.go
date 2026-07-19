@@ -237,14 +237,30 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		switch {
 		case trueMust && falseMust:
 			// pre-condition env (inputs_copy), not post-condition
+			if !FactsComplete(inputsCopy) {
+				return false
+			}
 			cg.FM.GlobalFacts = CloneFactSlice(inputsCopy)
 		case trueMust:
+			if !FactsComplete(elseFacts) {
+				return false
+			}
 			cg.FM.GlobalFacts = elseFacts
 		case falseMust:
+			if !FactsComplete(thenFacts) {
+				return false
+			}
 			cg.FM.GlobalFacts = thenFacts
 		default:
+			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) {
+				return false
+			}
 			cg.FM.GlobalFacts = thenFacts
-			MergeFacts(&cg.FM.GlobalFacts, elseFacts)
+			// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit
+			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				return false
+			}
 		}
 	}
 	// parent accum: both arms observed (generation-time separates; visit matches merge)
