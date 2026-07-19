@@ -16,15 +16,30 @@ type Lhs struct {
 
 // IndirectLevel mirrors Lhs::get_indirect_level.
 // Lhs.cpp:190–192 — var.type.indirect - type.indirect.
+// Incomplete Lhs IR (nil var/type) returns 0 for the bit; callers that must not
+// invent non-deref visit success use IndirectLevelComplete.
 func (l *Lhs) IndirectLevel() int {
-	if l == nil || l.Var == nil || l.Var.Type == nil {
+	n, ok := l.IndirectLevelComplete()
+	if !ok {
 		return 0
+	}
+	return n
+}
+
+// IndirectLevelComplete is get_indirect_level with ok=false on incomplete Lhs IR
+// (no invent treat broken Lhs as bare non-deref level 0 for visit/validate).
+func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
+	if l == nil || l.Var == nil || l.Var.Type == nil {
+		return 0, false
 	}
 	want := l.Type
 	if want == nil {
 		want = l.Var.Type
 	}
-	return l.Var.Type.IndirectLevel() - want.IndirectLevel()
+	if want == nil {
+		return 0, false
+	}
+	return l.Var.Type.IndirectLevel() - want.IndirectLevel(), true
 }
 
 // GetVar mirrors Lhs::get_var.

@@ -124,6 +124,14 @@ func TestIsValidPtr(t *testing.T) {
 	if !IsDanglingPtr(p, facts, 0) {
 		t.Fatal("dangling")
 	}
+	// incomplete maps fail closed as dangling (no invent not-dangling past hole)
+	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	if !IsDanglingPtr(p, hole, 0) {
+		t.Fatal("incomplete facts must fail closed as dangling")
+	}
+	if OpportunisticValidate(NewRng(1), p, GetIntType(), hole, 0, 0) != 0 {
+		t.Fatal("incomplete facts must reject opportunistic validate")
+	}
 }
 
 func TestFactMgrGlobalFacts(t *testing.T) {

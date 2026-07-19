@@ -1105,6 +1105,7 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 }
 
 // VisitFactsLhs mirrors Lhs::visit_facts.
+// Incomplete Lhs type IR fails closed (no invent bare non-deref visit success).
 // Lhs.cpp:301–356 — compound read-first; curr_rhs overlap; write/write_pointed.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
@@ -1148,7 +1149,11 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 			}
 		}
 	}
-	deref := lhs.IndirectLevel()
+	// incomplete Lhs type IR must not invent non-deref level-0 visit success
+	deref, ok := lhs.IndirectLevelComplete()
+	if !ok {
+		return false
+	}
 	valid := false
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {

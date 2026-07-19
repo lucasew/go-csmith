@@ -110,21 +110,21 @@ func TestNeedNestedLoop(t *testing.T) {
 }
 
 func TestNeedNestedLoopNilRWHoleFailClosed(t *testing.T) {
-	// Soft invent: skip nil RW entry and still need-nested from later vars.
-	// Fair: incomplete MustRead/MustWrite list fails closed false.
+	// Soft invent: skip nil RW entry as absent → no nested needed (false).
+	// Fair: incomplete MustRead/MustWrite list fails closed true (need nested).
 	arr := CreateVariableScalars("a", GetIntType(), false, false)
 	arr.IsArray = true
 	arr.ArraySizes = []int{2, 3} // dim 2 > iv 0
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtAssign}}}
 	rw := &RWDirective{MustReadVars: []*Variable{nil, arr}}
 	cg := CGContext{RW: rw, IVBounds: map[*Variable]int{}}
-	if b.NeedNestedLoop(cg, NewRng(1)) {
-		t.Fatal("nil MustRead hole must fail closed, not soft-skip to later var")
+	if !b.NeedNestedLoop(cg, NewRng(1)) {
+		t.Fatal("nil MustRead hole must fail closed true need-nested, not invent none")
 	}
 	rw2 := &RWDirective{MustWriteVars: []*Variable{nil, arr}}
 	cg2 := CGContext{RW: rw2, IVBounds: map[*Variable]int{}}
-	if b.NeedNestedLoop(cg2, NewRng(1)) {
-		t.Fatal("nil MustWrite hole must fail closed, not soft-skip to later var")
+	if !b.NeedNestedLoop(cg2, NewRng(1)) {
+		t.Fatal("nil MustWrite hole must fail closed true need-nested, not invent none")
 	}
 }
 

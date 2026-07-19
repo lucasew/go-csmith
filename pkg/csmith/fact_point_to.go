@@ -147,7 +147,12 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 
 // IsDanglingPtr mirrors FactPointTo::is_dangling_ptr.
 // FactPointTo.cpp:476–482 — related fact is dead (and dead deref not allowed).
+// Incomplete fact maps fail closed as dangling (true — no invent not-dangling
+// when FindRelatedPointTo returns nil past a hole before the related fact).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
+	if !FactsComplete(facts) {
+		return true
+	}
 	fact := FindRelatedPointTo(facts, p)
 	if fact == nil {
 		return false
@@ -158,8 +163,12 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 // OpportunisticValidate mirrors FactPointTo::opportunistic_validate.
 // FactPointTo.cpp:442–472 — 0 reject, 1 ok, 2 allowed unsafe deref via flipcoin.
 // r may be nil when both probs are 0 (deterministic reject on null/dead).
+// Incomplete fact maps fail closed as reject 0 (no invent ok via hole skip).
 func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo, nullProb, deadProb int) int {
 	if v == nil || v.Type == nil || typ == nil {
+		return 0
+	}
+	if !FactsComplete(facts) {
 		return 0
 	}
 	// no extra indirection needed
