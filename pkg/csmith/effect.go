@@ -315,10 +315,13 @@ func (e Effect) LhsWriteVars() []*Variable {
 // WriteVar mirrors Effect::write_var.
 // Effect.cpp:137–146 — record write; SE-free &= !volatile && !access_once;
 // pure left unchanged (upstream "pure = pure").
-// Incomplete base fails closed sticky IncompleteEffect (no invent grow write map on hole shell).
+// Incomplete base / nil Variable sticky IncompleteEffect (no invent grow write map
+// / soft-skip identity past holes).
 func (e Effect) WriteVar(v *Variable) Effect {
+	// Variable always live; sticky incomplete no invent identity no-op past hole
 	if v == nil {
-		return e
+		SetError(ErrGeneric)
+		return IncompleteEffect()
 	}
 	if e.incomplete {
 		SetError(ErrGeneric)
@@ -344,10 +347,13 @@ func (e Effect) WriteVar(v *Variable) Effect {
 // ReadVar mirrors Effect::read_var.
 // Effect.cpp:116–122 — record read; pure &= const&&!vol&&!access_once;
 // SE-free &= !vol&&!access_once.
-// Incomplete base fails closed sticky IncompleteEffect (no invent grow read map on hole shell).
+// Incomplete base / nil Variable sticky IncompleteEffect (no invent grow read map
+// / soft-skip identity past holes).
 func (e Effect) ReadVar(v *Variable) Effect {
+	// Variable always live; sticky incomplete no invent identity no-op past hole
 	if v == nil {
-		return e
+		SetError(ErrGeneric)
+		return IncompleteEffect()
 	}
 	if e.incomplete {
 		SetError(ErrGeneric)

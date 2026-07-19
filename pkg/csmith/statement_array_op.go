@@ -27,11 +27,13 @@ func MakeRandomIterCtrl(r *Rng, size int) (init, incr int) {
 }
 
 // AddVariableToSet mirrors add_variable_to_set — append if not already present.
-// Variable* always live; nil v is not a list hole (no-op single arg).
-// Incomplete *set (nil hole) fails closed no-op — no invent append/dup when
+// Variable* always live; nil v / nil set sticky no-op (no invent soft-skip past holes).
+// Incomplete *set (nil hole) sticky no-op — no invent append/dup when
 // IsVariableInSet is false only because membership cannot be decided past a hole.
 func AddVariableToSet(set *[]*Variable, v *Variable) {
+	// set + Variable always live; sticky incomplete no invent soft no-op past hole
 	if set == nil || v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete *set sticky no-op (no invent append/dup past membership hole)

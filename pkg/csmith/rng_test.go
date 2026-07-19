@@ -139,3 +139,28 @@ func TestRandomDigits(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRngNilSticky(t *testing.T) {
+	ClearError()
+	if (*Rng)(nil).Genrand() != 0 {
+		t.Fatal("nil Genrand must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil Genrand must SetError sticky")
+	}
+	ClearError()
+	if (*Rng)(nil).RndUpto(5) != 0 {
+		t.Fatal("nil RndUpto must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil RndUpto must SetError sticky")
+	}
+	ClearError()
+	if (*Rng)(nil).RndFlipcoin(50) {
+		t.Fatal("nil RndFlipcoin must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil RndFlipcoin must SetError sticky")
+	}
+	ClearError()
+}

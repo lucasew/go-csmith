@@ -102,8 +102,14 @@ type Block struct {
 
 // GetLastStm mirrors Block::get_last_stm — last effective statement.
 // Block.cpp:336–346 — last stmt, but stop early if return encountered.
+// Incomplete Block sticky nil (no invent soft-skip empty last / soft re-pick past hole).
 func (b *Block) GetLastStm() *Stmt {
-	if b == nil || len(b.Stmts) == 0 {
+	// Block always live; sticky incomplete no invent nil last soft-skip
+	if b == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if len(b.Stmts) == 0 {
 		return nil
 	}
 	var last *Stmt

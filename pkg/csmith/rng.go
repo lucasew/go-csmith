@@ -56,8 +56,11 @@ func NewRng(seed uint64) *Rng {
 
 // Genrand returns the next 31-bit value.
 // AbsRndNumGenerator::genrand → lrand48: (X >> 17) after LCG step.
+// Nil Rng sticky 0 (no invent fixed zero stream / soft re-pick without RNG).
 func (r *Rng) Genrand() uint32 {
+	// Rng always live for genrand; sticky incomplete no invent zero stream
 	if r == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	r.state = (lcgA*r.state + lcgC) & lcgMask
@@ -65,8 +68,11 @@ func (r *Rng) Genrand() uint32 {
 }
 
 // RandDepth is DefaultRndNumGenerator::rand_depth_ (count of rnd_upto/rnd_flipcoin/hex digit steps).
+// Nil Rng sticky 0 (no invent depth 0 soft-success past missing stream).
 func (r *Rng) RandDepth() uint64 {
+	// Rng always live; sticky incomplete no invent depth 0
 	if r == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	return r.randDepth
@@ -80,10 +86,17 @@ func (r *Rng) RndUpto(n uint32) uint32 {
 
 // RndUptoFilter is DefaultRndNumGenerator::rnd_upto with optional Filter.
 // On reject: re-genrand, keep rand_depth_ as local_depth+1 (does not double-count tries).
-// n==0 is undefined in C++ (raw % n); non-sticky return 0 without inventing domain
-// (soft re-pick: empty half/list lengths must not sticky-poison factories).
+// Nil Rng sticky 0 (no invent fixed zero draw). n==0 is undefined in C++ (raw % n);
+// non-sticky return 0 without inventing domain (soft re-pick: empty half/list lengths
+// must not sticky-poison factories).
 func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
-	if r == nil || n == 0 {
+	// Rng always live for rnd_upto; sticky incomplete no invent fixed 0 draw
+	if r == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	// n==0 non-sticky soft empty domain (no invent %0 / poison factories)
+	if n == 0 {
 		return 0
 	}
 	raw := r.Genrand()
@@ -114,8 +127,11 @@ func (r *Rng) RndFlipcoin(p uint32) bool {
 
 // RndFlipcoinFilter is DefaultRndNumGenerator::rnd_flipcoin with optional Filter.
 // If filter rejects 0 → true without genrand; rejects 1 → false without genrand.
+// Nil Rng sticky false (no invent fixed tails / soft re-pick without RNG).
 func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
+	// Rng always live for flipcoin; sticky incomplete no invent fixed false
 	if r == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if p > 100 {

@@ -800,9 +800,11 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 		return true
 	}
 	// Union: nested struct field blocks volatile; nested unions recurse.
-	// Type* always live on Fields; nil hole fails closed (not volatile-OK).
+	// Type* always live on Fields; nil hole sticky not volatile-OK
+	// (no invent volatile-OK / soft re-pick past holes).
 	for _, f := range t.Fields {
 		if f.Type == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if f.Type.IsStruct() {

@@ -342,3 +342,21 @@ func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestReadWriteVarNilSticky(t *testing.T) {
+	ClearError()
+	if EffectComplete(EmptyEffect().WriteVar(nil)) {
+		t.Fatal("WriteVar nil must fail closed IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("WriteVar nil must SetError sticky")
+	}
+	ClearError()
+	if EffectComplete(EmptyEffect().ReadVar(nil)) {
+		t.Fatal("ReadVar nil must fail closed IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("ReadVar nil must SetError sticky")
+	}
+	ClearError()
+}
