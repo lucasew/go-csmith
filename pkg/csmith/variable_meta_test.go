@@ -69,6 +69,16 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 		t.Fatal("FieldVars hole IsPackedAfterBitfield must SetError sticky")
 	}
 	ClearError()
+	// Type-nil parent sticky packed-after (restrictive — no invent not-packed soft-skip)
+	parent.FieldVars = []*Variable{f0, f1}
+	parent.Type = nil
+	if !f1.IsPackedAfterBitfield() {
+		t.Fatal("Type-nil parent must fail closed as packed-after-bitfield")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsPackedAfterBitfield must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetSeqNum(t *testing.T) {
@@ -155,6 +165,16 @@ func TestIsPackedAggregateFieldVarNilSticky(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("nil IsPackedAggregateFieldVar must SetError sticky")
+	}
+	ClearError()
+	// Type-nil ancestor sticky packed (restrictive — no invent not-packed soft-skip)
+	parent := &Variable{Name: "g_s"} // Type nil
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	if !field.IsPackedAggregateFieldVar() {
+		t.Fatal("Type-nil ancestor must fail closed as packed-aggregate field")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil ancestor IsPackedAggregateFieldVar must SetError sticky")
 	}
 	ClearError()
 }

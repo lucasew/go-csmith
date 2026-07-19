@@ -34,6 +34,16 @@ func TestGetContainerUnion(t *testing.T) {
 		t.Fatal("nil GetContainerUnion must SetError sticky")
 	}
 	ClearError()
+	// Type-nil on ancestry sticky (no invent skip hole as no-container)
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	if field.GetContainerUnion() != nil {
+		t.Fatal("Type-nil parent GetContainerUnion must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent GetContainerUnion must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSiblingUnionPartial(t *testing.T) {

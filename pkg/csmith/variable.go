@@ -755,7 +755,8 @@ func (v *Variable) IsValidVolatile() bool {
 
 // IsPackedAggregateFieldVar mirrors Variable::is_packed_aggregate_field_var.
 // Variable.cpp:307–312 — any ancestor field_var_of has packed aggregate type.
-// Incomplete Variable sticky false (no invent not-packed soft-skip past hole).
+// Incomplete Variable sticky false for nil shell; Type-nil ancestor sticky true
+// (restrictive — no invent not-packed soft-skip past incomplete parent type).
 func (v *Variable) IsPackedAggregateFieldVar() bool {
 	// Variable always live; sticky incomplete no invent not-packed soft-skip
 	if v == nil {
@@ -763,7 +764,12 @@ func (v *Variable) IsPackedAggregateFieldVar() bool {
 		return false
 	}
 	for p := v.FieldVarOf; p != nil; p = p.FieldVarOf {
-		if p.Type != nil && p.Type.Packed {
+		if p.Type == nil {
+			// incomplete parent Type sticky packed (restrictive)
+			SetError(ErrGeneric)
+			return true
+		}
+		if p.Type.Packed {
 			return true
 		}
 	}
@@ -784,7 +790,13 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 		return false
 	}
 	parent := v.FieldVarOf
-	if parent.Type != nil && parent.Type.IsStruct() && parent.Type.Packed {
+	// incomplete parent Type sticky packed-after (restrictive — no invent
+	// not-packed soft-skip past Type-nil parent shell)
+	if parent.Type == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if parent.Type.IsStruct() && parent.Type.Packed {
 		if !parent.FieldVarsComplete() {
 			// incomplete parent FieldVars sticky packed-after (restrictive)
 			SetError(ErrGeneric)
@@ -797,7 +809,12 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 			if parent.Type.IsBitfieldIndex(i) {
 				return true
 			}
-			if f.Type != nil && f.Type.HasBitfields() {
+			// incomplete sibling Type sticky packed-after (restrictive)
+			if f.Type == nil {
+				SetError(ErrGeneric)
+				return true
+			}
+			if f.Type.HasBitfields() {
 				return true
 			}
 		}
@@ -1340,13 +1357,27 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 // Variable.cpp:226–232 — walk field_var_of until union type.
 // GetContainerUnion walks FieldVarOf to the enclosing union variable.
 // Variable always live; sticky nil (no invent no-container soft-skip past hole).
+// Special null/garbage/tbd have Type nil by design — complete no-container.
+// Other Type-nil ancestor sticky nil (no invent skip hole and miss a later union parent).
 func (v *Variable) GetContainerUnion() *Variable {
 	if v == nil {
 		SetError(ErrGeneric)
 		return nil
 	}
+	// specials: Type nil by design, never inside a union container
+	if IsSpecialPtr(v) {
+		return nil
+	}
 	for p := v; p != nil; p = p.FieldVarOf {
-		if p.Type != nil && p.Type.IsUnion() {
+		if IsSpecialPtr(p) {
+			return nil
+		}
+		if p.Type == nil {
+			// incomplete Type on ancestry sticky (no invent no-container past hole)
+			SetError(ErrGeneric)
+			return nil
+		}
+		if p.Type.IsUnion() {
 			return p
 		}
 	}
