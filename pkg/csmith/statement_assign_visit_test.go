@@ -192,3 +192,29 @@ func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 		t.Fatal("visit")
 	}
 }
+
+func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete EffectContext must not invent assign visit success under poisoned running
+	ClearError()
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 10,
+		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
+	cg := WithEffectContext(IncompleteEffect())
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if VisitFactsStatementAssign(st, &cg, Defaults()) {
+		t.Fatal("incomplete EffectContext must fail closed assign visit")
+	}
+	// incomplete parent EffectAccum after merge
+	cg2 := EmptyCGContext()
+	inc := IncompleteEffect()
+	cg2.EffectAccum = &inc
+	if VisitFactsStatementAssign(st, &cg2, Defaults()) {
+		t.Fatal("incomplete EffectAccum must fail closed assign visit")
+	}
+	ClearError()
+}

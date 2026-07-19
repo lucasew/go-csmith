@@ -309,6 +309,9 @@ func MakeRandomAssignQfer(
 
 	// StatementAssign.cpp:225 — merge_param_context(lhs_cg_context, true)
 	cg.MergeParamContext(lhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return Stmt{}
+	}
 
 	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
 	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs, gensymFromVS(vs))
@@ -794,25 +797,42 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	// StatementAssign.cpp:362–367 — RHS in its own accum context
+	// Incomplete ambient fails closed (no invent visit under incomplete running)
 	runningEff := cg.EffectContext()
+	if !EffectComplete(runningEff) {
+		return false
+	}
 	rhsAccum := EmptyEffect()
 	rhsCG := *cg
 	rhsCG.effectContext = runningEff
 	rhsCG.EffectAccum = &rhsAccum
 	rhsCG.EffectStm = cg.EffectStm
+	if !EffectComplete(cg.EffectStm) {
+		return false
+	}
 
 	if !VisitFactsExpression(st.Expr, &rhsCG, opts) {
 		return false
 	}
 	// StatementAssign.cpp:372–375 — compound: LHS sees RHS effect
+	// Incomplete folds fail closed (no invent LHS visit under incomplete running)
 	if st.AssignOp != AssignSimple {
 		runningEff = runningEff.AddEffect(rhsAccum)
+		if !EffectComplete(runningEff) {
+			return false
+		}
 	}
 	cg.MergeParamContext(rhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return false
+	}
 	// StatementAssign.cpp:377 — write_var_set(rhs_accum.get_lhs_write_vars())
 	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge)
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
+		if !EffectComplete(runningEff) {
+			return false
+		}
 	}
 
 	// StatementAssign.cpp:379–384 — LHS context
@@ -842,6 +862,9 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	cg.MergeParamContext(lhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return false
+	}
 
 	// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
 	// uses get_rhs() (canonized ExpressionFuncall for compounds)

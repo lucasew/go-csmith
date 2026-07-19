@@ -293,9 +293,13 @@ func (e Effect) LhsWriteVars() []*Variable {
 // WriteVar mirrors Effect::write_var.
 // Effect.cpp:137–146 — record write; SE-free &= !volatile && !access_once;
 // pure left unchanged (upstream "pure = pure").
+// Incomplete base fails closed IncompleteEffect (no invent grow write map on hole shell).
 func (e Effect) WriteVar(v *Variable) Effect {
 	if v == nil {
 		return e
+	}
+	if e.incomplete {
+		return IncompleteEffect()
 	}
 	if e.written == nil {
 		e.written = make(map[*Variable]bool)
@@ -317,9 +321,13 @@ func (e Effect) WriteVar(v *Variable) Effect {
 // ReadVar mirrors Effect::read_var.
 // Effect.cpp:116–122 — record read; pure &= const&&!vol&&!access_once;
 // SE-free &= !vol&&!access_once.
+// Incomplete base fails closed IncompleteEffect (no invent grow read map on hole shell).
 func (e Effect) ReadVar(v *Variable) Effect {
 	if v == nil {
 		return e
+	}
+	if e.incomplete {
+		return IncompleteEffect()
 	}
 	nr := make(map[*Variable]bool, len(e.read)+1)
 	for k, val := range e.read {
@@ -564,7 +572,11 @@ func (e *Effect) Clear() {
 
 // AccessDerefVolatile mirrors Effect::access_deref_volatile.
 // Effect.cpp:124–135 — under strict_volatile_rule, clear SE-free if volatile after deref.
+// Incomplete base fails closed IncompleteEffect (no invent SE-free tweak on hole shell).
 func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile bool) Effect {
+	if e.incomplete {
+		return IncompleteEffect()
+	}
 	if !strictVolatile || v == nil {
 		return e
 	}

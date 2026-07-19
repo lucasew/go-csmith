@@ -78,6 +78,22 @@ func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	}
 }
 
+func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
+	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	w := IncompleteEffect().WriteVar(v)
+	if EffectComplete(w) || w.IsWritten(v) {
+		t.Fatal("WriteVar incomplete base must stay IncompleteEffect")
+	}
+	r := IncompleteEffect().ReadVar(v)
+	if EffectComplete(r) || r.IsRead(v) {
+		t.Fatal("ReadVar incomplete base must stay IncompleteEffect")
+	}
+	if EffectComplete(IncompleteEffect().AccessDerefVolatile(v, 1, true)) {
+		t.Fatal("AccessDerefVolatile incomplete base must stay incomplete")
+	}
+}
+
 func TestEffectIsReadByName(t *testing.T) {
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	e := EmptyEffect().ReadVar(v).WriteVar(v)

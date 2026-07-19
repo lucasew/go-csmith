@@ -758,6 +758,9 @@ func MakeRandomBinaryInvocation(
 	}
 	// FunctionInvocation.cpp:221 — merge_param_context(lhs) (effects + expr_depth)
 	cg.MergeParamContext(lhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return nil
+	}
 
 	// FunctionInvocation.cpp:222 — snapshot facts before RHS (ordered merge)
 	// incomplete GlobalFacts fail closed (no invent cleaned snapshot)
@@ -803,14 +806,22 @@ func MakeRandomBinaryInvocation(
 			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
 		} else {
 			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
+			// Incomplete lhs accum fails closed (no invent RHS under incomplete ambient)
 			rhsAccum := EmptyEffect()
 			rhsCG := *cg
-			rhsCG.effectContext = cg.EffectContext().AddEffectOpts(lhsAccum, true)
+			rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
+			if !EffectComplete(rhsCtx) {
+				return nil
+			}
+			rhsCG.effectContext = rhsCtx
 			rhsCG.EffectAccum = &rhsAccum
 			rhsCG.EffectStm = EmptyEffect()
 			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
 			cg.MergeParamContext(rhsCG, true)
+			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+				return nil
+			}
 		}
 	}
 	// FunctionInvocation.cpp:257 — ERROR_GUARD_AND_DEL2
@@ -910,6 +921,9 @@ func MakeRandomBinaryPtrComparison(
 	}
 	// FunctionInvocation.cpp:313 — merge_param_context(lhs)
 	cg.MergeParamContext(lhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return nil
+	}
 
 	// FunctionInvocation.cpp:317–320 — if LHS const, force RHS variable
 	tt := MaxTermTypes
