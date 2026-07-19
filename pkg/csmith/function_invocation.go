@@ -571,16 +571,14 @@ func BuildInvocationAndFunction(
 	callee.GenerateBodyWithKnownParams(r, opts, probs, vs, tables, stmtTab, bodyCG)
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
-	// then add_back_return_facts. C++ map[] missing → empty start then merge returns.
-	// Body stm_id always live after generate; StmID 0 / incomplete out / add_back
-	// fail closed Failed — no invent soft-merge returns or renew keep caller facts
-	// via FactsComplete(nil)==true / RenewFacts no-op on nil newFacts
+	// then add_back_return_facts. GetMapFactsOut: StmID 0 Incomplete; missing → empty.
+	// Incomplete out / add_back fail closed Failed — no invent soft-merge returns
 	var retFacts []*FactPointTo
-	if callee.Body == nil || callee.Body.StmID <= 0 {
+	if callee.Body == nil {
 		fi.Failed = true
 		return fi
 	}
-	out := calFM.MapFactsOut[callee.Body.StmID]
+	out := calFM.GetMapFactsOut(callee.Body.StmID)
 	if !FactsComplete(out) {
 		fi.Failed = true
 		return fi

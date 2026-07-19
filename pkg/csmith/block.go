@@ -865,11 +865,14 @@ func (b *Block) Output(indent int) string {
 		}
 	}
 	// OutputVariableList(local_vars) — Variable.cpp Output
-	// Variable* always live; no invent skip nil/incomplete holes as partial block
+	// Incomplete LocalVars fails closed whole block (no invent soft-skip hole partial)
+	if !VariablesComplete(b.LocalVars) {
+		return ""
+	}
 	var loopInits []*ArrayVariable
 	maxDim := 0
 	for _, lv := range b.LocalVars {
-		if lv == nil || lv.Type == nil {
+		if lv.Type == nil {
 			return ""
 		}
 		if lv.IsArray {

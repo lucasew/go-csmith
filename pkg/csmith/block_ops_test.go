@@ -300,6 +300,12 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 	if out := b.Output(0); out != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out)
 	}
+	// incomplete LocalVars must not invent soft-skip hole partial defs
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	b2 := &Block{LocalVars: []*Variable{loc, nil}}
+	if out := b2.Output(0); out != "" {
+		t.Fatal("LocalVars hole must fail closed whole block", out)
+	}
 }
 
 func TestAddNewVarFactTo(t *testing.T) {
