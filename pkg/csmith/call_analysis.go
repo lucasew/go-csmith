@@ -284,15 +284,34 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 
 // GetDirectInvocation mirrors Statement::get_direct_invocation.
 // Statement.cpp:714–734 — assign RHS, invoke, or if-test when TermFunction.
+// Expression* always live for these kinds; incomplete Expr/Invoke fails closed
+// as Failed shell (no invent nil "no call" for broken IR).
 func GetDirectInvocation(st *Stmt) *Invocation {
 	if st == nil {
 		return nil
 	}
 	switch st.Kind {
-	case StmtAssign, StmtInvoke, StmtIfElse:
-		if st.Expr != nil && st.Expr.Term == TermFunction {
-			return st.Expr.Invoke
+	case StmtAssign, StmtIfElse:
+		// StatementAssign/If always have live get_expr/get_test
+		if st.Expr == nil {
+			return &Invocation{Failed: true}
 		}
+		if st.Expr.Term != TermFunction {
+			return nil
+		}
+		if st.Expr.Invoke == nil {
+			return &Invocation{Failed: true}
+		}
+		return st.Expr.Invoke
+	case StmtInvoke:
+		// StatementExpr always has live get_invoke
+		if st.Expr == nil || st.Expr.Term != TermFunction {
+			return &Invocation{Failed: true}
+		}
+		if st.Expr.Invoke == nil {
+			return &Invocation{Failed: true}
+		}
+		return st.Expr.Invoke
 	}
 	return nil
 }
@@ -305,10 +324,20 @@ func FindContainedLabels(st *Stmt) []string {
 
 // FindContainedLabelsFM mirrors Statement::find_contained_labels.
 // Statement.cpp:706–720 — find_jump_label (CFG goto) then nested blocks.
-// When fm is nil, falls back to SourceLabel set during generation.
+// When fm is nil, falls back to SourceLabel set during generation (no CFG).
+// With FactMgr: same as PreOutput — only CFG/registry labels; no invent SourceLabel
+// when find_jump_label is empty. Incomplete CFGEdges holes fail closed (nil list).
 func FindContainedLabelsFM(st *Stmt, fm *FactMgr) []string {
 	if st == nil {
 		return nil
+	}
+	// CFGEdge* always live; nil hole fails whole label collect (no invent partial)
+	if fm != nil {
+		for _, e := range fm.CFGEdges {
+			if e == nil {
+				return nil
+			}
+		}
 	}
 	var labels []string
 	findContainedLabels(st, &labels, fm)
@@ -321,10 +350,12 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) {
 	}
 	// Statement.cpp:707–710 — find_jump_label()
 	lab := ""
-	if fm != nil && st.StmID > 0 {
-		lab = FindJumpLabel(fm, st.StmID)
-	}
-	if lab == "" {
+	if fm != nil {
+		// PreOutput: with FM, never fall back to SourceLabel
+		if st.StmID > 0 {
+			lab = FindJumpLabel(fm, st.StmID)
+		}
+	} else if st.SourceLabel != "" {
 		lab = st.SourceLabel
 	}
 	if lab != "" {

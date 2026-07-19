@@ -166,6 +166,15 @@ func TestGetDirectInvocation(t *testing.T) {
 	if GetDirectInvocation(st3) != nil {
 		t.Fatal("const")
 	}
+	// incomplete Expr/Invoke fails closed Failed (no invent nil as no-call)
+	got := GetDirectInvocation(&Stmt{Kind: StmtInvoke})
+	if got == nil || !got.Failed {
+		t.Fatal("nil Expr invoke must fail closed Failed shell", got)
+	}
+	got = GetDirectInvocation(&Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermFunction}})
+	if got == nil || !got.Failed {
+		t.Fatal("nil Invoke on TermFunction must fail closed Failed")
+	}
 }
 
 func TestFindContainedLabels(t *testing.T) {
@@ -313,5 +322,15 @@ func TestFindContainedLabelsFM(t *testing.T) {
 	}
 	if !found {
 		t.Fatal(labs)
+	}
+	// with FM: SourceLabel must not invent label when CFG has no jump to this stm
+	stSrc := &Stmt{Kind: StmtAssign, StmID: 99, SourceLabel: "lbl_invent"}
+	if labs2 := FindContainedLabelsFM(stSrc, fm); len(labs2) != 0 {
+		t.Fatal("SourceLabel must not invent under live FM", labs2)
+	}
+	// incomplete CFGEdges hole fails whole collect
+	fm.CFGEdges = []*CFGEdge{{SrcID: 3, DestStmID: 2}, nil}
+	if FindContainedLabelsFM(st, fm) != nil {
+		t.Fatal("nil CFG edge hole must fail closed nil labels")
 	}
 }
