@@ -77,11 +77,17 @@ func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) {
 }
 
 func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) {
-	if st == nil {
+	if st == nil || facts == nil {
 		return
 	}
 	if st.Kind == StmtReturn {
 		if out, ok := fm.MapFactsOut[st.StmID]; ok {
+			// incomplete return outs or working set fail closed
+			// (no invent skip this return / partial join)
+			if !FactsComplete(out) || !FactsComplete(*facts) {
+				*facts = nil
+				return
+			}
 			MergeFacts(facts, out)
 		}
 		return
@@ -96,19 +102,28 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) {
 
 // UpdateFactsForOOSVars mirrors FactMgr::update_facts_for_oos_vars.
 // FactMgr.cpp:141–170 — drop facts for vars; mark pointees as garbage/dead.
+// Fact* always live; nil hole fails closed (nil facts, no invent clean filter).
+// Variable* in OOS list always live; nil hole fails closed same way.
 func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 	if facts == nil || len(vars) == 0 {
 		return
 	}
+	if !FactsComplete(*facts) {
+		*facts = nil
+		return
+	}
+	for _, v := range vars {
+		if v == nil {
+			*facts = nil
+			return
+		}
+	}
 	// remove facts whose subject matches an OOS var
 	out := make([]*FactPointTo, 0, len(*facts))
 	for _, f := range *facts {
-		if f == nil || f.Var == nil {
-			continue
-		}
 		drop := false
 		for _, v := range vars {
-			if v != nil && v.Match(f.Var) {
+			if v.Match(f.Var) {
 				drop = true
 				break
 			}

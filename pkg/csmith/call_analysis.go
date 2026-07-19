@@ -221,6 +221,8 @@ func findContainedLabels(st *Stmt, labels *[]string, fm *FactMgr) {
 
 // CombineBranchFacts mirrors StatementIf::combine_branch_facts.
 // StatementIf.cpp:208–236 — merge then/else outs with must_return precision.
+// Fact maps always complete; nil holes fail closed (GlobalFacts nil, no invent
+// partial then/else join).
 func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	if st == nil || fm == nil || st.Kind != StmtIfElse {
 		return
@@ -231,6 +233,11 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	}
 	if st.Else != nil && st.Else.StmID > 0 {
 		elseOut = fm.MapFactsOut[st.Else.StmID]
+	}
+	// Fact* always live in maps used for branch combine
+	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
+		fm.GlobalFacts = nil
+		return
 	}
 	// makeup new vars from branch outs into preFacts snapshot
 	MakeupNewVarFacts(&preFacts, thenOut)
@@ -247,11 +254,23 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = CloneFactSlice(thenOut)
 		if st.Else != nil && st.Else.StmID > 0 {
 			if in, ok := fm.MapFactsIn[st.Else.StmID]; ok {
+				if !FactsComplete(in) {
+					fm.GlobalFacts = nil
+					return
+				}
 				MakeupNewVarFacts(&fm.GlobalFacts, in)
 			}
 		}
 	default:
 		fm.GlobalFacts = CloneFactSlice(thenOut)
+		// incomplete clone or else merge must not invent partial global
+		if thenOut != nil && fm.GlobalFacts == nil {
+			return
+		}
+		if !FactsComplete(elseOut) {
+			fm.GlobalFacts = nil
+			return
+		}
 		MergeFacts(&fm.GlobalFacts, elseOut)
 	}
 }

@@ -76,6 +76,18 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	if !facts[0].IsDead() {
 		t.Fatal("should mark dead pointee")
 	}
+	// nil fact hole fails closed — no invent clean filter past hole
+	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	UpdateFactsForOOSVars([]*Variable{loc}, &hole)
+	if hole != nil {
+		t.Fatal("nil fact hole must fail closed", hole)
+	}
+	// nil OOS var hole fails closed
+	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	UpdateFactsForOOSVars([]*Variable{nil}, &ok)
+	if ok != nil {
+		t.Fatal("nil OOS var hole must fail closed", ok)
+	}
 }
 
 func TestOutputCommentLine(t *testing.T) {

@@ -433,10 +433,14 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 		return b
 	}
 	// C++ edge->src is a live Statement*; look up via function tree (not only root of b)
+	// CFGEdge* always live; nil hole fails closed (no invent skip as absent goto)
 	for {
 		expanded := false
 		for _, e := range fm.CFGEdges {
-			if e == nil || e.SrcID <= 0 {
+			if e == nil {
+				return nil
+			}
+			if e.SrcID <= 0 {
 				continue
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
@@ -854,8 +858,10 @@ func (vs *VariableSelector) SelectMustUseVar(
 	blk := cg.CurrentBlock()
 	for i := 0; i < len(*list); i++ {
 		v := (*list)[i]
+		// Variable* always live in must-use lists; nil hole fails closed
+		// (no invent skip to next entry / partial must-use)
 		if v == nil {
-			continue
+			return nil
 		}
 		// is_visible (VariableSelector.cpp:1523)
 		if !v.IsVisible(blk) {

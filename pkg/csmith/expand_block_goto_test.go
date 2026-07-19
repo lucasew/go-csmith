@@ -69,6 +69,22 @@ func TestExpandBlockForGotoAssertB(t *testing.T) {
 	}
 }
 
+func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
+	// CFGEdge* always live; nil hole must not invent skip as absent edge
+	f := &Function{Name: "f"}
+	outer := &Block{Func: f, StmID: 1}
+	inner := &Block{Func: f, Parent: outer, StmID: 2}
+	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: inner}, {Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}
+	f.Blocks = []*Block{outer}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 20, DestStmID: 10}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if ExpandBlockForGoto(inner, cg) != nil {
+		t.Fatal("nil CFG hole must fail closed")
+	}
+}
+
 func TestLowerBlockForVars(t *testing.T) {
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	b := CreateVariableScalars("l_b", GetIntType(), false, false)

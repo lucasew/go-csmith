@@ -54,8 +54,10 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		}
 	}
 	for _, b := range GetBlocksStmt(st) {
+		// Block* always live from get_blocks; nil hole fails closed (stop recurse)
+		// no invent skip nested typed stmts past hole
 		if b == nil {
-			continue
+			return len(*stms)
 		}
 		for i := range b.Stmts {
 			FindTypedStmts(&b.Stmts[i], stms, kinds)

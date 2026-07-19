@@ -124,6 +124,23 @@ func TestCombineBranchFacts(t *testing.T) {
 	if fp == nil || !fp.IsNull() {
 		t.Fatal("both return use pre", fp)
 	}
+	// nil hole in branch outs fails closed — no invent partial combine
+	// bypass SetMapFactsOut (CloneFactSlice strips holes → nil) to plant a hole
+	fm2 := NewFactMgr(nil)
+	fm2.MapFactsOut = map[int][]*FactPointTo{
+		10: {MakeFactPointTo(p, GarbagePtr), nil},
+		11: {MakeFactPointTo(p, NullPtr)},
+	}
+	st2 := &Stmt{
+		Kind: StmtIfElse,
+		Then: &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
+		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
+	}
+	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	CombineBranchFacts(st2, pre, fm2)
+	if fm2.GlobalFacts != nil {
+		t.Fatal("nil branch fact hole must fail closed", fm2.GlobalFacts)
+	}
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {

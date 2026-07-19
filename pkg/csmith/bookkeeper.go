@@ -444,10 +444,11 @@ func StatExprDepths(funcs []*Function) {
 func StatBlkDepths(funcs []*Function) int {
 	blkDepthCnts = nil
 	cnt := 0
+	incomplete := false
 	// Bookkeeper.cpp:128–140 — stat_blk_depths_for_stmt
 	var walk func(st *Stmt, parent *Block)
 	walk = func(st *Stmt, parent *Block) {
-		if st == nil {
+		if st == nil || incomplete {
 			return
 		}
 		// eType != eBlock: our Stmt kinds are never pure Block statements
@@ -459,9 +460,13 @@ func StatBlkDepths(funcs []*Function) int {
 		IncrCounter(&blkDepthCnts, depth)
 		cnt++
 		// get_blocks → recurse into Then/Else stmts with that block as parent
+		// Block* always live; nil hole fails closed (clear counts, no invent partial)
 		for _, blk := range GetBlocksStmt(st) {
 			if blk == nil {
-				continue
+				incomplete = true
+				blkDepthCnts = nil
+				cnt = 0
+				return
 			}
 			for i := range blk.Stmts {
 				walk(&blk.Stmts[i], blk)
@@ -480,6 +485,9 @@ func StatBlkDepths(funcs []*Function) int {
 		// body is a Block; count its statements with parent=body
 		for i := range f.Body.Stmts {
 			walk(&f.Body.Stmts[i], f.Body)
+			if incomplete {
+				return 0
+			}
 		}
 	}
 	return cnt
@@ -604,8 +612,11 @@ func outputPointerStatistics(b *strings.Builder) {
 		hasNull := 0
 		ptPtr, ptScalar, ptStruct := 0, 0, 0
 		for i, p := range ptrs {
+			// Variable* always live in ptrs bookkeeping; nil hole fails closed
+			// (no invent skip partial alias/pointee stats)
 			if p == nil || p.Type == nil {
-				continue
+				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
 			if !p.Type.IsPointerLike() {
