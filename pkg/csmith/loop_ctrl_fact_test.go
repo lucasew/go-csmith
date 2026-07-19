@@ -75,13 +75,18 @@ func TestIsVisibleLocal(t *testing.T) {
 }
 
 func TestIsPointingToLocalsNilHole(t *testing.T) {
+	ClearError()
 	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	// incomplete PointTo fails closed as pointing-to-locals
+	// incomplete PointTo sticky as pointing-to-locals
 	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}
 	if !IsPointingToLocals(ptr, &Block{}, 0, facts) {
 		t.Fatal("nil pointee hole must fail closed as pointing-to-locals")
 	}
-	// incomplete map hole before related fact: no invent not-local via FindRelated nil
+	if !HasError() {
+		t.Fatal("nil pointee IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
+	// incomplete map hole sticky true
 	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
@@ -89,12 +94,20 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	if !IsPointingToLocals(ptr, blk, 0, holeMap) {
 		t.Fatal("incomplete map must fail closed as pointing-to-locals")
 	}
-	// incomplete stack: no invent not-local via IsVisibleLocal false past hole
+	if !HasError() {
+		t.Fatal("incomplete map IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
+	// incomplete stack sticky true
 	badBlk := &Block{LocalVars: []*Variable{loc, nil}}
 	okFacts := []*FactPointTo{MakeFactPointTo(ptr, loc)}
 	if !IsPointingToLocals(ptr, badBlk, 0, okFacts) {
 		t.Fatal("incomplete stack must fail closed as pointing-to-locals")
 	}
+	if !HasError() {
+		t.Fatal("incomplete stack IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPointingToLocals(t *testing.T) {

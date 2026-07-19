@@ -15,22 +15,24 @@ func (f *FactPointTo) IsTop() bool {
 
 // HasInvisible mirrors FactPointTo::has_invisible.
 // FactPointTo.cpp:87–99 — subject or pointee not visible at stm parent.
-// Incomplete Param/LocalVars at stParent fail closed as invisible (no invent
-// "all visible" when IsVisibleLocal returns false past a hole, nor invent
-// assertable after a short-circuited visibility scan).
+// Incomplete Param/LocalVars / PointTo holes fail closed sticky as invisible
+// (no invent "all visible" / soft re-pick past holes).
 func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 	if f == nil || f.Var == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	if stParent != nil && !stParent.StackScanComplete() {
+		SetError(ErrGeneric)
 		return true
 	}
 	if !f.Var.IsVisible(stParent) {
 		return true
 	}
 	for _, p := range f.PointTo {
-		// Variable* always live in PointTo; nil hole fails closed as invisible
+		// Variable* always live in PointTo; nil hole sticky as invisible
 		if p == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if IsSpecialPtr(p) {
@@ -45,14 +47,16 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 
 // IsAssertable mirrors FactPointTo::is_assertable.
 // FactPointTo.cpp:661–666 — no array subject; no garbage/tbd; no invisible.
-// Incomplete PointTo fails closed not-assertable (no invent skip GarbagePtr
-// past a hole via IsVariableInSet false membership).
+// Incomplete PointTo fails closed sticky not-assertable (no invent skip GarbagePtr
+// / soft re-pick past hole via IsVariableInSet false membership).
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if f == nil || f.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// incomplete fact must not invent assertable via partial PointTo scan
+	// incomplete fact sticky (no invent assertable via partial PointTo scan)
 	if !FactsComplete([]*FactPointTo{f}) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// get_array != null → not assertable

@@ -97,13 +97,17 @@ func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
 
 // HasInitSkippedVars mirrors StatementGoto::has_init_skipped_vars.
 // StatementGoto.cpp:281–306 — jump into/out would skip locals of intermediate blocks.
-// Incomplete LocalVars fails closed as has-skipped (no invent none).
+// Incomplete LocalVars fails closed sticky as has-skipped (no invent none / soft re-pick).
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
 	if destParent == nil {
 		return false
 	}
 	skipped := CollectInitSkippedVars(src, destParent)
 	if !VariablesComplete(skipped) {
+		// CollectInitSkippedVars already SetError sticky
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	return len(skipped) > 0

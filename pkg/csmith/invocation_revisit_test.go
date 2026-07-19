@@ -100,13 +100,17 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete PointTo SaveReturnFacts must SetError sticky")
 	}
 	ClearError()
-	// nil Invocation* registry slot must not invent soft-skip match later
+	// nil Invocation* registry slot sticky fail closed (no invent later match)
+	ClearError()
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
 	returnFactInvocations = append([]*Invocation{nil}, returnFactInvocations...)
 	returnFactPoints = append([]*FactPointTo{MakeFactPointTo(rv, NullPtr)}, returnFactPoints...)
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("nil inv registry hole must fail closed, not invent later match")
+	}
+	if !HasError() {
+		t.Fatal("nil inv registry GetReturnFact must SetError sticky")
 	}
 	// Add with hole must wipe sticky rather than soft-skip re-seed
 	ClearError()

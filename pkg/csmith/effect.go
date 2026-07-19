@@ -575,9 +575,10 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 
 // HasRaceWith mirrors Effect::has_race_with.
 // Effect.cpp:480–484 — non-empty intersection of read/write sets.
-// Incomplete either side fails closed as race (no invent race-free).
+// Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).
 func (e Effect) HasRaceWith(other Effect) bool {
 	if !EffectComplete(e) || !EffectComplete(other) {
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, v := range e.ReadVars() {

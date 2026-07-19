@@ -47,18 +47,19 @@ func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
 
 // GetReturnFactForInvocation mirrors get_return_fact_for_invocation (point-to).
 // FunctionInvocationUser.cpp:76–91 — assert parallel sizes.
-// Incomplete registry slot fails closed nil (no invent soft-skip hole to later match).
+// Incomplete registry slot fails closed sticky nil (no invent soft-skip hole to later match).
 func GetReturnFactForInvocation(fi *Invocation, v *Variable) *FactPointTo {
 	if fi == nil || v == nil {
 		return nil
 	}
 	if len(returnFactInvocations) != len(returnFactPoints) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	for i, inv := range returnFactInvocations {
-		// Invocation* always live on registry; nil hole fails closed (no invent
-		// soft-skip hole and still match a later inv == fi)
+		// Invocation* always live on registry; nil hole sticky
 		if inv == nil || returnFactPoints[i] == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if inv != fi {

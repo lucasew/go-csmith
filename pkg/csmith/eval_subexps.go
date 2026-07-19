@@ -135,25 +135,32 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 
 // HaveOverlappingFields mirrors have_overlapping_fields.
 // Lhs.cpp:287–298 — shared union pointee between e1 and e2.
-// Incomplete fact maps / pointees / exprs fail closed as overlap
-// (no invent conflict-free past holes / incomplete FindUnionPointees as empty).
+// Incomplete fact maps / pointees / exprs fail closed sticky as overlap
+// (no invent conflict-free / soft re-pick past holes).
 func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 	if facts != nil && !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return true
 	}
-	// incomplete expression shells fail closed as overlap
+	// incomplete expression shells sticky as overlap
 	if e1 == nil || e2 == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	if (e1.Term == TermVariable || e1.Term == TermLhs) && e1.Var == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	if (e2.Term == TermVariable || e2.Term == TermLhs) && e2.Var == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	vars1 := FindUnionPointees(facts, e1)
-	// incomplete → overlap; complete empty → no union pointees on e1 → no overlap
+	// incomplete → sticky overlap; complete empty → no union pointees on e1
 	if !VariablesComplete(vars1) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	if len(vars1) == 0 {
@@ -161,6 +168,9 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 	}
 	vars2 := FindUnionPointees(facts, e2)
 	if !VariablesComplete(vars2) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	for _, v := range vars2 {

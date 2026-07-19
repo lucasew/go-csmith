@@ -1112,16 +1112,17 @@ func (c CGContext) AcceptType(t *Type) bool {
 
 // InConflict mirrors CGContext::in_conflict — callee effect vs current context.
 // CGContext.cpp:531–564.
-// Variable* always live in effect lists; nil hole fails closed as conflict
-// (no invent skip as conflict-free incomplete effect).
-// Incomplete eff or effect_context fails closed as conflict (no invent conflict-free
-// via empty ReadVars/WrittenVars past IncompleteEffect or incomplete ambient).
+// Variable* always live in effect lists; nil hole fails closed sticky as conflict
+// (no invent skip / soft re-pick conflict-free incomplete effect).
+// Incomplete eff or effect_context sticky as conflict.
 func (c CGContext) InConflict(eff Effect) bool {
 	if !EffectComplete(eff) || !EffectComplete(c.EffectContext()) {
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, v := range eff.ReadVars() {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if c.IsNonReadable(v) {
@@ -1136,6 +1137,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 	}
 	for _, v := range eff.WrittenVars() {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if c.IsNonWritable(v) || v.IsConst() {

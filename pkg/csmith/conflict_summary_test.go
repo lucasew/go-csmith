@@ -76,28 +76,46 @@ func TestInConflictNoWrite(t *testing.T) {
 }
 
 func TestInConflictNilHoleFailClosed(t *testing.T) {
-	// nil Variable* in effect lists must not invent conflict-free
+	// nil Variable* in effect lists sticky conflict (no invent conflict-free)
+	ClearError()
 	eff := EmptyEffect()
 	eff.written = map[*Variable]bool{nil: true}
 	if !EmptyCGContext().InConflict(eff) {
 		t.Fatal("nil write hole must fail closed as conflict")
 	}
+	if !HasError() {
+		t.Fatal("nil write hole InConflict must SetError sticky")
+	}
+	ClearError()
 	eff2 := EmptyEffect()
 	eff2.read = map[*Variable]bool{nil: true}
 	if !EmptyCGContext().InConflict(eff2) {
 		t.Fatal("nil read hole must fail closed as conflict")
 	}
+	if !HasError() {
+		t.Fatal("nil read hole InConflict must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestInConflictIncompleteEffectFailClosed(t *testing.T) {
-	// IncompleteEffect / incomplete ambient must not invent conflict-free
+	// IncompleteEffect / incomplete ambient sticky conflict
+	ClearError()
 	if !EmptyCGContext().InConflict(IncompleteEffect()) {
 		t.Fatal("IncompleteEffect must fail closed as conflict")
 	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect InConflict must SetError sticky")
+	}
+	ClearError()
 	cg := WithEffectContext(IncompleteEffect())
 	if !cg.InConflict(EmptyEffect()) {
 		t.Fatal("incomplete ambient must fail closed as conflict")
 	}
+	if !HasError() {
+		t.Fatal("incomplete ambient InConflict must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestChooseFuncContextSkipsConflict(t *testing.T) {

@@ -65,12 +65,17 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	if !strings.Contains(out2, "assert (") {
 		t.Fatal(out2)
 	}
-	// incomplete PointTo: no invent assertable by skipping GarbagePtr past hole
+	// incomplete PointTo sticky not-assertable
+	ClearError()
 	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, GarbagePtr}}
 	if hole.IsAssertable(nil) {
 		t.Fatal("incomplete PointTo must fail closed not-assertable")
 	}
-	// incomplete stack at parent: HasInvisible fail closed (no invent assertable)
+	if !HasError() {
+		t.Fatal("incomplete PointTo IsAssertable must SetError sticky")
+	}
+	ClearError()
+	// incomplete stack at parent: HasInvisible sticky true
 	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc, nil}}
@@ -78,13 +83,19 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	if !fl.HasInvisible(blk) {
 		t.Fatal("incomplete stack must HasInvisible true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete stack HasInvisible must SetError sticky")
+	}
+	ClearError()
 	if fl.IsAssertable(blk) {
 		t.Fatal("incomplete stack must not invent assertable")
 	}
+	ClearError()
 	if s := hole.OutputAssertion(nil, "  "); s != "" && !strings.Contains(s, "//") {
 		// OutputCondition fails closed empty on hole → empty assertion
 		_ = s
 	}
+	ClearError()
 }
 
 func TestOutputAssertionsParanoid(t *testing.T) {

@@ -1229,15 +1229,16 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals.
 // FactPointTo.cpp:487–526.
-// Variable* always live in pointees; incomplete fact maps / stack scans / nil
-// holes fail closed as true (no invent "not pointing to locals" past holes or
-// FindRelatedPointTo nil-before-match on incomplete maps).
+// Incomplete fact maps / stack scans / nil holes fail closed sticky true
+// (no invent "not pointing to locals" / soft re-pick past holes).
+// MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
 		return false
 	}
-	// incomplete LocalVars/Param: membership short-circuit invents not-local
+	// incomplete LocalVars/Param sticky (membership short-circuit invents not-local)
 	if b != nil && !b.StackScanComplete() {
+		SetError(ErrGeneric)
 		return true
 	}
 	if indirection == -1 {
@@ -1246,8 +1247,9 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	if !v.IsPointer() {
 		return false
 	}
-	// incomplete fact maps: FindRelatedPointTo fails closed nil before related
+	// incomplete fact maps sticky true
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return true
 	}
 	var pointees []*Variable
@@ -1259,13 +1261,15 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		pointees = ft.PointTo
 	} else {
 		pointees = MergePointeesOfPointer(v, indirection, facts)
-		// nil = incomplete merge
-		if pointees == nil {
+		// incomplete merge non-sticky true (soft re-pick)
+		if !VariablesComplete(pointees) {
 			return true
 		}
 	}
 	for _, p := range pointees {
 		if p == nil {
+			// PointTo nil hole sticky
+			SetError(ErrGeneric)
 			return true
 		}
 		if IsSpecialPtr(p) {
@@ -1277,15 +1281,18 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		// recurse one level of pointees that are pointers
 		if p.IsPointer() {
 			if p.Type == nil {
+				SetError(ErrGeneric)
 				return true
 			}
 			for j := 0; j < p.Type.IndirectLevel(); j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
-				if nested == nil {
+				if !VariablesComplete(nested) {
+					// incomplete MergePointees non-sticky
 					return true
 				}
 				for _, n := range nested {
 					if n == nil {
+						SetError(ErrGeneric)
 						return true
 					}
 					if !IsSpecialPtr(n) && n.IsVisibleLocal(b) {
@@ -1315,31 +1322,35 @@ func ClearPointToAggregates() {
 // UpdatePtrAliases mirrors FactPointTo::update_ptr_aliases.
 // FactPointTo.cpp:764–790 — merge point-to sets into parallel ptr/alias vectors.
 // UpdatePtrAliases merges facts into parallel ptrs/aliases tables.
-// Fact* always live; nil hole fails closed (false — no invent skip partial alias).
-// Returns false on incomplete maps; true when scan completed.
+// Fact* always live; nil hole fails closed sticky (false — no invent skip partial
+// alias / soft re-pick past holes). Returns false on incomplete maps; true when done.
 func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Variable) bool {
 	if ptrs == nil || aliases == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, f := range facts {
-		// Fact* always live; no invent skip nil holes as absent aliases
+		// Fact* always live; nil hole sticky
 		if f == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if f.Var == nil {
+			SetError(ErrGeneric)
 			return false
 		}
-		// FactPointTo.cpp: type != 0 — specials may have Type-nil; other Type-nil
-		// is incomplete IR (fail closed — no invent soft-skip partial alias update)
+		// FactPointTo.cpp: type != 0 — specials may have Type-nil; other Type-nil sticky
 		if f.Var.Type == nil {
 			if IsSpecialPtr(f.Var) {
 				continue
 			}
+			SetError(ErrGeneric)
 			return false
 		}
-		// PointTo Variable* always live
+		// PointTo Variable* always live; nil hole sticky
 		for _, v := range f.PointTo {
 			if v == nil {
+				SetError(ErrGeneric)
 				return false
 			}
 		}
