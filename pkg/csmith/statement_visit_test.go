@@ -96,7 +96,8 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 }
 
 func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
-	// Incomplete parent EffectAccum → MergeEffects IncompleteEffect must not invent visit true
+	// Incomplete parent EffectAccum → MergeEffects IncompleteEffect sticky visit false
+	// (no invent soft re-pick past incomplete parent accum as visit success)
 	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -119,6 +120,25 @@ func TestVisitFactsStatementIfIncompleteAccumFailClosed(t *testing.T) {
 	cg.EffectAccum = &inc
 	if VisitFactsStatementIf(&st, &cg, Defaults()) {
 		t.Fatal("incomplete EffectAccum must fail closed if visit")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum if visit must SetError sticky")
+	}
+	ClearError()
+	// incomplete then-arm GlobalFacts after arm visit sticky (plant via incomplete map effect
+	// is covered by early GlobalFacts path; both-must incomplete inputs covered above)
+	// nil arms sticky hard IR
+	st2 := Stmt{
+		Kind: StmtIfElse, StmID: 1,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Then: nil, Else: &Block{StmID: 4},
+	}
+	cg2 := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+	if VisitFactsStatementIf(&st2, &cg2, Defaults()) {
+		t.Fatal("nil Then must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Then VisitFactsStatementIf must SetError sticky")
 	}
 	ClearError()
 }

@@ -254,7 +254,11 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	var thenFacts []*FactPointTo
 	if cg.FM != nil {
+		// incomplete then-arm facts sticky (no invent soft re-pick past hole as visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		thenFacts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -271,7 +275,11 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	var elseFacts []*FactPointTo
 	if cg.FM != nil {
+		// incomplete else-arm facts sticky (no invent soft re-pick past hole as visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -326,37 +334,56 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		switch {
 		case trueMust && falseMust:
 			// pre-condition env (inputs_copy), not post-condition
+			// incomplete inputs sticky (no invent soft re-pick past hole as visit success)
 			if !FactsComplete(inputsCopy) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = CloneFactSlice(inputsCopy)
 		case trueMust:
 			if !FactsComplete(elseFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = elseFacts
 		case falseMust:
 			if !FactsComplete(thenFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = thenFacts
 		default:
 			if !FactsComplete(thenFacts) || !FactsComplete(elseFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.FM.GlobalFacts = thenFacts
-			// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit
+			// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit sticky
 			_ = MergeFacts(&cg.FM.GlobalFacts, elseFacts)
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 		}
 	}
 	// parent accum: both arms observed (generation-time separates; visit matches merge)
-	// Incomplete arm accum fails closed (MergeEffects IncompleteEffect — no invent pure merge)
+	// Incomplete arm accum sticky (MergeEffects IncompleteEffect — no invent pure merge success)
 	if cg.EffectAccum != nil {
 		merged := MergeEffects(thenAccum, elseAccum)
 		if !EffectComplete(merged) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		*cg.EffectAccum = merged
