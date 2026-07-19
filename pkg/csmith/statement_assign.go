@@ -817,16 +817,19 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 	// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
 	// uses get_rhs() (canonized ExpressionFuncall for compounds)
 	if cg.FM != nil && lhsVar != nil {
+		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// visit success without map_stm_effect / map_facts_out)
+		if st.StmID <= 0 {
+			return false
+		}
 		_ = cg.FM.UpdateFactForAssign(lhsVar, indir, st.GetAssignRhs())
 		// incomplete assign must not invent visit success / SetMapFactsOut
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			return false
 		}
 		// StatementAssign.cpp:388–389 — map_stm_effect[this] = effect_stm
-		if st.StmID > 0 {
-			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
-			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
-		}
+		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
+		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
 	}
 	return true
 }

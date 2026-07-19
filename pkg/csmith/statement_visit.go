@@ -25,7 +25,12 @@ func VisitFactsStmt(st *Stmt, cg *CGContext, opts Options) bool {
 	case StmtGoto:
 		return VisitFactsStatementGoto(st, cg, opts)
 	case StmtLabel:
-		if cg.FM != nil && st.StmID > 0 {
+		// Statement::stm_id always live; StmID 0 + FM fails closed
+		// (no invent visit success without recording effect)
+		if cg.FM != nil {
+			if st.StmID <= 0 {
+				return false
+			}
 			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 		}
 		return true
@@ -52,7 +57,11 @@ func VisitFactsStatementJump(st *Stmt, cg *CGContext, opts Options) bool {
 	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
-	if cg.FM != nil && st.StmID > 0 {
+	// Statement::stm_id always live; StmID 0 + FM fails closed
+	if cg.FM != nil {
+		if st.StmID <= 0 {
+			return false
+		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	return true
@@ -81,7 +90,11 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 	}
 	fm := cg.FM
-	if fm != nil && st.StmID > 0 {
+	if fm != nil {
+		// Statement::stm_id always live; StmID 0 fails closed
+		if st.StmID <= 0 {
+			return false
+		}
 		// StatementGoto.cpp:390–398 — force dest re-analysis when current outs
 		// are proper subset of previous outs and neither visited this pass.
 		destID := st.GotoDestStmID
@@ -116,7 +129,11 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 	if st.Expr == nil || !VisitFactsExpression(st.Expr, cg, opts) {
 		return false
 	}
-	if cg.FM != nil && st.StmID > 0 {
+	// Statement::stm_id always live; StmID 0 + FM fails closed
+	if cg.FM != nil {
+		if st.StmID <= 0 {
+			return false
+		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
 	}
 	return true
@@ -218,12 +235,13 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 		if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
 			return false
 		}
+		if st.StmID <= 0 {
+			return false
+		}
 		acc := condEff
 		acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Then.StmID))
 		acc = acc.AddEffect(cg.FM.GetMapStmEffect(st.Else.StmID))
-		if st.StmID > 0 {
-			cg.FM.SetMapStmEffect(st.StmID, acc)
-		}
+		cg.FM.SetMapStmEffect(st.StmID, acc)
 	}
 
 	// StatementIf.cpp:185–196 — must_return pruning
@@ -424,14 +442,16 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		if cg.FM != nil {
+			// Statement::stm_id always live; StmID 0 fails closed
+			if st.StmID <= 0 {
+				return false
+			}
 			_ = cg.FM.UpdateFactForAssign(asg.LhsVar, 0, asg.Expr)
 			// incomplete assign must not invent visit success / effect map
 			if !FactsComplete(cg.FM.GlobalFacts) {
 				return false
 			}
-			if st.StmID > 0 {
-				cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
-			}
+			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
 		}
 		return true
 	}
@@ -455,11 +475,15 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	if cg.FM != nil {
-		// StatementArrayOp.cpp:285–291 — must_return → pre-body; else map_facts_in[body]
-		// C++ map[] always assigns (missing → empty); no invent keep prior
+		// StatementArrayOp.cpp:285–291 — body Block always has stm_id
+		// StmID 0 fails closed (no invent keep prior / soft EffectStm fallback)
+		if inner.Then.StmID <= 0 || st.StmID <= 0 {
+			return false
+		}
 		if inner.Then.MustReturn() {
 			cg.FM.GlobalFacts = preFacts
-		} else if inner.Then.StmID > 0 {
+		} else {
+			// map_facts_in[&body] — C++ map[] always; missing → empty
 			in := cg.FM.MapFactsIn[inner.Then.StmID]
 			if !FactsComplete(in) {
 				return false
@@ -468,27 +492,19 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
 		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
-		// C++ always merge_jump_facts; missing out → empty; incomplete fails closed
-		if st.StmID > 0 {
-			edges := cg.FM.FindEdgesIn(st.StmID, true, false)
-			if edges == nil {
+		edges := cg.FM.FindEdgesIn(st.StmID, true, false)
+		if edges == nil {
+			return false
+		}
+		for _, e := range edges {
+			out := cg.FM.MapFactsOut[e.SrcID]
+			if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
 				return false
-			}
-			for _, e := range edges {
-				out := cg.FM.MapFactsOut[e.SrcID]
-				if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
-					return false
-				}
 			}
 		}
 		// StatementArrayOp.cpp:298–299 — set_accumulated_effect_after_block
-		bodyEff := EmptyEffect()
-		if inner.Then.StmID > 0 {
-			bodyEff = cg.FM.GetMapStmEffect(inner.Then.StmID)
-		}
-		if bodyEff.IsEmpty() {
-			bodyEff = bodyCG.EffectStm
-		}
+		// map_stm_effect[body] only (no invent EffectStm soft fallback when empty)
+		bodyEff := cg.FM.GetMapStmEffect(inner.Then.StmID)
 		SetAccumulatedEffectAfterBlock(st, bodyEff, cg, preStm)
 	}
 	return true

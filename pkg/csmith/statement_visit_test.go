@@ -89,9 +89,10 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 }
 
 // testForInit builds a simple StatementAssign init (StatementFor always has live init).
+// StmID is always live after create — required when FM path records map_stm_effect.
 func testForInit(iv *Variable, n int) *Stmt {
 	return &Stmt{
-		Kind: StmtAssign, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
+		Kind: StmtAssign, StmID: AllocStmID(), LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(n), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
@@ -397,6 +398,40 @@ func TestVisitFactsStatementForMergesBreakEdge(t *testing.T) {
 	if !IsVariableInSet(got.PointTo, c) && len(got.PointTo) > 0 {
 		// MergeJumpFacts joins related — should include c
 		t.Fatalf("expected c in merge: %+v", got.PointTo)
+	}
+}
+
+func TestVisitFactsStmID0WithFMFailClosed(t *testing.T) {
+	// Statement::stm_id always live; StmID 0 + FM fails closed
+	// (no invent visit success without map_stm_effect)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	asg := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	if VisitFactsStatementAssign(asg, &cg, Defaults()) {
+		t.Fatal("assign StmID 0 must fail closed")
+	}
+	ret := &Stmt{
+		Kind: StmtReturn,
+		Expr: &Expression{Term: TermVariable, Var: f.RV, ExprType: GetIntType()},
+	}
+	if VisitFactsStatementReturn(ret, &cg, Defaults()) {
+		t.Fatal("return StmID 0 must fail closed")
+	}
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	body := &Block{StmID: 0, Func: f}
+	st := &Stmt{
+		Kind: StmtArrayOp, StmID: 15,
+		Loop: &LoopControl{IV: iv},
+		Then: body,
+	}
+	if VisitFactsStatementArrayOp(st, &cg, Defaults()) {
+		t.Fatal("arrayop body StmID 0 must fail closed")
 	}
 }
 
