@@ -490,7 +490,11 @@ func BuildUserInvocation(
 		// Expression::make_random_param bumps paramCG.ExprDepth; merge copies it
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
 		// FunctionInvocationUser.cpp:259 — ERROR_GUARD(false); sticky error or null param → fail
+		// null param without sticky invents soft re-pick past ERROR_GUARD miss
 		if arg == nil || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			fi.Failed = true
 			return fi
 		}
@@ -651,9 +655,12 @@ func BuildInvocationAndFunction(
 		paramCG.EffectAccum = &paramAccum
 		paramCG.EffectStm = EmptyEffect()
 		arg := MakeRandomParam(r, opts, tables, vs, &paramCG, ty, qfer, paramCG.ExprDepth, list)
-		// FunctionInvocationUser.cpp:186–187 — make_random_param; C++ would ERROR_GUARD after sticky error
-		// (build_invocation_and_function has no explicit ERROR_GUARD but uses param pointer)
+		// FunctionInvocationUser.cpp:186–187 — make_random_param; ERROR_GUARD after sticky error
+		// null param without sticky invents soft re-pick past ERROR_GUARD miss
 		if arg == nil || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			fi.Failed = true
 			return fi
 		}
@@ -679,13 +686,14 @@ func BuildInvocationAndFunction(
 	}
 
 	// FunctionInvocationUser.cpp:203–206 — hand-over from caller to callee with args
-	// get_fact_mgr_for_func(func) after make_random_signature (FMList); no invent NewFactMgr
+	// get_fact_mgr_for_func(func) after make_random_signature (FMList); sticky no invent without FM
 	var callerFM *FactMgr
 	if cg.FM != nil {
 		callerFM = cg.FM
 	}
 	calFM := callee.PairedFactMgr()
 	if calFM == nil {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
@@ -714,9 +722,13 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
 	// then add_back_return_facts. GetMapFactsOut: StmID 0 Incomplete; missing → empty.
-	// Incomplete out / add_back fail closed sticky — no invent soft-merge returns
+	// Incomplete out / add_back / missing body fail closed sticky — no invent soft-merge returns
 	var retFacts []*FactPointTo
 	if callee.Body == nil {
+		// GenerateBody must leave live body; sticky Failed (no invent soft-skip without body)
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		fi.Failed = true
 		return fi
 	}
@@ -728,6 +740,9 @@ func BuildInvocationAndFunction(
 	}
 	retFacts = CloneFactSlice(out)
 	if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		fi.Failed = true
 		return fi
 	}
@@ -1518,12 +1533,10 @@ func MakeRandomInvocation(
 		}
 	}
 	// FunctionInvocation.cpp:119 — assert(fi != 0); std factories must yield live invoke
-	// incomplete null without sticky error → failed shell (ExpressionFuncall var fallback)
+	// incomplete null without sticky error → Failed shell (ExpressionFuncall var soft re-pick)
+	// sticky ERROR already set → still Failed shell for callers that only check .Failed
 	// no invent success IR
 	if fi == nil {
-		if HasError() {
-			return nil
-		}
 		return &Invocation{Failed: true}
 	}
 	return fi

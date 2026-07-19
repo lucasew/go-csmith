@@ -179,6 +179,8 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 
 func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	// FunctionInvocationUser.cpp:257–258 — ERROR_GUARD(false) when make_random_param null
+	// sticky Failed (no invent soft re-pick past null param without ERROR)
+	ClearError()
 	opts := Defaults()
 	// force param term → Variable only; empty selector cannot select → null
 	opts.MaxExprComplexity = 0
@@ -204,6 +206,67 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	if len(fi.Args) != 0 {
 		t.Fatalf("must not append partial args: %d", len(fi.Args))
 	}
+	if !HasError() {
+		t.Fatal("null param BuildUserInvocation must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
+	// get_fact_mgr_for_func after signature always live; sticky Failed without paired FM
+	ClearError()
+	opts := Defaults()
+	opts.MaxFuncs = 10
+	vs := NewVariableSelector(opts)
+	list := &FunctionList{}
+	cg := EmptyCGContext()
+	f := MakeRandomSignature(NewRng(1), opts, NewProbabilities(opts), vs, &vs.Sym, cg, GetIntType(), nil, list)
+	if f == nil {
+		t.Fatal("signature", HasError())
+	}
+	// same-package clear paired FM (signature always pairs; strip for fail-closed path)
+	f.factMgr = nil
+	f.GenerateBody(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext())
+	if f.Body != nil {
+		t.Fatal("nil paired FM must fail closed body")
+	}
+	if !HasError() {
+		t.Fatal("nil paired FM GenerateBody must SetError sticky")
+	}
+	ClearError()
+	// BuildInvocationAndFunction incomplete ambient: Failed sticky before body hand-over
+	inc := IncompleteEffect()
+	cg2 := EmptyCGContext()
+	cg2.EffectAccum = &inc
+	fi := BuildInvocationAndFunction(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntType())
+	if fi == nil || !fi.Failed {
+		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete ambient BuildInvocationAndFunction must SetError sticky")
+	}
+	ClearError()
+	// stripped calFM sticky Failed: signature ok then clear FM before hand-over via
+	// same-package re-entry of PairedFactMgr path — BuildInvocationAndFunction re-makes
+	// signature so clear after MakeRandomSignature inside is not injectable.
+	// Exercise PairedFactMgr sticky on cleared function used as BuildUserInvocation
+	// static path does not need calFM. Direct sticky:
+	if (*Function)(nil).PairedFactMgr() != nil {
+		t.Fatal("nil Function PairedFactMgr must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function PairedFactMgr must SetError sticky")
+	}
+	ClearError()
+	f2 := &Function{Name: "no_fm", ReturnType: GetIntType()}
+	if f2.PairedFactMgr() != nil {
+		t.Fatal("unpaired Function PairedFactMgr must be nil")
+	}
+	// unpaired is complete miss (no invent FM) — not sticky until generate path
+	if HasError() {
+		t.Fatal("unpaired live Function PairedFactMgr must not sticky empty miss")
+	}
+	ClearError()
 }
 
 func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
