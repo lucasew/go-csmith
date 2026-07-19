@@ -104,6 +104,17 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if !FactsComplete(facts) {
 		t.Fatal("IncompleteFactSlice newFacts must not wipe prior", facts)
 	}
+	// incomplete lhs pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
+	facts = []*FactPointTo{MakeFactPointTo(p, a)}
+	if VariablesComplete(lhsAssignPointees(facts, nil, 0)) {
+		t.Fatal("nil lhs must IncompleteVariables")
+	}
+	if _, ok := applyPointToAssignFacts(&facts, nil, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
+		t.Fatal("nil lhs pointees must fail closed ok=false, not invent renew/merge")
+	}
+	if FactsComplete(facts) {
+		t.Fatal("incomplete lhs assign must wipe subject facts")
+	}
 }
 
 func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {

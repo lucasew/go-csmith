@@ -67,6 +67,15 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	if len(cands) != 1 || cands[0] != okt {
 		t.Fatalf("%v", cands)
 	}
+	// nil hole must IncompleteTypes — not bare nil invent empty-complete keep-typ
+	env.StructTypes = []*Type{okt, nil}
+	bad := okStructUnionLTypes(env, true, true, false)
+	if typesComplete(bad) {
+		t.Fatal("StructTypes hole must IncompleteTypes")
+	}
+	if chooseRandomStructFromType(env, GetIntType(), true, NewRng(1)) != nil {
+		t.Fatal("incomplete ok pool must fail closed nil, not invent keep original")
+	}
 }
 
 func TestVolRValEmit(t *testing.T) {

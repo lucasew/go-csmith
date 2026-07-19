@@ -1564,17 +1564,22 @@ func (vs *VariableSelector) SelectGlobalMT(
 
 // chooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
 // Type.cpp:570–586 — if ok structs exist pick one; else return original type.
+// Incomplete ok pool fails closed nil (no invent keep original typ past hole
+// via len(nil)==0 empty-complete success).
 func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng) *Type {
 	if typ == nil || r == nil {
 		return typ
 	}
 	cands := okStructUnionLTypes(env, noVolatile, true, true)
+	if !typesComplete(cands) {
+		return nil
+	}
 	if len(cands) == 0 {
 		return typ
 	}
 	st := cands[r.RndUpto(uint32(len(cands)))]
 	if st == nil {
-		return typ
+		return nil
 	}
 	return st
 }

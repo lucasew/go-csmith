@@ -1085,13 +1085,26 @@ func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
 
 // lhsAssignPointees mirrors merge_pointees_of_pointer used by abstract_fact_for_assign.
 // Used to decide renew (lvar_cnt==1) vs merge (may-point-to).
+// Incomplete lhs/facts/merge fails closed IncompleteVariables (not bare nil invent
+// lvar_cnt==0, and not IncompleteVariables len==1 invent definitive renew without check).
 func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Variable {
 	if lhs == nil {
-		return nil
+		return IncompleteVariables()
 	}
-	lvars := MergePointeesOfPointer(lhs.GetCollective(), lhsIndir, facts)
+	if !FactsComplete(facts) {
+		return IncompleteVariables()
+	}
+	coll := lhs.GetCollective()
+	if coll == nil {
+		// incomplete field path collective — no invent level-0 merge of self
+		return IncompleteVariables()
+	}
+	lvars := MergePointeesOfPointer(coll, lhsIndir, facts)
+	if !VariablesComplete(lvars) {
+		return IncompleteVariables()
+	}
 	if lhsIndir == 0 && lhs.Type != nil && lhs.Type.ptrTo != nil && len(lvars) == 0 {
-		lvars = []*Variable{lhs.GetCollective()}
+		lvars = []*Variable{coll}
 	}
 	return lvars
 }
@@ -1117,7 +1130,14 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	if len(newFacts) == 0 {
 		return false, true
 	}
-	lvarCnt := len(lhsAssignPointees(*facts, lhs, lhsIndir))
+	lvars := lhsAssignPointees(*facts, lhs, lhsIndir)
+	// incomplete pointees must not invent lvar_cnt via len(IncompleteVariables)==1 renew
+	// or len(nil)==0 merge-as-empty success
+	if !VariablesComplete(lvars) {
+		*facts = IncompleteFactSlice()
+		return false, false
+	}
+	lvarCnt := len(lvars)
 	// when AbstractFactForAssign used direct pointer path, lvarCnt matches transfer targets
 	if lvarCnt == 0 && lhs != nil && lhsIndir == 0 && lhs.IsPointer() {
 		lvarCnt = 1
