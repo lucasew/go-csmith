@@ -441,12 +441,13 @@ func GetMaxArrayDimension(vars []*Variable) int {
 
 // OutputArrayInitializers mirrors OutputArrayInitializers for loop-init arrays.
 // Variable.cpp:829–841 — allocate ctrl vars, declare, emit output_init.
-// Incomplete vars list (GetMaxArrayDimension -1) fails closed empty
+// Incomplete vars list (GetMaxArrayDimension -1) fails closed sticky empty
 // (no invent treat incomplete as zero-dim empty success).
 func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
 	dimen := GetMaxArrayDimension(vars)
 	// dimen < 0 = incomplete; dimen == 0 = complete empty / no arrays
 	if dimen < 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if dimen == 0 {

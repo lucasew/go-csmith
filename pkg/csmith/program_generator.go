@@ -263,8 +263,16 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 	if !g.hashHelpersEnabled() {
 		return false
 	}
+	// incomplete GlobalList fails closed not-ready (GetMaxArrayDimension -1 must not
+	// invent ready via dimen<=0; no invent hash-func shell past holes)
+	if g.VS == nil || !VariablesComplete(g.VS.GlobalList) {
+		return false
+	}
 	dimen := GetMaxArrayDimension(g.VS.GlobalList)
-	if dimen <= 0 {
+	if dimen < 0 {
+		return false
+	}
+	if dimen == 0 {
 		return true
 	}
 	return g.Opts.MaxArrayDim >= dimen
@@ -328,14 +336,22 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 }
 
 // OutputGlobals emits GlobalList declarations.
+// Incomplete GlobalList / Arrays fails closed sticky (no invent empty-section success
+// past nil holes via soft return "").
 func (g *ProgramGenerator) OutputGlobals() string {
 	if g == nil || g.VS == nil || len(g.VS.GlobalList) == 0 {
 		return ""
 	}
+	// incomplete GlobalList fails closed sticky (no invent partial section / empty shell)
+	if !VariablesComplete(g.VS.GlobalList) {
+		SetError(ErrGeneric)
+		return ""
+	}
 	arrayByName := map[string]*ArrayVariable{}
-	// ArrayVariable* always live on Arrays; nil hole fails closed (no invent skip)
+	// ArrayVariable* always live on Arrays; nil hole fails closed sticky
 	for _, av := range g.VS.Arrays {
 		if av == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		arrayByName[av.Name] = av
@@ -344,8 +360,9 @@ func (g *ProgramGenerator) OutputGlobals() string {
 	emittedArray := map[string]bool{}
 	var body strings.Builder
 	for _, v := range g.VS.GlobalList {
-		// Variable* always live; no invent skip nil/incomplete holes as partial section
-		if v == nil || v.Type == nil {
+		// pre-validated VariablesComplete; Type always live for OutputDef
+		if v.Type == nil {
+			SetError(ErrGeneric)
 			return ""
 		}
 		if av := arrayByName[v.Name]; av != nil {
@@ -450,17 +467,26 @@ func HashGlobalVariables(vs *VariableSelector) string {
 
 // HashGlobalVariablesWithUnionFacts hashes globals with FactUnion field filtering.
 // Variable::hash uses FactUnion::is_field_readable when FactMgr global_facts present.
+// Incomplete GlobalList / UnionFacts fails closed sticky (no invent empty-hash success
+// or skip-all-fields via IsFieldReadable soft false past holes).
 func HashGlobalVariablesWithUnionFacts(vs *VariableSelector, unionFacts []*FactUnion) string {
 	if vs == nil {
+		return ""
+	}
+	// incomplete GlobalList fails closed sticky (no invent empty hash past nil hole)
+	if !VariablesComplete(vs.GlobalList) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// incomplete union map fails closed sticky (no invent all-fields-unreadable past hole)
+	if unionFacts != nil && !UnionFactsComplete(unionFacts) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	ctrl := GetLastCtrlVars()
 	var b strings.Builder
 	for _, v := range vs.GlobalList {
-		// Variable* always live in GlobalList; no invent skip nil holes
-		if v == nil {
-			return ""
-		}
+		// pre-validated VariablesComplete
 		// empty hash is legitimate for ePointer / unreadable union fields (Variable.cpp)
 		b.WriteString(v.hashOutput(ctrl, unionFacts))
 	}

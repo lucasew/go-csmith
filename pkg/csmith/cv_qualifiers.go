@@ -414,6 +414,11 @@ func (q CVQualifiers) RandomQualifiersFrom(
 	if r == nil {
 		return CVQualifiers{}
 	}
+	// incomplete ambient fails closed sticky (no invent looser/stricter qfer past holes)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return CVQualifiers{}
+	}
 	var vols []bool
 	if noVolatile {
 		vols = make([]bool, len(q.IsVolatiles))
@@ -467,6 +472,11 @@ func (q CVQualifiers) RandomLooseQualifiers(
 	}
 	// CVQualifiers.cpp always has process RNG; no invent fixed looser shells
 	if r == nil {
+		return CVQualifiers{}
+	}
+	// incomplete ambient fails closed sticky (no invent looser qfer past holes)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	var vols []bool
@@ -756,6 +766,11 @@ func RandomQualifiersForType(
 	}
 	// CVQualifiers.cpp:295+ — always has RNG; no soft invent NewRng(0)
 	if r == nil {
+		return CVQualifiers{}
+	}
+	// incomplete ambient fails closed sticky (no invent non-vol qfer / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 

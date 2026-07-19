@@ -233,6 +233,31 @@ func TestRandomQualifiersSideEffectBlocksVolatile(t *testing.T) {
 	}
 }
 
+func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
+	// incomplete EffectContext fails closed sticky (no invent non-vol qfer past holes)
+	opts := Defaults()
+	ty := GetSimpleType(EInt)
+	cg := WithEffectContext(IncompleteEffect())
+	ClearError()
+	q := RandomQualifiersForType(ty, AccessRead, cg, false, 0, 100, opts, NewRng(2))
+	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
+		t.Fatalf("incomplete ambient must fail closed empty qfer %+v", q)
+	}
+	if !HasError() {
+		t.Fatal("incomplete ambient must SetError sticky")
+	}
+	ClearError()
+	base := NewCVQualifiers([]bool{false}, []bool{false})
+	q2 := base.RandomQualifiersFrom(false, AccessRead, cg, opts, NewProbabilities(opts), NewRng(3))
+	if len(q2.IsConsts) != 0 || len(q2.IsVolatiles) != 0 {
+		t.Fatalf("RandomQualifiersFrom incomplete ambient must empty %+v", q2)
+	}
+	if !HasError() {
+		t.Fatal("RandomQualifiersFrom incomplete ambient must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
 	opts := Defaults()
 	ty := GetSimpleType(EInt)

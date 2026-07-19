@@ -108,10 +108,15 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if !strings.Contains(out, "int i") {
 		t.Fatal(out)
 	}
-	// nil hole fails closed
+	// nil hole fails closed sticky
+	ClearError()
 	if s := OutputArrayInitializers([]*Variable{v, nil}, opts, "    "); s != "" {
 		t.Fatal("nil hole must fail closed", s)
 	}
+	if !HasError() {
+		t.Fatal("nil hole must SetError sticky")
+	}
+	ClearError()
 	// incomplete loop-init (local non-const without init) fails closed
 	blk := &Block{}
 	loc := &ArrayVariable{

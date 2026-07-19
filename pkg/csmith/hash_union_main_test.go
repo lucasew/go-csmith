@@ -33,6 +33,46 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 	}
 }
 
+func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
+	// incomplete GlobalList / UnionFacts fail closed sticky (no invent empty hash)
+	vs := NewVariableSelector(Defaults())
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g, nil}
+	ClearError()
+	if HashGlobalVariables(vs) != "" {
+		t.Fatal("nil GlobalList hole must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil GlobalList hole must SetError sticky")
+	}
+	ClearError()
+	vs.GlobalList = []*Variable{g}
+	if HashGlobalVariablesWithUnionFacts(vs, IncompleteUnionFactSlice()) != "" {
+		t.Fatal("incomplete union facts must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("incomplete union facts must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
+	// incomplete GlobalList must not invent ready via GetMaxArrayDimension -1 <= 0
+	opts := Defaults()
+	opts.ComputeHash = true
+	opts.StepHashByStmt = true // hashHelpersEnabled requires both
+	g := NewProgramGenerator(opts)
+	// complete empty globals: ready (no arrays)
+	g.VS.GlobalList = nil
+	if !g.hashFuncDefReady() {
+		t.Fatal("complete empty GlobalList must be ready")
+	}
+	g.VS.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false), nil}
+	if g.hashFuncDefReady() {
+		t.Fatal("incomplete GlobalList must not invent hashFuncDefReady")
+	}
+}
+
 func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 2

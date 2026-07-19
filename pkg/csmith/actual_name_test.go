@@ -131,3 +131,29 @@ func TestOutputGlobalsVolatileArrayComment(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestOutputGlobalsIncompleteSticky(t *testing.T) {
+	// incomplete GlobalList / Arrays fail closed sticky (no invent empty section)
+	opts := Defaults()
+	g := NewProgramGenerator(opts)
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v.Init = MakeInt(0)
+	g.VS.GlobalList = []*Variable{v, nil}
+	ClearError()
+	if g.OutputGlobals() != "" {
+		t.Fatal("nil GlobalList hole must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil GlobalList hole must SetError sticky")
+	}
+	ClearError()
+	g.VS.GlobalList = []*Variable{v}
+	g.VS.Arrays = []*ArrayVariable{nil}
+	if g.OutputGlobals() != "" {
+		t.Fatal("nil Arrays hole must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil Arrays hole must SetError sticky")
+	}
+	ClearError()
+}
