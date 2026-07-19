@@ -45,7 +45,16 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 			return false
 		}
 		if e.Var.IsPointer() {
+			// residual ERROR sticky — no invent complete no-ptrs past IsPointer hole
+			if HasError() {
+				*ptrs = IncompleteVariables()
+				return false
+			}
 			*ptrs = appendUniqueVar(*ptrs, e.Var)
+		} else if HasError() {
+			// residual ERROR sticky — no invent complete no-ptrs soft-skip past IsPointer hole
+			*ptrs = IncompleteVariables()
+			return false
 		}
 		return true
 	case TermCommaExpr:
@@ -174,7 +183,14 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			return false
 		}
 		if st.LhsVar.IsPointer() {
+			if HasError() {
+				*ptrs = IncompleteVariables()
+				return false
+			}
 			*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
+		} else if HasError() {
+			*ptrs = IncompleteVariables()
+			return false
 		}
 	}
 	if st.Lhs != nil {
@@ -191,7 +207,14 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 			return false
 		}
 		if st.Lhs.Var.IsPointer() {
+			if HasError() {
+				*ptrs = IncompleteVariables()
+				return false
+			}
 			*ptrs = appendUniqueVar(*ptrs, st.Lhs.Var)
+		} else if HasError() {
+			*ptrs = IncompleteVariables()
+			return false
 		}
 	}
 	// get_blocks only — no invent ptrs via stray Then on assign

@@ -161,6 +161,23 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil facts applyPointToAssignFacts must SetError sticky")
 	}
 	ClearError()
+	// RenewFact Match residual: Type-nil Var in subject map soft invent was merge later.
+	// Fair: sticky wipe incomplete fail closed ok=false.
+	brokenSubj := &Variable{Name: "g_broken"} // Type nil
+	factsR := []*FactPointTo{{Var: brokenSubj, PointTo: []*Variable{NullPtr}}}
+	// lvarCnt path: use pointer lhs with indir 0 and newFacts for p
+	// When lvars empty and lhs not pointer, goes to merge path with Type-nil Match residual.
+	// Use merge path: lvarCnt != 1 definitive renew
+	if _, ok := applyPointToAssignFacts(&factsR, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
+		t.Fatal("Match residual applyPointTo must fail closed ok=false")
+	}
+	if FactsComplete(factsR) {
+		t.Fatal("Match residual applyPointTo must wipe incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Match residual applyPointTo must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {

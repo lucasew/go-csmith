@@ -16,10 +16,24 @@ func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	}
 	last := b.GetLastStm()
 	if last == nil || !last.MustReturn() {
+		// residual ERROR sticky — no invent not-must-return soft-skip past MustReturn hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent must-return true past MustReturn hole
+	if HasError() {
 		return false
 	}
 	// Block.cpp:345–353 — same back-edge escape check as must_return
-	return !b.hasEscapeBackEdge(fm)
+	esc := b.hasEscapeBackEdge(fm)
+	// residual ERROR sticky — no invent no-escape soft-skip past CFG hole
+	if HasError() {
+		// incomplete CFG sticky restrictive must-return false (escape uncertain)
+		return false
+	}
+	return !esc
 }
 
 // NeedNestedLoop mirrors Block::need_nested_loop.

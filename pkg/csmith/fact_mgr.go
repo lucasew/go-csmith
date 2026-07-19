@@ -1669,12 +1669,27 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 	}
 	if lvarCnt == 1 && newFacts[0] != nil && newFacts[0].Var != nil && !newFacts[0].Var.IsArray {
 		// definitive assignment — renew (strong replace)
-		_ = RenewFact(facts, newFacts[0])
+		// residual ERROR sticky — no invent soft-continue merge later past RenewFact hole
+		if !RenewFact(facts, newFacts[0]) && HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false, false
+		}
 		for j := 1; j < len(newFacts); j++ {
 			merged := MergeFactInto(*facts, newFacts[j])
 			if !FactsComplete(merged) {
 				*facts = IncompleteFactSlice()
-				SetError(ErrGeneric)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false, false
+			}
+			// residual ERROR sticky — no invent soft-continue merge past MergeFact hole
+			if HasError() {
+				*facts = IncompleteFactSlice()
 				return false, false
 			}
 			*facts = merged
@@ -1685,7 +1700,13 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		merged := MergeFactInto(*facts, f)
 		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
-			SetError(ErrGeneric)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false, false
+		}
+		if HasError() {
+			*facts = IncompleteFactSlice()
 			return false, false
 		}
 		*facts = merged

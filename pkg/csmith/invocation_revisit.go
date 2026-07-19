@@ -403,7 +403,16 @@ func (f *Function) NeedsRevisit() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return f.FactChanged || f.UnionFieldRead || f.IsPointerReferenced()
+	if f.FactChanged || f.UnionFieldRead {
+		return true
+	}
+	// residual ERROR sticky — no invent not-revisit soft-skip past IsPointerReferenced hole
+	ref := f.IsPointerReferenced()
+	if HasError() {
+		// incomplete ReferencedPtrs already sticky true; keep residual restrictive
+		return true
+	}
+	return ref
 }
 
 // IsPointerReferenced mirrors Function::is_pointer_referenced.
