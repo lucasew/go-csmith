@@ -559,6 +559,14 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 			return true
 		}
 		if nr.Match(v) {
+			// residual ERROR sticky — no invent nonreadable true past Match hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue readable past Match residual false path
+		if HasError() {
 			return true
 		}
 	}
@@ -582,6 +590,14 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 				return true
 			}
 			if nw.LooseMatch(v) || v.LooseMatch(nw) {
+				// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
+			if HasError() {
 				return true
 			}
 		}
@@ -594,6 +610,14 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 			return true
 		}
 		if v.LooseMatch(iv) {
+			// residual ERROR sticky — no invent nonwritable true past LooseMatch hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue writable past LooseMatch residual
+		if HasError() {
 			return true
 		}
 	}

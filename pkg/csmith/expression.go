@@ -517,7 +517,15 @@ func (e *Expression) UseVar(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.Var == v || e.Var.Match(v)
+		if e.Var == v {
+			return true
+		}
+		matched := e.Var.Match(v)
+		// residual ERROR sticky — no invent not-use soft-skip past Match hole (restrictive uses)
+		if HasError() {
+			return true
+		}
+		return matched
 	case TermFunction:
 		// ExpressionFuncall always has live invoke + args after ERROR_GUARD
 		if e.Invoke == nil {
@@ -548,8 +556,21 @@ func (e *Expression) UseVar(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if e.Assign.LhsVar != nil && (e.Assign.LhsVar == v || e.Assign.LhsVar.Match(v)) {
-			return true
+		if e.Assign.LhsVar != nil {
+			if e.Assign.LhsVar == v {
+				return true
+			}
+			if e.Assign.LhsVar.Match(v) {
+				// residual ERROR sticky — no invent use-true past Match hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue RHS past LhsVar Match residual
+			if HasError() {
+				return true
+			}
 		}
 		if e.Assign.Lhs != nil {
 			if e.Assign.Lhs.Var == nil {
@@ -557,7 +578,18 @@ func (e *Expression) UseVar(v *Variable) bool {
 				SetError(ErrGeneric)
 				return true
 			}
-			if e.Assign.Lhs.Var == v || e.Assign.Lhs.Var.Match(v) {
+			if e.Assign.Lhs.Var == v {
+				return true
+			}
+			if e.Assign.Lhs.Var.Match(v) {
+				// residual ERROR sticky — no invent use-true past Match hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue RHS past Lhs Match residual
+			if HasError() {
 				return true
 			}
 		} else if e.Assign.LhsVar == nil {
@@ -577,7 +609,15 @@ func (e *Expression) UseVar(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.Var == v || e.Var.Match(v)
+		if e.Var == v {
+			return true
+		}
+		matched := e.Var.Match(v)
+		// residual ERROR sticky — no invent not-use soft-skip past Match hole
+		if HasError() {
+			return true
+		}
+		return matched
 	case TermConstant:
 		// constants do not use variables — complete default false
 		return false

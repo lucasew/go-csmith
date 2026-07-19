@@ -1528,10 +1528,25 @@ func (v *Variable) LooseMatch(other *Variable) bool {
 		return false
 	}
 	if me.Match(you) {
+		// residual ERROR sticky — no invent loose-match true past Match hole
+		if HasError() {
+			return false
+		}
 		return true
 	}
+	// residual ERROR sticky — no invent soft-continue union match past Match residual false path
+	if HasError() {
+		return false
+	}
 	meU := me.GetContainerUnion()
+	// residual ERROR sticky — no invent soft-continue past GetContainerUnion hole
+	if HasError() {
+		return false
+	}
 	youU := you.GetContainerUnion()
+	if HasError() {
+		return false
+	}
 	return meU != nil && youU != nil && meU == youU
 }
 

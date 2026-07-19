@@ -193,8 +193,24 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 func varOnCallChain(v *Variable, chain []*Block) bool {
 	for _, b := range chain {
 		// chain pre-validated complete at AddExternalEffectWithCallers
-		if b != nil && b.StackScanComplete() && b.IsVarOnStack(v) {
+		if b == nil {
+			continue
+		}
+		if !b.StackScanComplete() {
+			// incomplete stack sticky not-on-chain residual for caller IncompleteEffect
+			SetError(ErrGeneric)
+			return false
+		}
+		if b.IsVarOnStack(v) {
+			// residual ERROR sticky — no invent on-chain true past IsVarOnStack hole
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue not-on-chain past IsVarOnStack residual
+		if HasError() {
+			return false
 		}
 	}
 	return false

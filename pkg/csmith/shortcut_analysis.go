@@ -292,13 +292,36 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 				return true
 			}
 			for _, f := range destIn {
+				if f.Var == nil {
+					SetError(ErrGeneric)
+					return true
+				}
 				if f.Var.IsRV() {
+					// residual ERROR sticky — no invent soft-continue unfixed scan past IsRV hole
+					if HasError() {
+						return true
+					}
 					continue
+				}
+				// residual ERROR sticky — no invent soft-continue past IsRV residual false path
+				if HasError() {
+					return true
 				}
 				// Statement.cpp:797–800 — jump_src_f && !f->imply(*jump_src_f)
 				jumpSrc := FindRelatedPointTo(srcOut, f.Var)
-				if jumpSrc != nil && !f.Imply(jumpSrc) {
+				// residual ERROR sticky — no invent soft-continue fixed past FindRelated hole
+				if HasError() {
 					return true
+				}
+				if jumpSrc != nil {
+					ok := f.Imply(jumpSrc)
+					// residual ERROR sticky — no invent soft-continue fixed past Imply hole
+					if HasError() {
+						return true
+					}
+					if !ok {
+						return true
+					}
 				}
 			}
 		}

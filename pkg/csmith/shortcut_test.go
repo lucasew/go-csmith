@@ -496,6 +496,20 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	if ContainsUnfixedGoto(root, fm) {
 		t.Fatal("equal should be fixed")
 	}
+	// Imply residual: PointTo nil hole soft invent was soft-continue then invent fixed.
+	// Fair: sticky unfixed true.
+	ClearError()
+	broken := &FactPointTo{Var: p, PointTo: []*Variable{a, nil}}
+	fm.SetMapFactsOut(20, []*FactPointTo{MakeFactPointTo(p, a)})
+	fm.SetMapFactsIn(10, []*FactPointTo{broken})
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("Imply residual must fail closed unfixed")
+	}
+	if !HasError() {
+		t.Fatal("Imply residual ContainsUnfixedGoto must SetError sticky")
+	}
+	ClearError()
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, a)})
 	// incomplete srcOut hole: fail closed unfixed (no invent fixed past hole)
 	fm.MapFactsOut[20] = []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if !ContainsUnfixedGoto(root, fm) {

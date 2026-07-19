@@ -1282,4 +1282,15 @@ func TestUseVarIncompleteSticky(t *testing.T) {
 		t.Fatal("matching Variable UseVar must not sticky")
 	}
 	ClearError()
+	// Match residual: Type-nil aggregate subject soft invent was not-use soft-skip.
+	// Fair: sticky uses true (restrictive).
+	hole := &Variable{Name: "g_agg", Type: nil}
+	other := CreateVariableScalars("g_y", GetIntType(), false, false)
+	if !(&Expression{Term: TermVariable, Var: hole}).UseVar(other) {
+		t.Fatal("Match residual UseVar must fail closed true (uses)")
+	}
+	if !HasError() {
+		t.Fatal("Match residual UseVar must SetError sticky")
+	}
+	ClearError()
 }

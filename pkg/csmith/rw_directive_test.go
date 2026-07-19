@@ -21,6 +21,23 @@ func TestIsNonReadableWritable(t *testing.T) {
 	}
 }
 
+func TestIsNonReadableMatchResidualSticky(t *testing.T) {
+	// Type-nil ban entry: Match residual soft invent was soft-continue then invent readable later.
+	// Fair: sticky nonreadable true.
+	ClearError()
+	defer ClearError()
+	hole := &Variable{Name: "g_hole"} // Type nil
+	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	cg := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{hole, good}})
+	if !cg.IsNonReadable(good) {
+		t.Fatal("Match residual must fail closed nonreadable, not invent later readable skip")
+	}
+	if !HasError() {
+		t.Fatal("Match residual IsNonReadable must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestIVBoundNonWritable(t *testing.T) {
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	cg := EmptyCGContext()
