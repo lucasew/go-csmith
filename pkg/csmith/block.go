@@ -808,21 +808,26 @@ func (b *Block) Output(indent int) string {
 			}
 			continue
 		}
-		sb.WriteString(inner)
+		// build statement body first — no invent indent-only lines for incomplete IR
+		var content strings.Builder
 		switch st.Kind {
 		case StmtReturn:
 			// StatementReturn.cpp:125–134 — always ExpressionVariable var (no invent bare return;)
 			if st.Expr == nil {
-				// incomplete IR — no soft invent "return;" without var
+				break
+			}
+			exprOut := st.Expr.Output()
+			if exprOut == "" {
+				// incomplete expr IR — no invent "return ;"
 				break
 			}
 			// DEPTH-- before return when depth_protect
 			if b.EmitDepthProtect {
-				sb.WriteString("DEPTH--;\n")
-				sb.WriteString(inner)
+				content.WriteString("DEPTH--;\n")
+				content.WriteString(inner)
 			}
 			// StatementReturn.cpp:131–133 — "return " + var.Output + ";"
-			sb.WriteString("return " + st.Expr.Output() + ";\n")
+			content.WriteString("return " + exprOut + ";\n")
 		case StmtAssign:
 			// StatementArrayOp init body: aggregate constant needs tmp
 			// StatementArrayOp.cpp:237–248
@@ -830,8 +835,11 @@ func (b *Block) Output(indent int) string {
 				st.Expr.Term == TermConstant && st.LhsVar != nil &&
 				st.LhsVar.Type != nil && st.LhsVar.Type.IsAggregate() {
 				ty := st.LhsVar.Type.CName()
-				sb.WriteString(ty + " tmp = " + st.Expr.Output() + ";\n")
-				sb.WriteString(inner + st.ArrayAccess + " = tmp;\n")
+				rhs := st.Expr.Output()
+				if ty != "" && rhs != "" {
+					content.WriteString(ty + " tmp = " + rhs + ";\n")
+					content.WriteString(inner + st.ArrayAccess + " = tmp;\n")
+				}
 				break
 			}
 			// StatementAssign::OutputAsExpr — CGOptions::identify_wrappers process-wide
@@ -839,91 +847,110 @@ func (b *Block) Output(indent int) string {
 			// no soft invent Defaults() / force IdentifyWrappers=false
 			asExpr := OutputAssignAsExprOpts(&st, wrap, ProcessOptions())
 			if asExpr != "" {
-				sb.WriteString(asExpr + ";\n")
+				content.WriteString(asExpr + ";\n")
 			} else if st.ArrayAccess != "" && st.Expr != nil {
 				// array_init simple: a[i] = expr
-				sb.WriteString(st.ArrayAccess + " = " + st.Expr.Output() + ";\n")
+				rhs := st.Expr.Output()
+				if rhs != "" {
+					content.WriteString(st.ArrayAccess + " = " + rhs + ";\n")
+				}
 			}
 			// incomplete assign IR — no soft invent /* assign */
 		case StmtBreak:
 			// StatementBreak.cpp:117–118 — test.Output always live; no invent if () break
 			if st.Expr == nil {
-				// incomplete IR — no soft invent "if () break"
 				break
 			}
-			sb.WriteString("if (")
-			sb.WriteString(st.Expr.Output())
-			sb.WriteString(")\n")
-			sb.WriteString(inner + "    break;\n")
+			test := st.Expr.Output()
+			if test == "" {
+				break
+			}
+			content.WriteString("if (")
+			content.WriteString(test)
+			content.WriteString(")\n")
+			content.WriteString(inner + "    break;\n")
 		case StmtContinue:
 			// StatementContinue.cpp — test.Output always live; no invent if () continue
 			if st.Expr == nil {
-				// incomplete IR — no soft invent "if () continue"
 				break
 			}
-			sb.WriteString("if (")
-			sb.WriteString(st.Expr.Output())
-			sb.WriteString(")\n")
-			sb.WriteString(inner + "    continue;\n")
+			test := st.Expr.Output()
+			if test == "" {
+				break
+			}
+			content.WriteString("if (")
+			content.WriteString(test)
+			content.WriteString(")\n")
+			content.WriteString(inner + "    continue;\n")
 		case StmtFor:
 			// StatementFor::Output — header + body Block always live
 			// no invent for(;;) / header without body / body without header
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				// incomplete for IR — no soft invent /* for-stub */
 				break
 			}
 			hdr := forHeaderOutput(st.Loop)
 			if hdr == "" {
-				// incomplete init/test/incr — no soft invent empty for header
 				break
 			}
-			sb.WriteString(hdr + "\n")
-			sb.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(hdr + "\n")
+			content.WriteString(st.Then.Output(indent + 1))
 		case StmtIfElse:
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
-			// no invent if () / missing branches
+			// no invent if () / missing branches / empty test Output
 			if st.Expr == nil || st.Then == nil || st.Else == nil {
-				// incomplete IR — no soft invent partial if
 				break
 			}
-			sb.WriteString("if (")
-			sb.WriteString(st.Expr.Output())
-			sb.WriteString(")\n")
-			sb.WriteString(st.Then.Output(indent + 1))
-			sb.WriteString(inner + "else\n")
-			sb.WriteString(st.Else.Output(indent + 1))
+			test := st.Expr.Output()
+			if test == "" {
+				break
+			}
+			content.WriteString("if (")
+			content.WriteString(test)
+			content.WriteString(")\n")
+			content.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(inner + "else\n")
+			content.WriteString(st.Else.Output(indent + 1))
 		case StmtGoto:
 			// StatementGoto.cpp:252–253 — test.Output always live; no invent if () goto
 			if st.Label == "" || st.Expr == nil {
-				// incomplete goto IR — no soft invent /* goto-stub */ or if () goto
 				break
 			}
-			sb.WriteString("if (")
-			sb.WriteString(st.Expr.Output())
-			sb.WriteString(")\n")
-			sb.WriteString(inner + "    goto " + st.Label + ";\n")
+			test := st.Expr.Output()
+			if test == "" {
+				break
+			}
+			content.WriteString("if (")
+			content.WriteString(test)
+			content.WriteString(")\n")
+			content.WriteString(inner + "    goto " + st.Label + ";\n")
 		case StmtArrayOp:
 			// StatementArrayOp::output_header + body/init block always live
 			// nested dims carry Then; array-loop path reuses for body as Then
 			// no invent header without body
 			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
-				// incomplete arrayop IR — no soft invent /* arrayop-stub */
 				break
 			}
 			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
 			if hdr == "" {
 				break
 			}
-			sb.WriteString(hdr + "\n")
-			sb.WriteString(st.Then.Output(indent + 1))
+			content.WriteString(hdr + "\n")
+			content.WriteString(st.Then.Output(indent + 1))
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
-			// no soft invent /* invoke */ when expr missing (stmtOK rejects null)
+			// no soft invent /* invoke */ or empty ";" when expr Output empty
 			if st.Expr != nil {
-				sb.WriteString(st.Expr.Output() + ";\n")
+				out := st.Expr.Output()
+				if out != "" {
+					content.WriteString(out + ";\n")
+				}
 			}
 		default:
 			// incomplete IR — no soft invent comment stub
+		}
+		if content.Len() > 0 {
+			sb.WriteString(inner)
+			sb.WriteString(content.String())
 		}
 		// Statement::post_output — paranoid fact assertions (Statement.cpp:919–924)
 		if b.EmitParanoid && b.EmitFM != nil {

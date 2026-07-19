@@ -52,6 +52,32 @@ func TestOutputAddrOf(t *testing.T) {
 	}
 }
 
+func TestOutputBoundNoInventFieldWithoutDot(t *testing.T) {
+	// Variable.cpp:724–727 assert(dot != npos); no invent base-only field path
+	parent := CreateVariableScalars("g_s", GetIntType(), false, false)
+	f := &Variable{Name: "broken_field", Type: GetIntType(), FieldVarOf: parent}
+	if s := f.OutputUpperBound(false); s != "" {
+		t.Fatal("field without '.' must fail closed", s)
+	}
+	if s := f.OutputLowerBound(false); s != "" {
+		t.Fatal("field without '.' must fail closed", s)
+	}
+	f.Name = "g_s.f0"
+	if s := f.OutputUpperBound(false); s != "g_s.f0" {
+		t.Fatal(s)
+	}
+}
+
+func TestBlockNoInventIndentOnlyIncompleteStmt(t *testing.T) {
+	// incomplete break must not invent whitespace-only indented line
+	b := &Block{Stmts: []Stmt{{Kind: StmtBreak}}} // no Expr
+	out := b.Output(1)
+	// only braces / block shell, no stray indent lines that look like empty stmts
+	if strings.Contains(out, "break") || strings.Contains(out, "if (") {
+		t.Fatal(out)
+	}
+}
+
 func TestNewProgramGeneratorSharesSessionProbs(t *testing.T) {
 	// C++ Probabilities singleton — generator and VS must share one table
 	opts := Defaults()

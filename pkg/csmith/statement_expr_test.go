@@ -34,20 +34,32 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 }
 
 func TestMakeRandomExprStmtEmitSemicolon(t *testing.T) {
-	opts := Defaults()
-	probs := NewProbabilities(opts)
-	vs := NewVariableSelector(opts)
-	tables := NewExprTables(opts)
-	// force a binary invoke via synthetic expr
-	fi := func() *Invocation { c := EmptyCGContext(); return MakeRandomBinaryInvocation(NewRng(3), opts, probs, vs, tables, &c, GetIntType()) }()
+	// complete binary IR (live args) — no invent bare ";" for empty Output
+	fi := &Invocation{
+		IsStd:  true,
+		Binary: "+",
+		Args: []*Expression{
+			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: MakeInt(2)},
+		},
+	}
 	st := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: fi}}
 	b := &Block{Stmts: []Stmt{st}}
 	out := b.Output(0)
-	if !strings.Contains(out, ";") {
+	if !strings.Contains(out, ";") || !strings.Contains(out, "+") {
 		t.Fatal(out)
 	}
 	if strings.Contains(out, "invoke-stub") {
 		t.Fatal("still stub")
+	}
+	// incomplete invoke Output must not invent indent-only / bare ";"
+	empty := Stmt{Kind: StmtInvoke, Expr: &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "+"}}}
+	out2 := (&Block{Stmts: []Stmt{empty}}).Output(0)
+	if strings.Contains(out2, ";") && !strings.Contains(out2, "/*") {
+		// only block braces — no statement semicolon from empty invoke
+		if strings.Count(out2, ";") > 0 && strings.Contains(out2, "    ;") {
+			t.Fatal("empty invoke must not invent bare ;", out2)
+		}
 	}
 }
 

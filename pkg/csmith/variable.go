@@ -255,14 +255,22 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 		return v.AsArray.OutputUpperBoundArray()
 	}
 	if v.FieldVarOf != nil {
+		// Variable.cpp:724–727 — assert(dot != npos); no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputUpperBound(prefixName)
+		if base == "" {
+			return ""
+		}
 		dot := strings.LastIndex(v.Name, ".")
 		if dot < 0 {
-			return base
+			return ""
 		}
 		return base + v.Name[dot:]
 	}
-	return v.GetActualName(prefixName)
+	name := v.GetActualName(prefixName)
+	if name == "" {
+		return ""
+	}
+	return name
 }
 
 // OutputLowerBound mirrors Variable::OutputLowerBound.
@@ -275,14 +283,22 @@ func (v *Variable) OutputLowerBound(prefixName bool) string {
 		return v.AsArray.OutputLowerBound()
 	}
 	if v.FieldVarOf != nil {
+		// Variable.cpp:737–740 — assert(dot != npos); no invent base-only without ".fN"
 		base := v.FieldVarOf.OutputLowerBound(prefixName)
+		if base == "" {
+			return ""
+		}
 		dot := strings.LastIndex(v.Name, ".")
 		if dot < 0 {
-			return base
+			return ""
 		}
 		return base + v.Name[dot:]
 	}
-	return v.GetActualName(prefixName)
+	name := v.GetActualName(prefixName)
+	if name == "" {
+		return ""
+	}
+	return name
 }
 
 // NewCtrlVars mirrors Variable::new_ctrl_vars — i,j,k… (±suffix when fresh).

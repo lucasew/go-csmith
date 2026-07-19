@@ -574,7 +574,12 @@ func (av *ArrayVariable) OutputLowerBound() string {
 	if av == nil {
 		return ""
 	}
-	s := av.Name
+	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live
+	name := av.GetActualName(false)
+	if name == "" {
+		return ""
+	}
+	s := name
 	for range av.Sizes {
 		s += "[0]"
 	}
@@ -808,8 +813,17 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 	if av == nil {
 		return ""
 	}
+	name := av.GetActualName(false)
+	if name == "" {
+		// name always live; no invent bare "[n]" bounds
+		return ""
+	}
+	if len(av.Sizes) == 0 {
+		// no soft invent bare name without dimensions
+		return ""
+	}
 	var b strings.Builder
-	b.WriteString(av.GetActualName(false))
+	b.WriteString(name)
 	for _, sz := range av.Sizes {
 		// ArrayVariable.cpp:575 — out << "[" << (sizes[i] - 1) << "]"
 		b.WriteString("[" + itoa(sz-1) + "]")
