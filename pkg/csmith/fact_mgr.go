@@ -1299,7 +1299,9 @@ func (fm *FactMgr) UpdateFactForReturn(rv *Variable, expr *Expression) bool {
 // FactMgr.cpp:406–421 — abstract_fact_for_return into global_facts; set_fact_out(sr).
 // Incomplete assign fails closed (false; no invent SetMapFactsOut from wiped map).
 func (fm *FactMgr) UpdateFactForReturnStmt(st *Stmt, rv *Variable, expr *Expression) bool {
-	if fm == nil || rv == nil {
+	// Expression* always live on StatementReturn; nil expr fails closed
+	// (no invent garbage RHS transfer as stand-in for missing return value IR)
+	if fm == nil || rv == nil || expr == nil {
 		return false
 	}
 	// abstract_fact_for_return ≈ abstract_fact_for_assign(facts, Lhs(rv), expr)

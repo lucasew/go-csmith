@@ -20,6 +20,21 @@ func TestRhsToLhsTransferNullConst(t *testing.T) {
 	}
 }
 
+func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
+	// FactPointTo.cpp:168–169 — nullptr rhs → garbage (AddParamFacts missing arg)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	facts := RhsToLhsTransfer(nil, []*Variable{p}, nil)
+	if len(facts) != 1 || !facts[0].IsDead() {
+		t.Fatal("nil rhs must abstract as garbage like C++", facts)
+	}
+	// return always has Expression*; nil expr fails closed before garbage invent
+	fm := NewFactMgr(nil)
+	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
+		t.Fatal("nil return expr must fail closed")
+	}
+}
+
 func TestRhsToLhsTransferAddrOf(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)

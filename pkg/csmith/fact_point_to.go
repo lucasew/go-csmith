@@ -265,6 +265,8 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			return nil
 		}
 	}
+	// FactPointTo.cpp:168–169 — rhs==nullptr → garbage (param missing / abstract nullptr)
+	// fair C++ path for AddParamFacts missing args — not invent; mirrors nullptr value
 	if rhs == nil {
 		return MakeFactsPointTo(lvars, GarbagePtr)
 	}

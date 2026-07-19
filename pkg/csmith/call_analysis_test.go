@@ -221,6 +221,15 @@ func TestCombineBranchFacts(t *testing.T) {
 	if fm2.GlobalFacts != nil {
 		t.Fatal("nil branch fact hole must fail closed", fm2.GlobalFacts)
 	}
+	// missing Then/Else arm — no invent empty branch via FactsComplete(nil)
+	fm3 := NewFactMgr(nil)
+	fm3.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	st3 := &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 10}, Else: nil}
+	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	CombineBranchFacts(st3, pre, fm3)
+	if fm3.GlobalFacts != nil {
+		t.Fatal("nil Else arm must fail closed", fm3.GlobalFacts)
+	}
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {

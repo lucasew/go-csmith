@@ -350,11 +350,17 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	if st == nil || fm == nil || st.Kind != StmtIfElse {
 		return
 	}
+	// StatementIf always has live if_true / if_false blocks after make_random
+	// incomplete arms fail closed (no invent empty then/else via nil-out + FactsComplete)
+	if st.Then == nil || st.Else == nil {
+		fm.GlobalFacts = nil
+		return
+	}
 	var thenOut, elseOut []*FactPointTo
-	if st.Then != nil && st.Then.StmID > 0 {
+	if st.Then.StmID > 0 {
 		thenOut = fm.MapFactsOut[st.Then.StmID]
 	}
-	if st.Else != nil && st.Else.StmID > 0 {
+	if st.Else.StmID > 0 {
 		elseOut = fm.MapFactsOut[st.Else.StmID]
 	}
 	// Fact* always live in maps used for branch combine
@@ -369,8 +375,8 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		return
 	}
 
-	trueMust := st.Then != nil && st.Then.MustReturn()
-	falseMust := st.Else != nil && st.Else.MustReturn()
+	trueMust := st.Then.MustReturn()
+	falseMust := st.Else.MustReturn()
 	switch {
 	case trueMust && falseMust:
 		fm.GlobalFacts = CloneFactSlice(preFacts)
@@ -380,7 +386,7 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = CloneFactSlice(thenOut)
 		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
 		// C++ map[] always; missing → empty makeup; incomplete fails closed
-		if st.Else != nil && st.Else.StmID > 0 {
+		if st.Else.StmID > 0 {
 			in := fm.MapFactsIn[st.Else.StmID]
 			if !FactsComplete(in) {
 				fm.GlobalFacts = nil

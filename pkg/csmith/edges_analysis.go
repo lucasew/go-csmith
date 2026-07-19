@@ -277,8 +277,9 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				return
 			}
 		case StmtReturn:
-			// curr_func + rv always live for return after make; incomplete → ERROR
-			if cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil {
+			// curr_func + rv + return expr always live for return after make
+			// incomplete → ERROR (no invent garbage transfer from nil Expression*)
+			if cg.CurrentFunc == nil || cg.CurrentFunc.RV == nil || st.Expr == nil {
 				SetError(ErrGeneric)
 				return
 			}
