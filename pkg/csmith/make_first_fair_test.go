@@ -232,6 +232,26 @@ func TestGenerateFunctionsStopsOnERROR(t *testing.T) {
 	ClearError()
 }
 
+func TestGenerateFunctionsIncompleteGlobalListSeedFailClosed(t *testing.T) {
+	// GenerateFunctions FM seed (MakeFirst + unbuilt loop) shares VariablesComplete /
+	// FactsComplete gate — incomplete GlobalList must not invent built bodies.
+	ClearError()
+	opts := Defaults()
+	opts.MaxFuncs = 2
+	opts.MaxBlockSize = 1
+	g := NewProgramGenerator(opts)
+	g.Initialize()
+	g.GenerateAllTypes()
+	g.VS.GlobalList = []*Variable{CreateVariableScalars("g_x", GetIntType(), false, false), nil}
+	g.GenerateFunctions()
+	for _, f := range g.Funcs.Funcs {
+		if f != nil && (f.IsBuilt || f.BuildState == BuildBuilt) {
+			t.Fatal("incomplete GlobalList seed must not invent built body")
+		}
+	}
+	ClearError()
+}
+
 func TestGenerateFunctionsNoInventNilFuncHole(t *testing.T) {
 	// Function* always live on Funcs; nil hole stops unbuilt-body loop
 	ClearError()

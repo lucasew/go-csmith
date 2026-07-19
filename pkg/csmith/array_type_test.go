@@ -219,6 +219,50 @@ func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	ClearError()
 }
 
+func TestGenerateNewGlobalIncompleteGlobalFactsFailClosed(t *testing.T) {
+	// AddNewVarFactAndUpdate leaves incomplete GlobalFacts — must not invent create success
+	ClearError()
+	opts := Defaults()
+	opts.GlobalVariables = true
+	opts.Arrays = false
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
+	}
+	if !HasError() {
+		t.Fatal("must SetError")
+	}
+	ClearError()
+	// NonArray path same
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	if vs.GenerateNewNonArrayGlobal(AccessRead, cg2, GetIntType(), nil, NewRng(2)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewNonArrayGlobal")
+	}
+	if !HasError() {
+		t.Fatal("must SetError NonArray")
+	}
+	ClearError()
+	// ParentLocal path
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm3 := NewFactMgr(f)
+	fm3.GlobalFacts = IncompleteFactSlice()
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
+	if vs.GenerateNewParentLocal(blk, AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewParentLocal")
+	}
+	if !HasError() {
+		t.Fatal("must SetError ParentLocal")
+	}
+	ClearError()
+}
+
 func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	// AcceptType false for volatile struct when context not SE-free
 	opts := Defaults()

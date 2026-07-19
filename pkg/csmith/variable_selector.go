@@ -1425,6 +1425,7 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	vs.GlobalList = append(vs.GlobalList, v)
 	// VariableSelector.cpp:596–597 — FM on collective
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
+	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
@@ -1432,6 +1433,10 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
 	}
 	// VariableSelector.cpp:598 — current_func new_globals
 	if cg.CurrentFunc != nil {
@@ -1492,6 +1497,7 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	vs.GlobalList = append(vs.GlobalList, v)
 	// VariableSelector.cpp:563–564 — FM on collective
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
+	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
@@ -1499,6 +1505,10 @@ func (vs *VariableSelector) GenerateNewGlobal(
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
 	}
 	// VariableSelector.cpp:565 — current_func()->new_globals
 	if cg.CurrentFunc != nil {
@@ -1900,6 +1910,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	block.LocalVars = append(block.LocalVars, v)
 	// VariableSelector.cpp:945–946 — FM on collective
 	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
+	// Incomplete GlobalFacts after register must not invent create success
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
@@ -1907,6 +1918,10 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(block, coll)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return nil
+		}
 	}
 	// wrap_volatiles for Output
 	if vs.Opts.WrapVolatiles && v.IsVolatile() {
@@ -2097,10 +2112,19 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 		}
 		if cg.FM != nil {
 			cg.FM.AddNewVarFactAndUpdate(nil, &av.Variable)
+			// Incomplete GlobalFacts after register must not invent create success
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
+				return nil
+			}
 		}
 	} else if blk != nil {
 		if cg.FM != nil {
 			cg.FM.AddNewVarFactAndUpdate(blk, &av.Variable)
+			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
+				return nil
+			}
 		}
 	}
 	vs.VarCreated = true

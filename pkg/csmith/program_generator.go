@@ -139,13 +139,18 @@ func (g *ProgramGenerator) GenerateFunctions() {
 		cg.Types = &g.Types
 		if fm := g.FactMgrs.ForFunc(f); fm != nil {
 			// seed global pointer facts already known
-			// Variable* always live on GlobalList; nil hole fails closed (stop gen)
+			// Variable* always live on GlobalList; nil hole / incomplete AddNewVarFact
+			// fails closed (AddNewVarFact(nil) no-ops; incomplete GlobalFacts must not
+			// invent soft-continue GenerateBody)
 			if g.VS != nil {
+				if !VariablesComplete(g.VS.GlobalList) {
+					return
+				}
 				for _, gv := range g.VS.GlobalList {
-					if gv == nil {
+					fm.AddNewVarFact(gv)
+					if !FactsComplete(fm.GlobalFacts) {
 						return
 					}
-					fm.AddNewVarFact(gv)
 				}
 			}
 			cg = cg.WithFactMgr(fm)
