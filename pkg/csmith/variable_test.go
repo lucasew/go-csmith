@@ -215,6 +215,47 @@ func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
 		t.Fatal("self Match must not sticky")
 	}
 	ClearError()
+	// special Type-nil complete not-match (unless identity)
+	if NullPtr.Match(v) {
+		t.Fatal("special Match other must stay complete false")
+	}
+	if HasError() {
+		t.Fatal("special Match must not sticky")
+	}
+	ClearError()
+	if !NullPtr.Match(NullPtr) {
+		t.Fatal("special self Match must be true")
+	}
+	if HasError() {
+		t.Fatal("special self Match must not sticky")
+	}
+	ClearError()
+	// non-special Type-nil sticky (no invent not-match soft-skip)
+	broken := &Variable{Name: "broken"}
+	if broken.Match(v) {
+		t.Fatal("Type-nil Match must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Match must SetError sticky")
+	}
+	ClearError()
+	if v.Match(broken) {
+		t.Fatal("Match Type-nil other must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Match Type-nil other must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCreateFieldVarsNilSticky(t *testing.T) {
+	// Variable always live; sticky no invent soft-skip create past missing shell
+	ClearError()
+	(*Variable)(nil).CreateFieldVars()
+	if !HasError() {
+		t.Fatal("nil CreateFieldVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHasFieldVarLooseMatchIncompleteSticky(t *testing.T) {

@@ -1296,6 +1296,8 @@ func (v *Variable) GetSeqNum() int {
 // Match mirrors Variable::match — identity, or aggregate has field.
 // Variable.cpp:254–258.
 // Incomplete Variable* sticky false (no invent not-match / soft re-pick past holes).
+// Special null/garbage/tbd have Type nil by design — complete not-match (unless identity).
+// Other Type-nil shells sticky (no invent not-match soft-skip past incomplete IR).
 func (v *Variable) Match(other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-match
 	if v == nil || other == nil {
@@ -1305,7 +1307,14 @@ func (v *Variable) Match(other *Variable) bool {
 	if v == other {
 		return true
 	}
-	if v.Type != nil && v.Type.IsAggregate() {
+	if IsSpecialPtr(v) || IsSpecialPtr(other) {
+		return false
+	}
+	if v.Type == nil || other.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if v.Type.IsAggregate() {
 		return v.HasFieldVar(other)
 	}
 	return false
@@ -1512,7 +1521,9 @@ func (v *Variable) FindPointerFields() []*Variable {
 // when type still has Fields / half-built list was wiped).
 func (v *Variable) CreateFieldVars() {
 	// Variable.cpp:338 — assert(type->is_aggregate()) sticky for live non-aggregate
+	// Variable always live; sticky no invent soft-skip create past missing shell
 	if v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if v.Type == nil || !v.Type.IsAggregate() {
@@ -1725,6 +1736,11 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 		SetError(ErrGeneric)
 		return ""
 	}
+	// Type always live for dump dispatch; sticky no invent empty dump past Type-nil shell
+	if v.Type == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	all := expandWithinRanges(v.ArraySizes)
 	var b strings.Builder
 	for _, idx := range all {
@@ -1733,7 +1749,7 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 		for _, i := range idx {
 			name += "[" + itoa(i) + "]"
 		}
-		if v.Type != nil && v.Type.IsSimple() {
+		if v.Type.IsSimple() {
 			dir := v.Type.PrintfDirective()
 			if dir == "" {
 				if !HasError() {
@@ -1744,7 +1760,7 @@ func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*
 			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
 			continue
 		}
-		if v.Type != nil && v.Type.IsAggregate() && len(v.FieldVars) > 0 {
+		if v.Type.IsAggregate() && len(v.FieldVars) > 0 {
 			// dump fields with indexed prefix path via synthetic names
 			// Variable* always live in FieldVars; nil hole sticky whole dump
 			for fi, f := range v.FieldVars {

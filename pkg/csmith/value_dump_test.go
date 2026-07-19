@@ -104,6 +104,25 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 	}
 }
 
+func TestOutputValueDumpTypeNilSticky(t *testing.T) {
+	// Variable + Type always live at dump; sticky no invent empty dump past Type-nil shell
+	ClearError()
+	if (&Variable{Name: "g_broken"}).OutputValueDump("c ", 0, nil) != "" {
+		t.Fatal("Type-nil OutputValueDump must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil OutputValueDump must SetError sticky")
+	}
+	ClearError()
+	if outputValueDumpArray(&Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
+		t.Fatal("Type-nil outputValueDumpArray must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil outputValueDumpArray must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestExpandWithinRanges(t *testing.T) {
 	got := expandWithinRanges([]int{2, 2})
 	if len(got) != 4 {
