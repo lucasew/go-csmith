@@ -147,16 +147,17 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 
 // OutputSkippedVarInits mirrors StatementGoto::output_skipped_var_inits.
 // StatementGoto.cpp:264–275 — re-init skipped locals at destination label via init->Output.
+// Incomplete InitSkippedVars fails closed empty (no invent soft-skip hole partial re-inits).
 func OutputSkippedVarInits(st *Stmt, indent string) string {
 	if st == nil || len(st.InitSkippedVars) == 0 {
 		return ""
 	}
+	if !VariablesComplete(st.InitSkippedVars) {
+		return ""
+	}
 	var b strings.Builder
 	for _, v := range st.InitSkippedVars {
-		// StatementGoto.cpp:271 — vars[i] always live; no invent skip nil holes
-		if v == nil {
-			return ""
-		}
+		// pre-validated VariablesComplete
 		// StatementGoto.cpp:271 — assert(v->init); no invent "name = ;" for missing init
 		init := variableInitOutput(v)
 		if init == "" {
@@ -431,10 +432,10 @@ func MakeRandomGoto(
 		}
 	} else {
 		// StatementGoto.cpp:125–128 — map_accum_effect[other] read_vars
-		// C++ map[] always (missing → empty Effect); no invent skip when key absent
+		// C++ map[] always (missing live id → empty); StmID 0 IncompleteEffect
 		condBlk = okBlk
-		if cg.FM != nil && cg.FM.MapAccumEffect != nil {
-			readVars = cg.FM.MapAccumEffect[other.StmID].ReadVars()
+		if cg.FM != nil {
+			readVars = cg.FM.GetMapAccumEffect(other.StmID).ReadVars()
 		}
 	}
 	var cond *Expression
@@ -523,11 +524,9 @@ func MakeRandomGoto(
 		gotoIn = CloneFactSlice(srcFacts)
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
-		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing)
+		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing live id)
 		preEffect := cg.AccumEffect()
-		if fm.MapAccumEffect != nil {
-			cg.AddEffect(fm.MapAccumEffect[other.StmID], true)
-		}
+		cg.AddEffect(fm.GetMapAccumEffect(other.StmID), true)
 		// StatementGoto.cpp:167–182
 		destIn := fm.MapFactsIn[dest.StmID]
 		if !FactsComplete(destIn) {

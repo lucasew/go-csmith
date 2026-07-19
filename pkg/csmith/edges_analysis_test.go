@@ -307,4 +307,11 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	if fm.GetMapStmEffect(0).IsWritten(v) {
 		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
+	// GetMapStmEffect(0) IncompleteEffect — not invent empty pure default
+	if EffectComplete(fm.GetMapStmEffect(0)) || fm.GetMapStmEffect(0).IsEmpty() {
+		t.Fatal("StmID 0 GetMapStmEffect must IncompleteEffect")
+	}
+	if EffectComplete(fm.GetMapAccumEffect(0)) || fm.GetMapAccumEffect(0).IsPure() {
+		t.Fatal("StmID 0 GetMapAccumEffect must IncompleteEffect")
+	}
 }

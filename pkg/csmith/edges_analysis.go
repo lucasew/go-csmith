@@ -152,10 +152,8 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				if _, ok := tryMergeJumpFacts(facts, out); !ok {
 					return false
 				}
-				// map_accum_effect[src] — missing → zero Effect (same as skip Add)
-				if fm.MapAccumEffect != nil {
-					cg.AddEffect(fm.MapAccumEffect[e.SrcID], false)
-				}
+				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
+				cg.AddEffect(fm.GetMapAccumEffect(e.SrcID), false)
 			}
 		}
 		// always consider forward edges
@@ -172,9 +170,7 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			if _, ok := tryMergeJumpFacts(facts, out); !ok {
 				return false
 			}
-			if fm.MapAccumEffect != nil {
-				cg.AddEffect(fm.MapAccumEffect[e.SrcID], false)
-			}
+			cg.AddEffect(fm.GetMapAccumEffect(e.SrcID), false)
 		}
 	}
 	return ValidateAndUpdateFacts(st, facts, cg, opts, blk)

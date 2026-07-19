@@ -810,12 +810,34 @@ func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	fm.MapStmEffect[stmID] = eff
 }
 
-// GetMapStmEffect returns stored effect or empty.
+// GetMapStmEffect returns stored effect or empty for a live stm_id key.
+// StmID ≤0 fails closed IncompleteEffect (no invent empty pure map default
+// for incomplete statement keys used by SetAccumulatedEffect / body effect merge).
+// Missing map entry for a live id is C++ map[] default empty complete.
 func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
+	if stmID <= 0 {
+		return IncompleteEffect()
+	}
 	if fm == nil || fm.MapStmEffect == nil {
 		return EmptyEffect()
 	}
 	if e, ok := fm.MapStmEffect[stmID]; ok {
+		return e
+	}
+	return EmptyEffect()
+}
+
+// GetMapAccumEffect returns stored map_accum_effect or empty for a live stm_id.
+// StmID ≤0 fails closed IncompleteEffect (no invent empty-complete zero Effect
+// via map miss on incomplete keys — ReadVars/AddEffect would invent pure).
+func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
+	if stmID <= 0 {
+		return IncompleteEffect()
+	}
+	if fm == nil || fm.MapAccumEffect == nil {
+		return EmptyEffect()
+	}
+	if e, ok := fm.MapAccumEffect[stmID]; ok {
 		return e
 	}
 	return EmptyEffect()
