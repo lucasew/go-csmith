@@ -4,85 +4,148 @@ package csmith
 
 // CollectReferencedPtrsExpression mirrors Expression::get_referenced_ptrs.
 // ExpressionVariable.cpp:230–235 — pointer vars; comma/assign recurse; invoke args + callee.
+// Incomplete IR fails closed: clears *ptrs and returns false (no invent partial lists).
 func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
+	_ = collectReferencedPtrsExpression(e, ptrs)
+}
+
+// collectReferencedPtrsExpression returns false on incomplete IR (*ptrs cleared).
+func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	if e == nil || ptrs == nil {
-		return
+		if ptrs != nil {
+			*ptrs = nil
+		}
+		return false
 	}
 	switch e.Term {
 	case TermVariable:
-		if e.Var != nil && e.Var.IsPointer() {
+		// ExpressionVariable always has live Variable*
+		if e.Var == nil {
+			*ptrs = nil
+			return false
+		}
+		if e.Var.IsPointer() {
 			*ptrs = appendUniqueVar(*ptrs, e.Var)
 		}
+		return true
 	case TermCommaExpr:
-		CollectReferencedPtrsExpression(e.CommaLHS, ptrs)
-		CollectReferencedPtrsExpression(e.CommaRHS, ptrs)
-	case TermAssignment:
-		if e.Assign != nil {
-			CollectReferencedPtrsStmt(e.Assign, ptrs)
+		// both sides always live
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			*ptrs = nil
+			return false
 		}
+		if !collectReferencedPtrsExpression(e.CommaLHS, ptrs) {
+			return false
+		}
+		return collectReferencedPtrsExpression(e.CommaRHS, ptrs)
+	case TermAssignment:
+		if e.Assign == nil {
+			*ptrs = nil
+			return false
+		}
+		return collectReferencedPtrsStmt(e.Assign, ptrs)
 	case TermFunction:
 		// ExpressionFuncall.cpp:165–177 — param_value then eFuncCall → assert(fiu) + callee
 		if e.Invoke == nil {
-			return
+			*ptrs = nil
+			return false
 		}
 		for _, a := range e.Invoke.Args {
-			// Expression* args always live after ERROR_GUARD; nil hole fails closed
-			// (clear collected so far — no invent partial arg ptrs)
+			// Expression* args always live after ERROR_GUARD
 			if a == nil {
 				*ptrs = nil
-				return
+				return false
 			}
-			CollectReferencedPtrsExpression(a, ptrs)
+			if !collectReferencedPtrsExpression(a, ptrs) {
+				return false
+			}
 		}
 		// ExpressionFuncall.cpp:172–177 — only user FuncCall walks callee refs
-		// assert(fiu); incomplete std-as-user skip (no invent empty follow)
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
 			for _, p := range e.Invoke.User.ReferencedPtrs {
-				// Variable* always live on ReferencedPtrs; nil hole fails closed
+				// Variable* always live on ReferencedPtrs
 				if p == nil {
 					*ptrs = nil
-					return
+					return false
 				}
 				*ptrs = appendUniqueVar(*ptrs, p)
 			}
 		}
+		return true
+	case TermConstant:
+		return true
+	default:
+		// unknown term — incomplete IR
+		*ptrs = nil
+		return false
 	}
 }
 
 // CollectReferencedPtrsStmt mirrors Statement::get_referenced_ptrs.
 // Statement.cpp:331–345 — exprs + nested blocks.
 func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
+	_ = collectReferencedPtrsStmt(st, ptrs)
+}
+
+func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	if st == nil || ptrs == nil {
-		return
+		if ptrs != nil {
+			*ptrs = nil
+		}
+		return false
 	}
 	if st.Expr != nil {
-		CollectReferencedPtrsExpression(st.Expr, ptrs)
+		if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+			return false
+		}
 	}
 	if st.LhsVar != nil && st.LhsVar.IsPointer() {
 		*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
 	}
-	if st.Lhs != nil && st.Lhs.Var != nil && st.Lhs.Var.IsPointer() {
-		*ptrs = appendUniqueVar(*ptrs, st.Lhs.Var)
+	if st.Lhs != nil {
+		// Lhs always has live Var in C++; incomplete Lhs.Var fails closed
+		if st.Lhs.Var == nil {
+			*ptrs = nil
+			return false
+		}
+		if st.Lhs.Var.IsPointer() {
+			*ptrs = appendUniqueVar(*ptrs, st.Lhs.Var)
+		}
 	}
 	if st.Then != nil {
-		CollectReferencedPtrsBlock(st.Then, ptrs)
+		if !collectReferencedPtrsBlock(st.Then, ptrs) {
+			return false
+		}
 	}
 	if st.Else != nil {
-		CollectReferencedPtrsBlock(st.Else, ptrs)
+		if !collectReferencedPtrsBlock(st.Else, ptrs) {
+			return false
+		}
 	}
 	if st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.IsPointer() {
 		*ptrs = appendUniqueVar(*ptrs, st.Loop.IV)
 	}
+	return true
 }
 
 // CollectReferencedPtrsBlock walks all statements in a block.
 func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
+	_ = collectReferencedPtrsBlock(b, ptrs)
+}
+
+func collectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) bool {
 	if b == nil || ptrs == nil {
-		return
+		if ptrs != nil {
+			*ptrs = nil
+		}
+		return false
 	}
 	for i := range b.Stmts {
-		CollectReferencedPtrsStmt(&b.Stmts[i], ptrs)
+		if !collectReferencedPtrsStmt(&b.Stmts[i], ptrs) {
+			return false
+		}
 	}
+	return true
 }
 
 func appendUniqueVar(s []*Variable, v *Variable) []*Variable {

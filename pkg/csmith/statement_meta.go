@@ -189,9 +189,12 @@ func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, 
 
 // IsPtrUsed mirrors Statement::is_ptr_used.
 // Statement.cpp:355–359.
+// Incomplete IR fails closed as true (no invent "no pointer used" past holes).
 func IsPtrUsed(st *Stmt) bool {
 	var ptrs []*Variable
-	CollectReferencedPtrsStmt(st, &ptrs)
+	if !collectReferencedPtrsStmt(st, &ptrs) {
+		return true
+	}
 	return len(ptrs) > 0
 }
 

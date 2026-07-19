@@ -514,6 +514,29 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 	if CountExprKeyVar(bin2) != 2 || FindExprKeyVar(bin2) != nil {
 		t.Fatal("two vars")
 	}
+	// incomplete IR fails closed -1 / nil (no invent leaf 0 or key-var 1)
+	if CountExprKeyVar(nil) >= 0 {
+		t.Fatal("nil expr must fail closed -1")
+	}
+	if CountExprKeyVar(&Expression{Term: TermVariable}) >= 0 {
+		t.Fatal("nil Var must fail closed -1")
+	}
+	if CountExprKeyVar(&Expression{Term: TermConstant}) >= 0 {
+		t.Fatal("nil Con must fail closed -1")
+	}
+	if CountExprKeyVar(&Expression{Term: TermFunction}) >= 0 {
+		t.Fatal("nil Invoke must fail closed -1")
+	}
+	if CountExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
+		IsStd: true, Binary: "+", Args: []*Expression{ev, nil},
+	}}) >= 0 {
+		t.Fatal("nil arg hole must fail closed -1")
+	}
+	if FindExprKeyVar(&Expression{Term: TermFunction, Invoke: &Invocation{
+		IsStd: true, Binary: "+", Args: []*Expression{nil, c},
+	}}) != nil {
+		t.Fatal("nil arg FindExprKeyVar must fail closed")
+	}
 }
 
 func TestIsVariantKeyVars(t *testing.T) {
