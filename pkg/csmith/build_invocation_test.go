@@ -182,6 +182,32 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete AccumEffContext must fail closed BuildUserInvocation")
 	}
+	if !HasError() {
+		t.Fatal("incomplete AccumEffContext must SetError sticky")
+	}
+	ClearError()
+	// incomplete GlobalFacts on revisit must sticky fail
+	callee2 := &Function{
+		Name:            "g_helper2",
+		ReturnType:      GetIntType(),
+		BuildState:      BuildBuilt,
+		IsBuilt:         true,
+		FactChanged:     true,
+		AccumEffContext: EmptyEffect(),
+		Body:            &Block{StmID: 2, Stmts: []Stmt{}},
+	}
+	caller2 := &Function{Name: "func_1"}
+	list2 := &FunctionList{Funcs: []*Function{caller2, callee2}}
+	fm2 := NewFactMgr(caller2)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(caller2, EmptyEffect()).WithFuncList(list2).WithFactMgr(fm2)
+	fi2 := BuildUserInvocation(NewRng(5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list2, callee2)
+	if fi2 == nil || !fi2.Failed {
+		t.Fatal("incomplete GlobalFacts must fail closed BuildUserInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
 	ClearError()
 }
 
@@ -205,6 +231,9 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	if fi != nil && !fi.Failed {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
+	}
+	if !HasError() {
+		t.Fatal("incomplete caller EffectContext must SetError sticky")
 	}
 	ClearError()
 }

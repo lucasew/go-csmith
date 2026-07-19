@@ -398,6 +398,13 @@ func BuildUserInvocation(
 	if r == nil || callee == nil || cg == nil {
 		return &Invocation{Failed: true}
 	}
+	// incomplete ambient fails closed sticky (no invent param gen / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return &Invocation{User: callee, Failed: true}
+	}
 	fi := &Invocation{User: callee}
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
@@ -427,14 +434,18 @@ func BuildUserInvocation(
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
-		// Incomplete param accum fails closed (no invent more params under incomplete running)
+		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
 		running = running.AddEffect(paramAccum)
 		if !EffectComplete(running) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		cg.MergeParamContext(paramCG, false)
-		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			fi.Failed = true
 			return fi
 		}
@@ -446,10 +457,11 @@ func BuildUserInvocation(
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
 	if callee != first && callee.NeedsRevisit() {
 		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
-		// Incomplete AccumEffContext fails closed (no invent revisit under incomplete ambient)
+		// Incomplete AccumEffContext fails closed sticky (no invent revisit under incomplete ambient)
 		effectAccum := EmptyEffect()
 		effectContext := cg.EffectContext().AddEffect(callee.AccumEffContext)
 		if !EffectComplete(effectContext) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -459,8 +471,9 @@ func BuildUserInvocation(
 		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
 		var facts []*FactPointTo
 		if cg.FM != nil {
-			// incomplete GlobalFacts fail closed (no invent cleaned empty for revisit)
+			// incomplete GlobalFacts fail closed sticky (no invent cleaned empty for revisit)
 			if !FactsComplete(cg.FM.GlobalFacts) {
+				SetError(ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
@@ -470,7 +483,7 @@ func BuildUserInvocation(
 		fi.Failed = !ok
 		if ok {
 			// FunctionInvocationUser.cpp:284–290
-			// Incomplete effect hand-over fails closed Failed (no invent silent Incomplete FEffect)
+			// Incomplete effect hand-over fails closed sticky (no invent silent Incomplete FEffect)
 			if cg.CurrentBlock() != nil {
 				cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
 				if HasError() {
@@ -479,11 +492,13 @@ func BuildUserInvocation(
 				}
 			}
 			if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
+				SetError(ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
 			callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
 			if !EffectComplete(callee.FEffect) {
+				SetError(ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
@@ -530,6 +545,13 @@ func BuildInvocationAndFunction(
 	if retType == nil {
 		return &Invocation{Failed: true}
 	}
+	// incomplete ambient fails closed sticky (no invent signature/params past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return &Invocation{Failed: true}
+	}
 	// FunctionInvocationUser.cpp:179 — make_random_signature
 	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, nil, list)
 	if callee == nil {
@@ -564,14 +586,18 @@ func BuildInvocationAndFunction(
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
-		// Incomplete param accum fails closed (no invent more params under incomplete running)
+		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
 		running = running.AddEffect(paramAccum)
 		if !EffectComplete(running) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		cg.MergeParamContext(paramCG, false)
-		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			fi.Failed = true
 			return fi
 		}
@@ -590,8 +616,9 @@ func BuildInvocationAndFunction(
 	}
 	facts := []*FactPointTo{}
 	if callerFM != nil {
-		// incomplete caller GlobalFacts fail closed (no invent cleaned handover)
+		// incomplete caller GlobalFacts fail closed sticky (no invent cleaned handover)
 		if !FactsComplete(callerFM.GlobalFacts) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -612,7 +639,7 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
 	// then add_back_return_facts. GetMapFactsOut: StmID 0 Incomplete; missing → empty.
-	// Incomplete out / add_back fail closed Failed — no invent soft-merge returns
+	// Incomplete out / add_back fail closed sticky — no invent soft-merge returns
 	var retFacts []*FactPointTo
 	if callee.Body == nil {
 		fi.Failed = true
@@ -620,6 +647,7 @@ func BuildInvocationAndFunction(
 	}
 	out := calFM.GetMapFactsOut(callee.Body.StmID)
 	if !FactsComplete(out) {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
@@ -635,26 +663,30 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:221 — renew_facts(caller, ret_facts)
 	if callerFM != nil {
-		// complete retFacts (may be empty nil) required; incomplete caller fails closed
+		// complete retFacts (may be empty nil) required; incomplete caller fails closed sticky
 		// (no invent RenewFacts no-op success past incomplete then keep prior)
 		if !FactsComplete(callerFM.GlobalFacts) || !FactsComplete(retFacts) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		_ = RenewFacts(&callerFM.GlobalFacts, retFacts)
 		if !FactsComplete(callerFM.GlobalFacts) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		// FunctionInvocationUser.cpp:234–238 — new globals facts
-		// Incomplete NewGlobals fails closed Failed (no invent soft-skip hole / partial push)
+		// Incomplete NewGlobals fails closed sticky (no invent soft-skip hole / partial push)
 		if !VariablesComplete(callee.NewGlobals) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		for _, v := range callee.NewGlobals {
 			callerFM.AddNewVarFactAndUpdate(nil, v)
 			if !FactsComplete(callerFM.GlobalFacts) {
+				SetError(ErrGeneric)
 				fi.Failed = true
 				return fi
 			}
@@ -662,23 +694,27 @@ func BuildInvocationAndFunction(
 	}
 
 	// FunctionInvocationUser.cpp:223–228 — effect hand-over
-	// Incomplete external merge fails closed Failed (no invent silent Incomplete shells)
+	// Incomplete external merge fails closed sticky (no invent silent Incomplete shells)
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(callee.AccumEffContext) {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffect(cg.EffectContext())
 	if !EffectComplete(callee.AccumEffContext) {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	// feffect.add_external_effect(effect_accum, call_chain)
 	if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
 	if !EffectComplete(callee.FEffect) {
+		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
@@ -692,6 +728,7 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:230–233 — new_globals hand-over
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {
 		if !VariablesComplete(callee.NewGlobals) {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -718,6 +755,13 @@ func MakeRandomBinaryInvocation(
 ) *Invocation {
 	// FunctionInvocation.cpp always has RNG + CGContext; no invent binary shell without them
 	if r == nil || cg == nil {
+		return nil
+	}
+	// incomplete ambient fails closed sticky (no invent binary / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
@@ -796,7 +840,11 @@ func MakeRandomBinaryInvocation(
 	}
 	// FunctionInvocation.cpp:221 — merge_param_context(lhs) (effects + expr_depth)
 	cg.MergeParamContext(lhsCG, true)
-	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+	// incomplete effect after lhs merge fails closed sticky (no invent RHS / soft re-pick)
+	if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 
@@ -845,11 +893,12 @@ func MakeRandomBinaryInvocation(
 			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
 		} else {
 			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
-			// Incomplete lhs accum fails closed (no invent RHS under incomplete ambient)
+			// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 			rhsAccum := EmptyEffect()
 			rhsCG := *cg
 			rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
 			if !EffectComplete(rhsCtx) {
+				SetError(ErrGeneric)
 				return nil
 			}
 			rhsCG.effectContext = rhsCtx
@@ -858,7 +907,10 @@ func MakeRandomBinaryInvocation(
 			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
 			cg.MergeParamContext(rhsCG, true)
-			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return nil
 			}
 		}
@@ -934,6 +986,13 @@ func MakeRandomBinaryPtrComparison(
 	if r == nil || cg == nil || env == nil || !env.HasPointerType() {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent ptr cmp / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// FunctionInvocation.cpp:295–296 — eCmpEq or eCmpNe
 	op := BinCmpEq
 	if r.RndFlipcoin(50) {
@@ -962,7 +1021,11 @@ func MakeRandomBinaryPtrComparison(
 	}
 	// FunctionInvocation.cpp:313 — merge_param_context(lhs)
 	cg.MergeParamContext(lhsCG, true)
-	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+	// incomplete effect after lhs merge fails closed sticky (no invent RHS / soft re-pick)
+	if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 
@@ -984,9 +1047,10 @@ func MakeRandomBinaryPtrComparison(
 		rhsAccum := EmptyEffect()
 		rhsCG := *cg
 		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
-		// Incomplete lhs accum fails closed (no invent RHS under incomplete ambient)
+		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 		rhsCtx := cg.EffectContext().AddEffect(lhsAccum)
 		if !EffectComplete(rhsCtx) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		rhsCG.effectContext = rhsCtx
@@ -996,7 +1060,10 @@ func MakeRandomBinaryPtrComparison(
 		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
 		// FunctionInvocation.cpp:345
 		cg.MergeParamContext(rhsCG, true)
-		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 	}

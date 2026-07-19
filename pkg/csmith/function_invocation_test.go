@@ -48,6 +48,46 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	}
 }
 
+func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
+	// incomplete EffectAccum after lhs must sticky ERROR (no invent RHS / soft re-pick)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	vs.AllVars = []*Variable{g}
+	vs.Opts = opts
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	fi := MakeRandomBinaryInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntType())
+	if fi != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBinaryInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	// incomplete GlobalFacts snapshot before RHS
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	eff := EmptyEffect()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	cg2.EffectAccum = &eff
+	fi2 := MakeRandomBinaryInvocation(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntType())
+	if fi2 != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBinaryInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	// FunctionInvocation.cpp:208–221 — LHS under dedicated accum; merge_param_context
 	// folds reads into caller's effect_accum and raises expr_depth.
