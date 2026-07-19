@@ -493,6 +493,47 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM GetMapFactsOutFinal must SetError sticky")
 	}
 	ClearError()
+	// GetMapStmEffect / GetMapAccumEffect nil FM sticky IncompleteEffect
+	if EffectComplete((*FactMgr)(nil).GetMapStmEffect(1)) {
+		t.Fatal("nil FM GetMapStmEffect must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapStmEffect must SetError sticky")
+	}
+	ClearError()
+	if EffectComplete((*FactMgr)(nil).GetMapAccumEffect(1)) {
+		t.Fatal("nil FM GetMapAccumEffect must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM GetMapAccumEffect must SetError sticky")
+	}
+	ClearError()
+	// SetMap* nil FM / bad stm_id sticky
+	(*FactMgr)(nil).SetMapFactsIn(1, nil)
+	if !HasError() {
+		t.Fatal("nil FM SetMapFactsIn must SetError sticky")
+	}
+	ClearError()
+	fm.SetMapFactsIn(0, nil)
+	if !HasError() {
+		t.Fatal("stmID 0 SetMapFactsIn must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).SetMapStmEffect(1, EmptyEffect())
+	if !HasError() {
+		t.Fatal("nil FM SetMapStmEffect must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).ClearMapVisited()
+	if !HasError() {
+		t.Fatal("nil FM ClearMapVisited must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).CreateCFGEdgeTo(1, &Block{}, 0, false, false)
+	if !HasError() {
+		t.Fatal("nil FM CreateCFGEdgeTo must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindParentBlockNilSticky(t *testing.T) {

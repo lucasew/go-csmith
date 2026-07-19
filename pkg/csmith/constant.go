@@ -125,8 +125,14 @@ func (c *Constant) LessThan(num int) bool {
 
 // GetField mirrors Constant::get_field.
 // Constant.cpp:513–522 — split union/struct brace init by "{}," pick field fid.
+// Constant always live; sticky empty (no invent empty field soft-skip past hole).
+// Negative fid is complete empty (not incomplete IR).
 func (c *Constant) GetField(fid int) string {
-	if c == nil || fid < 0 {
+	if c == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if fid < 0 {
 		return ""
 	}
 	// StringUtils::split_string(value, fields, "{},")

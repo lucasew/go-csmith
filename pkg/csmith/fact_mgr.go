@@ -82,8 +82,10 @@ func NewFactMgr(f *Function) *FactMgr {
 }
 
 // SetMapFactsIn records pre-statement facts (FactMgr::map_facts_in[s] = facts).
+// FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 	if fm == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapFactsIn == nil {
@@ -93,8 +95,10 @@ func (fm *FactMgr) SetMapFactsIn(stmID int, facts []*FactPointTo) {
 }
 
 // SetMapFactsOut records post-statement facts.
+// FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapFactsOut(stmID int, facts []*FactPointTo) {
 	if fm == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapFactsOut == nil {
@@ -535,8 +539,14 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 
 // ClearMapVisited mirrors FactMgr::clear_map_visited.
 // FactMgr.cpp:510–514 — set all visited flags false (keep keys).
+// FactMgr always live; sticky (no invent soft-skip clear past hole).
+// Nil MapVisited is complete no-op (no keys to clear).
 func (fm *FactMgr) ClearMapVisited() {
-	if fm == nil || fm.MapVisited == nil {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if fm.MapVisited == nil {
 		return
 	}
 	for k := range fm.MapVisited {
@@ -546,10 +556,12 @@ func (fm *FactMgr) ClearMapVisited() {
 
 // RestoreFacts mirrors FactMgr::restore_facts.
 // FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
+// FactMgr always live; sticky (no invent soft-skip restore past hole).
 // Incomplete oldFacts / makeup fail closed sticky (no invent clean clone + partial
 // makeup, no soft re-pick past wiped GlobalFacts).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	if fm == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// nil oldFacts is empty restore; non-nil with holes → CloneFactSlice nil
@@ -986,8 +998,11 @@ func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo
 }
 
 // SetMapStmEffect records effect for a statement (map_stm_effect).
+// SetMapStmEffect records per-statement effect.
+// FactMgr + live stm_id always required; sticky (no invent soft-skip store past hole).
 func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	if fm == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapStmEffect == nil {
@@ -997,15 +1012,20 @@ func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 }
 
 // GetMapStmEffect returns stored effect or empty for a live stm_id key.
+// FactMgr always live; sticky IncompleteEffect (no invent empty pure past hole).
 // StmID ≤0 fails closed sticky IncompleteEffect (no invent empty pure map default
 // / soft re-pick past incomplete statement keys for SetAccumulatedEffect merge).
 // Missing map entry for a live id is C++ map[] default empty complete.
 func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteEffect()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if fm == nil || fm.MapStmEffect == nil {
+	if fm.MapStmEffect == nil {
 		return EmptyEffect()
 	}
 	if e, ok := fm.MapStmEffect[stmID]; ok {
@@ -1015,14 +1035,19 @@ func (fm *FactMgr) GetMapStmEffect(stmID int) Effect {
 }
 
 // GetMapAccumEffect returns stored map_accum_effect or empty for a live stm_id.
+// FactMgr always live; sticky IncompleteEffect (no invent empty pure past hole).
 // StmID ≤0 fails closed sticky IncompleteEffect (no invent empty-complete zero Effect
 // via map miss on incomplete keys — ReadVars/AddEffect would invent pure).
 func (fm *FactMgr) GetMapAccumEffect(stmID int) Effect {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteEffect()
+	}
 	if stmID <= 0 {
 		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
-	if fm == nil || fm.MapAccumEffect == nil {
+	if fm.MapAccumEffect == nil {
 		return EmptyEffect()
 	}
 	if e, ok := fm.MapAccumEffect[stmID]; ok {
@@ -1538,8 +1563,14 @@ func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool
 }
 
 // CreateCFGEdgeTo is create_cfg_edge with optional dest statement id (goto).
+// FactMgr always live; sticky (no invent soft-skip edge create past hole).
+// srcID 0 / missing dest is complete no-op (not incomplete IR shell).
 func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDest, backLink bool) {
-	if fm == nil || srcID == 0 {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if srcID == 0 {
 		return
 	}
 	// allow dest nil when destStmID set (break → for-statement edge)

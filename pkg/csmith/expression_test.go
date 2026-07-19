@@ -315,6 +315,15 @@ func TestConstantGetField(t *testing.T) {
 	if c.GetField(9) != "" {
 		t.Fatal("oob")
 	}
+	// Constant always live; sticky empty (no invent empty field soft-skip)
+	ClearError()
+	if (*Constant)(nil).GetField(0) != "" {
+		t.Fatal("nil GetField must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil GetField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionTypeProbabilityForceFunction(t *testing.T) {

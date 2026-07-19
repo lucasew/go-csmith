@@ -61,6 +61,28 @@ func TestResetBlockFactMaps(t *testing.T) {
 	if _, ok := fm.MapFactsIn[9]; !ok {
 		// block itself may be collected via collectBlockStmIDs
 	}
+	// FactMgr + Block always live; sticky no invent soft-skip reset past hole
+	ClearError()
+	(*FactMgr)(nil).ResetBlockFactMaps(b)
+	if !HasError() {
+		t.Fatal("nil FM ResetBlockFactMaps must SetError sticky")
+	}
+	ClearError()
+	fm.ResetBlockFactMaps(nil)
+	if !HasError() {
+		t.Fatal("nil Block ResetBlockFactMaps must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).ResetStmFactMaps(&Stmt{StmID: 1})
+	if !HasError() {
+		t.Fatal("nil FM ResetStmFactMaps must SetError sticky")
+	}
+	ClearError()
+	fm.ResetStmFactMaps(nil)
+	if !HasError() {
+		t.Fatal("nil Stmt ResetStmFactMaps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindJumpSources(t *testing.T) {
@@ -79,8 +101,23 @@ func TestFindJumpSources(t *testing.T) {
 	if none == nil || len(none) != 0 {
 		t.Fatal("complete empty", none)
 	}
-	// nil CFG hole fails closed sticky
+	// FactMgr + live dest StmID always required; sticky nil
 	ClearError()
+	if (*FactMgr)(nil).FindJumpSources(5) != nil {
+		t.Fatal("nil FM FindJumpSources must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindJumpSources must SetError sticky")
+	}
+	ClearError()
+	if fm.FindJumpSources(0) != nil {
+		t.Fatal("destStmID 0 FindJumpSources must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("destStmID 0 FindJumpSources must SetError sticky")
+	}
+	ClearError()
+	// nil CFG hole fails closed sticky
 	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 5}, nil}
 	if fm.FindJumpSources(5) != nil {
 		t.Fatal("nil hole must fail closed")

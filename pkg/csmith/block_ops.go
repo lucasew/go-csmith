@@ -350,8 +350,10 @@ func stmtTreeContainsID(st *Stmt, id int) bool {
 
 // ResetStmFactMaps mirrors FactMgr::reset_stm_fact_maps for a statement tree.
 // FactMgr.cpp:553–567 — walk get_blocks only (no invent via stray Then on assign).
+// FactMgr + Statement always live; sticky (no invent soft-skip reset past hole).
 func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	ids := map[int]bool{}
@@ -364,8 +366,10 @@ func (fm *FactMgr) ResetStmFactMaps(st *Stmt) {
 
 // ResetBlockFactMaps mirrors FactMgr::reset_stm_fact_maps(Block*).
 // FactMgr.cpp:553–567 — clear in/out for all statements under block.
+// FactMgr + Block always live; sticky (no invent soft-skip reset past hole).
 func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 	if fm == nil || b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	ids := map[int]bool{}
@@ -423,10 +427,12 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
 // Statement.cpp:492–506 — CFG edges with dest=stm and src eType==eGoto.
 // Returns source StmIDs of gotos targeting destStmID.
 // When fm.Func is set, non-goto sources (e.g. break→for) are excluded.
+// FactMgr + live dest StmID always required; sticky nil (no invent empty soft-success).
 // Incomplete CFG fails closed sticky nil (no invent soft re-pick empty sources past holes).
 // Complete empty → non-nil [].
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || destStmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete CFG fails closed sticky nil (distinct from complete empty non-nil [])

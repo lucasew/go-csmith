@@ -330,6 +330,12 @@ func TestRestoreFacts(t *testing.T) {
 		t.Fatal("incomplete oldFacts RestoreFacts must SetError sticky")
 	}
 	ClearError()
+	// FactMgr always live; sticky no invent soft-skip restore past hole
+	(*FactMgr)(nil).RestoreFacts(old)
+	if !HasError() {
+		t.Fatal("nil FM RestoreFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
