@@ -859,6 +859,8 @@ func (c CGContext) unionFacts() []*FactUnion {
 // CheckReadVar mirrors CGContext::check_read_var.
 // CGContext.cpp:191–213 — indices, nonreadable field/context, partial write, volatile, dangling.
 // Incomplete EffectStm/accum / GetCollective sticky (no invent read success / soft re-pick).
+// Type* always live for non-special subjects; Type-nil sticky false (IsPointer residual
+// ERROR+false skips dangling then invents ReadVar true past Type-nil shell).
 // Policy rejects (nonreadable, partial write, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
@@ -893,6 +895,12 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if v.IsVolatile() && !c.EffectContext().IsSideEffectFree() {
 		return false
 	}
+	// Type* always live for non-special subjects; Type-nil sticky false
+	// (IsPointer residual ERROR+false skips dangling then invents ReadVar true)
+	if !IsSpecialPtr(v) && v.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	// FactPointTo::is_dangling_ptr uses CGOptions::dead_pointer_dereference_prob()
 	// CGOptions::dead_pointer_dereference_prob only (no dual residual knob)
 	if v.IsPointer() && IsDanglingPtr(v, facts, ProcessOptions().DeadPointerDerefProb) {
@@ -911,6 +919,8 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 // CheckWriteVar mirrors CGContext::check_write_var.
 // CGContext.cpp:323–349.
 // Incomplete EffectStm/accum / GetCollective sticky (no invent write success / soft re-pick).
+// Type* always live for non-special subjects; Type-nil sticky false (IsPointer residual
+// ERROR+false skips dangling then invents WriteVar true past Type-nil shell).
 // Policy rejects (const, nonwritable, partial, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
@@ -939,6 +949,12 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	if v.IsVolatile() && !eff.IsSideEffectFree() {
+		return false
+	}
+	// Type* always live for non-special subjects; Type-nil sticky false
+	// (IsPointer residual ERROR+false skips dangling then invents WriteVar true)
+	if !IsSpecialPtr(v) && v.Type == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// CGContext.cpp:342–344 + is_dangling_ptr dead_pointer_dereference_prob

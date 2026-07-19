@@ -327,6 +327,24 @@ func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum CheckWriteVar must SetError sticky")
 	}
 	ClearError()
+	// Type-nil soft invent: IsPointer residual ERROR+false skip dangling then
+	// ReadVar/WriteVar return true. Fair: sticky false before classify.
+	shell := &Variable{Name: "g_typeless"}
+	cg3 := EmptyCGContext()
+	if cg3.CheckReadVar(shell, nil) {
+		t.Fatal("Type-nil must fail closed CheckReadVar, not invent read success")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil CheckReadVar must SetError sticky")
+	}
+	ClearError()
+	if cg3.CheckWriteVar(shell, nil) {
+		t.Fatal("Type-nil must fail closed CheckWriteVar, not invent write success")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil CheckWriteVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestReadIndicesHardIRSticky(t *testing.T) {
