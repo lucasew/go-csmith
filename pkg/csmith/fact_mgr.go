@@ -1979,10 +1979,24 @@ func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 		v := fact.Var
 		// const pointers should never be dangling; only globals
 		if v.IsConst() || !v.IsGlobal() {
+			// residual ERROR sticky — no invent soft-continue dead scan past IsConst/IsGlobal hole
+			if HasError() {
+				f.DeadGlobals = IncompleteVariables()
+				return
+			}
 			continue
 		}
 		if fact.IsDead() {
+			// residual ERROR sticky — no invent soft-continue later dead appends past IsDead hole
+			if HasError() {
+				f.DeadGlobals = IncompleteVariables()
+				return
+			}
 			f.DeadGlobals = append(f.DeadGlobals, v)
+		} else if HasError() {
+			// residual ERROR sticky — no invent not-dead soft-skip then complete DeadGlobals past hole
+			f.DeadGlobals = IncompleteVariables()
+			return
 		}
 	}
 }

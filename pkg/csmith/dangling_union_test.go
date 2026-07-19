@@ -132,6 +132,23 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 		t.Fatal("incomplete facts must SetError sticky")
 	}
 	ClearError()
+	// IsDead residual: PointTo nil hole stickies ERROR+true. Soft invent was append as
+	// dead then soft-continue later complete sibling into DeadGlobals. Fair: wipe incomplete.
+	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
+	goodDead := CreateVariableScalars("g_p3", PointerTo(GetIntType()), false, false)
+	fm.GlobalFacts = []*FactPointTo{
+		{Var: p2, PointTo: []*Variable{nil}}, // residual IsDead
+		NewFactPointTo(goodDead),
+	}
+	f.DeadGlobals = nil
+	fm.FindDanglingGlobalPtrs(f)
+	if VariablesComplete(f.DeadGlobals) {
+		t.Fatal("IsDead residual must IncompleteVariables DeadGlobals, not invent later dead")
+	}
+	if !HasError() {
+		t.Fatal("IsDead residual FindDanglingGlobalPtrs must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputPtrResets(t *testing.T) {

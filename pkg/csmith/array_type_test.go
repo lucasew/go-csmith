@@ -319,3 +319,40 @@ func TestCreateRandomArrayIncompleteStackFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCreateRandomArrayIsConstStructUnionResidualSticky(t *testing.T) {
+	// Type-nil field: IsConstStructUnion stickies residual ERROR+true.
+	// Soft invent was soft-continue filter then CreateArrayVariable later good int.
+	// Fair: sticky fail closed whole CreateRandomArray.
+	// Use global path (ChooseRandomNonvoid) — local nonvolatile filter residual on
+	// IsVolatileStructUnion can hang chooseRandomFiltered when all types rejected.
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	opts.GlobalVariables = true
+	vs := NewVariableSelector(opts)
+	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	// only broken type so Choose always hits residual IsConstStructUnion
+	vs.Types = &TypeEnv{AllTypes: []*Type{broken}}
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	cg := WithFunc(f, EmptyEffect())
+	cg.Types = vs.Types
+	// flipcoin(25) gates global create — scan seeds until residual sticky lands
+	sawSticky := false
+	for seed := uint64(1); seed < 400; seed++ {
+		ClearError()
+		if vs.CreateRandomArray(NewRng(seed), cg) != nil {
+			t.Fatalf("IsConstStructUnion residual must fail closed CreateRandomArray seed %d", seed)
+		}
+		if HasError() {
+			sawSticky = true
+			break
+		}
+	}
+	if !sawSticky {
+		t.Fatal("IsConstStructUnion residual CreateRandomArray must SetError sticky on global path")
+	}
+	ClearError()
+}

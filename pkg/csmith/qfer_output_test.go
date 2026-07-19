@@ -363,6 +363,25 @@ func TestOutputValueDumpNoInventEmptyName(t *testing.T) {
 		t.Fatal("field Type hole hashArrayVariable must SetError sticky")
 	}
 	ClearError()
+	// IsFieldReadable residual: incomplete UnionFacts stickies ERROR+false.
+	// Soft invent was soft-continue then emit later field transparent_crc past hole.
+	// Fair: sticky fail closed whole array hash.
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	arrU := &Variable{
+		Name: "g_u", Type: ut, IsArray: true, ArraySizes: []int{1},
+		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	holeFacts := []*FactUnion{nil}
+	if s := hashArrayVariable(arrU, ctrl, holeFacts); s != "" {
+		t.Fatal("IsFieldReadable residual must fail closed array hash", s)
+	}
+	if !HasError() {
+		t.Fatal("IsFieldReadable residual hashArrayVariable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {

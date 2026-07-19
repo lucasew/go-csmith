@@ -2231,9 +2231,19 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 				continue
 			}
 			// ArrayVariable.cpp:741–752 — skip unreadable union fields
-			if v.Type.IsUnion() && unionFacts != nil && !IsFieldReadable(v, i, unionFacts) {
-				j++
-				continue
+			if v.Type.IsUnion() && unionFacts != nil {
+				if !IsFieldReadable(v, i, unionFacts) {
+					// residual ERROR sticky — no invent soft-skip then partial array hash past hole
+					if HasError() {
+						return ""
+					}
+					j++
+					continue
+				}
+				// residual ERROR sticky — no invent soft-continue past IsFieldReadable hole
+				if HasError() {
+					return ""
+				}
 			}
 			if f.Type.IsSimple() && !f.Type.IsFloat() {
 				fn := ".f" + itoa(j)

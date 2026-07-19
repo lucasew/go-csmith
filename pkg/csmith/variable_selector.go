@@ -2691,11 +2691,23 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 			continue
 		}
 		if elem.IsConstStructUnion() {
+			// residual ERROR sticky — no invent soft-continue then create later past field-Type hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		// VariableSelector.cpp:1361 — cg_context.accept_type(type)
 		if !cg.AcceptType(elem) {
+			// residual ERROR sticky — no invent soft-continue then create later past AcceptType hole
+			if HasError() {
+				return nil
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent break create past AcceptType residual true path
+		if HasError() {
+			return nil
 		}
 		break
 	}
