@@ -17,18 +17,22 @@ func MakeRandomExprStmt(
 	if r == nil || cg == nil {
 		return Stmt{}
 	}
+	// incomplete ambient fails closed sticky (no invent expr stmt / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// StatementExpr.cpp:53 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementExpr, nullptr)
 	if DepthGuardByType(opts, DtStatementExpr) == BadDepth {
 		return Stmt{}
 	}
 	// StatementExpr.cpp:58–59 — snapshot for rollback
-	// incomplete accum/facts fail closed sticky (no invent expr stmt under hole shells)
+	// incomplete facts fail closed sticky (no invent expr stmt under hole shells)
 	var preEffect Effect
 	if cg.EffectAccum != nil {
-		if !EffectComplete(*cg.EffectAccum) {
-			SetError(ErrGeneric)
-			return Stmt{}
-		}
+		// pre-validated EffectComplete
 		preEffect = cg.EffectAccum.Clone()
 	}
 	var factsCopy []*FactPointTo

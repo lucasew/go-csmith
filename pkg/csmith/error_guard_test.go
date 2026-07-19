@@ -76,7 +76,7 @@ func TestMakeRandomBlockClearsErrorOnSuccess(t *testing.T) {
 }
 
 func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
-	// incomplete EffectAccum / GlobalFacts must not invent block success
+	// incomplete EffectAccum / GlobalFacts / EffectContext must not invent block success
 	ClearError()
 	opts := Defaults()
 	opts.MaxBlockSize = 0
@@ -94,7 +94,7 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must SetError")
 	}
 	if len(f.Blocks) != 0 || len(f.Stack) != 0 {
-		t.Fatal("must abortBlockMake registration")
+		t.Fatal("must not leave partial registration")
 	}
 	ClearError()
 	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
@@ -107,6 +107,21 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("must SetError GlobalFacts")
+	}
+	ClearError()
+	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
+	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	cg3.Types = &TypeEnv{}
+	if MakeRandomBlock(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg3, false) != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomBlock")
+	}
+	if !HasError() {
+		t.Fatal("must SetError EffectContext")
+	}
+	if len(f3.Blocks) != 0 || len(f3.Stack) != 0 {
+		t.Fatal("must not leave partial registration on incomplete context")
 	}
 	ClearError()
 }

@@ -78,6 +78,50 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	}
 }
 
+func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / GlobalFacts fail closed sticky before create
+	ClearError()
+	opts := Defaults()
+	opts.Arrays = false
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if vs.GenerateNewGlobal(AccessRead, cg, GetIntType(), &q, NewRng(1)) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed GenerateNewGlobal")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	if len(vs.GlobalList) != 0 {
+		t.Fatal("must not invent GlobalList registration past ambient hole")
+	}
+	ClearError()
+	fm2 := NewFactMgr(f)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm2)
+	if vs.GenerateNewGlobal(AccessRead, cg2, GetIntType(), &q, NewRng(2)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewGlobal")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	if vs.GenerateNewGlobal(AccessRead, cg3, GetIntType(), &q, NewRng(3)) != nil {
+		t.Fatal("incomplete EffectContext must fail closed GenerateNewGlobal")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMaxGlobalsFailClosed(t *testing.T) {
 	// Go MaxGlobals library cap — no invent unbounded GlobalList past limit
 	ResetDefaultGensym()

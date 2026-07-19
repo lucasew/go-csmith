@@ -115,10 +115,15 @@ func TestOutputPtrResets(t *testing.T) {
 	if OutputPtrResets(nil, Defaults()) != "" {
 		t.Fatal("empty")
 	}
-	// incomplete list must fail closed empty (no invent soft-skip hole)
+	// incomplete list fails closed sticky (no invent soft-skip hole)
+	ClearError()
 	if OutputPtrResets([]*Variable{p, nil}, Defaults()) != "" {
 		t.Fatal("nil hole must fail closed whole resets")
 	}
+	if !HasError() {
+		t.Fatal("nil hole OutputPtrResets must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStepHashBody(t *testing.T) {

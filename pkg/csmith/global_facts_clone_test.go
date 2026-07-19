@@ -144,6 +144,18 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectAccum must SetError sticky")
 	}
 	ClearError()
+	// incomplete EffectContext fails closed sticky
+	cg4 := WithFunc(nil, IncompleteEffect())
+	eff4 := EmptyEffect()
+	cg4.EffectAccum = &eff4
+	st4 := MakeRandomExprStmt(NewRng(7), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg4)
+	if st4.Kind != 0 || st4.StmID != 0 {
+		t.Fatal("incomplete EffectContext must fail closed MakeRandomExprStmt")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {

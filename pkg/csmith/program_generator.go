@@ -672,7 +672,9 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 // OutputMgr.cpp:326–340 — scalar = 0; arrays use get_last_ctrl_vars + output_init(&zero).
 // Incomplete dead_globals fails closed empty (no invent soft-skip hole as partial resets).
 func OutputPtrResets(ptrs []*Variable, opts Options) string {
+	// incomplete ptr list fails closed sticky (no invent empty-reset success past holes)
 	if !VariablesComplete(ptrs) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if len(ptrs) == 0 {

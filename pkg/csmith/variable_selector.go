@@ -1437,6 +1437,17 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if HasError() {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before create (no invent global past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var varQfer CVQualifiers
 	if qfer == nil || qfer.Wildcard {
 		varQfer = RandomQualifiersDefaultProbs(t, access, cg, false, vs.Opts, vs.Probs, r)
@@ -1473,11 +1484,23 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
+			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
+				vs.GlobalList = vs.GlobalList[:n-1]
+			}
+			if n := len(vs.AllVars); n > 0 && vs.AllVars[n-1] == v {
+				vs.AllVars = vs.AllVars[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
+				vs.GlobalList = vs.GlobalList[:n-1]
+			}
+			if n := len(vs.AllVars); n > 0 && vs.AllVars[n-1] == v {
+				vs.AllVars = vs.AllVars[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -1517,6 +1540,17 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if HasError() {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before create (no invent global past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var varQfer CVQualifiers
 	if qfer == nil || qfer.Wildcard {
 		// CVQualifiers::random_qualifiers(t, access, cg, false)
@@ -1545,11 +1579,18 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
+			// drop partial GlobalList registration (no invent orphan global past hole)
+			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
+				vs.GlobalList = vs.GlobalList[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(nil, coll)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if n := len(vs.GlobalList); n > 0 && vs.GlobalList[n-1] == v {
+				vs.GlobalList = vs.GlobalList[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -1920,6 +1961,17 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	if HasError() {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before create (no invent local past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:921 assert(t); 920–923 — volatile struct/union field(s) → global
 	if t.IsAggregate() && t.IsVolatileStructUnion() {
 		return vs.GenerateNewGlobal(access, cg, t, qfer, r)
@@ -1964,11 +2016,17 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	if cg.FM != nil {
 		coll := varCollective(v)
 		if coll == nil {
+			if n := len(block.LocalVars); n > 0 && block.LocalVars[n-1] == v {
+				block.LocalVars = block.LocalVars[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}
 		cg.FM.AddNewVarFactAndUpdate(block, coll)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if n := len(block.LocalVars); n > 0 && block.LocalVars[n-1] == v {
+				block.LocalVars = block.LocalVars[:n-1]
+			}
 			SetError(ErrGeneric)
 			return nil
 		}

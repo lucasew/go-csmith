@@ -328,6 +328,17 @@ func MakeRandomBlock(
 	if f == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky before stack push (no invent block past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	parent := (*Block)(nil)
 	if len(f.Stack) > 0 {
 		parent = f.Stack[len(f.Stack)-1]
