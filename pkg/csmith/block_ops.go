@@ -485,9 +485,9 @@ func (b *Block) AppendNestedLoop(
 	}
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
-		MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts)
-		// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
-		if !FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+		if !MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts) ||
+			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
+			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
@@ -540,9 +540,9 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	b.Stmts = append(b.Stmts, ret)
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
-		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
-		// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
-		if !FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
+		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) ||
+			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
+			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}

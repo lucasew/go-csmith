@@ -53,8 +53,7 @@ func MakeRandomIf(
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			return nil
 		}
-		MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts)
-		if func1PreFacts == nil {
+		if !MakeupNewVarFacts(&func1PreFacts, cg.FM.GlobalFacts) {
 			// incomplete makeup / snapshot — fail closed
 			return nil
 		}

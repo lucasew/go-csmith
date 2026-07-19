@@ -779,8 +779,8 @@ func MakeRandomBinaryInvocation(
 	}
 	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
 	if IsOrderedBinary(op) && cg.FM != nil && factsCopy != nil {
-		MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts)
-		if !FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) {
+		if !MakeupNewVarFacts(&factsCopy, cg.FM.GlobalFacts) ||
+			!FactsComplete(factsCopy) || !FactsComplete(cg.FM.GlobalFacts) {
 			// incomplete makeup/merge base — fail closed, no invent bare binary
 			return nil
 		}

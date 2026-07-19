@@ -343,8 +343,11 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		return
 	}
 	// makeup new vars from branch outs into preFacts snapshot
-	MakeupNewVarFacts(&preFacts, thenOut)
-	MakeupNewVarFacts(&preFacts, elseOut)
+	// sequential: first failure must not invent second makeup from cleared empty
+	if !MakeupNewVarFacts(&preFacts, thenOut) || !MakeupNewVarFacts(&preFacts, elseOut) {
+		fm.GlobalFacts = nil
+		return
+	}
 
 	trueMust := st.Then != nil && st.Then.MustReturn()
 	falseMust := st.Else != nil && st.Else.MustReturn()
@@ -363,7 +366,10 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 				fm.GlobalFacts = nil
 				return
 			}
-			MakeupNewVarFacts(&fm.GlobalFacts, in)
+			if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
+				fm.GlobalFacts = nil
+				return
+			}
 		}
 	default:
 		fm.GlobalFacts = CloneFactSlice(thenOut)

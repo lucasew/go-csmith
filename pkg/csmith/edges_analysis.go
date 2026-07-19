@@ -214,7 +214,10 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		CombineBranchFacts(st, preFacts, fm)
 	} else {
 		// MakeupNewVarFacts fails closed (nils preFacts) on holes; pre already complete
-		MakeupNewVarFacts(&preFacts, fm.GlobalFacts)
+		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) {
+			fm.GlobalFacts = nil
+			return
+		}
 	}
 	// simple statements: save effect_stm
 	if !IsCompound(st.Kind) {

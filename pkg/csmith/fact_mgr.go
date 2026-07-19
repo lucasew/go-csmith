@@ -345,7 +345,7 @@ func (fm *FactMgr) ClearMapVisited() {
 
 // RestoreFacts mirrors FactMgr::restore_facts.
 // FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
-// Incomplete oldFacts fails closed (no invent clean clone + makeup).
+// Incomplete oldFacts / makeup fail closed (no invent clean clone + partial makeup).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	if fm == nil {
 		return
@@ -356,7 +356,11 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		return
 	}
 	cp := CloneFactSlice(oldFacts)
-	MakeupNewVarFacts(&cp, fm.GlobalFacts)
+	if !MakeupNewVarFacts(&cp, fm.GlobalFacts) {
+		// incomplete GlobalFacts or mid-makeup hole — fail closed, no invent partial
+		fm.GlobalFacts = nil
+		return
+	}
 	fm.GlobalFacts = cp
 }
 
@@ -1121,22 +1125,24 @@ func (fm *FactMgr) CreateCFGEdgeTo(srcID int, dest *Block, destStmID int, postDe
 
 // MakeupNewVarFacts mirrors FactMgr::makeup_new_var_facts.
 // FactMgr.cpp:494–507 — add facts for globals/locals created after old_facts snapshot.
-// Fact* always live; incomplete old/new maps fail closed (nil oldFacts —
-// no invent soft-skip holes as absent new var or partial makeup).
-func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
+// Fact* always live; incomplete old/new maps or AddNewVarFactInto field holes fail
+// closed (nil oldFacts, false — no invent soft-skip holes as absent new var,
+// partial makeup, or re-accumulate later vars after *oldFacts was cleared).
+// Returns true when makeup completed with a complete *oldFacts accumulator.
+func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if oldFacts == nil {
-		return
+		return false
 	}
 	// incomplete working/snapshot sets fail closed before partial makeup
 	if !FactsComplete(*oldFacts) || !FactsComplete(newFacts) {
 		*oldFacts = nil
-		return
+		return false
 	}
 	for _, f := range newFacts {
 		// no invent soft-continue past nil fact holes (also covered by FactsComplete)
 		if f == nil || f.Var == nil {
 			*oldFacts = nil
-			return
+			return false
 		}
 		v := f.Var
 		if !v.IsGlobal() && !v.IsLocal() {
@@ -1146,8 +1152,15 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
 			// FactMgr.cpp:504 — add_new_var_fact(v, old_facts) → abstract_fact_for_var_init
 			// no invent NewFactPointTo garbage (tbd/garbage default) for live inits
 			AddNewVarFactInto(v, oldFacts)
+			// AddNewVarFactInto may clear *oldFacts on FieldVars/abstract holes;
+			// stop — no invent continue loop and re-append later vars onto nil.
+			if *oldFacts == nil || !FactsComplete(*oldFacts) {
+				*oldFacts = nil
+				return false
+			}
 		}
 	}
+	return true
 }
 
 // AddNewVarFactInto mirrors FactMgr::add_new_var_fact(v, facts).

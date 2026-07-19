@@ -236,15 +236,49 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
-	MakeupNewVarFacts(&old, newF)
+	if MakeupNewVarFacts(&old, newF) {
+		t.Fatal("incomplete oldFacts must fail closed false")
+	}
 	if old != nil {
 		t.Fatal("incomplete oldFacts must fail closed nil")
 	}
 	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	new2 := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
-	MakeupNewVarFacts(&old2, new2)
+	if MakeupNewVarFacts(&old2, new2) {
+		t.Fatal("incomplete newFacts must fail closed false")
+	}
 	if old2 != nil {
 		t.Fatal("incomplete newFacts must fail closed nil oldFacts")
+	}
+}
+
+func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
+	// AddNewVarFactInto FieldVars hole clears *oldFacts; must not invent later vars
+	ClearError()
+	opts := Defaults()
+	SetProcessOptions(opts)
+	SetProcessProbabilities(NewProbabilities(opts))
+	// non-pointer aggregate with nil field hole (global name)
+	agg := CreateVariableScalars("g_agg", GetIntType(), true, false)
+	if agg == nil {
+		t.Fatal("agg")
+	}
+	agg.FieldVars = []*Variable{nil}
+	later := CreateVariableScalars("g_later", PointerTo(GetIntType()), true, false)
+	old := []*FactPointTo{}
+	// both appear as new_facts subjects so makeup tries AddNewVarFactInto for each
+	newF := []*FactPointTo{
+		MakeFactPointTo(agg, NullPtr),
+		MakeFactPointTo(later, NullPtr),
+	}
+	if MakeupNewVarFacts(&old, newF) {
+		t.Fatal("FieldVars hole must fail closed false")
+	}
+	if old != nil {
+		t.Fatal("must not invent re-accumulate later pointer after hole", old)
+	}
+	if FindRelatedPointTo(old, later) != nil {
+		t.Fatal("later var must not be made up past field hole")
 	}
 }
 
