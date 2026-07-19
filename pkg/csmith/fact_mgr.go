@@ -1081,6 +1081,8 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) {
 
 // AddNewVarFactInto mirrors FactMgr::add_new_var_fact(v, facts).
 // FactMgr.cpp:118–131 — abstract_fact_for_var_init into the given fact slice.
+// Variable* FieldVars always live; nil hole fails closed (*facts = nil — no invent
+// soft-skip hole and still makeup later fields as complete).
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	if v == nil || facts == nil {
 		return
@@ -1092,7 +1094,14 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	// recurse into aggregate fields (pointer members) like AddNewVarFact
 	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
 		for _, f := range v.FieldVars {
+			if f == nil {
+				*facts = nil
+				return
+			}
 			AddNewVarFactInto(f, facts)
+			if *facts == nil {
+				return
+			}
 		}
 		return
 	}
@@ -1104,9 +1113,10 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	}
 	pt, _ := AbstractFactForVarInit(v)
 	// Fact.cpp:94–95 assert(lvar_cnt==1) — no invent garbage shell when empty
-	// Fact* always live from abstract; nil hole fails closed (stop, no invent partial)
+	// Fact* always live from abstract; nil hole fails closed (*facts cleared)
 	for _, f := range pt {
 		if f == nil {
+			*facts = nil
 			return
 		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {

@@ -319,6 +319,28 @@ func TestAddNewVarFactTo(t *testing.T) {
 	ClearMetaFacts()
 }
 
+func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
+	// soft invent: skip nil FieldVars and still makeup later pointer fields
+	// fair: incomplete FieldVars clears *facts
+	metaFactPointToEnabled = true
+	defer ClearMetaFacts()
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "p", Type: PointerTo(GetIntType()), BitWidth: -1},
+		{Name: "q", Type: PointerTo(GetIntType()), BitWidth: -1},
+	}}
+	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	// CreateFieldVars may have filled; force nil hole + later live pointer field
+	q := CreateVariableScalars("g_s.q", PointerTo(GetIntType()), false, false)
+	v.FieldVars = []*Variable{nil, q}
+	// seed a prior fact so clear is observable vs empty start
+	prior := MakeFactPointTo(CreateVariableScalars("g_other", PointerTo(GetIntType()), false, false), NullPtr)
+	facts := []*FactPointTo{prior}
+	AddNewVarFactInto(v, &facts)
+	if facts != nil {
+		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
+	}
+}
+
 func TestFindFixedPointShortcut(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	b := &Block{
