@@ -564,8 +564,13 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 // ReadVar mirrors CGContext::read_var — force read into accum + stm.
 // CGContext.cpp:175–185.
 // Incomplete GetCollective fails closed (no invent read/write on nil collective shell).
+// Incomplete EffectStm/accum fails closed sticky error (no invent silent grow on hole shell).
 func (c *CGContext) ReadVar(v *Variable) {
 	if c == nil || v == nil {
+		return
+	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
 		return
 	}
 	v = v.GetCollective()
@@ -587,13 +592,21 @@ func (c *CGContext) ReadVar(v *Variable) {
 	if c.CurrentFunc != nil && v.IsGlobal() {
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.ReadVar(v)
 	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
+	}
 }
 
 // WriteVar mirrors CGContext::write_var.
 // CGContext.cpp:307–317.
 // Incomplete GetCollective fails closed (no invent write on nil collective shell).
+// Incomplete EffectStm/accum fails closed sticky error (no invent silent grow on hole shell).
 func (c *CGContext) WriteVar(v *Variable) {
 	if c == nil || v == nil {
+		return
+	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
 		return
 	}
 	v = v.GetCollective()
@@ -613,6 +626,9 @@ func (c *CGContext) WriteVar(v *Variable) {
 	c.EffectStm = c.EffectStm.WriteVar(v)
 	if c.CurrentFunc != nil && v.IsGlobal() {
 		c.CurrentFunc.FEffect = c.CurrentFunc.FEffect.WriteVar(v)
+	}
+	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
 	}
 }
 
@@ -1268,8 +1284,15 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		valid = c.CheckWriteVar(v, facts)
 	}
 	// Lhs.cpp:348–351 — set_lhs_write_vars from write_vars on accum
+	// Incomplete SetLhsWriteVars / stm must not invent visit true after poison
 	if valid && c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWritten()
+		if !EffectComplete(*c.EffectAccum) {
+			return false
+		}
+	}
+	if valid && (!EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum))) {
+		return false
 	}
 	return valid
 }

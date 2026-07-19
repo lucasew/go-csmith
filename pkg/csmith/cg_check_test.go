@@ -69,6 +69,22 @@ func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 		t.Fatal("WriteVar incomplete collective must SetError")
 	}
 	ClearError()
+	// force path on incomplete EffectStm must SetError (no invent silent grow)
+	cg2 := EmptyCGContext()
+	cg2.EffectStm = IncompleteEffect()
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	cg2.WriteVar(v)
+	if !HasError() {
+		t.Fatal("WriteVar incomplete EffectStm must SetError")
+	}
+	ClearError()
+	cg3 := EmptyCGContext()
+	cg3.EffectStm = IncompleteEffect()
+	cg3.ReadVar(v)
+	if !HasError() {
+		t.Fatal("ReadVar incomplete EffectStm must SetError")
+	}
+	ClearError()
 }
 
 func TestCheckWriteVarIVBound(t *testing.T) {
@@ -162,6 +178,20 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	}
 	if cg.VisitFactsLhs(&Lhs{}, Defaults()) {
 		t.Fatal("nil lhs.Var")
+	}
+	// incomplete EffectStm/accum must not invent LHS visit success
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	lhs := &Lhs{Var: v, Type: GetIntType()}
+	cg2 := EmptyCGContext()
+	cg2.EffectStm = IncompleteEffect()
+	if cg2.VisitFactsLhs(lhs, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed VisitFactsLhs")
+	}
+	cg3 := EmptyCGContext()
+	inc := IncompleteEffect()
+	cg3.EffectAccum = &inc
+	if cg3.VisitFactsLhs(lhs, Defaults()) {
+		t.Fatal("incomplete EffectAccum must fail closed VisitFactsLhs")
 	}
 }
 
