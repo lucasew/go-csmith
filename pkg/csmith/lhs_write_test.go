@@ -160,6 +160,24 @@ func TestRemoveFunctionLocalFacts(t *testing.T) {
 	}
 }
 
+func TestRemoveFunctionLocalFactsNilFuncNoResidualInvent(t *testing.T) {
+	// Soft invent: MarkFuncEnd(nil) residual ERROR then SetMapFactsOut incomplete
+	// while GlobalFacts complete invents visit success past residual.
+	// Fair: nil Func is complete no-op mark; filter stays complete non-sticky.
+	ClearError()
+	defer ClearError()
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr)}
+	out := RemoveFunctionLocalFactsAt(facts, nil, nil)
+	if !FactsComplete(out) || len(out) != 1 {
+		t.Fatal("nil Func RemoveFunctionLocalFactsAt must stay complete", out)
+	}
+	if HasError() {
+		t.Fatal("nil Func RemoveFunctionLocalFactsAt must stay non-sticky")
+	}
+	ClearError()
+}
+
 func TestRemoveLoopLocalFacts(t *testing.T) {
 	outer := &Block{Looping: true}
 	inner := &Block{Parent: outer, LocalVars: []*Variable{

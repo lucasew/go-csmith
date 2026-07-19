@@ -390,7 +390,8 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				return
 			}
 			_ = fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
-			if !FactsComplete(fm.GlobalFacts) {
+			// residual ERROR sticky — no invent mark visited / soft-continue past return residual
+			if HasError() || !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
 				if !HasError() {
 					SetError(ErrGeneric)

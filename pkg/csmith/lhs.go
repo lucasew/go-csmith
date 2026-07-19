@@ -568,6 +568,11 @@ func finishLhs(v *Variable, typ *Type, compound bool, cg *CGContext, opts Option
 // selectWritable gathers non-const matching variables from stack, params, globals.
 // Stack/Param/Global Variable* always live; nil holes fail closed (nil select).
 func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compound bool) *Variable {
+	// want Type always live for Match; sticky no invent empty pool / soft re-pick past hole
+	if typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// incomplete ambient / facts fail closed sticky before pool scan (no invent soft re-pick)
 	if !EffectComplete(cg.EffectContext()) ||
 		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
@@ -607,10 +612,28 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 				incomplete = true
 				return
 			}
-			if x.IsConst() || !typ.Match(x.Type, MatchFlexible) {
+			if x.IsConst() {
+				// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
+				if HasError() {
+					incomplete = true
+					return
+				}
+				continue
+			}
+			if !typ.Match(x.Type, MatchFlexible) {
+				// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+				if HasError() {
+					incomplete = true
+					return
+				}
 				continue
 			}
 			if compound && x.IsVolatile() {
+				// residual ERROR sticky — no invent soft-continue then pick later past IsVolatile hole
+				if HasError() {
+					incomplete = true
+					return
+				}
 				continue
 			}
 			ok = append(ok, x)

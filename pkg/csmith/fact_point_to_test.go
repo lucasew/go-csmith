@@ -301,6 +301,15 @@ func TestMarkFuncEnd(t *testing.T) {
 	if ft2.MarkFuncEnd(f, body) != nil {
 		t.Fatal("global pointee")
 	}
+	// nil Function: complete no-op non-sticky (no invent residual wipe via RemoveFunctionLocal)
+	ClearError()
+	if ft.MarkFuncEnd(nil, body) != nil {
+		t.Fatal("nil Function MarkFuncEnd must no-op nil")
+	}
+	if HasError() {
+		t.Fatal("nil Function MarkFuncEnd must stay non-sticky complete no-op")
+	}
+	ClearError()
 	// nil pointee hole fails closed sticky
 	ClearError()
 	ft3 := &FactPointTo{Var: p, PointTo: []*Variable{nil}}

@@ -444,6 +444,28 @@ func TestMakeRandomLhsIncompleteAmbientFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestSelectWritableNilTypSticky(t *testing.T) {
+	// nil want typ soft invent was soft-skip Match as not-match then empty pool soft-miss.
+	// Fair: sticky fail closed whole selectWritable.
+	ClearError()
+	defer ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	vs.GlobalList = []*Variable{g}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	if selectWritable(NewRng(1), vs, cg, nil, false) != nil {
+		t.Fatal("nil typ must fail closed selectWritable")
+	}
+	if !HasError() {
+		t.Fatal("nil typ selectWritable must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestLhsOutputNilSticky(t *testing.T) {
 	ClearError()
 	if (*Lhs)(nil).Output(false) != "" {

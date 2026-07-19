@@ -52,8 +52,9 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		return false
 	}
 	_ = cg.FM.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
-	// incomplete return assign sticky (no invent visit success / soft re-pick)
-	if !FactsComplete(cg.FM.GlobalFacts) {
+	// residual ERROR sticky — no invent visit success past UpdateFact/set_fact_out residual
+	// (soft invent was FactsComplete GlobalFacts true while residual ERROR soft-continued)
+	if HasError() || !FactsComplete(cg.FM.GlobalFacts) {
 		if !HasError() {
 			SetError(ErrGeneric)
 		}

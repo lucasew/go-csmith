@@ -1145,9 +1145,15 @@ func (f *FactPointTo) MarkFuncEndLocals(locals []*Variable) *FactPointTo {
 // Incomplete Param/LocalVars stack lists fail closed (nil — no invent leave
 // stack pointees live because IsVarOnStack returned false past a hole).
 func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
-	// Fact + Function always live; sticky no invent leave stack pointees live past hole
-	if f == nil || fn == nil {
+	// Fact always live; sticky no invent leave stack pointees live past hole
+	if f == nil {
 		SetError(ErrGeneric)
+		return nil
+	}
+	// no function scope: complete no-op (nothing to mark dead) — non-sticky
+	// sticky residual here soft invents incomplete RemoveFunctionLocal past nil Func
+	// while GlobalFacts stay complete and visit invents success past residual ERROR
+	if fn == nil {
 		return nil
 	}
 	// incomplete stack lists fail closed sticky (no invent leave stack pointees live)
