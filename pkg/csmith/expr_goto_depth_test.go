@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestExpressionNotEquals(t *testing.T) {
+	ClearError()
 	if !(&Expression{Term: TermConstant, Con: MakeInt(1)}).NotEquals(0) {
 		t.Fatal("1 != 0")
 	}
@@ -12,6 +13,10 @@ func TestExpressionNotEquals(t *testing.T) {
 	if (&Expression{Term: TermVariable}).NotEquals(0) {
 		t.Fatal("var not_equals false")
 	}
+	if HasError() {
+		t.Fatal("complete NotEquals paths must not sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionUseVar(t *testing.T) {

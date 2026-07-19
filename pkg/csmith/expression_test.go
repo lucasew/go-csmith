@@ -954,6 +954,46 @@ func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestIs0Or1NotEqualsLessThanIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*Expression)(nil).Is0Or1() {
+		t.Fatal("nil Expression Is0Or1 must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Expression Is0Or1 must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermFunction}).Is0Or1() {
+		t.Fatal("Funcall without Invoke Is0Or1 must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Funcall without Invoke Is0Or1 must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermConstant}).NotEquals(0) {
+		t.Fatal("Constant without Con NotEquals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Constant without Con NotEquals must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermConstant}).LessThan(1) {
+		t.Fatal("Constant without Con LessThan must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Constant without Con LessThan must SetError sticky")
+	}
+	ClearError()
+	// Variable term complete default false for NotEquals (Expression.h)
+	if (&Expression{Term: TermVariable}).NotEquals(0) {
+		t.Fatal("Variable NotEquals must default false")
+	}
+	if HasError() {
+		t.Fatal("Variable NotEquals must not sticky")
+	}
+	ClearError()
+}
+
 func TestUseVarIncompleteSticky(t *testing.T) {
 	ClearError()
 	subj := CreateVariableScalars("g_x", GetIntType(), false, false)

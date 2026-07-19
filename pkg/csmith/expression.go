@@ -370,8 +370,20 @@ func (e *Expression) EqualsInt(num int) bool {
 
 // NotEquals mirrors Expression::not_equals(int).
 // Expression.h:139 — default false; Constant: !equals(num).
+// Incomplete Expression / Constant shell sticky false (no invent fold past holes).
 func (e *Expression) NotEquals(num int) bool {
-	if e == nil || e.Term != TermConstant || e.Con == nil {
+	// Expression always live for fold; sticky no invent "equals" past missing shell
+	if e == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if e.Term != TermConstant {
+		// Expression.h default false for non-Constant
+		return false
+	}
+	// incomplete Constant without Con sticky — no invent equals fold
+	if e.Con == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return e.Con.NotEquals(num)
@@ -379,8 +391,20 @@ func (e *Expression) NotEquals(num int) bool {
 
 // LessThan mirrors Expression::less_than(int).
 // Expression.h default false; Constant.cpp:501–502.
+// Incomplete Expression / Constant shell sticky false (no invent fold past holes).
 func (e *Expression) LessThan(num int) bool {
-	if e == nil || e.Term != TermConstant || e.Con == nil {
+	// Expression always live for fold; sticky no invent compare past missing shell
+	if e == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if e.Term != TermConstant {
+		// Expression.h default false for non-Constant
+		return false
+	}
+	// incomplete Constant without Con sticky — no invent less-than fold
+	if e.Con == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return e.Con.LessThan(num)
@@ -388,21 +412,45 @@ func (e *Expression) LessThan(num int) bool {
 
 // Is0Or1 mirrors Expression::is_0_or_1.
 // ExpressionFuncall → invoke; ExpressionComma → rhs; ExpressionAssign → simple+rhs.
+// Incomplete IR sticky false (no invent 0/1 fold / soft re-pick past holes).
 func (e *Expression) Is0Or1() bool {
+	// Expression always live for fold; sticky no invent "not 0or1" past missing shell
 	if e == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch e.Term {
 	case TermFunction:
-		return e.Invoke != nil && e.Invoke.Is0Or1()
+		// ExpressionFuncall always has live invoke for fold
+		if e.Invoke == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		return e.Invoke.Is0Or1()
 	case TermCommaExpr:
-		return e.CommaRHS != nil && e.CommaRHS.Is0Or1()
+		// comma value is RHS; sticky incomplete without RHS
+		if e.CommaRHS == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		return e.CommaRHS.Is0Or1()
 	case TermAssignment:
 		// ExpressionAssign.cpp:103–104
-		if e.Assign != nil && e.Assign.AssignOp == AssignSimple {
-			return e.Assign.Expr != nil && e.Assign.Expr.Is0Or1()
+		if e.Assign == nil {
+			SetError(ErrGeneric)
+			return false
 		}
+		if e.Assign.AssignOp != AssignSimple {
+			return false
+		}
+		if e.Assign.Expr == nil {
+			// incomplete assign RHS sticky — no invent not-0or1 fold
+			SetError(ErrGeneric)
+			return false
+		}
+		return e.Assign.Expr.Is0Or1()
 	}
+	// Expression.h default false (incl. Constant — no override)
 	return false
 }
 
