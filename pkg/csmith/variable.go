@@ -868,6 +868,8 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 // IsArrayField mirrors Variable::is_array_field.
 // Variable.cpp:270–277 — field of an array variable (or recursive).
 // Incomplete Variable sticky false (no invent not-array-field soft-skip past hole).
+// Parent IsArray without AsArray sticky true (restrictive — no invent not-array-field
+// soft-skip past broken array parent shell).
 func (v *Variable) IsArrayField() bool {
 	// Variable always live; sticky incomplete no invent not-array-field soft-skip
 	if v == nil {
@@ -878,7 +880,14 @@ func (v *Variable) IsArrayField() bool {
 		return false
 	}
 	p := v.FieldVarOf
-	if p.IsArray || p.AsArray != nil {
+	// C++ isArray always ArrayVariable*; missing AsArray sticky true restrictive
+	if p.IsArray {
+		if p.AsArray == nil {
+			SetError(ErrGeneric)
+		}
+		return true
+	}
+	if p.AsArray != nil {
 		return true
 	}
 	return p.IsArrayField()
@@ -1293,6 +1302,12 @@ func (v *Variable) GetCollective() *Variable {
 		}
 		// Variable.cpp:589 assert(parent) — incomplete ancestry sticky
 		if parent == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent self-collective past broken array ancestor shell)
+		if parent.IsArray && parent.AsArray == nil {
 			SetError(ErrGeneric)
 			return nil
 		}

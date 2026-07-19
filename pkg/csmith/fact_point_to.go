@@ -1271,6 +1271,12 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		for root.FieldVarOf != nil {
 			root = root.FieldVarOf
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		// (no invent soft-skip shell as non-itemized then complete identity success)
+		if root.IsArray && root.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		// itemized array: isArray && get_collective() != v (FactPointTo.cpp:722)
 		av := root.AsArray
 		if av == nil || !root.IsArray || av.Collective == nil {

@@ -383,6 +383,17 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 		t.Fatal("nil indexVar UpdateWithModifiedIndex must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was continue soft-skip → identity success
+	// fair: sticky nil fail closed
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	fShell := MakeFactPointTo(p, shell)
+	if fShell.UpdateWithModifiedIndex(idx) != nil {
+		t.Fatal("IsArray without AsArray root must fail closed UpdateWithModifiedIndex")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray UpdateWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
 	// Variable always live for string index use; sticky false
 	if indexExprUsesVar("i", nil) {
 		t.Fatal("nil indexVar indexExprUsesVar must fail closed false")

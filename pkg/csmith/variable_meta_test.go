@@ -159,15 +159,42 @@ func TestGetCollectiveArrayField(t *testing.T) {
 		t.Fatal("nil subject GetCollective must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray ancestor soft invent was self-collective success
+	// fair: sticky nil fail closed
+	shell := &Variable{Name: "g_shell", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	fld := &Variable{Name: "g_shell.f0", Type: GetIntType(), FieldVarOf: shell}
+	if fld.GetCollective() != nil {
+		t.Fatal("IsArray without AsArray ancestor GetCollective must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ancestor GetCollective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsArrayField(t *testing.T) {
-	arr := CreateVariableScalars("g_a", GetIntType(), true, false)
-	arr.IsArray = true
-	field := &Variable{Name: "g_a[0].f0", Type: GetIntType(), FieldVarOf: arr}
+	// live AsArray parent
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	field := &Variable{Name: "g_a[0].f0", Type: GetIntType(), FieldVarOf: &av.Variable}
 	if !field.IsArrayField() {
 		t.Fatal("array field")
 	}
+	// IsArray without AsArray soft invent was true without sticky
+	// fair: still true restrictive + SetError sticky
+	ClearError()
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	field2 := &Variable{Name: "g_b[0].f0", Type: GetIntType(), FieldVarOf: shell}
+	if !field2.IsArrayField() {
+		t.Fatal("IsArray without AsArray parent must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray parent IsArrayField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPackedAggregateFieldVarNilSticky(t *testing.T) {
