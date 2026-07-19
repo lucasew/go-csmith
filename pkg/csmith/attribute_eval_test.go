@@ -201,6 +201,30 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	}
 }
 
+func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
+	// soft invent: FindUnionPointees nil → len==0 → no overlap success
+	// fair: incomplete facts/pointees fail closed as overlap
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	holeFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	if !HaveOverlappingFields(e1, e2, holeFacts) {
+		t.Fatal("incomplete facts must fail closed as overlap")
+	}
+	if FindUnionPointees(holeFacts, e1) != nil {
+		t.Fatal("FindUnionPointees incomplete must be nil not empty")
+	}
+	// complete empty: non-pointer term → empty unions, no overlap
+	c := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	empty := FindUnionPointees(nil, c)
+	if empty == nil || len(empty) != 0 {
+		t.Fatal("complete non-ptr must be non-nil empty", empty)
+	}
+	if HaveOverlappingFields(c, c, nil) {
+		t.Fatal("complete constants must not invent overlap")
+	}
+}
+
 func TestBuiltinOutputSkipped(t *testing.T) {
 	f := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true}
 	if f.Output() != "" || f.OutputForwardDecl() != "" {

@@ -65,6 +65,15 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	if !strings.Contains(out2, "assert (") {
 		t.Fatal(out2)
 	}
+	// incomplete PointTo: no invent assertable by skipping GarbagePtr past hole
+	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, GarbagePtr}}
+	if hole.IsAssertable(nil) {
+		t.Fatal("incomplete PointTo must fail closed not-assertable")
+	}
+	if s := hole.OutputAssertion(nil, "  "); s != "" && !strings.Contains(s, "//") {
+		// OutputCondition fails closed empty on hole → empty assertion
+		_ = s
+	}
 }
 
 func TestOutputAssertionsParanoid(t *testing.T) {

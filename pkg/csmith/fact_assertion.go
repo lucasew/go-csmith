@@ -39,8 +39,14 @@ func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 
 // IsAssertable mirrors FactPointTo::is_assertable.
 // FactPointTo.cpp:661–666 — no array subject; no garbage/tbd; no invisible.
+// Incomplete PointTo fails closed not-assertable (no invent skip GarbagePtr
+// past a hole via IsVariableInSet false membership).
 func (f *FactPointTo) IsAssertable(stParent *Block) bool {
 	if f == nil || f.Var == nil {
+		return false
+	}
+	// incomplete fact must not invent assertable via partial PointTo scan
+	if !FactsComplete([]*FactPointTo{f}) {
 		return false
 	}
 	// get_array != null → not assertable
