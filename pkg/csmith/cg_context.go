@@ -470,6 +470,8 @@ func (c *CGContext) RemoveIVBound(iv *Variable) {
 }
 
 // IsVariableInSet reports whether v appears in set (pointer equality).
+// Nil slots are never matches for a live v (pointer equality); callers that
+// need fail-closed incomplete lists must use FactsComplete-style checks.
 func IsVariableInSet(set []*Variable, v *Variable) bool {
 	if v == nil {
 		return false

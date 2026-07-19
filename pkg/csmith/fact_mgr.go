@@ -958,8 +958,14 @@ func lhsAssignPointees(facts []*FactPointTo, lhs *Variable, lhsIndir int) []*Var
 
 // applyPointToAssignFacts applies point-to facts from abstract_fact_for_assign.
 // FactMgr.cpp:376–388 — renew when definitive single non-array LHS; else merge.
+// Incomplete facts/newFacts or MergeFactInto nil fails closed (*facts nil, false)
+// — no invent success past holes / soft-continue merge list.
 func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int, newFacts []*FactPointTo) bool {
 	if facts == nil || len(newFacts) == 0 {
+		return false
+	}
+	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		*facts = nil
 		return false
 	}
 	lvarCnt := len(lhsAssignPointees(*facts, lhs, lhsIndir))
@@ -971,12 +977,22 @@ func applyPointToAssignFacts(facts *[]*FactPointTo, lhs *Variable, lhsIndir int,
 		// definitive assignment — renew (strong replace)
 		_ = RenewFact(facts, newFacts[0])
 		for j := 1; j < len(newFacts); j++ {
-			*facts = MergeFactInto(*facts, newFacts[j])
+			merged := MergeFactInto(*facts, newFacts[j])
+			if merged == nil {
+				*facts = nil
+				return false
+			}
+			*facts = merged
 		}
 		return true
 	}
 	for _, f := range newFacts {
-		*facts = MergeFactInto(*facts, f)
+		merged := MergeFactInto(*facts, f)
+		if merged == nil {
+			*facts = nil
+			return false
+		}
+		*facts = merged
 	}
 	return true
 }

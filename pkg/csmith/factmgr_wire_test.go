@@ -46,6 +46,29 @@ func TestUpdateFactForReturn(t *testing.T) {
 	}
 }
 
+func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
+	// soft invent: MergeFactInto nil still return true with partial maps
+	// fair: incomplete newFacts / merge hole fails closed false + clear
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	facts := []*FactPointTo{MakeFactPointTo(p, a)}
+	// nil hole in newFacts
+	if applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}) {
+		t.Fatal("nil newFact hole must fail closed false")
+	}
+	if facts != nil {
+		t.Fatal("incomplete assign facts must clear", facts)
+	}
+	// incomplete subject map
+	facts = []*FactPointTo{MakeFactPointTo(p, a), nil}
+	if applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}) {
+		t.Fatal("nil subject map hole must fail closed false")
+	}
+	if facts != nil {
+		t.Fatal("incomplete subject must clear", facts)
+	}
+}
+
 func TestUpdateFactForAssignRenewsDefinitive(t *testing.T) {
 	// FactMgr.cpp:376–380 — lvar_cnt==1 non-array → renew (replace, not join)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
