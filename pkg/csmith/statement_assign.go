@@ -763,6 +763,9 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
+			if HasError() {
+				return false
+			}
 		} else if fi.User.IsEffectKnown() {
 			// static effect path (no fact/pointer change)
 			if cg.InConflict(fi.User.FEffect) {
@@ -774,8 +777,14 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			cg.AddVisibleEffectAt(fi.User.FEffect, blk)
+			if HasError() {
+				return false
+			}
 			// also add_external_effect of feffect
 			cg.AddExternalEffect(fi.User.FEffect)
+			if HasError() {
+				return false
+			}
 		}
 		// propagate fact_changed to caller (FunctionInvocation.cpp:96)
 		if cg.CurrentFunc != nil && fi.User.FactChanged {

@@ -161,13 +161,13 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false)}
 	// callee not first, NeedsRevisit, incomplete AccumEffContext
 	callee := &Function{
-		Name:           "g_helper",
-		ReturnType:     GetIntType(),
-		BuildState:     BuildBuilt,
-		IsBuilt:        true,
-		FactChanged:    true,
+		Name:            "g_helper",
+		ReturnType:      GetIntType(),
+		BuildState:      BuildBuilt,
+		IsBuilt:         true,
+		FactChanged:     true,
 		AccumEffContext: IncompleteEffect(),
-		Body:           &Block{StmID: 1, Stmts: []Stmt{}},
+		Body:            &Block{StmID: 1, Stmts: []Stmt{}},
 	}
 	// ensure NeedsRevisit true
 	if !callee.NeedsRevisit() {
@@ -181,6 +181,30 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete AccumEffContext must fail closed BuildUserInvocation")
+	}
+	ClearError()
+}
+
+func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
+	// BuildInvocationAndFunction effect hand-over must not invent success past incomplete
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	opts.MaxFuncs = 5
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	list := &FunctionList{Types: vs.Types}
+	// plant incomplete ambient on caller before build
+	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	list.Funcs = []*Function{caller}
+	cg := WithFunc(caller, IncompleteEffect()).WithFuncList(list)
+	cg.Types = vs.Types
+	fm := NewFactMgr(caller)
+	cg = cg.WithFactMgr(fm)
+	fi := BuildInvocationAndFunction(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	if fi != nil && !fi.Failed {
+		// may return Failed or nil; must not invent clean success under incomplete ambient
+		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
 	}
 	ClearError()
 }

@@ -446,6 +446,8 @@ func (c *CGContext) AddEffect(e Effect, includeLHS bool) {
 // MergeParamContext mirrors CGContext::merge_param_context.
 // CGContext.cpp:390–394 — add_effect(*param.effect_accum, include_lhs); copy expr_depth.
 // Does not merge param.effect_stm (only accum is folded via add_effect).
+// Incomplete effect merge fails closed sticky (AddEffect SetError); do not invent
+// expr_depth handoff after a failed effect merge.
 func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if c == nil {
 		return
@@ -453,6 +455,9 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 	if param.EffectAccum != nil {
 		// CGContext.cpp:392 — add_effect(*param.get_effect_accum(), include_lhs_effects)
 		c.AddEffect(*param.EffectAccum, includeLHS)
+		if HasError() {
+			return
+		}
 	}
 	// CGContext.cpp:393 — expr_depth = param_cg_context.expr_depth
 	c.ExprDepth = param.ExprDepth

@@ -468,7 +468,26 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	}
 	fm.SetupInOutMaps(false)
 	// accum effect context on function
+	// Incomplete external merge fails closed (no invent silent Incomplete AccumEffContext)
+	if !EffectComplete(cg.EffectContext()) || !EffectComplete(f.AccumEffContext) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
 	f.AccumEffContext = f.AccumEffContext.AddExternalEffect(cg.EffectContext())
+	if !EffectComplete(f.AccumEffContext) {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
+	}
 	// renew into original inputs_copy (false may mean no-change; incomplete fails closed)
 	_ = RenewFacts(&inputsCopy, *facts)
 	if !FactsComplete(inputsCopy) {

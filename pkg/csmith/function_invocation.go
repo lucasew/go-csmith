@@ -470,10 +470,23 @@ func BuildUserInvocation(
 		fi.Failed = !ok
 		if ok {
 			// FunctionInvocationUser.cpp:284–290
+			// Incomplete effect hand-over fails closed Failed (no invent silent Incomplete FEffect)
 			if cg.CurrentBlock() != nil {
 				cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
+				if HasError() {
+					fi.Failed = true
+					return fi
+				}
+			}
+			if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
+				fi.Failed = true
+				return fi
 			}
 			callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+			if !EffectComplete(callee.FEffect) {
+				fi.Failed = true
+				return fi
+			}
 			if cg.FM != nil {
 				cg.FM.GlobalFacts = facts
 			}
@@ -483,6 +496,10 @@ func BuildUserInvocation(
 		// add_external_effect(func->get_feffect())
 		if callee.IsEffectKnown() {
 			cg.AddExternalEffect(callee.FEffect)
+			if HasError() {
+				fi.Failed = true
+				return fi
+			}
 		}
 	}
 	_ = probs
@@ -645,11 +662,32 @@ func BuildInvocationAndFunction(
 	}
 
 	// FunctionInvocationUser.cpp:223–228 — effect hand-over
+	// Incomplete external merge fails closed Failed (no invent silent Incomplete shells)
+	if !EffectComplete(cg.EffectContext()) || !EffectComplete(callee.AccumEffContext) {
+		fi.Failed = true
+		return fi
+	}
 	callee.AccumEffContext = callee.AccumEffContext.AddExternalEffect(cg.EffectContext())
+	if !EffectComplete(callee.AccumEffContext) {
+		fi.Failed = true
+		return fi
+	}
 	// feffect.add_external_effect(effect_accum, call_chain)
+	if !EffectComplete(effectAccum) || !EffectComplete(callee.FEffect) {
+		fi.Failed = true
+		return fi
+	}
 	callee.FEffect = callee.FEffect.AddExternalEffectWithCallers(effectAccum, cg.CallChain)
+	if !EffectComplete(callee.FEffect) {
+		fi.Failed = true
+		return fi
+	}
 	// also keep ComputeSummary body effect already applied in GenerateBody
 	cg.AddVisibleEffectAt(effectAccum, cg.CurrentBlock())
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
 
 	// FunctionInvocationUser.cpp:230–233 — new_globals hand-over
 	if cg.CurrentFunc != nil && len(callee.NewGlobals) > 0 {

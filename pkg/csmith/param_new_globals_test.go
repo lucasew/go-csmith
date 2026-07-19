@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestMergeParamContext(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	parent := EmptyCGContext()
 	eff := EmptyEffect()
@@ -18,6 +19,21 @@ func TestMergeParamContext(t *testing.T) {
 	if parent.ExprDepth != 3 {
 		t.Fatal("depth")
 	}
+	// incomplete param accum must not invent expr_depth handoff after failed merge
+	parent2 := EmptyCGContext()
+	parent2.ExprDepth = 1
+	inc := IncompleteEffect()
+	param2 := EmptyCGContext()
+	param2.EffectAccum = &inc
+	param2.ExprDepth = 9
+	parent2.MergeParamContext(param2, true)
+	if !HasError() {
+		t.Fatal("incomplete param accum must SetError")
+	}
+	if parent2.ExprDepth != 1 {
+		t.Fatal("must not invent ExprDepth after failed effect merge")
+	}
+	ClearError()
 }
 
 func TestGenerateNewGlobalTracksNewGlobals(t *testing.T) {

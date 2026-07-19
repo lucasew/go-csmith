@@ -357,5 +357,13 @@ func (f *Function) ComputeSummary(bodyEffect Effect) {
 		}
 	}
 	// feffect.add_external_effect(body effect)
+	// Incomplete merge fails closed sticky (no invent silent Incomplete FEffect)
+	if !EffectComplete(bodyEffect) || !EffectComplete(f.FEffect) {
+		SetError(ErrGeneric)
+		return
+	}
 	f.FEffect = f.FEffect.AddExternalEffect(bodyEffect)
+	if !EffectComplete(f.FEffect) {
+		SetError(ErrGeneric)
+	}
 }
