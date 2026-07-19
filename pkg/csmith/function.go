@@ -122,8 +122,12 @@ func RandomFunctionName(sym *GenSym) string {
 // Function.cpp:256–259 — no soft invent nonvoid simple when AllTypes empty.
 func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) *Type {
 	// Type::choose_random requires AllTypes + RNG; ERROR_GUARD path → nil
-	// no invent default int when r nil or env empty
-	if r == nil || env == nil || len(env.AllTypes) == 0 {
+	// sticky no invent default int when r nil; empty env stays non-sticky soft nil
+	if r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if env == nil || len(env.AllTypes) == 0 {
 		return nil
 	}
 	return env.ChooseRandom(r, opts, probs, false)
@@ -131,7 +135,9 @@ func RandomReturnType(r *Rng, probs *Probabilities, env *TypeEnv, opts Options) 
 
 // ParamListProbability mirrors Function.cpp ParamListProbability → rnd_upto(max_params).
 func ParamListProbability(r *Rng, opts Options) uint32 {
+	// C++ always has RNG; sticky no invent param count 0 without draw
 	if r == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	n := opts.MaxParams
@@ -154,12 +160,14 @@ func MakeRandomSignature(
 	qfer *CVQualifiers,
 	list *FunctionList,
 ) *Function {
-	// Function.cpp:401+ — always has RNG; no soft invent NewRng(0)
+	// Function.cpp:401+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent RV/qfer under hole shells)
@@ -320,12 +328,14 @@ func MakeFirst(
 	list *FunctionList,
 	fmMap *FactMgrMap,
 ) *Function {
-	// Function.cpp:443+ — always has RNG; no soft invent NewRng(0)
+	// Function.cpp:443+ — always has RNG sticky; no soft invent NewRng(0)
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
+	// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 	if probs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Type::AllTypes is process-global in C++; session Types on list or vs

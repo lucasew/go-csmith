@@ -78,11 +78,28 @@ func TestMakeRandomUnaryIntPath(t *testing.T) {
 }
 
 func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
-	// no soft invent default int32 name for nil flags
+	// sticky no soft invent default int32 name / SizeToken for nil flags
+	ClearError()
 	var f *SafeOpFlags
 	if f.UnaryMinusFuncName() != "" {
 		t.Fatal("nil flags must fail closed")
 	}
+	// UnaryMinusFuncName may leave sticky from SizeToken
+	ClearError()
+	if f.SizeToken() != "" {
+		t.Fatal("nil SizeToken must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil SizeToken must SetError sticky")
+	}
+	ClearError()
+	if f.LHSType() != nil || f.RHSType() != nil {
+		t.Fatal("nil LHS/RHS type must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil LHSType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCastOpNoInventEmptySizeToken(t *testing.T) {

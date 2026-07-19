@@ -648,10 +648,13 @@ func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
 	if !HasError() {
 		t.Fatal("void Constant must SetError sticky")
 	}
-	// Expression.cpp:188 + ERROR_GUARD — MakeRandom nil → no invent TermConstant shell
+	// Expression.cpp always has RNG sticky — no invent TermConstant shell without RNG
 	ClearError()
 	if e := MakeRandomExpression(nil, opts, tables, nil, &cg, GetIntType(), nil, true, false, TermConstant, 0); e != nil {
 		t.Fatal("nil RNG must not invent TermConstant shell", e)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomExpression must SetError sticky")
 	}
 	ClearError()
 }

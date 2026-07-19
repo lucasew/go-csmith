@@ -707,8 +707,9 @@ func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 
 func forInitOutput(lc *LoopControl) string {
 	// StatementFor.cpp:408–410 — init->OutputAsExpr; always live StatementAssign
-	// no soft invent "iv = InitN" when InitStmt missing
+	// sticky no invent "iv = InitN" when InitStmt missing
 	if lc == nil || lc.InitStmt == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	wrap := false
@@ -719,8 +720,9 @@ func forInitOutput(lc *LoopControl) string {
 }
 
 func forTestOutput(lc *LoopControl) string {
-	// StatementFor.cpp:412 — test.Output; no soft invent "iv < LimitN" for missing test
+	// StatementFor.cpp:412 — test.Output; sticky no invent "iv < LimitN" for missing test
 	if lc == nil || lc.TestExpr == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	return lc.TestExpr.Output()
@@ -728,9 +730,10 @@ func forTestOutput(lc *LoopControl) string {
 
 // forIncrOutput emits for-loop increment via IncrStmt OutputAsExpr.
 // StatementFor.cpp:414 — incr->OutputAsExpr; always live StatementAssign.
-// no soft invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
+// sticky no invent iv+=IncrN / safe_* from LoopControl numbers when IncrStmt missing.
 func forIncrOutput(lc *LoopControl) string {
 	if lc == nil || lc.IncrStmt == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	wrap := false

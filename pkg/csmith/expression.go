@@ -650,8 +650,9 @@ func MakeRandomExpression(
 	exprDepth int,
 	list ...*FunctionList,
 ) *Expression {
-	// Expression.cpp always has RNG + live CGContext; no invent leaf shells without them
+	// Expression.cpp always has RNG + live CGContext; sticky no invent leaf shells without them
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky (no invent leaf / soft re-pick past holes)
@@ -674,7 +675,8 @@ func MakeRandomExpression(
 		tables = ProcessExprTables()
 	}
 	if tables == nil {
-		// no soft invent NewExprTables mid expression
+		// sticky no invent NewExprTables mid expression
+		SetError(ErrGeneric)
 		return nil
 	}
 	var flist *FunctionList

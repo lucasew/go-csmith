@@ -259,7 +259,8 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 // SafeOpFlags.cpp:219–242 — assert invalid size; method is const on live flags.
 func (f *SafeOpFlags) SizeToken() string {
 	if f == nil {
-		// no soft invent int32_t for nil flags
+		// sticky no soft invent int32_t for nil flags
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -326,7 +327,9 @@ func FlagsToType(signed bool, size SafeOpSize) *Type {
 // LHSType mirrors SafeOpFlags::get_lhs_type.
 // SafeOpFlags.cpp:98–102 — flags_to_type(op1_, op_size_); nil flags → nil (no invent).
 func (f *SafeOpFlags) LHSType() *Type {
+	// SafeOpFlags methods are const on live flags; sticky no invent type for nil
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return FlagsToType(f.Op1Signed, f.Size)
@@ -336,6 +339,7 @@ func (f *SafeOpFlags) LHSType() *Type {
 // SafeOpFlags.cpp:104–108 — flags_to_type(op2_, op_size_); nil flags → nil.
 func (f *SafeOpFlags) RHSType() *Type {
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return FlagsToType(f.Op2Signed, f.Size)

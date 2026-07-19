@@ -261,9 +261,14 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	if !sawP || !sawM {
 		t.Fatalf("need both p±1, +1=%v -1=%v", sawP, sawM)
 	}
+	ClearError()
 	if generateSmallRandomFloatHexConstant(0, nil) != "" {
 		t.Fatal("nil rng fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil rng generateSmallRandomFloatHexConstant must SetError sticky")
+	}
+	ClearError()
 	// formatSmallConstant must not invent float without RNG
 	if formatSmallConstant(EFloat, 1, Defaults()) != "" {
 		t.Fatal("formatSmallConstant float invent")

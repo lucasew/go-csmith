@@ -258,7 +258,8 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 // Constant.cpp:207–223 — ±0x{num}.{RandomHexDigits(1)}p±1 via pure_rnd_flipcoin(50).
 func generateSmallRandomFloatHexConstant(num int, r *Rng) string {
 	if r == nil {
-		// C++ always has RNG; no invent fixed float literal
+		// C++ always has RNG; sticky no invent fixed float literal
+		SetError(ErrGeneric)
 		return ""
 	}
 	sign := ""
@@ -440,7 +441,8 @@ func generateRandomInt128Constant(opts Options, r *Rng) string {
 // Constant.cpp:187–199 — pure_rnd_upto(100); hex; pure_rnd_flipcoin(50) for +/− exp.
 func generateRandomFloatHexConstant(r *Rng) string {
 	if r == nil {
-		// C++ always has RNG; no invent fixed literal
+		// C++ always has RNG; sticky no invent fixed literal
+		SetError(ErrGeneric)
 		return ""
 	}
 	exp := int(r.RndUpto(100))

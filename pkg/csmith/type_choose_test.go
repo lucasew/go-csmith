@@ -46,9 +46,13 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	if ty.IsSimple() && ty.Simple() == EVoid {
 		t.Fatal("void return")
 	}
-	// no invent default int without RNG
+	// sticky no invent default int without RNG
+	ClearError()
 	if RandomReturnType(nil, probs, env, opts) != nil {
 		t.Fatal("nil RNG RandomReturnType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomReturnType must SetError sticky")
 	}
 	ClearError()
 }

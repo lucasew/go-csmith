@@ -28,6 +28,15 @@ func TestParamListProbabilityRange(t *testing.T) {
 			t.Fatalf("param list prob %d", p)
 		}
 	}
+	// sticky no invent param count 0 without RNG draw
+	ClearError()
+	if ParamListProbability(nil, opts) != 0 {
+		t.Fatal("nil RNG ParamListProbability must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ParamListProbability must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomSignatureParams(t *testing.T) {
