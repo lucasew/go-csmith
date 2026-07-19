@@ -427,8 +427,17 @@ func BuildUserInvocation(
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
+		// Incomplete param accum fails closed (no invent more params under incomplete running)
 		running = running.AddEffect(paramAccum)
+		if !EffectComplete(running) {
+			fi.Failed = true
+			return fi
+		}
 		cg.MergeParamContext(paramCG, false)
+		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			fi.Failed = true
+			return fi
+		}
 	}
 
 	// FunctionInvocationUser.cpp:272–301
@@ -437,8 +446,13 @@ func BuildUserInvocation(
 	// skip revisit for first function (func_1) — no params, single call, DFA hack
 	if callee != first && callee.NeedsRevisit() {
 		// FunctionInvocationUser.cpp:277–291 — revisit with accum_eff_context
+		// Incomplete AccumEffContext fails closed (no invent revisit under incomplete ambient)
 		effectAccum := EmptyEffect()
 		effectContext := cg.EffectContext().AddEffect(callee.AccumEffContext)
+		if !EffectComplete(effectContext) {
+			fi.Failed = true
+			return fi
+		}
 		newCG := *cg
 		newCG.effectContext = effectContext
 		newCG.EffectAccum = &effectAccum
@@ -533,8 +547,17 @@ func BuildInvocationAndFunction(
 		arg.CheckAndSetCastOpts(ty, opts)
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
+		// Incomplete param accum fails closed (no invent more params under incomplete running)
 		running = running.AddEffect(paramAccum)
+		if !EffectComplete(running) {
+			fi.Failed = true
+			return fi
+		}
 		cg.MergeParamContext(paramCG, false)
+		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			fi.Failed = true
+			return fi
+		}
 	}
 
 	// FunctionInvocationUser.cpp:203–206 — hand-over from caller to callee with args
@@ -906,13 +929,21 @@ func MakeRandomBinaryPtrComparison(
 		rhsAccum := EmptyEffect()
 		rhsCG := *cg
 		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
-		rhsCG.effectContext = cg.EffectContext().AddEffect(lhsAccum)
+		// Incomplete lhs accum fails closed (no invent RHS under incomplete ambient)
+		rhsCtx := cg.EffectContext().AddEffect(lhsAccum)
+		if !EffectComplete(rhsCtx) {
+			return nil
+		}
+		rhsCG.effectContext = rhsCtx
 		rhsCG.EffectAccum = &rhsAccum
 		rhsCG.EffectStm = EmptyEffect()
 		rhsCG.Flags |= FlagNoDanglingPtr
 		right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, ptrTy, nil, true, false, tt, rhsCG.ExprDepth)
 		// FunctionInvocation.cpp:345
 		cg.MergeParamContext(rhsCG, true)
+		if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			return nil
+		}
 	}
 	if right == nil || HasError() {
 		return nil

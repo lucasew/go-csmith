@@ -297,6 +297,16 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 		// CheckReadVar rejects IsWrittenPartially
 		t.Fatal("want reject when IV written in context")
 	}
+	// Incomplete ambient (context or EffectStm) must not invent index visit success
+	cg3 := WithEffectContext(IncompleteEffect())
+	if lhs.VisitIndices(&cg3, Defaults()) {
+		t.Fatal("incomplete EffectContext must fail closed VisitIndices")
+	}
+	cg4 := EmptyCGContext()
+	cg4.EffectStm = IncompleteEffect()
+	if lhs.VisitIndices(&cg4, Defaults()) {
+		t.Fatal("incomplete EffectStm must fail closed VisitIndices")
+	}
 }
 
 func TestExtendCallChainNilHoleFailClosed(t *testing.T) {

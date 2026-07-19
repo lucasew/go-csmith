@@ -914,7 +914,12 @@ func (c CGContext) AcceptType(t *Type) bool {
 // CGContext.cpp:531–564.
 // Variable* always live in effect lists; nil hole fails closed as conflict
 // (no invent skip as conflict-free incomplete effect).
+// Incomplete eff or effect_context fails closed as conflict (no invent conflict-free
+// via empty ReadVars/WrittenVars past IncompleteEffect or incomplete ambient).
 func (c CGContext) InConflict(eff Effect) bool {
+	if !EffectComplete(eff) || !EffectComplete(c.EffectContext()) {
+		return true
+	}
 	for _, v := range eff.ReadVars() {
 		if v == nil {
 			return true

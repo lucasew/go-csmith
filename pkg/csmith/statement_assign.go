@@ -182,12 +182,18 @@ func MakeRandomAssignQfer(
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
+			if !EffectComplete(runningEff) {
+				return Stmt{}
+			}
 			if !callerQf {
 				qfer.SetVolatile(false, 0)
 			}
 		}
 		// StatementAssign.cpp:163 — always fold RHS into running under strict_volatile
 		runningEff = runningEff.AddEffect(rhsAccum)
+		if !EffectComplete(runningEff) {
+			return Stmt{}
+		}
 		if !callerQf && qfer.IsVolatile() {
 			qfer.SetVolatile(false, 0)
 		}
@@ -207,6 +213,9 @@ func MakeRandomAssignQfer(
 		}
 		if op != AssignSimple {
 			runningEff = runningEff.AddEffect(rhsAccum)
+			if !EffectComplete(runningEff) {
+				return Stmt{}
+			}
 			if !callerQf {
 				qfer.SetVolatile(false, 0)
 			}
@@ -214,12 +223,19 @@ func MakeRandomAssignQfer(
 	}
 	// StatementAssign.cpp:181 — merge_param_context(rhs_cg_context, true)
 	cg.MergeParamContext(rhsCG, true)
+	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+		return Stmt{}
+	}
 
 	// StatementAssign.cpp:183 — write_var_set(rhs_accum.get_lhs_write_vars())
 	// IncompleteVariables → WriteVarSet IncompleteEffect (no invent skip empty merge
 	// when LhsWriteVars used bare nil on incomplete rhs_accum).
 	if lw := rhsAccum.LhsWriteVars(); !VariablesComplete(lw) || len(lw) > 0 {
 		runningEff = runningEff.WriteVarSet(lw)
+		// Incomplete fold fails closed (no invent LHS under incomplete running)
+		if !EffectComplete(runningEff) {
+			return Stmt{}
+		}
 	}
 
 	// LHS context after RHS (StatementAssign.cpp:185–199)
@@ -706,9 +722,16 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if !VisitFactsExpression(arg, &paramCG, opts) {
 				return false
 			}
+			// Incomplete param accum fails closed (no invent visit more args under incomplete running)
 			running = running.AddEffect(paramAccum)
+			if !EffectComplete(running) {
+				return false
+			}
 			// merge_param_context; include_lhs for std ops only
 			cg.MergeParamContext(paramCG, !isFuncCall)
+			if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+				return false
+			}
 		}
 	}
 	if isFuncCall {

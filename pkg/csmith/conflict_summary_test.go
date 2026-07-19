@@ -64,6 +64,17 @@ func TestInConflictNilHoleFailClosed(t *testing.T) {
 	}
 }
 
+func TestInConflictIncompleteEffectFailClosed(t *testing.T) {
+	// IncompleteEffect / incomplete ambient must not invent conflict-free
+	if !EmptyCGContext().InConflict(IncompleteEffect()) {
+		t.Fatal("IncompleteEffect must fail closed as conflict")
+	}
+	cg := WithEffectContext(IncompleteEffect())
+	if !cg.InConflict(EmptyEffect()) {
+		t.Fatal("incomplete ambient must fail closed as conflict")
+	}
+}
+
 func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	bad := &Function{Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}

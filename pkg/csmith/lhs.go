@@ -148,7 +148,11 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 		return false
 	}
 	// Lhs.cpp:273–276 — combine context + stm as ambient; no accum
+	// Incomplete ambient fails closed (no invent index visit under incomplete context)
 	eff := cg.EffectContext().AddEffect(cg.EffectStm)
+	if !EffectComplete(eff) {
+		return false
+	}
 	rhsCG := CGContext{
 		effectContext: eff,
 		CurrentFunc:   cg.CurrentFunc,

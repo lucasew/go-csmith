@@ -152,6 +152,39 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	}
 }
 
+func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
+	// revisit under incomplete AccumEffContext must not invent success
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	vs := NewVariableSelector(opts)
+	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false)}
+	// callee not first, NeedsRevisit, incomplete AccumEffContext
+	callee := &Function{
+		Name:           "g_helper",
+		ReturnType:     GetIntType(),
+		BuildState:     BuildBuilt,
+		IsBuilt:        true,
+		FactChanged:    true,
+		AccumEffContext: IncompleteEffect(),
+		Body:           &Block{StmID: 1, Stmts: []Stmt{}},
+	}
+	// ensure NeedsRevisit true
+	if !callee.NeedsRevisit() {
+		t.Fatal("need revisit")
+	}
+	caller := &Function{Name: "func_1"}
+	list := &FunctionList{Funcs: []*Function{caller, callee}}
+	cg := WithFunc(caller, EmptyEffect()).WithFuncList(list)
+	fm := NewFactMgr(caller)
+	cg = cg.WithFactMgr(fm)
+	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
+	if fi == nil || !fi.Failed {
+		t.Fatal("incomplete AccumEffContext must fail closed BuildUserInvocation")
+	}
+	ClearError()
+}
+
 func TestGetFirstFunction(t *testing.T) {
 	if GetFirstFunction(nil) != nil {
 		t.Fatal("nil list")
