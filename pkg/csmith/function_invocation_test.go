@@ -416,3 +416,22 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestInvocationOutputNilSticky(t *testing.T) {
+	ClearError()
+	if (*Invocation)(nil).Output() != "" {
+		t.Fatal("nil Invocation Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Invocation Output must SetError sticky")
+	}
+	ClearError()
+	// Failed stays non-sticky soft re-pick
+	if (&Invocation{Failed: true}).Output() != "" {
+		t.Fatal("Failed Invocation Output must fail closed empty")
+	}
+	if HasError() {
+		t.Fatal("Failed Invocation Output must stay non-sticky soft re-pick")
+	}
+	ClearError()
+}

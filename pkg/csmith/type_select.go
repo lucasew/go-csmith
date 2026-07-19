@@ -19,7 +19,9 @@ type TypeEnv struct {
 // Incomplete DerivedTypes fails closed nil when add (no invent soft-skip hole
 // then match/append as if the pool were complete).
 func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
+	// Type* pointee always live; sticky no invent pointer-to-nil / soft-skip hole
 	if t == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// PointerTo already caches by pointee identity.
@@ -63,7 +65,13 @@ func (env *TypeEnv) HasPointerType() bool {
 // Type* always live on AllTypes; nil hole fails closed (nil — no invent soft-skip
 // hole and still match a later entry, or invent "not found" past incomplete pool).
 func (env *TypeEnv) FindType(t *Type) *Type {
-	if env == nil || t == nil {
+	// nil env: soft not-found (no AllTypes pool)
+	if env == nil {
+		return nil
+	}
+	// Type* always live as query subject; sticky no invent soft-skip nil key
+	if t == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if !typesComplete(env.AllTypes) {

@@ -265,3 +265,14 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputSkippedVarInitsNilStmtSticky(t *testing.T) {
+	ClearError()
+	if OutputSkippedVarInits(nil, "  ") != "" {
+		t.Fatal("nil Stmt OutputSkippedVarInits must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Stmt OutputSkippedVarInits must SetError sticky")
+	}
+	ClearError()
+}

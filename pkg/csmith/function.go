@@ -989,7 +989,13 @@ func (f *Function) Output() string {
 
 // OutputOpts adds force_static and optional function attributes on the header.
 func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
-	if f == nil || f.IsBuiltin {
+	// Function always live at def emit; sticky no invent empty def without it
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// builtins emit nothing (Function.cpp) — soft empty, not incomplete IR
+	if f.IsBuiltin {
 		return ""
 	}
 	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell

@@ -156,7 +156,13 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 // StatementGoto.cpp:264–275 — re-init skipped locals at destination label via init->Output.
 // Incomplete InitSkippedVars fails closed sticky empty (no invent soft-skip hole partial re-inits).
 func OutputSkippedVarInits(st *Stmt, indent string) string {
-	if st == nil || len(st.InitSkippedVars) == 0 {
+	// Statement always live at goto dest re-init; sticky no invent re-inits without it
+	if st == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// no skipped locals: soft empty
+	if len(st.InitSkippedVars) == 0 {
 		return ""
 	}
 	if !VariablesComplete(st.InitSkippedVars) {

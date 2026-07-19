@@ -59,9 +59,14 @@ func (fi *Invocation) wrapperOpts() Options {
 // FunctionInvocationUnary::Output / FunctionInvocationBinary::Output —
 // safe_* when avoid_signed_overflow + wrapper allowed; float unary uses standard op.
 func (fi *Invocation) Output() string {
+	// FunctionInvocation always live at Output; sticky no invent empty call without it
+	if fi == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	// Failed invocations are not emitted (ExpressionFuncall replaces with var).
 	// No soft invent /*bad_call*/ / /*invoke*/ comments. Failed stays non-sticky soft re-pick.
-	if fi == nil || fi.Failed {
+	if fi.Failed {
 		return ""
 	}
 	if fi.User != nil {

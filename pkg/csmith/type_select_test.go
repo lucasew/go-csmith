@@ -357,3 +357,22 @@ func TestAssignOpWorksForFloat(t *testing.T) {
 		t.Fatal("float ops")
 	}
 }
+
+func TestFindPointerTypeNilSticky(t *testing.T) {
+	ClearError()
+	env := &TypeEnv{}
+	if env.FindPointerType(nil, true) != nil {
+		t.Fatal("nil pointee FindPointerType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil pointee FindPointerType must SetError sticky")
+	}
+	ClearError()
+	if env.FindType(nil) != nil {
+		t.Fatal("nil type FindType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type FindType must SetError sticky")
+	}
+	ClearError()
+}

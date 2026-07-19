@@ -66,8 +66,9 @@ func (fi *Invocation) IsReturnTypeFloat() bool {
 // FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
 // FunctionInvocationUser.cpp:380 — return type.
 func (fi *Invocation) GetType() *Type {
-	// C++ FunctionInvocation always non-null; incomplete IR sticky → nil (no invent int)
+	// C++ FunctionInvocation always non-null; sticky nil → no invent int type shell
 	if fi == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if fi.User != nil {

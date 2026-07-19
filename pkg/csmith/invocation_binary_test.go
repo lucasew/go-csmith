@@ -505,3 +505,14 @@ func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestInvocationGetTypeNilSticky(t *testing.T) {
+	ClearError()
+	if (*Invocation)(nil).GetType() != nil {
+		t.Fatal("nil Invocation GetType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Invocation GetType must SetError sticky")
+	}
+	ClearError()
+}

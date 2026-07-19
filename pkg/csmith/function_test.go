@@ -343,3 +343,22 @@ func TestOutputHeaderNilFunctionSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFunctionOutputNilSticky(t *testing.T) {
+	ClearError()
+	if (*Function)(nil).Output() != "" {
+		t.Fatal("nil Function Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function Output must SetError sticky")
+	}
+	ClearError()
+	// builtin soft empty
+	if (&Function{IsBuiltin: true, Name: "b"}).Output() != "" {
+		t.Fatal("builtin Function Output must soft empty")
+	}
+	if HasError() {
+		t.Fatal("builtin Function Output must stay non-sticky")
+	}
+	ClearError()
+}
