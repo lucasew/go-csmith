@@ -221,3 +221,41 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / GlobalFacts fail closed sticky before const/pointer pick
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	if vs.MakeInitValue(AccessRead, cg, GetIntType(), &q, nil, NewRng(1)) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeInitValue")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := EmptyCGContext().WithFactMgr(fm)
+	if vs.MakeInitValue(AccessRead, cg2, GetIntType(), &q, nil, NewRng(2)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeInitValue")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	cg3 := WithFunc(nil, IncompleteEffect())
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	if vs.MakeInitValue(AccessRead, cg3, GetIntType(), &q, nil, NewRng(3)) != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeInitValue")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}

@@ -396,4 +396,25 @@ func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete invalid_vars must SetError sticky")
 	}
 	ClearError()
+	// incomplete ambient on SelectWithInvalid
+	inc := IncompleteEffect()
+	cg3 := EmptyCGContext()
+	cg3.EffectAccum = &inc
+	if vs.SelectWithInvalid(AccessRead, cg3, GetIntType(), nil, NewRng(4), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed SelectWithInvalid")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky SelectWithInvalid")
+	}
+	ClearError()
+	fm := NewFactMgr(nil)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg4 := EmptyCGContext().WithFactMgr(fm)
+	if vs.SelectWithInvalid(AccessRead, cg4, GetIntType(), nil, NewRng(5), MatchFlexible, nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed SelectWithInvalid")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky SelectWithInvalid")
+	}
+	ClearError()
 }

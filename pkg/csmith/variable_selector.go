@@ -690,6 +690,18 @@ func (vs *VariableSelector) MakeInitValue(
 	if vs == nil || t == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before const/pointer pick
+	// (no invent init / soft re-pick past holes under incomplete shells)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:830 — assert(qf && qf->sanity_check(t)); no invent empty qfer
 	if qf == nil || !qf.SanityCheck(t) {
 		SetError(ErrGeneric)
@@ -2385,6 +2397,17 @@ func (vs *VariableSelector) SelectWithInvalid(
 	if vs == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before scope pick (no invent select past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// incomplete invalid_vars fails closed sticky (no invent select past hole list)
 	if !VariablesComplete(invalidVars) {
 		SetError(ErrGeneric)
@@ -2606,6 +2629,17 @@ func (vs *VariableSelector) GenerateNewVariable(
 ) *Variable {
 	// VariableSelector.cpp:1090+ — always has RNG; no invent scope/type without it
 	if vs == nil || t == nil || r == nil {
+		return nil
+	}
+	// incomplete ambient / facts fail closed sticky before scope pick (no invent new var past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1093 — DEPTH_GUARD_BY_TYPE_RETURN(dtGenerateNewVariable, nullptr)

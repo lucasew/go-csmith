@@ -95,9 +95,14 @@ func TestOutputVariableList(t *testing.T) {
 	if s := OutputVariableList([]*Variable{a, broken}, "  ", true); s != "" {
 		t.Fatal("mixed incomplete must fail closed whole list", s)
 	}
+	ClearError()
 	if s := OutputVariableList([]*Variable{a, nil}, "  ", true); s != "" {
 		t.Fatal("nil hole must fail closed whole list", s)
 	}
+	if !HasError() {
+		t.Fatal("nil hole OutputVariableList must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputGlobalVariables(t *testing.T) {

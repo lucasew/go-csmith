@@ -9,13 +9,14 @@ import (
 
 // OutputVariableList mirrors OutputVariableList for a slice of variables.
 // VariableSelector.cpp / Variable.cpp — OutputDef per var; sorted names for determinism.
-// Incomplete Variable* list fails closed empty (no invent skip holes / partial section).
+// Incomplete Variable* list fails closed sticky empty (no invent skip holes / partial section).
 func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
 	if len(vars) == 0 {
 		return ""
 	}
-	// incomplete list — fail closed before sort invents nil-first ordering
+	// incomplete list fails closed sticky before sort invents nil-first ordering
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// stable order by name

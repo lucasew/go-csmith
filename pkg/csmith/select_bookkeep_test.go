@@ -74,6 +74,46 @@ func TestGenerateNewVariableLocalStackIndex(t *testing.T) {
 	}
 }
 
+func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / facts fail closed sticky before scope pick
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg.EffectAccum = &inc
+	if vs.GenerateNewVariable(AccessWrite, cg, GetIntType(), nil, NewRng(1)) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed GenerateNewVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if vs.GenerateNewVariable(AccessWrite, cg2, GetIntType(), nil, NewRng(2)) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed GenerateNewVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+	cg3 := WithFunc(f, IncompleteEffect()).WithFactMgr(NewFactMgr(f))
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	if vs.GenerateNewVariable(AccessWrite, cg3, GetIntType(), nil, NewRng(3)) != nil {
+		t.Fatal("incomplete EffectContext must fail closed GenerateNewVariable")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectGlobalMTInvalidVars(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
