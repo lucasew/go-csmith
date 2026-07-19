@@ -298,7 +298,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 }
 
 func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
-	// incomplete EffectAccum / GlobalFacts must not invent dummy block success
+	// incomplete EffectAccum / GlobalFacts / EffectContext must not invent dummy block success
 	ClearError()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
@@ -325,6 +325,20 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("must SetError GlobalFacts")
+	}
+	ClearError()
+	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
+	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
+	eff := EmptyEffect()
+	cg3.EffectAccum = &eff
+	if MakeDummyBlockCG(&cg3, opts) != nil {
+		t.Fatal("incomplete EffectContext must fail closed MakeDummyBlockCG")
+	}
+	if !HasError() {
+		t.Fatal("must SetError EffectContext")
+	}
+	if len(f3.Blocks) != 0 || len(f3.Stack) != 0 {
+		t.Fatal("must not leave partial block on incomplete context")
 	}
 	ClearError()
 }

@@ -1047,6 +1047,13 @@ func makeExpressionFuncall(
 	if cg.FM == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent funcall / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// ExpressionFuncall.cpp:66+ — no DEPTH_GUARD here (guard is on Expression::make_random)
 	// Probabilities singleton always live in C++; no invent NewProbabilities(opts)
 	var probs *Probabilities
@@ -1066,14 +1073,6 @@ func makeExpressionFuncall(
 	preStm := cg.EffectStm.Clone()
 	// incomplete GlobalFacts fail closed sticky (no invent cleaned snapshot for failed call restore)
 	if !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
-		return nil
-	}
-	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
-		SetError(ErrGeneric)
-		return nil
-	}
-	if !EffectComplete(cg.EffectStm) {
 		SetError(ErrGeneric)
 		return nil
 	}

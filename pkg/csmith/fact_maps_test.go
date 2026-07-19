@@ -306,6 +306,7 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	if FindRelatedPointTo(old, later) != nil {
 		t.Fatal("later var must not be made up past field hole")
 	}
+	ClearError()
 }
 
 func TestSetMapFactsOutGotoDest(t *testing.T) {

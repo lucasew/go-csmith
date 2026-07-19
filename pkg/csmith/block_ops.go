@@ -680,6 +680,13 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	if cg == nil || cg.CurrentFunc == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky before stack push (no invent dummy past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	f := cg.CurrentFunc
 	parent := cg.CurrentBlock()
 	// Block.cpp:99 — Block(get_current_block(), 0)
@@ -705,11 +712,7 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	}
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
-		if !EffectComplete(*cg.EffectAccum) {
-			pop()
-			SetError(ErrGeneric)
-			return nil
-		}
+		// pre-validated EffectComplete(*EffectAccum)
 		preEffect = cg.EffectAccum.Clone()
 	}
 	if !EffectComplete(preEffect) {

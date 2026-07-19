@@ -197,6 +197,21 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky MakeRandomContinue")
 	}
 	ClearError()
+	// incomplete GlobalFacts fails closed sticky
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff3 := EmptyEffect()
+	cg3.EffectAccum = &eff3
+	cg3.Flags |= FlagInLoop
+	st3 := MakeRandomBreak(NewRng(3), opts, vs, NewExprTables(opts), &cg3)
+	if st3.Expr != nil || stmtOK(st3) {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBreak")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky MakeRandomBreak")
+	}
+	ClearError()
 }
 
 func TestArrayOpHeaderNumeric(t *testing.T) {

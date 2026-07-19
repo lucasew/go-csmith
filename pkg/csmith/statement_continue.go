@@ -27,6 +27,10 @@ func MakeRandomContinue(
 		SetError(ErrGeneric)
 		return Stmt{}
 	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementContinue.cpp:71 — assert(b); no soft invent continue without looping block
 	if loop == nil {

@@ -636,6 +636,44 @@ func TestMakeExpressionFuncallRequiresFactMgr(t *testing.T) {
 	}
 }
 
+func TestMakeExpressionFuncallIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient / facts fail closed sticky (no invent funcall soft re-pick)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	fm := NewFactMgr(nil)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if makeExpressionFuncall(NewRng(1), opts, vs, NewExprTables(opts), &cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed makeExpressionFuncall")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(nil, IncompleteEffect()).WithFactMgr(NewFactMgr(nil))
+	eff := EmptyEffect()
+	cg2.EffectAccum = &eff
+	if makeExpressionFuncall(NewRng(2), opts, vs, NewExprTables(opts), &cg2, GetIntType(), nil, nil) != nil {
+		t.Fatal("incomplete EffectContext must fail closed makeExpressionFuncall")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	fm3 := NewFactMgr(nil)
+	fm3.GlobalFacts = IncompleteFactSlice()
+	cg3 := EmptyCGContext().WithFactMgr(fm3)
+	if makeExpressionFuncall(NewRng(3), opts, vs, NewExprTables(opts), &cg3, GetIntType(), nil, nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed makeExpressionFuncall")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	// ExpressionFuncall.cpp:84–90 — restore facts when invocation failed
 	opts := Defaults()

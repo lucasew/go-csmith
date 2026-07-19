@@ -22,6 +22,10 @@ func MakeRandomBreak(
 		SetError(ErrGeneric)
 		return Stmt{}
 	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
 	// StatementBreak.cpp:72 — assert(b); no soft invent break without looping block
