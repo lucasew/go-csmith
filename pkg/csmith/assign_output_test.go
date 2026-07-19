@@ -280,3 +280,29 @@ func TestOutputAssignSimpleNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputAssignAsExprNilSticky(t *testing.T) {
+	// Statement always live at OutputAsExpr; sticky no invent empty assign-as-expr shell
+	ClearError()
+	if OutputAssignAsExpr(nil, false) != "" {
+		t.Fatal("nil OutputAssignAsExpr must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputAssignAsExpr must SetError sticky")
+	}
+	ClearError()
+	if OutputAssignAsExprOpts(nil, false, Defaults()) != "" {
+		t.Fatal("nil OutputAssignAsExprOpts must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil OutputAssignAsExprOpts must SetError sticky")
+	}
+	ClearError()
+	if assignLhsText(nil, false) != "" {
+		t.Fatal("nil assignLhsText must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil assignLhsText must SetError sticky")
+	}
+	ClearError()
+}

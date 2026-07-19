@@ -36,10 +36,12 @@ type BooleanAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *BooleanAttribute) MakeRandom(r *Rng) string {
-	// Attribute always has process RNG; sticky no invent skip shell without it
+	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
+	// Attribute always has process RNG; sticky no invent skip shell without it
 	if r == nil {
 		SetError(ErrGeneric)
 		return ""
@@ -65,7 +67,9 @@ type MultiChoiceAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
+	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG + non-empty choices; sticky no invent without them
@@ -101,7 +105,9 @@ type AlignedAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
+	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it
@@ -143,7 +149,9 @@ type SectionAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *SectionAttribute) MakeRandom(r *Rng) string {
+	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
 	if a == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute always has process RNG; sticky no invent skip shell without it

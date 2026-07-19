@@ -545,8 +545,11 @@ func OutputAssignSimple(st *Stmt, wrapVol bool) string {
 	return st.AssignOp.AssignOpC(lhs, rhs)
 }
 
+// assignLhsText resolves LHS text for assign emit.
+// Statement always live at assign emit; sticky empty (no invent bare RHS past hole).
 func assignLhsText(st *Stmt, wrapVol bool) string {
 	if st == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if st.ArrayAccess != "" {
@@ -564,13 +567,16 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 // OutputAssignAsExpr mirrors StatementAssign::OutputAsExpr.
 // StatementAssign.cpp:542–625 — safe math rewrite for +=/-= when SafeFlags set.
 // Uses process CGOptions (identify_wrappers); no soft invent Defaults().
+// Incomplete Statement sticky empty (no invent empty assign-as-expr shell past hole).
 func OutputAssignAsExpr(st *Stmt, wrapVol bool) string {
 	return OutputAssignAsExprOpts(st, wrapVol, ProcessOptions())
 }
 
 // OutputAssignAsExprOpts is OutputAsExpr with options for wrapper id filtering.
 func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
+	// Statement always live at OutputAsExpr; sticky incomplete no invent empty token
 	if st == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	lhs := assignLhsText(st, wrapVol)

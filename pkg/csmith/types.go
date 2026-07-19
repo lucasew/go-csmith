@@ -345,8 +345,10 @@ func SetPlatformSizes(intSize, ptrSize int) {
 
 // SizeInBytes mirrors Type::SizeInBytes for simple/pointer types (Type.cpp).
 // Integer/pointer sizes come from platform (CGOptions / platform.info).
+// Type* always live at SizeInBytes sites; sticky 0 (no invent zero-size soft-skip).
 func (t *Type) SizeInBytes() int {
 	if t == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	if t.ptrTo != nil {

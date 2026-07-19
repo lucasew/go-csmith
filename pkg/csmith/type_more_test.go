@@ -67,6 +67,18 @@ func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
 	ClearError()
 }
 
+func TestSizeInBytesNilSticky(t *testing.T) {
+	// Type* always live at SizeInBytes; sticky no invent zero-size soft-skip
+	ClearError()
+	if n := (*Type)(nil).SizeInBytes(); n != 0 {
+		t.Fatal("nil SizeInBytes invent", n)
+	}
+	if !HasError() {
+		t.Fatal("nil SizeInBytes must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestPrintfDirective(t *testing.T) {
 	// pin platform so int is 4-byte (Generate may leave host int size)
 	SetPlatformSizes(4, 8)

@@ -89,6 +89,49 @@ func TestSectionAttributeNoInventName(t *testing.T) {
 	ClearError()
 }
 
+func TestAttributeNilReceiverMakeRandomSticky(t *testing.T) {
+	// Attribute* always live at MakeRandom; sticky no invent "" (not-selected) past hole
+	r := NewRng(1)
+	ClearError()
+	if (*BooleanAttribute)(nil).MakeRandom(r) != "" {
+		t.Fatal("nil BooleanAttribute must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil BooleanAttribute must SetError sticky")
+	}
+	ClearError()
+	if (*MultiChoiceAttribute)(nil).MakeRandom(r) != "" {
+		t.Fatal("nil MultiChoiceAttribute must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil MultiChoiceAttribute must SetError sticky")
+	}
+	ClearError()
+	if (*AlignedAttribute)(nil).MakeRandom(r) != "" {
+		t.Fatal("nil AlignedAttribute must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil AlignedAttribute must SetError sticky")
+	}
+	ClearError()
+	if (*SectionAttribute)(nil).MakeRandom(r) != "" {
+		t.Fatal("nil SectionAttribute must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil SectionAttribute must SetError sticky")
+	}
+	// typed-nil interface slot still hits MakeRandom sticky (not soft not-selected)
+	ClearError()
+	var typedNil Attribute = (*BooleanAttribute)(nil)
+	if typedNil.MakeRandom(r) != "" {
+		t.Fatal("typed-nil Attribute interface must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("typed-nil Attribute interface must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestAttributeNoInventEmptyName(t *testing.T) {
 	// Boolean / MultiChoice / Aligned require live name from ctor sticky
 	ClearError()

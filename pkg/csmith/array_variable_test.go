@@ -608,6 +608,47 @@ func TestSizeInBytesArray(t *testing.T) {
 	}
 }
 
+func TestArrayVariableNilPredicatesSticky(t *testing.T) {
+	// ArrayVariable always live; sticky no invent dim0 / empty-size / not-global / zero-bytes
+	ClearError()
+	if (*ArrayVariable)(nil).Dimension() != 0 {
+		t.Fatal("nil Dimension must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil Dimension must SetError sticky")
+	}
+	ClearError()
+	if (*ArrayVariable)(nil).TotalSize() != 0 {
+		t.Fatal("nil TotalSize must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil TotalSize must SetError sticky")
+	}
+	ClearError()
+	if (*ArrayVariable)(nil).IsGlobal() {
+		t.Fatal("nil IsGlobal must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsGlobal must SetError sticky")
+	}
+	ClearError()
+	if (*ArrayVariable)(nil).SizeInBytesArray() != 0 {
+		t.Fatal("nil SizeInBytesArray must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil SizeInBytesArray must SetError sticky")
+	}
+	ClearError()
+	avNoType := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
+	if avNoType.SizeInBytesArray() != 0 {
+		t.Fatal("nil Type SizeInBytesArray must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil Type SizeInBytesArray must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestContainsBackEdgeDestParentOnly(t *testing.T) {
 	// Block.cpp:491 — only dest->parent == this
 	b := &Block{StmID: 1}

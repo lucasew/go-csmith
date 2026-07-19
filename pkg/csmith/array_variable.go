@@ -192,16 +192,20 @@ func CreateArrayVariable(
 }
 
 // Dimension returns get_dimension.
+// ArrayVariable always live at get_dimension; sticky 0 (no invent dim soft-skip past hole).
 func (av *ArrayVariable) Dimension() int {
 	if av == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	return len(av.Sizes)
 }
 
 // TotalSize is product of sizes.
+// ArrayVariable always live; sticky 0 (no invent empty-size soft-skip past hole).
 func (av *ArrayVariable) TotalSize() int {
 	if av == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	n := 1
@@ -212,8 +216,10 @@ func (av *ArrayVariable) TotalSize() int {
 }
 
 // IsGlobal for arrays: name prefix g_ (same as Variable).
+// ArrayVariable always live; sticky incomplete no invent not-global soft-skip.
 func (av *ArrayVariable) IsGlobal() bool {
 	if av == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return av.Variable.IsGlobal()
@@ -937,8 +943,10 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 
 // SizeInBytesArray mirrors ArrayVariable::size_in_bytes.
 // ArrayVariable.cpp:241–247 — elem size × product of dimensions.
+// ArrayVariable/Type always live; sticky 0 (no invent zero-size soft-skip past hole).
 func (av *ArrayVariable) SizeInBytesArray() int {
 	if av == nil || av.Type == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	n := av.Type.SizeInBytes()
