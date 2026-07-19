@@ -75,6 +75,19 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 	}
 }
 
+func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
+	// soft invent: Clone incomplete PointTo appends nil / keeps partial out
+	fn := &Function{Name: "f", ReturnType: GetIntType()}
+	body := &Block{Func: fn}
+	fn.Body = body
+	fn.Blocks = []*Block{body}
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	facts := []*FactPointTo{{Var: gp, PointTo: []*Variable{nil}}}
+	if RemoveFunctionLocalFacts(facts, fn) != nil {
+		t.Fatal("incomplete PointTo must fail closed nil, not invent filter")
+	}
+}
+
 func TestRemoveFunctionLocalFacts(t *testing.T) {
 	// FactMgr.cpp:191 — is_var_on_stack(v, stm) via Body as function-exit parent
 	f := &Function{Name: "f"}
