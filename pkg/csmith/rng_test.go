@@ -45,6 +45,7 @@ func TestGenrandSeed0And1(t *testing.T) {
 
 func TestRndUptoUsesModulo(t *testing.T) {
 	// DefaultRndNumGenerator::rnd_upto: v = genrand() % n; rand_depth++.
+	ClearError()
 	r := NewRng(2)
 	// first genrand % 10 == 1959434203 % 10 == 3
 	if got := r.RndUpto(10); got != 3 {
@@ -57,6 +58,15 @@ func TestRndUptoUsesModulo(t *testing.T) {
 	if got := r.RndUpto(10); got != 5 {
 		t.Fatalf("RndUpto(10) second: got %d want 5", got)
 	}
+	// n==0 undefined non-sticky fail closed (soft re-pick empty domain)
+	ClearError()
+	if got := r.RndUpto(0); got != 0 {
+		t.Fatalf("RndUpto(0) got %d want 0", got)
+	}
+	if HasError() {
+		t.Fatal("RndUpto(0) must stay non-sticky for soft re-pick")
+	}
+	ClearError()
 }
 
 func TestRndUptoFilterRetries(t *testing.T) {

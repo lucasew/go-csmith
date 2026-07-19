@@ -889,8 +889,11 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 		return ""
 	}
 	s := f.OutputHeader(forceStatic)
-	// incomplete header IR — no invent bare ";"
+	// incomplete header IR sticky — no invent bare ";"
 	if s == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if withAttrs && r != nil {
@@ -906,16 +909,23 @@ func (f *Function) OutputHeaderAlias(forceStatic bool) string {
 	if f == nil {
 		return ""
 	}
-	// Function::alias_name set at create (name + "_alias"); no invent when missing
+	// Function::alias_name set at create (name + "_alias"); sticky no invent when missing
 	if f.AliasName == "" || f.Name == "" {
+		SetError(ErrGeneric)
 		return ""
 	}
 	rtName := f.returnTypeC()
 	if rtName == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	params := f.paramListC()
 	if params == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	var b strings.Builder
@@ -940,8 +950,11 @@ func (f *Function) OutputForwardDeclAlias(forceStatic bool) string {
 		return ""
 	}
 	s := f.OutputHeaderAlias(forceStatic)
-	// incomplete alias header — no invent bare ";"
+	// incomplete alias header sticky — no invent bare ";"
 	if s == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	return s + ";"
@@ -958,9 +971,12 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	if f == nil || f.IsBuiltin {
 		return ""
 	}
-	// Function.cpp:572 — OutputHeader always live; no invent separator-only shell
+	// Function.cpp:572 — OutputHeader always live; sticky no invent separator-only shell
 	hdr := f.OutputHeader(forceStatic)
 	if hdr == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	s := ""
@@ -976,23 +992,27 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	}
 	s += "\n"
 	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
-	// no invent header-only / empty-body shells (C++ would dereference body)
+	// sticky no invent header-only / empty-body shells (C++ would dereference body)
 	if f.Body == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 	bodyOut := f.Body.Output(0)
 	if bodyOut == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if f.DepthProtect && f.RetConst != nil {
 		// Function.cpp:575–597 — if (DEPTH…) body else return ret_c
-		// both body Output and ret_c value always live; no invent if/else or "return ;"
+		// both body Output and ret_c value always live; sticky no invent if/else or "return ;"
 		retVal := f.RetConst.Value
 		if retVal == "" {
-			// incomplete ret_c — body only, no invent depth if/else
-			s += bodyOut
-			return s
+			// incomplete ret_c sticky — body only, no invent depth if/else
+			SetError(ErrGeneric)
+			return ""
 		}
 		s += "if (DEPTH < MAX_DEPTH) \n"
 		s += bodyOut

@@ -395,11 +395,16 @@ func TestVolWrapNoInventIntType(t *testing.T) {
 }
 
 func TestOutputHeaderAliasNoInvent(t *testing.T) {
-	// no invent Name+"_alias" when AliasName empty
+	// sticky no invent Name+"_alias" when AliasName empty
+	ClearError()
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	if out := f.OutputHeaderAlias(false); out != "" {
 		t.Fatal("missing AliasName must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("missing AliasName must SetError sticky")
+	}
+	ClearError()
 	f.AliasName = "func_1_alias"
 	out := f.OutputHeaderAlias(true)
 	if !strings.Contains(out, "static int func_1_alias(void)") ||
@@ -480,14 +485,23 @@ func TestOutputDeclNoInventEmptyType(t *testing.T) {
 }
 
 func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
-	// incomplete header → empty, not bare ";"
+	// incomplete header sticky → empty, not bare ";"
+	ClearError()
 	f := &Function{Name: "func_x"}
 	if out := f.OutputForwardDecl(); out != "" {
 		t.Fatal("incomplete forward decl must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("incomplete forward decl must SetError sticky")
+	}
+	ClearError()
 	if out := f.OutputForwardDeclAlias(false); out != "" {
 		t.Fatal("incomplete alias decl must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("incomplete alias decl must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomLoopControlErrorReturn(t *testing.T) {

@@ -239,7 +239,8 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 
 func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	// Function.cpp:575–597 — depth_protect + body + ret_c always together
-	// no invent empty braces / header-only / if without else / "0"
+	// sticky no invent empty braces / header-only / if without else / "0"
+	ClearError()
 	f := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
 		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
@@ -249,13 +250,21 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	if out != "" {
 		t.Fatal("nil Body must fail closed empty, got", out)
 	}
-	// RetConst only — no invent if/else without body
+	if !HasError() {
+		t.Fatal("nil Body Output must SetError sticky")
+	}
+	// RetConst only — sticky no invent if/else without body
+	ClearError()
 	f.RetConst = MakeInt(42)
 	out = f.Output()
 	if out != "" {
 		t.Fatal("RetConst without Body must fail closed empty", out)
 	}
+	if !HasError() {
+		t.Fatal("RetConst without Body must SetError sticky")
+	}
 	// Body without RetConst — body only, no invent if without else
+	ClearError()
 	f.RetConst = nil
 	f.Body = &Block{Func: f}
 	out = f.Output()
@@ -271,15 +280,17 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") || !strings.Contains(out, "return 42") {
 		t.Fatal("complete depth_protect IR", out)
 	}
-	// empty ret_c value — no invent "return ;" depth shell
+	// empty ret_c value — sticky no invent "return ;" depth shell (whole emit fail closed)
+	ClearError()
 	f.RetConst = &Constant{Type: GetIntType(), Value: ""}
 	out = f.Output()
-	if strings.Contains(out, "if (DEPTH") || strings.Contains(out, "return ;") {
-		t.Fatal("empty RetConst.Value must not invent depth shell", out)
+	if out != "" {
+		t.Fatal("empty RetConst.Value must fail closed empty", out)
 	}
-	if !strings.Contains(out, "{") {
-		t.Fatal("want body without depth wrap", out)
+	if !HasError() {
+		t.Fatal("empty RetConst.Value must SetError sticky")
 	}
+	ClearError()
 }
 
 func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {

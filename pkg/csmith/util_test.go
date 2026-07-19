@@ -58,8 +58,13 @@ func TestCreateNewTmpVarAlwaysGensym(t *testing.T) {
 	if nb.CreateNewTmpVar(nil, EInt) != "" {
 		t.Fatal("nil Block CreateNewTmpVar must fail closed")
 	}
-	// empty gensym basename — no invent bare "1"
+	// empty gensym basename sticky — no invent bare "1"
+	ClearError()
 	if Gensym("") != "" {
 		t.Fatal("empty basename must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("empty basename Gensym must SetError sticky")
+	}
+	ClearError()
 }

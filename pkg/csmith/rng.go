@@ -80,7 +80,8 @@ func (r *Rng) RndUpto(n uint32) uint32 {
 
 // RndUptoFilter is DefaultRndNumGenerator::rnd_upto with optional Filter.
 // On reject: re-genrand, keep rand_depth_ as local_depth+1 (does not double-count tries).
-// n==0 is undefined in C++ (raw % n); fail closed return 0 without inventing domain.
+// n==0 is undefined in C++ (raw % n); non-sticky return 0 without inventing domain
+// (soft re-pick: empty half/list lengths must not sticky-poison factories).
 func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 	if r == nil || n == 0 {
 		return 0
