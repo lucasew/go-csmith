@@ -72,6 +72,50 @@ func TestStepHashOutput(t *testing.T) {
 	}
 }
 
+func TestStepHashNoInventDeclWithoutComputeHash(t *testing.T) {
+	// OutputHashFuncDef gated on ComputeHash — no invent forward decls alone
+	opts := Defaults()
+	opts.StepHashByStmt = true
+	opts.ComputeHash = false
+	g := NewProgramGenerator(opts)
+	hdr := g.OutputHeader()
+	if strings.Contains(hdr, "csmith_compute_hash") || strings.Contains(hdr, "step_hash") {
+		t.Fatal("must not invent hash decls without ComputeHash", hdr)
+	}
+	if def := g.OutputHashFuncDef(); def != "" {
+		t.Fatal("must not invent hash def without ComputeHash", def)
+	}
+}
+
+func TestStepHashNoInventCallWithoutDef(t *testing.T) {
+	// MaxArrayDim < global array rank → hashFuncDefReady false
+	// no invent csmith_compute_hash() call without matching def
+	opts := Defaults()
+	opts.StepHashByStmt = true
+	opts.ComputeHash = true
+	opts.MaxArrayDim = 0
+	g := NewProgramGenerator(opts)
+	// one global array so dimen > MaxArrayDim
+	av := &Variable{
+		Name:       "g_a",
+		Type:       GetIntType(),
+		IsArray:    true,
+		ArraySizes: []int{2, 3},
+		Qfer:       NewCVQualifiers([]bool{false}, []bool{false}),
+	}
+	g.VS.GlobalList = []*Variable{av}
+	if g.hashFuncDefReady() {
+		t.Fatal("want not ready when MaxArrayDim < dimen")
+	}
+	if def := g.OutputHashFuncDef(); def != "" {
+		t.Fatal("incomplete ctrl must fail closed def", def)
+	}
+	main := g.OutputMain()
+	if strings.Contains(main, "csmith_compute_hash()") {
+		t.Fatal("must not invent hash call without def", main)
+	}
+}
+
 func TestExpressionCommaUsesEnv(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)

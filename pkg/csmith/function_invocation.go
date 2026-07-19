@@ -65,8 +65,11 @@ func (fi *Invocation) Output() string {
 		return ""
 	}
 	if fi.User != nil {
-		// FunctionInvocationUser::Output — param_value[i] always live Expression*
-		// no invent empty slots "f(a, , c)" or soft "0" for nil/empty args
+		// FunctionInvocationUser::Output — func name + param_value[i] always live
+		// no invent "()" / empty slots "f(a, , c)" or soft "0" for nil/empty args
+		if fi.User.Name == "" {
+			return ""
+		}
 		var parts []string
 		for _, a := range fi.Args {
 			if a == nil {

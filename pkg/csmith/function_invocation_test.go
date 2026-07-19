@@ -243,6 +243,10 @@ func TestUserInvocationOutputNoInventNilArgs(t *testing.T) {
 	// FunctionInvocationUser::Output — param_value[i] always live; no invent f(a, , c)
 	callee := &Function{Name: "func_2", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt}
 	a0 := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	// empty callee name — no invent "()"
+	if out := (&Invocation{User: &Function{Name: "", ReturnType: GetIntType()}, Args: nil}).Output(); out != "" {
+		t.Fatal("empty User.Name must fail closed, got", out)
+	}
 	fi := &Invocation{
 		User: callee,
 		Args: []*Expression{a0, nil},
