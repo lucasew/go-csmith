@@ -157,6 +157,27 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 		t.Fatal("incomplete stack IsPointingToLocals must SetError sticky")
 	}
 	ClearError()
+	// Type-nil subject soft invent: IsPointer residual ERROR+false → not-local
+	// fair: sticky true (restrictive) before classify
+	shell := &Variable{Name: "g_typeless"}
+	if !IsPointingToLocals(shell, blk, 0, []*FactPointTo{}) {
+		t.Fatal("Type-nil subject must fail closed as pointing-to-locals")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil subject IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
+	// Type-nil non-special pointee: IsPointer residual false skips recurse → invent not-local
+	// fair: sticky true before IsPointer gate
+	tyNilPointee := &Variable{Name: "l_typeless"}
+	factsTy := []*FactPointTo{MakeFactPointTo(ptr, tyNilPointee)}
+	if !IsPointingToLocals(ptr, blk, 0, factsTy) {
+		t.Fatal("Type-nil pointee must fail closed as pointing-to-locals")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil pointee IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPointingToLocals(t *testing.T) {

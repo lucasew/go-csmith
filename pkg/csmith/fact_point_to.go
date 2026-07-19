@@ -1399,6 +1399,8 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 // Variable always live; sticky true (no invent not-local soft-skip past hole).
 // Incomplete fact maps / stack scans / nil holes fail closed sticky true
 // (no invent "not pointing to locals" / soft re-pick past holes).
+// Type* always live for non-special subjects/pointees; Type-nil sticky true
+// (IsPointer residual ERROR+false invents not-pointing-to-locals past shell).
 // MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
@@ -1412,6 +1414,12 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	}
 	if indirection == -1 {
 		return v.IsVisibleLocal(b)
+	}
+	// Type* always live for non-special subjects; Type-nil sticky true
+	// (no invent IsPointer residual false as not-pointing-to-locals past shell)
+	if !IsSpecialPtr(v) && v.Type == nil {
+		SetError(ErrGeneric)
+		return true
 	}
 	if !v.IsPointer() {
 		return false
@@ -1444,15 +1452,16 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		if IsSpecialPtr(p) {
 			continue
 		}
+		// Type-nil non-special pointee sticky true before IsPointer residual false skip
+		if p.Type == nil {
+			SetError(ErrGeneric)
+			return true
+		}
 		if p.IsVisibleLocal(b) {
 			return true
 		}
 		// recurse one level of pointees that are pointers
 		if p.IsPointer() {
-			if p.Type == nil {
-				SetError(ErrGeneric)
-				return true
-			}
 			for j := 0; j < p.Type.IndirectLevel(); j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
 				if !VariablesComplete(nested) {
