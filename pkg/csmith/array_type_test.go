@@ -170,6 +170,55 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	}
 }
 
+func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
+	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
+	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		}}, IsArray: true, ArraySizes: []int{2}},
+		Sizes: []int{2},
+	}
+	parent.AsArray = parent
+	parent.CreateFieldVars()
+	item := parent.ItemizeConstIndices([]int{0}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	item.CreateFieldVars()
+	if len(item.FieldVars) == 0 {
+		t.Fatal("fields")
+	}
+	fld := item.FieldVars[0]
+	item.FieldVars = append(item.FieldVars, nil)
+	if varCollective(fld) != nil {
+		t.Fatal("incomplete array-field path must yield nil collective")
+	}
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	before := len(fm.GlobalFacts)
+	ClearError()
+	// mirror GenerateNew* fail-closed: coll nil with FM set → sticky error, no invent facts
+	coll := varCollective(fld)
+	if coll == nil {
+		SetError(ErrGeneric)
+	} else {
+		fm.AddNewVarFactAndUpdate(nil, coll)
+	}
+	if !HasError() {
+		t.Fatal("nil collective must SetError (no invent generate success)")
+	}
+	if len(fm.GlobalFacts) != before {
+		t.Fatal("must not invent facts for nil collective")
+	}
+	// bare nil subject still no-ops without invent
+	fm.AddNewVarFactAndUpdate(nil, nil)
+	if len(fm.GlobalFacts) != before {
+		t.Fatal("AddNewVarFactAndUpdate(nil,nil) must not invent")
+	}
+	ClearError()
+}
+
 func TestCreateRandomArrayRejectsUnacceptableType(t *testing.T) {
 	// AcceptType false for volatile struct when context not SE-free
 	opts := Defaults()

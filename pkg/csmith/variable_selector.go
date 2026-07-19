@@ -1424,8 +1424,14 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 	vs.AllVars = append(vs.AllVars, v)
 	vs.GlobalList = append(vs.GlobalList, v)
 	// VariableSelector.cpp:596–597 — FM on collective
+	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	if cg.FM != nil {
-		cg.FM.AddNewVarFactAndUpdate(nil, varCollective(v))
+		coll := varCollective(v)
+		if coll == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		cg.FM.AddNewVarFactAndUpdate(nil, coll)
 	}
 	// VariableSelector.cpp:598 — current_func new_globals
 	if cg.CurrentFunc != nil {
@@ -1485,8 +1491,14 @@ func (vs *VariableSelector) GenerateNewGlobal(
 	// VariableSelector.cpp:561 — GlobalList (itemized array member when array path)
 	vs.GlobalList = append(vs.GlobalList, v)
 	// VariableSelector.cpp:563–564 — FM on collective
+	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	if cg.FM != nil {
-		cg.FM.AddNewVarFactAndUpdate(nil, varCollective(v))
+		coll := varCollective(v)
+		if coll == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		cg.FM.AddNewVarFactAndUpdate(nil, coll)
 	}
 	// VariableSelector.cpp:565 — current_func()->new_globals
 	if cg.CurrentFunc != nil {
@@ -1887,8 +1899,14 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// create_and_initialize does not push locals (fair with C++)
 	block.LocalVars = append(block.LocalVars, v)
 	// VariableSelector.cpp:945–946 — FM on collective
+	// Incomplete GetCollective must not invent success without facts (AddNewVarFactAndUpdate(nil) no-ops)
 	if cg.FM != nil {
-		cg.FM.AddNewVarFactAndUpdate(block, varCollective(v))
+		coll := varCollective(v)
+		if coll == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		cg.FM.AddNewVarFactAndUpdate(block, coll)
 	}
 	// wrap_volatiles for Output
 	if vs.Opts.WrapVolatiles && v.IsVolatile() {
