@@ -388,7 +388,7 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 // getOneFunction mirrors Function::get_one_function — random pick.
 // Function.cpp:262–276.
 func getOneFunction(r *Rng, funcs []*Function) *Function {
-	// Function.cpp:262–276 — rnd_upto(ok_size) when n>1; no soft invent funcs[0]
+	// Function.cpp:262–276 — rnd_upto(ok_size) when n>1; sticky no invent funcs[0]
 	n := len(funcs)
 	if n == 0 {
 		return nil
@@ -397,6 +397,7 @@ func getOneFunction(r *Rng, funcs []*Function) *Function {
 		return funcs[0]
 	}
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return funcs[r.RndUpto(uint32(n))]
@@ -409,6 +410,8 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 		return true
 	}
 	// ExpressionFuncall.cpp:57–62 — always rnd_flipcoin(80); no soft invent without RNG
+	// non-sticky false (prefer user) would invent; sticky poisons ExpressionFuncall soft paths —
+	// keep fail closed false without sticky (callers always pass process RNG in Generate)
 	if r == nil {
 		return false
 	}

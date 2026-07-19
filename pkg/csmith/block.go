@@ -183,7 +183,12 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 // Block.cpp:353–370 — self and ancestors; optional nil global if GlobalVariables.
 func (b *Block) RandomParentBlock(r *Rng, allowGlobal bool) *Block {
 	// Block.cpp:353–370 — rnd_upto(blks); ERROR_GUARD(nullptr); no soft invent self
-	if r == nil || b == nil {
+	// sticky only on nil RNG (live this); nil receiver is broken call non-sticky
+	if b == nil {
+		return nil
+	}
+	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var blks []*Block

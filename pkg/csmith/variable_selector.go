@@ -566,6 +566,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 					b = b.Parent
 				}
 				// VariableSelector.cpp:778 — assert(b); no soft invent return root
+				// non-sticky null (sticky poisons Generate when climb fails; soft re-pick)
 				if b == nil {
 					return nil
 				}
@@ -752,8 +753,9 @@ func (vs *VariableSelector) MakeInitValue(
 		if HasError() {
 			return nil
 		}
-		// VariableSelector.cpp:838–839 — assert simple != void
+		// VariableSelector.cpp:838–839 — assert simple != void sticky
 		if t.IsSimple() && t.simple == EVoid {
+			SetError(ErrGeneric)
 			return nil
 		}
 		c := MakeRandom(t, vs.Opts, vs.Probs, r)
@@ -770,8 +772,9 @@ func (vs *VariableSelector) MakeInitValue(
 	}
 	// pointer path: select visible var of pointee type
 	pointee := t.PtrType()
-	// VariableSelector.cpp:845 assert(type)
+	// VariableSelector.cpp:845 assert(type) sticky
 	if pointee == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	vars := vs.FindAllVisibleVars(b)
@@ -862,7 +865,7 @@ func (vs *VariableSelector) MakeInitValue(
 			RecordAddressTaken(chosen)
 		}
 	}
-	// VariableSelector.cpp:910 assert(var)
+	// VariableSelector.cpp:910 assert(var); defensive after create paths (ERROR_GUARD earlier)
 	if chosen == nil {
 		return nil
 	}
@@ -1485,7 +1488,8 @@ func (vs *VariableSelector) createAndInitialize(
 	}
 	v := CreateVariableWithInit(name, t, nil, qfer)
 	if v == nil {
-		// VariableSelector.cpp:535 assert(var)
+		// VariableSelector.cpp:535 assert(var) sticky
+		SetError(ErrGeneric)
 		return nil
 	}
 	applyInitExpr(v, ie)
@@ -2609,17 +2613,20 @@ func (vs *VariableSelector) SelectWithInvalid(
 			return nil
 		}
 	case MaxVarScope:
-		// VariableSelector.cpp:1222–1223 — assert(0); no soft invent GenerateNewVariable
+		// VariableSelector.cpp:1222–1223 — assert(0) sticky; no soft invent GenerateNewVariable
+		SetError(ErrGeneric)
 		return nil
 	default:
-		// unknown scope — no soft invent create
+		// unknown scope sticky — no soft invent create
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1224 — ERROR_GUARD(nullptr); null scope pick stays null (no soft create)
 	if HasError() {
 		return nil
 	}
-	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile()); no soft invent non-vol
+	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
+	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
 	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
 		return nil
 	}

@@ -96,6 +96,15 @@ func TestRandomParentBlock(t *testing.T) {
 		}
 		seen2[p] = true
 	}
+	// Block.cpp:353 — nil RNG sticky ERROR_GUARD
+	ClearError()
+	if inner.RandomParentBlock(nil, false) != nil {
+		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomParentBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestLabelAttrEmit(t *testing.T) {

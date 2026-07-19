@@ -469,8 +469,9 @@ func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
 	if DirectExpandCheck(StmtInvoke) {
 		return TermFunction
 	}
-	// Expression.cpp:107–111 — assert(filter); ERROR_GUARD(MAX_TERM_TYPES); no soft invent eVariable
+	// Expression.cpp:107–111 — assert(filter); ERROR_GUARD(MAX_TERM_TYPES) sticky; no soft invent eVariable
 	if r == nil || filter == nil {
+		SetError(ErrGeneric)
 		return MaxTermTypes
 	}
 	i := r.RndUptoFilter(uint32(filter.MaxProb()), filter)

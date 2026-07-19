@@ -71,6 +71,22 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %v want %v (raw %d)", got, want, raw)
 	}
+	// Expression.cpp:107–111 assert(filter) ERROR_GUARD sticky
+	ClearError()
+	if ExpressionTypeProbability(nil, f) != MaxTermTypes {
+		t.Fatal("nil RNG must fail closed MaxTermTypes")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG ExpressionTypeProbability must SetError sticky")
+	}
+	ClearError()
+	if ExpressionTypeProbability(NewRng(1), nil) != MaxTermTypes {
+		t.Fatal("nil filter must fail closed MaxTermTypes")
+	}
+	if !HasError() {
+		t.Fatal("nil filter ExpressionTypeProbability must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {

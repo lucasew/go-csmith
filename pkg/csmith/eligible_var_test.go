@@ -277,6 +277,15 @@ func TestMakeInitValueSanityCheckSticky(t *testing.T) {
 		t.Fatal("nil qfer must SetError sticky")
 	}
 	ClearError()
+	// VariableSelector.cpp:838–839 assert simple != void sticky
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), &q, nil, NewRng(2)) != nil {
+		t.Fatal("void type must fail closed MakeInitValue")
+	}
+	if !HasError() {
+		t.Fatal("void type must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeInitValueIncompleteAmbientSticky(t *testing.T) {
