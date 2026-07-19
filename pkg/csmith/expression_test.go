@@ -582,6 +582,21 @@ func TestBumpsExprDepth(t *testing.T) {
 		t.Fatal("nil BumpsExprDepth must SetError sticky")
 	}
 	ClearError()
+	// incomplete Function IR sticky true (no invent not-bump for siblings past hole)
+	if !BumpsExprDepth(&Expression{Term: TermFunction}) {
+		t.Fatal("nil Invoke BumpsExprDepth must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Invoke BumpsExprDepth must SetError sticky")
+	}
+	ClearError()
+	if !BumpsExprDepth(&Expression{Term: TermFunction, Invoke: &Invocation{}}) {
+		t.Fatal("non-std nil User BumpsExprDepth must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("non-std nil User BumpsExprDepth must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomExpressionBumpsCallerExprDepth(t *testing.T) {

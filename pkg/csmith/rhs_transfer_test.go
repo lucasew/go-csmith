@@ -165,6 +165,25 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 	}
 }
 
+func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
+	// incomplete CommaRHS must not invent complete GarbagePtr via nil-rhs peel
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	rhs := &Expression{
+		Term:     TermCommaExpr,
+		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		// CommaRHS nil
+	}
+	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if FactsComplete(out) {
+		t.Fatal("nil CommaRHS must fail closed incomplete, not invent GarbagePtr", out)
+	}
+	if !HasError() {
+		t.Fatal("nil CommaRHS RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 	// multi-level & hard IR sticky — no invent MakeFactsPointTo past assert(indirect==-1)
 	ClearError()
@@ -194,6 +213,27 @@ func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 	if len(facts) != 1 || !facts[0].IsNull() {
 		t.Fatalf("%+v", facts)
 	}
+}
+
+func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
+	// incomplete Assign.Expr must not invent complete GarbagePtr via nil-rhs peel
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	assign := &Stmt{
+		Kind: StmtAssign, LhsVar: q, Lhs: &Lhs{Var: q, Type: PointerTo(GetIntType())},
+		// Expr nil
+		AssignOp: AssignSimple,
+	}
+	rhs := &Expression{Term: TermAssignment, Assign: assign, ExprType: PointerTo(GetIntType())}
+	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
+	if FactsComplete(out) {
+		t.Fatal("nil Assign.Expr must fail closed incomplete, not invent GarbagePtr", out)
+	}
+	if !HasError() {
+		t.Fatal("nil Assign.Expr RhsToLhsTransfer must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferFunctionReturn(t *testing.T) {

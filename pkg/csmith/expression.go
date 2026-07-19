@@ -772,6 +772,8 @@ func MakeRandomParam(
 // BumpsExprDepth reports whether this expression increments cg_context.expr_depth.
 // Expression.cpp:213–218 — Constant, Variable, or user FunctionInvocation.
 // Expression always live; sticky true (no invent not-bump soft-skip depth past hole).
+// Incomplete Function IR (nil Invoke / non-std without User) sticky true — C++ would
+// crash on get_invoke()/get_func(); no invent not-bump past holes for siblings.
 func BumpsExprDepth(e *Expression) bool {
 	if e == nil {
 		SetError(ErrGeneric)
@@ -781,7 +783,20 @@ func BumpsExprDepth(e *Expression) bool {
 	case TermConstant, TermVariable:
 		return true
 	case TermFunction:
-		return e.Invoke != nil && e.Invoke.User != nil && !e.Invoke.IsStd
+		// ExpressionFuncall always has live invoke before get_func/is_std_func
+		if e.Invoke == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		if e.Invoke.IsStd {
+			return false
+		}
+		// user-defined path: Function* always live; incomplete sticky bump
+		if e.Invoke.User == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		return true
 	default:
 		return false
 	}

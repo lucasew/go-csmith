@@ -510,13 +510,23 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		return MakeFactsPointToSet(lvars, set)
 	case TermAssignment:
 		// FactPointTo.cpp:256–258 — peel embedded assign RHS
+		// incomplete Assign/Expr sticky — no invent GarbagePtr via nil-rhs peel soft path
 		if rhs.Assign == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
+		if rhs.Assign.Expr == nil {
 			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		return RhsToLhsTransfer(facts, lvars, rhs.Assign.Expr)
 	case TermCommaExpr:
 		// FactPointTo.cpp:259–261 — peel comma RHS
+		// incomplete CommaRHS sticky — no invent GarbagePtr via nil-rhs peel soft path
+		if rhs.CommaRHS == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
 		return RhsToLhsTransfer(facts, lvars, rhs.CommaRHS)
 	default:
 		// unknown term — non-sticky hole (soft re-pick factories)
