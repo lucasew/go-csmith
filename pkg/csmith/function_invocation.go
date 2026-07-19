@@ -780,6 +780,10 @@ func MakeRandomBinaryInvocation(
 		SetError(ErrGeneric)
 		return nil
 	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// FunctionInvocation.cpp:173 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomBinary, nullptr)
 	if DepthGuardByType(opts, DtFunctionInvocationRandomBinary) == BadDepth {
 		return nil
@@ -1013,6 +1017,10 @@ func MakeRandomBinaryPtrComparison(
 		SetError(ErrGeneric)
 		return nil
 	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// FunctionInvocation.cpp:295–296 — eCmpEq or eCmpNe
 	op := BinCmpEq
 	if r.RndFlipcoin(50) {
@@ -1180,6 +1188,10 @@ func MakeRandomUnaryInvocation(
 		SetError(ErrGeneric)
 		return nil
 	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// FunctionInvocation.cpp:143 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationRandomUnary, nullptr)
 	if DepthGuardByType(opts, DtFunctionInvocationRandomUnary) == BadDepth {
 		return nil
@@ -1247,6 +1259,17 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	if flags == nil || !SafeOpsBinary(op.BinaryOpC()) {
 		return "", ""
 	}
+	// incomplete ambient fails closed sticky (no invent tmp shells / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return "", ""
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return "", ""
+	}
 	blk := currentBlock(cg)
 	// FunctionInvocationBinary.cpp:68 — assert(blk); no soft invent safe_ops without temps
 	if blk == nil {
@@ -1277,6 +1300,17 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 // temp allocation. FunctionInvocationUnary.cpp:51–60 — always when flags non-nil.
 func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) string {
 	if flags == nil {
+		return ""
+	}
+	// incomplete ambient fails closed sticky (no invent tmp shell / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return ""
 	}
 	blk := currentBlock(cg)

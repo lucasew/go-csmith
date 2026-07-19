@@ -170,6 +170,19 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 	}
 }
 
+func TestIsEligibleVarIncompleteEffectSticky(t *testing.T) {
+	// Incomplete EffectContext must sticky (no invent soft-skip as absent re-pick)
+	ClearError()
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(IncompleteEffect())) {
+		t.Fatal("incomplete EffectContext must fail closed not eligible")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

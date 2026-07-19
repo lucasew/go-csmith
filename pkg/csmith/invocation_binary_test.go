@@ -177,6 +177,41 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearError()
+	// incomplete GlobalFacts must fail closed before operand gen
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if fi := MakeRandomUnaryInvocation(NewRng(3), opts, vs, NewExprTables(opts), &cg3, GetIntType()); fi != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomUnaryInvocation")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCreateSafeTmpsIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient must not invent tmp shells
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	flags := MakeDummyFlags()
+	cg := WithFunc(f, IncompleteEffect())
+	if t1, t2 := createBinarySafeTmps(cg, NewVariableSelector(Defaults()), flags, BinAdd); t1 != "" || t2 != "" {
+		t.Fatalf("incomplete EffectContext must fail closed createBinarySafeTmps, got %q %q", t1, t2)
+	}
+	if !HasError() {
+		t.Fatal("createBinarySafeTmps incomplete ambient must SetError sticky")
+	}
+	ClearError()
+	if tmp := createUnarySafeTmp(cg, NewVariableSelector(Defaults()), flags); tmp != "" {
+		t.Fatalf("incomplete EffectContext must fail closed createUnarySafeTmp, got %q", tmp)
+	}
+	if !HasError() {
+		t.Fatal("createUnarySafeTmp incomplete ambient must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {

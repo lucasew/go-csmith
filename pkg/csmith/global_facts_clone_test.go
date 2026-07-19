@@ -80,6 +80,16 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must SetError GlobalFacts")
 	}
 	ClearError()
+	// incomplete EffectStm must not invent assign under hole shell
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg3.EffectStm = IncompleteEffect()
+	if stmtOK(MakeRandomAssign(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntType())) {
+		t.Fatal("incomplete EffectStm must fail closed MakeRandomAssign")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {

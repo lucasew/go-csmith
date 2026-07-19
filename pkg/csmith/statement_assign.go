@@ -103,11 +103,9 @@ func MakeRandomAssignQfer(
 		return Stmt{}
 	}
 	// Incomplete ambient/facts fail closed sticky (no invent assign under hole shells)
-	if !EffectComplete(cg.EffectContext()) {
-		SetError(ErrGeneric)
-		return Stmt{}
-	}
-	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
 		SetError(ErrGeneric)
 		return Stmt{}
 	}

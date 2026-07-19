@@ -322,6 +322,11 @@ func MakeRandomGoto(
 		SetError(ErrGeneric)
 		return makeGotoFailed()
 	}
+	// incomplete GlobalFacts fail closed sticky (no invent goto under hole shells)
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return makeGotoFailed()
+	}
 
 	// 40% prefer back-edge (StatementGoto.cpp:73–84)
 	wantBack := r.RndFlipcoin(40)

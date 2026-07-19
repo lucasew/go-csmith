@@ -62,6 +62,23 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 	}
 }
 
+func TestVariableSelectionProbabilityIncompleteParamSticky(t *testing.T) {
+	// incomplete Param must not invent scope filter / soft re-pick past holes
+	ClearError()
+	opts := Defaults()
+	InitScopeTable(opts)
+	defer SetProcessScopeTab(nil)
+	f := &Function{Name: "f", ReturnType: GetIntType(), Param: IncompleteVariables()}
+	cg := WithFunc(f, EmptyEffect())
+	if sc := VariableSelectionProbabilityCG(NewRng(1), opts, &cg, MaxVarScope); sc != MaxVarScope {
+		t.Fatalf("incomplete Param must fail closed MAX, got %v", sc)
+	}
+	if !HasError() {
+		t.Fatal("incomplete Param must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectCreatesOrFinds(t *testing.T) {
 	opts := Defaults()
 	InitScopeTable(opts)

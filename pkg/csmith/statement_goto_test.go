@@ -403,6 +403,18 @@ func TestMakeRandomGotoIncompleteAmbientFailClosed(t *testing.T) {
 		t.Fatal("incomplete EffectContext must SetError sticky")
 	}
 	ClearError()
+	// incomplete GlobalFacts must fail closed before jump-block scan
+	fm3 := NewFactMgr(f)
+	fm3.GlobalFacts = IncompleteFactSlice()
+	cg3 := WithFunc(f, EmptyEffect()).WithFactMgr(fm3)
+	st3 := MakeRandomGoto(NewRng(6), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg3, blk)
+	if st3.Kind == StmtGoto && st3.Label != "" {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomGoto")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {

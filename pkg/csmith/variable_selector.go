@@ -854,6 +854,11 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	if v == nil {
 		return false
 	}
+	// incomplete ambient fails closed sticky (no invent eligible / soft-skip as absent re-pick)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return false
+	}
 	// VariableSelector.cpp:221–227 — itemized member → read_indices then use collective
 	// Incomplete GetCollective fails closed sticky (no invent not-eligible past hole)
 	coll := v.GetCollective()
@@ -2424,6 +2429,11 @@ func VariableSelectionProbability(r *Rng, opts Options) VariableScope {
 func VariableSelectionProbabilityCG(r *Rng, opts Options, cg *CGContext, upper VariableScope) VariableScope {
 	// VariableSelector.cpp:1053 — ERROR_GUARD(MAX_VAR_SCOPE); no soft invent ScopeNewValue
 	if r == nil {
+		return MaxVarScope
+	}
+	// incomplete Param fails closed sticky (no invent filter ParentParam via len-hole)
+	if cg != nil && cg.CurrentFunc != nil && !VariablesComplete(cg.CurrentFunc.Param) {
+		SetError(ErrGeneric)
 		return MaxVarScope
 	}
 	// VariableSelector.cpp:1050 — InitScopeTable(); use process scopeTable_ only
