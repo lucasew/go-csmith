@@ -54,6 +54,7 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 	}
 	// many seeds: never get pointer-containing struct
 	for seed := uint64(1); seed < 60; seed++ {
+		ClearError()
 		f := MakeOneUnionField(NewRng(seed), opts, probs, env, 0)
 		if f.Type != nil && f.Type.IsStruct() && f.Type.ContainPointerField() {
 			t.Fatalf("pointer struct in union field seed %d", seed)
@@ -62,6 +63,28 @@ func TestMakeOneUnionFieldRejectsPointerStruct(t *testing.T) {
 			t.Fatalf("raw pointer in union seed %d", seed)
 		}
 	}
+}
+
+func TestMakeOneUnionFieldFilterResidualSticky(t *testing.T) {
+	// ContainPointerField/HasBitfields Type-nil field residual: soft invent was soft-skip
+	// then pick good simple. Fair: sticky fail closed whole MakeOneUnionField.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	broken := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	env := &TypeEnv{AllTypes: []*Type{broken, GetIntType()}}
+	// disable bitfield path so we always hit type-pool filter
+	opts.Bitfields = false
+	f := MakeOneUnionField(NewRng(1), opts, probs, env, 0)
+	if f.Type != nil {
+		t.Fatal("ContainPointerField residual must fail closed MakeOneUnionField")
+	}
+	if !HasError() {
+		t.Fatal("ContainPointerField residual MakeOneUnionField must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeOneUnionFieldMayNestPlainStruct(t *testing.T) {

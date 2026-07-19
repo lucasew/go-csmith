@@ -130,6 +130,23 @@ func TestEffectSiblingTypeNilContainerSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestEffectConsolidateTypeNilParentSticky(t *testing.T) {
+	// Type-nil parent shell during consolidate: soft invent was leave-base complete.
+	// Fair: sticky IncompleteEffect fail closed.
+	ClearError()
+	parent := &Variable{Name: "g_s"} // Type nil
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	e := EmptyEffect().ReadVar(field)
+	e.Consolidate()
+	if EffectComplete(e) {
+		t.Fatal("Type-nil parent Consolidate must fail closed IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent Consolidate must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	// soft invent: delete some fields then hit nil key mid-map under random order
 	// fair: incomplete sticky → IncompleteEffect (not invent partial consolidate / leave base complete)

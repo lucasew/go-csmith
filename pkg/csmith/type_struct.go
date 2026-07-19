@@ -535,6 +535,10 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			}
 			// Type.cpp:716–717 — contain_pointer_field rejected
 			if t.ContainPointerField() {
+				// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
+				if HasError() {
+					return StructField{}
+				}
 				continue
 			}
 			if !t.IsStruct() && !t.IsUnion() {
@@ -550,6 +554,10 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 			}
 			// Type.cpp:726–727 — no bitfields in union members for now
 			if t.HasBitfields() {
+				// residual ERROR sticky — no invent soft-skip then pick later past bitfield hole
+				if HasError() {
+					return StructField{}
+				}
 				continue
 			}
 			// Type.cpp:730–731 — has_implicit_nontrivial_assign_ops() (not mere has_assign_ops)
@@ -630,7 +638,11 @@ func MakeRandomUnionType(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 			return nil
 		}
 		if f.Type.HasBitfields() {
-			// C++ assert(!fields.back()->has_bitfields())
+			// residual ERROR sticky — no invent soft-skip assert fail past incomplete field Type
+			if !HasError() {
+				// C++ assert(!fields.back()->has_bitfields()) — complete bitfields still fail closed
+				SetError(ErrGeneric)
+			}
 			return nil
 		}
 		fields = append(fields, f)

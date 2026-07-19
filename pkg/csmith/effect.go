@@ -146,22 +146,44 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 	out := e
 	for _, v := range reads {
 		if v.IsGlobal() {
+			// residual ERROR sticky — no invent soft-continue merge past IsGlobal hole
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out = out.ReadVar(v)
 			continue
 		}
 		if varOnCallChain(v, callChain) {
+			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out = out.ReadVar(v)
+		} else if HasError() {
+			// residual ERROR sticky — no invent not-on-chain soft-skip past hole
+			return IncompleteEffect()
 		}
 	}
 	for _, v := range writes {
 		if v.IsGlobal() {
+			// residual ERROR sticky — no invent soft-continue merge past IsGlobal hole
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out = out.WriteVar(v)
 			out.pure = false
 			continue
 		}
 		if varOnCallChain(v, callChain) {
+			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out = out.WriteVar(v)
 			out.pure = false
+		} else if HasError() {
+			// residual ERROR sticky — no invent not-on-chain soft-skip past hole
+			return IncompleteEffect()
 		}
 	}
 	out.sideEffectFree = out.sideEffectFree && other.sideEffectFree
@@ -875,22 +897,78 @@ func (e *Effect) Consolidate() {
 	}
 	// remove field reads when parent is also read
 	for v := range e.read {
-		if !e.read[v] || !v.IsFieldVar() {
+		if !e.read[v] {
+			continue
+		}
+		if !v.IsFieldVar() {
+			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
+			if HasError() {
+				*e = IncompleteEffect()
+				return
+			}
 			continue
 		}
 		parent := v.FieldVarOf
-		if parent != nil && e.IsRead(parent) {
+		// FieldVarOf always live for field vars; Type* always live for non-special parents
+		// Type-nil parent sticky IncompleteEffect (no invent leave-base complete past hole)
+		if parent == nil {
+			SetError(ErrGeneric)
+			*e = IncompleteEffect()
+			return
+		}
+		if parent.Type == nil && !IsSpecialPtr(parent) {
+			SetError(ErrGeneric)
+			*e = IncompleteEffect()
+			return
+		}
+		if e.IsRead(parent) {
+			// residual ERROR sticky — no invent soft-delete past IsRead hole
+			if HasError() {
+				*e = IncompleteEffect()
+				return
+			}
 			delete(e.read, v)
+		} else if HasError() {
+			// residual ERROR sticky — no invent leave-base complete past IsRead hole
+			*e = IncompleteEffect()
+			return
 		}
 	}
 	// remove field writes when parent is also written
 	for v := range e.written {
-		if !e.written[v] || !v.IsFieldVar() {
+		if !e.written[v] {
+			continue
+		}
+		if !v.IsFieldVar() {
+			// residual ERROR sticky — no invent soft-skip consolidate past IsFieldVar hole
+			if HasError() {
+				*e = IncompleteEffect()
+				return
+			}
 			continue
 		}
 		parent := v.FieldVarOf
-		if parent != nil && e.IsWritten(parent) {
+		if parent == nil {
+			SetError(ErrGeneric)
+			*e = IncompleteEffect()
+			return
+		}
+		if parent.Type == nil && !IsSpecialPtr(parent) {
+			SetError(ErrGeneric)
+			*e = IncompleteEffect()
+			return
+		}
+		if e.IsWritten(parent) {
+			// residual ERROR sticky — no invent soft-delete past IsWritten hole
+			if HasError() {
+				*e = IncompleteEffect()
+				return
+			}
 			delete(e.written, v)
+		} else if HasError() {
+			// residual ERROR sticky — no invent leave-base complete past IsWritten hole
+			*e = IncompleteEffect()
+			return
 		}
 	}
 }
