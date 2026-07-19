@@ -42,14 +42,42 @@ func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 		return false
 	}
 	for _, p := range f.Param {
+		// Param live after StackScanComplete; nil hole already sticky above
+		if p == nil {
+			SetError(ErrGeneric)
+			return false
+		}
 		if p.Match(v) {
+			// residual ERROR sticky — no invent on-stack true past Match hole
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		// residual ERROR sticky — no invent soft-continue then true later past Match hole
+		if HasError() {
+			return false
 		}
 	}
 	for b := stParent; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
-			if loc == v || loc.Match(v) {
+			if loc == nil {
+				SetError(ErrGeneric)
+				return false
+			}
+			if loc == v {
 				return true
+			}
+			if loc.Match(v) {
+				// residual ERROR sticky — no invent on-stack true past Match hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue then true later past Match hole
+			if HasError() {
+				return false
 			}
 		}
 	}

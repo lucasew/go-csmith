@@ -237,6 +237,24 @@ func TestIsValidPtr(t *testing.T) {
 	if !IsDanglingPtr(p, facts, 0) {
 		t.Fatal("dangling")
 	}
+	// IsDead residual: PointTo nil hole soft invent was soft-continue then invent valid true.
+	// Fair: sticky invalid / dangling.
+	ClearError()
+	broken := &FactPointTo{Var: p, PointTo: []*Variable{target, nil}}
+	if IsValidPtr(p, []*FactPointTo{broken}, 0, 0) {
+		t.Fatal("IsDead residual must fail closed invalid")
+	}
+	if !HasError() {
+		t.Fatal("IsDead residual IsValidPtr must SetError sticky")
+	}
+	ClearError()
+	if !IsDanglingPtr(p, []*FactPointTo{broken}, 0) {
+		t.Fatal("IsDead residual must fail closed dangling true")
+	}
+	if !HasError() {
+		t.Fatal("IsDead residual IsDanglingPtr must SetError sticky")
+	}
+	ClearError()
 	// Type-nil subject soft invent: related-fact match invents valid true
 	// fair: sticky invalid / dangling before fact lookup
 	ClearError()

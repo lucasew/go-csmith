@@ -1049,7 +1049,15 @@ func (v *Variable) IsVisible(blk *Block) bool {
 		return false
 	}
 	if v.IsGlobal() {
+		// residual ERROR sticky — no invent visible-true past IsGlobal hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent not-global soft-skip past IsGlobal residual false path
+	if HasError() {
+		return false
 	}
 	return v.IsVisibleLocal(blk)
 }

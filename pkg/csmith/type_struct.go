@@ -547,7 +547,15 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 					continue
 				}
 				if t.IsSimple() && t.IsFloat() && !opts.EnableFloat {
+					// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
+					if HasError() {
+						return StructField{}
+					}
 					continue
+				}
+				// residual ERROR sticky — no invent soft-continue non-float past IsFloat residual false path
+				if HasError() {
+					return StructField{}
 				}
 				nonStruct = append(nonStruct, t)
 				continue

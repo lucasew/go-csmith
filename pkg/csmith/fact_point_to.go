@@ -172,14 +172,34 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 		return false
 	}
 	fact := FindRelatedPointTo(facts, p)
+	// residual ERROR sticky — no invent valid false/true soft-skip past FindRelated hole
+	if HasError() {
+		return false
+	}
 	if fact == nil {
-		// FindRelated may already sticky on map holes; missing subject is complete invalid
+		// missing subject is complete invalid
 		return false
 	}
 	if nullProb <= 0 && fact.IsNull() {
+		// residual ERROR sticky — no invent valid past IsNull residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue valid past IsNull residual false path
+	if HasError() {
 		return false
 	}
 	if deadProb <= 0 && fact.IsDead() {
+		// residual ERROR sticky — no invent valid past IsDead residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent valid true past IsDead residual false path
+	if HasError() {
 		return false
 	}
 	return true
@@ -208,10 +228,19 @@ func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 		return true
 	}
 	fact := FindRelatedPointTo(facts, p)
+	// residual ERROR sticky — no invent not-dangling soft-skip past FindRelated hole
+	if HasError() {
+		return true
+	}
 	if fact == nil {
 		return false
 	}
-	return fact.IsDead() && deadProb == 0
+	dead := fact.IsDead()
+	// residual ERROR sticky — no invent not-dangling soft-skip past IsDead hole
+	if HasError() {
+		return true
+	}
+	return dead && deadProb == 0
 }
 
 // OpportunisticValidate mirrors FactPointTo::opportunistic_validate.
