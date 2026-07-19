@@ -170,7 +170,7 @@ func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {
 
 func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 	ClearError()
-	// Statement::stm_id always live; StmID 0 + FM fails closed
+	// Statement::stm_id always live; StmID 0 + FM fails closed sticky
 	// (no invent soft-skip edge merge then validate as complete)
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	st := &Stmt{
@@ -184,6 +184,17 @@ func TestAnalyzeWithEdgesInStmID0FailClosed(t *testing.T) {
 	facts := []*FactPointTo{}
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("StmID 0 must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 AnalyzeWithEdgesIn must SetError sticky")
+	}
+	ClearError()
+	// incomplete call sticky (no invent true past nil Statement*)
+	if AnalyzeWithEdgesIn(nil, &facts, &cg, Defaults(), nil) {
+		t.Fatal("nil st must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil st AnalyzeWithEdgesIn must SetError sticky")
 	}
 	ClearError()
 }
@@ -258,6 +269,10 @@ func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
 	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
 		t.Fatal("incomplete MapFactsOut on jump src must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("incomplete MapFactsOut AnalyzeWithEdgesIn must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {

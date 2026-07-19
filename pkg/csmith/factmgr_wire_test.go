@@ -205,12 +205,48 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if FindRelatedUnion(fm.UnionFacts, uv) == nil || FindRelatedUnion(fm.UnionFacts, uv).LastWrittenFID != 0 {
 		t.Fatal(fm.UnionFacts)
 	}
-	// incomplete: nil Type must not invent empty init success (AddNewVarFact skip)
+	// incomplete hard IR: nil var sticky (no invent empty init success / soft re-pick)
+	ClearError()
 	pt2, un2 := AbstractFactForVarInit(nil)
 	if FactsComplete(pt2) || UnionFactsComplete(un2) {
 		t.Fatal("nil var init must fail closed incomplete", pt2, un2)
 	}
-	// union without rhs/init — assert path incomplete (not invent empty union fact)
+	if !HasError() {
+		t.Fatal("nil var AbstractFactForVarInit must SetError sticky")
+	}
+	ClearError()
+	// array without AsArray sticky (Fact.cpp:99 assert(av))
+	ptArr, _ := AbstractFactForVarInit(&Variable{
+		Name: "g_ap_bad", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2},
+		Init: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
+	})
+	if FactsComplete(ptArr) {
+		t.Fatal("IsArray without AsArray must fail closed incomplete", ptArr)
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray must SetError sticky")
+	}
+	ClearError()
+	// nil InitExprs hole sticky
+	badInit := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_ap_nil", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2},
+			Init: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
+		},
+		Sizes:     []int{2},
+		InitExprs: []*Expression{nil},
+	}
+	badInit.AsArray = badInit
+	ptNil, _ := AbstractFactForVarInit(&badInit.Variable)
+	if FactsComplete(ptNil) {
+		t.Fatal("nil InitExprs hole must fail closed incomplete", ptNil)
+	}
+	if !HasError() {
+		t.Fatal("nil InitExprs AbstractFactForVarInit must SetError sticky")
+	}
+	ClearError()
+	// union without rhs/init — abstract hole marker (not invent empty union fact;
+	// sticky comes from AddNewVarFact, not pure abstract re-pick)
 	uv2 := &Variable{Name: "g_u2", Type: ut}
 	_, un3 := AbstractFactForVarInit(uv2)
 	if UnionFactsComplete(un3) {

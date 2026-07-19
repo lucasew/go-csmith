@@ -124,24 +124,32 @@ func (fm *FactMgr) HasEdgeIn(destStmID int, postDest, backLink bool) bool {
 
 // AnalyzeWithEdgesIn mirrors Statement::analyze_with_edges_in.
 // Statement.cpp:808–834 — merge visited jump sources then validate_and_update.
+// Incomplete call / StmID / CFG / jump out / accum effect fails closed sticky
+// false so soft re-pick cannot invent complete analysis past holes.
 func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
 	// Statement.cpp:808+ — always live Statement* + inputs + cg_context
 	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	fm := cg.FM
 	if fm != nil {
-		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// Statement::stm_id always live; StmID 0 fails closed sticky (no invent
 		// soft-skip edge merge then validate as complete analysis)
 		if st.StmID <= 0 {
+			SetError(ErrGeneric)
 			return false
 		}
 		// back edges only if already visited
 		if fm.MapVisited != nil && fm.MapVisited[st.StmID] {
 			back := fm.FindEdgesIn(st.StmID, false, true)
 			// nil = incomplete CFG (hole); empty non-nil = no matching edges
+			// FindEdgesIn already SetError sticky on incomplete CFG
 			if back == nil {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			for _, e := range back {
@@ -151,19 +159,26 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				}
 				// Statement.cpp:819–820 — always merge_jump_facts / add_effect
 				// C++ map[] missing → empty; no invent skip merge when out absent
-				// Incomplete out fails closed (no invent partial jump merge)
+				// Incomplete out fails closed sticky (no invent partial jump merge)
 				out := fm.GetMapFactsOut(e.SrcID)
 				if _, ok := tryMergeJumpFacts(facts, out); !ok {
+					// tryMergeJumpFacts already SetError sticky
 					return false
 				}
 				// map_accum_effect[src] — missing live id → empty; SrcID 0 IncompleteEffect
-				// Incomplete accum fails closed (no invent AddEffect poison then still ok)
+				// Incomplete accum fails closed sticky (no invent AddEffect poison then still ok)
 				accE := fm.GetMapAccumEffect(e.SrcID)
 				if !EffectComplete(accE) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return false
 				}
 				cg.AddEffect(accE, false)
 				if !EffectComplete(cg.EffectStm) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return false
 				}
 			}
@@ -171,6 +186,9 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 		// always consider forward edges
 		fwd := fm.FindEdgesIn(st.StmID, false, false)
 		if fwd == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		for _, e := range fwd {
@@ -184,10 +202,16 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			}
 			accE := fm.GetMapAccumEffect(e.SrcID)
 			if !EffectComplete(accE) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			cg.AddEffect(accE, false)
 			if !EffectComplete(cg.EffectStm) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 		}

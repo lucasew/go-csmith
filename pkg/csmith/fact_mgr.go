@@ -1042,12 +1042,14 @@ func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 
 // AbstractFactForVarInit mirrors Fact::abstract_fact_for_var_init.
 // Fact.cpp:85–112 — pointer/union only; assign from init; array alt inits merge.
-// Incomplete IR returns IncompleteFactSlice / IncompleteUnionFactSlice (not bare
-// nil — FactsComplete(nil)/UnionFactsComplete(nil) invent empty init success so
-// AddNewVarFact soft-skips as “no fact to add”).
+// Hard IR holes (nil var/Type, array without AsArray, nil InitExprs) fail closed
+// sticky IncompleteFactSlice / IncompleteUnionFactSlice so soft re-pick cannot
+// invent empty init success past broken IR. Incomplete abstract transfer results
+// remain non-sticky hole markers (AddNewVarFact sticks after abstract).
 func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if v == nil || v.Type == nil {
-		// incomplete var IR (not “non-pointer complete empty”)
+		// incomplete var IR sticky (not “non-pointer complete empty”)
+		SetError(ErrGeneric)
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	if !v.IsPointer() && !v.Type.IsUnion() {
@@ -1078,14 +1080,17 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	// Fact.cpp:97–109 — more init values on array of pointers
 	// Fact.cpp:99 — assert(av) when isArray (AsArray set)
 	if v.IsArray && v.AsArray == nil {
+		// hard IR: isArray without AsArray sticky (no invent skip more-inits)
+		SetError(ErrGeneric)
 		return IncompleteFactSlice(), nil
 	}
 	if av := v.AsArray; av != nil {
 		// Fact.cpp:100–106 — get_more_init_values() Expression* only
 		// no invent Constant from InitValues to_string() list
 		for _, e := range av.InitExprs {
-			// Expression* always live in C++; nil hole is broken IR — fail closed
+			// Expression* always live in C++; nil hole is broken IR — sticky
 			if e == nil {
+				SetError(ErrGeneric)
 				return IncompleteFactSlice(), nil
 			}
 			more := AbstractFactForAssign(nil, v, 0, e)
@@ -1093,8 +1098,9 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 				return IncompleteFactSlice(), nil
 			}
 			for _, f := range more {
-				// Fact* always live; MergeFactInto incomplete = hole marker
+				// Fact* always live; nil hole sticky (no invent skip merge hole)
 				if f == nil {
+					SetError(ErrGeneric)
 					return IncompleteFactSlice(), nil
 				}
 				merged := MergeFactInto(pt, f)
