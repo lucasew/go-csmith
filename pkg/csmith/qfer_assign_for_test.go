@@ -152,6 +152,12 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	if fm.GlobalFacts != nil {
 		t.Fatal("missing body MapFactsIn must clear GlobalFacts, not invent keep prior")
 	}
+	// body StmID 0 — no invent keep prior soft-skipping map_facts_in
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	postLoopAnalysis(fm, forSt, &Block{StmID: 0}, nil, EmptyEffect(), nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("body StmID 0 must fail closed nil GlobalFacts")
+	}
 }
 
 func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {

@@ -421,7 +421,11 @@ func MakeRandomArrayInit(
 		}
 	}
 	// map_stm_effect[sa] = effect_stm (StatementArrayOp.cpp:151)
-	if cg.FM != nil && st.StmID > 0 {
+	// StmID always allocated above; FM path always records (no invent soft-skip)
+	if cg.FM != nil {
+		if st.StmID <= 0 {
+			return Stmt{}
+		}
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
 	}
 	_ = probs

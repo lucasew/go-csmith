@@ -506,28 +506,32 @@ func (b *Block) AppendNestedLoop(
 	}
 	b.Stmts = append(b.Stmts, *st)
 	if cg.FM != nil {
+		// Block::stm_id always live when FM bound (no invent fold into key 0)
+		if b.StmID <= 0 {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
 		if !MakeupNewVarFacts(&preFacts, cg.FM.GlobalFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(cg.FM.GlobalFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			return nil
 		}
-		if st.StmID > 0 {
-			cg.FM.SetMapFactsIn(st.StmID, preFacts)
-			cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
-			if cg.FM.MapAccumEffect == nil {
-				cg.FM.MapAccumEffect = make(map[int]Effect)
-			}
-			cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
-			if cg.FM.MapVisited == nil {
-				cg.FM.MapVisited = make(map[int]bool)
-			}
-			cg.FM.MapVisited[st.StmID] = true
-			// fold for effect into block
-			be := cg.FM.GetMapStmEffect(b.StmID)
-			cg.FM.SetMapStmEffect(b.StmID, be.AddEffect(cg.FM.GetMapStmEffect(st.StmID)))
-			cg.FM.MapAccumEffect[b.StmID] = cg.AccumEffect()
+		cg.FM.SetMapFactsIn(st.StmID, preFacts)
+		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
+		if cg.FM.MapAccumEffect == nil {
+			cg.FM.MapAccumEffect = make(map[int]Effect)
 		}
+		cg.FM.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		if cg.FM.MapVisited == nil {
+			cg.FM.MapVisited = make(map[int]bool)
+		}
+		cg.FM.MapVisited[st.StmID] = true
+		// fold for effect into block
+		be := cg.FM.GetMapStmEffect(b.StmID)
+		cg.FM.SetMapStmEffect(b.StmID, be.AddEffect(cg.FM.GetMapStmEffect(st.StmID)))
+		cg.FM.MapAccumEffect[b.StmID] = cg.AccumEffect()
 	}
 	return st
 }
@@ -561,6 +565,12 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 	b.Stmts = append(b.Stmts, ret)
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
+		// Block::stm_id always live when FM bound (no invent fold into key 0)
+		if b.StmID <= 0 {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			SetError(ErrGeneric)
+			return nil
+		}
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) ||
 			!FactsComplete(preFacts) || !FactsComplete(fm.GlobalFacts) {
 			// incomplete makeup must not invent SetMapFactsIn from cleared preFacts
@@ -575,27 +585,23 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			SetError(ErrGeneric)
 			return nil
 		}
-		if st.StmID > 0 {
-			// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
-			fm.SetMapFactsIn(st.StmID, preFacts)
-			// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
-			fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)
-			if fm.MapAccumEffect == nil {
-				fm.MapAccumEffect = make(map[int]Effect)
-			}
-			fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
-			if fm.MapVisited == nil {
-				fm.MapVisited = make(map[int]bool)
-			}
-			fm.MapVisited[st.StmID] = true
-			// Block.cpp:391–392 — map_accum_effect[block]; map_stm_effect[block] += return
-			be := fm.GetMapStmEffect(b.StmID)
-			fm.SetMapStmEffect(b.StmID, be.AddEffect(fm.GetMapStmEffect(st.StmID)))
-			fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
-			if b.StmID > 0 {
-				fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
-			}
+		// Block.cpp:386–389 — set_fact_in; set_fact_out; accum; visited
+		fm.SetMapFactsIn(st.StmID, preFacts)
+		// set_fact_out filters function-locals for return (FactMgr.cpp:270–272)
+		fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, b)
+		if fm.MapAccumEffect == nil {
+			fm.MapAccumEffect = make(map[int]Effect)
 		}
+		fm.MapAccumEffect[st.StmID] = cg.AccumEffect()
+		if fm.MapVisited == nil {
+			fm.MapVisited = make(map[int]bool)
+		}
+		fm.MapVisited[st.StmID] = true
+		// Block.cpp:391–392 — map_accum_effect[block]; map_stm_effect[block] += return
+		be := fm.GetMapStmEffect(b.StmID)
+		fm.SetMapStmEffect(b.StmID, be.AddEffect(fm.GetMapStmEffect(st.StmID)))
+		fm.MapAccumEffect[b.StmID] = cg.AccumEffect()
+		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
 	}
 	return st
 }

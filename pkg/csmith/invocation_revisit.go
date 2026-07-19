@@ -372,10 +372,18 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		return false
 	}
 	*facts = CloneFactSlice(fm.GlobalFacts)
-	// body effect
-	if f.Body.StmID > 0 {
-		cg.AddEffect(fm.GetMapStmEffect(f.Body.StmID), false)
+	// body Block::stm_id always live; StmID 0 fails closed (no invent soft-skip
+	// map_stm_effect[body] then still merge return facts as complete revisit)
+	if f.Body.StmID <= 0 {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+		fm.GlobalFacts = savedGlobal
+		return false
 	}
+	cg.AddEffect(fm.GetMapStmEffect(f.Body.StmID), false)
 	var retFacts []*FactPointTo
 	AddBackReturnFacts(f.Body, fm, &retFacts)
 	if !FactsComplete(retFacts) || !FactsComplete(*facts) {

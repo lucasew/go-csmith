@@ -572,16 +572,17 @@ func BuildInvocationAndFunction(
 
 	// FunctionInvocationUser.cpp:212–215 — ret_facts = map_facts_out[body]
 	// C++ map[] missing → empty; no invent GlobalFacts fallback when out missing
+	// Body stm_id always live after generate; StmID 0 fails closed (mark failed)
 	// Incomplete out fails closed (nil — no invent cleaned clone of holes)
 	var retFacts []*FactPointTo
-	if callee.Body != nil && callee.Body.StmID > 0 {
+	if callee.Body == nil || callee.Body.StmID <= 0 {
+		fi.Failed = true
+	} else {
 		out := calFM.MapFactsOut[callee.Body.StmID]
 		if FactsComplete(out) {
 			retFacts = CloneFactSlice(out)
 		}
 		// incomplete → nil retFacts (fail closed)
-	}
-	if callee.Body != nil {
 		AddBackReturnFacts(callee.Body, calFM, &retFacts)
 	}
 	fi.SaveReturnFacts(retFacts)

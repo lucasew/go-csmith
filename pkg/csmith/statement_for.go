@@ -501,25 +501,28 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	if fm == nil {
 		return
 	}
-	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
-	// C++ map[] always assigns (missing → empty); no invent keep prior GlobalFacts
-	// Incomplete in fails closed (nil — no invent cleaned clone of holes)
-	if body != nil && body.StmID > 0 {
-		in := fm.MapFactsIn[body.StmID]
-		if !FactsComplete(in) {
-			fm.GlobalFacts = nil
-		} else {
-			fm.GlobalFacts = CloneFactSlice(in)
-		}
+	// StatementFor.cpp:355 — body Block always live with stm_id after make
+	// StmID 0 fails closed (no invent keep prior GlobalFacts soft-skipping map_facts_in)
+	if body == nil || body.StmID <= 0 {
+		fm.GlobalFacts = nil
+		return
 	}
-	if body != nil && body.MustReturn() {
+	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
+	// C++ map[] always assigns (missing → empty); Incomplete in fails closed
+	in := fm.MapFactsIn[body.StmID]
+	if !FactsComplete(in) {
+		fm.GlobalFacts = nil
+	} else {
+		fm.GlobalFacts = CloneFactSlice(in)
+	}
+	if body.MustReturn() {
 		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
 	// C++ always merge_jump_facts(global, map_facts_out[break]); missing → empty
 	// Incomplete out fails closed (nil GlobalFacts — no invent skip merge)
-	if body != nil && forSt != nil {
+	if forSt != nil {
 		for _, breakID := range body.BreakStmIDs {
 			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
 			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
@@ -532,7 +535,8 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		}
 	}
 	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)
-	if cg != nil && forSt != nil && body != nil {
+	// for-stmt stm_id always live; SetAccumulatedEffectAfterBlock no-ops on StmID 0
+	if cg != nil && forSt != nil {
 		bodyEff := fm.GetMapStmEffect(body.StmID)
 		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
 	}

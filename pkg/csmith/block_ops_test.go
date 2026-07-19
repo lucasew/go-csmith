@@ -213,6 +213,17 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	if st2 := b.AppendReturnStmt(nil, opts, NewVariableSelector(opts), &cg); st2 != nil {
 		t.Fatal("nil RNG must not invent return")
 	}
+	// Block StmID 0 + FM fails closed (no invent fold into key 0)
+	ClearError()
+	bad := &Block{Func: f, StmID: 0, Parent: nil}
+	f.Stack = []*Block{bad}
+	if bad.AppendReturnStmt(NewRng(2), opts, NewVariableSelector(opts), &cg) != nil {
+		t.Fatal("block StmID 0 must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("expect sticky error on incomplete block id")
+	}
+	ClearError()
 }
 
 func TestContainsBackEdge(t *testing.T) {

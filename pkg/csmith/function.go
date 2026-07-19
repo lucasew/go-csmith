@@ -576,11 +576,14 @@ func (f *Function) generateBodyCore(
 	}
 
 	// Function.cpp:652–656 — get_referenced_ptrs + feffect from map_stm_effect[body]
-	// ComputeSummary collects ReferencedPtrs; prefer map_stm_effect[body] when set
+	// C++ always map_stm_effect[body] (default empty Effect) — no invent soft-prefer
+	// generation bodyEff when map empty or body StmID 0
 	summaryEff := bodyEff
-	if cg.FM != nil && f.Body != nil && f.Body.StmID > 0 {
-		if e := cg.FM.GetMapStmEffect(f.Body.StmID); !e.IsEmpty() {
-			summaryEff = e
+	if cg.FM != nil && f.Body != nil {
+		if f.Body.StmID <= 0 {
+			summaryEff = EmptyEffect()
+		} else {
+			summaryEff = cg.FM.GetMapStmEffect(f.Body.StmID)
 		}
 	}
 	f.ComputeSummary(summaryEff)
