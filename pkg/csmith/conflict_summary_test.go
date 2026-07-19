@@ -24,6 +24,17 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 	if cg2.AcceptType(st) && st.IsVolatileStructUnion() {
 		t.Fatal("should reject vol struct")
 	}
+	// nil type / incomplete ambient must not invent accept
+	if cg.AcceptType(nil) {
+		t.Fatal("nil type must fail closed AcceptType")
+	}
+	cgi := WithEffectContext(IncompleteEffect())
+	if cgi.AllowVolatile() {
+		t.Fatal("incomplete ambient must not AllowVolatile")
+	}
+	if cgi.AcceptType(GetIntType()) {
+		t.Fatal("incomplete ambient must not invent AcceptType int")
+	}
 }
 
 func TestInConflictReadWrite(t *testing.T) {

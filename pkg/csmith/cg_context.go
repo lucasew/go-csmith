@@ -891,7 +891,11 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 
 // AllowVolatile mirrors CGContext::allow_volatile.
 // CGContext.cpp:517–518 — only when effect_context is side-effect free.
+// Incomplete ambient fails closed false (IsSideEffectFree already; explicit for clarity).
 func (c CGContext) AllowVolatile() bool {
+	if !EffectComplete(c.EffectContext()) {
+		return false
+	}
 	return c.EffectContext().IsSideEffectFree()
 }
 
@@ -903,9 +907,14 @@ func (c CGContext) AllowConst(access Access) bool {
 
 // AcceptType mirrors CGContext::accept_type.
 // CGContext.cpp:525–528 — reject volatile aggregates when not SE-free.
+// Nil type / incomplete ambient fails closed false (no invent accept nil Type
+// shell or soft-accept non-vol types under IncompleteEffect as SE-free path).
 func (c CGContext) AcceptType(t *Type) bool {
 	if t == nil {
-		return true
+		return false
+	}
+	if !EffectComplete(c.EffectContext()) {
+		return false
 	}
 	return c.EffectContext().IsSideEffectFree() || !t.IsVolatileStructUnion()
 }

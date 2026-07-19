@@ -589,8 +589,14 @@ func (e Effect) IsEmpty() bool {
 
 // Clear mirrors Effect::clear — empty pure SE-free effect.
 // Effect.cpp:497–501.
+// Clear mirrors Effect::clear — empty complete effect.
+// Incomplete base stays IncompleteEffect (no invent wipe hole shell to empty pure).
 func (e *Effect) Clear() {
 	if e == nil {
+		return
+	}
+	if e.incomplete {
+		*e = IncompleteEffect()
 		return
 	}
 	*e = EmptyEffect()

@@ -151,6 +151,12 @@ func TestHasRaceWith(t *testing.T) {
 	if !e2.IsEmpty() {
 		t.Fatal("clear")
 	}
+	// Clear must not invent wipe IncompleteEffect to empty pure
+	inc := IncompleteEffect()
+	inc.Clear()
+	if EffectComplete(inc) || inc.IsEmpty() || inc.IsPure() {
+		t.Fatal("Clear incomplete must stay IncompleteEffect")
+	}
 }
 
 func TestChooseFuncCanPickBuiltin(t *testing.T) {
