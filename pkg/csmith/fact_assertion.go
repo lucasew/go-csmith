@@ -317,7 +317,12 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 			label = FindJumpLabel(fm, st.StmID)
 			// resolve from source stmt when FindJumpLabel missed registry
 			if label == "" && fm.Func != nil {
-				if src := FindStmtByID(fm.Func, srcs[0]); src != nil {
+				src := FindStmtByID(fm.Func, srcs[0])
+				// residual ERROR sticky — no invent soft-continue label/SourceLabel past FindStmt hole
+				if HasError() {
+					return "", false
+				}
+				if src != nil {
 					label = src.Label
 				}
 			}

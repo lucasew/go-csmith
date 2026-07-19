@@ -504,6 +504,10 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 		// unresolved SrcID with Func set = incomplete IR sticky (no invent skip as non-goto)
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
+			// residual ERROR sticky — no invent soft-continue sources past FindStmt hole
+			if HasError() {
+				return nil
+			}
 			if src == nil {
 				SetError(ErrGeneric)
 				return nil
@@ -542,6 +546,10 @@ func FindJumpLabel(fm *FactMgr, destStmID int) string {
 		}
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
+			// residual ERROR sticky — no invent soft-continue label scan past FindStmt hole
+			if HasError() {
+				return ""
+			}
 			// unresolved src = incomplete function tree sticky; no invent skip hole to registry
 			if src == nil {
 				SetError(ErrGeneric)

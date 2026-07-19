@@ -432,6 +432,30 @@ func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 	}
 }
 
+func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
+	// FindStmt residual soft invent was soft-continue skip then invent fixed tree later.
+	// Fair: residual sticky restrictive unfixed true.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	// incomplete if sole Blocks entry — FindStmt residual when classifying edge src
+	outer := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtIfElse, StmID: 1, Then: &Block{Stmts: []Stmt{{Kind: StmtGoto, StmID: 20}}}, Else: nil},
+		{Kind: StmtAssign, StmID: 10},
+	}}
+	f.Blocks = []*Block{outer}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	root := &Stmt{Kind: StmtBlock, Then: outer, StmID: 99}
+	if !ContainsUnfixedGoto(root, fm) {
+		t.Fatal("FindStmt residual must fail closed unfixed, not invent fixed")
+	}
+	if !HasError() {
+		t.Fatal("FindStmt residual ContainsUnfixedGoto must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestContainsUnfixedGotoImply(t *testing.T) {
 	// Statement.cpp:797–800 — dest fact not imply jump_src → unfixed
 	f := &Function{Name: "f"}

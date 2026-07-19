@@ -605,8 +605,16 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// VariableSelector.cpp:773 — edge->src->eType == eGoto
 			src := FindStmtByID(fm.Func, e.SrcID)
+			// residual ERROR sticky — no invent soft-continue expand past FindStmt residual hole
+			if HasError() {
+				return nil
+			}
 			if src == nil {
 				src = findStmtByIDInTree(rootBlock(b), e.SrcID)
+				// residual ERROR sticky — no invent soft-continue expand past tree FindStmt hole
+				if HasError() {
+					return nil
+				}
 			}
 			if src == nil || src.Kind != StmtGoto {
 				continue

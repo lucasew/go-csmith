@@ -111,6 +111,34 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 	ClearError()
 }
 
+func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
+	// FindStmt residual: incomplete if-arm on sole Blocks path stickies ERROR.
+	// Soft invent was soft-continue expand past residual then climb later complete edge.
+	// Fair: sticky fail closed nil ExpandBlockForGoto.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	outer := &Block{Func: f, StmID: 1}
+	inner := &Block{Func: f, Parent: outer, StmID: 2}
+	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
+	// incomplete if (nil Else) — FindStmt residual when walking Blocks
+	outer.Stmts = []Stmt{
+		{Kind: StmtIfElse, StmID: 5, Then: inner, Else: nil},
+		{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10},
+	}
+	f.Blocks = []*Block{outer}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if ExpandBlockForGoto(inner, cg) != nil {
+		t.Fatal("FindStmt residual must fail closed ExpandBlockForGoto, not invent later climb")
+	}
+	if !HasError() {
+		t.Fatal("FindStmt residual ExpandBlockForGoto must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
 	// fair: incomplete LocalVars → nil, IncompleteVariables sticky

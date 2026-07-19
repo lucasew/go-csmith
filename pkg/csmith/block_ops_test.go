@@ -806,6 +806,29 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	}
 }
 
+func TestFindJumpSourcesFindStmtResidualSticky(t *testing.T) {
+	// FindStmt residual soft invent was soft-continue sources then invent complete src list.
+	// Fair: sticky fail closed nil sources.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	// incomplete if sole Blocks — FindStmt residual for SrcID under incomplete arm
+	outer := &Block{Func: f, Stmts: []Stmt{
+		{Kind: StmtIfElse, StmID: 1, Then: &Block{Stmts: []Stmt{{Kind: StmtGoto, StmID: 20, Label: "L"}}}, Else: nil},
+		{Kind: StmtAssign, StmID: 10},
+	}}
+	f.Blocks = []*Block{outer}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
+	if fm.FindJumpSources(10) != nil {
+		t.Fatal("FindStmt residual must fail closed nil sources, not invent complete list")
+	}
+	if !HasError() {
+		t.Fatal("FindStmt residual FindJumpSources must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 	// Statement.cpp:501 — only eGoto sources; break→for must not count
 	f := &Function{Name: "func_1"}

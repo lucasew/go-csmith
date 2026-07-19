@@ -1563,14 +1563,29 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			// wipe GlobalFacts mid-generation which would poison ERROR_GUARD paths).
 			for id := range fm.MapFactsOut {
 				if !stmtIDInBlock(fm.Func, id, blk) {
+					// residual ERROR sticky — no invent soft-continue later outs past stmtIDInBlock hole
+					if HasError() {
+						fm.GlobalFacts = IncompleteFactSlice()
+						return
+					}
 					continue
 				}
 				st := FindStmtByID(fm.Func, id)
+				// residual ERROR sticky — no invent soft-continue partial IncompleteFactSlice past FindStmt hole
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
 				if st == nil {
 					fm.MapFactsOut[id] = IncompleteFactSlice()
 					continue
 				}
 				parent := FindParentBlockOfStmID(fm.Func, id)
+				// residual ERROR sticky — no invent soft-continue AddFactOut past parent residual hole
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
 				fm.AddFactOut(st, parent, f)
 			}
 		}

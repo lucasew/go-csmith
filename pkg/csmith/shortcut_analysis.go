@@ -245,6 +245,11 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 		// Statement.cpp:781 — edge->src is eGoto and contains_stmt(src)
 		if fm.Func != nil {
 			src := FindStmtByID(fm.Func, e.SrcID)
+			// residual ERROR sticky — no invent soft-continue fixed-scan past FindStmt hole
+			// (incomplete if-arm residual soft invents skip then later invents fixed tree)
+			if HasError() {
+				return true
+			}
 			if src == nil || src.Kind != StmtGoto {
 				continue
 			}
