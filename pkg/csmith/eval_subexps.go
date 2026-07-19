@@ -14,8 +14,9 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant always has live Value
-		if e.Con == nil || e.Con.Value == "" {
+		// Constant always has live Type* + Value; Type-nil sticky
+		// (no invent self-eval complete list past incomplete Constant shell)
+		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
@@ -23,6 +24,12 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 	case TermVariable, TermLhs:
 		// ExpressionVariable / Lhs always have live Variable*
 		if e.Var == nil {
+			SetError(ErrGeneric)
+			return IncompleteExpressions()
+		}
+		// Type* always live on Variable for eval; Type-nil sticky
+		// Special null/garbage/tbd have Type nil by design — complete self-eval
+		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
 			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
@@ -53,6 +60,11 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 				SetError(ErrGeneric)
 				return IncompleteExpressions()
 			}
+			// Type* always live for eval; Type-nil sticky (specials exempt)
+			if e.Assign.Lhs.Var.Type == nil && !IsSpecialPtr(e.Assign.Lhs.Var) {
+				SetError(ErrGeneric)
+				return IncompleteExpressions()
+			}
 			sub := LhsAsExpression(e.Assign.Lhs)
 			if sub == nil {
 				SetError(ErrGeneric)
@@ -61,6 +73,12 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 			return []*Expression{sub}
 		}
 		if e.Assign.LhsVar != nil {
+			// Type* always live; Type-nil sticky (no invent untyped LHS eval shell)
+			// Special null/garbage/tbd have Type nil by design — complete path
+			if e.Assign.LhsVar.Type == nil && !IsSpecialPtr(e.Assign.LhsVar) {
+				SetError(ErrGeneric)
+				return IncompleteExpressions()
+			}
 			ty := e.Assign.LhsVar.Type
 			return []*Expression{{
 				Term:     TermVariable,

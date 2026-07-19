@@ -315,7 +315,9 @@ func formatSmallConstant(st ESimpleType, num int, opts Options) string {
 	// Constant.cpp:329–361 cast + L/UL suffix (non-float only; float uses
 	// generateSmallRandomFloatHexConstant with live RNG)
 	if st == EFloat {
-		// broken call path — float must not invent digit/sign from num alone
+		// broken call path sticky — float must not invent digit/sign from num alone
+		// or soft-empty success past wrong dispatch (use generateSmallRandomFloatHexConstant)
+		SetError(ErrGeneric)
 		return ""
 	}
 	var body string

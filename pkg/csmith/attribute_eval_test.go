@@ -341,6 +341,37 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 		}
 	}
 	ClearError()
+	// Type-nil Constant shell sticky (no invent self-eval complete list)
+	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+		Term: TermConstant, Con: &Constant{Value: "0"},
+	})) {
+		t.Fatal("Type-nil Constant must IncompleteExpressions")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Constant GetEvalToSubexps must SetError sticky")
+	}
+	ClearError()
+	// Type-nil Variable shell sticky (specials exempt)
+	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+		Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil},
+	})) {
+		t.Fatal("Type-nil Variable must IncompleteExpressions")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Variable GetEvalToSubexps must SetError sticky")
+	}
+	ClearError()
+	// Type-nil LhsVar assign sticky
+	if ExpressionsComplete(GetEvalToSubexps(&Expression{
+		Term: TermAssignment,
+		Assign: &Stmt{Kind: StmtAssign, LhsVar: &Variable{Name: "g_hole", Type: nil}},
+	})) {
+		t.Fatal("Type-nil LhsVar must IncompleteExpressions")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil LhsVar GetEvalToSubexps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHaveOverlappingFieldsUnion(t *testing.T) {

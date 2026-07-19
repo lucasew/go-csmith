@@ -296,10 +296,15 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 		t.Fatal("nil rng generateSmallRandomFloatHexConstant must SetError sticky")
 	}
 	ClearError()
-	// formatSmallConstant must not invent float without RNG
+	// formatSmallConstant must not invent float without RNG; sticky broken dispatch
+	ClearError()
 	if formatSmallConstant(EFloat, 1, Defaults()) != "" {
 		t.Fatal("formatSmallConstant float invent")
 	}
+	if !HasError() {
+		t.Fatal("formatSmallConstant float must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
