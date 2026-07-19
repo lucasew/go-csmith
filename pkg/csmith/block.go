@@ -185,6 +185,8 @@ func (b *Block) MustBreakOrReturn() bool {
 
 // IsVarOnStack mirrors Block::is_var_on_stack.
 // Block.cpp:443–456 — params + local_vars chain.
+// IsVarOnStack reports whether v is a param or local visible on this block chain.
+// Variable* always live; nil hole fails closed as false (no invent complete scan).
 func (b *Block) IsVarOnStack(v *Variable) bool {
 	if b == nil || v == nil {
 		return false
@@ -195,14 +197,20 @@ func (b *Block) IsVarOnStack(v *Variable) bool {
 	}
 	if f != nil {
 		for _, p := range f.Param {
-			if p != nil && p.Match(v) {
+			if p == nil {
+				return false
+			}
+			if p.Match(v) {
 				return true
 			}
 		}
 	}
 	for bb := b; bb != nil; bb = bb.Parent {
 		for _, loc := range bb.LocalVars {
-			if loc == v || (loc != nil && loc.Match(v)) {
+			if loc == nil {
+				return false
+			}
+			if loc == v || loc.Match(v) {
 				return true
 			}
 		}

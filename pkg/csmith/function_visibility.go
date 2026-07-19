@@ -5,22 +5,26 @@ package csmith
 // IsVarOnStack mirrors Function::is_var_on_stack(var, stm).
 // Function.cpp:185–201 — param or local in stm's parent block chain.
 // stParent is the statement's parent block (Stmt has no Parent field; pass enclosing block).
+// Variable* always live on Param/LocalVars; nil hole fails closed as false
+// (no invent complete not-on-stack scan past holes).
 func (f *Function) IsVarOnStack(v *Variable, stParent *Block) bool {
 	if f == nil || v == nil {
 		return false
 	}
 	for _, p := range f.Param {
-		if p != nil && p.Match(v) {
+		if p == nil {
+			return false
+		}
+		if p.Match(v) {
 			return true
 		}
 	}
 	for b := stParent; b != nil; b = b.Parent {
-		if IsVariableInSet(b.LocalVars, v) {
-			return true
-		}
-		// also Match for field-ish equality
 		for _, loc := range b.LocalVars {
-			if loc != nil && loc.Match(v) {
+			if loc == nil {
+				return false
+			}
+			if loc == v || loc.Match(v) {
 				return true
 			}
 		}

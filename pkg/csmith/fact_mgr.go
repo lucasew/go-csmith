@@ -780,6 +780,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	fm.AddNewVarFact(v)
 	// FactMgr.cpp:77–104 — push each new init fact into maps
 	// Fact* always live after add; nil hole fails closed (no invent partial map push)
+	// no invent MapFactsIn-only push when MapFactsOut is nil (one-sided invent)
 	for i := beforePT; i < len(fm.GlobalFacts); i++ {
 		f := fm.GlobalFacts[i]
 		if f == nil {
@@ -793,8 +794,12 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				}
 			}
 		}
-		// map_facts_out
+		// map_facts_out — required when In was updated for dual-map coherence
 		if fm.MapFactsOut == nil {
+			// incomplete FM — stop further dual push (no invent skip remaining facts)
+			if fm.MapFactsIn != nil {
+				return
+			}
 			continue
 		}
 		if blk == nil {

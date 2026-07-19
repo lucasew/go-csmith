@@ -778,6 +778,7 @@ func (v *Variable) IsVisible(blk *Block) bool {
 // IsVisibleLocal mirrors Variable::is_visible_local / ArrayVariable override.
 // Variable.cpp:482–503 — params + block-chain locals; fields recurse parent.
 // ArrayVariable.cpp:419–429 — walk blk parents until array's parent block.
+// Variable* always live; nil FieldVarOf/Param/Local holes fail closed as false.
 func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	if v == nil {
 		return false
@@ -786,6 +787,10 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 		return v.IsGlobal()
 	}
 	if v.IsFieldVar() {
+		// FieldVarOf always live for field vars; nil fails closed
+		if v.FieldVarOf == nil {
+			return false
+		}
 		return v.FieldVarOf.IsVisibleLocal(blk)
 	}
 	// ArrayVariable.cpp:419–429 — parent block chain for array (collective or itemized)
@@ -804,6 +809,9 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	}
 	if f != nil {
 		for _, p := range f.Param {
+			if p == nil {
+				return false
+			}
 			if p == v {
 				return true
 			}
@@ -811,6 +819,9 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	}
 	for b := blk; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
+			if loc == nil {
+				return false
+			}
 			if loc == v {
 				return true
 			}

@@ -22,6 +22,23 @@ func TestHasIntFieldAndContainPointer(t *testing.T) {
 		t.Fatal("struct")
 	}
 	_ = st.HasIntField() // may or may not
+	// nil field Type holes fail closed
+	hole := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
+	if hole.HasIntField() {
+		t.Fatal("nil field Type must not invent has-int")
+	}
+	if !hole.ContainPointerField() {
+		t.Fatal("nil field Type must fail closed as has-pointer")
+	}
+	if !hole.IsConstStructUnion() {
+		t.Fatal("nil field Type must fail closed as const")
+	}
+	if !hole.IsVolatileStructUnion() {
+		t.Fatal("nil field Type must fail closed as volatile")
+	}
+	if !hole.HasBitfields() {
+		t.Fatal("nil field Type must fail closed as has-bitfields")
+	}
 }
 
 func TestIsVisibleLocal(t *testing.T) {
@@ -41,6 +58,19 @@ func TestIsVisibleLocal(t *testing.T) {
 	f.Param = []*Variable{p}
 	if !p.IsVisibleLocal(inner) {
 		t.Fatal("param")
+	}
+	// nil Param/Local holes fail closed
+	f.Param = []*Variable{nil, p}
+	if p.IsVisibleLocal(inner) {
+		t.Fatal("nil Param hole must fail closed")
+	}
+	f.Param = []*Variable{p}
+	outer.LocalVars = []*Variable{nil, l}
+	if l.IsVisibleLocal(inner) {
+		t.Fatal("nil LocalVars hole must fail closed")
+	}
+	if f.IsVarOnStack(l, inner) {
+		t.Fatal("IsVarOnStack nil local hole must fail closed")
 	}
 }
 

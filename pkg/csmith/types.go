@@ -111,12 +111,16 @@ func (t *Type) IsAggregate() bool {
 
 // IsConstStructUnion mirrors Type::is_const_struct_union.
 // Type.cpp:437–451 — any field const or nested const aggregate.
+// Type* always live on Fields; nil hole fails closed as const (no invent non-const).
 func (t *Type) IsConstStructUnion() bool {
 	if t == nil || !t.IsAggregate() {
 		return false
 	}
 	for _, f := range t.Fields {
-		if f.Type != nil && f.Type.IsConstStructUnion() {
+		if f.Type == nil {
+			return true
+		}
+		if f.Type.IsConstStructUnion() {
 			return true
 		}
 		if f.Qfer.IsConst() {
@@ -128,12 +132,16 @@ func (t *Type) IsConstStructUnion() bool {
 
 // IsVolatileStructUnion mirrors Type::is_volatile_struct_union.
 // Type.cpp:454+.
+// Type* always live on Fields; nil hole fails closed as volatile (no invent non-vol).
 func (t *Type) IsVolatileStructUnion() bool {
 	if t == nil || !t.IsAggregate() {
 		return false
 	}
 	for _, f := range t.Fields {
-		if f.Type != nil && f.Type.IsVolatileStructUnion() {
+		if f.Type == nil {
+			return true
+		}
+		if f.Type.IsVolatileStructUnion() {
 			return true
 		}
 		if f.Qfer.IsVolatile() {
@@ -189,6 +197,8 @@ func (t *Type) IsPointerLike() bool {
 
 // HasIntField mirrors Type::has_int_field.
 // Type.cpp:471–480 — self is int or any field has_int_field.
+// HasIntField mirrors Type::has_int_field.
+// Type* always live on Fields; nil hole fails closed as false (no invent has-int).
 func (t *Type) HasIntField() bool {
 	if t == nil {
 		return false
@@ -197,7 +207,10 @@ func (t *Type) HasIntField() bool {
 		return true
 	}
 	for _, f := range t.Fields {
-		if f.Type != nil && f.Type.HasIntField() {
+		if f.Type == nil {
+			return false
+		}
+		if f.Type.HasIntField() {
 			return true
 		}
 	}
@@ -206,6 +219,7 @@ func (t *Type) HasIntField() bool {
 
 // ContainPointerField mirrors Type::contain_pointer_field.
 // Type.cpp:1664–1674 — ePointer, or any aggregate field that does.
+// Type* always live on Fields; nil hole fails closed as true (no invent pointer-free).
 func (t *Type) ContainPointerField() bool {
 	if t == nil {
 		return false
@@ -215,7 +229,10 @@ func (t *Type) ContainPointerField() bool {
 	}
 	if t.IsAggregate() {
 		for _, f := range t.Fields {
-			if f.Type != nil && f.Type.ContainPointerField() {
+			if f.Type == nil {
+				return true
+			}
+			if f.Type.ContainPointerField() {
 				return true
 			}
 		}
@@ -604,6 +621,8 @@ func (t *Type) NeedsCast(other *Type) bool {
 
 // HasBitfields mirrors Type::has_bitfields.
 // Type.cpp:1290–1301.
+// HasBitfields mirrors Type::has_bitfields.
+// Type* always live on Fields; nil hole fails closed as true (no invent bitfield-free).
 func (t *Type) HasBitfields() bool {
 	if t == nil {
 		return false
@@ -612,7 +631,10 @@ func (t *Type) HasBitfields() bool {
 		if f.BitWidth >= 0 {
 			return true
 		}
-		if f.Type != nil && f.Type.IsStruct() && f.Type.HasBitfields() {
+		if f.Type == nil {
+			return true
+		}
+		if f.Type.IsStruct() && f.Type.HasBitfields() {
 			return true
 		}
 	}
