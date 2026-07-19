@@ -152,10 +152,18 @@ func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 // IsValidPtr mirrors FactPointTo::is_valid_ptr(Variable*, facts).
 // FactPointTo.cpp:411–419 — needs related fact; null/dead forbidden when probs are 0.
 // Variable always live; sticky invalid (no invent valid soft-skip past hole).
+// Type* always live for non-special subjects; Type-nil sticky invalid (no invent
+// valid true via related-fact match past Type-nil pointer shell).
 // Incomplete fact maps fail closed sticky invalid (no invent valid / soft re-pick past holes).
 // Missing related fact / null/dead policy rejects stay non-sticky false.
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
 	if p == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	// Type* always live for non-special subjects; Type-nil sticky invalid
+	// (no invent valid via fact lookup past Type-nil pointer shell)
+	if !IsSpecialPtr(p) && p.Type == nil {
 		SetError(ErrGeneric)
 		return false
 	}
@@ -180,10 +188,18 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 // IsDanglingPtr mirrors FactPointTo::is_dangling_ptr.
 // FactPointTo.cpp:476–482 — related fact is dead (and dead deref not allowed).
 // Variable always live; sticky dangling true (no invent not-dangling soft-skip past hole).
+// Type* always live for non-special subjects; Type-nil sticky dangling true (restrictive —
+// no invent not-dangling / soft re-pick past Type-nil pointer shell).
 // Incomplete fact maps fail closed sticky as dangling (true — no invent not-dangling
 // / soft re-pick past holes when FindRelated would skip holes).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
 	if p == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	// Type* always live for non-special subjects; Type-nil sticky dangling
+	// (restrictive — no invent not-dangling past Type-nil shell)
+	if !IsSpecialPtr(p) && p.Type == nil {
 		SetError(ErrGeneric)
 		return true
 	}
@@ -628,6 +644,14 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 				return IncompleteFactSlice()
 			}
 			for _, p := range more {
+				// PointTo Variable* always live after VariablesComplete
+				// Type* always live for non-special pointees; Type-nil sticky
+				// (IsPointer residual ERROR+false soft-skips then invents partial
+				// transfer past Type-nil shell without pairing that pointee)
+				if p.Type == nil && !IsSpecialPtr(p) {
+					SetError(ErrGeneric)
+					return IncompleteFactSlice()
+				}
 				if p.IsPointer() {
 					ptrs = append(ptrs, p)
 				}

@@ -226,6 +226,25 @@ func TestIsValidPtr(t *testing.T) {
 	if !IsDanglingPtr(p, facts, 0) {
 		t.Fatal("dangling")
 	}
+	// Type-nil subject soft invent: related-fact match invents valid true
+	// fair: sticky invalid / dangling before fact lookup
+	ClearError()
+	shell := &Variable{Name: "g_typeless"}
+	factsShell := []*FactPointTo{MakeFactPointTo(shell, target)}
+	if IsValidPtr(shell, factsShell, 0, 0) {
+		t.Fatal("Type-nil subject IsValidPtr must fail closed false, not invent valid")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil subject IsValidPtr must SetError sticky")
+	}
+	ClearError()
+	if !IsDanglingPtr(shell, factsShell, 0) {
+		t.Fatal("Type-nil subject IsDanglingPtr must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil subject IsDanglingPtr must SetError sticky")
+	}
+	ClearError()
 	// incomplete maps fail closed as dangling (no invent not-dangling past hole)
 	ClearError()
 	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}

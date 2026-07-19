@@ -521,3 +521,28 @@ func TestAbstractFactForAssignNilLhsSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
+	// *p peels to non-pointer; lvars may be pointer pointees; more = pointees of those.
+	// soft invent: IsPointer residual ERROR+false skip Type-nil then partial transfer.
+	// fair: sticky IncompleteFactSlice before classify.
+	ClearError()
+	// p:int* points to q:int*; *p peels to int (non-pointer branch); lvars=[q];
+	// more = MergePointees(q,1) → Type-nil shell sticky
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	shell := &Variable{Name: "g_hole"} // Type nil
+	factsIn := []*FactPointTo{
+		MakeFactPointTo(p, q),
+		MakeFactPointTo(q, shell),
+	}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}
+	out := AbstractFactForAssign(factsIn, p, 1, rhs)
+	if FactsComplete(out) {
+		t.Fatal("Type-nil more pointee must fail closed incomplete, not partial transfer", out)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil more pointee AbstractFactForAssign must SetError sticky")
+	}
+	ClearError()
+}
