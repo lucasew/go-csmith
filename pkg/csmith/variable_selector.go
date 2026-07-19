@@ -66,6 +66,7 @@ func (vs *VariableSelector) atMaxGlobals() bool {
 
 // ChooseVisibleReadVar mirrors VariableSelector::choose_visible_read_var.
 // VariableSelector.cpp:361–377 — expand structs; match convert; on stack or global; not vol.
+// Variable* always live; expand/list holes fail closed (nil pick).
 func ChooseVisibleReadVar(
 	r *Rng,
 	b *Block,
@@ -78,9 +79,16 @@ func ChooseVisibleReadVar(
 		return nil
 	}
 	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
+	// nil expand = incomplete candidate list
+	if expanded == nil && len(readVars) > 0 {
+		return nil
+	}
 	var ok []*Variable
 	for _, v := range expanded {
-		if v == nil || v.Type == nil || v.IsVirtual() || v.IsVolatile() {
+		if v == nil || v.Type == nil {
+			return nil
+		}
+		if v.IsVirtual() || v.IsVolatile() {
 			continue
 		}
 		if !typ.Match(v.Type, MatchConvert) {
@@ -101,11 +109,15 @@ func ChooseVisibleReadVar(
 
 // FindVarByName mirrors VariableSelector::find_var_by_name.
 // VariableSelector.cpp:1571–1579 — scan AllVars via match_var_name.
+// Variable* always live on AllVars; nil hole fails closed (no invent skip).
 func (vs *VariableSelector) FindVarByName(name string) *Variable {
 	if vs == nil || name == "" {
 		return nil
 	}
 	for _, v := range vs.AllVars {
+		if v == nil {
+			return nil
+		}
 		if m := v.MatchVarName(name); m != nil {
 			return m
 		}
@@ -524,11 +536,15 @@ func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining [
 
 // FindAllNonArrayVisibleVars mirrors find_all_non_array_visible_vars.
 // VariableSelector.cpp:713–735 — non-array globals, params, non-array locals.
+// Variable* always live; nil hole fails closed (nil out, no invent partial pool).
 func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
-	var vars []*Variable
+	vars := make([]*Variable, 0)
 	if vs != nil {
 		for _, v := range vs.GlobalList {
-			if v != nil && !v.IsArray {
+			if v == nil {
+				return nil
+			}
+			if !v.IsArray {
 				vars = append(vars, v)
 			}
 		}
@@ -542,11 +558,19 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 		}
 	}
 	if f != nil {
-		vars = append(vars, f.Param...)
+		for _, p := range f.Param {
+			if p == nil {
+				return nil
+			}
+			vars = append(vars, p)
+		}
 	}
 	for b != nil {
 		for _, v := range b.LocalVars {
-			if v != nil && !v.IsArray {
+			if v == nil {
+				return nil
+			}
+			if !v.IsArray {
 				vars = append(vars, v)
 			}
 		}
@@ -557,10 +581,16 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 
 // GetAllLocalVars mirrors VariableSelector::get_all_local_vars.
 // VariableSelector.cpp:747–751.
+// Variable* always live on LocalVars; nil hole fails closed (nil out).
 func GetAllLocalVars(b *Block) []*Variable {
-	var vars []*Variable
+	vars := make([]*Variable, 0)
 	for b != nil {
-		vars = append(vars, b.LocalVars...)
+		for _, v := range b.LocalVars {
+			if v == nil {
+				return nil
+			}
+			vars = append(vars, v)
+		}
 		b = b.Parent
 	}
 	return vars
@@ -905,8 +935,9 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if v.IsArray && v.AsArray != nil {
 			// VariableSelector.cpp:1528–1530 — always itemize_array; no bare collective
 			// (C++ var = itemize_array(...); if null, try next — never return collective)
+			// RNG always live for itemize; nil r fails closed (no invent skip to next)
 			if r == nil {
-				continue
+				return nil
 			}
 			item := vs.ItemizeArray(r, cg, v.AsArray)
 			if item != nil {

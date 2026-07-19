@@ -270,12 +270,21 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
 			vars := MergePointeesOfPointer(rhs.Var.GetCollective(), indirect, facts)
+			// nil = incomplete pointees
+			if vars == nil {
+				return nil
+			}
 			var ret []*FactPointTo
 			for _, vv := range vars {
+				// Variable* always live from merge_pointees; nil hole fails closed
 				if vv == nil {
-					continue
+					return nil
 				}
 				ptrs := vv.FindPointerFields()
+				// FindPointerFields nil = incomplete FieldVars
+				if ptrs == nil {
+					return nil
+				}
 				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
 				if len(lvars) != len(ptrs) {
 					// fail closed — no soft invent min-length pairwise transfer
@@ -284,6 +293,10 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				for j := 0; j < len(lvars); j++ {
 					set := MergePointeesOfPointer(ptrs[j], 1, facts)
 					// C++ make_fact with set as-is (may be empty); no invent garbage
+					// set nil only when incomplete — fail closed whole transfer
+					if set == nil {
+						return nil
+					}
 					ret = append(ret, MakeFactPointToSet(lvars[j], set))
 				}
 			}

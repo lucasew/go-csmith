@@ -24,6 +24,18 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	}
 }
 
+func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
+	vs := NewVariableSelector(Defaults())
+	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	vs.GlobalList = []*Variable{g, nil}
+	if vs.FindAllNonArrayVisibleVars(nil) != nil {
+		t.Fatal("nil GlobalList hole must fail closed")
+	}
+	if GetAllLocalVars(&Block{LocalVars: []*Variable{g, nil}}) != nil {
+		t.Fatal("nil LocalVars hole must fail closed")
+	}
+}
+
 func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	// SE-free: ok

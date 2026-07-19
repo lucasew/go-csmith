@@ -43,6 +43,10 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	if got != loc {
 		t.Fatal("local on stack")
 	}
+	// nil candidate hole fails closed
+	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
+		t.Fatal("nil readVars hole must fail closed")
+	}
 }
 
 func TestEffectReadVarsSorted(t *testing.T) {

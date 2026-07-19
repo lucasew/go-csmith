@@ -698,6 +698,8 @@ func (v *Variable) GetDimension() int {
 
 // MatchVarName mirrors Variable::match_var_name.
 // Variable.cpp:1205–1222 — name match, array Output text, or field recurse.
+// MatchVarName mirrors Variable::match_var_name — name or field path.
+// Variable* always live in FieldVars; nil hole fails closed (nil match).
 func (v *Variable) MatchVarName(vname string) *Variable {
 	if v == nil || vname == "" {
 		return nil
@@ -718,6 +720,9 @@ func (v *Variable) MatchVarName(vname string) *Variable {
 		}
 	}
 	for _, f := range v.FieldVars {
+		if f == nil {
+			return nil
+		}
 		if m := f.MatchVarName(vname); m != nil {
 			return m
 		}

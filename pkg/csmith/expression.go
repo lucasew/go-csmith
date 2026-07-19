@@ -327,40 +327,62 @@ func (e *Expression) Is0Or1() bool {
 
 // UseVar mirrors Expression::use_var.
 // Expression.h:143 default false; Variable/Funcall/Comma/Assign overrides.
+// Incomplete IR fails closed as true (uses v) — no invent conflict-free non-use.
 func (e *Expression) UseVar(v *Variable) bool {
 	if e == nil || v == nil {
 		return false
 	}
 	switch e.Term {
 	case TermVariable:
-		return e.Var == v || (e.Var != nil && e.Var.Match(v))
+		// ExpressionVariable always has live Variable*
+		if e.Var == nil {
+			return true
+		}
+		return e.Var == v || e.Var.Match(v)
 	case TermFunction:
+		// ExpressionFuncall always has live invoke + args after ERROR_GUARD
 		if e.Invoke == nil {
-			return false
+			return true
 		}
 		for _, a := range e.Invoke.Args {
-			if a != nil && a.UseVar(v) {
+			if a == nil {
+				return true
+			}
+			if a.UseVar(v) {
 				return true
 			}
 		}
 		return false
 	case TermCommaExpr:
+		if e.CommaLHS == nil || e.CommaRHS == nil {
+			return true
+		}
 		return e.CommaLHS.UseVar(v) || e.CommaRHS.UseVar(v)
 	case TermAssignment:
 		if e.Assign == nil {
-			return false
+			return true
 		}
 		if e.Assign.LhsVar != nil && (e.Assign.LhsVar == v || e.Assign.LhsVar.Match(v)) {
 			return true
 		}
-		if e.Assign.Lhs != nil && e.Assign.Lhs.Var != nil &&
-			(e.Assign.Lhs.Var == v || e.Assign.Lhs.Var.Match(v)) {
+		if e.Assign.Lhs != nil {
+			if e.Assign.Lhs.Var == nil {
+				return true
+			}
+			if e.Assign.Lhs.Var == v || e.Assign.Lhs.Var.Match(v) {
+				return true
+			}
+		}
+		if e.Assign.Expr == nil {
 			return true
 		}
 		return e.Assign.Expr.UseVar(v)
 	case TermLhs:
 		// Lhs as expression term if ever used
-		return e.Var == v || (e.Var != nil && e.Var.Match(v))
+		if e.Var == nil {
+			return true
+		}
+		return e.Var == v || e.Var.Match(v)
 	default:
 		return false
 	}
