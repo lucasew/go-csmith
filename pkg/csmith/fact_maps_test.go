@@ -109,6 +109,21 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	}
 }
 
+func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
+	// second visit: incomplete current map must not invent join into final
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f1 := MakeFactPointTo(p, NullPtr)
+	fm.SetMapFactsIn(1, []*FactPointTo{f1})
+	fm.SetupInOutMaps(true)
+	// plant incomplete current MapFactsIn
+	fm.MapFactsIn[1] = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr}), nil}
+	fm.SetupInOutMaps(false)
+	if fm.MapFactsInFinal[1] != nil {
+		t.Fatal("incomplete combine must fail closed nil final, not invent partial join")
+	}
+}
+
 func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)

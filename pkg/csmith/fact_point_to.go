@@ -298,7 +298,12 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 			if indirect != -1 {
 				return nil
 			}
-			return MakeFactsPointTo(lvars, rhs.Var.GetCollective())
+			// GetCollective always live for address-of; nil is broken IR
+			coll := rhs.Var.GetCollective()
+			if coll == nil {
+				return nil
+			}
+			return MakeFactsPointTo(lvars, coll)
 		}
 		// FactPointTo.cpp:210–224 — aggregate RHS: map pointer fields pairwise
 		if rt.IsAggregate() {
@@ -689,39 +694,28 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 
 // MergeFacts mirrors merge_facts — merge each of new into facts.
 // Fact.cpp:192–200.
-// Fact* always live; nil holes fail closed (no invent skip partial join).
+// Returns whether any fact changed. Incomplete maps fail closed: *facts set nil,
+// returns false (no invent skip partial join / keep broken partial).
 func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
-	// pre-validate both maps complete before any join
-	for _, f := range *facts {
-		if f == nil {
-			return false
-		}
-	}
-	for _, f := range newFacts {
-		if f == nil {
-			return false
-		}
+	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		*facts = nil
+		return false
 	}
 	changed := false
 	for _, f := range newFacts {
-		before := len(*facts)
+		before := FindRelatedPointTo(*facts, f.Var)
 		merged := MergeFactInto(*facts, f)
 		// MergeFactInto nil = incomplete (should not happen after pre-validate)
 		if merged == nil {
+			*facts = nil
 			return false
 		}
 		*facts = merged
-		// detect change roughly: length or content
-		if len(*facts) != before {
-			changed = true
-			continue
-		}
-		// check related fact expanded
-		cur := FindRelatedPointTo(*facts, f.Var)
-		if cur != nil && !cur.Equal(f) && !f.Imply(cur) {
+		after := FindRelatedPointTo(*facts, f.Var)
+		if before == nil || after == nil || !before.Equal(after) {
 			changed = true
 		}
 	}

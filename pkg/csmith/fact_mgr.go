@@ -380,26 +380,42 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 				fm.MapFactsInFinal[id] = nil
 				continue
 			}
-			fm.MapFactsInFinal[id] = CloneFactSlice(facts)
+			// CloneFactSlice nil = incomplete clone; no invent empty final from fail
+			cl := CloneFactSlice(facts)
+			if cl == nil && facts != nil {
+				fm.MapFactsInFinal[id] = nil
+				continue
+			}
+			fm.MapFactsInFinal[id] = cl
 		}
 		for id, facts := range fm.MapFactsOut {
 			if !FactsComplete(facts) {
 				fm.MapFactsOutFinal[id] = nil
 				continue
 			}
-			fm.MapFactsOutFinal[id] = CloneFactSlice(facts)
+			cl := CloneFactSlice(facts)
+			if cl == nil && facts != nil {
+				fm.MapFactsOutFinal[id] = nil
+				continue
+			}
+			fm.MapFactsOutFinal[id] = cl
 		}
 		return
 	}
 	// combine current maps into final
-	// Fact* always live; incomplete maps fail closed (nil final entry, no invent join)
+	// Fact* always live; incomplete maps or failed merge fail closed (nil final, no invent partial join)
 	for id, facts2 := range fm.MapFactsIn {
 		facts1 := fm.MapFactsInFinal[id]
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
 			fm.MapFactsInFinal[id] = nil
 			continue
 		}
-		MergeFacts(&facts1, facts2)
+		// MergeFacts clears *facts on incomplete mid-join; false alone may mean no lattice change
+		_ = MergeFacts(&facts1, facts2)
+		if !FactsComplete(facts1) {
+			fm.MapFactsInFinal[id] = nil
+			continue
+		}
 		fm.MapFactsInFinal[id] = facts1
 	}
 	for id, facts2 := range fm.MapFactsOut {
@@ -408,7 +424,11 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			fm.MapFactsOutFinal[id] = nil
 			continue
 		}
-		MergeFacts(&facts1, facts2)
+		_ = MergeFacts(&facts1, facts2)
+		if !FactsComplete(facts1) {
+			fm.MapFactsOutFinal[id] = nil
+			continue
+		}
 		fm.MapFactsOutFinal[id] = facts1
 	}
 }

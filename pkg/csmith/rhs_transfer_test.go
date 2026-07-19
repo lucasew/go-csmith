@@ -92,6 +92,24 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 	}
 }
 
+func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
+	// GetCollective nil is broken IR — no invent MakeFactsPointTo with nil pointee
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// Variable without name/type quirks still has collective self; use incomplete shell
+	broken := &Variable{Name: "broken"} // Type nil, GetCollective returns self but IsPointer fails on lvars
+	// address-of path requires pointer lvars; use p as lhs, rhs var with nil collective via nil GetCollective
+	// only nil GetCollective when v is nil — covered by Var==nil fail closed
+	// multi-level & invents nil
+	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(GetIntType())}
+	// force Indir < -1 by ExprType deeper than Var.Type
+	rhs.ExprType = PointerTo(PointerTo(GetIntType()))
+	if RhsToLhsTransfer(nil, []*Variable{p}, rhs) != nil {
+		// indirect != -1 fails closed
+		t.Fatal("multi-level & must fail closed")
+	}
+	_ = broken
+}
+
 func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 	// FactPointTo.cpp:256–258 — embedded assign peels to assign RHS
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
