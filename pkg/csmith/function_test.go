@@ -224,4 +224,10 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	if !strings.Contains(out, "if (DEPTH < MAX_DEPTH)") || !strings.Contains(out, "return 42") {
 		t.Fatal("complete depth_protect IR", out)
 	}
+	// empty ret_c value — no invent "return ;" depth shell
+	f.RetConst = &Constant{Type: GetIntType(), Value: ""}
+	out = f.Output()
+	if strings.Contains(out, "if (DEPTH") || strings.Contains(out, "return ;") {
+		t.Fatal("empty RetConst.Value must not invent depth shell", out)
+	}
 }

@@ -105,6 +105,25 @@ func TestOutputHeaderForbiddenArgStructFailClosed(t *testing.T) {
 	}
 }
 
+func TestParamListNoInventEmptyNameOrType(t *testing.T) {
+	// Function.cpp param Output — live type + name; no invent "int " / bare type
+	f := &Function{
+		Name:       "func_p",
+		ReturnType: GetIntType(),
+		Param: []*Variable{
+			{Name: "", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		},
+	}
+	if out := f.OutputHeader(false); out != "" {
+		t.Fatal("empty param name must fail closed header", out)
+	}
+	f.Param[0].Name = "p_1"
+	f.Param[0].Type = nil
+	if out := f.OutputHeader(false); out != "" {
+		t.Fatal("nil param type must fail closed header", out)
+	}
+}
+
 func TestOutputHeaderInlineStatic(t *testing.T) {
 	f := &Function{
 		Name:       "func_2",

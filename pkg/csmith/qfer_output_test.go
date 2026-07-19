@@ -255,6 +255,24 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	}
 }
 
+func TestExpressionCommaNoInventEmptySide(t *testing.T) {
+	// ExpressionComma.cpp:109–115 — both sides Output live; no invent "( , x)"
+	good := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	bad := &Expression{Term: TermConstant} // nil Con → empty Output
+	e := &Expression{Term: TermCommaExpr, CommaLHS: bad, CommaRHS: good}
+	if out := e.Output(); out != "" {
+		t.Fatal("empty lhs Output must fail closed comma", out)
+	}
+	e.CommaLHS, e.CommaRHS = good, bad
+	if out := e.Output(); out != "" {
+		t.Fatal("empty rhs Output must fail closed comma", out)
+	}
+	e.CommaLHS, e.CommaRHS = good, &Expression{Term: TermConstant, Con: MakeInt(2)}
+	if out := e.Output(); out != "(1 , 2)" {
+		t.Fatal(out)
+	}
+}
+
 func TestOutputDeclNoInventEmptyType(t *testing.T) {
 	// Variable::OutputDecl — qualified type always live; no invent " name"
 	v := &Variable{Name: "g_x"}

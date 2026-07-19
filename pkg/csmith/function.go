@@ -634,10 +634,15 @@ func (f *Function) paramListCOpts(opts Options) string {
 		if !opts.ArgUnions && p.Type.IsUnion() {
 			return ""
 		}
+		// Variable always has live name + qualified type; no invent "int " / " p"
+		ty := p.Qfer.OutputQualifiedType(p.Type)
+		if ty == "" || p.Name == "" {
+			return ""
+		}
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(p.Qfer.OutputQualifiedType(p.Type))
+		b.WriteString(ty)
 		b.WriteString(" ")
 		b.WriteString(p.Name)
 	}
@@ -808,18 +813,25 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 		return s
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
+	bodyOut := f.Body.Output(0)
 	if f.DepthProtect && f.RetConst != nil {
 		// Function.cpp:575–597 — if (DEPTH…) body else return ret_c
+		// both body Output and ret_c value always live; no invent if/else or "return ;"
+		retVal := f.RetConst.Value
+		if bodyOut == "" || retVal == "" {
+			// incomplete depth_protect IR — body only when live (no soft invent shell)
+			return s + bodyOut
+		}
 		s += "if (DEPTH < MAX_DEPTH) \n"
-		s += f.Body.Output(0)
+		s += bodyOut
 		s += "else\n"
 		s += "return "
-		s += f.RetConst.Value
+		s += retVal
 		s += ";\n"
 		return s
 	}
 	// body without complete depth_protect wrap (void / missing ret_c)
 	// no soft invent "if (DEPTH…)" without else ret_c
-	s += f.Body.Output(0)
+	s += bodyOut
 	return s
 }

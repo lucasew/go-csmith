@@ -903,11 +903,17 @@ func (e *Expression) outputBody() string {
 		}
 	case TermCommaExpr:
 		// ExpressionComma.cpp:137–144 — "(" + lhs + " , " + rhs + ")"
-		// C++ always has live lhs/rhs references; no invent "( , )" for nil sides
+		// C++ always has live lhs/rhs Output; no invent "( , )" / "(x , )" / "( , y)"
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			return ""
 		}
-		return "(" + e.CommaLHS.Output() + " , " + e.CommaRHS.Output() + ")"
+		lhs := e.CommaLHS.Output()
+		rhs := e.CommaRHS.Output()
+		if lhs == "" || rhs == "" {
+			// incomplete side IR — fail closed whole comma
+			return ""
+		}
+		return "(" + lhs + " , " + rhs + ")"
 	}
 	// Expression.cpp:195–200 default: no emit invent; incomplete IR → empty
 	return ""
