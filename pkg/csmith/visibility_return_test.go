@@ -86,6 +86,12 @@ func TestAddBackReturnFacts(t *testing.T) {
 	if len(facts) != 1 || facts[0].Var != p {
 		t.Fatal(facts)
 	}
+	// return StmID 0 fails closed (no invent soft-merge MapFactsOut[0])
+	var facts0 []*FactPointTo
+	AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0)
+	if facts0 != nil {
+		t.Fatal("return StmID 0 must fail closed", facts0)
+	}
 }
 
 func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {

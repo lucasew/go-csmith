@@ -168,6 +168,13 @@ func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	if tgt || out != "  step_hash(9);\n" {
 		t.Fatal(out, tgt)
 	}
+	// FM + StmID 0 — no invent SourceLabel / step_hash for incomplete id
+	fm := NewFactMgr(nil)
+	st0 := &Stmt{Kind: StmtAssign, StmID: 0, SourceLabel: "lbl_invent"}
+	out0, tgt0 := PreOutput(st0, fm, true, false, nil, "  ")
+	if out0 != "" || tgt0 {
+		t.Fatal("StmID 0 under FM must not invent SourceLabel/step_hash", out0, tgt0)
+	}
 }
 
 func TestPreOutputFromCFGJumpSources(t *testing.T) {

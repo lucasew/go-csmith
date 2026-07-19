@@ -142,28 +142,27 @@ func (b *Block) SetAccumulatedEffect(fm *FactMgr) Effect {
 	if b == nil || fm == nil {
 		return eff
 	}
+	// Block::stm_id always live; StmID 0 fails closed empty (no invent non-empty
+	// accum return without map_stm_effect[block] recorded)
+	if b.StmID <= 0 {
+		return EmptyEffect()
+	}
 	for i := range b.Stmts {
 		st := &b.Stmts[i]
 		if st.StmID <= 0 {
-			if b.StmID > 0 {
-				fm.SetMapStmEffect(b.StmID, EmptyEffect())
-			}
+			fm.SetMapStmEffect(b.StmID, EmptyEffect())
 			return EmptyEffect()
 		}
 		// map_stm_effect[] defaults empty Effect in C++; incomplete map keys fail closed
 		se := fm.GetMapStmEffect(st.StmID)
 		if !effectMapKeysComplete(se.read) || !effectMapKeysComplete(se.written) ||
 			!effectMapKeysComplete(se.lhsWrite) {
-			if b.StmID > 0 {
-				fm.SetMapStmEffect(b.StmID, EmptyEffect())
-			}
+			fm.SetMapStmEffect(b.StmID, EmptyEffect())
 			return EmptyEffect()
 		}
 		eff = eff.AddEffect(se)
 	}
-	if b.StmID > 0 {
-		fm.SetMapStmEffect(b.StmID, eff)
-	}
+	fm.SetMapStmEffect(b.StmID, eff)
 	return eff
 }
 
@@ -575,12 +574,16 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
 		if len(b.Stmts) > 0 {
 			sr := &b.Stmts[len(b.Stmts)-1]
-			if sr.StmID > 0 {
+			// return stm_id always live after append_return; StmID 0 fails closed
+			// (no invent soft-skip body out update)
+			if sr.StmID <= 0 {
+				fm.SetMapFactsOut(b.StmID, nil)
+			} else {
 				out := fm.MapFactsOut[sr.StmID]
 				if FactsComplete(out) {
 					fm.SetMapFactsOut(b.StmID, out)
 				} else {
-					// incomplete sr out — fail closed empty body out (no invent skip)
+					// incomplete sr out — fail closed empty body out
 					fm.SetMapFactsOut(b.StmID, nil)
 				}
 			}

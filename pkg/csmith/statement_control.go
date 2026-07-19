@@ -103,6 +103,11 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false
 	}
+	// Block::stm_id always live for CFG-indexed edges; StmID 0 fails closed
+	// as possible escape (no invent "no back edge" soft-skipping FindEdgesIn)
+	if b.StmID <= 0 {
+		return true
+	}
 	// edges targeting the block as DestBlock
 	toBlk := fm.FindEdgesInToBlock(b, false, true)
 	if toBlk == nil {
@@ -114,15 +119,13 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 		}
 	}
 	// edges targeting block stm_id
-	if b.StmID > 0 {
-		back := fm.FindEdgesIn(b.StmID, false, true)
-		if back == nil {
+	back := fm.FindEdgesIn(b.StmID, false, true)
+	if back == nil {
+		return true
+	}
+	for _, e := range back {
+		if e.SrcID != b.StmID {
 			return true
-		}
-		for _, e := range back {
-			if e.SrcID != b.StmID {
-				return true
-			}
 		}
 	}
 	return false

@@ -133,11 +133,14 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	if fm == nil || st == nil {
 		return
 	}
+	// Statement::stm_id always live; StmID 0 fails closed (no invent silent
+	// set_fact_out success without map entry)
+	if st.StmID <= 0 {
+		return
+	}
 	// incomplete source facts fail closed (nil out — no invent cleaned set_fact_out)
 	if !FactsComplete(facts) {
-		if st.StmID > 0 {
-			fm.SetMapFactsOut(st.StmID, nil)
-		}
+		fm.SetMapFactsOut(st.StmID, nil)
 		return
 	}
 	cp := CloneFactSlice(facts)
@@ -173,9 +176,7 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 			cp = RemoveFunctionLocalFactsAt(cp, fm.Func, nil)
 		}
 	}
-	if st.StmID > 0 {
-		fm.SetMapFactsOut(st.StmID, cp)
-	}
+	fm.SetMapFactsOut(st.StmID, cp)
 }
 
 // FindParentBlockOfStmID walks function blocks for the parent of stm_id.

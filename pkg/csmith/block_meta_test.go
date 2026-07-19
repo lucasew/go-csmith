@@ -163,6 +163,11 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	if b.MustReturn() {
 		t.Fatal("back edge escapes")
 	}
+	// Block StmID 0 + FM fails closed as escape (no invent "no back edge")
+	b0 := &Block{StmID: 0, Stmts: []Stmt{ret}, EmitFM: fm}
+	if b0.MustReturn() {
+		t.Fatal("block StmID 0 must fail closed not must_return")
+	}
 	// MustJump also requires empty break_stms
 	b2 := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},

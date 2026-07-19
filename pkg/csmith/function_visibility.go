@@ -133,6 +133,12 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 	}
 	if st.Kind == StmtReturn {
 		// Statement.cpp:528 — merge_facts(facts, map_facts_out[this])
+		// Statement::stm_id always live; StmID 0 fails closed (no invent
+		// soft-merge MapFactsOut[0] / missing-as-empty success)
+		if st.StmID <= 0 {
+			*facts = nil
+			return false
+		}
 		// C++ map[] always; missing → empty merge; incomplete fails closed
 		out := fm.MapFactsOut[st.StmID]
 		if !FactsComplete(out) || !FactsComplete(*facts) {
