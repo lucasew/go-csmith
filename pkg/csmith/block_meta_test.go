@@ -49,6 +49,13 @@ func TestSetAccumulatedEffect(t *testing.T) {
 	if !fm.GetMapStmEffect(10).IsWritten(v) {
 		t.Fatal("block effect")
 	}
+	// StmID 0 incomplete — fail closed empty (no invent soft-skip as no-effect)
+	b2 := &Block{StmID: 11, Stmts: []Stmt{{StmID: 1}, {StmID: 0}}}
+	fm.SetMapStmEffect(11, EmptyEffect().WriteVar(v))
+	eff2 := b2.SetAccumulatedEffect(fm)
+	if !eff2.IsEmpty() || fm.GetMapStmEffect(11).IsWritten(v) {
+		t.Fatal("StmID 0 must fail closed empty accum, not invent partial")
+	}
 }
 
 func TestRandomParentBlock(t *testing.T) {

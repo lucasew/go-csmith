@@ -83,7 +83,8 @@ func TestIs1stStm(t *testing.T) {
 
 func TestFindContainerAndDominate(t *testing.T) {
 	body := &Block{StmID: 20}
-	ifSt := Stmt{Kind: StmtIfElse, StmID: 10, Then: body}
+	// StatementIf always has both arms
+	ifSt := Stmt{Kind: StmtIfElse, StmID: 10, Then: body, Else: &Block{}}
 	outer := &Block{Stmts: []Stmt{ifSt, {Kind: StmtAssign, StmID: 11}}}
 	body.Parent = outer
 	// fix Then pointer to outer.Stmts[0].Then
@@ -104,6 +105,15 @@ func TestFindContainerAndDominate(t *testing.T) {
 	}
 	if Dominate(&outer.Stmts[1], outer, &outer.Stmts[0], outer) {
 		t.Fatal("11 does not dominate 10")
+	}
+	// stray Then on assign is not get_blocks — no invent container/dominate
+	stray := &Block{StmID: 99, Parent: outer}
+	outer.Stmts[1].Then = stray
+	if FindContainerStm(stray) != nil {
+		t.Fatal("assign Then must not invent container")
+	}
+	if Dominate(&outer.Stmts[1], outer, &Stmt{Kind: StmtAssign, StmID: 100}, stray) {
+		t.Fatal("assign must not invent dominate via stray Then")
 	}
 }
 

@@ -400,13 +400,14 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = nil
 		return
 	}
-	var thenOut, elseOut []*FactPointTo
-	if st.Then.StmID > 0 {
-		thenOut = fm.MapFactsOut[st.Then.StmID]
+	// Block::stm_id always live; StmID 0 + FactsComplete(nil) would invent empty
+	// arm outs as complete (no invent soft empty map for missing block id)
+	if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
+		fm.GlobalFacts = nil
+		return
 	}
-	if st.Else.StmID > 0 {
-		elseOut = fm.MapFactsOut[st.Else.StmID]
-	}
+	thenOut := fm.MapFactsOut[st.Then.StmID]
+	elseOut := fm.MapFactsOut[st.Else.StmID]
 	// Fact* always live in maps used for branch combine
 	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
 		fm.GlobalFacts = nil
@@ -430,16 +431,14 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = CloneFactSlice(thenOut)
 		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
 		// C++ map[] always; missing → empty makeup; incomplete fails closed
-		if st.Else.StmID > 0 {
-			in := fm.MapFactsIn[st.Else.StmID]
-			if !FactsComplete(in) {
-				fm.GlobalFacts = nil
-				return
-			}
-			if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
-				fm.GlobalFacts = nil
-				return
-			}
+		in := fm.MapFactsIn[st.Else.StmID]
+		if !FactsComplete(in) {
+			fm.GlobalFacts = nil
+			return
+		}
+		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
+			fm.GlobalFacts = nil
+			return
 		}
 	default:
 		fm.GlobalFacts = CloneFactSlice(thenOut)

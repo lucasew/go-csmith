@@ -124,15 +124,18 @@ func Is1stStm(st *Stmt, parent *Block) bool {
 }
 
 // FindContainerStm mirrors Statement::find_container_stm for a nested block.
-// Statement.cpp:414–430 — parent-block statement whose Then/Else is b.
+// Statement.cpp:414–430 — parent-block statement whose get_blocks contains b.
+// Kind-gated get_blocks only (no invent container via stray Then on assign).
 func FindContainerStm(b *Block) *Stmt {
 	if b == nil || b.Parent == nil {
 		return nil
 	}
 	for i := range b.Parent.Stmts {
 		s := &b.Parent.Stmts[i]
-		if s.Then == b || s.Else == b {
-			return s
+		for _, nb := range GetBlocksStmt(s) {
+			if nb == b {
+				return s
+			}
 		}
 	}
 	return nil
@@ -144,13 +147,18 @@ func FindContainerStm(b *Block) *Stmt {
 // Statement::stm_id is always live after create; StmID 0 is incomplete IR.
 // Same-parent incomplete IDs resolve by parent membership when possible; unresolved
 // membership fails closed false (no invent dominate true via 0<=0 for orphans).
+// Nested-in-a uses get_blocks only (no invent dominate via stray Then on assign).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	if a == nil || s == nil {
 		return false
 	}
-	// s is nested inside a (a's Then/Else is s's parent block)
-	if sParent != nil && (a.Then == sParent || a.Else == sParent) {
-		return true
+	// s is nested inside a (get_blocks of a includes s's parent block)
+	if sParent != nil {
+		for _, nb := range GetBlocksStmt(a) {
+			if nb == sParent {
+				return true
+			}
+		}
 	}
 	// same parent: earlier stm_id dominates later (Statement.cpp:399–401)
 	if aParent == sParent {

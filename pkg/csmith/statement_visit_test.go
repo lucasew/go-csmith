@@ -58,11 +58,13 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	// Fix then: assign p = &a is hard; empty then with return (live ExpressionVariable)
 	rv := CreateVariableScalars("g_rv", GetIntType(), false, false)
 	ret := Stmt{
-		Kind: StmtReturn,
+		Kind: StmtReturn, StmID: 2,
 		Expr: &Expression{Term: TermVariable, Var: rv, ExprType: GetIntType()},
 	}
-	st.Then = &Block{Stmts: []Stmt{ret}}
-	st.Else = &Block{Stmts: []Stmt{}}
+	// Block::stm_id always live; StmID 0 fails closed (no invent EffectStm soft fallback)
+	st.Then = &Block{StmID: 3, Stmts: []Stmt{ret}}
+	st.Else = &Block{StmID: 4, Stmts: []Stmt{}}
+	st.StmID = 1
 	cg := EmptyCGContext().WithFactMgr(fm)
 	// return path needs CurrentFunc.RV for fact update; visit still runs expr visit
 	cg.CurrentFunc = &Function{Name: "f", ReturnType: GetIntType(), RV: rv}
@@ -70,6 +72,11 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	cg.EffectAccum = &eff
 	if !VisitFactsStatementIf(&st, &cg, Defaults()) {
 		t.Fatal("visit if")
+	}
+	// incomplete arm StmID must fail closed
+	st.Else.StmID = 0
+	if VisitFactsStatementIf(&st, &cg, Defaults()) {
+		t.Fatal("Else StmID 0 must fail closed")
 	}
 	// true must return → facts from else (pre) kept
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)

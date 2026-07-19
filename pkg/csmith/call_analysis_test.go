@@ -244,6 +244,19 @@ func TestCombineBranchFacts(t *testing.T) {
 	if fm3.GlobalFacts != nil {
 		t.Fatal("nil Else arm must fail closed", fm3.GlobalFacts)
 	}
+	// arm Block StmID 0 — no invent empty outs via FactsComplete(nil)
+	fm4 := NewFactMgr(nil)
+	fm4.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	st4 := &Stmt{
+		Kind: StmtIfElse,
+		Then: &Block{StmID: 0, Stmts: []Stmt{{Kind: StmtAssign, StmID: 20}}},
+		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
+	}
+	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	CombineBranchFacts(st4, pre, fm4)
+	if fm4.GlobalFacts != nil {
+		t.Fatal("Then StmID 0 must fail closed", fm4.GlobalFacts)
+	}
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {
