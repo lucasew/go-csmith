@@ -73,10 +73,22 @@ func TestFindEdgesInNilHoleFailClosed(t *testing.T) {
 	if got := fm.FindEdgesIn(20, false, false); got != nil {
 		t.Fatal("nil CFG hole must fail closed fwd", got)
 	}
+	// HasEdgeIn must not invent false from len(nil)==0
+	if !fm.HasEdgeIn(20, false, true) {
+		t.Fatal("incomplete FindEdgesIn must HasEdgeIn true, not invent none")
+	}
 	b := &Block{}
 	fm.CFGEdges = []*CFGEdge{nil, {SrcID: 1, DestBlock: b, BackLink: true}}
 	if got := fm.FindEdgesInToBlock(b, false, true); got != nil {
 		t.Fatal("nil hole FindEdgesInToBlock", got)
+	}
+}
+
+func TestHasEdgeInNilFMFailClosed(t *testing.T) {
+	// assert(fm) path — no invent no-edge without FactMgr
+	var fm *FactMgr
+	if !fm.HasEdgeIn(1, false, true) {
+		t.Fatal("nil FM must HasEdgeIn true")
 	}
 }
 

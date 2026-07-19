@@ -105,8 +105,19 @@ func (fm *FactMgr) FindEdgesInToBlock(dest *Block, postDest, backLink bool) []*C
 }
 
 // HasEdgeIn mirrors Statement::has_edge_in.
+// Statement.cpp:434–446 — assert(fm); scan cfg_edges.
+// Incomplete CFG (FindEdgesIn nil) fails closed true — no invent "no edge"
+// from len(nil)==0 soft-skip past hole.
 func (fm *FactMgr) HasEdgeIn(destStmID int, postDest, backLink bool) bool {
-	return len(fm.FindEdgesIn(destStmID, postDest, backLink)) > 0
+	if fm == nil {
+		// assert(fm) path — fail closed has-edge (conservative revisit)
+		return true
+	}
+	edges := fm.FindEdgesIn(destStmID, postDest, backLink)
+	if edges == nil {
+		return true
+	}
+	return len(edges) > 0
 }
 
 // AnalyzeWithEdgesIn mirrors Statement::analyze_with_edges_in.

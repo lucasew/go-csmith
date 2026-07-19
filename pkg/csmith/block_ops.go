@@ -564,9 +564,13 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 // ContainsBackEdge mirrors Block::contains_back_edge.
 // Block.cpp:485–496 — CFG back_link whose dest->parent == this.
 // CFGEdge* always live; nil hole fails closed as has-back (no invent none).
+// Nil FactMgr fails closed has-back (no invent clean CFG without edges list).
 func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
-	if b == nil || fm == nil {
+	if b == nil {
 		return false
+	}
+	if fm == nil {
+		return true
 	}
 	for _, e := range fm.CFGEdges {
 		if e == nil {

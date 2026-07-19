@@ -234,6 +234,10 @@ func TestContainsBackEdge(t *testing.T) {
 	if !b2.ContainsBackEdge(fm) {
 		t.Fatal("dest block parent")
 	}
+	// nil FM must not invent clean no-back-edge
+	if !b2.ContainsBackEdge(nil) {
+		t.Fatal("nil FM must fail closed has-back")
+	}
 }
 
 func TestMakeDummyBlockCG(t *testing.T) {
