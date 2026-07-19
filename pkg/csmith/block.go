@@ -821,8 +821,9 @@ func makeRandomStmtKind(
 	b *Block,
 	kind StatementType,
 ) Stmt {
-	// Statement.cpp always has live RNG + CGContext; nil → fail closed (no invent shell)
+	// Statement.cpp always has live RNG + CGContext; sticky fail closed (no invent shell)
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	switch kind {

@@ -204,8 +204,9 @@ func MakeRandomSignature(
 		return nil
 	}
 	name := RandomFunctionName(sym)
-	// gensym always live; no invent empty-name signature / "_alias" shell
+	// gensym always live; sticky no invent empty-name signature / "_alias" shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: retType}
@@ -352,8 +353,9 @@ func MakeFirst(
 		return nil
 	}
 	name := RandomFunctionName(sym)
-	// gensym always live; no invent empty-name function / "_alias" shell
+	// gensym always live; sticky no invent empty-name function / "_alias" shell
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f := &Function{Name: name, AliasName: name + "_alias", ReturnType: ty}

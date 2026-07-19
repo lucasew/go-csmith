@@ -597,7 +597,9 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 // ArrayVariable.cpp:439–461 — nested braces for multi-dim; pick from init_strings.
 // C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR.
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {
+	// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR sticky
 	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -610,17 +612,21 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 			// magic index pick (ArrayVariable.cpp:448–452)
 			s := *seed
 			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
-			// init string always live; no invent empty holes in brace list
+			// init string always live; sticky no invent empty holes in brace list
 			part := initStrings[rnd]
 			if part == "" {
+				SetError(ErrGeneric)
 				return ""
 			}
 			b.WriteString(part)
 			*seed = s + 1
 		} else {
-			// nested braces always live; no invent "{, }" with empty child
+			// nested braces always live; sticky no invent "{, }" with empty child
 			part := av.buildInitRecursive(dimen+1, initStrings, seed)
 			if part == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			b.WriteString(part)

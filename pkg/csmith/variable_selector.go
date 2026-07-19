@@ -1111,8 +1111,9 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if v.IsArray && v.AsArray != nil {
 			// VariableSelector.cpp:1528–1530 — always itemize_array; no bare collective
 			// (C++ var = itemize_array(...); if null, try next — never return collective)
-			// RNG always live for itemize; nil r fails closed (no invent skip to next)
+			// RNG always live for itemize; sticky nil r (no invent skip to next)
 			if r == nil {
+				SetError(ErrGeneric)
 				return nil
 			}
 			item := vs.ItemizeArray(r, cg, v.AsArray)
@@ -2006,8 +2007,9 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 	if t == nil || HasError() {
 		return nil
 	}
-	// VariableSelector.cpp:973–974 assert non-void simple
+	// VariableSelector.cpp:973–974 assert non-void simple sticky
 	if t.IsSimple() && t.Simple() == EVoid {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:976 — CVQualifiers::random_qualifiers(t)

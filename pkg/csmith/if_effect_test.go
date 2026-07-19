@@ -99,6 +99,23 @@ func TestArrayBuildInitRecursive(t *testing.T) {
 	if !strings.Contains(out, "{{") {
 		t.Fatal("want nested braces", out)
 	}
+	// empty init_strings list is broken IR sticky
+	ClearError()
+	seed := uint32(1)
+	if av.buildInitRecursive(0, nil, &seed) != "" {
+		t.Fatal("empty init list must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty init list must SetError sticky")
+	}
+	ClearError()
+	if av.buildInitRecursive(0, []string{""}, &seed) != "" {
+		t.Fatal("empty hole string must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty hole string must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
