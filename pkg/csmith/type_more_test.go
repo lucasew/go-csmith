@@ -147,6 +147,20 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	}
 }
 
+func TestFindTypeNilHole(t *testing.T) {
+	// Type* always live on AllTypes; no invent soft-skip hole then match later
+	intT := GetIntType()
+	env := &TypeEnv{AllTypes: []*Type{nil, intT}}
+	if env.FindType(intT) != nil {
+		t.Fatal("nil AllTypes hole must fail closed FindType (not soft-skip to match)")
+	}
+	// complete pool still finds
+	envOK := &TypeEnv{AllTypes: []*Type{GetSimpleType(EShort), intT}}
+	if envOK.FindType(intT) != intT {
+		t.Fatal("complete pool must find type")
+	}
+}
+
 func TestGetAllOKStructUnionTypes(t *testing.T) {
 	env := &TypeEnv{}
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{

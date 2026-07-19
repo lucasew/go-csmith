@@ -770,9 +770,9 @@ func makeExpressionVariableFlags(
 	qfer *CVQualifiers,
 	asParam, asReturn bool,
 ) *Expression {
-	// ExpressionVariable.cpp always has RNG + live selector/context
-	// no invent var shell without them
-	if r == nil || vs == nil || cg == nil {
+	// ExpressionVariable.cpp always has RNG + live selector/context + Type*
+	// no invent var shell without them; nil typ must not soft-skip type filters
+	if r == nil || vs == nil || cg == nil || typ == nil {
 		return nil
 	}
 	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)
@@ -814,45 +814,49 @@ func makeExpressionVariableFlags(
 		if skip {
 			continue
 		}
-		if typ != nil && v.Type != nil {
-			// ExpressionVariable.cpp:93–94 — no float var for non-float want
-			if !typ.IsFloat() && v.Type.IsFloat() {
-				dummy = append(dummy, v)
-				continue
-			}
-			// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
-			// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
-			if asParam && v.IsArgument() && v.Type.IsDereferencedFrom(typ) {
-				dummy = append(dummy, v)
-				continue
-			}
-			// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
-			if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
-				v.Type.IsDereferencedFrom(typ) {
-				dummy = append(dummy, v)
-				continue
-			}
-			// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
-			if asReturn && vs.Opts.NoReturnDeadPointer {
-				indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
-				var facts []*FactPointTo
-				if cg.FM != nil {
-					facts = cg.FM.GlobalFacts
-				}
-				if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
-					dummy = append(dummy, v)
-					continue
-				}
-			}
-			// ExpressionVariable.cpp:116–119 — opportunistic_validate (always; empty facts if no FM)
+		// Variable::type always live; incomplete type IR fails closed (no invent
+		// skip type/as_param/as_return filters and still accept the candidate)
+		if v.Type == nil {
+			dummy = append(dummy, v)
+			continue
+		}
+		// ExpressionVariable.cpp:93–94 — no float var for non-float want
+		if !typ.IsFloat() && v.Type.IsFloat() {
+			dummy = append(dummy, v)
+			continue
+		}
+		// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
+		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
+		if asParam && v.IsArgument() && v.Type.IsDereferencedFrom(typ) {
+			dummy = append(dummy, v)
+			continue
+		}
+		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
+		if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
+			v.Type.IsDereferencedFrom(typ) {
+			dummy = append(dummy, v)
+			continue
+		}
+		// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
+		if asReturn && vs.Opts.NoReturnDeadPointer {
+			indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
 			var facts []*FactPointTo
 			if cg.FM != nil {
 				facts = cg.FM.GlobalFacts
 			}
-			if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+			if IsPointingToLocals(v, cg.CurrentBlock(), indirection, facts) {
 				dummy = append(dummy, v)
 				continue
 			}
+		}
+		// ExpressionVariable.cpp:116–119 — opportunistic_validate (always; empty facts if no FM)
+		var facts []*FactPointTo
+		if cg.FM != nil {
+			facts = cg.FM.GlobalFacts
+		}
+		if OpportunisticValidate(r, v, typ, facts, vs.Opts.NullPointerDerefProb, vs.Opts.DeadPointerDerefProb) == 0 {
+			dummy = append(dummy, v)
+			continue
 		}
 		// ExpressionVariable.cpp:80 ERROR_GUARD after select (sticky)
 		if HasError() {

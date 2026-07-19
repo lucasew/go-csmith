@@ -55,6 +55,26 @@ func TestMakeRandomLhsDerefPointer(t *testing.T) {
 	}
 }
 
+func TestMakeRandomLhsRejectsNilVarType(t *testing.T) {
+	// Variable::type always live; Type-nil candidate must not soft-skip filters
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	vs.Types = &TypeEnv{}
+	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken.Type = nil
+	vs.GlobalList = []*Variable{broken}
+	vs.AllVars = []*Variable{broken}
+	cg := EmptyCGContext()
+	// may create a new var instead of broken; must never accept Type-nil
+	for seed := uint64(1); seed < 20; seed++ {
+		lhs := MakeRandomLhs(NewRng(seed), opts, probs, vs, &cg, GetIntType(), false, false, nil)
+		if lhs != nil && lhs.Var == broken {
+			t.Fatal("Type-nil var must not be accepted as Lhs")
+		}
+	}
+}
+
 func TestLhsOutputVolLval(t *testing.T) {
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	lhs := &Lhs{Var: v, Type: GetIntType()}

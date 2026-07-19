@@ -331,15 +331,20 @@ func MakeRandomLhs(
 			restore()
 			continue
 		}
+		// Variable::type always live; incomplete type IR fails closed (no invent
+		// skip const-after-deref filter and still accept the candidate)
+		if v.Type == nil {
+			dummy = append(dummy, v)
+			restore()
+			continue
+		}
 		// Lhs.cpp:85–86 / 97–99 — assert(!qfer.is_const_after_deref(deref_level))
 		// select+restrict should exclude const WRITE; reject if violated
-		if v.Type != nil && typ != nil {
-			deref := v.Type.IndirectLevel() - typ.IndirectLevel()
-			if v.IsConstAfterDeref(deref) {
-				dummy = append(dummy, v)
-				restore()
-				continue
-			}
+		deref := v.Type.IndirectLevel() - typ.IndirectLevel()
+		if v.IsConstAfterDeref(deref) {
+			dummy = append(dummy, v)
+			restore()
+			continue
 		}
 
 		// Lhs.cpp:103–122 — validity filters before visit_facts

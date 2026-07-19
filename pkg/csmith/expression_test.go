@@ -307,6 +307,20 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if e := makeExpressionVariableFlags(nil, vs, &cg, GetIntType(), nil, false, false); e != nil {
 		t.Fatal("nil RNG must not invent ExpressionVariable")
 	}
+	// Type* always live; nil want must not soft-skip type filters
+	if e := makeExpressionVariableFlags(NewRng(1), vs, &cg, nil, nil, false, false); e != nil {
+		t.Fatal("nil typ must not invent ExpressionVariable")
+	}
+	// Variable::type always live; Type-nil candidate must not soft-skip filters to success
+	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken.Type = nil
+	vs.GlobalList = []*Variable{broken}
+	vs.AllVars = []*Variable{broken}
+	// disable new-var creation path by restricting options if possible; still must not return broken
+	evBroken := makeExpressionVariableFlags(NewRng(3), vs, &cg, GetIntType(), nil, false, false)
+	if evBroken != nil && evBroken.Var == broken {
+		t.Fatal("Type-nil var must not be accepted as ExpressionVariable")
+	}
 }
 
 func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {

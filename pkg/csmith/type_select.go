@@ -44,8 +44,13 @@ func (env *TypeEnv) HasPointerType() bool {
 
 // FindType mirrors Type::find_type — pointer identity in AllTypes.
 // Type.cpp:410–417.
+// Type* always live on AllTypes; nil hole fails closed (nil — no invent soft-skip
+// hole and still match a later entry, or invent "not found" past incomplete pool).
 func (env *TypeEnv) FindType(t *Type) *Type {
 	if env == nil || t == nil {
+		return nil
+	}
+	if !typesComplete(env.AllTypes) {
 		return nil
 	}
 	for _, x := range env.AllTypes {
