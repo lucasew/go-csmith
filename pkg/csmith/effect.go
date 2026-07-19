@@ -486,10 +486,18 @@ func (e Effect) IsRead(v *Variable) bool {
 // FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
 // Effect.cpp:389–399.
 // Variable always live; sticky true (no invent no-field-read soft-skip past hole).
+// Type* always live for non-special subjects; Type-nil sticky true (IsAggregate
+// residual ERROR+false invents no-field-read / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
 // Incomplete effect fails closed as true sticky (incomplete marker soft re-pick banned).
 func (e Effect) FieldIsRead(v *Variable) bool {
 	if v == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	// Type* always live for non-special subjects; Type-nil sticky true
+	// (no invent IsAggregate residual false as no-field-read past shell)
+	if !IsSpecialPtr(v) && v.Type == nil {
 		SetError(ErrGeneric)
 		return true
 	}
@@ -516,10 +524,18 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
 // Variable always live; sticky true (no invent no-field-write soft-skip past hole).
+// Type* always live for non-special subjects; Type-nil sticky true (IsAggregate
+// residual ERROR+false invents no-field-write / conflict-free past Type-nil shell).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
 // Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).
 func (e Effect) FieldIsWritten(v *Variable) bool {
 	if v == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	// Type* always live for non-special subjects; Type-nil sticky true
+	// (no invent IsAggregate residual false as no-field-write past shell)
+	if !IsSpecialPtr(v) && v.Type == nil {
 		SetError(ErrGeneric)
 		return true
 	}

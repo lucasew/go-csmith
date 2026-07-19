@@ -258,6 +258,17 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 		t.Fatal("nil Variable FieldIsWritten must fail closed sticky true")
 	}
 	ClearError()
+	// Type-nil subject soft invent: IsAggregate residual ERROR+false → no field conflict
+	// fair: sticky true (restrictive) before classify
+	shell := &Variable{Name: "g_typeless"}
+	if !e.FieldIsRead(shell) || !HasError() {
+		t.Fatal("Type-nil FieldIsRead must fail closed sticky true")
+	}
+	ClearError()
+	if !e.FieldIsWritten(shell) || !HasError() {
+		t.Fatal("Type-nil FieldIsWritten must fail closed sticky true")
+	}
+	ClearError()
 }
 
 func TestEffectIsReadByName(t *testing.T) {

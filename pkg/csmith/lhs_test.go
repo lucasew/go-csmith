@@ -140,6 +140,16 @@ func TestLhsIndirectLevel(t *testing.T) {
 		t.Fatal("GetReferencedPtrs incomplete must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Var soft invent: IsPointer residual ERROR+false → complete empty no-ptrs
+	// fair: sticky IncompleteVariables before classify
+	tyNilLhs := &Lhs{Var: &Variable{Name: "g_typeless"}}
+	if VariablesComplete(tyNilLhs.GetReferencedPtrs()) {
+		t.Fatal("GetReferencedPtrs Type-nil must fail closed incomplete, not empty-complete")
+	}
+	if !HasError() {
+		t.Fatal("GetReferencedPtrs Type-nil must SetError sticky")
+	}
+	ClearError()
 	eBroken := &Expression{Term: TermVariable, Var: &Variable{Name: "y"}}
 	if _, ok := eBroken.IndirectLevelComplete(); ok {
 		t.Fatal("expr incomplete type must fail closed")

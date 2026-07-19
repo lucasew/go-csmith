@@ -143,10 +143,18 @@ func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 // Lhs.cpp:234–238 — pointer vars only.
 // Incomplete Lhs/Var fails closed IncompleteVariables (not bare nil invent
 // empty-complete "no ptrs" via VariablesComplete(nil)/len==0).
+// Type* always live for non-special Var; Type-nil sticky IncompleteVariables
+// (IsPointer residual ERROR+false invents complete empty no-ptrs past shell).
 // Non-pointer live Var → complete empty nil.
 func (l *Lhs) GetReferencedPtrs() []*Variable {
 	if l == nil || l.Var == nil {
 		// incomplete Lhs fails closed sticky (no invent empty-complete "no ptrs")
+		SetError(ErrGeneric)
+		return IncompleteVariables()
+	}
+	// Type* always live for non-special subjects; Type-nil sticky incomplete
+	// (no invent IsPointer residual false as complete empty no-ptrs)
+	if l.Var.Type == nil && !IsSpecialPtr(l.Var) {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
