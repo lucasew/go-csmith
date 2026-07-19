@@ -147,16 +147,19 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
-	// no MapFactsIn[10]; not must_return
+	// no MapFactsIn[10]; not must_return — C++ map[] empty is complete empty
 	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
-	if fm.GlobalFacts != nil {
-		t.Fatal("missing body MapFactsIn must clear GlobalFacts, not invent keep prior")
+	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+		t.Fatal("missing body MapFactsIn must clear prior, not invent keep prior")
 	}
-	// body StmID 0 — no invent keep prior soft-skipping map_facts_in
+	if !FactsComplete(fm.GlobalFacts) {
+		t.Fatal("missing body in is complete empty, not incomplete marker")
+	}
+	// body StmID 0 — incomplete IR marker
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	postLoopAnalysis(fm, forSt, &Block{StmID: 0}, nil, EmptyEffect(), nil)
-	if fm.GlobalFacts != nil {
-		t.Fatal("body StmID 0 must fail closed nil GlobalFacts")
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
 	}
 }
 
@@ -170,7 +173,7 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body MapFactsIn must fail closed nil GlobalFacts")
 	}
 }
@@ -188,7 +191,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
 	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete break MapFactsOut must fail closed nil GlobalFacts")
 	}
 	// incomplete first break must not invent continue-merge later complete break
@@ -202,7 +205,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 		31: {MakeFactPointTo(p, c)},
 	}
 	postLoopAnalysis(fm2, &Stmt{Kind: StmtFor, StmID: 8, Then: body2}, body2, pre, EmptyEffect(), nil)
-	if fm2.GlobalFacts != nil {
+	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("incomplete first break must not invent later break merge", fm2.GlobalFacts)
 	}
 }
@@ -219,7 +222,7 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 7, Then: body}, body, pre, EmptyEffect(), nil)
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
 	}
 }

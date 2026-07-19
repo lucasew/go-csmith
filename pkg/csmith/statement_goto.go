@@ -623,7 +623,7 @@ func MakeRandomGoto(
 		// Incomplete maps fail closed (nil — no invent cleaned clone of holes)
 		out := fm.MapFactsOut[dest.StmID]
 		if !FactsComplete(out) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 		} else {
 			fm.GlobalFacts = CloneFactSlice(out)
 		}
@@ -631,7 +631,7 @@ func MakeRandomGoto(
 			// ctrl/return: use map_facts_in[stm] (altered outs for OOS)
 			in := fm.MapFactsIn[dest.StmID]
 			if !FactsComplete(in) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 			} else {
 				fm.GlobalFacts = CloneFactSlice(in)
 			}

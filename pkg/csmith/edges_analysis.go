@@ -24,7 +24,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 	}
 	// pre-validate: incomplete maps must not soft-join past holes
 	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return false, false
 	}
 	// iterate a snapshot of subjects so we can grow via MergeFactInto
@@ -43,7 +43,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		merged := MergeFactInto(*facts, jumpF)
 		if merged == nil {
 			// mid-join incomplete — clear partial, no invent keep half-merged map
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false, false
 		}
 		*facts = merged
@@ -208,18 +208,18 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	// No sticky ERROR — incomplete pre can appear after fail-closed subpaths; wiping
 	// GlobalFacts signals incomplete without aborting whole generation.
 	if !FactsComplete(preFacts) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// incomplete GlobalFacts: makeup/branch combine must not invent past holes
 	if !FactsComplete(fm.GlobalFacts) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// Statement::stm_id always live; StmID 0 fails closed (no invent post_creation
 	// success without map_facts_in/out / map_visited)
 	if st.StmID <= 0 {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	if st.Kind == StmtIfElse {
@@ -227,7 +227,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	} else {
 		// MakeupNewVarFacts fails closed (nils preFacts) on holes; pre already complete
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 	}
@@ -241,7 +241,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		if HasUncertainCallRecursiveStmt(st) {
 			// preFacts complete above; still re-check after makeup
 			if !FactsComplete(preFacts) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 			outputs := CloneFactSlice(preFacts)
@@ -282,7 +282,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			// incomplete assign fails closed — no invent mark visited with wiped facts
 			_ = fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
 			if !FactsComplete(fm.GlobalFacts) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 		case StmtReturn:
@@ -294,14 +294,14 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			}
 			_ = fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 			if !FactsComplete(fm.GlobalFacts) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 		}
 	}
 	fm.RemoveRVFacts(&fm.GlobalFacts)
 	if !FactsComplete(fm.GlobalFacts) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	fm.SetMapFactsIn(st.StmID, preFacts)

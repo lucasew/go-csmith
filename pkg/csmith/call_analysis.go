@@ -400,26 +400,26 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	// StatementIf always has live if_true / if_false blocks after make_random
 	// incomplete arms fail closed (no invent empty then/else via nil-out + FactsComplete)
 	if st.Then == nil || st.Else == nil {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// Block::stm_id always live; StmID 0 + FactsComplete(nil) would invent empty
 	// arm outs as complete (no invent soft empty map for missing block id)
 	if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	thenOut := fm.MapFactsOut[st.Then.StmID]
 	elseOut := fm.MapFactsOut[st.Else.StmID]
 	// Fact* always live in maps used for branch combine
 	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// makeup new vars from branch outs into preFacts snapshot
 	// sequential: first failure must not invent second makeup from cleared empty
 	if !MakeupNewVarFacts(&preFacts, thenOut) || !MakeupNewVarFacts(&preFacts, elseOut) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 
@@ -436,11 +436,11 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		// C++ map[] always; missing → empty makeup; incomplete fails closed
 		in := fm.MapFactsIn[st.Else.StmID]
 		if !FactsComplete(in) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 	default:
@@ -450,13 +450,13 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 			return
 		}
 		if !FactsComplete(elseOut) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed
 		_ = MergeFacts(&fm.GlobalFacts, elseOut)
 		if !FactsComplete(fm.GlobalFacts) {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 			return
 		}
 	}

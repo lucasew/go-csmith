@@ -388,15 +388,15 @@ func MakeFirst(
 	// return outs onto a wiped GlobalFacts via FactsComplete(nil)==true
 	if f.Body != nil {
 		if f.Body.StmID <= 0 {
-			fm.GlobalFacts = nil
+			fm.GlobalFacts = IncompleteFactSlice()
 		} else {
 			out := fm.MapFactsOut[f.Body.StmID]
 			if !FactsComplete(out) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 			} else {
 				fm.GlobalFacts = CloneFactSlice(out)
 				if !AddBackReturnFacts(f.Body, fm, &fm.GlobalFacts) {
-					fm.GlobalFacts = nil
+					fm.GlobalFacts = IncompleteFactSlice()
 				}
 			}
 		}
@@ -610,15 +610,15 @@ func (f *Function) generateBodyCore(
 	// return facts onto wiped GlobalFacts via FactsComplete(nil)==true)
 	if cg.FM != nil && f.Body != nil {
 		if f.Body.StmID <= 0 {
-			cg.FM.GlobalFacts = nil
+			cg.FM.GlobalFacts = IncompleteFactSlice()
 		} else {
 			out := cg.FM.MapFactsOut[f.Body.StmID]
 			if !FactsComplete(out) {
-				cg.FM.GlobalFacts = nil
+				cg.FM.GlobalFacts = IncompleteFactSlice()
 			} else {
 				cg.FM.GlobalFacts = CloneFactSlice(out)
 				if !AddBackReturnFacts(f.Body, cg.FM, &cg.FM.GlobalFacts) {
-					cg.FM.GlobalFacts = nil
+					cg.FM.GlobalFacts = IncompleteFactSlice()
 				}
 			}
 		}

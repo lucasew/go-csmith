@@ -38,12 +38,12 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	}
 	facts := []*FactPointTo{MakeFactPointTo(p, loc)}
 	MarkFuncEndOnFacts(&facts, f, blk)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("MarkFuncEndOnFacts must clear on incomplete stack, not invent live pointee", facts)
 	}
 	facts2 := []*FactPointTo{MakeFactPointTo(p, loc)}
 	out := RemoveFunctionLocalFactsAt(facts2, f, blk)
-	if out != nil {
+	if FactsComplete(out) {
 		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
 	}
 	// Block stack scan
@@ -87,7 +87,7 @@ func TestAddBackReturnFacts(t *testing.T) {
 	}
 	// return StmID 0 fails closed (no invent soft-merge MapFactsOut[0])
 	var facts0 []*FactPointTo
-	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0) || facts0 != nil {
+	if AddBackReturnFacts(&Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 0}}}, fm, &facts0) || FactsComplete(facts0) {
 		t.Fatal("return StmID 0 must fail closed", facts0)
 	}
 }
@@ -108,7 +108,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		{Kind: StmtReturn, StmID: 20},
 	}}
 	var facts []*FactPointTo
-	if AddBackReturnFacts(body, fm, &facts) || facts != nil {
+	if AddBackReturnFacts(body, fm, &facts) || FactsComplete(facts) {
 		t.Fatal("incomplete out must fail closed nil accumulator, not invent later return", facts)
 	}
 	// nested if Then with incomplete return must stop before Else returns
@@ -123,7 +123,7 @@ func TestAddBackReturnFactsIncompleteStopsWalk(t *testing.T) {
 		Else: &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 40}}},
 	}}}
 	var facts2 []*FactPointTo
-	if AddBackReturnFacts(body2, fm2, &facts2) || facts2 != nil {
+	if AddBackReturnFacts(body2, fm2, &facts2) || FactsComplete(facts2) {
 		t.Fatal("nested incomplete must fail closed without inventing Else return", facts2)
 	}
 }
@@ -148,13 +148,13 @@ func TestUpdateFactsForOOSVarsVisibility(t *testing.T) {
 	// nil fact hole fails closed — no invent clean filter past hole
 	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	UpdateFactsForOOSVars([]*Variable{loc}, &hole)
-	if hole != nil {
+	if FactsComplete(hole) {
 		t.Fatal("nil fact hole must fail closed", hole)
 	}
 	// nil OOS var hole fails closed
 	ok := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	UpdateFactsForOOSVars([]*Variable{nil}, &ok)
-	if ok != nil {
+	if FactsComplete(ok) {
 		t.Fatal("nil OOS var hole must fail closed", ok)
 	}
 }

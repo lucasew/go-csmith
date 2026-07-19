@@ -118,7 +118,7 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return false
 	}
 	changed := false

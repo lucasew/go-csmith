@@ -96,13 +96,13 @@ func MakeRandomIf(
 		if thenB.StmID > 0 {
 			in := cg.FM.MapFactsIn[thenB.StmID]
 			if !FactsComplete(in) {
-				cg.FM.GlobalFacts = nil
+				cg.FM.GlobalFacts = IncompleteFactSlice()
 			} else {
 				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
 		} else {
 			// incomplete then block id — fail closed empty
-			cg.FM.GlobalFacts = nil
+			cg.FM.GlobalFacts = IncompleteFactSlice()
 		}
 	}
 

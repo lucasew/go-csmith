@@ -83,8 +83,8 @@ func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	fn.Blocks = []*Block{body}
 	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{{Var: gp, PointTo: []*Variable{nil}}}
-	if RemoveFunctionLocalFacts(facts, fn) != nil {
-		t.Fatal("incomplete PointTo must fail closed nil, not invent filter")
+	if FactsComplete(RemoveFunctionLocalFacts(facts, fn)) {
+		t.Fatal("incomplete PointTo must fail closed incomplete, not invent filter")
 	}
 }
 

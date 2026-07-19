@@ -14,12 +14,16 @@ func TestBodyOutAssignMissingNoInventPrior(t *testing.T) {
 	// mirror MakeFirst handoff assign
 	out := fm.MapFactsOut[f.Body.StmID]
 	if !FactsComplete(out) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
 		fm.GlobalFacts = CloneFactSlice(out)
 	}
-	if fm.GlobalFacts != nil {
-		t.Fatal("missing body out must clear GlobalFacts, not invent keep prior")
+	// missing MapFactsOut is complete empty (C++ map[]); must not keep prior
+	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+		t.Fatal("missing body out must clear prior GlobalFacts, not invent keep prior")
+	}
+	if !FactsComplete(fm.GlobalFacts) {
+		t.Fatal("missing body out is complete empty, not incomplete marker")
 	}
 }
 
@@ -34,12 +38,12 @@ func TestBodyOutAssignIncompleteFailClosed(t *testing.T) {
 	}
 	out := fm.MapFactsOut[f.Body.StmID]
 	if !FactsComplete(out) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
 		fm.GlobalFacts = CloneFactSlice(out)
 	}
-	if fm.GlobalFacts != nil {
-		t.Fatal("incomplete body out must fail closed nil GlobalFacts")
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("incomplete body out must fail closed incomplete GlobalFacts")
 	}
 }
 
@@ -57,8 +61,9 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 		retFacts = CloneFactSlice(out)
 		AddBackReturnFacts(callee.Body, calFM, &retFacts)
 	}
+	// missing MapFactsOut — retFacts never populated (no invent from GlobalFacts)
 	if retFacts != nil {
-		t.Fatal("missing body out must not invent GlobalFacts as ret_facts")
+		t.Fatal("missing body out must not invent GlobalFacts as ret_facts", retFacts)
 	}
 	// incomplete body out — no invent soft-merge returns onto wiped empty
 	ret := Stmt{Kind: StmtReturn, StmID: 99}
@@ -72,10 +77,11 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 	if FactsComplete(out) {
 		retFacts = CloneFactSlice(out)
 		if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
-			retFacts = nil
+			retFacts = IncompleteFactSlice()
 		}
 	}
-	if retFacts != nil {
+	// incomplete body out leaves retFacts unset (nil) — must not invent returns-only
+	if retFacts != nil && FactsComplete(retFacts) {
 		t.Fatal("incomplete body out must not invent returns-only ret_facts", retFacts)
 	}
 	// complete body out + incomplete return out — AddBack fails closed
@@ -84,7 +90,7 @@ func TestRetFactsNoInventGlobalFactsFallback(t *testing.T) {
 		99: {MakeFactPointTo(p, GarbagePtr), nil},
 	}
 	retFacts = CloneFactSlice(calFM.MapFactsOut[20])
-	if AddBackReturnFacts(callee.Body, calFM, &retFacts) || retFacts != nil {
+	if AddBackReturnFacts(callee.Body, calFM, &retFacts) || FactsComplete(retFacts) {
 		t.Fatal("incomplete return out must fail closed AddBackReturnFacts", retFacts)
 	}
 }

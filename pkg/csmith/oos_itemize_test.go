@@ -45,7 +45,7 @@ func TestUpdateFactsForOOSVars(t *testing.T) {
 	fm2 := NewFactMgr(nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm2.UpdateFactsForOOSVars([]*Variable{loc})
-	if fm2.GlobalFacts != nil {
+	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil fact hole must fail closed", fm2.GlobalFacts)
 	}
 }

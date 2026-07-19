@@ -367,8 +367,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		// Statement.cpp:621–624 — remove_rv; accum; visited always set
 		// incomplete GlobalFacts after visit: nil facts + false (no invent clean slice)
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			*facts = nil
-			cg.FM.GlobalFacts = nil
+			*facts = IncompleteFactSlice()
+			cg.FM.GlobalFacts = IncompleteFactSlice()
 			ok = false
 		} else {
 			*facts = CloneFactSlice(cg.FM.GlobalFacts)
@@ -378,8 +378,8 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 		// Statement::stm_id always live; StmID 0 fails closed (C++ always
 		// records map_accum_effect / map_visited — no invent soft-skip maps)
 		if st.StmID <= 0 {
-			*facts = nil
-			cg.FM.GlobalFacts = nil
+			*facts = IncompleteFactSlice()
+			cg.FM.GlobalFacts = IncompleteFactSlice()
 			return false
 		}
 		if cg.FM.MapAccumEffect == nil {

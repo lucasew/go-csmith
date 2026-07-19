@@ -249,7 +249,7 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("incomplete oldFacts must fail closed false")
 	}
-	if old != nil {
+	if FactsComplete(old) {
 		t.Fatal("incomplete oldFacts must fail closed nil")
 	}
 	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -257,8 +257,8 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if MakeupNewVarFacts(&old2, new2) {
 		t.Fatal("incomplete newFacts must fail closed false")
 	}
-	if old2 != nil {
-		t.Fatal("incomplete newFacts must fail closed nil oldFacts")
+	if FactsComplete(old2) {
+		t.Fatal("incomplete newFacts must fail closed incomplete oldFacts")
 	}
 }
 
@@ -284,7 +284,7 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("FieldVars hole must fail closed false")
 	}
-	if old != nil {
+	if FactsComplete(old) {
 		t.Fatal("must not invent re-accumulate later pointer after hole", old)
 	}
 	if FindRelatedPointTo(old, later) != nil {

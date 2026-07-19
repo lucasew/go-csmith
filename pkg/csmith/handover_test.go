@@ -70,7 +70,7 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm.CallerToCalleeHandover(nil, &facts)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
 }
@@ -85,7 +85,7 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr), MakeFactPointTo(p, NullPtr)}
 	fm.CallerToCalleeHandover(nil, &facts)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("incomplete Param must fail closed nil inputs, not invent drop param", facts)
 	}
 }
@@ -110,7 +110,7 @@ func TestRemoveRVFactsNilHole(t *testing.T) {
 	fm := NewFactMgr(f)
 	facts := []*FactPointTo{nil}
 	fm.RemoveRVFacts(&facts)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
 }

@@ -237,7 +237,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	CombineBranchFacts(st2, pre, fm2)
-	if fm2.GlobalFacts != nil {
+	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil branch fact hole must fail closed", fm2.GlobalFacts)
 	}
 	// missing Then/Else arm — no invent empty branch via FactsComplete(nil)
@@ -246,7 +246,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	st3 := &Stmt{Kind: StmtIfElse, Then: &Block{StmID: 10}, Else: nil}
 	fm3.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	CombineBranchFacts(st3, pre, fm3)
-	if fm3.GlobalFacts != nil {
+	if FactsComplete(fm3.GlobalFacts) {
 		t.Fatal("nil Else arm must fail closed", fm3.GlobalFacts)
 	}
 	// arm Block StmID 0 — no invent empty outs via FactsComplete(nil)
@@ -259,7 +259,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	fm4.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	CombineBranchFacts(st4, pre, fm4)
-	if fm4.GlobalFacts != nil {
+	if FactsComplete(fm4.GlobalFacts) {
 		t.Fatal("Then StmID 0 must fail closed", fm4.GlobalFacts)
 	}
 }

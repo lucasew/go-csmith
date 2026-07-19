@@ -145,14 +145,14 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	cg.EffectAccum = &eff
 	PostCreationAnalysis(st, pre, EmptyEffect(), &cg, Defaults())
 	// incomplete pre: fail closed nil GlobalFacts (no invent cleaned assign update)
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete pre must clear GlobalFacts, not invent post-creation")
 	}
 	// incomplete GlobalFacts seed
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	PostCreationAnalysis(st, pre2, EmptyEffect(), &cg, Defaults())
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete GlobalFacts must fail closed nil")
 	}
 	// StmID 0 — no invent post_creation success without maps
@@ -162,7 +162,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, EmptyEffect(), &cg, Defaults())
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("StmID 0 must fail closed nil GlobalFacts")
 	}
 	ClearError()

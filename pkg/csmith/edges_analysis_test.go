@@ -102,14 +102,14 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil subject hole must fail closed")
 	}
 	// fail closed clears *facts — no invent leave partial / hole-bearing map
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("incomplete must clear facts", facts)
 	}
 	holeSubj := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if _, ok := tryMergeJumpFacts(&holeSubj, jump); ok {
 		t.Fatal("tryMerge incomplete subject must ok=false")
 	}
-	if holeSubj != nil {
+	if FactsComplete(holeSubj) {
 		t.Fatal("tryMerge must clear incomplete subject", holeSubj)
 	}
 	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
@@ -117,7 +117,7 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	if MergeJumpFacts(&facts2, jumpHole) {
 		t.Fatal("nil jump hole must fail closed")
 	}
-	if facts2 != nil {
+	if FactsComplete(facts2) {
 		t.Fatal("incomplete jump must clear facts2", facts2)
 	}
 }

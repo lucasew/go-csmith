@@ -98,14 +98,14 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 
 // AddBackReturnFacts mirrors Statement::add_back_return_facts / Block walk.
 // Statement.cpp:525–537 — merge map_facts_out of every return into facts.
-// Incomplete map_facts_out / mid-join / nil block hole fails closed: *facts = nil
+// Incomplete map_facts_out / mid-join / nil block hole fails closed: *facts = IncompleteFactSlice()
 // and the walk stops (no invent keep merging later returns after a failed merge).
 // Returns false when incomplete (*facts wiped) so callers do not invent success
 // via FactsComplete(nil)==true after a fail-closed wipe.
 func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if b == nil || fm == nil || facts == nil {
 		if facts != nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 		}
 		return false
 	}
@@ -116,7 +116,7 @@ func AddBackReturnFacts(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
 func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if b == nil || fm == nil || facts == nil {
 		if facts != nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 		}
 		return false
 	}
@@ -132,7 +132,7 @@ func addBackReturnFactsBlock(b *Block, fm *FactMgr, facts *[]*FactPointTo) bool 
 func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 	if st == nil || facts == nil {
 		if facts != nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 		}
 		return false
 	}
@@ -141,19 +141,19 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 		// Statement::stm_id always live; StmID 0 fails closed (no invent
 		// soft-merge MapFactsOut[0] / missing-as-empty success)
 		if st.StmID <= 0 {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false
 		}
 		// C++ map[] always; missing → empty merge; incomplete fails closed
 		out := fm.MapFactsOut[st.StmID]
 		if !FactsComplete(out) || !FactsComplete(*facts) {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false
 		}
 		// MergeFacts clears *facts on incomplete mid-join — fail closed
 		_ = MergeFacts(facts, out)
 		if !FactsComplete(*facts) {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false
 		}
 		return true
@@ -162,7 +162,7 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) bool {
 	for _, blk := range GetBlocksStmt(st) {
 		// Block* always live from get_blocks; nil hole fails closed
 		if blk == nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false
 		}
 		if !addBackReturnFactsBlock(blk, fm, facts) {
@@ -183,12 +183,12 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		return
 	}
 	if !FactsComplete(*facts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return
 	}
 	for _, v := range vars {
 		if v == nil || !v.FieldVarsComplete() {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return
 		}
 	}

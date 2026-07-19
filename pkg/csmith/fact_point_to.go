@@ -732,7 +732,7 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return false
 	}
 	changed := false
@@ -741,7 +741,7 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		merged := MergeFactInto(*facts, f)
 		// MergeFactInto nil = incomplete (should not happen after pre-validate)
 		if merged == nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return false
 		}
 		*facts = merged
@@ -933,11 +933,11 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 		return
 	}
 	if !FactsComplete(*facts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return
 	}
 	if fn != nil && !fn.StackScanComplete(stParent) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return
 	}
 	for i, f := range *facts {
@@ -1060,14 +1060,14 @@ func UpdateFactsWithModifiedIndex(facts *[]*FactPointTo, indexVar *Variable) {
 		return
 	}
 	if !FactsComplete(*facts) {
-		*facts = nil
+		*facts = IncompleteFactSlice()
 		return
 	}
 	for i, fp := range *facts {
 		newFP := fp.UpdateWithModifiedIndex(indexVar)
 		// UpdateWithModifiedIndex nil = incomplete pointees
 		if newFP == nil {
-			*facts = nil
+			*facts = IncompleteFactSlice()
 			return
 		}
 		if newFP != fp {

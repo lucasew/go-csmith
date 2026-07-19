@@ -111,12 +111,16 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	thenStmID := 5
 	in := fm.MapFactsIn[thenStmID]
 	if !FactsComplete(in) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
 		fm.GlobalFacts = CloneFactSlice(in)
 	}
-	if fm.GlobalFacts != nil {
-		t.Fatal("missing then MapFactsIn must clear GlobalFacts, not invent pre-branch")
+	// missing MapFactsIn is complete empty (C++ map[]); must not keep prior
+	if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
+		t.Fatal("missing then MapFactsIn must clear prior, not invent pre-branch")
+	}
+	if !FactsComplete(fm.GlobalFacts) {
+		t.Fatal("missing then-in is complete empty, not incomplete marker")
 	}
 	// incomplete hole
 	fm.GlobalFacts = []*FactPointTo{prior}
@@ -125,11 +129,11 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	}
 	in = fm.MapFactsIn[thenStmID]
 	if !FactsComplete(in) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 	} else {
 		fm.GlobalFacts = CloneFactSlice(in)
 	}
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete then MapFactsIn must fail closed")
 	}
 }

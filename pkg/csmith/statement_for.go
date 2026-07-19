@@ -504,7 +504,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// StatementFor.cpp:355 — body Block always live with stm_id after make
 	// StmID 0 fails closed (no invent keep prior GlobalFacts soft-skipping map_facts_in)
 	if body == nil || body.StmID <= 0 {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
@@ -512,7 +512,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// (no invent must_return RestoreFacts past incomplete body entry)
 	in := fm.MapFactsIn[body.StmID]
 	if !FactsComplete(in) {
-		fm.GlobalFacts = nil
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	fm.GlobalFacts = CloneFactSlice(in)
@@ -530,11 +530,11 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
 			out := fm.MapFactsOut[breakID]
 			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
-				fm.GlobalFacts = nil
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 		}

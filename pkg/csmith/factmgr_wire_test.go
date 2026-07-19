@@ -79,7 +79,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}); ok {
 		t.Fatal("nil newFact hole must fail closed ok=false")
 	}
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("incomplete assign facts must clear", facts)
 	}
 	// incomplete subject map
@@ -87,7 +87,7 @@ func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {
 	if _, ok := applyPointToAssignFacts(&facts, p, 0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}); ok {
 		t.Fatal("nil subject map hole must fail closed ok=false")
 	}
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("incomplete subject must clear", facts)
 	}
 	// empty newFacts is ok no-op (not incomplete)
@@ -110,7 +110,7 @@ func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	if fm.UpdateFactForAssign(p, 0, rhs) {
 		t.Fatal("incomplete GlobalFacts assign must fail closed false")
 	}
-	if fm.GlobalFacts != nil {
+	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("point-to hole must clear GlobalFacts", fm.GlobalFacts)
 	}
 	if fm.UnionFacts != nil {

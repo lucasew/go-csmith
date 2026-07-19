@@ -347,13 +347,13 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 	prior := MakeFactPointTo(CreateVariableScalars("g_other", PointerTo(GetIntType()), false, false), NullPtr)
 	facts := []*FactPointTo{prior}
 	AddNewVarFactInto(v, &facts)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("nil FieldVars hole must fail closed clear facts, not soft-skip", facts)
 	}
 	// nil Variable* subject fails closed (no invent skip as absent)
 	facts2 := []*FactPointTo{prior}
 	AddNewVarFactInto(nil, &facts2)
-	if facts2 != nil {
+	if FactsComplete(facts2) {
 		t.Fatal("nil v must fail closed clear facts", facts2)
 	}
 }
@@ -425,18 +425,17 @@ func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	cg.EffectAccum = &eff
 	pre := EmptyEffect()
 	b.PostCreationAnalysis(&cg, Defaults(), pre, nil, nil)
-	// MapFactsOut[70] was set then likely reset on fail; if missing, GlobalFacts must be nil
+	// MapFactsOut missing (C++ map[] empty) → complete empty, not prior garbage
 	if _, ok := fm.MapFactsOut[70]; !ok {
-		if fm.GlobalFacts != nil {
+		if FindRelatedPointTo(fm.GlobalFacts, p) != nil {
 			t.Fatal("missing MapFactsOut must not invent keep prior GlobalFacts")
 		}
 		return
 	}
-	// if out present, must be complete (no hole invent) and not silently keep only prior
-	// when out was incomplete
+	// if out present incomplete → fail closed incomplete GlobalFacts
 	if !FactsComplete(fm.MapFactsOut[70]) {
-		if fm.GlobalFacts != nil {
-			t.Fatal("incomplete MapFactsOut must fail closed nil GlobalFacts")
+		if FactsComplete(fm.GlobalFacts) {
+			t.Fatal("incomplete MapFactsOut must fail closed incomplete GlobalFacts")
 		}
 	}
 }

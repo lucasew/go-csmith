@@ -44,7 +44,7 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, child)}
 	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
-	if facts != nil {
+	if FactsComplete(facts) {
 		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
 	}
 }
