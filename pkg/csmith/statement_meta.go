@@ -42,7 +42,8 @@ func GetBlocksStmt(st *Stmt) []*Block {
 
 // FindTypedStmts mirrors Statement::find_typed_stmts.
 // Statement.cpp:631–646 — collect statements whose Kind is in kinds (recursive).
-// Returns count of matches appended to stms.
+// Returns count of matches appended to stms, or -1 on incomplete IR
+// (nil Block hole — no invent partial typed-stmt list past hole; *stms cleared).
 func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 	if st == nil || stms == nil {
 		return 0
@@ -54,25 +55,30 @@ func FindTypedStmts(st *Stmt, stms *[]*Stmt, kinds []StatementType) int {
 		}
 	}
 	for _, b := range GetBlocksStmt(st) {
-		// Block* always live from get_blocks; nil hole fails closed (stop recurse)
-		// no invent skip nested typed stmts past hole
+		// Block* always live from get_blocks; nil hole fails closed
 		if b == nil {
-			return len(*stms)
+			*stms = nil
+			return -1
 		}
 		for i := range b.Stmts {
-			FindTypedStmts(&b.Stmts[i], stms, kinds)
+			if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+				return -1
+			}
 		}
 	}
 	return len(*stms)
 }
 
 // FindTypedStmtsInBlock walks a block's statements for typed collection.
+// Returns -1 on incomplete IR (same as FindTypedStmts).
 func FindTypedStmtsInBlock(b *Block, stms *[]*Stmt, kinds []StatementType) int {
 	if b == nil || stms == nil {
 		return 0
 	}
 	for i := range b.Stmts {
-		FindTypedStmts(&b.Stmts[i], stms, kinds)
+		if n := FindTypedStmts(&b.Stmts[i], stms, kinds); n < 0 {
+			return -1
+		}
 	}
 	return len(*stms)
 }

@@ -189,10 +189,24 @@ func variableInitOutput(v *Variable) string {
 	return ""
 }
 
+// copyBlocksNoHole copies blocks; nil hole fails closed (ok=false).
+// Block* always live on Function.Blocks; no invent soft-skip holes as absent.
+func copyBlocksNoHole(blocks []*Block) (out []*Block, ok bool) {
+	out = make([]*Block, 0, len(blocks))
+	for _, b := range blocks {
+		if b == nil {
+			return nil, false
+		}
+		out = append(out, b)
+	}
+	return out, true
+}
+
 // FindGoodJumpBlock mirrors StatementGoto::find_good_jump_block.
 // StatementGoto.cpp:309–354 — pick a block suitable as jump source/dest.
 // asDest true: block is jump destination; false: block is jump source (contains goto).
 // Mutates blocks slice by removing bad candidates (caller should pass a copy).
+// Block* always live; nil hole in blocks fails closed (nil — no invent soft-skip).
 func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block {
 	if r == nil || len(blocks) == 0 {
 		return nil
@@ -212,7 +226,15 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 		}
 	}
 	// work on a mutable copy (C++ mutates vector in place via erase)
-	blks := append([]*Block(nil), blocks...)
+	// Block* always live on Function.Blocks; nil hole fails closed
+	// (no invent soft-skip hole as absent candidate)
+	blks := make([]*Block, 0, len(blocks))
+	for _, b := range blocks {
+		if b == nil {
+			return nil
+		}
+		blks = append(blks, b)
+	}
 	for len(blks) > 0 {
 		idx := int(r.RndUpto(uint32(len(blks))))
 		// StatementGoto.cpp:326 ERROR_GUARD
@@ -220,10 +242,6 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 			return nil
 		}
 		b := blks[idx]
-		if b == nil {
-			blks = append(blks[:idx], blks[idx+1:]...)
-			continue
-		}
 		// StatementGoto.cpp:328–331 — disallow array-loop dest
 		if b.InArrayLoop && asDest {
 			blks = append(blks[:idx], blks[idx+1:]...)
@@ -295,7 +313,11 @@ func MakeRandomGoto(
 	if HasError() {
 		return makeGotoFailed()
 	}
-	blocks := append([]*Block(nil), cg.CurrentFunc.Blocks...)
+	// Block* always live on Function.Blocks; nil hole fails closed
+	blocks, ok := copyBlocksNoHole(cg.CurrentFunc.Blocks)
+	if !ok {
+		return makeGotoFailed()
+	}
 	// include current if not yet in Blocks list
 	if blk != nil {
 		found := false
@@ -322,7 +344,10 @@ func MakeRandomGoto(
 	if okBlk == nil {
 		// StatementGoto.cpp:81–84 — forward: as_dest=false (ok_blk is jump source)
 		backEdge = false
-		blocks = append([]*Block(nil), cg.CurrentFunc.Blocks...)
+		blocks, ok = copyBlocksNoHole(cg.CurrentFunc.Blocks)
+		if !ok {
+			return makeGotoFailed()
+		}
 		if blk != nil {
 			found := false
 			for _, b := range blocks {

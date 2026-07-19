@@ -331,3 +331,31 @@ func TestResetEffectAccum(t *testing.T) {
 		t.Fatalf("%+v", cg.EffectAccum)
 	}
 }
+
+func TestFindGoodJumpBlockNilHoleFailClosed(t *testing.T) {
+	// Block* always live; nil hole must not invent soft-skip as absent candidate
+	good := &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
+	if FindGoodJumpBlock(NewRng(1), []*Block{good, nil}, good, false) != nil {
+		t.Fatal("nil Block hole must fail closed FindGoodJumpBlock")
+	}
+	if FindGoodJumpBlock(NewRng(2), []*Block{nil, good}, good, true) != nil {
+		t.Fatal("nil hole first must fail closed")
+	}
+}
+
+func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	f.Blocks = []*Block{nil}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	blk := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	st := MakeRandomGoto(NewRng(3), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, blk)
+	if st.Kind == StmtGoto && st.Label != "" {
+		t.Fatal("nil Blocks hole must fail closed MakeRandomGoto")
+	}
+	ClearError()
+}

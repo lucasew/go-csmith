@@ -124,3 +124,14 @@ func TestContainsStmtTree(t *testing.T) {
 		t.Fatal("nested")
 	}
 }
+
+func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
+	// complete if/then still collects nested typed stmts
+	thenB := &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 3}}}
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	var stms []*Stmt
+	n := FindTypedStmts(st, &stms, []StatementType{StmtReturn})
+	if n != 1 || len(stms) != 1 {
+		t.Fatal(n, stms)
+	}
+}
