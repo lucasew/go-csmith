@@ -114,13 +114,16 @@ func (t *Type) IsAggregate() bool {
 
 // IsConstStructUnion mirrors Type::is_const_struct_union.
 // Type.cpp:437–451 — any field const or nested const aggregate.
-// Type* always live on Fields; nil hole fails closed as const (no invent non-const).
+// Type* always live on Fields; nil hole sticky fail closed as const (no invent non-const).
 func (t *Type) IsConstStructUnion() bool {
+	// non-aggregate / nil Type is complete false (not const-struct)
 	if t == nil || !t.IsAggregate() {
 		return false
 	}
 	for _, f := range t.Fields {
 		if f.Type == nil {
+			// incomplete field Type sticky const (restrictive — no invent non-const)
+			SetError(ErrGeneric)
 			return true
 		}
 		if f.Type.IsConstStructUnion() {
@@ -135,13 +138,16 @@ func (t *Type) IsConstStructUnion() bool {
 
 // IsVolatileStructUnion mirrors Type::is_volatile_struct_union.
 // Type.cpp:454+.
-// Type* always live on Fields; nil hole fails closed as volatile (no invent non-vol).
+// Type* always live on Fields; nil hole sticky fail closed as volatile (no invent non-vol).
 func (t *Type) IsVolatileStructUnion() bool {
+	// non-aggregate / nil Type is complete false (not vol-struct)
 	if t == nil || !t.IsAggregate() {
 		return false
 	}
 	for _, f := range t.Fields {
 		if f.Type == nil {
+			// incomplete field Type sticky volatile (restrictive — no invent non-vol)
+			SetError(ErrGeneric)
 			return true
 		}
 		if f.Type.IsVolatileStructUnion() {
@@ -217,6 +223,8 @@ func (t *Type) HasIntField() bool {
 	}
 	for _, f := range t.Fields {
 		if f.Type == nil {
+			// incomplete field Type sticky not-has-int (no invent int field past hole)
+			SetError(ErrGeneric)
 			return false
 		}
 		if f.Type.HasIntField() {
@@ -228,7 +236,7 @@ func (t *Type) HasIntField() bool {
 
 // ContainPointerField mirrors Type::contain_pointer_field.
 // Type.cpp:1664–1674 — ePointer, or any aggregate field that does.
-// Type* always live on Fields; nil hole fails closed as true (no invent pointer-free).
+// Type* always live on Fields; nil hole sticky true (no invent pointer-free).
 func (t *Type) ContainPointerField() bool {
 	if t == nil {
 		return false
@@ -239,6 +247,8 @@ func (t *Type) ContainPointerField() bool {
 	if t.IsAggregate() {
 		for _, f := range t.Fields {
 			if f.Type == nil {
+				// incomplete field Type sticky has-pointer (restrictive)
+				SetError(ErrGeneric)
 				return true
 			}
 			if f.Type.ContainPointerField() {
@@ -536,8 +546,11 @@ func (t *Type) IsConvertable(other *Type) bool {
 }
 
 // IsConvertableOpts applies CGOptions::strict_float / lang_cpp pointer rules.
+// Incomplete Type* sticky false (no invent not-convertable soft-skip past holes).
 func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
+	// both Type* always live; sticky incomplete no invent not-convertable soft-skip
 	if t == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if t == other {
@@ -623,8 +636,12 @@ func (t *Type) BaseType() *Type {
 // NeedsCast mirrors Type::needs_cast.
 // Type.cpp:1470–1473 — this is pointer and base_type not equivalent to other's base.
 // `this` is the expression's type; `other` is the desired cast target type.
+// Incomplete Type* sticky false for nil shell; incomplete base sticky needs-cast
+// (no invent no-cast / soft re-pick past holes).
 func (t *Type) NeedsCast(other *Type) bool {
+	// both Type* always live; sticky incomplete no invent no-cast soft-skip
 	if t == nil || other == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if t.PtrType() == nil {
@@ -632,6 +649,8 @@ func (t *Type) NeedsCast(other *Type) bool {
 	}
 	tb, ob := t.BaseType(), other.BaseType()
 	if tb == nil || ob == nil {
+		// incomplete base type sticky needs cast (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	return !tb.IsEquivalent(ob)
@@ -639,8 +658,7 @@ func (t *Type) NeedsCast(other *Type) bool {
 
 // HasBitfields mirrors Type::has_bitfields.
 // Type.cpp:1290–1301.
-// HasBitfields mirrors Type::has_bitfields.
-// Type* always live on Fields; nil hole fails closed as true (no invent bitfield-free).
+// Type* always live on Fields; nil hole sticky true (no invent bitfield-free).
 func (t *Type) HasBitfields() bool {
 	if t == nil {
 		return false
@@ -650,6 +668,8 @@ func (t *Type) HasBitfields() bool {
 			return true
 		}
 		if f.Type == nil {
+			// incomplete field Type sticky has-bitfields (restrictive)
+			SetError(ErrGeneric)
 			return true
 		}
 		if f.Type.IsStruct() && f.Type.HasBitfields() {

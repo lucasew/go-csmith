@@ -16,6 +16,7 @@ func TestIsEquivalentSameSize(t *testing.T) {
 }
 
 func TestNeedsCastPointerBases(t *testing.T) {
+	ClearError()
 	pi := PointerTo(GetIntType())
 	pc := PointerTo(GetSimpleType(EChar))
 	if !pi.NeedsCast(pc) && pi.BaseType().SizeInBytes() != pc.BaseType().SizeInBytes() {
@@ -29,6 +30,15 @@ func TestNeedsCastPointerBases(t *testing.T) {
 	if pi.NeedsCast(pi) {
 		t.Fatal("same no cast")
 	}
+	// incomplete Type sticky
+	ClearError()
+	if (*Type)(nil).NeedsCast(pi) {
+		t.Fatal("nil NeedsCast must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil NeedsCast must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionCastOutput(t *testing.T) {
@@ -48,6 +58,7 @@ func TestExpressionCastOutput(t *testing.T) {
 }
 
 func TestHasBitfields(t *testing.T) {
+	ClearError()
 	st := &Type{isStruct: true, Fields: []StructField{
 		{Type: GetIntType(), BitWidth: 3},
 	}}
@@ -60,6 +71,10 @@ func TestHasBitfields(t *testing.T) {
 	if st2.HasBitfields() {
 		t.Fatal("no bf")
 	}
+	if HasError() {
+		t.Fatal("complete HasBitfields must not sticky")
+	}
+	ClearError()
 }
 
 func TestCheckAndSetCast(t *testing.T) {
@@ -111,6 +126,7 @@ func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
 
 func TestNeedsCastOnlySourcePointer(t *testing.T) {
 	// Type.cpp:1470 — only `this` must be pointer
+	ClearError()
 	pi := PointerTo(GetIntType())
 	// bases int vs char inequivalent → cast
 	if !pi.NeedsCast(GetSimpleType(EChar)) {
@@ -124,6 +140,10 @@ func TestNeedsCastOnlySourcePointer(t *testing.T) {
 	if pi.NeedsCast(GetIntType()) {
 		t.Fatal("int* base int equivalent to int")
 	}
+	if HasError() {
+		t.Fatal("complete NeedsCast must not sticky")
+	}
+	ClearError()
 }
 
 func TestIsPromotableRanks(t *testing.T) {
@@ -174,6 +194,7 @@ func TestIsConvertableFloatToIntForbidden(t *testing.T) {
 }
 
 func TestIsConvertablePtrStrictFloatAndCPP(t *testing.T) {
+	ClearError()
 	pi := PointerTo(GetIntType())
 	pf := PointerTo(GetSimpleType(EFloat))
 	// same size usually float=4 int=4 → C allows by size
@@ -192,4 +213,13 @@ func TestIsConvertablePtrStrictFloatAndCPP(t *testing.T) {
 	if pi.IsConvertableOpts(pf, opts) {
 		t.Fatal("lang_cpp blocks")
 	}
+	// incomplete Type sticky not-convertable
+	ClearError()
+	if (*Type)(nil).IsConvertableOpts(pi, opts) {
+		t.Fatal("nil IsConvertableOpts must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsConvertableOpts must SetError sticky")
+	}
+	ClearError()
 }

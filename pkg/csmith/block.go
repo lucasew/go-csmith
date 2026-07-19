@@ -246,13 +246,17 @@ func (b *Block) StackScanComplete() bool {
 // IsVarOnStack mirrors Block::is_var_on_stack.
 // Block.cpp:443–456 — params + local_vars chain.
 // IsVarOnStack reports whether v is a param or local visible on this block chain.
-// Variable* always live; nil hole fails closed as false for the membership bit —
-// callers that need fail-closed selection use StackScanComplete.
+// Incomplete Block/Variable/Param/LocalVars sticky false (no invent not-on-stack
+// / soft re-pick past holes).
 func (b *Block) IsVarOnStack(v *Variable) bool {
+	// Block + Variable always live; sticky incomplete no invent not-on-stack
 	if b == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !b.StackScanComplete() {
+		// incomplete Param/LocalVars sticky fail closed not-on-stack
+		SetError(ErrGeneric)
 		return false
 	}
 	f := b.Func

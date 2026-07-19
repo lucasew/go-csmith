@@ -22,23 +22,44 @@ func TestHasIntFieldAndContainPointer(t *testing.T) {
 		t.Fatal("struct")
 	}
 	_ = st.HasIntField() // may or may not
-	// nil field Type holes fail closed
+	// nil field Type holes sticky fail closed
+	ClearError()
 	hole := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil, BitWidth: -1}}}
 	if hole.HasIntField() {
 		t.Fatal("nil field Type must not invent has-int")
 	}
+	if !HasError() {
+		t.Fatal("nil field Type HasIntField must SetError sticky")
+	}
+	ClearError()
 	if !hole.ContainPointerField() {
 		t.Fatal("nil field Type must fail closed as has-pointer")
 	}
+	if !HasError() {
+		t.Fatal("nil field Type ContainPointerField must SetError sticky")
+	}
+	ClearError()
 	if !hole.IsConstStructUnion() {
 		t.Fatal("nil field Type must fail closed as const")
 	}
+	if !HasError() {
+		t.Fatal("nil field Type IsConstStructUnion must SetError sticky")
+	}
+	ClearError()
 	if !hole.IsVolatileStructUnion() {
 		t.Fatal("nil field Type must fail closed as volatile")
 	}
+	if !HasError() {
+		t.Fatal("nil field Type IsVolatileStructUnion must SetError sticky")
+	}
+	ClearError()
 	if !hole.HasBitfields() {
 		t.Fatal("nil field Type must fail closed as has-bitfields")
 	}
+	if !HasError() {
+		t.Fatal("nil field Type HasBitfields must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsVisibleLocal(t *testing.T) {

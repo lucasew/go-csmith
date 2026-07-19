@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestIsVarOnStack(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	p := CreateVariableScalars("p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
@@ -17,6 +18,20 @@ func TestIsVarOnStack(t *testing.T) {
 	if inner.IsVarOnStack(g) {
 		t.Fatal("global")
 	}
+	if HasError() {
+		t.Fatal("complete Block.IsVarOnStack must not sticky")
+	}
+	// incomplete LocalVars sticky not-on-stack
+	ClearError()
+	outer.LocalVars = []*Variable{l, nil}
+	if inner.IsVarOnStack(l) {
+		t.Fatal("LocalVars hole Block.IsVarOnStack must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("LocalVars hole Block.IsVarOnStack must SetError sticky")
+	}
+	ClearError()
+	outer.LocalVars = []*Variable{l}
 }
 
 func TestChooseVisibleReadVar(t *testing.T) {
