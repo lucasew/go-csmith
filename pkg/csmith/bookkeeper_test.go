@@ -121,13 +121,14 @@ func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
 	outer := &Block{}
 	inner := &Block{Parent: outer}
 	outer.Parent = nil
-	// body = outer with if whose Then is inner
+	// body = outer with if whose Then is inner (Else empty but live)
 	f := &Function{Name: "func_1", Body: outer}
 	// assign at body depth (parent=outer → depth 1 → bucket 0)
 	// assign inside then (parent=inner → depth 2 → bucket 1)
+	// StatementIf always has both arms
 	outer.Stmts = []Stmt{
 		{Kind: StmtAssign, StmID: 1},
-		{Kind: StmtIfElse, StmID: 2, Then: inner},
+		{Kind: StmtIfElse, StmID: 2, Then: inner, Else: &Block{Parent: outer}},
 	}
 	inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 3}}
 	n := StatBlkDepths([]*Function{f})

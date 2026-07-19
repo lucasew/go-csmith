@@ -25,19 +25,37 @@ func StmtInBlock(stParent, b *Block) bool {
 }
 
 // GetBlocksStmt returns child blocks of a statement (Statement::get_blocks).
-// Then/Else for if/for; nested only — not the parent block.
+// Kind-gated like C++ overrides — assign/break/goto push nothing.
+// StatementIf always pushes if_true and if_false (live Block refs in C++);
+// nil arms are incomplete IR so walkers fail closed (no invent soft-skip missing arm).
+// StatementFor always pushes body; ArrayOp/Block push Then when non-nil (C++ if(body)).
 func GetBlocksStmt(st *Stmt) []*Block {
 	if st == nil {
 		return nil
 	}
-	var out []*Block
-	if st.Then != nil {
-		out = append(out, st.Then)
+	switch st.Kind {
+	case StmtIfElse:
+		// StatementIf.h — blks.push_back(&if_true); blks.push_back(&if_false);
+		return []*Block{st.Then, st.Else}
+	case StmtFor:
+		// StatementFor.h — blks.push_back(&body);
+		return []*Block{st.Then}
+	case StmtArrayOp:
+		// StatementArrayOp.h — if (body) blks.push_back(body);
+		if st.Then != nil {
+			return []*Block{st.Then}
+		}
+		return nil
+	case StmtBlock:
+		// nested Block::make_random body
+		if st.Then != nil {
+			return []*Block{st.Then}
+		}
+		return nil
+	default:
+		// assign/invoke/return/break/continue/goto — empty get_blocks
+		return nil
 	}
-	if st.Else != nil {
-		out = append(out, st.Else)
-	}
-	return out
 }
 
 // FindTypedStmts mirrors Statement::find_typed_stmts.

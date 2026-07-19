@@ -95,6 +95,12 @@ func TestGetQualifiers(t *testing.T) {
 	if !fi2.GetQualifiers().IsConst() {
 		t.Fatal("rv const")
 	}
+	// nil RV fails closed empty qfer (no invent storage-level false/false shell)
+	fi3 := &Invocation{User: &Function{Name: "f"}}
+	q3 := fi3.GetQualifiers()
+	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
+		t.Fatalf("nil RV must not invent qfer bits: %+v", q3)
+	}
 }
 
 func TestVisitUnorderedParamsMerges(t *testing.T) {

@@ -46,6 +46,28 @@ func TestFindTypedStmts(t *testing.T) {
 	}
 }
 
+func TestGetBlocksStmtKindGated(t *testing.T) {
+	// StatementIf always exposes both arms — nil arm is incomplete hole
+	ifBlks := GetBlocksStmt(&Stmt{Kind: StmtIfElse, Then: &Block{StmID: 1}})
+	if len(ifBlks) != 2 || ifBlks[0] == nil || ifBlks[1] != nil {
+		t.Fatalf("if arms: %+v", ifBlks)
+	}
+	// missing Else fails typed walk (no invent soft-skip absent arm)
+	var stms []*Stmt
+	if FindTypedStmts(&Stmt{Kind: StmtIfElse, Then: &Block{Stmts: []Stmt{{Kind: StmtReturn}}}}, &stms, []StatementType{StmtReturn}) >= 0 {
+		t.Fatal("nil Else arm must fail closed typed walk")
+	}
+	// for always pushes body slot
+	forBlks := GetBlocksStmt(&Stmt{Kind: StmtFor})
+	if len(forBlks) != 1 || forBlks[0] != nil {
+		t.Fatalf("for body slot: %+v", forBlks)
+	}
+	// assign has empty get_blocks even if Then is wrongly set
+	if blks := GetBlocksStmt(&Stmt{Kind: StmtAssign, Then: &Block{}}); len(blks) != 0 {
+		t.Fatal("assign must not invent get_blocks from stray Then", blks)
+	}
+}
+
 func TestIs1stStm(t *testing.T) {
 	b := &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 1},
@@ -164,9 +186,10 @@ func TestContainsStmtTree(t *testing.T) {
 }
 
 func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {
-	// complete if/then still collects nested typed stmts
+	// complete if/then+else still collects nested typed stmts
 	thenB := &Block{Stmts: []Stmt{{Kind: StmtReturn, StmID: 3}}}
-	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB}
+	elseB := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
+	st := &Stmt{Kind: StmtIfElse, StmID: 1, Then: thenB, Else: elseB}
 	var stms []*Stmt
 	n := FindTypedStmts(st, &stms, []StatementType{StmtReturn})
 	if n != 1 || len(stms) != 1 {

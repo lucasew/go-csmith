@@ -460,12 +460,13 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 func (fi *Invocation) GetQualifiers() CVQualifiers {
 	// FunctionInvocation.cpp:486–491 — eFuncCall: assert(func); assert(rv)
 	if fi != nil && fi.User != nil {
-		// fail closed bare qfer when RV missing (no invent arbitrary qualifiers)
+		// assert(rv) path — incomplete RV fails closed empty qfer
+		// (no invent NewCVQualifiers(false,false) storage-level shell)
 		if fi.User.RV == nil {
-			return NewCVQualifiers([]bool{false}, []bool{false})
+			return CVQualifiers{}
 		}
 		return fi.User.RV.Qfer
 	}
-	// binary/unary — non-const non-volatile int-like
+	// binary/unary — non-const non-volatile int-like (C++ default for std ops)
 	return NewCVQualifiers([]bool{false}, []bool{false})
 }
