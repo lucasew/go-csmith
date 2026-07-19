@@ -71,6 +71,12 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 		t.Fatal(ptrs, aliases)
 	}
 	// nil fact hole fails closed
+	// Type-nil non-special must fail closed (no invent soft-skip partial alias)
+	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
+	broken.Type = nil
+	if UpdatePtrAliases([]*FactPointTo{MakeFactPointTo(broken, p)}, &ptrs, &aliases) {
+		t.Fatal("Type-nil subject must fail closed UpdatePtrAliases")
+	}
 	if UpdatePtrAliases([]*FactPointTo{nil}, &ptrs, &aliases) {
 		t.Fatal("nil fact hole must fail closed")
 	}

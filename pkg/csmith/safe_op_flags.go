@@ -141,7 +141,8 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 	}
 	f := &SafeOpFlags{IsFunc: true}
 	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
-	sigProb := uint32(50)
+	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
+	sigProb := uint32(0)
 	if probs != nil {
 		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
 			sigProb = uint32(p)
@@ -188,7 +189,8 @@ func MakeRandomBinaryKind(
 	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
 
 	// SafeOpFlags.cpp:181–190 — float always signed
-	sigProb := uint32(50)
+	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
+	sigProb := uint32(0)
 	if probs != nil {
 		if p := probs.Single(PSafeOpsSignedProb); p >= 0 {
 			sigProb = uint32(p)

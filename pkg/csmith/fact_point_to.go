@@ -1221,9 +1221,16 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 		if f == nil {
 			return false
 		}
-		if f.Var == nil || f.Var.Type == nil {
-			// skip rv-like without type (upstream: type != 0)
-			continue
+		if f.Var == nil {
+			return false
+		}
+		// FactPointTo.cpp: type != 0 — specials may have Type-nil; other Type-nil
+		// is incomplete IR (fail closed — no invent soft-skip partial alias update)
+		if f.Var.Type == nil {
+			if IsSpecialPtr(f.Var) {
+				continue
+			}
+			return false
 		}
 		// PointTo Variable* always live
 		for _, v := range f.PointTo {

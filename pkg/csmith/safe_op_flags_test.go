@@ -26,6 +26,30 @@ func TestMakeRandomBinarySafeName(t *testing.T) {
 	}
 }
 
+func TestMakeRandomSafeOpNilProbsNoInvent50(t *testing.T) {
+	// nil probs → 0% signed coin (no invent default 50); pick size needs process probs
+	// or fails closed. Ensure signed coin is not invent-50: Op1Signed false at 0%.
+	opts := Defaults()
+	// install process probs so size pick can succeed while call-site probs nil
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(NewProbabilities(opts))
+	defer SetProcessProbabilities(prev)
+	for seed := uint64(1); seed < 20; seed++ {
+		f := MakeRandomBinaryKind(NewRng(seed), opts, nil, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, BinAdd)
+		if f == nil {
+			// size pick may fail closed without call-site probs if process cleared
+			continue
+		}
+		if f.Op1Signed || f.Op2Signed {
+			t.Fatalf("nil probs must not invent signed true at 50%% seed=%d", seed)
+		}
+	}
+	u := MakeRandomUnary(NewRng(2), opts, nil, GetIntType(), GetIntType(), UnMinus)
+	if u != nil && u.Op1Signed {
+		t.Fatal("nil probs unary must not invent signed true at 50%")
+	}
+}
+
 func TestSafeBinaryInvocationOutput(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true

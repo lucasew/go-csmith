@@ -295,8 +295,12 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
 			continue
 		}
-		// Function.cpp:294–295 — qfer->match(rv->qfer)
-		if qfer != nil && f.RV != nil && !qfer.Wildcard {
+		// Function.cpp:294–295 — qfer->match(rv->qfer); RV always live after create
+		// incomplete RV fails closed whole choose (no invent soft-skip as match)
+		if qfer != nil && !qfer.Wildcard {
+			if f.RV == nil {
+				return nil
+			}
 			if !qfer.Match(f.RV.Qfer, false) {
 				continue
 			}

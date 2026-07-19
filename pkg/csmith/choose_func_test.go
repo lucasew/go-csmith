@@ -84,6 +84,27 @@ func TestChooseFuncContextQferWildcard(t *testing.T) {
 	}
 }
 
+func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
+	// RV always live after Function create; nil RV with qfer filter must not soft-skip
+	good := &Function{
+		Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		RV:      &Variable{Name: "good_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		FEffect: EmptyEffect(),
+	}
+	noRV := &Function{
+		Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		RV: nil, FEffect: EmptyEffect(),
+	}
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if ChooseFuncContext(NewRng(1), []*Function{good, noRV}, GetIntType(), nil, nil, Defaults(), &q) != nil {
+		t.Fatal("nil RV among candidates must fail closed whole choose")
+	}
+	// good alone with matching qfer still works
+	if ChooseFuncContext(NewRng(2), []*Function{good}, GetIntType(), nil, nil, Defaults(), &q) != good {
+		t.Fatal("complete RV must still choose")
+	}
+}
+
 func TestChooseFuncUsesIsConvertable(t *testing.T) {
 	// Function.cpp:288–289 — is_convertable (short → int return ok)
 	f := &Function{Name: "f", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect()}
