@@ -167,6 +167,7 @@ func CreateArrayVariable(
 		// ArrayVariable.cpp:185 — add_init_value(e)
 		// Expression* always live after make; nil fails closed whole array
 		// (no invent partial InitExprs / fewer inits than initNum)
+		// non-sticky: soft re-pick factory when make_init_value / make_random fails
 		if e == nil {
 			return nil
 		}
@@ -1006,8 +1007,11 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 // index may be out of range (signed cast + % size). Kept for completeness;
 // live C++ path uses `if (1)` always. ArrayVariable.cpp:553–568.
 func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
-	// dead path; C++ would dereference indices[i] — no soft invent "0"
+	// dead path; C++ would dereference indices[i] — sticky no soft invent "0"
 	if av == nil || idx == nil {
+		if av != nil && idx == nil {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	size := 1
@@ -1025,6 +1029,10 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 		if u := t.ToUnsigned(); u != nil {
 			cn := u.CName()
 			if cn == "" {
+				// incomplete unsigned CName sticky — no invent bare cast shell
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)

@@ -67,6 +67,15 @@ func TestNewCtrlVarsLetters(t *testing.T) {
 		t.Fatal("empty ctrl name must SetError sticky")
 	}
 	ClearError()
+	// Variable.cpp:802 assert undersize — config soft re-pick non-sticky empty
+	// (sticky poisons Generate when array rank exceeds MaxArrayDim)
+	short := []*Variable{c1[0]}
+	if out := OutputArrayCtrlVars(short, 2, ""); out != "" {
+		t.Fatal("dimen > len(ctrl) must fail closed", out)
+	}
+	if HasError() {
+		t.Fatal("dimen > len(ctrl) must stay non-sticky config soft re-pick")
+	}
 	CtrlVarsDoFinalization()
 	if GetLastCtrlVars() != nil {
 		t.Fatal("cleared")

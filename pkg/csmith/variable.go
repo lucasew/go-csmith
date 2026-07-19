@@ -413,10 +413,12 @@ func CtrlVarNames(ctrl []*Variable) []string {
 // Incomplete ctrl list fails closed sticky empty (no invent "int , j;" / empty-complete
 // decl for nil slots via soft return "").
 func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
+	// dimen<=0 or empty/undersized ctrl: config soft re-pick (non-sticky empty)
+	// Variable.cpp:802 assert(dimen <= size) — soft empty when MaxArrayDim < rank
+	// (sticky here poisons Generate when array rank exceeds MaxArrayDim)
 	if dimen <= 0 || len(ctrl) == 0 {
 		return ""
 	}
-	// Variable.cpp:802 — assert(dimen <= ctrl_vars.size())
 	if dimen > len(ctrl) {
 		return ""
 	}
