@@ -196,21 +196,25 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 			return nil
 		}
 	} else {
-		// Function.cpp:744 — assert(0 && "Invalid builtin function format!")
+		// Function.cpp:744 — assert(0 && "Invalid builtin function format!") sticky
+		SetError(ErrGeneric)
 		return nil
 	}
 	ty := TypeFromString(parts[0])
 	if ty == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	name := parts[1]
-	// Function.cpp always has live name token; no invent empty-name builtin shell
+	// Function.cpp always has live name token; sticky (no invent empty-name builtin shell)
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// Function.cpp:752 — CVQualifiers::random_qualifiers always has process RNG
-	// no invent fixed non-const RV / NewProbabilities when session missing
+	// sticky — no invent fixed non-const RV / NewProbabilities when session missing
 	if r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	f := &Function{
@@ -223,12 +227,16 @@ func MakeBuiltinFunction(opts Options, probs *Probabilities, r *Rng, list *Funct
 	retQ := RandomQualifiersNoContextNoVolatile(ty, opts, probs, r)
 	f.RV = CreateVariableQfer(name+"_rv", ty, retQ)
 	if f.RV == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// params from ( ... )
 	paramStr := GetSubstring(parts[2], '(', ')')
-	// Function.cpp:345+ — assert-path on bad param list; no soft invent empty params
+	// Function.cpp:345+ — assert-path on bad param list; sticky no soft invent empty params
 	if !GenerateParameterListFromString(f, paramStr) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	// Function.cpp:757–758 — FMList.push_back(new FactMgr(f)) at builtin create

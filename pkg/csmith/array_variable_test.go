@@ -6,6 +6,7 @@ import (
 )
 
 func TestCreateArrayVariableDimensions(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
@@ -28,6 +29,8 @@ func TestCreateArrayVariableDimensions(t *testing.T) {
 
 func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	// ArrayVariable.cpp:127–133 — assert type/void; ERROR_GUARD after rnd_upto(99)
+	// void/nil/empty name fail closed non-sticky (Create soft re-pick factory path)
+	ClearError()
 	opts := Defaults()
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	if CreateArrayVariable(NewRng(1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleType(EVoid), MakeInt(0), q) != nil {
@@ -46,6 +49,7 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 
 func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 	// ArrayVariable.cpp:154–157 — empty sizes when no dim fits; no invent [1]
+	ClearError()
 	opts := Defaults()
 	opts.MaxArrayDim = 0
 	opts.MaxArrayLenPerDim = 0
@@ -61,6 +65,7 @@ func TestCreateArrayVariableNoSoftInventSizeOne(t *testing.T) {
 
 func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
+	ClearError()
 	opts := Defaults()
 	env := &TypeEnv{}
 	probs := NewProbabilities(opts)
@@ -80,6 +85,7 @@ func TestCreateArrayVariableAggregateCreatesFieldVars(t *testing.T) {
 
 func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 	// Constant::make_random needs live Probabilities for aggregates — no invent tables
+	ClearError()
 	opts := Defaults()
 	opts.MaxArrayDim = 1
 	opts.MaxArrayLenPerDim = 4
@@ -99,6 +105,7 @@ func TestCreateArrayVariableNilProbsNoInventAggregateAlt(t *testing.T) {
 
 func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	// ArrayVariable.cpp:179–184 — pointer + !strict_const → make_init_value, not Constant "0"
+	ClearError()
 	opts := Defaults()
 	opts.StrictConstArrays = false
 	opts.MaxArrayDim = 1
@@ -106,7 +113,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	opts.MaxArrayLength = 8
 	q := NewCVQualifiers([]bool{false}, []bool{false})
 	pt := PointerTo(GetIntType())
-	// without VS/CG: when alt init_num > 0 fail closed (no invent Constant stand-in)
+	// without VS/CG: when alt init_num > 0 fail closed non-sticky soft re-pick (no invent Constant stand-in)
 	sawFail := false
 	for seed := uint64(1); seed < 40; seed++ {
 		ClearError()
@@ -122,6 +129,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	if !sawFail {
 		t.Fatal("expected some seeds to need make_init_value and fail closed")
 	}
+	ClearError()
 	// with VS+CG: make_init_value path is live
 	vs := NewVariableSelector(opts)
 	vs.Probs = NewProbabilities(opts)

@@ -71,6 +71,7 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 }
 
 func TestMakeBuiltinFunction(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.Builtins = true
 	list := &FunctionList{}
@@ -88,18 +89,35 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	if len(list.Funcs) != 1 {
 		t.Fatal("list")
 	}
-	// disabled kind
+	// disabled kind — soft skip non-sticky (kind filter, not broken IR)
+	ClearError()
 	if MakeBuiltinFunction(opts, nil, nil, list, nil, "Int; __builtin_clzs; (UShort); clang") != nil {
 		t.Fatal("clang should skip")
 	}
-	// empty name token — no invent shell
+	// empty name token — sticky no invent shell
+	ClearError()
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "Int; ; (UInt); x86") != nil {
 		t.Fatal("empty builtin name must fail closed")
 	}
-	// Function.cpp always has RNG for random_qualifiers; no invent fixed RV qfer
+	if !HasError() {
+		t.Fatal("empty builtin name must SetError sticky")
+	}
+	// Function.cpp always has RNG for random_qualifiers; sticky no invent fixed RV qfer
+	ClearError()
 	if MakeBuiltinFunction(opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
 		t.Fatal("nil RNG must not invent builtin")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG must SetError sticky")
+	}
+	ClearError()
+	if MakeBuiltinFunction(opts, NewProbabilities(opts), NewRng(1), list, nil, "badformat") != nil {
+		t.Fatal("invalid format must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("invalid format must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestInitializeBuiltinFunctions(t *testing.T) {

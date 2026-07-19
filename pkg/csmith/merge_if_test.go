@@ -118,6 +118,12 @@ func TestMergeFacts(t *testing.T) {
 	if FactsComplete(MergeFactInto(facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
 	}
+	// MergeFactInto incomplete map marker stays non-sticky (soft re-pick); MergeFacts sticks.
+	ClearError()
+	if FactsComplete(MergeFactInto([]*FactPointTo{MakeFactPointTo(p, a), nil}, MakeFactPointTo(p, a))) {
+		t.Fatal("incomplete map MergeFactInto must fail closed")
+	}
+	ClearError()
 }
 
 func TestHasEligibleVolatileVar(t *testing.T) {

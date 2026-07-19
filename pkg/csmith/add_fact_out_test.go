@@ -180,6 +180,7 @@ func TestArrayIsVariant(t *testing.T) {
 		t.Fatal("diff collective")
 	}
 	// incomplete IndexExprs must not invent variant via string Indices soft-skip
+	ClearError()
 	a.IndexExprs = []*Expression{nil}
 	a.Indices = []string{"i"}
 	b.IndexExprs = []*Expression{nil}
@@ -187,11 +188,16 @@ func TestArrayIsVariant(t *testing.T) {
 	if a.IsVariant(&b.Variable) {
 		t.Fatal("IndexExprs hole must fail closed not invent string match")
 	}
+	if !HasError() {
+		t.Fatal("IndexExprs hole IsVariant must SetError sticky")
+	}
 	// mixed IndexExprs vs Indices-only must not invent dual-path match
+	ClearError()
 	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalars("i", GetIntType(), false, false), ExprType: GetIntType()}}
 	b.IndexExprs = nil
 	b.Indices = []string{"i"}
 	if a.IsVariant(&b.Variable) {
 		t.Fatal("mixed IndexExprs/Indices must fail closed")
 	}
+	ClearError()
 }

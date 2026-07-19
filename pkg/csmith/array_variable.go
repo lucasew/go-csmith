@@ -374,7 +374,7 @@ func FindExprKeyVar(e *Expression) *Variable {
 // IsVariant mirrors ArrayVariable::is_variant.
 // ArrayVariable.cpp:394–412 — same collective; each dim has exactly one key var
 // and those key vars match across the two itemized members.
-// Incomplete IndexExprs fails closed false (no invent soft-skip nil hole then
+// Incomplete IndexExprs fails closed sticky false (no invent soft-skip nil hole then
 // string Indices match as complete variant; no invent mixed expr/string dual path).
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av == nil || other == nil || !other.IsArray {
@@ -391,8 +391,9 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 	if av.Collective != ov.Collective {
 		return false
 	}
-	// incomplete IndexExprs holes — fail closed before string soft-fallback
+	// incomplete IndexExprs holes — sticky fail closed before string soft-fallback
 	if !ExpressionsComplete(av.IndexExprs) || !ExpressionsComplete(ov.IndexExprs) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// Expression* path when either side has IndexExprs — both must use same complete list
