@@ -1117,17 +1117,26 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals.
 // FactPointTo.cpp:487–526.
-// Variable* always live in pointees; nil hole fails closed as true
-// (no invent "not pointing to locals" past incomplete sets).
+// Variable* always live in pointees; incomplete fact maps / stack scans / nil
+// holes fail closed as true (no invent "not pointing to locals" past holes or
+// FindRelatedPointTo nil-before-match on incomplete maps).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
 		return false
+	}
+	// incomplete LocalVars/Param: membership short-circuit invents not-local
+	if b != nil && !b.StackScanComplete() {
+		return true
 	}
 	if indirection == -1 {
 		return v.IsVisibleLocal(b)
 	}
 	if !v.IsPointer() {
 		return false
+	}
+	// incomplete fact maps: FindRelatedPointTo fails closed nil before related
+	if !FactsComplete(facts) {
+		return true
 	}
 	var pointees []*Variable
 	if indirection == 0 {
