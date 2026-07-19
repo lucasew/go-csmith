@@ -80,12 +80,27 @@ func (e Effect) AddExternalEffect(other Effect) Effect {
 
 // AddExternalEffectWithCallers mirrors Effect::add_external_effect(e, call_chain).
 // Effect.cpp:221–269 — globals always; non-globals only if on a call_chain stack frame.
+// Variable* always live in effect lists; nil hole fails closed (return e unchanged,
+// no invent partial external merge past holes).
 func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) Effect {
-	out := e
 	for _, v := range other.ReadVars() {
 		if v == nil {
-			continue
+			return e
 		}
+	}
+	for _, v := range other.WrittenVars() {
+		if v == nil {
+			return e
+		}
+	}
+	// Block* always live on call_chain when used; nil hole fails closed
+	for _, b := range callChain {
+		if b == nil {
+			return e
+		}
+	}
+	out := e
+	for _, v := range other.ReadVars() {
 		if v.IsGlobal() {
 			out = out.ReadVar(v)
 			continue
@@ -95,9 +110,6 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 		}
 	}
 	for _, v := range other.WrittenVars() {
-		if v == nil {
-			continue
-		}
 		if v.IsGlobal() {
 			out = out.WriteVar(v)
 			out.pure = false
@@ -114,6 +126,8 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 
 func varOnCallChain(v *Variable, chain []*Block) bool {
 	for _, b := range chain {
+		// chain pre-validated complete at AddExternalEffectWithCallers;
+		// defensive: nil frame is not on-stack
 		if b != nil && b.IsVarOnStack(v) {
 			return true
 		}
@@ -286,30 +300,42 @@ func (e Effect) IsWritten(v *Variable) bool {
 }
 
 // ReadVars mirrors Effect::get_read_vars — list of read variables (stable order by name).
+// Variable* always live as map keys; nil key fails closed as []*Variable{nil}
+// (no invent skip hole as absent read).
 func (e Effect) ReadVars() []*Variable {
 	if len(e.read) == 0 {
 		return nil
 	}
 	out := make([]*Variable, 0, len(e.read))
 	for v, ok := range e.read {
-		if ok && v != nil {
-			out = append(out, v)
+		if !ok {
+			continue
 		}
+		if v == nil {
+			return []*Variable{nil}
+		}
+		out = append(out, v)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 
 // WrittenVars mirrors Effect::get_write_vars subset.
+// Variable* always live as map keys; nil key fails closed as []*Variable{nil}
+// (no invent skip hole as absent write).
 func (e Effect) WrittenVars() []*Variable {
 	if len(e.written) == 0 {
 		return nil
 	}
 	out := make([]*Variable, 0, len(e.written))
 	for v, ok := range e.written {
-		if ok && v != nil {
-			out = append(out, v)
+		if !ok {
+			continue
 		}
+		if v == nil {
+			return []*Variable{nil}
+		}
+		out = append(out, v)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out

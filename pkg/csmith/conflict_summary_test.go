@@ -50,6 +50,20 @@ func TestInConflictNoWrite(t *testing.T) {
 	}
 }
 
+func TestInConflictNilHoleFailClosed(t *testing.T) {
+	// nil Variable* in effect lists must not invent conflict-free
+	eff := EmptyEffect()
+	eff.written = map[*Variable]bool{nil: true}
+	if !EmptyCGContext().InConflict(eff) {
+		t.Fatal("nil write hole must fail closed as conflict")
+	}
+	eff2 := EmptyEffect()
+	eff2.read = map[*Variable]bool{nil: true}
+	if !EmptyCGContext().InConflict(eff2) {
+		t.Fatal("nil read hole must fail closed as conflict")
+	}
+}
+
 func TestChooseFuncContextSkipsConflict(t *testing.T) {
 	g := CreateVariableScalars("g_x", GetIntType(), false, false)
 	bad := &Function{Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}

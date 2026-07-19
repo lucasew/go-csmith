@@ -989,15 +989,16 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 
 // FindDanglingGlobalPtrs mirrors FactMgr::find_dangling_global_ptrs.
 // FactMgr.cpp:688–700 — non-const global pointers that are dead at function exit.
+// Fact* always live; nil hole fails closed (empty DeadGlobals, no invent partial).
 func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	if fm == nil || f == nil {
 		return
 	}
 	f.DeadGlobals = f.DeadGlobals[:0]
+	if !FactsComplete(fm.GlobalFacts) {
+		return
+	}
 	for _, fact := range fm.GlobalFacts {
-		if fact == nil || fact.Var == nil {
-			continue
-		}
 		v := fact.Var
 		// const pointers should never be dangling; only globals
 		if v.IsConst() || !v.IsGlobal() {
@@ -1075,13 +1076,15 @@ func (fm *FactMgr) UpdateFactsForOOSVars(vars []*Variable) {
 // FactMgr.cpp:108–116 — update_fact_for_assign each param from arg expression.
 // No invent NewFactPointTo when arg missing: nil rhs goes through abstract
 // (FactPointTo.cpp:168–169 → garbage for pointers), same as C++ nullptr value.
+// Variable* params always live; nil param hole fails closed (stop, no invent skip).
 func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	if fm == nil || fm.Func == nil || facts == nil {
 		return
 	}
 	for i, p := range fm.Func.Param {
 		if p == nil {
-			continue
+			// incomplete Param list — no invent skip remaining params
+			return
 		}
 		var arg *Expression
 		if i < len(args) {

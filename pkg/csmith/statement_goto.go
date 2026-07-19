@@ -90,31 +90,43 @@ func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
 
 // HasInitSkippedVars mirrors StatementGoto::has_init_skipped_vars.
 // StatementGoto.cpp:281–306 — jump into/out would skip locals of intermediate blocks.
+// Incomplete LocalVars (Collect nil) fails closed as has-skipped (no invent none).
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
-	return len(CollectInitSkippedVars(src, destParent)) > 0
+	if destParent == nil {
+		return false
+	}
+	skipped := CollectInitSkippedVars(src, destParent)
+	if skipped == nil {
+		return true
+	}
+	return len(skipped) > 0
 }
 
 // CollectInitSkippedVars collects locals whose initialization is skipped by a jump.
 // StatementGoto.cpp:281–306 — walk dest parent chain until src.
+// Variable* always live on LocalVars; nil hole → nil (fail closed).
+// Complete scan with no skipped vars → empty non-nil slice.
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
 		return nil
 	}
 	// StatementGoto.cpp:286–290 — climb dest->parent … until src
 	reachedSrc := false
-	var intermediate []*Variable
+	intermediate := make([]*Variable, 0)
 	for b := destParent; b != nil; b = b.Parent {
 		if b == src {
 			reachedSrc = true
 			break
 		}
-		intermediate = append(intermediate, b.LocalVars...)
-	}
-	var skipped []*Variable
-	for _, v := range intermediate {
-		if v == nil {
-			continue
+		for _, loc := range b.LocalVars {
+			if loc == nil {
+				return nil
+			}
+			intermediate = append(intermediate, loc)
 		}
+	}
+	skipped := make([]*Variable, 0)
+	for _, v := range intermediate {
 		// StatementGoto.cpp:296–304 — after climb b==src → all intermediate skipped;
 		// else !is_visible_local(src)
 		if reachedSrc || src == nil || !v.IsVisibleLocal(src) {

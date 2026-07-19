@@ -774,10 +774,12 @@ func (c CGContext) AcceptType(t *Type) bool {
 
 // InConflict mirrors CGContext::in_conflict — callee effect vs current context.
 // CGContext.cpp:531–564.
+// Variable* always live in effect lists; nil hole fails closed as conflict
+// (no invent skip as conflict-free incomplete effect).
 func (c CGContext) InConflict(eff Effect) bool {
 	for _, v := range eff.ReadVars() {
 		if v == nil {
-			continue
+			return true
 		}
 		if c.IsNonReadable(v) {
 			return true
@@ -791,7 +793,7 @@ func (c CGContext) InConflict(eff Effect) bool {
 	}
 	for _, v := range eff.WrittenVars() {
 		if v == nil {
-			continue
+			return true
 		}
 		if c.IsNonWritable(v) || v.IsConst() {
 			return true
@@ -823,7 +825,12 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		return true
 	}
 	for _, cb := range c.CallChain {
-		if cb != nil && v.IsVisibleLocal(cb) {
+		// Block* always live on call_chain; nil hole fails closed (not frame)
+		// no invent skip hole and still match a later frame
+		if cb == nil {
+			return false
+		}
+		if v.IsVisibleLocal(cb) {
 			return true
 		}
 	}
@@ -832,15 +839,20 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 
 // FindReachableFrameVars mirrors CGContext::find_reachable_frame_vars.
 // CGContext.cpp:566–578 — pointees that are frame locals.
+// Fact* always live; nil hole fails closed (nil out, no invent partial frames).
 func (c CGContext) FindReachableFrameVars(facts []*FactPointTo) []*Variable {
+	if !FactsComplete(facts) {
+		return nil
+	}
 	var out []*Variable
 	seen := map[*Variable]bool{}
 	for _, f := range facts {
-		if f == nil {
-			continue
-		}
 		for _, p := range f.PointTo {
+			// pointee Variable* always live in point-to sets (specials are non-nil)
 			if p == nil || IsSpecialPtr(p) || seen[p] {
+				if p == nil {
+					return nil
+				}
 				continue
 			}
 			if c.IsFrameVar(p) {

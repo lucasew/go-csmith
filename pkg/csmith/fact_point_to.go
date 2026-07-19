@@ -757,14 +757,16 @@ func (f *FactPointTo) MarkFuncEnd(fn *Function, stParent *Block) *FactPointTo {
 
 // MarkFuncEndOnFacts applies mark_func_end to each point-to fact in-place.
 // FactMgr.cpp:196–204.
+// Fact* always live; nil hole fails closed (nil facts, no invent partial mark).
 func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	if facts == nil {
 		return
 	}
+	if !FactsComplete(*facts) {
+		*facts = nil
+		return
+	}
 	for i, f := range *facts {
-		if f == nil {
-			continue
-		}
 		if nf := f.MarkFuncEnd(fn, stParent); nf != nil {
 			(*facts)[i] = nf
 		}

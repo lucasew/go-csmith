@@ -42,6 +42,7 @@ func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 
 // IsVarOOS mirrors Function::is_var_oos.
 // Function.cpp:214–224 — not visible at stm but is a local of this function.
+// Block*/Variable* always live; nil holes fail closed as OOS (no invent not-OOS).
 func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	if f == nil || v == nil {
 		return false
@@ -51,13 +52,13 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 	}
 	for _, b := range f.Blocks {
 		if b == nil {
-			continue
-		}
-		if IsVariableInSet(b.LocalVars, v) {
 			return true
 		}
 		for _, loc := range b.LocalVars {
-			if loc != nil && loc.Match(v) {
+			if loc == nil {
+				return true
+			}
+			if loc.Match(v) || loc == v {
 				return true
 			}
 		}

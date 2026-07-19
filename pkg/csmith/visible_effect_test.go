@@ -22,6 +22,18 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	if !e2.IsWritten(g) || !e2.written[loc] {
 		t.Fatal("chain includes local", e2)
 	}
+	// nil effect hole / nil chain hole fails closed — no invent partial merge
+	base := EmptyEffect().ReadVar(g)
+	hole := EmptyEffect()
+	hole.written = map[*Variable]bool{nil: true, g: true}
+	got := base.AddExternalEffectWithCallers(hole, []*Block{blk})
+	if !got.IsRead(g) || got.IsWritten(g) {
+		t.Fatal("nil effect hole must leave base unchanged", got)
+	}
+	got2 := base.AddExternalEffectWithCallers(other, []*Block{nil, blk})
+	if !got2.IsRead(g) || got2.IsWritten(g) || got2.IsWritten(loc) {
+		t.Fatal("nil call_chain hole must leave base unchanged", got2)
+	}
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {

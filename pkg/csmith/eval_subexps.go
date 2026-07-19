@@ -37,6 +37,7 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 
 // FindUnionPointees mirrors FactPointTo::find_union_pointees.
 // FactPointTo.cpp:807–829 — union fields referred via pointer expression.
+// Pointee Variable* always live; nil hole fails closed (nil out, no invent partial).
 func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	if e == nil {
 		return nil
@@ -55,7 +56,7 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	var unions []*Variable
 	for _, v := range vars {
 		if v == nil {
-			continue
+			return nil
 		}
 		u := v.GetContainerUnion()
 		// only care referenced union fields, not the union itself
@@ -70,13 +71,20 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 
 // HaveOverlappingFields mirrors have_overlapping_fields.
 // Lhs.cpp:287–298 — shared union pointee between e1 and e2.
+// Incomplete fact maps / pointees fail closed as overlap (no invent conflict-free).
 func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
+	if facts != nil && !FactsComplete(facts) {
+		return true
+	}
 	vars1 := FindUnionPointees(facts, e1)
 	if len(vars1) == 0 {
 		return false
 	}
 	vars2 := FindUnionPointees(facts, e2)
 	for _, v := range vars2 {
+		if v == nil {
+			return true
+		}
 		if IsVariableInSet(vars1, v) {
 			return true
 		}

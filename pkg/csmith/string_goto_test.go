@@ -68,13 +68,21 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	loc.Init = MakeInt(3)
 	inner := &Block{Parent: outer, LocalVars: []*Variable{loc}}
 	skipped := CollectInitSkippedVars(outer, inner)
-	if len(skipped) != 1 || skipped[0] != loc {
+	if skipped == nil || len(skipped) != 1 || skipped[0] != loc {
 		t.Fatal(skipped)
 	}
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: skipped}
 	out := OutputSkippedVarInits(st, "    ")
 	if !strings.Contains(out, "l_1 = 3;") {
 		t.Fatal(out)
+	}
+	// nil LocalVars hole fails closed
+	hole := &Block{Parent: outer, LocalVars: []*Variable{nil}}
+	if CollectInitSkippedVars(outer, hole) != nil {
+		t.Fatal("nil local hole must fail closed")
+	}
+	if !HasInitSkippedVars(outer, hole) {
+		t.Fatal("incomplete must fail closed as has-skipped")
 	}
 }
 
