@@ -171,6 +171,27 @@ func TestMakeStructConstant(t *testing.T) {
 		t.Fatal("nil RNG MakeUnionConstant must SetError sticky")
 	}
 	ClearError()
+	// Type-nil field sticky (no invent soft-empty then ERROR_GUARD as complete miss)
+	stHole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if MakeStructConstant(NewRng(5), opts, probs, stHole) != nil {
+		t.Fatal("Type-nil field MakeStructConstant must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil field MakeStructConstant must SetError sticky")
+	}
+	ClearError()
+	utHole := &Type{isUnion: true, StructName: "Uhole", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if MakeUnionConstant(NewRng(5), opts, probs, utHole) != nil {
+		t.Fatal("Type-nil field MakeUnionConstant must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil field MakeUnionConstant must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckImplicitNontrivialAssignOps(t *testing.T) {

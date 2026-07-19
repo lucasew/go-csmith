@@ -469,19 +469,25 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 		if f.BitWidth == 0 {
 			continue
 		}
+		// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
+		// ERROR_GUARD as complete field miss / soft re-pick past incomplete field Type)
+		if f.Type == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		var val string
 		if f.BitWidth > 0 {
 			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
-		} else if f.Type != nil && f.Type.IsStruct() {
+		} else if f.Type.IsStruct() {
 			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-		} else if f.Type != nil && f.Type.IsUnion() {
+		} else if f.Type.IsUnion() {
 			if c := MakeUnionConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
-		} else if f.Type != nil {
+		} else {
 			// Constant.cpp:271 — GenerateRandomConstant(fields[i]); no soft invent "0"
 			if c := MakeRandom(f.Type, opts, probs, r); c != nil {
 				val = c.Value
@@ -752,16 +758,22 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 		return nil
 	}
 	f0 := ut.Fields[0]
+	// Type* always live on Fields; Type-nil sticky (no invent soft-empty val then
+	// ERROR_GUARD as complete first-field miss / soft re-pick past incomplete Type)
+	if f0.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var val string
-	if f0.Type != nil && f0.Type.IsStruct() {
+	if f0.Type.IsStruct() {
 		if c := MakeStructConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-	} else if f0.Type != nil && f0.Type.IsUnion() {
+	} else if f0.Type.IsUnion() {
 		if c := MakeUnionConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
-	} else if f0.Type != nil {
+	} else {
 		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
 		if c := MakeRandom(f0.Type, opts, probs, r); c != nil {
 			val = c.Value
