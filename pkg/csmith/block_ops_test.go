@@ -585,6 +585,32 @@ func TestAddNewVarFactIntoNilFieldHoleFailClosed(t *testing.T) {
 		t.Fatal("nil facts AddNewVarFactInto must SetError sticky")
 	}
 	ClearError()
+	// Type-nil non-special shell: soft invent was IsPointer residual ERROR + empty FieldVars
+	// complete skip (facts stay complete). Fair: clear facts sticky before field walk.
+	shell := &Variable{Name: "g_typeless"}
+	facts3 := []*FactPointTo{prior}
+	AddNewVarFactInto(shell, &facts3)
+	if FactsComplete(facts3) {
+		t.Fatal("Type-nil shell must fail closed clear facts, not empty-fields complete", facts3)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil shell must SetError sticky")
+	}
+	ClearError()
+	// AddNewVarFact same Type-nil sticky clear GlobalFacts
+	fm := NewFactMgr(nil)
+	if fm == nil {
+		t.Fatal("NewFactMgr")
+	}
+	fm.GlobalFacts = []*FactPointTo{prior}
+	fm.AddNewVarFact(shell)
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("AddNewVarFact Type-nil must clear GlobalFacts", fm.GlobalFacts)
+	}
+	if !HasError() {
+		t.Fatal("AddNewVarFact Type-nil must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindFixedPointLocalVarsNilHoleFailClosed(t *testing.T) {

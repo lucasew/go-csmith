@@ -1205,6 +1205,8 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 // AddNewVarFact abstracts init facts for a new variable into GlobalFacts.
 // Variable* FieldVars always live; nil hole fails closed (GlobalFacts cleared —
 // no invent soft-skip field hole and still keep partial prior field merges).
+// Type* always live for non-special subjects; Type-nil sticky clear (no invent
+// empty-FieldVars aggregate complete / field walk past Type-nil shell).
 // Fact* from abstract always live; nil hole fails closed (GlobalFacts cleared).
 // FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
@@ -1212,8 +1214,17 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 		SetError(ErrGeneric)
 		return
 	}
+	// Type* always live for non-special subjects; specials Type-nil by design
+	// (not makeup subjects — complete skip, no invent field walk past shell)
+	if v.Type == nil {
+		if !IsSpecialPtr(v) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+		}
+		return
+	}
 	// recurse into aggregate fields (pointer members)
-	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
+	if !v.IsPointer() && !v.Type.IsUnion() {
 		for _, f := range v.FieldVars {
 			if f == nil {
 				// incomplete FieldVars — clear partial aggregate makeup sticky
@@ -1688,6 +1699,8 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 // FactMgr.cpp:118–131 — abstract_fact_for_var_init into the given fact slice.
 // Variable* FieldVars always live; nil hole fails closed (*facts = IncompleteFactSlice() — no invent
 // soft-skip hole and still makeup later fields as complete).
+// Type* always live for non-special subjects; Type-nil sticky clear (no invent
+// empty-FieldVars aggregate complete / field walk past Type-nil shell via IsPointer residual).
 // facts always live; sticky (no invent soft-skip makeup past hole).
 func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 	if facts == nil {
@@ -1700,12 +1713,21 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		SetError(ErrGeneric)
 		return
 	}
+	// Type* always live for non-special subjects; specials Type-nil by design
+	// (not makeup subjects — complete skip, no invent field walk past shell)
+	if v.Type == nil {
+		if !IsSpecialPtr(v) {
+			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+		}
+		return
+	}
 	// FactMgr.cpp:77–79 — only when PointTo meta_facts registered
 	if !metaFactPointToEnabled {
 		return
 	}
 	// recurse into aggregate fields (pointer members) like AddNewVarFact
-	if !v.IsPointer() && (v.Type == nil || !v.Type.IsUnion()) {
+	if !v.IsPointer() && !v.Type.IsUnion() {
 		for _, f := range v.FieldVars {
 			if f == nil {
 				*facts = IncompleteFactSlice()
