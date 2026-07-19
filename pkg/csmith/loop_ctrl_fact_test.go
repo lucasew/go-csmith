@@ -117,6 +117,14 @@ func TestIsVisibleLocal(t *testing.T) {
 
 func TestIsPointingToLocalsNilHole(t *testing.T) {
 	ClearError()
+	// Variable always live; sticky true (no invent not-local soft-skip)
+	if !IsPointingToLocals(nil, &Block{}, 0, nil) {
+		t.Fatal("nil Variable IsPointingToLocals must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
 	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	// incomplete PointTo sticky as pointing-to-locals
 	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}

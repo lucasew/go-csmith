@@ -157,6 +157,21 @@ func TestGetLastWrittenTypeUnionOnly(t *testing.T) {
 		t.Fatal("OOB fid GetLastWrittenType must SetError sticky")
 	}
 	ClearError()
+	// FactUnion always live; sticky nil (no invent soft-skip past hole)
+	if (*FactUnion)(nil).GetLastWrittenType() != nil {
+		t.Fatal("nil GetLastWrittenType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil GetLastWrittenType must SetError sticky")
+	}
+	ClearError()
+	if (&FactUnion{}).GetLastWrittenType() != nil {
+		t.Fatal("nil Var GetLastWrittenType must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Var GetLastWrittenType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRhsToLhsTransferUnionConstant(t *testing.T) {

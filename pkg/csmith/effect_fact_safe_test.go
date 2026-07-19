@@ -185,6 +185,15 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 		t.Fatal("nil FieldVars hole FieldIsWritten must fail closed sticky true")
 	}
 	ClearError()
+	// Variable always live; sticky true (no invent no-field-* soft-skip)
+	if !e.FieldIsRead(nil) || !HasError() {
+		t.Fatal("nil Variable FieldIsRead must fail closed sticky true")
+	}
+	ClearError()
+	if !e.FieldIsWritten(nil) || !HasError() {
+		t.Fatal("nil Variable FieldIsWritten must fail closed sticky true")
+	}
+	ClearError()
 }
 
 func TestEffectIsReadByName(t *testing.T) {

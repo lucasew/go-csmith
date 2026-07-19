@@ -151,15 +151,21 @@ func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
 
 // IsValidPtr mirrors FactPointTo::is_valid_ptr(Variable*, facts).
 // FactPointTo.cpp:411–419 — needs related fact; null/dead forbidden when probs are 0.
+// Variable always live; sticky invalid (no invent valid soft-skip past hole).
 // Incomplete fact maps fail closed sticky invalid (no invent valid / soft re-pick past holes).
 // Missing related fact / null/dead policy rejects stay non-sticky false.
 func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool {
+	if p == nil {
+		SetError(ErrGeneric)
+		return false
+	}
 	if !FactsComplete(facts) {
 		SetError(ErrGeneric)
 		return false
 	}
 	fact := FindRelatedPointTo(facts, p)
 	if fact == nil {
+		// FindRelated may already sticky on map holes; missing subject is complete invalid
 		return false
 	}
 	if nullProb <= 0 && fact.IsNull() {
@@ -173,9 +179,14 @@ func IsValidPtr(p *Variable, facts []*FactPointTo, nullProb, deadProb int) bool 
 
 // IsDanglingPtr mirrors FactPointTo::is_dangling_ptr.
 // FactPointTo.cpp:476–482 — related fact is dead (and dead deref not allowed).
+// Variable always live; sticky dangling true (no invent not-dangling soft-skip past hole).
 // Incomplete fact maps fail closed sticky as dangling (true — no invent not-dangling
 // / soft re-pick past holes when FindRelated would skip holes).
 func IsDanglingPtr(p *Variable, facts []*FactPointTo, deadProb int) bool {
+	if p == nil {
+		SetError(ErrGeneric)
+		return true
+	}
 	if !FactsComplete(facts) {
 		SetError(ErrGeneric)
 		return true
@@ -1149,15 +1160,18 @@ func isIdentChar(c byte) bool {
 // FactPointTo.cpp:712–748 — if pointee is itemized array whose index uses
 // indexVar, replace that index with Constant("-1") (any-member).
 // Returns this fact if unchanged, or a new fact with rewritten pointees.
+// Fact + indexVar always live; sticky nil (no invent identity soft-skip past hole).
 func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 	if f == nil || indexVar == nil {
-		return f
+		SetError(ErrGeneric)
+		return nil
 	}
 	pointees := append([]*Variable(nil), f.PointTo...)
 	changed := false
 	for j, v := range f.PointTo {
-		// Variable* always live in PointTo; nil hole fails closed (no invent skip)
+		// Variable* always live in PointTo; nil hole sticky fail closed (no invent skip)
 		if v == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		// walk to root field_var_of (FactPointTo.cpp:718–720)
@@ -1176,6 +1190,7 @@ func (f *FactPointTo) UpdateWithModifiedIndex(indexVar *Variable) *FactPointTo {
 		if len(av.IndexExprs) > 0 {
 			for k, exp := range av.IndexExprs {
 				if exp == nil {
+					SetError(ErrGeneric)
 					return nil
 				}
 				if exp.UseVar(indexVar) {
@@ -1303,12 +1318,14 @@ func MergePointeesOfPointer(ptr *Variable, indirect int, facts []*FactPointTo) [
 
 // IsPointingToLocals mirrors FactPointTo::is_pointing_to_locals.
 // FactPointTo.cpp:487–526.
+// Variable always live; sticky true (no invent not-local soft-skip past hole).
 // Incomplete fact maps / stack scans / nil holes fail closed sticky true
 // (no invent "not pointing to locals" / soft re-pick past holes).
 // MergePointees incomplete stays non-sticky true (fact-map soft re-pick).
 func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPointTo) bool {
 	if v == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	// incomplete LocalVars/Param sticky (membership short-circuit invents not-local)
 	if b != nil && !b.StackScanComplete() {

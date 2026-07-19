@@ -184,6 +184,22 @@ func TestArrayIsVirtualCollectiveParent(t *testing.T) {
 func TestIsValidPtr(t *testing.T) {
 	p := CreateVariableScalars("g_p", GetIntType(), false, false)
 	target := CreateVariableScalars("g_t", GetIntType(), false, false)
+	// Variable always live; sticky invalid / dangling
+	ClearError()
+	if IsValidPtr(nil, nil, 0, 0) {
+		t.Fatal("nil p IsValidPtr must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil p IsValidPtr must SetError sticky")
+	}
+	ClearError()
+	if !IsDanglingPtr(nil, nil, 0) {
+		t.Fatal("nil p IsDanglingPtr must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil p IsDanglingPtr must SetError sticky")
+	}
+	ClearError()
 	// no fact → invalid
 	if IsValidPtr(p, nil, 0, 0) {
 		t.Fatal("no fact")
@@ -315,9 +331,28 @@ func TestUpdateWithModifiedIndexNilPointee(t *testing.T) {
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	idx := CreateVariableScalars("i", GetIntType(), false, false)
+	ClearError()
 	if f.UpdateWithModifiedIndex(idx) != nil {
 		t.Fatal("nil pointee hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil pointee UpdateWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
+	if (*FactPointTo)(nil).UpdateWithModifiedIndex(idx) != nil {
+		t.Fatal("nil fact UpdateWithModifiedIndex must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil fact UpdateWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
+	if f.UpdateWithModifiedIndex(nil) != nil {
+		t.Fatal("nil indexVar UpdateWithModifiedIndex must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil indexVar UpdateWithModifiedIndex must SetError sticky")
+	}
+	ClearError()
 	if VariablesComplete(MergePointeesOfPointers([]*Variable{nil}, nil)) {
 		t.Fatal("nil ptr hole MergePointees must fail closed incomplete")
 	}

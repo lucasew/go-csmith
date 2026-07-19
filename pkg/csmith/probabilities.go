@@ -323,8 +323,14 @@ func (p *Probabilities) initStatementProbs(opts Options) {
 }
 
 // SafeOpsSizeWeight returns equal-group weight for SafeOpSize index (int sizes only).
+// Probabilities always live at weight query; sticky 0 (no invent zero-weight soft-skip past hole).
+// OOB sizeIdx is complete miss weight 0 (not incomplete IR).
 func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
-	if p == nil || sizeIdx < 0 || sizeIdx >= len(p.safeOpsSizeWeight) {
+	if p == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	if sizeIdx < 0 || sizeIdx >= len(p.safeOpsSizeWeight) {
 		return 0
 	}
 	return p.safeOpsSizeWeight[sizeIdx]

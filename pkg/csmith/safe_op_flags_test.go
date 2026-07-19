@@ -201,3 +201,15 @@ func TestSafeOpFlagsCloneNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSafeOpsSizeWeightNilSticky(t *testing.T) {
+	// Probabilities always live at weight query; sticky 0 (no invent zero-weight soft-skip)
+	ClearError()
+	if (*Probabilities)(nil).SafeOpsSizeWeight(0) != 0 {
+		t.Fatal("nil SafeOpsSizeWeight must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("nil SafeOpsSizeWeight must SetError sticky")
+	}
+	ClearError()
+}

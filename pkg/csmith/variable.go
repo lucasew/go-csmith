@@ -1320,7 +1320,13 @@ func (v *Variable) HasFieldVar(other *Variable) bool {
 
 // GetContainerUnion mirrors Variable::get_container_union.
 // Variable.cpp:226–232 — walk field_var_of until union type.
+// GetContainerUnion walks FieldVarOf to the enclosing union variable.
+// Variable always live; sticky nil (no invent no-container soft-skip past hole).
 func (v *Variable) GetContainerUnion() *Variable {
+	if v == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	for p := v; p != nil; p = p.FieldVarOf {
 		if p.Type != nil && p.Type.IsUnion() {
 			return p

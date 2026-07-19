@@ -204,8 +204,14 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 
 // GetLastWrittenType mirrors FactUnion::get_last_written_type.
 // FactUnion.cpp:63–71.
+// FactUnion + Var always live; sticky nil (no invent soft-skip past hole).
+// Top/bottom are complete no-type (not incomplete IR).
 func (f *FactUnion) GetLastWrittenType() *Type {
-	if f == nil || f.Var == nil || f.IsTop() || f.IsBottom() {
+	if f == nil || f.Var == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if f.IsTop() || f.IsBottom() {
 		return nil
 	}
 	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
@@ -300,10 +306,15 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 // IsNonreadableField mirrors FactUnion::is_nonreadable_field.
 // FactUnion.cpp:178–192 — when analysis active (facts non-empty), unread union fields blocked.
 // When facts empty, returns false (analysis not engaged).
+// Variable always live; sticky nonreadable (no invent readable soft-skip past hole).
 // Incomplete FactUnion maps fail closed nonreadable (no invent readable while
 // FindRelatedUnion returns nil past a hole before a matching parent fact).
 func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
-	if v == nil || !v.IsInsideUnionField() {
+	if v == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !v.IsInsideUnionField() {
 		return false
 	}
 	if len(facts) == 0 {

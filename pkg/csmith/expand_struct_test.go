@@ -65,6 +65,22 @@ func TestFactMgrForFunc(t *testing.T) {
 	if m.ForFunc(f) != fm {
 		t.Fatal("reuse")
 	}
+	// FactMgrMap + Function always live; sticky nil
+	ClearError()
+	if (*FactMgrMap)(nil).ForFunc(f) != nil {
+		t.Fatal("nil map ForFunc must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil map ForFunc must SetError sticky")
+	}
+	ClearError()
+	if m.ForFunc(nil) != nil {
+		t.Fatal("nil Function ForFunc must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Function ForFunc must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpandStructUnionVars(t *testing.T) {

@@ -25,6 +25,15 @@ func TestGetContainerUnion(t *testing.T) {
 	if iv.GetContainerUnion() != nil {
 		t.Fatal("int")
 	}
+	// Variable always live; sticky nil (no invent no-container soft-skip)
+	ClearError()
+	if (*Variable)(nil).GetContainerUnion() != nil {
+		t.Fatal("nil GetContainerUnion must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil GetContainerUnion must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSiblingUnionPartial(t *testing.T) {

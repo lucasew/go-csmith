@@ -1023,8 +1023,10 @@ func NewFactMgrMap() *FactMgrMap {
 // Prefer the FactMgr paired at make_random_signature / make_first (Function.cpp:422);
 // only create when registering a function that has no paired entry yet.
 // get_fact_mgr_for_func itself only looks up — create happens at signature time.
+// FactMgrMap + Function always live; sticky nil (no invent miss soft-skip past hole).
 func (m *FactMgrMap) ForFunc(f *Function) *FactMgr {
 	if m == nil || f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if m.byFunc == nil {

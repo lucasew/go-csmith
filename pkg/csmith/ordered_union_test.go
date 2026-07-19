@@ -73,6 +73,15 @@ func TestIsNonreadableField(t *testing.T) {
 	if IsNonreadableField(f1, nil) {
 		t.Fatal("empty")
 	}
+	// Variable always live; sticky nonreadable (no invent readable soft-skip)
+	ClearError()
+	if !IsNonreadableField(nil, nil) {
+		t.Fatal("nil Variable IsNonreadableField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil Variable IsNonreadableField must SetError sticky")
+	}
+	ClearError()
 	// last write f0 → f1 nonreadable
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
 	if IsNonreadableField(f0, facts) {

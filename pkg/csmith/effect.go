@@ -477,10 +477,15 @@ func (e Effect) IsRead(v *Variable) bool {
 
 // FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
 // Effect.cpp:389–399.
+// Variable always live; sticky true (no invent no-field-read soft-skip past hole).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
-// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
+// Incomplete effect fails closed as true sticky (incomplete marker soft re-pick banned).
 func (e Effect) FieldIsRead(v *Variable) bool {
-	if v == nil || !v.IsAggregate() {
+	if v == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !v.IsAggregate() {
 		return false
 	}
 	if e.incomplete {
@@ -502,10 +507,15 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
+// Variable always live; sticky true (no invent no-field-write soft-skip past hole).
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
 // Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).
 func (e Effect) FieldIsWritten(v *Variable) bool {
-	if v == nil || !v.IsAggregate() {
+	if v == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if !v.IsAggregate() {
 		return false
 	}
 	if e.incomplete {
