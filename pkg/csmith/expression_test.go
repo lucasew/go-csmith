@@ -174,6 +174,14 @@ func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
 	if (&Expression{Term: TermVariable}).GetType() != nil {
 		t.Fatal("nil Var must fail closed")
 	}
+	// ExprType alone must not invent type without live Var
+	ClearError()
+	if (&Expression{Term: TermVariable, ExprType: GetIntType()}).GetType() != nil {
+		t.Fatal("nil Var must not invent type from ExprType alone")
+	}
+	if !HasError() {
+		t.Fatal("nil Var+ExprType GetType must SetError sticky")
+	}
 	// incomplete Constant Con/Type sticky (no invent untyped constant soft-miss)
 	ClearError()
 	if (&Expression{Term: TermConstant}).GetType() != nil {
@@ -1105,6 +1113,14 @@ func TestCompatibleWithIncompleteSticky(t *testing.T) {
 	}
 	if HasError() {
 		t.Fatal("Constant CompatibleWithVar must not sticky")
+	}
+	ClearError()
+	// incomplete Constant shell sticky (no invent expand_struct success past hole)
+	if (&Expression{Term: TermConstant}).CompatibleWithVar(v, true) {
+		t.Fatal("nil Con CompatibleWithVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Con CompatibleWithVar must SetError sticky")
 	}
 	ClearError()
 }

@@ -92,7 +92,11 @@ func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
 		return e.Var.Compatible(v, expandStruct)
 	case TermConstant:
 		// Constant.cpp:488–493 — assert(v); expand_struct → true; else false
-		// no soft invent field-var special cases beyond expand_struct
+		// incomplete Constant shell sticky (no invent expand_struct success past hole)
+		if e.Con == nil {
+			SetError(ErrGeneric)
+			return false
+		}
 		return expandStruct
 	default:
 		return false
@@ -180,14 +184,20 @@ func (e *Expression) GetTypeUncast() *Type {
 		}
 		return e.Con.Type
 	case TermVariable, TermLhs:
-		// ExpressionVariable always has live type; ExprType preferred then Var.Type
+		// ExpressionVariable always has live Variable*; incomplete sticky
+		// (no invent type shell from ExprType alone without live Var)
+		if e.Var == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		// ExprType preferred (desired type after indirection) then Var.Type
 		if e.ExprType != nil {
 			return e.ExprType
 		}
-		if e.Var != nil && e.Var.Type != nil {
+		if e.Var.Type != nil {
 			return e.Var.Type
 		}
-		// incomplete Variable IR sticky — no invent untyped variable
+		// incomplete Variable type IR sticky — no invent untyped variable
 		SetError(ErrGeneric)
 		return nil
 	case TermFunction:

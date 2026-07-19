@@ -1381,12 +1381,21 @@ func (v *Variable) LooseMatch(other *Variable) bool {
 
 // IsUnionField mirrors Variable::is_union_field — direct field of a union.
 // Variable always live; sticky false (no invent not-union-field soft-skip past hole).
+// Field with live parent but Type-nil parent is incomplete IR sticky (no invent
+// not-union-field soft-skip past hole). Non-field (FieldVarOf nil) is complete false.
 func (v *Variable) IsUnionField() bool {
 	if v == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.FieldVarOf != nil && v.FieldVarOf.Type != nil && v.FieldVarOf.Type.IsUnion()
+	if v.FieldVarOf == nil {
+		return false
+	}
+	if v.FieldVarOf.Type == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.FieldVarOf.Type.IsUnion()
 }
 
 // IsInsideUnionField mirrors Variable::is_inside_union_field.

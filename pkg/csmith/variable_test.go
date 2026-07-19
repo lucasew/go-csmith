@@ -309,6 +309,24 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 		t.Fatal("complete IsPointer/IsAggregate must not sticky")
 	}
 	ClearError()
+	// field with Type-nil parent sticky (no invent not-union-field soft-skip)
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", FieldVarOf: parent, Type: GetIntType()}
+	if field.IsUnionField() {
+		t.Fatal("Type-nil parent IsUnionField must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsUnionField must SetError sticky")
+	}
+	ClearError()
+	// non-field complete false
+	if p.IsUnionField() {
+		t.Fatal("non-field IsUnionField must be false complete")
+	}
+	if HasError() {
+		t.Fatal("non-field IsUnionField must not sticky")
+	}
+	ClearError()
 }
 
 func TestFieldVarsCompleteNilIncomplete(t *testing.T) {
