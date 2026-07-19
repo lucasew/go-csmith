@@ -36,7 +36,12 @@ type BooleanAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *BooleanAttribute) MakeRandom(r *Rng) string {
-	if a == nil || r == nil {
+	// Attribute always has process RNG; sticky no invent skip shell without it
+	if a == nil {
+		return ""
+	}
+	if r == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent empty __attribute__ token
@@ -60,7 +65,12 @@ type MultiChoiceAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *MultiChoiceAttribute) MakeRandom(r *Rng) string {
-	if a == nil || r == nil || len(a.Choices) == 0 {
+	if a == nil {
+		return ""
+	}
+	// Attribute always has process RNG + non-empty choices; sticky no invent without them
+	if r == nil || len(a.Choices) == 0 {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent ("choice") without name
@@ -91,7 +101,12 @@ type AlignedAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *AlignedAttribute) MakeRandom(r *Rng) string {
-	if a == nil || r == nil {
+	if a == nil {
+		return ""
+	}
+	// Attribute always has process RNG; sticky no invent skip shell without it
+	if r == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	// Attribute name from ctor; sticky no invent bare "(N)" without name
@@ -128,7 +143,12 @@ type SectionAttribute struct {
 
 // MakeRandom implements Attribute.
 func (a *SectionAttribute) MakeRandom(r *Rng) string {
-	if a == nil || r == nil {
+	if a == nil {
+		return ""
+	}
+	// Attribute always has process RNG; sticky no invent skip shell without it
+	if r == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if !r.RndFlipcoin(uint32(clampProb(a.Prob))) {
@@ -153,6 +173,11 @@ type AttributeGenerator struct {
 // Output mirrors AttributeGenerator::Output — " __attribute__((a, b))" or "".
 func (g *AttributeGenerator) Output(r *Rng) string {
 	if g == nil || len(g.Attributes) == 0 {
+		return ""
+	}
+	// AttributeGenerator always has process RNG when attributes exist; sticky no invent skip
+	if r == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var parts []string

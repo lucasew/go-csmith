@@ -131,6 +131,54 @@ func TestSectionAttribute(t *testing.T) {
 	}
 }
 
+func TestAttributeNilRNGSticky(t *testing.T) {
+	// Attribute / generator always have process RNG; sticky no invent skip shells
+	ClearError()
+	if (&BooleanAttribute{Name: "unused", Prob: 100}).MakeRandom(nil) != "" {
+		t.Fatal("nil RNG boolean must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG BooleanAttribute must SetError sticky")
+	}
+	ClearError()
+	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default"}}).MakeRandom(nil) != "" {
+		t.Fatal("nil RNG multichoice must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MultiChoiceAttribute must SetError sticky")
+	}
+	ClearError()
+	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: nil}).MakeRandom(NewRng(1)) != "" {
+		t.Fatal("empty choices must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty choices MultiChoiceAttribute must SetError sticky")
+	}
+	ClearError()
+	if (&AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}).MakeRandom(nil) != "" {
+		t.Fatal("nil RNG aligned must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG AlignedAttribute must SetError sticky")
+	}
+	ClearError()
+	if (&SectionAttribute{Name: "section", Prob: 100}).MakeRandom(nil) != "" {
+		t.Fatal("nil RNG section must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG SectionAttribute must SetError sticky")
+	}
+	ClearError()
+	g := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}}}
+	if g.Output(nil) != "" {
+		t.Fatal("nil RNG generator Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG AttributeGenerator.Output must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestNewVarAttrGeneratorGated(t *testing.T) {
 	opts := Defaults()
 	opts.VariableAttributes = false

@@ -156,8 +156,9 @@ func CreateArrayVariable(
 			}
 		} else {
 			// make_init_value needs live VS + CGContext (C++ always has both)
+			// sticky no invent Constant "0" / null stand-in for missing make_init_value
 			if vs == nil || cg == nil {
-				// no invent Constant "0" / null stand-in for missing make_init_value
+				SetError(ErrGeneric)
 				return nil
 			}
 			qf := qfer

@@ -723,7 +723,9 @@ func (vs *VariableSelector) MakeInitValue(
 	b *Block,
 	r *Rng,
 ) *Expression {
+	// VariableSelector always has VS + type + RNG; sticky no invent init shell without them
 	if vs == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before const/pointer pick
@@ -1415,11 +1417,14 @@ func (vs *VariableSelector) createAndInitialize(
 	name string,
 	r *Rng,
 ) *Variable {
+	// VariableSelector always has VS + type + RNG; sticky no invent create shell without them
 	if vs == nil || t == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
-	// name always live from gensym; no invent empty-name create path
+	// name always live from gensym; sticky no invent empty-name create path
 	if name == "" {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
@@ -1836,7 +1841,9 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	mt MatchType,
 	invalidVars ...[]*Variable,
 ) *Variable {
+	// VariableSelector always has VS + type + RNG; sticky no invent eager global struct without them
 	if vs == nil || typ == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
@@ -1908,7 +1915,9 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 	mt MatchType,
 	invalidVars ...[]*Variable,
 ) *Variable {
+	// VariableSelector always has VS + block + type + RNG; sticky no invent eager local struct without them
 	if vs == nil || block == nil || typ == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
@@ -1970,7 +1979,9 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 // VariableSelector::GenerateParameterVariable(type, qfer).
 // VariableSelector.cpp:955–957.
 func (vs *VariableSelector) GenerateParameterVariableTyped(typ *Type, qfer CVQualifiers) *Variable {
+	// VariableSelector always live; sticky no invent param shell without VS
 	if vs == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	name := vs.RandomParamName()
@@ -2044,7 +2055,9 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 // VariableSelector.cpp:1146–1179 — non-array visible, has_int_field, drop union+ptr;
 // choose_var(WRITE, eConvert, invalid, no_bitfield=true).
 func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[*Variable]bool) *Variable {
+	// VariableSelector always has VS + RNG; sticky no invent loop-ctrl shell without them
 	if vs == nil || r == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before filter (no invent soft re-pick)
@@ -2693,7 +2706,13 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	mt MatchType,
 	invalidVars []*Variable,
 ) *Variable {
-	if vs == nil || cg.CurrentFunc == nil || r == nil {
+	// VariableSelector always has VS + RNG; sticky no invent parent-local select without them
+	if vs == nil || r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// no CurrentFunc: soft re-pick (select scopes without live func stack)
+	if cg.CurrentFunc == nil {
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky before stack pick (no invent soft re-pick)

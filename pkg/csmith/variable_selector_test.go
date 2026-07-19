@@ -311,8 +311,19 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_x", NewRng(1)) != nil {
 		t.Fatal("void must fail closed")
 	}
+	ClearError()
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_y", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG createAndInitialize must SetError sticky")
+	}
+	ClearError()
+	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "", NewRng(1)) != nil {
+		t.Fatal("empty name must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("empty name createAndInitialize must SetError sticky")
 	}
 	ClearError()
 }
@@ -364,6 +375,50 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 		if av := vs.CreateRandomArray(NewRng(seed), cg); av != nil {
 			t.Fatalf("seed %d: must not invent array when make_random fails", seed)
 		}
+	}
+	ClearError()
+}
+
+func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
+	// MakeInitValue / SelectLoopCtrl / SelectParentLocal always have VS+RNG sticky
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if vs.MakeInitValue(AccessRead, EmptyCGContext(), GetIntType(), &q, nil, nil) != nil {
+		t.Fatal("nil RNG MakeInitValue must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeInitValue must SetError sticky")
+	}
+	ClearError()
+	if vs.SelectLoopCtrlVar(nil, EmptyCGContext(), nil) != nil {
+		t.Fatal("nil RNG SelectLoopCtrlVar must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG SelectLoopCtrlVar must SetError sticky")
+	}
+	ClearError()
+	// no CurrentFunc is soft re-pick (not sticky) — EmptyCGContext select scopes
+	if vs.SelectParentLocalInv(AccessRead, EmptyCGContext(), GetIntType(), nil, NewRng(1), MatchFlexible, nil) != nil {
+		t.Fatal("nil CurrentFunc SelectParentLocalInv must fail closed")
+	}
+	if HasError() {
+		t.Fatal("nil CurrentFunc SelectParentLocalInv must stay non-sticky soft re-pick")
+	}
+	ClearError()
+	if vs.SelectParentLocalInv(AccessRead, WithFunc(&Function{Name: "f"}, EmptyEffect()), GetIntType(), nil, nil, MatchFlexible, nil) != nil {
+		t.Fatal("nil RNG SelectParentLocalInv must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG SelectParentLocalInv must SetError sticky")
+	}
+	ClearError()
+	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), nil, nil, NewRng(1), MatchFlexible) != nil {
+		t.Fatal("nil type EagerCreateGlobalStruct must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type EagerCreateGlobalStruct must SetError sticky")
 	}
 	ClearError()
 }
@@ -436,10 +491,15 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetSimpleType(EVoid), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_v", NewRng(1)) != nil {
 		t.Fatal("void must fail closed")
 	}
-	// nil RNG
+	// nil RNG sticky
+	ClearError()
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_n", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG createAndInitialize must SetError sticky")
+	}
+	ClearError()
 	// bad qfer (empty levels on pointer) — MakeInitValue fail closed sticky
 	ptr := PointerTo(GetIntType())
 	badQ := CVQualifiers{} // empty not sanity_check for pointer
