@@ -1149,17 +1149,13 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		if lhsExpr == nil {
 			return false
 		}
-		// complete get_eval_to_subexps always ≥1 entry; nil/empty fails closed
-		// (no invent skip overlap check as success past incomplete RHS)
+		// complete get_eval_to_subexps always ≥1 entry; incomplete/empty fails closed
+		// (IncompleteExpressions — no invent skip overlap as success past incomplete RHS)
 		subs := GetEvalToSubexps(c.CurrRHS)
-		if len(subs) == 0 {
+		if !ExpressionsComplete(subs) || len(subs) == 0 {
 			return false
 		}
 		for _, sub := range subs {
-			// Expression* always live in eval list; no invent skip nil holes
-			if sub == nil {
-				return false
-			}
 			if sub.Term == TermVariable || sub.Term == TermLhs {
 				if HaveOverlappingFields(sub, lhsExpr, facts) {
 					return false

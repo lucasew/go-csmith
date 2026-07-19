@@ -194,22 +194,20 @@ func TestGetDereferencedPtrs(t *testing.T) {
 }
 
 func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
-	// incomplete IR must not invent empty deref list as complete
-	if GetDereferencedPtrs(&Expression{Term: TermVariable}) != nil {
-		t.Fatal("nil Var must fail closed")
+	// incomplete IR must IncompleteExpressions (not bare nil invent empty-complete)
+	cases := []*Expression{
+		{Term: TermVariable},
+		{Term: TermCommaExpr},
+		{Term: TermFunction},
+		{Term: TermFunction, Invoke: &Invocation{
+			Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil},
+		}},
+		{Term: TermAssignment},
+		nil,
 	}
-	if GetDereferencedPtrs(&Expression{Term: TermCommaExpr}) != nil {
-		t.Fatal("nil comma sides must fail closed")
-	}
-	if GetDereferencedPtrs(&Expression{Term: TermFunction}) != nil {
-		t.Fatal("nil Invoke must fail closed")
-	}
-	if GetDereferencedPtrs(&Expression{Term: TermFunction, Invoke: &Invocation{
-		Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil},
-	}}) != nil {
-		t.Fatal("nil arg hole must fail closed")
-	}
-	if GetDereferencedPtrs(&Expression{Term: TermAssignment}) != nil {
-		t.Fatal("nil Assign must fail closed")
+	for _, e := range cases {
+		if ExpressionsComplete(GetDereferencedPtrs(e)) {
+			t.Fatalf("incomplete deref must IncompleteExpressions, got complete for %#v", e)
+		}
 	}
 }
