@@ -257,7 +257,8 @@ func TestRestoreFacts(t *testing.T) {
 }
 
 func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
-	// incomplete old/new maps must not invent partial makeup past holes
+	// incomplete old/new maps must not invent partial makeup past holes — sticky
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -268,6 +269,10 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(old) {
 		t.Fatal("incomplete oldFacts must fail closed nil")
 	}
+	if !HasError() {
+		t.Fatal("incomplete oldFacts must SetError sticky")
+	}
+	ClearError()
 	old2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	new2 := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
 	if MakeupNewVarFacts(&old2, new2) {
@@ -276,6 +281,10 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(old2) {
 		t.Fatal("incomplete newFacts must fail closed incomplete oldFacts")
 	}
+	if !HasError() {
+		t.Fatal("incomplete newFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {

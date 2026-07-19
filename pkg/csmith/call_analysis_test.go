@@ -223,8 +223,9 @@ func TestCombineBranchFacts(t *testing.T) {
 	if fp == nil || !fp.IsNull() {
 		t.Fatal("both return use pre", fp)
 	}
-	// nil hole in branch outs fails closed — no invent partial combine
+	// nil hole in branch outs fails closed sticky — no invent partial combine
 	// bypass SetMapFactsOut (CloneFactSlice strips holes → nil) to plant a hole
+	ClearError()
 	fm2 := NewFactMgr(nil)
 	fm2.MapFactsOut = map[int][]*FactPointTo{
 		10: {MakeFactPointTo(p, GarbagePtr), nil},
@@ -240,6 +241,10 @@ func TestCombineBranchFacts(t *testing.T) {
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("nil branch fact hole must fail closed", fm2.GlobalFacts)
 	}
+	if !HasError() {
+		t.Fatal("nil branch fact hole must SetError sticky")
+	}
+	ClearError()
 	// missing Then/Else arm — no invent empty branch via FactsComplete(nil)
 	fm3 := NewFactMgr(nil)
 	fm3.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -249,6 +254,10 @@ func TestCombineBranchFacts(t *testing.T) {
 	if FactsComplete(fm3.GlobalFacts) {
 		t.Fatal("nil Else arm must fail closed", fm3.GlobalFacts)
 	}
+	if !HasError() {
+		t.Fatal("nil Else arm must SetError sticky")
+	}
+	ClearError()
 	// arm Block StmID 0 — no invent empty outs via FactsComplete(nil)
 	fm4 := NewFactMgr(nil)
 	fm4.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -262,6 +271,10 @@ func TestCombineBranchFacts(t *testing.T) {
 	if FactsComplete(fm4.GlobalFacts) {
 		t.Fatal("Then StmID 0 must fail closed", fm4.GlobalFacts)
 	}
+	if !HasError() {
+		t.Fatal("Then StmID 0 must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {

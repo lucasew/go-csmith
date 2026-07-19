@@ -22,9 +22,10 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 	if facts == nil {
 		return false, false
 	}
-	// pre-validate: incomplete maps must not soft-join past holes
+	// pre-validate: incomplete maps must not soft-join past holes — sticky ERROR
 	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false, false
 	}
 	// iterate a snapshot of subjects so we can grow via MergeFactInto
@@ -42,8 +43,9 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 		before := FindRelatedPointTo(*facts, f.Var)
 		merged := MergeFactInto(*facts, jumpF)
 		if !FactsComplete(merged) {
-			// mid-join incomplete — clear partial, no invent keep half-merged map
+			// mid-join incomplete — clear partial sticky, no invent keep half-merged map
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false, false
 		}
 		*facts = merged

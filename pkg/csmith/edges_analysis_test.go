@@ -106,11 +106,12 @@ func TestHasEdgeInNilFMFailClosed(t *testing.T) {
 }
 
 func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	jump := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
-	// incomplete subject map must not soft-join past hole
+	// incomplete subject map must not soft-join past hole — sticky
 	if MergeJumpFacts(&facts, jump) {
 		t.Fatal("nil subject hole must fail closed")
 	}
@@ -118,6 +119,10 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete must clear facts", facts)
 	}
+	if !HasError() {
+		t.Fatal("nil subject hole must SetError sticky")
+	}
+	ClearError()
 	holeSubj := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	if _, ok := tryMergeJumpFacts(&holeSubj, jump); ok {
 		t.Fatal("tryMerge incomplete subject must ok=false")
@@ -125,6 +130,10 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(holeSubj) {
 		t.Fatal("tryMerge must clear incomplete subject", holeSubj)
 	}
+	if !HasError() {
+		t.Fatal("tryMerge incomplete must SetError sticky")
+	}
+	ClearError()
 	facts2 := []*FactPointTo{MakeFactPointTo(p, a)}
 	jumpHole := []*FactPointTo{nil}
 	if MergeJumpFacts(&facts2, jumpHole) {
@@ -133,6 +142,10 @@ func TestMergeJumpFactsNilHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts2) {
 		t.Fatal("incomplete jump must clear facts2", facts2)
 	}
+	if !HasError() {
+		t.Fatal("nil jump hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsStatementReturnIncompleteAssignFailClosed(t *testing.T) {

@@ -300,6 +300,7 @@ func TestGenerateNewGlobalFixedQferHasInit(t *testing.T) {
 func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	// VariableSelector.cpp:526–527 — Constant::make_random then create_array;
 	// no invent array with nil init when make_random fails.
+	ClearError()
 	opts := Defaults()
 	opts.StrictConstArrays = true
 	opts.Arrays = true
@@ -313,6 +314,7 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_y", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
+	ClearError()
 }
 
 func TestCreateRandomArrayIncompleteAmbientSticky(t *testing.T) {
@@ -363,11 +365,13 @@ func TestCreateRandomArrayMakeRandomFailClosed(t *testing.T) {
 			t.Fatalf("seed %d: must not invent array when make_random fails", seed)
 		}
 	}
+	ClearError()
 }
 
 func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	// VariableSelector.cpp:531–533 — make_init_value then new_variable;
 	// make_init_value always Expression* or ERROR_GUARD — no invent uninit shell.
+	ClearError()
 	opts := Defaults()
 	opts.Arrays = false // force scalar path
 	vs := NewVariableSelector(opts)
@@ -380,12 +384,13 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}), nil, "g_n", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	// bad qfer (empty levels on pointer) — MakeInitValue fail closed
+	// bad qfer (empty levels on pointer) — MakeInitValue fail closed sticky
 	ptr := PointerTo(GetIntType())
 	badQ := CVQualifiers{} // empty not sanity_check for pointer
 	if vs.createAndInitialize(AccessRead, EmptyCGContext(), ptr, badQ, nil, "g_p", NewRng(3)) != nil {
 		t.Fatal("bad qfer must fail closed without invent uninit var")
 	}
+	ClearError()
 }
 
 func TestSelectParentLocalInvIncompleteStackFailClosed(t *testing.T) {

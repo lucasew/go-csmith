@@ -1068,40 +1068,51 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 	pt, un := AbstractFactForVarInit(v)
 	if wantPT {
-		// incomplete abstract must not invent skip (no fact to add)
+		// incomplete abstract must not invent skip (no fact to add) — sticky ERROR
 		if !FactsComplete(pt) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		// Fact.cpp:94–95 assert(lvar_cnt==1) — no soft invent NewFactPointTo when empty
 		for _, f := range pt {
 			if f == nil {
-				// incomplete abstract list — clear partial GlobalFacts, no invent keep half-merge
+				// incomplete abstract list — clear partial GlobalFacts sticky
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			merged := MergeFactInto(fm.GlobalFacts, f)
 			if !FactsComplete(merged) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			fm.GlobalFacts = merged
 		}
 	}
 	if wantUn {
-		// incomplete union abstract must not invent skip empty UnionFacts merge
+		// incomplete union abstract must not invent skip empty UnionFacts merge sticky
+		// also wipe GlobalFacts so callers checking FactsComplete abort (not leave
+		// sticky-only poison with complete GlobalFacts)
 		if !UnionFactsComplete(un) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
+			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		for _, uf := range un {
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
+				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
+				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			fm.UnionFacts = merged
@@ -1404,15 +1415,17 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if oldFacts == nil {
 		return false
 	}
-	// incomplete working/snapshot sets fail closed before partial makeup
+	// incomplete working/snapshot sets fail closed sticky before partial makeup
 	if !FactsComplete(*oldFacts) || !FactsComplete(newFacts) {
 		*oldFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, f := range newFacts {
 		// no invent soft-continue past nil fact holes (also covered by FactsComplete)
 		if f == nil || f.Var == nil {
 			*oldFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
 		v := f.Var
@@ -1424,9 +1437,12 @@ func MakeupNewVarFacts(oldFacts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 			// no invent NewFactPointTo garbage (tbd/garbage default) for live inits
 			AddNewVarFactInto(v, oldFacts)
 			// AddNewVarFactInto may clear *oldFacts on FieldVars/abstract holes;
-			// stop — no invent continue loop and re-append later vars onto nil.
+			// stop sticky — no invent continue loop and re-append later vars onto nil.
 			if *oldFacts == nil || !FactsComplete(*oldFacts) {
 				*oldFacts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 		}
@@ -1579,8 +1595,9 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 	}
 	for i, p := range fm.Func.Param {
 		if p == nil {
-			// incomplete Param list — no invent skip remaining params
+			// incomplete Param list fails closed sticky — no invent skip remaining params
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		var arg *Expression
@@ -1588,10 +1605,13 @@ func (fm *FactMgr) AddParamFacts(args []*Expression, facts *[]*FactPointTo) {
 			arg = args[i]
 		}
 		// FactMgr.cpp:113–114 — always update_fact_for_assign (all params, not pointer-only)
-		// false alone may mean no lattice change; incomplete clears *facts
+		// false alone may mean no lattice change; incomplete clears *facts sticky
 		_ = fm.UpdateFactForAssignInto(p, 0, arg, facts)
 		if !FactsComplete(*facts) {
 			*facts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	}
@@ -1672,18 +1692,23 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 	if fm == nil || inputs == nil || fm.Func == nil {
 		return
 	}
-	// incomplete inputs fail closed before partition (no invent drop via hole skip)
+	// incomplete inputs fail closed sticky before partition (no invent drop via hole skip)
 	if !FactsComplete(*inputs) {
 		*inputs = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	if !VariablesComplete(fm.Func.Param) {
 		*inputs = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	fm.AddParamFacts(args, inputs)
 	if !FactsComplete(*inputs) {
 		*inputs = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	// partition: keep globals and params
@@ -1725,7 +1750,9 @@ func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 		return
 	}
 	if !FactsComplete(*facts) {
+		// incomplete map fails closed sticky (no invent clean filter past holes)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	out := make([]*FactPointTo, 0, len(*facts))

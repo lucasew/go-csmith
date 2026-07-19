@@ -435,15 +435,17 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		return
 	}
 	// StatementIf always has live if_true / if_false blocks after make_random
-	// incomplete arms fail closed (no invent empty then/else via nil-out + FactsComplete)
+	// incomplete arms fail closed sticky (no invent empty then/else via nil-out + FactsComplete)
 	if st.Then == nil || st.Else == nil {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// Block::stm_id always live; StmID 0 + FactsComplete(nil) would invent empty
 	// arm outs as complete (no invent soft empty map for missing block id)
 	if st.Then.StmID <= 0 || st.Else.StmID <= 0 {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	thenOut := fm.GetMapFactsOut(st.Then.StmID)
@@ -451,12 +453,16 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	// Fact* always live in maps used for branch combine
 	if !FactsComplete(preFacts) || !FactsComplete(thenOut) || !FactsComplete(elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// makeup new vars from branch outs into preFacts snapshot
 	// sequential: first failure must not invent second makeup from cleared empty
 	if !MakeupNewVarFacts(&preFacts, thenOut) || !MakeupNewVarFacts(&preFacts, elseOut) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 
@@ -474,10 +480,14 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		in := fm.GetMapFactsIn(st.Else.StmID)
 		if !FactsComplete(in) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		if !MakeupNewVarFacts(&fm.GlobalFacts, in) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	default:
@@ -485,16 +495,21 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		// incomplete clone must not invent empty-complete GlobalFacts (bare nil)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		if !FactsComplete(elseOut) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
-		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed
+		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed sticky
 		_ = MergeFacts(&fm.GlobalFacts, elseOut)
 		if !FactsComplete(fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	}

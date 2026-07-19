@@ -185,7 +185,8 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if UnionFactsComplete(un3) {
 		t.Fatal("union without init must fail closed incomplete", un3)
 	}
-	// incomplete abstract must wipe on AddNewVarFact (not invent skip no-fact)
+	// incomplete abstract must wipe on AddNewVarFact sticky (not invent skip no-fact)
+	ClearError()
 	fm2 := NewFactMgr(nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(
 		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr)}
@@ -193,6 +194,10 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 	if UnionFactsComplete(fm2.UnionFacts) {
 		t.Fatal("AddNewVarFact incomplete union must fail closed", fm2.UnionFacts)
 	}
+	if !HasError() {
+		t.Fatal("AddNewVarFact incomplete union must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAbstractFactForVarInitPointerArrayAlts(t *testing.T) {

@@ -74,13 +74,14 @@ func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 }
 
 func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	opts.MaxBlockSize = 1
 	opts.MaxBlockDepth = 1
 	g := NewProgramGenerator(opts)
 	g.GenerateAllTypes()
-	// seed a union global
+	// seed a union global with live init (nil rhs union abstract fails closed sticky)
 	ut := &Type{
 		isUnion: true, StructName: "U1",
 		Fields: []StructField{
@@ -89,9 +90,12 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 		},
 	}
 	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	// Constant init field 0 — AbstractFactUnion transfer for constant → MakeFactUnions
+	uv.Init = MakeInt(0)
 	g.VS.GlobalList = append(g.VS.GlobalList, uv)
 	g.GenerateFunctions()
-	// attach union fact on first func FM
+	ClearError() // generation may fail-closed other paths; hash path only needs VS+FM
+	// attach union fact on first func FM (or use generator FM after seed)
 	if len(g.Funcs.Funcs) > 0 {
 		fm := g.FactMgrs.ForFunc(g.Funcs.Funcs[0])
 		if fm != nil {
@@ -102,9 +106,11 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 	if strings.Contains(out, "g_u.f1") {
 		t.Fatal("unread field hashed", out)
 	}
+	ClearError()
 }
 
 func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext(), GetIntType(), nil, NewRng(1))

@@ -65,6 +65,7 @@ func TestCallerToCalleeHandoverTransitive(t *testing.T) {
 }
 
 func TestCallerToCalleeHandoverNilHole(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
@@ -73,11 +74,16 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
+	if !HasError() {
+		t.Fatal("nil fact hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	// soft invent: Param hole → IsVariableInSet false → drop param from keep
-	// fair: VariablesComplete Param fails closed nil inputs
+	// fair: VariablesComplete Param fails closed nil inputs sticky
+	ClearError()
 	callee := &Function{Name: "c", ReturnType: GetIntType()}
 	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p, nil}
@@ -88,9 +94,14 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("incomplete Param must fail closed nil inputs, not invent drop param", facts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete Param must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)
 	if !VariablesComplete([]*Variable{a, b}) || VariablesComplete([]*Variable{a, nil, b}) {
@@ -106,6 +117,7 @@ func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
 }
 
 func TestRemoveRVFactsNilHole(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgr(f)
 	facts := []*FactPointTo{nil}
@@ -113,9 +125,14 @@ func TestRemoveRVFactsNilHole(t *testing.T) {
 	if FactsComplete(facts) {
 		t.Fatal("nil fact hole must fail closed", facts)
 	}
+	if !HasError() {
+		t.Fatal("nil fact hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRemoveRVFacts(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f", RV: CreateVariableScalars("f_rv", GetIntType(), false, false)}
 	fm := NewFactMgr(f)
 	other := CreateVariableScalars("other_rv", GetIntType(), false, false)

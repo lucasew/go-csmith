@@ -149,8 +149,11 @@ func (g *ProgramGenerator) GenerateFunctions() {
 				}
 				for _, gv := range g.VS.GlobalList {
 					fm.AddNewVarFact(gv)
-					if !FactsComplete(fm.GlobalFacts) {
-						SetError(ErrGeneric)
+					// incomplete PT/union abstract sticky or wipe must abort (no invent body past holes)
+					if HasError() || !FactsComplete(fm.GlobalFacts) {
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
 						return
 					}
 				}
