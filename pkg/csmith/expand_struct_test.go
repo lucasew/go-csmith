@@ -128,6 +128,52 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	}
 }
 
+func TestEagerCreateStructIncompleteAmbientSticky(t *testing.T) {
+	// Incomplete ambient / invalidVars must not invent soft re-pick create success
+	ClearError()
+	opts := Defaults()
+	opts.ExpandStruct = true
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	GenerateAllTypesEnv(NewRng(2), opts, probs, env)
+	vs.Types = env
+	vs.Probs = probs
+	vs.Opts = opts
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if vs.EagerCreateGlobalStruct(AccessRead, WithEffectContext(IncompleteEffect()), GetIntType(), &q, NewRng(5), MatchFlexible) != nil {
+		t.Fatal("incomplete EffectContext must fail closed EagerCreateGlobalStruct")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext(), GetIntType(), &q, NewRng(5), MatchFlexible, IncompleteVariables()) != nil {
+		t.Fatal("incomplete invalidVars must fail closed EagerCreateGlobalStruct")
+	}
+	if !HasError() {
+		t.Fatal("incomplete invalidVars must SetError sticky")
+	}
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	blk := &Block{}
+	f.Stack = []*Block{blk}
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, IncompleteEffect()), GetIntType(), &q, NewRng(9), MatchFlexible) != nil {
+		t.Fatal("incomplete EffectContext must fail closed EagerCreateLocalStruct")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext local must SetError sticky")
+	}
+	ClearError()
+	if vs.EagerCreateLocalStruct(blk, AccessRead, WithFunc(f, EmptyEffect()), GetIntType(), &q, NewRng(9), MatchFlexible, IncompleteVariables()) != nil {
+		t.Fatal("incomplete invalidVars must fail closed EagerCreateLocalStruct")
+	}
+	if !HasError() {
+		t.Fatal("incomplete invalidVars local must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectParentLocalExpandStruct(t *testing.T) {
 	opts := Defaults()
 	opts.ExpandStruct = true

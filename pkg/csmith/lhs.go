@@ -574,21 +574,53 @@ func selectDerefPointerInv(
 	if typ == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before choose/create (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); no invent
 	if qfer == nil || !qfer.SanityCheck(typ) {
+		return nil
+	}
+	// incomplete invalid_vars fails closed sticky
+	if !VariablesComplete(invalidVars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1252–1266 — GlobalNonvolatilesList only (no GlobalList soft-fallback)
 	var cands []*Variable
 	if vs != nil {
+		if !VariablesComplete(vs.GlobalNonvolatilesList) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		cands = append(cands, vs.GlobalNonvolatilesList...)
 	}
 	var blk *Block
 	if cg.CurrentFunc != nil {
+		if !BlocksComplete(cg.CurrentFunc.Stack) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if !VariablesComplete(cg.CurrentFunc.Param) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		if len(cg.CurrentFunc.Stack) > 0 {
 			blk = cg.CurrentFunc.Stack[len(cg.CurrentFunc.Stack)-1]
 		}
 		for b := blk; b != nil; b = b.Parent {
+			if !VariablesComplete(b.LocalVars) {
+				SetError(ErrGeneric)
+				return nil
+			}
 			cands = append(cands, b.LocalVars...)
 		}
 		cands = append(cands, cg.CurrentFunc.Param...)

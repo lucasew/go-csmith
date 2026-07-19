@@ -152,3 +152,43 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
+	// Incomplete ambient / invalidVars / pools must not invent soft re-pick success
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	pt := PointerTo(GetIntType())
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	pv := CreateVariableQfer("g_p", pt, q)
+	vs.GlobalList = []*Variable{pv}
+	vs.GlobalNonvolatilesList = []*Variable{pv}
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	probs := NewProbabilities(opts)
+	cg := WithFunc(f, IncompleteEffect())
+	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg, GetIntType(), &q, AccessRead, nil) != nil {
+		t.Fatal("incomplete EffectContext must fail closed selectDerefPointerInv")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(f, EmptyEffect())
+	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, IncompleteVariables()) != nil {
+		t.Fatal("incomplete invalidVars must fail closed selectDerefPointerInv")
+	}
+	if !HasError() {
+		t.Fatal("incomplete invalidVars must SetError sticky")
+	}
+	ClearError()
+	vs.GlobalNonvolatilesList = IncompleteVariables()
+	if selectDerefPointerInv(NewRng(2), opts, probs, vs, cg2, GetIntType(), &q, AccessRead, nil) != nil {
+		t.Fatal("incomplete GlobalNonvolatilesList must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalNonvolatilesList must SetError sticky")
+	}
+	ClearError()
+}

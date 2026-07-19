@@ -55,6 +55,36 @@ func TestSelectMustUseVarTypeNilHole(t *testing.T) {
 	ClearError()
 }
 
+func TestSelectMustUseVarIncompleteAmbientSticky(t *testing.T) {
+	// Incomplete EffectContext / GlobalFacts must not invent soft re-pick success
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	rw := &RWDirective{MustWriteVars: []*Variable{g}}
+	cg := WithFunc(f, IncompleteEffect()).WithRW(rw)
+	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
+		t.Fatal("incomplete EffectContext must fail closed SelectMustUseVar")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f, EmptyEffect()).WithRW(rw).WithFactMgr(fm)
+	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg2, GetIntType(), nil) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed SelectMustUseVar")
+	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestChooseVarFullWantNilTypeNil(t *testing.T) {
 	// want==nil path: Type-nil candidate must fail closed sticky, not invent eligible
 	ClearError()

@@ -636,6 +636,11 @@ func (q *CVQualifiers) Restrict(access Access, cg CGContext) {
 	if q == nil || q.Wildcard {
 		return
 	}
+	// incomplete ambient fails closed sticky (no invent clear-vol via IncompleteEffect SE-false)
+	if !EffectComplete(cg.EffectContext()) {
+		SetError(ErrGeneric)
+		return
+	}
 	if access == AccessWrite {
 		q.SetConst(false, 0)
 	}

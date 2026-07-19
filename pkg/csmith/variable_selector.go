@@ -1011,6 +1011,17 @@ func (vs *VariableSelector) SelectMustUseVar(
 	if vs == nil || cg.RW == nil || typ == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before must-use scan (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var list *[]*Variable
 	if access == AccessRead {
 		list = &cg.RW.MustReadVars
@@ -1758,11 +1769,26 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	if vs == nil || typ == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:611 assert(type)
 	level := typ.IndirectLevel()
 	var inv []*Variable
 	if len(invalidVars) > 0 {
 		inv = invalidVars[0]
+	}
+	if !VariablesComplete(inv) {
+		SetError(ErrGeneric)
+		return nil
 	}
 	// VariableSelector.cpp:613–630
 	var st *Type
@@ -1815,11 +1841,26 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 	if vs == nil || block == nil || typ == nil || r == nil {
 		return nil
 	}
+	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// VariableSelector.cpp:641 assert(type)
 	level := typ.IndirectLevel()
 	var inv []*Variable
 	if len(invalidVars) > 0 {
 		inv = invalidVars[0]
+	}
+	if !VariablesComplete(inv) {
+		SetError(ErrGeneric)
+		return nil
 	}
 	var st *Type
 	var createQfer *CVQualifiers

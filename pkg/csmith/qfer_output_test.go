@@ -22,6 +22,20 @@ func TestRestrictWrite(t *testing.T) {
 	}
 }
 
+func TestRestrictIncompleteEffectSticky(t *testing.T) {
+	// Incomplete EffectContext must not invent clear-vol via IncompleteEffect SE-false
+	ClearError()
+	q := NewCVQualifiers([]bool{true}, []bool{true})
+	q.Restrict(AccessWrite, WithEffectContext(IncompleteEffect()))
+	if !q.IsConst() || !q.IsVolatile() {
+		t.Fatalf("incomplete ambient must not mutate qfer: const=%v vol=%v", q.IsConst(), q.IsVolatile())
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSetConstPosFromEnd(t *testing.T) {
 	// CVQualifiers.cpp:588–592 — set_const(v, pos) → is_consts[len-pos-1]
 	q := NewCVQualifiers([]bool{true, true}, []bool{false, false})
