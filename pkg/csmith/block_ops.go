@@ -461,7 +461,9 @@ func (b *Block) AppendNestedLoop(
 // AppendReturnStmt mirrors Block::append_return_stmt.
 // Block.cpp:374–391 — make return, visit_facts, record fact/effect maps.
 func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg *CGContext) *Stmt {
-	if b == nil || cg == nil {
+	// Block.cpp:378+ — Statement::make_random(eReturn) always has RNG
+	// no invent return shell without live block/context/RNG
+	if b == nil || r == nil || cg == nil {
 		return nil
 	}
 	fm := cg.FM

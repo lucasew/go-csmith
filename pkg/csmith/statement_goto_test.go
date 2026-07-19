@@ -197,6 +197,19 @@ func TestMakeBinaryForCompare(t *testing.T) {
 	}
 }
 
+func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
+	// FunctionInvocation.cpp:565+ — always has RNG; no invent empty Binary token
+	opts := Defaults()
+	lhs := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, lhs, rhs); fi != nil {
+		t.Fatal("nil RNG")
+	}
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinaryOp(MaxBinaryOp), lhs, rhs); fi != nil {
+		t.Fatal("MAX binary op must fail closed")
+	}
+}
+
 func TestGotoLabelsClearedOnFinalization(t *testing.T) {
 	GotoLabelsDoFinalization()
 	_ = LabelForGotoDest(1, func() string { return "lbl_x" })

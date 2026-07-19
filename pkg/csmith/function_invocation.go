@@ -379,7 +379,8 @@ func BuildUserInvocation(
 	list *FunctionList,
 	callee *Function,
 ) *Invocation {
-	if callee == nil || cg == nil {
+	// FunctionInvocationUser.cpp always has RNG + CGContext; no invent call shell without them
+	if r == nil || callee == nil || cg == nil {
 		return &Invocation{Failed: true}
 	}
 	fi := &Invocation{User: callee}
@@ -470,7 +471,8 @@ func BuildInvocationAndFunction(
 	list *FunctionList,
 	retType *Type,
 ) *Invocation {
-	if cg == nil || list == nil || ReachMaxFunctions(list, opts) {
+	// FunctionInvocationUser.cpp always has RNG + CGContext; no invent call+func without them
+	if r == nil || cg == nil || list == nil || ReachMaxFunctions(list, opts) {
 		return &Invocation{Failed: true}
 	}
 	// FunctionInvocationUser.cpp:175 — assert(type); return type must be provided
@@ -873,11 +875,17 @@ func MakeBinary(
 	op BinaryOp,
 	lhs, rhs *Expression,
 ) *Invocation {
-	if lhs == nil || rhs == nil {
+	// FunctionInvocation.cpp:565+ — always has RNG; no invent binary shell without it
+	if r == nil || lhs == nil || rhs == nil {
 		return nil
 	}
 	// FunctionInvocation.cpp:565 — DEPTH_GUARD_BY_TYPE_RETURN(dtFunctionInvocationBinary, nullptr)
 	if DepthGuardByType(opts, DtFunctionInvocationBinary) == BadDepth {
+		return nil
+	}
+	// invalid / MAX op — no invent empty Binary token shell
+	opStr := op.BinaryOpC()
+	if int(op) < 0 || int(op) >= MaxBinaryOp || opStr == "" {
 		return nil
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
@@ -889,14 +897,14 @@ func MakeBinary(
 	}
 	inv := &Invocation{
 		IsStd:  true,
-		Binary: op.BinaryOpC(),
+		Binary: opStr,
 		Args:   []*Expression{lhs, rhs},
 		Safe:   flags,
 	}
 	inv.setOutOpts(opts)
 	// FunctionInvocationBinary.cpp:59–75 — always create tmps for safe_ops
 	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(cg, nil, flags, op)
-	if flags != nil && SafeOpsBinary(op.BinaryOpC()) && inv.Tmp1 == "" {
+	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
 		return nil
 	}
 	return inv

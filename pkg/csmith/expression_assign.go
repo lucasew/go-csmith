@@ -15,7 +15,8 @@ func MakeExpressionAssign(
 	typ *Type,
 	qfer *CVQualifiers,
 ) *Expression {
-	if cg == nil {
+	// ExpressionAssign.cpp always has RNG + CGContext; no invent assign expr without them
+	if r == nil || cg == nil {
 		return nil
 	}
 	// ExpressionAssign.cpp:56–57 / 61–62 — get_fact_mgr always live; no invent without FM

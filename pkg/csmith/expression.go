@@ -736,7 +736,9 @@ func makeExpressionVariableFlags(
 	qfer *CVQualifiers,
 	asParam, asReturn bool,
 ) *Expression {
-	if vs == nil || cg == nil {
+	// ExpressionVariable.cpp always has RNG + live selector/context
+	// no invent var shell without them
+	if r == nil || vs == nil || cg == nil {
 		return nil
 	}
 	// ExpressionVariable.cpp:61 — DEPTH_GUARD_BY_TYPE_RETURN(dtExpressionVariable, nullptr)

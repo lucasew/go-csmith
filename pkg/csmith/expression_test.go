@@ -233,6 +233,10 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if ev != nil && ev.Var == fv {
 		t.Fatal("must not use float for int want")
 	}
+	// ExpressionVariable.cpp always has RNG; no invent var shell
+	if e := makeExpressionVariableFlags(nil, vs, &cg, GetIntType(), nil, false, false); e != nil {
+		t.Fatal("nil RNG must not invent ExpressionVariable")
+	}
 }
 
 func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {

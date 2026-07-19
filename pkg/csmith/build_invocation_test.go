@@ -17,6 +17,22 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	}
 }
 
+func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
+	// zero-param callee must not invent success call without process RNG
+	opts := Defaults()
+	callee := &Function{Name: "func_x", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
+	list := &FunctionList{Funcs: []*Function{callee}}
+	cg := EmptyCGContext()
+	fi := BuildUserInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee)
+	if fi == nil || !fi.Failed {
+		t.Fatal("nil RNG must fail closed user invoke")
+	}
+	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	if fi2 == nil || !fi2.Failed {
+		t.Fatal("nil RNG must fail closed build+function")
+	}
+}
+
 func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 10

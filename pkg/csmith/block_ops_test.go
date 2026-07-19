@@ -174,6 +174,10 @@ func TestAppendReturnStmtRecordsMaps(t *testing.T) {
 	if _, ok := fm.MapFactsOut[st.StmID]; !ok {
 		t.Fatal("facts out")
 	}
+	// Block.cpp always has RNG for make_random(eReturn)
+	if st2 := b.AppendReturnStmt(nil, opts, NewVariableSelector(opts), &cg); st2 != nil {
+		t.Fatal("nil RNG must not invent return")
+	}
 }
 
 func TestContainsBackEdge(t *testing.T) {
