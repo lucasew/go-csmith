@@ -533,14 +533,31 @@ func (f *FactPointTo) Clone() *FactPointTo {
 	return MakeFactPointToSet(f.Var, f.PointTo)
 }
 
+// FactsComplete reports whether every Fact* in the slice is live (non-nil Var).
+// Incomplete maps must not soft-join or soft-filter past holes.
+func FactsComplete(facts []*FactPointTo) bool {
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // MergeFactInto merges new fact with lattice join (Fact::merge_fact).
 // Fact.cpp:149–171 — strong replace only when not related; else join.
+// Fact* always live at call sites; nil f fails closed (no invent no-op success).
 func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
+	// no invent treat nil fact as empty merge that preserves facts
 	if f == nil {
-		return facts
+		return nil
 	}
 	for i, old := range facts {
-		if old != nil && old.Var == f.Var {
+		// Fact* always live in maps; nil hole fails closed (no invent skip to next)
+		if old == nil {
+			return nil
+		}
+		if old.Var == f.Var {
 			if old.Imply(f) {
 				// old already covers f
 				return facts
@@ -557,25 +574,40 @@ func MergeFactInto(facts []*FactPointTo, f *FactPointTo) []*FactPointTo {
 
 // MergeFacts mirrors merge_facts — merge each of new into facts.
 // Fact.cpp:192–200.
+// Fact* always live; nil holes fail closed (no invent skip partial join).
 func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	if facts == nil {
 		return false
 	}
+	// pre-validate both maps complete before any join
+	for _, f := range *facts {
+		if f == nil {
+			return false
+		}
+	}
+	for _, f := range newFacts {
+		if f == nil {
+			return false
+		}
+	}
 	changed := false
 	for _, f := range newFacts {
 		before := len(*facts)
-		*facts = MergeFactInto(*facts, f)
+		merged := MergeFactInto(*facts, f)
+		// MergeFactInto nil = incomplete (should not happen after pre-validate)
+		if merged == nil {
+			return false
+		}
+		*facts = merged
 		// detect change roughly: length or content
 		if len(*facts) != before {
 			changed = true
 			continue
 		}
 		// check related fact expanded
-		if f != nil {
-			cur := FindRelatedPointTo(*facts, f.Var)
-			if cur != nil && !cur.Equal(f) && !f.Imply(cur) {
-				changed = true
-			}
+		cur := FindRelatedPointTo(*facts, f.Var)
+		if cur != nil && !cur.Equal(f) && !f.Imply(cur) {
+			changed = true
 		}
 	}
 	return changed

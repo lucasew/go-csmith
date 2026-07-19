@@ -3,17 +3,6 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-// factsSliceComplete reports whether every Fact* in the slice is live (non-nil).
-// Used by merge paths that must fail closed on nil map holes.
-func factsSliceComplete(facts []*FactPointTo) bool {
-	for _, f := range facts {
-		if f == nil || f.Var == nil {
-			return false
-		}
-	}
-	return true
-}
-
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
 // Fact* always live in maps; nil subject/jump holes fail closed (no invent skip).
@@ -23,7 +12,7 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 		return false
 	}
 	// pre-validate: incomplete maps must not soft-join past holes
-	if !factsSliceComplete(*facts) || !factsSliceComplete(jumpFacts) {
+	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
 		return false
 	}
 	changed := false
@@ -40,7 +29,11 @@ func MergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) bool {
 			jumpF = MakeFactPointTo(f.Var, GarbagePtr)
 		}
 		before := FindRelatedPointTo(*facts, f.Var)
-		*facts = MergeFactInto(*facts, jumpF)
+		merged := MergeFactInto(*facts, jumpF)
+		if merged == nil {
+			return false
+		}
+		*facts = merged
 		after := FindRelatedPointTo(*facts, f.Var)
 		if before == nil || after == nil || !before.Equal(after) {
 			changed = true
@@ -55,7 +48,7 @@ func tryMergeJumpFacts(facts *[]*FactPointTo, jumpFacts []*FactPointTo) (changed
 	if facts == nil {
 		return false, false
 	}
-	if !factsSliceComplete(*facts) || !factsSliceComplete(jumpFacts) {
+	if !FactsComplete(*facts) || !FactsComplete(jumpFacts) {
 		return false, false
 	}
 	return MergeJumpFacts(facts, jumpFacts), true
@@ -297,6 +290,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			for _, e := range back {
 				if out, has := fm.MapFactsOut[e.SrcID]; has {
+					// incomplete fact maps fail closed (no invent skip soft-merge)
+					if !FactsComplete(currentInputs) || !FactsComplete(out) {
+						SetError(ErrGeneric)
+						return currentInputs, -1, false
+					}
 					MergeFacts(&currentInputs, out)
 				}
 			}
@@ -307,6 +305,10 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 			}
 			for _, e := range toBlk {
 				if out, has := fm.MapFactsOut[e.SrcID]; has {
+					if !FactsComplete(currentInputs) || !FactsComplete(out) {
+						SetError(ErrGeneric)
+						return currentInputs, -1, false
+					}
 					MergeFacts(&currentInputs, out)
 				}
 			}

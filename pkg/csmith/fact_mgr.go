@@ -266,6 +266,13 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		*factsOut = nil
 		return
 	}
+	// Fact* always live; nil hole fails closed (no invent skip partial dest update)
+	for _, fact := range factsIn {
+		if fact == nil || fact.Var == nil {
+			*factsOut = nil
+			return
+		}
+	}
 	var oosVars []*Variable
 	seen := map[*Variable]bool{}
 	addOOS := func(v *Variable) {
@@ -276,9 +283,6 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		oosVars = append(oosVars, v)
 	}
 	for _, fact := range factsIn {
-		if fact == nil || fact.Var == nil {
-			continue
-		}
 		// skip return variables
 		if isReturnVar(fact.Var) {
 			continue
@@ -291,7 +295,12 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 				addOOS(p)
 			}
 		}
-		*factsOut = MergeFactInto(*factsOut, fact)
+		merged := MergeFactInto(*factsOut, fact)
+		if merged == nil {
+			*factsOut = nil
+			return
+		}
+		*factsOut = merged
 	}
 	UpdateFactsForOOSVars(oosVars, factsOut)
 }
@@ -309,8 +318,14 @@ func (fm *FactMgr) ClearMapVisited() {
 
 // RestoreFacts mirrors FactMgr::restore_facts.
 // FactMgr.cpp:489–492 — makeup new vars into old, then replace global_facts.
+// Incomplete oldFacts fails closed (no invent clean clone + makeup).
 func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 	if fm == nil {
+		return
+	}
+	// nil oldFacts is empty restore; non-nil with holes → CloneFactSlice nil
+	if oldFacts != nil && !FactsComplete(oldFacts) {
+		fm.GlobalFacts = nil
 		return
 	}
 	cp := CloneFactSlice(oldFacts)
@@ -340,13 +355,22 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 		return
 	}
 	// combine current maps into final
+	// Fact* always live; incomplete maps fail closed (nil final entry, no invent join)
 	for id, facts2 := range fm.MapFactsIn {
 		facts1 := fm.MapFactsInFinal[id]
+		if !FactsComplete(facts1) || !FactsComplete(facts2) {
+			fm.MapFactsInFinal[id] = nil
+			continue
+		}
 		MergeFacts(&facts1, facts2)
 		fm.MapFactsInFinal[id] = facts1
 	}
 	for id, facts2 := range fm.MapFactsOut {
 		facts1 := fm.MapFactsOutFinal[id]
+		if !FactsComplete(facts1) || !FactsComplete(facts2) {
+			fm.MapFactsOutFinal[id] = nil
+			continue
+		}
 		MergeFacts(&facts1, facts2)
 		fm.MapFactsOutFinal[id] = facts1
 	}
@@ -550,11 +574,12 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 
 // RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
 // FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
+// Fact* always live; nil hole fails closed (nil out, no invent clean filter).
 func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, fact := range facts {
 		if fact == nil || fact.Var == nil {
-			continue
+			return nil
 		}
 		// FactMgr.cpp:191–195 — is_var_on_stack OR other-function RV
 		if f != nil && stParent != nil && f.IsVarOnStack(fact.Var, stParent) {
@@ -570,6 +595,8 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 	return out
 }
 
+// filterFactsNotInVars drops subjects in drop. Fact* always live;
+// nil hole fails closed (nil out, no invent clean filter past holes).
 func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
 		return facts
@@ -577,7 +604,7 @@ func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
 		if f == nil || f.Var == nil {
-			continue
+			return nil
 		}
 		if IsVariableInSet(drop, f.Var) {
 			continue
@@ -752,10 +779,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	beforePT := len(fm.GlobalFacts)
 	fm.AddNewVarFact(v)
 	// FactMgr.cpp:77–104 — push each new init fact into maps
+	// Fact* always live after add; nil hole fails closed (no invent partial map push)
 	for i := beforePT; i < len(fm.GlobalFacts); i++ {
 		f := fm.GlobalFacts[i]
 		if f == nil {
-			continue
+			return
 		}
 		// map_facts_in: stm in_block(blk) || blk==null
 		if fm.MapFactsIn != nil {

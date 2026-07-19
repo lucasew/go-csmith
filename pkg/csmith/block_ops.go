@@ -130,9 +130,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	var gotoSrcIDs []int
 	if fm != nil {
 		// Block.cpp:617–629 — remove edges with control stmt inside s as src
+		// CFGEdge* always live; nil hole fails closed — keep hole (no invent clean CFG)
 		ne := fm.CFGEdges[:0]
 		for _, e := range fm.CFGEdges {
 			if e == nil {
+				ne = append(ne, nil)
 				continue
 			}
 			if cfgIDs[e.SrcID] {
@@ -146,6 +148,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		ne = fm.CFGEdges[:0]
 		for _, e := range fm.CFGEdges {
 			if e == nil {
+				ne = append(ne, nil)
 				continue
 			}
 			destIn := e.DestStmID > 0 && ids[e.DestStmID]
@@ -356,14 +359,16 @@ func collectBlockStmIDs(b *Block, ids map[int]bool) {
 // Statement.cpp:492–506 — CFG edges with dest=stm and src eType==eGoto.
 // Returns source StmIDs of gotos targeting destStmID.
 // When fm.Func is set, non-goto sources (e.g. break→for) are excluded.
+// CFGEdge* always live; nil hole → nil (fail closed). Complete empty → non-nil [].
 func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 	if fm == nil || destStmID <= 0 {
 		return nil
 	}
-	var srcs []int
+	srcs := make([]int, 0)
 	for _, e := range fm.CFGEdges {
+		// CFGEdge* always live; no invent skip nil holes as absent gotos
 		if e == nil {
-			continue
+			return nil
 		}
 		if e.DestStmID != destStmID || e.SrcID <= 0 {
 			continue
@@ -382,12 +387,17 @@ func (fm *FactMgr) FindJumpSources(destStmID int) []int {
 
 // FindJumpLabel mirrors Statement::find_jump_label.
 // Statement.cpp:473–487 — label of first goto that jumps to destStmID.
+// CFGEdge* always live; nil hole fails closed (empty label, no invent scan past hole).
 func FindJumpLabel(fm *FactMgr, destStmID int) string {
 	if fm == nil || destStmID <= 0 {
 		return ""
 	}
 	for _, e := range fm.CFGEdges {
-		if e == nil || e.DestStmID != destStmID || e.SrcID <= 0 {
+		if e == nil {
+			// incomplete CFG — no invent label from partial scan or registry alone
+			return ""
+		}
+		if e.DestStmID != destStmID || e.SrcID <= 0 {
 			continue
 		}
 		if fm.Func != nil {

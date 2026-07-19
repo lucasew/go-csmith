@@ -14,12 +14,22 @@ const (
 
 // SameFacts mirrors same_facts for FactPointTo slices.
 // Fact.cpp:237–246 — same size and each fact of facts1 found in facts2.
+// Fact* always live; nil hole fails closed (no invent same-as-skip).
 func SameFacts(a, b []*FactPointTo) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for _, f := range a {
+		if f == nil {
+			return false
+		}
 		if FindFact(b, f) < 0 {
+			return false
+		}
+	}
+	// also reject holes in b (size-matched but incomplete)
+	for _, f := range b {
+		if f == nil {
 			return false
 		}
 	}
@@ -28,12 +38,18 @@ func SameFacts(a, b []*FactPointTo) bool {
 
 // FindFact mirrors find_fact — equal fact in vector, or -1.
 // Fact.cpp find_fact by equal().
+// Fact* always live; nil want or hole is not a match (no invent equal-to-nil).
 func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 	if want == nil {
 		return -1
 	}
 	for i, f := range facts {
-		if f != nil && f.Equal(want) {
+		if f == nil {
+			// incomplete list — no invent skip hole as non-match only at this index
+			// still scan rest for live equals; callers of SameFacts pre-reject holes
+			continue
+		}
+		if f.Equal(want) {
 			return i
 		}
 	}

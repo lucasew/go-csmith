@@ -207,7 +207,10 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 	label := ""
 	// Statement.cpp:908–914 — find_jump_sources → first goto label
 	if fm != nil && st.StmID > 0 {
-		if srcs := fm.FindJumpSources(st.StmID); len(srcs) > 0 {
+		srcs := fm.FindJumpSources(st.StmID)
+		// nil = incomplete CFG; no invent label from partial sources
+		// empty non-nil = no gotos (do not fall back to SourceLabel)
+		if srcs != nil && len(srcs) > 0 {
 			label = FindJumpLabel(fm, st.StmID)
 			// resolve from source stmt when FindJumpLabel missed registry
 			if label == "" && fm.Func != nil {

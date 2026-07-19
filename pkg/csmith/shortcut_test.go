@@ -15,6 +15,11 @@ func TestSameFacts(t *testing.T) {
 	if SameFacts(a, b2) {
 		t.Fatal("diff")
 	}
+	// nil hole fails closed — no invent same-as-skip
+	hole := []*FactPointTo{nil}
+	if SameFacts(hole, hole) {
+		t.Fatal("nil hole must not be same")
+	}
 }
 
 func TestSubsetFacts(t *testing.T) {

@@ -146,11 +146,16 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 // Statement.cpp:653–663 — goto sources from a different parent block.
 // destParent is this statement's parent; srcParentOf maps src StmID → parent block.
 // When srcParentOf is nil, treat non-sibling StmIDs in destParent as other-block sources.
+// Incomplete CFG (FindJumpSources nil) fails closed as jump-target (no invent none).
 func IsJumpTargetFromOtherBlocks(destStmID int, destParent *Block, fm *FactMgr, srcParentOf map[int]*Block) bool {
 	if fm == nil || destStmID <= 0 {
 		return false
 	}
-	for _, srcID := range fm.FindJumpSources(destStmID) {
+	srcs := fm.FindJumpSources(destStmID)
+	if srcs == nil {
+		return true
+	}
+	for _, srcID := range srcs {
 		if srcParentOf != nil {
 			if srcParentOf[srcID] != destParent {
 				return true

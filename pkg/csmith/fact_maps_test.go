@@ -30,6 +30,12 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	if fp == nil {
 		t.Fatal("p gone")
 	}
+	// nil fact hole fails closed — no invent partial dest update
+	var out2 []*FactPointTo
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, &out2, f, nil)
+	if out2 != nil {
+		t.Fatal("nil hole must fail closed dest facts", out2)
+	}
 }
 
 func TestClearMapVisited(t *testing.T) {

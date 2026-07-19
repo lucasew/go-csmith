@@ -71,8 +71,21 @@ func TestFindJumpSources(t *testing.T) {
 		{SrcID: 12, DestStmID: 6},
 	}
 	srcs := fm.FindJumpSources(5)
-	if len(srcs) != 2 {
+	if srcs == nil || len(srcs) != 2 {
 		t.Fatal(srcs)
+	}
+	// complete empty is non-nil empty
+	none := fm.FindJumpSources(999)
+	if none == nil || len(none) != 0 {
+		t.Fatal("complete empty", none)
+	}
+	// nil CFG hole fails closed
+	fm.CFGEdges = []*CFGEdge{{SrcID: 10, DestStmID: 5}, nil}
+	if fm.FindJumpSources(5) != nil {
+		t.Fatal("nil hole must fail closed")
+	}
+	if FindJumpLabel(fm, 5) != "" {
+		t.Fatal("nil hole FindJumpLabel must fail closed")
 	}
 }
 
