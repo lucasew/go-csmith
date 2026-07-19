@@ -125,17 +125,27 @@ func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 
 func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	// IsWritten/IsRead false on IncompleteEffect invents conflict-free / eligible
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	inc := IncompleteEffect()
 	if !inc.IsWritten(v) {
 		t.Fatal("incomplete IsWritten must fail closed true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete IsWritten must SetError sticky")
+	}
+	ClearError()
 	if !inc.IsRead(v) {
 		t.Fatal("incomplete IsRead must fail closed true")
 	}
+	if !HasError() {
+		t.Fatal("incomplete IsRead must SetError sticky")
+	}
+	ClearError()
 	if !inc.IsWrittenPartially(v) || !inc.IsReadPartially(v) {
 		t.Fatal("incomplete partial membership must fail closed true")
 	}
+	ClearError()
 	// aggregate field membership
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	parent := &Variable{Name: "g_s", Type: st}
@@ -146,6 +156,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	if !inc.FieldIsWritten(parent) || !inc.FieldIsRead(parent) {
 		t.Fatal("incomplete FieldIs* must fail closed true")
 	}
+	ClearError()
 	// sibling-union on incomplete effect
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -153,11 +164,14 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	}}
 	uv := &Variable{Name: "g_u", Type: ut}
 	uv.CreateFieldVars()
-	if len(uv.FieldVars) < 1 {
+	if len(uv.FieldVars) < 1 || uv.FieldVars[0] == nil {
 		t.Fatal("union fields")
 	}
 	if !inc.SiblingUnionFieldIsRead(uv.FieldVars[0]) || !inc.SiblingUnionFieldIsWritten(uv.FieldVars[0]) {
 		t.Fatal("incomplete SiblingUnion* must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("incomplete SiblingUnion* must SetError sticky")
 	}
 	// nil FieldVars hole sticky fail closed true
 	ClearError()
@@ -174,6 +188,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 }
 
 func TestEffectIsReadByName(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_x", GetIntType(), true, false)
 	e := EmptyEffect().ReadVar(v).WriteVar(v)
 	if !e.IsReadByName("g_x") || !e.IsWrittenByName("g_x") {
@@ -182,9 +197,20 @@ func TestEffectIsReadByName(t *testing.T) {
 	if e.IsReadByName("g_y") {
 		t.Fatal("missing")
 	}
+	// incomplete effect sticky by-name membership
+	ClearError()
+	inc := IncompleteEffect()
+	if !inc.IsReadByName("g_x") || !inc.IsWrittenByName("g_x") {
+		t.Fatal("incomplete by-name must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("incomplete by-name must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestJoinVisits(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	a := CreateVariableScalars("g_a", GetIntType(), true, false)
 	b := CreateVariableScalars("g_b", GetIntType(), true, false)

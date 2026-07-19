@@ -287,14 +287,18 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 
 // ExtendCallChain mirrors CGContext::extend_call_chain.
 // CGContext.cpp:470–478 — copy parent chain, push current block.
-// Block* always live on call_chain; nil hole fails closed (empty chain —
-// no invent keep-hole chain that soft-skips frames later).
+// Block* always live on call_chain; nil hole sticky empty chain
+// (no invent keep-hole chain that soft-skips frames later).
 func (c *CGContext) ExtendCallChain(from CGContext) {
+	// CGContext always live for extend; sticky incomplete shell no invent no-op
 	if c == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	for _, b := range from.CallChain {
 		if b == nil {
+			// incomplete call_chain sticky wipe (no invent soft-skip hole frames)
+			SetError(ErrGeneric)
 			c.CallChain = nil
 			return
 		}

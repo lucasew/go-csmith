@@ -54,10 +54,12 @@ func goodGotoTarget(st Stmt) bool {
 
 // ContainsStmt reports whether b (or nested get_blocks) holds st.
 // Block::contains_stmt light — used for NeedRevisit LCA on back-edge goto.
-// Kind-gated get_blocks only; nil arm fails closed false (no invent membership
+// Kind-gated get_blocks only; nil arm sticky false (no invent membership
 // by soft-skipping a missing if-arm / stray Then on assign).
 func (b *Block) ContainsStmt(st *Stmt) bool {
+	// Block + Statement always live; sticky incomplete no invent not-contain soft-skip
 	if b == nil || st == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {
@@ -71,6 +73,8 @@ func (b *Block) ContainsStmt(st *Stmt) bool {
 		blks := GetBlocksStmt(s)
 		for _, nb := range blks {
 			if nb == nil {
+				// incomplete arm sticky fail closed not-contain
+				SetError(ErrGeneric)
 				return false
 			}
 		}

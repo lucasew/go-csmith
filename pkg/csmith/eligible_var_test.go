@@ -3,6 +3,7 @@ package csmith
 import "testing"
 
 func TestIsWrittenFieldInheritsParent(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	var env TypeEnv

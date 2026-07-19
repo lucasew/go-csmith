@@ -359,13 +359,16 @@ func (e Effect) ReadVar(v *Variable) Effect {
 
 // IsWritten mirrors Effect::is_written — exact or parent field_var_of.
 // Effect.cpp:333–345.
-// Incomplete effect fails closed as true (no invent not-written / conflict-free
-// past IncompleteEffect empty maps — same shape as IsWrittenByName).
+// Incomplete effect sticky true (no invent not-written / conflict-free past holes).
 func (e Effect) IsWritten(v *Variable) bool {
+	// Variable always live; sticky incomplete no invent not-written soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as written (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	if e.written[v] {
@@ -432,13 +435,16 @@ func (e Effect) WrittenVars() []*Variable {
 
 // IsRead mirrors Effect::is_read — exact or struct parent (not union).
 // Effect.cpp:276–289.
-// Incomplete effect fails closed as true (no invent not-read / conflict-free
-// past IncompleteEffect empty maps — same shape as IsReadByName).
+// Incomplete effect sticky true (no invent not-read / conflict-free past holes).
 func (e Effect) IsRead(v *Variable) bool {
+	// Variable always live; sticky incomplete no invent not-read soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as read (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	if e.read[v] {
@@ -501,12 +507,15 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 // Effect.cpp:416–428 — another field of the same container union was read.
 // Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
-// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
+// Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
+	// Variable always live; sticky incomplete no invent no-sibling soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return true
 	}
 	youColl := v.GetCollective()
@@ -543,12 +552,15 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 // Effect.cpp:430–441.
 // Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
 // Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
-// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
+// Incomplete effect sticky true (no invent no-sibling soft re-pick past holes).
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
+	// Variable always live; sticky incomplete no invent no-sibling soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if e.incomplete {
+		SetError(ErrGeneric)
 		return true
 	}
 	youColl := v.GetCollective()
@@ -667,14 +679,16 @@ func (e Effect) IsWrittenPartially(v *Variable) bool {
 
 // HasGlobalEffect mirrors Effect::has_global_effect.
 // Effect.cpp:543–562 — any global in read or write sets.
-// Incomplete effect / nil map keys fail closed as true (no invent pure /
-// no-global success on IncompleteEffect empty maps via pure flag alone).
+// Incomplete effect / nil map keys sticky true (no invent pure / no-global success).
 func (e Effect) HasGlobalEffect() bool {
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as has-global (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for v := range e.read {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.read[v] && v.IsGlobal() {
@@ -683,6 +697,7 @@ func (e Effect) HasGlobalEffect() bool {
 	}
 	for v := range e.written {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.written[v] && v.IsGlobal() {
@@ -772,10 +787,13 @@ func (e *Effect) Consolidate() {
 // Incomplete effect / nil key fails closed as true (no invent not-read).
 func (e Effect) IsReadByName(name string) bool {
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as read (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for v := range e.read {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.read[v] && v.Name == name {
@@ -787,13 +805,16 @@ func (e Effect) IsReadByName(name string) bool {
 
 // IsWrittenByName mirrors Effect::is_written(string).
 // Effect.cpp:351–364.
-// Incomplete effect / nil key fails closed as true (no invent not-written).
+// Incomplete effect / nil key sticky true (no invent not-written soft re-pick).
 func (e Effect) IsWrittenByName(name string) bool {
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as written (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for v := range e.written {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.written[v] && v.Name == name {

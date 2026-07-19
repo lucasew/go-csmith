@@ -253,8 +253,11 @@ func (av *ArrayVariable) CDeclType() string {
 
 // NoLoopInitializer mirrors ArrayVariable::no_loop_initializer.
 // ArrayVariable.cpp:429–435 — struct/union, const, global, or multi init_values.
+// Incomplete ArrayVariable/Type sticky true (no invent loop-init eligibility past holes).
 func (av *ArrayVariable) NoLoopInitializer() bool {
+	// ArrayVariable always live with Type; sticky incomplete no invent loop-init OK
 	if av == nil || av.Type == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	return av.Type.IsAggregate() || av.IsConst() || av.IsGlobal() || len(av.InitValues) > 0
@@ -387,11 +390,18 @@ func FindExprKeyVar(e *Expression) *Variable {
 // Incomplete IndexExprs fails closed sticky false (no invent soft-skip nil hole then
 // string Indices match as complete variant; no invent mixed expr/string dual path).
 func (av *ArrayVariable) IsVariant(other *Variable) bool {
-	if av == nil || other == nil || !other.IsArray {
+	// both ArrayVariable shells always live; sticky incomplete no invent not-variant
+	if av == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !other.IsArray {
 		return false
 	}
 	ov := other.AsArray
 	if ov == nil {
+		// incomplete array flag without AsArray sticky
+		SetError(ErrGeneric)
 		return false
 	}
 	// both must be itemized (collective non-nil) under the same collective
