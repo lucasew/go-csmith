@@ -339,6 +339,8 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.
 // FactMgr.cpp:208–246 — first_time clones into final; else combine.
+// Fact* always live; incomplete source maps fail closed (nil final entry —
+// no invent cleaned partial clone of holes on first_time or soft-join later).
 func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm == nil {
 		return
@@ -351,9 +353,17 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	}
 	if firstTime {
 		for id, facts := range fm.MapFactsIn {
+			if !FactsComplete(facts) {
+				fm.MapFactsInFinal[id] = nil
+				continue
+			}
 			fm.MapFactsInFinal[id] = CloneFactSlice(facts)
 		}
 		for id, facts := range fm.MapFactsOut {
+			if !FactsComplete(facts) {
+				fm.MapFactsOutFinal[id] = nil
+				continue
+			}
 			fm.MapFactsOutFinal[id] = CloneFactSlice(facts)
 		}
 		return

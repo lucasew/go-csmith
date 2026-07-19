@@ -316,6 +316,46 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 	}
 }
 
+func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
+	// Fact* always live; incomplete working set must not invent visit success
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
+	if StmVisitFacts(st, &facts, &cg, Defaults()) {
+		t.Fatal("incomplete inputs must fail closed")
+	}
+	if fm.MapVisited[88] {
+		t.Fatal("must not mark visited when inputs incomplete before visit")
+	}
+}
+
+func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
+	// incomplete pre-visit inputs must not invent set_fact_in from cleaned clone
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	facts := []*FactPointTo{MakeFactPointTo(v, GarbagePtr), nil}
+	if ValidateAndUpdateFacts(st, &facts, &cg, Defaults(), nil) {
+		t.Fatal("incomplete inputs must fail closed")
+	}
+	if _, ok := fm.MapFactsIn[90]; ok {
+		t.Fatal("must not invent MapFactsIn from incomplete inputs")
+	}
+}
+
 func TestShortcutAnalysisMissingOutFailClosed(t *testing.T) {
 	// Statement.cpp:559 — inputs = map_facts_out[this]
 	// missing out must not invent ShortcutOK while leaving inputs unchanged

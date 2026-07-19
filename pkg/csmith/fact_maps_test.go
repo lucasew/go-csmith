@@ -71,6 +71,36 @@ func TestSetupInOutMaps(t *testing.T) {
 	}
 }
 
+func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
+	// FactMgr.cpp:208–222 — first_time copy_facts; Fact* always live
+	// incomplete hole must not invent cleaned final map entry
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// plant holes bypassing SetMapFacts* (CloneFactSlice strips holes)
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		1: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		2: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	fm.SetupInOutMaps(true)
+	if fm.MapFactsInFinal[1] != nil {
+		t.Fatal("incomplete MapFactsIn must not invent cleaned InFinal")
+	}
+	if fm.MapFactsOutFinal[2] != nil {
+		t.Fatal("incomplete MapFactsOut must not invent cleaned OutFinal")
+	}
+	// complete sibling still clones
+	fm2 := NewFactMgr(nil)
+	fm2.MapFactsIn = map[int][]*FactPointTo{
+		3: {MakeFactPointTo(p, NullPtr)},
+	}
+	fm2.SetupInOutMaps(true)
+	if len(fm2.MapFactsInFinal[3]) != 1 {
+		t.Fatal("complete first_time must still clone")
+	}
+}
+
 func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)

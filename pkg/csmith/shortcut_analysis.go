@@ -329,10 +329,16 @@ var FailedStm *Stmt
 // StmVisitFacts mirrors Statement::stm_visit_facts.
 // Statement.cpp:609–626 — clear effect_stm; visit_facts; remove_rv_facts;
 // always record map_accum_effect and map_visited (even on failure).
+// Incomplete inputs or post-visit GlobalFacts fail closed (nil facts, false) —
+// no invent cleaned clone of holes while still reporting visit success.
 func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
 	// Statement.cpp:609+ — always live Statement* + inputs + cg_context
 	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
+		return false
+	}
+	// Fact* always live; incomplete working set fails closed before visit
+	if !FactsComplete(*facts) {
 		return false
 	}
 	// Statement.cpp:611 — get_effect_stm().clear()
@@ -348,9 +354,16 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	}
 	if cg.FM != nil {
 		// Statement.cpp:621–624 — remove_rv; accum; visited always set
-		*facts = CloneFactSlice(cg.FM.GlobalFacts)
-		cg.FM.RemoveRVFacts(facts)
-		cg.FM.GlobalFacts = *facts
+		// incomplete GlobalFacts after visit: nil facts + false (no invent clean slice)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			*facts = nil
+			cg.FM.GlobalFacts = nil
+			ok = false
+		} else {
+			*facts = CloneFactSlice(cg.FM.GlobalFacts)
+			cg.FM.RemoveRVFacts(facts)
+			cg.FM.GlobalFacts = *facts
+		}
 		if st.StmID > 0 {
 			if cg.FM.MapAccumEffect == nil {
 				cg.FM.MapAccumEffect = make(map[int]Effect)
@@ -367,10 +380,14 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 
 // ValidateAndUpdateFacts mirrors Statement::validate_and_update_facts.
 // Statement.cpp:569–606 — shortcut; else stm_visit_facts then set_fact_in/out.
+// Incomplete working facts fail closed (false) — no invent pre-visit copy past holes.
 func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options, blk *Block) bool {
 	// Statement.cpp:574+ — always live this + inputs + cg_context
 	// no soft invent true on incomplete call
 	if st == nil || facts == nil || cg == nil {
+		return false
+	}
+	if !FactsComplete(*facts) {
 		return false
 	}
 	// sync FM global facts with working set
