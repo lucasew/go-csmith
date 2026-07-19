@@ -98,6 +98,10 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	if IsJumpTargetFromOtherBlocks(5, destParent, fm, nil) {
 		t.Fatal("sibling not other block")
 	}
+	// nil FM — no invent "not a jump target"
+	if !IsJumpTargetFromOtherBlocks(5, destParent, nil, nil) {
+		t.Fatal("nil FM must fail closed jump-target")
+	}
 }
 
 func TestIsPtrUsedForTestExpr(t *testing.T) {

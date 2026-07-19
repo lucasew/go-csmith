@@ -417,16 +417,25 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 	fm.CFGEdges = []*CFGEdge{
 		{SrcID: 40, DestStmID: 50, PostDest: true}, // break
 		{SrcID: 30, DestStmID: 10},                  // goto
-		{SrcID: 99, DestStmID: 10},                  // dangling non-goto id
 	}
 	// assign 10: only real goto 30
 	srcs := fm.FindJumpSources(10)
-	if len(srcs) != 1 || srcs[0] != 30 {
+	if srcs == nil || len(srcs) != 1 || srcs[0] != 30 {
 		t.Fatalf("goto only: %v", srcs)
 	}
 	// for 50: break filtered out
-	if len(fm.FindJumpSources(50)) != 0 {
-		t.Fatal("break must not be jump source")
+	if got := fm.FindJumpSources(50); got == nil || len(got) != 0 {
+		t.Fatal("break must not be jump source", got)
+	}
+	// dangling SrcID with Func set — no invent skip as non-goto
+	fm.CFGEdges = append(fm.CFGEdges, &CFGEdge{SrcID: 99, DestStmID: 10})
+	if fm.FindJumpSources(10) != nil {
+		t.Fatal("unresolved SrcID must fail closed nil sources")
+	}
+	// only unresolved edge for dest 11 — no invent skip hole to registry/label
+	fm.CFGEdges = []*CFGEdge{{SrcID: 99, DestStmID: 11}}
+	if FindJumpLabel(fm, 11) != "" {
+		t.Fatal("unresolved SrcID must fail closed empty label")
 	}
 }
 

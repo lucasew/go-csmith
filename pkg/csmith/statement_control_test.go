@@ -51,6 +51,10 @@ func TestNeedReturnStmt(t *testing.T) {
 	if f.NeedReturnStmt() {
 		t.Fatal("void")
 	}
+	// incomplete without ReturnType — no invent "no return needed"
+	if !(&Function{}).NeedReturnStmt() {
+		t.Fatal("nil ReturnType must fail closed need-return")
+	}
 }
 
 func TestGenerateFunctionsHaveReturnWhenNeeded(t *testing.T) {

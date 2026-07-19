@@ -112,10 +112,14 @@ func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 }
 
 // NeedReturnStmt mirrors Function::need_return_stmt.
-// Function.cpp:618–619.
+// Function.cpp:618–619 — return_type always live; void simple → false.
+// Nil ReturnType fails closed true (no invent "no return needed" for incomplete IR).
 func (f *Function) NeedReturnStmt() bool {
-	if f == nil || f.ReturnType == nil {
+	if f == nil {
 		return false
+	}
+	if f.ReturnType == nil {
+		return true
 	}
 	return !(f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid)
 }
