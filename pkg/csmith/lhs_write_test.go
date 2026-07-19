@@ -150,7 +150,28 @@ func TestGetDereferencedPtrs(t *testing.T) {
 		t.Fatal(d)
 	}
 	bare := &Expression{Term: TermVariable, Var: p, ExprType: p.Type}
-	if len(GetDereferencedPtrs(bare)) != 0 {
-		t.Fatal("no deref")
+	if bareOut := GetDereferencedPtrs(bare); bareOut == nil || len(bareOut) != 0 {
+		t.Fatal("no deref complete empty", bareOut)
+	}
+}
+
+func TestGetDereferencedPtrsIncompleteFailClosed(t *testing.T) {
+	// incomplete IR must not invent empty deref list as complete
+	if GetDereferencedPtrs(&Expression{Term: TermVariable}) != nil {
+		t.Fatal("nil Var must fail closed")
+	}
+	if GetDereferencedPtrs(&Expression{Term: TermCommaExpr}) != nil {
+		t.Fatal("nil comma sides must fail closed")
+	}
+	if GetDereferencedPtrs(&Expression{Term: TermFunction}) != nil {
+		t.Fatal("nil Invoke must fail closed")
+	}
+	if GetDereferencedPtrs(&Expression{Term: TermFunction, Invoke: &Invocation{
+		Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}, nil},
+	}}) != nil {
+		t.Fatal("nil arg hole must fail closed")
+	}
+	if GetDereferencedPtrs(&Expression{Term: TermAssignment}) != nil {
+		t.Fatal("nil Assign must fail closed")
 	}
 }

@@ -159,6 +159,25 @@ func TestGetEvalToSubexpsComma(t *testing.T) {
 	}
 }
 
+func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
+	// incomplete IR must not invent empty eval list as complete (overlap skip)
+	if GetEvalToSubexps(&Expression{Term: TermCommaExpr}) != nil {
+		t.Fatal("nil CommaRHS must fail closed")
+	}
+	if GetEvalToSubexps(&Expression{Term: TermAssignment}) != nil {
+		t.Fatal("nil Assign must fail closed")
+	}
+	if GetEvalToSubexps(&Expression{Term: TermVariable}) != nil {
+		t.Fatal("nil Var must fail closed")
+	}
+	if GetEvalToSubexps(&Expression{Term: TermFunction}) != nil {
+		t.Fatal("nil Invoke must fail closed")
+	}
+	if GetEvalToSubexps(&Expression{Term: TermConstant}) != nil {
+		t.Fatal("nil Con must fail closed")
+	}
+}
+
 func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
