@@ -113,6 +113,17 @@ func TestRecordJumpsAndVarFreshness(t *testing.T) {
 		t.Fatal("nil type RecordVarCreated must SetError sticky")
 	}
 	ClearError()
+	// nil builder sticky (no invent silent skip of stats lines / undercount)
+	formattedOutput(nil, "x: ", 1)
+	if !HasError() {
+		t.Fatal("nil builder formattedOutput must SetError sticky")
+	}
+	ClearError()
+	formattedOutputf(nil, "x: ", 1.0)
+	if !HasError() {
+		t.Fatal("nil builder formattedOutputf must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRecordBitfieldsAndPointerCmpSticky(t *testing.T) {

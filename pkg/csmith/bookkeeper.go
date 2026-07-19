@@ -129,8 +129,10 @@ func BookkeeperDoFinalization() {
 }
 
 func formattedOutput(b *strings.Builder, msg string, num int) {
-	// Bookkeeper.cpp always has live message string; sticky no invent "XXX %d" shell
+	// Bookkeeper.cpp always has live ostream + message; sticky no invent silent
+	// skip of stats lines (undercount) past missing builder shell
 	if b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if msg == "" {
@@ -143,7 +145,10 @@ func formattedOutput(b *strings.Builder, msg string, num int) {
 }
 
 func formattedOutputf(b *strings.Builder, msg string, num float64) {
+	// Bookkeeper.cpp always has live ostream + message; sticky no invent silent
+	// skip of stats lines past missing builder shell
 	if b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if msg == "" {

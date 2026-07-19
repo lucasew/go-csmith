@@ -130,6 +130,23 @@ func TestCollectExpandable(t *testing.T) {
 		t.Fatal("nil field hole must SetError sticky")
 	}
 	ClearError()
+	// special Type-nil complete expand as self only
+	got := NullPtr.CollectExpandable()
+	if !VariablesComplete(got) || len(got) != 1 || got[0] != NullPtr {
+		t.Fatal("special CollectExpandable must stay complete self-only", got)
+	}
+	if HasError() {
+		t.Fatal("special CollectExpandable must not sticky")
+	}
+	ClearError()
+	// non-special Type-nil sticky IncompleteVariables (no invent expand pool past hole)
+	if VariablesComplete((&Variable{Name: "broken"}).CollectExpandable()) {
+		t.Fatal("Type-nil CollectExpandable must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil CollectExpandable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFieldVolatileOrFromParent(t *testing.T) {

@@ -1862,9 +1862,15 @@ func itoa(n int) string {
 // CollectExpandable walks field_vars for selectable members.
 // Variable* always live in FieldVars; nil hole fails closed IncompleteVariables
 // (not bare nil — VariablesComplete(nil)==true invents empty expand success).
+// Special null/garbage/tbd have Type nil by design — complete expand as self only.
+// Other Type-nil shells sticky IncompleteVariables (no invent expand pool past hole).
 func (v *Variable) CollectExpandable() []*Variable {
 	if v == nil {
 		// incomplete subject fails closed sticky (no invent empty expand pool)
+		SetError(ErrGeneric)
+		return IncompleteVariables()
+	}
+	if !IsSpecialPtr(v) && v.Type == nil {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
