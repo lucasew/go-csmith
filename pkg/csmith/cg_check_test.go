@@ -479,6 +479,25 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 		t.Fatal("incomplete EffectStm must fail closed VisitIndices")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was complete true (no indices path)
+	// fair: sticky false (mirrors ReadIndices hard IR)
+	broken := &Lhs{Var: &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}}
+	cg5 := EmptyCGContext()
+	if broken.VisitIndices(&cg5, Defaults()) {
+		t.Fatal("IsArray without AsArray VisitIndices must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray VisitIndices must SetError sticky")
+	}
+	ClearError()
+	// nil Lhs sticky
+	if ((*Lhs)(nil)).VisitIndices(&cg5, Defaults()) {
+		t.Fatal("nil Lhs VisitIndices must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs VisitIndices must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExtendCallChainNilHoleFailClosed(t *testing.T) {

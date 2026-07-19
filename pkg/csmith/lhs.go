@@ -168,10 +168,18 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 // Lhs.cpp:264–284 — visit array IndexExprs under RHS effect context
 // (effect_context + effect_stm, null accum).
 // Incomplete Lhs / ambient / IndexExprs sticky (no invent soft-skip past holes).
+// IsArray without AsArray hard IR sticky false (no invent visit success as
+// "no array indices" past broken array shell — mirrors ReadIndices).
 func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 	// Lhs.cpp:264+ — get_var()->get_array may be null → true without using cg
 	// incomplete Lhs shell sticky (visit always has live Lhs* in C++)
 	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
+	// sticky (no invent complete true soft-skip past IsArray without AsArray)
+	if l.Var.IsArray && l.Var.AsArray == nil {
 		SetError(ErrGeneric)
 		return false
 	}
