@@ -281,3 +281,22 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 		t.Fatal("want body without depth wrap", out)
 	}
 }
+
+func TestMakeRandomSignatureIncompleteAmbientFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
+	inc := IncompleteEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &inc
+	cg.Types = vs.Types
+	if MakeRandomSignature(NewRng(2), opts, probs, vs, &vs.Sym, cg, GetIntType(), nil, nil) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomSignature")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+}

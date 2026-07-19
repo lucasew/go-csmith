@@ -162,6 +162,17 @@ func MakeRandomSignature(
 	if probs == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (no invent RV/qfer under hole shells)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	var env *TypeEnv
 	if list != nil {
 		env = list.Types

@@ -100,6 +100,27 @@ func TestSelectLTypeDefaultInt(t *testing.T) {
 	}
 }
 
+func TestSelectLTypeIncompleteStructPoolFailClosed(t *testing.T) {
+	// incomplete ok_types must sticky fail — no invent fall-through get_int_type past hole
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	// force struct-as-LType path eligible: simple assign + AllTypes with hole
+	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil}}
+	// plant high struct prob so we would enter branch if complete
+	probs.single[PStructAsLTypeProb] = 100
+	probs.single[PPointerAsLTypeProb] = 0
+	probs.single[PFloatAsLTypeProb] = 0
+	ty := SelectLType(NewRng(1), opts, probs, env, false, AssignSimple)
+	if ty != nil {
+		t.Fatalf("incomplete AllTypes must fail closed SelectLType, got %v", ty.CName())
+	}
+	if !HasError() {
+		t.Fatal("incomplete AllTypes must SetError sticky SelectLType")
+	}
+	ClearError()
+}
+
 func TestSelectLTypeErrorGuard(t *testing.T) {
 	// Type.cpp:1613 — ERROR_GUARD after pointer branch always; no soft invent get_int_type
 	opts := Defaults()

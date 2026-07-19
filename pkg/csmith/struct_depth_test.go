@@ -68,6 +68,7 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 		t.Fatalf("%v", cands)
 	}
 	// nil hole must IncompleteTypes — not bare nil invent empty-complete keep-typ
+	ClearError()
 	env.StructTypes = []*Type{okt, nil}
 	bad := okStructUnionLTypes(env, true, true, false)
 	if typesComplete(bad) {
@@ -76,9 +77,14 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	if chooseRandomStructFromType(env, GetIntType(), true, NewRng(1)) != nil {
 		t.Fatal("incomplete ok pool must fail closed nil, not invent keep original")
 	}
+	if !HasError() {
+		t.Fatal("incomplete ok pool must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVolRValEmit(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, true)
 	v.UseVolRVal = true
 	out := v.OutputC()

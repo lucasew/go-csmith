@@ -459,8 +459,12 @@ func SelectLType(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, noVol
 	if typ == nil && op == AssignSimple && env != nil && probs != nil {
 		// Type.cpp:1617–1618 — get_all_ok_struct_union_types(ok, no_const=true, no_volatile, need_int=false, bStruct=true)
 		cands := env.GetAllOKStructUnionTypes(true, noVolatile, false, true)
-		// incomplete ok_types — skip struct-as-LType (no invent pick from hole pool)
-		if typesComplete(cands) && len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
+		// incomplete ok_types fail closed sticky (no invent fall-through get_int_type past hole pool)
+		if !typesComplete(cands) {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if len(cands) > 0 && r.RndFlipcoin(uint32(probs.Single(PStructAsLTypeProb))) {
 			if HasError() {
 				return nil
 			}
