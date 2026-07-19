@@ -15,8 +15,14 @@ func (f *FactPointTo) IsTop() bool {
 
 // HasInvisible mirrors FactPointTo::has_invisible.
 // FactPointTo.cpp:87–99 — subject or pointee not visible at stm parent.
+// Incomplete Param/LocalVars at stParent fail closed as invisible (no invent
+// "all visible" when IsVisibleLocal returns false past a hole, nor invent
+// assertable after a short-circuited visibility scan).
 func (f *FactPointTo) HasInvisible(stParent *Block) bool {
 	if f == nil || f.Var == nil {
+		return true
+	}
+	if stParent != nil && !stParent.StackScanComplete() {
 		return true
 	}
 	if !f.Var.IsVisible(stParent) {

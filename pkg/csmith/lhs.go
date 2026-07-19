@@ -66,20 +66,33 @@ func (l *Lhs) GetType() *Type {
 
 // IsVolatile mirrors Lhs::is_volatile.
 // Lhs.cpp:220–222 — volatile after deref of indirect level.
+// Incomplete Lhs type IR fails closed as volatile (restrictive — no invent
+// non-vol eligibility via invented level 0).
 func (l *Lhs) IsVolatile() bool {
 	if l == nil || l.Var == nil {
 		return false
 	}
-	return l.Var.IsVolatileAfterDeref(l.IndirectLevel())
+	n, ok := l.IndirectLevelComplete()
+	if !ok {
+		return true
+	}
+	return l.Var.IsVolatileAfterDeref(n)
 }
 
 // GetQualifiers mirrors Lhs::get_qualifiers.
 // Lhs.cpp:197–202 — var.qfer.indirect_qualifiers(indirect).
+// Incomplete Lhs type IR fails closed sticky error + empty qfer (no invent
+// storage-level quals via invented level 0).
 func (l *Lhs) GetQualifiers() CVQualifiers {
 	if l == nil || l.Var == nil {
 		return CVQualifiers{}
 	}
-	q := l.Var.Qfer.IndirectQualifiers(l.IndirectLevel())
+	n, ok := l.IndirectLevelComplete()
+	if !ok {
+		SetError(ErrGeneric)
+		return CVQualifiers{}
+	}
+	q := l.Var.Qfer.IndirectQualifiers(n)
 	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
 	// sticky error for ERROR_GUARD callers; no soft invent strip of const
 	if q.IsConst() {

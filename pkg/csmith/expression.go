@@ -237,7 +237,12 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 			return CVQualifiers{}
 		}
 		// ExpressionVariable::get_qualifiers — qfer.indirect_qualifiers(indirect)
-		return e.Var.Qfer.IndirectQualifiers(e.IndirectLevel())
+		// incomplete type IR must not invent storage-level quals via level 0
+		n, ok := e.IndirectLevelComplete()
+		if !ok {
+			return CVQualifiers{}
+		}
+		return e.Var.Qfer.IndirectQualifiers(n)
 	case TermAssignment:
 		if e.Assign != nil && e.Assign.Lhs != nil {
 			return e.Assign.Lhs.GetQualifiers()

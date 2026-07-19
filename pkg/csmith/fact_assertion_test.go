@@ -70,6 +70,17 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	if hole.IsAssertable(nil) {
 		t.Fatal("incomplete PointTo must fail closed not-assertable")
 	}
+	// incomplete stack at parent: HasInvisible fail closed (no invent assertable)
+	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	loc.Name = "l_1"
+	blk := &Block{LocalVars: []*Variable{loc, nil}}
+	fl := MakeFactPointTo(loc, NullPtr)
+	if !fl.HasInvisible(blk) {
+		t.Fatal("incomplete stack must HasInvisible true")
+	}
+	if fl.IsAssertable(blk) {
+		t.Fatal("incomplete stack must not invent assertable")
+	}
 	if s := hole.OutputAssertion(nil, "  "); s != "" && !strings.Contains(s, "//") {
 		// OutputCondition fails closed empty on hole → empty assertion
 		_ = s

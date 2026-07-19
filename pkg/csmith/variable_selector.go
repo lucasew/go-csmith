@@ -924,6 +924,10 @@ func (vs *VariableSelector) SelectMustUseVar(
 		mt = MatchDerefExact
 	}
 	blk := cg.CurrentBlock()
+	// incomplete Param/LocalVars must not invent IsVisible false and skip must-use vars
+	if blk != nil && !blk.StackScanComplete() {
+		return nil
+	}
 	for i := 0; i < len(*list); i++ {
 		v := (*list)[i]
 		// Variable* always live in must-use lists; nil hole fails closed

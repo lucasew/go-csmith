@@ -242,7 +242,13 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		return
 	}
 	if lhs.Term == TermVariable && rhs.Term == TermVariable {
-		if lhs.IndirectLevel() == rhs.IndirectLevel() {
+		// incomplete type IR must not invent ptr-vs-ptr counts via invented level 0
+		li, lok := lhs.IndirectLevelComplete()
+		ri, rok := rhs.IndirectLevelComplete()
+		if !lok || !rok {
+			return
+		}
+		if li == ri {
 			cmpPtrToPtr++
 		} else {
 			cmpPtrToAddr++
