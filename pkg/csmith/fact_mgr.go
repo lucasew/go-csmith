@@ -416,20 +416,56 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	f := fm.Func
 	// visibility needs complete stack for non-globals
 	if f != nil && !fact.Var.IsGlobal() {
+		// residual ERROR sticky — no invent soft-skip AddFactOut past IsGlobal hole
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			return
+		}
 		if !f.StackScanComplete(stParent) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
 		if !f.IsVarVisible(fact.Var, stParent) {
+			// residual ERROR sticky — no invent soft-skip not-visible past hard IR hole
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			}
 			return
 		}
-	} else if f != nil && !f.IsVarVisible(fact.Var, stParent) {
-		return
+		// residual ERROR sticky — no invent append past IsVarVisible hole
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			return
+		}
+	} else if f != nil {
+		// residual from IsGlobal true path
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			return
+		}
+		if !f.IsVarVisible(fact.Var, stParent) {
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			return
+		}
 	}
 	switch st.Kind {
 	case StmtReturn:
 		if !fact.Var.IsGlobal() {
+			// residual ERROR sticky — no invent soft-drop return non-global past IsGlobal hole
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 	case StmtBreak, StmtContinue:
@@ -439,13 +475,27 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			b = b.Parent
 		}
 		if f != nil && !fact.Var.IsGlobal() {
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+				return
+			}
 			if !f.StackScanComplete(b) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				SetError(ErrGeneric)
 				return
 			}
+		} else if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			return
 		}
 		if f != nil && !f.IsVarVisible(fact.Var, b) {
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+			}
+			return
+		}
+		if HasError() {
+			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 			return
 		}
 	case StmtGoto:
@@ -454,14 +504,32 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		destParent := st.GotoDestParent
 		if destParent == nil && st.GotoDestStmID > 0 && f != nil {
 			destParent = FindParentBlockOfStmID(f, st.GotoDestStmID)
+			// residual ERROR sticky — no invent soft-skip dest parent miss past hole
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+				return
+			}
 		}
 		if destParent != nil && f != nil {
 			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
-				SetError(ErrGeneric)
+				return
+			}
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 			if !f.IsVarVisible(fact.Var, destParent) {
+				if HasError() {
+					fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+				}
+				return
+			}
+			if HasError() {
+				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
 			}
 		}

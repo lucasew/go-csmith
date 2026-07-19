@@ -99,8 +99,24 @@ func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
 		return
 	}
 	for _, f := range facts {
+		// Fact* always live after FactsComplete
+		if f == nil || f.Var == nil {
+			SetError(ErrGeneric)
+			return
+		}
 		if fi.User.RV.Match(f.Var) {
+			// residual ERROR sticky — no invent soft-continue save past Match hole
+			if HasError() {
+				return
+			}
 			AddReturnFactForInvocation(fi, f)
+			// residual ERROR sticky — no invent soft-continue registry past Add hole
+			if HasError() {
+				return
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip not-match then save later
+			return
 		}
 	}
 }

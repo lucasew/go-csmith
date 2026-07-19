@@ -44,6 +44,26 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete fact PointTo must SetError sticky")
 	}
 	ClearError()
+	// IsVarVisible residual via incomplete Param after StackScanComplete path:
+	// Param hole on Function stickies StackScanComplete first — already covered.
+	// Type-nil subject IsGlobal residual is nil-only; use incomplete Blocks for goto dest.
+	// Goto dest parent resolve residual: incomplete Func Blocks hole sticky.
+	f3 := &Function{Name: "f3"}
+	gp3 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	body3 := &Block{Func: f3}
+	f3.Body = body3
+	f3.Blocks = []*Block{body3, nil}
+	fm3 := NewFactMgr(f3)
+	stGoto := &Stmt{Kind: StmtGoto, StmID: 9, GotoDestStmID: 99}
+	// FindParentBlockOfStmID walks Blocks; nil hole stickies residual
+	fm3.AddFactOut(stGoto, body3, MakeFactPointTo(gp3, NullPtr))
+	if FactsComplete(fm3.MapFactsOut[9]) {
+		t.Fatal("FindParentBlock residual must fail closed incomplete out", fm3.MapFactsOut[9])
+	}
+	if !HasError() {
+		t.Fatal("FindParentBlock residual AddFactOut must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddFactOutVisible(t *testing.T) {

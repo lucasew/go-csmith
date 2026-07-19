@@ -100,6 +100,24 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("incomplete PointTo SaveReturnFacts must SetError sticky")
 	}
 	ClearError()
+	// Match residual soft invent was soft-skip not-match then save later matching fact.
+	// Fair: Type-nil RV Match stickies residual then fail closed whole save.
+	// Use nil RV field already complete no-op; use RV with Match residual via nil other fact Var
+	// (FactsComplete rejects nil fact). Residual path: Match on complete then Add residual.
+	// Plant desynced registry so AddReturnFact stickies after first Match success.
+	ClearError()
+	InvocationReturnFactsDoFinalization()
+	fiOK := &Invocation{User: &Function{Name: "h", RV: rv}}
+	returnFactInvocations = []*Invocation{&Invocation{User: &Function{Name: "x"}}}
+	returnFactPoints = []*FactPointTo{} // desync sizes
+	fiOK.SaveReturnFacts([]*FactPointTo{MakeFactPointTo(rv, NullPtr)})
+	if GetReturnFactForInvocation(fiOK, rv) != nil {
+		t.Fatal("desync Add residual must fail closed no invent registry")
+	}
+	if !HasError() {
+		t.Fatal("desync Add residual SaveReturnFacts must SetError sticky")
+	}
+	ClearError()
 	// nil Invocation* registry slot sticky fail closed (no invent later match)
 	ClearError()
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}

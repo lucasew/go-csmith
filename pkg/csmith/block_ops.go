@@ -311,6 +311,11 @@ func blockUnderStmt(st *Stmt, blk *Block) bool {
 		}
 		for i := range b.Stmts {
 			if blockUnderStmt(&b.Stmts[i], blk) {
+				// residual ERROR sticky — no invent soft-continue under-scan past hole
+				return true
+			}
+			// residual ERROR sticky — no invent soft-skip not-under past recursive hole
+			if HasError() {
 				return true
 			}
 		}
