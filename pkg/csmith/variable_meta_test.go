@@ -37,6 +37,7 @@ func TestIsValidVolatile(t *testing.T) {
 }
 
 func TestIsPackedAfterBitfield(t *testing.T) {
+	ClearError()
 	st := &Type{
 		isStruct: true,
 		Packed:   true,
@@ -55,26 +56,44 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("f1 after bitfield in packed struct")
 	}
-	// incomplete FieldVars hole before f1: fail closed packed-after (restrictive)
+	if HasError() {
+		t.Fatal("complete IsPackedAfterBitfield must not sticky")
+	}
+	// incomplete FieldVars hole before f1: sticky packed-after (restrictive)
+	ClearError()
 	parent.FieldVars = []*Variable{f0, nil, f1}
 	if !f1.IsPackedAfterBitfield() {
 		t.Fatal("FieldVars hole must fail closed as packed-after-bitfield")
 	}
+	if !HasError() {
+		t.Fatal("FieldVars hole IsPackedAfterBitfield must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetSeqNum(t *testing.T) {
 	// Variable.cpp:261–265 — assert '_' present
+	ClearError()
 	v := CreateVariableScalars("g_42", GetIntType(), false, false)
-	if v.GetSeqNum() != 42 {
-		t.Fatal(v.GetSeqNum())
+	if v == nil || v.GetSeqNum() != 42 {
+		t.Fatal(v)
 	}
+	if HasError() {
+		t.Fatal("complete GetSeqNum must not sticky")
+	}
+	ClearError()
 	if (&Variable{Name: "badname"}).GetSeqNum() != -1 {
 		t.Fatal("no underscore fail closed")
 	}
+	if !HasError() {
+		t.Fatal("no underscore GetSeqNum must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetCollectiveArrayField(t *testing.T) {
 	// Variable.cpp:583–612 — field of itemized array maps to collective field
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},

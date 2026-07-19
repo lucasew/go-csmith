@@ -201,20 +201,35 @@ func TestLhsIsVolatileAfterDeref(t *testing.T) {
 
 func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	// soft invent: Type nil / OOB peel → not const/vol → allow write/access
-	// fair: incomplete fails closed const/vol true
+	// fair: incomplete sticky fails closed const/vol true
 	// 2-level non-vol qfer so Qfer path does not OOB-fail-closed as full vol first
+	ClearError()
 	v := &Variable{Name: "g_p", Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false})}
 	// Type nil
 	if !v.IsConstAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as const after deref")
 	}
+	if !HasError() {
+		t.Fatal("nil Type IsConstAfterDeref must SetError sticky")
+	}
+	ClearError()
 	if !v.IsVolatileAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as volatile after deref")
 	}
+	if !HasError() {
+		t.Fatal("nil Type IsVolatileAfterDeref must SetError sticky")
+	}
+	ClearError()
 	if !v.IsPartialVolatileAfterDeref(1) {
 		t.Fatal("nil Type must fail closed as partial volatile")
 	}
-	// OOB peel: pointer type peels once then nil at high deref
+	if !HasError() {
+		t.Fatal("nil Type IsPartialVolatileAfterDeref must SetError sticky")
+	}
+	ClearError()
+	// OOB peel: pointer type peels once then nil at high deref.
+	// Qfer OOB (len 2, deref 3) fail-closed const/vol non-sticky first; Type peel
+	// sticky only when Qfer does not already short-circuit (empty qfer + nil type).
 	v.Type = PointerTo(GetIntType())
 	if !v.IsConstAfterDeref(3) {
 		t.Fatal("OOB peel must fail closed as const")
@@ -222,11 +237,25 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	if !v.IsVolatileAfterDeref(3) {
 		t.Fatal("OOB peel must fail closed as volatile")
 	}
-	// GetFieldID incomplete parent FieldVars
+	// Type peel sticky path: empty qfer + incomplete type
+	ClearError()
+	v2 := &Variable{Name: "g_q", Type: nil}
+	if !v2.IsConstAfterDeref(0) {
+		t.Fatal("nil Type empty qfer must fail closed const")
+	}
+	if !HasError() {
+		t.Fatal("nil Type IsConstAfterDeref must SetError sticky")
+	}
+	ClearError()
+	// GetFieldID incomplete parent FieldVars sticky -1
 	parent := &Variable{Name: "u", Type: &Type{isUnion: true}}
 	f0 := &Variable{Name: "u.f0", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{nil, f0}
 	if f0.GetFieldID() != -1 {
 		t.Fatal("FieldVars hole must fail closed GetFieldID -1")
 	}
+	if !HasError() {
+		t.Fatal("FieldVars hole GetFieldID must SetError sticky")
+	}
+	ClearError()
 }

@@ -383,6 +383,7 @@ func TestMakeScalarVolatilesClearsInner(t *testing.T) {
 
 func TestIsConstAfterDeref(t *testing.T) {
 	// is_consts = [outerPtr, storage]; deref 0 → storage (last); deref 1 → outerPtr
+	ClearError()
 	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
 	if q.IsConstAfterDeref(0) {
 		t.Fatal("deref0 should be storage false")
@@ -393,7 +394,7 @@ func TestIsConstAfterDeref(t *testing.T) {
 	if !q.IsVolatileAfterDeref(0) {
 		t.Fatal("deref0 vol storage true")
 	}
-	// CVQualifiers.cpp:569/578 — assert OOB; fail closed as const/vol (not soft non-const)
+	// CVQualifiers.cpp:569/578 — assert OOB; fail closed as const/vol (non-sticky soft filter)
 	if !q.IsConstAfterDeref(5) {
 		t.Fatal("OOB deref must fail closed as const")
 	}

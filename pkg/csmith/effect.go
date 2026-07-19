@@ -466,6 +466,8 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 		return false
 	}
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as field-read (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, f := range v.FieldVars {
@@ -483,12 +485,14 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
 // Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
-// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
+// Incomplete effect sticky true (no invent no-field-write soft re-pick past holes).
 func (e Effect) FieldIsWritten(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
 	}
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as field-written (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for _, f := range v.FieldVars {
@@ -724,10 +728,13 @@ func (e *Effect) UpdatePurity() {
 // IncompleteEffect empty maps).
 func (e Effect) UnionFieldIsRead() bool {
 	if e.incomplete {
+		// IncompleteEffect sticky fail closed as union-field-read (restrictive)
+		SetError(ErrGeneric)
 		return true
 	}
 	for v := range e.read {
 		if v == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.read[v] && v.IsInsideUnionField() {

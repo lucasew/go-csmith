@@ -56,7 +56,9 @@ func (q CVQualifiers) IsConstAfterDeref(derefLevel int) bool {
 	if lenC == 0 {
 		return false
 	}
-	// assert(len > deref_level) fail-closed as const (no soft invent non-const WRITE)
+	// assert(len > deref_level) fail-closed as const (no soft invent non-const WRITE).
+	// Non-sticky: OOB qfer depth is common soft filter input; Variable Type peel
+	// sticky covers hard incomplete IR without poisoning healthy eligibility draws.
 	if lenC <= derefLevel {
 		return true
 	}
@@ -73,7 +75,9 @@ func (q CVQualifiers) IsVolatileAfterDeref(derefLevel int) bool {
 	if lenV == 0 {
 		return false
 	}
-	// assert fail-closed as volatile (no soft invent non-vol access)
+	// assert fail-closed as volatile (no soft invent non-vol access).
+	// Non-sticky: same as IsConstAfterDeref OOB — Variable Type peel sticky covers
+	// hard incomplete IR without poisoning healthy eligibility draws.
 	if lenV <= derefLevel {
 		return true
 	}

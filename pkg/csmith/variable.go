@@ -736,7 +736,7 @@ func (v *Variable) IsPackedAggregateFieldVar() bool {
 
 // IsPackedAfterBitfield mirrors Variable::is_packed_after_bitfield.
 // Variable.cpp:1240–1258 — packed struct field after a bitfield has unstable offset.
-// Incomplete parent FieldVars fail closed true (restrictive — no invent not-packed
+// Incomplete parent FieldVars sticky true (restrictive — no invent not-packed
 // by soft-skipping FieldVars holes before this field).
 func (v *Variable) IsPackedAfterBitfield() bool {
 	if v == nil || v.FieldVarOf == nil {
@@ -745,6 +745,8 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 	parent := v.FieldVarOf
 	if parent.Type != nil && parent.Type.IsStruct() && parent.Type.Packed {
 		if !parent.FieldVarsComplete() {
+			// incomplete parent FieldVars sticky packed-after (restrictive)
+			SetError(ErrGeneric)
 			return true
 		}
 		for i, f := range parent.FieldVars {
@@ -881,17 +883,21 @@ func (v *Variable) IsVisible(blk *Block) bool {
 // IsVisibleLocal mirrors Variable::is_visible_local / ArrayVariable override.
 // Variable.cpp:482–503 — params + block-chain locals; fields recurse parent.
 // ArrayVariable.cpp:419–429 — walk blk parents until array's parent block.
-// Variable* always live; nil FieldVarOf/Param/Local holes fail closed as false.
+// Variable* always live; nil FieldVarOf/Param/Local holes sticky false
+// (no invent not-visible soft-skip past holes).
 func (v *Variable) IsVisibleLocal(blk *Block) bool {
+	// Variable always live; sticky incomplete no invent not-visible soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if blk == nil {
 		return v.IsGlobal()
 	}
 	if v.IsFieldVar() {
-		// FieldVarOf always live for field vars; nil fails closed
+		// FieldVarOf always live for field vars; nil sticky fail closed
 		if v.FieldVarOf == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return v.FieldVarOf.IsVisibleLocal(blk)
@@ -913,6 +919,8 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	if f != nil {
 		for _, p := range f.Param {
 			if p == nil {
+				// incomplete Param sticky not-visible
+				SetError(ErrGeneric)
 				return false
 			}
 			if p == v {
@@ -923,6 +931,8 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 	for b := blk; b != nil; b = b.Parent {
 		for _, loc := range b.LocalVars {
 			if loc == nil {
+				// incomplete LocalVars sticky not-visible
+				SetError(ErrGeneric)
 				return false
 			}
 			if loc == v {
@@ -935,22 +945,30 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 
 // IsConstAfterDeref mirrors Variable::is_const_after_deref.
 // Variable.cpp:521–538.
+// Incomplete type / OOB peel sticky const (no invent non-const WRITE / soft re-pick).
 func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
-	if v == nil || derefLevel < 0 {
+	// Variable always live; sticky incomplete no invent non-const soft-skip
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if derefLevel < 0 {
 		return false
 	}
 	if v.Qfer.IsConstAfterDeref(derefLevel) {
 		return true
 	}
-	// incomplete type / OOB peel: fail closed as const (no invent non-const WRITE)
+	// incomplete type / OOB peel sticky const (restrictive)
 	if v.Type == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
-		// Variable.cpp:535 assert(t); broken peel → fail closed const
+		// Variable.cpp:535 assert(t); broken peel → sticky fail closed const
 		if t == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 	}
@@ -959,22 +977,29 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 
 // IsVolatileAfterDeref mirrors Variable::is_volatile_after_deref.
 // Variable.cpp:561–578 — qfer then peel type; assert(t) after peel.
-// Incomplete type / OOB peel fails closed as volatile (no invent non-vol access).
+// Incomplete type / OOB peel sticky volatile (no invent non-vol access / soft re-pick).
 func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
-	if v == nil || derefLevel < 0 {
+	// Variable always live; sticky incomplete no invent non-vol soft-skip
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if derefLevel < 0 {
 		return false
 	}
 	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
 		return true
 	}
 	if v.Type == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
-		// Variable.cpp:575 assert(t); OOB peel → fail closed volatile
+		// Variable.cpp:575 assert(t); OOB peel → sticky fail closed volatile
 		if t == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 	}
@@ -983,9 +1008,14 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 
 // IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
 // Variable.cpp:541–558 — not fully volatile at level, but pointee is volatile struct/union.
-// Incomplete type / OOB peel fails closed as partial-vol (restrictive IsEligibleVar).
+// Incomplete type / OOB peel sticky partial-vol (restrictive IsEligibleVar).
 func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
-	if v == nil || derefLevel < 0 {
+	// Variable always live; sticky incomplete no invent not-partial-vol soft-skip
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if derefLevel < 0 {
 		return false
 	}
 	// whole type volatile at this deref → not "partial"
@@ -993,6 +1023,7 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 		return false
 	}
 	if v.Type == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	t := v.Type
@@ -1000,6 +1031,7 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 		t = t.PtrType()
 		// Variable.cpp:555 assert(t)
 		if t == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 	}
@@ -1133,14 +1165,17 @@ func (v *Variable) GetCollective() *Variable {
 }
 
 // GetSeqNum mirrors Variable::get_seq_num — digits after first '_'.
-// Variable.cpp:261–265 — assert('_' present); no invent 0 on missing separator.
+// Variable.cpp:261–265 — assert('_' present); sticky no invent 0 on missing separator.
 func (v *Variable) GetSeqNum() int {
+	// Variable always live with gensym name; sticky incomplete no invent 0
 	if v == nil {
+		SetError(ErrGeneric)
 		return -1
 	}
 	idx := strings.IndexByte(v.Name, '_')
-	// assert(index != npos)
+	// assert(index != npos) sticky — no invent seq 0 without separator
 	if idx < 0 || idx+1 >= len(v.Name) {
+		SetError(ErrGeneric)
 		return -1
 	}
 	return Str2Int(v.Name[idx+1:])
@@ -1258,14 +1293,16 @@ func (v *Variable) IsInsideUnionField() bool {
 
 // GetFieldID mirrors Variable::get_field_id — index in parent FieldVars, or -1.
 // Variable.cpp:323–333.
-// Variable* always live in FieldVars; nil hole fails closed as -1 (no invent skip
-// hole and match a later sibling index). Callers that need complete parent field
-// lists should use FieldVarOf.FieldVarsComplete().
+// Variable* always live in FieldVars; incomplete parent FieldVars sticky -1
+// (no invent skip hole and match a later sibling index / soft re-pick).
 func (v *Variable) GetFieldID() int {
+	// non-field is complete -1 (not a field)
 	if v == nil || v.FieldVarOf == nil {
 		return -1
 	}
 	if !v.FieldVarOf.FieldVarsComplete() {
+		// incomplete parent FieldVars sticky (no invent field index past hole)
+		SetError(ErrGeneric)
 		return -1
 	}
 	for i, f := range v.FieldVarOf.FieldVars {

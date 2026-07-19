@@ -63,10 +63,14 @@ func TestHasIntFieldAndContainPointer(t *testing.T) {
 }
 
 func TestIsVisibleLocal(t *testing.T) {
+	ClearError()
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f}
 	inner := &Block{Parent: outer, Func: f}
 	l := CreateVariableScalars("l_1", GetIntType(), false, false)
+	if l == nil {
+		t.Fatal("loc")
+	}
 	outer.LocalVars = []*Variable{l}
 	if !l.IsVisibleLocal(inner) {
 		t.Fatal("outer local visible from inner")
@@ -80,16 +84,28 @@ func TestIsVisibleLocal(t *testing.T) {
 	if !p.IsVisibleLocal(inner) {
 		t.Fatal("param")
 	}
-	// nil Param/Local holes fail closed
+	if HasError() {
+		t.Fatal("complete IsVisibleLocal must not sticky")
+	}
+	// nil Param/Local holes sticky fail closed
+	ClearError()
 	f.Param = []*Variable{nil, p}
 	if p.IsVisibleLocal(inner) {
 		t.Fatal("nil Param hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil Param hole IsVisibleLocal must SetError sticky")
+	}
+	ClearError()
 	f.Param = []*Variable{p}
 	outer.LocalVars = []*Variable{nil, l}
 	if l.IsVisibleLocal(inner) {
 		t.Fatal("nil LocalVars hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil LocalVars hole IsVisibleLocal must SetError sticky")
+	}
+	ClearError()
 	if f.IsVarOnStack(l, inner) {
 		t.Fatal("IsVarOnStack nil local hole must fail closed")
 	}
