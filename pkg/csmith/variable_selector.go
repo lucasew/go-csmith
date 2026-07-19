@@ -432,8 +432,10 @@ func rootBlock(b *Block) *Block {
 // findParentOfStmIDInTree returns the block that directly owns stmID under root.
 // Walks get_blocks only; incomplete if-arm skips that compound's children
 // (no invent soft-skip missing arm then find under sibling arm / stray Then on assign).
+// Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 	if root == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Block
@@ -470,8 +472,10 @@ func findParentOfStmIDInTree(root *Block, stmID int) *Block {
 
 // findStmtByIDInTree finds a statement by stm_id under root (self + nested blocks).
 // Walks get_blocks only; incomplete if-arm skips that compound's children.
+// Block root + live StmID always required; sticky nil (no invent soft miss past hole).
 func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var walk func(b *Block) *Stmt
@@ -1540,8 +1544,10 @@ func (vs *VariableSelector) createAndInitialize(
 }
 
 // varCollective returns get_collective() for FM (itemized array → parent collective).
+// Variable always live; sticky nil (no invent soft-skip collective past hole).
 func varCollective(v *Variable) *Variable {
 	if v == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if v.AsArray != nil && v.AsArray.Collective != nil {

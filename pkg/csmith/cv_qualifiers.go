@@ -808,7 +808,12 @@ func isVolatileOKOnOneLevel(opts Options, t *Type) bool {
 	if !opts.LangCPP {
 		return true
 	}
-	if t == nil || (!t.IsStruct() && !t.IsUnion()) {
+	// Type always live on ptr chain; sticky not-OK (no invent volatile-OK past hole)
+	if t == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !t.IsStruct() && !t.IsUnion() {
 		return true
 	}
 	if !t.HasAssignOps {
@@ -849,11 +854,15 @@ func RandomQualifiersForType(
 	opts Options,
 	r *Rng,
 ) CVQualifiers {
+	// Type always live; sticky empty (no invent soft-skip qfer past hole)
 	if t == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
-	// CVQualifiers.cpp:295+ — always has RNG; no soft invent NewRng(0)
+	// CVQualifiers.cpp:295+ — always has RNG sticky; no invent empty shells without draw
+	// (align RandomQualifiersFrom / RandomLooseQualifiers)
 	if r == nil {
+		SetError(ErrGeneric)
 		return CVQualifiers{}
 	}
 	// incomplete ambient fails closed sticky (no invent non-vol qfer / soft re-pick past holes)

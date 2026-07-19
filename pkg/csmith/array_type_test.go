@@ -185,6 +185,14 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
 	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).
+	ClearError()
+	if varCollective(nil) != nil {
+		t.Fatal("nil varCollective must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil varCollective must SetError sticky")
+	}
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},

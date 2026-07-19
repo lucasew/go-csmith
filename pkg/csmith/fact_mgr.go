@@ -1135,6 +1135,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	if v.Type.IsUnion() {
 		un, _ = AbstractFactUnionForAssign(nil, nil, v, 0, rhs)
 		// incomplete union abstract is hole marker (not bare nil invent empty)
+		// non-sticky for soft re-pick factories (AddParamFacts); AddNewVarFact sticks after
 		if !UnionFactsComplete(un) {
 			return nil, IncompleteUnionFactSlice()
 		}
@@ -1144,6 +1145,7 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 	// Fact.cpp:94–95 — abstract_fact_for_assign; assert(lvar_cnt == 1)
 	pt = AbstractFactForAssign(nil, v, 0, rhs)
 	// incomplete / multi / zero — hole marker (no invent empty init for AddNewVarFact)
+	// non-sticky IncompleteFactSlice for soft re-pick factories
 	if !FactsComplete(pt) || len(pt) != 1 {
 		return IncompleteFactSlice(), nil
 	}

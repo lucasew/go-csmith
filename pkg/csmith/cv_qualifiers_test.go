@@ -293,6 +293,23 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("RandomQualifiersFrom incomplete ambient must SetError sticky")
 	}
 	ClearError()
+	// Type + RNG always live; sticky empty (no invent soft-skip qfer past hole)
+	q3 := RandomQualifiersForType(nil, AccessRead, EmptyCGContext(), false, 0, 100, opts, NewRng(1))
+	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
+		t.Fatalf("nil type must fail closed empty qfer %+v", q3)
+	}
+	if !HasError() {
+		t.Fatal("nil type RandomQualifiersForType must SetError sticky")
+	}
+	ClearError()
+	q4 := RandomQualifiersForType(ty, AccessRead, EmptyCGContext(), false, 0, 100, opts, nil)
+	if len(q4.IsConsts) != 0 || len(q4.IsVolatiles) != 0 {
+		t.Fatalf("nil rng must fail closed empty qfer %+v", q4)
+	}
+	if !HasError() {
+		t.Fatal("nil rng RandomQualifiersForType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomQualifiersSEFreeVolatileAlways(t *testing.T) {
