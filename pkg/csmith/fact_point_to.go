@@ -1531,7 +1531,12 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		return true
 	}
 	if indirection == -1 {
-		return v.IsVisibleLocal(b)
+		ok := v.IsVisibleLocal(b)
+		// residual ERROR sticky — no invent not-local soft-skip past IsVisibleLocal hole
+		if HasError() {
+			return true
+		}
+		return ok
 	}
 	// Type* always live for non-special subjects; Type-nil sticky true
 	// (no invent IsPointer residual false as not-pointing-to-locals past shell)
@@ -1540,7 +1545,15 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		return true
 	}
 	if !v.IsPointer() {
+		// residual ERROR sticky — no invent not-pointer soft-skip past IsPointer hole
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue pointees past IsPointer residual true path
+	if HasError() {
+		return true
 	}
 	// incomplete fact maps sticky true
 	if !FactsComplete(facts) {
@@ -1550,6 +1563,10 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 	var pointees []*Variable
 	if indirection == 0 {
 		ft := FindRelatedPointTo(facts, v)
+		// residual ERROR sticky — no invent not-pointing soft-skip past FindRelated hole
+		if HasError() {
+			return true
+		}
 		if ft == nil {
 			return false
 		}
@@ -1558,6 +1575,10 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 		pointees = MergePointeesOfPointer(v, indirection, facts)
 		// incomplete merge non-sticky true (soft re-pick)
 		if !VariablesComplete(pointees) {
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue past MergePointees residual
+		if HasError() {
 			return true
 		}
 	}
@@ -1576,14 +1597,29 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 			return true
 		}
 		if p.IsVisibleLocal(b) {
+			// residual ERROR sticky — no invent pointing-true past IsVisibleLocal hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue not-local past IsVisibleLocal residual
+		if HasError() {
 			return true
 		}
 		// recurse one level of pointees that are pointers
 		if p.IsPointer() {
+			// residual ERROR sticky — no invent soft-skip recurse past IsPointer residual
+			if HasError() {
+				return true
+			}
 			for j := 0; j < p.Type.IndirectLevel(); j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
 				if !VariablesComplete(nested) {
 					// incomplete MergePointees non-sticky
+					return true
+				}
+				if HasError() {
 					return true
 				}
 				for _, n := range nested {
@@ -1591,11 +1627,25 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 						SetError(ErrGeneric)
 						return true
 					}
-					if !IsSpecialPtr(n) && n.IsVisibleLocal(b) {
+					if IsSpecialPtr(n) {
+						continue
+					}
+					if n.IsVisibleLocal(b) {
+						// residual ERROR sticky — no invent pointing-true past nested IsVisibleLocal hole
+						if HasError() {
+							return true
+						}
+						return true
+					}
+					// residual ERROR sticky — no invent soft-continue nested not-local past residual
+					if HasError() {
 						return true
 					}
 				}
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip non-pointer past IsPointer residual false path
+			return true
 		}
 	}
 	return false

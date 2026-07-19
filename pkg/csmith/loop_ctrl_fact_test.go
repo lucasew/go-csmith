@@ -178,6 +178,19 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 		t.Fatal("Type-nil pointee IsPointingToLocals must SetError sticky")
 	}
 	ClearError()
+	// IsVisibleLocal residual: incomplete LocalVars on parent soft invent was not-local then invent false.
+	// Fair: sticky true (restrictive pointing-to-locals).
+	// Use indirection -1 path (direct IsVisibleLocal).
+	loc2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	loc2.Name = "l_2"
+	badParent := &Block{LocalVars: []*Variable{loc2, nil}}
+	if !IsPointingToLocals(loc2, badParent, -1, nil) {
+		t.Fatal("IsVisibleLocal residual must fail closed true pointing-to-locals")
+	}
+	if !HasError() {
+		t.Fatal("IsVisibleLocal residual IsPointingToLocals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPointingToLocals(t *testing.T) {

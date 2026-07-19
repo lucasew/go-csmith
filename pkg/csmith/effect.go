@@ -667,6 +667,10 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 			return true
 		}
 		me := rColl.GetContainerUnion()
+		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
+		if HasError() {
+			return true
+		}
 		if me == you {
 			return true
 		}
@@ -721,6 +725,10 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 			return true
 		}
 		me := wColl.GetContainerUnion()
+		// residual ERROR sticky — no invent soft-continue no-sibling past GetContainerUnion hole
+		if HasError() {
+			return true
+		}
 		if me == you {
 			return true
 		}
