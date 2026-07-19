@@ -272,17 +272,25 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	// C++ only rw_directive; Go also MustUseArrays from make_random_array_loop
 	mustArr := cg.MustUseArrays
 	if len(mustArr) == 0 && cg.RW != nil {
-		mustArr = cg.RW.FindMustUseArrays()
+		found := cg.RW.FindMustUseArrays()
+		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
+		if found == nil {
+			return nil
+		}
+		mustArr = found
 	}
 	// StatementFor.cpp:208–214 — choose_ok_var among must-use arrays; assert(av)
 	// no soft invent scan-all-arrays when choose_ok_var returns nil
+	// ArrayVariable* always live on must-use list; nil hole fails closed
+	// (no invent soft-skip hole as absent must-use array)
 	bound := InvalidIVBound
 	if len(mustArr) > 0 {
-		var arrVars []*Variable
+		arrVars := make([]*Variable, 0, len(mustArr))
 		for _, av := range mustArr {
-			if av != nil {
-				arrVars = append(arrVars, &av.Variable)
+			if av == nil {
+				return nil
 			}
+			arrVars = append(arrVars, &av.Variable)
 		}
 		pick := ChooseOKVar(r, arrVars)
 		// StatementFor.cpp:210–211 — assert(av); library fail closed

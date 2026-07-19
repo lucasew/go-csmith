@@ -181,3 +181,27 @@ func TestVisitFactsForUsesInitStmt(t *testing.T) {
 		t.Fatal("visit_facts for")
 	}
 }
+
+func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
+	// ArrayVariable* always live on must-use list; nil hole fails closed
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	fm := NewFactMgr(nil)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// plant incomplete MustUseArrays
+	cg.MustUseArrays = []*ArrayVariable{nil}
+	if MakeIteration(NewRng(1), opts, probs, vs, &cg) != nil {
+		t.Fatal("nil must-use array hole must fail closed MakeIteration")
+	}
+	// incomplete RW FindMustUseArrays
+	cg.MustUseArrays = nil
+	cg.RW = &RWDirective{MustReadVars: []*Variable{nil}}
+	if MakeIteration(NewRng(2), opts, probs, vs, &cg) != nil {
+		t.Fatal("incomplete FindMustUseArrays must fail closed")
+	}
+	ClearError()
+}
