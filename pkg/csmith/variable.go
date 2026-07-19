@@ -1514,15 +1514,21 @@ func itoa(n int) string {
 // (not bare nil — VariablesComplete(nil)==true invents empty expand success).
 func (v *Variable) CollectExpandable() []*Variable {
 	if v == nil {
+		// incomplete subject fails closed sticky (no invent empty expand pool)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := []*Variable{v}
 	for _, f := range v.FieldVars {
 		if f == nil {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		nested := f.CollectExpandable()
 		if !VariablesComplete(nested) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return IncompleteVariables()
 		}
 		out = append(out, nested...)
@@ -1553,8 +1559,9 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return hashArrayVariable(v, ctrl, unionFacts)
 	}
 	if v.Type.IsAggregate() {
-		// incomplete FieldVars fails closed whole hash (no invent soft-skip hole)
+		// incomplete FieldVars fails closed sticky whole hash (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
+			SetError(ErrGeneric)
 			return ""
 		}
 		var b strings.Builder

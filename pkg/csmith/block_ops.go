@@ -90,17 +90,13 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		// search nested get_blocks only (kind-gated; no invent Then on assign)
 		for i := range b.Stmts {
 			blks := GetBlocksStmt(&b.Stmts[i])
-			// pre-validate complete arms — nil hole fails closed (no invent
+			// pre-validate complete arms — nil hole fails closed sticky (no invent
 			// soft-skip missing arm then search sibling arm as complete tree)
-			incomplete := false
 			for _, blk := range blks {
 				if blk == nil {
-					incomplete = true
-					break
+					SetError(ErrGeneric)
+					return 0
 				}
-			}
-			if incomplete {
-				continue
 			}
 			for _, blk := range blks {
 				if n := blk.RemoveStmt(stmID, fm); n > 0 {
@@ -118,10 +114,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 	// Statement.cpp find_typed_stmts: continue/break/goto inside s
 	cfgIDs := map[int]bool{}
 	if !collectTypedStmIDs(removed, []StatementType{StmtBreak, StmtContinue, StmtGoto}, cfgIDs) {
-		// incomplete IR under removed — fail closed wipe CFG with hole marker
+		// incomplete IR under removed — fail closed sticky wipe CFG with hole marker
 		// (not bare nil — CFGEdgesComplete(nil) invents empty-complete edge set)
 		if fm != nil {
 			fm.CFGEdges = IncompleteCFGEdges()
+			SetError(ErrGeneric)
 		}
 		cfgIDs = map[int]bool{}
 	}
@@ -148,6 +145,7 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		// (no invent keep-hole partial scrub / empty-complete via bare nil)
 		if !CFGEdgesComplete(fm.CFGEdges) {
 			fm.CFGEdges = IncompleteCFGEdges()
+			SetError(ErrGeneric)
 			gotoSrcIDs = nil
 		} else {
 			ne := make([]*CFGEdge, 0, len(fm.CFGEdges))
@@ -194,10 +192,11 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 		f = fm.Func
 	}
 	if f != nil {
-		// Block* always live on Function.Blocks; nil hole fails closed
+		// Block* always live on Function.Blocks; nil hole fails closed sticky
 		// IncompleteBlocks (not bare nil invent empty-complete Blocks list)
 		if !BlocksComplete(f.Blocks) {
 			f.Blocks = IncompleteBlocks()
+			SetError(ErrGeneric)
 		} else {
 			nb := make([]*Block, 0, len(f.Blocks))
 			for _, blk := range f.Blocks {

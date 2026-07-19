@@ -177,12 +177,15 @@ func UpdateFactsForOOSVars(vars []*Variable, facts *[]*FactPointTo) {
 		return
 	}
 	if !FactsComplete(*facts) {
+		// incomplete map/vars fail closed sticky (no invent soft re-pick OOS cleanup)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	for _, v := range vars {
 		if v == nil || !v.FieldVarsComplete() {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 	}

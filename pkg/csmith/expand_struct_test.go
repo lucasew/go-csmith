@@ -92,14 +92,23 @@ func TestExpandStructUnionVars(t *testing.T) {
 	if len(keep) != 1 || keep[0] != sv {
 		t.Fatalf("keep aggregate: %+v", keep)
 	}
-	// nil candidate / field hole fails closed incomplete (not invent empty complete)
+	// nil candidate / field hole fails closed sticky incomplete (not invent empty complete)
+	ClearError()
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{nil}, GetIntType())) {
 		t.Fatal("nil var hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil var hole must SetError sticky")
+	}
+	ClearError()
 	sv.FieldVars = append(sv.FieldVars, nil)
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{sv}, GetIntType())) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil FieldVars hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEagerCreateLocalStruct(t *testing.T) {

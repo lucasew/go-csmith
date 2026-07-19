@@ -198,6 +198,16 @@ func TestSelectArrayNilHoleFailClosed(t *testing.T) {
 		t.Fatal("Arrays list hole must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray is incomplete IR — fail closed sticky
+	broken := &Variable{Name: "g_broken", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	vs.GlobalList = []*Variable{broken}
+	if vs.SelectArray(NewRng(3), EmptyCGContext()) != nil {
+		t.Fatal("IsArray without AsArray must fail closed SelectArray")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray must SetError sticky")
+	}
+	ClearError()
 	// incomplete ambient fails closed sticky before filters
 	inc := IncompleteEffect()
 	cg := EmptyCGContext()

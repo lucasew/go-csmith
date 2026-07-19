@@ -831,7 +831,8 @@ func TestRemoveStmtScrubsFuncBlocks(t *testing.T) {
 }
 
 func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
-	// incomplete CFG scrub must wipe IncompleteCFGEdges (not bare nil invent empty complete)
+	// incomplete CFG scrub must wipe IncompleteCFGEdges sticky (not bare nil invent empty complete)
+	ClearError()
 	fm := NewFactMgr(nil)
 	b := &Block{
 		StmID: 10,
@@ -848,7 +849,11 @@ func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	if CFGEdgesComplete(fm.CFGEdges) {
 		t.Fatal("incomplete scrub must leave IncompleteCFGEdges, not invent empty complete", fm.CFGEdges)
 	}
-	// incomplete Function.Blocks hole → IncompleteBlocks
+	if !HasError() {
+		t.Fatal("incomplete CFG scrub must SetError sticky")
+	}
+	ClearError()
+	// incomplete Function.Blocks hole → IncompleteBlocks sticky
 	f := &Function{Name: "f"}
 	fm2 := NewFactMgr(f)
 	outer := &Block{Func: f, StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 3}}}
@@ -860,6 +865,10 @@ func TestRemoveStmtIncompleteCFGWipeMarker(t *testing.T) {
 	if BlocksComplete(f.Blocks) {
 		t.Fatal("incomplete Blocks scrub must leave IncompleteBlocks", f.Blocks)
 	}
+	if !HasError() {
+		t.Fatal("incomplete Blocks scrub must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBlockProbabilityUniformNotAlwaysMax(t *testing.T) {

@@ -106,10 +106,13 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 // Incomplete Lhs type IR fails closed IncompleteVariables (no invent level-0 merge).
 func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 	if l == nil || l.Var == nil {
+		// incomplete Lhs fails closed sticky (no invent empty pointees / soft re-pick)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	n, ok := l.IndirectLevelComplete()
 	if !ok {
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	return MergePointeesOfPointer(l.Var.GetCollective(), n, facts)
@@ -122,6 +125,8 @@ func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 // Non-pointer live Var → complete empty nil.
 func (l *Lhs) GetReferencedPtrs() []*Variable {
 	if l == nil || l.Var == nil {
+		// incomplete Lhs fails closed sticky (no invent empty-complete "no ptrs")
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	if !l.Var.IsPointer() {

@@ -1311,6 +1311,8 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 // IncompleteVariables (not bare nil invent empty-complete expand pool).
 func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 	if !VariablesComplete(vars) {
+		// incomplete pool fails closed sticky (no invent soft re-pick empty expand)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	out := append([]*Variable(nil), vars...)
@@ -1321,8 +1323,9 @@ func ExpandStructUnionVars(vars []*Variable, want *Type) []*Variable {
 		}
 		// don't break up a struct if it matches the given type
 		if v.Type != nil && v.Type.IsAggregate() && v.Type != want {
-			// FieldVars always live; incomplete fails closed
+			// FieldVars always live; incomplete fails closed sticky
 			if !v.FieldVarsComplete() {
+				SetError(ErrGeneric)
 				return IncompleteVariables()
 			}
 			// erase i, append field_vars at end (upstream insert end + i--)
@@ -2240,9 +2243,13 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		if !v.IsArray {
 			continue
 		}
-		if v.AsArray != nil {
-			add(v.AsArray)
+		// IsArray without AsArray is incomplete IR — fail closed sticky
+		// (no invent soft-skip broken array as absent then pick another)
+		if v.AsArray == nil {
+			SetError(ErrGeneric)
+			return nil
 		}
+		add(v.AsArray)
 	}
 	// ArrayVariable* on Arrays list; nil hole fails closed sticky
 	for _, av := range vs.Arrays {

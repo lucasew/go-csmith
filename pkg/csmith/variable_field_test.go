@@ -63,12 +63,17 @@ func TestHasFieldVarNilHole(t *testing.T) {
 		t.Fatal("nil FieldVars hole must fail closed (no invent skip to later)")
 	}
 	// MarkDeadVar / OOS must not invent leave field pointees live past hole
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, child)}
 	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
 	if FactsComplete(facts) {
 		t.Fatal("OOS incomplete FieldVars must clear facts, not invent live pointee", facts)
 	}
+	if !HasError() {
+		t.Fatal("OOS incomplete FieldVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
@@ -86,6 +91,7 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 }
 
 func TestCollectExpandable(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	env := &TypeEnv{}
@@ -96,11 +102,15 @@ func TestCollectExpandable(t *testing.T) {
 	if len(all) < 1+len(st.Fields) {
 		t.Fatal(len(all))
 	}
-	// nil FieldVars hole fails closed incomplete (not bare nil invent empty complete)
+	// nil FieldVars hole fails closed sticky incomplete (not bare nil invent empty complete)
 	v.FieldVars = append(v.FieldVars, nil)
 	if VariablesComplete(v.CollectExpandable()) {
 		t.Fatal("nil field hole must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil field hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFieldVolatileOrFromParent(t *testing.T) {
