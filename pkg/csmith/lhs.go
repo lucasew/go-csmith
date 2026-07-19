@@ -213,8 +213,10 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 
 // CompatibleVar mirrors Lhs::compatible(Variable*).
 // Lhs.cpp:364.
+// Lhs + Var always live; sticky false (no invent not-compatible soft-skip past hole).
 func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
 	if l == nil || l.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return l.Var.Compatible(v, expandStruct)
@@ -222,8 +224,10 @@ func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
 
 // CompatibleExpr mirrors Lhs::compatible(Expression*).
 // Lhs.cpp:359–362 — exp->compatible(&var).
+// Lhs + Var + Expression always live; sticky false (no invent not-compatible soft-skip).
 func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
 	if l == nil || l.Var == nil || exp == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return exp.CompatibleWithVar(l.Var, expandStruct)

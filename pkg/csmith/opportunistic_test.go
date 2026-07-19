@@ -226,6 +226,29 @@ func TestLhsCompatibleExpr(t *testing.T) {
 	if lhs.CompatibleExpr(eb, false) {
 		t.Fatal("other var")
 	}
+	// Lhs + Expression always live; sticky no invent not-compatible soft-skip
+	ClearError()
+	if (*Lhs)(nil).CompatibleExpr(ea, false) {
+		t.Fatal("nil Lhs CompatibleExpr must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs CompatibleExpr must SetError sticky")
+	}
+	ClearError()
+	if lhs.CompatibleExpr(nil, false) {
+		t.Fatal("nil exp CompatibleExpr must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil exp CompatibleExpr must SetError sticky")
+	}
+	ClearError()
+	if (*Lhs)(nil).CompatibleVar(a, false) {
+		t.Fatal("nil Lhs CompatibleVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs CompatibleVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionFuncallCompatibleUnary(t *testing.T) {

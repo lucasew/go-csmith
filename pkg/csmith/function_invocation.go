@@ -425,7 +425,9 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 
 // GetFirstFunction mirrors GetFirstFunction — first entry in FuncList / func_1.
 // Function.cpp / FunctionInvocationUser.cpp:274.
-// Function* always live at [0]; nil hole fails closed (nil — no invent scan later).
+// Nil list / empty Funcs is complete miss (no invent first of empty; isolated
+// BuildUserInvocation may pass nil list as "no first-function identity").
+// Function* always live at [0]; nil hole sticky (no invent scan later).
 func GetFirstFunction(list *FunctionList) *Function {
 	if list == nil || len(list.Funcs) == 0 {
 		return nil

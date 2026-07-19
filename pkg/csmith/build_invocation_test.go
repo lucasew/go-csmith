@@ -250,15 +250,30 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 }
 
 func TestGetFirstFunction(t *testing.T) {
+	// nil/empty list is complete miss (isolated BuildUserInvocation passes nil list)
+	ClearError()
 	if GetFirstFunction(nil) != nil {
 		t.Fatal("nil list")
 	}
+	if HasError() {
+		t.Fatal("nil list GetFirstFunction must stay non-sticky complete miss")
+	}
+	ClearError()
 	a := &Function{Name: "func_1"}
 	b := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{a, b}}
 	if GetFirstFunction(list) != a {
 		t.Fatal("want first")
 	}
+	// nil hole at [0] sticky (no invent scan later)
+	ClearError()
+	if GetFirstFunction(&FunctionList{Funcs: []*Function{nil, b}}) != nil {
+		t.Fatal("nil first hole must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil first hole GetFirstFunction must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {

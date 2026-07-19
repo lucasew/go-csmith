@@ -88,6 +88,15 @@ func TestIsCtrlStmt(t *testing.T) {
 	if !IsCtrlStmt(&Stmt{Kind: StmtBreak}) || IsCtrlStmt(&Stmt{Kind: StmtAssign}) {
 		t.Fatal("ctrl")
 	}
+	// Statement always live; sticky no invent not-ctrl soft-skip
+	ClearError()
+	if IsCtrlStmt(nil) {
+		t.Fatal("nil IsCtrlStmt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsCtrlStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestShortcutAnalysisReuse(t *testing.T) {
@@ -236,6 +245,43 @@ func TestContainsStmt(t *testing.T) {
 	if !ContainsStmt(&outer, &inner) {
 		t.Fatal("contains")
 	}
+	// Statement always live; sticky no invent not-contained soft-skip
+	ClearError()
+	if ContainsStmt(nil, &inner) {
+		t.Fatal("nil root ContainsStmt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil root ContainsStmt must SetError sticky")
+	}
+	ClearError()
+	if ContainsStmt(&outer, nil) {
+		t.Fatal("nil target ContainsStmt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil target ContainsStmt must SetError sticky")
+	}
+	ClearError()
+	if FindStmtInTree(nil, 1) != nil {
+		t.Fatal("nil FindStmtInTree must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FindStmtInTree must SetError sticky")
+	}
+	ClearError()
+	if FindStmtInTree(&outer, 0) != nil {
+		t.Fatal("stmID 0 FindStmtInTree must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("stmID 0 FindStmtInTree must SetError sticky")
+	}
+	ClearError()
+	if BlockContainsStmt(nil, &inner) {
+		t.Fatal("nil BlockContainsStmt must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil BlockContainsStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {

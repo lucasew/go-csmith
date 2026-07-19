@@ -77,8 +77,10 @@ func SubsetFacts(a, b []*FactPointTo) bool {
 }
 
 // IsCtrlStmt mirrors Statement::is_ctrl_stmt — break/continue/goto/return.
+// Statement always live; sticky false (no invent not-ctrl soft-skip past hole).
 func IsCtrlStmt(st *Stmt) bool {
 	if st == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	switch st.Kind {
@@ -90,8 +92,10 @@ func IsCtrlStmt(st *Stmt) bool {
 }
 
 // ContainsStmt reports whether root statement tree contains target by StmID.
+// Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func ContainsStmt(root, target *Stmt) bool {
 	if root == nil || target == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return FindStmtInTree(root, target.StmID) != nil
@@ -99,9 +103,11 @@ func ContainsStmt(root, target *Stmt) bool {
 
 // FindStmtInTree finds a statement by stm_id inside root's tree (self + nested blocks).
 // Walks get_blocks only (kind-gated) — no invent search via stray Then on non-compound.
+// Incomplete Statement / StmID sticky nil (no invent soft-skip miss / soft re-pick).
 // Incomplete Block* hole fails closed sticky nil (no invent soft-skip arm / soft re-pick).
 func FindStmtInTree(root *Stmt, stmID int) *Stmt {
 	if root == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if root.StmID == stmID {
@@ -152,8 +158,10 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 }
 
 // BlockContainsStmt walks a block for target stm_id.
+// Block + Statement always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmt(b *Block, target *Stmt) bool {
 	if b == nil || target == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {

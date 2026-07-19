@@ -768,10 +768,12 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 }
 
 // Clone shallow-copies the fact (new PointTo slice).
+// Fact always live; sticky nil (no invent soft-skip clone past hole).
 // Incomplete PointTo (nil hole) fails closed sticky nil — no invent clone of broken set
 // / soft re-pick past holes. Empty top (nil PointTo) clones as empty non-nil set.
 func (f *FactPointTo) Clone() *FactPointTo {
 	if f == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	set := f.PointTo

@@ -74,6 +74,17 @@ func TestFactPointToNullDead(t *testing.T) {
 	if (&FactPointTo{Var: p, PointTo: []*Variable{nil}}).Clone() != nil {
 		t.Fatal("Clone incomplete PointTo must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("Clone incomplete PointTo must SetError sticky")
+	}
+	ClearError()
+	if (*FactPointTo)(nil).Clone() != nil {
+		t.Fatal("nil FactPointTo Clone must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil FactPointTo Clone must SetError sticky")
+	}
+	ClearError()
 	// FactsComplete requires complete PointTo (empty IsTop OK)
 	if !FactsComplete([]*FactPointTo{{Var: p, PointTo: nil}}) {
 		t.Fatal("empty PointTo (top) is complete")

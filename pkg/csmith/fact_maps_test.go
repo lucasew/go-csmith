@@ -234,6 +234,29 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(u) != 1 {
 		t.Fatal(u)
 	}
+	// FactMgr always live; sticky IncompleteFactSlice (no invent empty complete)
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).FindUpdatedFacts(1)) {
+		t.Fatal("nil FM FindUpdatedFacts must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindUpdatedFacts must SetError sticky")
+	}
+	ClearError()
+	if FactsComplete(fm.FindUpdatedFacts(0)) {
+		t.Fatal("stmID 0 FindUpdatedFacts must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("stmID 0 FindUpdatedFacts must SetError sticky")
+	}
+	ClearError()
+	if FactsComplete((*FactMgr)(nil).FindUpdatedFinalFacts(1)) {
+		t.Fatal("nil FM FindUpdatedFinalFacts must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil FM FindUpdatedFinalFacts must SetError sticky")
+	}
+	ClearError()
 	// equal → no update
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	if len(fm.FindUpdatedFacts(1)) != 0 {

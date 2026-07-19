@@ -506,8 +506,10 @@ func findStmtByIDInTree(root *Block, stmID int) *Stmt {
 
 // BlockContainsStmID mirrors Block::contains_stmt for a statement id.
 // Statement.cpp:684–705 — parent chain of s includes this block.
+// Block always live; sticky false (no invent not-contained soft-skip past hole).
 func BlockContainsStmID(b *Block, stmID int) bool {
 	if b == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	if b.StmID == stmID {

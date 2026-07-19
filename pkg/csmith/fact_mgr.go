@@ -753,11 +753,13 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 
 // FindUpdatedFacts mirrors FactMgr::find_updated_facts.
 // FactMgr.cpp:652–665 — facts_out that differ from related facts_in.
-// Incomplete in/out maps fail closed sticky IncompleteFactSlice (not bare nil —
+// Incomplete FactMgr/StmID sticky IncompleteFactSlice (not bare nil —
 // FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
+// Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
-		return nil
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
 	}
 	in := fm.GetMapFactsIn(stmID)
 	out := fm.GetMapFactsOut(stmID)
@@ -784,11 +786,13 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 
 // FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
 // FactMgr.cpp:667–686 — final maps; always include rv facts.
-// Incomplete in/out maps fail closed sticky IncompleteFactSlice (not bare nil —
+// Incomplete FactMgr/StmID sticky IncompleteFactSlice (not bare nil —
 // FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
+// Incomplete in/out maps fail closed sticky IncompleteFactSlice.
 func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	if fm == nil || stmID <= 0 {
-		return nil
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
 	}
 	in := fm.GetMapFactsInFinal(stmID)
 	out := fm.GetMapFactsOutFinal(stmID)

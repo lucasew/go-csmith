@@ -258,4 +258,12 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 		t.Fatal("FieldVars hole GetFieldID must SetError sticky")
 	}
 	ClearError()
+	// Variable always live; sticky -1 (no invent not-field soft-skip past hole)
+	if (*Variable)(nil).GetFieldID() != -1 {
+		t.Fatal("nil GetFieldID must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("nil GetFieldID must SetError sticky")
+	}
+	ClearError()
 }
