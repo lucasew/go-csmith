@@ -51,6 +51,72 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 	}
 }
 
+func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
+	// StatementFor always has init/test/incr + body; no invent for(;;) or header-only
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
+	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
+	if forHeaderOutput(lc) != "" {
+		t.Fatal("forHeader must fail closed without init/test/incr IR")
+	}
+	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).Output(0)
+	if strings.Contains(out, "for") {
+		t.Fatal("for without body/IR must not invent header", out)
+	}
+	// header present but no Then body
+	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
+	goodTest := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd}
+	lc2 := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: goodTest, IncrStmt: goodIncr}
+	if forHeaderOutput(lc2) == "" {
+		t.Fatal("complete IR must emit header")
+	}
+	out = (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc2}}}).Output(0)
+	if strings.Contains(out, "for") {
+		t.Fatal("for without body must not invent header-only", out)
+	}
+	// ArrayOp header without Then
+	out = (&Block{Stmts: []Stmt{{Kind: StmtArrayOp, Loop: lc}}}).Output(0)
+	if strings.Contains(out, "for") {
+		t.Fatal("arrayop without body must not invent header", out)
+	}
+}
+
+func TestArrayLoopKeepsStmtForKind(t *testing.T) {
+	// StatementArrayOp.cpp:80–81 / StatementFor::make_random_array_loop → StatementFor*
+	// no soft invent StmtArrayOp kind over for IR
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	stmtTab := NewStatementThresholdTable(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
+	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(2))
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	// force non-init path: flipcoin(5) false — seed until we get array loop (for) not array_init
+	var got *Stmt
+	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
+		st := MakeRandomArrayOp(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		if st.Kind == StmtFor && st.Loop != nil && st.Then != nil {
+			got = &st
+			break
+		}
+		if st.Kind == StmtArrayOp && st.Loop != nil {
+			// array_init is also StmtArrayOp — skip
+			continue
+		}
+	}
+	if got == nil {
+		t.Skip("no array-loop for in sample seeds")
+	}
+	if got.Kind != StmtFor {
+		t.Fatalf("array loop must stay StmtFor, got %v", got.Kind)
+	}
+}
+
 func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 	// StatementBreak/Continue/Goto/If always have live test Expression*; no invent if ()
 	out := (&Block{Stmts: []Stmt{{Kind: StmtBreak}}}).Output(0)

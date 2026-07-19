@@ -140,16 +140,17 @@ func MakeRandomArrayLoop(
 	loopCG := *cg
 	loopCG.RW = rwd
 	loopCG.MustUseArrays = avs
+	// StatementFor.cpp:344–346 — make_random → StatementFor* (not StatementArrayOp)
 	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &loopCG)
 	if st == nil {
 		return nil
 	}
 	// mark body as in_array_loop (Block::in_array_loop) for goto restrictions
+	// (C++ body Block::in_array_loop from iv_bounds during nested make_random)
 	if st.Then != nil {
 		st.Then.InArrayLoop = true
 	}
-	// array-op kind for emission/distribution tracking when used as array op
-	st.Kind = StmtArrayOp
+	// Kind stays StmtFor — no soft invent StmtArrayOp shell over for IR
 	return st
 }
 

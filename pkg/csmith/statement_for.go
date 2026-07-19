@@ -522,6 +522,10 @@ func forHeaderOutput(lc *LoopControl) string {
 	init := forInitOutput(lc)
 	test := forTestOutput(lc)
 	incr := forIncrOutput(lc)
+	// StatementFor.cpp:408–414 — always live init/test/incr; no invent empty segments
+	if init == "" || test == "" || incr == "" {
+		return ""
+	}
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
 }
 

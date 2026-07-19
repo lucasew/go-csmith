@@ -842,15 +842,19 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(")\n")
 			sb.WriteString(inner + "    continue;\n")
 		case StmtFor:
-			if st.Loop != nil && st.Loop.IV != nil {
-				// StatementFor::Output — header + body Block always live
-				sb.WriteString(forHeaderOutput(st.Loop) + "\n")
-				// no soft invent empty "{}" body when Then missing
-				if st.Then != nil {
-					sb.WriteString(st.Then.Output(indent + 1))
-				}
+			// StatementFor::Output — header + body Block always live
+			// no invent for(;;) / header without body / body without header
+			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+				// incomplete for IR — no soft invent /* for-stub */
+				break
 			}
-			// incomplete for IR — no soft invent /* for-stub */
+			hdr := forHeaderOutput(st.Loop)
+			if hdr == "" {
+				// incomplete init/test/incr — no soft invent empty for header
+				break
+			}
+			sb.WriteString(hdr + "\n")
+			sb.WriteString(st.Then.Output(indent + 1))
 		case StmtIfElse:
 			// StatementIf.cpp:147–159 — test + if_true + else + if_false always live
 			// no invent if () / missing branches
@@ -876,15 +880,18 @@ func (b *Block) Output(indent int) string {
 			sb.WriteString(inner + "    goto " + st.Label + ";\n")
 		case StmtArrayOp:
 			// StatementArrayOp::output_header + body/init block always live
-			// not StatementFor StatementAssign IR (InitStmt empty on array dims)
-			if st.Loop != nil && st.Loop.IV != nil {
-				sb.WriteString(arrayOpHeaderOutput(st.Loop, ProcessOptions()) + "\n")
-				// no soft invent empty "{}" when Then missing
-				if st.Then != nil {
-					sb.WriteString(st.Then.Output(indent + 1))
-				}
+			// nested dims carry Then; array-loop path reuses for body as Then
+			// no invent header without body
+			if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
+				// incomplete arrayop IR — no soft invent /* arrayop-stub */
+				break
 			}
-			// incomplete arrayop IR — no soft invent /* arrayop-stub */
+			hdr := arrayOpHeaderOutput(st.Loop, ProcessOptions())
+			if hdr == "" {
+				break
+			}
+			sb.WriteString(hdr + "\n")
+			sb.WriteString(st.Then.Output(indent + 1))
 		case StmtInvoke:
 			// StatementExpr::Output — expr.Output(); ";"
 			// no soft invent /* invoke */ when expr missing (stmtOK rejects null)
