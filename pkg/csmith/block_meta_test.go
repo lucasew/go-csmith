@@ -56,8 +56,9 @@ func TestSetAccumulatedEffect(t *testing.T) {
 	if EffectComplete(eff2) || eff2.IsEmpty() || eff2.IsPure() {
 		t.Fatal("StmID 0 must fail closed IncompleteEffect, not invent empty/pure", eff2)
 	}
-	if EffectComplete(fm.GetMapStmEffect(11)) || fm.GetMapStmEffect(11).IsWritten(v) {
-		t.Fatal("block map must IncompleteEffect, not invent partial write")
+	// IncompleteEffect: IsWritten is fail-closed true — probe completeness / map shell only
+	if EffectComplete(fm.GetMapStmEffect(11)) || fm.GetMapStmEffect(11).written[v] {
+		t.Fatal("block map must IncompleteEffect, not invent partial write map entry")
 	}
 	// nil block/fm must IncompleteEffect (not invent EmptyEffect pure)
 	if EffectComplete(((*Block)(nil)).SetAccumulatedEffect(fm)) {

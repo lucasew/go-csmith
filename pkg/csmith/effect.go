@@ -347,9 +347,14 @@ func (e Effect) ReadVar(v *Variable) Effect {
 
 // IsWritten mirrors Effect::is_written — exact or parent field_var_of.
 // Effect.cpp:333–345.
+// Incomplete effect fails closed as true (no invent not-written / conflict-free
+// past IncompleteEffect empty maps — same shape as IsWrittenByName).
 func (e Effect) IsWritten(v *Variable) bool {
 	if v == nil {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	if e.written[v] {
 		return true
@@ -411,9 +416,14 @@ func (e Effect) WrittenVars() []*Variable {
 
 // IsRead mirrors Effect::is_read — exact or struct parent (not union).
 // Effect.cpp:276–289.
+// Incomplete effect fails closed as true (no invent not-read / conflict-free
+// past IncompleteEffect empty maps — same shape as IsReadByName).
 func (e Effect) IsRead(v *Variable) bool {
 	if v == nil {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	if e.read[v] {
 		return true
@@ -428,9 +438,13 @@ func (e Effect) IsRead(v *Variable) bool {
 // FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
 // Effect.cpp:389–399.
 // Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
+// Incomplete effect fails closed as true (no invent no-field-read past holes).
 func (e Effect) FieldIsRead(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
@@ -446,9 +460,13 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
 // Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
+// Incomplete effect fails closed as true (no invent no-field-write past holes).
 func (e Effect) FieldIsWritten(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
@@ -465,9 +483,13 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 // Effect.cpp:416–428 — another field of the same container union was read.
 // Variable* always live as map keys; nil hole fails closed as true (no invent none).
 // Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
+// Incomplete effect fails closed as true (no invent no-sibling-read past empty maps).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	if v == nil {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	youColl := v.GetCollective()
 	if youColl == nil {
@@ -500,9 +522,13 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 // Effect.cpp:430–441.
 // Variable* always live as map keys; nil hole fails closed as true (no invent none).
 // Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
+// Incomplete effect fails closed as true (no invent no-sibling-write past empty maps).
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	if v == nil {
 		return false
+	}
+	if e.incomplete {
+		return true
 	}
 	youColl := v.GetCollective()
 	if youColl == nil {
@@ -594,12 +620,14 @@ func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile 
 
 // IsReadPartially mirrors Effect::is_read_partially.
 // Effect.cpp:444–446.
+// Incomplete effect fails closed as true via IsRead/FieldIs*/Sibling* membership.
 func (e Effect) IsReadPartially(v *Variable) bool {
 	return e.IsRead(v) || e.FieldIsRead(v) || e.SiblingUnionFieldIsRead(v)
 }
 
 // IsWrittenPartially mirrors Effect::is_written_partially.
 // Effect.cpp:448–451.
+// Incomplete effect fails closed as true via IsWritten/FieldIs*/Sibling* membership.
 func (e Effect) IsWrittenPartially(v *Variable) bool {
 	return e.IsWritten(v) || e.FieldIsWritten(v) || e.SiblingUnionFieldIsWritten(v)
 }

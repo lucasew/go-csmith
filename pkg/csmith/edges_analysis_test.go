@@ -304,7 +304,8 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	// StmID 0 — no invent soft no-op that leaves effect unrecorded as success
 	st0 := &Stmt{Kind: StmtFor, StmID: 0}
 	SetAccumulatedEffectAfterBlock(st0, EmptyEffect().WriteVar(v), &cg, EmptyEffect())
-	if fm.GetMapStmEffect(0).IsWritten(v) {
+	// GetMapStmEffect(0) IncompleteEffect (IsWritten fail-closed true — use map entry probe)
+	if _, ok := fm.MapStmEffect[0]; ok {
 		t.Fatal("StmID 0 must not invent map effect key 0")
 	}
 	// GetMapStmEffect(0) IncompleteEffect — not invent empty pure default

@@ -24,21 +24,22 @@ func TestAddExternalEffectWithCallers(t *testing.T) {
 	}
 	// nil effect hole / nil chain hole fails closed IncompleteEffect
 	// (no invent leave-base empty-complete / partial merge)
+	// IncompleteEffect IsRead/IsWritten are fail-closed true — probe completeness / maps
 	base := EmptyEffect().ReadVar(g)
 	hole := EmptyEffect()
 	hole.written = map[*Variable]bool{nil: true, g: true}
 	got := base.AddExternalEffectWithCallers(hole, []*Block{blk})
-	if EffectComplete(got) || got.IsRead(g) || got.IsEmpty() {
+	if EffectComplete(got) || got.IsEmpty() || got.read[g] || got.written[g] {
 		t.Fatal("nil effect hole must fail closed IncompleteEffect", got)
 	}
 	got2 := base.AddExternalEffectWithCallers(other, []*Block{nil, blk})
-	if EffectComplete(got2) || got2.IsWritten(g) || got2.IsWritten(loc) {
+	if EffectComplete(got2) || got2.written[g] || got2.written[loc] {
 		t.Fatal("nil call_chain hole must fail closed IncompleteEffect", got2)
 	}
 	// incomplete LocalVars on chain frame: no invent partial global merge
 	holeBlk := &Block{LocalVars: []*Variable{loc, nil}}
 	got3 := base.AddExternalEffectWithCallers(other, []*Block{holeBlk})
-	if EffectComplete(got3) || got3.IsWritten(g) || got3.IsWritten(loc) {
+	if EffectComplete(got3) || got3.written[g] || got3.written[loc] {
 		t.Fatal("incomplete stack on chain must fail closed IncompleteEffect", got3)
 	}
 }

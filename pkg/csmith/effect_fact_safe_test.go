@@ -79,18 +79,57 @@ func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 }
 
 func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
-	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete
+	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete Effect
+	// (membership on incomplete is fail-closed true separately)
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	w := IncompleteEffect().WriteVar(v)
-	if EffectComplete(w) || w.IsWritten(v) {
+	if EffectComplete(w) {
 		t.Fatal("WriteVar incomplete base must stay IncompleteEffect")
 	}
 	r := IncompleteEffect().ReadVar(v)
-	if EffectComplete(r) || r.IsRead(v) {
+	if EffectComplete(r) {
 		t.Fatal("ReadVar incomplete base must stay IncompleteEffect")
 	}
 	if EffectComplete(IncompleteEffect().AccessDerefVolatile(v, 1, true)) {
 		t.Fatal("AccessDerefVolatile incomplete base must stay incomplete")
+	}
+}
+
+func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
+	// IsWritten/IsRead false on IncompleteEffect invents conflict-free / eligible
+	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	inc := IncompleteEffect()
+	if !inc.IsWritten(v) {
+		t.Fatal("incomplete IsWritten must fail closed true")
+	}
+	if !inc.IsRead(v) {
+		t.Fatal("incomplete IsRead must fail closed true")
+	}
+	if !inc.IsWrittenPartially(v) || !inc.IsReadPartially(v) {
+		t.Fatal("incomplete partial membership must fail closed true")
+	}
+	// aggregate field membership
+	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	parent := &Variable{Name: "g_s", Type: st}
+	parent.CreateFieldVars()
+	if len(parent.FieldVars) == 0 {
+		t.Fatal("fields")
+	}
+	if !inc.FieldIsWritten(parent) || !inc.FieldIsRead(parent) {
+		t.Fatal("incomplete FieldIs* must fail closed true")
+	}
+	// sibling-union on incomplete effect
+	ut := &Type{isUnion: true, Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: GetIntType(), BitWidth: -1},
+	}}
+	uv := &Variable{Name: "g_u", Type: ut}
+	uv.CreateFieldVars()
+	if len(uv.FieldVars) < 1 {
+		t.Fatal("union fields")
+	}
+	if !inc.SiblingUnionFieldIsRead(uv.FieldVars[0]) || !inc.SiblingUnionFieldIsWritten(uv.FieldVars[0]) {
+		t.Fatal("incomplete SiblingUnion* must fail closed true")
 	}
 }
 
