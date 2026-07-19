@@ -25,6 +25,8 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		if ptrs != nil {
 			*ptrs = IncompleteVariables()
 		}
+		// Expression always live for get_referenced_ptrs; sticky incomplete
+		SetError(ErrGeneric)
 		return false
 	}
 	switch e.Term {
@@ -32,6 +34,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		// ExpressionVariable always has live Variable*
 		if e.Var == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		if e.Var.IsPointer() {
@@ -42,6 +45,7 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		// both sides always live
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		if !collectReferencedPtrsExpression(e.CommaLHS, ptrs) {
@@ -51,19 +55,23 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	case TermAssignment:
 		if e.Assign == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		return collectReferencedPtrsStmt(e.Assign, ptrs)
 	case TermFunction:
 		// ExpressionFuncall.cpp:165–177 — param_value then eFuncCall → assert(fiu) + callee
+		// Invoke always live for TermFunction; sticky incomplete (public Collect also sticks)
 		if e.Invoke == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		for _, a := range e.Invoke.Args {
 			// Expression* args always live after ERROR_GUARD
 			if a == nil {
 				*ptrs = IncompleteVariables()
+				SetError(ErrGeneric)
 				return false
 			}
 			if !collectReferencedPtrsExpression(a, ptrs) {
@@ -72,9 +80,10 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 		}
 		// ExpressionFuncall.cpp:172–177 — only user FuncCall walks callee refs
 		if e.Invoke.User != nil && !e.Invoke.IsStd {
-			// incomplete callee ReferencedPtrs fails closed (no invent skip hole)
+			// incomplete callee ReferencedPtrs sticky (no invent skip hole as empty refs)
 			if !VariablesComplete(e.Invoke.User.ReferencedPtrs) {
 				*ptrs = IncompleteVariables()
+				SetError(ErrGeneric)
 				return false
 			}
 			for _, p := range e.Invoke.User.ReferencedPtrs {
@@ -85,8 +94,9 @@ func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
 	case TermConstant:
 		return true
 	default:
-		// unknown term — incomplete IR
+		// unknown term — incomplete IR sticky
 		*ptrs = IncompleteVariables()
+		SetError(ErrGeneric)
 		return false
 	}
 }
@@ -111,16 +121,18 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		if ptrs != nil {
 			*ptrs = IncompleteVariables()
 		}
+		// Statement always live for get_referenced_ptrs; sticky incomplete
+		SetError(ErrGeneric)
 		return false
 	}
 	// Statement.cpp:331–345 — get_exprs + get_blocks; get_exprs always live for
 	// assign/invoke/return/if/break/continue/goto and for-test.
 	// Kind-gated for (no invent Loop-on-wrong-kind as for get_exprs).
 	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
-		// Incomplete Loop without TestExpr fails closed (no invent skip for-test
-		// ptrs / soft-claim IV alone as the only for-related pointer).
+		// Incomplete Loop without TestExpr sticky (no invent skip for-test ptrs)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
@@ -130,9 +142,10 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		switch st.Kind {
 		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
 			// C++ get_exprs always yields live Expression* for these kinds
-			// incomplete nil Expr fails closed (no invent partial ptr list as success)
+			// incomplete nil Expr sticky (no invent partial ptr list as success)
 			if st.Expr == nil {
 				*ptrs = IncompleteVariables()
+				SetError(ErrGeneric)
 				return false
 			}
 			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
@@ -150,9 +163,10 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		*ptrs = appendUniqueVar(*ptrs, st.LhsVar)
 	}
 	if st.Lhs != nil {
-		// Lhs always has live Var in C++; incomplete Lhs.Var fails closed
+		// Lhs always has live Var in C++; incomplete Lhs.Var sticky
 		if st.Lhs.Var == nil {
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 		if st.Lhs.Var.IsPointer() {
@@ -163,8 +177,9 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	blks := GetBlocksStmt(st)
 	for _, b := range blks {
 		if b == nil {
-			// incomplete arm — fail closed (no invent partial ptr list past hole)
+			// incomplete arm sticky (no invent partial ptr list past hole)
 			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
 			return false
 		}
 	}
@@ -196,6 +211,8 @@ func collectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) bool {
 		if ptrs != nil {
 			*ptrs = IncompleteVariables()
 		}
+		// Block always live for get_referenced_ptrs walk; sticky incomplete
+		SetError(ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {

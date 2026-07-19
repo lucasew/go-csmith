@@ -235,6 +235,26 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("nil var appendUniqueVar must SetError sticky")
 	}
 	ClearError()
+	// TermFunction without Invoke sticky incomplete collect
+	var ptrs2 []*Variable
+	CollectReferencedPtrsExpression(&Expression{Term: TermFunction}, &ptrs2)
+	if VariablesComplete(ptrs2) {
+		t.Fatal("nil Invoke collect must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("nil Invoke CollectReferencedPtrsExpression must SetError sticky")
+	}
+	ClearError()
+	// nil Expr assign sticky
+	var ptrs3 []*Variable
+	CollectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 9}, &ptrs3)
+	if VariablesComplete(ptrs3) {
+		t.Fatal("nil Expr assign collect must IncompleteVariables")
+	}
+	if !HasError() {
+		t.Fatal("nil Expr CollectReferencedPtrsStmt must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {

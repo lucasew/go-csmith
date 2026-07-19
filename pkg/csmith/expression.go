@@ -853,7 +853,8 @@ func MakeRandomExpression(
 
 	// Expression.cpp:147–153 — type==nullptr → choose_random_nonvoid(_nonvolatile)
 	// based on effect_context purity; re-roll if struct + Constant want.
-	// C++ always has AllTypes from GenerateSimpleTypes; no GetSimpleType invent.
+	// C++ always has AllTypes from GenerateSimpleTypes; empty env soft nil
+	// (no invent simple type; non-sticky soft re-pick — later tries may sticky if typ stays nil)
 	if typ == nil {
 		if env == nil || len(env.AllTypes) == 0 {
 			return nil

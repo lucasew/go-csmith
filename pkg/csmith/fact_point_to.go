@@ -327,15 +327,28 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 	if rhs == nil {
 		return MakeFactsPointTo(lvars, GarbagePtr)
 	}
-	rt := rhs.GetType()
-	// non-pointer, non-union RHS (FactPointTo.cpp:172–178)
-	if rt == nil || (!rt.IsPointerLike() && !rt.IsUnion()) {
-		// equals(0) and size >= 8 → null else garbage
-		if rhs.EqualsInt(0) && rt != nil && rt.SizeInBytes() >= 8 {
-			return MakeFactsPointTo(lvars, NullPtr)
+	// Compound terms first — TermFunction without Invoke has nil GetType and must
+	// not invent complete GarbagePtr via the scalar non-pointer branch (soft invent).
+	switch rhs.Term {
+	case TermFunction, TermAssignment, TermCommaExpr:
+		// structured transfer below (after rt fetch for pointer-like checks in Constant/Variable)
+	default:
+		rt0 := rhs.GetType()
+		// incomplete type sticky Incomplete (no invent GarbagePtr complete success)
+		if rt0 == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
 		}
-		return MakeFactsPointTo(lvars, GarbagePtr)
+		// non-pointer, non-union RHS (FactPointTo.cpp:172–178)
+		if !rt0.IsPointerLike() && !rt0.IsUnion() {
+			// equals(0) and size >= 8 → null else garbage
+			if rhs.EqualsInt(0) && rt0.SizeInBytes() >= 8 {
+				return MakeFactsPointTo(lvars, NullPtr)
+			}
+			return MakeFactsPointTo(lvars, GarbagePtr)
+		}
 	}
+	rt := rhs.GetType()
 	switch rhs.Term {
 	case TermConstant:
 		if rt.IsPointerLike() {

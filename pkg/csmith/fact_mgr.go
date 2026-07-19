@@ -1172,7 +1172,12 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 				return IncompleteFactSlice(), nil
 			}
 			more := AbstractFactForAssign(nil, v, 0, e)
+			// live Expression* alt path: incomplete abstract sticky
+			// (no invent soft-skip incomplete init alt / soft re-pick past hole)
 			if !FactsComplete(more) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return IncompleteFactSlice(), nil
 			}
 			for _, f := range more {
@@ -1182,7 +1187,11 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 					return IncompleteFactSlice(), nil
 				}
 				merged := MergeFactInto(pt, f)
+				// incomplete merge after live alt sticky (no invent partial init facts)
 				if !FactsComplete(merged) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return IncompleteFactSlice(), nil
 				}
 				pt = merged

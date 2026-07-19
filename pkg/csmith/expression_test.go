@@ -632,12 +632,15 @@ func TestMakeRandomExpressionNilTypeUsesEnv(t *testing.T) {
 	if e.Con == nil || e.Con.Type == nil {
 		t.Fatal("const type")
 	}
-	// no soft invent simple when AllTypes empty
+	// empty/nil TypeEnv: complete soft miss (no invent simple type; non-sticky soft re-pick)
+	// later choose retries may still SetError when typ remains nil after tries
+	ClearError()
 	cg2 := EmptyCGContext()
 	cg2.Types = &TypeEnv{}
 	if MakeRandomExpression(NewRng(1), opts, NewExprTables(opts), nil, &cg2, nil, nil, true, false, TermConstant, 0) != nil {
 		t.Fatal("empty Type env must not invent simple type")
 	}
+	ClearError()
 }
 
 func TestMakeRandomExpressionNoInventSessionProbs(t *testing.T) {

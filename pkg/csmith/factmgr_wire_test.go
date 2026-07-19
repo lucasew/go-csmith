@@ -257,6 +257,34 @@ func TestAbstractFactForVarInitUnion(t *testing.T) {
 		t.Fatal("nil InitExprs AbstractFactForVarInit must SetError sticky")
 	}
 	ClearError()
+	// incomplete abstract of live alt sticky (no invent soft-skip incomplete init alt)
+	badAlt := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_ap_bad", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2},
+			Init: &Constant{Type: PointerTo(GetIntType()), Value: "0"},
+		},
+		Sizes: []int{2},
+		// TermFunction without Invoke → incomplete abstract transfer
+		InitExprs: []*Expression{{Term: TermFunction}},
+	}
+	badAlt.AsArray = badAlt
+	// also exercise incomplete alt via RhsToLhsTransfer nil Invoke sticky path
+	more := AbstractFactForAssign(nil, &badAlt.Variable, 0, &Expression{Term: TermFunction})
+	if FactsComplete(more) {
+		t.Fatal("nil Invoke AbstractFactForAssign must incomplete", more)
+	}
+	if !HasError() {
+		t.Fatal("nil Invoke AbstractFactForAssign must SetError sticky")
+	}
+	ClearError()
+	ptBad, _ := AbstractFactForVarInit(&badAlt.Variable)
+	if FactsComplete(ptBad) {
+		t.Fatalf("incomplete alt abstract must fail closed incomplete complete=%v err=%v n=%d", FactsComplete(ptBad), HasError(), len(ptBad))
+	}
+	if !HasError() {
+		t.Fatal("incomplete alt AbstractFactForVarInit must SetError sticky")
+	}
+	ClearError()
 	// union without rhs/init — incomplete abstract non-sticky (AddParamFacts soft path);
 	// AddNewVarFact sticks after incomplete abstract (no invent skip no-fact)
 	ClearError()
