@@ -19,9 +19,15 @@ type Constant struct {
 // probs is the session Probabilities (C++ singleton); nil allowed for simple/pointer
 // only — aggregate constants need live probs (no invent NewProbabilities(opts)).
 func MakeRandom(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
+	// Type* always live at make_random (Expression choose_random / callers);
+	// sticky no invent Constant{Type:nil, Value:"0"} success shell past hole
+	if typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// Constant.cpp:312 — assert(st != eVoid) before simple emit sticky
 	// (no invent soft re-pick past void as empty success / "/* void */")
-	if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
+	if typ.IsSimple() && typ.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -173,9 +179,11 @@ func splitConstFields(s string) []string {
 // Constant.cpp:296–...
 func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rng) string {
 	// Constant.cpp:302–314 — type dispatch before pure_rnd (no invent require RNG first)
+	// Type* always live at GenerateRandomConstant in generation; sticky no invent "0"
+	// success string that MakeRandom would wrap as Type-nil Constant shell
 	if typ == nil {
-		// Constant.cpp:303–304 — type==0 → "0"
-		return "0"
+		SetError(ErrGeneric)
+		return ""
 	}
 	if typ.IsStruct() {
 		// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)

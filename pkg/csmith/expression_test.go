@@ -161,6 +161,7 @@ func TestExpressionGetQualifiersIndirect(t *testing.T) {
 
 func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
 	// no invent ExprType shell without live invoke / assign / comma RHS
+	ClearError()
 	if (&Expression{Term: TermFunction, ExprType: GetIntType()}).GetType() != nil {
 		t.Fatal("nil Invoke must not invent type from ExprType")
 	}
@@ -173,6 +174,22 @@ func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
 	if (&Expression{Term: TermVariable}).GetType() != nil {
 		t.Fatal("nil Var must fail closed")
 	}
+	// incomplete Constant Con/Type sticky (no invent untyped constant soft-miss)
+	ClearError()
+	if (&Expression{Term: TermConstant}).GetType() != nil {
+		t.Fatal("nil Con must fail closed nil type")
+	}
+	if !HasError() {
+		t.Fatal("nil Con GetType must SetError sticky")
+	}
+	ClearError()
+	if (&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}).GetType() != nil {
+		t.Fatal("nil Con.Type must fail closed nil type")
+	}
+	if !HasError() {
+		t.Fatal("nil Con.Type GetType must SetError sticky")
+	}
+	ClearError()
 	// complete still works
 	v := CreateVariableScalars("g_i", GetIntType(), false, false)
 	if (&Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}).GetType() != GetIntType() {

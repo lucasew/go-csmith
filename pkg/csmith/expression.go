@@ -172,12 +172,13 @@ func (e *Expression) GetTypeUncast() *Type {
 	}
 	switch e.Term {
 	case TermConstant:
-		if e.Con != nil {
-			return e.Con.Type
+		// Constant always has live Type*; incomplete Con/Type sticky (no invent
+		// untyped constant soft-miss / soft re-pick past hole)
+		if e.Con == nil || e.Con.Type == nil {
+			SetError(ErrGeneric)
+			return nil
 		}
-		// incomplete Constant IR sticky — no invent untyped constant
-		SetError(ErrGeneric)
-		return nil
+		return e.Con.Type
 	case TermVariable, TermLhs:
 		// ExpressionVariable always has live type; ExprType preferred then Var.Type
 		if e.ExprType != nil {

@@ -28,6 +28,14 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 		t.Fatal("void MakeRandom must SetError sticky")
 	}
 	ClearError()
+	// Type* always live; sticky no invent Constant{Type:nil, Value:"0"} shell
+	if MakeRandom(nil, Defaults(), nil, NewRng(1)) != nil {
+		t.Fatal("nil type MakeRandom must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil type MakeRandom must SetError sticky")
+	}
+	ClearError()
 	// simple non-void needs RNG sticky (no invent NewRng)
 	if MakeRandom(GetIntType(), Defaults(), nil, nil) != nil {
 		t.Fatal("nil RNG simple MakeRandom must fail closed")
