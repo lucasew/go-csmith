@@ -93,13 +93,22 @@ func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union must not invent FactUnion")
 	}
-	// MakeFactUnions fails closed incomplete on non-union / nil hole (not bare nil invent empty)
+	// MakeFactUnions fails closed sticky incomplete on non-union / nil hole
+	ClearError()
 	if UnionFactsComplete(MakeFactUnions([]*Variable{v}, 0)) {
 		t.Fatal("non-union MakeFactUnions must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("non-union MakeFactUnions must SetError sticky")
+	}
+	ClearError()
 	if UnionFactsComplete(MakeFactUnions([]*Variable{nil}, 0)) {
 		t.Fatal("nil hole MakeFactUnions must fail closed incomplete")
 	}
+	if !HasError() {
+		t.Fatal("nil hole MakeFactUnions must SetError sticky")
+	}
+	ClearError()
 	if len(MakeFactUnions([]*Variable{}, 0)) != 0 {
 		t.Fatal("empty vars must yield empty facts")
 	}

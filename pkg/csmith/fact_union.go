@@ -43,17 +43,19 @@ func MakeFactUnionTop(v *Variable) *FactUnion {
 
 // MakeFactUnions mirrors FactUnion::make_facts.
 // FactUnion.cpp:169–176 — vars[i] always live; make_fact asserts union type.
-// Incomplete IR fails closed IncompleteUnionFactSlice (not bare nil —
-// UnionFactsComplete(nil)==true invents empty-complete make_facts success).
+// Incomplete IR fails closed sticky IncompleteUnionFactSlice (not bare nil —
+// UnionFactsComplete(nil)==true invents empty-complete make_facts / soft re-pick).
 func MakeFactUnions(vars []*Variable, fid int) []*FactUnion {
 	out := make([]*FactUnion, 0, len(vars))
 	for _, v := range vars {
 		if v == nil {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		f := MakeFactUnion(v, fid)
-		// non-union subject is assert path — fail closed whole batch
+		// non-union subject is assert path — fail closed sticky whole batch
 		if f == nil {
+			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
 		out = append(out, f)

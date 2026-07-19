@@ -48,7 +48,8 @@ func TestUpdateFactForReturn(t *testing.T) {
 
 func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	// soft invent: MergeUnionFact nil still changed=true with wiped UnionFacts
-	// fair: incomplete union map hole fails closed false
+	// fair: incomplete union map hole fails closed false (abstract incomplete non-sticky)
+	ClearError()
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
@@ -67,6 +68,19 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	if UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("incomplete union merge must fail closed incomplete UnionFacts", fm.UnionFacts)
 	}
+	// incomplete abstract alone must not invent success; soft re-pick keeps non-sticky
+	ClearError()
+	// complete map + MergeUnionFact incomplete subject sticky wipe
+	fm2 := NewFactMgr(nil)
+	fm2.UnionFacts = []*FactUnion{MakeFactUnion(parent, 0)}
+	merged := MergeUnionFact(fm2.UnionFacts, nil)
+	if UnionFactsComplete(merged) {
+		t.Fatal("nil fact MergeUnionFact must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil fact MergeUnionFact must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestApplyPointToAssignFactsNilHoleFailClosed(t *testing.T) {

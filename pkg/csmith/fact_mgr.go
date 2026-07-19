@@ -1430,14 +1430,18 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 		return false
 	}
 	for _, uf := range ufacts {
-		// FactUnion* always live from complete abstract
+		// FactUnion* always live from complete abstract — nil hole sticky wipe
 		if uf == nil {
 			fm.UnionFacts = IncompleteUnionFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
 		merged := MergeUnionFact(fm.UnionFacts, uf)
 		if !UnionFactsComplete(merged) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		fm.UnionFacts = merged
@@ -1451,13 +1455,15 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 }
 
 // MergeUnionFact replaces or appends a union fact by subject.
-// FactUnion* always live; nil f or map hole fails closed IncompleteUnionFactSlice
-// (no invent empty-complete via UnionFactsComplete(nil)).
+// FactUnion* always live; nil f or map hole fails closed sticky IncompleteUnionFactSlice
+// (no invent empty-complete via UnionFactsComplete(nil) / soft re-pick past wipe).
 func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 	if f == nil {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	if !UnionFactsComplete(facts) {
+		SetError(ErrGeneric)
 		return IncompleteUnionFactSlice()
 	}
 	for i, old := range facts {
@@ -1747,13 +1753,18 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 			return false
 		}
 		for _, uf := range ufacts {
+			// FactUnion* always live from complete abstract — nil hole sticky wipe
 			if uf == nil {
 				fm.UnionFacts = IncompleteUnionFactSlice()
+				SetError(ErrGeneric)
 				return false
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if !UnionFactsComplete(merged) {
 				fm.UnionFacts = IncompleteUnionFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 			fm.UnionFacts = merged
