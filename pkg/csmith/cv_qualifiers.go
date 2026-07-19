@@ -499,12 +499,17 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	if DepthGuardByDepth(opts, need) == BadDepth {
 		return out
 	}
+	// CVQualifiers.cpp always has process RNG for const/vol flips
+	// no invent fixed non-const non-vol pointer level without draw
+	if r == nil {
+		return q
+	}
 	isConst := false
-	if opts.ConstPointers && probs != nil && r != nil {
+	if opts.ConstPointers && probs != nil {
 		isConst = r.RndFlipcoin(uint32(probs.Single(PRegularConstProb)))
 	}
 	isVol := false
-	if !noVolatile && opts.VolatilePointers && probs != nil && r != nil {
+	if !noVolatile && opts.VolatilePointers && probs != nil {
 		isVol = r.RndFlipcoin(uint32(probs.Single(PRegularVolatileProb)))
 	}
 	out.AddQualifiers(isConst, isVol)

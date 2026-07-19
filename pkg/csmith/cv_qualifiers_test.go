@@ -35,6 +35,10 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	if len(added.IsConsts) != 3 {
 		t.Fatalf("add level %d", len(added.IsConsts))
 	}
+	// nil RNG — no invent fixed non-const non-vol pointer level
+	if got := q4.RandomAddQualifiers(nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
+		t.Fatalf("nil RNG must not invent grow, got %d", len(got.IsConsts))
+	}
 }
 
 func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {

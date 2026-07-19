@@ -175,6 +175,16 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	if out := g.OutputFunctions(); out != "" {
 		t.Fatal("empty function IR must fail closed sections", out)
 	}
+	// incomplete among live fails whole (no invent skip holes)
+	good := &Function{
+		Name: "func_1", AliasName: "func_1_alias", ReturnType: GetIntType(),
+		RV: CreateVariableQfer("func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		Body: &Block{}, IsBuilt: true, BuildState: BuildBuilt,
+	}
+	g.Funcs.Funcs = []*Function{good, {Name: "", ReturnType: GetIntType()}}
+	if out := g.OutputFunctions(); out != "" {
+		t.Fatal("mixed incomplete must fail closed", out)
+	}
 }
 
 func TestBlockLocalNoInventEmptyDef(t *testing.T) {

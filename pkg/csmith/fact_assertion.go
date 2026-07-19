@@ -166,13 +166,15 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 	}
 	var body strings.Builder
 	for _, f := range facts {
+		// Fact* always live in fact maps; no invent skip nil holes
 		if f == nil || f.Var == nil {
-			continue
+			return ""
 		}
 		// skip globals neither read nor written in this function
 		if f.Var.IsGlobal() && !eff.IsRead(f.Var) && !eff.IsWritten(f.Var) {
 			continue
 		}
+		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
 		body.WriteString(f.OutputAssertion(stParent, indent))
 	}
 	if body.Len() == 0 {

@@ -367,28 +367,36 @@ func (g *ProgramGenerator) OutputGlobals() string {
 func (g *ProgramGenerator) OutputFunctions() string {
 	var forwards, aliases, bodies strings.Builder
 	for _, f := range g.Funcs.Funcs {
-		if f == nil || f.IsBuiltin {
+		// Function* always live; builtins skip emit; no invent skip incomplete user funcs
+		if f == nil {
+			return ""
+		}
+		if f.IsBuiltin {
 			continue
 		}
-		// incomplete header IR — no invent bare blank lines
+		// incomplete header IR — fail closed whole functions section
 		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
-		if d != "" {
-			forwards.WriteString(d)
-			forwards.WriteString("\n")
+		if d == "" {
+			return ""
 		}
+		forwards.WriteString(d)
+		forwards.WriteString("\n")
 		// Function.cpp:820–826 — alias decls when FunctionAttributes
 		if g.Opts.FunctionAttributes {
 			a := f.OutputForwardDeclAlias(g.Opts.ForceGlobalsStatic)
-			if a != "" {
-				aliases.WriteString(a)
-				aliases.WriteString("\n")
+			if a == "" {
+				// alias expected when FunctionAttributes; incomplete AliasName
+				return ""
 			}
+			aliases.WriteString(a)
+			aliases.WriteString("\n")
 		}
 		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
-		if body != "" {
-			bodies.WriteString(body)
-			bodies.WriteString("\n")
+		if body == "" {
+			return ""
 		}
+		bodies.WriteString(body)
+		bodies.WriteString("\n")
 	}
 	// no invent section headers without live content
 	if forwards.Len() == 0 && aliases.Len() == 0 && bodies.Len() == 0 {
@@ -594,8 +602,9 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 	zero := MakeInt(0)
 	var b strings.Builder
 	for _, v := range ptrs {
+		// Variable* always live in dead_globals; no invent skip nil/incomplete holes
 		if v == nil {
-			continue
+			return ""
 		}
 		sizes := v.ArraySizes
 		av := v.AsArray
@@ -605,7 +614,8 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		if v.IsArray && len(sizes) > 0 {
 			if len(names) == 0 {
 				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
-				continue
+				// incomplete ctrl IR — fail closed whole resets
+				return ""
 			}
 			// ArrayVariable::output_init(out, &zero, ctrl_vars, 1) — always loop form
 			if av == nil {
@@ -620,9 +630,9 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			av.InitExpr = nil
 			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
-			// incomplete array init IR — no invent blank
+			// incomplete array init IR — fail closed whole resets
 			if initOut == "" {
-				continue
+				return ""
 			}
 			b.WriteString(initOut)
 			continue
@@ -630,7 +640,7 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		// OutputMgr.cpp:337 — Variable::Output always live; no invent " = 0;" without name
 		out := v.OutputC()
 		if out == "" {
-			continue
+			return ""
 		}
 		b.WriteString("    " + out + " = 0;\n")
 	}

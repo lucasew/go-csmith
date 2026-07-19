@@ -832,20 +832,23 @@ func (f *Function) OutputOpts(forceStatic, withAttrs bool, r *Rng) string {
 	}
 	s += "\n"
 	// Function.cpp:575–598 — depth_protect + body + else ret_c always live together
-	// no invent if without else, else without body, or empty "{}" body
+	// no invent header-only / empty-body shells (C++ would dereference body)
 	if f.Body == nil {
-		// incomplete IR — header only (C++ would dereference body)
-		return s
+		return ""
 	}
 	// indent 0: function body braces at column 0 (Block::Output / DefaultOutputMgr style).
 	bodyOut := f.Body.Output(0)
+	if bodyOut == "" {
+		return ""
+	}
 	if f.DepthProtect && f.RetConst != nil {
 		// Function.cpp:575–597 — if (DEPTH…) body else return ret_c
 		// both body Output and ret_c value always live; no invent if/else or "return ;"
 		retVal := f.RetConst.Value
-		if bodyOut == "" || retVal == "" {
-			// incomplete depth_protect IR — body only when live (no soft invent shell)
-			return s + bodyOut
+		if retVal == "" {
+			// incomplete ret_c — body only, no invent depth if/else
+			s += bodyOut
+			return s
 		}
 		s += "if (DEPTH < MAX_DEPTH) \n"
 		s += bodyOut

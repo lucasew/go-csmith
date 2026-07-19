@@ -209,27 +209,21 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 
 func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	// Function.cpp:575–597 — depth_protect + body + ret_c always together
-	// no invent empty braces / if without else / else without body / "0"
+	// no invent empty braces / header-only / if without else / "0"
 	f := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
 		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
 		DepthProtect: true,
 	}
 	out := f.Output()
-	if strings.Contains(out, "{\n}\n") {
-		t.Fatal("nil Body must not invent empty braces", out)
-	}
-	if strings.Contains(out, "if (DEPTH") {
-		t.Fatal("nil Body must not invent depth if", out)
-	}
-	if strings.Contains(out, "return 0") {
-		t.Fatal("nil RetConst must not invent return 0", out)
+	if out != "" {
+		t.Fatal("nil Body must fail closed empty, got", out)
 	}
 	// RetConst only — no invent if/else without body
 	f.RetConst = MakeInt(42)
 	out = f.Output()
-	if strings.Contains(out, "if (DEPTH") || strings.Contains(out, "return 42") {
-		t.Fatal("RetConst without Body must not invent depth shell", out)
+	if out != "" {
+		t.Fatal("RetConst without Body must fail closed empty", out)
 	}
 	// Body without RetConst — body only, no invent if without else
 	f.RetConst = nil
@@ -252,5 +246,8 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	out = f.Output()
 	if strings.Contains(out, "if (DEPTH") || strings.Contains(out, "return ;") {
 		t.Fatal("empty RetConst.Value must not invent depth shell", out)
+	}
+	if !strings.Contains(out, "{") {
+		t.Fatal("want body without depth wrap", out)
 	}
 }
