@@ -106,8 +106,14 @@ func MakeRandomIf(
 	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
 	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
-	// live if_true Block* required (no invent if with nil Then shell)
-	if HasError() || thenB == nil {
+	// live if_true Block* required sticky (no invent if with nil Then shell)
+	if thenB == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
+	}
+	if HasError() {
 		return nil
 	}
 
@@ -134,8 +140,14 @@ func MakeRandomIf(
 	elseCG.EffectAccum = &elseEff
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
 	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
-	// live if_false Block* required
-	if HasError() || elseB == nil {
+	// live if_false Block* required sticky (no invent if with nil Else shell)
+	if elseB == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
+	}
+	if HasError() {
 		return nil
 	}
 	// StatementIf.cpp:101–107 — construct StatementIf; do not merge branch facts here

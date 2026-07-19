@@ -129,3 +129,28 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestProbabilitiesNilSticky(t *testing.T) {
+	ClearError()
+	if (*Probabilities)(nil).Single(PMoreStructUnionProb) != 0 {
+		t.Fatal("nil Single must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil Single must SetError sticky")
+	}
+	ClearError()
+	if (*Probabilities)(nil).BinaryOpWeight(0) != 0 {
+		t.Fatal("nil BinaryOpWeight must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil BinaryOpWeight must SetError sticky")
+	}
+	ClearError()
+	if (*Probabilities)(nil).StatementThresholdTable() != nil {
+		t.Fatal("nil StatementThresholdTable must return nil")
+	}
+	if !HasError() {
+		t.Fatal("nil StatementThresholdTable must SetError sticky")
+	}
+	ClearError()
+}

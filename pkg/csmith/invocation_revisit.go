@@ -333,8 +333,11 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 
 // NeedsRevisit reports whether build_invocation would re-analyze the callee.
 // FunctionInvocationUser.cpp:274–276.
+// Incomplete Function sticky false (no invent not-revisit soft-skip past hole).
 func (f *Function) NeedsRevisit() bool {
+	// Function always live; sticky incomplete no invent not-revisit soft-skip
 	if f == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	return f.FactChanged || f.UnionFieldRead || f.IsPointerReferenced()
@@ -342,13 +345,17 @@ func (f *Function) NeedsRevisit() bool {
 
 // IsPointerReferenced mirrors Function::is_pointer_referenced.
 // Function.h:110.
-// Incomplete ReferencedPtrs fails closed true (NeedsRevisit — no invent
+// Incomplete ReferencedPtrs sticky true (NeedsRevisit — no invent
 // "no pointers" via VariablesComplete(nil)/len==0 empty-complete).
 func (f *Function) IsPointerReferenced() bool {
+	// Function always live; sticky incomplete no invent no-ptrs soft-skip
 	if f == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !VariablesComplete(f.ReferencedPtrs) {
+		// incomplete ReferencedPtrs sticky has-pointers (restrictive revisit)
+		SetError(ErrGeneric)
 		return true
 	}
 	return len(f.ReferencedPtrs) > 0

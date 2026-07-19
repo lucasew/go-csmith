@@ -327,3 +327,22 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 		t.Fatal("visited_cnt")
 	}
 }
+
+func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*Function)(nil).NeedsRevisit() {
+		t.Fatal("nil Function NeedsRevisit must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Function NeedsRevisit must SetError sticky")
+	}
+	ClearError()
+	f := &Function{Name: "f", ReferencedPtrs: []*Variable{nil}}
+	if !f.IsPointerReferenced() {
+		t.Fatal("incomplete ReferencedPtrs must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("incomplete ReferencedPtrs IsPointerReferenced must SetError sticky")
+	}
+	ClearError()
+}

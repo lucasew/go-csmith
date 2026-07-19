@@ -668,7 +668,9 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 func findArrayOpInnermost(st *Stmt) *Stmt {
+	// Statement always live; sticky incomplete no invent nil soft-skip
 	if st == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	cur := st
@@ -679,7 +681,12 @@ func findArrayOpInnermost(st *Stmt) *Stmt {
 }
 
 func isArrayInitBody(b *Block) bool {
-	if b == nil || len(b.Stmts) != 1 {
+	// Block always live for array-init body check; sticky incomplete no invent false soft-skip
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if len(b.Stmts) != 1 {
 		return false
 	}
 	s := &b.Stmts[0]

@@ -79,9 +79,11 @@ func NewProbabilities(opts Options) *Probabilities {
 }
 
 // StatementThresholdTable returns Statement::stmtTable_ built from pStatementProb.
-// Nil when Probabilities is nil.
+// Incomplete Probabilities sticky nil (no invent empty table soft-skip past hole).
 func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
+	// Probabilities always live in C++ singleton; sticky incomplete no invent nil table
 	if p == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	return p.statementTable
@@ -89,16 +91,25 @@ func (p *Probabilities) StatementThresholdTable() *ThresholdTable {
 
 // Single returns a single probability in [0,100].
 // SingleProbElem::get_prob_direct.
+// Incomplete Probabilities sticky 0 (no invent default 50 / soft re-pick past hole).
 func (p *Probabilities) Single(name ProbName) int {
+	// Probabilities always live; sticky incomplete no invent 0% without table
 	if p == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	return p.single[name]
 }
 
 // SimpleTypeWeight returns equal-group weight (0 or 1) for eSimpleType index.
+// Incomplete Probabilities sticky 0 (no invent weight 1 soft-skip past hole).
 func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
-	if p == nil || simpleIdx < 0 || simpleIdx >= len(p.simpleTypeWeight) {
+	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
+	if p == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	if simpleIdx < 0 || simpleIdx >= len(p.simpleTypeWeight) {
 		return 0
 	}
 	return p.simpleTypeWeight[simpleIdx]
@@ -113,8 +124,14 @@ func (p *Probabilities) SimpleTypesFilter() Filter {
 }
 
 // BinaryOpWeight returns equal-group weight for eBinaryOps index.
+// Incomplete Probabilities sticky 0 (no invent weight soft-skip past hole).
 func (p *Probabilities) BinaryOpWeight(opIdx int) int {
-	if p == nil || opIdx < 0 || opIdx >= len(p.binaryOpWeight) {
+	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
+	if p == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	if opIdx < 0 || opIdx >= len(p.binaryOpWeight) {
 		return 0
 	}
 	return p.binaryOpWeight[opIdx]
@@ -129,8 +146,14 @@ func (p *Probabilities) BinaryOpsFilter() Filter {
 }
 
 // UnaryOpWeight returns equal-group weight for eUnaryOps index.
+// Incomplete Probabilities sticky 0 (no invent weight soft-skip past hole).
 func (p *Probabilities) UnaryOpWeight(opIdx int) int {
-	if p == nil || opIdx < 0 || opIdx >= len(p.unaryOpWeight) {
+	// Probabilities always live; sticky incomplete no invent weight 0 soft-skip
+	if p == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	if opIdx < 0 || opIdx >= len(p.unaryOpWeight) {
 		return 0
 	}
 	return p.unaryOpWeight[opIdx]

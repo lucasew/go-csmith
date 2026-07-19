@@ -220,8 +220,14 @@ func (fi *Invocation) CompatibleVar(v *Variable, expandStruct bool) bool {
 // Is0Or1 mirrors FunctionInvocationBinary::is_0_or_1 and Unary eNot.
 // FunctionInvocationBinary.cpp:179–181 — comparison ops yield 0/1.
 // FunctionInvocationUnary.h:67 — eNot only.
+// Incomplete Invocation sticky false (no invent not-0or1 / soft re-pick past hole).
 func (fi *Invocation) Is0Or1() bool {
-	if fi == nil || !fi.IsStd {
+	// Invocation always live for fold; sticky incomplete no invent not-0or1
+	if fi == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if !fi.IsStd {
 		return false
 	}
 	if fi.IsUnary {
