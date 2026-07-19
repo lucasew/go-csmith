@@ -69,6 +69,7 @@ func TestExpressionUseVar(t *testing.T) {
 }
 
 func TestMustJumpUsesNotEquals(t *testing.T) {
+	ClearError()
 	st := Stmt{Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	if !st.MustJump() {
 		t.Fatal("true const")
@@ -77,6 +78,16 @@ func TestMustJumpUsesNotEquals(t *testing.T) {
 	if st.MustJump() {
 		t.Fatal("false const")
 	}
+	// incomplete break without test sticky not-must-jump
+	ClearError()
+	st.Expr = nil
+	if st.MustJump() {
+		t.Fatal("nil Expr MustJump must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Expr MustJump must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMinimalDepthTable(t *testing.T) {

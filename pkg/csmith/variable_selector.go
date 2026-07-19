@@ -883,7 +883,9 @@ func (vs *VariableSelector) MakeInitValue(
 // VariableSelector.cpp:216–290 — itemized collective: read_indices first;
 // then effect/const/volatile/FactUnion nonreadable checks on collective.
 func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) bool {
+	// Variable always live; sticky incomplete no invent not-eligible soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// incomplete ambient fails closed sticky (no invent eligible / soft-skip as absent re-pick)

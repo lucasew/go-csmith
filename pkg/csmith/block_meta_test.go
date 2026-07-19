@@ -189,11 +189,16 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	if b.MustReturn() {
 		t.Fatal("back edge escapes")
 	}
-	// Block StmID 0 + FM fails closed as escape (no invent "no back edge")
+	// Block StmID 0 + FM sticky fail closed as escape (no invent "no back edge")
+	ClearError()
 	b0 := &Block{StmID: 0, Stmts: []Stmt{ret}, EmitFM: fm}
 	if b0.MustReturn() {
 		t.Fatal("block StmID 0 must fail closed not must_return")
 	}
+	if !HasError() {
+		t.Fatal("block StmID 0 MustReturn must SetError sticky")
+	}
+	ClearError()
 	// MustJump also requires empty break_stms
 	b2 := &Block{Stmts: []Stmt{{
 		Kind: StmtBreak, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -205,10 +210,15 @@ func TestMustReturnBreakStmsAndBackEdge(t *testing.T) {
 	if !b2.MustJump() {
 		t.Fatal("true break must_jump")
 	}
+	if HasError() {
+		t.Fatal("complete MustJump must not sticky")
+	}
+	ClearError()
 }
 
 func TestBlockOutputBlockIDComment(t *testing.T) {
 	// Block.cpp:250–253 — "{ " + /* block id: N */
+	ClearError()
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
 		LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),

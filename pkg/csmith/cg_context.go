@@ -479,8 +479,9 @@ func (c *CGContext) MergeParamContext(param CGContext, includeLHS bool) {
 
 // FindMustUseArrays mirrors RWDirective::find_must_use_arrays.
 // CGContext.cpp:610–624 — unique arrays from must_read and must_write.
-// Variable* always live on must-use lists; nil hole fails closed (nil out).
+// Variable* always live on must-use lists; nil hole sticky fails closed (nil out).
 func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
+	// RWDirective always live when queried; nil RW complete empty (no must-use)
 	if rw == nil {
 		return nil
 	}
@@ -488,6 +489,8 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 	seen := make(map[*Variable]bool)
 	add := func(v *Variable) bool {
 		if v == nil {
+			// incomplete must-use list sticky (no invent soft-skip hole as absent)
+			SetError(ErrGeneric)
 			return false
 		}
 		if !v.IsArray || seen[v] {
@@ -514,13 +517,17 @@ func (rw *RWDirective) FindMustUseArrays() []*ArrayVariable {
 
 // IsNonReadable mirrors CGContext::is_nonreadable.
 // CGContext.cpp:118–128 — match against no_read_vars.
-// Variable* always live on NoReadVars; nil hole fails closed as nonreadable.
+// Variable* always live on NoReadVars; nil hole sticky nonreadable
+// (no invent readable past hole / soft re-pick).
 func (c CGContext) IsNonReadable(v *Variable) bool {
+	// subject always live; nil subject complete readable (no RW ban)
 	if c.RW == nil || v == nil {
 		return false
 	}
 	for _, nr := range c.RW.NoReadVars {
 		if nr == nil {
+			// incomplete NoReadVars sticky nonreadable (restrictive)
+			SetError(ErrGeneric)
 			return true
 		}
 		if nr.Match(v) {
@@ -532,14 +539,18 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 
 // IsNonWritable mirrors CGContext::is_nonwritable.
 // CGContext.cpp:133–149 — loose_match no_write_vars; IV bounds.
-// Variable* always live on NoWriteVars/IVBounds; nil hole fails closed as nonwritable.
+// Variable* always live on NoWriteVars/IVBounds; nil hole sticky nonwritable
+// (no invent writable past hole / soft re-pick).
 func (c CGContext) IsNonWritable(v *Variable) bool {
+	// subject always live; nil subject complete writable
 	if v == nil {
 		return false
 	}
 	if c.RW != nil {
 		for _, nw := range c.RW.NoWriteVars {
 			if nw == nil {
+				// incomplete NoWriteVars sticky nonwritable (restrictive)
+				SetError(ErrGeneric)
 				return true
 			}
 			if nw.LooseMatch(v) || v.LooseMatch(nw) {
@@ -550,6 +561,8 @@ func (c CGContext) IsNonWritable(v *Variable) bool {
 	// not writing to loop IVs (avoid infinite loops)
 	for iv := range c.IVBounds {
 		if iv == nil {
+			// incomplete IVBounds sticky nonwritable
+			SetError(ErrGeneric)
 			return true
 		}
 		if v.LooseMatch(iv) {
@@ -603,12 +616,13 @@ func IncompleteVariables() []*Variable {
 // Nil slots are never matches for a live v (pointer equality); callers that
 // need fail-closed incomplete lists must use VariablesComplete first.
 func IsVariableInSet(set []*Variable, v *Variable) bool {
+	// subject always live; nil subject complete not-in-set
 	if v == nil {
 		return false
 	}
 	if !VariablesComplete(set) {
-		// incomplete membership is false for the bit — callers that must not
-		// invent not-in-set use VariablesComplete and fail closed themselves
+		// incomplete membership is false for the bit — non-sticky soft filter;
+		// callers that must not invent not-in-set use VariablesComplete + fail closed
 		return false
 	}
 	for _, x := range set {

@@ -89,18 +89,28 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 }
 
 func TestIsNonReadableNilHole(t *testing.T) {
+	ClearError()
 	g := CreateVariableScalars("g_1", GetIntType(), true, false)
 	cg := EmptyCGContext().WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
 	if !cg.IsNonReadable(g) {
 		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
 	}
+	if !HasError() {
+		t.Fatal("nil NoReadVars hole IsNonReadable must SetError sticky")
+	}
+	ClearError()
 	cg2 := EmptyCGContext().WithRW(&RWDirective{NoWriteVars: []*Variable{nil}})
 	if !cg2.IsNonWritable(g) {
 		t.Fatal("nil NoWriteVars hole must fail closed as nonwritable")
 	}
+	if !HasError() {
+		t.Fatal("nil NoWriteVars hole IsNonWritable must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVariableCompatible(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
 	b := CreateVariableScalars("g_b", GetIntType(), false, false)
 	if !a.Compatible(a, false) {

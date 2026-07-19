@@ -32,7 +32,7 @@ func (st Stmt) MustReturn() bool {
 // MustJump mirrors Statement::must_jump — transfer of control always taken.
 // Break/Continue/Goto: true only when test.not_equals(0); variable tests → false.
 // StatementIf: both branches must_jump; Block: last stm.
-// Incomplete get_blocks fails closed false (same as MustReturn).
+// Incomplete get_blocks sticky false (no invent not-must-jump soft re-pick past holes).
 func (st Stmt) MustJump() bool {
 	if st.MustReturn() {
 		return true
@@ -40,16 +40,25 @@ func (st Stmt) MustJump() bool {
 	switch st.Kind {
 	case StmtBreak, StmtContinue, StmtGoto:
 		// Expression::not_equals(0) — Constant only; other terms false
-		return st.Expr != nil && st.Expr.NotEquals(0)
+		// incomplete test Expr sticky not-must-jump (no invent always-jump)
+		if st.Expr == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		return st.Expr.NotEquals(0)
 	case StmtIfElse:
 		blks := GetBlocksStmt(&st)
 		if len(blks) != 2 || blks[0] == nil || blks[1] == nil {
+			// StatementIf always both arms; incomplete sticky not-must-jump
+			SetError(ErrGeneric)
 			return false
 		}
 		return blks[0].MustJump() && blks[1].MustJump()
 	case StmtFor, StmtArrayOp:
 		blks := GetBlocksStmt(&st)
 		if len(blks) == 0 || blks[0] == nil {
+			// StatementFor always has body; incomplete sticky not-must-jump
+			SetError(ErrGeneric)
 			return false
 		}
 		return blks[0].MustJump()
@@ -97,20 +106,25 @@ func (b *Block) MustJump() bool {
 
 // hasEscapeBackEdge reports a back_link edge into b whose src is not the block itself.
 // Block.cpp:318–326 / 346–353 — continue into loop body can bypass end return.
-// Incomplete CFG (nil hole) fails closed as possible escape — no invent "no edge".
+// Incomplete CFG sticky possible escape — no invent "no edge" soft re-pick.
 // Nil FactMgr: no edges known (C++ find_edges_in empty) → no escape (not invent escape).
 func (b *Block) hasEscapeBackEdge(fm *FactMgr) bool {
 	if b == nil || fm == nil {
 		return false
 	}
-	// Block::stm_id always live for CFG-indexed edges; StmID 0 fails closed
-	// as possible escape (no invent "no back edge" soft-skipping FindEdgesIn)
+	// Block::stm_id always live for CFG-indexed edges; StmID 0 sticky
+	// possible escape (no invent "no back edge" soft-skipping FindEdgesIn)
 	if b.StmID <= 0 {
+		SetError(ErrGeneric)
 		return true
 	}
 	// edges targeting the block as DestBlock
 	toBlk := fm.FindEdgesInToBlock(b, false, true)
+	// incomplete CFG (nil hole) sticky possible escape
 	if toBlk == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return true
 	}
 	for _, e := range toBlk {

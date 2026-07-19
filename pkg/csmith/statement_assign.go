@@ -488,8 +488,11 @@ func makePossibleCompoundAssign(
 
 // GetAssignRhs mirrors StatementAssign::get_rhs — canonized compound form when set.
 // StatementAssign.h:109; FactMgr::update_fact_for_assign(sa) uses get_rhs().
+// Incomplete Statement sticky nil (no invent soft-skip assign without RHS past hole).
 func (st *Stmt) GetAssignRhs() *Expression {
+	// Statement always live for get_rhs; sticky incomplete no invent nil soft-skip
 	if st == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	if st.Rhs != nil {

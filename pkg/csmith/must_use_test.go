@@ -3,8 +3,12 @@ package csmith
 import "testing"
 
 func TestFindMustUseArrays(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntType(), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("array")
+	}
 	sc := CreateVariableScalars("g_i", GetIntType(), false, false)
 	rw := &RWDirective{
 		MustReadVars:  []*Variable{&av.Variable, sc},
@@ -14,6 +18,19 @@ func TestFindMustUseArrays(t *testing.T) {
 	if len(got) != 1 || got[0] != av {
 		t.Fatalf("%v", got)
 	}
+	if HasError() {
+		t.Fatal("complete FindMustUseArrays must not sticky")
+	}
+	// incomplete must-use list sticky
+	ClearError()
+	rw.MustReadVars = []*Variable{&av.Variable, nil}
+	if rw.FindMustUseArrays() != nil {
+		t.Fatal("nil hole FindMustUseArrays must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil hole FindMustUseArrays must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSelectMustUseVar(t *testing.T) {
