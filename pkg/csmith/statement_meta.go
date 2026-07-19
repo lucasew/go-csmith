@@ -123,6 +123,9 @@ func FindContainerStm(b *Block) *Stmt {
 // Dominate mirrors Statement::dominate.
 // Statement.cpp:393–410 — a dominates s (same block order or ancestor container).
 // aParent / sParent are parent blocks of a and s (Stmt has no Parent field).
+// Statement::stm_id is always live after create; StmID 0 is incomplete IR.
+// Same-parent incomplete IDs resolve by parent membership when possible; unresolved
+// membership fails closed false (no invent dominate true via 0<=0 for orphans).
 func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	if a == nil || s == nil {
 		return false
@@ -131,7 +134,7 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 	if sParent != nil && (a.Then == sParent || a.Else == sParent) {
 		return true
 	}
-	// same parent: earlier stm_id dominates later
+	// same parent: earlier stm_id dominates later (Statement.cpp:399–401)
 	if aParent == sParent {
 		if aParent != nil && (a.StmID == 0 || s.StmID == 0) {
 			ia, is := -1, -1
@@ -146,6 +149,8 @@ func Dominate(a *Stmt, aParent *Block, s *Stmt, sParent *Block) bool {
 			if ia >= 0 && is >= 0 {
 				return ia <= is
 			}
+			// incomplete StmID and not both in parent — fail closed
+			return false
 		}
 		return a.StmID <= s.StmID
 	}

@@ -813,7 +813,13 @@ func (b *Block) Output(indent int) string {
 			if name == "" {
 				return ""
 			}
-			cn := GetSimpleType(b.TmpVars[name]).CName()
+			// eSimpleType always valid in macro_tmp_vars; OOB/invalid fails closed
+			// (GetSimpleType nil — no invent "int" for broken tmp type)
+			ty := GetSimpleType(b.TmpVars[name])
+			if ty == nil {
+				return ""
+			}
+			cn := ty.CName()
 			if cn == "" {
 				return ""
 			}

@@ -62,6 +62,11 @@ func TestTmpVarsEmitSorted(t *testing.T) {
 	if out2 != "" {
 		t.Fatal("empty tmp name must fail closed whole block", out2)
 	}
+	// invalid eSimpleType — fail closed (no invent "int" for OOB tmp type)
+	b3 := &Block{TmpVars: map[string]ESimpleType{"t_bad": ESimpleType(MaxSimpleTypes + 1)}}
+	if b3.Output(0) != "" {
+		t.Fatal("OOB tmp type must fail closed whole block")
+	}
 }
 
 func TestNoteReadTracksGlobal(t *testing.T) {

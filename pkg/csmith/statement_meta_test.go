@@ -85,6 +85,24 @@ func TestFindContainerAndDominate(t *testing.T) {
 	}
 }
 
+func TestDominateIncompleteStmIDNoInvent(t *testing.T) {
+	// StmID 0 is incomplete IR; orphans not in parent must not invent dominate via 0<=0
+	parent := &Block{Stmts: []Stmt{{Kind: StmtAssign, StmID: 1}}}
+	orphanA := &Stmt{Kind: StmtAssign, StmID: 0}
+	orphanB := &Stmt{Kind: StmtAssign, StmID: 0}
+	if Dominate(orphanA, parent, orphanB, parent) {
+		t.Fatal("orphan StmID 0 pair must fail closed not dominate")
+	}
+	// same-parent members with StmID 0 still order by index
+	parent.Stmts = []Stmt{{Kind: StmtAssign, StmID: 0}, {Kind: StmtAssign, StmID: 0}}
+	if !Dominate(&parent.Stmts[0], parent, &parent.Stmts[1], parent) {
+		t.Fatal("index order must dominate when both in parent")
+	}
+	if Dominate(&parent.Stmts[1], parent, &parent.Stmts[0], parent) {
+		t.Fatal("later must not dominate earlier")
+	}
+}
+
 func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	fm := NewFactMgr(nil)
 	destParent := &Block{Stmts: []Stmt{{StmID: 5}}}

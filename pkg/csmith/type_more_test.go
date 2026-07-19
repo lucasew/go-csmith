@@ -147,6 +147,22 @@ func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
 	}
 }
 
+func TestGetSimpleTypeOOBNoInventInt(t *testing.T) {
+	// Type.cpp get_simple_type assert path — no invent eInt for invalid enum
+	if GetSimpleType(ESimpleType(-1)) != nil {
+		t.Fatal("negative eSimpleType must fail closed nil")
+	}
+	if GetSimpleType(ESimpleType(MaxSimpleTypes)) != nil {
+		t.Fatal("OOB eSimpleType must fail closed nil, not invent eInt")
+	}
+	if GetSimpleType(ESimpleType(MaxSimpleTypes+99)) != nil {
+		t.Fatal("far OOB must fail closed nil")
+	}
+	if GetSimpleType(EInt) != GetIntType() {
+		t.Fatal("valid eInt must still resolve")
+	}
+}
+
 func TestFindTypeNilHole(t *testing.T) {
 	// Type* always live on AllTypes; no invent soft-skip hole then match later
 	intT := GetIntType()

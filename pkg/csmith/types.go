@@ -82,9 +82,11 @@ func init() {
 }
 
 // GetSimpleType mirrors Type::get_simple_type — canonical cached values.
+// Type.cpp get_simple_type indexes simple_types[MAX_SIMPLE_TYPES]; OOB is assert
+// path — fail closed nil (no invent eInt for invalid eSimpleType).
 func GetSimpleType(st ESimpleType) *Type {
 	if st < 0 || int(st) >= MaxSimpleTypes {
-		st = EInt
+		return nil
 	}
 	return simpleTypes[st]
 }
