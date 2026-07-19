@@ -1101,6 +1101,10 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 			return false
 		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
+			// residual ERROR sticky — no invent soft-continue then true later past Match hole
+			if HasError() {
+				return false
+			}
 			continue
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
@@ -1254,6 +1258,10 @@ func (vs *VariableSelector) SelectMustUseVar(
 			return nil
 		}
 		if !typ.Match(v.Type, mt) {
+			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+			if HasError() {
+				return nil
+			}
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {

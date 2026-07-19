@@ -173,6 +173,30 @@ func TestRemoveRVFacts(t *testing.T) {
 	}
 }
 
+func TestRemoveRVFactsMatchResidualSticky(t *testing.T) {
+	// Type-nil own RV: Match stickies residual ERROR+false.
+	// Soft invent was soft-continue drop then keep later non-RV complete filter.
+	// Fair: sticky wipe IncompleteFactSlice whole RemoveRVFacts.
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f", RV: &Variable{Name: "f_rv"}} // Type nil
+	fm := NewFactMgr(f)
+	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	other := CreateVariableScalars("other_rv", GetIntType(), false, false)
+	facts := []*FactPointTo{
+		{Var: other, PointTo: []*Variable{NullPtr}}, // IsRV; Match residual vs Type-nil f.RV
+		MakeFactPointTo(gp, NullPtr),
+	}
+	fm.RemoveRVFacts(&facts)
+	if FactsComplete(facts) {
+		t.Fatal("Match residual must IncompleteFactSlice, not invent later non-RV keep")
+	}
+	if !HasError() {
+		t.Fatal("Match residual RemoveRVFacts must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestOutputTab(t *testing.T) {
 	if OutputTab(0) != "" || OutputTab(2) != "        " {
 		t.Fatal(OutputTab(2))

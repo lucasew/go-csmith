@@ -106,11 +106,20 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 	tries := uint32(0)
 	if f != nil {
 		for f.Filter(v) {
+			// residual ERROR sticky — no invent soft-retry filter past hard IR residual hole
+			// (e.g. IsVolatileStructUnion field-Type residual soft-rejects then hangs forever)
+			if HasError() {
+				return 0
+			}
 			// DefaultRndNumGenerator.cpp: roll back rand_depth_ to local_depth+1
 			r.randDepth = localDepth + 1
 			raw = r.Genrand()
 			v = raw % n
 			tries++
+		}
+		// residual ERROR sticky — no invent accept candidate past residual filter true path
+		if HasError() {
+			return 0
 		}
 	}
 	if r.trace && r.traceTo != nil {

@@ -2247,9 +2247,19 @@ func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 	for _, f := range *facts {
 		if f.Var.IsRV() {
 			// keep only this function's RV
-			if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
-				out = append(out, f)
+			if fm.Func != nil && fm.Func.RV != nil {
+				match := fm.Func.RV.Match(f.Var)
+				// residual ERROR sticky — no invent soft-continue filter past Match hole
+				// (Type-nil RV Match residual ERROR+false soft invents drop then keep later non-RV)
+				if HasError() {
+					*facts = IncompleteFactSlice()
+					return
+				}
+				if match {
+					out = append(out, f)
+				}
 			}
+			// fm.Func/RV nil: other-function RV drop is complete (no Match probe)
 			continue
 		}
 		out = append(out, f)

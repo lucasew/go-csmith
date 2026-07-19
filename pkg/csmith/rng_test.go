@@ -83,6 +83,26 @@ func TestRndUptoFilterRetries(t *testing.T) {
 	}
 }
 
+func TestRndUptoFilterResidualSticky(t *testing.T) {
+	// Filter residual ERROR soft invent was soft-retry forever (hang) then invent pick.
+	// Fair: sticky fail closed return 0 without infinite soft-retry.
+	ClearError()
+	defer ClearError()
+	r := NewRng(1)
+	residualReject := filterFunc(func(v uint32) bool {
+		SetError(ErrGeneric)
+		return true
+	})
+	got := r.RndUptoFilter(10, residualReject)
+	if got != 0 {
+		t.Fatalf("residual filter must fail closed 0, got %d", got)
+	}
+	if !HasError() {
+		t.Fatal("residual filter RndUptoFilter must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestRndFlipcoin(t *testing.T) {
 	// seed2 first genrand%100 = 1959434203%100 = 3 < 50 → true
 	r := NewRng(2)
