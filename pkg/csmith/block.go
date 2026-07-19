@@ -282,9 +282,12 @@ func (b *Block) CreateNewTmpVar(sym *GenSym, st ESimpleType) string {
 	if b == nil {
 		return ""
 	}
-	// Block.cpp:217 — const string var_name = gensym("t_");
+	// Block.cpp:217 — const string var_name = gensym("t_"); sticky no invent bare ""
 	name := Gensym("t_")
 	if name == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	if b.TmpVars == nil {

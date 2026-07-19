@@ -95,6 +95,7 @@ func MakeRandomReturn(
 	}
 	// StatementReturn.cpp:56–59 — assert(curr_func); assert(fm)
 	// fail closed without FactMgr invent (C++ get_fact_mgr always live)
+	// non-sticky: soft re-pick factory (sticky poisons MakeRandomFor / generation)
 	if cg.FM == nil {
 		return Stmt{}
 	}
@@ -103,12 +104,12 @@ func MakeRandomReturn(
 		SetError(ErrGeneric)
 		return Stmt{}
 	}
-	// StatementReturn.cpp:56–62 — curr_func->return_type; no invent
+	// StatementReturn.cpp:56–62 — curr_func->return_type; non-sticky soft re-pick
 	ret := cg.CurrentFunc.ReturnType
 	if ret == nil {
 		return Stmt{}
 	}
-	// StatementReturn.cpp:61–62 — &curr_func->rv->qfer (assert rv present in C++)
+	// StatementReturn.cpp:61–62 — &curr_func->rv->qfer; non-sticky soft re-pick
 	if cg.CurrentFunc.RV == nil {
 		return Stmt{}
 	}

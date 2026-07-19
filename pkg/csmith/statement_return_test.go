@@ -53,7 +53,9 @@ func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 }
 
 func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
-	// StatementReturn.cpp:58–59 — assert(fm); no invent return without FactMgr
+	// StatementReturn.cpp:58–59 — assert(fm); soft re-pick non-sticky without FactMgr
+	// (sticky poisons MakeRandomFor / generation when return path re-picks)
+	ClearError()
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
@@ -61,6 +63,20 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	st := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg)
 	if st.Expr != nil {
 		t.Fatal("nil FM must fail closed empty return")
+	}
+	if HasError() {
+		t.Fatal("nil FM MakeRandomReturn must stay non-sticky soft re-pick")
+	}
+	// nil RV non-sticky soft re-pick
+	fm := NewFactMgr(f)
+	f.RV = nil
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	st2 := MakeRandomReturn(NewRng(1), opts, NewVariableSelector(opts), &cg2)
+	if st2.Expr != nil {
+		t.Fatal("nil RV must fail closed empty return")
+	}
+	if HasError() {
+		t.Fatal("nil RV MakeRandomReturn must stay non-sticky soft re-pick")
 	}
 }
 

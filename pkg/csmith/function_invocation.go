@@ -1316,13 +1316,15 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		return "", ""
 	}
 	blk := currentBlock(cg)
-	// FunctionInvocationBinary.cpp:68 — assert(blk); no soft invent safe_ops without temps
+	// FunctionInvocationBinary.cpp:68 — assert(blk); non-sticky soft re-pick when no stack
+	// (sticky would poison library MakeBinary without parent block)
 	if blk == nil {
 		return "", ""
 	}
-	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield a simple type
+	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield simple type sticky
 	ty1 := flags.LHSType()
 	if ty1 == nil || !ty1.IsSimple() {
+		SetError(ErrGeneric)
 		return "", ""
 	}
 	st := ty1.Simple()
@@ -1359,12 +1361,14 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 		return ""
 	}
 	blk := currentBlock(cg)
-	// FunctionInvocationUnary.cpp:57 — assert(blk); no soft invent unary safe without tmp
+	// FunctionInvocationUnary.cpp:57 — assert(blk); non-sticky soft re-pick when no stack
 	if blk == nil {
 		return ""
 	}
+	// flags_to_type must yield simple type sticky
 	ty := flags.LHSType()
 	if ty == nil || !ty.IsSimple() {
+		SetError(ErrGeneric)
 		return ""
 	}
 	var sym *GenSym
