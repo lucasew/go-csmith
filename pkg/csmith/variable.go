@@ -1195,8 +1195,9 @@ func (v *Variable) FindPointerFields() []*Variable {
 
 // CreateFieldVars mirrors Variable::create_field_vars for structs.
 // Variable.cpp:337–370 — names name.f0, name.f1; OR parent const/vol into field qfer.
-// Incomplete field Types / make_random fail closed: clear partial FieldVars
-// (no invent half-built field list).
+// Incomplete field Types / make_random fail closed: FieldVars → IncompleteVariables
+// (not bare nil — FieldVarsComplete(nil)==true invents empty-complete zero fields
+// when type still has Fields / half-built list was wiped).
 func (v *Variable) CreateFieldVars() {
 	// Variable.cpp:338 — assert(type->is_aggregate())
 	if v == nil || v.Type == nil || !v.Type.IsAggregate() {
@@ -1210,7 +1211,7 @@ func (v *Variable) CreateFieldVars() {
 	isConst := v.IsConst()
 	j := 0
 	fail := func() {
-		v.FieldVars = nil
+		v.FieldVars = IncompleteVariables()
 	}
 	for _, f := range v.Type.Fields {
 		if f.Type == nil {
