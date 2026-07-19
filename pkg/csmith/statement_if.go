@@ -67,11 +67,6 @@ func MakeRandomIf(
 	}
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
-	// Snapshot pre-branch facts for else arm (map_facts_in[if_true] after true block)
-	var preFacts []*FactPointTo
-	if cg.FM != nil {
-		preFacts = CloneFactSlice(cg.FM.GlobalFacts)
-	}
 
 	thenEff := pre
 	thenCG := *cg
@@ -84,15 +79,19 @@ func MakeRandomIf(
 	}
 
 	// StatementIf.cpp:97–98 — else starts from map_facts_in[if_true]
+	// C++ map[] always assigns (missing → empty); no invent pre-branch GlobalFacts fallback
+	// Incomplete then-in fails closed (nil — no invent cleaned clone of holes)
 	if cg.FM != nil {
 		if thenB.StmID > 0 {
-			if in, ok := cg.FM.MapFactsIn[thenB.StmID]; ok {
-				cg.FM.GlobalFacts = CloneFactSlice(in)
+			in := cg.FM.MapFactsIn[thenB.StmID]
+			if !FactsComplete(in) {
+				cg.FM.GlobalFacts = nil
 			} else {
-				cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+				cg.FM.GlobalFacts = CloneFactSlice(in)
 			}
 		} else {
-			cg.FM.GlobalFacts = CloneFactSlice(preFacts)
+			// incomplete then block id — fail closed empty
+			cg.FM.GlobalFacts = nil
 		}
 	}
 

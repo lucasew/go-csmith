@@ -252,14 +252,15 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 		fm.GlobalFacts = CloneFactSlice(elseOut)
 	case falseMust:
 		fm.GlobalFacts = CloneFactSlice(thenOut)
+		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
+		// C++ map[] always; missing → empty makeup; incomplete fails closed
 		if st.Else != nil && st.Else.StmID > 0 {
-			if in, ok := fm.MapFactsIn[st.Else.StmID]; ok {
-				if !FactsComplete(in) {
-					fm.GlobalFacts = nil
-					return
-				}
-				MakeupNewVarFacts(&fm.GlobalFacts, in)
+			in := fm.MapFactsIn[st.Else.StmID]
+			if !FactsComplete(in) {
+				fm.GlobalFacts = nil
+				return
 			}
+			MakeupNewVarFacts(&fm.GlobalFacts, in)
 		}
 	default:
 		fm.GlobalFacts = CloneFactSlice(thenOut)

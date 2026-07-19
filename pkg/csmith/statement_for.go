@@ -490,8 +490,13 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
+	// C++ map[] always assigns (missing → empty); no invent keep prior GlobalFacts
+	// Incomplete in fails closed (nil — no invent cleaned clone of holes)
 	if body != nil && body.StmID > 0 {
-		if in, ok := fm.MapFactsIn[body.StmID]; ok {
+		in := fm.MapFactsIn[body.StmID]
+		if !FactsComplete(in) {
+			fm.GlobalFacts = nil
+		} else {
 			fm.GlobalFacts = CloneFactSlice(in)
 		}
 	}
@@ -500,13 +505,18 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
+	// C++ always merge_jump_facts(global, map_facts_out[break]); missing → empty
+	// Incomplete out fails closed (nil GlobalFacts — no invent skip merge)
 	if body != nil && forSt != nil {
 		for _, breakID := range body.BreakStmIDs {
 			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
 			fm.CreateCFGEdgeTo(breakID, nil, forSt.StmID, true, false)
-			if out, ok := fm.MapFactsOut[breakID]; ok {
-				MergeJumpFacts(&fm.GlobalFacts, out)
+			out := fm.MapFactsOut[breakID]
+			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
+				fm.GlobalFacts = nil
+				continue
 			}
+			MergeJumpFacts(&fm.GlobalFacts, out)
 		}
 	}
 	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)

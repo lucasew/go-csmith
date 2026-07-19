@@ -86,15 +86,14 @@ func addBackReturnFactsStmt(st *Stmt, fm *FactMgr, facts *[]*FactPointTo) {
 		return
 	}
 	if st.Kind == StmtReturn {
-		if out, ok := fm.MapFactsOut[st.StmID]; ok {
-			// incomplete return outs or working set fail closed
-			// (no invent skip this return / partial join)
-			if !FactsComplete(out) || !FactsComplete(*facts) {
-				*facts = nil
-				return
-			}
-			MergeFacts(facts, out)
+		// Statement.cpp:528 — merge_facts(facts, map_facts_out[this])
+		// C++ map[] always; missing → empty merge; incomplete fails closed
+		out := fm.MapFactsOut[st.StmID]
+		if !FactsComplete(out) || !FactsComplete(*facts) {
+			*facts = nil
+			return
 		}
+		MergeFacts(facts, out)
 		return
 	}
 	if st.Then != nil {

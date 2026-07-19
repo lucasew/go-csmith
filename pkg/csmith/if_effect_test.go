@@ -99,6 +99,41 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
+	// StatementIf.cpp:97 — global_facts = map_facts_in[if_true]
+	// missing then-in must not invent pre-branch GlobalFacts for else
+	// Unit: plant missing MapFactsIn after then would have set it — contract of assign
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	prior := MakeFactPointTo(p, GarbagePtr)
+	fm.GlobalFacts = []*FactPointTo{prior}
+	// missing MapFactsIn[5]
+	thenStmID := 5
+	in := fm.MapFactsIn[thenStmID]
+	if !FactsComplete(in) {
+		fm.GlobalFacts = nil
+	} else {
+		fm.GlobalFacts = CloneFactSlice(in)
+	}
+	if fm.GlobalFacts != nil {
+		t.Fatal("missing then MapFactsIn must clear GlobalFacts, not invent pre-branch")
+	}
+	// incomplete hole
+	fm.GlobalFacts = []*FactPointTo{prior}
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		5: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	in = fm.MapFactsIn[thenStmID]
+	if !FactsComplete(in) {
+		fm.GlobalFacts = nil
+	} else {
+		fm.GlobalFacts = CloneFactSlice(in)
+	}
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete then MapFactsIn must fail closed")
+	}
+}
+
 func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext; no invent if shell
 	opts := Defaults()

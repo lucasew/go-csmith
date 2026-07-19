@@ -302,27 +302,27 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			cg.FM.GlobalFacts = CloneFactSlice(factsCopy)
 		} else if st.Then != nil && st.Then.StmID > 0 {
 			// map_facts_in[&body] — fixed-point entry, not merge(pre,post)
-			if in, ok := cg.FM.MapFactsIn[st.Then.StmID]; ok {
-				if !FactsComplete(in) {
-					return false
-				}
-				cg.FM.GlobalFacts = CloneFactSlice(in)
+			// C++ map[] always assigns (missing → empty); no invent keep prior
+			in := cg.FM.MapFactsIn[st.Then.StmID]
+			if !FactsComplete(in) {
+				return false
 			}
+			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
 		// StatementFor.cpp:460–466 / post_loop_analysis:361–367 —
 		// find_edges_in(true, false) on this for stmt (break edges dest = for-stmt)
 		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
+		// C++ always merge_jump_facts(inputs, map_facts_out[src]); missing → empty
 		if st.StmID > 0 {
 			edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 			if edges == nil {
 				return false
 			}
 			for _, e := range edges {
-				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-					// incomplete jump facts fail closed
-					if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
-						return false
-					}
+				out := cg.FM.MapFactsOut[e.SrcID]
+				// incomplete jump facts fail closed (no invent skip merge)
+				if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+					return false
 				}
 			}
 		}
@@ -419,21 +419,28 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 	}
 	if cg.FM != nil {
 		// StatementArrayOp.cpp:285–291 — must_return → pre-body; else map_facts_in[body]
+		// C++ map[] always assigns (missing → empty); no invent keep prior
 		if inner.Then.MustReturn() {
 			cg.FM.GlobalFacts = preFacts
-		} else if in, ok := cg.FM.MapFactsIn[inner.Then.StmID]; ok {
+		} else if inner.Then.StmID > 0 {
+			in := cg.FM.MapFactsIn[inner.Then.StmID]
+			if !FactsComplete(in) {
+				return false
+			}
 			cg.FM.GlobalFacts = CloneFactSlice(in)
 		}
 		// StatementArrayOp.cpp:292–297 — find_edges_in(true, false) on this stmt
 		// CFGEdge* always live; nil FindEdgesIn = incomplete CFG (fail closed)
+		// C++ always merge_jump_facts; missing out → empty; incomplete fails closed
 		if st.StmID > 0 {
 			edges := cg.FM.FindEdgesIn(st.StmID, true, false)
 			if edges == nil {
 				return false
 			}
 			for _, e := range edges {
-				if out, ok := cg.FM.MapFactsOut[e.SrcID]; ok {
-					MergeJumpFacts(&cg.FM.GlobalFacts, out)
+				out := cg.FM.MapFactsOut[e.SrcID]
+				if _, mok := tryMergeJumpFacts(&cg.FM.GlobalFacts, out); !mok {
+					return false
 				}
 			}
 		}

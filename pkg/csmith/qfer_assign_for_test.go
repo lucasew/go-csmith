@@ -139,6 +139,54 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 	}
 }
 
+func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
+	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
+	// missing body in must not invent keep prior GlobalFacts
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
+	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
+	// no MapFactsIn[10]; not must_return
+	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("missing body MapFactsIn must clear GlobalFacts, not invent keep prior")
+	}
+}
+
+func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	body := &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign}}}
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		11: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
+	postLoopAnalysis(fm, forSt, body, nil, EmptyEffect(), nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete body MapFactsIn must fail closed nil GlobalFacts")
+	}
+}
+
+func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
+	// merge_jump_facts always; incomplete break out fails closed
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	body := &Block{StmID: 12, BreakStmIDs: []int{22}, Stmts: []Stmt{{Kind: StmtAssign}}}
+	fm.SetMapFactsIn(12, pre)
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		22: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
+	postLoopAnalysis(fm, forSt, body, pre, EmptyEffect(), nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete break MapFactsOut must fail closed nil GlobalFacts")
+	}
+}
+
 func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)

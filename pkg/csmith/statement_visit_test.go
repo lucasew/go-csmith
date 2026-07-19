@@ -200,6 +200,40 @@ func TestVisitFactsBlockSequential(t *testing.T) {
 	}
 }
 
+func TestVisitFactsStatementForIncompleteBodyInFailClosed(t *testing.T) {
+	// StatementFor.cpp:456 — inputs = map_facts_in[&body]
+	// incomplete body in after fixed-point must fail closed (not invent keep prior)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	// empty body converges; then we plant incomplete MapFactsIn via edge-free path
+	// Use a body that VisitFactsBlock succeeds but we override MapFactsIn mid-flight:
+	// not possible mid-call. Instead: VisitFactsBlock fails on incomplete GlobalFacts
+	// at start — plant incomplete GlobalFacts:
+	body := &Block{StmID: 30, Func: f, Looping: true, Stmts: nil}
+	st := &Stmt{
+		Kind: StmtFor, StmID: 10,
+		Loop: &LoopControl{
+			IV: iv, InitN: 0, LimitN: 3, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+			InitStmt: testForInit(iv, 0),
+		},
+		Then: body,
+	}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// After empty VisitFactsBlock succeeds, plant incomplete body in and re-check
+	// by calling visit with MapFactsIn already incomplete and body that does not
+	// rewrite it: VisitFactsBlock on empty may SetMapFactsIn from complete inputs.
+	// Pre-plant incomplete MapFactsIn; VisitFactsBlock for empty starts from GlobalFacts
+	// complete empty then overwrites MapFactsIn. So plant incomplete GlobalFacts:
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	if VisitFactsStatementFor(st, &cg, Defaults()) {
+		t.Fatal("incomplete GlobalFacts/body path must fail closed")
+	}
+}
+
 func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	// StatementFor.cpp:456–458 — !must_return → map_facts_in[body], not merge post
 	f := &Function{Name: "f", ReturnType: GetIntType()}
