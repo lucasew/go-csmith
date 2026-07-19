@@ -208,4 +208,20 @@ func TestOutputCNilSticky(t *testing.T) {
 		t.Fatal("nil Variable OutputValueDump must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was bare-name OutputC/LHS
+	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if shell.OutputC() != "" {
+		t.Fatal("IsArray without AsArray OutputC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputC must SetError sticky")
+	}
+	ClearError()
+	if shell.OutputLhsC() != "" {
+		t.Fatal("IsArray without AsArray OutputLhsC must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray OutputLhsC must SetError sticky")
+	}
+	ClearError()
 }

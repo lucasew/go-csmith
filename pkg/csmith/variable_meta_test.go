@@ -170,6 +170,15 @@ func TestGetCollectiveArrayField(t *testing.T) {
 		t.Fatal("IsArray without AsArray ancestor GetCollective must SetError sticky")
 	}
 	ClearError()
+	// bare IsArray without AsArray soft invent was return self as collective
+	// fair: sticky nil fail closed
+	if shell.GetCollective() != nil {
+		t.Fatal("IsArray without AsArray GetCollective must fail closed nil, not invent self")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray bare GetCollective must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsArrayField(t *testing.T) {

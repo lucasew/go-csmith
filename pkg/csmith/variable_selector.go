@@ -2351,38 +2351,40 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	// also include Arrays list members that may not be on GlobalList yet
 	seen := map[*ArrayVariable]bool{}
 	var arrayVars []*ArrayVariable
-	add := func(av *ArrayVariable) {
+	// add returns false on hard IR hole (caller fail closed whole select)
+	add := func(av *ArrayVariable) bool {
 		if av == nil || av.Collective != nil || seen[av] {
-			return
+			return true
 		}
 		// VariableSelector.cpp:1393–1412
 		if cg.EffectContext().IsReadPartially(&av.Variable) ||
 			cg.EffectContext().IsWrittenPartially(&av.Variable) {
-			return
+			return true
 		}
 		if !cg.EffectContext().IsSideEffectFree() && av.IsVolatile() {
-			return
+			return true
 		}
 		if av.IsConst() {
-			return
+			return true
 		}
 		if cg.IsNonWritable(&av.Variable) {
-			return
+			return true
 		}
 		// VariableSelector.cpp:1405 — av->type->is_const_struct_union() always live Type*
-		// Type-nil sticky fail select pool (no invent not-const soft-include past hole)
+		// Type-nil sticky fail whole select (no invent soft-skip past hole then pick another)
 		if av.Type == nil {
 			SetError(ErrGeneric)
-			return
+			return false
 		}
 		if av.Type.IsConstStructUnion() {
-			return
+			return true
 		}
 		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
-			return
+			return true
 		}
 		seen[av] = true
 		arrayVars = append(arrayVars, av)
+		return true
 	}
 	// Variable* always live in visible list; nil hole fails closed sticky (FindAll already)
 	for _, v := range vars {
@@ -2399,7 +2401,9 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			SetError(ErrGeneric)
 			return nil
 		}
-		add(v.AsArray)
+		if !add(v.AsArray) {
+			return nil
+		}
 	}
 	// ArrayVariable* on Arrays list; nil hole fails closed sticky
 	for _, av := range vs.Arrays {
@@ -2407,7 +2411,9 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			SetError(ErrGeneric)
 			return nil
 		}
-		add(av)
+		if !add(av) {
+			return nil
+		}
 	}
 	// Type-nil / filter sticky from add — no invent CreateRandomArray / pick soft-success
 	if HasError() {

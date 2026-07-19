@@ -194,6 +194,12 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 		SetError(ErrGeneric)
 		return ""
 	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent bare-name Output past broken array shell)
+	if v.IsArray && v.AsArray == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
 	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
 	if v.AsArray != nil && v.AsArray.Collective != nil {
 		return v.AsArray.OutputAccess()
@@ -241,6 +247,12 @@ func (v *Variable) OutputLhsC() string {
 func (v *Variable) OutputLhsCOpts(prefixName bool) string {
 	// Variable always live at LHS emit; sticky incomplete no invent empty token
 	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent bare-name LHS past broken array shell)
+	if v.IsArray && v.AsArray == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
@@ -1350,6 +1362,12 @@ func (v *Variable) GetCollective() *Variable {
 			coll = coll.FieldVars[idx]
 		}
 		return coll
+	}
+	// C++ isArray always ArrayVariable*; missing AsArray sticky
+	// (no invent self as collective past broken array shell)
+	if v.IsArray && v.AsArray == nil {
+		SetError(ErrGeneric)
+		return nil
 	}
 	// non-field: itemized array member → collective parent
 	if v.AsArray != nil && v.AsArray.Collective != nil {
