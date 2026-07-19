@@ -358,14 +358,20 @@ func CtrlVarsDoFinalization() {
 }
 
 // CtrlVarNames returns actual names of a ctrl-var slice.
-// Variable* always live; nil hole fails closed as nil (no invent empty-name pad).
+// Variable* always live; incomplete list fails closed IncompleteLabelsSlice
+// (not bare nil invent empty-complete name list via LabelsComplete(nil)/len==0).
 func CtrlVarNames(ctrl []*Variable) []string {
+	if !VariablesComplete(ctrl) {
+		return IncompleteLabelsSlice()
+	}
 	out := make([]string, len(ctrl))
 	for i, v := range ctrl {
-		if v == nil {
-			return nil
+		name := v.GetActualName(false)
+		if name == "" {
+			// empty actual name is broken IR — fail closed incomplete names
+			return IncompleteLabelsSlice()
 		}
-		out[i] = v.GetActualName(false)
+		out[i] = name
 	}
 	return out
 }
@@ -974,6 +980,8 @@ func MakeDummyStaticVariable(name string) *Variable {
 
 // GetCollective mirrors Variable::get_collective.
 // Variable.cpp:581–615 — itemized array → parent; array field maps onto collective fields.
+// Incomplete FieldVars / missing parent / OOB field path fails closed nil
+// (no invent return self as collective when field map cannot be decided).
 func (v *Variable) GetCollective() *Variable {
 	if v == nil {
 		return nil
@@ -985,28 +993,38 @@ func (v *Variable) GetCollective() *Variable {
 		for parent != nil && !parent.IsArray && parent.AsArray == nil {
 			parent = parent.FieldVarOf
 		}
-		// Variable.cpp:589 assert(parent)
+		// Variable.cpp:589 assert(parent) — incomplete ancestry fails closed
 		if parent == nil {
-			return v
+			return nil
+		}
+		// incomplete field IR on path or parent — no invent soft self-collective
+		if !v.FieldVarsComplete() || !parent.FieldVarsComplete() {
+			return nil
 		}
 		// if parent is already collective parent, this field is on collective
-		if parent.GetCollective() == parent {
+		pColl := parent.GetCollective()
+		if pColl == nil {
+			return nil
+		}
+		if pColl == parent {
 			return v
 		}
 		// map field path onto coll parent's fields (Variable.cpp:596–611)
-		coll := parent.GetCollective()
-		if coll == nil {
-			return v
-		}
+		coll := pColl
 		// build field index path from array ancestor down to v
 		var path []int
 		for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
-			path = append([]int{cur.GetFieldID()}, path...)
+			fid := cur.GetFieldID()
+			// incomplete FieldVars → GetFieldID -1 — fail closed (no invent self)
+			if fid < 0 {
+				return nil
+			}
+			path = append([]int{fid}, path...)
 		}
 		for _, idx := range path {
 			// Variable.cpp:608 assert(index < coll->field_vars.size())
-			if coll == nil || idx < 0 || idx >= len(coll.FieldVars) {
-				return v
+			if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
+				return nil
 			}
 			coll = coll.FieldVars[idx]
 		}
@@ -1300,24 +1318,23 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
-		// Variable* always live in FieldVars; nil hole fails closed whole dump
-		// (no invent soft-skip hole and still dump later fields)
+		// incomplete FieldVars fails closed whole dump (no invent soft-skip hole)
+		if !v.FieldVarsComplete() {
+			return ""
+		}
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			if f == nil {
-				return ""
-			}
 			b.WriteString(f.OutputValueDump(prefix, indent, unionFacts))
 		}
 		return b.String()
 	}
 	if v.Type.IsUnion() {
-		// Variable* always live in FieldVars; nil hole fails closed whole dump
+		// incomplete FieldVars fails closed whole dump
+		if !v.FieldVarsComplete() {
+			return ""
+		}
 		var b strings.Builder
 		for i, f := range v.FieldVars {
-			if f == nil {
-				return ""
-			}
 			// Variable.cpp:1195–1200 — FactUnion::is_field_readable (program end facts)
 			if !IsFieldReadable(v, i, unionFacts) {
 				continue
@@ -1506,12 +1523,12 @@ func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string 
 		return hashArrayVariable(v, ctrl, unionFacts)
 	}
 	if v.Type.IsAggregate() {
+		// incomplete FieldVars fails closed whole hash (no invent soft-skip hole)
+		if !v.FieldVarsComplete() {
+			return ""
+		}
 		var b strings.Builder
 		for i, f := range v.FieldVars {
-			// Variable* always live in FieldVars; nil hole fails closed whole hash
-			if f == nil {
-				return ""
-			}
 			// Variable.cpp:893–898 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
 				if !IsFieldReadable(v, i, unionFacts) {

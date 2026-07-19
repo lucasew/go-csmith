@@ -9,27 +9,22 @@ import (
 
 // OutputVariableList mirrors OutputVariableList for a slice of variables.
 // VariableSelector.cpp / Variable.cpp — OutputDef per var; sorted names for determinism.
+// Incomplete Variable* list fails closed empty (no invent skip holes / partial section).
 func OutputVariableList(vars []*Variable, indent string, forceStatic bool) string {
 	if len(vars) == 0 {
+		return ""
+	}
+	// incomplete list — fail closed before sort invents nil-first ordering
+	if !VariablesComplete(vars) {
 		return ""
 	}
 	// stable order by name
 	cp := append([]*Variable(nil), vars...)
 	sort.SliceStable(cp, func(i, j int) bool {
-		if cp[i] == nil {
-			return true
-		}
-		if cp[j] == nil {
-			return false
-		}
 		return cp[i].Name < cp[j].Name
 	})
 	var b strings.Builder
 	for _, v := range cp {
-		// Variable* always live in C++ list; no invent skip nil / incomplete holes
-		if v == nil {
-			return ""
-		}
 		// OutputDef always live; no invent indent-only / blank lines for incomplete IR
 		var def string
 		if v.IsArray && v.AsArray != nil {

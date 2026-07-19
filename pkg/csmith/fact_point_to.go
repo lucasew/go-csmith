@@ -1299,18 +1299,33 @@ func UpdatePtrAliases(facts []*FactPointTo, ptrs *[]*Variable, aliases *[][]*Var
 	return true
 }
 
+// FunctionsComplete reports every Function* is live (no nil holes).
+// Note: FunctionsComplete(nil)==true (complete empty). Fail-closed incomplete
+// Funcs wipes / walks must not invent skip hole as absent function.
+func FunctionsComplete(funcs []*Function) bool {
+	for _, f := range funcs {
+		if f == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IncompleteFunctions is the fail-closed incomplete Function* list marker.
+func IncompleteFunctions() []*Function {
+	return []*Function{nil}
+}
+
 // AggregateAllPointToSets mirrors FactPointTo::aggregate_all_pointto_sets.
 // FactPointTo.cpp:792–804 — scan each non-builtin func FactMgr map_facts_out.
 // FactPointTo.cpp:803 — assert(all_ptrs.size() == all_aliases.size()); kept by UpdatePtrAliases.
-// Incomplete fact maps fail closed (clear aggregates — no invent partial AllPtrs).
+// Incomplete fact maps / Funcs list fail closed (clear aggregates — no invent partial AllPtrs).
 func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 	ClearPointToAggregates()
+	if !FunctionsComplete(funcs) {
+		return
+	}
 	for _, f := range funcs {
-		// Function* always live on Funcs; no invent skip nil holes mid aggregate
-		if f == nil {
-			ClearPointToAggregates()
-			return
-		}
 		if f.IsBuiltin {
 			continue
 		}
