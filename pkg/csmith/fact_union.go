@@ -167,7 +167,12 @@ func (f *FactUnion) Output() string {
 	if f == nil || f.Var == nil {
 		return ""
 	}
-	return f.Var.GetActualName(false) + " last written field: " + strconv.Itoa(f.LastWrittenFID)
+	// var name always live; no invent " last written field: N" without identifier
+	name := f.Var.GetActualName(false)
+	if name == "" {
+		return ""
+	}
+	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)
 }
 
 // IsFieldReadable mirrors FactUnion::is_field_readable.

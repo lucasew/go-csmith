@@ -29,18 +29,19 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 		if v == nil {
 			continue
 		}
-		b.WriteString(indent)
+		// OutputDef always live; no invent indent-only / blank lines for incomplete IR
+		var def string
 		if v.IsArray && v.AsArray != nil {
-			b.WriteString(v.AsArray.OutputDef())
+			def = v.AsArray.OutputDef()
 		} else {
-			b.WriteString(v.OutputDef(forceStatic))
+			def = v.OutputDef(forceStatic)
 		}
-		if !strings.HasSuffix(b.String(), "\n") {
-			// OutputDef usually has no trailing newline for scalars
+		if def == "" {
+			continue
 		}
-		// ensure newline after each
-		s := b.String()
-		if !strings.HasSuffix(s, "\n") {
+		b.WriteString(indent)
+		b.WriteString(def)
+		if !strings.HasSuffix(def, "\n") {
 			b.WriteString("\n")
 		}
 	}
@@ -49,20 +50,29 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 
 // OutputGlobalVariables mirrors OutputGlobalVariables.
 // VariableSelector.cpp:1594–1601 — comment header + list (no access_once toggle).
+// no invent section header without any live global defs
 func OutputGlobalVariables(vars []*Variable) string {
+	body := OutputVariableList(vars, "", true)
+	if body == "" {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(OutputCommentLine("--- GLOBAL VARIABLES ---", false, false))
-	b.WriteString(OutputVariableList(vars, "", true))
+	b.WriteString(body)
 	return b.String()
 }
 
 // OutputGlobalVariablesDecls mirrors OutputGlobalVariablesDecls with optional prefix.
 // VariableSelector.cpp:1604–1612.
+// no invent section header without any live decls
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
+	body := OutputVariableList(vars, "", false)
+	if body == "" {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString(OutputCommentLine("--- GLOBAL VARIABLES ---", false, false))
 	// prefix each line (e.g. "extern ")
-	body := OutputVariableList(vars, "", false)
 	if prefix == "" {
 		b.WriteString(body)
 		return b.String()

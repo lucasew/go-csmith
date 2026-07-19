@@ -721,9 +721,16 @@ func (b *Block) Output(indent int) string {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			st := b.TmpVars[name]
+			// macro_tmp_vars name + type always live; no invent "int  = 0;" / "  t = 0;"
+			if name == "" {
+				continue
+			}
+			cn := GetSimpleType(b.TmpVars[name]).CName()
+			if cn == "" {
+				continue
+			}
 			sb.WriteString(inner)
-			sb.WriteString(GetSimpleType(st).CName() + " " + name + " = 0;\n")
+			sb.WriteString(cn + " " + name + " = 0;\n")
 		}
 	}
 	// OutputVariableList(local_vars) — Variable.cpp Output

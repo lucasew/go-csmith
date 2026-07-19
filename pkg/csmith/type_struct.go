@@ -340,8 +340,13 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			// Type.cpp always has field type; no soft invent "int"
 			return ""
 		}
+		// Type.cpp:1879–1880 — output_qualified_type always live; no invent " fN;"
+		ty := f.Qfer.OutputQualifiedType(f.Type)
+		if ty == "" {
+			return ""
+		}
 		b.WriteString("   ")
-		b.WriteString(f.Qfer.OutputQualifiedType(f.Type))
+		b.WriteString(ty)
 		// Type.cpp uses f0,f1…; field Name may already be fN from make_one
 		name := f.Name
 		if name == "" {
@@ -645,8 +650,13 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		if f.Type == nil {
 			return ""
 		}
+		// output_qualified_type always live; no invent " fN;" without type
+		ty := f.Qfer.OutputQualifiedType(f.Type)
+		if ty == "" {
+			return ""
+		}
 		b.WriteString("   ")
-		b.WriteString(f.Qfer.OutputQualifiedType(f.Type))
+		b.WriteString(ty)
 		name := f.Name
 		if name == "" {
 			name = fmt.Sprintf("f%d", j)

@@ -51,6 +51,11 @@ func TestOutputVariableList(t *testing.T) {
 	if ia < 0 || ib < 0 || ia > ib {
 		t.Fatal(out)
 	}
+	// incomplete OutputDef — no invent indent-only blank lines
+	broken := &Variable{Name: "g_x", Type: GetIntType()} // no init
+	if s := OutputVariableList([]*Variable{broken}, "    ", true); s != "" {
+		t.Fatal("empty defs must fail closed empty list", s)
+	}
 }
 
 func TestOutputGlobalVariables(t *testing.T) {
@@ -62,6 +67,13 @@ func TestOutputGlobalVariables(t *testing.T) {
 	decl := OutputGlobalVariablesDecls([]*Variable{v}, "extern ")
 	if !strings.Contains(decl, "extern ") {
 		t.Fatal(decl)
+	}
+	// no invent section-only header when all defs empty
+	if s := OutputGlobalVariables([]*Variable{{Name: "g_x", Type: GetIntType()}}); s != "" {
+		t.Fatal("empty globals must fail closed section", s)
+	}
+	if s := OutputGlobalVariablesDecls(nil, "extern "); s != "" {
+		t.Fatal("nil globals must fail closed section", s)
 	}
 }
 

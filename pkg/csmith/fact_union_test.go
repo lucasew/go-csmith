@@ -78,6 +78,13 @@ func TestFactUnionOutput(t *testing.T) {
 	if !strings.Contains(s, "g_u") || !strings.Contains(s, "2") {
 		t.Fatal(s)
 	}
+	// no invent " last written field: N" without identifier
+	anon := MakeFactUnion(&Variable{Type: ut}, 0)
+	if anon != nil {
+		if out := anon.Output(); out != "" {
+			t.Fatal("empty union var name must fail closed", out)
+		}
+	}
 }
 
 func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
