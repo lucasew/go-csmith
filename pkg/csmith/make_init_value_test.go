@@ -92,6 +92,7 @@ func TestGenerateNewNonArrayGlobal(t *testing.T) {
 }
 
 func TestGetAllArrayVars(t *testing.T) {
+	ClearError()
 	vs := NewVariableSelector(Defaults())
 	a := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	s := CreateVariableScalars("g_s", GetIntType(), false, false)
@@ -100,6 +101,15 @@ func TestGetAllArrayVars(t *testing.T) {
 	if len(got) != 1 || got[0] != a {
 		t.Fatalf("%v", got)
 	}
+	// Arrays nil hole must IncompleteVariables sticky (not bare nil empty-complete invent)
+	vs.Arrays = []*ArrayVariable{nil}
+	if VariablesComplete(vs.GetAllArrayVars()) {
+		t.Fatal("Arrays nil hole must fail closed IncompleteVariables, not invent empty-complete")
+	}
+	if !HasError() {
+		t.Fatal("Arrays nil hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
@@ -117,6 +127,23 @@ func TestCreateAndInitializeUsesMakeInitValue(t *testing.T) {
 	if v == nil || (v.Init == nil && v.InitExpr == nil) {
 		t.Fatal("expected init")
 	}
+}
+
+func TestCreateAndInitializeIncompleteAmbientSticky(t *testing.T) {
+	// incomplete ambient must not invent create past holes
+	ClearError()
+	opts := Defaults()
+	opts.Arrays = false
+	vs := NewVariableSelector(opts)
+	vs.Opts = opts
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if vs.createAndInitialize(AccessWrite, WithEffectContext(IncompleteEffect()), GetIntType(), q, nil, "l_x", NewRng(1)) != nil {
+		t.Fatal("incomplete EffectContext must fail closed createAndInitialize")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectContext must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeInitValueCreatesTargetWhenNone(t *testing.T) {

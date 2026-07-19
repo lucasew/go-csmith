@@ -385,12 +385,15 @@ func (vs *VariableSelector) FindAllVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
+			// incomplete GlobalList fails closed sticky (no invent soft re-pick empty-complete)
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, vs.GlobalList...)
 	}
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, b.LocalVars...)
@@ -575,11 +578,14 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 // (nil blk, IncompleteVariables remaining — no invent empty remaining past hole).
 func LowerBlockForVars(blks []*Block, vars []*Variable) (blk *Block, remaining []*Variable) {
 	if !VariablesComplete(vars) {
+		// incomplete vars/blocks fail closed sticky (no invent soft re-pick remaining)
+		SetError(ErrGeneric)
 		return nil, IncompleteVariables()
 	}
 	remaining = append([]*Variable(nil), vars...)
 	for _, b := range blks {
 		if b == nil || !VariablesComplete(b.LocalVars) {
+			SetError(ErrGeneric)
 			return nil, IncompleteVariables()
 		}
 		var next []*Variable
@@ -605,6 +611,7 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	if vs != nil {
 		if !VariablesComplete(vs.GlobalList) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		for _, v := range vs.GlobalList {
@@ -623,12 +630,14 @@ func (vs *VariableSelector) FindAllNonArrayVisibleVars(b *Block) []*Variable {
 	}
 	if f != nil {
 		if !VariablesComplete(f.Param) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, f.Param...)
 	}
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		for _, v := range b.LocalVars {
@@ -649,6 +658,7 @@ func GetAllLocalVars(b *Block) []*Variable {
 	vars := make([]*Variable, 0)
 	for b != nil {
 		if !VariablesComplete(b.LocalVars) {
+			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
 		vars = append(vars, b.LocalVars...)
@@ -667,6 +677,8 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 		return out
 	}
 	if !VariablesComplete(vs.GlobalList) {
+		// incomplete GlobalList fails closed sticky (no invent empty-complete array pool)
+		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
 	for _, v := range vs.GlobalList {
@@ -675,9 +687,11 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 		}
 	}
 	// Arrays list may hold collectives not yet on GlobalList
+	// ArrayVariable* always live; bare nil return invents VariablesComplete(nil) empty-complete
 	for _, av := range vs.Arrays {
 		if av == nil {
-			return nil
+			SetError(ErrGeneric)
+			return IncompleteVariables()
 		}
 		if av.IsGlobal() && av.Collective == nil {
 			if !IsVariableInSet(out, &av.Variable) {
@@ -1390,6 +1404,17 @@ func (vs *VariableSelector) createAndInitialize(
 	}
 	// name always live from gensym; no invent empty-name create path
 	if name == "" {
+		return nil
+	}
+	// incomplete ambient / facts fail closed sticky before create (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize

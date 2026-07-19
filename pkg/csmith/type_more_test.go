@@ -141,10 +141,15 @@ func TestIsUnnamedPadding(t *testing.T) {
 }
 
 func TestGetAllOKStructUnionTypesNilHole(t *testing.T) {
+	ClearError()
 	env := &TypeEnv{AllTypes: []*Type{GetIntType(), nil}}
 	if typesComplete(env.GetAllOKStructUnionTypes(false, false, false, true)) {
 		t.Fatal("nil type hole must fail closed incomplete, not invent empty complete")
 	}
+	if !HasError() {
+		t.Fatal("nil type hole must SetError sticky")
+	}
+	ClearError()
 	// complete empty filter (no structs) is complete empty non-nil
 	env2 := &TypeEnv{AllTypes: []*Type{GetIntType()}}
 	ok := env2.GetAllOKStructUnionTypes(false, false, false, true)

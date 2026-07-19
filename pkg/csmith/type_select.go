@@ -88,6 +88,8 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 		return []*Type{}
 	}
 	if !typesComplete(env.AllTypes) {
+		// incomplete AllTypes fails closed sticky (no invent soft re-pick empty/partial ok pool)
+		SetError(ErrGeneric)
 		return IncompleteTypes()
 	}
 	ok := make([]*Type, 0)

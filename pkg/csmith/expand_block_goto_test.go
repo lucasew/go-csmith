@@ -93,7 +93,8 @@ func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
 
 func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
-	// fair: incomplete LocalVars → nil,nil
+	// fair: incomplete LocalVars → nil, IncompleteVariables sticky
+	ClearError()
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
@@ -101,9 +102,14 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("incomplete LocalVars must fail closed incomplete remaining", blk, rem)
 	}
+	if !HasError() {
+		t.Fatal("incomplete LocalVars must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestLowerBlockForVars(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("l_a", GetIntType(), false, false)
 	b := CreateVariableScalars("l_b", GetIntType(), false, false)
 	g := CreateVariableScalars("g_1", GetIntType(), false, false)
@@ -124,11 +130,15 @@ func TestLowerBlockForVars(t *testing.T) {
 	if blk != outer || len(rem) != 0 {
 		t.Fatalf("first cover: %v %v", blk, rem)
 	}
-	// nil block hole fails closed
+	// nil block hole fails closed sticky
 	blk, rem = LowerBlockForVars([]*Block{nil, outer}, []*Variable{a, b})
 	if blk != nil || VariablesComplete(rem) {
 		t.Fatal("nil block hole must fail closed incomplete remaining", blk, rem)
 	}
+	if !HasError() {
+		t.Fatal("nil block hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGenerateNewParentLocalExpandGoto(t *testing.T) {
