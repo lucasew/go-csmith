@@ -1016,6 +1016,8 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 // HasEligibleVolatileVarQfer is has_eligible_volatile_var with CVQualifiers filter.
 // VariableSelector.cpp:294–316.
 // Incomplete candidate list fails closed false (no invent skip hole as absent).
+// Residual ERROR from IsEligible/MatchIndirect sticky fail closed false
+// (no invent soft-continue then true from a later candidate past hard IR hole).
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
 	// incomplete candidate list fails closed sticky (no invent skip hole as absent)
 	if !VariablesComplete(vars) {
@@ -1028,12 +1030,21 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 			SetError(ErrGeneric)
 			return false
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return false
+		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
 			continue
 		}
 		// VariableSelector.cpp:301–303 — qfer->match_indirect(var->qfer)
 		if qfer != nil && !qfer.Wildcard {
 			if !qfer.MatchIndirect(v.Qfer, false) {
+				// residual ERROR sticky — no invent soft-continue past MatchIndirect hole
+				if HasError() {
+					return false
+				}
 				continue
 			}
 		}
@@ -1045,6 +1056,10 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
 			RecordVolatileAvail()
 			return true
+		}
+		// hard IR residual from IsEligible sticky — no invent soft-continue then true later
+		if HasError() {
+			return false
 		}
 	}
 	return false
@@ -1078,8 +1093,17 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 			SetError(ErrGeneric)
 			return false
 		}
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		if v.IsArray && v.AsArray == nil {
+			SetError(ErrGeneric)
+			return false
+		}
 		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			return true
+		}
+		// IsValidPtr residual ERROR sticky — no invent soft-continue then true later
+		if HasError() {
+			return false
 		}
 	}
 	return false
@@ -1411,6 +1435,10 @@ func chooseVarFromOK(r *Rng, want *Type, ok []*Variable, opts Options) *Variable
 			if wantInd > vv.Type.IndirectLevel() {
 				// VariableSelector.cpp:490–494
 				if !opts.TakeUnionFieldAddr && vv.IsInsideUnionField() {
+					// Type-nil ancestry stickies residual ERROR — no invent soft-continue bias
+					if HasError() {
+						return nil
+					}
 					continue
 				}
 				addressable = append(addressable, vv)

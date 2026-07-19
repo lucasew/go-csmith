@@ -176,3 +176,24 @@ func TestChooseVarFromOKSingleNoBias(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
+	// take_union_field_addr off + Type-nil parent: IsInsideUnionField stickies ERROR.
+	// Soft invent was continue past residual then invent addressable bias / later pick.
+	// Fair: sticky fail closed whole choose.
+	ClearError()
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	want := PointerTo(GetIntType())
+	opts := Defaults()
+	opts.TakeUnionFieldAddr = false
+	got := chooseVarFromOK(NewRng(1), want, []*Variable{field, pv}, opts)
+	if got != nil {
+		t.Fatalf("Type-nil ancestry residual must fail closed nil, got %v", got)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil ancestry chooseVarFromOK must SetError sticky")
+	}
+	ClearError()
+}

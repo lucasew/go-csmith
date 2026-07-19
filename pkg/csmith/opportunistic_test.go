@@ -173,6 +173,17 @@ func TestHasDereferenceableVar(t *testing.T) {
 		t.Fatal("nil typ HasDereferenceableVar must SetError sticky")
 	}
 	ClearError()
+	// IsArray without AsArray soft invent was residual soft-continue then true
+	// from later good ptr. Fair: sticky fail closed whole probe.
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
+	if HasDereferenceableVar([]*Variable{shell, p}, GetIntType(), cg, opts) {
+		t.Fatal("IsArray without AsArray HasDereferenceableVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray HasDereferenceableVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPartialVolatileAfterDeref(t *testing.T) {
@@ -315,4 +326,17 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	if VolatileAvailCount() < 1 {
 		t.Fatal("volatile_avail")
 	}
+	// IsArray without AsArray soft invent was residual soft-continue then true
+	// from later good volatile. Fair: sticky fail closed whole probe.
+	ClearError()
+	BookkeeperDoFinalization()
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	good := CreateVariableScalars("g_v", GetIntType(), true, false)
+	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext()) {
+		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must SetError sticky")
+	}
+	ClearError()
 }
