@@ -76,10 +76,10 @@ func TestCollectAndOutputSkippedInits(t *testing.T) {
 	if !strings.Contains(out, "l_1 = 3;") {
 		t.Fatal(out)
 	}
-	// nil LocalVars hole fails closed
+	// nil LocalVars hole fails closed incomplete (not bare nil invent empty complete)
 	hole := &Block{Parent: outer, LocalVars: []*Variable{nil}}
-	if CollectInitSkippedVars(outer, hole) != nil {
-		t.Fatal("nil local hole must fail closed")
+	if VariablesComplete(CollectInitSkippedVars(outer, hole)) {
+		t.Fatal("nil local hole must fail closed incomplete")
 	}
 	if !HasInitSkippedVars(outer, hole) {
 		t.Fatal("incomplete must fail closed as has-skipped")
@@ -217,14 +217,15 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 			// hole on outer LocalVars when dest is outer and src is inner:
 			// CollectInitSkippedVars(inner, outer) — dest outer, climb outer, LocalVars hole → nil
 			// path depends on back vs forward
-			if st.InitSkippedVars == nil {
-				t.Fatal("must not invent nil InitSkippedVars from incomplete Collect")
+			if !VariablesComplete(st.InitSkippedVars) {
+				// incomplete skip list must not be attached to a live goto
+				t.Fatal("must not invent goto with incomplete InitSkippedVars", st.InitSkippedVars)
 			}
 		}
 	}
-	// Direct: Collect nil when hole
-	if CollectInitSkippedVars(inner, outer) != nil {
-		t.Fatal("outer LocalVars hole must yield nil Collect")
+	// Direct: Collect incomplete when hole
+	if VariablesComplete(CollectInitSkippedVars(inner, outer)) {
+		t.Fatal("outer LocalVars hole must yield incomplete Collect")
 	}
 	ClearError()
 }

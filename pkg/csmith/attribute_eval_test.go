@@ -227,8 +227,8 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	if !HaveOverlappingFields(e1, e2, holeFacts) {
 		t.Fatal("incomplete facts must fail closed as overlap")
 	}
-	if FindUnionPointees(holeFacts, e1) != nil {
-		t.Fatal("FindUnionPointees incomplete must be nil not empty")
+	if VariablesComplete(FindUnionPointees(holeFacts, e1)) {
+		t.Fatal("FindUnionPointees incomplete must fail closed incomplete, not invent empty complete")
 	}
 	// complete empty: non-pointer term → empty unions, no overlap
 	c := &Expression{Term: TermConstant, Con: MakeInt(1)}

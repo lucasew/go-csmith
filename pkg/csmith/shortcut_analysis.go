@@ -124,12 +124,9 @@ func MarkContainedGotosVisited(root *Stmt, fm *FactMgr) {
 	if root == nil || fm == nil {
 		return
 	}
-	// CFGEdge* always live; pre-scan for holes so we never invent partial
-	// mark-as-visited before hitting a nil edge (two-phase: validate then mark).
-	for _, e := range fm.CFGEdges {
-		if e == nil {
-			return
-		}
+	// incomplete CFG: no invent partial mark-as-visited past edge holes
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return
 	}
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
@@ -205,11 +202,11 @@ func containsUnfixedGotoIDs(ids map[int]bool, fm *FactMgr) bool {
 	if fm == nil || len(ids) == 0 {
 		return false
 	}
+	// incomplete CFG is unfixed (no invent skip holes as fixed)
+	if !CFGEdgesComplete(fm.CFGEdges) {
+		return true
+	}
 	for _, e := range fm.CFGEdges {
-		// CFGEdge* always live; nil hole is unfixed (no invent skip as fixed)
-		if e == nil {
-			return true
-		}
 		if e.SrcID <= 0 {
 			continue
 		}

@@ -97,13 +97,13 @@ func MarkNeedRevisitLCA(curr *Block, dest *Stmt) {
 
 // HasInitSkippedVars mirrors StatementGoto::has_init_skipped_vars.
 // StatementGoto.cpp:281–306 — jump into/out would skip locals of intermediate blocks.
-// Incomplete LocalVars (Collect nil) fails closed as has-skipped (no invent none).
+// Incomplete LocalVars fails closed as has-skipped (no invent none).
 func HasInitSkippedVars(src *Block, destParent *Block) bool {
 	if destParent == nil {
 		return false
 	}
 	skipped := CollectInitSkippedVars(src, destParent)
-	if skipped == nil {
+	if !VariablesComplete(skipped) {
 		return true
 	}
 	return len(skipped) > 0
@@ -111,11 +111,13 @@ func HasInitSkippedVars(src *Block, destParent *Block) bool {
 
 // CollectInitSkippedVars collects locals whose initialization is skipped by a jump.
 // StatementGoto.cpp:281–306 — walk dest parent chain until src.
-// Variable* always live on LocalVars; nil hole → nil (fail closed).
+// Variable* always live on LocalVars; nil hole → IncompleteVariables (not bare nil —
+// VariablesComplete(nil)/len==0 invent empty-complete skip list success).
 // Complete scan with no skipped vars → empty non-nil slice.
+// destParent nil → complete empty (no dest chain).
 func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 	if destParent == nil {
-		return nil
+		return []*Variable{}
 	}
 	// StatementGoto.cpp:286–290 — climb dest->parent … until src
 	reachedSrc := false
@@ -127,7 +129,7 @@ func CollectInitSkippedVars(src *Block, destParent *Block) []*Variable {
 		}
 		for _, loc := range b.LocalVars {
 			if loc == nil {
-				return nil
+				return IncompleteVariables()
 			}
 			intermediate = append(intermediate, loc)
 		}
@@ -464,7 +466,7 @@ func MakeRandomGoto(
 		// incomplete LocalVars on intermediate blocks fails closed (Collect nil)
 		// no invent goto with empty InitSkippedVars when skip list is incomplete
 		skipped := CollectInitSkippedVars(blk, okBlk)
-		if skipped == nil {
+		if !VariablesComplete(skipped) {
 			return makeGotoFailed()
 		}
 		st := Stmt{
@@ -572,10 +574,10 @@ func MakeRandomGoto(
 	}
 
 	// StatementGoto.cpp:184–192 — insert goto after other_stm in other_blk
-	// incomplete LocalVars on intermediate blocks fails closed (Collect nil)
+	// incomplete LocalVars on intermediate blocks fails closed (IncompleteVariables)
 	// no invent forward goto with empty InitSkippedVars when skip list is incomplete
 	skippedFwd := CollectInitSkippedVars(okBlk, blk)
-	if skippedFwd == nil {
+	if !VariablesComplete(skippedFwd) {
 		return makeGotoFailed()
 	}
 	sg := Stmt{

@@ -69,32 +69,35 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 
 // FindUnionPointees mirrors FactPointTo::find_union_pointees.
 // FactPointTo.cpp:807–829 — union fields referred via pointer expression.
-// Incomplete facts/pointees/expr fail closed (nil out). Complete empty (no union
-// pointees) returns non-nil empty so callers can distinguish from incomplete
-// (no invent len(nil)==0 as "no union" / conflict-free).
+// Incomplete facts/pointees/expr fail closed IncompleteVariables (not bare nil —
+// VariablesComplete(nil)/len(nil)==0 invent empty-complete "no union" success).
+// Complete empty (no union pointees) returns non-nil empty.
 func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	if e == nil {
-		return nil
+		return IncompleteVariables()
 	}
 	// incomplete fact map fails closed before merge_pointees
 	if facts != nil && !FactsComplete(facts) {
-		return nil
+		return IncompleteVariables()
 	}
 	var vars []*Variable
 	switch e.Term {
 	case TermVariable, TermLhs:
 		if e.Var == nil {
-			return nil
+			return IncompleteVariables()
 		}
 		// incomplete type IR must not invent level-0 merge as empty unions
 		ind, iok := e.IndirectLevelComplete()
 		if !iok {
-			return nil
+			return IncompleteVariables()
 		}
 		vars = MergePointeesOfPointer(e.Var.GetCollective(), ind, facts)
 		// nil = incomplete merge; empty non-nil = no pointees
 		if vars == nil {
-			return nil
+			return IncompleteVariables()
+		}
+		if !VariablesComplete(vars) {
+			return IncompleteVariables()
 		}
 	default:
 		// non-pointer expr: complete empty union set
@@ -103,14 +106,11 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 	unions := make([]*Variable, 0)
 	for _, v := range vars {
 		if v == nil {
-			return nil
+			return IncompleteVariables()
 		}
 		u := v.GetContainerUnion()
 		// only care referenced union fields, not the union itself
 		if u != nil && v != u {
-			if !VariablesComplete(unions) {
-				return nil
-			}
 			if !IsVariableInSet(unions, u) {
 				unions = append(unions, u)
 			}
@@ -122,7 +122,7 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 // HaveOverlappingFields mirrors have_overlapping_fields.
 // Lhs.cpp:287–298 — shared union pointee between e1 and e2.
 // Incomplete fact maps / pointees / exprs fail closed as overlap
-// (no invent conflict-free past holes / FindUnionPointees nil as empty).
+// (no invent conflict-free past holes / incomplete FindUnionPointees as empty).
 func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 	if facts != nil && !FactsComplete(facts) {
 		return true
@@ -138,21 +138,18 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 		return true
 	}
 	vars1 := FindUnionPointees(facts, e1)
-	// nil = incomplete; empty complete = no union pointees on e1 → no overlap
-	if vars1 == nil {
+	// incomplete → overlap; complete empty → no union pointees on e1 → no overlap
+	if !VariablesComplete(vars1) {
 		return true
 	}
 	if len(vars1) == 0 {
 		return false
 	}
 	vars2 := FindUnionPointees(facts, e2)
-	if vars2 == nil {
+	if !VariablesComplete(vars2) {
 		return true
 	}
 	for _, v := range vars2 {
-		if v == nil {
-			return true
-		}
 		if IsVariableInSet(vars1, v) {
 			return true
 		}
