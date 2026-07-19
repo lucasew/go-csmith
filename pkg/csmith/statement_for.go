@@ -509,19 +509,21 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// C++ map[] always assigns (missing → empty); Incomplete in fails closed
+	// (no invent must_return RestoreFacts past incomplete body entry)
 	in := fm.MapFactsIn[body.StmID]
 	if !FactsComplete(in) {
 		fm.GlobalFacts = nil
-	} else {
-		fm.GlobalFacts = CloneFactSlice(in)
+		return
 	}
+	fm.GlobalFacts = CloneFactSlice(in)
 	if body.MustReturn() {
 		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
 	// C++ always merge_jump_facts(global, map_facts_out[break]); missing → empty
-	// Incomplete out fails closed (nil GlobalFacts — no invent skip merge)
+	// Incomplete out / mid-join fails closed wipe + stop (no invent continue
+	// later breaks onto FactsComplete(nil)==true empty success)
 	if forSt != nil {
 		for _, breakID := range body.BreakStmIDs {
 			// create_cfg_edge(break, for-stmt, post_dest=true, back=false)
@@ -529,9 +531,12 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			out := fm.MapFactsOut[breakID]
 			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = nil
-				continue
+				return
 			}
-			MergeJumpFacts(&fm.GlobalFacts, out)
+			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
+				fm.GlobalFacts = nil
+				return
+			}
 		}
 	}
 	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)

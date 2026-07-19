@@ -191,6 +191,37 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	if fm.GlobalFacts != nil {
 		t.Fatal("incomplete break MapFactsOut must fail closed nil GlobalFacts")
 	}
+	// incomplete first break must not invent continue-merge later complete break
+	// via FactsComplete(nil)==true after wipe
+	c := CreateVariableScalars("g_c", GetIntType(), false, false)
+	body2 := &Block{StmID: 13, BreakStmIDs: []int{30, 31}, Stmts: []Stmt{{Kind: StmtAssign}}}
+	fm2 := NewFactMgr(nil)
+	fm2.SetMapFactsIn(13, pre)
+	fm2.MapFactsOut = map[int][]*FactPointTo{
+		30: {MakeFactPointTo(p, NullPtr), nil},
+		31: {MakeFactPointTo(p, c)},
+	}
+	postLoopAnalysis(fm2, &Stmt{Kind: StmtFor, StmID: 8, Then: body2}, body2, pre, EmptyEffect(), nil)
+	if fm2.GlobalFacts != nil {
+		t.Fatal("incomplete first break must not invent later break merge", fm2.GlobalFacts)
+	}
+}
+
+func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
+	// incomplete map_facts_in[body] must not invent RestoreFacts(pre) on must_return
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	body := &Block{StmID: 14, Stmts: []Stmt{{Kind: StmtReturn}}}
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		14: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 7, Then: body}, body, pre, EmptyEffect(), nil)
+	if fm.GlobalFacts != nil {
+		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
+	}
 }
 
 func TestPostLoopAnalysisMustReturn(t *testing.T) {

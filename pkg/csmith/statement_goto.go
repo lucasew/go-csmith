@@ -532,7 +532,13 @@ func MakeRandomGoto(
 			return makeGotoFailed()
 		}
 		stmInMerged = CloneFactSlice(destIn)
-		if MergeJumpFacts(&stmInMerged, gotoOut) {
+		// tryMerge distinguishes incomplete wipe from complete no-change
+		// (no invent treat MergeJumpFacts false as "unchanged" after wipe)
+		changed, mok := tryMergeJumpFacts(&stmInMerged, gotoOut)
+		if !mok {
+			return makeGotoFailed()
+		}
+		if changed {
 			stmOut = CloneFactSlice(stmInMerged)
 			foundNewFacts = true
 			factsInCopy := make(map[int][]*FactPointTo)
