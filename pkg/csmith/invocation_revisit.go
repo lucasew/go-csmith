@@ -99,11 +99,14 @@ func RenewFact(facts *[]*FactPointTo, nf *FactPointTo) bool {
 		return false
 	}
 	if nf == nil || nf.Var == nil {
+		// incomplete renew wiped sticky (no invent soft re-pick past hole)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete([]*FactPointTo{nf}) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	for i, f := range *facts {
@@ -127,7 +130,9 @@ func RenewFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		// incomplete maps wiped sticky (no invent soft re-pick past hole)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	changed := false

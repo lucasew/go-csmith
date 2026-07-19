@@ -537,13 +537,15 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		SetError(ErrGeneric)
 		return
 	}
-	// incomplete GlobalFacts fail closed (no invent cleaned postFacts / OOS from holes)
+	// incomplete GlobalFacts fail closed sticky (no invent cleaned postFacts / OOS from holes)
 	// Use IncompleteFactSlice — bare nil invents empty success via FactsComplete(nil)
 	var postFacts []*FactPointTo
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		postFacts = IncompleteFactSlice()
 		fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+		SetError(ErrGeneric)
+		return
 	} else {
 		postFacts = CloneFactSlice(fm.GlobalFacts)
 		if len(b.LocalVars) > 0 {
@@ -573,6 +575,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				SetError(ErrGeneric)
+				return
 			} else {
 				factsCopy := CloneFactSlice(in0)
 				// reset accum to pre-block effect
@@ -621,6 +625,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					fm.GlobalFacts = IncompleteFactSlice()
 					postFacts = IncompleteFactSlice()
 					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					SetError(ErrGeneric)
+					return
 				} else {
 					fm.GlobalFacts = CloneFactSlice(out)
 					postFacts = fm.GlobalFacts
@@ -652,8 +658,10 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			if FactsComplete(out) {
 				fm.SetMapFactsOut(b.StmID, out)
 			} else {
-				// incomplete sr out — fail closed hole marker (not empty complete)
+				// incomplete sr out — fail closed sticky hole marker (not empty complete)
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				SetError(ErrGeneric)
+				return
 			}
 		}
 	}

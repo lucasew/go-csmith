@@ -600,6 +600,9 @@ func TestPostCreationIncompleteMapFactsInNoInventEmptyFP(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete MapFactsIn must fail closed incomplete GlobalFacts, not invent empty FP", fm.GlobalFacts)
 	}
+	if !HasError() {
+		t.Fatal("incomplete MapFactsIn must SetError sticky")
+	}
 	ClearError()
 }
 

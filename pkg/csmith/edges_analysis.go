@@ -229,38 +229,44 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 		return
 	}
 	fm := cg.FM
-	// incomplete pre-facts: fail closed empty env (no invent cleaned post-creation)
-	// No sticky ERROR — incomplete pre can appear after fail-closed subpaths; wiping
-	// GlobalFacts signals incomplete without aborting whole generation.
+	// incomplete pre-facts: fail closed sticky (no invent cleaned post-creation)
+	// sticky ERROR so makeRandomStmt ERROR_GUARD aborts without soft re-pick past wipe
 	if !FactsComplete(preFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// incomplete GlobalFacts: makeup/branch combine must not invent past holes
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
-	// Statement::stm_id always live; StmID 0 fails closed (no invent post_creation
+	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent post_creation
 	// success without map_facts_in/out / map_visited)
 	if st.StmID <= 0 {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	if st.Kind == StmtIfElse {
 		CombineBranchFacts(st, preFacts, fm)
 	} else {
-		// MakeupNewVarFacts fails closed (nils preFacts) on holes; pre already complete
+		// MakeupNewVarFacts fails closed sticky (nils preFacts) on holes; pre already complete
 		if !MakeupNewVarFacts(&preFacts, fm.GlobalFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	}
 	// simple statements: save effect_stm
-	// Incomplete EffectStm fails closed (no invent map_stm_effect incomplete as recorded success)
+	// Incomplete EffectStm fails closed sticky (no invent map_stm_effect incomplete as recorded success)
 	if !IsCompound(st.Kind) {
 		if !EffectComplete(cg.EffectStm) {
 			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return
 		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
@@ -272,6 +278,7 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			// preFacts complete above; still re-check after makeup
 			if !FactsComplete(preFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			outputs := CloneFactSlice(preFacts)
@@ -309,10 +316,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 				return
 			}
 			// FactMgr.cpp:397–399 — update_fact_for_assign(sa) uses get_rhs()
-			// incomplete assign fails closed — no invent mark visited with wiped facts
+			// incomplete assign fails closed sticky — no invent mark visited with wiped facts
 			_ = fm.UpdateFactForAssign(lhs, indir, st.GetAssignRhs())
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		case StmtReturn:
@@ -325,6 +335,9 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			_ = fm.UpdateFactForReturnStmt(st, cg.CurrentFunc.RV, st.Expr)
 			if !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return
 			}
 		}
@@ -332,14 +345,18 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	fm.RemoveRVFacts(&fm.GlobalFacts)
 	if !FactsComplete(fm.GlobalFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	fm.SetMapFactsIn(st.StmID, preFacts)
 	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
-	// Incomplete accum fails closed (no invent MapAccumEffect incomplete as recorded success)
+	// Incomplete accum fails closed sticky (no invent MapAccumEffect incomplete as recorded success)
 	acc := cg.AccumEffect()
 	if !EffectComplete(acc) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapAccumEffect == nil {

@@ -755,7 +755,9 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		return false
 	}
 	if !FactsComplete(*facts) || !FactsComplete(newFacts) {
+		// incomplete maps wiped sticky (no invent soft re-pick past wiped join)
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return false
 	}
 	changed := false
@@ -765,6 +767,7 @@ func MergeFacts(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		// MergeFactInto incomplete = hole marker (should not happen after pre-validate)
 		if !FactsComplete(merged) {
 			*facts = IncompleteFactSlice()
+			SetError(ErrGeneric)
 			return false
 		}
 		*facts = merged

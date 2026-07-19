@@ -83,7 +83,8 @@ func TestMergeFacts(t *testing.T) {
 	if len(FindRelatedPointTo(facts, p).PointTo) < 2 {
 		t.Fatal("p joined")
 	}
-	// nil hole fails closed — no invent skip partial join
+	// nil hole fails closed sticky — no invent skip partial join / soft re-pick past wipe
+	ClearError()
 	hole := []*FactPointTo{MakeFactPointTo(p, a), nil}
 	base := []*FactPointTo{MakeFactPointTo(q, a)}
 	if MergeFacts(&base, hole) {
@@ -92,6 +93,10 @@ func TestMergeFacts(t *testing.T) {
 	if FindRelatedPointTo(base, p) != nil {
 		t.Fatal("must not invent partial merge past hole")
 	}
+	if !HasError() {
+		t.Fatal("incomplete MergeFacts must SetError sticky")
+	}
+	ClearError()
 	if FactsComplete(MergeFactInto(facts, nil)) {
 		t.Fatal("nil fact MergeFactInto must fail closed incomplete")
 	}

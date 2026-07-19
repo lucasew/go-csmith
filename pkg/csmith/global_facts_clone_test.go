@@ -226,10 +226,14 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	PostCreationAnalysis(st, pre, EmptyEffect(), &cg, Defaults())
-	// incomplete pre: fail closed nil GlobalFacts (no invent cleaned assign update)
+	// incomplete pre: fail closed sticky wipe (no invent cleaned assign update)
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete pre must clear GlobalFacts, not invent post-creation")
 	}
+	if !HasError() {
+		t.Fatal("incomplete pre must SetError sticky")
+	}
+	ClearError()
 	// incomplete GlobalFacts seed
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	pre2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -237,6 +241,10 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete GlobalFacts must fail closed nil")
 	}
+	if !HasError() {
+		t.Fatal("incomplete GlobalFacts must SetError sticky")
+	}
+	ClearError()
 	// StmID 0 — no invent post_creation success without maps
 	st0 := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -246,6 +254,9 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	PostCreationAnalysis(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, EmptyEffect(), &cg, Defaults())
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("StmID 0 must fail closed nil GlobalFacts")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 must SetError sticky")
 	}
 	ClearError()
 }

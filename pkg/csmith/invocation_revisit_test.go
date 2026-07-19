@@ -20,6 +20,7 @@ func TestPermuteParamOrdersTwo(t *testing.T) {
 }
 
 func TestRenewFacts(t *testing.T) {
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	RenewFacts(&facts, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
@@ -32,6 +33,31 @@ func TestRenewFacts(t *testing.T) {
 	if len(facts) != n {
 		t.Fatal(len(facts))
 	}
+	// incomplete maps fail closed sticky (no invent soft re-pick past hole)
+	hole := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	base := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	if RenewFacts(&base, hole) {
+		t.Fatal("incomplete newFacts must fail closed false")
+	}
+	if FactsComplete(base) {
+		t.Fatal("incomplete renew must wipe facts incomplete")
+	}
+	if !HasError() {
+		t.Fatal("incomplete RenewFacts must SetError sticky")
+	}
+	ClearError()
+	// incomplete RenewFact target
+	facts2 := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	if RenewFact(&facts2, nil) {
+		t.Fatal("nil nf must fail closed false")
+	}
+	if FactsComplete(facts2) {
+		t.Fatal("nil nf renew must wipe incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil nf RenewFact must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestReturnFactRegistry(t *testing.T) {
