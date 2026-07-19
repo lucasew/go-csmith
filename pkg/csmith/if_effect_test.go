@@ -180,3 +180,48 @@ func TestRandomParentBlockERRORGuard(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
+	// incomplete map_facts_in[then] must not invent else gen / if success
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 0
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	// Plant then block will get new StmID; hard to plant incomplete then-in mid-make.
+	// Instead incomplete GlobalFacts before make fails closed when func_1 hack off:
+	// Use incomplete EffectAccum so arm merge fails after branches.
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	cg.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	// MakeRandomIf will fail on MergeEffects incomplete or MakeRandomBlock
+	st := MakeRandomIf(NewRng(1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	if st != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
+	}
+	ClearError()
+}
+
+func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 0
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	// seed globals so MakeIteration can succeed; fail closed is on incomplete EffectAccum after
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
+	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntType(), nil, NewRng(1))
+	inc := IncompleteEffect()
+	cg.EffectAccum = &inc
+	if MakeRandomFor(NewRng(2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
+	}
+	// nil return is the invent ban; SetError when iteration path reaches accum check
+	ClearError()
+}

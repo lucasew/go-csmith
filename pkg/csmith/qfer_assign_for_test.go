@@ -142,6 +142,7 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// missing body in must not invent keep prior GlobalFacts
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -161,9 +162,11 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("body StmID 0 must fail closed incomplete GlobalFacts")
 	}
+	ClearError()
 }
 
 func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -176,10 +179,12 @@ func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body MapFactsIn must fail closed nil GlobalFacts")
 	}
+	ClearError()
 }
 
 func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	// merge_jump_facts always; incomplete break out fails closed
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -208,10 +213,12 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	if FactsComplete(fm2.GlobalFacts) {
 		t.Fatal("incomplete first break must not invent later break merge", fm2.GlobalFacts)
 	}
+	ClearError()
 }
 
 func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	// incomplete map_facts_in[body] must not invent RestoreFacts(pre) on must_return
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -225,9 +232,11 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("incomplete body in must not invent must_return restore", fm.GlobalFacts)
 	}
+	ClearError()
 }
 
 func TestPostLoopAnalysisMustReturn(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)
@@ -240,9 +249,11 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	if fp == nil || fp.IsNull() || (len(fp.PointTo) > 0 && fp.PointTo[0] != a) {
 		t.Fatalf("want pre fact → a, got %+v", fp)
 	}
+	ClearError()
 }
 
 func TestPostLoopAnalysisBreakMerge(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
 	a := CreateVariableScalars("g_a", GetIntType(), false, false)

@@ -456,9 +456,14 @@ func MakeRandomFor(
 	// StatementFor.cpp:299–300 — record effect and facts before loop body
 	// incomplete GlobalFacts fail closed (no invent cleaned pre-loop snapshot)
 	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	preEffect := cg.EffectStm.Clone()
+	if !EffectComplete(preEffect) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	preFacts := CloneFactSlice(cg.FM.GlobalFacts)
 	// body CGContext(cg, rw_directive, iv, bound) — StatementFor.cpp:302–303
 	// always record iv in iv_bounds (even INVALID_BOUND) so writes to IV are blocked
@@ -467,8 +472,13 @@ func MakeRandomFor(
 		bodyCG.AddIVBound(lc.IV, lc.Bound)
 	}
 	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
+	// Incomplete parent accum fails closed (no invent body under incomplete shell)
 	bodyEff := EmptyEffect()
 	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			SetError(ErrGeneric)
+			return nil
+		}
 		bodyEff = *cg.EffectAccum
 	}
 	bodyCG.EffectAccum = &bodyEff
@@ -487,6 +497,12 @@ func MakeRandomFor(
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmID()}
 	postLoopAnalysis(cg.FM, st, body, preFacts, preEffect, cg)
+	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
+	if !FactsComplete(cg.FM.GlobalFacts) ||
+		!EffectComplete(cg.FM.GetMapStmEffect(st.StmID)) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// merge body effect into parent accum
 	// Incomplete parent/body fails closed (no invent pure MergeEffects past holes)
 	if cg.EffectAccum != nil {
@@ -508,9 +524,10 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		return
 	}
 	// StatementFor.cpp:355 — body Block always live with stm_id after make
-	// StmID 0 fails closed (no invent keep prior GlobalFacts soft-skipping map_facts_in)
+	// StmID 0 fails closed sticky (no invent keep prior GlobalFacts soft-skipping map_facts_in)
 	if body == nil || body.StmID <= 0 {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
@@ -518,11 +535,17 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	in := fm.GetMapFactsIn(body.StmID)
 	if !FactsComplete(in) {
 		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	fm.GlobalFacts = CloneFactSlice(in)
 	if body.MustReturn() {
 		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
+		if !FactsComplete(preFacts) {
+			fm.GlobalFacts = IncompleteFactSlice()
+			SetError(ErrGeneric)
+			return
+		}
 		fm.RestoreFacts(preFacts)
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
@@ -534,19 +557,32 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			out := fm.GetMapFactsOut(breakID)
 			if !FactsComplete(out) || !FactsComplete(fm.GlobalFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			if _, ok := tryMergeJumpFacts(&fm.GlobalFacts, out); !ok {
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 		}
 	}
 	// StatementFor.cpp:369 — set_accumulated_effect_after_block(pre_effect, &body, …)
-	// for-stmt stm_id always live; SetAccumulatedEffectAfterBlock no-ops on StmID 0
+	// for-stmt stm_id always live; incomplete body/pre effect fails closed sticky
 	if cg != nil && forSt != nil {
+		if forSt.StmID <= 0 {
+			SetError(ErrGeneric)
+			return
+		}
 		bodyEff := fm.GetMapStmEffect(body.StmID)
+		if !EffectComplete(bodyEff) || !EffectComplete(preEffect) {
+			SetError(ErrGeneric)
+			return
+		}
 		SetAccumulatedEffectAfterBlock(forSt, bodyEff, cg, preEffect)
+		if !EffectComplete(fm.GetMapStmEffect(forSt.StmID)) {
+			SetError(ErrGeneric)
+		}
 	}
 }
 
