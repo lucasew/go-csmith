@@ -171,15 +171,24 @@ func TestVisitFactsExpressionVariableAddrBitfield(t *testing.T) {
 }
 
 func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
-	// incomplete Lhs must fail closed (no invent visit success)
+	// incomplete Lhs hard IR sticky (no invent visit success / soft re-pick)
+	ClearError()
 	cg := EmptyCGContext()
 	if cg.VisitFactsLhs(nil, Defaults()) {
 		t.Fatal("nil lhs")
 	}
+	if !HasError() {
+		t.Fatal("nil lhs VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
 	if cg.VisitFactsLhs(&Lhs{}, Defaults()) {
 		t.Fatal("nil lhs.Var")
 	}
-	// incomplete EffectStm/accum must not invent LHS visit success
+	if !HasError() {
+		t.Fatal("nil lhs.Var VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
+	// incomplete EffectStm/accum sticky via CheckWriteVar
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	cg2 := EmptyCGContext()
@@ -187,12 +196,20 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	if cg2.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed VisitFactsLhs")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
 	cg3 := EmptyCGContext()
 	inc := IncompleteEffect()
 	cg3.EffectAccum = &inc
 	if cg3.VisitFactsLhs(lhs, Defaults()) {
 		t.Fatal("incomplete EffectAccum must fail closed VisitFactsLhs")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestReadPointedNullRejected(t *testing.T) {
@@ -231,7 +248,8 @@ func TestAccessDerefVolatile(t *testing.T) {
 }
 
 func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
-	// incomplete ambient/stm must not invent CheckDerefVolatile success
+	// incomplete ambient/stm sticky (no invent CheckDerefVolatile / soft re-pick)
+	ClearError()
 	opts := Defaults()
 	opts.StrictVolatileRule = true
 	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
@@ -239,34 +257,80 @@ func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
 	if cg.CheckDerefVolatile(v, 1, opts) {
 		t.Fatal("incomplete ambient must fail closed CheckDerefVolatile")
 	}
+	if !HasError() {
+		t.Fatal("incomplete ambient CheckDerefVolatile must SetError sticky")
+	}
+	ClearError()
 	cg2 := EmptyCGContext()
 	cg2.EffectStm = IncompleteEffect()
 	if cg2.CheckDerefVolatile(v, 1, opts) {
 		t.Fatal("incomplete EffectStm must fail closed CheckDerefVolatile")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm CheckDerefVolatile must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
-	// incomplete EffectStm must not invent CheckRead/WriteVar success
+	// incomplete EffectStm sticky (no invent CheckRead/WriteVar / soft re-pick)
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, false)
 	cg := EmptyCGContext()
 	cg.EffectStm = IncompleteEffect()
 	if cg.CheckReadVar(v, nil) {
 		t.Fatal("incomplete EffectStm must fail closed CheckReadVar")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm CheckReadVar must SetError sticky")
+	}
+	ClearError()
 	if cg.CheckWriteVar(v, nil) {
 		t.Fatal("incomplete EffectStm must fail closed CheckWriteVar")
 	}
-	// incomplete EffectAccum
+	if !HasError() {
+		t.Fatal("incomplete EffectStm CheckWriteVar must SetError sticky")
+	}
+	// incomplete EffectAccum sticky
+	ClearError()
 	cg2 := EmptyCGContext()
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
 	if cg2.CheckReadVar(v, nil) {
 		t.Fatal("incomplete EffectAccum must fail closed CheckReadVar")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum CheckReadVar must SetError sticky")
+	}
+	ClearError()
 	if cg2.CheckWriteVar(v, nil) {
 		t.Fatal("incomplete EffectAccum must fail closed CheckWriteVar")
 	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum CheckWriteVar must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestReadIndicesHardIRSticky(t *testing.T) {
+	// IsArray without AsArray hard IR sticky
+	ClearError()
+	cg := EmptyCGContext()
+	broken := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if cg.ReadIndices(broken, nil) {
+		t.Fatal("IsArray without AsArray must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray ReadIndices must SetError sticky")
+	}
+	ClearError()
+	if cg.ReadIndices(nil, nil) {
+		t.Fatal("nil var ReadIndices must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil var ReadIndices must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestReadIndicesConstantOK(t *testing.T) {

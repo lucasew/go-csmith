@@ -608,15 +608,18 @@ func IsVariableInSet(set []*Variable, v *Variable) bool {
 // ReadIndices mirrors CGContext::read_indices for array subscript expressions.
 // CGContext.cpp:352–380 — visit IndexExprs on itemized arrays; walk field_var_of;
 // array fields walk to parent array.
+// Hard IR (nil subject, IsArray without AsArray, missing parent array) sticky.
 func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
-	// CGContext.cpp:352+ — always live this + v; no soft invent true on nil
+	// CGContext.cpp:352+ — always live this + v; hard IR sticky (no soft invent true)
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.IsArray || v.AsArray != nil {
 		av := v.AsArray
-		// C++ static_cast ArrayVariable* on isArray; missing AsArray is broken IR
+		// C++ static_cast ArrayVariable* on isArray; missing AsArray is broken IR sticky
 		if av == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		// Expression::visit_facts reads process CGOptions; no Defaults invent
@@ -645,8 +648,9 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 		for p != nil && !p.IsArray && p.AsArray == nil {
 			p = p.FieldVarOf
 		}
-		// CGContext.cpp:373 — assert(v); no soft invent true when parent missing
+		// CGContext.cpp:373 — assert(v); hard IR sticky when parent missing
 		if p == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		return c.ReadIndices(p, facts)
@@ -727,36 +731,46 @@ func (c *CGContext) WriteVar(v *Variable) {
 
 // CheckDerefVolatile mirrors CGContext::check_deref_volatile.
 // CGContext.cpp:152–169.
+// Incomplete ambient/stm sticky (no invent OK under IncompleteEffect / soft re-pick).
 func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options) bool {
-	// CGContext.cpp:153 — assert(v && "nullptr Variable!"); no soft invent true
+	// CGContext.cpp:153 — assert(v && "nullptr Variable!"); hard IR sticky
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !opts.StrictVolatileRule {
 		return true
 	}
-	// Incomplete ambient fails closed (no invent OK under IncompleteEffect as non-SE-free path)
+	// Incomplete ambient fails closed sticky (no invent OK / soft re-pick past hole)
 	if !EffectComplete(c.EffectContext()) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !c.EffectContext().IsSideEffectFree() {
 		level := derefLevel
 		for level > 0 {
 			if v.IsVolatileAfterDeref(level) {
+				// policy reject (volatile under impure) — not incomplete IR sticky
 				return false
 			}
 			level--
 		}
 	}
-	// Incomplete accum/stm AccessDerefVolatile must not invent visit success after poison
+	// Incomplete accum/stm AccessDerefVolatile sticky (AccessDerefVolatile sets ERROR)
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
 		if !EffectComplete(*c.EffectAccum) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
 	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
 	if !EffectComplete(c.EffectStm) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	return true
@@ -780,20 +794,27 @@ func (c CGContext) unionFacts() []*FactUnion {
 
 // CheckReadVar mirrors CGContext::check_read_var.
 // CGContext.cpp:191–213 — indices, nonreadable field/context, partial write, volatile, dangling.
-// Incomplete GetCollective fails closed false (no invent read success / panic on nil).
-// Incomplete EffectStm/accum fails closed (no invent read success after ReadVar poison).
+// Incomplete EffectStm/accum / GetCollective sticky (no invent read success / soft re-pick).
+// Policy rejects (nonreadable, partial write, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
+		// ReadIndices hard IR already sticky; visit fail may not be
 		return false
 	}
 	v = v.GetCollective()
 	if v == nil {
+		// GetCollective already SetError sticky
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if IsNonreadableField(v, c.unionFacts()) {
@@ -815,6 +836,9 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	c.ReadVar(v)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	return true
@@ -822,13 +846,15 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 
 // CheckWriteVar mirrors CGContext::check_write_var.
 // CGContext.cpp:323–349.
-// Incomplete GetCollective fails closed false (no invent write success / panic on nil).
-// Incomplete EffectStm/accum fails closed (no invent write success after WriteVar poison).
+// Incomplete EffectStm/accum / GetCollective sticky (no invent write success / soft re-pick).
+// Policy rejects (const, nonwritable, partial, volatile, dangling) stay non-sticky false.
 func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		SetError(ErrGeneric)
 		return false
 	}
 	if !c.ReadIndices(v, facts) {
@@ -836,6 +862,9 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	v = v.GetCollective()
 	if v == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if c.IsNonWritable(v) || v.IsConst() {
@@ -854,6 +883,9 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	}
 	c.WriteVar(v)
 	if !EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum)) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	return true
@@ -1318,10 +1350,12 @@ func (c *CGContext) PtrModifiedInRhs(lhs *Lhs, facts []*FactPointTo) bool {
 }
 
 // VisitFactsLhs mirrors Lhs::visit_facts.
-// Incomplete Lhs type IR fails closed (no invent bare non-deref visit success).
+// Incomplete Lhs type IR fails closed sticky (no invent bare non-deref visit success
+// / soft re-pick past broken LHS shells). Policy rejects stay non-sticky false.
 // Lhs.cpp:301–356 — compound read-first; curr_rhs overlap; write/write_pointed.
 func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	if c == nil || lhs == nil || lhs.Var == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	facts := c.pointToFacts()
@@ -1340,27 +1374,33 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
 	if c.CurrRHS != nil {
 		lhsExpr := LhsAsExpression(lhs)
-		// Lhs always live for this check; incomplete RHS subexps fail closed
+		// Lhs always live for this check; incomplete shell sticky
 		if lhsExpr == nil {
+			SetError(ErrGeneric)
 			return false
 		}
-		// complete get_eval_to_subexps always ≥1 entry; incomplete/empty fails closed
+		// complete get_eval_to_subexps always ≥1 entry; incomplete sticky via GetEvalToSubexps
 		// (IncompleteExpressions — no invent skip overlap as success past incomplete RHS)
 		subs := GetEvalToSubexps(c.CurrRHS)
 		if !ExpressionsComplete(subs) || len(subs) == 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		for _, sub := range subs {
 			if sub.Term == TermVariable || sub.Term == TermLhs {
 				if HaveOverlappingFields(sub, lhsExpr, facts) {
+					// policy / incomplete overlap fail closed false (FindUnion may sticky)
 					return false
 				}
 			}
 		}
 	}
-	// incomplete Lhs type IR must not invent non-deref level-0 visit success
+	// incomplete Lhs type IR sticky (no invent non-deref level-0 visit success)
 	deref, ok := lhs.IndirectLevelComplete()
 	if !ok {
+		SetError(ErrGeneric)
 		return false
 	}
 	valid := false
@@ -1387,14 +1427,20 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		valid = c.CheckWriteVar(v, facts)
 	}
 	// Lhs.cpp:348–351 — set_lhs_write_vars from write_vars on accum
-	// Incomplete SetLhsWriteVars / stm must not invent visit true after poison
+	// Incomplete SetLhsWriteVars / stm sticky (no invent visit true after poison)
 	if valid && c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.SetLhsWriteVarsFromWritten()
 		if !EffectComplete(*c.EffectAccum) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}
 	if valid && (!EffectComplete(c.EffectStm) || (c.EffectAccum != nil && !EffectComplete(*c.EffectAccum))) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	return valid
