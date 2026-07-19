@@ -249,9 +249,17 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 
 // ExtendCallChain mirrors CGContext::extend_call_chain.
 // CGContext.cpp:470–478 — copy parent chain, push current block.
+// Block* always live on call_chain; nil hole fails closed (empty chain —
+// no invent keep-hole chain that soft-skips frames later).
 func (c *CGContext) ExtendCallChain(from CGContext) {
 	if c == nil {
 		return
+	}
+	for _, b := range from.CallChain {
+		if b == nil {
+			c.CallChain = nil
+			return
+		}
 	}
 	c.CallChain = append([]*Block(nil), from.CallChain...)
 	b := from.CurrentBlock()
@@ -306,9 +314,17 @@ func (c *CGContext) AddVisibleEffect(e Effect) {
 
 // AddVisibleEffectAt mirrors CGContext::add_visible_effect(e, b).
 // CGContext.cpp:411–417 — callers = call_chain then b.
+// Block* always live on call_chain; nil hole fails closed (skip merge —
+// no invent partial external effect past incomplete frames).
 func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	if c == nil {
 		return
+	}
+	for _, cb := range c.CallChain {
+		if cb == nil {
+			// incomplete call_chain — fail closed without inventing partial merge
+			return
+		}
 	}
 	callers := append([]*Block(nil), c.CallChain...)
 	if b != nil {

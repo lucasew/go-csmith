@@ -239,3 +239,19 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 		t.Fatal("effect_stm clear on *CGContext must drop pre-seed write")
 	}
 }
+
+func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
+	// StatementFor.cpp:319+ — select_array always used; nil fails whole setup
+	ClearError()
+	opts := Defaults()
+	opts.MaxArrayNumInLoop = 3
+	vs := NewVariableSelector(opts)
+	// no Types → CreateRandomArray fails → SelectArray nil
+	vs.Types = nil
+	vs.Arrays = nil
+	got := MakeRandomArrayLoopSetup(NewRng(1), opts, vs, EmptyCGContext())
+	if got != nil {
+		t.Fatal("nil SelectArray must fail closed whole setup, not invent fewer arrays")
+	}
+	ClearError()
+}

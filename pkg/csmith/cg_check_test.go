@@ -260,3 +260,29 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 		t.Fatal("want reject when IV written in context")
 	}
 }
+
+func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
+	// incomplete call_chain fails closed empty (no invent keep-hole chain)
+	from := EmptyCGContext()
+	from.CallChain = []*Block{&Block{StmID: 1}, nil}
+	var c CGContext
+	c.ExtendCallChain(from)
+	if c.CallChain != nil {
+		t.Fatal("nil CallChain hole must clear chain, not invent keep-hole")
+	}
+}
+
+func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
+	// incomplete call_chain must not invent partial external merge
+	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	e := EmptyEffect().WriteVar(g)
+	cg := EmptyCGContext()
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	cg.CallChain = []*Block{nil}
+	cg.AddVisibleEffectAt(e, &Block{StmID: 1})
+	// fail closed: accum unchanged (no invent merge past hole)
+	if eff.IsWritten(g) {
+		t.Fatal("nil CallChain hole must not invent external write merge")
+	}
+}

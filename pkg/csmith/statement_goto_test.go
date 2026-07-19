@@ -359,3 +359,25 @@ func TestMakeRandomGotoNilBlocksHoleFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
+	// incomplete working facts or prev outs fail closed
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, GotoDestStmID: 20}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if VisitFactsStatementGoto(st, &cg, Defaults()) {
+		t.Fatal("incomplete GlobalFacts must fail closed VisitFactsGoto")
+	}
+	// complete facts, incomplete prev out
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		10: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	if VisitFactsStatementGoto(st, &cg, Defaults()) {
+		t.Fatal("incomplete prev MapFactsOut must fail closed")
+	}
+}

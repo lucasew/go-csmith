@@ -71,6 +71,10 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 	// check write on skipped vars (re-init at dest)
 	// StatementGoto.cpp — vars[i] always live; no invent skip nil holes
 	facts := cg.pointToFacts()
+	// incomplete working facts fail closed (no invent write-check past holes)
+	if !FactsComplete(facts) {
+		return false
+	}
 	for _, v := range st.InitSkippedVars {
 		if v == nil || !cg.CheckWriteVar(v, facts) {
 			return false
@@ -86,6 +90,10 @@ func VisitFactsStatementGoto(st *Stmt, cg *CGContext, opts Options) bool {
 			visitedDest := fm.MapVisited != nil && fm.MapVisited[destID]
 			prevOut := fm.MapFactsOut[st.StmID]
 			cur := facts
+			// incomplete prev outs fail closed — do not invent subset/clear path
+			if !FactsComplete(prevOut) {
+				return false
+			}
 			if !visitedThis && !visitedDest &&
 				!SameFacts(cur, prevOut) &&
 				SubsetFacts(cur, prevOut) {

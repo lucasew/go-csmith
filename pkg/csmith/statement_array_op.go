@@ -169,6 +169,7 @@ func MakeRandomArrayLoop(
 // MakeRandomArrayLoopSetup selects arrays for array-loop (test helper / inventory).
 // Prefer MakeRandomArrayLoop for full must_read/write directive wiring.
 // StatementFor.cpp:314–330 selection half.
+// select_array always used; nil fails closed whole setup (no invent fewer arrays).
 func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGContext) []*ArrayVariable {
 	if r == nil || vs == nil {
 		return nil
@@ -178,14 +179,19 @@ func MakeRandomArrayLoopSetup(r *Rng, opts Options, vs *VariableSelector, cg CGC
 		maxN = 0
 	}
 	n := int(r.RndUpto(uint32(maxN)))
-	var out []*ArrayVariable
+	out := make([]*ArrayVariable, 0, n)
 	for i := 0; i < n; i++ {
 		av := vs.SelectArray(r, cg)
-		if av != nil {
-			out = append(out, av)
+		// StatementFor.cpp:319–328 — no soft invent fewer arrays by skipping nil
+		if HasError() || av == nil {
+			return nil
 		}
+		out = append(out, av)
 		// access choice 0/1/2 burns RNG (must_read / must_write / both)
 		_ = r.RndUpto(3)
+		if HasError() {
+			return nil
+		}
 	}
 	return out
 }
