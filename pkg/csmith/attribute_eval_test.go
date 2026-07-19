@@ -112,6 +112,14 @@ func TestNewVarAttrGeneratorGated(t *testing.T) {
 	if _, ok := g.Attributes[1].(*AlignedAttribute); !ok {
 		t.Fatalf("%T", g.Attributes[1])
 	}
+	// nil probs → 0% (no invent default 30)
+	g0 := NewVarAttrGenerator(opts, nil)
+	if len(g0.Attributes) == 0 {
+		t.Fatal("attrs present at 0%")
+	}
+	if ba, ok := g0.Attributes[2].(*BooleanAttribute); !ok || ba.Prob != 0 {
+		t.Fatalf("nil probs must not invent Prob=30, got %#v", g0.Attributes[2])
+	}
 }
 
 func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
@@ -130,7 +138,15 @@ func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
 	if !foundSec || !foundAlign {
 		t.Fatal("section/aligned", foundSec, foundAlign)
 	}
+	// nil probs → 0% (no invent default 30)
+	g0 := NewFuncAttrGenerator(opts, nil)
+	for _, a := range g0.Attributes {
+		if ba, ok := a.(*BooleanAttribute); ok && ba.Prob != 0 {
+			t.Fatalf("nil probs must not invent Prob=30, got %s=%d", ba.Name, ba.Prob)
+		}
+	}
 }
+
 
 func TestTypeAttrOnStructDecl(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{

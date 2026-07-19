@@ -127,3 +127,31 @@ func TestChooseFuncNoSoftBuiltinFallback(t *testing.T) {
 		t.Fatal("must not fall back to builtins when coin says user pool")
 	}
 }
+
+func TestChooseFuncBuiltinProbZeroNoInvent50(t *testing.T) {
+	// Function.cpp:329 uses BuiltinFunctionProb() as-is; 0 must not invent 50
+	opts := Defaults()
+	opts.Builtins = true
+	opts.BuiltinFunctionProb = 0
+	bi := &Function{
+		Name: "b", ReturnType: GetIntType(), IsBuiltin: true,
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	user := &Function{
+		Name: "u", ReturnType: GetIntType(),
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	// only builtins: must stay nil (no invent 50% pick)
+	for seed := uint64(1); seed < 40; seed++ {
+		if ChooseFuncContext(NewRng(seed), []*Function{bi}, GetIntType(), nil, nil, opts, nil) != nil {
+			t.Fatalf("BuiltinFunctionProb=0 must never pick builtin first seed=%d", seed)
+		}
+	}
+	// with user pool: always user, never invent builtin path at 50%
+	for seed := uint64(1); seed < 40; seed++ {
+		got := ChooseFuncContext(NewRng(seed), []*Function{bi, user}, GetIntType(), nil, nil, opts, nil)
+		if got != user {
+			t.Fatalf("want user only, got %v seed=%d", got, seed)
+		}
+	}
+}

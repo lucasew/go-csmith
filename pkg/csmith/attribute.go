@@ -172,7 +172,8 @@ func NewVarAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerator
 	if !opts.VariableAttributes {
 		return &AttributeGenerator{}
 	}
-	p := 30
+	// nil probs → 0% (no invent default 30 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PVarAttrProb)
 	}
@@ -196,7 +197,8 @@ func NewFuncAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerato
 	if !opts.FunctionAttributes {
 		return &AttributeGenerator{}
 	}
-	p := 30
+	// nil probs → 0% (no invent default 30 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PFuncAttrProb)
 	}

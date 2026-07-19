@@ -326,13 +326,11 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 	}
 	// Function.cpp:330–337 — BuiltinFunctionProb → try builtin; else user only
 	// (no soft fallback to builtins when user pool empty / not chosen)
+	// CGOptions::BuiltinFunctionProb() as-is; 0 means never (no invent default 50)
 	var f *Function
 	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
 		p := opts.BuiltinFunctionProb
-		if p <= 0 {
-			p = 50
-		}
-		if r.RndFlipcoin(uint32(p)) {
+		if p > 0 && r.RndFlipcoin(uint32(p)) {
 			f = getOneFunction(r, okBuiltin)
 		}
 	}
