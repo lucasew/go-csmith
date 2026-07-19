@@ -6,6 +6,7 @@ import (
 )
 
 func TestReachMaxFunctions(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	opts.MaxFuncs = 2
 	var list FunctionList
@@ -17,6 +18,17 @@ func TestReachMaxFunctions(t *testing.T) {
 	if ReachMaxFunctions(&list, opts) {
 		t.Fatal("under max")
 	}
+	// nil Function* hole fails closed as at-max non-sticky (soft re-pick gate)
+	ClearError()
+	opts.MaxFuncs = 100
+	list.Funcs = []*Function{{Name: "a"}, nil}
+	if !ReachMaxFunctions(&list, opts) {
+		t.Fatal("nil hole must fail closed as at-max")
+	}
+	if HasError() {
+		t.Fatal("nil hole ReachMaxFunctions must stay non-sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomBinaryInvocationOutput(t *testing.T) {

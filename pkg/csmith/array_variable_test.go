@@ -416,37 +416,52 @@ func TestOutputUpperBoundArray(t *testing.T) {
 }
 
 func TestSetIndexExprNoSoftZero(t *testing.T) {
-	// ArrayVariable.cpp:227–231 — push/set Expression*; no invent "0" for nil/empty
+	// ArrayVariable.cpp:227–231 — push/set Expression*; sticky no invent "0" for nil/empty
+	ClearError()
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	// nil / empty Output — fail closed, no invent empty index slot
+	// nil / empty Output — sticky fail closed, no invent empty index slot
 	av.AddIndexExpr(nil)
 	if len(av.Indices) != 0 {
 		t.Fatalf("nil AddIndexExpr must not invent slot, got %v", av.Indices)
 	}
+	if !HasError() {
+		t.Fatal("nil AddIndexExpr must SetError sticky")
+	}
+	ClearError()
 	av.AddIndex("")
 	if len(av.Indices) != 0 {
 		t.Fatalf("empty AddIndex must not invent slot, got %v", av.Indices)
 	}
+	if !HasError() {
+		t.Fatal("empty AddIndex must SetError sticky")
+	}
+	ClearError()
 	av.SetIndexExpr(0, &Expression{Term: TermConstant, Con: MakeInt(3), ExprType: GetIntType()})
 	if len(av.Indices) != 1 || av.Indices[0] != "3" {
 		t.Fatal(av.Indices)
 	}
-	// SetIndex past end without pad — no invent empty holes
+	// SetIndex past end without pad — sticky no invent empty holes
+	ClearError()
 	av2 := &ArrayVariable{Variable: Variable{Name: "g_b"}, Sizes: []int{2, 2}}
 	av2.SetIndex(1, "i")
 	if len(av2.Indices) != 0 {
 		t.Fatalf("SetIndex past end must fail closed, got %v", av2.Indices)
 	}
+	if !HasError() {
+		t.Fatal("SetIndex past end must SetError sticky")
+	}
 	// append at end only
+	ClearError()
 	av2.SetIndex(0, "i")
 	av2.SetIndex(1, "j")
 	if len(av2.Indices) != 2 || av2.Indices[0] != "i" || av2.Indices[1] != "j" {
 		t.Fatalf("sequential SetIndex append: %v", av2.Indices)
 	}
+	ClearError()
 }
 
 func TestOutputWithIndicesNoLetterInvent(t *testing.T) {
@@ -736,7 +751,8 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 }
 
 func TestSetIndexNoInventNilPad(t *testing.T) {
-	// IndexExprs lag Indices: must not invent nil pad slots
+	// IndexExprs lag Indices: sticky must not invent nil pad slots
+	ClearError()
 	av := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
 		Indices:  []string{"0", "1"},
@@ -747,10 +763,15 @@ func TestSetIndexNoInventNilPad(t *testing.T) {
 	if len(av.IndexExprs) > 0 && av.IndexExprs[0] == nil {
 		t.Fatal("must not invent nil pad at IndexExprs[0]")
 	}
+	if !HasError() {
+		t.Fatal("IndexExprs lag SetIndex must SetError sticky")
+	}
 	// only append when index == len
+	ClearError()
 	av.IndexExprs = nil
 	av.SetIndex(0, "0")
 	if len(av.IndexExprs) != 1 || av.IndexExprs[0] == nil {
 		t.Fatal("append at len must store live expr")
 	}
+	ClearError()
 }

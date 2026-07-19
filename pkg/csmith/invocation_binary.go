@@ -66,15 +66,22 @@ func (fi *Invocation) IsReturnTypeFloat() bool {
 // FunctionInvocationUnary.cpp:114–131; FunctionInvocationBinary.cpp:192–241;
 // FunctionInvocationUser.cpp:380 — return type.
 func (fi *Invocation) GetType() *Type {
-	// C++ FunctionInvocation always non-null; incomplete IR → nil (no invent int)
+	// C++ FunctionInvocation always non-null; incomplete IR sticky → nil (no invent int)
 	if fi == nil {
 		return nil
 	}
 	if fi.User != nil {
 		// FunctionInvocationUser.cpp:380 — return func->return_type
+		// nil ReturnType incomplete sticky
+		if fi.User.ReturnType == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
 		return fi.User.ReturnType
 	}
 	if !fi.IsStd {
+		// incomplete non-user non-std shell sticky
+		SetError(ErrGeneric)
 		return nil
 	}
 	if fi.IsUnary {
@@ -91,13 +98,15 @@ func (fi *Invocation) getTypeUnary() *Type {
 	case "!":
 		return GetIntType()
 	case "+", "-", "~":
-		// C++ param_value[0]->get_type(); missing operand → incomplete IR
+		// C++ param_value[0]->get_type(); missing operand → incomplete IR sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		return fi.Args[0].GetType()
 	default:
-		// FunctionInvocationUnary.cpp:117 assert invalid operator; no invent eInt
+		// FunctionInvocationUnary.cpp:117 assert invalid operator sticky; no invent eInt
+		SetError(ErrGeneric)
 		return nil
 	}
 }
@@ -110,19 +119,22 @@ func (fi *Invocation) getTypeBinary() *Type {
 		return GetSimpleType(EFloat)
 	}
 	op, ok := BinaryOpFromString(fi.Binary)
-	// FunctionInvocationBinary.cpp:196–199 — assert invalid operator; no soft invent eInt
+	// FunctionInvocationBinary.cpp:196–199 — assert invalid operator sticky; no soft invent eInt
 	if !ok {
+		SetError(ErrGeneric)
 		return nil
 	}
 	switch op {
 	case BinAdd, BinSub, BinMul, BinDiv, BinMod, BinBitXor, BinBitAnd, BinBitOr:
 		// FunctionInvocationBinary.cpp:208–224 — param_value[0/1]->get_type always live
-		// missing operands → incomplete IR (no invent signed=true → eInt)
+		// missing operands → incomplete IR sticky (no invent signed=true → eInt)
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		lt, rt := fi.Args[0].GetType(), fi.Args[1].GetType()
 		if lt == nil || rt == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if lt.IsSigned() && rt.IsSigned() {
@@ -132,12 +144,14 @@ func (fi *Invocation) getTypeBinary() *Type {
 	case BinCmpGt, BinCmpLt, BinCmpGe, BinCmpLe, BinCmpEq, BinCmpNe, BinAnd, BinOr:
 		return GetIntType()
 	case BinLShift, BinRShift:
-		// FunctionInvocationBinary.cpp:229–238 — param_value[0]->get_type always
+		// FunctionInvocationBinary.cpp:229–238 — param_value[0]->get_type always sticky
 		if len(fi.Args) < 1 || fi.Args[0] == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		lt := fi.Args[0].GetType()
 		if lt == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if lt.IsSigned() {
@@ -145,7 +159,8 @@ func (fi *Invocation) getTypeBinary() *Type {
 		}
 		return GetSimpleType(EUInt)
 	default:
-		// FunctionInvocationBinary.cpp:240–241 — assert(0); no soft invent eInt
+		// FunctionInvocationBinary.cpp:240–241 — assert(0) sticky; no soft invent eInt
+		SetError(ErrGeneric)
 		return nil
 	}
 }

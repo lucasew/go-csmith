@@ -268,7 +268,8 @@ func binaryCastOp(cast, a0, op, a1 string) string {
 
 // ReachMaxFunctions mirrors Function::reach_max_functions_cnt.
 // Function* always live on Funcs; nil hole fails closed as at-max
-// (no invent undercount that allows more functions).
+// (no invent undercount that allows more functions). Non-sticky: at-max is a
+// soft re-pick gate, not ERROR_GUARD sticky (would leave unbuilt shells).
 func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 	if list == nil {
 		return false

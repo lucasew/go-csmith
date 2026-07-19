@@ -90,23 +90,33 @@ func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 }
 
 func TestUnaryGetTypeInvalidOpFailClosed(t *testing.T) {
-	// FunctionInvocationUnary.cpp:117 — assert invalid operator; no invent eInt
+	// FunctionInvocationUnary.cpp:117 — assert invalid operator sticky; no invent eInt
+	ClearError()
 	arg := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "??", Args: []*Expression{arg}}
 	if fi.GetType() != nil {
 		t.Fatal("invalid unary op must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("invalid unary op must SetError sticky")
+	}
 	// valid not
+	ClearError()
 	fi.Unary = "!"
 	if fi.GetType() != GetIntType() {
 		t.Fatal("!")
 	}
-	// empty args for minus
+	// empty args for minus sticky
+	ClearError()
 	fi.Unary = "-"
 	fi.Args = nil
 	if fi.GetType() != nil {
 		t.Fatal("empty args")
 	}
+	if !HasError() {
+		t.Fatal("empty args unary GetType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
@@ -441,23 +451,37 @@ func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {
 
 func TestBinaryGetTypeMissingArgsFailClosed(t *testing.T) {
 	// FunctionInvocationBinary.cpp:208–209 — param_value[0/1]->get_type always
-	// no soft invent signed=true → eInt when operands missing
+	// sticky no soft invent signed=true → eInt when operands missing
+	ClearError()
 	fi := &Invocation{IsStd: true, Binary: "+"}
 	if fi.GetType() != nil {
 		t.Fatal("add without args must not invent eInt")
 	}
+	if !HasError() {
+		t.Fatal("add without args must SetError sticky")
+	}
+	ClearError()
 	fi.Args = []*Expression{{Term: TermConstant, Con: MakeInt(1)}}
 	if fi.GetType() != nil {
 		t.Fatal("add with one arg")
 	}
-	// shift needs left only
+	if !HasError() {
+		t.Fatal("add with one arg must SetError sticky")
+	}
+	// shift needs left only sticky
+	ClearError()
 	fi = &Invocation{IsStd: true, Binary: "<<"}
 	if fi.GetType() != nil {
 		t.Fatal("shift without left must not invent eInt")
 	}
+	if !HasError() {
+		t.Fatal("shift without left must SetError sticky")
+	}
 	// cmp still returns int without consulting operands (C++ switch arm)
+	ClearError()
 	fi = &Invocation{IsStd: true, Binary: "=="}
 	if fi.GetType() != GetIntType() {
 		t.Fatal("cmp")
 	}
+	ClearError()
 }
