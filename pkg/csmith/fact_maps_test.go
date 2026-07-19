@@ -123,6 +123,37 @@ func TestBackupRestoreStmFactMaps(t *testing.T) {
 	}
 }
 
+func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
+	// incomplete source maps must not invent cleaned backup clones
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	st := &Stmt{Kind: StmtAssign, StmID: 15}
+	fm.MapFactsIn = map[int][]*FactPointTo{
+		15: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		15: {MakeFactPointTo(p, GarbagePtr), nil},
+	}
+	in := map[int][]*FactPointTo{}
+	out := map[int][]*FactPointTo{}
+	fm.BackupStmFactMaps(st, in, out)
+	if in[15] != nil {
+		t.Fatal("incomplete MapFactsIn must backup as nil, not invent cleaned")
+	}
+	if out[15] != nil {
+		t.Fatal("incomplete MapFactsOut must backup as nil, not invent cleaned")
+	}
+	// restore incomplete backup → nil maps (not invent cleaned)
+	fm.MapFactsIn[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	fm.MapFactsOut[15] = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	in[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	out[15] = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
+	fm.RestoreStmFactMaps(st, in, out)
+	if fm.MapFactsIn[15] != nil || fm.MapFactsOut[15] != nil {
+		t.Fatal("restore incomplete backup must fail closed nil")
+	}
+}
+
 func TestFindUpdatedFacts(t *testing.T) {
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)

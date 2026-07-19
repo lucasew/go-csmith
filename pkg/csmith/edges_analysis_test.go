@@ -143,6 +143,57 @@ func TestAnalyzeWithEdgesInMergesJump(t *testing.T) {
 	}
 }
 
+func TestAnalyzeWithEdgesInIncompleteOutFailClosed(t *testing.T) {
+	// Statement.cpp:819 — merge_jump_facts always; incomplete out fails closed
+	// (no invent skip merge when MapFactsOut has holes)
+	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, StmID: 20, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
+	}
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	fm.CreateCFGEdgeTo(10, &Block{}, 20, false, false)
+	fm.MapVisited = map[int]bool{10: true}
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		10: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	facts := []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_a", GetIntType(), false, false))}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if AnalyzeWithEdgesIn(st, &facts, &cg, Defaults(), nil) {
+		t.Fatal("incomplete MapFactsOut on jump src must fail closed")
+	}
+}
+
+func TestFindFixedPointIncompleteBackOutFailClosed(t *testing.T) {
+	// Block.cpp:535 — merge_facts(current, map_facts_out[src]) always
+	// incomplete out fails closed (no invent skip soft-merge)
+	ClearError()
+	f := &Function{Name: "f"}
+	b := &Block{StmID: 50, Func: f, Looping: true, Stmts: nil}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// mark visited so fixed-point enters back-edge merge path
+	fm.MapVisited = map[int]bool{50: true}
+	fm.CreateCFGEdgeTo(60, b, 50, false, true)
+	fm.MapFactsOut = map[int][]*FactPointTo{
+		60: {MakeFactPointTo(p, NullPtr), nil},
+	}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	_, _, ok := FindFixedPointBlock(b, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}, &cg, Defaults(), false)
+	if ok {
+		t.Fatal("incomplete back-edge MapFactsOut must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("expect sticky error on incomplete fixed-point merge")
+	}
+	ClearError()
+}
+
 func TestFindFixedPointBlock(t *testing.T) {
 	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)

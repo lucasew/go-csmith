@@ -471,20 +471,30 @@ func MakeRandomGoto(
 	var gotoIn, gotoOut, stmInMerged, stmOut []*FactPointTo
 	if fm != nil {
 		// StatementGoto.cpp:159–162 — ctrl uses facts_in, else facts_out
+		// C++ map[] always; incomplete maps fail closed (no invent partial goto)
+		var srcFacts []*FactPointTo
 		if IsCtrlStmt(other) {
-			gotoIn = CloneFactSlice(fm.MapFactsIn[other.StmID])
+			srcFacts = fm.MapFactsIn[other.StmID]
 		} else {
-			gotoIn = CloneFactSlice(fm.MapFactsOut[other.StmID])
+			srcFacts = fm.MapFactsOut[other.StmID]
 		}
+		if !FactsComplete(srcFacts) {
+			return makeGotoFailed()
+		}
+		gotoIn = CloneFactSlice(srcFacts)
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
-		// StatementGoto.cpp:164–166 — merge effect from goto src
+		// StatementGoto.cpp:164–166 — merge effect from goto src (map[] zero if missing)
 		preEffect := cg.AccumEffect()
-		if acc, ok := fm.MapAccumEffect[other.StmID]; ok {
-			cg.AddEffect(acc, true)
+		if fm.MapAccumEffect != nil {
+			cg.AddEffect(fm.MapAccumEffect[other.StmID], true)
 		}
 		// StatementGoto.cpp:167–182
-		stmInMerged = CloneFactSlice(fm.MapFactsIn[dest.StmID])
+		destIn := fm.MapFactsIn[dest.StmID]
+		if !FactsComplete(destIn) {
+			return makeGotoFailed()
+		}
+		stmInMerged = CloneFactSlice(destIn)
 		if MergeJumpFacts(&stmInMerged, gotoOut) {
 			stmOut = CloneFactSlice(stmInMerged)
 			foundNewFacts = true
@@ -492,13 +502,23 @@ func MakeRandomGoto(
 			factsOutCopy := make(map[int][]*FactPointTo)
 			fm.BackupStmFactMaps(dest, factsInCopy, factsOutCopy)
 			// feed merged facts as global for visit (stm_visit_facts inputs)
+			if !FactsComplete(stmInMerged) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				return makeGotoFailed()
+			}
 			fm.GlobalFacts = CloneFactSlice(stmInMerged)
 			if !VisitFactsStmt(dest, cg, opts) {
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
-			// visit may update GlobalFacts as outs; capture for set_fact_out
+			// visit may update GlobalFacts as outs; incomplete fails closed
+			if !FactsComplete(fm.GlobalFacts) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				return makeGotoFailed()
+			}
 			stmOut = CloneFactSlice(fm.GlobalFacts)
 			// StatementGoto.cpp:178–181 — if dest contains other, recompute goto_out
 			if ContainsStmt(dest, other) {

@@ -131,13 +131,16 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 				if fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
 					continue
 				}
-				if out, has := fm.MapFactsOut[e.SrcID]; has {
-					if _, ok := tryMergeJumpFacts(facts, out); !ok {
-						return false
-					}
+				// Statement.cpp:819–820 — always merge_jump_facts / add_effect
+				// C++ map[] missing → empty; no invent skip merge when out absent
+				// Incomplete out fails closed (no invent partial jump merge)
+				out := fm.MapFactsOut[e.SrcID]
+				if _, ok := tryMergeJumpFacts(facts, out); !ok {
+					return false
 				}
-				if acc, has := fm.MapAccumEffect[e.SrcID]; has {
-					cg.AddEffect(acc, false)
+				// map_accum_effect[src] — missing → zero Effect (same as skip Add)
+				if fm.MapAccumEffect != nil {
+					cg.AddEffect(fm.MapAccumEffect[e.SrcID], false)
 				}
 			}
 		}
@@ -150,13 +153,13 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 			if fm.MapVisited == nil || !fm.MapVisited[e.SrcID] {
 				continue
 			}
-			if out, has := fm.MapFactsOut[e.SrcID]; has {
-				if _, ok := tryMergeJumpFacts(facts, out); !ok {
-					return false
-				}
+			// Statement.cpp:830–831 — always merge_jump_facts / add_effect
+			out := fm.MapFactsOut[e.SrcID]
+			if _, ok := tryMergeJumpFacts(facts, out); !ok {
+				return false
 			}
-			if acc, has := fm.MapAccumEffect[e.SrcID]; has {
-				cg.AddEffect(acc, false)
+			if fm.MapAccumEffect != nil {
+				cg.AddEffect(fm.MapAccumEffect[e.SrcID], false)
 			}
 		}
 	}
@@ -289,14 +292,14 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return currentInputs, -1, false
 			}
 			for _, e := range back {
-				if out, has := fm.MapFactsOut[e.SrcID]; has {
-					// incomplete fact maps fail closed (no invent skip soft-merge)
-					if !FactsComplete(currentInputs) || !FactsComplete(out) {
-						SetError(ErrGeneric)
-						return currentInputs, -1, false
-					}
-					MergeFacts(&currentInputs, out)
+				// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src])
+				// C++ map[] always; missing → empty merge; incomplete fails closed
+				out := fm.MapFactsOut[e.SrcID]
+				if !FactsComplete(currentInputs) || !FactsComplete(out) {
+					SetError(ErrGeneric)
+					return currentInputs, -1, false
 				}
+				MergeFacts(&currentInputs, out)
 			}
 			toBlk := fm.FindEdgesInToBlock(b, false, true)
 			if toBlk == nil {
@@ -304,13 +307,13 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				return currentInputs, -1, false
 			}
 			for _, e := range toBlk {
-				if out, has := fm.MapFactsOut[e.SrcID]; has {
-					if !FactsComplete(currentInputs) || !FactsComplete(out) {
-						SetError(ErrGeneric)
-						return currentInputs, -1, false
-					}
-					MergeFacts(&currentInputs, out)
+				// same map_facts_out[src] always-merge for edges into block
+				out := fm.MapFactsOut[e.SrcID]
+				if !FactsComplete(currentInputs) || !FactsComplete(out) {
+					SetError(ErrGeneric)
+					return currentInputs, -1, false
 				}
+				MergeFacts(&currentInputs, out)
 			}
 		}
 		// Block.cpp:537–541 — shortcut when inputs match previous

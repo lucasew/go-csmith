@@ -392,6 +392,7 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 
 // BackupStmFactMaps mirrors FactMgr::backup_stm_fact_maps for a statement tree.
 // FactMgr.cpp:516–531 — copy in/out maps for stm and nested blocks.
+// Incomplete source maps store nil (no invent cleaned partial clone of holes).
 func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
@@ -407,10 +408,18 @@ func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fact
 	}
 	if st.StmID > 0 {
 		if in, ok := fm.MapFactsIn[st.StmID]; ok {
-			factsIn[st.StmID] = CloneFactSlice(in)
+			if !FactsComplete(in) {
+				factsIn[st.StmID] = nil
+			} else {
+				factsIn[st.StmID] = CloneFactSlice(in)
+			}
 		}
 		if out, ok := fm.MapFactsOut[st.StmID]; ok {
-			factsOut[st.StmID] = CloneFactSlice(out)
+			if !FactsComplete(out) {
+				factsOut[st.StmID] = nil
+			} else {
+				factsOut[st.StmID] = CloneFactSlice(out)
+			}
 		}
 	}
 }
@@ -421,10 +430,18 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 	}
 	if b.StmID > 0 {
 		if in, ok := fm.MapFactsIn[b.StmID]; ok {
-			factsIn[b.StmID] = CloneFactSlice(in)
+			if !FactsComplete(in) {
+				factsIn[b.StmID] = nil
+			} else {
+				factsIn[b.StmID] = CloneFactSlice(in)
+			}
 		}
 		if out, ok := fm.MapFactsOut[b.StmID]; ok {
-			factsOut[b.StmID] = CloneFactSlice(out)
+			if !FactsComplete(out) {
+				factsOut[b.StmID] = nil
+			} else {
+				factsOut[b.StmID] = CloneFactSlice(out)
+			}
 		}
 	}
 	for i := range b.Stmts {
@@ -434,6 +451,7 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 
 // RestoreStmFactMaps mirrors FactMgr::restore_stm_fact_maps.
 // FactMgr.cpp:533–548.
+// Incomplete backup entries restore as nil (no invent cleaned partial clone).
 func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
 		return
@@ -446,12 +464,20 @@ func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*Fac
 	}
 	if st.StmID > 0 {
 		if in, ok := factsIn[st.StmID]; ok {
-			fm.MapFactsIn[st.StmID] = CloneFactSlice(in)
+			if !FactsComplete(in) {
+				fm.MapFactsIn[st.StmID] = nil
+			} else {
+				fm.MapFactsIn[st.StmID] = CloneFactSlice(in)
+			}
 		} else {
 			delete(fm.MapFactsIn, st.StmID)
 		}
 		if out, ok := factsOut[st.StmID]; ok {
-			fm.MapFactsOut[st.StmID] = CloneFactSlice(out)
+			if !FactsComplete(out) {
+				fm.MapFactsOut[st.StmID] = nil
+			} else {
+				fm.MapFactsOut[st.StmID] = CloneFactSlice(out)
+			}
 		} else {
 			delete(fm.MapFactsOut, st.StmID)
 		}
@@ -464,12 +490,20 @@ func (fm *FactMgr) restoreBlockFactMaps(b *Block, factsIn, factsOut map[int][]*F
 	}
 	if b.StmID > 0 {
 		if in, ok := factsIn[b.StmID]; ok {
-			fm.MapFactsIn[b.StmID] = CloneFactSlice(in)
+			if !FactsComplete(in) {
+				fm.MapFactsIn[b.StmID] = nil
+			} else {
+				fm.MapFactsIn[b.StmID] = CloneFactSlice(in)
+			}
 		} else {
 			delete(fm.MapFactsIn, b.StmID)
 		}
 		if out, ok := factsOut[b.StmID]; ok {
-			fm.MapFactsOut[b.StmID] = CloneFactSlice(out)
+			if !FactsComplete(out) {
+				fm.MapFactsOut[b.StmID] = nil
+			} else {
+				fm.MapFactsOut[b.StmID] = CloneFactSlice(out)
+			}
 		} else {
 			delete(fm.MapFactsOut, b.StmID)
 		}
