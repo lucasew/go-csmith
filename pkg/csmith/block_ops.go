@@ -35,10 +35,9 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 		ivDepth = len(cg.IVBounds)
 	}
 	// Block.cpp:399–414 — must_read/write vars use get_dimension()
+	// Variable* always live on RW lists; nil hole fails closed false
+	// (no invent soft-skip hole and still need-nested from later vars)
 	check := func(v *Variable) bool {
-		if v == nil {
-			return false
-		}
 		dimen := v.GetDimension()
 		if dimen == 0 {
 			return false
@@ -52,11 +51,17 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 		return false
 	}
 	for _, v := range cg.RW.MustReadVars {
+		if v == nil {
+			return false
+		}
 		if check(v) {
 			return true
 		}
 	}
 	for _, v := range cg.RW.MustWriteVars {
+		if v == nil {
+			return false
+		}
 		if check(v) {
 			return true
 		}
