@@ -40,6 +40,22 @@ func TestAttributeGeneratorOutput(t *testing.T) {
 		t.Fatal("nil Attribute hole must SetError sticky")
 	}
 	ClearError()
+	// AttributeGenerator always live; sticky empty (no invent soft-skip past hole)
+	if (*AttributeGenerator)(nil).Output(NewRng(1)) != "" {
+		t.Fatal("nil AttributeGenerator Output must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil AttributeGenerator Output must SetError sticky")
+	}
+	ClearError()
+	// empty Attributes complete empty
+	if (&AttributeGenerator{}).Output(NewRng(1)) != "" {
+		t.Fatal("empty Attributes must complete empty")
+	}
+	if HasError() {
+		t.Fatal("empty Attributes must not sticky")
+	}
+	ClearError()
 }
 
 func TestMultiChoiceAttribute(t *testing.T) {

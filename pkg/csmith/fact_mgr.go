@@ -237,8 +237,10 @@ func (fm *FactMgr) SetMapFactsOutForStmt(st *Stmt, facts []*FactPointTo, blk *Bl
 }
 
 // SetMapFactsOutForStmtDest is set_fact_out with optional goto dest parent override.
+// FactMgr + Statement always live; sticky (no invent soft-skip set_fact_out past hole).
 func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk, destParent *Block) {
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent silent
@@ -385,8 +387,10 @@ func FindStmtByID(f *Function, stmID int) *Stmt {
 // Incomplete Param/LocalVars at visibility sites fail closed sticky IncompleteFactSlice
 // on map entry (no invent soft-skip append as absent / soft re-pick past incomplete out).
 // Incomplete fact PointTo also fails closed sticky hole marker (no invent clone partial).
+// FactMgr + Statement + Fact always live; sticky (no invent soft-skip append past hole).
 func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	if fm == nil || st == nil || fact == nil || fact.Var == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// StmID 0 fails closed sticky (no invent silent add_fact_out without map entry)
@@ -586,8 +590,10 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 // FactMgr.cpp:208–246 — first_time clones into final; else combine.
 // Fact* always live; incomplete source maps fail closed sticky (final hole marker —
 // no invent cleaned partial clone / soft re-pick past incomplete finals).
+// FactMgr always live; sticky (no invent soft-skip setup past hole).
 func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapFactsInFinal == nil {
@@ -662,11 +668,14 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 // Incomplete source maps store hole markers (no invent cleaned partial clones).
 // Incomplete get_blocks tree (nil if-arm) fails closed sticky: root maps backed as
 // IncompleteFactSlice (no invent root-only complete backup / soft re-pick past hole).
+// FactMgr + Statement + dest maps always live; sticky (no invent soft-skip backup past hole).
 func (fm *FactMgr) BackupStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if factsIn == nil || factsOut == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	blks := GetBlocksStmt(st)
@@ -721,8 +730,10 @@ func (fm *FactMgr) backupBlockFactMaps(b *Block, factsIn, factsOut map[int][]*Fa
 // Incomplete backup entries restore as hole markers (storeFactMapEntry).
 // Incomplete get_blocks tree fails closed sticky: root maps set IncompleteFactSlice
 // (no invent soft-skip nil arm then restore root/sibling as complete tree).
+// FactMgr + Statement always live; sticky (no invent soft-skip restore past hole).
 func (fm *FactMgr) RestoreStmFactMaps(st *Stmt, factsIn, factsOut map[int][]*FactPointTo) {
 	if fm == nil || st == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if fm.MapFactsIn == nil {
@@ -1177,8 +1188,10 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 // Variable* FieldVars always live; nil hole fails closed (GlobalFacts cleared —
 // no invent soft-skip field hole and still keep partial prior field merges).
 // Fact* from abstract always live; nil hole fails closed (GlobalFacts cleared).
+// FactMgr + Variable always live; sticky (no invent soft-skip makeup past hole).
 func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if fm == nil || v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	// recurse into aggregate fields (pointer members)
@@ -1708,8 +1721,10 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 // FactMgr.cpp:688–700 — non-const global pointers that are dead at function exit.
 // Incomplete GlobalFacts fails closed IncompleteVariables DeadGlobals
 // (not bare empty invent "no dangling" via VariablesComplete(nil)/len==0).
+// FactMgr + Function always live; sticky (no invent soft-skip dangling scan past hole).
 func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 	if fm == nil || f == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	f.DeadGlobals = f.DeadGlobals[:0]

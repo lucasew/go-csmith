@@ -534,6 +534,53 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 		t.Fatal("nil FM CreateCFGEdgeTo must SetError sticky")
 	}
 	ClearError()
+	// FactMgr mutators always live; sticky no invent soft-skip past hole
+	(*FactMgr)(nil).SetupInOutMaps(true)
+	if !HasError() {
+		t.Fatal("nil FM SetupInOutMaps must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).AddNewVarFact(CreateVariableScalars("g_x", GetIntType(), false, false))
+	if !HasError() {
+		t.Fatal("nil FM AddNewVarFact must SetError sticky")
+	}
+	ClearError()
+	fm.AddNewVarFact(nil)
+	if !HasError() {
+		t.Fatal("nil Variable AddNewVarFact must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).FindDanglingGlobalPtrs(&Function{Name: "f"})
+	if !HasError() {
+		t.Fatal("nil FM FindDanglingGlobalPtrs must SetError sticky")
+	}
+	ClearError()
+	fm.FindDanglingGlobalPtrs(nil)
+	if !HasError() {
+		t.Fatal("nil Function FindDanglingGlobalPtrs must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).AddFactOut(&Stmt{StmID: 1}, nil, MakeFactPointTo(
+		CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr))
+	if !HasError() {
+		t.Fatal("nil FM AddFactOut must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).SetMapFactsOutForStmtDest(&Stmt{StmID: 1}, nil, nil, nil)
+	if !HasError() {
+		t.Fatal("nil FM SetMapFactsOutForStmtDest must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).BackupStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{})
+	if !HasError() {
+		t.Fatal("nil FM BackupStmFactMaps must SetError sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).RestoreStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{})
+	if !HasError() {
+		t.Fatal("nil FM RestoreStmFactMaps must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindParentBlockNilSticky(t *testing.T) {

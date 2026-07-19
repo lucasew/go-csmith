@@ -161,8 +161,10 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 
 // DoFinalization mirrors VariableSelector::doFinalization.
 // VariableSelector.cpp:1584–1592 — clear AllVars / GlobalList / nonvolatiles.
+// VariableSelector always live; sticky (no invent soft-skip finalization past hole).
 func (vs *VariableSelector) DoFinalization() {
 	if vs == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	vs.AllVars = nil

@@ -163,6 +163,13 @@ func TestVariableSelectorDoFinalization(t *testing.T) {
 	if len(vs.AllVars) != 0 || len(vs.GlobalList) != 0 {
 		t.Fatal("cleared")
 	}
+	// VariableSelector always live; sticky no invent soft-skip finalization past hole
+	ClearError()
+	(*VariableSelector)(nil).DoFinalization()
+	if !HasError() {
+		t.Fatal("nil DoFinalization must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMatchVarNameNilSticky(t *testing.T) {

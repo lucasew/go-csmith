@@ -176,10 +176,12 @@ func BlockContainsStmt(b *Block, target *Stmt) bool {
 // Statement.cpp:769–804 — unvisited goto out of tree, or visited goto whose
 // dest facts are not implied by jump-src outs.
 func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
+	// Statement always live; sticky unfixed (no invent all-fixed soft-skip past hole).
 	// Statement.cpp:770–771 — get_fact_mgr_for_func; assert(fm)
 	// fail closed sticky: nil FM is unfixed (no invent "all gotos fixed" / soft re-pick)
 	if root == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if fm == nil {
 		SetError(ErrGeneric)
@@ -198,10 +200,12 @@ func ContainsUnfixedGoto(root *Stmt, fm *FactMgr) bool {
 
 // ContainsUnfixedGotoBlock mirrors contains_unfixed_goto when root is a Block.
 // Block is a Statement in C++; walk nested stmts for contains_stmt(goto/dest).
+// Block always live; sticky unfixed (no invent all-fixed soft-skip past hole).
+// assert(fm) sticky unfixed without FactMgr.
 func ContainsUnfixedGotoBlock(b *Block, fm *FactMgr) bool {
-	// assert(fm) sticky unfixed without FactMgr
 	if b == nil {
-		return false
+		SetError(ErrGeneric)
+		return true
 	}
 	if fm == nil {
 		SetError(ErrGeneric)

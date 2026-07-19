@@ -179,8 +179,14 @@ type AttributeGenerator struct {
 }
 
 // Output mirrors AttributeGenerator::Output — " __attribute__((a, b))" or "".
+// AttributeGenerator always live at emit; sticky empty (no invent soft-skip past hole).
+// Empty Attributes is complete empty (not incomplete IR).
 func (g *AttributeGenerator) Output(r *Rng) string {
-	if g == nil || len(g.Attributes) == 0 {
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if len(g.Attributes) == 0 {
 		return ""
 	}
 	// AttributeGenerator always has process RNG when attributes exist; sticky no invent skip

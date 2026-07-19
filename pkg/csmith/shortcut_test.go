@@ -396,6 +396,22 @@ func TestContainsUnfixedGotoImply(t *testing.T) {
 	if !ContainsUnfixedGoto(root, fm) {
 		t.Fatal("incomplete MapFactsOut must fail closed unfixed")
 	}
+	// Statement/Block always live; sticky unfixed (no invent all-fixed soft-skip)
+	ClearError()
+	if !ContainsUnfixedGoto(nil, fm) {
+		t.Fatal("nil root ContainsUnfixedGoto must fail closed unfixed")
+	}
+	if !HasError() {
+		t.Fatal("nil root ContainsUnfixedGoto must SetError sticky")
+	}
+	ClearError()
+	if !ContainsUnfixedGotoBlock(nil, fm) {
+		t.Fatal("nil Block ContainsUnfixedGotoBlock must fail closed unfixed")
+	}
+	if !HasError() {
+		t.Fatal("nil Block ContainsUnfixedGotoBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
