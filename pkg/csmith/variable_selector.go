@@ -78,23 +78,27 @@ func ChooseVisibleReadVar(
 	if typ == nil {
 		return nil
 	}
-	// incomplete union fact map fails closed (no invent soft-filter nonreadable past holes)
+	// incomplete union fact map fails closed sticky (no invent soft-filter nonreadable past holes)
 	if unionFacts != nil && !UnionFactsComplete(unionFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	expanded := ExpandStructUnionVars(append([]*Variable(nil), readVars...), typ)
-	// IncompleteVariables expand — fail closed (not invent filter past hole)
+	// IncompleteVariables expand — fail closed sticky (not invent filter past hole)
 	if !VariablesComplete(expanded) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete stack lists must not invent filter that drops all locals
 	if b != nil && !b.StackScanComplete() {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var ok []*Variable
 	for _, v := range expanded {
 		// pre-validated VariablesComplete; Type always live for match
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if v.IsVirtual() || v.IsVolatile() {
@@ -1806,8 +1810,9 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	ty := GetIntType()
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllNonArrayVisibleVars(blk)
-	// incomplete visible pool — fail closed (no invent loop ctrl from partial)
+	// incomplete visible pool — fail closed sticky (no invent loop ctrl from partial)
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// VariableSelector.cpp:1155–1168 — remove no-int-field and union-with-pointer
@@ -1815,6 +1820,7 @@ func (vs *VariableSelector) SelectLoopCtrlVar(r *Rng, cg CGContext, invalid map[
 	var invalidSlice []*Variable
 	for _, v := range vars {
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if invalid[v] {
@@ -1941,8 +1947,9 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 	}
 	blk := cg.CurrentBlock()
 	vars := vs.FindAllVisibleVars(blk)
-	// incomplete GlobalList/LocalVars hole — fail closed
+	// incomplete GlobalList/LocalVars hole — fail closed sticky (no invent array select soft nil)
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// also include Arrays list members that may not be on GlobalList yet
@@ -1975,9 +1982,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 		seen[av] = true
 		arrayVars = append(arrayVars, av)
 	}
-	// Variable* always live in visible list; nil hole fails closed (FindAll already)
+	// Variable* always live in visible list; nil hole fails closed sticky (FindAll already)
 	for _, v := range vars {
 		if v == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		if !v.IsArray {
@@ -1987,9 +1995,10 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			add(v.AsArray)
 		}
 	}
-	// ArrayVariable* on Arrays list; nil hole fails closed
+	// ArrayVariable* on Arrays list; nil hole fails closed sticky
 	for _, av := range vs.Arrays {
 		if av == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		add(av)

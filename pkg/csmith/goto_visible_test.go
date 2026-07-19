@@ -43,17 +43,27 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	if got != loc {
 		t.Fatal("local on stack")
 	}
-	// nil candidate hole fails closed
+	// nil candidate hole fails closed sticky
+	ClearError()
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a, nil}, GetIntType(), nil) != nil {
 		t.Fatal("nil readVars hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil readVars hole must SetError sticky")
+	}
+	ClearError()
 	// incomplete union facts must not invent soft-filter pick
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, GetIntType(), IncompleteUnionFactSlice()) != nil {
 		t.Fatal("incomplete union facts must fail closed nil pick")
 	}
+	if !HasError() {
+		t.Fatal("incomplete union facts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectReadVarsSorted(t *testing.T) {
+	ClearError()
 	a := CreateVariableScalars("g_z", GetIntType(), false, false)
 	b := CreateVariableScalars("g_a", GetIntType(), false, false)
 	e := EmptyEffect().ReadVar(a).ReadVar(b)

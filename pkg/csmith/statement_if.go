@@ -18,6 +18,17 @@ func MakeRandomIf(
 	if r == nil || cg == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky (before EffectStm clear; no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// StatementIf.cpp:58 — DEPTH_GUARD_BY_TYPE_RETURN(dtStatementIf, nullptr)
 	if DepthGuardByType(opts, DtStatementIf) == BadDepth {
 		return nil

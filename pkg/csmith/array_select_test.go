@@ -169,15 +169,24 @@ func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 }
 
 func TestSelectArrayNilHoleFailClosed(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{nil}
 	if vs.SelectArray(NewRng(1), EmptyCGContext()) != nil {
 		t.Fatal("visible list hole must fail closed SelectArray")
 	}
+	if !HasError() {
+		t.Fatal("visible list hole must SetError sticky")
+	}
+	ClearError()
 	vs.GlobalList = nil
 	vs.Arrays = []*ArrayVariable{nil}
 	if vs.SelectArray(NewRng(2), EmptyCGContext()) != nil {
 		t.Fatal("Arrays list hole must fail closed SelectArray")
 	}
+	if !HasError() {
+		t.Fatal("Arrays list hole must SetError sticky")
+	}
+	ClearError()
 }

@@ -67,6 +67,17 @@ func MakeRandomArrayOp(
 	if vs == nil || r == nil || cg == nil {
 		return Stmt{}
 	}
+	// incomplete ambient fails closed sticky (no invent array-op / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
 	// StatementArrayOp.cpp:77–80 — rnd_flipcoin(5); ERROR_GUARD
 	aryInit := r.RndFlipcoin(5)
 	if HasError() {
@@ -96,6 +107,17 @@ func MakeRandomArrayLoop(
 	cg *CGContext,
 ) *Stmt {
 	if r == nil || vs == nil || cg == nil {
+		return nil
+	}
+	// incomplete ambient fails closed sticky (no invent array loop / soft re-pick past holes)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// StatementFor.cpp:316–317 — rnd_upto(CGOptions::max_array_num_in_loop())
@@ -135,9 +157,10 @@ func MakeRandomArrayLoop(
 	if cg.RW != nil {
 		allMustReads = CombineVariableSets(cg.RW.MustReadVars, mustReads)
 		allMustWrites = CombineVariableSets(cg.RW.MustWriteVars, mustWrites)
-		// incomplete combine / existing No* lists fail closed (no invent partial RW)
+		// incomplete combine / existing No* lists fail closed sticky (no invent partial RW)
 		if !VariablesComplete(allMustReads) || !VariablesComplete(allMustWrites) ||
 			!VariablesComplete(cg.RW.NoReadVars) || !VariablesComplete(cg.RW.NoWriteVars) {
+			SetError(ErrGeneric)
 			return nil
 		}
 		noReads = append([]*Variable(nil), cg.RW.NoReadVars...)
@@ -216,6 +239,17 @@ func MakeRandomArrayInit(
 	_ = stmtTab
 	_ = tables
 	if vs == nil || r == nil || cg == nil {
+		return Stmt{}
+	}
+	// incomplete ambient fails closed sticky before EffectStm clear (no invent array init)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return Stmt{}
+	}
+	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	av := vs.SelectArray(r, *cg)

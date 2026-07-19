@@ -437,6 +437,17 @@ func MakeRandomFor(
 	if cg.FM == nil {
 		return nil
 	}
+	// incomplete ambient fails closed sticky before EffectStm clear (no invent soft re-pick)
+	if !EffectComplete(cg.EffectContext()) ||
+		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
+		!EffectComplete(cg.EffectStm) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !FactsComplete(cg.FM.GlobalFacts) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	// StatementFor.cpp:290 — clear per-statement effect before building for
 	cg.EffectStm = EmptyEffect()
 

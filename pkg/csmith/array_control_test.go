@@ -256,3 +256,43 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomArrayLoopIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient / RW combine must sticky ERROR (no invent array loop soft re-pick)
+	ClearError()
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if MakeRandomArrayLoop(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayLoop")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectAccum must SetError sticky")
+	}
+	ClearError()
+	// incomplete NoReadVars on RW — MaxArrayNumInLoop=0 skips select; always hits combine
+	opts0 := Defaults()
+	opts0.MaxArrayNumInLoop = 0
+	eff := EmptyEffect()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg2.EffectAccum = &eff
+	cg2.RW = &RWDirective{NoReadVars: IncompleteVariables()}
+	if MakeRandomArrayLoop(NewRng(2), opts0, NewProbabilities(opts0), vs, NewExprTables(opts0), NewStatementThresholdTable(opts0), &cg2) != nil {
+		t.Fatal("incomplete RW NoReadVars must fail closed MakeRandomArrayLoop")
+	}
+	if !HasError() {
+		t.Fatal("incomplete RW lists must SetError sticky")
+	}
+	ClearError()
+	if stmtOK(MakeRandomArrayOp(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)) {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomArrayOp")
+	}
+	if !HasError() {
+		t.Fatal("MakeRandomArrayOp must SetError sticky")
+	}
+	ClearError()
+}

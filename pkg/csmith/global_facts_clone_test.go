@@ -216,3 +216,32 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
+	// incomplete ambient at entry must sticky ERROR before EffectStm clear
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if MakeRandomIf(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
+	}
+	if !HasError() {
+		t.Fatal("MakeRandomIf must SetError sticky")
+	}
+	ClearError()
+	cg2 := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+	cg2.EffectAccum = &inc
+	if MakeRandomFor(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
+	}
+	if !HasError() {
+		t.Fatal("MakeRandomFor must SetError sticky")
+	}
+	ClearError()
+}
