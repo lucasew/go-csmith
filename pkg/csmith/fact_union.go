@@ -34,9 +34,14 @@ func MakeFactUnion(v *Variable, fid int) *FactUnion {
 }
 
 // MakeFactUnionTop mirrors make_fact(v) with TOP.
+// Incomplete MakeFactUnion sticky nil (no invent TOP shell past hole).
 func MakeFactUnionTop(v *Variable) *FactUnion {
 	f := MakeFactUnion(v, FactUnionTop)
 	if f == nil {
+		// MakeFactUnion may already sticky non-union/incomplete subject
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	return f

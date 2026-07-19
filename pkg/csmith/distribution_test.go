@@ -80,3 +80,26 @@ func TestThresholdTableNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestDistributionTableNilSticky(t *testing.T) {
+	ClearError()
+	(*DistributionTable)(nil).AddEntry(1, 10)
+	if !HasError() {
+		t.Fatal("nil DistributionTable AddEntry must SetError sticky")
+	}
+	ClearError()
+	if (*DistributionTable)(nil).Max() != 0 {
+		t.Fatal("nil Max must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil Max must SetError sticky")
+	}
+	ClearError()
+	if (*DistributionTable)(nil).RndNumToKey(0) != -1 {
+		t.Fatal("nil RndNumToKey must return -1")
+	}
+	if !HasError() {
+		t.Fatal("nil RndNumToKey must SetError sticky")
+	}
+	ClearError()
+}

@@ -50,6 +50,7 @@ func (env *TypeEnv) FindPointerType(t *Type, add bool) *Type {
 // Incomplete DerivedTypes fails closed sticky false (no invent "no pointers" /
 // soft re-pick scalar paths past DerivedTypes holes via typesComplete false).
 func (env *TypeEnv) HasPointerType() bool {
+	// nil TypeEnv is complete empty pool (no pointers) — not incomplete IR
 	if env == nil {
 		return false
 	}
@@ -65,7 +66,7 @@ func (env *TypeEnv) HasPointerType() bool {
 // Type* always live on AllTypes; nil hole fails closed (nil — no invent soft-skip
 // hole and still match a later entry, or invent "not found" past incomplete pool).
 func (env *TypeEnv) FindType(t *Type) *Type {
-	// nil env: soft not-found (no AllTypes pool)
+	// nil TypeEnv is complete empty pool — soft not-found (not incomplete IR)
 	if env == nil {
 		return nil
 	}

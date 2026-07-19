@@ -339,7 +339,9 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 }
 
 // ReadUnionFieldBlock walks statements for union field access.
+// Incomplete Block sticky false for nil shell is complete empty walk; live block only.
 func ReadUnionFieldBlock(b *Block) bool {
+	// nil block is complete empty (no stmts) — not incomplete IR
 	if b == nil {
 		return false
 	}

@@ -10,8 +10,14 @@ type DistributionTable struct {
 }
 
 // AddEntry mirrors DistributionTable::add_entry.
+// Incomplete table sticky no-op (no invent soft grow past missing shell).
 func (d *DistributionTable) AddEntry(key, prob int) {
-	if d == nil || prob <= 0 {
+	// DistributionTable always live when building filters; sticky incomplete no invent
+	if d == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if prob <= 0 {
 		return
 	}
 	d.keys = append(d.keys, key)
@@ -20,16 +26,25 @@ func (d *DistributionTable) AddEntry(key, prob int) {
 }
 
 // Max mirrors get_max.
+// Incomplete table sticky 0 (no invent default domain soft-skip past hole).
 func (d *DistributionTable) Max() int {
+	// DistributionTable always live; sticky incomplete no invent max 0 soft-skip
 	if d == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	return d.maxProb
 }
 
 // RndNumToKey mirrors rnd_num_to_key — walk cumulative probs.
+// Incomplete table sticky -1 (no invent identity key soft-skip past hole).
 func (d *DistributionTable) RndNumToKey(rnd int) int {
-	if d == nil || rnd < 0 || rnd >= d.maxProb {
+	// DistributionTable always live for lookup; sticky incomplete no invent -1 soft-skip
+	if d == nil {
+		SetError(ErrGeneric)
+		return -1
+	}
+	if rnd < 0 || rnd >= d.maxProb {
 		return -1
 	}
 	for i, p := range d.probs {

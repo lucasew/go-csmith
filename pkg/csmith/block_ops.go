@@ -367,9 +367,11 @@ func (fm *FactMgr) ResetBlockFactMaps(b *Block) {
 }
 
 // collectTreeStmAndBlockIDs records st's StmID and nested get_blocks Block/Stmt ids.
-// Returns false on incomplete Block* hole (no invent partial tree as complete).
+// Sticky false on incomplete Block* hole (no invent partial tree as complete).
 func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
+	// Statement + id set always live; sticky incomplete no invent empty tree
 	if st == nil || ids == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if st.StmID > 0 {
@@ -377,6 +379,8 @@ func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
 	}
 	for _, b := range GetBlocksStmt(st) {
 		if b == nil {
+			// incomplete arm sticky fail closed
+			SetError(ErrGeneric)
 			return false
 		}
 		if !collectBlockStmIDs(b, ids) {
@@ -387,9 +391,11 @@ func collectTreeStmAndBlockIDs(st *Stmt, ids map[int]bool) bool {
 }
 
 // collectBlockStmIDs records b.StmID and nested get_blocks trees.
-// Returns false on incomplete hole.
+// Sticky false on incomplete hole.
 func collectBlockStmIDs(b *Block, ids map[int]bool) bool {
+	// Block + id set always live; sticky incomplete no invent empty block tree
 	if b == nil || ids == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if b.StmID > 0 {

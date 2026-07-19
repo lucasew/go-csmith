@@ -147,3 +147,14 @@ func TestIsArrayField(t *testing.T) {
 		t.Fatal("array field")
 	}
 }
+
+func TestIsPackedAggregateFieldVarNilSticky(t *testing.T) {
+	ClearError()
+	if (*Variable)(nil).IsPackedAggregateFieldVar() {
+		t.Fatal("nil IsPackedAggregateFieldVar must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsPackedAggregateFieldVar must SetError sticky")
+	}
+	ClearError()
+}

@@ -755,8 +755,11 @@ func (v *Variable) IsValidVolatile() bool {
 
 // IsPackedAggregateFieldVar mirrors Variable::is_packed_aggregate_field_var.
 // Variable.cpp:307–312 — any ancestor field_var_of has packed aggregate type.
+// Incomplete Variable sticky false (no invent not-packed soft-skip past hole).
 func (v *Variable) IsPackedAggregateFieldVar() bool {
+	// Variable always live; sticky incomplete no invent not-packed soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for p := v.FieldVarOf; p != nil; p = p.FieldVarOf {
@@ -772,7 +775,12 @@ func (v *Variable) IsPackedAggregateFieldVar() bool {
 // Incomplete parent FieldVars sticky true (restrictive — no invent not-packed
 // by soft-skipping FieldVars holes before this field).
 func (v *Variable) IsPackedAfterBitfield() bool {
-	if v == nil || v.FieldVarOf == nil {
+	// Variable always live; non-field complete false
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if v.FieldVarOf == nil {
 		return false
 	}
 	parent := v.FieldVarOf
