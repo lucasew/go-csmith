@@ -434,14 +434,20 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	if len(got) != 0 {
 		t.Fatal(got)
 	}
-	// incomplete facts on RemoveLoopLocalFacts
+	// incomplete facts on RemoveLoopLocalFacts sticky
+	ClearError()
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty)) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("incomplete facts RemoveLoopLocalFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
+	ClearError()
 	fm := NewFactMgr(nil)
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
@@ -449,4 +455,15 @@ func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	if FactsComplete(fm.MapFactsOut[5]) {
 		t.Fatal("incomplete set_fact_out must not invent complete empty")
 	}
+	if !HasError() {
+		t.Fatal("incomplete set_fact_out must SetError sticky")
+	}
+	ClearError()
+	// StmID 0 fails closed sticky (no invent silent set_fact_out)
+	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
+	fm.SetMapFactsOutForStmt(st0, []*FactPointTo{MakeFactPointTo(p, NullPtr)}, nil)
+	if !HasError() {
+		t.Fatal("StmID 0 set_fact_out must SetError sticky")
+	}
+	ClearError()
 }

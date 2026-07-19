@@ -102,6 +102,7 @@ func TestVisitFactsLhsSetsLhsWrite(t *testing.T) {
 
 func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	// soft invent: Clone incomplete PointTo appends nil / keeps partial out
+	ClearError()
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
 	body := &Block{Func: fn}
 	fn.Body = body
@@ -111,6 +112,10 @@ func TestRemoveFunctionLocalFactsIncompletePointToFailClosed(t *testing.T) {
 	if FactsComplete(RemoveFunctionLocalFacts(facts, fn)) {
 		t.Fatal("incomplete PointTo must fail closed incomplete, not invent filter")
 	}
+	if !HasError() {
+		t.Fatal("incomplete PointTo RemoveFunctionLocalFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRemoveFunctionLocalFacts(t *testing.T) {

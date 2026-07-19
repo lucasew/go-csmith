@@ -51,6 +51,9 @@ func TestStackScanCompleteHoleFailClosed(t *testing.T) {
 	if FactsComplete(out) {
 		t.Fatal("RemoveFunctionLocalFactsAt must fail closed on incomplete stack", out)
 	}
+	if !HasError() {
+		t.Fatal("RemoveFunctionLocalFactsAt incomplete stack must SetError sticky")
+	}
 	// Block stack scan
 	if blk.StackScanComplete() {
 		t.Fatal("Block.StackScanComplete hole")

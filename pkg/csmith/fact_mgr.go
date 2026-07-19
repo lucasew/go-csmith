@@ -210,18 +210,20 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 	if fm == nil || st == nil {
 		return
 	}
-	// Statement::stm_id always live; StmID 0 fails closed (no invent silent
-	// set_fact_out success without map entry)
+	// Statement::stm_id always live; StmID 0 fails closed sticky (no invent silent
+	// set_fact_out success without map entry / soft re-pick past missing out)
 	if st.StmID <= 0 {
+		SetError(ErrGeneric)
 		return
 	}
-	// incomplete source facts fail closed — hole marker (not SetMapFactsOut(nil)
+	// incomplete source facts fail closed sticky — hole marker (not SetMapFactsOut(nil)
 	// which storeFactMapEntry would invent as complete empty)
 	if !FactsComplete(facts) {
 		if fm.MapFactsOut == nil {
 			fm.MapFactsOut = make(map[int][]*FactPointTo)
 		}
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	cp := CloneFactSlice(facts)
@@ -244,9 +246,10 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		}
 		// FactMgr.cpp:427–428 assert(func); no soft invent RemoveFunctionLocalFacts
 		// when dest unknown (wrong filter vs update_facts_for_dest).
-		// IncompleteFactSlice — bare nil + SetMapFactsOut invents complete empty.
+		// IncompleteFactSlice sticky — bare nil + SetMapFactsOut invents complete empty.
 		if fm.Func == nil {
 			cp = IncompleteFactSlice()
+			SetError(ErrGeneric)
 		} else {
 			out := []*FactPointTo{}
 			UpdateFactsForDest(cp, &out, fm.Func, dp)
@@ -257,6 +260,17 @@ func (fm *FactMgr) SetMapFactsOutForStmtDest(st *Stmt, facts []*FactPointTo, blk
 		if blk == nil {
 			cp = RemoveFunctionLocalFactsAt(cp, fm.Func, nil)
 		}
+	}
+	// incomplete after filter/dest — store hole sticky (no invent complete out map)
+	if !FactsComplete(cp) {
+		if fm.MapFactsOut == nil {
+			fm.MapFactsOut = make(map[int][]*FactPointTo)
+		}
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
 	}
 	fm.SetMapFactsOut(st.StmID, cp)
 }
@@ -758,28 +772,35 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 // RemoveLoopLocalFacts mirrors FactMgr::remove_loop_local_facts for a block.
 // FactMgr.cpp:601–612 — collect locals from blk up through enclosing loop,
 // then update_facts_for_oos_vars (drop subjects + mark pointees garbage).
-// Incomplete facts/locals/clone fail closed nil (no invent cleaned OOS filter).
+// Incomplete facts/locals/clone fail closed sticky (no invent cleaned OOS filter
+// / soft re-pick past wiped break-continue out maps).
 func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 	if blk == nil {
 		return facts
 	}
-	// incomplete facts fail closed before OOS
+	// incomplete facts fail closed sticky before OOS
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	locals := collectLoopLocalVars(blk)
-	// incomplete LocalVars hole — fail closed
+	// incomplete LocalVars hole — fail closed sticky
 	if !VariablesComplete(locals) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	out := CloneFactSlice(facts)
-	// incomplete clone is hole marker (not bare nil invent empty complete)
+	// incomplete clone is hole marker sticky (not bare nil invent empty complete)
 	if !FactsComplete(out) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	// Statement.cpp set_fact_out / FactMgr.cpp:607–611
 	UpdateFactsForOOSVars(locals, &out)
 	if !FactsComplete(out) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	return out
@@ -829,13 +850,15 @@ func RemoveFunctionLocalFacts(facts []*FactPointTo, f *Function) []*FactPointTo 
 // RemoveFunctionLocalFactsAt mirrors FactMgr::remove_function_local_facts.
 // FactMgr.cpp:179–205 — drop stack/other-rv subjects; mark_func_end on remaining.
 // Fact* always live; incomplete PointTo/fact holes or incomplete Param/LocalVars
-// stack lists fail closed (nil out — no invent keep stack locals when IsVarOnStack
-// returns false past a hole, or leave stack pointees live).
+// stack lists fail closed sticky (no invent keep stack locals when IsVarOnStack
+// returns false past a hole, or soft re-pick past wiped return out maps).
 func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Block) []*FactPointTo {
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	if f != nil && stParent != nil && !f.StackScanComplete(stParent) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
@@ -849,27 +872,32 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 		}
 		cl := fact.Clone()
 		if cl == nil {
+			SetError(ErrGeneric)
 			return IncompleteFactSlice()
 		}
 		out = append(out, cl)
 	}
 	// FactMgr.cpp:196–204 — remaining facts may point to stack locals → garbage
 	MarkFuncEndOnFacts(&out, f, stParent)
-	// MarkFuncEndOnFacts clears *facts on incomplete after mark
+	// MarkFuncEndOnFacts clears *facts on incomplete after mark sticky
 	if !FactsComplete(out) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return IncompleteFactSlice()
 	}
 	return out
 }
 
 // filterFactsNotInVars drops subjects in drop. Fact* always live;
-// incomplete maps/pointees or incomplete drop list fail closed (nil out —
-// no invent keep subjects that match only after a drop-list hole).
+// incomplete maps/pointees or incomplete drop list fail closed sticky
+// (no invent keep subjects that match only after a drop-list hole).
 func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo {
 	if len(drop) == 0 {
 		return facts
 	}
 	if !FactsComplete(facts) || !VariablesComplete(drop) {
+		SetError(ErrGeneric)
 		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
