@@ -54,7 +54,8 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 func TestApplyInitExprOutputDef(t *testing.T) {
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	pt := PointerTo(GetIntType())
-	pv := CreateVariableQfer("g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
+	pv := CreateVariableQfer("g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
 	applyInitExpr(pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
 	def := pv.OutputDef(false)
 	if !strings.Contains(def, "g_p") || !strings.Contains(def, "&") {

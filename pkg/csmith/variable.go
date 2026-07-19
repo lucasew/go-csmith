@@ -125,8 +125,13 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 		// and those fields are not OutputDef'd as standalone defs)
 		return ""
 	}
+	// Variable.cpp:640–660 — OutputDecl always live; no invent " = init;" without decl
+	decl := v.OutputDeclOpts(forceStatic, prefixName)
+	if decl == "" {
+		return ""
+	}
 	var b strings.Builder
-	b.WriteString(v.OutputDeclOpts(forceStatic, prefixName))
+	b.WriteString(decl)
 	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
 	if withAttrs && r != nil {
 		b.WriteString(EnsureVarAttrGenerator().Output(r))

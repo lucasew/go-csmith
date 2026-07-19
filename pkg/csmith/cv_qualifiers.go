@@ -622,9 +622,9 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 	if t == nil {
 		return ""
 	}
-	// CVQualifiers.cpp:533 — assert(sanity_check(t)); fail closed bare type (no invent bad layout)
+	// CVQualifiers.cpp:533 — assert(sanity_check(t)); no invent bare CName for bad layout
 	if !q.Wildcard && len(q.IsConsts) > 0 && !q.SanityCheck(t) {
-		return t.CName()
+		return ""
 	}
 	opts := ProcessOptions()
 	emitConst := func() bool { return opts.Consts }

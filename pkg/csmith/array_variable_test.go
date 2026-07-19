@@ -270,6 +270,17 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	}
 }
 
+func TestArrayCDeclTypeNoInventInt(t *testing.T) {
+	// ArrayVariable decl always has live type; no invent "int"
+	av := &ArrayVariable{Variable: Variable{Name: "g_a"}, Sizes: []int{2}}
+	if s := av.CDeclType(); s != "" {
+		t.Fatal("nil Type must fail closed", s)
+	}
+	if s := av.OutputDef(); s != "" {
+		t.Fatal("incomplete array def must fail closed", s)
+	}
+}
+
 func TestArrayOutputDefMissingInitFailClosed(t *testing.T) {
 	// ArrayVariable.cpp:503 — assert(init) on string-initializer path
 	av := &ArrayVariable{

@@ -147,8 +147,9 @@ func (g *AttributeGenerator) Output(r *Rng) string {
 	}
 	var parts []string
 	for _, a := range g.Attributes {
+		// Attribute* always live in C++; no invent skip nil holes
 		if a == nil {
-			continue
+			return ""
 		}
 		s := a.MakeRandom(r)
 		if s != "" {

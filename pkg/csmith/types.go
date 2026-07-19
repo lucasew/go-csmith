@@ -333,7 +333,8 @@ func (t *Type) SizeInBytes() int {
 	case ELongLong, EULongLong, EInt128, EUInt128:
 		return 8
 	default:
-		return platformIntSize
+		// unknown simple — assert path; no soft invent platform int size
+		return 0
 	}
 }
 
@@ -679,8 +680,9 @@ func (t *Type) SignedOverflowPossible(intSize int) bool {
 	if t == nil || !t.IsSimple() || !t.IsSigned() {
 		return false
 	}
+	// CGOptions::int_size always positive; no invent platform size when arg is 0
 	if intSize < 1 {
-		intSize = platformIntSize
+		return false
 	}
 	return t.SizeInBytes() >= intSize
 }

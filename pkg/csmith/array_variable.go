@@ -200,8 +200,13 @@ func (av *ArrayVariable) IsGlobal() bool {
 
 // CDeclType returns C type with dimensions, e.g. int x[2][3].
 func (av *ArrayVariable) CDeclType() string {
+	// ArrayVariable / Variable decl always has live type; no invent "int"
 	if av == nil || av.Type == nil {
-		return "int"
+		return ""
+	}
+	cn := av.Type.CName()
+	if cn == "" || av.Name == "" {
+		return ""
 	}
 	var b strings.Builder
 	if av.IsConst() {
@@ -210,7 +215,7 @@ func (av *ArrayVariable) CDeclType() string {
 	if av.IsVolatile() {
 		b.WriteString("volatile ")
 	}
-	b.WriteString(av.Type.CName())
+	b.WriteString(cn)
 	b.WriteString(" ")
 	b.WriteString(av.Name)
 	for _, s := range av.Sizes {
@@ -507,10 +512,15 @@ func (av *ArrayVariable) OutputDef() string {
 	if av.Collective != nil {
 		return ""
 	}
+	// ArrayVariable.cpp:494–507 — OutputDecl always live; no invent bare ";" / " = …"
+	decl := av.CDeclType()
+	if decl == "" {
+		return ""
+	}
 	var b strings.Builder
 	if !av.NoLoopInitializer() {
 		// ArrayVariable.cpp:494–498 — OutputDecl + ";" (loop fills body)
-		b.WriteString(av.CDeclType())
+		b.WriteString(decl)
 		b.WriteString(";")
 		return b.String()
 	}
@@ -528,7 +538,7 @@ func (av *ArrayVariable) OutputDef() string {
 	if len(vals) == 0 {
 		return ""
 	}
-	b.WriteString(av.CDeclType())
+	b.WriteString(decl)
 	// multi-dim or multi-value: recursive full initializer when total size small
 	if av.TotalSize() <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
 		seed := uint32(0xABCDEF)

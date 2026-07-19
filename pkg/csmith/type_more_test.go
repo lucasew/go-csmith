@@ -36,6 +36,17 @@ func TestSignedOverflowPossible(t *testing.T) {
 	if GetSimpleType(EUInt).SignedOverflowPossible(4) {
 		t.Fatal("unsigned")
 	}
+	// no invent platform int_size when arg is 0
+	if GetIntType().SignedOverflowPossible(0) {
+		t.Fatal("intSize 0 must fail closed false")
+	}
+}
+
+func TestSizeInBytesNoInventUnknownSimple(t *testing.T) {
+	// unknown simple — no soft invent platform int size
+	if n := (&Type{simple: ESimpleType(99)}).SizeInBytes(); n != 0 {
+		t.Fatal("unknown simple SizeInBytes invent", n)
+	}
 }
 
 func TestPrintfDirective(t *testing.T) {

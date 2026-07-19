@@ -224,6 +224,24 @@ func TestVariableOutputDefMissingInitFailClosed(t *testing.T) {
 	}
 }
 
+func TestVariableOutputDefMissingDeclFailClosed(t *testing.T) {
+	// Variable.cpp:640–660 — no invent " = 3;" without live decl/type
+	v := &Variable{Name: "g_u", Init: MakeInt(3)}
+	if v.OutputDef(true) != "" {
+		t.Fatal("missing type must fail closed", v.OutputDef(true))
+	}
+}
+
+func TestOutputQualifiedTypeBadSanityFailClosed(t *testing.T) {
+	// CVQualifiers.cpp:533 — assert(sanity_check(t)); no invent bare type
+	// pointer type needs 2-level qfer (indirect+1)
+	pt := PointerTo(GetIntType())
+	q := NewCVQualifiers([]bool{false}, []bool{false}) // too short
+	if s := q.OutputQualifiedType(pt); s != "" {
+		t.Fatal("bad qfer layout must fail closed", s)
+	}
+}
+
 func TestOutputGlobalsUsesOutputDef(t *testing.T) {
 	opts := Defaults()
 	opts.Seed = 2
