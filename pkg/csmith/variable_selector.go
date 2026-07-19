@@ -183,7 +183,12 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		var ok []*Variable
 		boundOf := map[*Variable]int{}
 		for iv, bound := range cg.IVBounds {
-			if iv == nil || bound == InvalidIVBound {
+			// Variable* always live as IVBounds keys; nil key fails closed
+			// (no invent partial ok_ivs pool by soft-skipping holes)
+			if iv == nil {
+				return nil
+			}
+			if bound == InvalidIVBound {
 				continue
 			}
 			// iter->second != INVALID && bound < dimen_len
@@ -939,7 +944,12 @@ func (vs *VariableSelector) SelectMustUseVar(
 		if !v.IsVisible(blk) {
 			continue
 		}
-		if v.Type == nil || !typ.Match(v.Type, mt) {
+		// Variable::type always live; Type-nil fails closed (no invent soft-skip
+		// incomplete must-use entry and still pick a later list member)
+		if v.Type == nil {
+			return nil
+		}
+		if !typ.Match(v.Type, mt) {
 			continue
 		}
 		if qfer != nil && !qfer.Wildcard {
@@ -1026,6 +1036,11 @@ func ChooseVarFull(
 		for _, v := range vars {
 			// Variable* always live in candidate lists; nil hole fails closed
 			if v == nil {
+				return nil
+			}
+			// Variable::type always live; Type-nil fails closed (no invent eligible
+			// without type IR via soft-skip)
+			if v.Type == nil {
 				return nil
 			}
 			if IsVariableInSet(invalidVars, v) {

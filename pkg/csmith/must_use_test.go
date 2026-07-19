@@ -33,6 +33,34 @@ func TestSelectMustUseVar(t *testing.T) {
 	// 75% may erase — either still present or gone is fine
 }
 
+func TestSelectMustUseVarTypeNilHole(t *testing.T) {
+	// Variable::type always live; Type-nil must not soft-skip to a later candidate
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f"}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
+	broken.Type = nil
+	good := CreateVariableScalars("g_good", GetIntType(), false, false)
+	rw := &RWDirective{MustWriteVars: []*Variable{broken, good}}
+	cg := WithFunc(f, EmptyEffect()).WithRW(rw)
+	if vs.SelectMustUseVar(NewRng(2), AccessWrite, cg, GetIntType(), nil) != nil {
+		t.Fatal("Type-nil must-use entry must fail closed whole select")
+	}
+}
+
+func TestChooseVarFullWantNilTypeNil(t *testing.T) {
+	// want==nil path: Type-nil candidate must fail closed, not invent eligible
+	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
+	broken.Type = nil
+	good := CreateVariableScalars("g_good", GetIntType(), false, false)
+	if ChooseVarFull(NewRng(1), []*Variable{broken, good}, AccessRead, EmptyCGContext(),
+		nil, nil, MatchFlexible, nil, false, false, false) != nil {
+		t.Fatal("Type-nil with want==nil must fail closed")
+	}
+}
+
 func TestSelectMustUseArrayItemize(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

@@ -88,6 +88,23 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	}
 }
 
+func TestItemizeArrayNilIVKeyHole(t *testing.T) {
+	// Variable* always live as IVBounds keys; nil key must not soft-skip to other IVs
+	opts := Defaults()
+	vs := NewVariableSelector(opts)
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	av.AsArray = av
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	cg := EmptyCGContext()
+	cg.IVBounds = map[*Variable]int{nil: 0, iv: 0}
+	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
+		t.Fatal("nil IVBounds key must fail closed whole itemize")
+	}
+}
+
 func TestSelectArrayFiltersPartialWrite(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
