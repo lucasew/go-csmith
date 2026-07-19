@@ -721,10 +721,16 @@ func (v *Variable) IsValidVolatile() bool {
 	if v.IsInsideUnionField() {
 		uv := v.GetContainerUnion()
 		if uv == nil {
-			// incomplete container sticky invalid
-			if !HasError() {
-				SetError(ErrGeneric)
+			// Type-nil ancestry / incomplete container sticky invalid
+			// (use ancestryTypeHole — not residual global HasError alone)
+			if ancestryTypeHole(v) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
 			}
+			// complete IsInsideUnionField true but no container is broken IR sticky
+			SetError(ErrGeneric)
 			return false
 		}
 		return uv.IsValidVolatile()
@@ -1439,7 +1445,9 @@ func (v *Variable) IsUnionField() bool {
 }
 
 // IsInsideUnionField mirrors Variable::is_inside_union_field.
-// Variable always live; sticky false (no invent not-inside soft-skip past hole).
+// Variable always live; sticky false for nil shell.
+// Type-nil parent on chain sticky true (restrictive — no invent not-inside
+// soft-skip past incomplete union-field IR; IsUnionField alone stickies false).
 func (v *Variable) IsInsideUnionField() bool {
 	if v == nil {
 		SetError(ErrGeneric)
@@ -1447,6 +1455,14 @@ func (v *Variable) IsInsideUnionField() bool {
 	}
 	for p := v; p != nil; p = p.FieldVarOf {
 		if p.IsUnionField() {
+			return true
+		}
+		// IsUnionField stickies Type-nil parent as false; incomplete ancestry
+		// must not invent not-inside after that soft false
+		if p.FieldVarOf != nil && !IsSpecialPtr(p.FieldVarOf) && p.FieldVarOf.Type == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return true
 		}
 	}

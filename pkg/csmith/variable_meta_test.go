@@ -12,6 +12,7 @@ func TestIsTmpVar(t *testing.T) {
 }
 
 func TestIsValidVolatile(t *testing.T) {
+	ClearError()
 	// non-const always ok
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	if !v.IsValidVolatile() {
@@ -34,6 +35,17 @@ func TestIsValidVolatile(t *testing.T) {
 	if !p2.IsValidVolatile() {
 		t.Fatal("const non-null")
 	}
+	ClearError()
+	// Type-nil parent inside union-field path sticky invalid (no invent valid soft-skip)
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	if field.IsValidVolatile() {
+		t.Fatal("Type-nil parent field IsValidVolatile must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent field IsValidVolatile must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPackedAfterBitfield(t *testing.T) {

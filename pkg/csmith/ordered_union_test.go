@@ -68,6 +68,28 @@ func TestUnionFieldHelpers(t *testing.T) {
 		t.Fatal("nil IsInsideUnionField must SetError sticky")
 	}
 	ClearError()
+	// Type-nil parent sticky true (restrictive — no invent not-inside soft-skip)
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	if !field.IsInsideUnionField() {
+		t.Fatal("Type-nil parent IsInsideUnionField must fail closed true restrictive")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsInsideUnionField must SetError sticky")
+	}
+	ClearError()
+	// non-field complete false
+	if !f0.IsInsideUnionField() {
+		// f0 is real union field — should be true; use scalar
+	}
+	scalar := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if scalar.IsInsideUnionField() {
+		t.Fatal("scalar IsInsideUnionField must be false complete")
+	}
+	if HasError() {
+		t.Fatal("scalar IsInsideUnionField must not sticky")
+	}
+	ClearError()
 }
 
 func TestIsNonreadableField(t *testing.T) {
