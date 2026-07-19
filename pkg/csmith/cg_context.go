@@ -563,11 +563,17 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 
 // ReadVar mirrors CGContext::read_var — force read into accum + stm.
 // CGContext.cpp:175–185.
+// Incomplete GetCollective fails closed (no invent read/write on nil collective shell).
 func (c *CGContext) ReadVar(v *Variable) {
 	if c == nil || v == nil {
 		return
 	}
 	v = v.GetCollective()
+	if v == nil {
+		// incomplete field/array collective path — fail closed sticky error
+		SetError(ErrGeneric)
+		return
+	}
 	if c.IsNonReadable(v) {
 		// CGContext.cpp:178 — assert(!"attempted read from a nonreadable variable")
 		// no soft invent silent skip: set sticky error for ERROR_GUARD callers
@@ -585,11 +591,16 @@ func (c *CGContext) ReadVar(v *Variable) {
 
 // WriteVar mirrors CGContext::write_var.
 // CGContext.cpp:307–317.
+// Incomplete GetCollective fails closed (no invent write on nil collective shell).
 func (c *CGContext) WriteVar(v *Variable) {
 	if c == nil || v == nil {
 		return
 	}
 	v = v.GetCollective()
+	if v == nil {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.IsNonWritable(v) {
 		// CGContext.cpp:310 — assert(!"attempted write to a nonwritable variable")
 		// no soft invent silent skip
@@ -649,6 +660,7 @@ func (c CGContext) unionFacts() []*FactUnion {
 
 // CheckReadVar mirrors CGContext::check_read_var.
 // CGContext.cpp:191–213 — indices, nonreadable field/context, partial write, volatile, dangling.
+// Incomplete GetCollective fails closed false (no invent read success / panic on nil).
 func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
 		return false
@@ -657,6 +669,9 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	v = v.GetCollective()
+	if v == nil {
+		return false
+	}
 	if IsNonreadableField(v, c.unionFacts()) {
 		return false
 	}
@@ -680,6 +695,7 @@ func (c *CGContext) CheckReadVar(v *Variable, facts []*FactPointTo) bool {
 
 // CheckWriteVar mirrors CGContext::check_write_var.
 // CGContext.cpp:323–349.
+// Incomplete GetCollective fails closed false (no invent write success / panic on nil).
 func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 	if c == nil || v == nil {
 		return false
@@ -688,6 +704,9 @@ func (c *CGContext) CheckWriteVar(v *Variable, facts []*FactPointTo) bool {
 		return false
 	}
 	v = v.GetCollective()
+	if v == nil {
+		return false
+	}
 	if c.IsNonWritable(v) || v.IsConst() {
 		return false
 	}
@@ -723,7 +742,15 @@ func (c *CGContext) ReadPointed(v *Variable, indirect int, facts []*FactPointTo,
 	if !c.ReadIndices(v, facts) {
 		return false
 	}
-	tmp := []*Variable{v.GetCollective()}
+	// incomplete collective path fails closed (no invent MergePointees from nil shell)
+	coll := v.GetCollective()
+	if coll == nil {
+		if accumCopy != nil && c.EffectAccum != nil {
+			*c.EffectAccum = *accumCopy
+		}
+		return false
+	}
+	tmp := []*Variable{coll}
 	for indirect > 0 {
 		indirect--
 		tmp = MergePointeesOfPointers(tmp, facts)

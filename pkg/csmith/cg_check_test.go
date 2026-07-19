@@ -33,6 +33,44 @@ func TestCheckWriteVarConst(t *testing.T) {
 	}
 }
 
+func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
+	// GetCollective nil on incomplete FieldVars must not invent write success / panic
+	ClearError()
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		}}, IsArray: true, ArraySizes: []int{2}},
+		Sizes: []int{2},
+	}
+	parent.AsArray = parent
+	parent.CreateFieldVars()
+	item := parent.ItemizeConstIndices([]int{0}, nil)
+	if item == nil {
+		t.Fatal("itemize")
+	}
+	item.CreateFieldVars()
+	if len(item.FieldVars) == 0 {
+		t.Fatal("fields")
+	}
+	fld := item.FieldVars[0]
+	item.FieldVars = append(item.FieldVars, nil)
+	cg := EmptyCGContext()
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if cg.CheckWriteVar(fld, nil) {
+		t.Fatal("incomplete collective must fail closed CheckWriteVar")
+	}
+	if cg.CheckReadVar(fld, nil) {
+		t.Fatal("incomplete collective must fail closed CheckReadVar")
+	}
+	// force-write path sets sticky error, not invent silent skip
+	cg.WriteVar(fld)
+	if !HasError() {
+		t.Fatal("WriteVar incomplete collective must SetError")
+	}
+	ClearError()
+}
+
 func TestCheckWriteVarIVBound(t *testing.T) {
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
 	cg := EmptyCGContext()
