@@ -474,6 +474,8 @@ func abortBlockMake(f *Function, b *Block) {
 
 // PostCreationAnalysis mirrors Block::post_creation_analysis.
 // Block.cpp:682–742 — effects, OOS, optional fixed-point with remove_stmt, append_return.
+// Incomplete preEffect / StmID 0 fails closed sticky (no invent fixed-point / map
+// record / soft-reset EffectAccum from IncompleteEffect shell).
 func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effect, r *Rng, vs *VariableSelector) {
 	if b == nil || cg == nil {
 		return
@@ -482,11 +484,27 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	if fm == nil {
 		return
 	}
+	if b.StmID <= 0 {
+		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
+	if !EffectComplete(preEffect) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
 	fm.MapVisited[b.StmID] = true
 	b.SetAccumulatedEffect(fm)
+	// incomplete block map_stm_effect fails closed (no invent continue post-analysis)
+	if !EffectComplete(fm.GetMapStmEffect(b.StmID)) {
+		fm.GlobalFacts = IncompleteFactSlice()
+		SetError(ErrGeneric)
+		return
+	}
 	// incomplete GlobalFacts fail closed (no invent cleaned postFacts / OOS from holes)
 	// Use IncompleteFactSlice — bare nil invents empty success via FactsComplete(nil)
 	var postFacts []*FactPointTo

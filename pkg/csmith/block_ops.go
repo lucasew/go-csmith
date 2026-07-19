@@ -666,6 +666,8 @@ func blockHasStmtID(b *Block, id int) bool {
 
 // MakeDummyBlockCG mirrors Block::make_dummy_block with CGContext.
 // Block.cpp:95–110 — empty block, fact_in, post_creation_analysis, stack pop.
+// Incomplete EffectAccum / GlobalFacts / post-creation fails closed nil
+// (no invent dummy block success past hole shells).
 func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// Block.cpp:96–97 — assert(curr_func)
 	if cg == nil || cg.CurrentFunc == nil {
@@ -686,12 +688,35 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// Block.cpp:102–103 — blocks + stack push
 	f.Blocks = append(f.Blocks, b)
 	f.Stack = append(f.Stack, b)
+	pop := func() {
+		if len(f.Stack) > 0 && f.Stack[len(f.Stack)-1] == b {
+			f.Stack = f.Stack[:len(f.Stack)-1]
+		}
+		if len(f.Blocks) > 0 && f.Blocks[len(f.Blocks)-1] == b {
+			f.Blocks = f.Blocks[:len(f.Blocks)-1]
+		}
+	}
 	preEffect := EmptyEffect()
 	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			pop()
+			SetError(ErrGeneric)
+			return nil
+		}
 		preEffect = cg.EffectAccum.Clone()
+	}
+	if !EffectComplete(preEffect) {
+		pop()
+		SetError(ErrGeneric)
+		return nil
 	}
 	// Block.cpp:105 — set_fact_in(b, global_facts)
 	if cg.FM != nil {
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			pop()
+			SetError(ErrGeneric)
+			return nil
+		}
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
 	// Block.cpp:107 — post_creation_analysis
@@ -699,6 +724,16 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// Block.cpp:108 — stack pop
 	if len(f.Stack) > 0 {
 		f.Stack = f.Stack[:len(f.Stack)-1]
+	}
+	// incomplete post-creation must not invent dummy block success
+	if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
+		if len(f.Blocks) > 0 && f.Blocks[len(f.Blocks)-1] == b {
+			f.Blocks = f.Blocks[:len(f.Blocks)-1]
+		}
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
 	}
 	return b
 }

@@ -264,6 +264,7 @@ func TestContainsBackEdge(t *testing.T) {
 }
 
 func TestMakeDummyBlockCG(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	// void: no append_return_stmt during post_creation
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
@@ -284,6 +285,64 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	if len(f.Stack) != 0 {
 		t.Fatal("stack not popped")
 	}
+	ClearError()
+}
+
+func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
+	// incomplete EffectAccum / GlobalFacts must not invent dummy block success
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	inc := IncompleteEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &inc
+	if MakeDummyBlockCG(&cg, opts) != nil {
+		t.Fatal("incomplete EffectAccum must fail closed MakeDummyBlockCG")
+	}
+	if !HasError() {
+		t.Fatal("must SetError")
+	}
+	if len(f.Blocks) != 0 || len(f.Stack) != 0 {
+		t.Fatal("must not leave partial block registration")
+	}
+	ClearError()
+	f2 := &Function{Name: "f2", ReturnType: GetSimpleType(EVoid)}
+	fm2 := NewFactMgr(f2)
+	fm2.GlobalFacts = IncompleteFactSlice()
+	cg2 := WithFunc(f2, EmptyEffect()).WithFactMgr(fm2)
+	if MakeDummyBlockCG(&cg2, opts) != nil {
+		t.Fatal("incomplete GlobalFacts must fail closed MakeDummyBlockCG")
+	}
+	if !HasError() {
+		t.Fatal("must SetError GlobalFacts")
+	}
+	ClearError()
+}
+
+func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	b := &Block{StmID: AllocStmID(), Func: f}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	b.PostCreationAnalysis(&cg, Defaults(), IncompleteEffect(), nil, nil)
+	if !HasError() {
+		t.Fatal("incomplete preEffect must SetError")
+	}
+	if FactsComplete(fm.GlobalFacts) && len(fm.GlobalFacts) == 0 {
+		// may be IncompleteFactSlice
+	}
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("must wipe GlobalFacts incomplete")
+	}
+	ClearError()
+	b0 := &Block{StmID: 0, Func: f}
+	b0.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
+	if !HasError() {
+		t.Fatal("StmID 0 must SetError")
+	}
+	ClearError()
 }
 
 func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
