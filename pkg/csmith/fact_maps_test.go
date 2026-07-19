@@ -385,7 +385,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	}
 	// incomplete facts on RemoveLoopLocalFacts
 	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	if RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty) != nil {
+	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty)) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
 	}
 }

@@ -188,6 +188,8 @@ func (f *FactUnion) Output() string {
 
 // UnionFactsComplete reports FactUnion* maps have no nil holes.
 // Incomplete lists must not invent readable/related matches past a hole.
+// Note: UnionFactsComplete(nil)==true (complete empty). Fail-closed incomplete
+// wipes must use IncompleteUnionFactSlice() so later checks do not invent empty success.
 func UnionFactsComplete(facts []*FactUnion) bool {
 	for _, f := range facts {
 		if f == nil || f.Var == nil {
@@ -195,6 +197,12 @@ func UnionFactsComplete(facts []*FactUnion) bool {
 		}
 	}
 	return true
+}
+
+// IncompleteUnionFactSlice is the fail-closed incomplete union-fact list marker.
+// UnionFactsComplete returns false. Distinct from complete empty (nil or {}).
+func IncompleteUnionFactSlice() []*FactUnion {
+	return []*FactUnion{nil}
 }
 
 // IsFieldReadable mirrors FactUnion::is_field_readable.

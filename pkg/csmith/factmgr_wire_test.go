@@ -64,8 +64,8 @@ func TestUpdateFactForAssignUnionMergeHoleFailClosed(t *testing.T) {
 	if fm.UpdateFactForAssign(f1, 0, rhs) {
 		t.Fatal("nil UnionFacts hole must fail closed false, not invent success")
 	}
-	if fm.UnionFacts != nil {
-		t.Fatal("incomplete union merge must clear UnionFacts", fm.UnionFacts)
+	if UnionFactsComplete(fm.UnionFacts) {
+		t.Fatal("incomplete union merge must fail closed incomplete UnionFacts", fm.UnionFacts)
 	}
 }
 
@@ -113,7 +113,7 @@ func TestUpdateFactForAssignPointToHoleNoUnionInvent(t *testing.T) {
 	if FactsComplete(fm.GlobalFacts) {
 		t.Fatal("point-to hole must clear GlobalFacts", fm.GlobalFacts)
 	}
-	if fm.UnionFacts != nil {
+	if UnionFactsComplete(fm.UnionFacts) {
 		t.Fatal("must not invent keep UnionFacts after point-to fail", fm.UnionFacts)
 	}
 }

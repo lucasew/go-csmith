@@ -642,20 +642,23 @@ func RemoveLoopLocalFacts(facts []*FactPointTo, blk *Block) []*FactPointTo {
 	}
 	// incomplete facts fail closed before OOS
 	if !FactsComplete(facts) {
-		return nil
+		return IncompleteFactSlice()
 	}
 	locals := collectLoopLocalVars(blk)
 	// nil locals = incomplete LocalVars hole — fail closed
 	if locals == nil {
-		return nil
+		return IncompleteFactSlice()
 	}
 	out := CloneFactSlice(facts)
-	// complete empty clones as non-nil empty; nil clone = incomplete
-	if out == nil && facts != nil {
-		return nil
+	// complete empty clones as non-nil empty; nil clone of non-empty incomplete
+	if out == nil && facts != nil && len(facts) > 0 {
+		return IncompleteFactSlice()
 	}
 	// Statement.cpp set_fact_out / FactMgr.cpp:607–611
 	UpdateFactsForOOSVars(locals, &out)
+	if !FactsComplete(out) {
+		return IncompleteFactSlice()
+	}
 	return out
 }
 
@@ -745,7 +748,7 @@ func filterFactsNotInVars(facts []*FactPointTo, drop []*Variable) []*FactPointTo
 		return facts
 	}
 	if !FactsComplete(facts) || !VariablesComplete(drop) {
-		return nil
+		return IncompleteFactSlice()
 	}
 	out := make([]*FactPointTo, 0, len(facts))
 	for _, f := range facts {
@@ -933,12 +936,12 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	if wantUn {
 		for _, uf := range un {
 			if uf == nil {
-				fm.UnionFacts = nil
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if merged == nil {
-				fm.UnionFacts = nil
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				return
 			}
 			fm.UnionFacts = merged
@@ -1092,7 +1095,7 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	ptChanged, ptOK := applyPointToAssignFacts(&fm.GlobalFacts, lhs, lhsIndir, newFacts)
 	if !ptOK {
 		// point-to incomplete — fail closed, do not invent union merge on wiped map
-		fm.UnionFacts = nil
+		fm.UnionFacts = IncompleteUnionFactSlice()
 		return false
 	}
 	if ptChanged {
@@ -1103,12 +1106,12 @@ func (fm *FactMgr) UpdateFactForAssign(lhs *Variable, lhsIndir int, rhs *Express
 	for _, uf := range ufacts {
 		// FactUnion* always live from abstract; nil hole fails closed
 		if uf == nil {
-			fm.UnionFacts = nil
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return false
 		}
 		merged := MergeUnionFact(fm.UnionFacts, uf)
 		if merged == nil {
-			fm.UnionFacts = nil
+			fm.UnionFacts = IncompleteUnionFactSlice()
 			return false
 		}
 		fm.UnionFacts = merged
@@ -1368,7 +1371,7 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	ptChanged, ptOK := applyPointToAssignFacts(facts, lhs, lhsIndir, newFacts)
 	if !ptOK {
 		if fm != nil {
-			fm.UnionFacts = nil
+			fm.UnionFacts = IncompleteUnionFactSlice()
 		}
 		return false
 	}
@@ -1379,12 +1382,12 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 		ufacts, _ := AbstractFactUnionForAssign(fm.UnionFacts, *facts, lhs, lhsIndir, rhs)
 		for _, uf := range ufacts {
 			if uf == nil {
-				fm.UnionFacts = nil
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				return false
 			}
 			merged := MergeUnionFact(fm.UnionFacts, uf)
 			if merged == nil {
-				fm.UnionFacts = nil
+				fm.UnionFacts = IncompleteUnionFactSlice()
 				return false
 			}
 			fm.UnionFacts = merged
