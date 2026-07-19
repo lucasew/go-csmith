@@ -304,6 +304,22 @@ func TestMakeDummyBlockCG(t *testing.T) {
 		t.Fatal("stack not popped")
 	}
 	ClearError()
+	// Block.cpp:96–97 assert(curr_func) sticky
+	if MakeDummyBlockCG(nil, opts) != nil {
+		t.Fatal("nil cg must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil cg must SetError sticky")
+	}
+	ClearError()
+	empty := EmptyCGContext()
+	if MakeDummyBlockCG(&empty, opts) != nil {
+		t.Fatal("nil CurrentFunc must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil CurrentFunc must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {

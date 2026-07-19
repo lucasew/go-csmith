@@ -153,8 +153,10 @@ func formattedOutputf(b *strings.Builder, msg string, num float64) {
 // RecordAddressTaken mirrors Bookkeeper::record_address_taken.
 // Bookkeeper.cpp:324–334.
 func RecordAddressTaken(v *Variable) {
-	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type)
+	// Bookkeeper.cpp:325–326 — assert(var); assert(var->type) sticky
+	// (no invent skip broken IR as zero address-taken stats / soft re-pick)
 	if v == nil || v.Type == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	v.IsAddrTaken = true
@@ -167,8 +169,10 @@ func RecordAddressTaken(v *Variable) {
 // RecordVolatileAccess mirrors Bookkeeper::record_volatile_access.
 // Bookkeeper.cpp:386–412.
 func RecordVolatileAccess(v *Variable, derefLevel int, write bool) {
-	// Bookkeeper.cpp:388 — assert(var)
+	// Bookkeeper.cpp:388 — assert(var) sticky
+	// (no invent skip nil as zero vol-access stats)
 	if v == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if write {
@@ -269,8 +273,12 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 // RecordVarsWithBitfields mirrors Bookkeeper::record_vars_with_bitfields.
 // Bookkeeper.cpp:464–474 — assert(type); base aggregate with bitfields.
 func RecordVarsWithBitfields(t *Type) {
-	// Bookkeeper.cpp:465 assert(type)
-	if t == nil || !t.HasBitfields() {
+	// Bookkeeper.cpp:465 assert(type) sticky on nil; !has_bitfields is normal no-op
+	if t == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if !t.HasBitfields() {
 		return
 	}
 	level := t.IndirectLevel()

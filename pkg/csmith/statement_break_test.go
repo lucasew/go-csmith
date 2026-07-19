@@ -155,7 +155,8 @@ func TestBreakContinueGotoIfNoInventEmptyCond(t *testing.T) {
 }
 
 func TestMakeRandomBreakRequiresLoop(t *testing.T) {
-	// StatementBreak.cpp:72 assert(b) — no soft invent break without looping parent
+	// StatementBreak.cpp:72 assert(b) sticky — no soft invent break without looping parent
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -171,6 +172,10 @@ func TestMakeRandomBreakRequiresLoop(t *testing.T) {
 	if stmtOK(st) {
 		t.Fatal("stmtOK rejects incomplete break")
 	}
+	if !HasError() {
+		t.Fatal("no looping parent must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {

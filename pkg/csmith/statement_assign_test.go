@@ -187,3 +187,29 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 }
 
 
+
+func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
+	// incomplete Lhs mid-compound — sticky no invent empty Binary shell
+	ClearError()
+	opts := Defaults()
+	// SafeAssign path uses dummy flags; LhsAsExpression(nil Lhs.Var) fails sticky
+	lhs := &Lhs{Var: nil}
+	st := makePossibleCompoundAssign(
+		EmptyCGContext(),
+		opts,
+		NewProbabilities(opts),
+		NewRng(1),
+		GetIntType(),
+		lhs,
+		AssignBitAnd,
+		&Expression{Term: TermConstant, Con: MakeInt(1)},
+		nil,
+	)
+	if stmtOK(st) {
+		t.Fatal("nil Lhs compound must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("incomplete Lhs mid-compound must SetError sticky")
+	}
+	ClearError()
+}

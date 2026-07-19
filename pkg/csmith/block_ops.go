@@ -695,8 +695,9 @@ func blockHasStmtID(b *Block, id int) bool {
 // Incomplete EffectAccum / GlobalFacts / post-creation fails closed nil
 // (no invent dummy block success past hole shells).
 func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
-	// Block.cpp:96–97 — assert(curr_func)
+	// Block.cpp:96–97 — assert(curr_func) sticky
 	if cg == nil || cg.CurrentFunc == nil {
+		SetError(ErrGeneric)
 		return nil
 	}
 	// incomplete ambient fails closed sticky before stack push (no invent dummy past holes)

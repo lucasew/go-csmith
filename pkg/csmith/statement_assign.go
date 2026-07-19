@@ -404,9 +404,10 @@ func makePossibleCompoundAssign(
 		// simple assign — StatementAssign ctor rhs(&expr)
 		return st
 	}
-	// compound always maps to a live binary token; no invent empty Binary shell
+	// compound always maps to a live binary token; sticky no invent empty Binary shell
 	opStr := bop.BinaryOpC()
 	if int(bop) < 0 || int(bop) >= MaxBinaryOp || opStr == "" {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	lt := typ
@@ -425,8 +426,9 @@ func makePossibleCompoundAssign(
 	} else {
 		// StatementAssign.cpp:260–266 — make_random_binary + CreateFunctionInvocationBinary
 		// SafeOpFlags.cpp:169–215 via make_random_binary(..., sOpAssign, bop)
-		// always has RNG for non-safe compounds; no invent nil-flags shell
+		// always has RNG for non-safe compounds; sticky no invent nil-flags shell
 		if r == nil {
+			SetError(ErrGeneric)
 			return Stmt{}
 		}
 		flags = MakeRandomBinaryKind(r, opts, probs, lt, lt, lt, SafeOpAssign, bop)
@@ -463,7 +465,8 @@ func makePossibleCompoundAssign(
 	// StatementAssign.cpp:269–271 — add_operand ExpressionVariable(lhs); e.clone(); ExpressionFuncall
 	lhsExpr := LhsAsExpression(lhs)
 	if lhsExpr == nil {
-		// C++ always has live Lhs; incomplete IR → empty assign (ERROR path)
+		// C++ always has live Lhs; incomplete IR sticky empty assign
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// e.clone() — Expression is value-like; shallow copy of the root is enough

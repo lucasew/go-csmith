@@ -20,15 +20,28 @@ func TestIncrCounterAndCalcTotal(t *testing.T) {
 
 func TestRecordAddressTaken(t *testing.T) {
 	BookkeeperDoFinalization()
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	RecordAddressTaken(v)
 	if !v.IsAddrTaken || addressTakenCnt != 1 {
 		t.Fatal(addressTakenCnt, v.IsAddrTaken)
 	}
+	// Bookkeeper.cpp:325–326 assert(var/type) sticky
+	RecordAddressTaken(nil)
+	if !HasError() {
+		t.Fatal("nil var must SetError sticky")
+	}
+	ClearError()
+	RecordAddressTaken(&Variable{Name: "x", Type: nil})
+	if !HasError() {
+		t.Fatal("nil type must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRecordVolatileAccess(t *testing.T) {
 	BookkeeperDoFinalization()
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	RecordVolatileAccess(v, 0, false)
 	if readVolatileCnt != 1 {
@@ -43,6 +56,12 @@ func TestRecordVolatileAccess(t *testing.T) {
 	if readNonVolatileCnt != 1 {
 		t.Fatal(readNonVolatileCnt)
 	}
+	// Bookkeeper.cpp:388 assert(var) sticky
+	RecordVolatileAccess(nil, 0, false)
+	if !HasError() {
+		t.Fatal("nil var must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRecordJumpsAndVarFreshness(t *testing.T) {

@@ -28,8 +28,9 @@ func MakeRandomBreak(
 	}
 	// find closest looping parent (StatementBreak.cpp:71–75)
 	loop := ClosestLoopingBlock(cg.CurrentBlock())
-	// StatementBreak.cpp:72 — assert(b); no soft invent break without looping block
+	// StatementBreak.cpp:72 — assert(b) sticky; no soft invent break without looping block
 	if loop == nil {
+		SetError(ErrGeneric)
 		return Stmt{}
 	}
 	// StatementBreak.cpp:76 — clear effect_stm before condition
