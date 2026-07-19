@@ -79,6 +79,25 @@ func TestUnaryMinusFuncNameNilFailClosed(t *testing.T) {
 	}
 }
 
+func TestCastOpNoInventEmptySizeToken(t *testing.T) {
+	// invalid SafeOpSize → empty SizeToken; no invent "(-()x)" / "(()a + ()b)"
+	if unaryCastMinus("", "x") != "" || unaryCastMinus("int32_t", "") != "" {
+		t.Fatal("unary cast empty must fail closed")
+	}
+	if binaryCastOp("", "a", "+", "b") != "" || binaryCastOp("int32_t", "a", "", "b") != "" {
+		t.Fatal("binary cast empty must fail closed")
+	}
+	fi := &Invocation{
+		IsStd: true, IsUnary: true, Unary: "-",
+		Args:        []*Expression{{Term: TermConstant, Con: MakeInt(1)}},
+		Safe:        &SafeOpFlags{Size: SafeOpSize(99), Op1Signed: true},
+		OutSafeMath: false,
+	}
+	if out := fi.Output(); out != "" {
+		t.Fatal("invalid size unary cast must fail closed", out)
+	}
+}
+
 func TestBinaryFuncNameFloat(t *testing.T) {
 	f := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeFloat}
 	if got := f.BinaryFuncName("+"); got != "safe_add_func_float_f_f" {

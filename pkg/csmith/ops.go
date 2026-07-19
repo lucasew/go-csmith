@@ -255,7 +255,15 @@ func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
 }
 
 // AssignOpC formats an assignment for a variable name and optional RHS.
+// StatementAssign.cpp:515–537 — lhs always live; rhs live when op needs it.
+// no invent " = x" / "++" / "g = " empty-side shells
 func (op AssignOp) AssignOpC(name, rhs string) string {
+	if name == "" {
+		return ""
+	}
+	if !op.NeedNoRHS() && rhs == "" {
+		return ""
+	}
 	switch op {
 	case AssignSimple:
 		return name + " = " + rhs

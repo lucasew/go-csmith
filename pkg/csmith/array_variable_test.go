@@ -418,6 +418,11 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 	if !strings.Contains(got, "% 10") {
 		t.Fatal(got)
 	}
+	// incomplete index Output — no invent "(( % 10)"
+	bad := &Expression{Term: TermConstant}
+	if out := av.OutputIndexModulo(0, bad); out != "" {
+		t.Fatal("empty index Output must fail closed", out)
+	}
 }
 
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {

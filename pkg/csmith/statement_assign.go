@@ -499,8 +499,12 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 		case AssignSimple, AssignBitAnd, AssignBitXor, AssignBitOr:
 			// StatementAssign.cpp:546–565 — simple/bit compounds
 			// ccomp + volatile + real compound → "lhs = lhs binop rhs"
+			// no invent "lhs = lhs + " with empty rhs Output
 			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
 				if assignLhsIsVolatile(st) {
+					if rhs == "" {
+						return ""
+					}
 					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
 				}
 			}

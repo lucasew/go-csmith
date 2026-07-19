@@ -844,10 +844,18 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 		size = av.Sizes[i]
 	}
 	body := idx.Output()
+	// index Output always live; no invent "(( % n)" empty shell
+	if body == "" {
+		return ""
+	}
 	// cast signed index type to unsigned before %
 	if t := idx.GetType(); t != nil && t.IsSigned() {
 		if u := t.ToUnsigned(); u != nil {
-			return fmt.Sprintf("((%s)(%s) %% %d)", u.CName(), body, size)
+			cn := u.CName()
+			if cn == "" {
+				return ""
+			}
+			return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)
 		}
 	}
 	return fmt.Sprintf("((%s) %% %d)", body, size)

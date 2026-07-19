@@ -144,7 +144,7 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		fname := fi.Safe.UnaryMinusFuncName()
 		// SafeOpFlags.cpp:325 assert / empty name → cast path (no invent wrapper name)
 		if fname == "" {
-			return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+			return unaryCastMinus(fi.Safe.SizeToken(), a0)
 		}
 		id := SafeOpFlagsToID(fname)
 		// FunctionInvocationUnary.cpp:208–218 — safe_math_wrapper filter
@@ -167,12 +167,12 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		}
 		// wrapper denied → cast + standard (need_cast fallthrough)
 		// FunctionInvocationUnary.cpp:226–239
-		return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+		return unaryCastMinus(fi.Safe.SizeToken(), a0)
 	}
 	// FunctionInvocationUnary.cpp:229–240 — ePlus/eNot/eBitNot or non-safe minus
 	if fi.Unary == "-" && fi.Safe != nil && !fi.OutSafeMath {
 		// need_cast when Safe flags exist but avoid_signed_overflow off
-		return fmt.Sprintf("(-(%s)%s)", fi.Safe.SizeToken(), a0)
+		return unaryCastMinus(fi.Safe.SizeToken(), a0)
 	}
 	// FunctionInvocationUnary.cpp:226–239 — standard form (op)(arg)
 	switch fi.Unary {
@@ -182,6 +182,14 @@ func (fi *Invocation) outputUnary(a0 string) string {
 		// assert invalid operator — no invent emit
 		return ""
 	}
+}
+
+// unaryCastMinus is (-(size)arg); empty size token fail closed (no invent "(-()x)").
+func unaryCastMinus(cast, a0 string) string {
+	if cast == "" || a0 == "" {
+		return ""
+	}
+	return fmt.Sprintf("(-(%s)%s)", cast, a0)
 }
 
 // outputBinary mirrors FunctionInvocationBinary::Output.
@@ -220,16 +228,22 @@ func (fi *Invocation) outputBinary(a0, a1 string) string {
 			}
 			// wrapper denied → cast both operands (need_cast fallthrough)
 			// FunctionInvocationBinary.cpp:400–414
-			cast := fi.Safe.SizeToken()
-			return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, fi.Binary, cast, a1)
+			return binaryCastOp(fi.Safe.SizeToken(), a0, fi.Binary, a1)
 		}
 	}
 	// need_cast when Safe present but SafeMath off for arith/shift
 	if fi.Safe != nil && SafeOpsBinary(fi.Binary) && !fi.OutSafeMath {
-		cast := fi.Safe.SizeToken()
-		return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, fi.Binary, cast, a1)
+		return binaryCastOp(fi.Safe.SizeToken(), a0, fi.Binary, a1)
 	}
 	return fmt.Sprintf("(%s %s %s)", a0, fi.Binary, a1)
+}
+
+// binaryCastOp is ((cast)a0 op (cast)a1); empty cast fail closed (no invent "(()a + ()b)").
+func binaryCastOp(cast, a0, op, a1 string) string {
+	if cast == "" || a0 == "" || a1 == "" || op == "" {
+		return ""
+	}
+	return fmt.Sprintf("((%s)%s %s (%s)%s)", cast, a0, op, cast, a1)
 }
 
 // ReachMaxFunctions mirrors Function::reach_max_functions_cnt.

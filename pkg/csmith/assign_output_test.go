@@ -39,6 +39,32 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	if out := OutputAssignSimple(st, false); out != "++g_1" {
 		t.Fatal(out)
 	}
+	// AssignOpC — no invent empty-name or empty-rhs shells
+	if AssignSimple.AssignOpC("", "1") != "" || AssignSimple.AssignOpC("g", "") != "" {
+		t.Fatal("AssignOpC empty sides must fail closed")
+	}
+	if AssignPreIncr.AssignOpC("", "") != "" {
+		t.Fatal("empty name preincr must fail closed")
+	}
+	if AssignPreIncr.AssignOpC("g", "") != "++g" {
+		t.Fatal(AssignPreIncr.AssignOpC("g", ""))
+	}
+}
+
+func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
+	// ccomp volatile rewrite needs live rhs; no invent "g = g & "
+	v := CreateVariableScalars("g_v", GetIntType(), true, true)
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, AssignOp: AssignBitAnd,
+		Expr:      &Expression{Term: TermConstant}, // empty Output
+		SafeFlags: &SafeOpFlags{Size: SafeInt32, Op1Signed: true, Op2Signed: true},
+	}
+	opts := Defaults()
+	opts.SafeMath = true
+	opts.CComp = true
+	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
+		t.Fatal("empty ccomp rhs must fail closed", out)
+	}
 }
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
