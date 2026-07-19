@@ -453,8 +453,8 @@ func (e Effect) IsRead(v *Variable) bool {
 
 // FieldIsRead mirrors Effect::field_is_read — any field of aggregate read.
 // Effect.cpp:389–399.
-// Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
-// Incomplete effect fails closed as true (no invent no-field-read past holes).
+// Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
+// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
 func (e Effect) FieldIsRead(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
@@ -464,6 +464,7 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.IsRead(f) || e.FieldIsRead(f) {
@@ -475,8 +476,8 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 
 // FieldIsWritten mirrors Effect::field_is_written.
 // Effect.cpp:404–414.
-// Variable* always live in FieldVars; nil hole fails closed as true (no invent none).
-// Incomplete effect fails closed as true (no invent no-field-write past holes).
+// Variable* always live in FieldVars; nil hole sticky fail closed as true (no invent none).
+// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
 func (e Effect) FieldIsWritten(v *Variable) bool {
 	if v == nil || !v.IsAggregate() {
 		return false
@@ -486,6 +487,7 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 	}
 	for _, f := range v.FieldVars {
 		if f == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if e.IsWritten(f) || e.FieldIsWritten(f) {
@@ -497,9 +499,9 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 
 // SiblingUnionFieldIsRead mirrors Effect::sibling_union_field_is_read.
 // Effect.cpp:416–428 — another field of the same container union was read.
-// Variable* always live as map keys; nil hole fails closed as true (no invent none).
-// Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
-// Incomplete effect fails closed as true (no invent no-sibling-read past empty maps).
+// Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
+// Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
+// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
 func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	if v == nil {
 		return false
@@ -509,6 +511,7 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	}
 	youColl := v.GetCollective()
 	if youColl == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
@@ -517,6 +520,7 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 	}
 	for r := range e.read {
 		if r == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if !e.read[r] {
@@ -524,6 +528,7 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 		}
 		rColl := r.GetCollective()
 		if rColl == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		me := rColl.GetContainerUnion()
@@ -536,9 +541,9 @@ func (e Effect) SiblingUnionFieldIsRead(v *Variable) bool {
 
 // SiblingUnionFieldIsWritten mirrors Effect::sibling_union_field_is_written.
 // Effect.cpp:430–441.
-// Variable* always live as map keys; nil hole fails closed as true (no invent none).
-// Incomplete GetCollective fails closed as true (no invent no-sibling / panic).
-// Incomplete effect fails closed as true (no invent no-sibling-write past empty maps).
+// Variable* always live as map keys; nil hole sticky fail closed as true (no invent none).
+// Incomplete GetCollective sticky fail closed as true (no invent no-sibling / panic).
+// Incomplete effect fails closed as true non-sticky (incomplete marker soft re-pick).
 func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	if v == nil {
 		return false
@@ -548,6 +553,7 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	}
 	youColl := v.GetCollective()
 	if youColl == nil {
+		SetError(ErrGeneric)
 		return true
 	}
 	you := youColl.GetContainerUnion()
@@ -556,6 +562,7 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	}
 	for w := range e.written {
 		if w == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		if !e.written[w] {
@@ -563,6 +570,7 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 		}
 		wColl := w.GetCollective()
 		if wColl == nil {
+			SetError(ErrGeneric)
 			return true
 		}
 		me := wColl.GetContainerUnion()

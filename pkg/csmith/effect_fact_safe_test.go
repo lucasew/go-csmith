@@ -159,6 +159,18 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	if !inc.SiblingUnionFieldIsRead(uv.FieldVars[0]) || !inc.SiblingUnionFieldIsWritten(uv.FieldVars[0]) {
 		t.Fatal("incomplete SiblingUnion* must fail closed true")
 	}
+	// nil FieldVars hole sticky fail closed true
+	ClearError()
+	e := EmptyEffect()
+	hole := &Variable{Name: "g_h", Type: st, FieldVars: []*Variable{nil}}
+	if !e.FieldIsRead(hole) || !HasError() {
+		t.Fatal("nil FieldVars hole FieldIsRead must fail closed sticky true")
+	}
+	ClearError()
+	if !e.FieldIsWritten(hole) || !HasError() {
+		t.Fatal("nil FieldVars hole FieldIsWritten must fail closed sticky true")
+	}
+	ClearError()
 }
 
 func TestEffectIsReadByName(t *testing.T) {

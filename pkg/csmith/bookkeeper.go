@@ -239,7 +239,8 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		return
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
-	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed (no invent counts)
+	// Bookkeeper.cpp:364–365 — assert both pointer; fail closed non-sticky skip
+	// (non-pointer cmp is soft non-event, not sticky factory poison)
 	if lt == nil || rt == nil || !lt.IsPointerLike() || !rt.IsPointerLike() {
 		return
 	}
@@ -250,10 +251,11 @@ func RecordPointerComparisons(lhs, rhs *Expression) {
 		return
 	}
 	if lhs.Term == TermVariable && rhs.Term == TermVariable {
-		// incomplete type IR must not invent ptr-vs-ptr counts via invented level 0
+		// incomplete type IR sticky — no invent ptr-vs-ptr counts via invented level 0
 		li, lok := lhs.IndirectLevelComplete()
 		ri, rok := rhs.IndirectLevelComplete()
 		if !lok || !rok {
+			SetError(ErrGeneric)
 			return
 		}
 		if li == ri {
@@ -718,10 +720,11 @@ func outputPointerStatistics(b *strings.Builder) {
 		hasNull := 0
 		ptPtr, ptScalar, ptStruct := 0, 0, 0
 		for i, p := range ptrs {
-			// Variable* always live in ptrs bookkeeping; nil hole fails closed
+			// Variable* always live in ptrs bookkeeping; nil hole sticky fail closed
 			// (no invent skip partial alias/pointee stats)
 			if p == nil || p.Type == nil {
 				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+				SetError(ErrGeneric)
 				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates

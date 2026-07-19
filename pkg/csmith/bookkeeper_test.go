@@ -105,14 +105,19 @@ func TestRecordPointerComparisons(t *testing.T) {
 	if cmpPtrToNull != 1 {
 		t.Fatal(cmpPtrToNull)
 	}
-	// incomplete type IR must not invent ptr-vs-ptr via level 0
+	// incomplete type IR sticky must not invent ptr-vs-ptr via level 0
 	BookkeeperDoFinalization()
+	ClearError()
 	broken := &Expression{Term: TermVariable, Var: &Variable{Name: "x"}, ExprType: pt}
 	good := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", pt, false, false), ExprType: pt}
 	RecordPointerComparisons(broken, good)
 	if cmpPtrToPtr != 0 || cmpPtrToAddr != 0 {
 		t.Fatal("incomplete IndirectLevel must not invent compare counts", cmpPtrToPtr, cmpPtrToAddr)
 	}
+	if !HasError() {
+		t.Fatal("incomplete IndirectLevel RecordPointerComparisons must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {
