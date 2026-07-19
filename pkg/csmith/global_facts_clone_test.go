@@ -197,6 +197,7 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 }
 
 func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
+	ClearError()
 	fi := &Invocation{
 		Args: []*Expression{
 			{Term: TermConstant, Con: MakeInt(1)},
@@ -209,6 +210,10 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
 		t.Fatal("incomplete facts must fail closed VisitUnorderedParams")
 	}
+	if !HasError() {
+		t.Fatal("incomplete facts VisitUnorderedParams must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {

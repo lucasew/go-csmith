@@ -266,24 +266,29 @@ func (fi *Invocation) EqualsInt(num int) bool {
 
 // VisitFactsBinaryOrdered mirrors FunctionInvocationBinary::visit_facts for &&/||.
 // FunctionInvocationBinary.cpp:487–508 — evaluate left; merge right with post-left.
+// Hard IR incomplete sticky (nil fi/args, incomplete maps); visit policy fails non-sticky.
 func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
-	// incomplete IR — fail closed (no soft invent visit success)
+	// incomplete IR sticky (no soft invent visit success / soft re-pick)
 	// param_value[0/1] always live Expression* after ERROR_GUARD
 	if fi == nil || cg == nil || len(fi.Args) < 2 {
+		SetError(ErrGeneric)
 		return false
 	}
 	if fi.Args[0] == nil || fi.Args[1] == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// left
 	if !VisitFactsExpression(fi.Args[0], cg, opts) {
 		return false
 	}
-	// snapshot after left — incomplete GlobalFacts fail closed
-	// (no invent cleaned afterLeft merge)
+	// snapshot after left — incomplete GlobalFacts sticky
 	var afterLeft []*FactPointTo
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		afterLeft = CloneFactSlice(cg.FM.GlobalFacts)
@@ -295,11 +300,17 @@ func VisitFactsBinaryOrdered(fi *Invocation, cg *CGContext, opts Options) bool {
 	// merge post-right with post-left
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) || !FactsComplete(afterLeft) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
-		// MergeFacts clears GlobalFacts on incomplete mid-join — fail closed visit
+		// MergeFacts sticky on incomplete mid-join
 		_ = MergeFacts(&cg.FM.GlobalFacts, afterLeft)
 		if !FactsComplete(cg.FM.GlobalFacts) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 	}

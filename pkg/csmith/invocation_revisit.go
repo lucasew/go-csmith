@@ -16,19 +16,24 @@ var (
 // Incomplete invocation registry slots fail closed wipe (no invent soft-skip
 // nil inv and still match/re-seed a later parallel slot).
 func AddReturnFactForInvocation(fi *Invocation, f *FactPointTo) {
+	// incomplete inv/fact sticky (no invent registry of broken facts / soft re-pick)
 	if fi == nil || f == nil || !FactsComplete([]*FactPointTo{f}) {
+		SetError(ErrGeneric)
 		return
 	}
-	// keep parallel slices; desync is broken IR — reset rather than invent
+	// keep parallel slices; desync is broken IR sticky — reset rather than invent
 	if len(returnFactInvocations) != len(returnFactPoints) {
 		returnFactInvocations = nil
 		returnFactPoints = nil
+		SetError(ErrGeneric)
+		return
 	}
 	for i, inv := range returnFactInvocations {
-		// nil registry slot is incomplete — fail closed clear, no invent re-seed
+		// nil registry slot sticky — clear, no invent re-seed
 		if inv == nil || returnFactPoints[i] == nil {
 			returnFactInvocations = nil
 			returnFactPoints = nil
+			SetError(ErrGeneric)
 			return
 		}
 		if inv == fi && returnFactPoints[i].Var == f.Var {
@@ -77,10 +82,17 @@ func InvocationReturnFactsDoFinalization() {
 // FunctionInvocationUser.cpp:358–365 — facts matching func.rv.
 // Incomplete maps fail closed (no invent soft-skip holes and still save later).
 func (fi *Invocation) SaveReturnFacts(facts []*FactPointTo) {
-	if fi == nil || fi.User == nil || fi.User.RV == nil {
+	// nil fi/User is hard IR sticky; nil RV is complete no-op (void/non-pointer return)
+	if fi == nil || fi.User == nil {
+		SetError(ErrGeneric)
 		return
 	}
+	if fi.User.RV == nil {
+		return
+	}
+	// incomplete maps sticky (no invent soft-skip holes and still save later)
 	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
 		return
 	}
 	for _, f := range facts {
@@ -234,19 +246,24 @@ func permuteInts(a []int) [][]int {
 
 // VisitUnorderedParams mirrors FunctionInvocation::visit_unordered_params.
 // FunctionInvocation.cpp:457–480 — visit args in all orders; merge facts.
+// Hard IR incomplete sticky (nil call/facts, empty orders, nil args, incomplete maps);
+// VisitFactsExpression policy fails stay non-sticky false.
 func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
-	// FunctionInvocation.cpp:457+ — always live this + facts; no soft invent true
+	// FunctionInvocation.cpp:457+ — always live this + facts sticky
 	if fi == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// incomplete working facts fail closed (no invent cleaned permute base)
+	// incomplete working facts sticky (no invent cleaned permute base / soft re-pick)
 	if !FactsComplete(*facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	inputsCopy := CloneFactSlice(*facts)
 	orders := fi.PermuteParamOrders()
-	// FunctionInvocation.cpp:462 — assert(orders.size() > 0); no soft invent success
+	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
 	if len(orders) == 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	var merged []*FactPointTo
@@ -254,11 +271,13 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 		cur := CloneFactSlice(inputsCopy)
 		for _, paramID := range order {
 			if paramID < 0 || paramID >= len(fi.Args) {
+				SetError(ErrGeneric)
 				return false
 			}
 			arg := fi.Args[paramID]
-			// param_value[i] always non-null after ERROR_GUARD
+			// param_value[i] always non-null after ERROR_GUARD sticky
 			if arg == nil {
+				SetError(ErrGeneric)
 				return false
 			}
 			// visit under working facts
@@ -269,8 +288,11 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 				return false
 			}
 			if cg.FM != nil {
-				// incomplete GlobalFacts after arg visit fail closed
+				// incomplete GlobalFacts after arg visit sticky
 				if !FactsComplete(cg.FM.GlobalFacts) {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return false
 				}
 				cur = CloneFactSlice(cg.FM.GlobalFacts)
@@ -280,16 +302,25 @@ func (fi *Invocation) VisitUnorderedParams(facts *[]*FactPointTo, cg *CGContext,
 			merged = cur
 		} else {
 			if !FactsComplete(merged) || !FactsComplete(cur) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
-			// MergeFacts clears *facts on incomplete mid-join — fail closed visit
+			// MergeFacts sticky on incomplete mid-join
 			_ = MergeFacts(&merged, cur)
 			if !FactsComplete(merged) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return false
 			}
 		}
 	}
 	if !FactsComplete(merged) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	*facts = merged
@@ -324,14 +355,17 @@ func (f *Function) IsPointerReferenced() bool {
 
 // RevisitUserInvocation mirrors FunctionInvocationUser::revisit.
 // FunctionInvocationUser.cpp:309–352.
+// Hard IR incomplete sticky (nil call/body/FM/facts, StmID 0, incomplete maps);
+// VisitFactsBlock policy fails stay non-sticky (restore maps without new SetError).
 func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext, opts Options) bool {
-	// FunctionInvocationUser.cpp:309+ — get_fact_mgr_for_func + body always live
-	// no soft invent true for incomplete caller context
+	// FunctionInvocationUser.cpp:309+ — get_fact_mgr_for_func + body always live sticky
 	if fi == nil || fi.User == nil || facts == nil || cg == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	f := fi.User
 	if f.Body == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	// callee FactMgr — prefer function's FM from caller's package map if same
@@ -339,10 +373,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// when revisiting callee, use a dedicated FM on the function if stored
 	// light: use caller FM but clear visited for body analysis
 	if fm == nil {
+		SetError(ErrGeneric)
 		return false
 	}
-	// incomplete caller facts fail closed (no invent cleaned revisit)
+	// incomplete caller facts sticky (no invent cleaned revisit / soft re-pick)
 	if !FactsComplete(*facts) {
+		SetError(ErrGeneric)
 		return false
 	}
 	// backup maps
@@ -352,6 +388,14 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	accCopy := cloneEffectMap(fm.MapAccumEffect)
 	inputsCopy := CloneFactSlice(*facts)
 
+	restore := func() {
+		fm.MapFactsIn = inCopy
+		fm.MapFactsOut = outCopy
+		fm.MapStmEffect = effCopy
+		fm.MapAccumEffect = accCopy
+		*facts = inputsCopy
+	}
+
 	fm.ClearMapVisited()
 	f.VisitedCnt++
 	if f.VisitedCnt == 1 {
@@ -360,11 +404,10 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// handover params into inputs
 	fm.CallerToCalleeHandover(fi.Args, facts)
 	if !FactsComplete(*facts) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// visit body
@@ -375,139 +418,120 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	bodyCG.FM = fm
 	ok := VisitFactsBlock(f.Body, &bodyCG, opts)
 	if !ok {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		// policy / body visit fail — restore without invent success (sticky if already set)
+		restore()
 		fm.GlobalFacts = savedGlobal
 		return false
 	}
-	// incomplete body GlobalFacts fail closed (no invent cleaned return env)
+	// incomplete body GlobalFacts sticky
 	if !FactsComplete(fm.GlobalFacts) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	*facts = CloneFactSlice(fm.GlobalFacts)
-	// body Block::stm_id always live; StmID 0 fails closed (no invent soft-skip
-	// map_stm_effect[body] then still merge return facts as complete revisit)
+	// body Block::stm_id always live; StmID 0 sticky
 	if f.Body.StmID <= 0 {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		SetError(ErrGeneric)
 		return false
 	}
-	// Incomplete body map_stm_effect fails closed (AddEffect poisons EffectStm —
-	// no invent revisit success with incomplete caller effects)
+	// Incomplete body map_stm_effect sticky
 	bodyEff := fm.GetMapStmEffect(f.Body.StmID)
 	if !EffectComplete(bodyEff) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	cg.AddEffect(bodyEff, false)
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// FunctionInvocationUser.cpp: ret from map_facts_out[body] + add_back_return_facts
-	// GetMapFactsOut: StmID 0 Incomplete; missing live → empty complete
 	bodyOut := fm.GetMapFactsOut(f.Body.StmID)
 	if !FactsComplete(bodyOut) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	retFacts := CloneFactSlice(bodyOut)
 	if !AddBackReturnFacts(f.Body, fm, &retFacts) || !FactsComplete(retFacts) || !FactsComplete(*facts) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	fi.SaveReturnFacts(retFacts)
 	_ = MergeFacts(facts, retFacts)
 	if !FactsComplete(*facts) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	// drop param locals OOS
 	UpdateFactsForOOSVars(f.Param, facts)
 	if !FactsComplete(*facts) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	fm.SetupInOutMaps(false)
-	// accum effect context on function
-	// Incomplete external merge fails closed (no invent silent Incomplete AccumEffContext)
+	// Incomplete external merge sticky
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(f.AccumEffContext) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	f.AccumEffContext = f.AccumEffContext.AddExternalEffect(cg.EffectContext())
 	if !EffectComplete(f.AccumEffContext) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
-	// renew into original inputs_copy (false may mean no-change; incomplete fails closed)
+	// renew into original inputs_copy (false may mean no-change; incomplete sticky)
 	_ = RenewFacts(&inputsCopy, *facts)
 	if !FactsComplete(inputsCopy) {
-		fm.MapFactsIn = inCopy
-		fm.MapFactsOut = outCopy
-		fm.MapStmEffect = effCopy
-		fm.MapAccumEffect = accCopy
-		*facts = inputsCopy
+		restore()
 		fm.GlobalFacts = savedGlobal
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	*facts = inputsCopy
 	fm.GlobalFacts = *facts
 	return true
 }
+
 
 func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	if m == nil {

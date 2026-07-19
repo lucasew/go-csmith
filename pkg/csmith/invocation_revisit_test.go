@@ -76,7 +76,8 @@ func TestReturnFactRegistry(t *testing.T) {
 }
 
 func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
-	// soft invent: skip nil fact hole and still register later RV match
+	// incomplete maps sticky (no invent soft-skip hole and still register later)
+	ClearError()
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
 	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
@@ -86,11 +87,19 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fi, rv) != nil {
 		t.Fatal("incomplete SaveReturnFacts must not invent registry entry")
 	}
-	// incomplete PointTo on matching fact
+	if !HasError() {
+		t.Fatal("incomplete SaveReturnFacts must SetError sticky")
+	}
+	ClearError()
+	// incomplete PointTo on matching fact sticky
 	fi.SaveReturnFacts([]*FactPointTo{{Var: rv, PointTo: []*Variable{nil}}})
 	if GetReturnFactForInvocation(fi, rv) != nil {
 		t.Fatal("incomplete PointTo must not invent registry")
 	}
+	if !HasError() {
+		t.Fatal("incomplete PointTo SaveReturnFacts must SetError sticky")
+	}
+	ClearError()
 	// nil Invocation* registry slot must not invent soft-skip match later
 	fi2 := &Invocation{User: &Function{Name: "g", RV: rv}}
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
@@ -99,11 +108,17 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("nil inv registry hole must fail closed, not invent later match")
 	}
-	// Add with hole must wipe rather than soft-skip re-seed
+	// Add with hole must wipe sticky rather than soft-skip re-seed
+	ClearError()
 	AddReturnFactForInvocation(fi2, MakeFactPointTo(rv, NullPtr))
 	if GetReturnFactForInvocation(fi2, rv) != nil {
 		t.Fatal("AddReturnFact over hole must wipe, not invent re-seed")
 	}
+	if !HasError() {
+		t.Fatal("AddReturnFact over hole must SetError sticky")
+	}
+	ClearError()
+	InvocationReturnFactsDoFinalization()
 }
 
 func TestNeedsRevisit(t *testing.T) {
@@ -215,7 +230,8 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 }
 
 func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
-	// FunctionInvocation.cpp:462 — assert(orders.size() > 0)
+	// FunctionInvocation.cpp:462 — assert(orders.size() > 0) sticky
+	ClearError()
 	fm := NewFactMgr(nil)
 	cg := EmptyCGContext().WithFactMgr(fm)
 	fi := &Invocation{Args: []*Expression{{Term: TermConstant, Con: MakeInt(1)}}}
@@ -223,6 +239,10 @@ func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
 		t.Fatal("empty orders must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("empty orders VisitUnorderedParams must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFactChangedOnAssign(t *testing.T) {
