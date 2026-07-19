@@ -275,7 +275,9 @@ func IsNonreadableField(v *Variable, facts []*FactUnion) bool {
 // (nil join — callers of transfer must not invent empty complete from that alone;
 // RhsToLhsTransferUnion pre-checks completeness before join).
 func JoinVarFactsUnion(facts []*FactUnion, vars []*Variable) *FactUnion {
+	// incomplete union map / vars fails closed sticky (no invent soft nil join success path)
 	if !UnionFactsComplete(facts) || !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return nil
 	}
 	var fu *FactUnion
@@ -376,7 +378,10 @@ func RhsToLhsTransferUnion(
 		}
 		rhsFact := JoinVarFactsUnion(unionFacts, rvars)
 		if rhsFact == nil {
-			// complete: no related RHS union fact → empty transfer (not invent fid 0)
+			// sticky incomplete join vs complete: no related RHS fact → empty transfer
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
 			return nil
 		}
 		return MakeFactUnions(lvars, rhsFact.LastWrittenFID)

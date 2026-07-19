@@ -968,17 +968,24 @@ func MarkFuncEndOnFacts(facts *[]*FactPointTo, fn *Function, stParent *Block) {
 	if facts == nil {
 		return
 	}
+	// incomplete maps/stack fail closed sticky (no invent keep facts past holes)
 	if !FactsComplete(*facts) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	if fn != nil && !fn.StackScanComplete(stParent) {
 		*facts = IncompleteFactSlice()
+		SetError(ErrGeneric)
 		return
 	}
 	for i, f := range *facts {
+		// nil without error = no lattice change; sticky = incomplete fail closed
 		if nf := f.MarkFuncEnd(fn, stParent); nf != nil {
 			(*facts)[i] = nf
+		} else if HasError() {
+			*facts = IncompleteFactSlice()
+			return
 		}
 	}
 }

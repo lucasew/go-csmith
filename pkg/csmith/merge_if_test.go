@@ -98,6 +98,7 @@ func TestMergeFacts(t *testing.T) {
 }
 
 func TestHasEligibleVolatileVar(t *testing.T) {
+	ClearError()
 	v := CreateVariableScalars("g_v", GetIntType(), false, true)
 	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
 	if !HasEligibleVolatileVar([]*Variable{v, nv}, GetIntType(), AccessRead, EmptyCGContext()) {
@@ -107,10 +108,14 @@ func TestHasEligibleVolatileVar(t *testing.T) {
 	if HasEligibleVolatileVar([]*Variable{v}, GetIntType(), AccessRead, WithEffectContext(WithSideEffects())) {
 		t.Fatal("se")
 	}
-	// nil hole fails closed — no invent skip as absent non-vol
+	// nil hole fails closed sticky — no invent skip as absent non-vol
 	if HasEligibleVolatileVar([]*Variable{nil, v}, GetIntType(), AccessRead, EmptyCGContext()) {
 		t.Fatal("nil hole must fail closed")
 	}
+	if !HasError() {
+		t.Fatal("nil hole must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIfMergesFacts(t *testing.T) {

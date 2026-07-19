@@ -900,11 +900,15 @@ func HasEligibleVolatileVar(vars []*Variable, typ *Type, access Access, cg CGCon
 // VariableSelector.cpp:294–316.
 // Incomplete candidate list fails closed false (no invent skip hole as absent).
 func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers, access Access, cg CGContext) bool {
+	// incomplete candidate list fails closed sticky (no invent skip hole as absent)
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return false
 	}
 	for _, v := range vars {
+		// incomplete type IR fails closed sticky (no invent filter past hole)
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if typ != nil && !typ.Match(v.Type, MatchFlexible) {
@@ -936,15 +940,23 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 	if typ == nil {
 		return false
 	}
+	// incomplete candidate list fails closed sticky (no invent skip hole)
 	if !VariablesComplete(vars) {
+		SetError(ErrGeneric)
 		return false
 	}
 	var facts []*FactPointTo
 	if cg.FM != nil {
+		// incomplete GlobalFacts fail closed sticky (no invent is_valid_ptr past holes)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			return false
+		}
 		facts = cg.FM.GlobalFacts
 	}
 	for _, v := range vars {
 		if v.Type == nil {
+			SetError(ErrGeneric)
 			return false
 		}
 		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
