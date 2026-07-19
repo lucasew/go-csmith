@@ -831,14 +831,29 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	}
 	var updated []*FactPointTo
 	for _, f := range out {
+		// Fact* always live after FactsComplete
+		if f == nil || f.Var == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
 		// FactMgr.cpp:659–662 — assert(prev_f); only changed when prev exists
 		// no soft invent "new out-only fact" as updated
 		prev := FindRelatedPointTo(in, f.Var)
+		// residual ERROR sticky — no invent soft-continue then partial updated past hole
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if prev == nil {
 			continue
 		}
 		if !f.Equal(prev) {
+			// residual ERROR sticky — no invent soft-continue past Equal hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			updated = append(updated, f)
+		} else if HasError() {
+			return IncompleteFactSlice()
 		}
 	}
 	return updated
@@ -864,18 +879,40 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 	}
 	var updated []*FactPointTo
 	for _, f := range out {
+		if f == nil || f.Var == nil {
+			SetError(ErrGeneric)
+			return IncompleteFactSlice()
+		}
 		// FactMgr.cpp:676–677 — rv facts always listed (no pre-fact required)
 		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.Match(f.Var) {
+			// residual ERROR sticky — no invent soft-continue past Match hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			updated = append(updated, f)
 			continue
 		}
+		// residual ERROR sticky from Match false path
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		// FactMgr.cpp:679–682 — assert(prev_f); no soft invent missing prev as change
 		prev := FindRelatedPointTo(in, f.Var)
+		// residual ERROR sticky — no invent soft-continue then partial updated past hole
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if prev == nil {
 			continue
 		}
 		if !f.Equal(prev) {
+			// residual ERROR sticky — no invent soft-continue past Equal hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			updated = append(updated, f)
+		} else if HasError() {
+			return IncompleteFactSlice()
 		}
 	}
 	return updated

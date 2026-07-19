@@ -984,11 +984,20 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 
 	// VariableSelector.cpp:232–234 — partial volatile through pointer
 	if derefLevel > 0 && v.IsPartialVolatileAfterDeref(derefLevel) {
+		// residual ERROR sticky — no invent eligible past partial-vol hole
+		return false
+	}
+	// residual ERROR sticky — no invent eligible true past Type-nil peel / probe hole
+	if HasError() {
 		return false
 	}
 	eff := cg.EffectContext()
 	isConst := v.IsConstAfterDeref(derefLevel)
 	isVol := v.IsVolatileAfterDeref(derefLevel) || v.IsVolatile()
+	// residual ERROR sticky — no invent eligible true past IsConst/IsVolatileAfterDeref hole
+	if HasError() {
+		return false
+	}
 
 	// volatile + non-SE-free context → reject
 	if isVol && !eff.IsSideEffectFree() {
@@ -997,11 +1006,25 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	// cannot read/write a var being written in context
 	if access == AccessRead || access == AccessWrite {
 		if eff.IsWrittenPartially(v) {
+			// residual ERROR sticky — no invent eligible past partial-write hole
+			if HasError() {
+				return false
+			}
 			return false
 		}
 	}
+	// residual ERROR sticky from IsWrittenPartially false path
+	if HasError() {
+		return false
+	}
 	// cannot write a var being read (deref_level==0)
 	if access == AccessWrite && derefLevel == 0 && eff.IsReadPartially(v) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	// cannot write const
@@ -1010,16 +1033,40 @@ func IsEligibleVar(v *Variable, derefLevel int, access Access, cg CGContext) boo
 	}
 	// VariableSelector.cpp:277–287 — nonreadable / nonwritable from context
 	if access == AccessRead && cg.IsNonReadable(v) {
+		// residual ERROR sticky — no invent eligible past IsNonReadable hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	if access == AccessWrite && cg.IsNonWritable(v) {
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	if HasError() {
 		return false
 	}
 	// FactUnion::is_nonreadable_field on READ (VariableSelector.cpp:279–280)
 	if access == AccessRead && cg.FM != nil {
 		if IsNonreadableField(v, cg.FM.UnionFacts) {
+			if HasError() {
+				return false
+			}
 			return false
 		}
+		// residual ERROR sticky — no invent eligible past IsNonreadableField hole
+		if HasError() {
+			return false
+		}
+	}
+	// never invent eligible-complete success with residual ERROR set
+	if HasError() {
+		return false
 	}
 	return true
 }

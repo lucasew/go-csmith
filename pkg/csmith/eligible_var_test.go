@@ -212,6 +212,52 @@ func TestIsEligibleVarIncompleteEffectSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestIsEligibleVarTypeNilDerefResidualSticky(t *testing.T) {
+	// Type-nil subject / Type-nil parent field residual: soft invent was eligible true past hole.
+	// Fair: sticky fail closed not eligible.
+	ClearError()
+	broken := &Variable{Name: "g_p"} // Type nil
+	if IsEligibleVar(broken, 0, AccessRead, EmptyCGContext()) {
+		t.Fatal("Type-nil subject must fail closed not eligible")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil subject IsEligibleVar must SetError sticky")
+	}
+	ClearError()
+	// Type-nil parent field: IsNonreadableField residual under FM
+	parent := &Variable{Name: "g_u"} // Type nil
+	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
+	f := &Function{Name: "f"}
+	fm := NewFactMgr(f)
+	// non-empty union facts so IsNonreadableField walks IsInsideUnionField (stickies residual)
+	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	parent.Type = ut
+	// Force Type-nil mid-walk: parent of field is parent with Type then clear after fact
+	// IsInsideUnionField on Type-nil parent stickies residual true
+	parent.Type = nil
+	cg := EmptyCGContext().WithFactMgr(fm)
+	// plant a fact so len(facts)!=0 — empty UnionFacts soft-returns not nonreadable
+	// Use non-empty incomplete-complete facts with live union var
+	uv := &Variable{Name: "g_u2", Type: ut}
+	fm.UnionFacts = []*FactUnion{{Var: uv, LastWrittenFID: 0}}
+	if IsEligibleVar(field, 0, AccessRead, cg) {
+		t.Fatal("Type-nil parent IsInsideUnionField residual must fail closed not eligible")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent residual IsEligibleVar must SetError sticky")
+	}
+	ClearError()
+	// IsArray without AsArray GetCollective sticky not eligible
+	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	if IsEligibleVar(shell, 0, AccessRead, EmptyCGContext()) {
+		t.Fatal("IsArray without AsArray must fail closed not eligible")
+	}
+	if !HasError() {
+		t.Fatal("IsArray without AsArray IsEligibleVar must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

@@ -311,6 +311,21 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
 	}
+	// Equal residual: PointTo nil hole soft invent was continue then partial updated list
+	ClearError()
+	goodIn := MakeFactPointTo(p, NullPtr)
+	badOut := &FactPointTo{Var: p, PointTo: []*Variable{GarbagePtr, nil}} // hole for Equal
+	goodOutOther := MakeFactPointTo(q, GarbagePtr)
+	// plant complete maps with Equal residual on p then later q would invent partial
+	fm.MapFactsIn[1] = []*FactPointTo{goodIn, MakeFactPointTo(q, NullPtr)}
+	fm.MapFactsOut[1] = []*FactPointTo{badOut, goodOutOther}
+	if FactsComplete(fm.FindUpdatedFacts(1)) {
+		t.Fatal("Equal residual must fail closed incomplete, not invent partial updated")
+	}
+	if !HasError() {
+		t.Fatal("Equal residual FindUpdatedFacts must SetError sticky")
+	}
+	ClearError()
 	// nil fact hole fails closed sticky at store and find_updated
 	ClearError()
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
