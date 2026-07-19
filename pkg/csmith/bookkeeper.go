@@ -418,7 +418,12 @@ func ExpressionComplexity(e *Expression) int {
 		return 0
 	case TermVariable:
 		// ExpressionVariable always has live Variable*; incomplete sticky → -1
+		// Type-nil non-special sticky (no invent leaf complexity 0 past type hole)
 		if e.Var == nil {
+			SetError(ErrGeneric)
+			return -1
+		}
+		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
 			SetError(ErrGeneric)
 			return -1
 		}

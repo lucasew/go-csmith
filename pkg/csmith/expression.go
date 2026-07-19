@@ -159,9 +159,16 @@ func (e *Expression) checkAndSetCastCore(desired *Type) {
 		SetError(ErrGeneric)
 		return
 	}
-	// Expression.cpp:222 — get_type() before cast is applied
+	// Expression.cpp:222 — get_type() before cast is applied; incomplete type sticky
+	// (no invent soft-skip cast decision past Type-nil shell as no-cast success)
 	src := e.GetTypeUncast()
-	if src != nil && src.NeedsCast(desired) {
+	if src == nil {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return
+	}
+	if src.NeedsCast(desired) {
 		e.CastType = desired
 	}
 }
@@ -796,7 +803,24 @@ func BumpsExprDepth(e *Expression) bool {
 		return true
 	}
 	switch e.Term {
-	case TermConstant, TermVariable:
+	case TermConstant:
+		// Constant always has live Type*+Value; incomplete sticky bump (restrictive)
+		// (no invent not-bump soft-skip depth past Type-nil / empty-value shell)
+		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
+			SetError(ErrGeneric)
+			return true
+		}
+		return true
+	case TermVariable:
+		// Variable* always live; Type-nil non-special sticky bump (restrictive)
+		if e.Var == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		if e.Var.Type == nil && !IsSpecialPtr(e.Var) {
+			SetError(ErrGeneric)
+			return true
+		}
 		return true
 	case TermFunction:
 		// ExpressionFuncall always has live invoke before get_func/is_std_func

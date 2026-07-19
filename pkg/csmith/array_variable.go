@@ -288,8 +288,9 @@ func CountExprKeyVar(e *Expression) int {
 		}
 		return 1
 	case TermConstant:
-		// live Constant*; incomplete shell fails closed sticky
-		if e.Con == nil || e.Con.Value == "" {
+		// live Constant* Type+Value; incomplete shell fails closed sticky
+		// (no invent key-count 0 for Type-nil / empty-value soft-miss)
+		if e.Con == nil || e.Con.Type == nil || e.Con.Value == "" {
 			SetError(ErrGeneric)
 			return -1
 		}

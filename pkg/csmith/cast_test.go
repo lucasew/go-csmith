@@ -101,6 +101,16 @@ func TestCheckAndSetCast(t *testing.T) {
 		t.Fatal("nil desired CheckAndSetCast must SetError sticky")
 	}
 	ClearError()
+	// incomplete GetTypeUncast sticky (no invent soft-skip cast past Type-nil shell)
+	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}
+	hole.CheckAndSetCast(want)
+	if hole.CastType != nil {
+		t.Fatal("Type-nil var must not invent cast")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil var CheckAndSetCast must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {

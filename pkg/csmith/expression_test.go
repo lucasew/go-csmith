@@ -322,6 +322,14 @@ func TestExpressionComplexityFuncArgs(t *testing.T) {
 		t.Fatal("nil Con.Type ExpressionComplexity must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Variable shell sticky (no invent leaf complexity 0)
+	if ExpressionComplexity(&Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) >= 0 {
+		t.Fatal("Type-nil Var must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Var ExpressionComplexity must SetError sticky")
+	}
+	ClearError()
 	// non-std nil User sticky (no invent complexity 0 as non-call)
 	if ExpressionComplexity(&Expression{Term: TermFunction, Invoke: &Invocation{}}) >= 0 {
 		t.Fatal("non-std nil User must fail closed -1")
@@ -665,6 +673,22 @@ func TestBumpsExprDepth(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("non-std nil User BumpsExprDepth must SetError sticky")
+	}
+	ClearError()
+	// Type-nil Constant sticky bump (no invent not-bump soft-skip depth past hole)
+	if !BumpsExprDepth(&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) {
+		t.Fatal("Type-nil Con BumpsExprDepth must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Con BumpsExprDepth must SetError sticky")
+	}
+	ClearError()
+	// Type-nil Variable sticky bump (specials exempt)
+	if !BumpsExprDepth(&Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}) {
+		t.Fatal("Type-nil Var BumpsExprDepth must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Var BumpsExprDepth must SetError sticky")
 	}
 	ClearError()
 }

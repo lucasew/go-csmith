@@ -773,6 +773,14 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 		t.Fatal("nil Con CountExprKeyVar must SetError sticky")
 	}
 	ClearError()
+	// Type-nil Constant sticky (no invent key-count 0 past hole)
+	if CountExprKeyVar(&Expression{Term: TermConstant, Con: &Constant{Value: "0"}}) >= 0 {
+		t.Fatal("Type-nil Con must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Con CountExprKeyVar must SetError sticky")
+	}
+	ClearError()
 	if CountExprKeyVar(&Expression{Term: TermFunction}) >= 0 {
 		t.Fatal("nil Invoke must fail closed -1")
 	}
