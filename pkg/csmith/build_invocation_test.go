@@ -6,7 +6,8 @@ import (
 )
 
 func TestBuildInvocationAndFunctionNilType(t *testing.T) {
-	// FunctionInvocationUser.cpp:175 — assert(type); no GetIntType invent
+	// FunctionInvocationUser.cpp:175 — assert(type); sticky Failed no GetIntType invent
+	ClearError()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
@@ -15,10 +16,15 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
 	}
+	if !HasError() {
+		t.Fatal("nil return type must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
-	// zero-param callee must not invent success call without process RNG
+	// zero-param callee must not invent success call without process RNG — sticky Failed
+	ClearError()
 	opts := Defaults()
 	callee := &Function{Name: "func_x", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	list := &FunctionList{Funcs: []*Function{callee}}
@@ -27,10 +33,47 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil RNG must fail closed user invoke")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
+	}
+	ClearError()
 	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
+	if !HasError() {
+		t.Fatal("nil RNG BuildInvocationAndFunction must SetError sticky")
+	}
+	ClearError()
+	// callee / cg hard IR sticky Failed
+	fi3 := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, nil)
+	if fi3 == nil || !fi3.Failed {
+		t.Fatal("nil callee must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil callee BuildUserInvocation must SetError sticky")
+	}
+	ClearError()
+	// Param hole sticky Failed
+	callee2 := &Function{Name: "func_y", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true,
+		Param: []*Variable{nil}}
+	fi4 := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, callee2)
+	if fi4 == nil || !fi4.Failed {
+		t.Fatal("nil Param hole must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Param hole BuildUserInvocation must SetError sticky")
+	}
+	ClearError()
+	// MakeRandomInvocation nil r/cg sticky Failed
+	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, list, GetIntType(), nil, false)
+	if fi5 == nil || !fi5.Failed {
+		t.Fatal("nil RNG MakeRandomInvocation must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG MakeRandomInvocation must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {

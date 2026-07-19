@@ -455,8 +455,10 @@ func BuildUserInvocation(
 	list *FunctionList,
 	callee *Function,
 ) *Invocation {
-	// FunctionInvocationUser.cpp always has RNG + CGContext; no invent call shell without them
+	// FunctionInvocationUser.cpp always has RNG + CGContext; sticky Failed
+	// (no invent call shell / soft re-pick past hole)
 	if r == nil || callee == nil || cg == nil {
+		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent param gen / soft re-pick past holes)
@@ -470,8 +472,9 @@ func BuildUserInvocation(
 	// FunctionInvocationUser.cpp:249–270 — running effect context across params
 	running := cg.EffectContext()
 	for _, p := range callee.Param {
-		// FunctionInvocationUser.cpp:256–258 — v->type / &v->qfer; no GetIntType invent
+		// FunctionInvocationUser.cpp:256–258 — v->type / &v->qfer; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -598,12 +601,18 @@ func BuildInvocationAndFunction(
 	list *FunctionList,
 	retType *Type,
 ) *Invocation {
-	// FunctionInvocationUser.cpp always has RNG + CGContext; no invent call+func without them
-	if r == nil || cg == nil || list == nil || ReachMaxFunctions(list, opts) {
+	// FunctionInvocationUser.cpp always has RNG + CGContext + FuncList; sticky Failed
+	// (no invent call+func shell past hole). At-max is complete soft Failed (no sticky).
+	if r == nil || cg == nil || list == nil {
+		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
-	// FunctionInvocationUser.cpp:175 — assert(type); return type must be provided
+	if ReachMaxFunctions(list, opts) {
+		return &Invocation{Failed: true}
+	}
+	// FunctionInvocationUser.cpp:175 — assert(type); sticky Failed (no invent return type)
 	if retType == nil {
+		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent signature/params past holes)
@@ -616,6 +625,10 @@ func BuildInvocationAndFunction(
 	// FunctionInvocationUser.cpp:179 — make_random_signature
 	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, nil, list)
 	if callee == nil {
+		// signature ERROR_GUARD sticky when not already set
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return &Invocation{Failed: true}
 	}
 
@@ -623,8 +636,9 @@ func BuildInvocationAndFunction(
 	fi := &Invocation{User: callee}
 	running := cg.EffectContext()
 	for _, p := range callee.Param {
-		// FunctionInvocationUser.cpp:185–187 — v->type; no GetIntType invent
+		// FunctionInvocationUser.cpp:185–187 — v->type; sticky no invent soft-skip param hole
 		if p == nil || p.Type == nil {
+			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
@@ -1421,8 +1435,10 @@ func MakeRandomInvocation(
 	qfer *CVQualifiers,
 	stdFunc bool,
 ) *Invocation {
-	// FunctionInvocation.cpp always has RNG + CGContext; no invent invoke shell without them
+	// FunctionInvocation.cpp always has RNG + CGContext; sticky Failed
+	// (no invent invoke shell / soft re-pick past hole)
 	if r == nil || cg == nil {
+		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
 	// incomplete ambient fails closed sticky (no invent choose/build / soft re-pick past holes)
@@ -1469,14 +1485,18 @@ func MakeRandomInvocation(
 					env = cg.Types
 				}
 				sigType = RandomReturnType(r, probs, env, opts)
-				// ERROR_GUARD when choose_random fails; no soft invent GetIntType return
+				// ERROR_GUARD when choose_random fails; sticky Failed (no invent GetIntType return)
 				if sigType == nil {
+					if !HasError() {
+						SetError(ErrGeneric)
+					}
 					return &Invocation{Failed: true}
 				}
 			}
-			// Statement probability table is process/session singleton (no invent second table)
+			// Statement probability table is process/session singleton; sticky no invent second table
 			stmtTab := ProcessStmtTab()
 			if stmtTab == nil {
+				SetError(ErrGeneric)
 				return &Invocation{Failed: true}
 			}
 			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, stmtTab, cg, list, sigType)
@@ -1484,7 +1504,7 @@ func MakeRandomInvocation(
 				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
 			}
 		} else {
-			// FunctionInvocation.cpp:102–106 — failed when at max funcs
+			// FunctionInvocation.cpp:102–106 — failed when at max funcs (complete soft Failed)
 			return &Invocation{Failed: true}
 		}
 	}

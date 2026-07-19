@@ -75,11 +75,16 @@ func TestCreateFieldVarsUnion(t *testing.T) {
 			{Name: "f1", Type: GetSimpleType(EShort), BitWidth: -1},
 		},
 	}
+	ClearError()
 	v := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	if v == nil {
+		t.Fatal("CreateVariableQfer union", HasError())
+	}
 	if len(v.FieldVars) != 2 {
 		t.Fatal(len(v.FieldVars))
 	}
 	if v.FieldVars[0].Name != "g_u.f0" {
 		t.Fatal(v.FieldVars[0].Name)
 	}
+	ClearError()
 }

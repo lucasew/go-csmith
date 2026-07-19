@@ -58,8 +58,14 @@ func MakeExpressionComma(
 
 // castIfNeeded mirrors ExpressionComma.cpp cast_if_needed.
 // ExpressionComma.cpp:48–53 — nullptr constant of pointer type → cast_type.
+// Expression always live when cast path runs; sticky (no invent soft-skip cast past hole).
+// Non-constant / empty Con is complete no-op (nothing to cast).
 func castIfNeeded(exp *Expression) {
-	if exp == nil || exp.Term != TermConstant || exp.Con == nil {
+	if exp == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if exp.Term != TermConstant || exp.Con == nil {
 		return
 	}
 	ty := exp.GetType()

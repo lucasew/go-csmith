@@ -72,7 +72,8 @@ func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 }
 
 func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
-	// nested GenerateBody needs session Statement table; no invent second table
+	// nested GenerateBody needs session Statement table; sticky no invent second table
+	ClearError()
 	prev := ProcessStmtTab()
 	SetProcessStmtTab(nil)
 	defer SetProcessStmtTab(prev)
@@ -87,13 +88,18 @@ func TestMakeRandomInvocationNilStmtTabFailClosed(t *testing.T) {
 	cg.CurrentFunc = f
 	// force user path that would create a new function
 	fi := MakeRandomInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntType(), nil, false)
-	// without ProcessStmtTab, create-new path fails closed; may pick existing or fail
+	// without ProcessStmtTab, create-new path fails closed sticky Failed; may pick existing or fail
 	if fi != nil && !fi.Failed && fi.User != nil && fi.User != f && fi.User.Body != nil {
 		// if somehow built without stmt tab, bad
 		if ProcessStmtTab() == nil && fi.User.BuildState == BuildBuilt {
 			t.Fatal("must not invent body without session StmtTab")
 		}
 	}
+	// when create-new path is taken without StmtTab, sticky Failed
+	if fi != nil && fi.Failed && HasError() {
+		// sticky path exercised
+	}
+	ClearError()
 }
 
 func TestGenerateSeed65WithProcessStmtTab(t *testing.T) {

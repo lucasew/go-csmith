@@ -155,6 +155,8 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 	av := CreateArrayVariable(NewRng(3), opts, vs.Probs, vs, &cg, nil, "g_p", pt, MakeInt(0), q)
 	if av == nil {
 		// make_init_value may ERROR_GUARD; not invent Constant "0"
+		// Clear residual sticky so later tests are not poisoned
+		ClearError()
 		return
 	}
 	for _, s := range av.InitValues {
@@ -162,6 +164,7 @@ func TestCreateArrayVariablePointerAltNeedsMakeInitValue(t *testing.T) {
 			t.Fatal("empty alt")
 		}
 	}
+	ClearError()
 }
 
 func TestArrayCDecl(t *testing.T) {

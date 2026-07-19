@@ -32,8 +32,20 @@ func TestMakeExpressionComma(t *testing.T) {
 	if !strings.HasPrefix(out, "(") || !strings.HasSuffix(out, ")") {
 		t.Fatal(out)
 	}
-	// ExpressionComma always has live lhs/rhs; sticky no invent "( , )" for missing sides
+	// Expression always live for cast_if_needed; sticky (no invent soft-skip past hole)
 	ClearError()
+	castIfNeeded(nil)
+	if !HasError() {
+		t.Fatal("nil castIfNeeded must SetError sticky")
+	}
+	ClearError()
+	// non-constant complete no-op
+	castIfNeeded(&Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false)})
+	if HasError() {
+		t.Fatal("non-constant castIfNeeded must complete no-op")
+	}
+	ClearError()
+	// ExpressionComma always has live lhs/rhs; sticky no invent "( , )" for missing sides
 	bare := &Expression{Term: TermCommaExpr}
 	if bare.Output() != "" {
 		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.Output())

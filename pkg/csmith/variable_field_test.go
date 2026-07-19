@@ -6,12 +6,16 @@ import (
 )
 
 func TestCreateFieldVars(t *testing.T) {
+	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	// Type.cpp GenerateSimpleTypes before make_random_struct_type / field choose
 	env := &TypeEnv{}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
+	if st == nil {
+		t.Fatal("MakeRandomStructType", HasError())
+	}
 	v := CreateVariableQfer("g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil || len(v.FieldVars) != len(st.Fields) {
 		t.Fatalf("fields %d want %d", len(v.FieldVars), len(st.Fields))
