@@ -125,6 +125,17 @@ func TestMakeRandomBlockIncompleteFailClosed(t *testing.T) {
 		t.Fatal("must SetError GlobalFacts")
 	}
 	ClearError()
+	// Function + Block always live on make abort; sticky
+	abortBlockMake(nil, &Block{})
+	if !HasError() {
+		t.Fatal("nil func abortBlockMake must SetError sticky")
+	}
+	ClearError()
+	abortBlockMake(&Function{Name: "f"}, nil)
+	if !HasError() {
+		t.Fatal("nil block abortBlockMake must SetError sticky")
+	}
+	ClearError()
 	f3 := &Function{Name: "f3", ReturnType: GetSimpleType(EVoid)}
 	cg3 := WithFunc(f3, IncompleteEffect()).WithFactMgr(NewFactMgr(f3))
 	eff := EmptyEffect()

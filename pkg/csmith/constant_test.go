@@ -200,6 +200,25 @@ func TestBinaryConstantPath(t *testing.T) {
 			t.Fatalf("binary off invent %q", s)
 		}
 	}
+	ClearError()
+	// BinaryConstant on + nil RNG sticky (no invent soft skip without draw)
+	opts.BinaryConstant = true
+	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
+		t.Fatal("nil RNG maybeBinaryConstant must not claim binary branch")
+	}
+	if !HasError() {
+		t.Fatal("nil RNG BinaryConstant maybeBinaryConstant must SetError sticky")
+	}
+	ClearError()
+	// BinaryConstant off complete no-op
+	opts.BinaryConstant = false
+	if _, ok := maybeBinaryConstant(opts, nil, 2, ""); ok {
+		t.Fatal("BinaryConstant off must complete no-op")
+	}
+	if HasError() {
+		t.Fatal("BinaryConstant off must not sticky")
+	}
+	ClearError()
 }
 
 func TestMarkMutableConstWrapsSimple(t *testing.T) {

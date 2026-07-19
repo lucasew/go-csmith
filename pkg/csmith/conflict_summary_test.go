@@ -226,6 +226,15 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("nil ptrs CollectReferencedPtrsBlock must SetError sticky")
 	}
 	ClearError()
+	// Variable always live in collect walks; sticky
+	got := appendUniqueVar(nil, nil)
+	if got != nil {
+		t.Fatal("nil var appendUniqueVar must leave list", got)
+	}
+	if !HasError() {
+		t.Fatal("nil var appendUniqueVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {

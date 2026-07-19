@@ -527,8 +527,10 @@ func MakeRandomBlock(
 }
 
 // abortBlockMake pops stack and unregisters a failed Block::make_random (C++ delete b).
+// Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
 	if f == nil || b == nil {
+		SetError(ErrGeneric)
 		return
 	}
 	if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {

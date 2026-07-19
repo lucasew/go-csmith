@@ -287,6 +287,30 @@ func TestContainsStmtTree(t *testing.T) {
 		t.Fatal("nil Else ContainsStmtTree must SetError sticky")
 	}
 	ClearError()
+	// blockHasStmtIDDeep: Block + live StmID always required sticky
+	if blockHasStmtIDDeep(nil, 1) {
+		t.Fatal("nil block blockHasStmtIDDeep must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil block blockHasStmtIDDeep must SetError sticky")
+	}
+	ClearError()
+	if blockHasStmtIDDeep(thenB, 0) {
+		t.Fatal("StmID 0 blockHasStmtIDDeep must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("StmID 0 blockHasStmtIDDeep must SetError sticky")
+	}
+	ClearError()
+	// incomplete nested arm sticky
+	bad := &Block{Stmts: []Stmt{{Kind: StmtIfElse, StmID: 9, Then: &Block{StmID: 10}, Else: nil}}}
+	if blockHasStmtIDDeep(bad, 10) {
+		t.Fatal("incomplete if arm must fail closed not invent nest match")
+	}
+	if !HasError() {
+		t.Fatal("incomplete if arm blockHasStmtIDDeep must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindTypedStmtsCompleteStillWorks(t *testing.T) {

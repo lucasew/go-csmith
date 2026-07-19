@@ -573,6 +573,14 @@ func TestValidateAndUpdateFactsIncompleteSticky(t *testing.T) {
 		t.Fatal("incomplete facts ValidateAndUpdateFacts must SetError sticky")
 	}
 	ClearError()
+	// nil facts out sticky
+	if ValidateAndUpdateFacts(st, nil, &cg, Defaults(), nil) {
+		t.Fatal("nil facts must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil facts ValidateAndUpdateFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsStatementArrayOpNilLoopFailClosed(t *testing.T) {

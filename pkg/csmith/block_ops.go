@@ -733,8 +733,11 @@ func (b *Block) ContainsBackEdge(fm *FactMgr) bool {
 	return false
 }
 
+// blockHasStmtID reports whether b directly contains stm_id (no nest).
+// Block always live; sticky false (no invent not-found soft-skip past hole).
 func blockHasStmtID(b *Block, id int) bool {
 	if b == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	for i := range b.Stmts {

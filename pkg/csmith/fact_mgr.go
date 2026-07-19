@@ -1403,7 +1403,9 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 
 // stmtIDInBlock reports Statement::in_block(blk) for a statement id under func.
 func stmtIDInBlock(f *Function, stmID int, blk *Block) bool {
+	// Block + live StmID always required; sticky false (align BlockContainsStmID)
 	if blk == nil || stmID <= 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	// BlockContainsStmID walks nested Then/Else under blk

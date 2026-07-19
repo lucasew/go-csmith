@@ -508,11 +508,21 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 	}
 	// Statement.cpp:600–605 — copy pre-visit inputs; stm_visit; set in/out only on success
 	inputsCopy := CloneFactSlice(*facts)
+	// incomplete pre-visit clone sticky (CloneFactSlice already sticks on holes)
+	if !FactsComplete(inputsCopy) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return false
+	}
 	if !StmVisitFacts(st, facts, cg, opts) {
 		return false
 	}
-	// incomplete post-visit must not invent set_fact_in/out success
+	// incomplete post-visit sticky (no invent set_fact_in/out success / soft re-pick past hole)
 	if !FactsComplete(*facts) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if cg.FM != nil {

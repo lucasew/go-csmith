@@ -375,8 +375,14 @@ func binaryConstProb() uint32 {
 // maybeBinaryConstant is binary_constant && rnd_flipcoin(BinaryConstProb).
 // On hit returns "0b"+HexToBinary(...)+suffix; ok=true means binary branch taken
 // (including empty fail-closed). No invent hex fallback when binary was selected.
+// When BinaryConstant is on, RNG always live; sticky (no invent soft skip without draw).
+// BinaryConstant off is complete no-op.
 func maybeBinaryConstant(opts Options, r *Rng, nHex int, suffix string) (string, bool) {
-	if r == nil || !opts.BinaryConstant {
+	if !opts.BinaryConstant {
+		return "", false
+	}
+	if r == nil {
+		SetError(ErrGeneric)
 		return "", false
 	}
 	if !r.RndFlipcoin(binaryConstProb()) {

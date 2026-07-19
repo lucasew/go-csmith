@@ -358,8 +358,12 @@ func ContainsStmtTree(root, s *Stmt) bool {
 	return false
 }
 
+// blockHasStmtIDDeep walks get_blocks for stm_id under b.
+// Block + live StmID always required; sticky false (no invent not-found soft-skip past hole).
+// Incomplete arm sticky false (no invent membership via partial arm scan before hole).
 func blockHasStmtIDDeep(b *Block, id int) bool {
 	if b == nil || id <= 0 {
+		SetError(ErrGeneric)
 		return false
 	}
 	if b.StmID == id {
@@ -369,12 +373,15 @@ func blockHasStmtIDDeep(b *Block, id int) bool {
 		if b.Stmts[i].StmID == id {
 			return true
 		}
-		// recurse via get_blocks only (kind-gated)
-		for _, nb := range GetBlocksStmt(&b.Stmts[i]) {
+		// pre-validate complete get_blocks before invent match past incomplete arm
+		blks := GetBlocksStmt(&b.Stmts[i])
+		for _, nb := range blks {
 			if nb == nil {
-				// incomplete arm — not invent soft-skip to later siblings
+				SetError(ErrGeneric)
 				return false
 			}
+		}
+		for _, nb := range blks {
 			if blockHasStmtIDDeep(nb, id) {
 				return true
 			}

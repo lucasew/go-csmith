@@ -206,8 +206,12 @@ func collectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) bool {
 	return true
 }
 
+// appendUniqueVar appends v if not already present.
+// Variable always live in collect walks; sticky leave list unchanged
+// (no invent soft-skip nil hole as absent — callers fail closed IncompleteVariables).
 func appendUniqueVar(s []*Variable, v *Variable) []*Variable {
 	if v == nil {
+		SetError(ErrGeneric)
 		return s
 	}
 	for _, x := range s {
