@@ -69,6 +69,20 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 		t.Fatal("nil factsOut UpdateFactsForDest must SetError sticky")
 	}
 	ClearError()
+	// IsVarOOS residual (Blocks hole before match): soft invent was soft-skip then merge.
+	// Fair: sticky IncompleteFactSlice fail closed whole dest update.
+	fHole := &Function{Name: "fh", ReturnType: GetIntType()}
+	locH := &Variable{Name: "l_h", Type: GetIntType()}
+	fHole.Blocks = []*Block{nil, {Func: fHole, LocalVars: []*Variable{locH}}}
+	var outH []*FactPointTo
+	UpdateFactsForDest([]*FactPointTo{MakeFactPointTo(p, locH)}, &outH, fHole, nil)
+	if FactsComplete(outH) {
+		t.Fatal("IsVarOOS residual must fail closed incomplete dest facts", outH)
+	}
+	if !HasError() {
+		t.Fatal("IsVarOOS residual UpdateFactsForDest must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestClearMapVisited(t *testing.T) {

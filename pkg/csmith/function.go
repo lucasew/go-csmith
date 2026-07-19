@@ -604,9 +604,46 @@ func (f *Function) generateBodyCore(
 				return
 			}
 			if p.IsPointer() {
-				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
-					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, MakeFactPointTo(p, TBDPtr))
+				// residual ERROR sticky — no invent soft-skip param seed past IsPointer hole
+				if HasError() {
+					f.BuildState = BuildUnbuilt
+					f.IsBuilt = false
+					return
 				}
+				// incomplete GlobalFacts sticky before soft FindRelated miss invent
+				if !FactsComplete(cg.FM.GlobalFacts) {
+					SetError(ErrGeneric)
+					f.BuildState = BuildUnbuilt
+					f.IsBuilt = false
+					return
+				}
+				if FindRelatedPointTo(cg.FM.GlobalFacts, p) == nil {
+					// residual ERROR sticky — no invent soft-continue later params past FindRelated hole
+					if HasError() {
+						f.BuildState = BuildUnbuilt
+						f.IsBuilt = false
+						return
+					}
+					nf := MakeFactPointTo(p, TBDPtr)
+					if nf == nil || HasError() {
+						if !HasError() {
+							SetError(ErrGeneric)
+						}
+						f.BuildState = BuildUnbuilt
+						f.IsBuilt = false
+						return
+					}
+					cg.FM.GlobalFacts = append(cg.FM.GlobalFacts, nf)
+				} else if HasError() {
+					f.BuildState = BuildUnbuilt
+					f.IsBuilt = false
+					return
+				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue non-pointer past IsPointer hole
+				f.BuildState = BuildUnbuilt
+				f.IsBuilt = false
+				return
 			}
 		}
 	}

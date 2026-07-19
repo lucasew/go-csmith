@@ -515,7 +515,16 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 			continue
 		}
 		if f.IsVarOOS(fact.Var, destParent) {
+			// residual ERROR sticky — no invent soft-continue OOS scan past hard IR hole
+			if HasError() {
+				*factsOut = IncompleteFactSlice()
+				return
+			}
 			addOOS(fact.Var)
+		} else if HasError() {
+			// residual ERROR sticky — no invent not-OOS soft-skip past hard IR hole
+			*factsOut = IncompleteFactSlice()
+			return
 		}
 		for _, p := range fact.PointTo {
 			// Variable* always live in PointTo; nil hole fails closed whole dest update sticky
@@ -526,7 +535,14 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 				return
 			}
 			if !IsSpecialPtr(p) && f.IsVarOOS(p, destParent) {
+				if HasError() {
+					*factsOut = IncompleteFactSlice()
+					return
+				}
 				addOOS(p)
+			} else if HasError() {
+				*factsOut = IncompleteFactSlice()
+				return
 			}
 		}
 		merged := MergeFactInto(*factsOut, fact)
@@ -540,6 +556,10 @@ func UpdateFactsForDest(factsIn []*FactPointTo, factsOut *[]*FactPointTo, f *Fun
 		*factsOut = merged
 	}
 	UpdateFactsForOOSVars(oosVars, factsOut)
+	// residual ERROR sticky — no invent complete dest facts past OOS update hole
+	if HasError() {
+		*factsOut = IncompleteFactSlice()
+	}
 }
 
 // ClearMapVisited mirrors FactMgr::clear_map_visited.

@@ -66,14 +66,27 @@ func (f *Function) IsVarVisible(v *Variable, stParent *Block) bool {
 		return false
 	}
 	if v.IsGlobal() {
+		// residual ERROR sticky — no invent visible-true past IsGlobal hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent not-global soft-skip past IsGlobal hole
+	if HasError() {
+		return false
 	}
 	// nil Function for non-global sticky not-visible (IsVarOnStack also stickies)
 	if f == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return f.IsVarOnStack(v, stParent)
+	ok := f.IsVarOnStack(v, stParent)
+	// residual ERROR sticky — no invent visible/not-visible soft-skip past stack hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsVarOOS mirrors Function::is_var_oos.
@@ -95,7 +108,15 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 		return true
 	}
 	if f.IsVarVisible(v, stParent) {
+		// residual ERROR sticky — no invent not-OOS past IsVarVisible hole
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue Blocks scan past IsVarVisible hole
+	if HasError() {
+		return true
 	}
 	for _, b := range f.Blocks {
 		if b == nil {
@@ -109,6 +130,13 @@ func (f *Function) IsVarOOS(v *Variable, stParent *Block) bool {
 				return true
 			}
 			if loc.Match(v) || loc == v {
+				// residual ERROR sticky — no invent OOS-true past Match hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			if HasError() {
 				return true
 			}
 		}

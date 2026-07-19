@@ -653,7 +653,13 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 					return IncompleteFactSlice()
 				}
 				if p.IsPointer() {
+					// residual ERROR sticky — no invent soft-skip then partial transfer past hole
+					if HasError() {
+						return IncompleteFactSlice()
+					}
 					ptrs = append(ptrs, p)
+				} else if HasError() {
+					return IncompleteFactSlice()
 				}
 			}
 		}
@@ -664,6 +670,13 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		// incomplete transfer must not invent partial field abstract
 		// (sticky only if RhsToLhsTransfer hard path already SetError)
 		if !FactsComplete(part) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return IncompleteFactSlice()
+		}
+		// residual ERROR sticky — no invent soft-append partial transfer past hard IR hole
+		if HasError() {
 			return IncompleteFactSlice()
 		}
 		out = append(out, part...)

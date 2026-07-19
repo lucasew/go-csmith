@@ -79,6 +79,20 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 		t.Fatal("incomplete stack IsVarOOS must SetError sticky")
 	}
 	ClearError()
+	// Blocks hole residual: soft invent was soft-skip hole then not-OOS / invent match later.
+	// Fair: sticky OOS true fail closed (hole before match).
+	f2 := &Function{Name: "f2"}
+	loc := &Variable{Name: "l_1", Type: GetIntType()}
+	okBlk := &Block{Func: f2, LocalVars: []*Variable{loc}}
+	f2.Blocks = []*Block{nil, okBlk}
+	// nil dest: not visible; scan Blocks hits nil hole before okBlk match
+	if !f2.IsVarOOS(loc, nil) {
+		t.Fatal("Blocks hole must fail closed OOS sticky")
+	}
+	if !HasError() {
+		t.Fatal("Blocks hole IsVarOOS must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestAddVisibleEffectUsesChain(t *testing.T) {
