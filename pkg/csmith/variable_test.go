@@ -274,3 +274,15 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFieldVarsCompleteNilIncomplete(t *testing.T) {
+	// nil Variable is incomplete shell — not invent empty-complete fields
+	if (*Variable)(nil).FieldVarsComplete() {
+		t.Fatal("nil FieldVarsComplete must be incomplete false")
+	}
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if !v.FieldVarsComplete() {
+		t.Fatal("scalar FieldVarsComplete empty complete")
+	}
+}

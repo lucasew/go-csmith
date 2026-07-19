@@ -1053,3 +1053,22 @@ func TestFindJumpLabelNilFMSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
+	ClearError()
+	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
+		t.Fatal("nil Block ContainsBackEdge must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Block ContainsBackEdge must SetError sticky")
+	}
+	ClearError()
+	b := &Block{StmID: 1}
+	if !b.ContainsBackEdge(nil) {
+		t.Fatal("nil FM ContainsBackEdge must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil FM ContainsBackEdge must SetError sticky")
+	}
+	ClearError()
+}

@@ -335,3 +335,21 @@ func TestMakeRandomArrayLoopSetupIncompleteAmbientFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVectorFilterNilSticky(t *testing.T) {
+	ClearError()
+	if (*VectorFilter)(nil).MaxProb() != 0 {
+		t.Fatal("nil MaxProb must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil MaxProb must SetError sticky")
+	}
+	ClearError()
+	if !(*VectorFilter)(nil).Filter(0) {
+		t.Fatal("nil Filter must reject-all true")
+	}
+	if !HasError() {
+		t.Fatal("nil Filter must SetError sticky")
+	}
+	ClearError()
+}

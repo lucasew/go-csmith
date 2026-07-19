@@ -326,8 +326,11 @@ func (v *Variable) OutputUpperBound(prefixName bool) string {
 
 // OutputLowerBound mirrors Variable::OutputLowerBound.
 // Variable.cpp:734–745. Arrays override separately.
+// Incomplete Variable sticky empty (no invent empty bound soft-skip past hole).
 func (v *Variable) OutputLowerBound(prefixName bool) string {
+	// Variable always live at bound emit; sticky incomplete no invent empty token
 	if v == nil {
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.AsArray != nil {
@@ -796,8 +799,14 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 
 // IsArrayField mirrors Variable::is_array_field.
 // Variable.cpp:270–277 — field of an array variable (or recursive).
+// Incomplete Variable sticky false (no invent not-array-field soft-skip past hole).
 func (v *Variable) IsArrayField() bool {
-	if v == nil || v.FieldVarOf == nil {
+	// Variable always live; sticky incomplete no invent not-array-field soft-skip
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if v.FieldVarOf == nil {
 		return false
 	}
 	p := v.FieldVarOf
@@ -810,8 +819,11 @@ func (v *Variable) IsArrayField() bool {
 // GetDimension mirrors Variable::get_dimension (default 0) / ArrayVariable override.
 // Variable.h:88 — virtual size_t get_dimension() const { return 0; }
 // ArrayVariable — sizes.size().
+// Incomplete Variable sticky 0 (no invent dim soft-skip past hole).
 func (v *Variable) GetDimension() int {
+	// Variable always live; sticky incomplete no invent dim 0 soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return 0
 	}
 	if v.AsArray != nil {
@@ -1104,15 +1116,23 @@ func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
 }
 
 // IsPointer mirrors Variable::is_pointer.
+// Incomplete Variable sticky false (no invent not-pointer soft-skip past hole).
 func (v *Variable) IsPointer() bool {
-	return v != nil && v.Type != nil && v.Type.PtrType() != nil
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.Type != nil && v.Type.PtrType() != nil
 }
 
 // IsVirtual mirrors Variable::is_virtual.
 // Variable.cpp:280–288 — field recurses; array is virtual when collective==0
 // (parent array, not itemized member). Dummy null/garbage/tbd use IsSpecialPtr / Type==nil.
+// Incomplete Variable sticky false (no invent not-virtual soft-skip past hole).
 func (v *Variable) IsVirtual() bool {
+	// Variable always live; sticky incomplete no invent not-virtual soft-skip
 	if v == nil {
+		SetError(ErrGeneric)
 		return false
 	}
 	if v.FieldVarOf != nil {
@@ -1130,8 +1150,13 @@ func (v *Variable) IsVirtual() bool {
 }
 
 // IsAggregate mirrors Variable::is_aggregate.
+// Incomplete Variable sticky false (no invent not-aggregate soft-skip past hole).
 func (v *Variable) IsAggregate() bool {
-	return v != nil && v.Type != nil && v.Type.IsAggregate()
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return v.Type != nil && v.Type.IsAggregate()
 }
 
 // MakeDummyStaticVariable mirrors VariableSelector::make_dummy_static_variable.
@@ -1246,9 +1271,11 @@ func (v *Variable) Match(other *Variable) bool {
 // FieldVarsComplete reports nested FieldVars have no nil holes.
 // Incomplete aggregates must not invent not-has-field / not-match past a hole
 // for mark_dead_var and similar; callers fail closed when false.
+// Nil Variable is incomplete (false) — no invent empty-complete fields for missing shell.
 func (v *Variable) FieldVarsComplete() bool {
+	// nil Variable is incomplete shell (not complete empty fields)
 	if v == nil {
-		return true
+		return false
 	}
 	for _, f := range v.FieldVars {
 		if f == nil || !f.FieldVarsComplete() {
