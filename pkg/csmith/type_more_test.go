@@ -223,4 +223,22 @@ func TestIfStructAssignOps(t *testing.T) {
 	opts.LangCPP = true
 	// may or may not flip — just exercise
 	_ = IfUnionWillHaveAssignOps(NewRng(3), opts, NewProbabilities(opts))
+	// nil probs → 0% (no invent default 50)
+	for seed := uint64(1); seed < 30; seed++ {
+		if IfStructWillHaveAssignOps(NewRng(seed), opts, nil) {
+			t.Fatal("nil probs must not invent assign-ops true at 50%")
+		}
+	}
+}
+
+func TestMoreTypesProbabilityNilProbs(t *testing.T) {
+	// below threshold still true; above threshold nil probs → 0% not invent 50
+	if !MoreTypesProbability(NewRng(1), nil, 5) {
+		t.Fatal("count<10 always true")
+	}
+	for seed := uint64(1); seed < 40; seed++ {
+		if MoreTypesProbability(NewRng(seed), nil, 20) {
+			t.Fatal("nil probs past threshold must not invent 50% true")
+		}
+	}
 }

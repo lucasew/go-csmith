@@ -245,10 +245,21 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 
 // RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.
 // CVQualifiers.cpp:375–397.
+// C++ always has process RNG + Probabilities; nil r fails closed nil (no invent
+// identity bits without draw). Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
 	if opts.MatchExactQualifiers {
 		return append([]bool(nil), q.IsConsts...)
+	}
+	// CVQualifiers.cpp always has process RNG for flipcoin paths
+	if r == nil {
+		return nil
+	}
+	// nil probs → 0% (no invent NewProbabilities / hard-coded 50)
+	p := 0
+	if probs != nil {
+		p = probs.Single(PStricterConstProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -268,16 +279,6 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 			}
 			return out
 		}
-		// CVQualifiers.cpp always has process RNG for flipcoin paths
-		// no invent fixed false (non-stricter) without draw — keep original bit
-		if r == nil {
-			out = append(out, q.IsConsts[i])
-			continue
-		}
-		p := 50
-		if probs != nil {
-			p = probs.Single(PStricterConstProb)
-		}
 		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	return out
@@ -285,10 +286,19 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 
 // RandomStricterVolatiles mirrors CVQualifiers::random_stricter_volatiles.
 // CVQualifiers.cpp:399–420.
+// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
 	if opts.MatchExactQualifiers {
 		return append([]bool(nil), q.IsVolatiles...)
+	}
+	if r == nil {
+		return nil
+	}
+	p := 0
+	if probs != nil {
+		p = probs.Single(PRegularVolatileProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -309,15 +319,6 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 			MakeScalarVolatiles(opts, out)
 			return out
 		}
-		// no invent fixed non-vol without RNG draw — keep original bit
-		if r == nil {
-			out = append(out, q.IsVolatiles[i])
-			continue
-		}
-		p := 50
-		if probs != nil {
-			p = probs.Single(PRegularVolatileProb)
-		}
 		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	MakeScalarVolatiles(opts, out)
@@ -326,10 +327,19 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 
 // RandomLooserConsts mirrors CVQualifiers::random_looser_consts.
 // CVQualifiers.cpp:422–439.
+// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
 	if opts.MatchExactQualifiers {
 		return append([]bool(nil), q.IsConsts...)
+	}
+	if r == nil {
+		return nil
+	}
+	p := 0
+	if probs != nil {
+		p = probs.Single(PLooserConstProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -344,15 +354,6 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 			}
 			return out
 		}
-		// no invent fixed non-const without RNG draw — keep original bit
-		if r == nil {
-			out = append(out, q.IsConsts[i])
-			continue
-		}
-		p := 50
-		if probs != nil {
-			p = probs.Single(PLooserConstProb)
-		}
 		out = append(out, r.RndFlipcoin(uint32(p)))
 	}
 	return out
@@ -360,10 +361,19 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 
 // RandomLooserVolatiles mirrors CVQualifiers::random_looser_volatiles.
 // CVQualifiers.cpp:441–457.
+// C++ always has process RNG + Probabilities; nil r fails closed nil.
+// Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
 	if opts.MatchExactQualifiers {
 		return append([]bool(nil), q.IsVolatiles...)
+	}
+	if r == nil {
+		return nil
+	}
+	p := 0
+	if probs != nil {
+		p = probs.Single(PRegularVolatileProb)
 	}
 	out := make([]bool, 0, depth)
 	for i := 0; i < depth; i++ {
@@ -378,15 +388,6 @@ func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabi
 			}
 			MakeScalarVolatiles(opts, out)
 			return out
-		}
-		// no invent fixed non-vol without RNG draw — keep original bit
-		if r == nil {
-			out = append(out, q.IsVolatiles[i])
-			continue
-		}
-		p := 50
-		if probs != nil {
-			p = probs.Single(PRegularVolatileProb)
 		}
 		out = append(out, r.RndFlipcoin(uint32(p)))
 	}

@@ -238,7 +238,8 @@ func NewLabelAttrGenerator(opts Options, probs *Probabilities) *AttributeGenerat
 	if !opts.LabelAttributes {
 		return &AttributeGenerator{}
 	}
-	p := 50
+	// nil probs → 0% (no invent default 50 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PTypeAttrProb)
 	}
@@ -254,7 +255,8 @@ func NewStructTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGe
 	if !opts.TypeAttributes {
 		return &AttributeGenerator{}
 	}
-	p := 50
+	// nil probs → 0% (no invent default 50 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PTypeAttrProb)
 	}
@@ -273,7 +275,8 @@ func NewUnionTypeAttrGenerator(opts Options, probs *Probabilities) *AttributeGen
 	if !opts.TypeAttributes {
 		return g
 	}
-	p := 50
+	// nil probs → 0% (no invent default 50 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PTypeAttrProb)
 	}

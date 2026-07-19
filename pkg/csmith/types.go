@@ -908,12 +908,13 @@ func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool 
 	if !opts.LangCPP {
 		return false
 	}
-	p := 50
-	if probs != nil {
-		p = probs.Single(PRegularVolatileProb)
-	}
 	if r == nil {
 		return false
+	}
+	// nil probs → 0% (no invent default 50 / NewProbabilities)
+	p := 0
+	if probs != nil {
+		p = probs.Single(PRegularVolatileProb)
 	}
 	return r.RndFlipcoin(uint32(p))
 }

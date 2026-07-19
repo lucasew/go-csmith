@@ -17,7 +17,8 @@ func MoreTypesProbability(r *Rng, probs *Probabilities, typeCount int) bool {
 	if r == nil {
 		return false
 	}
-	p := 50
+	// nil probs → 0% (no invent default 50 / NewProbabilities)
+	p := 0
 	if probs != nil {
 		p = probs.Single(PMoreStructUnionProb)
 	}

@@ -60,6 +60,35 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	}
 }
 
+func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
+	// C++ always has RNG; nil r must not invent identity bits as successful draw
+	opts := Defaults()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	if q.RandomStricterConsts(nil, opts, NewProbabilities(opts)) != nil {
+		t.Fatal("nil RNG stricter const must fail closed nil")
+	}
+	if q.RandomStricterVolatiles(nil, opts, NewProbabilities(opts)) != nil {
+		t.Fatal("nil RNG stricter vol must fail closed nil")
+	}
+	if q.RandomLooserConsts(nil, opts, NewProbabilities(opts)) != nil {
+		t.Fatal("nil RNG looser const must fail closed nil")
+	}
+	if q.RandomLooserVolatiles(nil, opts, NewProbabilities(opts)) != nil {
+		t.Fatal("nil RNG looser vol must fail closed nil")
+	}
+	// nil probs → 0% (no invent default 50); drawable non-const stays false under stricter
+	got := q.RandomStricterConsts(NewRng(1), opts, nil)
+	if len(got) != 1 || got[0] {
+		t.Fatalf("nil probs stricter must not invent 50%% true, got %v", got)
+	}
+	// exact match still identity without RNG
+	opts.MatchExactQualifiers = true
+	q2 := NewCVQualifiers([]bool{true, false}, []bool{false, true})
+	if got := q2.RandomStricterConsts(nil, opts, nil); !boolsEqual(got, q2.IsConsts) {
+		t.Fatal("exact match still identity", got)
+	}
+}
+
 func TestRandomQualifiersFromNoVolatile(t *testing.T) {
 	// CVQualifiers.cpp:194–225 — no_volatile clears all vols
 	opts := Defaults()
