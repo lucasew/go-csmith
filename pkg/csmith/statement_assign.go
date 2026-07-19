@@ -559,15 +559,22 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	}
 	lhs := assignLhsText(st, wrapVol)
 	if lhs == "" {
+		// incomplete LHS IR sticky — no invent bare RHS / safe rewrite
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// StatementAssign.cpp: expr.Output always for ops that need RHS
-	// no soft invent "0" / bare lhs when Expr missing or Output empty
+	// sticky no invent "0" / bare lhs when Expr missing or Output empty
 	var rhs string
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
 	}
 	if !st.AssignOp.NeedNoRHS() && (st.Expr == nil || rhs == "") {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
 	// StatementAssign.cpp:543 — if (avoid_signed_overflow() && op_flags)
@@ -595,12 +602,16 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 		case AssignAdd, AssignSub:
 			bop, ok := st.AssignOp.CompoundToBinaryOps()
 			if !ok {
-				// incomplete IR — no invent OutputSimple for broken compound map
+				// incomplete IR sticky — no invent OutputSimple for broken compound map
+				SetError(ErrGeneric)
 				return ""
 			}
 			fname := st.SafeFlags.BinaryFuncName(bop.BinaryOpC())
 			if fname == "" {
-				// SafeOpFlags.cpp assert empty name — fail closed no invent bare +=
+				// SafeOpFlags.cpp assert empty name sticky; no invent bare +=
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			id := SafeOpFlagsToID(fname)
@@ -610,6 +621,9 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			}
 			// StatementAssign.cpp:595–598 — expr.Output always (live Expression*)
 			if rhs == "" && !st.AssignOp.NeedNoRHS() {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			var b strings.Builder
@@ -636,7 +650,8 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			b.WriteString(")")
 			return b.String()
 		default:
-			// StatementAssign.cpp:618–619 — assert(false); no soft invent OutputSimple
+			// StatementAssign.cpp:618–619 — assert(false) sticky; no soft invent OutputSimple
+			SetError(ErrGeneric)
 			return ""
 		}
 	}

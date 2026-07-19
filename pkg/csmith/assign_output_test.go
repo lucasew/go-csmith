@@ -86,11 +86,15 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 		t.Fatal("empty ccomp rhs must SetError sticky")
 	}
 	ClearError()
-	// nil Expr on simple assign — no invent bare lhs
+	// nil Expr on simple assign sticky — no invent bare lhs
 	st2 := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
 	if out := OutputAssignAsExprOpts(st2, false, opts); out != "" {
 		t.Fatal("nil Expr simple must fail closed", out)
 	}
+	if !HasError() {
+		t.Fatal("nil Expr simple OutputAssignAsExpr must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
@@ -235,7 +239,8 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 }
 
 func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
-	// StatementAssign.cpp:618–619 assert(false); no invent OutputSimple for *= with flags
+	// StatementAssign.cpp:618–619 assert(false) sticky; no invent OutputSimple for *= with flags
+	ClearError()
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignMul,
@@ -247,6 +252,10 @@ func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
 	if out := OutputAssignAsExprOpts(st, false, opts); out != "" {
 		t.Fatalf("unknown op with flags must fail closed, got %q", out)
 	}
+	if !HasError() {
+		t.Fatal("unknown op with flags must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestRandomQualifiersDefaultProbsNilNoInvent(t *testing.T) {

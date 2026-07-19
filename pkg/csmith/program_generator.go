@@ -653,7 +653,10 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 		ctrl := GetNewCtrlVars(g.Opts)
 		ctrlDecl = OutputArrayCtrlVars(ctrl, dimen, "    ")
 		if ctrlDecl == "" {
-			// incomplete ctrl IR — fail closed empty (call sites use hashFuncDefReady)
+			// incomplete ctrl IR sticky — fail closed empty (no invent partial hash shell)
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 	}
@@ -704,7 +707,10 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 		if v.IsArray && len(sizes) > 0 {
 			if len(names) == 0 {
 				// C++ assumes get_last_ctrl_vars() non-empty after OutputArrayInitializers
-				// incomplete ctrl IR — fail closed whole resets
+				// incomplete ctrl IR sticky — fail closed whole resets
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			// ArrayVariable::output_init(out, &zero, ctrl_vars, 1) — always loop form
@@ -720,16 +726,22 @@ func OutputPtrResets(ptrs []*Variable, opts Options) string {
 			av.InitExpr = nil
 			initOut := outputArrayInitForced(av, "    ", names, opts.PostIncrOperator)
 			av.Init, av.InitExpr = savedInit, savedExpr
-			// incomplete array init IR — fail closed whole resets
+			// incomplete array init IR sticky — fail closed whole resets
 			if initOut == "" {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
 				return ""
 			}
 			b.WriteString(initOut)
 			continue
 		}
-		// OutputMgr.cpp:337 — Variable::Output always live; no invent " = 0;" without name
+		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
 		out := v.OutputC()
 		if out == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return ""
 		}
 		b.WriteString("    " + out + " = 0;\n")
