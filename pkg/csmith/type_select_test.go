@@ -430,3 +430,52 @@ func TestRandomTypeFromTypeVoidIsSimpleResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomPointerTypeEmptyDerivedStillFlips(t *testing.T) {
+	// Type.cpp:1145–1154 — rnd_flipcoin(20) always, even when derived_types empty.
+	// Short-circuit skip of the flip desyncs vs C++.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	env := &TypeEnv{}
+	// empty DerivedTypes; AllTypes has simples for choose_random fallthrough
+	env.AllTypes = []*Type{
+		GetSimpleType(EChar), GetSimpleType(EInt), GetSimpleType(EShort),
+		GetSimpleType(ELong), GetSimpleType(ELongLong),
+		GetSimpleType(EUChar), GetSimpleType(EUInt), GetSimpleType(EUShort),
+		GetSimpleType(EULong), GetSimpleType(EULongLong),
+	}
+	// Two RNGs: one for MakeRandomPointerType, one manual replay of fair stream
+	// Fair: flip(20) then choose_random path. After many seeds both succeed.
+	ok := 0
+	for seed := uint64(1); seed < 80; seed++ {
+		ClearError()
+		p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+		if p != nil && p.PtrType() != nil {
+			ok++
+		}
+	}
+	if ok == 0 {
+		t.Fatal("expected some int* from empty-derived fallthrough")
+	}
+	// When flip(20) true and derived empty, must not sticky-error; fall through
+	ClearError()
+	// seed that hits flip true with empty derived: brute
+	found := false
+	for seed := uint64(0); seed < 200; seed++ {
+		r := NewRng(seed)
+		if r.RndFlipcoin(20) {
+			// this seed's first draw is heads — MakeRandomPointerType must still return
+			ClearError()
+			p := env.MakeRandomPointerType(NewRng(seed), opts, probs)
+			if p == nil || HasError() {
+				t.Fatalf("empty derived + flip true must fall through choose_random, seed=%d p=%v err=%v", seed, p, HasError())
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no seed with first flip true in 0..199")
+	}
+}

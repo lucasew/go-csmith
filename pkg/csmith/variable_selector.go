@@ -3,6 +3,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	AllVars                []*Variable
@@ -1985,8 +1986,18 @@ func (vs *VariableSelector) createAndInitialize(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// VariableSelector.cpp:525–530 — NewArrayVariableProb → create_array_and_itemize
-	if vs.Opts.Arrays && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PNewArrayVariableProb))) {
+	// VariableSelector.cpp:525 — always rnd_flipcoin(NewArrayVariableProb());
+	// Probabilities sets p=0 when CGOptions::arrays() false — still draw (no invent skip).
+	// If VS.Opts.Arrays is false but shared Probs still has p=20 (stale process table),
+	// force p=0 while keeping the draw so stream stays aligned with C++ always-flip.
+	arrProb := uint32(0)
+	if vs.Probs != nil {
+		arrProb = uint32(vs.Probs.Single(PNewArrayVariableProb))
+	}
+	if !vs.Opts.Arrays {
+		arrProb = 0
+	}
+	if r.RndFlipcoin(arrProb) {
 		// VariableSelector.cpp:526–529 — strict_const → Constant::make_random; else make_init_value
 		var init *Constant
 		var ie *Expression

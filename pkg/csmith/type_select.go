@@ -564,26 +564,38 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 	if env == nil {
 		return nil
 	}
-	// Type.cpp:1145–1154 — occasionally choose pointer to pointers (20%)
+	// Type.cpp:1145–1154 — always rnd_flipcoin(20) first, then size check.
+	// Do not invent short-circuit skip of the flip when derived_types is empty
+	// (that desyncs the stream vs C++ which still draws).
 	// Type* always live on derived_types; nil hole fails closed (no invent skip hole
 	// and fall through to choose_random as if derived were empty).
-	if r.RndFlipcoin(20) && len(env.DerivedTypes) > 0 {
-		if !typesComplete(env.DerivedTypes) {
-			SetError(ErrGeneric)
+	if r.RndFlipcoin(20) {
+		// Type.cpp:1146 — ERROR_GUARD after flipcoin
+		if HasError() {
 			return nil
 		}
-		idx := r.RndUpto(uint32(len(env.DerivedTypes)))
-		t := env.DerivedTypes[idx]
-		if t.IndirectLevel() < opts.MaxPointerDepth {
-			// residual ERROR sticky — no invent soft-return pointer past IndirectLevel residual
+		if len(env.DerivedTypes) > 0 {
+			if !typesComplete(env.DerivedTypes) {
+				SetError(ErrGeneric)
+				return nil
+			}
+			idx := r.RndUpto(uint32(len(env.DerivedTypes)))
+			// Type.cpp:1149 ERROR_GUARD after rnd_upto
 			if HasError() {
 				return nil
 			}
-			return env.FindPointerType(t, true)
-		}
-		// residual ERROR sticky — no invent soft-continue choose_random past IndirectLevel residual false
-		if HasError() {
-			return nil
+			t := env.DerivedTypes[idx]
+			if t.IndirectLevel() < opts.MaxPointerDepth {
+				// residual ERROR sticky — no invent soft-return pointer past IndirectLevel residual
+				if HasError() {
+					return nil
+				}
+				return env.FindPointerType(t, true)
+			}
+			// residual ERROR sticky — no invent soft-continue choose_random past IndirectLevel residual false
+			if HasError() {
+				return nil
+			}
 		}
 	}
 	// Type.cpp:1158–1165 — choose_random then consolidate all simple → int*
