@@ -816,3 +816,50 @@ func TestCloneFactSliceIncompleteResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetProgramEndFacts(t *testing.T) {
+	// FactMgr.cpp:732–735
+	f1 := &Function{Name: "func_1"}
+	f2 := &Function{Name: "func_2"}
+	list := &FunctionList{Funcs: []*Function{f1, f2}}
+	fms := NewFactMgrMap()
+	fm1 := fms.ForFunc(f1)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	fm1.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	got := GetProgramEndFacts(list, fms)
+	if len(got) != 1 || FindRelatedPointTo(got, p) == nil {
+		t.Fatal(got)
+	}
+	ClearError()
+	if GetProgramEndFacts(nil, fms) != nil {
+		t.Fatal("empty list")
+	}
+	ClearError()
+	if FactsComplete(GetProgramEndFacts(list, nil)) || !HasError() {
+		t.Fatal("nil fms sticky")
+	}
+	ClearError()
+}
+
+func TestSanityCheckMap(t *testing.T) {
+	f := &Function{Name: "func_1"}
+	fm := NewFactMgr(f)
+	// empty maps ok
+	ClearError()
+	fm.SanityCheckMap()
+	if HasError() {
+		t.Fatal("empty complete")
+	}
+	// incomplete map sticky
+	fm.MapFactsIn[1] = IncompleteFactSlice()
+	fm.SanityCheckMap()
+	if !HasError() {
+		t.Fatal("incomplete sticky")
+	}
+	ClearError()
+	(*FactMgr)(nil).SanityCheckMap()
+	if !HasError() {
+		t.Fatal("nil fm sticky")
+	}
+	ClearError()
+}

@@ -2524,3 +2524,105 @@ func OutputTab(indent int) string {
 	}
 	return s
 }
+
+// SanityCheckMap mirrors FactMgr::sanity_check_map.
+// FactMgr.cpp:703–729 — soft visibility checks on map_facts_in/out (asserts disabled).
+// Incomplete maps sticky (no invent soft-pass past holes).
+func (fm *FactMgr) SanityCheckMap() {
+	if fm == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	// map_facts_in
+	for stmID, facts := range fm.MapFactsIn {
+		if !FactsComplete(facts) {
+			SetError(ErrGeneric)
+			return
+		}
+		st := FindStmtByID(fm.Func, stmID)
+		var parent *Block
+		if st != nil {
+			parent = FindParentBlockOfStmID(fm.Func, stmID)
+		}
+		for _, f := range facts {
+			if f == nil || f.Var == nil {
+				SetError(ErrGeneric)
+				return
+			}
+			v := f.Var
+			if v.IsVisible(parent) {
+				if HasError() {
+					return
+				}
+				continue
+			}
+			if HasError() {
+				return
+			}
+			// FactMgr.cpp:713–716 — body entry may include params with parent==0
+			if parent == nil && fm.Func != nil && IsVariableInSet(fm.Func.Param, v) {
+				continue
+			}
+			// upstream assert disabled — soft skip
+		}
+	}
+	// map_facts_out
+	for stmID, facts := range fm.MapFactsOut {
+		if !FactsComplete(facts) {
+			SetError(ErrGeneric)
+			return
+		}
+		parent := FindParentBlockOfStmID(fm.Func, stmID)
+		for _, f := range facts {
+			if f == nil || f.Var == nil {
+				SetError(ErrGeneric)
+				return
+			}
+			v := f.Var
+			vis := v.IsVisible(parent)
+			if HasError() {
+				return
+			}
+			if !vis && fm.Func != nil && fm.Func.RV != nil {
+				if fm.Func.RV.Match(v) {
+					if HasError() {
+						return
+					}
+					continue
+				}
+				if HasError() {
+					return
+				}
+			}
+			// soft skip when not visible (assert disabled)
+		}
+	}
+}
+
+// GetProgramEndFacts mirrors FactMgr::get_program_end_facts.
+// FactMgr.cpp:732–735 — global_facts of first function's FactMgr.
+// fms must hold session FMList; first is GetFirstFunction(list).
+func GetProgramEndFacts(list *FunctionList, fms *FactMgrMap) []*FactPointTo {
+	first := GetFirstFunction(list)
+	if first == nil {
+		// complete miss when list empty; sticky if hole in list
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		return nil
+	}
+	if fms == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	fm := fms.ForFunc(first)
+	if fm == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	if !FactsComplete(fm.GlobalFacts) {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	return fm.GlobalFacts
+}

@@ -895,17 +895,17 @@ Total items: 2070
 - [x] FactMgr.cpp::FactMgr.find_dangling_global_ptrs
 - [x] FactMgr.cpp::FactMgr.find_updated_facts
 - [x] FactMgr.cpp::FactMgr.find_updated_final_facts
-- [ ] FactMgr.cpp::FactMgr.get_program_end_facts
-- [ ] FactMgr.cpp::FactMgr.makeup_new_var_facts
-- [ ] FactMgr.cpp::FactMgr.merge_jump_facts
+- [x] FactMgr.cpp::FactMgr.get_program_end_facts
+- [x] FactMgr.cpp::FactMgr.makeup_new_var_facts
+- [x] FactMgr.cpp::FactMgr.merge_jump_facts
 - [x] FactMgr.cpp::FactMgr.output_assertions
 - [x] FactMgr.cpp::FactMgr.remove_function_local_facts
 - [x] FactMgr.cpp::FactMgr.remove_loop_local_facts
 - [x] FactMgr.cpp::FactMgr.remove_rv_facts
-- [ ] FactMgr.cpp::FactMgr.reset_stm_fact_maps
+- [x] FactMgr.cpp::FactMgr.reset_stm_fact_maps
 - [x] FactMgr.cpp::FactMgr.restore_facts
 - [x] FactMgr.cpp::FactMgr.restore_stm_fact_maps
-- [ ] FactMgr.cpp::FactMgr.sanity_check_map
+- [x] FactMgr.cpp::FactMgr.sanity_check_map
 - [x] FactMgr.cpp::FactMgr.set_fact_in
 - [x] FactMgr.cpp::FactMgr.set_fact_out
 - [x] FactMgr.cpp::FactMgr.setup_in_out_maps
