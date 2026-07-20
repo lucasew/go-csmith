@@ -173,7 +173,7 @@ func TestArrayCDecl(t *testing.T) {
 		Sizes:    []int{2, 3},
 	}
 	d := av.CDeclType()
-	if d != "int a[2][3]" {
+	if d != "int32_t a[2][3]" {
 		t.Fatal(d)
 	}
 }

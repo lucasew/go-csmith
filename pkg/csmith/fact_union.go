@@ -665,8 +665,11 @@ func RhsToLhsTransferUnion(
 			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		// FactUnion.cpp:89 — assert(indirect >= 0); hard sticky (no invent clamp for &)
-		if indirect < 0 {
+		// FactUnion.cpp:89 assert(indirect >= 0) is NDEBUG-elided in Release.
+		// merge_pointees_of_pointer with indirect<=0 returns {collective} (while loop
+		// never runs). Fair: allow &expr (indirect==-1) as pointee set {coll}; only
+		// multi-level & (indirect < -1) is sticky broken IR.
+		if indirect < -1 {
 			SetError(ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
@@ -675,7 +678,12 @@ func RhsToLhsTransferUnion(
 		if HasError() {
 			return IncompleteUnionFactSlice()
 		}
-		rvars := MergePointeesOfPointer(coll, indirect, ptFacts)
+		// indirect<=0 → MergePointeesOfPointer no-ops to {coll}; pass 0 for that path
+		mergeLevel := indirect
+		if mergeLevel < 0 {
+			mergeLevel = 0
+		}
+		rvars := MergePointeesOfPointer(coll, mergeLevel, ptFacts)
 		// residual ERROR sticky — no invent soft-merge past MergePointees residual
 		if HasError() {
 			return IncompleteUnionFactSlice()

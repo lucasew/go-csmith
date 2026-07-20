@@ -29,10 +29,10 @@ func TestOutputHeaderWrapVolatiles(t *testing.T) {
 func TestVolLValLhs(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, true)
 	v.UseVolRVal = true
-	if v.OutputLhsC() != "VOL_LVAL(g_1, int)" {
+	if v.OutputLhsC() != "VOL_LVAL(g_1, int32_t)" {
 		t.Fatal(v.OutputLhsC())
 	}
-	if v.OutputC() != "VOL_RVAL(g_1, int)" {
+	if v.OutputC() != "VOL_RVAL(g_1, int32_t)" {
 		t.Fatal(v.OutputC())
 	}
 }

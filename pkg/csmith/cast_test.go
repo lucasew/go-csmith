@@ -49,7 +49,7 @@ func TestExpressionCastOutput(t *testing.T) {
 	}
 	out := e.Output()
 	// Expression.cpp:228–231 — "(type) " with trailing space
-	if !strings.Contains(out, "int*") || !strings.HasPrefix(out, "(") {
+	if !strings.Contains(out, "int32_t*") || !strings.HasPrefix(out, "(") {
 		t.Fatal(out)
 	}
 	if !strings.Contains(out, ") ") {

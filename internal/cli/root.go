@@ -100,6 +100,8 @@ func NewRootCmd() *cobra.Command {
 			}
 			opts.OutputPath = outputPath
 
+			// RandomProgramGenerator prints argv[1..] in Options: line
+			opts.Argv = os.Args[1:]
 			program, err := csmith.Generate(opts)
 			if err != nil {
 				return err

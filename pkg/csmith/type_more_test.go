@@ -317,7 +317,7 @@ func TestPrintfDirective(t *testing.T) {
 
 func TestSizeofString(t *testing.T) {
 	ClearError()
-	if GetIntType().SizeofString() != "sizeof(int)" {
+	if GetIntType().SizeofString() != "sizeof(int32_t)" {
 		t.Fatal(GetIntType().SizeofString())
 	}
 	// Type* always live; sticky no invent sizeof(void)/sizeof()

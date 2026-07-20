@@ -335,7 +335,7 @@ func TestGenerateCanEmitPointerGlobal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(out, "int*") || strings.Contains(out, "int *") {
+		if strings.Contains(out, "int32_t*") || strings.Contains(out, "int32_t *") || strings.Contains(out, "int*") {
 			found = true
 			break
 		}

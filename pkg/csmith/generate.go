@@ -42,6 +42,7 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 	// Session Probabilities + attr gens: NewProgramGenerator (C++ singleton); no invent
 	// a second NewProbabilities(opts) here for InitAttrGenerators alone.
 	g := NewProgramGenerator(opts)
+	g.Argv = opts.Argv
 	defer ClearAttrGenerators()
 	// AbsProgramGenerator.cpp:64–86 — dump/parse probabilities then exit or continue
 	if opts.DumpDefaultProbabilities != "" {

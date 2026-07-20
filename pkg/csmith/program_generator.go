@@ -466,7 +466,8 @@ func (g *ProgramGenerator) OutputStructTypes() string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("/* --- STRUCT/UNION TYPES --- */\n\n")
+	// Type.cpp / OutputMgr path comment: "Struct/Union Declarations"
+	b.WriteString("/* --- Struct/Union Declarations --- */\n")
 	b.WriteString(body.String())
 	return b.String()
 }

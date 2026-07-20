@@ -3,7 +3,10 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // ESimpleType mirrors Type.h enum class eSimpleType (declaration order = integer value).
 type ESimpleType int
@@ -524,7 +527,8 @@ func (t *Type) SizeInBytes() int {
 	}
 }
 
-// CName is a minimal C spelling for simple/pointer types.
+// CName mirrors Type::Output for simple/pointer/struct/union spellings.
+// Type.cpp:1678–1706 — stdint-style intN_t/uintN_t from SizeInBytes*8.
 func (t *Type) CName() string {
 	// Type* always live at Output sites in C++; sticky no invent "void" for nil
 	if t == nil {
@@ -558,39 +562,62 @@ func (t *Type) CName() string {
 		}
 		return "union " + t.StructName
 	}
+	// eSimple
 	switch t.simple {
 	case EVoid:
 		return "void"
-	case EChar:
-		return "char"
-	case EInt:
-		return "int"
-	case EShort:
-		return "short"
-	case ELong:
-		return "long"
-	case ELongLong:
-		return "long long"
-	case EUChar:
-		return "unsigned char"
-	case EUInt:
-		return "unsigned int"
-	case EUShort:
-		return "unsigned short"
-	case EULong:
-		return "unsigned long"
 	case EFloat:
 		return "float"
-	case EULongLong:
-		return "unsigned long long"
 	case EInt128:
-		return "__int128"
+		// Type.cpp:1685–1686 — __int{SizeInBytes*8}
+		sz := t.SizeInBytes()
+		if HasError() || sz <= 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		return fmt.Sprintf("__int%d", sz*8)
 	case EUInt128:
-		return "unsigned __int128"
+		sz := t.SizeInBytes()
+		if HasError() || sz <= 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		return fmt.Sprintf("unsigned __int%d", sz*8)
 	default:
-		// unknown simple — assert path sticky; no soft invent "int"
-		SetError(ErrGeneric)
-		return ""
+		// Type.cpp:1689–1693 — (is_signed?"int":"uint") + bits + "_t"
+		if t.simple == 0 && !t.IsSimple() {
+			// unknown/non-simple fallthrough sticky
+			SetError(ErrGeneric)
+			return ""
+		}
+		// only integer simples reach here
+		switch t.simple {
+		case EChar, EShort, EInt, ELong, ELongLong, EUChar, EUShort, EUInt, EULong, EULongLong:
+			// ok
+		default:
+			SetError(ErrGeneric)
+			return ""
+		}
+		sz := t.SizeInBytes()
+		if HasError() || sz <= 0 {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		signed := t.IsSigned()
+		if HasError() {
+			return ""
+		}
+		bits := sz * 8
+		if signed {
+			return fmt.Sprintf("int%d_t", bits)
+		}
+		return fmt.Sprintf("uint%d_t", bits)
 	}
 }
 

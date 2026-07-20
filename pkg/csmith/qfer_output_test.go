@@ -484,7 +484,7 @@ func TestOutputHeaderAliasNoInvent(t *testing.T) {
 	ClearError()
 	f.AliasName = "func_1_alias"
 	out := f.OutputHeaderAlias(true)
-	if !strings.Contains(out, "static int func_1_alias(void)") ||
+	if !strings.Contains(out, "static int32_t func_1_alias(void)") ||
 		!strings.Contains(out, `alias("func_1")`) {
 		t.Fatal(out)
 	}

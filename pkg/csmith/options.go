@@ -329,6 +329,8 @@ type Options struct {
 	DumpRandomProbabilities  string
 	SafeMathWrappers         string
 	MonitorFuncs             string
+	// Argv is CLI args for the Options: header line (excluding argv[0]).
+	Argv []string
 	EnableBuiltinKinds       string
 	DisableBuiltinKinds      string
 	NoDeltaReduction         bool
@@ -346,8 +348,10 @@ func Defaults() Options {
 		SplitFilesDir:    "",
 		NoMain:           false,
 		PlatformInfoPath: defaultPlatformInfoPath,
-		IntSize:          int(unsafe.Sizeof(int(0))),
-		PointerSize:      int(unsafe.Sizeof(uintptr(0))),
+		// C ABI sizeof(int) is 4 on LP64/ILP32 Csmith targets — not Go's int (8 on amd64).
+		// platform.info / --int-size may override; Type::Output uses intN_t from SizeInBytes.
+		IntSize:     4,
+		PointerSize: int(unsafe.Sizeof(uintptr(0))),
 
 		MaxFuncs:             10,
 		MaxParams:            5,

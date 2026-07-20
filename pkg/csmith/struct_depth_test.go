@@ -109,7 +109,7 @@ func TestVolRValEmit(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), false, true)
 	v.UseVolRVal = true
 	out := v.OutputC()
-	if out != "VOL_RVAL(g_1, int)" {
+	if out != "VOL_RVAL(g_1, int32_t)" {
 		t.Fatal(out)
 	}
 }
