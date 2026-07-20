@@ -887,52 +887,71 @@ func (e Effect) SiblingUnionFieldIsWritten(v *Variable) bool {
 	return false
 }
 
+// NonEmptyIntersection mirrors Effect.cpp non_empty_intersection.
+// Effect.cpp:56–69 — any pair where va[i]->match(vb[j]) || vb[j]->match(va[i]).
+// Nil entries in either list fail closed sticky true (restrictive race).
+func NonEmptyIntersection(va, vb []*Variable) bool {
+	for _, a := range va {
+		for _, b := range vb {
+			if a == nil || b == nil {
+				SetError(ErrGeneric)
+				return true
+			}
+			if a.Match(b) {
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			if HasError() {
+				return true
+			}
+			if b.Match(a) {
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			if HasError() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // HasRaceWith mirrors Effect::has_race_with.
-// Effect.cpp:480–484 — non-empty intersection of read/write sets.
+// Effect.cpp:480–484 — read∩write || write∩read || write∩write via non_empty_intersection.
 // Incomplete either side fails closed sticky as race (no invent race-free / soft re-pick).
 func (e Effect) HasRaceWith(other Effect) bool {
 	if !EffectComplete(e) || !EffectComplete(other) {
 		SetError(ErrGeneric)
 		return true
 	}
-	for _, v := range e.ReadVars() {
-		if other.IsWritten(v) {
-			// residual ERROR sticky — no invent race true past IsWritten hole
-			if HasError() {
-				return true
-			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue race-free past IsWritten residual
-		if HasError() {
-			return true
-		}
+	ra, wa := e.ReadVars(), e.WrittenVars()
+	if HasError() {
+		return true
 	}
-	for _, v := range e.WrittenVars() {
-		if other.IsRead(v) {
-			// residual ERROR sticky — no invent race true past IsRead hole
-			if HasError() {
-				return true
-			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue race-free past IsRead residual
-		if HasError() {
-			return true
-		}
-		if other.IsWritten(v) {
-			// residual ERROR sticky — no invent race true past IsWritten hole
-			if HasError() {
-				return true
-			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue race-free past IsWritten residual
-		if HasError() {
-			return true
-		}
+	rb, wb := other.ReadVars(), other.WrittenVars()
+	if HasError() {
+		return true
 	}
-	return false
+	if NonEmptyIntersection(ra, wb) {
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	if NonEmptyIntersection(wa, rb) {
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	if NonEmptyIntersection(wa, wb) {
+		return true
+	}
+	return HasError()
 }
 
 // IsEmpty mirrors Effect::is_empty — no reads and no writes.

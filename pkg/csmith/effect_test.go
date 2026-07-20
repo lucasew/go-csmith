@@ -99,3 +99,38 @@ func TestIncompleteEffectCloneResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAccessEnumAndEmptyEffect(t *testing.T) {
+	// Effect.h Access { READ, WRITE }; get_empty_effect
+	if AccessRead != 0 || AccessWrite != 1 {
+		t.Fatalf("Access enum R=%d W=%d", AccessRead, AccessWrite)
+	}
+	e := EmptyEffect()
+	if !e.IsPure() || !e.IsSideEffectFree() || !e.IsEmpty() {
+		t.Fatal("empty_effect pure SE-free empty")
+	}
+}
+
+func TestNonEmptyIntersectionMatch(t *testing.T) {
+	// Effect.cpp:56–69 — Variable::match (identity / aggregate field)
+	ClearError()
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	if NonEmptyIntersection([]*Variable{a}, []*Variable{b}) {
+		t.Fatal("distinct scalars no intersect")
+	}
+	if !NonEmptyIntersection([]*Variable{a}, []*Variable{a}) {
+		t.Fatal("identity intersect")
+	}
+	// write-write race via has_race_with
+	e1 := EmptyEffect().WriteVar(a)
+	e2 := EmptyEffect().WriteVar(a)
+	if !e1.HasRaceWith(e2) {
+		t.Fatal("write-write race")
+	}
+	e3 := EmptyEffect().ReadVar(b)
+	if e1.HasRaceWith(e3) {
+		t.Fatal("disjoint no race")
+	}
+	ClearError()
+}

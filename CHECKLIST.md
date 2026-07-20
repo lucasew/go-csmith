@@ -245,8 +245,8 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.dump_random_probabilities
 - [x] CGOptions.cpp::CGOptions.enable_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.enable_float
-- [ ] CGOptions.cpp::CGOptions.enabled_builtin
-- [ ] CGOptions.cpp::CGOptions.enabled_builtin_kind
+- [x] CGOptions.cpp::CGOptions.enabled_builtin
+- [x] CGOptions.cpp::CGOptions.enabled_builtin_kind
 - [x] CGOptions.cpp::CGOptions.expand_struct
 - [ ] CGOptions.cpp::CGOptions.f
 - [x] CGOptions.cpp::CGOptions.fast_execution
@@ -324,7 +324,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.return_unions
 - [x] CGOptions.cpp::CGOptions.safe_math_wrapper
 - [x] CGOptions.cpp::CGOptions.sequence_name_prefix
-- [ ] CGOptions.cpp::CGOptions.set_default_builtin_kinds
+- [x] CGOptions.cpp::CGOptions.set_default_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.set_default_settings
 - [x] CGOptions.cpp::CGOptions.set_platform_specific_options
 - [ ] CGOptions.cpp::CGOptions.set_vol_tests
@@ -625,44 +625,44 @@ Total items: 2070
 - [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.set_current_pos
 - [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.trace_depth
 - [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.~DFSRndNumGenerator
-- [ ] Effect.cpp::Access.READ
-- [ ] Effect.cpp::Access.WRITE
-- [ ] Effect.cpp::Effect.Access
-- [ ] Effect.cpp::Effect.Access.READ
-- [ ] Effect.cpp::Effect.Access.WRITE
-- [ ] Effect.cpp::Effect.access_deref_volatile
-- [ ] Effect.cpp::Effect.add_effect
-- [ ] Effect.cpp::Effect.add_external_effect
-- [ ] Effect.cpp::Effect.clear
-- [ ] Effect.cpp::Effect.consolidate
-- [ ] Effect.cpp::Effect.Effect
-- [ ] Effect.cpp::Effect.field_is_read
-- [ ] Effect.cpp::Effect.field_is_written
-- [ ] Effect.cpp::Effect.get_empty_effect
-- [ ] Effect.cpp::Effect.get_lhs_write_vars
-- [ ] Effect.cpp::Effect.get_read_vars
-- [ ] Effect.cpp::Effect.get_write_vars
-- [ ] Effect.cpp::Effect.has_global_effect
-- [ ] Effect.cpp::Effect.has_race_with
-- [ ] Effect.cpp::Effect.is_empty
-- [ ] Effect.cpp::Effect.is_pure
-- [ ] Effect.cpp::Effect.is_read
-- [ ] Effect.cpp::Effect.is_read_partially
-- [ ] Effect.cpp::Effect.is_side_effect_free
-- [ ] Effect.cpp::Effect.is_written
-- [ ] Effect.cpp::Effect.is_written_partially
-- [ ] Effect.cpp::Effect.operator=
-- [ ] Effect.cpp::Effect.Output
-- [ ] Effect.cpp::Effect.read_var
-- [ ] Effect.cpp::Effect.set_lhs_write_vars
-- [ ] Effect.cpp::Effect.sibling_union_field_is_read
-- [ ] Effect.cpp::Effect.sibling_union_field_is_written
-- [ ] Effect.cpp::Effect.union_field_is_read
-- [ ] Effect.cpp::Effect.update_purity
-- [ ] Effect.cpp::Effect.write_var
-- [ ] Effect.cpp::Effect.write_var_set
-- [ ] Effect.cpp::Effect.~Effect
-- [ ] Effect.cpp::non_empty_intersection
+- [x] Effect.cpp::Access.READ
+- [x] Effect.cpp::Access.WRITE
+- [x] Effect.cpp::Effect.Access
+- [x] Effect.cpp::Effect.Access.READ
+- [x] Effect.cpp::Effect.Access.WRITE
+- [x] Effect.cpp::Effect.access_deref_volatile
+- [x] Effect.cpp::Effect.add_effect
+- [x] Effect.cpp::Effect.add_external_effect
+- [x] Effect.cpp::Effect.clear
+- [x] Effect.cpp::Effect.consolidate
+- [x] Effect.cpp::Effect.Effect
+- [x] Effect.cpp::Effect.field_is_read
+- [x] Effect.cpp::Effect.field_is_written
+- [x] Effect.cpp::Effect.get_empty_effect
+- [x] Effect.cpp::Effect.get_lhs_write_vars
+- [x] Effect.cpp::Effect.get_read_vars
+- [x] Effect.cpp::Effect.get_write_vars
+- [x] Effect.cpp::Effect.has_global_effect
+- [x] Effect.cpp::Effect.has_race_with
+- [x] Effect.cpp::Effect.is_empty
+- [x] Effect.cpp::Effect.is_pure
+- [x] Effect.cpp::Effect.is_read
+- [x] Effect.cpp::Effect.is_read_partially
+- [x] Effect.cpp::Effect.is_side_effect_free
+- [x] Effect.cpp::Effect.is_written
+- [x] Effect.cpp::Effect.is_written_partially
+- [x] Effect.cpp::Effect.operator=
+- [x] Effect.cpp::Effect.Output
+- [x] Effect.cpp::Effect.read_var
+- [x] Effect.cpp::Effect.set_lhs_write_vars
+- [x] Effect.cpp::Effect.sibling_union_field_is_read
+- [x] Effect.cpp::Effect.sibling_union_field_is_written
+- [x] Effect.cpp::Effect.union_field_is_read
+- [x] Effect.cpp::Effect.update_purity
+- [x] Effect.cpp::Effect.write_var
+- [x] Effect.cpp::Effect.write_var_set
+- [x] Effect.cpp::Effect.~Effect
+- [x] Effect.cpp::non_empty_intersection
 - [ ] Enumerator.h::Enumerator.add_bool_elem
 - [ ] Enumerator.h::Enumerator.add_bool_elem_of_bool
 - [ ] Enumerator.h::Enumerator.add_elem
@@ -847,9 +847,9 @@ Total items: 2070
 - [ ] ExtensionValue.cpp::ExtensionValue.get_value
 - [ ] ExtensionValue.cpp::ExtensionValue.set_value
 - [ ] ExtensionValue.cpp::ExtensionValue.~ExtensionValue
-- [ ] Fact.cpp::eFactCategory
-- [ ] Fact.cpp::eFactCategory.ePointTo
-- [ ] Fact.cpp::eFactCategory.eUnionWrite
+- [x] Fact.cpp::eFactCategory
+- [x] Fact.cpp::eFactCategory.ePointTo
+- [x] Fact.cpp::eFactCategory.eUnionWrite
 - [ ] Fact.cpp::Fact.abstract_fact_for_assign
 - [ ] Fact.cpp::Fact.abstract_fact_for_return
 - [ ] Fact.cpp::Fact.abstract_fact_for_var_init
