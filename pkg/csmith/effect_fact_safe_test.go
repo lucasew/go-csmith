@@ -569,3 +569,41 @@ func TestAccessDerefVolatileResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsReadIsStructResidualSticky(t *testing.T) {
+	// IsStruct residual soft invent was invent not-read soft-skip past Type-nil parent.
+	// Type-nil parent already sticky read true before IsStruct.
+	ClearError()
+	parent := &Variable{Name: "g_s", Type: nil}
+	child := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	e := EmptyEffect()
+	if !e.IsRead(child) {
+		t.Fatal("Type-nil parent IsRead must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil parent IsRead must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestFieldIsReadIsAggregateResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent no-field-read past Type-nil shell.
+	ClearError()
+	hole := &Variable{Name: "g_x", Type: nil}
+	if !EmptyEffect().FieldIsRead(hole) {
+		t.Fatal("Type-nil FieldIsRead must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil FieldIsRead must SetError sticky")
+	}
+	ClearError()
+	// complete non-aggregate
+	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if EmptyEffect().FieldIsRead(v) {
+		t.Fatal("scalar FieldIsRead must be false")
+	}
+	if HasError() {
+		t.Fatal("complete FieldIsRead must not sticky")
+	}
+	ClearError()
+}

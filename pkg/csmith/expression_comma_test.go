@@ -207,3 +207,18 @@ func TestCommaOutputLHSResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
+	// FindUnionPointees residual soft invent was invent no-overlap soft-success past Type-nil.
+	ClearError()
+	// Type-nil non-special expr → FindUnionPointees incomplete → overlap sticky
+	e1 := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
+	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)}
+	if !HaveOverlappingFields(e1, e2, nil) {
+		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil FindUnion residual HaveOverlappingFields must SetError sticky")
+	}
+	ClearError()
+}

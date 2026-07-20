@@ -166,7 +166,14 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 		// only care referenced union fields, not the union itself
 		if u != nil && v != u {
 			if !IsVariableInSet(unions, u) {
+				// residual ERROR sticky — no invent soft-continue set past IsVariableInSet residual
+				if HasError() {
+					return IncompleteVariables()
+				}
 				unions = append(unions, u)
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip dupe past IsVariableInSet residual true
+				return IncompleteVariables()
 			}
 		}
 	}
@@ -223,6 +230,14 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 	}
 	for _, v := range vars2 {
 		if IsVariableInSet(vars1, v) {
+			// residual ERROR sticky — no invent overlap-true past IsVariableInSet residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-overlap past IsVariableInSet residual false
+		if HasError() {
 			return true
 		}
 	}
@@ -240,6 +255,12 @@ func LhsAsExpression(lhs *Lhs) *Expression {
 	ty := lhs.Type
 	if ty == nil {
 		ty = lhs.Var.Type
+	}
+	// Type* always live for non-special Lhs; Type-nil sticky (no invent untyped
+	// TermVariable shell past incomplete Lhs type IR)
+	if ty == nil && !IsSpecialPtr(lhs.Var) {
+		SetError(ErrGeneric)
+		return nil
 	}
 	return &Expression{Term: TermVariable, Var: lhs.Var, ExprType: ty}
 }

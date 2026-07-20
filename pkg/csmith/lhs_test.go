@@ -627,3 +627,25 @@ func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
+	// Type-nil Lhs soft invent was invent TermVariable shell past incomplete type IR.
+	ClearError()
+	if LhsAsExpression(&Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: nil}) != nil {
+		t.Fatal("Type-nil LhsAsExpression must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil LhsAsExpression must SetError sticky")
+	}
+	ClearError()
+	// complete path
+	v := CreateVariableScalars("g_y", GetIntType(), false, false)
+	e := LhsAsExpression(&Lhs{Var: v, Type: GetIntType()})
+	if e == nil || e.Var != v {
+		t.Fatal("complete LhsAsExpression")
+	}
+	if HasError() {
+		t.Fatal("complete LhsAsExpression must not sticky")
+	}
+	ClearError()
+}

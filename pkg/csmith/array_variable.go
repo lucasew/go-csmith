@@ -800,11 +800,12 @@ func (av *ArrayVariable) OutputDef() string {
 	}
 	// ArrayVariable.cpp:494–507 — OutputDecl always live; sticky no invent bare ";" / " = …"
 	decl := av.CDeclType()
+	// residual ERROR sticky — no invent soft-empty def past CDeclType residual
+	if HasError() {
+		return ""
+	}
 	if decl == "" {
-		// CDeclType already sticks incomplete Type/name; keep sticky if empty for other reasons
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder

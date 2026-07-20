@@ -569,12 +569,20 @@ func (e Effect) IsRead(v *Variable) bool {
 			return true
 		}
 		if v.FieldVarOf.Type.IsStruct() {
+			// residual ERROR sticky — no invent soft-continue struct-read past IsStruct residual
+			if HasError() {
+				return true
+			}
 			ok := e.IsRead(v.FieldVarOf)
 			// residual ERROR sticky — no invent not-read soft-skip past nested IsRead hole
 			if HasError() {
 				return true
 			}
 			return ok
+		}
+		// residual ERROR sticky — no invent not-read soft-skip past IsStruct residual false
+		if HasError() {
+			return true
 		}
 	}
 	return false
@@ -599,7 +607,15 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 		return true
 	}
 	if !v.IsAggregate() {
+		// residual ERROR sticky — no invent no-field-read soft-skip past IsAggregate residual
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue field scan past IsAggregate residual true
+	if HasError() {
+		return true
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as field-read (restrictive)
@@ -656,7 +672,15 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 		return true
 	}
 	if !v.IsAggregate() {
+		// residual ERROR sticky — no invent no-field-write soft-skip past IsAggregate residual
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue field scan past IsAggregate residual true
+	if HasError() {
+		return true
 	}
 	if e.incomplete {
 		// IncompleteEffect sticky fail closed as field-written (restrictive)

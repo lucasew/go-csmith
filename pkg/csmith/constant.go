@@ -198,12 +198,20 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		return ""
 	}
 	if typ.IsStruct() {
+		// residual ERROR sticky — no invent soft-continue const past IsStruct residual hole
+		if HasError() {
+			return ""
+		}
 		// Probabilities singleton always live in C++; sticky no invent NewProbabilities(opts)
 		if r == nil || probs == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
 		if c := MakeStructConstant(r, opts, probs, typ); c != nil {
+			// residual ERROR sticky — no invent soft-empty value past MakeStruct residual
+			if HasError() {
+				return ""
+			}
 			return c.Value
 		}
 		// incomplete struct const IR sticky (MakeStruct may already SetError)
@@ -212,12 +220,24 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		}
 		return ""
 	}
+	// residual ERROR sticky — no invent soft-continue union path past IsStruct residual false
+	if HasError() {
+		return ""
+	}
 	if typ.IsUnion() {
+		// residual ERROR sticky — no invent soft-continue const past IsUnion residual hole
+		if HasError() {
+			return ""
+		}
 		if r == nil || probs == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
 		if c := MakeUnionConstant(r, opts, probs, typ); c != nil {
+			// residual ERROR sticky — no invent soft-empty value past MakeUnion residual
+			if HasError() {
+				return ""
+			}
 			return c.Value
 		}
 		if !HasError() {
@@ -225,13 +245,33 @@ func generateRandomConstant(typ *Type, opts Options, probs *Probabilities, r *Rn
 		}
 		return ""
 	}
+	// residual ERROR sticky — no invent soft-continue pointer path past IsUnion residual false
+	if HasError() {
+		return ""
+	}
 	// Constant.cpp:308–310 — pointer constant is always "0" (no RNG draw)
 	if typ.PtrType() != nil {
+		// residual ERROR sticky — no invent "0" past PtrType residual hole
+		if HasError() {
+			return ""
+		}
 		return "0"
+	}
+	// residual ERROR sticky — no invent soft-continue simple path past PtrType residual nil
+	if HasError() {
+		return ""
 	}
 	// Constant.cpp:411 — assert(0) for types other than simple/pointer/struct/union sticky
 	if !typ.IsSimple() {
+		// residual ERROR sticky — no invent soft-continue past IsSimple residual hole
+		if HasError() {
+			return ""
+		}
 		SetError(ErrGeneric)
+		return ""
+	}
+	// residual ERROR sticky — no invent soft-continue simple past IsSimple residual true
+	if HasError() {
 		return ""
 	}
 	// Constant.cpp:312 — assert(st != eVoid); no soft invent comment literal sticky
