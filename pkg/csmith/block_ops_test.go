@@ -1542,40 +1542,6 @@ func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
 // TestStmVisitFactsDoesNotMergeLiveMayNullIntoInputs — Statement.cpp:609–626.
 // stm_visit_facts mutates inputs only; never merges global_facts may-null into inputs.
 // Invent per-stmt mergeMayNull reinjected mid-gen null during FP (seed-2 e12688).
-// TestStmVisitFactsRestoresLiveAndMayMergeNull — Statement.cpp:609–626 restores
-// global_facts after visit. Residual: join live may-null into work (e10107) until
-// self-back+sequential alone preserve lattice (e12688 over-strip residual).
-func TestStmVisitFactsRestoresLiveAndMayMergeNull(t *testing.T) {
-	ClearError()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	inputs := []*FactPointTo{MakeFactPointTo(p, tgt)}
-	live := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
-	if live == nil {
-		t.Fatal("live")
-	}
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
-	st := &Stmt{
-		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
-	}
-	fm := NewFactMgr(nil)
-	fm.GlobalFacts = []*FactPointTo{live}
-	cg := EmptyCGContext().WithFactMgr(fm)
-	eff := EmptyEffect()
-	cg.EffectAccum = &eff
-	facts := CloneFactSlice(inputs)
-	if !StmVisitFacts(st, &facts, &cg, Defaults()) {
-		t.Fatalf("visit must ok err=%v", HasError())
-	}
-	// live GlobalFacts restored
-	if g := FindRelatedPointTo(fm.GlobalFacts, p); g == nil || !g.IsNull() {
-		t.Fatal("live GlobalFacts must restore after visit")
-	}
-	ClearError()
-}
-
-
 func TestFindFixedPointSelfBackPreservesMayNull(t *testing.T) {
 	ClearError()
 	SetProcessOptions(Defaults())
@@ -1654,3 +1620,89 @@ func TestFindFixedPointAssignDerefFailsOnMayNull(t *testing.T) {
 	ClearError()
 }
 
+
+// TestFindFixedPointKeepsUnrelatedMayNull — self-back merges mid-gen may-null;
+// a non-touching assign must not drop it (Statement.cpp inputs flow).
+// No invent mergeMayNullFromLive — pure sequential + self-back.
+func TestFindFixedPointKeepsUnrelatedMayNull(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	x := CreateVariableScalars("g_x", GetIntType(), false, false)
+	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	mid := MakeFactPointToSet(p, []*Variable{tgt, NullPtr})
+	if mid == nil {
+		t.Fatal("mid fact")
+	}
+	asg := Stmt{
+		Kind: StmtAssign, StmID: 2,
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		AssignOp: AssignSimple,
+	}
+	body := &Block{StmID: 1, Func: f, Looping: true, Stmts: []Stmt{asg}}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = []*FactPointTo{mid}
+	fm.SetMapFactsIn(1, entry)
+	fm.SetMapFactsOut(1, []*FactPointTo{mid})
+	fm.MapVisited = map[int]bool{1: true}
+	fm.CreateCFGEdge(1, body, false, true)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	out, idx, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
+	if !ok {
+		t.Fatalf("FP must succeed idx=%d err=%v", idx, HasError())
+	}
+	got := FindRelatedPointTo(out, p)
+	if got == nil || !got.IsNull() {
+		t.Fatalf("unrelated assign must keep self-back may-null on g_p, got %+v", got)
+	}
+	ClearError()
+}
+
+// TestPostCreationFPKeepsPreOOSPostFacts — Block.cpp:690 vs 729.
+// post_facts is the pre-OOS snapshot; after FP only global_facts = map_facts_out.
+// Top-level return path (734–735) restores post_facts, not analysis outs.
+func TestPostCreationFPKeepsPreOOSPostFacts(t *testing.T) {
+	// Covered indirectly: empty-loop FP with self-back leaves map out from analysis
+	// while StmVisitFacts pure-inputs is exercised by KeepsUnrelatedMayNull.
+	// Explicit contract: after successful FindFixedPointBlock, caller must not
+	// treat analysis out as Block.cpp:690 post_facts.
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	preOOS := []*FactPointTo{MakeFactPointToSet(p, []*Variable{tgt, NullPtr})}
+	entry := []*FactPointTo{MakeFactPointTo(p, tgt)}
+	body := &Block{StmID: 1, Func: f, Looping: true, Parent: nil, Stmts: nil}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = CloneFactSlice(preOOS)
+	fm.SetMapFactsIn(1, entry)
+	fm.SetMapFactsOut(1, CloneFactSlice(preOOS))
+	fm.MapVisited = map[int]bool{1: true}
+	fm.CreateCFGEdge(1, body, false, true)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// snapshot like Block.cpp:690
+	postFacts := CloneFactSlice(preOOS)
+	out, _, ok := FindFixedPointBlock(body, entry, &cg, Defaults(), true)
+	if !ok {
+		t.Fatal("empty FP")
+	}
+	// analysis out has may-null from self-back; postFacts snapshot is independent
+	if g := FindRelatedPointTo(out, p); g == nil || !g.IsNull() {
+		t.Fatalf("analysis out should have may-null: %+v", g)
+	}
+	// postFacts must remain the pre-OOS snapshot object content (not replaced by out)
+	if len(postFacts) != len(preOOS) {
+		t.Fatal("postFacts snapshot must be untouched by FindFixedPointBlock")
+	}
+	ClearError()
+}

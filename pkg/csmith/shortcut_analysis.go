@@ -2,6 +2,7 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+
 // Shortcut result codes (Statement::shortcut_analysis).
 const (
 	// ShortcutOK reused previous analysis (return 0).
@@ -506,12 +507,11 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	cg.ClearEffectStm()
 	// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; does not assign
 	// fm->global_facts = inputs. Go VisitFacts* use GlobalFacts as the working set:
-	// load *facts then join live may-null (seed-2 e10107). C++ keeps mid-gen on
-	// inputs via self-back of map_facts_out (Block.cpp:693+531–536) once per FP
-	// iteration; pure inputs-only without that lattice matching still drops may-null
-	// (e10107). Per-stmt live merge is residual invent vs sequential refine and can
-	// over-strip (e12688). Prefer pure inputs once self-back+sequential match C++.
-	// Always restore pre-visit live GlobalFacts after harvest.
+	// load *facts then join live may-null. C++ mid-gen enters via self-back of
+	// map_facts_out once (Block.cpp:693+531–536). Pure inputs-only still loses
+	// may-null on seed-2 (e10107) despite unit self-back tests; per-stmt live join
+	// is residual invent that can over-strip (e12688). Always restore pre-visit
+	// live GlobalFacts after harvest.
 	var liveSaved []*FactPointTo
 	haveLive := false
 	if cg.FM != nil {

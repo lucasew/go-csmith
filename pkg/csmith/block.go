@@ -838,9 +838,11 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 				}
 				for {
-					out, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
+					_, failIdx, ok := FindFixedPointBlock(b, factsCopy, cg, opts, b.NeedRevisit)
 					if ok {
-						postFacts = out
+						// Block.cpp:706–728 — post_facts is NOT reassigned to analysis
+						// outs; it stays the pre-OOS snapshot (Block.cpp:690). Only
+						// global_facts = map_facts_out after the loop (729).
 						break
 					}
 					// remove from fail index through end (Block.cpp:709–714)
@@ -890,10 +892,8 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					// from inputs. Breaking here left MapFactsIn/Out deleted → complete-empty
 					// postLoop/global_facts (seed-2 e2308: EV rejects ** with nfacts=0).
 					if len(b.Stmts) == 0 {
-						out, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
-						if okEmpty {
-							postFacts = out
-						} else {
+						_, _, okEmpty := FindFixedPointBlock(b, factsCopy, cg, opts, true)
+						if !okEmpty {
 							// install empty-body maps from entry facts (C++ find_fixed_point)
 							if !FactsComplete(factsCopy) {
 								fm.GlobalFacts = IncompleteFactSlice()
@@ -937,12 +937,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 								}
 							}
 							fm.SetMapFactsOut(b.StmID, outCopy)
-							postFacts = outCopy
 						}
+						// post_facts stays pre-OOS snapshot (Block.cpp:690)
 						break
 					}
 				}
-				// Block.cpp:729 — global_facts = map_facts_out[this] (always; missing → empty)
+				// Block.cpp:729 — global_facts = map_facts_out[this] only; post_facts unchanged
 				// incomplete out fails closed (hole marker — no invent keep prior / empty)
 				out := fm.GetMapFactsOut(b.StmID)
 				if !FactsComplete(out) {
@@ -952,7 +952,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					SetError(ErrGeneric)
 					return
 				} else {
-									fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
+					fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
 					// residual ERROR sticky — no invent soft-out past CloneFactSlice residual
 					if HasError() {
 						fm.GlobalFacts = IncompleteFactSlice()
@@ -960,7 +960,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 						return
 					}
-					postFacts = fm.GlobalFacts
+					// do not invent postFacts = global_facts — C++ post_facts stays line-690 snapshot
 				}
 			}
 		} else if b.Looping {
