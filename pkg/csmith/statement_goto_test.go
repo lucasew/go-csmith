@@ -646,3 +646,54 @@ func TestIsVisibleLocalUsesMatch(t *testing.T) {
 		t.Fatal("sticky")
 	}
 }
+
+// TestForwardGotoVisitMakeupLaterLocals — StatementGoto.cpp:167–204.
+// map_facts_in[dest] is a pre-make snapshot and can omit locals created after
+// dest (or during dest generation). Before VisitFactsStmt, MakeupNewVarFacts
+// from live GlobalFacts must restore those facts so opportunistic_validate
+// still sees them (seed-2 e19427: l_432 wiped → extra Select U100 vs UP U120).
+func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f, StmID: 1}
+	f.Blocks = []*Block{blk}
+	f.Stack = []*Block{blk}
+	fm := NewFactMgr(f)
+
+	// earlier local pointer with fact (simulates l_432)
+	lp := CreateVariableScalars("l_early", PointerTo(GetIntType()), false, false)
+	// IsLocal is name-prefix "l_" (Variable.cpp:is_local)
+	blk.LocalVars = append(blk.LocalVars, lp)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, NullPtr)}
+	// dest statement created with map_in that lacks l_early (pre-make snapshot)
+	dest := Stmt{Kind: StmtAssign, StmID: 10}
+	blk.Stmts = []Stmt{dest}
+	// map_in[dest] is incomplete relative to GlobalFacts (no l_early)
+	otherFact := MakeFactPointTo(
+		CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false),
+		NullPtr,
+	)
+	fm.SetMapFactsIn(10, []*FactPointTo{otherFact})
+	fm.SetMapFactsOut(10, []*FactPointTo{otherFact})
+
+	// Makeup from live GlobalFacts into map_in clone must re-add l_early
+	stmIn := CloneFactSlice(fm.GetMapFactsIn(10))
+	if FindRelatedPointTo(stmIn, lp) != nil {
+		t.Fatal("map_in should start without l_early")
+	}
+	if !MakeupNewVarFacts(&stmIn, fm.GlobalFacts) {
+		t.Fatal("MakeupNewVarFacts", HasError())
+	}
+	if FindRelatedPointTo(stmIn, lp) == nil {
+		t.Fatal("MakeupNewVarFacts must re-add later local fact into visit inputs")
+	}
+	if HasError() {
+		t.Fatal("complete makeup must not sticky")
+	}
+	// without makeup, SetGlobalFacts(map_in) would wipe l_early from live env
+	wiped := CloneFactSlice(fm.GetMapFactsIn(10))
+	if FindRelatedPointTo(wiped, lp) != nil {
+		t.Fatal("raw map_in still must lack l_early")
+	}
+}

@@ -2,7 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 // stmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
 // StatementGoto.cpp:55, 224–229.
@@ -637,14 +641,49 @@ func MakeRandomGoto(
 				SetError(ErrGeneric)
 				return makeGotoFailed()
 			}
+			// map_facts_in[dest] is the pre-make snapshot of dest and can lack
+			// facts for locals created later in the same block (or during dest
+			// generation). C++ stm_visit_facts mutates only the inputs FactVec
+			// while global_facts stays live; after visit it assigns
+			// global_facts = map_facts_out[dest]. Go VisitFacts uses GlobalFacts
+			// as the working set, so replacing it with raw map_in wipes later
+			// locals (seed-2 e19427: l_432 fact lost → opportunistic_validate
+			// fail → extra Select). MakeupNewVarFacts restores those locals
+			// from the live GlobalFacts into the visit inputs (FactMgr.cpp:494–508).
+			liveSaved := CloneFactSlice(fm.GlobalFacts)
+			if !FactsComplete(liveSaved) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				SetError(ErrGeneric)
+				return makeGotoFailed()
+			}
+			if !MakeupNewVarFacts(&stmInMerged, liveSaved) {
+				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
+				cg.ResetEffectAccum(preEffect)
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return makeGotoFailed()
+			}
+			if os.Getenv("CSMITH_DUMP_EV") == "1" {
+				has := false
+				for _, f := range stmInMerged {
+					if f != nil && f.Var != nil && f.Var.Name == "l_432" {
+						has = true
+					}
+				}
+				fmt.Fprintf(os.Stderr, "GOTO makeup after has432=%v n=%d\n", has, len(stmInMerged))
+			}
 			fm.SetGlobalFacts(CloneFactSlice(stmInMerged), "auto_statement_goto_664")
 			if !VisitFactsStmt(dest, cg, opts) {
+				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				return makeGotoFailed()
 			}
 			// visit may update GlobalFacts as outs; incomplete fails closed sticky
 			if !FactsComplete(fm.GlobalFacts) {
+				fm.SetGlobalFacts(liveSaved, "auto_statement_goto_restore")
 				fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy)
 				cg.ResetEffectAccum(preEffect)
 				SetError(ErrGeneric)
