@@ -119,10 +119,22 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 		return CVQualifiers{}
 	}
 	q := l.Var.Qfer.IndirectQualifiers(n)
+	// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
+	if HasError() {
+		return CVQualifiers{}
+	}
 	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
 	// sticky error for ERROR_GUARD callers; no soft invent strip of const / invent quals shell
 	if q.IsConst() {
+		// residual ERROR sticky — no invent soft-quals past IsConst residual true
+		if HasError() {
+			return CVQualifiers{}
+		}
 		SetError(ErrGeneric)
+		return CVQualifiers{}
+	}
+	// residual ERROR sticky — no invent soft-complete quals past IsConst residual false
+	if HasError() {
 		return CVQualifiers{}
 	}
 	return q

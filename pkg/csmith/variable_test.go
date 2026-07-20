@@ -427,3 +427,43 @@ func TestIsValidVolatileNonConstResidualHygiene(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCompatibleIsVolatileResidualSticky(t *testing.T) {
+	// IsVolatile residual soft invent was invent soft-compat past nil subject already sticky.
+	ClearError()
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	if a.Compatible(nil, false) {
+		t.Fatal("nil other Compatible must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil other Compatible must SetError sticky")
+	}
+	ClearError()
+	// complete path no sticky
+	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	if a.Compatible(b, false) {
+		// different vars not expand → false complete
+	}
+	if HasError() {
+		t.Fatal("complete Compatible must not sticky")
+	}
+	ClearError()
+	if !a.Compatible(a, false) {
+		t.Fatal("same var Compatible must true")
+	}
+	if HasError() {
+		t.Fatal("same var Compatible must not sticky")
+	}
+	ClearError()
+}
+
+func TestCreateFieldVarsIsVolatileResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent soft-skip create past non-aggregate.
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v.CreateFieldVars()
+	if !HasError() {
+		t.Fatal("non-aggregate CreateFieldVars must SetError sticky")
+	}
+	ClearError()
+}

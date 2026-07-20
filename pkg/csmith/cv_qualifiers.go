@@ -676,14 +676,29 @@ func (q CVQualifiers) MatchIndirect(other CVQualifiers, matchExact bool) bool {
 		return false
 	}
 	if len(q.IsConsts) == len(other.IsConsts) {
-		return q.Match(other, matchExact)
+		ok := q.Match(other, matchExact)
+		// residual ERROR sticky — no invent soft-match past Match residual
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	deref := len(other.IsConsts) - len(q.IsConsts)
 	// CVQualifiers.cpp:162–163 — if (deref < -1) return false; complete not-match
 	if deref < -1 {
 		return false
 	}
-	return q.Match(other.IndirectQualifiers(deref), matchExact)
+	ind := other.IndirectQualifiers(deref)
+	// residual ERROR sticky — no invent soft-match past IndirectQualifiers residual
+	if HasError() {
+		return false
+	}
+	ok := q.Match(ind, matchExact)
+	// residual ERROR sticky — no invent soft-match past Match residual after peel
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // SetConst mirrors CVQualifiers::set_const.

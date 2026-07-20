@@ -34,8 +34,23 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 		return AssignSimple
 	}
 	// StatementAssign.cpp:92–95 — non-simple or base float → simple assign
-	if typ != nil && (!typ.IsSimple() || typ.IsFloat()) {
-		return AssignSimple
+	if typ != nil {
+		simple := typ.IsSimple()
+		// residual ERROR sticky — no invent soft-simple past IsSimple residual
+		if HasError() {
+			return AssignOp(-1)
+		}
+		if !simple {
+			return AssignSimple
+		}
+		isF := typ.IsFloat()
+		// residual ERROR sticky — no invent soft-simple past IsFloat residual
+		if HasError() {
+			return AssignOp(-1)
+		}
+		if isF {
+			return AssignSimple
+		}
 	}
 	// C++ always has RNG + assignOpsTable_ sticky; no invent table or simple without pick
 	if r == nil {
@@ -49,8 +64,15 @@ func AssignOpsProbability(r *Rng, opts Options, table *DistributionTable, typ *T
 	}
 	f := NewVectorFilter(table)
 	// signed ints: filter out ++/-- (upstream avoids for signed)
-	if typ != nil && typ.IsSigned() {
-		f.Add(int(AssignPreIncr)).Add(int(AssignPreDecr)).Add(int(AssignPostIncr)).Add(int(AssignPostDecr))
+	if typ != nil {
+		signed := typ.IsSigned()
+		// residual ERROR sticky — no invent soft-filter past IsSigned residual
+		if HasError() {
+			return AssignOp(-1)
+		}
+		if signed {
+			f.Add(int(AssignPreIncr)).Add(int(AssignPreDecr)).Add(int(AssignPostIncr)).Add(int(AssignPostDecr))
+		}
 	}
 	v := r.RndUptoFilter(uint32(f.MaxProb()), f)
 	return AssignOp(f.Lookup(int(v)))
@@ -145,8 +167,15 @@ func MakeRandomAssignQfer(
 		return Stmt{}
 	}
 	// StatementAssign.cpp:211–216 — float LHS forces simple if op doesn't work
-	if typ != nil && typ.IsFloat() && !AssignOpWorksForFloat(op) {
-		op = AssignSimple
+	if typ != nil {
+		isF := typ.IsFloat()
+		// residual ERROR sticky — no invent soft-continue float op past IsFloat residual
+		if HasError() {
+			return Stmt{}
+		}
+		if isF && !AssignOpWorksForFloat(op) {
+			op = AssignSimple
+		}
 	}
 
 	// StatementAssign.cpp:131–140 — running effect + separate RHS/LHS accum

@@ -441,3 +441,33 @@ func TestInvocationOutputNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomBinaryInvocationIsFloatResidualSticky(t *testing.T) {
+	// IsFloat residual soft invent was invent soft-continue binary pick past Type-nil shell.
+	ClearError()
+	if (*Type)(nil).IsFloat() {
+		t.Fatal("nil Type IsFloat must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type IsFloat must SetError sticky")
+	}
+	ClearError()
+	// complete float IsFloat true path no sticky
+	ft := GetSimpleType(EFloat)
+	if !ft.IsFloat() {
+		t.Fatal("EFloat IsFloat must true")
+	}
+	if HasError() {
+		t.Fatal("complete EFloat IsFloat must not sticky")
+	}
+	ClearError()
+	// complete int IsFloat false no sticky
+	if GetIntType().IsFloat() {
+		t.Fatal("int IsFloat must false")
+	}
+	if HasError() {
+		t.Fatal("complete int IsFloat must not sticky")
+	}
+	ClearError()
+}
+

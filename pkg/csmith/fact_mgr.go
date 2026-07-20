@@ -2365,13 +2365,35 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 		cnt := len(keep)
 		for i := 0; i < len(rest); i++ {
 			rf := rest[i]
+			// Fact* always live after FactsComplete partition; nil hole sticky wipe
+			if rf == nil {
+				*inputs = IncompleteFactSlice()
+				SetError(ErrGeneric)
+				return
+			}
+			moved := false
 			for _, kf := range keep {
-				if kf.PointsTo(rf.Var) {
+				if kf == nil {
+					*inputs = IncompleteFactSlice()
+					SetError(ErrGeneric)
+					return
+				}
+				pt := kf.PointsTo(rf.Var)
+				// residual ERROR sticky — no invent soft-partition past PointsTo residual
+				if HasError() {
+					*inputs = IncompleteFactSlice()
+					return
+				}
+				if pt {
 					keep = append(keep, rf)
 					rest = append(rest[:i], rest[i+1:]...)
 					i--
+					moved = true
 					break
 				}
+			}
+			if moved {
+				continue
 			}
 		}
 		if len(keep) == cnt {

@@ -1510,14 +1510,33 @@ func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
 		return false
 	}
 	// IsVolatile / IsFieldVar residual only on nil (already gated); complete path never stickies
-	if v.IsVolatile() || other.IsVolatile() {
+	vVol := v.IsVolatile()
+	// residual ERROR sticky — no invent soft-compat past subject IsVolatile residual
+	if HasError() {
+		return false
+	}
+	oVol := other.IsVolatile()
+	// residual ERROR sticky — no invent soft-compat past other IsVolatile residual
+	if HasError() {
+		return false
+	}
+	if vVol || oVol {
 		return false
 	}
 	if v == other {
 		return true
 	}
 	if expandStruct {
-		return !v.IsFieldVar() && !other.IsFieldVar()
+		vf := v.IsFieldVar()
+		// residual ERROR sticky — no invent soft-compat past IsFieldVar residual
+		if HasError() {
+			return false
+		}
+		of := other.IsFieldVar()
+		if HasError() {
+			return false
+		}
+		return !vf && !of
 	}
 	return false
 }
@@ -1986,8 +2005,20 @@ func (v *Variable) CreateFieldVars() {
 		SetError(ErrGeneric)
 		return
 	}
-	if v.Type == nil || !v.Type.IsAggregate() {
+	if v.Type == nil {
 		SetError(ErrGeneric)
+		return
+	}
+	if !v.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-skip create past IsAggregate residual
+		if HasError() {
+			return
+		}
+		SetError(ErrGeneric)
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue create past IsAggregate residual true
+	if HasError() {
 		return
 	}
 	if len(v.FieldVars) > 0 {
@@ -1995,7 +2026,17 @@ func (v *Variable) CreateFieldVars() {
 	}
 	// Variable.cpp:340 — assert(fields.size() == qfers_.size()); Go fields embed qfer
 	isVol := v.IsVolatile()
+	// residual ERROR sticky — no invent soft-create fields past IsVolatile residual
+	if HasError() {
+		v.FieldVars = IncompleteVariables()
+		return
+	}
 	isConst := v.IsConst()
+	// residual ERROR sticky — no invent soft-create fields past IsConst residual
+	if HasError() {
+		v.FieldVars = IncompleteVariables()
+		return
+	}
 	j := 0
 	fail := func() {
 		// sticky ERROR so soft re-pick cannot invent empty-complete zero fields past hole

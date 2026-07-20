@@ -980,18 +980,25 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocation.cpp:179–183 — do { pick } while (type->is_float() && !works)
 	// FunctionInvocation.cpp:185 — assert(type); nil type allowed only for non-float paths (library)
 	op := PickBinaryOp(r, opts)
-	if typ != nil && typ.IsFloat() {
-		validB := false
-		// C++ unbounded do-while; cap high (no soft invent invalid float op)
-		for tries := 0; tries < 256; tries++ {
-			if BinaryOpWorksForFloat(op) {
-				validB = true
-				break
-			}
-			op = PickBinaryOp(r, opts)
-		}
-		if !validB {
+	if typ != nil {
+		isF := typ.IsFloat()
+		// residual ERROR sticky — no invent soft-continue pick past IsFloat residual
+		if HasError() {
 			return nil
+		}
+		if isF {
+			validB := false
+			// C++ unbounded do-while; cap high (no soft invent invalid float op)
+			for tries := 0; tries < 256; tries++ {
+				if BinaryOpWorksForFloat(op) {
+					validB = true
+					break
+				}
+				op = PickBinaryOp(r, opts)
+			}
+			if !validB {
+				return nil
+			}
 		}
 	}
 	// PickBinaryOp MAX / empty token — sticky no invent infix shell without live op
@@ -1117,7 +1124,15 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or 0/1 constant
 	if (op == BinMod || op == BinDiv) && right.Term == TermConstant && right.Con != nil {
 		if right.Con.Value == "0" || right.Con.Value == "1" {
-			if lhsTy == nil || !lhsTy.IsFloat() {
+			isF := false
+			if lhsTy != nil {
+				isF = lhsTy.IsFloat()
+				// residual ERROR sticky — no invent soft-rewrite op past IsFloat residual
+				if HasError() {
+					return nil
+				}
+			}
+			if !isF {
 				op = BinAdd
 				opStr = op.BinaryOpC()
 				if flags != nil && !SafeOpsBinary(opStr) {
@@ -1420,7 +1435,12 @@ func MakeRandomUnaryInvocation(
 	// C++ unbounded do-while; cap high (no soft invent invalid float op)
 	for tries := 0; tries < 256; tries++ {
 		uop = PickUnaryOp(r, opts)
-		if !typ.IsFloat() || UnaryOpWorksForFloat(uop) {
+		isF := typ.IsFloat()
+		// residual ERROR sticky — no invent soft-continue unary pick past IsFloat residual
+		if HasError() {
+			return nil
+		}
+		if !isF || UnaryOpWorksForFloat(uop) {
 			validU = true
 			break
 		}

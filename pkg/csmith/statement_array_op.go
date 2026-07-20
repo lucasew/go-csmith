@@ -405,6 +405,15 @@ func MakeRandomArrayInit(
 			return Stmt{}
 		}
 		cg.WriteVar(iv)
+		// residual ERROR sticky — no invent soft-continue later dims past WriteVar residual
+		if HasError() {
+			for _, d := range dims {
+				if d != nil && d.IV != nil {
+					cg.RemoveIVBound(d.IV)
+				}
+			}
+			return Stmt{}
+		}
 		// StatementArrayOp.cpp:134 — iv_bounds[cv] = size
 		cg.AddIVBound(iv, size)
 		_ = di
@@ -420,6 +429,15 @@ func MakeRandomArrayInit(
 	}
 	// StatementArrayOp.cpp:137 — write_var(av)
 	cg.WriteVar(&av.Variable)
+	// residual ERROR sticky — no invent soft-complete array-op past WriteVar residual
+	if HasError() {
+		for _, x := range dims {
+			if x != nil && x.IV != nil {
+				cg.RemoveIVBound(x.IV)
+			}
+		}
+		return Stmt{}
+	}
 
 	// access with ctrl vars: a[i0][i1]… (C++ always has cvs[i] live name)
 	access := av.Name

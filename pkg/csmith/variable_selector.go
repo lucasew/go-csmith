@@ -2099,15 +2099,27 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		cg.CurrentFunc.NewGlobals = append(cg.CurrentFunc.NewGlobals, v)
 	}
 	// VariableSelector.cpp:567–572 — access_once only for non-volatile globals
-	if !varQfer.IsVolatile() {
+	volQ := varQfer.IsVolatile()
+	// residual ERROR sticky — no invent soft-register past qfer IsVolatile residual
+	if HasError() {
+		return nil
+	}
+	if !volQ {
 		if vs.Opts.AccessOnce && vs.Probs != nil && r.RndFlipcoin(uint32(vs.Probs.Single(PAccessOnceVariableProb))) {
 			v.IsAccessOnce = true
 		}
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, v)
 	}
 	// wrap_volatiles → VOL_RVAL on Output
-	if vs.Opts.WrapVolatiles && v.IsVolatile() {
-		v.UseVolRVal = true
+	if vs.Opts.WrapVolatiles {
+		vol := v.IsVolatile()
+		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
+		if HasError() {
+			return nil
+		}
+		if vol {
+			v.UseVolRVal = true
+		}
 	}
 	vs.VarCreated = true
 	// VariableSelector.cpp:1230–1236 — use_new_var stats
@@ -2620,8 +2632,15 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		}
 	}
 	// wrap_volatiles for Output
-	if vs.Opts.WrapVolatiles && v.IsVolatile() {
-		v.UseVolRVal = true
+	if vs.Opts.WrapVolatiles {
+		vol := v.IsVolatile()
+		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual
+		if HasError() {
+			return nil
+		}
+		if vol {
+			v.UseVolRVal = true
+		}
 	}
 	vs.VarCreated = true
 	return v
@@ -2911,7 +2930,12 @@ func (vs *VariableSelector) CreateRandomArray(r *Rng, cg CGContext) *ArrayVariab
 	// ArrayVariable.cpp:190–191 — CreateArrayVariable already registered GlobalList/local
 	// VariableSelector.cpp:1371–1377 — DFA facts + new_globals (not a second list push)
 	if asGlobal {
-		if !av.IsVolatile() {
+		vol := av.IsVolatile()
+		// residual ERROR sticky — no invent soft-register array past IsVolatile residual
+		if HasError() {
+			return nil
+		}
+		if !vol {
 			vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
 		}
 		if cg.CurrentFunc != nil {
@@ -3145,8 +3169,15 @@ func (vs *VariableSelector) SelectWithInvalid(
 	}
 	// VariableSelector.cpp:1225–1227 — non-SE-free context: assert(!is_volatile())
 	// non-sticky null soft re-pick (sticky poisons generation when vol slips through filter)
-	if v != nil && !cg.EffectContext().IsSideEffectFree() && v.IsVolatile() {
-		return nil
+	if v != nil && !cg.EffectContext().IsSideEffectFree() {
+		vol := v.IsVolatile()
+		// residual ERROR sticky — no invent soft-null past IsVolatile residual
+		if HasError() {
+			return nil
+		}
+		if vol {
+			return nil
+		}
 	}
 	// VariableSelector.cpp:1229–1239 — record statistics
 	if v != nil {

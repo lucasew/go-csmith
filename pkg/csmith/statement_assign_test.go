@@ -252,3 +252,43 @@ func TestAssignLhsIsVolatileResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
+	// IsFloat residual soft invent was invent AssignSimple soft-success past Type-nil shell.
+	ClearError()
+	opts := Defaults()
+	tab := NewAssignOpsTable(opts)
+	// typ nil → skip simple/float filters → may pick compound
+	op := AssignOpsProbability(NewRng(1), opts, tab, (*Type)(nil))
+	_ = op
+	if HasError() {
+		t.Fatal("nil typ AssignOpsProbability must soft path no sticky")
+	}
+	ClearError()
+	// complete float → simple
+	ft := GetSimpleType(EFloat)
+	if AssignOpsProbability(NewRng(1), opts, tab, ft) != AssignSimple {
+		t.Fatal("float typ must force AssignSimple")
+	}
+	if HasError() {
+		t.Fatal("complete float AssignOpsProbability must not sticky")
+	}
+	ClearError()
+	// non-simple → simple
+	pt := PointerTo(GetIntType())
+	if AssignOpsProbability(NewRng(1), opts, tab, pt) != AssignSimple {
+		t.Fatal("non-simple typ must force AssignSimple")
+	}
+	if HasError() {
+		t.Fatal("complete pointer AssignOpsProbability must not sticky")
+	}
+	ClearError()
+	// nil Type IsFloat residual hygiene for assign make gate
+	if (*Type)(nil).IsFloat() {
+		t.Fatal("nil Type IsFloat must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Type IsFloat must SetError sticky")
+	}
+	ClearError()
+}
