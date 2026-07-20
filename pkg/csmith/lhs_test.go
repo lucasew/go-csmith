@@ -609,3 +609,21 @@ func TestOutputLhsCAccessResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVisitFactsLhsGetTypeResidualSticky(t *testing.T) {
+	// GetType residual soft invent was invent compound-read visit success past Type-nil Lhs.
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	cg := WithFunc(f, EmptyEffect())
+	cg.FM = NewFactMgr(f)
+	// Type-nil Lhs + Type-nil Var → GetType residual
+	lhs := &Lhs{Var: &Variable{Name: "g_x", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, Type: nil, CompoundAssign: true}
+	if cg.VisitFactsLhs(lhs, opts) {
+		t.Fatal("GetType residual must fail closed VisitFactsLhs")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
+}

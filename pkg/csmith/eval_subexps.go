@@ -71,6 +71,10 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 				return IncompleteExpressions()
 			}
 			sub := LhsAsExpression(e.Assign.Lhs)
+			// residual ERROR sticky — no invent self-eval list past LhsAsExpression residual
+			if HasError() {
+				return IncompleteExpressions()
+			}
 			if sub == nil {
 				SetError(ErrGeneric)
 				return IncompleteExpressions()

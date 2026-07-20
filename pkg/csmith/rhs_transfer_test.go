@@ -546,3 +546,31 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
+	// IsUnion residual soft invent was invent non-union complete transfer past hole.
+	// Type-nil non-special already sticky; complete non-union empty transfer hygiene.
+	ClearError()
+	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil)
+	if !UnionFactsComplete(out) && out != nil {
+		// IncompleteUnionFactSlice when incomplete maps — nil maps are complete empty
+	}
+	// complete non-union with nil maps: UnionFactsComplete(nil)==true and FactsComplete(nil)==true
+	// then non-union path returns nil, lvarCnt
+	if HasError() {
+		t.Fatal("complete non-union AbstractFactUnionForAssign must not sticky", out, n)
+	}
+	ClearError()
+	// Type-nil non-special sticky
+	hole := &Variable{Name: "g_x", Type: nil}
+	uf, _ := AbstractFactUnionForAssign(nil, nil, hole, 0, nil)
+	if UnionFactsComplete(uf) {
+		// IncompleteUnionFactSlice is not complete
+		t.Fatal("Type-nil must fail closed incomplete", uf)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil non-special AbstractFactUnionForAssign must SetError sticky")
+	}
+	ClearError()
+}

@@ -635,7 +635,19 @@ func AbstractFactUnionForAssign(
 			return IncompleteUnionFactSlice(), lvarCnt
 		}
 	} else if lhs.Type.IsUnion() {
-		return RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs), lvarCnt
+		// residual ERROR sticky — no invent union transfer past IsUnion residual hole
+		if HasError() {
+			return IncompleteUnionFactSlice(), lvarCnt
+		}
+		out := RhsToLhsTransferUnion(unionFacts, ptFacts, lvars, rhs)
+		// residual ERROR sticky — no invent soft-continue transfer past union transfer residual
+		if HasError() {
+			return IncompleteUnionFactSlice(), lvarCnt
+		}
+		return out, lvarCnt
+	} else if HasError() {
+		// residual ERROR sticky — no invent non-union transfer past IsUnion residual false
+		return IncompleteUnionFactSlice(), lvarCnt
 	}
 	if rhs == nil {
 		// non-union LHS with no RHS: complete empty field facts

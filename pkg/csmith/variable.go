@@ -942,9 +942,16 @@ func (v *Variable) IsValidVolatile() bool {
 		return false
 	}
 	// Variable.cpp:1068 — assert(init); non-const / non-zero / non-pointer → valid
-	// IsConst residual only on nil (already gated); complete path never stickies
 	if !v.IsConst() {
+		// residual ERROR sticky — no invent valid-true past IsConst residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue const path past IsConst residual true
+	if HasError() {
+		return false
 	}
 	if v.Type == nil {
 		// incomplete type sticky invalid for const vol check
@@ -952,18 +959,36 @@ func (v *Variable) IsValidVolatile() bool {
 		return false
 	}
 	if !v.Type.IsPointerLike() {
+		// residual ERROR sticky — no invent valid-true past IsPointerLike residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue pointer path past IsPointerLike residual true
+	if HasError() {
+		return false
 	}
 	// const pointer: invalid when init is null (equals 0)
 	// C++ assert(init) — missing init sticky invalid (no invent valid true)
 	if v.InitExpr != nil {
-		return v.InitExpr.NotEquals(0)
+		ok := v.InitExpr.NotEquals(0)
+		// residual ERROR sticky — no invent valid-true past NotEquals residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	if v.Init == nil {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Init.NotEqualsZero()
+	ok := v.Init.NotEqualsZero()
+	// residual ERROR sticky — no invent valid-true past NotEqualsZero residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsPackedAggregateFieldVar mirrors Variable::is_packed_aggregate_field_var.
@@ -1009,7 +1034,12 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	if parent.Type.IsStruct() && parent.Type.Packed {
+	isStruct := parent.Type.IsStruct()
+	// residual ERROR sticky — no invent soft-continue packed path past IsStruct residual
+	if HasError() {
+		return true
+	}
+	if isStruct && parent.Type.Packed {
 		if !parent.FieldVarsComplete() {
 			// incomplete parent FieldVars sticky packed-after (restrictive)
 			SetError(ErrGeneric)

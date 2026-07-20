@@ -1778,13 +1778,26 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	v := lhs.Var
 	// compound assign: validate as read first (Lhs.cpp:307–311)
 	if lhs.CompoundAssign {
-		ev := &Expression{Term: TermVariable, Var: v, ExprType: lhs.GetType()}
+		ty := lhs.GetType()
+		// residual ERROR sticky — no invent soft-continue visit past GetType residual
+		if HasError() {
+			return false
+		}
+		ev := &Expression{Term: TermVariable, Var: v, ExprType: ty}
 		if !c.VisitFactsExpressionVariable(ev, opts) {
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past compound read residual
+		if HasError() {
 			return false
 		}
 	}
 	// Lhs.cpp:313–315 — visit array indices
 	if !lhs.VisitIndices(c, opts) {
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue visit past VisitIndices residual true
+	if HasError() {
 		return false
 	}
 	// avoid overlapping union field assign a.x = a.y (Lhs.cpp:318–328)
@@ -1798,10 +1811,12 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 		// complete get_eval_to_subexps always ≥1 entry; incomplete sticky via GetEvalToSubexps
 		// (IncompleteExpressions — no invent skip overlap as success past incomplete RHS)
 		subs := GetEvalToSubexps(c.CurrRHS)
+		// residual ERROR sticky — no invent soft-skip overlap past GetEvalToSubexps residual
+		if HasError() {
+			return false
+		}
 		if !ExpressionsComplete(subs) || len(subs) == 0 {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return false
 		}
 		for _, sub := range subs {

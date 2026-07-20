@@ -393,3 +393,37 @@ func TestFieldVarsCompleteNilIncomplete(t *testing.T) {
 		t.Fatal("scalar FieldVarsComplete empty complete")
 	}
 }
+
+func TestIsValidVolatileInitExprResidualSticky(t *testing.T) {
+	// NotEquals residual soft invent was invent valid-true past incomplete InitExpr shell.
+	ClearError()
+	// const volatile pointer with Type-nil InitExpr residual NotEquals
+	pt := PointerTo(GetIntType())
+	v := CreateVariableQfer("g_p", pt, NewCVQualifiers([]bool{true, false}, []bool{true, false}))
+	if v == nil {
+		t.Fatal("create")
+	}
+	// ensure const+vol at storage level
+	v.Qfer = NewCVQualifiers([]bool{true}, []bool{true})
+	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
+	v.Init = nil
+	if v.IsValidVolatile() {
+		t.Fatal("InitExpr NotEquals residual must fail closed invalid volatile")
+	}
+	if !HasError() {
+		t.Fatal("InitExpr NotEquals residual IsValidVolatile must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestIsValidVolatileNonConstResidualHygiene(t *testing.T) {
+	ClearError()
+	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	if !v.IsValidVolatile() {
+		t.Fatal("non-const volatile must be valid")
+	}
+	if HasError() {
+		t.Fatal("complete IsValidVolatile must not sticky")
+	}
+	ClearError()
+}
