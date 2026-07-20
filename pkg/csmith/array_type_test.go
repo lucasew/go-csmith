@@ -182,6 +182,40 @@ func TestAddNewVarFactAndUpdateMapsAndGlobalAssert(t *testing.T) {
 	ClearError()
 }
 
+func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
+	// FactMgr.cpp:84–104 — always push init fact into maps even when global_facts
+	// already has a related fact (caller new_globals handoff after RenewFacts).
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// seed GlobalFacts as if RenewFacts already appended the subject
+	fp := MakeFactPointTo(g, NullPtr)
+	if fp == nil {
+		t.Fatal("MakeFactPointTo")
+	}
+	fm.GlobalFacts = []*FactPointTo{fp}
+	// map slot exists but does not yet list g (post-call maps lag GlobalFacts)
+	sid := 7
+	fm.MapFactsIn[sid] = []*FactPointTo{}
+	fm.MapFactsOut[sid] = []*FactPointTo{}
+	fm.AddNewVarFactAndUpdate(nil, g)
+	if HasError() {
+		t.Fatal("must not sticky when fact already present")
+	}
+	if FindRelatedPointTo(fm.MapFactsIn[sid], g) == nil {
+		t.Fatal("must push existing related fact into map_facts_in")
+	}
+	if FindRelatedPointTo(fm.MapFactsOut[sid], g) == nil {
+		t.Fatal("must push existing related fact into map_facts_out")
+	}
+	// GlobalFacts length unchanged (no second invent of same subject)
+	if len(fm.GlobalFacts) != 1 {
+		t.Fatalf("GlobalFacts len=%d want 1", len(fm.GlobalFacts))
+	}
+	ClearError()
+}
+
 func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
 	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).

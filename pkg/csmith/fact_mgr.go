@@ -1575,7 +1575,13 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		SetError(ErrGeneric)
 		return
 	}
-	// snapshot length to detect newly merged facts
+	// FactMgr.cpp:77–104 — abstract_fact_for_var_init; push into global_facts if
+	// missing; ALWAYS push the init fact into map_facts_in/out (even when
+	// global_facts already had a related fact). Go used to only push newly
+	// appended GlobalFacts entries — after RenewFacts on call return the fact
+	// already existed, so callee new_globals handoff skipped map updates and
+	// caller for-bodies kept map_in without the new global (seed-2 e2308:
+	// g_134→g_80 with g_80 missing from map_in after nested call creates g_80).
 	beforePT := len(fm.GlobalFacts)
 	fm.AddNewVarFact(v)
 	// AddNewVarFact may wipe GlobalFacts incomplete — stop map push sticky
@@ -1585,11 +1591,37 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 		}
 		return
 	}
-	// FactMgr.cpp:77–104 — push each new init fact into maps
+	// Facts to push into maps: newly merged, else existing related (C++ always
+	// iterates abstract results and pushes each f to maps after optional global push).
+	var toPush []*FactPointTo
+	if len(fm.GlobalFacts) > beforePT {
+		toPush = fm.GlobalFacts[beforePT:]
+	} else {
+		// already in GlobalFacts — still update maps (handoff / re-register)
+		subj := varCollective(v)
+		if subj == nil {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return
+		}
+		rel := FindRelatedPointTo(fm.GlobalFacts, subj)
+		if HasError() {
+			return
+		}
+		if rel == nil {
+			rel = FindRelatedPointTo(fm.GlobalFacts, v)
+			if HasError() {
+				return
+			}
+		}
+		if rel != nil {
+			toPush = []*FactPointTo{rel}
+		}
+	}
 	// Fact* always live after add; nil / incomplete Clone fails closed sticky wipe
 	// no invent MapFactsIn-only push when MapFactsOut is nil (one-sided invent)
-	for i := beforePT; i < len(fm.GlobalFacts); i++ {
-		f := fm.GlobalFacts[i]
+	for _, f := range toPush {
 		if f == nil {
 			fm.GlobalFacts = IncompleteFactSlice()
 			SetError(ErrGeneric)
