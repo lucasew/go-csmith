@@ -580,14 +580,39 @@ func CombineBranchFacts(st *Stmt, preFacts []*FactPointTo, fm *FactMgr) {
 	}
 
 	trueMust := st.Then.MustReturn()
+	// residual ERROR sticky — no invent soft-continue branch-merge past Then MustReturn residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	falseMust := st.Else.MustReturn()
+	// residual ERROR sticky — no invent soft-continue branch-merge past Else MustReturn residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	switch {
 	case trueMust && falseMust:
 		fm.GlobalFacts = CloneFactSlice(preFacts)
+		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 	case trueMust:
 		fm.GlobalFacts = CloneFactSlice(elseOut)
+		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 	case falseMust:
 		fm.GlobalFacts = CloneFactSlice(thenOut)
+		// residual ERROR sticky — no invent soft-complete GlobalFacts past CloneFactSlice residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		// StatementIf.cpp:227 — makeup_new_var_facts(outputs, map_facts_in[&if_false])
 		// C++ map[] always; missing → empty makeup; incomplete fails closed
 		in := fm.GetMapFactsIn(st.Else.StmID)

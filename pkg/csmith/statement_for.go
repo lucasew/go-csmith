@@ -619,7 +619,17 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 		return
 	}
 	fm.GlobalFacts = CloneFactSlice(in)
+	// residual ERROR sticky — no invent soft-must-return path past CloneFactSlice residual
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
+	}
 	if body.MustReturn() {
+		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		// StatementFor.cpp:356–359 — loop never entered; restore pre-loop
 		if !FactsComplete(preFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -627,6 +637,10 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			return
 		}
 		fm.RestoreFacts(preFacts)
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
+		fm.GlobalFacts = IncompleteFactSlice()
+		return
 	}
 	// StatementFor.cpp:361–367 — forward edges from breaks + merge jump facts
 	// GetMapFactsOut: breakID 0 Incomplete; incomplete mid-join wipe + stop

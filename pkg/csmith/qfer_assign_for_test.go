@@ -327,6 +327,30 @@ func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	ClearError()
 }
 
+func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
+	// MustReturn residual soft invent was soft-continue break-merge invent complete GlobalFacts.
+	ClearError()
+	fm := NewFactMgr(nil)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	pre := []*FactPointTo{MakeFactPointTo(p, a)}
+	// complete map_facts_in so we reach MustReturn
+	body := &Block{
+		StmID: 10,
+		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{StmID: 30}}},
+	}
+	fm.SetMapFactsIn(10, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
+	postLoopAnalysis(fm, &Stmt{Kind: StmtFor, StmID: 9, Then: body}, body, pre, EmptyEffect(), nil)
+	if FactsComplete(fm.GlobalFacts) {
+		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm.GlobalFacts)
+	}
+	if !HasError() {
+		t.Fatal("MustReturn residual postLoopAnalysis must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	ClearError()
 	fm := NewFactMgr(nil)

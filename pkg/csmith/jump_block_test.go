@@ -75,6 +75,21 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 		t.Fatal("HasInitSkippedVars residual FindGoodJumpBlock must SetError sticky")
 	}
 	ClearError()
+	// curr last MustReturn residual soft invent was soft-continue allow dest invent pick.
+	// Fair: sticky fail closed whole FindGoodJumpBlock (asDest).
+	// last if incomplete residual MustReturn false; without sticky re-pick continues to good.
+	curr := &Block{
+		Func: f,
+		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}},
+	}
+	good2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
+	if FindGoodJumpBlock(NewRng(1), []*Block{good2}, curr, true) != nil {
+		t.Fatal("MustReturn residual must fail closed FindGoodJumpBlock asDest")
+	}
+	if !HasError() {
+		t.Fatal("MustReturn residual FindGoodJumpBlock must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {

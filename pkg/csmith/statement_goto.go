@@ -294,8 +294,15 @@ func FindGoodJumpBlock(r *Rng, blocks []*Block, curr *Block, asDest bool) *Block
 			return nil
 		}
 		if asDest {
-			if last := curr.GetLastStm(); last != nil && last.MustReturn() {
-				return nil
+			if last := curr.GetLastStm(); last != nil {
+				must := last.MustReturn()
+				// residual ERROR sticky — no invent soft-reject/allow dest past MustReturn residual
+				if HasError() {
+					return nil
+				}
+				if must {
+					return nil
+				}
 			}
 		}
 	}

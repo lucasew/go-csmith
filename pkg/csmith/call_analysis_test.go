@@ -401,6 +401,28 @@ func TestCombineBranchFacts(t *testing.T) {
 		t.Fatal("Then StmID 0 must SetError sticky")
 	}
 	ClearError()
+	// MustReturn residual soft invent was soft-continue branch-merge invent complete GlobalFacts.
+	// Then last is If with nil arm → MustReturn residual sticky false.
+	fm5 := NewFactMgr(nil)
+	fm5.SetMapFactsOut(10, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
+	fm5.SetMapFactsOut(11, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
+	fm5.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	st5 := &Stmt{
+		Kind: StmtIfElse,
+		Then: &Block{
+			StmID: 10,
+			Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{StmID: 30}}},
+		},
+		Else: &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign, StmID: 21}}},
+	}
+	CombineBranchFacts(st5, pre, fm5)
+	if FactsComplete(fm5.GlobalFacts) {
+		t.Fatal("MustReturn residual must fail closed incomplete GlobalFacts", fm5.GlobalFacts)
+	}
+	if !HasError() {
+		t.Fatal("MustReturn residual CombineBranchFacts must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestPostCreationAssignFacts(t *testing.T) {

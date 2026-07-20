@@ -522,7 +522,12 @@ func MakeRandomBlock(
 			pendingFwd = st.Label
 		}
 		// Block.cpp:152 — stop when statement must_return
-		if st.MustReturn() {
+		must := st.MustReturn()
+		// residual ERROR sticky — no invent soft-continue more stmts past MustReturn residual
+		if HasError() {
+			break
+		}
+		if must {
 			break
 		}
 	}
@@ -546,13 +551,21 @@ func MakeRandomBlock(
 	// Block::post_creation_analysis (Block.cpp:682–742)
 	// Upstream appends return only inside post_creation when still missing.
 	// Without FactMgr, append return here so function bodies stay valid C.
-	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() && !b.MustReturn() {
-		ret := MakeRandomReturn(r, opts, vs, cg)
-		if stmtOK(ret) {
-			if ret.StmID == 0 {
-				ret.StmID = AllocStmID()
+	if cg.FM == nil && parent == nil && f != nil && f.NeedReturnStmt() {
+		must := b.MustReturn()
+		// residual ERROR sticky — no invent soft-append return past MustReturn residual
+		if HasError() {
+			abortBlockMake(f, b)
+			return nil
+		}
+		if !must {
+			ret := MakeRandomReturn(r, opts, vs, cg)
+			if stmtOK(ret) {
+				if ret.StmID == 0 {
+					ret.StmID = AllocStmID()
+				}
+				b.Stmts = append(b.Stmts, ret)
 			}
-			b.Stmts = append(b.Stmts, ret)
 		}
 	}
 	if b.StmID == 0 {
@@ -754,9 +767,19 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 					b.NeedRevisit = true
 					fm.ResetBlockFactMaps(b)
-					if !selfBack && b.FromTailToHead() {
-						selfBack = true
-						fm.CreateCFGEdge(b.StmID, b, false, true)
+					if !selfBack {
+						fromTail := b.FromTailToHead()
+						// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
+						if HasError() {
+							fm.GlobalFacts = IncompleteFactSlice()
+							postFacts = IncompleteFactSlice()
+							fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+							return
+						}
+						if fromTail {
+							selfBack = true
+							fm.CreateCFGEdge(b.StmID, b, false, true)
+						}
 					}
 					if cg.EffectAccum != nil {
 						*cg.EffectAccum = preEffect.Clone()
@@ -793,36 +816,57 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					postFacts = fm.GlobalFacts
 				}
 			}
-		} else if b.Looping && b.FromTailToHead() {
-			fm.CreateCFGEdge(b.StmID, b, false, true)
+		} else if b.Looping {
+			fromTail := b.FromTailToHead()
+			// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
+				postFacts = IncompleteFactSlice()
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				return
+			}
+			if fromTail {
+				fm.CreateCFGEdge(b.StmID, b, false, true)
+			}
 		}
 	}
 	// Block.cpp:734–741 — append return for top-level body when still missing
 	// incomplete postFacts must not invent return gen via FactsComplete(nil) empty
-	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() && !b.MustReturn() {
-		if !FactsComplete(postFacts) {
+	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() {
+		must := b.MustReturn()
+		// residual ERROR sticky — no invent soft-append return past MustReturn residual
+		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
-			SetError(ErrGeneric)
+			if !FactsComplete(postFacts) {
+				postFacts = IncompleteFactSlice()
+			}
 			return
 		}
-		fm.GlobalFacts = postFacts
-		if b.AppendReturnStmt(r, opts, vs, cg) == nil {
-			// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
-			return
-		}
-		// Block.cpp:740 — set_fact_out(this, map_facts_out[sr])
-		// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
-		if len(b.Stmts) > 0 {
-			sr := &b.Stmts[len(b.Stmts)-1]
-			// return stm_id always live after append_return; StmID 0 → Incomplete via getter
-			out := fm.GetMapFactsOut(sr.StmID)
-			if FactsComplete(out) {
-				fm.SetMapFactsOut(b.StmID, out)
-			} else {
-				// incomplete sr out — fail closed sticky hole marker (not empty complete)
-				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+		if !must {
+			if !FactsComplete(postFacts) {
+				fm.GlobalFacts = IncompleteFactSlice()
 				SetError(ErrGeneric)
 				return
+			}
+			fm.GlobalFacts = postFacts
+			if b.AppendReturnStmt(r, opts, vs, cg) == nil {
+				// append_return_stmt ERROR_GUARD / assert(visited) leave sticky error
+				return
+			}
+			// Block.cpp:740 — set_fact_out(this, map_facts_out[sr])
+			// C++ map[] always reads sr out (missing → empty); no invent skip set_fact_out
+			if len(b.Stmts) > 0 {
+				sr := &b.Stmts[len(b.Stmts)-1]
+				// return stm_id always live after append_return; StmID 0 → Incomplete via getter
+				out := fm.GetMapFactsOut(sr.StmID)
+				if FactsComplete(out) {
+					fm.SetMapFactsOut(b.StmID, out)
+				} else {
+					// incomplete sr out — fail closed sticky hole marker (not empty complete)
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					SetError(ErrGeneric)
+					return
+				}
 			}
 		}
 	}
