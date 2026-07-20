@@ -72,6 +72,32 @@ func TestGenerateAllTypesEnvCreatesStructs(t *testing.T) {
 	}
 }
 
+func TestGenerateSimpleTypesSeedsAllNonVoid(t *testing.T) {
+	// Type.cpp:1170–1176 — eChar..eUInt128 always on AllTypes (float off still listed).
+	ClearError()
+	opts := Defaults()
+	opts.EnableFloat = false
+	opts.LongLong = false // AllowInt64 may still depend on math64
+	var env TypeEnv
+	GenerateAllTypesEnv(NewRng(1), opts, NewProbabilities(opts), &env)
+	// At least the 13 non-void simple slots before any struct/union.
+	// (structs may append further under MoreTypesProbability.)
+	found := map[ESimpleType]bool{}
+	for _, ty := range env.AllTypes {
+		if ty != nil && ty.IsSimple() {
+			found[ty.Simple()] = true
+		}
+	}
+	for st := EChar; int(st) < MaxSimpleTypes; st++ {
+		if !found[st] {
+			t.Fatalf("AllTypes missing simple %v (GenerateSimpleTypes is unfiltered)", st)
+		}
+	}
+	if found[EVoid] {
+		t.Fatal("AllTypes must not include void")
+	}
+}
+
 func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	// C++ always has RNG + Probabilities sticky; no invent fields/aggregates without them
 	ClearError()

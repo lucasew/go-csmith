@@ -82,47 +82,39 @@ if ! CSMITH_TRACE_RNG=1 CSMITH_TRACE_RNG_RAW=1 CSMITH_TRACE_RNG_SITE=1 CSMITH_TR
 fi
 
 echo "[3/4] Normalizing traces..."
-awk '
-  BEGIN { idx=0 }
-  /^U depth=/ {
-    idx++
-    n=""; v=""; tries="-"; raw="-"
-    for (i=1; i<=NF; i++) {
-      if ($i ~ /^n=/) { split($i,a,"="); n=a[2] }
-      else if ($i ~ /^v=/) { split($i,a,"="); v=a[2] }
-      else if ($i ~ /^tries=/) { split($i,a,"="); tries=a[2] }
-      else if ($i ~ /^raw=/) { split($i,a,"="); raw=a[2] }
+# Both upstream and Go emit the same CSMITH_TRACE_RNG line format:
+#   F depth=N p=P v=V [@site]
+#   U depth=N n=N v=V tries=T raw=R [@site]
+# (Go may prefix a "# seed=..." comment line; ignore non-matching lines.)
+normalize_rng() {
+  awk '
+    BEGIN { idx=0 }
+    /^U depth=/ {
+      idx++
+      n=""; v=""; tries="-"; raw="-"
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^n=/) { split($i,a,"="); n=a[2] }
+        else if ($i ~ /^v=/) { split($i,a,"="); v=a[2] }
+        else if ($i ~ /^tries=/) { split($i,a,"="); tries=a[2] }
+        else if ($i ~ /^raw=/) { split($i,a,"="); raw=a[2] }
+      }
+      print idx, "U", n, v, tries, raw
+      next
     }
-    print idx, "U", n, v, tries, raw
-    next
-  }
-  /^F depth=/ {
-    idx++
-    p=""; v=""
-    for (i=1; i<=NF; i++) {
-      if ($i ~ /^p=/) { split($i,a,"="); p=a[2] }
-      else if ($i ~ /^v=/) { split($i,a,"="); v=a[2] }
+    /^F depth=/ {
+      idx++
+      p=""; v=""
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^p=/) { split($i,a,"="); p=a[2] }
+        else if ($i ~ /^v=/) { split($i,a,"="); v=a[2] }
+      }
+      print idx, "F", p, v, "-", "-"
+      next
     }
-    print idx, "F", p, v, "-", "-"
-    next
-  }
-' "$UP_RNG" > "$UP_NORM"
-
-awk '
-  $2=="U" {
-    tries="-"; raw="-"
-    for (i=6; i<=NF; i++) {
-      if ($i ~ /^tries=/) { split($i,a,"="); tries=a[2] }
-      else if ($i ~ /^raw=/) { split($i,a,"="); raw=a[2] }
-    }
-    print $1, "U", $3, $5, tries, raw
-    next
-  }
-  $2=="F" {
-    print $1, "F", $3, $5, "-", "-"
-    next
-  }
-' "$GO_RNG" > "$GO_NORM"
+  ' "$1"
+}
+normalize_rng "$UP_RNG" > "$UP_NORM"
+normalize_rng "$GO_RNG" > "$GO_NORM"
 
 up_count=$(wc -l < "$UP_NORM" | tr -d ' ')
 go_count=$(wc -l < "$GO_NORM" | tr -d ' ')
@@ -196,7 +188,18 @@ up_line=$(sed -n "${mismatch_at}p" "$UP_NORM" || true)
 go_line=$(sed -n "${mismatch_at}p" "$GO_NORM" || true)
 echo "upstream_event: ${up_line:-<none>}"
 echo "go_event:       ${go_line:-<none>}"
-go_site="$(awk -v n="$mismatch_at" '$1==n { site=""; for (i=1; i<=NF; i++) if ($i ~ /^@/) site=substr($i,2); if (site!="") print site }' "$GO_RNG" | head -n1)"
+# Map event index N to N-th U/F line in raw Go trace; extract optional @site.
+go_site="$(awk -v n="$mismatch_at" '
+  /^[UF] depth=/ {
+    idx++
+    if (idx == n) {
+      site=""
+      for (i=1; i<=NF; i++) if ($i ~ /^@/) site=substr($i,2)
+      print site
+      exit
+    }
+  }
+' "$GO_RNG")"
 echo "go_callsite:    ${go_site:-<none>}"
 
 start=$((mismatch_at - CONTEXT))
@@ -212,14 +215,15 @@ nl -ba "$GO_NORM" | sed -n "${start},${end}p"
 echo ""
 echo "go_site_context (${start}..${end}):"
 awk -v s="$start" -v e="$end" '
-  ($1+0)>=s && ($1+0)<=e {
-    site="<none>"
-    for (i=1; i<=NF; i++) {
-      if ($i ~ /^@/) {
-        site=substr($i,2)
+  /^[UF] depth=/ {
+    idx++
+    if (idx >= s && idx <= e) {
+      site="<none>"
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^@/) site=substr($i,2)
       }
+      printf("%6d %s\n", idx, site)
     }
-    printf("%6d %s\n", $1, site)
   }
 ' "$GO_RNG"
 echo ""

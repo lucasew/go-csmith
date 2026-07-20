@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 )
 
 // glibc srand48/lrand48 LCG parameters (AbsRndNumGenerator::genrand → lrand48).
@@ -57,8 +59,9 @@ type Rng struct {
 	// traceString mirrors DefaultRndNumGenerator / DFSRndNumGenerator::trace_string_.
 	traceString string
 
-	trace   bool
-	traceTo io.Writer
+	trace     bool
+	traceSite bool
+	traceTo   io.Writer
 
 	// dfs holds DFSRndNumGenerator search state; nil for Default kind.
 	dfs *dfsEngine
@@ -73,6 +76,9 @@ func NewRng(seed uint64) *Rng {
 	}
 	if os.Getenv("CSMITH_TRACE_RNG") != "" && os.Getenv("CSMITH_TRACE_RNG") != "0" {
 		r.trace = true
+		if os.Getenv("CSMITH_TRACE_RNG_SITE") != "" && os.Getenv("CSMITH_TRACE_RNG_SITE") != "0" {
+			r.traceSite = true
+		}
 		path := os.Getenv("CSMITH_TRACE_RNG_FILE")
 		if path == "" {
 			path = "/tmp/csmith-rng.trace"
@@ -159,7 +165,17 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 		}
 	}
 	if r.trace && r.traceTo != nil {
-		_, _ = fmt.Fprintf(r.traceTo, "U depth=%d n=%d v=%d tries=%d raw=%d\n", localDepth, n, v, tries, raw)
+		site := ""
+		if r.traceSite {
+			if _, file, line, ok := runtime.Caller(2); ok {
+				// skip RndUpto → RndUptoFilter → real caller when depth allows
+				site = fmt.Sprintf(" @%s:%d", filepath.Base(file), line)
+			}
+			if _, file, line, ok := runtime.Caller(1); ok && site == "" {
+				site = fmt.Sprintf(" @%s:%d", filepath.Base(file), line)
+			}
+		}
+		_, _ = fmt.Fprintf(r.traceTo, "U depth=%d n=%d v=%d tries=%d raw=%d%s\n", localDepth, n, v, tries, raw, site)
 	}
 	return v
 }

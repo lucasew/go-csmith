@@ -146,6 +146,9 @@ func MakeRandomAssignQfer(
 		SetError(ErrGeneric)
 		return Stmt{}
 	}
+	// StatementAssign.cpp:115–123 — AssignOpsProbability(type) once; if type null
+	// SelectLType(no_vol, op) using that op. Do NOT re-pick op after SelectLType
+	// (seed-2 event 45 was an invented second AssignOpsProbability draw).
 	op := AssignOpsProbability(r, opts, assignTab, typ)
 	if op < 0 {
 		// AssignOpsProbability already stickies on nil r/table; other invalid op soft
@@ -163,7 +166,6 @@ func MakeRandomAssignQfer(
 		if HasError() || typ == nil {
 			return Stmt{}
 		}
-		op = AssignOpsProbability(r, opts, assignTab, typ)
 	}
 	// StatementAssign.cpp:124 — assert(!type->is_const_struct_union()) sticky
 	if typ != nil {

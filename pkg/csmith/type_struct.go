@@ -253,18 +253,11 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 		SetError(ErrGeneric)
 		return
 	}
-	// GenerateSimpleTypes already cached; seed AllTypes with non-void simples
+	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
+	// Float/int64/int128 gates are probability filters + ChooseRandomTypeFilter,
+	// not AllTypes population (seed-2 first choose was n=13 vs upstream n=14).
 	if len(env.AllTypes) == 0 {
 		for st := EChar; int(st) < MaxSimpleTypes; st++ {
-			if st == EVoid {
-				continue
-			}
-			if st == EFloat && !opts.EnableFloat {
-				continue
-			}
-			if (st == ELongLong || st == EULongLong) && !opts.AllowInt64() {
-				continue
-			}
 			env.AllTypes = append(env.AllTypes, GetSimpleType(st))
 		}
 	}

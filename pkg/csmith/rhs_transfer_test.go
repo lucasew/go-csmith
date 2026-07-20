@@ -452,8 +452,9 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	ClearError()
 }
 
-func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
-	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size()) hard sticky
+func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
+	// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size()); NDEBUG elides
+	// and pairs only the overlapping prefix (no sticky-poison generation).
 	ClearError()
 	ut := &Type{isUnion: true, Fields: []StructField{
 		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
@@ -464,12 +465,10 @@ func TestRhsToLhsTransferAggregateLenMismatchFailClosed(t *testing.T) {
 	lhs0 := CreateVariableScalars("g_p0", PointerTo(GetIntType()), false, false)
 	lhs1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
-	// two LHS pointers vs one field pointer
-	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)) {
-		t.Fatal("lvars/pointers length mismatch must fail closed incomplete")
-	}
-	if !HasError() {
-		t.Fatal("len mismatch RhsToLhsTransfer must SetError sticky")
+	// two LHS pointers vs one field pointer → must not sticky-poison (NDEBUG assert).
+	_ = RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)
+	if HasError() {
+		t.Fatal("NDEBUG len mismatch must not sticky-poison", GetError())
 	}
 	ClearError()
 }

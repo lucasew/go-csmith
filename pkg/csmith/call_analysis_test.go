@@ -453,7 +453,8 @@ func TestPostCreationAssignFacts(t *testing.T) {
 }
 
 func TestPostCreationUncertainFunc1(t *testing.T) {
-	// Statement.cpp:868–871 — assert(validate) when func_1 uncertain revalidate fails
+	// Statement.cpp:868–871 — assert(0) when func_1 uncertain revalidate fails;
+	// NDEBUG elides assert and still installs outputs + special_handled.
 	ClearError()
 	defer ClearError()
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
@@ -481,9 +482,9 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 		t.Fatal("expect uncertain")
 	}
 	PostCreationAnalysis(st, nil, EmptyEffect(), &cg, Defaults())
-	// incomplete call tree fails validate → sticky error (no soft invent continue)
-	if !HasError() {
-		t.Fatal("validate fail must set sticky error like assert(0)")
+	// NDEBUG Release: assert(0) elided — no sticky abort; facts still installed.
+	if HasError() {
+		t.Fatal("NDEBUG assert(0) path must not sticky-poison generation", GetError())
 	}
 }
 

@@ -395,9 +395,14 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 					return
 				}
 			}
-			// Statement.cpp:868–871 — assert(validate); no soft invent skip special path
-			if !ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock()) {
-				SetError(ErrGeneric)
+			// Statement.cpp:868–871 — assert(0) if !validate; NDEBUG elides assert and
+			// still installs outputs + special_handled (Release csmith does not abort).
+			// Do not sticky-poison generation: match NDEBUG continue (same class as
+			// FactUnion indirect==-1 under NDEBUG).
+			_ = ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
+			// residual ERROR sticky — no invent install outputs past validate residual hole
+			if HasError() {
+				fm.GlobalFacts = IncompleteFactSlice()
 				return
 			}
 			fm.GlobalFacts = outputs
@@ -510,10 +515,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
 		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
 			if cnt++; cnt > 7 {
-				// Block.cpp:526–530 — assert(0) when too many iterations; sticky error
-				// no soft invent success / silent false without ERROR for callers
-				SetError(ErrGeneric)
-				return currentInputs, -1, false
+				// Block.cpp:526–530 — assert(0) when too many iterations.
+				// NDEBUG elides assert and continues the infinite do-while (Release).
+				// Do not sticky-poison generation: return false so post_creation_analysis
+				// strips failing stmts and retries (same class as other NDEBUG asserts).
+				return currentInputs, 0, false
 			}
 			back := fm.FindEdgesIn(b.StmID, false, true)
 			// nil = incomplete CFG; no invent skip holes as absent back-edges

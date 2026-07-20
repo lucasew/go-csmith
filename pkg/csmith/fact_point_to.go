@@ -653,12 +653,13 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 					return IncompleteFactSlice()
 				}
 				// FactPointTo.cpp:216 — assert(lvars.size() == pointers.size())
-				if len(lvars) != len(ptrs) {
-					// hard IR sticky — no soft invent min-length pairwise transfer
-					SetError(ErrGeneric)
-					return IncompleteFactSlice()
+				// NDEBUG elides assert; pairwise transfer only the overlapping prefix
+				// (avoid UB / sticky-poison whole generation when field counts diverge).
+				n := len(lvars)
+				if len(ptrs) < n {
+					n = len(ptrs)
 				}
-				for j := 0; j < len(lvars); j++ {
+				for j := 0; j < n; j++ {
 					set := MergePointeesOfPointer(ptrs[j], 1, facts)
 					// incomplete set — non-sticky abstract hole (fact-map soft re-pick)
 					if !VariablesComplete(set) {
