@@ -1,9 +1,44 @@
 package csmith
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
+
+func TestGenerateRandomConstantInRangePowFloat(t *testing.T) {
+	// Constant.cpp:228 — (int)pow(2, bound/2.0); bound=15 → ~181 not 1<<(15/2)=128
+	ClearError()
+	opts := Defaults()
+	wantB := int(math.Pow(2, 15.0/2.0))
+	if wantB < 180 || wantB > 182 {
+		t.Fatalf("pow domain %d want ~181", wantB)
+	}
+	// Same seed: range const must burn U(wantB)+F like manual draws
+	rManual := NewRng(1)
+	_ = rManual.RndUpto(uint32(wantB))
+	_ = rManual.RndFlipcoin(50)
+	rGen := NewRng(1)
+	s := GenerateRandomConstantInRange(GetIntType(), 15, opts, rGen)
+	if s == "" || HasError() {
+		t.Fatal("range const", s, GetError())
+	}
+	if rGen.RandDepth() != rManual.RandDepth() {
+		t.Fatalf("depth want %d (U%d+F) got %d — integer shift would use U128", rManual.RandDepth(), wantB, rGen.RandDepth())
+	}
+	// Contrast: U128 stream diverges from U181 after first draw with same raw
+	r128 := NewRng(1)
+	_ = r128.RndUpto(128)
+	r181 := NewRng(1)
+	_ = r181.RndUpto(uint32(wantB))
+	if r128.Genrand() == 0 && r181.Genrand() == 0 {
+		// not a meaningful assert; just ensure wantB != 128
+	}
+	if wantB == 128 {
+		t.Fatal("bound=15 must not collapse to integer half-shift domain 128")
+	}
+	ClearError()
+}
 
 func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 	opts := Defaults()

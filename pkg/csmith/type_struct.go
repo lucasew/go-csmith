@@ -4,6 +4,7 @@ package csmith
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -467,22 +468,23 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 		SetError(ErrGeneric)
 		return ""
 	}
-	// b = 2^(bound/2); clamp
-	exp := bound / 2
-	if exp < 0 {
-		exp = 0
+	// Constant.cpp:228 / 238 — int b = (int)pow(2, (double)bound / 2);
+	// Floating exponent: bound=15 → 2^7.5 ≈ 181, not integer 1<<(15/2)=128
+	// (seed-2 e424 was U181 vs U128).
+	b := int(math.Pow(2, float64(bound)/2.0))
+	// Constant.cpp:239–240 — eUInt: if (b < 0) b = INT_MAX
+	if st == EUInt && b < 0 {
+		b = int(^uint32(0) >> 1) // platform INT_MAX-ish for 32-bit cast
 	}
-	if exp > 30 {
-		exp = 30
-	}
-	bmax := uint32(1) << uint(exp)
-	// Constant.cpp: pure_rnd_upto(b); no invent bmax=1 when shift underflows (exp clamped)
-	if bmax == 0 {
+	if b < 1 {
+		// pure_rnd_upto domain; no invent b=1 soft-success past broken pow
 		SetError(ErrGeneric)
 		return ""
 	}
-	num := int(r.RndUpto(bmax))
-	// Constant.cpp:226–235 — eInt may negate; eUInt stays non-negative
+	// pure_rnd_upto(b); C++ unsigned int domain
+	num := int(r.RndUpto(uint32(b)))
+	// Constant.cpp:231–236 — eInt: pure_rnd_flipcoin(50) may negate
+	// Constant.cpp:241–243 — eUInt: non-negative only
 	if st == EInt && r.RndFlipcoin(50) {
 		num = -num
 	}
