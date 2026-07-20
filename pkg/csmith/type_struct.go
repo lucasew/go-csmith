@@ -325,6 +325,10 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	b.WriteString(t.StructName)
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
+		// residual ERROR sticky — no invent soft-continue fields past attr residual
+		if HasError() {
+			return ""
+		}
 	}
 	b.WriteString(" {\n")
 	j := 0
@@ -351,10 +355,24 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			b.WriteString("   ")
 			// Type.cpp:1867 — OutputFirstQuals
 			if f.Qfer.IsConst() {
+				// residual ERROR sticky — no invent soft-const past IsConst residual hole
+				if HasError() {
+					return ""
+				}
 				b.WriteString("const ")
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
+				return ""
 			}
 			if f.Qfer.IsVolatile() {
+				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
+				if HasError() {
+					return ""
+				}
 				b.WriteString("volatile ")
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
+				return ""
 			}
 			b.WriteString(signedKW)
 			// Type.cpp:1875 assert(length >= 0); 0 → padding " : 0;"
@@ -377,10 +395,12 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		}
 		// Type.cpp:1879–1880 — output_qualified_type always live; sticky no invent " fN;"
 		ty := f.Qfer.OutputQualifiedType(f.Type)
+		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
+		if HasError() {
+			return ""
+		}
 		if ty == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")
@@ -704,6 +724,10 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	b.WriteString(t.StructName)
 	if attrs != nil && r != nil {
 		b.WriteString(attrs.Output(r))
+		// residual ERROR sticky — no invent soft-continue fields past attr residual
+		if HasError() {
+			return ""
+		}
 	}
 	b.WriteString(" {\n")
 	j := 0
@@ -727,10 +751,24 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 			}
 			b.WriteString("   ")
 			if f.Qfer.IsConst() {
+				// residual ERROR sticky — no invent soft-const past IsConst residual hole
+				if HasError() {
+					return ""
+				}
 				b.WriteString("const ")
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue field past IsConst residual false
+				return ""
 			}
 			if f.Qfer.IsVolatile() {
+				// residual ERROR sticky — no invent soft-vol past IsVolatile residual hole
+				if HasError() {
+					return ""
+				}
 				b.WriteString("volatile ")
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue field past IsVolatile residual false
+				return ""
 			}
 			b.WriteString(signedKW)
 			if f.BitWidth == 0 {
@@ -747,10 +785,12 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 		}
 		// output_qualified_type always live sticky; no invent " fN;" without type
 		ty := f.Qfer.OutputQualifiedType(f.Type)
+		// residual ERROR sticky — no invent soft-continue field past OutputQualifiedType residual
+		if HasError() {
+			return ""
+		}
 		if ty == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		b.WriteString("   ")

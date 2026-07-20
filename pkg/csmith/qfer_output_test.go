@@ -757,3 +757,43 @@ func TestOutputForwardDeclHeaderResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputGlobalsOutputDefResidualSticky(t *testing.T) {
+	// OutputDef residual soft invent was soft-continue later globals invent partial section.
+	ClearError()
+	opts := Defaults()
+	g := NewProgramGenerator(opts)
+	g.VS = NewVariableSelector(opts)
+	// Type-nil InitExpr residual on OutputDefFull
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v.Init = nil
+	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
+	g.VS.GlobalList = []*Variable{v}
+	if s := g.OutputGlobals(); s != "" {
+		t.Fatal("InitExpr Output residual must fail closed OutputGlobals", s)
+	}
+	if !HasError() {
+		t.Fatal("InitExpr Output residual OutputGlobals must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestReturnTypeCNameResidualSticky(t *testing.T) {
+	// CName residual soft invent was invent "void"/partial header past hole.
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: &Type{isStruct: true}} // unnamed struct CName residual
+	if s := f.returnTypeC(); s != "" {
+		t.Fatal("CName residual must fail closed returnTypeC", s)
+	}
+	if !HasError() {
+		t.Fatal("CName residual returnTypeC must SetError sticky")
+	}
+	ClearError()
+	if s := f.OutputHeader(false); s != "" {
+		t.Fatal("CName residual must fail closed OutputHeader", s)
+	}
+	if !HasError() {
+		t.Fatal("CName residual OutputHeader must SetError sticky")
+	}
+	ClearError()
+}

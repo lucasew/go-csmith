@@ -189,3 +189,40 @@ func TestOutputStructUnionDeclNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputStructDeclFieldTypeResidualSticky(t *testing.T) {
+	// OutputQualifiedType residual soft invent was soft-continue later fields invent partial struct.
+	ClearError()
+	st := &Type{
+		isStruct: true, StructName: "S0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+			{Name: "f1", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}, // CName residual
+		},
+	}
+	if s := st.OutputStructDecl(); s != "" {
+		t.Fatal("field CName residual must fail closed OutputStructDecl", s)
+	}
+	if !HasError() {
+		t.Fatal("field CName residual OutputStructDecl must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
+	// OutputQualifiedType residual soft invent was soft-continue invent partial union.
+	ClearError()
+	ut := &Type{
+		isUnion: true, StructName: "U0",
+		Fields: []StructField{
+			{Name: "f0", Type: &Type{isStruct: true}, BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		},
+	}
+	if s := ut.OutputUnionDecl(); s != "" {
+		t.Fatal("field CName residual must fail closed OutputUnionDecl", s)
+	}
+	if !HasError() {
+		t.Fatal("field CName residual OutputUnionDecl must SetError sticky")
+	}
+	ClearError()
+}

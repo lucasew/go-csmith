@@ -417,10 +417,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 			emittedArray[v.Name] = true
 			// ArrayVariable::OutputDef always live; sticky no invent "static \n" for empty
 			def := av.OutputDef()
+			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
+			if HasError() {
+				return ""
+			}
 			if def == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
@@ -434,10 +436,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// (no invent scalar OutputDefFull for live array not registered on VS.Arrays)
 		if v.IsArray && v.AsArray != nil {
 			def := v.AsArray.OutputDef()
+			// residual ERROR sticky — no invent soft-continue later globals past OutputDef residual
+			if HasError() {
+				return ""
+			}
 			if def == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			if g.Opts.ForceGlobalsStatic {
@@ -450,10 +454,12 @@ func (g *ProgramGenerator) OutputGlobals() string {
 		// Variable::OutputDef with force_globals_static + prefix_name + optional attrs
 		// sticky no invent blank global line for incomplete IR
 		def := v.OutputDefFull(g.Opts.ForceGlobalsStatic, g.Opts.PrefixName, g.Opts.VariableAttributes, g.Rng)
+		// residual ERROR sticky — no invent soft-continue later globals past OutputDefFull residual
+		if HasError() {
+			return ""
+		}
 		if def == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		body.WriteString(def)
@@ -665,10 +671,12 @@ func (g *ProgramGenerator) OutputMain() string {
 				return ""
 			}
 			firstInv = inv.Output()
+			// residual ERROR sticky — no invent main body past inv.Output residual hole
+			if HasError() {
+				return ""
+			}
 			if firstInv == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 		}

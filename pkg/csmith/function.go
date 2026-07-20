@@ -834,16 +834,22 @@ func (f *Function) returnTypeC() string {
 			return ""
 		}
 		out := f.RV.Qfer.OutputQualifiedType(f.RV.Type)
+		// residual ERROR sticky — no invent soft-empty return past OutputQualifiedType residual
+		if HasError() {
+			return ""
+		}
 		if out == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		return out
 	}
 	if f.ReturnType != nil {
 		cn := f.ReturnType.CName()
+		// residual ERROR sticky — no invent soft-empty return past CName residual
+		if HasError() {
+			return ""
+		}
 		if cn == "" {
 			SetError(ErrGeneric)
 			return ""
@@ -892,10 +898,12 @@ func (f *Function) paramListCOpts(opts Options) string {
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
 		ty := p.Qfer.OutputQualifiedType(p.Type)
+		// residual ERROR sticky — no invent soft-continue later params past OutputQualifiedType residual
+		if HasError() {
+			return ""
+		}
 		if ty == "" || p.Name == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		if i > 0 {
