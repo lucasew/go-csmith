@@ -1240,8 +1240,10 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 			SetError(ErrGeneric)
 			return false
 		}
+		// StatementAssign.cpp:386 — FactMgr::update_fact_for_assign(this, inputs)
+		// Go: GlobalFacts is the visit working set (cloned into by StmVisitFacts).
 		_ = cg.FM.UpdateFactForAssign(lhsVar, indir, st.GetAssignRhs())
-		// incomplete assign sticky (no invent visit success / SetMapFactsOut)
+		// incomplete assign sticky (no invent visit success)
 		if !FactsComplete(cg.FM.GlobalFacts) {
 			if !HasError() {
 				SetError(ErrGeneric)
@@ -1253,9 +1255,9 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		// StatementAssign.cpp:388–389 — map_stm_effect[this] = effect_stm
+		// StatementAssign.cpp:388–389 — map_stm_effect only; set_fact_out is
+		// validate_and_update_facts / stm_visit_facts callers (not here).
 		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm)
-		cg.FM.SetMapFactsOut(st.StmID, cg.FM.GlobalFacts)
 	}
 	return true
 }

@@ -196,8 +196,35 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			return false
 		}
 	}
-	_, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
-	return ok
+	// Block.cpp:466–476 — find_fixed_point then inputs = map_facts_out[this]
+	out, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
+	if !ok {
+		return false
+	}
+	if cg.FM != nil && b.StmID > 0 {
+		// Prefer map_facts_out (C++); fall back to FindFixedPointBlock return
+		mout := cg.FM.GetMapFactsOut(b.StmID)
+		if FactsComplete(mout) {
+			cl := CloneFactSlice(mout)
+			if HasError() || !FactsComplete(cl) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			cg.FM.GlobalFacts = cl
+		} else if FactsComplete(out) {
+			cl := CloneFactSlice(out)
+			if HasError() || !FactsComplete(cl) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return false
+			}
+			cg.FM.GlobalFacts = cl
+		}
+	}
+	return true
 }
 
 // VisitFactsStatementIf mirrors StatementIf::visit_facts.

@@ -505,8 +505,19 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 	// Statement.cpp:611 — get_effect_stm().clear()
 	cg.ClearEffectStm()
 	// Statement.cpp:612 — curr_blk = parent (stack top is current block in Go)
+	// C++ visit_facts mutates inputs in place; Go uses FM.GlobalFacts as the visit
+	// working set. Must clone: applyPointToAssignFacts reassigns GlobalFacts on
+	// merge/append, which would leave *facts pointing at the pre-merge slice and
+	// drop lattice updates (seed-2 e10107 may-null wipe during for fixed-point).
 	if cg.FM != nil {
-		cg.FM.GlobalFacts = *facts
+		cl := CloneFactSlice(*facts)
+		if HasError() || !FactsComplete(cl) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		cg.FM.GlobalFacts = cl
 	}
 	ok := VisitFactsStmt(st, cg, opts)
 	// Statement.cpp:615–617 — failed_stm = this when !ok && !is_compound
@@ -525,8 +536,19 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			ok = false
 		} else {
 			*facts = CloneFactSlice(cg.FM.GlobalFacts)
-			cg.FM.RemoveRVFacts(facts)
-			cg.FM.GlobalFacts = *facts
+			if HasError() || !FactsComplete(*facts) {
+				*facts = IncompleteFactSlice()
+				cg.FM.GlobalFacts = IncompleteFactSlice()
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				ok = false
+			} else {
+				cg.FM.RemoveRVFacts(facts)
+				// RemoveRVFacts mutates *facts; keep GlobalFacts as the same post-RV set
+				// C++ stm_visit_facts only remove_rv_facts(inputs) — no separate global_facts
+				cg.FM.GlobalFacts = *facts
+			}
 		}
 		// Statement::stm_id always live; StmID 0 fails closed sticky (C++ always
 		// records map_accum_effect / map_visited — no invent soft-skip maps)
@@ -569,7 +591,7 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 		SetError(ErrGeneric)
 		return false
 	}
-	// sync FM global facts with working set
+	// sync FM global facts with working set (clone — no alias with *facts)
 	if cg.FM != nil {
 		// Statement::stm_id always live; StmID 0 sticky (no invent
 		// validate success without set_fact_in/out)
@@ -577,7 +599,14 @@ func ValidateAndUpdateFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts
 			SetError(ErrGeneric)
 			return false
 		}
-		cg.FM.GlobalFacts = *facts
+		cl := CloneFactSlice(*facts)
+		if HasError() || !FactsComplete(cl) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return false
+		}
+		cg.FM.GlobalFacts = cl
 	}
 	sc := ShortcutAnalysis(st, facts, cg, opts)
 	switch sc {
