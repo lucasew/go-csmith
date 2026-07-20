@@ -1177,23 +1177,48 @@ func MakeRandomBinaryInvocation(
 	if right == nil || HasError() {
 		return nil
 	}
-	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or 0/1 constant
-	if (op == BinMod || op == BinDiv) && right.Term == TermConstant && right.Con != nil {
-		if right.Con.Value == "0" || right.Con.Value == "1" {
-			isF := false
+	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or possible 0/1
+	// C++: rhs->equals(0) || rhs->is_0_or_1() — covers Constant AND comparison
+	// Funcalls (all cmp ops are is_0_or_1). Then rnd_upto(MAX_BINARY_OP, filter)
+	// rejecting mod/div/shifts — NOT a silent BinAdd invent (seed-2 e9211:
+	// Mod with ptr-cmp RHS → UP U18 re-pick vs Go skip → U120).
+	if op == BinMod || op == BinDiv {
+		eq0 := right.EqualsInt(0)
+		// residual ERROR sticky — no invent soft-skip re-pick past EqualsInt residual
+		if HasError() {
+			return nil
+		}
+		is01 := right.Is0Or1()
+		// residual ERROR sticky — no invent soft-skip re-pick past Is0Or1 residual
+		if HasError() {
+			return nil
+		}
+		if eq0 || is01 {
+			lhsF, rhsF := false, false
 			if lhsTy != nil {
-				isF = lhsTy.IsFloat()
-				// residual ERROR sticky — no invent soft-rewrite op past IsFloat residual
+				lhsF = lhsTy.IsFloat()
 				if HasError() {
 					return nil
 				}
 			}
-			if !isF {
-				op = BinAdd
-				opStr = op.BinaryOpC()
-				if flags != nil && !SafeOpsBinary(opStr) {
-					flags = nil
+			if rhsTy != nil {
+				rhsF = rhsTy.IsFloat()
+				if HasError() {
+					return nil
 				}
+			}
+			if !lhsF && !rhsF {
+				// VectorFilter rejects mod/div/lshift/rshift only (no BinaryOpsProb)
+				f := NewVectorFilterItems([]int{
+					int(BinMod), int(BinDiv), int(BinLShift), int(BinRShift),
+				}, FilterModeOut)
+				op = BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), f))
+				// residual ERROR sticky — no invent soft-op past RndUpto residual
+				if HasError() {
+					return nil
+				}
+				opStr = op.BinaryOpC()
+				// C++ fi->set_operation(op) keeps existing SafeOpFlags
 			}
 		}
 	}
