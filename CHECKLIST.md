@@ -95,39 +95,39 @@ Total items: 2070
 - [x] Attribute.cpp::MultiChoiceAttribute.MultiChoiceAttribute
 - [x] Attribute.cpp::SectionAttribute.make_random
 - [x] Attribute.cpp::SectionAttribute.SectionAttribute
-- [ ] Block.cpp::Block.append_nested_loop
-- [ ] Block.cpp::Block.append_return_stmt
-- [ ] Block.cpp::Block.Block
-- [ ] Block.cpp::Block.block_size
-- [ ] Block.cpp::Block.contains_back_edge
-- [ ] Block.cpp::Block.create_new_tmp_var
-- [ ] Block.cpp::Block.find_fixed_point
-- [ ] Block.cpp::Block.from_tail_to_head
-- [ ] Block.cpp::Block.get_depth_protect
-- [ ] Block.cpp::Block.get_dereferenced_ptrs
-- [ ] Block.cpp::Block.get_exprs
-- [ ] Block.cpp::Block.get_last_stm
-- [ ] Block.cpp::Block.is_var_on_stack
-- [ ] Block.cpp::Block.make_dummy_block
-- [ ] Block.cpp::Block.make_random
-- [ ] Block.cpp::Block.must_break_or_return
-- [ ] Block.cpp::Block.must_jump
-- [ ] Block.cpp::Block.must_return
-- [ ] Block.cpp::Block.need_nested_loop
-- [ ] Block.cpp::Block.operator=
-- [ ] Block.cpp::Block.Output
-- [ ] Block.cpp::Block.OutputTmpVariableList
-- [ ] Block.cpp::Block.post_creation_analysis
-- [ ] Block.cpp::Block.push_back
-- [ ] Block.cpp::Block.random_parent_block
-- [ ] Block.cpp::Block.remove_stmt
-- [ ] Block.cpp::Block.set_accumulated_effect
-- [ ] Block.cpp::Block.set_depth_protect
-- [ ] Block.cpp::Block.visit_facts
-- [ ] Block.cpp::Block.~Block
+- [x] Block.cpp::Block.append_nested_loop
+- [x] Block.cpp::Block.append_return_stmt
+- [x] Block.cpp::Block.Block
+- [x] Block.cpp::Block.block_size
+- [x] Block.cpp::Block.contains_back_edge
+- [x] Block.cpp::Block.create_new_tmp_var
+- [x] Block.cpp::Block.find_fixed_point
+- [x] Block.cpp::Block.from_tail_to_head
+- [x] Block.cpp::Block.get_depth_protect
+- [x] Block.cpp::Block.get_dereferenced_ptrs
+- [x] Block.cpp::Block.get_exprs
+- [x] Block.cpp::Block.get_last_stm
+- [x] Block.cpp::Block.is_var_on_stack
+- [x] Block.cpp::Block.make_dummy_block
+- [x] Block.cpp::Block.make_random
+- [x] Block.cpp::Block.must_break_or_return
+- [x] Block.cpp::Block.must_jump
+- [x] Block.cpp::Block.must_return
+- [x] Block.cpp::Block.need_nested_loop
+- [x] Block.cpp::Block.operator=
+- [x] Block.cpp::Block.Output
+- [x] Block.cpp::Block.OutputTmpVariableList
+- [x] Block.cpp::Block.post_creation_analysis
+- [x] Block.cpp::Block.push_back
+- [x] Block.cpp::Block.random_parent_block
+- [x] Block.cpp::Block.remove_stmt
+- [x] Block.cpp::Block.set_accumulated_effect
+- [x] Block.cpp::Block.set_depth_protect
+- [x] Block.cpp::Block.visit_facts
+- [x] Block.cpp::Block.~Block
 - [x] Block.cpp::BlockProbability
-- [ ] Block.cpp::find_block_by_id
-- [ ] Block.cpp::OutputStatementList
+- [x] Block.cpp::find_block_by_id
+- [x] Block.cpp::OutputStatementList
 - [x] Bookkeeper.cpp::Bookkeeper.Bookkeeper
 - [x] Bookkeeper.cpp::Bookkeeper.doFinalization
 - [x] Bookkeeper.cpp::Bookkeeper.output_bitfields
@@ -148,15 +148,15 @@ Total items: 2070
 - [x] Bookkeeper.cpp::Bookkeeper.record_type_with_bitfields
 - [x] Bookkeeper.cpp::Bookkeeper.record_vars_with_bitfields
 - [x] Bookkeeper.cpp::Bookkeeper.record_volatile_access
-- [ ] Bookkeeper.cpp::Bookkeeper.stat_blk_depths
-- [ ] Bookkeeper.cpp::Bookkeeper.stat_blk_depths_for_stmt
-- [ ] Bookkeeper.cpp::Bookkeeper.stat_expr_depths
-- [ ] Bookkeeper.cpp::Bookkeeper.stat_expr_depths_for_stmt
-- [ ] Bookkeeper.cpp::Bookkeeper.update_ptr_aliases
-- [ ] Bookkeeper.cpp::Bookkeeper.~Bookkeeper
+- [x] Bookkeeper.cpp::Bookkeeper.stat_blk_depths
+- [x] Bookkeeper.cpp::Bookkeeper.stat_blk_depths_for_stmt
+- [x] Bookkeeper.cpp::Bookkeeper.stat_expr_depths
+- [x] Bookkeeper.cpp::Bookkeeper.stat_expr_depths_for_stmt
+- [x] Bookkeeper.cpp::Bookkeeper.update_ptr_aliases
+- [x] Bookkeeper.cpp::Bookkeeper.~Bookkeeper
 - [x] Bookkeeper.cpp::calc_total
-- [ ] Bookkeeper.cpp::formatted_output
-- [ ] Bookkeeper.cpp::formatted_outputf
+- [x] Bookkeeper.cpp::formatted_output
+- [x] Bookkeeper.cpp::formatted_outputf
 - [x] Bookkeeper.cpp::incr_counter
 - [ ] CFGEdge.cpp::CFGEdge.CFGEdge
 - [ ] CFGEdge.cpp::CFGEdge.~CFGEdge
@@ -354,39 +354,39 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.x86_64
 - [x] CompatibleChecker.cpp::CompatibleChecker.compatible_check
 - [x] CompatibleChecker.cpp::CompatibleChecker.enable_compatible_check
-- [ ] Constant.cpp::Constant.clone
-- [ ] Constant.cpp::Constant.compatible
-- [ ] Constant.cpp::Constant.Constant
-- [ ] Constant.cpp::Constant.CVQualifiers
-- [ ] Constant.cpp::Constant.equals
-- [ ] Constant.cpp::Constant.get_complexity
-- [ ] Constant.cpp::Constant.get_field
-- [ ] Constant.cpp::Constant.get_referenced_ptrs
-- [ ] Constant.cpp::Constant.get_type
-- [ ] Constant.cpp::Constant.get_value
-- [ ] Constant.cpp::Constant.less_than
-- [ ] Constant.cpp::Constant.make_int
-- [ ] Constant.cpp::Constant.make_random
-- [ ] Constant.cpp::Constant.make_random_nonzero
-- [ ] Constant.cpp::Constant.make_random_upto
-- [ ] Constant.cpp::Constant.not_equals
-- [ ] Constant.cpp::Constant.Output
-- [ ] Constant.cpp::Constant.push_back
-- [ ] Constant.cpp::Constant.~Constant
-- [ ] Constant.cpp::GenerateRandomCharConstant
-- [ ] Constant.cpp::GenerateRandomConstant
-- [ ] Constant.cpp::GenerateRandomConstantInRange
-- [ ] Constant.cpp::GenerateRandomFloatConstant
-- [ ] Constant.cpp::GenerateRandomFloatHexConstant
-- [ ] Constant.cpp::GenerateRandomInt128Constant
-- [ ] Constant.cpp::GenerateRandomIntConstant
-- [ ] Constant.cpp::GenerateRandomLongConstant
-- [ ] Constant.cpp::GenerateRandomLongLongConstant
-- [ ] Constant.cpp::GenerateRandomShortConstant
-- [ ] Constant.cpp::GenerateRandomStructConstant
-- [ ] Constant.cpp::GenerateRandomUnionConstant
-- [ ] Constant.cpp::GenerateSmallRandomFloatHexConstant
-- [ ] Constant.cpp::HexToBinary
+- [x] Constant.cpp::Constant.clone
+- [x] Constant.cpp::Constant.compatible
+- [x] Constant.cpp::Constant.Constant
+- [x] Constant.cpp::Constant.CVQualifiers
+- [x] Constant.cpp::Constant.equals
+- [x] Constant.cpp::Constant.get_complexity
+- [x] Constant.cpp::Constant.get_field
+- [x] Constant.cpp::Constant.get_referenced_ptrs
+- [x] Constant.cpp::Constant.get_type
+- [x] Constant.cpp::Constant.get_value
+- [x] Constant.cpp::Constant.less_than
+- [x] Constant.cpp::Constant.make_int
+- [x] Constant.cpp::Constant.make_random
+- [x] Constant.cpp::Constant.make_random_nonzero
+- [x] Constant.cpp::Constant.make_random_upto
+- [x] Constant.cpp::Constant.not_equals
+- [x] Constant.cpp::Constant.Output
+- [x] Constant.cpp::Constant.push_back
+- [x] Constant.cpp::Constant.~Constant
+- [x] Constant.cpp::GenerateRandomCharConstant
+- [x] Constant.cpp::GenerateRandomConstant
+- [x] Constant.cpp::GenerateRandomConstantInRange
+- [x] Constant.cpp::GenerateRandomFloatConstant
+- [x] Constant.cpp::GenerateRandomFloatHexConstant
+- [x] Constant.cpp::GenerateRandomInt128Constant
+- [x] Constant.cpp::GenerateRandomIntConstant
+- [x] Constant.cpp::GenerateRandomLongConstant
+- [x] Constant.cpp::GenerateRandomLongLongConstant
+- [x] Constant.cpp::GenerateRandomShortConstant
+- [x] Constant.cpp::GenerateRandomStructConstant
+- [x] Constant.cpp::GenerateRandomUnionConstant
+- [x] Constant.cpp::GenerateSmallRandomFloatHexConstant
+- [x] Constant.cpp::HexToBinary
 - [ ] CoverageTestExtension.cpp::CoverageTestExtension.CoverageTestExtension
 - [ ] CoverageTestExtension.cpp::CoverageTestExtension.GenerateValues
 - [ ] CoverageTestExtension.cpp::CoverageTestExtension.get_values

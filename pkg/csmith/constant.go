@@ -77,8 +77,164 @@ func MakeRandomUpto(limit uint32, r *Rng) *Constant {
 }
 
 // MakeInt mirrors Constant::make_int.
+// Constant.cpp:449–481 — optional mark_mutable_const wraps "(v)".
 func MakeInt(v int) *Constant {
-	return &Constant{Type: GetSimpleType(EInt), Value: strconv.Itoa(v)}
+	return MakeIntOpts(v, ProcessOptions())
+}
+
+// MakeIntOpts is make_int with explicit Options (library tests).
+func MakeIntOpts(v int, opts Options) *Constant {
+	s := strconv.Itoa(v)
+	// Constant.cpp:475–478 — mark_mutable_const → "(v)"
+	if opts.MarkMutableConst {
+		s = "(" + s + ")"
+	}
+	return &Constant{Type: GetSimpleType(EInt), Value: s}
+}
+
+// MakeRandomNonzero mirrors Constant::make_random_nonzero.
+// Constant.cpp:436–446 — regenerate until str2int(value) != 0.
+// Incomplete type/rng sticky nil; bounded retries fail closed (no invent hang).
+func MakeRandomNonzero(typ *Type, opts Options, probs *Probabilities, r *Rng) *Constant {
+	if typ == nil || r == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// Cap retries — C++ loops unbounded; library fail closed if stuck on zero.
+	for tries := 0; tries < 64; tries++ {
+		c := MakeRandom(typ, opts, probs, r)
+		if c == nil || HasError() {
+			return nil
+		}
+		// Constant.cpp:439 — StringUtils::str2int(v) == 0 → retry
+		if c.NotEqualsZero() {
+			return c
+		}
+		// residual ERROR sticky — no invent soft-retry past NotEqualsZero residual
+		if HasError() {
+			return nil
+		}
+	}
+	SetError(ErrGeneric)
+	return nil
+}
+
+// Clone mirrors Constant::clone → new Constant(*this).
+// Constant.cpp:82.
+// Incomplete Constant sticky nil (no invent zero Constant shell).
+func (c *Constant) Clone() *Constant {
+	if c == nil || c.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return &Constant{Type: c.Type, Value: c.Value}
+}
+
+// GetType mirrors Constant::get_type.
+// Constant.cpp:527 — return *type.
+func (c *Constant) GetType() *Type {
+	if c == nil || c.Type == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return c.Type
+}
+
+// GetValue mirrors Constant value string accessor.
+func (c *Constant) GetValue() string {
+	if c == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return c.Value
+}
+
+// GetComplexity mirrors Constant::get_complexity — always 1.
+// Constant.h:88.
+func (c *Constant) GetComplexity() int {
+	if c == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	return 1
+}
+
+// GetReferencedPtrs mirrors Expression::get_referenced_ptrs on Constant — none.
+// Constant has no pointers.
+func (c *Constant) GetReferencedPtrs() []*Variable {
+	if c == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return nil
+}
+
+// CompatibleWithVar mirrors Constant::compatible(Variable*).
+// Constant.cpp:488–493 — expand_struct → true; else false (not field soft-match).
+func (c *Constant) CompatibleWithVar(v *Variable, expandStruct bool) bool {
+	if c == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	// C++ assert(v)
+	if v == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if expandStruct {
+		return true
+	}
+	return false
+}
+
+// CompatibleWithExpr mirrors Constant::compatible(Expression*).
+// Constant.cpp:496–498 — always false (assert exp non-null).
+func (c *Constant) CompatibleWithExpr(exp *Expression) bool {
+	if c == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	if exp == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return false
+}
+
+// Output mirrors Constant::Output.
+// Constant.cpp:532–553 — paren negatives; pointer-0 → (void*)0 / nullptr; else cast+value.
+// Incomplete Constant sticky "" (no invent bare "0" for Type-nil shell).
+func (c *Constant) Output() string {
+	if c == nil || c.Type == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// empty value sticky (no invent bare token)
+	if c.Value == "" {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// negative numbers in parentheses
+	if c.Value[0] == '-' {
+		return "(" + c.Value + ")"
+	}
+	// pointer zero
+	if c.Type.PtrType() != nil {
+		// residual ERROR sticky — no invent soft-null past PtrType residual
+		if HasError() {
+			return ""
+		}
+		if c.Equals(0) {
+			opts := ProcessOptions()
+			if opts.LangCPP {
+				return "nullptr"
+			}
+			return "(void*)" + c.Value
+		}
+	} else if HasError() {
+		return ""
+	}
+	return c.Value
 }
 
 // Equals mirrors Constant::equals(int).

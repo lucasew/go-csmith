@@ -345,3 +345,86 @@ func TestMakeRandomConstantVoidResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomNonzero(t *testing.T) {
+	ClearError()
+	r := NewRng(2)
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	c := MakeRandomNonzero(GetIntType(), opts, probs, r)
+	if c == nil || HasError() {
+		t.Fatal("nonzero", HasError())
+	}
+	if c.Equals(0) {
+		t.Fatal("must nonzero", c.Value)
+	}
+	if MakeRandomNonzero(nil, opts, probs, r) != nil || !HasError() {
+		t.Fatal("nil type sticky")
+	}
+	ClearError()
+}
+
+func TestConstantCloneOutputCompatible(t *testing.T) {
+	ClearError()
+	c := MakeInt(-3)
+	cl := c.Clone()
+	if cl == nil || cl.Value != "-3" || cl == c {
+		t.Fatal(cl)
+	}
+	if c.Output() != "(-3)" {
+		t.Fatal(c.Output())
+	}
+	z := &Constant{Type: PointerTo(GetIntType()), Value: "0"}
+	if z.Output() != "(void*)0" {
+		t.Fatal(z.Output())
+	}
+	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	if !c.CompatibleWithVar(v, true) || c.CompatibleWithVar(v, false) {
+		t.Fatal("expand_struct gate")
+	}
+	if c.CompatibleWithExpr(&Expression{Term: TermConstant, Con: c}) {
+		t.Fatal("expr always false")
+	}
+	if c.GetComplexity() != 1 || c.GetType() != GetIntType() {
+		t.Fatal("accessors")
+	}
+	if c.GetReferencedPtrs() != nil {
+		t.Fatal("no ptrs")
+	}
+	// MakeInt with mark_mutable_const
+	o := Defaults()
+	o.MarkMutableConst = true
+	if MakeIntOpts(5, o).Value != "(5)" {
+		t.Fatal(MakeIntOpts(5, o).Value)
+	}
+	ClearError()
+}
+
+func TestBlockDepthProtectAndFind(t *testing.T) {
+	ClearError()
+	b := &Block{StmID: 7, blockSize: 4}
+	if b.BlockSize() != 4 {
+		t.Fatal(b.BlockSize())
+	}
+	if b.GetDepthProtect() {
+		t.Fatal("default false")
+	}
+	if !b.SetDepthProtect(true) || !b.GetDepthProtect() {
+		t.Fatal("set")
+	}
+	b.PushStmt(Stmt{Kind: StmtReturn, StmID: 1, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}})
+	if len(b.Stmts) != 1 {
+		t.Fatal("push")
+	}
+	f := &Function{Name: "f", Blocks: []*Block{b}}
+	if FindBlockByID([]*Function{f}, 7) != b {
+		t.Fatal("find")
+	}
+	if FindBlockByID([]*Function{f}, 99) != nil {
+		t.Fatal("miss")
+	}
+	if FindBlockByID([]*Function{f}, 0) != nil || !HasError() {
+		t.Fatal("id 0 sticky")
+	}
+	ClearError()
+}

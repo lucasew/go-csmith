@@ -100,6 +100,102 @@ type Block struct {
 	EmitFM       *FactMgr
 }
 
+// BlockSize mirrors Block::block_size.
+// Block.h:85 — CGOptions::max_block_size captured at construction.
+func (b *Block) BlockSize() int {
+	if b == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	return b.blockSize
+}
+
+// GetDepthProtect mirrors Block::get_depth_protect.
+// Block.h:76.
+func (b *Block) GetDepthProtect() bool {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return b.EmitDepthProtect
+}
+
+// SetDepthProtect mirrors Block::set_depth_protect — returns new value.
+// Block.h:72–74.
+func (b *Block) SetDepthProtect(v bool) bool {
+	if b == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	b.EmitDepthProtect = v
+	return v
+}
+
+// PushStmt mirrors stms.push_back for a complete Statement.
+// Incomplete Stmt Kind sticky (no invent append hole).
+func (b *Block) PushStmt(st Stmt) {
+	if b == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	b.Stmts = append(b.Stmts, st)
+}
+
+// FindBlockByID mirrors find_block_by_id.
+// Block.cpp:69–83 — scan non-builtin Function::blocks for stm_id.
+// Incomplete funcs sticky nil.
+func FindBlockByID(funcs []*Function, blkID int) *Block {
+	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// incomplete id sticky (no invent match-first soft-pick)
+	if blkID <= 0 {
+		SetError(ErrGeneric)
+		return nil
+	}
+	for _, f := range funcs {
+		if f.IsBuiltin {
+			continue
+		}
+		for _, b := range f.Blocks {
+			if b == nil {
+				SetError(ErrGeneric)
+				return nil
+			}
+			if b.StmID == blkID {
+				return b
+			}
+		}
+	}
+	return nil
+}
+
+// OutputStatementList mirrors static OutputStatementList.
+// Block.cpp:235–241 — pre_output + Output + post_output per statement.
+// Implemented via a temporary Block carrying the same emit flags as the parent
+// path in Block.Output (statement switch lives there).
+// Incomplete list sticky "" (no invent partial emit past hole).
+func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
+	// empty list soft empty section
+	if len(stms) == 0 {
+		return ""
+	}
+	// Build a transient block with parent's emit flags and only these statements.
+	// Strip braces by reusing Block.outputStmtsOnly.
+	tmp := &Block{Stmts: stms}
+	if parent != nil {
+		tmp.EmitFM = parent.EmitFM
+		tmp.EmitStepHash = parent.EmitStepHash
+		tmp.EmitLabelAttrs = parent.EmitLabelAttrs
+		tmp.LabelAttrRng = parent.LabelAttrRng
+		tmp.EmitParanoid = parent.EmitParanoid
+		tmp.EmitConcise = parent.EmitConcise
+		tmp.EmitDepthProtect = parent.EmitDepthProtect
+	}
+	return tmp.outputStmtsOnly(indent)
+}
+
 // GetLastStm mirrors Block::get_last_stm — last effective statement.
 // Block.cpp:336–346 — last stmt, but stop early if return encountered.
 // Incomplete Block sticky nil (no invent soft-skip empty last / soft re-pick past hole).
@@ -1176,159 +1272,15 @@ func stmtOK(st Stmt) bool {
 	}
 }
 
-// Output emits C for the block with indent levels.
-func (b *Block) Output(indent int) string {
-	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
+// outputStmtsOnly emits Statement list at indent levels (Block.cpp OutputStatementList).
+// indent is statement base indent (spaces/4); uses Emit* flags on b.
+func (b *Block) outputStmtsOnly(indent int) string {
 	if b == nil {
 		SetError(ErrGeneric)
 		return ""
 	}
-	pad := strings.Repeat("    ", indent)
-	inner := strings.Repeat("    ", indent+1)
+	inner := strings.Repeat("    ", indent)
 	var sb strings.Builder
-	// Block.cpp:250–253 — "{ " + /* block id: stm_id */
-	sb.WriteString(pad + "{ ")
-	if b.EmitConcise {
-		sb.WriteString("\n")
-	} else {
-		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
-		sb.WriteString(OutputCommentLine("block id: "+Int2Str(b.StmID), false, false))
-	}
-	// Block.cpp:255–257
-	if b.EmitDepthProtect {
-		sb.WriteString(inner + "DEPTH++;\n")
-	}
-	// Block::OutputTmpVariableList — sorted names for deterministic emit
-	if len(b.TmpVars) > 0 {
-		names := make([]string, 0, len(b.TmpVars))
-		for name := range b.TmpVars {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			// macro_tmp_vars name + type always live; sticky no invent "int  = 0;" / skip holes
-			if name == "" {
-				SetError(ErrGeneric)
-				return ""
-			}
-			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
-			// (GetSimpleType nil — no invent "int" for broken tmp type)
-			ty := GetSimpleType(b.TmpVars[name])
-			if ty == nil {
-				SetError(ErrGeneric)
-				return ""
-			}
-			cn := ty.CName()
-			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
-			if HasError() {
-				return ""
-			}
-			if cn == "" {
-				SetError(ErrGeneric)
-				return ""
-			}
-			sb.WriteString(inner)
-			sb.WriteString(cn + " " + name + " = 0;\n")
-		}
-	}
-	// OutputVariableList(local_vars) — Variable.cpp Output
-	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
-	if !VariablesComplete(b.LocalVars) {
-		SetError(ErrGeneric)
-		return ""
-	}
-	var loopInits []*ArrayVariable
-	maxDim := 0
-	for _, lv := range b.LocalVars {
-		if lv.Type == nil {
-			SetError(ErrGeneric)
-			return ""
-		}
-		if lv.IsArray {
-			// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
-			// sticky (no invent synthetic shell from ArraySizes past incomplete AsArray)
-			if lv.AsArray == nil {
-				SetError(ErrGeneric)
-				return ""
-			}
-			av := lv.AsArray
-			// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
-			// (C++ LocalVars may hold itemize() member alongside parent)
-			if av.Collective != nil {
-				continue
-			}
-			// incomplete array def sticky — fail closed whole block
-			def := av.OutputDef()
-			// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
-			if HasError() {
-				return ""
-			}
-			if def == "" {
-				SetError(ErrGeneric)
-				return ""
-			}
-			sb.WriteString(inner)
-			sb.WriteString(def)
-			sb.WriteString("\n")
-			if !av.NoLoopInitializer() {
-				// residual ERROR sticky — no invent soft-continue loop-init past hole
-				if HasError() {
-					return ""
-				}
-				loopInits = append(loopInits, av)
-				if len(av.Sizes) > maxDim {
-					maxDim = len(av.Sizes)
-				}
-			} else if HasError() {
-				// residual ERROR sticky — no invent soft-skip NoLoopInitializer past hole
-				return ""
-			}
-			continue
-		}
-		// Variable::Output for locals (no force static)
-		def := lv.OutputDef(false)
-		// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
-		if HasError() {
-			return ""
-		}
-		if def == "" {
-			SetError(ErrGeneric)
-			return ""
-		}
-		sb.WriteString(inner)
-		sb.WriteString(def)
-		sb.WriteString("\n")
-	}
-	// OutputArrayInitializers for locals without brace init
-	// Variable.cpp:829–841 — new_ctrl_vars + OutputArrayCtrlVars
-	if len(loopInits) > 0 {
-		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
-		opts := ProcessOptions()
-		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
-		// sticky no invent inits without live ctrl decl
-		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
-		if decl == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
-			return ""
-		}
-		sb.WriteString(decl)
-		ctrl := CtrlVarNames(ctrlVars)
-		for _, av := range loopInits {
-			initOut := av.OutputInit(inner, ctrl)
-			// residual ERROR sticky — no invent soft-continue later inits past OutputInit residual
-			if HasError() {
-				return ""
-			}
-			if initOut == "" {
-				// incomplete array init IR sticky — fail closed whole block
-				SetError(ErrGeneric)
-				return ""
-			}
-			sb.WriteString(initOut)
-		}
-	}
 	for _, st := range b.Stmts {
 		// Statement::pre_output — label from jump sources / SourceLabel, else step_hash
 		// Statement.cpp:905–917 — goto target skips output_hash
@@ -1617,6 +1569,168 @@ func (b *Block) Output(indent int) string {
 			}
 			sb.WriteString(post)
 		}
+	}
+	return sb.String()
+}
+
+// Output emits C for the block with indent levels.
+func (b *Block) Output(indent int) string {
+	// Block.cpp:248+ — always live this; sticky no invent empty "{}" shell for nil
+	if b == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	pad := strings.Repeat("    ", indent)
+	inner := strings.Repeat("    ", indent+1)
+	var sb strings.Builder
+	// Block.cpp:250–253 — "{ " + /* block id: stm_id */
+	sb.WriteString(pad + "{ ")
+	if b.EmitConcise {
+		sb.WriteString("\n")
+	} else {
+		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
+		sb.WriteString(OutputCommentLine("block id: "+Int2Str(b.StmID), false, false))
+	}
+	// Block.cpp:255–257
+	if b.EmitDepthProtect {
+		sb.WriteString(inner + "DEPTH++;\n")
+	}
+	// Block::OutputTmpVariableList — sorted names for deterministic emit
+	if len(b.TmpVars) > 0 {
+		names := make([]string, 0, len(b.TmpVars))
+		for name := range b.TmpVars {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			// macro_tmp_vars name + type always live; sticky no invent "int  = 0;" / skip holes
+			if name == "" {
+				SetError(ErrGeneric)
+				return ""
+			}
+			// eSimpleType always valid in macro_tmp_vars; OOB/invalid sticky fail closed
+			// (GetSimpleType nil — no invent "int" for broken tmp type)
+			ty := GetSimpleType(b.TmpVars[name])
+			if ty == nil {
+				SetError(ErrGeneric)
+				return ""
+			}
+			cn := ty.CName()
+			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
+			if HasError() {
+				return ""
+			}
+			if cn == "" {
+				SetError(ErrGeneric)
+				return ""
+			}
+			sb.WriteString(inner)
+			sb.WriteString(cn + " " + name + " = 0;\n")
+		}
+	}
+	// OutputVariableList(local_vars) — Variable.cpp Output
+	// Incomplete LocalVars fails closed sticky whole block (no invent soft-skip hole partial)
+	if !VariablesComplete(b.LocalVars) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var loopInits []*ArrayVariable
+	maxDim := 0
+	for _, lv := range b.LocalVars {
+		if lv.Type == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
+		if lv.IsArray {
+			// C++ static_cast ArrayVariable* when isArray; missing AsArray is broken IR
+			// sticky (no invent synthetic shell from ArraySizes past incomplete AsArray)
+			if lv.AsArray == nil {
+				SetError(ErrGeneric)
+				return ""
+			}
+			av := lv.AsArray
+			// ArrayVariable.cpp:493 — only collective emits def; itemized dual-count skip
+			// (C++ LocalVars may hold itemize() member alongside parent)
+			if av.Collective != nil {
+				continue
+			}
+			// incomplete array def sticky — fail closed whole block
+			def := av.OutputDef()
+			// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
+			if HasError() {
+				return ""
+			}
+			if def == "" {
+				SetError(ErrGeneric)
+				return ""
+			}
+			sb.WriteString(inner)
+			sb.WriteString(def)
+			sb.WriteString("\n")
+			if !av.NoLoopInitializer() {
+				// residual ERROR sticky — no invent soft-continue loop-init past hole
+				if HasError() {
+					return ""
+				}
+				loopInits = append(loopInits, av)
+				if len(av.Sizes) > maxDim {
+					maxDim = len(av.Sizes)
+				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip NoLoopInitializer past hole
+				return ""
+			}
+			continue
+		}
+		// Variable::Output for locals (no force static)
+		def := lv.OutputDef(false)
+		// residual ERROR sticky — no invent soft-continue later locals past OutputDef residual
+		if HasError() {
+			return ""
+		}
+		if def == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		sb.WriteString(inner)
+		sb.WriteString(def)
+		sb.WriteString("\n")
+	}
+	// OutputArrayInitializers for locals without brace init
+	// Variable.cpp:829–841 — new_ctrl_vars + OutputArrayCtrlVars
+	if len(loopInits) > 0 {
+		// CGOptions::fresh_array_ctrl_var_names / max dimensions via process opts
+		opts := ProcessOptions()
+		ctrlVars := NewCtrlVars(maxDim, opts.FreshArrayCtrlVarNames)
+		// sticky no invent inits without live ctrl decl
+		decl := OutputArrayCtrlVars(ctrlVars, maxDim, inner)
+		if decl == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		sb.WriteString(decl)
+		ctrl := CtrlVarNames(ctrlVars)
+		for _, av := range loopInits {
+			initOut := av.OutputInit(inner, ctrl)
+			// residual ERROR sticky — no invent soft-continue later inits past OutputInit residual
+			if HasError() {
+				return ""
+			}
+			if initOut == "" {
+				// incomplete array init IR sticky — fail closed whole block
+				SetError(ErrGeneric)
+				return ""
+			}
+			sb.WriteString(initOut)
+		}
+	}
+	// Block.cpp:235–241 OutputStatementList
+	sb.WriteString(b.outputStmtsOnly(indent + 1))
+	// residual ERROR sticky — no invent soft-continue past stmt list residual
+	if HasError() {
+		return ""
 	}
 	// Block.cpp:266–267
 	if b.EmitDepthProtect {
