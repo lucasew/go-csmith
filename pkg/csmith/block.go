@@ -3,6 +3,8 @@
 package csmith
 
 import (
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 )
@@ -550,6 +552,9 @@ func MakeRandomBlock(
 	// Block.cpp:132–133 — stack + blocks push
 	f.Stack = append(f.Stack, b)
 	f.Blocks = append(f.Blocks, b)
+	if os.Getenv("CSMITH_DUMP_STACK") != "" {
+		fmt.Fprintf(os.Stderr, "GO_BPUSH id=%d n=%d loop=%v arr=%v depth=%d\n", b.StmID, len(f.Stack), looping, b.InArrayLoop, cg.BlkDepth)
+	}
 	// DepthSpec::depth_guard_by_type(dtBlock) — random mode always GOOD
 	if DepthGuardByType(opts, "dtBlock") == BadDepth {
 		abortBlockMake(f, b)
@@ -684,8 +689,11 @@ func MakeRandomBlock(
 		abortBlockMake(f, b)
 		return nil
 	}
-	if f != nil && len(f.Stack) > 0 {
-		f.Stack = f.Stack[:len(f.Stack)-1]
+	// Block.cpp:178 — stack.pop_back(); identity-safe like abortBlockMake.
+	if f != nil {
+		if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
+			f.Stack = f.Stack[:n-1]
+		}
 	}
 	// Block.cpp:187 — Error::set_error(SUCCESS)
 	ClearError()

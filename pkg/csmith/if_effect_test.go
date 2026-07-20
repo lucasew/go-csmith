@@ -239,11 +239,11 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	ClearError()
 }
 
-// TestMakeRandomIfSharesEffectAccumWithParent — StatementIf.cpp:93–99 both arms
-// use the same CGContext (shared effect_accum). Forked then/else snapshots lost
-// arm reads for later StatementGoto choose_visible_read_var (seed-2 e12693:
-// nread 29→46 after share; still short of UP 56 until other units fixed).
-func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
+// TestMakeRandomIfSharesCGContextWithParent — StatementIf.cpp:93–99 both arms
+// use the same CGContext& (shared effect_accum, effect_stm, blk_depth, iv_bounds).
+// CloneSubcontext arms left parent EffectStm/BlkDepth stale so else started from a
+// second clone (seed-2 e13830: SelectParentLocal stack n=4 vs UP n=5).
+func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	ClearError()
 	opts := Defaults()
 	probs := NewProbabilities(opts)
@@ -267,10 +267,7 @@ func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &accum
 	cg.Types = vs.Types
-	thenCG := cg.CloneSubcontext()
-	if thenCG.EffectAccum != cg.EffectAccum {
-		t.Fatal("CloneSubcontext must share EffectAccum pointer (C++ same cg_context)")
-	}
+	preDepth := cg.BlkDepth
 	st := MakeRandomIf(NewRng(9), opts, probs, vs, tables, tab, &cg)
 	if cg.EffectAccum == nil {
 		t.Fatal("parent EffectAccum must remain non-nil")
@@ -282,6 +279,10 @@ func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 	if cg.EffectAccum != &accum {
 		t.Fatal("MakeRandomIf must keep parent EffectAccum pointer identity (C++ shared)")
 	}
+	// compound factories bump/restore BlkDepth on the shared context
+	if cg.BlkDepth != preDepth {
+		t.Fatalf("shared cg BlkDepth must restore after if arms: got %d want %d", cg.BlkDepth, preDepth)
+	}
 	if st != nil && st.StmID > 0 && fm != nil {
 		// map_stm_effect[if] = cond + then_block + else_block (sequential mutates)
 		if !EffectComplete(fm.GetMapStmEffect(st.StmID)) {
@@ -289,6 +290,7 @@ func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
 		}
 	}
 	_ = g1
+	_ = stmtTab
 	ClearError()
 }
 

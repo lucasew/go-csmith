@@ -512,14 +512,27 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 	currentInputs := CloneFactSlice(inputs)
 	// last pre-OOS sequential outputs (C++ post_facts assignment at Block.cpp:558)
 	var lastPreOOS []*FactPointTo
-	// push block
+	// push block onto generation stack for nested is_var_on_stack during re-visit.
+	// C++ find_fixed_point does not push (Block.cpp:513–568); make_random already
+	// has the block on stack during post_creation. VisitFactsBlock (no make) needs
+	// the block on stack for Go paths that consult func.Stack. Push only when not
+	// already top to avoid double-entry during post_creation (seed-2 e13830).
+	pushed := false
 	if cg.CurrentFunc != nil {
-		cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
-		defer func() {
-			if f := cg.CurrentFunc; f != nil && len(f.Stack) > 0 {
-				f.Stack = f.Stack[:len(f.Stack)-1]
-			}
-		}()
+		n := len(cg.CurrentFunc.Stack)
+		if n == 0 || cg.CurrentFunc.Stack[n-1] != b {
+			cg.CurrentFunc.Stack = append(cg.CurrentFunc.Stack, b)
+			pushed = true
+		}
+		if pushed {
+			defer func() {
+				if f := cg.CurrentFunc; f != nil {
+					if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
+						f.Stack = f.Stack[:n-1]
+					}
+				}
+			}()
+		}
 	}
 	cnt := 0
 	for {

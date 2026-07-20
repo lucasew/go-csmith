@@ -4,7 +4,6 @@ package csmith
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -354,14 +353,6 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 	if c == nil {
 		SetError(ErrGeneric)
 		return
-	}
-	if os.Getenv("CSMITH_DEBUG_G32") != "" && c.EffectAccum != nil {
-		had32 := c.EffectAccum.IsReadByName("g_32")
-		ClearError()
-		if had32 {
-			fmt.Fprintf(os.Stderr, "RESET_ACCUM had_g32 nread=%d\n", len(c.EffectAccum.ReadVars()))
-			ClearError()
-		}
 	}
 	cp := e.Clone()
 	// residual ERROR sticky — no invent soft-reset past IncompleteEffect Clone residual

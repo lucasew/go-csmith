@@ -373,6 +373,40 @@ func TestFindFixedPointBlock(t *testing.T) {
 	ClearError()
 }
 
+// TestFindFixedPointBlockNoDoublePushStack — when block is already stack top
+// (make_random post_creation), find_fixed_point must not push again.
+// VisitFactsBlock still pushes when the block is not on stack.
+func TestFindFixedPointBlockNoDoublePushStack(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	outer := &Block{StmID: 1, Func: f}
+	body := &Block{StmID: 10, Func: f, Parent: outer}
+	f.Stack = []*Block{outer, body}
+	f.Blocks = []*Block{outer, body}
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	body.Stmts = []Stmt{{
+		Kind: StmtAssign, StmID: 2, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}}
+	fm := NewFactMgr(f)
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	before := len(f.Stack)
+	_, _, ok := FindFixedPointBlock(body, []*FactPointTo{}, &cg, Defaults(), true)
+	if !ok {
+		t.Fatalf("fp failed sticky=%v", HasError())
+	}
+	if len(f.Stack) != before {
+		t.Fatalf("already-top block must not double-push stack: before=%d after=%d", before, len(f.Stack))
+	}
+	if len(f.Stack) != 2 || f.Stack[0] != outer || f.Stack[1] != body {
+		t.Fatalf("stack identity must be unchanged")
+	}
+	ClearError()
+}
+
 // TestFindFixedPointBlockShortcutConflictFallthrough — Block.cpp:537–541.
 // shortcut==1 (effect conflict) is commented out in C++; full re-analysis runs.
 // Inventing fail-closed on ShortcutConflict emptied bodies during outer FP.

@@ -128,18 +128,18 @@ func MakeRandomIf(
 		return nil
 	}
 
-	// StatementIf.cpp:93–99 — both arms use the same cg_context (shared effect_accum).
-	// C++ Block::make_random(cg_context) for true then false; effect_accum is one
-	// pointer for the whole if. Forking thenEff/elseEff snapshots and MergeEffects
-	// left mid-function EffectAccum missing arm reads (seed-2 e12693: choose_visible
-	// ok_vars n=11 vs UP n=16; missing g_32/g_143/g_385/l_450/l_452).
-	// CloneSubcontext deep-copies IVBounds only; EffectAccum pointer is shared.
+	// StatementIf.cpp:93–99 — both arms use the same CGContext& (not a copy).
+	// C++ Block::make_random(cg_context) for true then false: shared effect_accum,
+	// effect_stm, expr_depth, blk_depth, iv_bounds, curr_blk, etc.
+	// CloneSubcontext here was unfair: EffectAccum pointer was shared but EffectStm /
+	// BlkDepth / ExprDepth forked; after then, parent still held pre-then EffectStm and
+	// else started from a second clone of the stale parent (seed-2 e13830: SelectParentLocal
+	// stack n=4 vs UP n=5 — nesting bookkeeping desync after if arms).
 	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
 		SetError(ErrGeneric)
 		return nil
 	}
-	thenCG := cg.CloneSubcontext()
-	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
+	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
 	// live if_true Block* required sticky (no invent if with nil Then shell)
 	if thenB == nil {
@@ -155,6 +155,7 @@ func MakeRandomIf(
 	// StatementIf.cpp:97–98 — else starts from map_facts_in[if_true]
 	// C++ map[] always assigns (missing → empty); no invent pre-branch GlobalFacts fallback
 	// Incomplete then-in / StmID fails closed sticky (no invent else gen past holes)
+	// EffectAccum / EffectStm / BlkDepth continue on the same cg (not reset between arms).
 	if cg.FM != nil {
 		if thenB.StmID <= 0 {
 			cg.FM.GlobalFacts = IncompleteFactSlice()
@@ -170,9 +171,7 @@ func MakeRandomIf(
 		cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_if_170")
 	}
 
-	elseCG := cg.CloneSubcontext()
-	// EffectAccum still shared with parent (same as C++ sequential make on one cg)
-	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
+	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, cg, false)
 	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
 	// live if_false Block* required sticky (no invent if with nil Else shell)
 	if elseB == nil {
