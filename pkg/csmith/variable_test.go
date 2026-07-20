@@ -467,3 +467,24 @@ func TestCreateFieldVarsIsVolatileResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsPointerPtrTypeResidualSticky(t *testing.T) {
+	// PtrType residual soft invent was invent not-pointer soft-skip past Type-nil.
+	ClearError()
+	if (&Variable{Name: "g_x", Type: nil}).IsPointer() {
+		t.Fatal("Type-nil IsPointer must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsPointer must SetError sticky")
+	}
+	ClearError()
+	// complete pointer
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if !p.IsPointer() {
+		t.Fatal("pointer IsPointer must true")
+	}
+	if HasError() {
+		t.Fatal("complete pointer IsPointer must not sticky")
+	}
+	ClearError()
+}

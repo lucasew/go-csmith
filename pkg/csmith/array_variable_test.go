@@ -1096,3 +1096,29 @@ func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSizeInBytesArraySizeInBytesResidualSticky(t *testing.T) {
+	// SizeInBytes residual soft invent was invent soft-zero size past Type-nil shell.
+	ClearError()
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: nil}, Sizes: []int{2}}
+	if av.SizeInBytesArray() != 0 {
+		t.Fatal("Type-nil SizeInBytesArray must fail closed 0")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil SizeInBytesArray must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCDeclTypeCNameResidualSticky(t *testing.T) {
+	// CName residual soft invent was invent soft-empty decl past Type-nil shell.
+	ClearError()
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: nil}, Sizes: []int{2}}
+	if av.CDeclType() != "" {
+		t.Fatal("Type-nil CDeclType must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil CDeclType must SetError sticky")
+	}
+	ClearError()
+}

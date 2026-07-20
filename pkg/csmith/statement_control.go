@@ -258,5 +258,10 @@ func (f *Function) NeedReturnStmt() bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	return !(f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid)
+	simple := f.ReturnType.IsSimple()
+	// residual ERROR sticky — no invent soft need-return past IsSimple residual
+	if HasError() {
+		return true
+	}
+	return !(simple && f.ReturnType.Simple() == EVoid)
 }

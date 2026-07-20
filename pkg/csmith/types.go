@@ -1239,6 +1239,10 @@ func (t *Type) PrintfDirective() string {
 		return "0x%0x"
 	}
 	if t.IsAggregate() {
+		// residual ERROR sticky — no invent soft-printf past IsAggregate residual true
+		if HasError() {
+			return ""
+		}
 		// Type.cpp:1945–1951 — fields[i]->printf_directive always live Type*
 		// sticky no invent empty holes / partial "{%d, }" for nil field types
 		var b strings.Builder
@@ -1265,7 +1269,15 @@ func (t *Type) PrintfDirective() string {
 		b.WriteString("}")
 		return b.String()
 	}
+	// residual ERROR sticky — no invent soft-continue past IsAggregate residual false
+	if HasError() {
+		return ""
+	}
 	if t.IsSimple() {
+		// residual ERROR sticky — no invent soft-printf past IsSimple residual
+		if HasError() {
+			return ""
+		}
 		sz := t.SizeInBytes()
 		// residual ERROR sticky — no invent format past SizeInBytes residual hole
 		if HasError() {

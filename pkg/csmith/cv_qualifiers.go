@@ -1045,15 +1045,30 @@ func RandomQualifiersForType(
 	// CVQualifiers.cpp:306–330 — pointer levels (t->ptr_type chain).
 	level := 0
 	tmp := t.PtrType()
+	// residual ERROR sticky — no invent soft-qual levels past PtrType residual
+	if HasError() {
+		return CVQualifiers{}
+	}
 	for tmp != nil {
 		level++
 		isConsts = append(isConsts, false)
 		isVolatiles = append(isVolatiles, false)
 		tmp = tmp.PtrType()
+		// residual ERROR sticky — no invent soft-qual levels past nested PtrType residual
+		if HasError() {
+			return CVQualifiers{}
+		}
 	}
 	tmp = t.PtrType()
+	if HasError() {
+		return CVQualifiers{}
+	}
 	for tmp != nil {
 		volatileOK := isVolatileOKOnOneLevel(opts, tmp)
+		// residual ERROR sticky — no invent soft-qual past isVolatileOK residual
+		if HasError() {
+			return CVQualifiers{}
+		}
 		isVolatile := false
 		if volatileOK {
 			// rnd_flipcoin(volatile_prob)
@@ -1070,6 +1085,9 @@ func RandomQualifiersForType(
 		isVolatiles[level-1] = isVolatile
 		level--
 		tmp = tmp.PtrType()
+		if HasError() {
+			return CVQualifiers{}
+		}
 	}
 
 	// CVQualifiers.cpp:332–343 — variable itself.

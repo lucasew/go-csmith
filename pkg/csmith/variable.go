@@ -1422,6 +1422,10 @@ func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
+		// residual ERROR sticky — no invent soft-peel past PtrType residual
+		if HasError() {
+			return true
+		}
 		// Variable.cpp:535 assert(t); broken peel → sticky fail closed const
 		if t == nil {
 			SetError(ErrGeneric)
@@ -1466,6 +1470,10 @@ func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
+		// residual ERROR sticky — no invent soft-peel past PtrType residual
+		if HasError() {
+			return true
+		}
 		// Variable.cpp:575 assert(t); OOB peel → sticky fail closed volatile
 		if t == nil {
 			SetError(ErrGeneric)
@@ -1511,6 +1519,10 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 	t := v.Type
 	for i := 0; i < derefLevel; i++ {
 		t = t.PtrType()
+		// residual ERROR sticky — no invent soft-peel past PtrType residual
+		if HasError() {
+			return true
+		}
 		// Variable.cpp:555 assert(t)
 		if t == nil {
 			SetError(ErrGeneric)
@@ -1582,7 +1594,12 @@ func (v *Variable) IsPointer() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Type.PtrType() != nil
+	pt := v.Type.PtrType()
+	// residual ERROR sticky — no invent soft not-pointer past PtrType residual
+	if HasError() {
+		return false
+	}
+	return pt != nil
 }
 
 // IsVirtual mirrors Variable::is_virtual.

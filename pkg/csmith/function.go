@@ -835,7 +835,12 @@ func (f *Function) MakeReturnConst(opts Options, probs *Probabilities, r *Rng) {
 		SetError(ErrGeneric)
 		return
 	}
-	if f.ReturnType.IsSimple() && f.ReturnType.Simple() == EVoid {
+	simple := f.ReturnType.IsSimple()
+	// residual ERROR sticky — no invent soft-ret past IsSimple residual
+	if HasError() {
+		return
+	}
+	if simple && f.ReturnType.Simple() == EVoid {
 		// need_return_stmt is false for void; fail closed if called wrongly
 		return
 	}

@@ -896,13 +896,23 @@ func (vs *VariableSelector) MakeInitValue(
 	qfer.AcceptStricter = false
 
 	// VariableSelector.cpp:836–841 — non-pointer or 20% chance → constant
-	if !t.IsPointerLike() || r.RndFlipcoin(20) {
+	ptrLike := t.IsPointerLike()
+	// residual ERROR sticky — no invent soft-init path past IsPointerLike residual
+	if HasError() {
+		return nil
+	}
+	if !ptrLike || r.RndFlipcoin(20) {
 		// VariableSelector.cpp:837 ERROR_GUARD
 		if HasError() {
 			return nil
 		}
 		// VariableSelector.cpp:838–839 — assert simple != void sticky
-		if t.IsSimple() && t.simple == EVoid {
+		simple := t.IsSimple()
+		// residual ERROR sticky — no invent soft-const past IsSimple residual
+		if HasError() {
+			return nil
+		}
+		if simple && t.simple == EVoid {
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -920,6 +930,10 @@ func (vs *VariableSelector) MakeInitValue(
 	}
 	// pointer path: select visible var of pointee type
 	pointee := t.PtrType()
+	// residual ERROR sticky — no invent soft-pointee past PtrType residual
+	if HasError() {
+		return nil
+	}
 	// VariableSelector.cpp:845 assert(type) sticky
 	if pointee == nil {
 		SetError(ErrGeneric)
@@ -2407,13 +2421,22 @@ func (vs *VariableSelector) EagerCreateGlobalStruct(
 	case 1:
 		// C++ source has t->ptr_type with t==null (upstream bug); fair uses type->ptr_type
 		pointee := typ.PtrType()
+		// residual ERROR sticky — no invent soft-create struct past PtrType residual
+		if HasError() {
+			return nil
+		}
 		if pointee == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		st = chooseRandomStructFromType(vs.Types, pointee, false, r)
 		if qfer != nil {
 			// VariableSelector.cpp:621–622 — qfer->indirect_qualifiers(level)
 			q1 := qfer.IndirectQualifiers(level)
+			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
+			if HasError() {
+				return nil
+			}
 			createQfer = &q1
 		} else {
 			createQfer = nil
@@ -2488,12 +2511,21 @@ func (vs *VariableSelector) EagerCreateLocalStruct(
 	case 1:
 		// fair type->ptr_type (upstream t->ptr_type with t==0)
 		pointee := typ.PtrType()
+		// residual ERROR sticky — no invent soft-create local struct past PtrType residual
+		if HasError() {
+			return nil
+		}
 		if pointee == nil {
+			SetError(ErrGeneric)
 			return nil
 		}
 		st = chooseRandomStructFromType(vs.Types, pointee, true, r)
 		if qfer != nil {
 			q1 := qfer.IndirectQualifiers(level)
+			// residual ERROR sticky — no invent soft-create past IndirectQualifiers residual
+			if HasError() {
+				return nil
+			}
 			createQfer = &q1
 		} else {
 			createQfer = nil

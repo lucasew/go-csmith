@@ -872,26 +872,38 @@ func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, n
 		f.Add(int(TermConstant))
 	}
 	// Expression.cpp:166–175 — struct/union cannot be constant subexpr; func gated by return flags
-	if typ != nil && (typ.IsStruct() || typ.IsUnion()) {
-		f.Add(int(TermConstant))
-		if typ.IsStruct() && !opts.ReturnStructs {
-			f.Add(int(TermFunction))
-		}
-		if typ.IsUnion() && !opts.ReturnUnions {
-			f.Add(int(TermFunction))
-		}
-		isCSU := typ.IsConstStructUnion()
-		// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
+	if typ != nil {
+		isSt := typ.IsStruct()
+		// residual ERROR sticky — no invent soft-filter term past IsStruct residual
 		if HasError() {
 			return MaxTermTypes
 		}
-		isVSU := typ.IsVolatileStructUnion()
-		// residual ERROR sticky — no invent soft-filter term past IsVolatileStructUnion residual
+		isUn := typ.IsUnion()
+		// residual ERROR sticky — no invent soft-filter term past IsUnion residual
 		if HasError() {
 			return MaxTermTypes
 		}
-		if isCSU || isVSU {
-			f.Add(int(TermAssignment))
+		if isSt || isUn {
+			f.Add(int(TermConstant))
+			if isSt && !opts.ReturnStructs {
+				f.Add(int(TermFunction))
+			}
+			if isUn && !opts.ReturnUnions {
+				f.Add(int(TermFunction))
+			}
+			isCSU := typ.IsConstStructUnion()
+			// residual ERROR sticky — no invent soft-filter term past IsConstStructUnion residual
+			if HasError() {
+				return MaxTermTypes
+			}
+			isVSU := typ.IsVolatileStructUnion()
+			// residual ERROR sticky — no invent soft-filter term past IsVolatileStructUnion residual
+			if HasError() {
+				return MaxTermTypes
+			}
+			if isCSU || isVSU {
+				f.Add(int(TermAssignment))
+			}
 		}
 	}
 	// depth gate: Expression.cpp:177–178
@@ -1195,9 +1207,16 @@ func MakeRandomExpression(
 	switch tt {
 	case TermConstant:
 		// Expression.cpp:185–188 — assert simple != eVoid sticky
-		if typ != nil && typ.IsSimple() && typ.Simple() == EVoid {
-			SetError(ErrGeneric)
-			return nil
+		if typ != nil {
+			simple := typ.IsSimple()
+			// residual ERROR sticky — no invent soft-const past IsSimple residual
+			if HasError() {
+				return nil
+			}
+			if simple && typ.Simple() == EVoid {
+				SetError(ErrGeneric)
+				return nil
+			}
 		}
 		// Expression.cpp:188 — Constant::make_random; ERROR_GUARD after
 		// no invent TermConstant shell with nil Con when make_random fails
@@ -1682,8 +1701,15 @@ func makeExpressionFuncall(
 	}
 	stdFunc := ExpressionFunctionProbability(r, list, opts)
 	// ExpressionFuncall.cpp:71–73 — unary/binary only for non-void simple types
-	if typ != nil && (!typ.IsSimple() || typ.Simple() == EVoid) {
-		stdFunc = false
+	if typ != nil {
+		simple := typ.IsSimple()
+		// residual ERROR sticky — no invent soft-std path past IsSimple residual
+		if HasError() {
+			return nil
+		}
+		if !simple || typ.Simple() == EVoid {
+			stdFunc = false
+		}
 	}
 	// ExpressionFuncall.cpp:75–78 — snapshot effects and facts for failed invocation
 	var preAccum Effect

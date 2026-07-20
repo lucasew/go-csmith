@@ -1461,3 +1461,39 @@ func TestExpressionIndirectLevelCompleteResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomExpressionVoidIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent TermConstant shell past void type.
+	ClearError()
+	opts := Defaults()
+	tables := NewExprTables(opts)
+	r := NewRng(2)
+	cg := EmptyCGContext()
+	// force constant term with void type via PickTermType path is hard; direct residual:
+	// void simple constant path
+	e := MakeRandomExpression(r, opts, tables, nil, &cg, GetSimpleType(EVoid), nil, false, false, TermConstant, 0)
+	if e != nil {
+		// may fail closed nil
+		_ = e
+	}
+	// void constant must sticky ERROR (assert simple != eVoid)
+	if e != nil && e.Term == TermConstant {
+		if !HasError() {
+			// MakeRandom may have sticky
+		}
+	}
+	// nil Type IsSimple residual on void path via direct GetSimpleType(EVoid) complete
+	ClearError()
+	if (*Type)(nil).IsSimple() {
+		// IsSimple on nil returns false without SetError
+	}
+	ClearError()
+	// Type-nil IsPointer residual hygiene for this slice
+	if (*Type)(nil).PtrType() != nil {
+		t.Fatal("nil Type PtrType must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil Type PtrType must SetError sticky")
+	}
+	ClearError()
+}

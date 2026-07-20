@@ -759,11 +759,22 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 	lhsTy := lhs.Type
 	for i := 0; i < lhsIndir && lhsTy != nil; i++ {
 		lhsTy = lhsTy.PtrType()
+		// residual ERROR sticky — no invent soft-peel past PtrType residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 	}
-	if lhsTy != nil && lhsTy.PtrType() != nil {
-		// pointer-valued store (possibly *p when p is multi-level pointer)
-		// FactPointTo.cpp:277 — transfer lvars as merged; incomplete is hole marker
-		return RhsToLhsTransfer(factsIn, lvars, rhs)
+	if lhsTy != nil {
+		pt := lhsTy.PtrType()
+		// residual ERROR sticky — no invent soft-store path past PtrType residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
+		if pt != nil {
+			// pointer-valued store (possibly *p when p is multi-level pointer)
+			// FactPointTo.cpp:277 — transfer lvars as merged; incomplete is hole marker
+			return RhsToLhsTransfer(factsIn, lvars, rhs)
+		}
 	}
 	// when assigning through *p (indir>0) or to aggregate, transfer to pointer fields
 	// FactPointTo.cpp:280–293 — merge_pointees already yields collective at indir 0

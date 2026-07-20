@@ -146,7 +146,12 @@ func CreateArrayVariable(
 		// if (!pointer || strict_const_arrays) Constant::make_random
 		// else VariableSelector::make_init_value
 		var e *Expression
-		if !elem.IsPointerLike() || opts.StrictConstArrays {
+		ptrLike := elem.IsPointerLike()
+		// residual ERROR sticky — no invent soft-init path past IsPointerLike residual
+		if HasError() {
+			return nil
+		}
+		if !ptrLike || opts.StrictConstArrays {
 			c := MakeRandom(elem, opts, probs, r)
 			if HasError() {
 				return nil
@@ -252,6 +257,10 @@ func (av *ArrayVariable) CDeclType() string {
 		return ""
 	}
 	cn := av.Type.CName()
+	// residual ERROR sticky — no invent soft-empty decl past CName residual
+	if HasError() {
+		return ""
+	}
 	if cn == "" || av.Name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -1140,6 +1149,10 @@ func (av *ArrayVariable) SizeInBytesArray() int {
 		return 0
 	}
 	n := av.Type.SizeInBytes()
+	// residual ERROR sticky — no invent soft-zero size past SizeInBytes residual
+	if HasError() {
+		return 0
+	}
 	for _, sz := range av.Sizes {
 		if sz > 0 {
 			n *= sz

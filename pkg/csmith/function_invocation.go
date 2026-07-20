@@ -1077,7 +1077,12 @@ func MakeRandomBinaryInvocation(
 			// Type always live after flags assert; SizeInBytes 0 is incomplete
 			// (no invent default 32-bit width)
 			if lhsTy != nil {
-				if sb := lhsTy.SizeInBytes(); sb > 0 {
+				sb := lhsTy.SizeInBytes()
+				// residual ERROR sticky — no invent soft-shift const past SizeInBytes residual
+				if HasError() {
+					return nil
+				}
+				if sb > 0 {
 					bits := uint32(sb * 8)
 					// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
 					if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
@@ -1654,7 +1659,12 @@ func MakeRandomInvocation(
 	matchType := typ
 	// FunctionInvocation.cpp:71–73 path — non-simple/void force user path (type known)
 	if typ != nil {
-		if typ.PtrType() != nil {
+		pt := typ.PtrType()
+		// residual ERROR sticky — no invent soft-std path past PtrType residual
+		if HasError() {
+			return &Invocation{Failed: true}
+		}
+		if pt != nil {
 			stdFunc = false
 		} else {
 			simple := typ.IsSimple()
