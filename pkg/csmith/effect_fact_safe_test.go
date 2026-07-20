@@ -26,6 +26,37 @@ func TestEffectHasGlobalAndUnionRead(t *testing.T) {
 	if !e2.UnionFieldIsRead() {
 		t.Fatal("union field read")
 	}
+	if HasError() {
+		t.Fatal("complete UnionFieldIsRead must not sticky")
+	}
+	// IsInsideUnionField residual: Type-nil parent soft invent was soft-continue no-union-read.
+	// Fair: sticky union-read true.
+	ClearError()
+	parentHole := &Variable{Name: "g_u2"} // Type nil
+	fieldHole := &Variable{Name: "g_u2.f0", Type: GetIntType(), FieldVarOf: parentHole}
+	e3 := EmptyEffect().ReadVar(fieldHole)
+	if !e3.UnionFieldIsRead() {
+		t.Fatal("IsInsideUnionField residual UnionFieldIsRead must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("IsInsideUnionField residual UnionFieldIsRead must SetError sticky")
+	}
+	ClearError()
+	// IsReadPartially residual via Type-nil parent field walk.
+	if !EmptyEffect().IsReadPartially(fieldHole) {
+		t.Fatal("IsRead residual IsReadPartially must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("IsRead residual IsReadPartially must SetError sticky")
+	}
+	ClearError()
+	if !EmptyEffect().IsWrittenPartially(fieldHole) {
+		t.Fatal("IsWritten residual IsWrittenPartially must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("IsWritten residual IsWrittenPartially must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestEffectUpdatePurity(t *testing.T) {

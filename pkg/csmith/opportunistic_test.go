@@ -202,6 +202,27 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	vv := CreateVariableQfer("g_pv", pt, NewCVQualifiers([]bool{false, false}, []bool{true, false}))
 	// IsVolatileAfterDeref(1) depends on qfer layout — just ensure no panic
 	_ = vv.IsPartialVolatileAfterDeref(1)
+	// Type-nil residual soft invent was not-partial soft-skip. Fair: sticky partial true.
+	ClearError()
+	hole := &Variable{Name: "g_p_hole", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if !hole.IsPartialVolatileAfterDeref(0) {
+		t.Fatal("Type-nil IsPartialVolatileAfterDeref must fail closed partial true")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsPartialVolatileAfterDeref must SetError sticky")
+	}
+	ClearError()
+	// IsVolatileStructUnion residual: Type-nil field soft invent was not-partial.
+	// Fair: sticky partial true. Use deref 0 on aggregate (qfer level 0 non-vol).
+	broken := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: nil, BitWidth: -1}}}
+	vs := &Variable{Name: "g_s_hole", Type: broken, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	if !vs.IsPartialVolatileAfterDeref(0) {
+		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestMakeRandomAssignCompatibleRegen(t *testing.T) {

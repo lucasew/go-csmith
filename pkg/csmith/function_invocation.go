@@ -606,11 +606,20 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:293–297 — static effect, no re-analyze
 		// add_external_effect(func->get_feffect())
 		if callee.IsEffectKnown() {
+			// residual ERROR sticky — no invent static-effect path past IsEffectKnown hole
+			if HasError() {
+				fi.Failed = true
+				return fi
+			}
 			cg.AddExternalEffect(callee.FEffect)
 			if HasError() {
 				fi.Failed = true
 				return fi
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip effect fold past IsEffectKnown residual false
+			fi.Failed = true
+			return fi
 		}
 	}
 	_ = probs

@@ -560,7 +560,26 @@ func (e Effect) FieldIsRead(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if e.IsRead(f) || e.FieldIsRead(f) {
+		if e.IsRead(f) {
+			// residual ERROR sticky — no invent field-read true past IsRead hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue nested past IsRead residual false
+		if HasError() {
+			return true
+		}
+		if e.FieldIsRead(f) {
+			// residual ERROR sticky — no invent field-read true past nested FieldIsRead hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual
+		if HasError() {
 			return true
 		}
 	}
@@ -598,7 +617,26 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if e.IsWritten(f) || e.FieldIsWritten(f) {
+		if e.IsWritten(f) {
+			// residual ERROR sticky — no invent field-written true past IsWritten hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue nested past IsWritten residual false
+		if HasError() {
+			return true
+		}
+		if e.FieldIsWritten(f) {
+			// residual ERROR sticky — no invent field-written true past nested FieldIsWritten hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual
+		if HasError() {
 			return true
 		}
 	}
@@ -746,11 +784,38 @@ func (e Effect) HasRaceWith(other Effect) bool {
 	}
 	for _, v := range e.ReadVars() {
 		if other.IsWritten(v) {
+			// residual ERROR sticky — no invent race true past IsWritten hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue race-free past IsWritten residual
+		if HasError() {
 			return true
 		}
 	}
 	for _, v := range e.WrittenVars() {
-		if other.IsRead(v) || other.IsWritten(v) {
+		if other.IsRead(v) {
+			// residual ERROR sticky — no invent race true past IsRead hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue race-free past IsRead residual
+		if HasError() {
+			return true
+		}
+		if other.IsWritten(v) {
+			// residual ERROR sticky — no invent race true past IsWritten hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue race-free past IsWritten residual
+		if HasError() {
 			return true
 		}
 	}
@@ -819,14 +884,72 @@ func (e Effect) AccessDerefVolatile(v *Variable, derefLevel int, strictVolatile 
 // Effect.cpp:444–446.
 // Incomplete effect fails closed as true via IsRead/FieldIs*/Sibling* membership.
 func (e Effect) IsReadPartially(v *Variable) bool {
-	return e.IsRead(v) || e.FieldIsRead(v) || e.SiblingUnionFieldIsRead(v)
+	if e.IsRead(v) {
+		// residual ERROR sticky — no invent partial-read true past IsRead hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue partial past IsRead residual false
+	if HasError() {
+		return true
+	}
+	if e.FieldIsRead(v) {
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	if e.SiblingUnionFieldIsRead(v) {
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	return false
 }
 
 // IsWrittenPartially mirrors Effect::is_written_partially.
 // Effect.cpp:448–451.
 // Incomplete effect fails closed as true via IsWritten/FieldIs*/Sibling* membership.
 func (e Effect) IsWrittenPartially(v *Variable) bool {
-	return e.IsWritten(v) || e.FieldIsWritten(v) || e.SiblingUnionFieldIsWritten(v)
+	if e.IsWritten(v) {
+		// residual ERROR sticky — no invent partial-write true past IsWritten hole
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue partial past IsWritten residual false
+	if HasError() {
+		return true
+	}
+	if e.FieldIsWritten(v) {
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	if e.SiblingUnionFieldIsWritten(v) {
+		if HasError() {
+			return true
+		}
+		return true
+	}
+	if HasError() {
+		return true
+	}
+	return false
 }
 
 // HasGlobalEffect mirrors Effect::has_global_effect.
@@ -844,6 +967,14 @@ func (e Effect) HasGlobalEffect() bool {
 			return true
 		}
 		if e.read[v] && v.IsGlobal() {
+			// residual ERROR sticky — no invent has-global true past IsGlobal hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-global past IsGlobal residual
+		if HasError() {
 			return true
 		}
 	}
@@ -853,6 +984,14 @@ func (e Effect) HasGlobalEffect() bool {
 			return true
 		}
 		if e.written[v] && v.IsGlobal() {
+			// residual ERROR sticky — no invent has-global true past IsGlobal hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-global past IsGlobal residual
+		if HasError() {
 			return true
 		}
 	}
@@ -888,6 +1027,14 @@ func (e Effect) UnionFieldIsRead() bool {
 			return true
 		}
 		if e.read[v] && v.IsInsideUnionField() {
+			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-union-read past IsInside residual
+		if HasError() {
 			return true
 		}
 	}

@@ -1233,7 +1233,15 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 	}
 	// whole type volatile at this deref → not "partial"
 	if v.Qfer.IsVolatileAfterDeref(derefLevel) {
+		// residual ERROR sticky — no invent not-partial soft-skip past qfer peel hole
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue peel past qfer residual false path
+	if HasError() {
+		return true
 	}
 	if v.Type == nil {
 		SetError(ErrGeneric)
@@ -1248,7 +1256,12 @@ func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
 			return true
 		}
 	}
-	return t.IsVolatileStructUnion()
+	ok := t.IsVolatileStructUnion()
+	// residual ERROR sticky — no invent not-partial soft-skip past IsVolatileStructUnion hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // Compatible mirrors Variable::compatible.

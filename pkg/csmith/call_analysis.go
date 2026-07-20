@@ -230,11 +230,24 @@ func (fi *Invocation) HasUncertainCallRecursive() bool {
 				return true
 			}
 			if a.Invoke.HasUncertainCallRecursive() {
+				// residual ERROR sticky — no invent uncertain true past nested recurse hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later args past nested residual
+			if HasError() {
 				return true
 			}
 		}
 	}
-	return fi.HasUncertainCall()
+	ok := fi.HasUncertainCall()
+	// residual ERROR sticky — no invent certain soft-skip past HasUncertainCall hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // HasSimpleParams mirrors FunctionInvocation::has_simple_params.
@@ -280,13 +293,38 @@ func HasUncertainCallRecursiveExpr(e *Expression) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return HasUncertainCallRecursiveExpr(e.CommaLHS) || HasUncertainCallRecursiveExpr(e.CommaRHS)
+		if HasUncertainCallRecursiveExpr(e.CommaLHS) {
+			// residual ERROR sticky — no invent uncertain true past LHS hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue RHS past LHS residual
+		if HasError() {
+			return true
+		}
+		if HasUncertainCallRecursiveExpr(e.CommaRHS) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
+			return true
+		}
+		return false
 	case TermAssignment:
 		if e.Assign == nil {
 			SetError(ErrGeneric)
 			return true
 		}
-		return HasUncertainCallRecursiveStmt(e.Assign)
+		ok := HasUncertainCallRecursiveStmt(e.Assign)
+		// residual ERROR sticky — no invent certain soft-skip past Assign recurse hole
+		if HasError() {
+			return true
+		}
+		return ok
 	default:
 		return false
 	}
@@ -315,6 +353,14 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			return true
 		}
 		if HasUncertainCallRecursiveExpr(st.Loop.TestExpr) {
+			// residual ERROR sticky — no invent uncertain true past test-expr hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue body past test residual
+		if HasError() {
 			return true
 		}
 		// get_blocks body only — sticky no invent soft-skip nil body as "no uncertain call"
@@ -325,6 +371,14 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			}
 			for i := range b.Stmts {
 				if HasUncertainCallRecursiveStmt(&b.Stmts[i]) {
+					// residual ERROR sticky — no invent uncertain true past nested stmt hole
+					if HasError() {
+						return true
+					}
+					return true
+				}
+				// residual ERROR sticky — no invent soft-continue later stmts past residual
+				if HasError() {
 					return true
 				}
 			}

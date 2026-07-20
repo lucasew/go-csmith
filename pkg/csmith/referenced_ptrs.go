@@ -298,13 +298,38 @@ func ReadUnionFieldExpr(e *Expression) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.Var.IsInsideUnionField()
+		ok := e.Var.IsInsideUnionField()
+		// residual ERROR sticky — no invent no-union-read soft-skip past IsInsideUnionField hole
+		if HasError() {
+			return true
+		}
+		return ok
 	case TermCommaExpr:
 		if e.CommaLHS == nil || e.CommaRHS == nil {
 			SetError(ErrGeneric)
 			return true
 		}
-		return ReadUnionFieldExpr(e.CommaLHS) || ReadUnionFieldExpr(e.CommaRHS)
+		if ReadUnionFieldExpr(e.CommaLHS) {
+			// residual ERROR sticky — no invent union-read true past LHS hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue RHS past LHS residual
+		if HasError() {
+			return true
+		}
+		if ReadUnionFieldExpr(e.CommaRHS) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
+			return true
+		}
+		return false
 	case TermAssignment:
 		if e.Assign == nil {
 			SetError(ErrGeneric)
@@ -367,8 +392,18 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 			}
 		}
 	}
-	if st.LhsVar != nil && st.LhsVar.IsInsideUnionField() {
-		return true
+	if st.LhsVar != nil {
+		if st.LhsVar.IsInsideUnionField() {
+			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-union-read past IsInside residual
+		if HasError() {
+			return true
+		}
 	}
 	if st.Lhs != nil {
 		// Lhs always has live Var; incomplete sticky fail closed
@@ -377,6 +412,14 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 			return true
 		}
 		if st.Lhs.Var.IsInsideUnionField() {
+			// residual ERROR sticky — no invent union-read true past IsInsideUnionField hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue no-union-read past IsInside residual
+		if HasError() {
 			return true
 		}
 	}

@@ -632,9 +632,21 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 		// FactPointTo.cpp:283–288 — is_inside_union_field → walk to eUnion container
 		u := v
 		if u.IsInsideUnionField() {
+			// residual ERROR sticky — no invent soft-continue transfer past IsInsideUnionField hole
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			if cu := u.GetContainerUnion(); cu != nil {
+				// residual ERROR sticky — no invent container true past GetContainerUnion hole
+				if HasError() {
+					return IncompleteFactSlice()
+				}
 				u = cu
 			} else {
+				// residual ERROR sticky — no invent soft-continue walk past GetContainerUnion residual
+				if HasError() {
+					return IncompleteFactSlice()
+				}
 				// walk FieldVarOf until Type is union
 				// Type* always live on ancestry; Type-nil non-special sticky
 				// (no invent soft-skip incomplete parent past walk to assert)
@@ -657,6 +669,9 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 				SetError(ErrGeneric)
 				return IncompleteFactSlice()
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip not-inside past IsInside residual false
+			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:289–292 — find_pointer_fields; rhs_to_lhs_transfer
 		ptrs := u.FindPointerFields()

@@ -391,6 +391,29 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 		t.Fatal("complete ReadUnionFieldStmt must not sticky")
 	}
 	ClearError()
+	// IsInsideUnionField residual on LhsVar: soft invent was soft-continue no-union-read.
+	// Fair: sticky true.
+	parentHole := &Variable{Name: "g_u"} // Type nil
+	fieldHole := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parentHole}
+	stHole := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: fieldHole, AssignOp: AssignSimple}
+	if !ReadUnionFieldStmt(stHole) {
+		t.Fatal("IsInsideUnionField residual ReadUnionFieldStmt must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("IsInsideUnionField residual ReadUnionFieldStmt must SetError sticky")
+	}
+	ClearError()
+	// comma LHS residual soft invent was soft-continue RHS invent no-union-read.
+	lhsHole := &Expression{Term: TermVariable, Var: fieldHole}
+	rhsOK := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x2", GetIntType(), false, false)}
+	comma := &Expression{Term: TermCommaExpr, CommaLHS: lhsHole, CommaRHS: rhsOK}
+	if !ReadUnionFieldExpr(comma) {
+		t.Fatal("nested IsInside residual ReadUnionFieldExpr must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested IsInside residual ReadUnionFieldExpr must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestNeedNestedLoopIsEffectKnownSticky(t *testing.T) {

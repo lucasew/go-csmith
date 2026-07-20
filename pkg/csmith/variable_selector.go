@@ -116,7 +116,15 @@ func ChooseVisibleReadVar(
 			continue
 		}
 		if !typ.Match(v.Type, MatchConvert) {
+			// residual ERROR sticky — no invent soft-continue then pick later past Match hole
+			if HasError() {
+				return nil
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent keep after Match residual true path
+		if HasError() {
+			return nil
 		}
 		onStack := b != nil && b.IsVarOnStack(v)
 		// residual ERROR sticky — no invent soft-continue past IsVarOnStack hole
@@ -124,7 +132,15 @@ func ChooseVisibleReadVar(
 			return nil
 		}
 		if !onStack && !v.IsGlobal() {
+			// residual ERROR sticky — no invent soft-continue then pick later past IsGlobal hole
+			if HasError() {
+				return nil
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent keep after IsGlobal residual true path
+		if HasError() {
+			return nil
 		}
 		nonread := IsNonreadableField(v, unionFacts)
 		// residual ERROR sticky — no invent soft-continue then pick later past hole

@@ -167,6 +167,30 @@ func TestHasUncertainCall(t *testing.T) {
 	if fi2.HasUncertainCall() {
 		t.Fatal("not uncertain")
 	}
+	// nested HasUncertainCallRecursive residual: soft invent was soft-continue later args certain.
+	// Fair: sticky uncertain true.
+	ClearError()
+	nestedHole := &Expression{Term: TermFunction, Invoke: nil}
+	fiHole := &Invocation{
+		User: &Function{Name: "func_h", ReturnType: GetIntType()},
+		Args: []*Expression{nestedHole, &Expression{Term: TermConstant, Con: MakeInt(1)}},
+	}
+	if !fiHole.HasUncertainCallRecursive() {
+		t.Fatal("nested Invoke-nil residual must fail closed uncertain")
+	}
+	if !HasError() {
+		t.Fatal("nested Invoke-nil residual HasUncertainCallRecursive must SetError sticky")
+	}
+	ClearError()
+	// comma LHS residual soft invent was soft-continue RHS invent certain.
+	comma := &Expression{Term: TermCommaExpr, CommaLHS: nestedHole, CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	if !HasUncertainCallRecursiveExpr(comma) {
+		t.Fatal("comma nested residual must fail closed uncertain")
+	}
+	if !HasError() {
+		t.Fatal("comma nested residual HasUncertainCallRecursiveExpr must SetError sticky")
+	}
+	ClearError()
 	if !fi.HasUncertainCallRecursive() {
 		t.Fatal("recursive")
 	}

@@ -864,6 +864,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 		} else if fi.User.IsEffectKnown() {
+			// residual ERROR sticky — no invent static-effect path past IsEffectKnown hole
+			if HasError() {
+				return false
+			}
 			// static effect path (no fact/pointer change)
 			if cg.InConflict(fi.User.FEffect) {
 				return false
@@ -883,6 +887,9 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 			if HasError() {
 				return false
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip effect fold past IsEffectKnown residual false
+			return false
 		}
 		// propagate fact_changed to caller (FunctionInvocation.cpp:96)
 		if cg.CurrentFunc != nil && fi.User.FactChanged {
