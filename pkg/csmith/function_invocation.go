@@ -620,23 +620,22 @@ func BuildUserInvocation(
 		newCG := cg.CloneSubcontext()
 		newCG.effectContext = effectContext
 		newCG.EffectAccum = &effectAccum
-		// keep caller FM for global_facts input; RevisitUserInvocation swaps CurrentFunc
-		var facts []*FactPointTo
-		if cg.FM != nil {
-			// incomplete GlobalFacts fail closed sticky (no invent cleaned empty for revisit)
-			if !FactsComplete(cg.FM.GlobalFacts) {
-				SetError(ErrGeneric)
-				fi.Failed = true
-				return fi
-			}
-			facts = CloneFactSlice(cg.FM.GlobalFacts)
-			// residual ERROR sticky — no invent soft-revisit past CloneFactSlice residual
-			if HasError() {
-				fi.Failed = true
-				return fi
-			}
+		// FunctionInvocationUser.cpp:284 — revisit(fm->global_facts, new_context)
+		// where fm = get_fact_mgr(&cg_context) is the CALLER FactMgr. C++ mutates
+		// caller global_facts in place (handover drops frame locals, then renew
+		// restores from inputs_copy). Do not deep-clone then reinstall: that path
+		// can drop mid-gen may-null lattice (seed-2 first_div 10107 l_233).
+		if cg.FM == nil {
+			SetError(ErrGeneric)
+			fi.Failed = true
+			return fi
 		}
-		ok := RevisitUserInvocation(fi, &facts, &newCG, opts)
+		if !FactsComplete(cg.FM.GlobalFacts) {
+			SetError(ErrGeneric)
+			fi.Failed = true
+			return fi
+		}
+		ok := RevisitUserInvocation(fi, &cg.FM.GlobalFacts, &newCG, opts)
 		fi.Failed = !ok
 		if ok {
 			// FunctionInvocationUser.cpp:284–290
@@ -658,9 +657,6 @@ func BuildUserInvocation(
 				SetError(ErrGeneric)
 				fi.Failed = true
 				return fi
-			}
-			if cg.FM != nil {
-				cg.FM.GlobalFacts = facts
 			}
 		}
 	} else {

@@ -1034,22 +1034,18 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				SetError(ErrGeneric)
 				return false
 			}
-			facts := CloneFactSlice(cg.FM.GlobalFacts)
-			// residual ERROR sticky — no invent soft-revisit past CloneFactSlice residual
-			if HasError() {
-				return false
-			}
-			if !RevisitUserInvocation(fi, &facts, cg, opts) {
+			// FunctionInvocation.cpp:530–551 — revisit(caller global_facts) by reference
+			// (same as build_invocation: mutate caller lattice in place via handover+renew).
+			if !RevisitUserInvocation(fi, &cg.FM.GlobalFacts, cg, opts) {
 				return false
 			}
 			// incomplete post-revisit sticky
-			if !FactsComplete(facts) {
+			if !FactsComplete(cg.FM.GlobalFacts) {
 				if !HasError() {
 					SetError(ErrGeneric)
 				}
 				return false
 			}
-			cg.FM.GlobalFacts = facts
 			// fold feffect from accum during revisit
 			if cg.InConflict(fi.User.FEffect) {
 				// residual ERROR sticky — no invent soft-continue visit past InConflict residual true

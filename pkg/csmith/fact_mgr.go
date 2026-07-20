@@ -684,6 +684,49 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		}
 		return
 	}
+	// Re-join may-null from live GlobalFacts into the restored snapshot for subjects
+	// already present (seed-2 first_div 10107). ExpressionFuncall takes a shallow
+	// Fact* snapshot; mid-gen merge_fact replaces slots with new FactPointTo may-null
+	// objects the snapshot does not reference. Failed-invoke restore would drop that
+	// lattice; C++ often re-derives it via visit_facts, but soft re-pick paths may not.
+	if FactsComplete(fm.GlobalFacts) && FactsComplete(work) {
+		for _, f := range fm.GlobalFacts {
+			if f == nil || f.Var == nil || !f.IsNull() {
+				continue
+			}
+			var subj *Variable
+			if rel := FindRelatedPointTo(work, f.Var); rel != nil {
+				subj = rel.Var
+			} else {
+				for _, w := range work {
+					if w != nil && w.Var != nil && w.Var.Name == f.Var.Name {
+						subj = w.Var
+						break
+					}
+				}
+			}
+			if subj == nil {
+				continue
+			}
+			bridge := MakeFactPointToSet(subj, f.PointTo)
+			if bridge == nil {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				fm.GlobalFacts = IncompleteFactSlice()
+				return
+			}
+			merged := MergeFactInto(work, bridge)
+			if !FactsComplete(merged) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				fm.GlobalFacts = IncompleteFactSlice()
+				return
+			}
+			work = merged
+		}
+	}
 	fm.GlobalFacts = work
 }
 

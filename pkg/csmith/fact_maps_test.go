@@ -410,6 +410,28 @@ func TestRestoreFacts(t *testing.T) {
 	ClearError()
 }
 
+// TestRestoreFactsKeepsMayNullFromLiveEnv: failed ExpressionFuncall restore must
+// not drop may-null gained mid-gen via merge_fact slot replacement (seed-2 e10107).
+func TestRestoreFactsKeepsMayNullFromLiveEnv(t *testing.T) {
+	ClearError()
+	fm := NewFactMgr(&Function{Name: "f"})
+	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	p := CreateVariableScalars("l_233", PointerTo(PointerTo(GetSimpleType(EShort))), false, false)
+	p.IsArray = true
+	// Snapshot as if before assign: only g_127
+	snap := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g})}
+	// Live env after mid-gen merge: may-null
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, g})}
+	fm.RestoreFacts(snap)
+	if !FactsComplete(fm.GlobalFacts) {
+		t.Fatal("restore incomplete", HasError())
+	}
+	fp := FindRelatedPointTo(fm.GlobalFacts, p)
+	if fp == nil || !fp.IsNull() {
+		t.Fatalf("want may-null after restore, got %v", fp)
+	}
+}
+
 func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 	// incomplete old/new maps must not invent partial makeup past holes — sticky
 	ClearError()

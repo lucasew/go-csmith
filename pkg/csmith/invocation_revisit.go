@@ -468,7 +468,15 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	outCopy := cloneFactMap(fm.MapFactsOut)
 	effCopy := cloneEffectMap(fm.MapStmEffect)
 	accCopy := cloneEffectMap(fm.MapAccumEffect)
+	// FunctionInvocationUser.cpp:315 — inputs_copy = inputs (pre-handover caller lattice).
+	// Deep-clone so handover/body cannot orphan mid-gen may-null on the live *facts slice
+	// when *facts aliases caller GlobalFacts (build_invocation passes global_facts by ref).
 	inputsCopy := CloneFactSlice(*facts)
+	// Working lattice for handover + body visit. C++ mutates `inputs` in place for the
+	// visit_facts walk; we keep a separate work slice so callee FactMgr.GlobalFacts is
+	// never aliased to the caller's GlobalFacts slice (that alias polluted callee FM
+	// and could leave caller on a post-handover slice without frame locals).
+	work := CloneFactSlice(*facts)
 
 	restore := func() {
 		fm.MapFactsIn = inCopy
@@ -483,18 +491,19 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	if f.VisitedCnt == 1 {
 		fm.SetupInOutMaps(true)
 	}
-	// handover params into inputs
-	fm.CallerToCalleeHandover(fi.Args, facts)
-	if !FactsComplete(*facts) {
+	// handover params into working lattice (not directly into caller GlobalFacts)
+	fm.CallerToCalleeHandover(fi.Args, &work)
+	if !FactsComplete(work) {
 		restore()
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
-	// visit body
+	// visit body — install work into callee FM only for the duration of VisitFactsBlock
+	// (C++ visit_facts mutates the inputs vector; Go visit uses FM.GlobalFacts).
 	savedGlobal := fm.GlobalFacts
-	fm.GlobalFacts = *facts
+	fm.GlobalFacts = work
 	bodyCG := cg.CloneSubcontext()
 	bodyCG.CurrentFunc = f
 	bodyCG.FM = fm
@@ -517,11 +526,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
-	*facts = CloneFactSlice(fm.GlobalFacts)
+	work = CloneFactSlice(fm.GlobalFacts)
+	// Restore callee GlobalFacts immediately — do not leave caller lattice installed.
+	fm.GlobalFacts = savedGlobal
 	// body Block::stm_id always live; StmID 0 sticky
 	if f.Body.StmID <= 0 {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		SetError(ErrGeneric)
 		return false
 	}
@@ -529,7 +539,6 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	bodyEff := fm.GetMapStmEffect(f.Body.StmID)
 	if !EffectComplete(bodyEff) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -539,12 +548,10 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// residual ERROR sticky — no invent soft-continue ret-facts past AddEffect residual
 	if HasError() {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		return false
 	}
 	if !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -554,36 +561,32 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	bodyOut := fm.GetMapFactsOut(f.Body.StmID)
 	if !FactsComplete(bodyOut) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
 	retFacts := CloneFactSlice(bodyOut)
-	if !AddBackReturnFacts(f.Body, fm, &retFacts) || !FactsComplete(retFacts) || !FactsComplete(*facts) {
+	if !AddBackReturnFacts(f.Body, fm, &retFacts) || !FactsComplete(retFacts) || !FactsComplete(work) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
 	fi.SaveReturnFacts(retFacts)
-	_ = MergeFacts(facts, retFacts)
-	if !FactsComplete(*facts) {
+	_ = MergeFacts(&work, retFacts)
+	if !FactsComplete(work) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
 	// drop param locals OOS
-	UpdateFactsForOOSVars(f.Param, facts)
-	if !FactsComplete(*facts) {
+	UpdateFactsForOOSVars(f.Param, &work)
+	if !FactsComplete(work) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -593,7 +596,6 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	// Incomplete external merge sticky
 	if !EffectComplete(cg.EffectContext()) || !EffectComplete(f.AccumEffContext) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
@@ -602,24 +604,22 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	f.AccumEffContext = f.AccumEffContext.AddExternalEffect(cg.EffectContext())
 	if !EffectComplete(f.AccumEffContext) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
-	// renew into original inputs_copy (false may mean no-change; incomplete sticky)
-	_ = RenewFacts(&inputsCopy, *facts)
+	// FunctionInvocationUser.cpp:348–350 — renew_facts(inputs_copy, inputs); inputs = inputs_copy
+	// Restore pre-handover caller lattice (incl. frame-local may-null) then apply body deltas.
+	_ = RenewFacts(&inputsCopy, work)
 	if !FactsComplete(inputsCopy) {
 		restore()
-		fm.GlobalFacts = savedGlobal
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return false
 	}
 	*facts = inputsCopy
-	fm.GlobalFacts = *facts
 	return true
 }
 
