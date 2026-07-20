@@ -92,7 +92,10 @@ func ChooseVisibleReadVar(
 	}
 	// incomplete stack lists must not invent filter that drops all locals
 	if b != nil && !b.StackScanComplete() {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-filter past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return nil
 	}
 	var ok []*Variable
@@ -887,8 +890,20 @@ func (vs *VariableSelector) MakeInitValue(
 		return nil
 	}
 	// VariableSelector.cpp:830 — assert(qf && qf->sanity_check(t)); no invent empty qfer
-	if qf == nil || !qf.SanityCheck(t) {
+	if qf == nil {
 		SetError(ErrGeneric)
+		return nil
+	}
+	if !qf.SanityCheck(t) {
+		// residual ERROR sticky — no invent soft-init past SanityCheck residual
+		if HasError() {
+			return nil
+		}
+		SetError(ErrGeneric)
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-init past SanityCheck residual true
+	if HasError() {
 		return nil
 	}
 	qfer := *qf
@@ -2601,7 +2616,12 @@ func (vs *VariableSelector) GenerateParameterVariable(f *Function, r *Rng) *Vari
 		return nil
 	}
 	// VariableSelector.cpp:973–974 assert non-void simple sticky
-	if t.IsSimple() && t.Simple() == EVoid {
+	simple := t.IsSimple()
+	// residual ERROR sticky — no invent soft-param past IsSimple residual
+	if HasError() {
+		return nil
+	}
+	if simple && t.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -2775,7 +2795,15 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	varQfer.Restrict(access, cg)
 	// VariableSelector.cpp:939 — assert(var_qfer.sanity_check(t)); no soft invent bad qfer
 	if !varQfer.SanityCheck(t) {
+		// residual ERROR sticky — no invent soft-local past SanityCheck residual
+		if HasError() {
+			return nil
+		}
 		SetError(ErrGeneric)
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-local past SanityCheck residual true
+	if HasError() {
 		return nil
 	}
 	name := vs.RandomLocalName()
@@ -3468,15 +3496,22 @@ func (vs *VariableSelector) SelectParentLocalInv(
 	}
 	// VariableSelector.cpp:1019–1028 — simple nonvoid → match as int; else random_type_from_type no_vol
 	matchT := t
-	if t != nil && t.IsSimple() && t.Simple() != EVoid {
-		// VariableSelector.cpp:1019–1020 — get_int_type() (upstream type widen for locals)
-		matchT = GetIntType()
-	} else {
-		// VariableSelector.cpp:1021–1023 — random_type_from_type(type, true, false); ERROR_GUARD
-		matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
-		// no soft invent keep original type when random_type_from_type fails
-		if matchT == nil || HasError() {
+	if t != nil {
+		simple := t.IsSimple()
+		// residual ERROR sticky — no invent soft-match past IsSimple residual
+		if HasError() {
 			return nil
+		}
+		if simple && t.Simple() != EVoid {
+			// VariableSelector.cpp:1019–1020 — get_int_type() (upstream type widen for locals)
+			matchT = GetIntType()
+		} else {
+			// VariableSelector.cpp:1021–1023 — random_type_from_type(type, true, false); ERROR_GUARD
+			matchT = RandomTypeFromType(r, vs.Types, vs.Opts, vs.Probs, t, true, false)
+			// no soft invent keep original type when random_type_from_type fails
+			if matchT == nil || HasError() {
+				return nil
+			}
 		}
 	}
 	// VariableSelector.cpp:1026–1028 — choose_var; ERROR_GUARD

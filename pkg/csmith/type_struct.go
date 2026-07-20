@@ -447,8 +447,20 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 	// Constant.cpp:223 — assert(type->eType == eSimple)
 	// Constant.cpp:226–245 — only eInt / eUInt; else assert(0)
 	// sticky no invent empty/default constant past broken range IR
-	if r == nil || typ == nil || !typ.IsSimple() {
+	if r == nil || typ == nil {
 		SetError(ErrGeneric)
+		return ""
+	}
+	if !typ.IsSimple() {
+		// residual ERROR sticky — no invent soft-empty range past IsSimple residual
+		if HasError() {
+			return ""
+		}
+		SetError(ErrGeneric)
+		return ""
+	}
+	// residual ERROR sticky — no invent soft-continue range past IsSimple residual true
+	if HasError() {
 		return ""
 	}
 	st := typ.Simple()
@@ -671,10 +683,15 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 		}
 		cand := nonStruct[r.RndUpto(uint32(len(nonStruct)))]
 		// Type.cpp:747–752 — SIMPLE_TYPES_PROB_FILTER reject
-		if cand.IsSimple() && probs != nil && probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
+		simple := cand.IsSimple()
+		// residual ERROR sticky — no invent soft-field past IsSimple residual
+		if HasError() {
+			return StructField{}
+		}
+		if simple && probs != nil && probs.SimpleTypeWeight(int(cand.Simple())) == 0 {
 			continue
 		}
-		if cand.IsSimple() && cand.Simple() == EVoid {
+		if simple && cand.Simple() == EVoid {
 			continue
 		}
 		ft = cand

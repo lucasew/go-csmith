@@ -488,3 +488,34 @@ func TestIsPointerPtrTypeResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCreateVariableScalarsVoidIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent void scalar create past void type shell.
+	ClearError()
+	if CreateVariableScalars("g_v", GetSimpleType(EVoid), false, false) != nil {
+		t.Fatal("void CreateVariableScalars must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("void CreateVariableScalars must SetError sticky")
+	}
+	ClearError()
+	// Type-nil sticky
+	if CreateVariableScalars("g_x", nil, false, false) != nil {
+		t.Fatal("Type-nil CreateVariableScalars must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil CreateVariableScalars must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestCreateVariableWithInitVoidIsSimpleResidualSticky(t *testing.T) {
+	ClearError()
+	if CreateVariableWithInit("g_v", GetSimpleType(EVoid), nil, NewCVQualifiers([]bool{false}, []bool{false})) != nil {
+		t.Fatal("void CreateVariableWithInit must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("void CreateVariableWithInit must SetError sticky")
+	}
+	ClearError()
+}

@@ -139,7 +139,10 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 	}
 	for _, b := range callChain {
 		if !b.StackScanComplete() {
-			SetError(ErrGeneric)
+			// residual ERROR sticky — no invent soft-merge past StackScan residual
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return IncompleteEffect()
 		}
 	}

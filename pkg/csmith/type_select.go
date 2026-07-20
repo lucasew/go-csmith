@@ -310,8 +310,16 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		t := env.AllTypes[i]
 		// pre-validated complete
 		if t.IsSimple() {
+			// residual ERROR sticky — no invent soft-filter past IsSimple residual true
+			if HasError() {
+				return true
+			}
 			// SIMPLE_TYPES_PROB_FILTER (Type.cpp:226–228)
 			return probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0
+		}
+		// residual ERROR sticky — no invent soft-continue filter past IsSimple residual false
+		if HasError() {
+			return true
 		}
 		// Type.cpp:229–231 — !return_structs rejects structs
 		if t.IsStruct() && !opts.ReturnStructs {
@@ -406,7 +414,12 @@ func RandomTypeFromType(
 	}
 	// Type.cpp:599–601 — eSimple && !strict_simple_type → choose_random_simple
 	// no soft invent re-roll when strict_simple_type (make_init_value pointer create)
-	if typ.IsSimple() && !strictSimple {
+	simple := typ.IsSimple()
+	// residual ERROR sticky — no invent soft-type past IsSimple residual
+	if HasError() {
+		return nil
+	}
+	if simple && !strictSimple {
 		if r == nil {
 			SetError(ErrGeneric)
 			return nil
@@ -426,7 +439,7 @@ func RandomTypeFromType(
 		return GetSimpleType(st)
 	}
 	// Type.cpp:602–605 — strict simple or non-simple: keep t (assert non-void simple) sticky
-	if typ.IsSimple() && typ.Simple() == EVoid {
+	if simple && typ.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -477,10 +490,15 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		}
 		t := env.AllTypes[i]
 		// pre-validated complete
-		if t.IsSimple() && t.Simple() == EVoid {
+		simple := t.IsSimple()
+		// residual ERROR sticky — no invent soft-filter past IsSimple residual
+		if HasError() {
 			return true
 		}
-		if t.IsSimple() && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
+		if simple && t.Simple() == EVoid {
+			return true
+		}
+		if simple && probs != nil && probs.SimpleTypeWeight(int(t.Simple())) == 0 {
 			return true
 		}
 		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnion() {

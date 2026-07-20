@@ -762,7 +762,12 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 		SetError(ErrGeneric)
 		return nil
 	}
-	if typ.IsSimple() && typ.Simple() == EVoid {
+	simple := typ.IsSimple()
+	// residual ERROR sticky — no invent soft-create past IsSimple residual
+	if HasError() {
+		return nil
+	}
+	if simple && typ.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -773,7 +778,14 @@ func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQuali
 		Init: init,
 	}
 	if typ.IsAggregate() {
+		// residual ERROR sticky — no invent soft-create past IsAggregate residual true
+		if HasError() {
+			return nil
+		}
 		v.CreateFieldVars()
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-create past IsAggregate residual false
+		return nil
 	}
 	// Variable.cpp:420 — ERROR_GUARD_AND_DEL1(nullptr, var)
 	if HasError() {
@@ -803,7 +815,12 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 		SetError(ErrGeneric)
 		return nil
 	}
-	if typ.IsSimple() && typ.Simple() == EVoid {
+	simple := typ.IsSimple()
+	// residual ERROR sticky — no invent soft-create past IsSimple residual
+	if HasError() {
+		return nil
+	}
+	if simple && typ.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}
@@ -811,7 +828,12 @@ func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Va
 	// Variable.cpp:392–395 — non-union top: Constant::make_random(type); union top: 0
 	// Constant::make_random reads process CGOptions + Probabilities singleton
 	var init *Constant
-	if !typ.IsUnion() {
+	isUn := typ.IsUnion()
+	// residual ERROR sticky — no invent soft-create past IsUnion residual
+	if HasError() {
+		return nil
+	}
+	if !isUn {
 		// process RNG + probs; nil probs → fail closed for aggregates
 		init = MakeRandom(typ, ProcessOptions(), ProcessProbabilities(), createVarRng())
 		// Variable.cpp:397 — ERROR_GUARD_AND_DEL1 when make_random fails / nullptr
@@ -2188,7 +2210,17 @@ func (v *Variable) CreateFieldVars() {
 		qfer := NewCVQualifiers(consts, vols)
 		// Variable.cpp:363 — assert(var->qfer.sanity_check(var->type))
 		if !qfer.SanityCheck(f.Type) {
+			// residual ERROR sticky — no invent soft-field past SanityCheck residual
+			if HasError() {
+				fail()
+				return
+			}
 			// fail closed — no soft invent bad-qfer field var
+			fail()
+			return
+		}
+		// residual ERROR sticky — no invent soft-field past SanityCheck residual true
+		if HasError() {
 			fail()
 			return
 		}

@@ -440,6 +440,14 @@ func (t *Type) ToUnsigned() *Type {
 		return nil
 	}
 	if !t.IsSimple() {
+		// residual ERROR sticky — no invent soft-nil unsigned past IsSimple residual
+		if HasError() {
+			return nil
+		}
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-continue unsigned past IsSimple residual true
+	if HasError() {
 		return nil
 	}
 	switch t.simple {
@@ -773,7 +781,17 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 		if t.ptrTo == other.ptrTo {
 			return true
 		}
-		if t.ptrTo.IsSimple() && other.ptrTo.IsSimple() {
+		ts := t.ptrTo.IsSimple()
+		// residual ERROR sticky — no invent soft-convert past subject pointee IsSimple residual
+		if HasError() {
+			return false
+		}
+		os := other.ptrTo.IsSimple()
+		// residual ERROR sticky — no invent soft-convert past other pointee IsSimple residual
+		if HasError() {
+			return false
+		}
+		if ts && os {
 			if t.ptrTo.simple == other.ptrTo.simple {
 				return true
 			}

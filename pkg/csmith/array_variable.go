@@ -53,7 +53,12 @@ func CreateArrayVariable(
 		SetError(ErrGeneric)
 		return nil
 	}
-	if elem.IsSimple() && elem.Simple() == EVoid {
+	simple := elem.IsSimple()
+	// residual ERROR sticky — no invent soft-array past IsSimple residual
+	if HasError() {
+		return nil
+	}
+	if simple && elem.Simple() == EVoid {
 		SetError(ErrGeneric)
 		return nil
 	}

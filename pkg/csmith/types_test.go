@@ -308,3 +308,32 @@ func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestToUnsignedIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent soft-nil unsigned past Type-nil shell.
+	ClearError()
+	if (*Type)(nil).ToUnsigned() != nil {
+		t.Fatal("nil ToUnsigned must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil ToUnsigned must SetError sticky")
+	}
+	ClearError()
+	// complete signed int
+	u := GetIntType().ToUnsigned()
+	if u == nil || u.Simple() != EUInt {
+		t.Fatal("int ToUnsigned must uint", u)
+	}
+	if HasError() {
+		t.Fatal("complete int ToUnsigned must not sticky")
+	}
+	ClearError()
+	// pointer non-simple complete nil without sticky
+	if PointerTo(GetIntType()).ToUnsigned() != nil {
+		t.Fatal("pointer ToUnsigned must nil")
+	}
+	if HasError() {
+		t.Fatal("complete pointer ToUnsigned must not sticky")
+	}
+	ClearError()
+}

@@ -458,12 +458,18 @@ func (c *CGContext) AddVisibleEffectAt(e Effect, b *Block) {
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
 			// incomplete call_chain / stack lists — fail closed sticky (no invent skip merge)
-			SetError(ErrGeneric)
+			// residual ERROR sticky — no invent soft-skip merge past StackScan residual
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return
 		}
 	}
 	if b != nil && !b.StackScanComplete() {
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft-skip merge past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return
 	}
 	callers := append([]*Block(nil), c.CallChain...)
@@ -1623,7 +1629,10 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 	}
 	if !b.StackScanComplete() {
 		// incomplete stack sticky (no invent not-frame / soft re-pick past hole)
-		SetError(ErrGeneric)
+		// residual ERROR sticky — no invent soft not-frame past StackScan residual
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return false
 	}
 	if v.IsVisibleLocal(b) {
@@ -1641,7 +1650,10 @@ func (c CGContext) IsFrameVar(v *Variable) bool {
 		// Block* always live on call_chain; nil / incomplete stack sticky fail closed
 		// (no invent skip hole and still match a later frame)
 		if cb == nil || !cb.StackScanComplete() {
-			SetError(ErrGeneric)
+			// residual ERROR sticky — no invent soft not-frame past StackScan residual
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
 			return false
 		}
 		if v.IsVisibleLocal(cb) {
@@ -1666,10 +1678,17 @@ func (c CGContext) frameStacksComplete() bool {
 		return true
 	}
 	if !b.StackScanComplete() {
+		// residual ERROR sticky — no invent soft-complete frames past StackScan residual
+		if HasError() {
+			return false
+		}
 		return false
 	}
 	for _, cb := range c.CallChain {
 		if cb == nil || !cb.StackScanComplete() {
+			if HasError() {
+				return false
+			}
 			return false
 		}
 	}

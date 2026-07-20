@@ -413,3 +413,20 @@ func TestChooseRandomStructFromTypeIsVolatileResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRandomTypeFromTypeVoidIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent keep void simple past assert.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	r := NewRng(2)
+	// strict simple void
+	got := RandomTypeFromType(r, nil, opts, probs, GetSimpleType(EVoid), true, true)
+	if got != nil {
+		t.Fatal("strict void RandomTypeFromType must fail closed nil", got)
+	}
+	if !HasError() {
+		t.Fatal("strict void RandomTypeFromType must SetError sticky")
+	}
+	ClearError()
+}
