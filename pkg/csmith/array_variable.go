@@ -176,9 +176,18 @@ func CreateArrayVariable(
 		}
 		av.InitExprs = append(av.InitExprs, e)
 		// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for brace emit
-		if val := e.Output(); val != "" {
+		val := e.Output()
+		// residual ERROR sticky — no invent soft-skip init value past Output residual hole
+		if HasError() {
+			return nil
+		}
+		if val != "" {
 			av.InitValues = append(av.InitValues, val)
 			av.ArrayInits = append(av.ArrayInits, val)
+		} else {
+			// incomplete init Output sticky — no invent fewer InitValues than InitExprs
+			SetError(ErrGeneric)
+			return nil
 		}
 	}
 	// ArrayVariable.cpp:190–191 — blk? local_vars : GetGlobalVariables()
@@ -775,7 +784,12 @@ func (av *ArrayVariable) OutputDef() string {
 	if av.Init != nil && av.Init.Value != "" {
 		vals = append(vals, av.Init.Value)
 	} else if av.InitExpr != nil {
-		if s := av.InitExpr.Output(); s != "" {
+		s := av.InitExpr.Output()
+		// residual ERROR sticky — no invent soft-skip brace init past Output residual hole
+		if HasError() {
+			return ""
+		}
+		if s != "" {
 			vals = append(vals, s)
 		}
 	}
@@ -820,13 +834,24 @@ func (av *ArrayVariable) OutputDef() string {
 	b.WriteString(";")
 	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
 	if av.IsGlobal() && av.IsVolatile() {
+		// residual ERROR sticky — no invent soft-skip comment past IsGlobal/IsVolatile residual
+		if HasError() {
+			return ""
+		}
 		// name always live (CDeclType already requires Name); comment uses actual_name
 		nm := av.GetActualName(false)
+		// residual ERROR sticky — no invent complete def past GetActualName residual hole
+		if HasError() {
+			return ""
+		}
 		if nm != "" {
 			b.WriteString(" /* VOLATILE GLOBAL ")
 			b.WriteString(nm)
 			b.WriteString(" */")
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent complete def past IsGlobal residual false path
+		return ""
 	}
 	return b.String()
 }
@@ -933,6 +958,10 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	var initVal string
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
+		// residual ERROR sticky — no invent loop-init past Output residual hole
+		if HasError() {
+			return ""
+		}
 	} else if av.Init != nil {
 		initVal = av.Init.Value
 	}
@@ -1099,6 +1128,10 @@ func (av *ArrayVariable) OutputAccess() string {
 			// ArrayVariable.cpp:548–552 — indices[i]->Output always live Expression*
 			// sticky no invent empty brackets "[]" for empty index Output
 			idx := e.Output()
+			// residual ERROR sticky — no invent soft-continue later indices past Output residual
+			if HasError() {
+				return ""
+			}
 			if idx == "" {
 				SetError(ErrGeneric)
 				return ""
@@ -1182,12 +1215,20 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 	}
 	// cast signed index type to unsigned before %
 	if t.IsSigned() {
+		// residual ERROR sticky — no invent cast path past IsSigned residual hole
+		if HasError() {
+			return ""
+		}
 		u := t.ToUnsigned()
 		if u == nil {
 			// incomplete to_unsigned sticky — no invent bare modulo past hole
 			if !HasError() {
 				SetError(ErrGeneric)
 			}
+			return ""
+		}
+		// residual ERROR sticky — no invent cast path past ToUnsigned residual hole
+		if HasError() {
 			return ""
 		}
 		cn := u.CName()
@@ -1199,6 +1240,10 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 			return ""
 		}
 		return fmt.Sprintf("((%s)(%s) %% %d)", cn, body, size)
+	}
+	// residual ERROR sticky — no invent bare modulo past IsSigned residual false path
+	if HasError() {
+		return ""
 	}
 	return fmt.Sprintf("((%s) %% %d)", body, size)
 }

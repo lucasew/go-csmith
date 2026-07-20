@@ -1122,6 +1122,15 @@ func TestExpressionOutputNilSticky(t *testing.T) {
 		t.Fatal("nil Expression Output must SetError sticky")
 	}
 	ClearError()
+	// outputBody residual soft invent was invent empty cast body soft-success.
+	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}, CastType: GetIntType()}
+	if hole.Output() != "" {
+		t.Fatal("Type-nil Con Output residual must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Con Output residual must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetTypeIncompleteSticky(t *testing.T) {

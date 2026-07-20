@@ -607,6 +607,49 @@ func TestOutputIndexModuloSignedCast(t *testing.T) {
 	ClearError()
 }
 
+func TestOutputDefInitExprOutputResidualSticky(t *testing.T) {
+	// InitExpr.Output residual soft invent was soft-skip brace init invent complete def.
+	ClearError()
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			// incomplete InitExpr → Output residual
+			InitExpr: &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}, // Type-nil
+		},
+		Sizes: []int{2},
+	}
+	av.AsArray = av
+	if s := av.OutputDef(); s != "" {
+		t.Fatal("InitExpr Output residual must fail closed OutputDef, not invent brace", s)
+	}
+	if !HasError() {
+		t.Fatal("InitExpr Output residual OutputDef must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputAccessIndexOutputResidualSticky(t *testing.T) {
+	// index Output residual soft invent was soft-continue later indices invent partial access.
+	ClearError()
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2, 3}}
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType()},
+		Sizes:      []int{2, 3},
+		Collective: parent,
+		IndexExprs: []*Expression{
+			{Term: TermConstant, Con: MakeInt(0)},
+			{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual Output
+		},
+	}
+	if s := item.OutputAccess(); s != "" {
+		t.Fatal("index Output residual must fail closed OutputAccess", s)
+	}
+	if !HasError() {
+		t.Fatal("index Output residual OutputAccess must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	// ArrayVariable.cpp:261–264 — itemize expands field vars for aggregate element type
 	ClearError()

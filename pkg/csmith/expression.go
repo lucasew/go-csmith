@@ -1458,10 +1458,18 @@ func (e *Expression) Output() string {
 		return ""
 	}
 	body := e.outputBody()
+	// residual ERROR sticky — no invent soft-empty body past outputBody residual hole
+	if HasError() {
+		return ""
+	}
 	if e.CastType != nil {
 		// Expression.cpp:228–231 — cast_type->Output + body; both always live
 		// sticky no invent "() body" / "(type) " empty body
 		cn := e.CastType.CName()
+		// residual ERROR sticky — no invent cast emit past CName residual hole
+		if HasError() {
+			return ""
+		}
 		if cn == "" || body == "" {
 			if !HasError() {
 				SetError(ErrGeneric)

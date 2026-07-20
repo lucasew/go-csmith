@@ -225,13 +225,15 @@ func variableInitOutput(v *Variable) string {
 	// Variable.cpp:656 / OutputDef — InitExpr first
 	if v.InitExpr != nil {
 		out := v.InitExpr.Output()
+		// residual ERROR sticky — no invent soft-fallback Init past Output residual hole
+		if HasError() {
+			return ""
+		}
 		// incomplete InitExpr IR sticky — fail closed empty (no invent "0")
 		if out != "" {
 			return out
 		}
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	if v.Init != nil && v.Init.Value != "" {
