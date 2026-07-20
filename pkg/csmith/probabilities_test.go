@@ -183,3 +183,86 @@ func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestProbabilityFilterEqualGroup(t *testing.T) {
+	// ProbabilityFilter for pSimpleTypesProb via process singleton.
+	p := NewProbabilities(Defaults())
+	SetProcessProbabilities(p)
+	defer SetProcessProbabilities(nil)
+
+	f := GetProbFilter(PSimpleTypesProb)
+	// void weight 0 → reject
+	if !f.Filter(uint32(EVoid)) {
+		t.Fatal("void must be filtered")
+	}
+	// eInt weight 1 → accept
+	if f.Filter(uint32(EInt)) {
+		t.Fatal("eInt must pass filter")
+	}
+	// BINARY_OPS with muls off
+	o := Defaults()
+	o.Muls = false
+	p2 := NewProbabilities(o)
+	SetProcessProbabilities(p2)
+	bf := GetProbFilter(PBinaryOpsProb)
+	if !bf.Filter(uint32(BinMul)) {
+		t.Fatal("mul disabled must filter")
+	}
+	if bf.Filter(uint32(BinAdd)) {
+		t.Fatal("add must pass")
+	}
+}
+
+// rejectSimple mirrors a VectorFilter-style extra reject on one simple type index.
+type rejectSimple uint32
+
+func (r *rejectSimple) Filter(v uint32) bool { return v == uint32(*r) }
+
+func TestRegisterExtraFilter(t *testing.T) {
+	// Probabilities.cpp:791–813 register + check_extra_filter
+	p := NewProbabilities(Defaults())
+	SetProcessProbabilities(p)
+	defer SetProcessProbabilities(nil)
+
+	// Reject eInt via extra filter even though weight is 1 (pointer Filter for identity)
+	rej := rejectSimple(EInt)
+	extra := &rej
+	RegisterExtraFilter(PSimpleTypesProb, extra)
+	f := GetProbFilter(PSimpleTypesProb)
+	if !f.Filter(uint32(EInt)) {
+		t.Fatal("extra filter must reject eInt before weight check")
+	}
+	// eShort still passes (weight 1, extra false)
+	if f.Filter(uint32(EShort)) {
+		t.Fatal("eShort must still pass")
+	}
+	UnregisterExtraFilter(PSimpleTypesProb, extra)
+	if f.Filter(uint32(EInt)) {
+		t.Fatal("after unregister, eInt weight 1 must pass")
+	}
+}
+
+func TestGetProbFilterMissingSticky(t *testing.T) {
+	// No process probs → fail closed
+	SetProcessProbabilities(nil)
+	ClearError()
+	f := GetProbFilter(PSimpleTypesProb)
+	if !f.Filter(0) {
+		t.Fatal("missing process probs filter must reject")
+	}
+	if !HasError() {
+		t.Fatal("GetProbFilter without process must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestProbabilityFilterNilReceiver(t *testing.T) {
+	ClearError()
+	if !(*ProbabilityFilter)(nil).Filter(0) {
+		t.Fatal("nil ProbabilityFilter must reject")
+	}
+	if !HasError() {
+		t.Fatal("nil ProbabilityFilter must SetError sticky")
+	}
+	ClearError()
+}

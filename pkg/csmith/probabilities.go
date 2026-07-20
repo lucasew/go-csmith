@@ -5,6 +5,8 @@ package csmith
 
 // ProbName identifies a probability knob (subset used by the fair spine so far).
 // Full enum in Probabilities.h — extend when a ported path needs a name.
+// Order of *single* names is independent of C++ enum values; group roots used
+// by ProbabilityFilter must match the names set_prob_filter registers.
 type ProbName int
 
 const (
@@ -40,8 +42,13 @@ const (
 	PBuiltinFunctionProb
 	PArrayOOBProb
 
-	// Group: simple types (equal weights 0/1)
+	// Equal groups (set_default_* + set_prob_filter)
+	PStatementProb
+	PAssignOpsProb
+	PUnaryOpsProb
+	PBinaryOpsProb
 	PSimpleTypesProb
+	PSafeOpsSizeProb
 )
 
 // Probabilities holds default probability tables for the current Options.
@@ -61,13 +68,54 @@ type Probabilities struct {
 	// statementTable mirrors Statement::stmtTable_ after initialize(pStatementProb).
 	// Probabilities.cpp set_default_statement_prob (unequal group cutoffs → eStatementType).
 	statementTable *ThresholdTable
+
+	// probFilters mirrors Probabilities::prob_filters_ (ProbabilityFilter per equal group).
+	probFilters map[ProbName]*ProbabilityFilter
+	// extraFilters mirrors Probabilities::extra_filters_ (register_extra_filter).
+	extraFilters map[ProbName]Filter
+}
+
+// ProbabilityFilter mirrors ProbabilityFilter — equal-group weight filter.
+// Probabilities.cpp:55–82 — extra filter first, then weight==0 rejects.
+type ProbabilityFilter struct {
+	pname ProbName
+}
+
+// NewProbabilityFilter mirrors ProbabilityFilter(ProbName).
+func NewProbabilityFilter(pname ProbName) *ProbabilityFilter {
+	return &ProbabilityFilter{pname: pname}
+}
+
+// Filter implements Filter — true means reject candidate v.
+// Probabilities.cpp:59–81.
+func (f *ProbabilityFilter) Filter(v uint32) bool {
+	if f == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	p := ProcessProbabilities()
+	if p == nil {
+		// C++ GetInstance always live after init; nil is library fail-closed.
+		SetError(ErrGeneric)
+		return true
+	}
+	if p.CheckExtraFilter(f.pname, int(v)) {
+		return true
+	}
+	w := p.equalGroupWeight(f.pname, int(v))
+	if HasError() {
+		return true
+	}
+	return w == 0
 }
 
 // NewProbabilities builds tables from opts like Probabilities::initialize
 // after CGOptions::set_default_settings (and option flags).
 func NewProbabilities(opts Options) *Probabilities {
 	p := &Probabilities{
-		single: make(map[ProbName]int),
+		single:       make(map[ProbName]int),
+		probFilters:  make(map[ProbName]*ProbabilityFilter),
+		extraFilters: make(map[ProbName]Filter),
 	}
 	p.initSingle(opts)
 	p.initSimpleTypes(opts)
@@ -75,7 +123,129 @@ func NewProbabilities(opts Options) *Probabilities {
 	p.initUnaryOps(opts)
 	p.initSafeOpsSize(opts)
 	p.initStatementProbs(opts)
+	// set_prob_filter for each equal group after set_default_*
+	p.setProbFilter(PSimpleTypesProb)
+	p.setProbFilter(PBinaryOpsProb)
+	p.setProbFilter(PUnaryOpsProb)
+	p.setProbFilter(PSafeOpsSizeProb)
 	return p
+}
+
+// equalGroupWeight returns weight for equal-group root pname at index v.
+// ProbabilityFilter walks GroupProbElem; Go weight slices are pre-indexed.
+func (p *Probabilities) equalGroupWeight(pname ProbName, v int) int {
+	if p == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	switch pname {
+	case PSimpleTypesProb:
+		return p.SimpleTypeWeight(v)
+	case PBinaryOpsProb:
+		return p.BinaryOpWeight(v)
+	case PUnaryOpsProb:
+		return p.UnaryOpWeight(v)
+	case PSafeOpsSizeProb:
+		return p.SafeOpsSizeWeight(v)
+	default:
+		// Not an equal-group filter root; C++ would assert on dynamic_cast.
+		SetError(ErrGeneric)
+		return 0
+	}
+}
+
+// setProbFilter mirrors Probabilities::set_prob_filter.
+// Probabilities.cpp:787–789.
+func (p *Probabilities) setProbFilter(pname ProbName) {
+	if p == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	p.probFilters[pname] = NewProbabilityFilter(pname)
+}
+
+// GetProbFilter mirrors Probabilities::get_prob_filter (static via process).
+// Probabilities.cpp:777–785 — prob_filters_ then extra_filters_; missing → sticky nil.
+func GetProbFilter(pname ProbName) Filter {
+	p := ProcessProbabilities()
+	if p == nil {
+		SetError(ErrGeneric)
+		return filterFunc(func(uint32) bool { return true })
+	}
+	if f, ok := p.probFilters[pname]; ok && f != nil {
+		return f
+	}
+	if f, ok := p.extraFilters[pname]; ok && f != nil {
+		return f
+	}
+	// C++ asserts filter non-null; fail closed reject-all.
+	SetError(ErrGeneric)
+	return filterFunc(func(uint32) bool { return true })
+}
+
+// RegisterExtraFilter mirrors Probabilities::register_extra_filter.
+// Probabilities.cpp:791–796.
+func RegisterExtraFilter(pname ProbName, filter Filter) {
+	p := ProcessProbabilities()
+	if p == nil || filter == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	p.extraFilters[pname] = filter
+}
+
+// UnregisterExtraFilter mirrors Probabilities::unregister_extra_filter.
+// Probabilities.cpp:798–804 — pointer identity; Go requires comparable Filter
+// values (pointer/struct receivers). Function-typed Filters are not comparable.
+func UnregisterExtraFilter(pname ProbName, filter Filter) {
+	p := ProcessProbabilities()
+	if p == nil || filter == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	cur, ok := p.extraFilters[pname]
+	if !ok || cur == nil || !filterPtrEqual(cur, filter) {
+		SetError(ErrGeneric)
+		return
+	}
+	p.extraFilters[pname] = nil
+}
+
+// filterPtrEqual is C++ Filter* equality without panicking on func Filters.
+func filterPtrEqual(a, b Filter) (eq bool) {
+	defer func() {
+		if recover() != nil {
+			eq = false
+		}
+	}()
+	return a == b
+}
+
+// CheckExtraFilter mirrors Probabilities::check_extra_filter.
+// Probabilities.cpp:806–813 — true when extra filter rejects v.
+func (p *Probabilities) CheckExtraFilter(pname ProbName, v int) bool {
+	if p == nil {
+		SetError(ErrGeneric)
+		return true
+	}
+	if v < 0 {
+		return false
+	}
+	f, ok := p.extraFilters[pname]
+	if !ok || f == nil {
+		return false
+	}
+	return f.Filter(uint32(v))
+}
+
+// ClearFilters mirrors Probabilities::clear_filter on both maps (destructor path).
+func (p *Probabilities) ClearFilters() {
+	if p == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	p.probFilters = make(map[ProbName]*ProbabilityFilter)
+	p.extraFilters = make(map[ProbName]Filter)
 }
 
 // StatementThresholdTable returns Statement::stmtTable_ built from pStatementProb.
@@ -117,10 +287,20 @@ func (p *Probabilities) SimpleTypeWeight(simpleIdx int) int {
 
 // SimpleTypesFilter rejects eSimpleType indices with weight 0.
 // ProbabilityFilter for pSimpleTypesProb (equal group): filter(v) when weight==0.
+// Uses live ProbabilityFilter when p is the process singleton; otherwise a
+// bound filter against this *Probabilities (library/test paths without SetProcess).
 func (p *Probabilities) SimpleTypesFilter() Filter {
+	if p == nil {
+		SetError(ErrGeneric)
+		return filterFunc(func(uint32) bool { return true })
+	}
+	if ProcessProbabilities() == p {
+		if f, ok := p.probFilters[PSimpleTypesProb]; ok && f != nil {
+			return f
+		}
+	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SimpleTypeWeight(int(v))
-		// residual ERROR sticky — no invent filter false (keep) past SimpleTypeWeight residual
 		if HasError() {
 			return true
 		}
@@ -145,9 +325,17 @@ func (p *Probabilities) BinaryOpWeight(opIdx int) int {
 // BinaryOpsFilter rejects eBinaryOps with weight 0 (BINARY_OPS_PROB_FILTER).
 // Probabilities.cpp set_default_binary_ops_prob + set_prob_filter.
 func (p *Probabilities) BinaryOpsFilter() Filter {
+	if p == nil {
+		SetError(ErrGeneric)
+		return filterFunc(func(uint32) bool { return true })
+	}
+	if ProcessProbabilities() == p {
+		if f, ok := p.probFilters[PBinaryOpsProb]; ok && f != nil {
+			return f
+		}
+	}
 	return filterFunc(func(v uint32) bool {
 		w := p.BinaryOpWeight(int(v))
-		// residual ERROR sticky — no invent filter false (keep) past BinaryOpWeight residual
 		if HasError() {
 			return true
 		}
@@ -172,9 +360,17 @@ func (p *Probabilities) UnaryOpWeight(opIdx int) int {
 // UnaryOpsFilter rejects eUnaryOps with weight 0 (UNARY_OPS_PROB_FILTER).
 // Probabilities.cpp set_default_unary_ops_prob + set_prob_filter.
 func (p *Probabilities) UnaryOpsFilter() Filter {
+	if p == nil {
+		SetError(ErrGeneric)
+		return filterFunc(func(uint32) bool { return true })
+	}
+	if ProcessProbabilities() == p {
+		if f, ok := p.probFilters[PUnaryOpsProb]; ok && f != nil {
+			return f
+		}
+	}
 	return filterFunc(func(v uint32) bool {
 		w := p.UnaryOpWeight(int(v))
-		// residual ERROR sticky — no invent filter false (keep) past UnaryOpWeight residual
 		if HasError() {
 			return true
 		}
@@ -354,9 +550,17 @@ func (p *Probabilities) SafeOpsSizeWeight(sizeIdx int) int {
 // SafeOpsSizeFilter rejects SafeOpSize indices with weight 0 (SAFE_OPS_SIZE_PROB_FILTER).
 // Probabilities.cpp set_default_safe_ops_size_prob + set_prob_filter.
 func (p *Probabilities) SafeOpsSizeFilter() Filter {
+	if p == nil {
+		SetError(ErrGeneric)
+		return filterFunc(func(uint32) bool { return true })
+	}
+	if ProcessProbabilities() == p {
+		if f, ok := p.probFilters[PSafeOpsSizeProb]; ok && f != nil {
+			return f
+		}
+	}
 	return filterFunc(func(v uint32) bool {
 		w := p.SafeOpsSizeWeight(int(v))
-		// residual ERROR sticky — no invent filter false (keep) past SafeOpsSizeWeight residual
 		if HasError() {
 			return true
 		}

@@ -1260,15 +1260,15 @@ Total items: 2070
 - [ ] Probabilities.cpp::GroupProbElem.set_prob
 - [ ] Probabilities.cpp::GroupProbElem.set_prob_table
 - [ ] Probabilities.cpp::GroupProbElem.~GroupProbElem
-- [ ] Probabilities.cpp::Probabilities.check_extra_filter
-- [ ] Probabilities.cpp::Probabilities.clear_filter
+- [x] Probabilities.cpp::Probabilities.check_extra_filter
+- [x] Probabilities.cpp::Probabilities.clear_filter
 - [ ] Probabilities.cpp::Probabilities.DestroyInstance
 - [ ] Probabilities.cpp::Probabilities.dump_actual_probabilities
 - [ ] Probabilities.cpp::Probabilities.dump_default_probabilities
-- [ ] Probabilities.cpp::Probabilities.get_binary_ops_prob_filter
+- [x] Probabilities.cpp::Probabilities.get_binary_ops_prob_filter
 - [ ] Probabilities.cpp::Probabilities.get_pname
 - [x] Probabilities.cpp::Probabilities.get_prob
-- [ ] Probabilities.cpp::Probabilities.get_prob_filter
+- [x] Probabilities.cpp::Probabilities.get_prob_filter
 - [ ] Probabilities.cpp::Probabilities.get_random_single_prob
 - [ ] Probabilities.cpp::Probabilities.get_sname
 - [x] Probabilities.cpp::Probabilities.GetInstance
@@ -1282,23 +1282,23 @@ Total items: 2070
 - [ ] Probabilities.cpp::Probabilities.parse_single_probability
 - [ ] Probabilities.cpp::Probabilities.pname_to_type
 - [ ] Probabilities.cpp::Probabilities.Probabilities
-- [ ] Probabilities.cpp::Probabilities.register_extra_filter
-- [ ] Probabilities.cpp::Probabilities.set_default_binary_ops_prob
-- [ ] Probabilities.cpp::Probabilities.set_default_safe_ops_size_prob
-- [ ] Probabilities.cpp::Probabilities.set_default_simple_types_prob
-- [ ] Probabilities.cpp::Probabilities.set_default_statement_prob
-- [ ] Probabilities.cpp::Probabilities.set_default_unary_ops_prob
+- [x] Probabilities.cpp::Probabilities.register_extra_filter
+- [x] Probabilities.cpp::Probabilities.set_default_binary_ops_prob
+- [x] Probabilities.cpp::Probabilities.set_default_safe_ops_size_prob
+- [x] Probabilities.cpp::Probabilities.set_default_simple_types_prob
+- [x] Probabilities.cpp::Probabilities.set_default_statement_prob
+- [x] Probabilities.cpp::Probabilities.set_default_unary_ops_prob
 - [ ] Probabilities.cpp::Probabilities.set_group_prob
-- [ ] Probabilities.cpp::Probabilities.set_prob_filter
+- [x] Probabilities.cpp::Probabilities.set_prob_filter
 - [ ] Probabilities.cpp::Probabilities.set_prob_table
 - [ ] Probabilities.cpp::Probabilities.set_single_name
 - [ ] Probabilities.cpp::Probabilities.set_single_name_maps
 - [ ] Probabilities.cpp::Probabilities.setup_group_probabilities
-- [ ] Probabilities.cpp::Probabilities.unregister_extra_filter
+- [x] Probabilities.cpp::Probabilities.unregister_extra_filter
 - [ ] Probabilities.cpp::Probabilities.~Probabilities
-- [ ] Probabilities.cpp::ProbabilityFilter.filter
-- [ ] Probabilities.cpp::ProbabilityFilter.ProbabilityFilter
-- [ ] Probabilities.cpp::ProbabilityFilter.~ProbabilityFilter
+- [x] Probabilities.cpp::ProbabilityFilter.filter
+- [x] Probabilities.cpp::ProbabilityFilter.ProbabilityFilter
+- [x] Probabilities.cpp::ProbabilityFilter.~ProbabilityFilter
 - [ ] Probabilities.cpp::ProbElem.dump_default
 - [ ] Probabilities.cpp::ProbElem.dump_val
 - [ ] Probabilities.cpp::ProbElem.get_prob
@@ -1307,21 +1307,21 @@ Total items: 2070
 - [ ] Probabilities.cpp::ProbElem.set_prob
 - [ ] Probabilities.cpp::ProbElem.set_prob_table
 - [ ] Probabilities.cpp::ProbElem.~ProbElem
-- [ ] Probabilities.cpp::ProbName.pAccessOnceVariableProb
+- [x] Probabilities.cpp::ProbName.pAccessOnceVariableProb
 - [ ] Probabilities.cpp::ProbName.pAddAssignProb
 - [ ] Probabilities.cpp::ProbName.pAddProb
 - [ ] Probabilities.cpp::ProbName.pAndProb
-- [ ] Probabilities.cpp::ProbName.pArrayOOBProb
+- [x] Probabilities.cpp::ProbName.pArrayOOBProb
 - [ ] Probabilities.cpp::ProbName.pArrayOpProb
-- [ ] Probabilities.cpp::ProbName.pAssignOpsProb
+- [x] Probabilities.cpp::ProbName.pAssignOpsProb
 - [ ] Probabilities.cpp::ProbName.pAssignProb
-- [ ] Probabilities.cpp::ProbName.pBinaryConstProb
-- [ ] Probabilities.cpp::ProbName.pBinaryOpsProb
+- [x] Probabilities.cpp::ProbName.pBinaryConstProb
+- [x] Probabilities.cpp::ProbName.pBinaryOpsProb
 - [ ] Probabilities.cpp::ProbName.pBitAndAssignProb
 - [ ] Probabilities.cpp::ProbName.pBitAndProb
-- [ ] Probabilities.cpp::ProbName.pBitFieldInNormalStructProb
-- [ ] Probabilities.cpp::ProbName.pBitFieldsCreationProb
-- [ ] Probabilities.cpp::ProbName.pBitFieldsSignedProb
+- [x] Probabilities.cpp::ProbName.pBitFieldInNormalStructProb
+- [x] Probabilities.cpp::ProbName.pBitFieldsCreationProb
+- [x] Probabilities.cpp::ProbName.pBitFieldsSignedProb
 - [ ] Probabilities.cpp::ProbName.pBitNotProb
 - [ ] Probabilities.cpp::ProbName.pBitOrAssignProb
 - [ ] Probabilities.cpp::ProbName.pBitOrProb
@@ -1329,7 +1329,7 @@ Total items: 2070
 - [ ] Probabilities.cpp::ProbName.pBitXorProb
 - [ ] Probabilities.cpp::ProbName.pBlockProb
 - [ ] Probabilities.cpp::ProbName.pBreakProb
-- [ ] Probabilities.cpp::ProbName.pBuiltinFunctionProb
+- [x] Probabilities.cpp::ProbName.pBuiltinFunctionProb
 - [ ] Probabilities.cpp::ProbName.pCharProb
 - [ ] Probabilities.cpp::ProbName.pCmpEqProb
 - [ ] Probabilities.cpp::ProbName.pCmpGeProb
@@ -1340,16 +1340,16 @@ Total items: 2070
 - [ ] Probabilities.cpp::ProbName.pContinueProb
 - [ ] Probabilities.cpp::ProbName.pDivAssignProb
 - [ ] Probabilities.cpp::ProbName.pDivProb
-- [ ] Probabilities.cpp::ProbName.pExhaustiveBitFieldsProb
-- [ ] Probabilities.cpp::ProbName.pFieldConstProb
-- [ ] Probabilities.cpp::ProbName.pFieldVolatileProb
-- [ ] Probabilities.cpp::ProbName.pFloatAsLTypeProb
+- [x] Probabilities.cpp::ProbName.pExhaustiveBitFieldsProb
+- [x] Probabilities.cpp::ProbName.pFieldConstProb
+- [x] Probabilities.cpp::ProbName.pFieldVolatileProb
+- [x] Probabilities.cpp::ProbName.pFloatAsLTypeProb
 - [ ] Probabilities.cpp::ProbName.pFloatProb
 - [ ] Probabilities.cpp::ProbName.pForProb
-- [ ] Probabilities.cpp::ProbName.pFuncAttrProb
+- [x] Probabilities.cpp::ProbName.pFuncAttrProb
 - [ ] Probabilities.cpp::ProbName.pGotoProb
 - [ ] Probabilities.cpp::ProbName.pIfElseProb
-- [ ] Probabilities.cpp::ProbName.pInlineFunctionProb
+- [x] Probabilities.cpp::ProbName.pInlineFunctionProb
 - [ ] Probabilities.cpp::ProbName.pInt128Prob
 - [ ] Probabilities.cpp::ProbName.pInt16Prob
 - [ ] Probabilities.cpp::ProbName.pInt32Prob
@@ -1357,56 +1357,56 @@ Total items: 2070
 - [ ] Probabilities.cpp::ProbName.pInt8Prob
 - [ ] Probabilities.cpp::ProbName.pIntProb
 - [ ] Probabilities.cpp::ProbName.pInvokeProb
-- [ ] Probabilities.cpp::ProbName.pLabelAttrProb
+- [x] Probabilities.cpp::ProbName.pLabelAttrProb
 - [ ] Probabilities.cpp::ProbName.pLongLongProb
 - [ ] Probabilities.cpp::ProbName.pLongProb
-- [ ] Probabilities.cpp::ProbName.pLooserConstProb
+- [x] Probabilities.cpp::ProbName.pLooserConstProb
 - [ ] Probabilities.cpp::ProbName.pLShiftAssignProb
 - [ ] Probabilities.cpp::ProbName.pLShiftProb
 - [ ] Probabilities.cpp::ProbName.pMinusProb
 - [ ] Probabilities.cpp::ProbName.pModProb
-- [ ] Probabilities.cpp::ProbName.pMoreStructUnionProb
+- [x] Probabilities.cpp::ProbName.pMoreStructUnionProb
 - [ ] Probabilities.cpp::ProbName.pMulAssignProb
 - [ ] Probabilities.cpp::ProbName.pMulProb
-- [ ] Probabilities.cpp::ProbName.pNewArrayVariableProb
+- [x] Probabilities.cpp::ProbName.pNewArrayVariableProb
 - [ ] Probabilities.cpp::ProbName.pNotProb
 - [ ] Probabilities.cpp::ProbName.pOrProb
 - [ ] Probabilities.cpp::ProbName.pPlusProb
-- [ ] Probabilities.cpp::ProbName.pPointerAsLTypeProb
+- [x] Probabilities.cpp::ProbName.pPointerAsLTypeProb
 - [ ] Probabilities.cpp::ProbName.pPostDecrProb
 - [ ] Probabilities.cpp::ProbName.pPostIncrProb
 - [ ] Probabilities.cpp::ProbName.pPreDecrProb
 - [ ] Probabilities.cpp::ProbName.pPreIncrProb
-- [ ] Probabilities.cpp::ProbName.pRegularConstProb
-- [ ] Probabilities.cpp::ProbName.pRegularVolatileProb
+- [x] Probabilities.cpp::ProbName.pRegularConstProb
+- [x] Probabilities.cpp::ProbName.pRegularVolatileProb
 - [ ] Probabilities.cpp::ProbName.pRemAssignProb
 - [ ] Probabilities.cpp::ProbName.pReturnProb
 - [ ] Probabilities.cpp::ProbName.pRShiftAssignProb
 - [ ] Probabilities.cpp::ProbName.pRShiftProb
-- [ ] Probabilities.cpp::ProbName.pSafeOpsSignedProb
-- [ ] Probabilities.cpp::ProbName.pSafeOpsSizeProb
-- [ ] Probabilities.cpp::ProbName.pScalarFieldInFullBitFieldsProb
-- [ ] Probabilities.cpp::ProbName.pSelectDerefPointerProb
-- [ ] Probabilities.cpp::ProbName.pShiftByNonConstantProb
+- [x] Probabilities.cpp::ProbName.pSafeOpsSignedProb
+- [x] Probabilities.cpp::ProbName.pSafeOpsSizeProb
+- [x] Probabilities.cpp::ProbName.pScalarFieldInFullBitFieldsProb
+- [x] Probabilities.cpp::ProbName.pSelectDerefPointerProb
+- [x] Probabilities.cpp::ProbName.pShiftByNonConstantProb
 - [ ] Probabilities.cpp::ProbName.pShortProb
 - [ ] Probabilities.cpp::ProbName.pSimpleAssignProb
-- [ ] Probabilities.cpp::ProbName.pSimpleTypesProb
-- [ ] Probabilities.cpp::ProbName.pStatementProb
-- [ ] Probabilities.cpp::ProbName.pStdUnaryFuncProb
-- [ ] Probabilities.cpp::ProbName.pStricterConstProb
-- [ ] Probabilities.cpp::ProbName.pStructAsLTypeProb
+- [x] Probabilities.cpp::ProbName.pSimpleTypesProb
+- [x] Probabilities.cpp::ProbName.pStatementProb
+- [x] Probabilities.cpp::ProbName.pStdUnaryFuncProb
+- [x] Probabilities.cpp::ProbName.pStricterConstProb
+- [x] Probabilities.cpp::ProbName.pStructAsLTypeProb
 - [ ] Probabilities.cpp::ProbName.pSubAssignProb
 - [ ] Probabilities.cpp::ProbName.pSubProb
-- [ ] Probabilities.cpp::ProbName.pTypeAttrProb
+- [x] Probabilities.cpp::ProbName.pTypeAttrProb
 - [ ] Probabilities.cpp::ProbName.pUCharProb
 - [ ] Probabilities.cpp::ProbName.pUInt128Prob
 - [ ] Probabilities.cpp::ProbName.pUIntProb
 - [ ] Probabilities.cpp::ProbName.pULongLongProb
 - [ ] Probabilities.cpp::ProbName.pULongProb
-- [ ] Probabilities.cpp::ProbName.pUnaryOpsProb
-- [ ] Probabilities.cpp::ProbName.pUnionAsLTypeProb
+- [x] Probabilities.cpp::ProbName.pUnaryOpsProb
+- [x] Probabilities.cpp::ProbName.pUnionAsLTypeProb
 - [ ] Probabilities.cpp::ProbName.pUShortProb
-- [ ] Probabilities.cpp::ProbName.pVarAttrProb
+- [x] Probabilities.cpp::ProbName.pVarAttrProb
 - [ ] Probabilities.cpp::ProbName.pVoidProb
 - [ ] Probabilities.cpp::SingleProbElem.dump_default
 - [ ] Probabilities.cpp::SingleProbElem.dump_val
@@ -1456,12 +1456,12 @@ Total items: 2070
 - [ ] Probabilities.cpp::UNARY_OPS_PROB_FILTER
 - [ ] Probabilities.cpp::UnionAsLTypeProb
 - [ ] Probabilities.cpp::VarAttrProb
-- [ ] ProbabilityTable.h::DistributionTable.add_entry
-- [ ] ProbabilityTable.h::DistributionTable.DistributionTable
-- [ ] ProbabilityTable.h::DistributionTable.get_max
-- [ ] ProbabilityTable.h::DistributionTable.key_to_prob
-- [ ] ProbabilityTable.h::DistributionTable.rnd_num_to_key
-- [ ] ProbabilityTable.h::DistributionTable.~DistributionTable
+- [x] ProbabilityTable.h::DistributionTable.add_entry
+- [x] ProbabilityTable.h::DistributionTable.DistributionTable
+- [x] ProbabilityTable.h::DistributionTable.get_max
+- [x] ProbabilityTable.h::DistributionTable.key_to_prob
+- [x] ProbabilityTable.h::DistributionTable.rnd_num_to_key
+- [x] ProbabilityTable.h::DistributionTable.~DistributionTable
 - [ ] ProbabilityTable.h::ProbabilityTable.add_elem
 - [ ] ProbabilityTable.h::ProbabilityTable.get_value
 - [ ] ProbabilityTable.h::ProbabilityTable.initialize

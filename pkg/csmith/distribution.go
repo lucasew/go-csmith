@@ -10,14 +10,12 @@ type DistributionTable struct {
 }
 
 // AddEntry mirrors DistributionTable::add_entry.
+// Probabilities.cpp:1025–1029 — always push key/prob (including weight 0).
 // Incomplete table sticky no-op (no invent soft grow past missing shell).
 func (d *DistributionTable) AddEntry(key, prob int) {
 	// DistributionTable always live when building filters; sticky incomplete no invent
 	if d == nil {
 		SetError(ErrGeneric)
-		return
-	}
-	if prob <= 0 {
 		return
 	}
 	d.keys = append(d.keys, key)
@@ -36,8 +34,24 @@ func (d *DistributionTable) Max() int {
 	return d.maxProb
 }
 
+// KeyToProb mirrors DistributionTable::key_to_prob.
+// Probabilities.cpp:1031–1038 — first matching key's weight; 0 if missing.
+func (d *DistributionTable) KeyToProb(key int) int {
+	if d == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	for i, k := range d.keys {
+		if k == key {
+			return d.probs[i]
+		}
+	}
+	return 0
+}
+
 // RndNumToKey mirrors rnd_num_to_key — walk cumulative probs.
 // Incomplete table sticky -1 (no invent identity key soft-skip past hole).
+// OOB rnd (not in [0,max)) returns -1; C++ asserts.
 func (d *DistributionTable) RndNumToKey(rnd int) int {
 	// DistributionTable always live for lookup; sticky incomplete no invent -1 soft-skip
 	if d == nil {

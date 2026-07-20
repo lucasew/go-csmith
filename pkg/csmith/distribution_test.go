@@ -81,6 +81,30 @@ func TestThresholdTableNilSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestDistributionTableKeyToProb(t *testing.T) {
+	// Probabilities.cpp:1031–1038 key_to_prob
+	var d DistributionTable
+	d.AddEntry(10, 70)
+	d.AddEntry(20, 0) // weight 0 still recorded (C++ always push)
+	d.AddEntry(30, 30)
+	if d.Max() != 100 {
+		t.Fatalf("max with zero-weight entry: got %d want 100", d.Max())
+	}
+	if d.KeyToProb(10) != 70 || d.KeyToProb(20) != 0 || d.KeyToProb(30) != 30 {
+		t.Fatalf("key_to_prob: 10=%d 20=%d 30=%d", d.KeyToProb(10), d.KeyToProb(20), d.KeyToProb(30))
+	}
+	if d.KeyToProb(99) != 0 {
+		t.Fatal("missing key → 0")
+	}
+	// zero-weight key never selected by rnd_num_to_key
+	if d.RndNumToKey(0) != 10 || d.RndNumToKey(69) != 10 {
+		t.Fatal("band before zero-weight")
+	}
+	if d.RndNumToKey(70) != 30 {
+		t.Fatal("after zero-weight entry, next band is 30")
+	}
+}
+
 func TestDistributionTableNilSticky(t *testing.T) {
 	ClearError()
 	(*DistributionTable)(nil).AddEntry(1, 10)
@@ -100,6 +124,13 @@ func TestDistributionTableNilSticky(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("nil RndNumToKey must SetError sticky")
+	}
+	ClearError()
+	if (*DistributionTable)(nil).KeyToProb(1) != 0 {
+		t.Fatal("nil KeyToProb must return 0")
+	}
+	if !HasError() {
+		t.Fatal("nil KeyToProb must SetError sticky")
 	}
 	ClearError()
 }
