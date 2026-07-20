@@ -764,8 +764,7 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 }
 
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
-// ArrayVariable.cpp:439–461 — nested braces for multi-dim; pick from init_strings.
-// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR.
+// ArrayVariable.cpp:426–446 — nested braces; magic seed pick; join with "," (no space).
 func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {
 	// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR sticky
 	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
@@ -775,14 +774,10 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 	var b strings.Builder
 	b.WriteString("{")
 	for i := 0; i < av.Sizes[dimen]; i++ {
-		if i > 0 {
-			b.WriteString(", ")
-		}
 		if dimen == len(av.Sizes)-1 {
-			// magic index pick (ArrayVariable.cpp:448–452)
+			// ArrayVariable.cpp:433–437 — ((seed*seed+(i+7)*(i+13))*52369) % n
 			s := *seed
 			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
-			// init string always live; sticky no invent empty holes in brace list
 			part := initStrings[rnd]
 			if part == "" {
 				SetError(ErrGeneric)
@@ -791,7 +786,6 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 			b.WriteString(part)
 			*seed = s + 1
 		} else {
-			// nested braces always live; sticky no invent "{, }" with empty child
 			part := av.buildInitRecursive(dimen+1, initStrings, seed)
 			if part == "" {
 				if !HasError() {
@@ -801,9 +795,54 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 			}
 			b.WriteString(part)
 		}
+		// ArrayVariable.cpp:441–442 — comma only between elements, no trailing, no space
+		if i != av.Sizes[dimen]-1 {
+			b.WriteString(",")
+		}
 	}
 	b.WriteString("}")
 	return b.String()
+}
+
+// buildInitializerStr mirrors ArrayVariable::build_initializer_str.
+// ArrayVariable.cpp:450–474 — force_non_uniform → recursive seed path; else nested dims.
+func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
+	if av == nil || len(initStrings) == 0 {
+		SetError(ErrGeneric)
+		return ""
+	}
+	// Process options match CGOptions::force_non_uniform_array_init (default true)
+	if ProcessOptions().ForceNonUniformArrayInit {
+		// ArrayVariable.cpp:452–453 — static seed 0xABCDEF in recursive
+		seed := uint32(0xABCDEF)
+		return av.buildInitRecursive(0, initStrings, &seed)
+	}
+	// ArrayVariable.cpp:456–473 — build from last dimension outward
+	str := ""
+	for i := len(av.Sizes) - 1; i >= 0; i-- {
+		lenI := av.Sizes[i]
+		var dim strings.Builder
+		dim.WriteString("{")
+		for j := 0; j < lenI; j++ {
+			if i == len(av.Sizes)-1 {
+				rnd := (uint32(i) + uint32(j+7)*uint32(j+13)) * 52369 % uint32(len(initStrings))
+				part := initStrings[rnd]
+				if part == "" {
+					SetError(ErrGeneric)
+					return ""
+				}
+				dim.WriteString(part)
+			} else {
+				dim.WriteString(str)
+			}
+			if j < lenI-1 {
+				dim.WriteString(", ")
+			}
+		}
+		dim.WriteString("}")
+		str = dim.String()
+	}
+	return str
 }
 
 // OutputDef emits a definition with brace initializer when no_loop_initializer.
@@ -871,35 +910,17 @@ func (av *ArrayVariable) OutputDef() string {
 		}
 	}
 	b.WriteString(decl)
-	// multi-dim or multi-value: recursive full initializer when total size small
-	tot := av.TotalSize()
-	// residual ERROR sticky — no invent soft-brace/full init past TotalSize residual
-	if HasError() {
+	// ArrayVariable.cpp:506 — always build_initializer_str (full nested braces).
+	// Do not invent size caps (old tot>64 → emit 8 was not C++).
+	init := av.buildInitializerStr(vals)
+	if init == "" {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
 		return ""
 	}
-	if tot <= 64 && (len(av.Sizes) > 1 || len(vals) > 1) {
-		seed := uint32(0xABCDEF)
-		init := av.buildInitRecursive(0, vals, &seed)
-		if init == "" {
-			SetError(ErrGeneric)
-			return ""
-		}
-		b.WriteString(" = ")
-		b.WriteString(init)
-	} else {
-		b.WriteString(" = {")
-		maxEmit := tot
-		if maxEmit > 8 {
-			maxEmit = 8
-		}
-		for i := 0; i < maxEmit && i < len(vals); i++ {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(vals[i])
-		}
-		b.WriteString("}")
-	}
+	b.WriteString(" = ")
+	b.WriteString(init)
 	b.WriteString(";")
 	// Variable.cpp:658–661 — ArrayVariable inherits OutputDef comment path for volatile globals
 	if av.IsGlobal() && av.IsVolatile() {

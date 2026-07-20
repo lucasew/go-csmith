@@ -5,6 +5,7 @@ package csmith
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -481,19 +482,27 @@ func GenerateRandomConstantInRange(typ *Type, bound int, opts Options, r *Rng) s
 		SetError(ErrGeneric)
 		return ""
 	}
-	// pure_rnd_upto(b); C++ unsigned int domain
+	// pure_rnd_upto(b); C++ unsigned int domain (random mode == RndUpto)
 	num := int(r.RndUpto(uint32(b)))
-	// Constant.cpp:231–236 — eInt: pure_rnd_flipcoin(50) may negate
-	// Constant.cpp:241–243 — eUInt: non-negative only
-	if st == EInt && r.RndFlipcoin(50) {
-		num = -num
+	// Constant.cpp:230–236 — eInt:
+	//   flag = pure_rnd_flipcoin(50); if (flag) oss << num; else oss << "-" << num;
+	// true → positive; false → negative (not the inverse).
+	// Constant.cpp:241–243 — eUInt: non-negative only (no flip)
+	var oss string
+	if st == EInt {
+		if r.RndFlipcoin(50) {
+			oss = strconv.Itoa(num)
+		} else {
+			oss = "-" + strconv.Itoa(num)
+		}
+	} else {
+		oss = strconv.Itoa(num)
 	}
-	v := formatSmallConstant(st, num, opts)
-	// Constant.cpp:246 — mark_mutable_const → "(" + oss + ")"; no invent ignore option
-	if v != "" && opts.MarkMutableConst {
-		return "(" + v + ")"
+	// Constant.cpp:246 — no L/UL suffix here (only mark_mutable_const paren wrap)
+	if opts.MarkMutableConst {
+		return "(" + oss + ")"
 	}
-	return v
+	return oss
 }
 
 // MakeStructConstant mirrors GenerateRandomStructConstant.

@@ -60,8 +60,8 @@ Total items: 2070
 - [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDFSRndNumGenerator
 - [x] ArrayVariable.cpp::ArrayVariable.add_index
 - [x] ArrayVariable.cpp::ArrayVariable.ArrayVariable
-- [x] ArrayVariable.cpp::ArrayVariable.build_init_recursive
-- [x] ArrayVariable.cpp::ArrayVariable.build_initializer_str
+- [ ] ArrayVariable.cpp::ArrayVariable.build_init_recursive
+- [ ] ArrayVariable.cpp::ArrayVariable.build_initializer_str
 - [x] ArrayVariable.cpp::ArrayVariable.CreateArrayVariable
 - [x] ArrayVariable.cpp::ArrayVariable.get_array
 - [x] ArrayVariable.cpp::ArrayVariable.get_collective
@@ -83,7 +83,7 @@ Total items: 2070
 - [x] ArrayVariable.cpp::ArrayVariable.output_init
 - [x] ArrayVariable.cpp::ArrayVariable.output_with_indices
 - [x] ArrayVariable.cpp::ArrayVariable.OutputDecl
-- [x] ArrayVariable.cpp::ArrayVariable.OutputDef
+- [ ] ArrayVariable.cpp::ArrayVariable.OutputDef
 - [x] ArrayVariable.cpp::ArrayVariable.OutputLowerBound
 - [x] ArrayVariable.cpp::ArrayVariable.OutputUpperBound
 - [x] ArrayVariable.cpp::ArrayVariable.push_back

@@ -2,6 +2,7 @@ package csmith
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -49,6 +50,31 @@ func TestGenerateRandomConstantInRangeBounded(t *testing.T) {
 			t.Fatal("empty")
 		}
 	}
+}
+
+func TestGenerateRandomConstantInRangeSignPolarity(t *testing.T) {
+	// Constant.cpp:230–236 — flip true → positive digit string; false → "-" + digits.
+	// Seed 2 first eInt range: U then F; first flip seed2 after U domain is fixed.
+	ClearError()
+	opts := Defaults()
+	// bound=8 → b=pow(2,4)=16
+	r := NewRng(2)
+	num := int(r.RndUpto(16))
+	pos := r.RndFlipcoin(50)
+	want := strconv.Itoa(num)
+	if !pos {
+		want = "-" + want
+	}
+	r2 := NewRng(2)
+	got := GenerateRandomConstantInRange(GetIntType(), 8, opts, r2)
+	if got != want {
+		t.Fatalf("sign polarity: got %q want %q (num=%d flipTrue=%v)", got, want, num, pos)
+	}
+	// no invent L/UL suffix (Constant.cpp oss is bare digits)
+	if strings.ContainsAny(got, "LUlu") {
+		t.Fatalf("range const must be bare digits, got %q", got)
+	}
+	ClearError()
 }
 
 func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
