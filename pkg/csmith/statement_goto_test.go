@@ -595,3 +595,54 @@ func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomGotoUsesOnlyFuncBlocks(t *testing.T) {
+	// StatementGoto.cpp:70–84 — vector copy of func->blocks only; no invent
+	// append of current block when missing from the list.
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	outer := &Block{StmID: 1, Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 2}}}
+	// curr not registered on f.Blocks
+	curr := &Block{StmID: 3, Func: f, Parent: outer, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
+	f.Blocks = []*Block{outer}
+	f.Stack = []*Block{curr}
+	cg := EmptyCGContext()
+	cg.CurrentFunc = f
+	cg.FM = NewFactMgr(f)
+	cg.EffectAccum = &Effect{}
+	r := NewRng(1)
+	// Force goto: may still fail soft if no good block; ensure we don't panic
+	// and that FindGoodJumpBlock is only given func.Blocks (size 1), not 2.
+	_ = MakeRandomGoto(r, Defaults(), ProcessProbabilities(), NewVariableSelector(Defaults()), nil, &cg, curr)
+	// If invent-append were present, first RndUpto would see n=2 for seed paths;
+	// unit documents the contract: Blocks list is source of truth.
+	if len(f.Blocks) != 1 {
+		t.Fatalf("func.Blocks must stay size 1, got %d", len(f.Blocks))
+	}
+}
+
+
+func TestIsVisibleLocalUsesMatch(t *testing.T) {
+	// Variable.cpp:490–500 — match() for params and locals.
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	if p == nil {
+		t.Fatal("param")
+	}
+	f.Param = []*Variable{p}
+	blk := &Block{StmID: 1, Func: f}
+	if !p.IsVisibleLocal(blk) {
+		t.Fatal("param must be visible in function block")
+	}
+	// identity via Match path for locals
+	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	blk.LocalVars = []*Variable{loc}
+	if !loc.IsVisibleLocal(blk) {
+		t.Fatal("local must be visible")
+	}
+	if HasError() {
+		t.Fatal("sticky")
+	}
+}

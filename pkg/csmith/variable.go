@@ -1383,8 +1383,15 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 				SetError(ErrGeneric)
 				return false
 			}
-			if p == v {
+			// Variable.cpp:490–494 — param[i]->match(this)
+			if p.Match(v) {
+				if HasError() {
+					return false
+				}
 				return true
+			}
+			if HasError() {
+				return false
 			}
 		}
 	}
@@ -1395,8 +1402,15 @@ func (v *Variable) IsVisibleLocal(blk *Block) bool {
 				SetError(ErrGeneric)
 				return false
 			}
-			if loc == v {
+			// Variable.cpp:497–500 — find_variable_in_set uses match()
+			if loc.Match(v) {
+				if HasError() {
+					return false
+				}
 				return true
+			}
+			if HasError() {
+				return false
 			}
 		}
 	}

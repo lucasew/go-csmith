@@ -409,24 +409,12 @@ func MakeRandomGoto(
 	if HasError() {
 		return makeGotoFailed()
 	}
+	// StatementGoto.cpp:70–84 — vector copy of func->blocks only (no invent append curr)
 	// Block* always live on Function.Blocks; nil hole fails closed sticky
 	blocks, ok := copyBlocksNoHole(cg.CurrentFunc.Blocks)
 	if !ok {
 		SetError(ErrGeneric)
 		return makeGotoFailed()
-	}
-	// include current if not yet in Blocks list
-	if blk != nil {
-		found := false
-		for _, b := range blocks {
-			if b == blk {
-				found = true
-				break
-			}
-		}
-		if !found {
-			blocks = append(blocks, blk)
-		}
 	}
 
 	var okBlk *Block
@@ -439,24 +427,12 @@ func MakeRandomGoto(
 		}
 	}
 	if okBlk == nil {
-		// StatementGoto.cpp:81–84 — forward: as_dest=false (ok_blk is jump source)
+		// StatementGoto.cpp:81–84 — forward: re-copy func->blocks; as_dest=false
 		backEdge = false
 		blocks, ok = copyBlocksNoHole(cg.CurrentFunc.Blocks)
 		if !ok {
 			SetError(ErrGeneric)
 			return makeGotoFailed()
-		}
-		if blk != nil {
-			found := false
-			for _, b := range blocks {
-				if b == blk {
-					found = true
-					break
-				}
-			}
-			if !found {
-				blocks = append(blocks, blk)
-			}
 		}
 		okBlk = FindGoodJumpBlock(r, blocks, blk, false)
 	}

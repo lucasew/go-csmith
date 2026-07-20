@@ -515,11 +515,15 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:526–536 — when already visited, merge back-edge outs into inputs
 		if fm != nil && b.StmID > 0 && fm.MapVisited != nil && fm.MapVisited[b.StmID] {
 			if cnt++; cnt > 7 {
-				// Block.cpp:526–530 — assert(0) when too many iterations.
-				// NDEBUG elides assert and continues the infinite do-while (Release).
-				// Do not sticky-poison generation: return false so post_creation_analysis
-				// strips failing stmts and retries (same class as other NDEBUG asserts).
-				return currentInputs, 0, false
+				// Block.cpp:526–530 — assert(0); NDEBUG continues do-while.
+				// Returning false+strip invents emptying the body (seed-2 func_54).
+				// Fair: keep iterating until shortcut converges (Release UP path).
+				// Cap hard to avoid hang: accept current outputs as fixed-point.
+				if cnt > 50 {
+					// last-resort accept (not in C++; safety only)
+					return currentInputs, -1, true
+				}
+				// fall through: continue merge/analyze loop like NDEBUG
 			}
 			back := fm.FindEdgesIn(b.StmID, false, true)
 			// nil = incomplete CFG; no invent skip holes as absent back-edges
