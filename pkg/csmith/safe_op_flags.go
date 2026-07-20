@@ -144,6 +144,10 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 	}
 	f := &SafeOpFlags{IsFunc: true}
 	rvFloat := ReturnFloatTypeUnary(opts, rvType, op1Type, uop)
+	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeUnary residual
+	if HasError() {
+		return nil
+	}
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
 	sigProb := uint32(0)
 	if probs != nil {
@@ -162,6 +166,10 @@ func MakeRandomUnary(r *Rng, opts Options, probs *Probabilities, rvType, op1Type
 		f.Size = SafeFloat
 	} else {
 		sz, ok := pickSafeOpSize(r, probs)
+		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
+		if HasError() {
+			return nil
+		}
 		if !ok {
 			return nil
 		}
@@ -191,6 +199,10 @@ func MakeRandomBinaryKind(
 	}
 	f := &SafeOpFlags{IsFunc: true} // ISSUE upstream: always true
 	rvFloat := ReturnFloatTypeBinary(opts, rvType, op1Type, op2Type, bop)
+	// residual ERROR sticky — no invent soft-flags past ReturnFloatTypeBinary residual
+	if HasError() {
+		return nil
+	}
 
 	// SafeOpFlags.cpp:181–190 — float always signed
 	// C++ Probabilities singleton always live; nil probs → 0% (no invent default 50)
@@ -222,6 +234,10 @@ func MakeRandomBinaryKind(
 		f.Size = SafeFloat
 	} else {
 		sz, ok := pickSafeOpSize(r, probs)
+		// residual ERROR sticky — no invent soft-flags past pickSafeOpSize residual
+		if HasError() {
+			return nil
+		}
 		if !ok {
 			return nil
 		}

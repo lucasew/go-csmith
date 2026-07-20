@@ -376,3 +376,40 @@ func TestFindPointerTypeNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestGetAllOKStructUnionTypesFieldTypeResidualSticky(t *testing.T) {
+	// IsConstStructUnion residual soft invent was invent keep incomplete struct in ok pool.
+	ClearError()
+	env := &TypeEnv{AllTypes: []*Type{
+		{isStruct: true, StructName: "S0", Fields: []StructField{
+			{Name: "f0", Type: nil, BitWidth: -1}, // residual via IsConstStructUnion
+		}},
+	}}
+	// noConst true forces IsConstStructUnion scan
+	got := env.GetAllOKStructUnionTypes(true, false, false, true)
+	if typesComplete(got) {
+		// IncompleteTypes marker
+		t.Fatal("field Type-nil residual must fail closed IncompleteTypes", got)
+	}
+	if !HasError() {
+		t.Fatal("field Type-nil residual GetAllOKStructUnionTypes must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestChooseRandomStructFromTypeIsVolatileResidualSticky(t *testing.T) {
+	// IsVolatileStructUnion residual soft invent was invent return typ past hole.
+	ClearError()
+	env := &TypeEnv{}
+	// Type with nil field Type → IsVolatileStructUnion residual when noVolatile
+	typ := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if env.ChooseRandomStructFromType(NewRng(1), typ, true) != nil {
+		t.Fatal("IsVolatileStructUnion residual must fail closed ChooseRandomStructFromType")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileStructUnion residual ChooseRandomStructFromType must SetError sticky")
+	}
+	ClearError()
+}

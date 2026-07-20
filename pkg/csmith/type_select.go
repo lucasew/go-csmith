@@ -105,12 +105,24 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 	for _, t := range env.AllTypes {
 		if wantStruct {
 			if !t.IsStruct() {
+				// residual ERROR sticky — no invent soft-skip then pick later past IsStruct residual
+				if HasError() {
+					return IncompleteTypes()
+				}
 				continue
 			}
 		} else {
 			if !t.IsUnion() {
+				// residual ERROR sticky — no invent soft-skip then pick later past IsUnion residual
+				if HasError() {
+					return IncompleteTypes()
+				}
 				continue
 			}
+		}
+		// residual ERROR sticky — no invent soft-continue keep past IsStruct/IsUnion residual true
+		if HasError() {
+			return IncompleteTypes()
 		}
 		if noConst && t.IsConstStructUnion() {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
@@ -119,6 +131,10 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 			}
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue keep past IsConstStructUnion residual false
+		if HasError() {
+			return IncompleteTypes()
+		}
 		if noVolatile && t.IsVolatileStructUnion() {
 			// residual ERROR sticky — no invent soft-skip then pick later past field-Type hole
 			if HasError() {
@@ -126,12 +142,20 @@ func (env *TypeEnv) GetAllOKStructUnionTypes(noConst, noVolatile, needIntField, 
 			}
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue keep past IsVolatileStructUnion residual false
+		if HasError() {
+			return IncompleteTypes()
+		}
 		if needIntField && !t.HasIntField() {
 			// residual ERROR sticky — no invent soft-skip then pick later past HasIntField hole
 			if HasError() {
 				return IncompleteTypes()
 			}
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue keep past HasIntField residual false
+		if HasError() {
+			return IncompleteTypes()
 		}
 		ok = append(ok, t)
 	}
@@ -193,13 +217,31 @@ func ChooseRandomStructUnionType(r *Rng, ok []*Type) *Type {
 // Type.cpp:570–586 — if type is struct return it; else random from env.
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
 	if typ != nil && typ.IsStruct() {
+		// residual ERROR sticky — no invent soft-return typ past IsStruct residual hole
+		if HasError() {
+			return nil
+		}
 		if noVolatile && typ.IsVolatileStructUnion() {
+			// residual ERROR sticky — no invent soft-fallthrough past IsVolatileStructUnion residual
+			if HasError() {
+				return nil
+			}
 			// fall through to pick another
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-return typ past IsVolatileStructUnion residual false
+			return nil
 		} else {
 			return typ
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue pool pick past IsStruct residual false
+		return nil
 	}
 	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
+	// residual ERROR sticky — no invent soft-pick past GetAllOK residual hole
+	if HasError() {
+		return nil
+	}
 	// incomplete AllTypes pool — fail closed sticky (no invent pick from partial)
 	if !typesComplete(ok) {
 		SetError(ErrGeneric)
@@ -273,12 +315,32 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 		}
 		// Type.cpp:229–231 — !return_structs rejects structs
 		if t.IsStruct() && !opts.ReturnStructs {
+			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue filter past IsStruct residual false
+		if HasError() {
 			return true
 		}
 		if t.IsUnion() && !opts.ReturnUnions {
+			// residual ERROR sticky — no invent soft-reject/keep past IsUnion residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue filter past IsUnion residual false
+		if HasError() {
 			return true
 		}
 		if forFieldVar && t.IsStruct() {
+			// residual ERROR sticky — no invent soft-continue depth filter past IsStruct residual
+			if HasError() {
+				return true
+			}
 			// Type.cpp:240–242 — reject when depth >= max_nested_struct_level
 			d := t.StructDepth()
 			// residual ERROR sticky — no invent soft-continue filter past StructDepth hole
@@ -289,6 +351,9 @@ func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, for
 			if d >= opts.MaxNestedStructLevel {
 				return true
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-keep past IsStruct residual false
+			return true
 		}
 		return false
 	})
@@ -431,9 +496,25 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 		}
 		// arg_structs / arg_unions gates (used for local array element types)
 		if t.IsStruct() && !opts.ArgStructs {
+			// residual ERROR sticky — no invent soft-reject/keep past IsStruct residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue filter past IsStruct residual false
+		if HasError() {
 			return true
 		}
 		if t.IsUnion() && !opts.ArgUnions {
+			// residual ERROR sticky — no invent soft-reject/keep past IsUnion residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue filter past IsUnion residual false
+		if HasError() {
 			return true
 		}
 		return false
@@ -446,6 +527,10 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 	t := env.AllTypes[idx]
 	if !t.Used {
 		RecordTypeWithBitfields(t)
+		// residual ERROR sticky — no invent soft-mark used past RecordTypeWithBitfields residual
+		if HasError() {
+			return nil
+		}
 		t.Used = true
 	}
 	return t
@@ -474,18 +559,37 @@ func (env *TypeEnv) MakeRandomPointerType(r *Rng, opts Options, probs *Probabili
 		idx := r.RndUpto(uint32(len(env.DerivedTypes)))
 		t := env.DerivedTypes[idx]
 		if t.IndirectLevel() < opts.MaxPointerDepth {
+			// residual ERROR sticky — no invent soft-return pointer past IndirectLevel residual
+			if HasError() {
+				return nil
+			}
 			return env.FindPointerType(t, true)
+		}
+		// residual ERROR sticky — no invent soft-continue choose_random past IndirectLevel residual false
+		if HasError() {
+			return nil
 		}
 	}
 	// Type.cpp:1158–1165 — choose_random then consolidate all simple → int*
 	base := env.ChooseRandom(r, opts, probs, false)
+	// residual ERROR sticky — no invent soft-empty pointer past ChooseRandom residual
+	if HasError() {
+		return nil
+	}
 	if base == nil {
 		// ERROR_GUARD(nullptr) — no soft invent GetIntType
 		return nil
 	}
 	// Type.cpp:1161–1164 — any eSimple consolidates to get_int_type()
 	if base.IsSimple() {
+		// residual ERROR sticky — no invent soft-consolidate past IsSimple residual hole
+		if HasError() {
+			return nil
+		}
 		base = GetIntType()
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+		return nil
 	}
 	return env.FindPointerType(base, true)
 }
