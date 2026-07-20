@@ -868,3 +868,25 @@ func TestCtrlVarNamesGetActualNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsFieldReadableIsUnionResidualSticky(t *testing.T) {
+	// IsUnion residual soft invent was invent not-readable soft-skip past Type-nil already sticky.
+	// Non-union complete: not readable false without sticky.
+	ClearError()
+	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	if IsFieldReadable(v, 0, nil) {
+		t.Fatal("non-union IsFieldReadable must be false")
+	}
+	if HasError() {
+		t.Fatal("complete non-union IsFieldReadable must not sticky")
+	}
+	ClearError()
+	// Type-nil sticky
+	if IsFieldReadable(&Variable{Name: "g_u", Type: nil}, 0, nil) {
+		t.Fatal("Type-nil IsFieldReadable must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil IsFieldReadable must SetError sticky")
+	}
+	ClearError()
+}

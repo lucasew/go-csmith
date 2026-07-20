@@ -889,11 +889,27 @@ func (f *Function) paramListCOpts(opts Options) string {
 		}
 		// Function.cpp:489–491 — assert(!arg_structs → not struct; same unions) sticky
 		if !opts.ArgStructs && p.Type.IsStruct() {
+			// residual ERROR sticky — no invent soft-empty param past IsStruct residual
+			if HasError() {
+				return ""
+			}
 			SetError(ErrGeneric)
 			return ""
 		}
+		// residual ERROR sticky — no invent soft-continue param past IsStruct residual false
+		if HasError() {
+			return ""
+		}
 		if !opts.ArgUnions && p.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-empty param past IsUnion residual
+			if HasError() {
+				return ""
+			}
 			SetError(ErrGeneric)
+			return ""
+		}
+		// residual ERROR sticky — no invent soft-continue param past IsUnion residual false
+		if HasError() {
 			return ""
 		}
 		// Variable always has live name + qualified type; sticky no invent "int " / " p"
@@ -942,11 +958,27 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 	}
 	if rt != nil {
 		if !opts.ReturnStructs && rt.IsStruct() {
+			// residual ERROR sticky — no invent soft-empty header past IsStruct residual
+			if HasError() {
+				return ""
+			}
 			SetError(ErrGeneric)
 			return ""
 		}
+		// residual ERROR sticky — no invent soft-continue header past IsStruct residual false
+		if HasError() {
+			return ""
+		}
 		if !opts.ReturnUnions && rt.IsUnion() {
+			// residual ERROR sticky — no invent soft-empty header past IsUnion residual
+			if HasError() {
+				return ""
+			}
 			SetError(ErrGeneric)
+			return ""
+		}
+		// residual ERROR sticky — no invent soft-continue header past IsUnion residual false
+		if HasError() {
 			return ""
 		}
 	}
@@ -956,19 +988,23 @@ func (f *Function) OutputHeaderOpts(forceStatic bool, opts Options) string {
 		return ""
 	}
 	params := f.paramListCOpts(opts)
+	// residual ERROR sticky — no invent soft-empty header past paramList residual
+	if HasError() {
+		return ""
+	}
 	if params == "" {
 		// assert-path sticky fail closed on forbidden/incomplete params
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	rtName := f.returnTypeC()
+	// residual ERROR sticky — no invent soft-empty header past returnTypeC residual
+	if HasError() {
+		return ""
+	}
 	if rtName == "" {
 		// incomplete return type IR sticky — no invent void header
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder

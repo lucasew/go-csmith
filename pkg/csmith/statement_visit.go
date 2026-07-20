@@ -437,8 +437,20 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 
 	iv := st.Loop.IV
 	// StatementFor.cpp:440 — assert(iv->type->eType == eSimple) sticky
-	if iv.Type == nil || !iv.Type.IsSimple() {
+	if iv.Type == nil {
 		SetError(ErrGeneric)
+		return false
+	}
+	if !iv.Type.IsSimple() {
+		// residual ERROR sticky — no invent soft-continue for-visit past IsSimple residual
+		if HasError() {
+			return false
+		}
+		SetError(ErrGeneric)
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue for-visit past IsSimple residual true
+	if HasError() {
 		return false
 	}
 	// StatementFor.cpp:441 — assert(iv_bounds.find(iv) == end); hard sticky re-bind

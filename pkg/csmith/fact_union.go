@@ -301,6 +301,14 @@ func IsFieldReadable(v *Variable, fid int, facts []*FactUnion) bool {
 		return false
 	}
 	if !v.Type.IsUnion() || fid < 0 {
+		// residual ERROR sticky — no invent not-readable soft-skip past IsUnion residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue readable past IsUnion residual true
+	if HasError() {
 		return false
 	}
 	if !UnionFactsComplete(facts) {

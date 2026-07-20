@@ -188,3 +188,40 @@ func TestOutputHeaderAlias(t *testing.T) {
 		t.Fatal(f.OutputForwardDeclAlias(false))
 	}
 }
+
+func TestOutputHeaderReturnStructOptionResidualSticky(t *testing.T) {
+	// IsStruct residual soft invent was invent scalar header past ReturnStructs off.
+	ClearError()
+	opts := Defaults()
+	opts.ReturnStructs = false
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	f := &Function{Name: "func_1", ReturnType: st}
+	if s := f.OutputHeaderOpts(false, opts); s != "" {
+		t.Fatal("ReturnStructs off must fail closed OutputHeader", s)
+	}
+	if !HasError() {
+		t.Fatal("ReturnStructs off OutputHeader must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestParamListArgStructOptionResidualSticky(t *testing.T) {
+	// IsStruct residual soft invent was invent param list past ArgStructs off.
+	ClearError()
+	opts := Defaults()
+	opts.ArgStructs = false
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+	}}
+	p := &Variable{Name: "p", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Param: []*Variable{p}}
+	if s := f.paramListCOpts(opts); s != "" {
+		t.Fatal("ArgStructs off must fail closed paramListC", s)
+	}
+	if !HasError() {
+		t.Fatal("ArgStructs off paramListC must SetError sticky")
+	}
+	ClearError()
+}

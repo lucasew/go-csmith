@@ -387,11 +387,18 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		return nil
 	}
 	if item.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-continue expand past IsAggregate residual
+		if HasError() {
+			return nil
+		}
 		item.CreateFieldVars()
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
 		if HasError() {
 			return nil
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue itemize past IsAggregate residual false
+		return nil
 	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)
@@ -829,9 +836,23 @@ func (vs *VariableSelector) GetAllArrayVars() []*Variable {
 			return IncompleteVariables()
 		}
 		if av.IsGlobal() && av.Collective == nil {
-			if !IsVariableInSet(out, &av.Variable) {
-				out = append(out, &av.Variable)
+			// residual ERROR sticky — no invent soft-continue pool past IsGlobal residual
+			if HasError() {
+				return IncompleteVariables()
 			}
+			if !IsVariableInSet(out, &av.Variable) {
+				// residual ERROR sticky — no invent soft-continue pool past IsVariableInSet residual
+				if HasError() {
+					return IncompleteVariables()
+				}
+				out = append(out, &av.Variable)
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip dupe past IsVariableInSet residual true
+				return IncompleteVariables()
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue pool past IsGlobal residual false
+			return IncompleteVariables()
 		}
 	}
 	return out
@@ -951,8 +972,18 @@ func (vs *VariableSelector) MakeInitValue(
 		qferDeref.RemoveQualifiers(1)
 		qferDeref.AcceptStricter = false
 		// use_local: no globals OR (block set, pointee is pointer, non-vol qfer)
+		isPtrLike := pointee.IsPointerLike()
+		// residual ERROR sticky — no invent soft-useLocal past IsPointerLike residual
+		if HasError() {
+			return nil
+		}
+		isVol := qferDeref.IsVolatile()
+		// residual ERROR sticky — no invent soft-useLocal past IsVolatile residual
+		if HasError() {
+			return nil
+		}
 		useLocal := !vs.Opts.GlobalVariables ||
-			(b != nil && pointee.IsPointerLike() && !qferDeref.IsVolatile())
+			(b != nil && isPtrLike && !isVol)
 		// VariableSelector.cpp:882–883 — strict_simple_type=true (no simple re-roll)
 		var tt *Type
 		if useLocal {
@@ -971,7 +1002,21 @@ func (vs *VariableSelector) MakeInitValue(
 				return nil
 			}
 			if chosen.Type != nil {
-				RecordVolatileAccess(chosen, chosen.Type.IndirectLevel()-tt.IndirectLevel(), false)
+				ci := chosen.Type.IndirectLevel()
+				// residual ERROR sticky — no invent soft-count past IndirectLevel residual
+				if HasError() {
+					return nil
+				}
+				ti := tt.IndirectLevel()
+				// residual ERROR sticky — no invent soft-count past want IndirectLevel residual
+				if HasError() {
+					return nil
+				}
+				RecordVolatileAccess(chosen, ci-ti, false)
+				// residual ERROR sticky — no invent soft-continue past RecordVolatileAccess residual
+				if HasError() {
+					return nil
+				}
 			}
 		} else {
 			if vs.Opts.CComp {

@@ -327,3 +327,39 @@ func TestFactUnionOutputGetActualNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestItemizeIsAggregateResidualSticky(t *testing.T) {
+	// IsAggregate residual soft invent was invent itemize shell past CreateFieldVars skip.
+	// Type-nil already sticky before IsAggregate; complete scalar element itemizes without expand.
+	ClearError()
+	// Type-nil itemize path
+	// covered by Itemize Type-nil tests; hygiene for residual after CreateFieldVars on aggregate with nil field
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+			{Name: "f0", Type: nil, BitWidth: -1},
+		}}, IsArray: true, ArraySizes: []int{2}},
+		Sizes: []int{2},
+	}
+	parent.AsArray = parent
+	// Itemize may CreateFieldVars residual on nil field Type
+	item := parent.Itemize(NewRng(1))
+	if item != nil && !HasError() {
+		// if itemize succeeded without expand hole, CreateFieldVars may not run on non-aggregate wait - Type is struct aggregate
+		// CreateFieldVars on nil field Type should sticky
+		t.Fatal("CreateFieldVars residual must SetError sticky when itemize returns")
+	}
+	if item == nil && !HasError() {
+		// Itemize may soft-fail without sticky for other reasons — require sticky on aggregate expand hole
+		// Force CreateFieldVars residual: Type aggregate with nil field after Itemize mounts
+	}
+	ClearError()
+	// Direct CreateFieldVars residual
+	v := &Variable{Name: "g_s", Type: &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}}
+	v.CreateFieldVars()
+	if !HasError() {
+		t.Fatal("CreateFieldVars nil field Type must SetError sticky")
+	}
+	ClearError()
+}
