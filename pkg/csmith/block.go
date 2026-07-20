@@ -1372,8 +1372,8 @@ func (b *Block) outputStmtsOnly(indent int) string {
 				SetError(ErrGeneric)
 				return ""
 			}
-			// DEPTH-- before return when depth_protect
-			if b.EmitDepthProtect {
+			// StatementReturn.cpp:127–129 — DEPTH-- when CGOptions::depth_protect()
+			if ProcessOptions().DepthProtect {
 				content.WriteString("DEPTH--;\n")
 				content.WriteString(inner)
 			}
@@ -1641,8 +1641,9 @@ func (b *Block) Output(indent int) string {
 		// OutputMgr::output_comment_line — skip when quiet/concise (EmitConcise)
 		sb.WriteString(OutputCommentLine("block id: "+Int2Str(b.StmID), false, false))
 	}
-	// Block.cpp:255–257
-	if b.EmitDepthProtect {
+	// Block.cpp:255–257 — CGOptions::depth_protect(), not Block::depth_protect flag.
+	// Function sets body->set_depth_protect(true) always; emit still gates on CGOptions.
+	if ProcessOptions().DepthProtect {
 		sb.WriteString(inner + "DEPTH++;\n")
 	}
 	// Block.cpp:261–262 — OutputTmpVariableList only when CGOptions::math_notmp().
@@ -1786,8 +1787,8 @@ func (b *Block) Output(indent int) string {
 		return ""
 	}
 	sb.WriteString(stmtsOut)
-	// Block.cpp:266–267
-	if b.EmitDepthProtect {
+	// Block.cpp:266–267 — CGOptions::depth_protect() (not body depth_protect flag)
+	if ProcessOptions().DepthProtect {
 		sb.WriteString(inner + "DEPTH--;\n")
 	}
 	sb.WriteString(pad + "}\n")

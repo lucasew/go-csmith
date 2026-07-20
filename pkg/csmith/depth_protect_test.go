@@ -149,3 +149,25 @@ func TestKnownDepthTypeUnknownResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestDefaultDepthProtectNoInventDEPTH(t *testing.T) {
+	// Block.cpp:255–267 — DEPTH++/-- only when CGOptions::depth_protect()
+	// Function.cpp:648 sets body->set_depth_protect(true) always; must not invent DEPTH emit.
+	ClearError()
+	opts := Defaults()
+	if opts.DepthProtect {
+		t.Fatal("default depth_protect must be false")
+	}
+	SetProcessOptions(opts)
+	defer SetProcessOptions(Defaults())
+	out, err := Generate(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "DEPTH++") || strings.Contains(out, "DEPTH--") {
+		t.Fatal("default options must not invent DEPTH++/--")
+	}
+	if strings.Contains(out, "MAX_DEPTH") {
+		t.Fatal("default must not invent MAX_DEPTH macro")
+	}
+}

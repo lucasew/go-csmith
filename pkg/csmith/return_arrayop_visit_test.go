@@ -6,11 +6,17 @@ import (
 )
 
 func TestReturnOutputDepthProtect(t *testing.T) {
+	// StatementReturn.cpp:127–129 / Block.cpp:255 — emit gates on CGOptions::depth_protect
+	opts := Defaults()
+	opts.DepthProtect = true
+	SetProcessOptions(opts)
+	defer SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	st := Stmt{
 		Kind: StmtReturn,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
 	}
+	// Body flag may be set by set_depth_protect(true); emit still requires CGOptions.
 	b := &Block{Func: f, Stmts: []Stmt{st}, EmitDepthProtect: true}
 	out := b.Output(0)
 	// DEPTH-- must appear before return
@@ -18,6 +24,12 @@ func TestReturnOutputDepthProtect(t *testing.T) {
 	iRet := strings.Index(out, "return")
 	if iDepth < 0 || iRet < 0 || iDepth > iRet {
 		t.Fatal(out)
+	}
+	// default options must not invent DEPTH++/--
+	SetProcessOptions(Defaults())
+	out2 := b.Output(0)
+	if strings.Contains(out2, "DEPTH") {
+		t.Fatal("depth_protect off must not invent DEPTH:", out2)
 	}
 }
 
