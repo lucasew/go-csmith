@@ -1756,8 +1756,19 @@ func (v *Variable) FindPointerFields() []*Variable {
 			continue
 		}
 		if f.IsPointer() {
+			// residual ERROR sticky — no invent soft-include pointer past IsPointer hole
+			if HasError() {
+				return IncompleteVariables()
+			}
 			out = append(out, f)
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue aggregate past IsPointer residual false
+			return IncompleteVariables()
 		} else if f.IsAggregate() {
+			// residual ERROR sticky — no invent soft-continue nest past IsAggregate residual true
+			if HasError() {
+				return IncompleteVariables()
+			}
 			nested := f.FindPointerFields()
 			// incomplete nested FieldVars (empty complete is non-nil [])
 			if !VariablesComplete(nested) {
@@ -1768,6 +1779,9 @@ func (v *Variable) FindPointerFields() []*Variable {
 				return IncompleteVariables()
 			}
 			out = append(out, nested...)
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-skip field past IsAggregate residual false
+			return IncompleteVariables()
 		}
 	}
 	return out

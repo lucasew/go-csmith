@@ -188,6 +188,16 @@ func TestHasDereferenceableVar(t *testing.T) {
 		t.Fatal("IsArray without AsArray HasDereferenceableVar must SetError sticky")
 	}
 	ClearError()
+	// IsValidPtr residual soft invent was soft-continue later good invent true.
+	// Fair: sticky false. incomplete facts on first candidate stickies residual.
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt), nil}
+	if HasDereferenceableVar([]*Variable{p}, GetIntType(), cg, opts) {
+		t.Fatal("IsValidPtr residual (incomplete facts) must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsValidPtr residual HasDereferenceableVar must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestIsPartialVolatileAfterDeref(t *testing.T) {

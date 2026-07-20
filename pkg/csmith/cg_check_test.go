@@ -188,6 +188,34 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 		t.Fatal("nil lhs.Var VisitFactsLhs must SetError sticky")
 	}
 	ClearError()
+	// IsValidPtr residual soft invent was soft-continue visit invent success.
+	// Fair: sticky false. deref>0 + incomplete facts.
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	lhsPtr := &Lhs{Var: p, Type: GetIntType()} // *p
+	cgPtr := EmptyCGContext()
+	cgPtr.EffectStm = EmptyEffect()
+	cgPtr.FM = NewFactMgr(nil)
+	cgPtr.FM.GlobalFacts = []*FactPointTo{nil} // incomplete
+	if cgPtr.VisitFactsLhs(lhsPtr, Defaults()) {
+		t.Fatal("IsValidPtr residual VisitFactsLhs must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsValidPtr residual VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
+	// PtrModified residual soft invent was soft-continue visit invent success.
+	// Fair: sticky false via incomplete EffectStm IsWritten residual true (modified).
+	cgMod := EmptyCGContext()
+	cgMod.EffectStm = IncompleteEffect()
+	cgMod.FM = NewFactMgr(nil)
+	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_t", GetIntType(), false, false))}
+	if cgMod.VisitFactsLhs(lhsPtr, Defaults()) {
+		t.Fatal("PtrModified residual VisitFactsLhs must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("PtrModified residual VisitFactsLhs must SetError sticky")
+	}
+	ClearError()
 	// incomplete EffectStm/accum sticky via CheckWriteVar
 	v := CreateVariableScalars("g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}

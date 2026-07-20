@@ -1207,11 +1207,24 @@ func HasDereferenceableVar(vars []*Variable, typ *Type, cg CGContext, opts Optio
 			SetError(ErrGeneric)
 			return false
 		}
-		if typ.IsDereferencedFrom(v.Type) && IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
-			return true
-		}
-		// IsValidPtr residual ERROR sticky — no invent soft-continue then true later
-		if HasError() {
+		if typ.IsDereferencedFrom(v.Type) {
+			// residual ERROR sticky — no invent soft-continue then true later past IsDereferencedFrom hole
+			if HasError() {
+				return false
+			}
+			if IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+				// residual ERROR sticky — no invent eligible-true past IsValidPtr hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later vars past IsValidPtr residual false
+			if HasError() {
+				return false
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue later vars past IsDereferencedFrom residual false
 			return false
 		}
 	}

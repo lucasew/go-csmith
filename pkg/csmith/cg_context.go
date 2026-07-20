@@ -1277,15 +1277,36 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
 			// invalid ptr policy / incomplete maps (IsValidPtr may sticky)
+			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
+			if HasError() {
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual true path
+		if HasError() {
 			return false
 		}
 		if !c.CheckReadVar(v, facts) {
 			return false
 		}
+		// residual ERROR sticky — no invent soft-continue visit past CheckReadVar residual
+		if HasError() {
+			return false
+		}
 		if !c.ReadPointed(v, deref, facts, opts) {
 			return false
 		}
-		return c.CheckDerefVolatile(v, deref, opts)
+		// residual ERROR sticky — no invent soft-continue visit past ReadPointed residual
+		if HasError() {
+			return false
+		}
+		volOK := c.CheckDerefVolatile(v, deref, opts)
+		// residual ERROR sticky — no invent visit success past CheckDerefVolatile residual
+		if HasError() {
+			return false
+		}
+		return volOK
 	}
 	if deref < 0 {
 		// address-of: forbid bitfields — policy non-sticky
@@ -1294,7 +1315,12 @@ func (c *CGContext) VisitFactsExpressionVariable(e *Expression, opts Options) bo
 		}
 		return true
 	}
-	return c.CheckReadVar(v, facts)
+	readOK := c.CheckReadVar(v, facts)
+	// residual ERROR sticky — no invent visit success past CheckReadVar residual
+	if HasError() {
+		return false
+	}
+	return readOK
 }
 
 // AllowVolatile mirrors CGContext::allow_volatile.
@@ -1757,25 +1783,57 @@ func (c *CGContext) VisitFactsLhs(lhs *Lhs, opts Options) bool {
 	valid := false
 	if deref > 0 {
 		if !IsValidPtr(v, facts, opts.NullPointerDerefProb, opts.DeadPointerDerefProb) {
+			// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual
+			if HasError() {
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past IsValidPtr residual true path
+		if HasError() {
 			return false
 		}
 		// Lhs.cpp:337–339 — pointer modified in RHS
 		if c.PtrModifiedInRhs(lhs, facts) {
+			// residual ERROR sticky — no invent soft-continue visit past PtrModified residual true
+			if HasError() {
+				return false
+			}
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past PtrModified residual false
+		if HasError() {
 			return false
 		}
 		// read the pointer itself then write pointees
 		if !c.CheckReadVar(v, facts) {
 			return false
 		}
+		// residual ERROR sticky — no invent soft-continue visit past CheckReadVar residual
+		if HasError() {
+			return false
+		}
 		if !c.WritePointed(lhs, facts, opts) {
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past WritePointed residual
+		if HasError() {
 			return false
 		}
 		if !c.CheckDerefVolatile(v, deref, opts) {
 			return false
 		}
+		// residual ERROR sticky — no invent soft-continue visit past CheckDerefVolatile residual
+		if HasError() {
+			return false
+		}
 		valid = true
 	} else {
 		valid = c.CheckWriteVar(v, facts)
+		// residual ERROR sticky — no invent soft-continue visit past CheckWriteVar residual
+		if HasError() {
+			return false
+		}
 	}
 	// Lhs.cpp:348–351 — set_lhs_write_vars from write_vars on accum
 	// Incomplete SetLhsWriteVars / stm sticky (no invent visit true after poison)

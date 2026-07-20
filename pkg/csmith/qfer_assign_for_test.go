@@ -149,6 +149,28 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 		t.Fatal("Type-nil field FindPointerFields must SetError sticky")
 	}
 	ClearError()
+	// nested FindPointerFields residual soft invent was soft-continue later fields invent complete.
+	// Fair: sticky IncompleteVariables via nested Type-nil.
+	nestHole := &Variable{
+		Name: "nest", Type: &Type{isStruct: true},
+		FieldVars: []*Variable{{Name: "nest.x"}}, // Type nil
+	}
+	outer := &Variable{
+		Name: "outer", Type: &Type{isStruct: true},
+		FieldVars: []*Variable{
+			nestHole,
+			{Name: "outer.p", Type: PointerTo(GetIntType())},
+		},
+	}
+	// nestHole Type is aggregate - IsAggregate true, recurse FindPointerFields hits Type-nil field
+	gotNest := outer.FindPointerFields()
+	if VariablesComplete(gotNest) {
+		t.Fatal("nested residual FindPointerFields must fail closed incomplete", gotNest)
+	}
+	if !HasError() {
+		t.Fatal("nested residual FindPointerFields must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestFindPointerFields(t *testing.T) {
