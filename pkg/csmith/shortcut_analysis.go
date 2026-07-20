@@ -24,7 +24,12 @@ func SameFacts(a, b []*FactPointTo) bool {
 		return false
 	}
 	for _, f := range a {
-		if FindFact(b, f) < 0 {
+		idx := FindFact(b, f)
+		// residual ERROR sticky — no invent soft-continue same past FindFact residual hole
+		if HasError() {
+			return false
+		}
+		if idx < 0 {
 			return false
 		}
 	}
@@ -49,7 +54,15 @@ func FindFact(facts []*FactPointTo, want *FactPointTo) int {
 	}
 	for i, f := range facts {
 		if f.Equal(want) {
+			// residual ERROR sticky — no invent match-index true past Equal hole
+			if HasError() {
+				return -1
+			}
 			return i
+		}
+		// residual ERROR sticky — no invent soft-continue later match past Equal residual false
+		if HasError() {
+			return -1
 		}
 	}
 	return -1

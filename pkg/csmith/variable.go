@@ -893,6 +893,14 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 				break
 			}
 			if parent.Type.IsBitfieldIndex(i) {
+				// residual ERROR sticky — no invent packed-true past IsBitfieldIndex hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later siblings past IsBitfield residual
+			if HasError() {
 				return true
 			}
 			// incomplete sibling Type sticky packed-after (restrictive)
@@ -901,11 +909,24 @@ func (v *Variable) IsPackedAfterBitfield() bool {
 				return true
 			}
 			if f.Type.HasBitfields() {
+				// residual ERROR sticky — no invent packed-true past HasBitfields hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later siblings past HasBitfields residual
+			if HasError() {
 				return true
 			}
 		}
 	}
-	return parent.IsPackedAfterBitfield()
+	ok := parent.IsPackedAfterBitfield()
+	// residual ERROR sticky — no invent not-packed soft-skip past nested IsPackedAfterBitfield hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // IsArrayField mirrors Variable::is_array_field.
@@ -933,7 +954,12 @@ func (v *Variable) IsArrayField() bool {
 	if p.AsArray != nil {
 		return true
 	}
-	return p.IsArrayField()
+	ok := p.IsArrayField()
+	// residual ERROR sticky — no invent not-array-field soft-skip past nested IsArrayField hole
+	if HasError() {
+		return true
+	}
+	return ok
 }
 
 // GetDimension mirrors Variable::get_dimension (default 0) / ArrayVariable override.

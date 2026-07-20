@@ -263,25 +263,44 @@ func OpportunisticValidate(r *Rng, v *Variable, typ *Type, facts []*FactPointTo,
 		return 1
 	}
 	fp := FindRelatedPointTo(facts, v)
+	// residual ERROR sticky — no invent soft-continue validate past FindRelated hole
+	if HasError() {
+		return 0
+	}
 	if fp == nil {
 		return 0
 	}
 	ret := 0
 	if fp.IsNull() {
+		// residual ERROR sticky — no invent ok past IsNull residual hole
+		if HasError() {
+			return 0
+		}
 		if nullProb > 0 && r != nil && r.RndFlipcoin(uint32(nullProb)) {
 			ret = 2
 		} else {
 			return 0
 		}
 	} else {
+		// residual ERROR sticky — no invent soft-continue not-null past IsNull residual false
+		if HasError() {
+			return 0
+		}
 		ret = 1
 	}
 	if fp.IsDead() {
+		// residual ERROR sticky — no invent ok past IsDead residual hole
+		if HasError() {
+			return 0
+		}
 		if deadProb > 0 && r != nil && r.RndFlipcoin(uint32(deadProb)) {
 			ret = 2
 		} else {
 			return 0
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent not-dead soft-skip past IsDead residual false
+		return 0
 	}
 	return ret
 }

@@ -1285,8 +1285,16 @@ func AbstractFactForVarInit(v *Variable) (pt []*FactPointTo, un []*FactUnion) {
 		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	if !v.IsPointer() && !v.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-skip empty-init past IsPointer residual false
+		if HasError() {
+			return IncompleteFactSlice(), IncompleteUnionFactSlice()
+		}
 		// complete empty — not a point-to/union subject
 		return nil, nil
+	}
+	// residual ERROR sticky — no invent soft-continue pointer/union path past IsPointer residual true
+	if HasError() {
+		return IncompleteFactSlice(), IncompleteUnionFactSlice()
 	}
 	var rhs *Expression
 	if v.InitExpr != nil {
@@ -1382,6 +1390,11 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 	}
 	// recurse into aggregate fields (pointer members)
 	if !v.IsPointer() && !v.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-continue field recurse past IsPointer residual false
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		for _, f := range v.FieldVars {
 			if f == nil {
 				// incomplete FieldVars — clear partial aggregate makeup sticky
@@ -1400,6 +1413,11 @@ func (fm *FactMgr) AddNewVarFact(v *Variable) {
 				return
 			}
 		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue pointer/union makeup past IsPointer residual true
+	if HasError() {
+		fm.GlobalFacts = IncompleteFactSlice()
 		return
 	}
 	// FactMgr.cpp:77–79 — only meta_facts that were registered
@@ -1961,9 +1979,29 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 		return
 	}
 	if !v.IsPointer() {
+		// residual ERROR sticky — no invent soft-skip makeup past IsPointer residual false
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return
+		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue makeup past IsPointer residual true
+	if HasError() {
+		*facts = IncompleteFactSlice()
 		return
 	}
 	if FindRelatedPointTo(*facts, v) != nil {
+		// residual ERROR sticky — no invent soft-skip found past FindRelated residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return
+		}
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue not-found past FindRelated residual false
+	if HasError() {
+		*facts = IncompleteFactSlice()
 		return
 	}
 	pt, _ := AbstractFactForVarInit(v)

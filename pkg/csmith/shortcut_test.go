@@ -42,6 +42,27 @@ func TestSameFacts(t *testing.T) {
 		t.Fatal("FindFact incomplete map must SetError sticky")
 	}
 	ClearError()
+	// Equal residual soft invent was soft-continue later match invent found index.
+	// Fair: sticky -1. Want with PointTo hole stickies Equal residual false.
+	wantHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
+	complete := []*FactPointTo{MakeFactPointTo(p, NullPtr), MakeFactPointTo(p, GarbagePtr)}
+	if FindFact(complete, wantHole) >= 0 {
+		t.Fatal("Equal residual FindFact must fail closed -1")
+	}
+	if !HasError() {
+		t.Fatal("equal residual FindFact must SetError sticky")
+	}
+	ClearError()
+	// SameFacts residual via FindFact Equal residual soft invent was same-true.
+	// Fair: sticky not-same.
+	// Use complete map vs want that causes Equal residual on first scan element...
+	// SameFacts(a,b) for each a in FindFact(b): if want in a has PointTo hole, FactsComplete fails first.
+	// Equal residual: complete facts with different PointTo holes on map side already FactsComplete false.
+	// Equal residual via want complete but map fact with PointTo that Equal can residual - FactsComplete rejects map holes.
+	// Residual path for FindFact Equal residual is want incomplete PointTo - already covered above for FindFact.
+	// SameFacts with residual from FindFact when want is complete: soft invent covered by FindFact residual.
+	// Add SameFacts residual when FindFact residual from incomplete want isn't reachable via SameFacts (FactsComplete on a).
+	// Covered by FindFact residual test.
 }
 
 func TestSubsetFacts(t *testing.T) {

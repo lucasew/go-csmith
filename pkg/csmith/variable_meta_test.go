@@ -106,6 +106,38 @@ func TestIsPackedAfterBitfield(t *testing.T) {
 		t.Fatal("Type-nil parent IsPackedAfterBitfield must SetError sticky")
 	}
 	ClearError()
+	// sibling Type-nil residual soft invent was soft-continue later siblings invent not-packed.
+	// Fair: sticky packed-after true. Use non-bitfield field layout so walk hits Type-nil.
+	stNoBF := &Type{
+		isStruct: true,
+		Packed:   true,
+		Fields: []StructField{
+			{Name: "fx", Type: GetIntType(), BitWidth: -1},
+			{Name: "f1", Type: GetIntType(), BitWidth: -1},
+		},
+	}
+	parent.Type = stNoBF
+	sibHole := &Variable{Name: "g_s.fx", Type: nil, FieldVarOf: parent}
+	parent.FieldVars = []*Variable{sibHole, f1}
+	if !f1.IsPackedAfterBitfield() {
+		t.Fatal("sibling Type-nil residual IsPackedAfterBitfield must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("sibling Type-nil residual IsPackedAfterBitfield must SetError sticky")
+	}
+	ClearError()
+	// nested HasBitfields residual on sibling: soft invent was soft-continue invent not-packed.
+	// Fair: sticky packed-after true.
+	innerHole := &Type{isStruct: true, Fields: []StructField{{Type: nil, BitWidth: -1}}}
+	sibNest := &Variable{Name: "g_s.fn", Type: innerHole, FieldVarOf: parent}
+	parent.FieldVars = []*Variable{sibNest, f1}
+	if !f1.IsPackedAfterBitfield() {
+		t.Fatal("HasBitfields residual IsPackedAfterBitfield must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("HasBitfields residual IsPackedAfterBitfield must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetSeqNum(t *testing.T) {
@@ -217,6 +249,17 @@ func TestIsArrayField(t *testing.T) {
 	}
 	if !HasError() {
 		t.Fatal("IsArray without AsArray parent IsArrayField must SetError sticky")
+	}
+	ClearError()
+	// nested IsArrayField residual soft invent was not-array-field soft-skip.
+	// Fair: sticky true restrictive via nested IsArray without AsArray.
+	mid := &Variable{Name: "g_m.f0", Type: GetIntType(), FieldVarOf: shell}
+	deep := &Variable{Name: "g_m.f0.x", Type: GetIntType(), FieldVarOf: mid}
+	if !deep.IsArrayField() {
+		t.Fatal("nested IsArray residual IsArrayField must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested IsArray residual IsArrayField must SetError sticky")
 	}
 	ClearError()
 }

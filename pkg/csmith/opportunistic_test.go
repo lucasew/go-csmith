@@ -56,6 +56,10 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), facts, 0, 0) != 0 {
 		t.Fatal("dead blocked")
 	}
+	if HasError() {
+		t.Fatal("complete dead blocked must not sticky")
+	}
+	ClearError()
 }
 
 func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
