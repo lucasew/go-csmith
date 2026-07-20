@@ -1278,6 +1278,10 @@ func MakeBinary(
 		return nil
 	}
 	lt, rt := lhs.GetType(), rhs.GetType()
+	// residual ERROR sticky — no invent binary shell past GetType residual hole
+	if HasError() {
+		return nil
+	}
 	// FunctionInvocation.cpp:566–568 — rv_type nullptr; op1/op2 from operands
 	flags := MakeRandomBinaryKind(r, opts, probs, nil, lt, rt, SafeOpBinary, op)
 	// FunctionInvocation.cpp:568 — ERROR_GUARD; no soft invent binary without flags

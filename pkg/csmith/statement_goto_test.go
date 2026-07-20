@@ -241,6 +241,21 @@ func TestMakeBinaryIncompleteAmbientSticky(t *testing.T) {
 	ClearError()
 }
 
+func TestMakeBinaryGetTypeResidualSticky(t *testing.T) {
+	// GetType residual soft invent was MakeRandomBinaryKind with nil types then invent binary shell.
+	ClearError()
+	opts := Defaults()
+	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
+	if fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext(), BinAdd, hole, rhs); fi != nil {
+		t.Fatal("GetType residual must fail closed MakeBinary, not invent shell", fi)
+	}
+	if !HasError() {
+		t.Fatal("GetType residual MakeBinary must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	// FunctionInvocation.cpp:565+ — always has RNG + operands sticky; no invent Binary shell
 	ClearError()

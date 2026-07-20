@@ -72,7 +72,14 @@ func MakeExpressionAssign(
 	exprType := typ
 	if st.Lhs != nil {
 		if t := st.Lhs.GetType(); t != nil {
+			// residual ERROR sticky — no invent ExpressionAssign shell past GetType residual
+			if HasError() {
+				return nil
+			}
 			exprType = t
+		} else if HasError() {
+			// residual ERROR sticky — no invent ExpressionAssign shell past GetType residual nil
+			return nil
 		}
 	} else if st.LhsVar != nil && st.LhsVar.Type != nil {
 		exprType = st.LhsVar.Type

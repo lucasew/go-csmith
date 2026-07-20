@@ -285,7 +285,14 @@ func MakeRandomAssignQfer(
 	lhsType := typ
 	if opts.StrictFloat && rhs != nil {
 		if rt := rhs.GetType(); rt != nil {
+			// residual ERROR sticky — no invent Lhs type soft-fallback past GetType residual
+			if HasError() {
+				return Stmt{}
+			}
 			lhsType = rt
+		} else if HasError() {
+			// residual ERROR sticky — no invent Lhs past GetType residual nil
+			return Stmt{}
 		}
 	}
 	compound := op != AssignSimple
@@ -320,9 +327,23 @@ func MakeRandomAssignQfer(
 	}
 	if rhs != nil {
 		if rt := rhs.GetType(); rt != nil {
-			if bt := rt.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
-				op = AssignSimple
+			// residual ERROR sticky — no invent float-op soft-continue past GetType residual
+			if HasError() {
+				return Stmt{}
 			}
+			if bt := rt.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+				// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
+				if HasError() {
+					return Stmt{}
+				}
+				op = AssignSimple
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue op past BaseType residual false
+				return Stmt{}
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue op past GetType residual nil
+			return Stmt{}
 		}
 	}
 
@@ -418,7 +439,14 @@ func makePossibleCompoundAssign(
 	lt := typ
 	if lhs != nil {
 		if t := lhs.GetType(); t != nil {
+			// residual ERROR sticky — no invent compound binary past GetType residual
+			if HasError() {
+				return Stmt{}
+			}
 			lt = t
+		} else if HasError() {
+			// residual ERROR sticky — no invent compound binary past GetType residual nil
+			return Stmt{}
 		}
 	}
 	var flags *SafeOpFlags

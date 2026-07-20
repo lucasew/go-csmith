@@ -47,6 +47,10 @@ func MakeExpressionComma(
 	// ExpressionComma.cpp:62–64 — cast_if_needed when lang_cpp (optional for C null ptrs)
 	if opts.LangCPP {
 		castIfNeeded(rhs)
+		// residual ERROR sticky — no invent complete comma past cast/GetType residual hole
+		if HasError() {
+			return nil
+		}
 	}
 	return &Expression{
 		Term:     TermCommaExpr,
@@ -69,7 +73,20 @@ func castIfNeeded(exp *Expression) {
 		return
 	}
 	ty := exp.GetType()
+	// residual ERROR sticky — no invent soft-skip cast past GetType residual hole
+	if HasError() {
+		return
+	}
 	if ty != nil && ty.IsPointerLike() && exp.EqualsInt(0) {
+		// residual ERROR sticky — no invent cast-true past EqualsInt residual hole
+		if HasError() {
+			return
+		}
 		exp.CastType = ty
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue cast no-op past EqualsInt residual false
+	if HasError() {
+		return
 	}
 }

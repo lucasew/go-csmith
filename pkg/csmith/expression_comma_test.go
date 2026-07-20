@@ -164,3 +164,29 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCastIfNeededGetTypeResidualSticky(t *testing.T) {
+	// GetType residual soft invent was soft-skip cast then invent CastType / complete no-op.
+	ClearError()
+	// Type-nil Con → GetType residual; no invent cast
+	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
+	castIfNeeded(hole)
+	if hole.CastType != nil {
+		t.Fatal("GetType residual must not invent CastType", hole.CastType)
+	}
+	if !HasError() {
+		t.Fatal("GetType residual castIfNeeded must SetError sticky")
+	}
+	ClearError()
+	// empty Value → EqualsInt residual after live pointer type; no invent cast
+	pt := PointerTo(GetIntType())
+	eqHole := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: ""}}
+	castIfNeeded(eqHole)
+	if eqHole.CastType != nil {
+		t.Fatal("EqualsInt residual must not invent CastType", eqHole.CastType)
+	}
+	if !HasError() {
+		t.Fatal("EqualsInt residual castIfNeeded must SetError sticky")
+	}
+	ClearError()
+}

@@ -250,6 +250,17 @@ func TestRecordPointerComparisons(t *testing.T) {
 		t.Fatal("incomplete IndirectLevel RecordPointerComparisons must SetError sticky")
 	}
 	ClearError()
+	// GetType residual soft invent was soft-skip non-pointer then invent complete stats no-op.
+	BookkeeperDoFinalization()
+	typeHole := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
+	RecordPointerComparisons(typeHole, good)
+	if cmpPtrToNull != 0 || cmpPtrToPtr != 0 || cmpPtrToAddr != 0 {
+		t.Fatal("GetType residual must not invent compare counts", cmpPtrToNull, cmpPtrToPtr, cmpPtrToAddr)
+	}
+	if !HasError() {
+		t.Fatal("GetType residual RecordPointerComparisons must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestStatBlkDepthsUsesGetBlkDepth(t *testing.T) {

@@ -313,6 +313,28 @@ func TestMakePossibleCompoundAssignTmps(t *testing.T) {
 	}
 }
 
+func TestMakePossibleCompoundAssignGetTypeResidualSticky(t *testing.T) {
+	// GetType residual soft invent was soft-continue compound binary past Lhs hole.
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	// Lhs Type-nil + Var Type-nil → GetType residual
+	lhs := &Lhs{Var: &Variable{Name: "g_hole"}}
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
+	st := makePossibleCompoundAssign(cg, opts, probs, NewRng(3), GetIntType(), lhs, AssignAdd, rhs, nil)
+	if st.Kind != 0 || st.SafeFlags != nil || st.Rhs != nil {
+		t.Fatal("GetType residual must fail closed compound, not invent shell", st)
+	}
+	if !HasError() {
+		t.Fatal("GetType residual makePossibleCompoundAssign must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakePossibleCompoundAssignNoSafeMathStillCanonizes(t *testing.T) {
 	// make_possible_compound_assign is not gated on avoid_signed_overflow
 	opts := Defaults()

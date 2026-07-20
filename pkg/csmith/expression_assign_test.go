@@ -75,6 +75,20 @@ func TestPickTermAssignmentDepthOk(t *testing.T) {
 	}
 }
 
+func TestLhsGetTypeResidualNoInventExprType(t *testing.T) {
+	// GetType residual soft invent was soft-fallback exprType=typ then invent ExpressionAssign shell.
+	// Probe Lhs.GetType residual itself (wrap path guards HasError after same residual).
+	ClearError()
+	hole := &Lhs{Var: &Variable{Name: "g_hole"}}
+	if hole.GetType() != nil {
+		t.Fatal("Type-nil Lhs GetType must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Lhs GetType must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestMakeExpressionAssignIncompleteAmbientFailClosed(t *testing.T) {
 	ClearError()
 	opts := Defaults()
