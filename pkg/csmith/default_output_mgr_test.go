@@ -1,0 +1,186 @@
+package csmith
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestCreateDefaultOutputMgrSplit(t *testing.T) {
+	ClearError()
+	ClearOutputMgr()
+	o := Defaults()
+	o.MaxSplitFiles = 3
+	o.SplitFilesDir = "/tmp/csmith-split-unit"
+	if !CreateDefaultOutputMgr(o) || HasError() {
+		t.Fatal("create", HasError())
+	}
+	paths := ProcessSplitPaths()
+	if len(paths) != 3 {
+		t.Fatal(paths)
+	}
+	if !strings.HasSuffix(paths[1], "rnd_output1.c") {
+		t.Fatal(paths[1])
+	}
+	if GetMainOutPath(o) != paths[0] {
+		t.Fatal(GetMainOutPath(o))
+	}
+	ClearOutputMgr()
+}
+
+func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
+	ClearError()
+	ClearOutputMgr()
+	o := Defaults()
+	o.MaxSplitFiles = 2
+	o.SplitFilesDir = ""
+	if CreateDefaultOutputMgr(o) || !HasError() {
+		t.Fatal("empty dir sticky")
+	}
+	ClearError()
+	ClearOutputMgr()
+}
+
+func TestRandomOutputVarDefsAssign(t *testing.T) {
+	// DefaultOutputMgr.cpp:144–151 pure_rnd_upto per global
+	ClearError()
+	prevR := ProcessRng()
+	prevO := ProcessOptions()
+	defer func() {
+		RandomNumberDoFinalization()
+		SetProcessOptions(prevO)
+		SetProcessRng(prevR)
+		ClearError()
+	}()
+	CreateRandomNumberInstance(RngKindDefault, 2)
+	o := Defaults()
+	SetProcessOptions(o)
+	v1 := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v2 := CreateVariableScalars("g_2", GetIntType(), true, false)
+	out := RandomOutputVarDefs([]*Variable{v1, v2}, 2, true)
+	if out == nil || HasError() {
+		t.Fatal("var defs", HasError())
+	}
+	if len(out) != 2 {
+		t.Fatal(len(out))
+	}
+	// both defs placed somewhere
+	joined := out[0] + out[1]
+	if !strings.Contains(joined, "g_1") || !strings.Contains(joined, "g_2") {
+		t.Fatal(joined)
+	}
+}
+
+func TestRandomOutputDefsEmptyFilesSticky(t *testing.T) {
+	ClearError()
+	if RandomOutputVarDefs(nil, 0, true) != nil || !HasError() {
+		t.Fatal("nFiles 0 sticky")
+	}
+	ClearError()
+}
+
+func TestSplitAllHeadersContent(t *testing.T) {
+	ClearError()
+	h := SplitAllHeadersContent(3, true, "void foo(void);\n")
+	if len(h) != 3 {
+		t.Fatal(len(h))
+	}
+	if !strings.Contains(h[1], "assert.h") {
+		t.Fatal(h[1])
+	}
+	if !strings.Contains(h[0], "rnd_globals.h") {
+		t.Fatal(h[0])
+	}
+	for i := 0; i < 3; i++ {
+		if !strings.Contains(h[i], "void foo(void);") {
+			t.Fatal(i, h[i])
+		}
+	}
+}
+
+func TestCreateDFSOutputMgr(t *testing.T) {
+	ClearError()
+	ClearOutputMgr()
+	o := Defaults()
+	CreateDFSOutputMgr(o)
+	if ProcessOutputMgrKind() != OutputMgrKindDFS {
+		t.Fatal(ProcessOutputMgrKind())
+	}
+	if ProcessStructOutput() != DefaultStructOutputName {
+		t.Fatal(ProcessStructOutput())
+	}
+	o.StructOutput = "my_structs.h"
+	CreateDFSOutputMgr(o)
+	if ProcessStructOutput() != "my_structs.h" {
+		t.Fatal(ProcessStructOutput())
+	}
+	if DFSOutputHeader("HDR\n", true) != "" {
+		t.Fatal("compact skip")
+	}
+	if DFSOutputHeader("HDR\n", false) != "HDR\n" {
+		t.Fatal("non-compact")
+	}
+	ClearOutputMgr()
+}
+
+func TestGetCountPrefix(t *testing.T) {
+	ClearError()
+	g := &ProgramGenerator{OutputKind: OutputMgrKindDefault, GoodCount: 3}
+	if g.GetCountPrefix("x") != "" || !HasError() {
+		t.Fatal("default assert sticky")
+	}
+	ClearError()
+	g.OutputKind = OutputMgrKindDFS
+	if g.GetCountPrefix("foo") != "p_3_foo" {
+		t.Fatal(g.GetCountPrefix("foo"))
+	}
+	if g.GetCountPrefix("") != "" || !HasError() {
+		t.Fatal("empty name sticky")
+	}
+	ClearError()
+}
+
+func TestProcessProgramGenerator(t *testing.T) {
+	ClearError()
+	ClearProcessProgramGenerator()
+	if ProcessProgramGenerator() != nil || !HasError() {
+		t.Fatal("nil sticky")
+	}
+	ClearError()
+	o := Defaults()
+	g := NewProgramGenerator(o)
+	if ProcessProgramGenerator() != g {
+		t.Fatal("current generator")
+	}
+	if g.GetOutputMgrKind() != OutputMgrKindDefault {
+		t.Fatal(g.GetOutputMgrKind())
+	}
+	DoFinalization()
+	if ProcessProgramGenerator() != nil {
+		// finalization clears; may sticky on Get
+		ClearError()
+	}
+}
+
+func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
+	ClearError()
+	prevO := ProcessOptions()
+	defer func() {
+		DoFinalization()
+		SetProcessOptions(prevO)
+		ClearError()
+	}()
+	o := Defaults()
+	o.DFSExhaustive = true
+	o.RandomBased = false
+	o.MaxExhaustiveDepth = 6
+	g := NewProgramGenerator(o)
+	if g.OutputKind != OutputMgrKindDFS {
+		t.Fatal(g.OutputKind)
+	}
+	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+		t.Fatal("DFS rng", g.Rng)
+	}
+	if ProcessOutputMgrKind() != OutputMgrKindDFS {
+		t.Fatal(ProcessOutputMgrKind())
+	}
+}

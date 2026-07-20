@@ -20,16 +20,16 @@ Total items: 2070
 - [ ] AbsExtension.cpp::AbsExtension.OutputInit
 - [ ] AbsExtension.cpp::AbsExtension.OutputTail
 - [ ] AbsExtension.cpp::AbsExtension.~AbsExtension
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.AbsProgramGenerator
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.CreateInstance
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.get_count_prefix
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.GetInstance
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.getmgr
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.getOutputMgr
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.GetOutputMgr
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.goGenerator
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.initialize
-- [ ] AbsProgramGenerator.cpp::AbsProgramGenerator.~AbsProgramGenerator
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.AbsProgramGenerator
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.CreateInstance
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.get_count_prefix
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.GetInstance
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.getmgr
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.getOutputMgr
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.GetOutputMgr
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.goGenerator
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.initialize
+- [x] AbsProgramGenerator.cpp::AbsProgramGenerator.~AbsProgramGenerator
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.AbsRndNumGenerator
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.count
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.genrand
@@ -441,29 +441,29 @@ Total items: 2070
 - [x] CVQualifiers.cpp::CVQualifiers.~CVQualifiers
 - [x] CVQualifiers.cpp::is_volatile_ok_on_one_level
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.create_output_dir
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.CreateInstance
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.DefaultOutputMgr
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.get_main_out
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.init
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.CreateInstance
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.DefaultOutputMgr
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.get_main_out
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.init
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.is_split
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.open_one_output_file
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.Output
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.Output
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.output_comment_line
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.output_tab
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputAllHeaders
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputGlobals
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.OutputHeader
 - [x] DefaultOutputMgr.cpp::DefaultOutputMgr.outputln
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputDefs
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputFuncDefs
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputVarDefs
-- [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.~DefaultOutputMgr
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.DefaultProgramGenerator
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.get_count_prefix
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.getOutputMgr
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.goGenerator
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.initialize
-- [ ] DefaultProgramGenerator.cpp::DefaultProgramGenerator.~DefaultProgramGenerator
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputDefs
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputFuncDefs
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.RandomOutputVarDefs
+- [x] DefaultOutputMgr.cpp::DefaultOutputMgr.~DefaultOutputMgr
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.DefaultProgramGenerator
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.get_count_prefix
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.getOutputMgr
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.goGenerator
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.initialize
+- [x] DefaultProgramGenerator.cpp::DefaultProgramGenerator.~DefaultProgramGenerator
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.add_number
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.DefaultRndNumGenerator
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.genrand
@@ -578,22 +578,22 @@ Total items: 2070
 - [ ] DepthSpec.cpp::depth_guard_by_type
 - [ ] DepthSpec.cpp::dtGenerateNewGlobal_minimal_depth_
 - [ ] DepthSpec.cpp::dtGenerateNewParentLocal_minimal_depth_
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.CreateInstance
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.DFSOutputMgr
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.get_main_out
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.Output
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.CreateInstance
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.DFSOutputMgr
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.get_main_out
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.Output
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.output_comment_line
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.output_tab
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.OutputHeader
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.OutputHeader
 - [x] DFSOutputMgr.cpp::DFSOutputMgr.outputln
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.OutputStructUnions
-- [ ] DFSOutputMgr.cpp::DFSOutputMgr.~DFSOutputMgr
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.DFSProgramGenerator
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.get_count_prefix
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.getOutputMgr
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.goGenerator
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.initialize
-- [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.~DFSProgramGenerator
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.OutputStructUnions
+- [x] DFSOutputMgr.cpp::DFSOutputMgr.~DFSOutputMgr
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.DFSProgramGenerator
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.get_count_prefix
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.getOutputMgr
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.goGenerator
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.initialize
+- [x] DFSProgramGenerator.cpp::DFSProgramGenerator.~DFSProgramGenerator
 - [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.DFSRndNumGenerator
 - [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.dumpCurrentState
 - [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.eager_backtracking
@@ -1211,9 +1211,9 @@ Total items: 2070
 - [x] LinearSequence.cpp::LinearSequence.LinearSequence
 - [x] LinearSequence.cpp::LinearSequence.sequence_length
 - [x] LinearSequence.cpp::LinearSequence.~LinearSequence
-- [ ] OutputMgr.cpp::OutputMgr.get_main_out
+- [x] OutputMgr.cpp::OutputMgr.get_main_out
 - [x] OutputMgr.cpp::OutputMgr.is_monitored_func
-- [ ] OutputMgr.cpp::OutputMgr.Output
+- [x] OutputMgr.cpp::OutputMgr.Output
 - [x] OutputMgr.cpp::OutputMgr.output_comment_line
 - [x] OutputMgr.cpp::OutputMgr.output_tab
 - [x] OutputMgr.cpp::OutputMgr.output_tab_
@@ -1223,16 +1223,16 @@ Total items: 2070
 - [x] OutputMgr.cpp::OutputMgr.OutputHeader
 - [x] OutputMgr.cpp::OutputMgr.outputln
 - [x] OutputMgr.cpp::OutputMgr.OutputMain
-- [ ] OutputMgr.cpp::OutputMgr.OutputMgr
+- [x] OutputMgr.cpp::OutputMgr.OutputMgr
 - [x] OutputMgr.cpp::OutputMgr.OutputPtrResets
 - [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDecl
 - [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncDef
 - [x] OutputMgr.cpp::OutputMgr.OutputStepHashFuncInvocation
-- [ ] OutputMgr.cpp::OutputMgr.OutputStructUnions
+- [x] OutputMgr.cpp::OutputMgr.OutputStructUnions
 - [x] OutputMgr.cpp::OutputMgr.OutputTail
 - [x] OutputMgr.cpp::OutputMgr.really_outputln
 - [x] OutputMgr.cpp::OutputMgr.set_curr_func
-- [ ] OutputMgr.cpp::OutputMgr.~OutputMgr
+- [x] OutputMgr.cpp::OutputMgr.~OutputMgr
 - [ ] PartialExpander.cpp::PartialExpander.copy_expands
 - [ ] PartialExpander.cpp::PartialExpander.direct_expand_check
 - [ ] PartialExpander.cpp::PartialExpander.expand_check

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// ProgramGenerator mirrors DefaultProgramGenerator state for one generation run.
+// ProgramGenerator mirrors DefaultProgramGenerator / DFSProgramGenerator state.
 type ProgramGenerator struct {
 	Opts    Options
 	Seed    uint64
@@ -23,24 +23,94 @@ type ProgramGenerator struct {
 	Argv []string
 	// Types holds derived pointer types (Type::derived_types).
 	Types TypeEnv
+	// GoodCount mirrors DFSProgramGenerator::good_count_ (successful emit count).
+	GoodCount int64
+	// OutputKind mirrors which OutputMgr CreateInstance was selected.
+	OutputKind OutputMgrKind
 }
 
-// NewProgramGenerator constructs a generator (DefaultProgramGenerator ctor + initialize subset).
-// DefaultProgramGenerator::initialize — CreateInstance RNG; ExtensionMgr skipped (null).
+// processProgramGen mirrors AbsProgramGenerator::current_generator_.
+var processProgramGen *ProgramGenerator
+
+// SetProcessProgramGenerator installs AbsProgramGenerator::current_generator_.
+func SetProcessProgramGenerator(g *ProgramGenerator) { processProgramGen = g }
+
+// ProcessProgramGenerator mirrors AbsProgramGenerator::GetInstance.
+// Nil sticky fail-closed (C++ asserts).
+func ProcessProgramGenerator() *ProgramGenerator {
+	if processProgramGen == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return processProgramGen
+}
+
+// ClearProcessProgramGenerator drops current_generator_ (finalization / tests).
+func ClearProcessProgramGenerator() { processProgramGen = nil }
+
+// GetOutputMgrKind mirrors AbsProgramGenerator::getOutputMgr kind (Go: no ostream).
+func (g *ProgramGenerator) GetOutputMgrKind() OutputMgrKind {
+	if g == nil {
+		SetError(ErrGeneric)
+		return OutputMgrKindDefault
+	}
+	return g.OutputKind
+}
+
+// GetCountPrefix mirrors Default/DFS ProgramGenerator::get_count_prefix.
+// DefaultProgramGenerator.cpp:63–66 assert(0) — sticky "".
+// DFSProgramGenerator.cpp:67–71 — "p_" + good_count_ + "_" + name.
+func (g *ProgramGenerator) GetCountPrefix(name string) string {
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if g.OutputKind != OutputMgrKindDFS {
+		// Default assert(0); library fail-closed empty (no invent DFS-style prefix)
+		SetError(ErrGeneric)
+		return ""
+	}
+	// incomplete empty name sticky (no invent "p_0_")
+	if name == "" {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return fmt.Sprintf("p_%d_%s", g.GoodCount, name)
+}
+
+// NewProgramGenerator constructs a generator (Abs/Default/DFS ProgramGenerator).
+// AbsProgramGenerator::CreateInstance selects DFS vs Default from dfs_exhaustive.
+// initialize — CreateInstance RNG + OutputMgr; ExtensionMgr skipped (null).
 func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// CGOptions process-wide state for Constant::make_random / choose_var / emit.
 	SetProcessOptions(opts)
 	// CGOptions::monitored_funcs → OutputMgr::monitored_funcs_
 	opts.ApplyMonitoredFuncs()
 	seed := opts.Seed
-	// RandomNumber::CreateInstance(rDefaultRndNumGenerator, seed)
-	// RandomNumber.cpp:63–74 — process singleton + DefaultRndNumGenerator.
-	CreateRandomNumberInstance(RngKindDefault, seed)
+	// AbsProgramGenerator.cpp:53–59 — dfs_exhaustive → DFS else Default
+	var kind RngKind
+	var outKind OutputMgrKind
+	if opts.DFSExhaustive {
+		kind = RngKindDFS
+		outKind = OutputMgrKindDFS
+		CreateDFSOutputMgr(opts)
+	} else {
+		kind = RngKindDefault
+		outKind = OutputMgrKindDefault
+		if !CreateDefaultOutputMgr(opts) {
+			// sticky already set on split path fail
+		}
+	}
+	// RandomNumber::CreateInstance
+	CreateRandomNumberInstance(kind, seed)
 	r := ProcessRng()
 	if r == nil {
-		// Create failed (should not on Default); fail closed sticky already set.
-		r = NewRng(seed)
-		SetProcessRng(r)
+		// Create failed; Default always works; DFS needs MaxExhaustiveDepth>0
+		if kind == RngKindDefault {
+			r = NewRng(seed)
+			SetProcessRng(r)
+		}
+		// DFS fail closed with sticky error + nil rng handled below
 	}
 	// C++ Probabilities is a process singleton — one session table for generator + VS
 	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
@@ -59,23 +129,26 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// Expression session tables from InitSessionProbabilityTables (no invent mid-ctor)
 	exprTables := ProcessExprTables()
 	g := &ProgramGenerator{
-		Opts:     opts,
-		Seed:     seed,
-		Rng:      r,
-		Probs:    probs,
-		VS:       vs,
-		Tables:   exprTables,
-		StmtTab:  stmtTab,
-		FactMgrs: NewFactMgrMap(),
+		Opts:       opts,
+		Seed:       seed,
+		Rng:        r,
+		Probs:      probs,
+		VS:         vs,
+		Tables:     exprTables,
+		StmtTab:    stmtTab,
+		FactMgrs:   NewFactMgrMap(),
+		OutputKind: outKind,
 	}
 	// Share gensym + derived_types across selector and generator.
 	vs.Types = &g.Types
 	// Attribute generators for this generation (Initialize*Attributes)
 	InitAttrGenerators(opts, probs)
+	// AbsProgramGenerator::current_generator_
+	SetProcessProgramGenerator(g)
 	return g
 }
 
-// Initialize mirrors DefaultProgramGenerator::initialize (RNG already seeded).
+// Initialize mirrors Default/DFS ProgramGenerator::initialize (RNG already seeded).
 // C++ initialize only CreateInstance+OutputMgr; Go also runs Finalization subset
 // so library multi-Generate starts from a clean process pool (dtor-like).
 func (g *ProgramGenerator) Initialize() {
@@ -88,11 +161,19 @@ func (g *ProgramGenerator) Initialize() {
 	// generator's live singletons (CGOptions / RNG / Probabilities / Statement table).
 	if g != nil {
 		SetProcessOptions(g.Opts)
-		// RandomNumber::CreateInstance after Finalization (DefaultProgramGenerator.cpp:55)
-		CreateRandomNumberInstance(RngKindDefault, g.Seed)
+		SetProcessProgramGenerator(g)
+		// RandomNumber::CreateInstance after Finalization
+		kind := RngKindDefault
+		if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
+			kind = RngKindDFS
+			CreateDFSOutputMgr(g.Opts)
+		} else {
+			_ = CreateDefaultOutputMgr(g.Opts)
+		}
+		CreateRandomNumberInstance(kind, g.Seed)
 		if r := ProcessRng(); r != nil {
 			g.Rng = r
-		} else {
+		} else if g.Rng != nil {
 			SetProcessRng(g.Rng)
 		}
 		SetProcessProbabilities(g.Probs)
@@ -967,10 +1048,191 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	return b.String()
 }
 
+// OutputForwardDeclarations mirrors OutputForwardDeclarations (no section banners).
+// Used by DefaultOutputMgr::OutputAllHeaders and DFSOutputMgr::Output.
+// Incomplete Funcs sticky "" (no invent partial forward list).
+func (g *ProgramGenerator) OutputForwardDeclarations() string {
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if !FunctionsComplete(g.Funcs.Funcs) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range g.Funcs.Funcs {
+		if f.IsBuiltin {
+			continue
+		}
+		d := f.OutputForwardDeclOpts(g.Opts.ForceGlobalsStatic, g.Rng, g.Opts.FunctionAttributes)
+		if HasError() {
+			return ""
+		}
+		if d == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		b.WriteString(d)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// OutputDFS mirrors DFSOutputMgr::Output after generation.
+// DFSOutputMgr.cpp:75–90 — globals; optional forwards; functions; hash; optional main.
+// No OutputTail. Compact skips forwards and main.
+// Incomplete emit sticky "".
+func (g *ProgramGenerator) OutputDFS() string {
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var b strings.Builder
+	// OutputGlobalVariables
+	if g.VS != nil && len(g.VS.GlobalList) > 0 {
+		globalsOut := g.OutputGlobals()
+		if HasError() {
+			return ""
+		}
+		if globalsOut == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		b.WriteString(globalsOut)
+	}
+	compact := g.Opts.CompactOutput
+	if !compact {
+		fwd := g.OutputForwardDeclarations()
+		if HasError() {
+			return ""
+		}
+		b.WriteString(fwd)
+	}
+	// OutputFunctions bodies (with banners via OutputFunctions for non-compact readability;
+	// C++ dumps Function::Output only — use function bodies without invent dual forwards)
+	if !FunctionsComplete(g.Funcs.Funcs) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	for _, f := range g.Funcs.Funcs {
+		if f.IsBuiltin {
+			continue
+		}
+		body := f.OutputOpts(g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+		if HasError() || body == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		b.WriteString(body)
+		b.WriteString("\n")
+	}
+	b.WriteString(g.OutputHashFuncDef())
+	if HasError() {
+		return ""
+	}
+	if !compact && !g.Opts.NoMain {
+		mainOut := g.OutputMain()
+		if HasError() {
+			return ""
+		}
+		if mainOut == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		b.WriteString(mainOut)
+	}
+	return b.String()
+}
+
+// OutputSplitFiles mirrors DefaultOutputMgr::Output when is_split().
+// DefaultOutputMgr.cpp:177–180 + hash/main/tail on outs[0].
+// Returns path → content map (header + each rnd_outputN.c). Incomplete sticky nil.
+func (g *ProgramGenerator) OutputSplitFiles() map[string]string {
+	if g == nil || !IsSplit(g.Opts) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !CreateDefaultOutputMgr(g.Opts) {
+		return nil
+	}
+	n := g.Opts.MaxSplitFiles
+	paths := ProcessSplitPaths()
+	if len(paths) != n {
+		SetError(ErrGeneric)
+		return nil
+	}
+	// OutputGlobals → rnd_globals.h
+	var globals []*Variable
+	if g.VS != nil {
+		globals = g.VS.GlobalList
+	}
+	decls := OutputGlobalVariablesDecls(globals, "extern ")
+	if HasError() {
+		return nil
+	}
+	structs := g.OutputStructTypes()
+	if HasError() {
+		return nil
+	}
+	hdrPath := SplitGlobalsHeaderPath(g.Opts)
+	if hdrPath == "" || HasError() {
+		return nil
+	}
+	files := map[string]string{
+		hdrPath: SplitGlobalsHeaderBody(decls, structs),
+	}
+	// OutputAllHeaders
+	forwards := g.OutputForwardDeclarations()
+	if HasError() {
+		return nil
+	}
+	headers := SplitAllHeadersContent(n, g.Opts.Paranoid, forwards)
+	if headers == nil || HasError() {
+		return nil
+	}
+	// RandomOutputDefs into n buckets
+	defs := RandomOutputDefs(globals, g.Funcs.Funcs, n, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng)
+	if defs == nil || HasError() {
+		return nil
+	}
+	// hash + main + tail on main file (outs[0])
+	var mainExtra strings.Builder
+	mainExtra.WriteString(g.OutputHashFuncDef())
+	if HasError() {
+		return nil
+	}
+	if !g.Opts.NoMain {
+		m := g.OutputMain()
+		if HasError() || (m == "" && !g.Opts.NoMain) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return nil
+		}
+		mainExtra.WriteString(m)
+	}
+	mainExtra.WriteString(OutputTail(g.Funcs.Funcs, g.Opts))
+	if HasError() {
+		return nil
+	}
+	for i := 0; i < n; i++ {
+		files[paths[i]] = headers[i] + defs[i]
+		if i == 0 {
+			files[paths[i]] += mainExtra.String()
+		}
+	}
+	return files
+}
+
 // GoGenerator mirrors DefaultProgramGenerator::goGenerator / DefaultOutputMgr::Output.
 // DefaultProgramGenerator.cpp:67–80; DefaultOutputMgr.cpp:175–195.
 // Returns empty string when sticky ERROR_RETURN aborts generation (no soft invent
 // of partial program as success).
+// Split mode: joins path-labeled sections (library has no multi-file write).
+// DFS mode: DFSOutputMgr emit (no tail).
 func (g *ProgramGenerator) GoGenerator() string {
 	// ProgramGenerator always live for goGenerator; sticky incomplete no invent empty program
 	if g == nil {
@@ -1020,6 +1282,68 @@ func (g *ProgramGenerator) GoGenerator() string {
 	}
 	if !hasUser {
 		return ""
+	}
+	// DFSOutputMgr path (DFSProgramGenerator emits header+Output per success)
+	if g.OutputKind == OutputMgrKindDFS || g.Opts.DFSExhaustive {
+		// DFSProgramGenerator.cpp:78 — OutputStructUnions to separate file first
+		// Library: prefix structs file content as labeled section
+		structsFile := g.OutputStructTypes()
+		if HasError() {
+			return ""
+		}
+		var db strings.Builder
+		if structsFile != "" {
+			db.WriteString("/* --- ")
+			db.WriteString(DFSStructOutputPath())
+			db.WriteString(" ---\n")
+			db.WriteString(structsFile)
+			db.WriteString("--- end structs --- */\n")
+		}
+		// OutputHeader may be compact-skipped
+		hdr := DFSOutputHeader(g.OutputHeader(), g.Opts.CompactOutput)
+		if HasError() {
+			return ""
+		}
+		db.WriteString(hdr)
+		body := g.OutputDFS()
+		if HasError() || body == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		db.WriteString(body)
+		g.GoodCount++
+		return db.String()
+	}
+	// DefaultOutputMgr split path
+	if IsSplit(g.Opts) {
+		files := g.OutputSplitFiles()
+		if files == nil || HasError() {
+			return ""
+		}
+		// stable join for library single-string return
+		var keys []string
+		for k := range files {
+			keys = append(keys, k)
+		}
+		// sort paths for determinism
+		for i := 0; i < len(keys); i++ {
+			for j := i + 1; j < len(keys); j++ {
+				if keys[j] < keys[i] {
+					keys[i], keys[j] = keys[j], keys[i]
+				}
+			}
+		}
+		var sb strings.Builder
+		for _, k := range keys {
+			sb.WriteString("/* --- file: ")
+			sb.WriteString(k)
+			sb.WriteString(" ---\n")
+			sb.WriteString(files[k])
+			sb.WriteString("--- end file --- */\n")
+		}
+		return sb.String()
 	}
 	// GlobalList non-empty must emit live defs (no invent drop incomplete globals)
 	globalsOut := g.OutputGlobals()

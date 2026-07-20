@@ -248,3 +248,258 @@ func CompactOutputTab(indent int, compact bool) string {
 	}
 	return OutputTab(indent)
 }
+
+// --- DefaultOutputMgr process singleton (split-file emit) ---
+
+// DefaultStructOutputName mirrors DFSOutputMgr DEFAULT_STRUCT_OUTPUT.
+// DFSOutputMgr.h:36.
+const DefaultStructOutputName = "csmith_structs.h"
+
+// OutputMgrKind selects Default vs DFS emit orchestration.
+type OutputMgrKind int
+
+const (
+	// OutputMgrKindDefault is DefaultOutputMgr.
+	OutputMgrKindDefault OutputMgrKind = iota
+	// OutputMgrKindDFS is DFSOutputMgr.
+	OutputMgrKindDFS
+)
+
+// processOutputMgrKind / processStructOutput mirror CreateInstance selection state.
+var (
+	processOutputMgrKind OutputMgrKind
+	processStructOutput  string
+	processSplitPaths    []string // DefaultOutputMgr outs_ paths after init
+	processOutputFile    string   // CGOptions::output_file when set
+)
+
+// CreateDefaultOutputMgr mirrors DefaultOutputMgr::CreateInstance + init.
+// DefaultOutputMgr.cpp:62–97 — record ofile path; if max_split_files>0 build split paths.
+// Does not open OS files (library returns paths/content); incomplete split dir sticky.
+func CreateDefaultOutputMgr(opts Options) bool {
+	processOutputMgrKind = OutputMgrKindDefault
+	processOutputFile = strings.TrimSpace(opts.OutputPath)
+	processSplitPaths = nil
+	if !IsSplit(opts) {
+		return true
+	}
+	// init: open_one_output_file path for each max_split_files
+	n := opts.MaxSplitFiles
+	if n <= 0 {
+		return true
+	}
+	paths := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		p := SplitOutputFilePath(opts, i)
+		if p == "" || HasError() {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			processSplitPaths = nil
+			return false
+		}
+		paths = append(paths, p)
+	}
+	processSplitPaths = paths
+	return true
+}
+
+// CreateDFSOutputMgr mirrors DFSOutputMgr::CreateInstance.
+// DFSOutputMgr.cpp:49–61 — struct_output_ default or CGOptions::struct_output.
+func CreateDFSOutputMgr(opts Options) {
+	processOutputMgrKind = OutputMgrKindDFS
+	processSplitPaths = nil
+	processOutputFile = ""
+	s := strings.TrimSpace(opts.StructOutput)
+	if s == "" {
+		processStructOutput = DefaultStructOutputName
+	} else {
+		processStructOutput = s
+	}
+}
+
+// ClearOutputMgr resets process OutputMgr singleton state (finalization / tests).
+func ClearOutputMgr() {
+	processOutputMgrKind = OutputMgrKindDefault
+	processStructOutput = ""
+	processSplitPaths = nil
+	processOutputFile = ""
+}
+
+// ProcessOutputMgrKind returns active OutputMgr kind.
+func ProcessOutputMgrKind() OutputMgrKind { return processOutputMgrKind }
+
+// ProcessStructOutput returns DFSOutputMgr::struct_output_.
+func ProcessStructOutput() string { return processStructOutput }
+
+// ProcessSplitPaths returns a copy of DefaultOutputMgr split file paths.
+func ProcessSplitPaths() []string {
+	if len(processSplitPaths) == 0 {
+		return nil
+	}
+	return append([]string(nil), processSplitPaths...)
+}
+
+// ProcessOutputFile returns DefaultOutputMgr ofile path (empty → stdout).
+func ProcessOutputFile() string { return processOutputFile }
+
+// GetMainOutPath mirrors DefaultOutputMgr::get_main_out target name.
+// DefaultOutputMgr.cpp:197–205 — split → outs[0]; ofile_; else "" (stdout).
+// Empty string means stdout (library has no ostream).
+func GetMainOutPath(opts Options) string {
+	if IsSplit(opts) {
+		if len(processSplitPaths) == 0 {
+			// not initialized sticky
+			SetError(ErrGeneric)
+			return ""
+		}
+		return processSplitPaths[0]
+	}
+	return processOutputFile
+}
+
+// PureRndUptoIndex mirrors pure_rnd_upto for split file pick.
+// DefaultOutputMgr.cpp:148 / 159 — index = pure_rnd_upto(size).
+// nFiles==0 sticky -1 (no invent index 0 into empty outs).
+func PureRndUptoIndex(nFiles int) int {
+	if nFiles <= 0 {
+		SetError(ErrGeneric)
+		return -1
+	}
+	return int(PureRndUpto(uint32(nFiles), nil))
+}
+
+// RandomOutputVarDefs mirrors DefaultOutputMgr::RandomOutputVarDefs pure assignment.
+// DefaultOutputMgr.cpp:144–151 — each global → pure_rnd_upto(nFiles) file bucket.
+// Returns nFiles content strings (defs only, no headers). Incomplete globals sticky nil.
+func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []string {
+	if nFiles <= 0 {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !VariablesComplete(globals) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	out := make([]string, nFiles)
+	for _, v := range globals {
+		idx := PureRndUptoIndex(nFiles)
+		if idx < 0 || HasError() {
+			return nil
+		}
+		var def string
+		if v.IsArray && v.AsArray != nil {
+			def = v.AsArray.OutputDef()
+		} else if v.IsArray {
+			SetError(ErrGeneric)
+			return nil
+		} else {
+			def = v.OutputDef(forceStatic)
+		}
+		if HasError() || def == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return nil
+		}
+		if !strings.HasSuffix(def, "\n") {
+			def += "\n"
+		}
+		out[idx] += def
+	}
+	return out
+}
+
+// RandomOutputFuncDefs mirrors DefaultOutputMgr::RandomOutputFuncDefs.
+// DefaultOutputMgr.cpp:154–163 — skip builtin; pure_rnd_upto file; Function::Output.
+// Returns nFiles body strings. Incomplete funcs sticky nil.
+func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
+	if nFiles <= 0 {
+		SetError(ErrGeneric)
+		return nil
+	}
+	if !FunctionsComplete(funcs) {
+		SetError(ErrGeneric)
+		return nil
+	}
+	out := make([]string, nFiles)
+	for _, f := range funcs {
+		if f.IsBuiltin {
+			continue
+		}
+		idx := PureRndUptoIndex(nFiles)
+		if idx < 0 || HasError() {
+			return nil
+		}
+		body := f.OutputOpts(forceStatic, funcAttr, rng)
+		if HasError() || body == "" {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return nil
+		}
+		if !strings.HasSuffix(body, "\n") {
+			body += "\n"
+		}
+		out[idx] += body
+	}
+	return out
+}
+
+// RandomOutputDefs mirrors DefaultOutputMgr::RandomOutputDefs.
+// DefaultOutputMgr.cpp:165–168 — var defs then func defs into same nFiles buckets.
+func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
+	vars := RandomOutputVarDefs(globals, nFiles, forceStatic)
+	if vars == nil || HasError() {
+		return nil
+	}
+	fn := RandomOutputFuncDefs(funcs, nFiles, forceStatic, funcAttr, rng)
+	if fn == nil || HasError() {
+		return nil
+	}
+	out := make([]string, nFiles)
+	for i := 0; i < nFiles; i++ {
+		out[i] = vars[i] + fn[i]
+	}
+	return out
+}
+
+// SplitAllHeadersContent mirrors DefaultOutputMgr::OutputAllHeaders for N files.
+// DefaultOutputMgr.cpp:120–141 — secondary preambles; primary include; all get forwards.
+// forwards is OutputForwardDeclarations text (same into every file).
+func SplitAllHeadersContent(nFiles int, paranoid bool, forwards string) []string {
+	if nFiles <= 0 {
+		SetError(ErrGeneric)
+		return nil
+	}
+	out := make([]string, nFiles)
+	for i := 1; i < nFiles; i++ {
+		out[i] = SplitSecondaryHeaderPreamble(paranoid)
+	}
+	out[0] = SplitPrimaryHeaderInclude()
+	for i := 0; i < nFiles; i++ {
+		out[i] += forwards
+		if forwards != "" && !strings.HasSuffix(forwards, "\n") {
+			out[i] += "\n"
+		}
+		out[i] += "\n"
+	}
+	return out
+}
+
+// DFSOutputHeader mirrors DFSOutputMgr::OutputHeader.
+// DFSOutputMgr.cpp:63–66 — compact skips header entirely.
+func DFSOutputHeader(header string, compact bool) string {
+	if compact {
+		return ""
+	}
+	return header
+}
+
+// DFSStructOutputPath mirrors DFSOutputMgr::struct_output_ path for structs file.
+func DFSStructOutputPath() string {
+	if processStructOutput == "" {
+		return DefaultStructOutputName
+	}
+	return processStructOutput
+}

@@ -40,6 +40,10 @@ func DoFinalization() {
 	ResetCompatibleCheck()
 	// OutputMgr monitored_funcs_ / curr_func_
 	ClearMonitoredFuncs()
+	// DefaultOutputMgr / DFSOutputMgr process singleton
+	ClearOutputMgr()
+	// AbsProgramGenerator::current_generator_
+	ClearProcessProgramGenerator()
 	// RandomNumber::doFinalization — Finalization.cpp:53
 	// Cleared here; ProgramGenerator re-CreateInstance / SetProcessRng after.
 	RandomNumberDoFinalization()
