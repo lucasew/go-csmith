@@ -1131,9 +1131,12 @@ func MakeRandomBinaryInvocation(
 					bits := uint32(sb * 8)
 					// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
 					if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
+						// FunctionInvocation.cpp:241–243 — Constant::make_random_upto as RHS.
+						// Not Expression::make_random — C++ does NOT bump expr_depth here
+						// (depth++ only in Expression.cpp:213–218 after make_random).
+						// Extra bump made Go hit max_expr_depth one level early (seed-2 e9188:
+						// UP U120 Function vs Go depth-gate filtered Function → Constant).
 						right = &Expression{Term: TermConstant, Con: c}
-						// Expression.cpp:213–218 — constant bumps expr_depth on caller context
-						cg.ExprDepth++
 					}
 				}
 			}
