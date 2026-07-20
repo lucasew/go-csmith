@@ -75,19 +75,23 @@ func TestExpandBlockForGotoNilFM(t *testing.T) {
 }
 
 func TestExpandBlockForGotoAssertB(t *testing.T) {
-	// VariableSelector.cpp:778 assert(b) — no soft invent root when climb fails
+	// Live tree: goto in sibling arm so climb from then must reach outer.
+	// VariableSelector.cpp:773–779 expand then stop when src is covered.
+	ClearError()
 	f := &Function{Name: "f"}
-	// dest in orphan block; src in unrelated block (not ancestor)
-	destBlk := &Block{Func: f, StmID: 1, Stmts: []Stmt{{Kind: StmtAssign, StmID: 10}}}
-	srcBlk := &Block{Func: f, StmID: 2, Stmts: []Stmt{{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}}
-	f.Blocks = []*Block{destBlk, srcBlk}
+	outer := &Block{Func: f, StmID: 1}
+	thenB := &Block{Func: f, Parent: outer, StmID: 2, Stmts: []Stmt{{Kind: StmtAssign, StmID: 10}}}
+	elseB := &Block{Func: f, Parent: outer, StmID: 3, Stmts: []Stmt{{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}}}
+	outer.Stmts = []Stmt{{Kind: StmtIfElse, StmID: 5, Then: thenB, Else: elseB}}
+	f.Blocks = []*Block{outer}
 	fm := NewFactMgr(f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 20, DestStmID: 10}}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
-	// climb from destBlk cannot reach src (no parent link)
-	if ExpandBlockForGoto(destBlk, cg) != nil {
-		t.Fatal("want nil when assert(b) would fire")
+	got := ExpandBlockForGoto(thenB, cg)
+	if got != outer {
+		t.Fatalf("climb must reach outer for sibling goto: got %#v sticky=%v", got, HasError())
 	}
+	ClearError()
 }
 
 func TestExpandBlockForGotoNilCFGHole(t *testing.T) {
@@ -137,6 +141,33 @@ func TestExpandBlockForGotoFindStmtResidualSticky(t *testing.T) {
 		t.Fatal("FindStmt residual ExpandBlockForGoto must SetError sticky")
 	}
 	ClearError()
+}
+
+// TestExpandBlockForGotoSkipsOrphanGotoEdges — aborted make_random leaves Blocks
+// on Func.Blocks with CFGEdges to live dests (C++ delete frees IR; edges gone).
+// Expand must not climb-fail on those orphans (seed-2 e15453 GenerateNewParentLocal).
+func TestExpandBlockForGotoSkipsOrphanGotoEdges(t *testing.T) {
+	ClearError()
+	defer ClearError()
+	f := &Function{Name: "f"}
+	body := &Block{Func: f, StmID: 22}
+	// live dest statement in body
+	body.Stmts = []Stmt{{Kind: StmtAssign, StmID: 153}}
+	// orphan block not linked under body (abort left it on Func.Blocks only)
+	orphan := &Block{Func: f, StmID: 99}
+	orphan.Stmts = []Stmt{{Kind: StmtGoto, StmID: 210, GotoDestStmID: 153}}
+	f.Blocks = []*Block{body, orphan}
+	fm := NewFactMgr(f)
+	fm.CFGEdges = []*CFGEdge{{SrcID: 210, DestStmID: 153}}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// Without orphan skip, climb from body for src=210 fails (src not in live tree).
+	got := ExpandBlockForGoto(body, cg)
+	if got != body {
+		t.Fatalf("orphan goto edge must be skipped; want body, got %#v sticky=%v", got, HasError())
+	}
+	if HasError() {
+		t.Fatal("orphan skip must not SetError sticky")
+	}
 }
 
 func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {

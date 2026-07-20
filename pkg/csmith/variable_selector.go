@@ -3,6 +3,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	AllVars                []*Variable
@@ -634,6 +639,13 @@ func BlockContainsStmID(b *Block, stmID int) bool {
 // VariableSelector.cpp:765–787 — climb parents so new locals are visible at
 // both a goto dest inside b and the goto source outside b.
 // Block always live; sticky nil (no invent soft-skip expand past hole).
+//
+// Stale CFG edges: aborted StatementGoto::make_random leaves orphan Blocks on
+// Func.Blocks with CFGEdges whose src Statement* would be freed in C++ (edge
+// gone). FindStmtByID still finds those orphans via Func.Blocks. Skip edges
+// whose src is not under rootBlock(b) — otherwise climb fails and
+// GenerateNewParentLocal returns nil without create RNG (seed-2 e15453:
+// first_div after type select F10 vs U100).
 func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 	if b == nil {
 		SetError(ErrGeneric)
@@ -644,7 +656,7 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 		return b
 	}
 	// C++ edge->src is a live Statement*; look up via function tree (not only root of b)
-	// CFGEdge* always live; nil hole fails closed (no invent skip as absent goto)
+	// CFGEdge* always live; nil hole fails closed (no invent soft-skip edge)
 	for {
 		expanded := false
 		for _, e := range fm.CFGEdges {
@@ -672,6 +684,16 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			if src == nil || src.Kind != StmtGoto {
 				continue
 			}
+			// Skip orphan/stale edges: src not under the live root of b.
+			// C++ would not keep a CFGEdge after freeing the abort-path Statement*.
+			root := rootBlock(b)
+			if root == nil || findParentOfStmIDInTree(root, e.SrcID) == nil {
+				// residual ERROR sticky from incomplete tree walk
+				if HasError() {
+					return nil
+				}
+				continue
+			}
 			destID := e.DestStmID
 			if destID <= 0 && e.DestBlock != nil {
 				destID = e.DestBlock.StmID
@@ -687,16 +709,30 @@ func ExpandBlockForGoto(b *Block, cg CGContext) *Block {
 			}
 			// VariableSelector.cpp:773–779
 			if BlockContainsStmID(b, destID) && !BlockContainsStmID(b, e.SrcID) {
-				for b != nil && !BlockContainsStmID(b, e.SrcID) {
-					b = b.Parent
-				}
-				// VariableSelector.cpp:778 — assert(b); no soft invent return root
-				// non-sticky null (sticky poisons Generate when climb fails; soft re-pick)
-				if b == nil {
+				// residual ERROR sticky from contains_stmt walks
+				if HasError() {
 					return nil
 				}
+				// climb on a copy so a failed climb does not wipe caller's b
+				cur := b
+				for cur != nil && !BlockContainsStmID(cur, e.SrcID) {
+					if HasError() {
+						return nil
+					}
+					cur = cur.Parent
+				}
+				// VariableSelector.cpp:778 — assert(b). Orphan edges already skipped
+				// above; remaining climb-fail is defensive skip (no invent soft-nil
+				// GenerateNewParentLocal past a stale edge).
+				if cur == nil {
+					continue
+				}
+				b = cur
 				expanded = true
 				break
+			}
+			if HasError() {
+				return nil
 			}
 		}
 		if !expanded {
@@ -2811,6 +2847,7 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 	// VariableSelector.cpp:924–928 — enlarge for goto visibility
 	block = ExpandBlockForGoto(block, cg)
 	if block == nil {
+		if os.Getenv("X") != "" { fmt.Fprintln(os.Stderr, "expand-nil") }
 		return nil
 	}
 	var varQfer CVQualifiers
