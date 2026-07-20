@@ -54,11 +54,20 @@ func GetBlocksStmt(st *Stmt) []*Block {
 		}
 		return []*Block{st.Then}
 	case StmtArrayOp:
-		// StatementArrayOp.h — if (body) blks.push_back(body);
-		if st.Then != nil {
-			return []*Block{st.Then}
+		// StatementArrayOp.h:69–71 — if (body) blks.push_back(body).
+		// make_random_array_init uses Expression ctor (body=0, init_value=e);
+		// get_blocks is empty. Go nests RHS under Then for Output only — must not
+		// invent get_blocks walk of that Then (extra Lhs/expr ptrs → ReferencedPtrs
+		// / NeedsRevisit drift vs UP, seed-2 func_49 revisit soft-fail).
+		if st.Then == nil {
+			return nil
 		}
-		return nil
+		inner := findArrayOpInnermost(st)
+		if inner != nil && isArrayInitBody(inner.Then) {
+			return nil
+		}
+		// true body path (Block ctor) — rare; keep Then when not array-init shape
+		return []*Block{st.Then}
 	case StmtBlock:
 		// nested Block::make_random body
 		if st.Then != nil {

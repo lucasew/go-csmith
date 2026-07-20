@@ -539,22 +539,28 @@ func MakeRandomArrayInit(
 		}},
 	}
 	// nest fors: outermost first dim (StatementArrayOp::output_header)
+	// StatementArrayOp Expression ctor: body=0, init_value=e — store init on Expr
+	// so get_exprs matches C++ (get_blocks stays empty for array-init shape).
 	if len(dims) == 0 {
 		// StatementArrayOp is a Statement; always has stm_id
-		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, StmID: AllocStmID()}
+		return Stmt{Kind: StmtArrayOp, ArrayAccess: access, Then: innerBody, Expr: rhs, StmID: AllocStmID()}
 	}
 	st := Stmt{
 		Kind:        StmtArrayOp,
 		Loop:        dims[len(dims)-1],
 		Then:        innerBody,
 		ArrayAccess: access,
+		Expr:        rhs,
 		StmID:       AllocStmID(),
 	}
 	for i := len(dims) - 2; i >= 0; i-- {
+		// keep init_value on outermost only (C++ one StatementArrayOp / one init_value)
+		inner := st
 		st = Stmt{
 			Kind:  StmtArrayOp,
 			Loop:  dims[i],
-			Then:  &Block{Func: cg.CurrentFunc, Stmts: []Stmt{st}},
+			Then:  &Block{Func: cg.CurrentFunc, Stmts: []Stmt{inner}},
+			Expr:  rhs,
 			StmID: AllocStmID(),
 		}
 	}

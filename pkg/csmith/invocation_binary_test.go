@@ -772,3 +772,49 @@ func TestGetTypeBinaryIsSignedResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+
+func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
+	// FunctionInvocation.cpp:111–118 — rnd_flipcoin(StdUnaryFuncProb()) always,
+	// even when type is null. Old Go skipped the draw when typ==nil (unfair
+	// prefer-binary without consuming F5).
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	// Force unary branch: PStdUnaryFuncProb=100 so flipcoin always true.
+	probs.single[PStdUnaryFuncProb] = 100
+	vs := NewVariableSelector(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	cg := WithFunc(f, EmptyEffect())
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	cg.FM = NewFactMgr(f)
+	list := &FunctionList{Funcs: []*Function{f}}
+	r := NewRng(1)
+	// stdFunc=true, typ=nil → must draw StdUnary (100% true) then fail closed
+	// (C++ assert(type) / no invent binary after true unary draw).
+	fi := MakeRandomInvocation(r, opts, probs, vs, NewExprTables(opts), &cg, list, nil, nil, true)
+	if fi == nil || !fi.Failed {
+		t.Fatalf("nil-type + unary draw must Failed shell, got %#v", fi)
+	}
+	if !HasError() {
+		t.Fatal("nil-type + unary draw must SetError sticky (assert type)")
+	}
+	// depth advanced by flipcoin (and not by silent skip)
+	if r.randDepth < 1 {
+		t.Fatal("StdUnaryFuncProb flipcoin must advance randDepth even when typ nil")
+	}
+	ClearError()
+	// typ=nil + unary prob 0 → binary path (still drew flipcoin)
+	probs.single[PStdUnaryFuncProb] = 0
+	r2 := NewRng(2)
+	ClearError()
+	_ = MakeRandomInvocation(r2, opts, probs, vs, NewExprTables(opts), &cg, list, nil, nil, true)
+	// binary with nil type may Failed or produce; key is flipcoin was drawn
+	if r2.randDepth < 1 {
+		t.Fatal("StdUnaryFuncProb flipcoin must advance randDepth when prob=0 typ nil")
+	}
+	ClearError()
+}

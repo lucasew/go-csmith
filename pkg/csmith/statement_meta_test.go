@@ -93,6 +93,20 @@ func TestGetBlocksStmtKindGated(t *testing.T) {
 	if blks := GetBlocksStmt(&Stmt{Kind: StmtAssign, Then: &Block{}}); len(blks) != 0 {
 		t.Fatal("assign must not invent get_blocks from stray Then", blks)
 	}
+	// StatementArrayOp.h:69–71 — array_init Expression ctor has body=0.
+	// Go Then is Output-only; get_blocks must stay empty (no invent body walk).
+	ClearError()
+	initBody := &Block{Stmts: []Stmt{{
+		Kind: StmtAssign, ArrayAccess: "a[i]",
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+	}}}
+	arr := &Stmt{Kind: StmtArrayOp, Then: initBody, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}
+	if blks := GetBlocksStmt(arr); len(blks) != 0 {
+		t.Fatal("array-init ArrayOp get_blocks must be empty (C++ body=null)", blks)
+	}
+	if HasError() {
+		t.Fatal("array-init GetBlocksStmt must not SetError")
+	}
 }
 
 func TestIs1stStm(t *testing.T) {

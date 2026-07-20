@@ -1800,9 +1800,27 @@ func MakeRandomInvocation(
 		}
 	}
 	if fi == nil {
-		// FunctionInvocation.cpp:111–118 — StdUnaryFuncProb → unary else binary
-		// unary asserts(type); when type nil prefer binary (no GetIntType invent)
-		if typ != nil && r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb))) {
+		// FunctionInvocation.cpp:111–118 — always rnd_flipcoin(StdUnaryFuncProb());
+		// then unary if true else binary. C++ draws even when type is null
+		// (unary asserts(type) after a true draw). Skipping the draw when
+		// typ==nil desyncs RNG vs upstream (unfair soft prefer-binary without F5).
+		// Fair: always Flipcoin; unary only when flag && typ live.
+		if probs == nil || r == nil {
+			SetError(ErrGeneric)
+			return &Invocation{Failed: true}
+		}
+		stdUnary := r.RndFlipcoin(uint32(probs.Single(PStdUnaryFuncProb)))
+		// FunctionInvocation.cpp ERROR_GUARD after flipcoin
+		if HasError() {
+			return &Invocation{Failed: true}
+		}
+		if stdUnary {
+			// FunctionInvocation.cpp:143 assert(type); NDEBUG Release continues into
+			// type->… UB — fail closed sticky (no invent binary after a true unary draw).
+			if typ == nil {
+				SetError(ErrGeneric)
+				return &Invocation{Failed: true}
+			}
 			fi = MakeRandomUnaryInvocation(r, opts, vs, tables, cg, typ)
 		} else {
 			fi = MakeRandomBinaryInvocation(r, opts, probs, vs, tables, cg, typ)

@@ -302,29 +302,35 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 		t.Fatal("Type-nil LhsVar CollectReferencedPtrsStmt must SetError sticky")
 	}
 	ClearError()
-	// StatementArrayOp.h:65–68 — get_exprs is if(init_value) only, NOT For test.
-	// make_random_array_init uses numeric LoopControl (no TestExpr) + Then body.
-	// Fair: requiring TestExpr sticky ERROR'd ComputeSummary after stmtOK accepted ArrayOp.
+	// StatementArrayOp.h:65–68 / 69–71 — get_exprs if(init_value); get_blocks if(body).
+	// array_init Expression ctor: body=0, init_value=e. Go Then is Output-only.
 	iv := CreateVariableScalars("i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	ptrArr := CreateVariableScalars("a", PointerTo(GetIntType()), false, false)
 	body := &Block{Stmts: []Stmt{{
-		Kind: StmtAssign, LhsVar: CreateVariableScalars("a", GetIntType(), false, false),
+		Kind: StmtAssign, LhsVar: ptrArr,
 		Expr: rhs, ArrayAccess: "a[i]", StmID: 2,
 	}}}
 	var ptrsArr []*Variable
+	// with init_value on Expr (C++ path) — must NOT walk Then Lhs as extra ptr
 	CollectReferencedPtrsStmt(&Stmt{
 		Kind: StmtArrayOp, StmID: 1,
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
-		Then: body,
+		Then: body, Expr: rhs,
 	}, &ptrsArr)
 	if !VariablesComplete(ptrsArr) {
-		t.Fatal("array-init ArrayOp (numeric loop + body) must collect without IncompleteVariables", ptrsArr)
+		t.Fatal("array-init ArrayOp must collect without IncompleteVariables", ptrsArr)
 	}
 	if HasError() {
 		t.Fatal("array-init ArrayOp must not SetError sticky")
 	}
+	for _, p := range ptrsArr {
+		if p == ptrArr {
+			t.Fatal("array-init get_blocks empty: must not invent Lhs ptr from Output Then")
+		}
+	}
 	ClearError()
-	// with init_value on Expr (C++ Expression ctor path)
+	// Expr-only (no Then) still completes
 	var ptrsInit []*Variable
 	CollectReferencedPtrsStmt(&Stmt{
 		Kind: StmtArrayOp, StmID: 3,
