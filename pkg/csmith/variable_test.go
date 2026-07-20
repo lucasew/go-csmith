@@ -562,3 +562,49 @@ func TestIsVolatileIncludesVolatileStructUnion(t *testing.T) {
 		t.Fatal("ReadVar volatile struct must clear side_effect_free")
 	}
 }
+
+
+func TestCreateFieldVarsStorageVolOnly(t *testing.T) {
+	// Variable.cpp:344–358 — create_field_vars ORs qfer.is_volatile() (storage),
+	// not Variable::is_volatile() (includes is_volatile_struct_union).
+	ClearError()
+	volField := NewCVQualifiers([]bool{false}, []bool{true})
+	plainField := NewCVQualifiers([]bool{false}, []bool{false})
+	st := &Type{
+		isStruct:   true,
+		StructName: "S0",
+		Fields: []StructField{
+			{Name: "f0", Type: GetSimpleType(EUInt), Qfer: volField, BitWidth: 15},
+			{Name: "f1", Type: GetSimpleType(EInt), Qfer: plainField, BitWidth: -1},
+		},
+	}
+	// non-vol storage qfer; type is vol-struct via f0
+	v := CreateVariableScalars("g_s", st, false, false)
+	if v == nil {
+		t.Fatal("create")
+	}
+	v.Type = st
+	v.Qfer = NewCVQualifiers([]bool{false}, []bool{false})
+	v.FieldVars = nil
+	ClearError()
+	v.CreateFieldVars()
+	if HasError() || len(v.FieldVars) < 2 {
+		t.Fatalf("fields err=%v n=%d", HasError(), len(v.FieldVars))
+	}
+	// parent IsVolatile true (vol struct fields)
+	if !v.IsVolatile() {
+		t.Fatal("parent must IsVolatile via struct fields")
+	}
+	// f1 must stay non-vol (only storage OR field qfer)
+	f1 := v.FieldVars[1]
+	if f1.Qfer.IsVolatile() {
+		t.Fatal("plain field must not inherit parent IsVolatile() type-OR")
+	}
+	if f1.IsVolatile() {
+		t.Fatal("plain field Variable.IsVolatile must false")
+	}
+	// f0 stays vol from field qfer
+	if !v.FieldVars[0].IsVolatile() {
+		t.Fatal("vol field must remain volatile")
+	}
+}

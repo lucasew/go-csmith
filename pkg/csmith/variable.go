@@ -2113,15 +2113,18 @@ func (v *Variable) CreateFieldVars() {
 	if len(v.FieldVars) > 0 {
 		return
 	}
-	// Variable.cpp:340 — assert(fields.size() == qfers_.size()); Go fields embed qfer
-	isVol := v.IsVolatile()
-	// residual ERROR sticky — no invent soft-create fields past IsVolatile residual
+	// Variable.cpp:340 / 344–345 — qfer.is_volatile() / qfer.is_const() STORAGE only.
+	// Do NOT use Variable::is_volatile() (after_deref ORs is_volatile_struct_union):
+	// that would force all fields vol when parent has any vol field (seed2 e848:
+	// g_44.f1/f2/f4 wrongly vol → filtered under non-SE-free; UP n=11 vs Go n=8).
+	isVol := v.Qfer.IsVolatile()
+	// residual ERROR sticky — no invent soft-create fields past qfer IsVolatile residual
 	if HasError() {
 		v.FieldVars = IncompleteVariables()
 		return
 	}
-	isConst := v.IsConst()
-	// residual ERROR sticky — no invent soft-create fields past IsConst residual
+	isConst := v.Qfer.IsConst()
+	// residual ERROR sticky — no invent soft-create fields past qfer IsConst residual
 	if HasError() {
 		v.FieldVars = IncompleteVariables()
 		return
