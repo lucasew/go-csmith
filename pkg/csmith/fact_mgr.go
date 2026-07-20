@@ -538,6 +538,11 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		}
 	}
 	cl := fact.Clone()
+	// residual ERROR sticky — no invent soft-append past Clone residual
+	if HasError() {
+		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
+		return
+	}
 	if cl == nil {
 		fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 		SetError(ErrGeneric)
@@ -1139,6 +1144,10 @@ func RemoveFunctionLocalFactsAt(facts []*FactPointTo, f *Function, stParent *Blo
 			return IncompleteFactSlice()
 		}
 		cl := fact.Clone()
+		// residual ERROR sticky — no invent soft-keep past Clone residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if cl == nil {
 			SetError(ErrGeneric)
 			return IncompleteFactSlice()
@@ -1571,6 +1580,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 			return
 		}
 		cl := f.Clone()
+		// residual ERROR sticky — no invent soft-push past Clone residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
 		if cl == nil {
 			// incomplete PointTo on new fact — fail closed sticky
 			fm.GlobalFacts = IncompleteFactSlice()
@@ -1607,6 +1621,11 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 					continue
 				}
 				c2 := f.Clone()
+				// residual ERROR sticky — no invent soft-push past Clone residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					return
+				}
 				if c2 == nil {
 					fm.GlobalFacts = IncompleteFactSlice()
 					SetError(ErrGeneric)
@@ -2090,13 +2109,26 @@ func AddNewVarFactInto(v *Variable, facts *[]*FactPointTo) {
 			return
 		}
 		cl := f.Clone()
+		// residual ERROR sticky — no invent soft-makeup past Clone residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return
+		}
 		if cl == nil {
 			*facts = IncompleteFactSlice()
 			SetError(ErrGeneric)
 			return
 		}
 		if FindRelatedPointTo(*facts, f.Var) == nil {
+			// residual ERROR sticky — no invent soft-append past FindRelated residual
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return
+			}
 			*facts = append(*facts, cl)
+		} else if HasError() {
+			*facts = IncompleteFactSlice()
+			return
 		}
 	}
 }

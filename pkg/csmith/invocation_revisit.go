@@ -637,7 +637,12 @@ func cloneEffectMap(m map[int]Effect) map[int]Effect {
 	}
 	out := make(map[int]Effect, len(m))
 	for k, v := range m {
-		out[k] = v.Clone()
+		cp := v.Clone()
+		// residual ERROR sticky — no invent soft-clone map past IncompleteEffect residual
+		if HasError() {
+			return make(map[int]Effect)
+		}
+		out[k] = cp
 	}
 	return out
 }

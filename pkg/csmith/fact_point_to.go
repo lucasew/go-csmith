@@ -1098,6 +1098,11 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		}
 		if cur == nil {
 			cl := nf.Clone()
+			// residual ERROR sticky — no invent soft-append past Clone residual
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return false
+			}
 			if cl == nil {
 				*facts = IncompleteFactSlice()
 				SetError(ErrGeneric)
@@ -1109,6 +1114,11 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 		}
 		// join into clone then replace
 		cp := cur.Clone()
+		// residual ERROR sticky — no invent soft-join past Clone residual
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
+		}
 		if cp == nil {
 			*facts = IncompleteFactSlice()
 			SetError(ErrGeneric)
@@ -1312,6 +1322,10 @@ func CloneFactSlice(facts []*FactPointTo) []*FactPointTo {
 	for _, f := range facts {
 		// Fact* always live after FactsComplete; Clone nil = incomplete PointTo sticky
 		cl := f.Clone()
+		// residual ERROR sticky — no invent soft-clone past Clone residual
+		if HasError() {
+			return IncompleteFactSlice()
+		}
 		if cl == nil {
 			SetError(ErrGeneric)
 			return IncompleteFactSlice()

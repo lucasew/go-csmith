@@ -652,7 +652,12 @@ func VisitFactsStatementArrayOp(st *Stmt, cg *CGContext, opts Options) bool {
 				SetError(ErrGeneric)
 				return false
 			}
-			cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
+			effCl := cg.EffectStm.Clone()
+	// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
+	if HasError() {
+		return false
+	}
+	cg.FM.SetMapStmEffect(st.StmID, effCl)
 		}
 		return true
 	}

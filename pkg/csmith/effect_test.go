@@ -76,3 +76,26 @@ func TestIsSideEffectFreeIncompleteResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIncompleteEffectCloneResidualSticky(t *testing.T) {
+	// IncompleteEffect Clone residual soft invent was invent soft-complete snapshot past hole.
+	ClearError()
+	cp := IncompleteEffect().Clone()
+	if EffectComplete(cp) {
+		t.Fatal("IncompleteEffect Clone must stay IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("IncompleteEffect Clone must SetError sticky")
+	}
+	ClearError()
+	// complete clone no sticky
+	e := EmptyEffect()
+	cp2 := e.Clone()
+	if !EffectComplete(cp2) {
+		t.Fatal("EmptyEffect Clone must complete")
+	}
+	if HasError() {
+		t.Fatal("complete Clone must not sticky")
+	}
+	ClearError()
+}

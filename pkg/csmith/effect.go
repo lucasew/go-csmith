@@ -61,6 +61,9 @@ func EffectComplete(e Effect) bool {
 func (e Effect) Clone() Effect {
 	out := Effect{pure: e.pure, sideEffectFree: e.sideEffectFree, incomplete: e.incomplete}
 	if e.incomplete {
+		// residual ERROR sticky — no invent soft-complete clone past IncompleteEffect hole
+		// (snapshot restore paths must HasError/EffectComplete fail closed)
+		SetError(ErrGeneric)
 		return IncompleteEffect()
 	}
 	if len(e.read) > 0 {

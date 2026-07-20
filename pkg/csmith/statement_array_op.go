@@ -564,7 +564,12 @@ func MakeRandomArrayInit(
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
-		cg.FM.SetMapStmEffect(st.StmID, cg.EffectStm.Clone())
+		eff := cg.EffectStm.Clone()
+		// residual ERROR sticky — no invent soft-map effect past IncompleteEffect Clone residual
+		if HasError() {
+			return Stmt{}
+		}
+		cg.FM.SetMapStmEffect(st.StmID, eff)
 	}
 	_ = probs
 	return st

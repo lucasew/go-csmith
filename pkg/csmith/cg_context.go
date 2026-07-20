@@ -337,6 +337,14 @@ func (c *CGContext) ResetEffectAccum(e Effect) {
 		return
 	}
 	cp := e.Clone()
+	// residual ERROR sticky — no invent soft-reset past IncompleteEffect Clone residual
+	if HasError() {
+		return
+	}
+	if !EffectComplete(cp) {
+		SetError(ErrGeneric)
+		return
+	}
 	if c.EffectAccum != nil {
 		*c.EffectAccum = cp
 		return

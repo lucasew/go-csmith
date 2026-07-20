@@ -369,12 +369,15 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 			SetError(ErrGeneric)
 			return nil
 		}
-		if ret != nil && f.ReturnType != nil && !ret.IsConvertableOpts(f.ReturnType, opts) {
-			// residual ERROR sticky — no invent soft-continue then pick later past hole
+		if ret != nil && f.ReturnType != nil {
+			ok := ret.IsConvertableOpts(f.ReturnType, opts)
+			// residual ERROR sticky — no invent soft-continue then pick later past IsConvertable residual
 			if HasError() {
 				return nil
 			}
-			continue
+			if !ok {
+				continue
+			}
 		}
 		// Function.cpp:294–295 — qfer->match(rv->qfer); RV always live after create
 		// incomplete RV fails closed sticky (no invent soft-skip as match / re-pick)
