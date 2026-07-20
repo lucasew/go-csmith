@@ -138,6 +138,14 @@ func (t *Type) IsConstStructUnion() bool {
 			return true
 		}
 		if f.Qfer.IsConst() {
+			// residual ERROR sticky — no invent const-true past field IsConst residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past IsConst residual false
+		if HasError() {
 			return true
 		}
 	}
@@ -170,6 +178,14 @@ func (t *Type) IsVolatileStructUnion() bool {
 			return true
 		}
 		if f.Qfer.IsVolatile() {
+			// residual ERROR sticky — no invent vol-true past field IsVolatile residual
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past IsVolatile residual false
+		if HasError() {
 			return true
 		}
 	}

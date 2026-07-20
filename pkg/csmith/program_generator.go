@@ -909,13 +909,15 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	var initVal string
 	if av.InitExpr != nil {
 		initVal = av.InitExpr.Output()
+		// residual ERROR sticky — no invent forced loop-init past Output residual hole
+		if HasError() {
+			return ""
+		}
 	} else if av.Init != nil {
 		initVal = av.Init.Value
 	}
 	if initVal == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder

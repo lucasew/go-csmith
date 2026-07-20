@@ -495,3 +495,19 @@ func TestVisitFactsLhsCompoundRead(t *testing.T) {
 		t.Fatal("rw", eff.IsRead(v), eff.IsWritten(v))
 	}
 }
+
+func TestAttributeGeneratorMakeRandomResidualSticky(t *testing.T) {
+	// MakeRandom residual soft invent was soft-continue later attrs invent partial __attribute__.
+	ClearError()
+	g := &AttributeGenerator{Attributes: []Attribute{
+		&BooleanAttribute{Name: "unused", Prob: 100},
+		&BooleanAttribute{Name: "", Prob: 100}, // empty name residual sticky
+	}}
+	if s := g.Output(NewRng(1)); s != "" {
+		t.Fatal("MakeRandom residual must fail closed AttributeGenerator.Output", s)
+	}
+	if !HasError() {
+		t.Fatal("MakeRandom residual AttributeGenerator.Output must SetError sticky")
+	}
+	ClearError()
+}

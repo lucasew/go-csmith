@@ -797,3 +797,23 @@ func TestReturnTypeCNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputArrayInitForcedResidualSticky(t *testing.T) {
+	// InitExpr Output residual soft invent was invent forced loop-init past hole.
+	ClearError()
+	av := &ArrayVariable{
+		Variable: Variable{
+			Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
+			InitExpr: &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}, // Type-nil residual
+		},
+		Sizes: []int{2},
+	}
+	av.AsArray = av
+	if s := outputArrayInitForced(av, "    ", []string{"i"}, true); s != "" {
+		t.Fatal("InitExpr Output residual must fail closed outputArrayInitForced", s)
+	}
+	if !HasError() {
+		t.Fatal("InitExpr Output residual outputArrayInitForced must SetError sticky")
+	}
+	ClearError()
+}

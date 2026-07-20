@@ -621,3 +621,42 @@ func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestInvocationOutputArgResidualSticky(t *testing.T) {
+	// Arg Output residual soft invent was soft-continue later args invent partial call.
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	fi := &Invocation{
+		User: f,
+		Args: []*Expression{
+			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
+		},
+	}
+	if s := fi.Output(); s != "" {
+		t.Fatal("arg Output residual must fail closed Invocation.Output", s)
+	}
+	if !HasError() {
+		t.Fatal("arg Output residual Invocation.Output must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestInvocationBinaryOutputResidualSticky(t *testing.T) {
+	// a0/a1 Output residual soft invent was invent binary past incomplete arg.
+	ClearError()
+	fi := &Invocation{
+		IsStd: true, Binary: "+",
+		Args: []*Expression{
+			{Term: TermConstant, Con: MakeInt(1)},
+			{Term: TermConstant, Con: &Constant{Value: "2"}}, // Type-nil residual
+		},
+	}
+	if s := fi.Output(); s != "" {
+		t.Fatal("a1 Output residual must fail closed binary Output", s)
+	}
+	if !HasError() {
+		t.Fatal("a1 Output residual binary Output must SetError sticky")
+	}
+	ClearError()
+}

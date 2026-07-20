@@ -381,6 +381,10 @@ func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng
 		attr := st.LabelAttr
 		if attr == "" && emitLabelAttrs && attrRng != nil {
 			attr = EnsureLabelAttrGenerator().Output(attrRng)
+			// residual ERROR sticky — no invent soft-continue label past attr residual
+			if HasError() {
+				return "", false
+			}
 		}
 		if attr != "" {
 			b.WriteString(attr)

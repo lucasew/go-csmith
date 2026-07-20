@@ -1519,12 +1519,14 @@ func (e *Expression) outputBody() string {
 			// ExpressionAssign::Output → (assign as expr)
 			wrap := e.Assign.LhsVar != nil && e.Assign.LhsVar.UseVolRVal
 			as := OutputAssignAsExpr(e.Assign, wrap)
+			// residual ERROR sticky — no invent soft-empty assign expr past Output residual
+			if HasError() {
+				return ""
+			}
 			if as != "" {
 				return "(" + as + ")"
 			}
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		SetError(ErrGeneric)
@@ -1537,12 +1539,18 @@ func (e *Expression) outputBody() string {
 			return ""
 		}
 		lhs := e.CommaLHS.Output()
+		// residual ERROR sticky — no invent soft-continue RHS past LHS Output residual
+		if HasError() {
+			return ""
+		}
 		rhs := e.CommaRHS.Output()
+		// residual ERROR sticky — no invent soft-empty comma past RHS Output residual
+		if HasError() {
+			return ""
+		}
 		if lhs == "" || rhs == "" {
 			// incomplete side IR — sticky fail closed whole comma
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		return "(" + lhs + " , " + rhs + ")"

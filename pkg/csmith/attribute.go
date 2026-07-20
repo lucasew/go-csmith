@@ -202,6 +202,10 @@ func (g *AttributeGenerator) Output(r *Rng) string {
 			return ""
 		}
 		s := a.MakeRandom(r)
+		// residual ERROR sticky — no invent soft-continue later attrs past MakeRandom residual
+		if HasError() {
+			return ""
+		}
 		if s != "" {
 			parts = append(parts, s)
 		}

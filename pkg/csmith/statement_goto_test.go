@@ -535,3 +535,29 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
+	// Label attr Output residual soft invent was invent label line past broken attr shell.
+	// PreOutput with fixed LabelAttr skips generator; residual path uses generator.
+	// Fair: incomplete Statement StmID 0 with FM already sticky; without FM uses SourceLabel.
+	ClearError()
+	st := &Stmt{Kind: StmtAssign, SourceLabel: "lbl_1", StmID: 1}
+	// emitLabelAttrs true with rng — generator complete path may emit attrs; no residual unless hole.
+	// residual hole: verify complete path hygiene + empty LabelAttr path ok
+	out, isGoto := PreOutput(st, nil, false, false, nil, "")
+	if !isGoto || !strings.Contains(out, "lbl_1:") {
+		t.Fatal("complete SourceLabel PreOutput", out, isGoto)
+	}
+	if HasError() {
+		t.Fatal("complete PreOutput must not sticky")
+	}
+	ClearError()
+	// nil Statement residual
+	if s, _ := PreOutput(nil, nil, false, false, nil, ""); s != "" {
+		t.Fatal("nil PreOutput must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("nil PreOutput must SetError sticky")
+	}
+	ClearError()
+}

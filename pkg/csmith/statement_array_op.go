@@ -302,7 +302,14 @@ func MakeRandomArrayInit(
 	invalid := map[*Variable]bool{}
 	volCount := 0
 	if av.IsVolatile() {
+		// residual ERROR sticky — no invent volCount past IsVolatile residual hole
+		if HasError() {
+			return Stmt{}
+		}
 		volCount++
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue non-vol past IsVolatile residual false
+		return Stmt{}
 	}
 	var facts []*FactPointTo
 	if cg.FM != nil {
@@ -348,6 +355,10 @@ func MakeRandomArrayInit(
 					break
 				}
 				volCount++
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
+				iv = nil
+				break
 			}
 			// StatementArrayOp.cpp:118–123 — strict_volatile / ccomp packed / signed_char
 			packed := opts.CComp && iv.IsPackedAggregateFieldVar()

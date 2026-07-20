@@ -85,11 +85,13 @@ func (fi *Invocation) Output() string {
 				return ""
 			}
 			out := a.Output()
+			// residual ERROR sticky — no invent soft-continue later args past Output residual
+			if HasError() {
+				return ""
+			}
 			if out == "" {
 				// incomplete arg IR — sticky fail closed whole call
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			parts = append(parts, out)
@@ -122,13 +124,20 @@ func (fi *Invocation) Output() string {
 				return ""
 			}
 			a0 := fi.Args[0].Output()
-			if a0 == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+			// residual ERROR sticky — no invent soft-empty unary past Output residual
+			if HasError() {
 				return ""
 			}
-			return fi.outputUnary(a0)
+			if a0 == "" {
+				SetError(ErrGeneric)
+				return ""
+			}
+			out := fi.outputUnary(a0)
+			// residual ERROR sticky — no invent soft-empty unary past outputUnary residual
+			if HasError() {
+				return ""
+			}
+			return out
 		}
 		// binary: need two live args with non-empty Output
 		if len(fi.Args) < 2 || fi.Args[0] == nil || fi.Args[1] == nil {
@@ -141,14 +150,25 @@ func (fi *Invocation) Output() string {
 			return ""
 		}
 		a0 := fi.Args[0].Output()
-		a1 := fi.Args[1].Output()
-		if a0 == "" || a1 == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+		// residual ERROR sticky — no invent soft-continue a1 past a0 Output residual
+		if HasError() {
 			return ""
 		}
-		return fi.outputBinary(a0, a1)
+		a1 := fi.Args[1].Output()
+		// residual ERROR sticky — no invent soft-empty binary past a1 Output residual
+		if HasError() {
+			return ""
+		}
+		if a0 == "" || a1 == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		out := fi.outputBinary(a0, a1)
+		// residual ERROR sticky — no invent soft-empty binary past outputBinary residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	// incomplete non-user non-std shell sticky
 	SetError(ErrGeneric)
