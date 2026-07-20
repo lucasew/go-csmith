@@ -536,17 +536,37 @@ func (q CVQualifiers) RandomLooseQualifiers(
 		vols = make([]bool, len(q.IsVolatiles))
 	} else {
 		vols = q.RandomLooserVolatiles(r, opts, probs)
+		// residual ERROR sticky — no invent soft-continue looser past RandomLooserVolatiles residual
+		if HasError() {
+			return CVQualifiers{}
+		}
 		if !cg.EffectContext().IsSideEffectFree() && len(vols) > 0 {
+			// residual ERROR sticky — no invent soft-clear vol past IsSideEffectFree residual
+			if HasError() {
+				return CVQualifiers{}
+			}
 			vols[len(vols)-1] = false
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsSideEffectFree residual true
+			return CVQualifiers{}
 		}
 	}
 	MakeScalarVolatiles(opts, vols)
 	consts := q.RandomLooserConsts(r, opts, probs)
+	// residual ERROR sticky — no invent soft-continue looser past RandomLooserConsts residual
+	if HasError() {
+		return CVQualifiers{}
+	}
 	MakeScalarConsts(opts, consts)
 	if access == AccessWrite && len(consts) > 0 {
 		consts[len(consts)-1] = false
 	}
-	return NewCVQualifiers(consts, vols)
+	out := NewCVQualifiers(consts, vols)
+	// residual ERROR sticky — no invent soft-qfer past NewCVQualifiers residual (mismatch)
+	if HasError() {
+		return CVQualifiers{}
+	}
+	return out
 }
 
 // RandomAddQualifiers mirrors CVQualifiers::random_add_qualifiers.
@@ -574,13 +594,27 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	}
 	isConst := false
 	if opts.ConstPointers && probs != nil {
-		isConst = r.RndFlipcoin(uint32(probs.Single(PRegularConstProb)))
+		p := probs.Single(PRegularConstProb)
+		// residual ERROR sticky — no invent soft-const past Single residual hole
+		if HasError() {
+			return q
+		}
+		isConst = r.RndFlipcoin(uint32(p))
 	}
 	isVol := false
 	if !noVolatile && opts.VolatilePointers && probs != nil {
-		isVol = r.RndFlipcoin(uint32(probs.Single(PRegularVolatileProb)))
+		p := probs.Single(PRegularVolatileProb)
+		// residual ERROR sticky — no invent soft-vol past Single residual hole
+		if HasError() {
+			return q
+		}
+		isVol = r.RndFlipcoin(uint32(p))
 	}
 	out.AddQualifiers(isConst, isVol)
+	// residual ERROR sticky — no invent soft-add level past AddQualifiers residual
+	if HasError() {
+		return q
+	}
 	return out
 }
 

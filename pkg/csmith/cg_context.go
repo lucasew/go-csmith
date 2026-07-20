@@ -1000,14 +1000,20 @@ func (c *CGContext) CheckDerefVolatile(v *Variable, derefLevel int, opts Options
 	// Incomplete accum/stm AccessDerefVolatile sticky (AccessDerefVolatile sets ERROR)
 	if c.EffectAccum != nil {
 		*c.EffectAccum = c.EffectAccum.AccessDerefVolatile(v, derefLevel, true)
+		// residual ERROR sticky — no invent soft-continue stm past accum AccessDeref residual
+		if HasError() {
+			return false
+		}
 		if !EffectComplete(*c.EffectAccum) {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return false
 		}
 	}
 	c.EffectStm = c.EffectStm.AccessDerefVolatile(v, derefLevel, true)
+	// residual ERROR sticky — no invent soft-OK past stm AccessDeref residual
+	if HasError() {
+		return false
+	}
 	if !EffectComplete(c.EffectStm) {
 		if !HasError() {
 			SetError(ErrGeneric)

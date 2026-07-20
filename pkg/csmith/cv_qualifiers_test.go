@@ -519,3 +519,34 @@ func TestSanityCheckIndirectLevelResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRandomLooseQualifiersNilRNGSticky(t *testing.T) {
+	// nil RNG residual soft invent was invent fixed looser qfer shell.
+	ClearError()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	out := q.RandomLooseQualifiers(false, AccessRead, EmptyCGContext(), Defaults(), NewProbabilities(Defaults()), nil)
+	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
+		t.Fatal("nil RNG RandomLooseQualifiers must fail closed empty", out)
+	}
+	if !HasError() {
+		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestRandomLooseQualifiersIncompleteEffectSticky(t *testing.T) {
+	ClearError()
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	cg := EmptyCGContext()
+	// incomplete effect context
+	inc := IncompleteEffect()
+	cg = WithEffectContext(inc)
+	out := q.RandomLooseQualifiers(false, AccessRead, cg, Defaults(), NewProbabilities(Defaults()), NewRng(1))
+	if len(out.IsConsts) != 0 {
+		t.Fatal("incomplete ambient RandomLooseQualifiers must fail closed empty", out)
+	}
+	if !HasError() {
+		t.Fatal("incomplete ambient RandomLooseQualifiers must SetError sticky")
+	}
+	ClearError()
+}

@@ -61,11 +61,20 @@ func OutputVariableList(vars []*Variable, indent string, forceStatic bool) strin
 // no invent section header without any live global defs
 func OutputGlobalVariables(vars []*Variable) string {
 	body := OutputVariableList(vars, "", true)
+	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
+	if HasError() {
+		return ""
+	}
 	if body == "" {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(OutputCommentLine("--- GLOBAL VARIABLES ---", false, false))
+	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
+	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
+	if HasError() {
+		return ""
+	}
+	b.WriteString(hdr)
 	b.WriteString(body)
 	return b.String()
 }
@@ -75,11 +84,20 @@ func OutputGlobalVariables(vars []*Variable) string {
 // no invent section header without any live decls
 func OutputGlobalVariablesDecls(vars []*Variable, prefix string) string {
 	body := OutputVariableList(vars, "", false)
+	// residual ERROR sticky — no invent soft-header past OutputVariableList residual
+	if HasError() {
+		return ""
+	}
 	if body == "" {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(OutputCommentLine("--- GLOBAL VARIABLES ---", false, false))
+	hdr := OutputCommentLine("--- GLOBAL VARIABLES ---", false, false)
+	// residual ERROR sticky — no invent soft-body past OutputCommentLine residual
+	if HasError() {
+		return ""
+	}
+	b.WriteString(hdr)
 	// prefix each line (e.g. "extern ")
 	if prefix == "" {
 		b.WriteString(body)

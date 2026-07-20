@@ -890,3 +890,24 @@ func TestIsFieldReadableIsUnionResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputGlobalVariablesListResidualSticky(t *testing.T) {
+	// OutputDef residual soft invent was invent section header past incomplete var.
+	ClearError()
+	// incomplete list sticky
+	if OutputGlobalVariables([]*Variable{nil}) != "" {
+		t.Fatal("nil hole OutputGlobalVariables must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil hole OutputGlobalVariables must SetError sticky")
+	}
+	ClearError()
+	// complete empty
+	if OutputGlobalVariables(nil) != "" {
+		t.Fatal("empty OutputGlobalVariables must be empty")
+	}
+	if HasError() {
+		t.Fatal("empty OutputGlobalVariables must not sticky")
+	}
+	ClearError()
+}
