@@ -146,15 +146,58 @@ func OutputWrapperH() string {
 	return "#define N_WRAP " + itoa(WrapperNamesCount()) + "\n"
 }
 
-// SafeOpKind mirrors SafeOpKind for make_random_binary.
+// SafeOpKind mirrors SafeOpKind for make_random_binary / make_random_unary.
 type SafeOpKind int
 
 const (
+	// SafeOpUnary is sOpUnary.
+	SafeOpUnary SafeOpKind = iota
 	// SafeOpBinary is sOpBinary.
-	SafeOpBinary SafeOpKind = iota
+	SafeOpBinary
 	// SafeOpAssign is sOpAssign (compound assign).
 	SafeOpAssign
 )
+
+// MaxSafeOpKind is MAX_SAFE_OP_KIND (one past last kind).
+const MaxSafeOpKind = int(SafeOpAssign) + 1
+
+// MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
+// SafeOpFlags.cpp:61–63 — (false, false, false, sInt8).
+func MakeDummyFlags() *SafeOpFlags {
+	return &SafeOpFlags{
+		Op1Signed: false,
+		Op2Signed: false,
+		IsFunc:    false,
+		Size:      SafeInt8,
+	}
+}
+
+// Op1Sign mirrors SafeOpFlags::get_op1_sign.
+func (f *SafeOpFlags) Op1Sign() bool {
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.Op1Signed
+}
+
+// Op2Sign mirrors SafeOpFlags::get_op2_sign.
+func (f *SafeOpFlags) Op2Sign() bool {
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.Op2Signed
+}
+
+// OpSize mirrors SafeOpFlags::get_op_size.
+func (f *SafeOpFlags) OpSize() SafeOpSize {
+	if f == nil {
+		SetError(ErrGeneric)
+		return SafeInt8
+	}
+	return f.Size
+}
 
 // SafeMathWrapperAllowed mirrors CGOptions::safe_math_wrapper(id).
 // CGOptions.cpp:597–602 — empty list means all allowed.

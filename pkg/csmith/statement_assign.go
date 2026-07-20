@@ -506,14 +506,6 @@ func MakeRandomAssignQfer(
 	return st
 }
 
-// MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
-// SafeOpFlags.cpp:61–63.
-// MakeDummyFlags mirrors SafeOpFlags::make_dummy_flags.
-// SafeOpFlags.cpp:61–63 — unsigned int8, is_func false.
-func MakeDummyFlags() *SafeOpFlags {
-	return &SafeOpFlags{Op1Signed: false, Op2Signed: false, IsFunc: false, Size: SafeInt8}
-}
-
 // makePossibleCompoundAssign mirrors StatementAssign::make_possible_compound_assign.
 // StatementAssign.cpp:244–301 — for compound ops: SafeOpFlags + FunctionInvocationBinary
 // operands (ExpressionVariable(lhs), e.clone()) wrapped as ExpressionFuncall rhs;

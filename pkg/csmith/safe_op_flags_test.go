@@ -213,3 +213,29 @@ func TestSafeOpsSizeWeightNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeDummyFlagsAndGetters(t *testing.T) {
+	// SafeOpFlags.cpp:61–63 make_dummy_flags; get_op*_sign / get_op_size
+	f := MakeDummyFlags()
+	if f.Op1Sign() || f.Op2Sign() || f.OpSize() != SafeInt8 || f.IsFunc {
+		t.Fatalf("dummy: %+v", f)
+	}
+	if f.Clone().Size != SafeInt8 {
+		t.Fatal("clone")
+	}
+	// SafeOpKind order matches C++ enum class
+	if SafeOpUnary != 0 || SafeOpBinary != 1 || SafeOpAssign != 2 || MaxSafeOpKind != 3 {
+		t.Fatalf("kind order u=%d b=%d a=%d max=%d", SafeOpUnary, SafeOpBinary, SafeOpAssign, MaxSafeOpKind)
+	}
+	if MinimalDepth(DtSafeOpFlags, int(SafeOpBinary)) != 2 {
+		t.Fatal("binary minimal depth")
+	}
+	if MinimalDepth(DtSafeOpFlags, int(SafeOpUnary)) != 3 {
+		t.Fatal("unary minimal depth")
+	}
+	ClearError()
+	if (*SafeOpFlags)(nil).Op1Sign() || !HasError() {
+		t.Fatal("nil Op1Sign sticky")
+	}
+	ClearError()
+}

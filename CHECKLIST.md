@@ -129,7 +129,7 @@ Total items: 2070
 - [ ] Block.cpp::find_block_by_id
 - [ ] Block.cpp::OutputStatementList
 - [ ] Bookkeeper.cpp::Bookkeeper.Bookkeeper
-- [ ] Bookkeeper.cpp::Bookkeeper.doFinalization
+- [x] Bookkeeper.cpp::Bookkeeper.doFinalization
 - [ ] Bookkeeper.cpp::Bookkeeper.output_bitfields
 - [ ] Bookkeeper.cpp::Bookkeeper.output_counters
 - [ ] Bookkeeper.cpp::Bookkeeper.output_expr_statistics
@@ -487,93 +487,93 @@ Total items: 2070
 - [ ] DefaultRndNumGenerator.cpp::std.to_string
 - [x] DefaultRndNumGenerator.cpp::csmith_trace_rng_enabled
 - [ ] DepthSpec.cpp::DepthSpec.backtracking
-- [ ] DepthSpec.cpp::DepthSpec.depth_guard_by_depth
-- [ ] DepthSpec.cpp::DepthSpec.depth_guard_by_type
+- [x] DepthSpec.cpp::DepthSpec.depth_guard_by_depth
+- [x] DepthSpec.cpp::DepthSpec.depth_guard_by_type
 - [ ] DepthSpec.cpp::DepthSpec.depth_print
-- [ ] DepthSpec.cpp::DepthSpec.dtBlock_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtExpression_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtExpressionFuncall_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtExpressionRandomParam_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtExpressionVariable_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFirstFunction_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtBlock_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtExpression_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtExpressionFuncall_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtExpressionRandomParam_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtExpressionVariable_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFirstFunction_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtFunction_minimal_depth_
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionGenerateBody_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationBinary_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandom_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinary_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionGenerateBody_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationBinary_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandom_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinary_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomBinaryPointer_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomRegularBinary_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomUnary_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationRandomUnary_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationStdFunc_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtFunctionInvocationUnary_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtFunctionInvocationUnary_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtFunctionUserBuildInvocation_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtGenerateNewGlobal_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtGenerateNewParentLocal_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtGenerateNewVariable_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtGenerateParamList_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtInitPointerValue_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtInitVariable_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtLhs_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtRandomTypeFromType_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtReturnType_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSafeOpFlags_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectDerefPointer_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtGenerateNewGlobal_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtGenerateNewParentLocal_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtGenerateNewVariable_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtGenerateParamList_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtInitPointerValue_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtInitVariable_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtLhs_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtRandomTypeFromType_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtReturnType_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSafeOpFlags_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectDerefPointer_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtSelectExistingVariable_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectGlobal_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectLValue_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectParentLocal_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtSelectVariable_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectGlobal_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectLValue_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectParentLocal_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtSelectVariable_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.dtStatement_minimal_depth_
-- [ ] DepthSpec.cpp::DepthSpec.dtStatementAssign_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatementExpr_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatementFor_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatementIf_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtStatementReturn_minimal_depth
-- [ ] DepthSpec.cpp::DepthSpec.dtTypeChooseSimple_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatementAssign_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatementExpr_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatementFor_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatementIf_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtStatementReturn_minimal_depth
+- [x] DepthSpec.cpp::DepthSpec.dtTypeChooseSimple_minimal_depth
 - [ ] DepthSpec.cpp::DepthSpec.~DepthSpec
 - [ ] DepthSpec.cpp::dType
-- [ ] DepthSpec.cpp::dType.dtBlock
-- [ ] DepthSpec.cpp::dType.dtExpression
-- [ ] DepthSpec.cpp::dType.dtExpressionFuncall
-- [ ] DepthSpec.cpp::dType.dtExpressionRandomParam
-- [ ] DepthSpec.cpp::dType.dtExpressionVariable
-- [ ] DepthSpec.cpp::dType.dtFirstFunction
-- [ ] DepthSpec.cpp::dType.dtFunction
-- [ ] DepthSpec.cpp::dType.dtFunctionGenerateBody
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationBinary
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandom
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinary
+- [x] DepthSpec.cpp::dType.dtBlock
+- [x] DepthSpec.cpp::dType.dtExpression
+- [x] DepthSpec.cpp::dType.dtExpressionFuncall
+- [x] DepthSpec.cpp::dType.dtExpressionRandomParam
+- [x] DepthSpec.cpp::dType.dtExpressionVariable
+- [x] DepthSpec.cpp::dType.dtFirstFunction
+- [x] DepthSpec.cpp::dType.dtFunction
+- [x] DepthSpec.cpp::dType.dtFunctionGenerateBody
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationBinary
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationRandom
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinary
 - [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomBinaryPointer
 - [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomRegularBinary
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationRandomUnary
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationRandomUnary
 - [ ] DepthSpec.cpp::dType.dtFunctionInvocationStdFunc
-- [ ] DepthSpec.cpp::dType.dtFunctionInvocationUnary
+- [x] DepthSpec.cpp::dType.dtFunctionInvocationUnary
 - [ ] DepthSpec.cpp::dType.dtFunctionUserBuildInvocation
-- [ ] DepthSpec.cpp::dType.dtGenerateNewGlobal
-- [ ] DepthSpec.cpp::dType.dtGenerateNewParentLocal
-- [ ] DepthSpec.cpp::dType.dtGenerateNewVariable
-- [ ] DepthSpec.cpp::dType.dtGenerateParamList
-- [ ] DepthSpec.cpp::dType.dtInitPointerValue
-- [ ] DepthSpec.cpp::dType.dtInitVariable
-- [ ] DepthSpec.cpp::dType.dtLhs
-- [ ] DepthSpec.cpp::dType.dtRandomTypeFromType
-- [ ] DepthSpec.cpp::dType.dtReturnType
-- [ ] DepthSpec.cpp::dType.dtSafeOpFlags
-- [ ] DepthSpec.cpp::dType.dtSelectDerefPointer
+- [x] DepthSpec.cpp::dType.dtGenerateNewGlobal
+- [x] DepthSpec.cpp::dType.dtGenerateNewParentLocal
+- [x] DepthSpec.cpp::dType.dtGenerateNewVariable
+- [x] DepthSpec.cpp::dType.dtGenerateParamList
+- [x] DepthSpec.cpp::dType.dtInitPointerValue
+- [x] DepthSpec.cpp::dType.dtInitVariable
+- [x] DepthSpec.cpp::dType.dtLhs
+- [x] DepthSpec.cpp::dType.dtRandomTypeFromType
+- [x] DepthSpec.cpp::dType.dtReturnType
+- [x] DepthSpec.cpp::dType.dtSafeOpFlags
+- [x] DepthSpec.cpp::dType.dtSelectDerefPointer
 - [ ] DepthSpec.cpp::dType.dtSelectExistingVariable
-- [ ] DepthSpec.cpp::dType.dtSelectGlobal
-- [ ] DepthSpec.cpp::dType.dtSelectLValue
-- [ ] DepthSpec.cpp::dType.dtSelectParentLocal
-- [ ] DepthSpec.cpp::dType.dtSelectVariable
-- [ ] DepthSpec.cpp::dType.dtStatement
-- [ ] DepthSpec.cpp::dType.dtStatementAssign
-- [ ] DepthSpec.cpp::dType.dtStatementExpr
-- [ ] DepthSpec.cpp::dType.dtStatementFor
-- [ ] DepthSpec.cpp::dType.dtStatementIf
-- [ ] DepthSpec.cpp::dType.dtStatementReturn
-- [ ] DepthSpec.cpp::dType.dtTypeChooseSimple
+- [x] DepthSpec.cpp::dType.dtSelectGlobal
+- [x] DepthSpec.cpp::dType.dtSelectLValue
+- [x] DepthSpec.cpp::dType.dtSelectParentLocal
+- [x] DepthSpec.cpp::dType.dtSelectVariable
+- [x] DepthSpec.cpp::dType.dtStatement
+- [x] DepthSpec.cpp::dType.dtStatementAssign
+- [x] DepthSpec.cpp::dType.dtStatementExpr
+- [x] DepthSpec.cpp::dType.dtStatementFor
+- [x] DepthSpec.cpp::dType.dtStatementIf
+- [x] DepthSpec.cpp::dType.dtStatementReturn
+- [x] DepthSpec.cpp::dType.dtTypeChooseSimple
 - [ ] DepthSpec.cpp::depth_guard_by_depth
 - [ ] DepthSpec.cpp::depth_guard_by_type
 - [ ] DepthSpec.cpp::dtGenerateNewGlobal_minimal_depth_
@@ -1245,9 +1245,9 @@ Total items: 2070
 - [ ] PartialExpander.cpp::PartialExpander.set_stmt_expand
 - [ ] PartialExpander.cpp::PartialExpander.~PartialExpander
 - [ ] PartialExpander.cpp::print_map
-- [ ] platform.cpp::create_dir
-- [ ] platform.cpp::platform_gen_seed
-- [ ] platform.cpp::read_time
+- [x] platform.cpp::create_dir
+- [x] platform.cpp::platform_gen_seed
+- [x] platform.cpp::read_time
 - [ ] Probabilities.cpp::GroupProbElem.dump_default
 - [ ] Probabilities.cpp::GroupProbElem.dump_val
 - [ ] Probabilities.cpp::GroupProbElem.elem_exist
@@ -1512,36 +1512,36 @@ Total items: 2070
 - [ ] RandomProgramGenerator.cpp::print_advanced_help
 - [ ] RandomProgramGenerator.cpp::print_help
 - [ ] RandomProgramGenerator.cpp::print_version
-- [ ] SafeOpFlags.cpp::SafeOpFlags.clone
-- [ ] SafeOpFlags.cpp::SafeOpFlags.flags_to_type
-- [ ] SafeOpFlags.cpp::SafeOpFlags.get_lhs_type
-- [ ] SafeOpFlags.cpp::SafeOpFlags.get_op1_sign
-- [ ] SafeOpFlags.cpp::SafeOpFlags.get_op2_sign
-- [ ] SafeOpFlags.cpp::SafeOpFlags.get_op_size
-- [ ] SafeOpFlags.cpp::SafeOpFlags.get_rhs_type
-- [ ] SafeOpFlags.cpp::SafeOpFlags.make_dummy_flags
-- [ ] SafeOpFlags.cpp::SafeOpFlags.make_random_binary
-- [ ] SafeOpFlags.cpp::SafeOpFlags.make_random_unary
+- [x] SafeOpFlags.cpp::SafeOpFlags.clone
+- [x] SafeOpFlags.cpp::SafeOpFlags.flags_to_type
+- [x] SafeOpFlags.cpp::SafeOpFlags.get_lhs_type
+- [x] SafeOpFlags.cpp::SafeOpFlags.get_op1_sign
+- [x] SafeOpFlags.cpp::SafeOpFlags.get_op2_sign
+- [x] SafeOpFlags.cpp::SafeOpFlags.get_op_size
+- [x] SafeOpFlags.cpp::SafeOpFlags.get_rhs_type
+- [x] SafeOpFlags.cpp::SafeOpFlags.make_dummy_flags
+- [x] SafeOpFlags.cpp::SafeOpFlags.make_random_binary
+- [x] SafeOpFlags.cpp::SafeOpFlags.make_random_unary
 - [ ] SafeOpFlags.cpp::SafeOpFlags.operator=
 - [ ] SafeOpFlags.cpp::SafeOpFlags.OutputFuncOrMacro
 - [ ] SafeOpFlags.cpp::SafeOpFlags.OutputOp1
 - [ ] SafeOpFlags.cpp::SafeOpFlags.OutputOp2
 - [ ] SafeOpFlags.cpp::SafeOpFlags.OutputSign
 - [ ] SafeOpFlags.cpp::SafeOpFlags.OutputSize
-- [ ] SafeOpFlags.cpp::SafeOpFlags.return_float_type
-- [ ] SafeOpFlags.cpp::SafeOpFlags.safe_float_func_string
-- [ ] SafeOpFlags.cpp::SafeOpFlags.SafeOpFlags
-- [ ] SafeOpFlags.cpp::SafeOpFlags.to_id
-- [ ] SafeOpFlags.cpp::SafeOpFlags.to_string
-- [ ] SafeOpFlags.cpp::SafeOpFlags.~SafeOpFlags
-- [ ] SafeOpFlags.cpp::SafeOpKind.sOpAssign
-- [ ] SafeOpFlags.cpp::SafeOpKind.sOpBinary
-- [ ] SafeOpFlags.cpp::SafeOpKind.sOpUnary
-- [ ] SafeOpFlags.cpp::SafeOpSize.sFloat
-- [ ] SafeOpFlags.cpp::SafeOpSize.sInt16
-- [ ] SafeOpFlags.cpp::SafeOpSize.sInt32
-- [ ] SafeOpFlags.cpp::SafeOpSize.sInt64
-- [ ] SafeOpFlags.cpp::SafeOpSize.sInt8
+- [x] SafeOpFlags.cpp::SafeOpFlags.return_float_type
+- [x] SafeOpFlags.cpp::SafeOpFlags.safe_float_func_string
+- [x] SafeOpFlags.cpp::SafeOpFlags.SafeOpFlags
+- [x] SafeOpFlags.cpp::SafeOpFlags.to_id
+- [x] SafeOpFlags.cpp::SafeOpFlags.to_string
+- [x] SafeOpFlags.cpp::SafeOpFlags.~SafeOpFlags
+- [x] SafeOpFlags.cpp::SafeOpKind.sOpAssign
+- [x] SafeOpFlags.cpp::SafeOpKind.sOpBinary
+- [x] SafeOpFlags.cpp::SafeOpKind.sOpUnary
+- [x] SafeOpFlags.cpp::SafeOpSize.sFloat
+- [x] SafeOpFlags.cpp::SafeOpSize.sInt16
+- [x] SafeOpFlags.cpp::SafeOpSize.sInt32
+- [x] SafeOpFlags.cpp::SafeOpSize.sInt64
+- [x] SafeOpFlags.cpp::SafeOpSize.sInt8
 - [ ] Sequence.cpp::Sequence.add_number
 - [ ] Sequence.cpp::Sequence.clear
 - [ ] Sequence.cpp::Sequence.get_number
@@ -1929,7 +1929,7 @@ Total items: 2070
 - [ ] Variable.cpp::Variable.compatible
 - [ ] Variable.cpp::Variable.create_field_vars
 - [ ] Variable.cpp::Variable.CreateVariable
-- [ ] Variable.cpp::Variable.doFinalization
+- [x] Variable.cpp::Variable.doFinalization
 - [ ] Variable.cpp::Variable.find
 - [ ] Variable.cpp::Variable.find_pointer_fields
 - [ ] Variable.cpp::Variable.get_actual_name
@@ -2023,7 +2023,7 @@ Total items: 2070
 - [ ] VariableSelector.cpp::VariableSelector.create_array_and_itemize
 - [ ] VariableSelector.cpp::VariableSelector.create_mutated_array_var
 - [ ] VariableSelector.cpp::VariableSelector.create_random_array
-- [ ] VariableSelector.cpp::VariableSelector.doFinalization
+- [x] VariableSelector.cpp::VariableSelector.doFinalization
 - [ ] VariableSelector.cpp::VariableSelector.eager_create_global_struct
 - [ ] VariableSelector.cpp::VariableSelector.eager_create_local_struct
 - [ ] VariableSelector.cpp::VariableSelector.expand_block_for_goto

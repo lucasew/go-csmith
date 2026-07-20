@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -92,7 +91,8 @@ func NewRootCmd() *cobra.Command {
 			}
 
 			if !seedSet {
-				opts.Seed = uint64(time.Now().UnixNano())
+				// RandomProgramGenerator.cpp:699 — platform_gen_seed()
+				opts.Seed = csmith.PlatformGenSeed()
 			}
 			if opts.DFSExhaustive {
 				// Upstream parser flips random_based off when dfs-exhaustive is enabled.

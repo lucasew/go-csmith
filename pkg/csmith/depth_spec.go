@@ -106,8 +106,9 @@ func MinimalDepth(dType string, flag int) int {
 	case DtFirstFunction:
 		return MinimalDepth(DtReturnType, 0) + MinimalDepth(DtFunctionGenerateBody, 0)
 	case DtSafeOpFlags:
-		// binary 2, unary 3
-		if flag == 1 { // sOpBinary-ish
+		// DepthSpec.cpp — sOpBinary → 2; sOpUnary (and assign) → 3
+		// SafeOpKind: sOpUnary=0, sOpBinary=1, sOpAssign=2
+		if flag == int(SafeOpBinary) {
 			return 2
 		}
 		return 3
