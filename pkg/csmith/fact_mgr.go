@@ -665,14 +665,18 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		SetError(ErrGeneric)
 		return
 	}
-	// nil oldFacts is empty restore; non-nil with holes → CloneFactSlice nil
+	// nil oldFacts is empty restore; non-nil with holes → fail closed sticky
 	if oldFacts != nil && !FactsComplete(oldFacts) {
 		fm.GlobalFacts = IncompleteFactSlice()
 		SetError(ErrGeneric)
 		return
 	}
-	cp := CloneFactSlice(oldFacts)
-	if !MakeupNewVarFacts(&cp, fm.GlobalFacts) {
+	// FactMgr.cpp:489–492 — makeup_new_var_facts(old_facts, global_facts);
+	// global_facts = old_facts. Snapshot is a Fact* vector (shallow); do not deep-clone
+	// FactPointTo objects (CloneFactSlice would freeze pre-merge lattice and diverge
+	// from C++ when Fact objects are still shared with the live env).
+	work := append([]*FactPointTo(nil), oldFacts...)
+	if !MakeupNewVarFacts(&work, fm.GlobalFacts) {
 		// incomplete GlobalFacts or mid-makeup hole — fail closed sticky
 		fm.GlobalFacts = IncompleteFactSlice()
 		if !HasError() {
@@ -680,7 +684,7 @@ func (fm *FactMgr) RestoreFacts(oldFacts []*FactPointTo) {
 		}
 		return
 	}
-	fm.GlobalFacts = cp
+	fm.GlobalFacts = work
 }
 
 // SetupInOutMaps mirrors FactMgr::setup_in_out_maps.

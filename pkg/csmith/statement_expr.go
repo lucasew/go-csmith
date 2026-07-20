@@ -46,11 +46,8 @@ func MakeRandomExprStmt(
 			SetError(ErrGeneric)
 			return Stmt{}
 		}
-		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
-		// residual ERROR sticky — no invent soft-expr stmt past CloneFactSlice residual
-		if HasError() {
-			return Stmt{}
-		}
+		// StatementExpr / ExpressionFuncall — shallow Fact* vector snapshot (C++ facts_copy = global_facts)
+		factsCopy = append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
 	}
 	list := cg.Funcs
 	// is_std_func=false (StatementExpr.cpp:60)

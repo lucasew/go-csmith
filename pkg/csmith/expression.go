@@ -1863,11 +1863,11 @@ func makeExpressionFuncall(
 		SetError(ErrGeneric)
 		return nil
 	}
-	factsCopy := CloneFactSlice(cg.FM.GlobalFacts)
-	// residual ERROR sticky — no invent soft-funcall past CloneFactSlice residual
-	if HasError() {
-		return nil
-	}
+	// ExpressionFuncall.cpp:78 — vector<const Fact *> facts_copy = fm->global_facts
+	// (shallow copy of the Fact* vector; Fact objects are shared until merge replaces slots).
+	// Deep CloneFactSlice here freezes pre-merge lattice and can drop mid-gen may-null
+	// updates that C++ keeps when Fact objects are still shared across the snapshot.
+	factsCopy := append([]*FactPointTo(nil), cg.FM.GlobalFacts...)
 	fi := MakeRandomInvocation(r, opts, probs, vs, tables, cg, list, typ, qfer, stdFunc)
 	// ExpressionFuncall.cpp:82 — ERROR_GUARD(nullptr) before fi->failed
 	if HasError() {
