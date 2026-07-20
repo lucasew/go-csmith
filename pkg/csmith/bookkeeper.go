@@ -609,29 +609,34 @@ func collectStmtExprs(st *Stmt, out *[]*Expression) bool {
 		}
 		return false
 	}
-	// StatementFor/ArrayOp::get_exprs — push test only (init/incr are separate
+	// StatementFor::get_exprs — push test only (init/incr are separate
 	// StatementAssigns not walked via get_exprs). Kind-gated (no invent
 	// Loop-on-wrong-kind). Incomplete Loop IR fails closed sticky.
-	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
+	// StatementArrayOp.h:65–68 — if (init_value) only; NOT For test.
+	// Fair: ArrayOp make_random_array_init uses numeric LoopControl (no TestExpr).
+	switch st.Kind {
+	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			SetError(ErrGeneric)
 			return false
 		}
 		*out = append(*out, st.Loop.TestExpr)
-	} else {
-		switch st.Kind {
-		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-			// C++ get_exprs always yields live Expression* for these kinds
-			// incomplete nil Expr fails closed sticky (no invent empty get_exprs success)
-			if st.Expr == nil {
-				SetError(ErrGeneric)
-				return false
-			}
+	case StmtArrayOp:
+		// optional init_value (body path has none; Go may nest RHS under Then)
+		if st.Expr != nil {
 			*out = append(*out, st.Expr)
-		default:
-			if st.Expr != nil {
-				*out = append(*out, st.Expr)
-			}
+		}
+	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+		// C++ get_exprs always yields live Expression* for these kinds
+		// incomplete nil Expr fails closed sticky (no invent empty get_exprs success)
+		if st.Expr == nil {
+			SetError(ErrGeneric)
+			return false
+		}
+		*out = append(*out, st.Expr)
+	default:
+		if st.Expr != nil {
+			*out = append(*out, st.Expr)
 		}
 	}
 	// get_blocks → recurse (Block* always live; nil hole fails closed sticky)

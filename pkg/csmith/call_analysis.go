@@ -102,32 +102,39 @@ func collectCalledInvocationsStmt(st *Stmt, out *[]*Invocation) bool {
 	if st == nil || out == nil {
 		return false
 	}
-	// StatementFor/ArrayOp::get_exprs → test only (not st.Expr)
-	// Kind-gated: no invent treat Loop-on-wrong-kind as for get_exprs
-	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
+	// StatementFor::get_exprs → test only (not st.Expr).
+	// StatementArrayOp.h:65–68 — if (init_value) only; NOT For test.
+	// Kind-gated: no invent treat Loop-on-wrong-kind as for get_exprs.
+	// Fair: array_init numeric LoopControl has no TestExpr (seed-2 ComputeSummary).
+	switch st.Kind {
+	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			return false
 		}
 		if !collectCalledInvocationsExpr(st.Loop.TestExpr, out) {
 			return false
 		}
-	} else {
-		switch st.Kind {
-		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-			// C++ get_exprs always yields live Expression* for these kinds
-			// incomplete nil Expr fails closed (no invent empty call list as success)
-			if st.Expr == nil {
-				return false
-			}
+	case StmtArrayOp:
+		// optional init_value; body path has none (walk get_blocks)
+		if st.Expr != nil {
 			if !collectCalledInvocationsExpr(st.Expr, out) {
 				return false
 			}
-		default:
-			// other kinds: optional expr if present
-			if st.Expr != nil {
-				if !collectCalledInvocationsExpr(st.Expr, out) {
-					return false
-				}
+		}
+	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+		// C++ get_exprs always yields live Expression* for these kinds
+		// incomplete nil Expr fails closed (no invent empty call list as success)
+		if st.Expr == nil {
+			return false
+		}
+		if !collectCalledInvocationsExpr(st.Expr, out) {
+			return false
+		}
+	default:
+		// other kinds: optional expr if present
+		if st.Expr != nil {
+			if !collectCalledInvocationsExpr(st.Expr, out) {
+				return false
 			}
 		}
 	}
@@ -356,7 +363,7 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 			return true
 		}
 		return ok
-	case StmtFor, StmtArrayOp:
+	case StmtFor:
 		// StatementFor::get_exprs → test (not st.Expr)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			SetError(ErrGeneric)
@@ -393,6 +400,43 @@ func HasUncertainCallRecursiveStmt(st *Stmt) bool {
 					return true
 				}
 				// residual ERROR sticky — no invent soft-continue later stmts past residual
+				if HasError() {
+					return true
+				}
+			}
+		}
+		return false
+	case StmtArrayOp:
+		// StatementArrayOp.h:65–68 — if (init_value) only; NOT For test.
+		// Fair: array_init numeric LoopControl has no TestExpr.
+		if st.Expr != nil {
+			if HasUncertainCallRecursiveExpr(st.Expr) {
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			if HasError() {
+				return true
+			}
+		}
+		// get_blocks body (Go array_init nests assign under Then)
+		blks := GetBlocksStmt(st)
+		if HasError() {
+			return true
+		}
+		for _, b := range blks {
+			if b == nil {
+				SetError(ErrGeneric)
+				return true
+			}
+			for i := range b.Stmts {
+				if HasUncertainCallRecursiveStmt(&b.Stmts[i]) {
+					if HasError() {
+						return true
+					}
+					return true
+				}
 				if HasError() {
 					return true
 				}

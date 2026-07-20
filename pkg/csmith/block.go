@@ -1358,7 +1358,7 @@ func stmtOK(st Stmt) bool {
 		return st.LhsVar != nil || st.ArrayAccess != "" || (st.Lhs != nil && st.Lhs.Var != nil)
 	case StmtInvoke:
 		return st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed
-	case StmtFor, StmtArrayOp:
+	case StmtFor:
 		// StatementFor always has init/test/incr + body (StatementFor.cpp make_random)
 		// no invent OK from IV alone without test/body
 		if st.Loop == nil || st.Loop.IV == nil {
@@ -1368,6 +1368,21 @@ func stmtOK(st Stmt) bool {
 			return false
 		}
 		return st.Then != nil
+	case StmtArrayOp:
+		// StatementArrayOp.cpp make_random_array_init: LoopControl with numeric
+		// init/limit/incr + IV (no InitStmt/TestExpr/IncrStmt — those are For-only).
+		// Nested multi-dim wraps Loop + Then; body always present.
+		// Fair: rejecting array-init as !stmtOK re-picks the statement kind and
+		// shifts the whole block (seed-2 e33136: UP keeps ArrayOp then later
+		// append_return Select U1 vs Go soft-fail → For/Goto F40).
+		if st.Then == nil {
+			return false
+		}
+		if st.Loop != nil {
+			return st.Loop.IV != nil
+		}
+		// zero-dim / degenerate still needs access or body (no invent Kind-only)
+		return st.ArrayAccess != ""
 	case StmtGoto:
 		// StatementGoto always has live test + label
 		return st.Label != "" && st.Expr != nil

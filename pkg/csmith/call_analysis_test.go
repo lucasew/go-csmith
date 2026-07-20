@@ -100,6 +100,39 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 		t.Fatal("incomplete for must SetError sticky")
 	}
 	ClearError()
+	// StatementArrayOp.h:65–68 — get_exprs is if(init_value) only, not For test.
+	// array_init numeric LoopControl must not fail closed incomplete (seed-2 fair).
+	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	body := &Block{Stmts: []Stmt{{
+		Kind: StmtAssign, StmID: 2,
+		LhsVar: CreateVariableScalars("a", GetIntType(), false, false),
+		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		ArrayAccess: "a[i]",
+	}}}
+	var callsArr []*Invocation
+	CollectCalledInvocationsStmt(&Stmt{
+		Kind: StmtArrayOp, StmID: 1,
+		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
+		Then: body,
+	}, &callsArr)
+	if !InvocationsComplete(callsArr) {
+		t.Fatal("array-init ArrayOp must collect complete (no invent For-test hole)", callsArr)
+	}
+	if HasError() {
+		t.Fatal("array-init ArrayOp must not SetError sticky")
+	}
+	ClearError()
+	if HasUncertainCallRecursiveStmt(&Stmt{
+		Kind: StmtArrayOp, StmID: 1,
+		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
+		Then: body,
+	}) {
+		t.Fatal("array-init without calls must be certain (false)")
+	}
+	if HasError() {
+		t.Fatal("array-init HasUncertainCallRecursive must not SetError")
+	}
+	ClearError()
 }
 
 func TestCollectCalledAssignNilExprFailClosed(t *testing.T) {

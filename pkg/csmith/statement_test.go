@@ -138,4 +138,19 @@ func TestStmtOKIncompleteForIfAssignFailClosed(t *testing.T) {
 	if !stmtOK(Stmt{Kind: StmtGoto, Label: "lbl", Expr: test}) {
 		t.Fatal("goto with label+test must pass")
 	}
+	// StatementArrayOp.cpp make_random_array_init: numeric LoopControl + IV + body
+	// (no InitStmt/TestExpr/IncrStmt — those are StatementFor only).
+	// Rejecting this shape soft-fails ArrayOp and re-picks the statement kind
+	// (seed-2 e33136: first_div after unfair ArrayOp drop).
+	if stmtOK(Stmt{Kind: StmtArrayOp, Loop: &LoopControl{IV: iv}}) {
+		t.Fatal("array-op IV-only without body must fail stmtOK")
+	}
+	if !stmtOK(Stmt{Kind: StmtArrayOp, Loop: &LoopControl{
+		IV: iv, InitN: 0, LimitN: 4, IncrN: 1, TestOp: BinCmpLt, IncrOp: AssignAdd,
+	}, Then: &Block{}, ArrayAccess: "a[i]"}) {
+		t.Fatal("array-init ArrayOp (numeric loop + body) must pass stmtOK")
+	}
+	if stmtOK(Stmt{Kind: StmtArrayOp, Then: &Block{}}) {
+		t.Fatal("array-op body without Loop/ArrayAccess must fail stmtOK")
+	}
 }

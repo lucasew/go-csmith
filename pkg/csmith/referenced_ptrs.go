@@ -143,8 +143,13 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 	}
 	// Statement.cpp:331–345 — get_exprs + get_blocks; get_exprs always live for
 	// assign/invoke/return/if/break/continue/goto and for-test.
-	// Kind-gated for (no invent Loop-on-wrong-kind as for get_exprs).
-	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
+	// Kind-gated (no invent Loop-on-wrong-kind as for get_exprs).
+	// StatementArrayOp.h:65–68 — if (init_value) only; NOT StatementFor::test.
+	// Fair: treating ArrayOp as For (require Loop.TestExpr) fails closed on
+	// make_random_array_init numeric LoopControl and sticky ERROR in
+	// ComputeSummary (seed-2 after stmtOK accepts ArrayOp).
+	switch st.Kind {
+	case StmtFor:
 		// Incomplete Loop without TestExpr sticky (no invent skip for-test ptrs)
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			*ptrs = IncompleteVariables()
@@ -154,24 +159,29 @@ func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
 		if !collectReferencedPtrsExpression(st.Loop.TestExpr, ptrs) {
 			return false
 		}
-	} else {
-		switch st.Kind {
-		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-			// C++ get_exprs always yields live Expression* for these kinds
-			// incomplete nil Expr sticky (no invent partial ptr list as success)
-			if st.Expr == nil {
-				*ptrs = IncompleteVariables()
-				SetError(ErrGeneric)
-				return false
-			}
+	case StmtArrayOp:
+		// StatementArrayOp.h:65–68 — if (init_value) push; optional (body path has none).
+		// Go array_init may nest RHS under Then assign (get_blocks); Expr is init_value when set.
+		if st.Expr != nil {
 			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
 				return false
 			}
-		default:
-			if st.Expr != nil {
-				if !collectReferencedPtrsExpression(st.Expr, ptrs) {
-					return false
-				}
+		}
+	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+		// C++ get_exprs always yields live Expression* for these kinds
+		// incomplete nil Expr sticky (no invent partial ptr list as success)
+		if st.Expr == nil {
+			*ptrs = IncompleteVariables()
+			SetError(ErrGeneric)
+			return false
+		}
+		if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+			return false
+		}
+	default:
+		if st.Expr != nil {
+			if !collectReferencedPtrsExpression(st.Expr, ptrs) {
+				return false
 			}
 		}
 	}
@@ -365,9 +375,11 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 		SetError(ErrGeneric)
 		return true
 	}
-	// get_exprs: for → Loop.TestExpr; assign/etc require live Expr
-	// Kind-gated for (no invent Loop-on-wrong-kind)
-	if st.Kind == StmtFor || st.Kind == StmtArrayOp {
+	// get_exprs: for → Loop.TestExpr; ArrayOp → optional init_value (not For test);
+	// assign/etc require live Expr. Kind-gated (no invent Loop-on-wrong-kind).
+	// StatementArrayOp.h:65–68 — if (init_value) only.
+	switch st.Kind {
+	case StmtFor:
 		if st.Loop == nil || st.Loop.TestExpr == nil {
 			SetError(ErrGeneric)
 			return true
@@ -375,21 +387,23 @@ func ReadUnionFieldStmt(st *Stmt) bool {
 		if ReadUnionFieldExpr(st.Loop.TestExpr) {
 			return true
 		}
-	} else {
-		switch st.Kind {
-		case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
-			// C++ get_exprs always live; nil Expr sticky fail closed true
-			if st.Expr == nil {
-				SetError(ErrGeneric)
-				return true
-			}
-			if ReadUnionFieldExpr(st.Expr) {
-				return true
-			}
-		default:
-			if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
-				return true
-			}
+	case StmtArrayOp:
+		// optional init_value; body path walks get_blocks only
+		if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
+			return true
+		}
+	case StmtAssign, StmtInvoke, StmtReturn, StmtIfElse, StmtBreak, StmtContinue, StmtGoto:
+		// C++ get_exprs always live; nil Expr sticky fail closed true
+		if st.Expr == nil {
+			SetError(ErrGeneric)
+			return true
+		}
+		if ReadUnionFieldExpr(st.Expr) {
+			return true
+		}
+	default:
+		if st.Expr != nil && ReadUnionFieldExpr(st.Expr) {
+			return true
 		}
 	}
 	if st.LhsVar != nil {
