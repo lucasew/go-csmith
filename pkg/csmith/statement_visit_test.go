@@ -846,3 +846,30 @@ func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
 	}
 	ClearError()
 }
+
+// TestVisitFactsBlockRevisitClearsStaleVisited — each visit_facts starts without
+// merging prior map_facts_out via stale map_visited[this] (seed-2 e10107 path).
+func TestVisitFactsBlockRevisitClearsStaleVisited(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	body := &Block{StmID: 50, Func: f, Looping: true, Stmts: nil}
+	fm.MapVisited = map[int]bool{50: true}
+	p := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalars("l_loc", GetIntType(), false, false)
+	fm.SetMapFactsOut(99, []*FactPointTo{MakeFactPointToSet(p, []*Variable{loc, GarbagePtr})})
+	fm.CreateCFGEdge(99, body, false, true)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, loc)}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsBlock(body, &cg, Defaults()) {
+		t.Fatalf("revisit must succeed with clean entry err=%v", HasError())
+	}
+	if fm.MapVisited == nil || !fm.MapVisited[50] {
+		t.Fatal("success must set map_visited[body]")
+	}
+	ClearError()
+}

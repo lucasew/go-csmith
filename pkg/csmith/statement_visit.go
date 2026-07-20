@@ -210,6 +210,15 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 		if HasError() {
 			return false
 		}
+		// Fresh visit_facts: do not inherit map_visited[this] from a prior visit under
+		// different inputs. Stale map_visited forces find_fixed_point to merge prior
+		// continue/break map_facts_out (post-OOS) into entry (Block.cpp:526–536), which
+		// can mark still-relevant pointees garbage and reject in-scope reads as dangling
+		// (seed-2 l_260 → assign 108 → for 124 strip → e10107). map_visited is set again
+		// on successful find_fixed_point / visit_facts (Block.cpp:478, 561).
+		if b.StmID > 0 && cg.FM.MapVisited != nil {
+			delete(cg.FM.MapVisited, b.StmID)
+		}
 	}
 	// Block.cpp:473–476 — find_fixed_point; fail → reset_effect_accum(pre_effect)
 	out, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
