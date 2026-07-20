@@ -19,6 +19,73 @@ func (f *FactPointTo) IsTop() bool {
 	return len(f.PointTo) == 0
 }
 
+// IsBottom mirrors FactPointTo::is_bottom — always false (no bottom lattice).
+// FactPointTo.h:94–96.
+func (f *FactPointTo) IsBottom() bool {
+	if f == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return false
+}
+
+// SetTop mirrors FactPointTo::set_top — clear points-to set.
+// FactPointTo.h:97.
+func (f *FactPointTo) SetTop() {
+	if f == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	f.PointTo = nil
+}
+
+// SetBottom mirrors FactPointTo::set_bottom — no-op.
+// FactPointTo.h:98.
+func (f *FactPointTo) SetBottom() {
+	if f == nil {
+		SetError(ErrGeneric)
+		return
+	}
+}
+
+// GetVar mirrors Fact::get_var / FactPointTo::get_var.
+// FactPointTo.h:64.
+func (f *FactPointTo) GetVar() *Variable {
+	if f == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return f.Var
+}
+
+// Output mirrors FactPointTo::Output — pointee set diagnostic.
+// FactPointTo.cpp Output — subject and pointees by name.
+func (f *FactPointTo) Output() string {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if f.Var == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(f.Var.Name)
+	b.WriteString(" => {")
+	for i, p := range f.PointTo {
+		if p == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(p.Name)
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
 // HasInvisible mirrors FactPointTo::has_invisible.
 // FactPointTo.cpp:87–99 — subject or pointee not visible at stm parent.
 // Incomplete Param/LocalVars / PointTo holes fail closed sticky as invisible

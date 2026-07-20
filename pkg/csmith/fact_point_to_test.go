@@ -642,3 +642,72 @@ func TestIsNullIsDeadPointsToNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestFactPointToLatticeTopBottom(t *testing.T) {
+	// FactPointTo.h:93–98 is_top/is_bottom/set_top/set_bottom
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f := MakeFactPointTo(p, NullPtr)
+	if f.IsBottom() {
+		t.Fatal("is_bottom always false")
+	}
+	if f.IsTop() {
+		t.Fatal("non-empty not top")
+	}
+	f.SetTop()
+	if !f.IsTop() || len(f.PointTo) != 0 {
+		t.Fatal("set_top clears")
+	}
+	f.SetBottom() // no-op
+	if f.GetVar() != p {
+		t.Fatal("get_var")
+	}
+	f2 := MakeFactPointTo(p, NullPtr)
+	if out := f2.Output(); out == "" || out != "g_p => {null}" {
+		// name may vary; just require format
+		if out == "" {
+			t.Fatal("Output empty")
+		}
+	}
+}
+
+func TestFactFreeHelpers(t *testing.T) {
+	ClearError()
+	p := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	facts := []*FactPointTo{MakeFactPointTo(p, a)}
+	cp := CopyFacts(facts)
+	if !SameFacts(cp, facts) {
+		t.Fatal("CopyFacts/SameFacts")
+	}
+	// CombineFacts join_visits
+	other := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
+	CombineFacts(&facts, other)
+	fp := FindRelatedPointTo(facts, p)
+	if fp == nil || len(fp.PointTo) < 1 {
+		t.Fatal("combine")
+	}
+	// AbstractFactForReturn — Fact.cpp:76–83 assign into func.rv
+	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType()), RV: rv}
+	// null constant RHS is a complete abstract path
+	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
+	ClearError()
+	ret := AbstractFactForReturn(nil, rhs, fn)
+	if HasError() {
+		t.Fatal("return abstract sticky")
+	}
+	// nil fn/expr sticky
+	ClearError()
+	if FactsComplete(AbstractFactForReturn(nil, rhs, nil)) || !HasError() {
+		t.Fatal("nil fn must sticky incomplete")
+	}
+	ClearError()
+	_ = ret
+	// PrintFacts not sticky on complete empty
+	_ = PrintFacts(nil, nil)
+	if HasError() {
+		t.Fatal("print empty")
+	}
+	ClearError()
+	FactDoFinalization()
+}

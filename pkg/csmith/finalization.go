@@ -14,8 +14,8 @@ func DoFinalization() {
 	TypeDoFinalization()
 	// Bookkeeper::doFinalization
 	BookkeeperDoFinalization()
-	// FactPointTo::all_ptrs / all_aliases
-	ClearPointToAggregates()
+	// Fact::doFinalization + FactPointTo::all_ptrs / all_aliases
+	FactDoFinalization()
 	// FactMgr::doFinalization / meta_facts
 	ClearMetaFacts()
 	// Attribute generators

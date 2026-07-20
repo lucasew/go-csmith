@@ -2,6 +2,8 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import "strings"
+
 // Special points-to targets (FactPointTo.cpp:61–66).
 var (
 	// NullPtr mirrors FactPointTo::null_ptr.
@@ -2088,4 +2090,71 @@ func AggregateAllPointToSets(funcs []*Function, fms *FactMgrMap) {
 		ClearPointToAggregates()
 		SetError(ErrGeneric)
 	}
+}
+
+// CopyFacts mirrors copy_facts — deep clone FactPointTo slice.
+// Fact.cpp:213–220. Alias for CloneFactSlice.
+func CopyFacts(facts []*FactPointTo) []*FactPointTo {
+	return CloneFactSlice(facts)
+}
+
+// CombineFacts mirrors combine_facts — join_visits across revisits.
+// Fact.cpp:225–235. Alias for JoinVisitsInto.
+func CombineFacts(facts *[]*FactPointTo, facts2 []*FactPointTo) {
+	_ = JoinVisitsInto(facts, facts2)
+}
+
+// PrintFacts mirrors print_facts — concatenate OutputAssertion lines.
+// Fact.cpp:263–268.
+func PrintFacts(facts []*FactPointTo, stParent *Block) string {
+	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range facts {
+		b.WriteString(f.OutputAssertion(stParent, ""))
+	}
+	return b.String()
+}
+
+// PrintVarFact mirrors print_var_fact — assertions for one variable name.
+// Fact.cpp:270–277.
+func PrintVarFact(facts []*FactPointTo, vname string, stParent *Block) string {
+	if !FactsComplete(facts) {
+		SetError(ErrGeneric)
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range facts {
+		if f.Var == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
+		if f.Var.Name == vname {
+			b.WriteString(f.OutputAssertion(stParent, ""))
+		}
+	}
+	return b.String()
+}
+
+// AbstractFactForReturn mirrors Fact::abstract_fact_for_return.
+// Fact.cpp:76–83 — abstract_fact_for_assign(facts, Lhs(func.rv), expr).
+func AbstractFactForReturn(facts []*FactPointTo, expr *Expression, fn *Function) []*FactPointTo {
+	if fn == nil || fn.RV == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	// Expression* always live on return; sticky fail closed
+	if expr == nil {
+		SetError(ErrGeneric)
+		return IncompleteFactSlice()
+	}
+	return AbstractFactForAssign(facts, fn.RV, 0, expr)
+}
+
+// FactDoFinalization mirrors Fact::doFinalization.
+// Fact.cpp:110–115 — clear Fact::facts_ registry; Go uses ClearPointToAggregates.
+func FactDoFinalization() {
+	ClearPointToAggregates()
 }

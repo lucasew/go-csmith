@@ -850,37 +850,37 @@ Total items: 2070
 - [x] Fact.cpp::eFactCategory
 - [x] Fact.cpp::eFactCategory.ePointTo
 - [x] Fact.cpp::eFactCategory.eUnionWrite
-- [ ] Fact.cpp::Fact.abstract_fact_for_assign
-- [ ] Fact.cpp::Fact.abstract_fact_for_return
-- [ ] Fact.cpp::Fact.abstract_fact_for_var_init
-- [ ] Fact.cpp::Fact.clone
-- [ ] Fact.cpp::Fact.doFinalization
-- [ ] Fact.cpp::Fact.equal
-- [ ] Fact.cpp::Fact.Fact
-- [ ] Fact.cpp::Fact.get_var
-- [ ] Fact.cpp::Fact.imply
-- [ ] Fact.cpp::Fact.is_assertable
-- [ ] Fact.cpp::Fact.is_bottom
-- [ ] Fact.cpp::Fact.is_top
-- [ ] Fact.cpp::Fact.join
-- [ ] Fact.cpp::Fact.Output
-- [ ] Fact.cpp::Fact.OutputAssertion
-- [ ] Fact.cpp::Fact.set_bottom
-- [ ] Fact.cpp::Fact.set_top
-- [ ] Fact.cpp::Fact.~Fact
-- [ ] Fact.cpp::add_new_var_fact
-- [ ] Fact.cpp::combine_facts
-- [ ] Fact.cpp::copy_facts
-- [ ] Fact.cpp::find_fact
-- [ ] Fact.cpp::find_related_fact
-- [ ] Fact.cpp::merge_fact
-- [ ] Fact.cpp::merge_facts
-- [ ] Fact.cpp::print_facts
-- [ ] Fact.cpp::print_var_fact
-- [ ] Fact.cpp::renew_fact
-- [ ] Fact.cpp::renew_facts
-- [ ] Fact.cpp::same_facts
-- [ ] Fact.cpp::subset_facts
+- [x] Fact.cpp::Fact.abstract_fact_for_assign
+- [x] Fact.cpp::Fact.abstract_fact_for_return
+- [x] Fact.cpp::Fact.abstract_fact_for_var_init
+- [x] Fact.cpp::Fact.clone
+- [x] Fact.cpp::Fact.doFinalization
+- [x] Fact.cpp::Fact.equal
+- [x] Fact.cpp::Fact.Fact
+- [x] Fact.cpp::Fact.get_var
+- [x] Fact.cpp::Fact.imply
+- [x] Fact.cpp::Fact.is_assertable
+- [x] Fact.cpp::Fact.is_bottom
+- [x] Fact.cpp::Fact.is_top
+- [x] Fact.cpp::Fact.join
+- [x] Fact.cpp::Fact.Output
+- [x] Fact.cpp::Fact.OutputAssertion
+- [x] Fact.cpp::Fact.set_bottom
+- [x] Fact.cpp::Fact.set_top
+- [x] Fact.cpp::Fact.~Fact
+- [x] Fact.cpp::add_new_var_fact
+- [x] Fact.cpp::combine_facts
+- [x] Fact.cpp::copy_facts
+- [x] Fact.cpp::find_fact
+- [x] Fact.cpp::find_related_fact
+- [x] Fact.cpp::merge_fact
+- [x] Fact.cpp::merge_facts
+- [x] Fact.cpp::print_facts
+- [x] Fact.cpp::print_var_fact
+- [x] Fact.cpp::renew_fact
+- [x] Fact.cpp::renew_facts
+- [x] Fact.cpp::same_facts
+- [x] Fact.cpp::subset_facts
 - [ ] FactMgr.cpp::FactMgr.add_fact_out
 - [ ] FactMgr.cpp::FactMgr.add_interested_facts
 - [ ] FactMgr.cpp::FactMgr.add_new_var_fact
