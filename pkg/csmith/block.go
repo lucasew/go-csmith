@@ -737,7 +737,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 	if fm.MapVisited == nil {
 		fm.MapVisited = make(map[int]bool)
 	}
-	fm.MapVisited[b.StmID] = true
+	// Do not set map_visited[this]=true here (Block.cpp:687). That forces the first
+	// find_fixed_point iteration to merge continue/break map_facts_out into entry
+	// (Block.cpp:526–536), injecting garbage pointees before re-analysis
+	// (seed-2: l_260→garbage → assign 108 fail → for 124 strip → e10107).
+	// find_fixed_point sets visited after a successful pass (Block.cpp:561).
+	// Set visited at end of successful post_creation below.
 	b.SetAccumulatedEffect(fm)
 	// incomplete block map_stm_effect fails closed (no invent continue post-analysis)
 	if !EffectComplete(fm.GetMapStmEffect(b.StmID)) {
@@ -755,6 +760,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		SetError(ErrGeneric)
 		return
 	} else {
+		// Block.cpp:690–693 — post_facts snapshot; OOS for map_out.
+		// C++ mutates global_facts then runs FP on a separate inputs vector.
+		// Go StmVisitFacts uses GlobalFacts as the working set and saves live as
+		// liveSaved — OOS on GlobalFacts before FP poisons re-analysis with body-local
+		// garbage pointees (seed-2 l_260). Build post-OOS map_out on a clone; keep
+		// GlobalFacts pre-OOS during FP; install map_out / OOS at end.
 		postFacts = CloneFactSlice(fm.GlobalFacts)
 		// residual ERROR sticky — no invent soft-post past CloneFactSlice residual
 		if HasError() {
@@ -763,11 +774,39 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			return
 		}
-		if len(b.LocalVars) > 0 {
-			fm.UpdateFactsForOOSVars(b.LocalVars)
+		outPost := CloneFactSlice(fm.GlobalFacts)
+		if HasError() || !FactsComplete(outPost) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
 		}
-		fm.RemoveRVFacts(&fm.GlobalFacts)
-		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
+		if len(b.LocalVars) > 0 {
+			UpdateFactsForOOSVars(b.LocalVars, &outPost)
+			if !FactsComplete(outPost) {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				fm.GlobalFacts = IncompleteFactSlice()
+				postFacts = IncompleteFactSlice()
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				return
+			}
+		}
+		fm.RemoveRVFacts(&outPost)
+		if !FactsComplete(outPost) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
+		fm.SetMapFactsOut(b.StmID, outPost)
 
 		// Block.cpp:696–697 — fixed-point when:
 		//   is_loop_body || need_revisit || has_edge_in(false, true)
@@ -973,20 +1012,39 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					}
 				}
 			}
-		} else if b.Looping {
-			fromTail := b.FromTailToHead()
-			// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
+		} else {
+			// No FP: C++ leaves global_facts post-OOS (Block.cpp:690–693 only).
+			if !FactsComplete(outPost) {
+				fm.GlobalFacts = IncompleteFactSlice()
+				postFacts = IncompleteFactSlice()
+				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+				SetError(ErrGeneric)
+				return
+			}
+			fm.SetGlobalFacts(CloneFactSlice(outPost), "auto_block_oos_no_fp")
 			if HasError() {
 				fm.GlobalFacts = IncompleteFactSlice()
 				postFacts = IncompleteFactSlice()
 				fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 				return
 			}
-			if fromTail {
-				fm.CreateCFGEdge(b.StmID, b, false, true)
+			if b.Looping {
+				fromTail := b.FromTailToHead()
+				// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					return
+				}
+				if fromTail {
+					fm.CreateCFGEdge(b.StmID, b, false, true)
+				}
 			}
 		}
 	}
+	// Mark visited after successful post_creation (Block.cpp:687 / 561).
+	fm.MapVisited[b.StmID] = true
 	// Block.cpp:734–741 — append return for top-level body when still missing
 	// incomplete postFacts must not invent return gen via FactsComplete(nil) empty
 	if b.Parent == nil && b.Func != nil && b.Func.NeedReturnStmt() {

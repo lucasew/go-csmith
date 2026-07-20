@@ -1715,3 +1715,56 @@ func TestFindFixedPointReturnsPreOOSPostFacts(t *testing.T) {
 	}
 	ClearError()
 }
+
+// TestPostCreationDefersOOSUntilAfterFP — Block.cpp:690–729.
+// OOS for map_out must not permanently poison GlobalFacts before find_fixed_point
+// when Go uses GlobalFacts as the analysis working set (unlike C++ inputs FactVec).
+func TestPostCreationDefersOOSUntilAfterFP(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	fm := NewFactMgr(f)
+	pt := PointerTo(GetIntType())
+	outer := CreateVariableScalars("l_outer", pt, false, false)
+	bodyLoc := CreateVariableScalars("l_body", GetIntType(), false, false)
+	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(outer, bodyLoc)}
+	x := CreateVariableScalars("g_x", GetIntType(), false, false)
+	asg := Stmt{
+		Kind: StmtAssign, StmID: AllocStmID(),
+		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	parent := &Block{StmID: AllocStmID(), Func: f}
+	body := &Block{
+		StmID: AllocStmID(), Func: f, Looping: true, Parent: parent,
+		LocalVars: []*Variable{bodyLoc},
+		Stmts:     []Stmt{asg},
+	}
+	fm.SetMapFactsIn(body.StmID, CloneFactSlice(fm.GlobalFacts))
+	if fm.MapStmEffect == nil {
+		fm.MapStmEffect = make(map[int]Effect)
+	}
+	fm.MapStmEffect[body.StmID] = EmptyEffect()
+	fm.MapStmEffect[asg.StmID] = EmptyEffect()
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// Pre-OOS live must not be dead before/during construction
+	if FindRelatedPointTo(fm.GlobalFacts, outer) == nil || FindRelatedPointTo(fm.GlobalFacts, outer).IsDead() {
+		t.Fatal("setup: outer must be live→bodyLoc")
+	}
+	body.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
+	if HasError() {
+		t.Fatalf("post_creation: %v", HasError())
+	}
+	// map_out exists
+	if !FactsComplete(fm.GetMapFactsOut(body.StmID)) {
+		t.Fatal("map_out incomplete")
+	}
+	// visited set
+	if fm.MapVisited == nil || !fm.MapVisited[body.StmID] {
+		t.Fatal("must mark visited after post_creation")
+	}
+	ClearError()
+}
