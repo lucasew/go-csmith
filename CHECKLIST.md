@@ -5,6 +5,15 @@ Format: `- [ ] File.cpp::Item` or `- [ ] File.cpp::Item.subitem`.
 
 Source pin: `.build/csmith-src` (see SPEC.md).
 
+**Process lock (SPEC §3.1a–3.1b):** mark items only when the Go unit matches the
+C++ contract under 1:1 tests. Same flags + seed (and RNG event match) are a
+**consequence** of fair units — not the acceptance metric and not the unit of work.
+Do not chase `first_div` / event streams to “finish” this list.
+
+**If every box is checked but seed defaults still diverge** (events or program
+body vs golden upstream): the list is **not done**. Something was marked done
+by mistake. Re-open the incomplete unit; do not treat 100% as success.
+
 Generated: auto-extracted from headers + `.cpp` definitions.
 Total items: 2070
 

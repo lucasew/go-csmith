@@ -46,6 +46,34 @@ Until that exists, `Generate` may be absent or return a clear `not implemented` 
 
 Drop-in is **emergent** from fair C++-linked ports and 1:1 function tests. It is **not** achieved by matching RNG event streams with residual burns, invent floors, or packed offline tables.
 
+### 3.1a Event match is a consequence (lock)
+
+**Whole-program RNG stream match and `first_div` climb are never the work item.**
+
+| | |
+|--|--|
+| **Goal** | Each checklist / C++ unit behaves 1:1 under tests; control flow and entropy use match the cited C++ path |
+| **Consequence** | Same flags + seed → same draws → same program body (and thus matching event streams) **if and only if** units are fair |
+| **Not the goal** | Optimizing `find-rng-divergence`, event counts, or seed-N first divergence as acceptance |
+
+If stream/body match is missing, the next step is **find the wrong or incomplete C++ unit** and fix that contract — not blank draws, residual pads, or scheduled event climbs.
+
+Thermometers (`find-rng-divergence.sh`, traces, seed diffs) may **report** consequence; they must not **drive** what lands.
+
+### 3.1b Checklist “100%” without match means false marks
+
+**Invariant:** for default options and a fixed seed, if the golden upstream and this port diverge on RNG stream or program body, the checklist is **not** honestly complete — even if every box is `[x]`.
+
+| Situation | Meaning |
+|-----------|---------|
+| All items checked **and** same flags+seed → same body (streams follow) | Checklist may be done |
+| All items checked **but** events or body still diverge | Something was **mistakenly marked done**; it is not 1:1 with C++ |
+| Response | **Uncheck** (or treat as open) the responsible unit once known; until then treat “100%” as **invalid / under audit** |
+
+Do **not** invent residual work to force the thermometer green while leaving false `[x]` marks. The fix is re-open the wrong port and restore a real 1:1 contract.
+
+Mass “catch-up” checks without per-item tests are the usual failure mode. A mark requires the §3.4 contract, not “a Go symbol exists.”
+
 ### 3.2 Golden reference
 
 - Resolve with **`loadDotfilesEnv`** then Nix: `pkgs.csmith` / `pkgs.csmith.src`
@@ -66,7 +94,7 @@ Drop-in is **emergent** from fair C++-linked ports and 1:1 function tests. It is
 
 **Primary success signal:** “function F behaves 1:1 with upstream under tests.”
 
-**Secondary / late:** whole-program source match and (if useful) RNG stream agreement as a **byproduct** of correct control flow — never as a license to cheat.
+**Secondary / late (consequence only):** whole-program source match and RNG stream agreement appear **as a byproduct** of correct control flow and fair entropy use. They are never the climb target and never a license to cheat. See §3.1a.
 
 ### 3.4 1:1 function contract
 
