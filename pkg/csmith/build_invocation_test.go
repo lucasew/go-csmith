@@ -429,12 +429,14 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 		Param:       []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
 	}
 	callee.Body.Func = callee
+	// FunctionInvocationUser.cpp:311 — revisit uses get_fact_mgr_for_func(callee)
+	_ = callee.ensurePairedFactMgr()
+	callee.ensurePairedFactMgr().SetMapStmEffect(callee.Body.StmID, EmptyEffect())
 	caller := &Function{Name: "func_1"}
 	list := &FunctionList{Funcs: []*Function{caller, callee}}
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	fm := NewFactMgr(caller)
-	// also register callee FM facts via same FM for light revisit (uses caller FM)
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm)
 	cg.Funcs = list
 	fi := BuildUserInvocation(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
@@ -450,6 +452,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 		// empty body visit may still count
 		t.Log("visited", callee.VisitedCnt, "failed", fi.Failed)
 	}
+	ClearError()
 }
 
 func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
@@ -469,7 +472,7 @@ func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect())
 	fi := BuildUserInvocation(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, first)
 	if fi.Failed {
-		t.Fatal("first should not fail revisit")
+		t.Fatalf("first should not fail revisit err=%v", HasError())
 	}
 	// first path uses add_external_effect, not revisit → VisitedCnt unchanged by Revisit
 	if first.VisitedCnt != 0 {

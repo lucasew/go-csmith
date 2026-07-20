@@ -448,10 +448,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		SetError(ErrGeneric)
 		return false
 	}
-	// callee FactMgr — prefer function's FM from caller's package map if same
-	fm := cg.FM
-	// when revisiting callee, use a dedicated FM on the function if stored
-	// light: use caller FM but clear visited for body analysis
+	// FunctionInvocationUser.cpp:311 — FactMgr *fm = get_fact_mgr_for_func(func);
+	// Must use the callee's paired FactMgr (map_facts_in/out for body stmts), not
+	// the caller's cg.FM. Using caller maps made VisitFactsBlock fail on nested
+	// calls in if-conditions, fixed-point stripped the if, and func->blocks lost
+	// nested arms (seed-2 e2342: goto nblocks 8 vs UP 10).
+	fm := f.PairedFactMgr()
 	if fm == nil {
 		SetError(ErrGeneric)
 		return false
@@ -498,9 +500,12 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	bodyCG.FM = fm
 	ok := VisitFactsBlock(f.Body, &bodyCG, opts)
 	if !ok {
-		// policy / body visit fail — restore without invent success (sticky if already set)
+		// policy / body visit fail — restore maps; analysis fail is soft (C++ log_analysis_fail
+		// returns false without leaving permanent Error for caller generation). Sticky
+		// ERROR from incomplete IR during nested visit would poison subsequent soft paths.
 		restore()
 		fm.GlobalFacts = savedGlobal
+		ClearError()
 		return false
 	}
 	// incomplete body GlobalFacts sticky

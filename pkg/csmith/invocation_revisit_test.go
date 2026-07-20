@@ -358,16 +358,22 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 		FactChanged: true,
 	}
 	callee.RV = CreateVariableScalars("func_x_rv", GetIntType(), false, false)
-	fm := NewFactMgr(callee)
+	// FunctionInvocationUser.cpp:311 — get_fact_mgr_for_func(func) is the callee FM
+	fm := callee.ensurePairedFactMgr()
+	callee.Body.Func = callee
 	eff := EmptyEffect()
-	cg := WithFunc(callee, EmptyEffect()).WithFactMgr(fm)
+	// caller context may hold a different FM; revisit must use callee.PairedFactMgr()
+	callerFM := NewFactMgr(&Function{Name: "caller"})
+	cg := WithFunc(callee, EmptyEffect()).WithFactMgr(callerFM)
 	cg.EffectAccum = &eff
-	// mark body effect empty
+	// mark body effect empty on callee maps
 	fm.SetMapStmEffect(100, EmptyEffect())
 	fi := &Invocation{User: callee}
 	facts := []*FactPointTo{}
-	if !RevisitUserInvocation(fi, &facts, &cg, Defaults()) {
-		t.Fatal("revisit")
+	ClearError()
+	ok := RevisitUserInvocation(fi, &facts, &cg, Defaults())
+	if !ok {
+		t.Fatalf("revisit ok=%v err=%v", ok, HasError())
 	}
 	if callee.VisitedCnt < 1 {
 		t.Fatal("visited_cnt")
