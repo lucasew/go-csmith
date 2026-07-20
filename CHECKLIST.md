@@ -486,7 +486,7 @@ Total items: 2070
 - [ ] DefaultRndNumGenerator.cpp::std.string
 - [ ] DefaultRndNumGenerator.cpp::std.to_string
 - [x] DefaultRndNumGenerator.cpp::csmith_trace_rng_enabled
-- [ ] DepthSpec.cpp::DepthSpec.backtracking
+- [x] DepthSpec.cpp::DepthSpec.backtracking
 - [x] DepthSpec.cpp::DepthSpec.depth_guard_by_depth
 - [x] DepthSpec.cpp::DepthSpec.depth_guard_by_type
 - [ ] DepthSpec.cpp::DepthSpec.depth_print
@@ -594,37 +594,37 @@ Total items: 2070
 - [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.goGenerator
 - [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.initialize
 - [ ] DFSProgramGenerator.cpp::DFSProgramGenerator.~DFSProgramGenerator
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.DFSRndNumGenerator
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.dumpCurrentState
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.eager_backtracking
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.filter_invalid_nums
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.genrand
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_all_done
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_current_pos
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_decision_depth
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_prefixed_name
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_sequence
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.init_states
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.initialize_sequence
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.kind
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.log_depth
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.make_rndnum_generator
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.operator=
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.random_choice
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.RandomDigits
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.RandomHexDigits
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.reset_state
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.revisit_node
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.rnd_flipcoin
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.rnd_upto
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.dump
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.initSearchState
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.SearchState
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.~SearchState
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.set_current_pos
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.trace_depth
-- [ ] DFSRndNumGenerator.cpp::DFSRndNumGenerator.~DFSRndNumGenerator
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.DFSRndNumGenerator
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.dumpCurrentState
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.eager_backtracking
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.filter_invalid_nums
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.genrand
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_all_done
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_current_pos
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_decision_depth
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_prefixed_name
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.get_sequence
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.init_states
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.initialize_sequence
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.kind
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.log_depth
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.make_rndnum_generator
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.operator=
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.random_choice
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.RandomDigits
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.RandomHexDigits
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.reset_state
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.revisit_node
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.rnd_flipcoin
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.rnd_upto
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.dump
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.initSearchState
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.SearchState
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.SearchState.~SearchState
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.set_current_pos
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.trace_depth
+- [x] DFSRndNumGenerator.cpp::DFSRndNumGenerator.~DFSRndNumGenerator
 - [x] Effect.cpp::Access.READ
 - [x] Effect.cpp::Access.WRITE
 - [x] Effect.cpp::Effect.Access

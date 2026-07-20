@@ -44,17 +44,24 @@ type Filter interface {
 	Filter(v uint32) bool
 }
 
-// Rng is the default random-number generator used by Csmith (random-based mode).
-// Mirrors DefaultRndNumGenerator + AbsRndNumGenerator genrand.
+// Rng is AbsRndNumGenerator concrete state for Default or DFS mode.
+// Default: DefaultRndNumGenerator + Abs genrand.
+// DFS: DFSRndNumGenerator (dfs engine) + Abs genrand for hex/digits.
 type Rng struct {
 	state     uint64
 	randDepth uint64
 
-	// traceString mirrors DefaultRndNumGenerator::trace_string_ (where labels).
+	// kind mirrors AbsRndNumGenerator::kind (Default vs DFS).
+	kind RngKind
+
+	// traceString mirrors DefaultRndNumGenerator / DFSRndNumGenerator::trace_string_.
 	traceString string
 
 	trace   bool
 	traceTo io.Writer
+
+	// dfs holds DFSRndNumGenerator search state; nil for Default kind.
+	dfs *dfsEngine
 }
 
 // NewRng seeds like AbsRndNumGenerator::seedrand → srand48(seed).
@@ -62,6 +69,7 @@ type Rng struct {
 func NewRng(seed uint64) *Rng {
 	r := &Rng{
 		state: ((seed << 16) + 0x330E) & lcgMask,
+		kind:  RngKindDefault,
 	}
 	if os.Getenv("CSMITH_TRACE_RNG") != "" && os.Getenv("CSMITH_TRACE_RNG") != "0" {
 		r.trace = true
@@ -123,6 +131,10 @@ func (r *Rng) RndUptoFilter(n uint32, f Filter) uint32 {
 	if n == 0 {
 		return 0
 	}
+	// DFSRndNumGenerator::rnd_upto → random_choice (not genrand %)
+	if r.kind == RngKindDFS {
+		return r.dfsRndUpto(n, f)
+	}
 	raw := r.Genrand()
 	v := raw % n
 	localDepth := r.randDepth
@@ -170,6 +182,10 @@ func (r *Rng) RndFlipcoinFilter(p uint32, f Filter) bool {
 	if p > 100 {
 		p = 100
 	}
+	// DFSRndNumGenerator::rnd_flipcoin → random_choice(2) with invalid list
+	if r.kind == RngKindDFS {
+		return r.dfsRndFlipcoin(p, f)
+	}
 	localDepth := r.randDepth
 	r.randDepth++
 	if f != nil {
@@ -214,12 +230,16 @@ func (r *Rng) RandomHexDigits(num int) string {
 	for i := 0; i < num; i++ {
 		x := r.Genrand() % 16
 		b = append(b, HexAlphabet[x])
-		r.randDepth++
+		// DefaultRndNumGenerator increments rand_depth_; Abs/DFS does not.
+		if r.kind != RngKindDFS {
+			r.randDepth++
+		}
 	}
 	return string(b)
 }
 
 // RandomDigits is DefaultRndNumGenerator::RandomDigits when CGOptions::is_random().
+// DFS uses AbsRndNumGenerator::RandomDigits (no rand_depth_ bump).
 func (r *Rng) RandomDigits(num int) string {
 	// AbsRndNumGenerator always has live RNG; sticky no invent empty digits without it
 	if r == nil {
@@ -233,18 +253,20 @@ func (r *Rng) RandomDigits(num int) string {
 	for i := 0; i < num; i++ {
 		x := r.Genrand() % 10
 		b = append(b, DecAlphabet[x])
-		r.randDepth++
+		if r.kind != RngKindDFS {
+			r.randDepth++
+		}
 	}
 	return string(b)
 }
 
-// Kind is DefaultRndNumGenerator::kind → rDefaultRndNumGenerator.
+// Kind is AbsRndNumGenerator::kind — Default or DFS.
 func (r *Rng) Kind() RngKind {
 	if r == nil {
 		SetError(ErrGeneric)
 		return RngKindDefault
 	}
-	return RngKindDefault
+	return r.kind
 }
 
 // GetPrefixedNameDefault is DefaultRndNumGenerator::get_prefixed_name — identity.
@@ -262,12 +284,16 @@ func (r *Rng) TraceDepth() string {
 	return r.traceString
 }
 
-// GetSequence is DefaultRndNumGenerator::get_sequence.
-// Sequence bookkeeping is a no-op in default mode (add_number empty); returns "".
+// GetSequence is DefaultRndNumGenerator::get_sequence / DFSRndNumGenerator::get_sequence.
+// Default: sequence bookkeeping no-op → "".
+// DFS: LinearSequence map joined by sep (empty sticky "").
 func (r *Rng) GetSequence() string {
 	if r == nil {
 		SetError(ErrGeneric)
 		return ""
+	}
+	if r.kind == RngKindDFS {
+		return r.dfsSequenceString()
 	}
 	return ""
 }
@@ -330,32 +356,54 @@ func ProcessGetSequence() string {
 }
 
 // PureRndUpto mirrors pure_rnd_upto.
-// random.cpp:104–117 — n==0 → 0; random mode == rnd_upto; DFS switches generator (not ported).
+// random.cpp:104–117 — n==0 → 0; !is_random switches to Default generator temporarily.
 func PureRndUpto(n uint32, f Filter) uint32 {
 	if n == 0 {
 		return 0
 	}
-	// CGOptions::is_random() — non-random switches to DefaultRndNumGenerator.
-	// Go only has default RNG; pure path is identity with ProcessRndUpto.
-	return ProcessRndUpto(n, f)
+	if ProcessOptions().IsRandom() {
+		return ProcessRndUpto(n, f)
+	}
+	old := SwitchRndNumGenerator(RngKindDefault)
+	rv := ProcessRndUpto(n, f)
+	_ = SwitchRndNumGenerator(old)
+	return rv
 }
 
 // PureRndFlipcoin mirrors pure_rnd_flipcoin.
 // random.cpp:119–130.
 func PureRndFlipcoin(p uint32, f Filter) bool {
-	return ProcessRndFlipcoin(p, f)
+	if ProcessOptions().IsRandom() {
+		return ProcessRndFlipcoin(p, f)
+	}
+	old := SwitchRndNumGenerator(RngKindDefault)
+	rv := ProcessRndFlipcoin(p, f)
+	_ = SwitchRndNumGenerator(old)
+	return rv
 }
 
 // PureRandomHexDigits mirrors PureRandomHexDigits.
 // random.cpp:79–89.
 func PureRandomHexDigits(num int) string {
-	return ProcessRandomHexDigits(num)
+	if ProcessOptions().IsRandom() {
+		return ProcessRandomHexDigits(num)
+	}
+	old := SwitchRndNumGenerator(RngKindDefault)
+	rv := ProcessRandomHexDigits(num)
+	_ = SwitchRndNumGenerator(old)
+	return rv
 }
 
 // PureRandomDigits mirrors PureRandomDigits.
 // random.cpp:91–102.
 func PureRandomDigits(num int) string {
-	return ProcessRandomDigits(num)
+	if ProcessOptions().IsRandom() {
+		return ProcessRandomDigits(num)
+	}
+	old := SwitchRndNumGenerator(RngKindDefault)
+	rv := ProcessRandomDigits(num)
+	_ = SwitchRndNumGenerator(old)
+	return rv
 }
 
 // legacy names used by older call sites if any remain during transition.

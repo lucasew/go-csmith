@@ -112,9 +112,26 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 		t.Fatal("random")
 	}
 	opts.DFSExhaustive = true
-	// still GOOD without DFS engine
+	// DFS mode needs live DFS engine (DepthSpec::backtracking).
+	// Fresh engine current_pos_=-1 → eager_backtracking returns false → GOOD.
+	prevR := ProcessRng()
+	prevO := ProcessOptions()
+	RandomNumberDoFinalization()
+	opts.MaxExhaustiveDepth = 8
+	SetProcessOptions(opts)
+	CreateRandomNumberInstance(RngKindDFS, 1)
+	defer func() {
+		RandomNumberDoFinalization()
+		SetProcessOptions(prevO)
+		SetProcessRng(prevR)
+		ClearError()
+	}()
+	ClearError()
 	if DepthGuardByTypeFlag(opts, DtFunction, 0) != GoodDepth {
-		t.Fatal("dfs stub")
+		t.Fatal("dfs fresh engine GOOD", GetError())
+	}
+	if HasError() {
+		t.Fatal("complete depth guard must not sticky")
 	}
 }
 

@@ -155,12 +155,20 @@ func knownDepthType(dType string) bool {
 
 // DepthGuardByDepth mirrors DepthSpec::depth_guard_by_depth.
 // DepthSpec.cpp:330–335 — always GOOD_DEPTH when !dfs_exhaustive (random mode).
+// DFS: DFSRndNumGenerator::eager_backtracking → BAD_DEPTH when true.
 func DepthGuardByDepth(opts Options, depthNeeded int) int {
 	if !opts.DFSExhaustive {
 		return GoodDepth
 	}
-	// DFS: would call eager_backtracking(depthNeeded); no DFS engine → GOOD
-	_ = depthNeeded
+	r := ProcessRng()
+	if r == nil || r.kind != RngKindDFS {
+		// DFS exhaustive without live DFS generator: sticky incomplete
+		SetError(ErrGeneric)
+		return BadDepth
+	}
+	if r.EagerBacktracking(depthNeeded) {
+		return BadDepth
+	}
 	return GoodDepth
 }
 
@@ -176,13 +184,13 @@ func DepthGuardByTypeFlag(opts Options, dType string, flag int) int {
 		return GoodDepth
 	}
 	// DepthSpec.cpp:381–382 — unknown dType assert(0) → BAD_DEPTH sticky fail closed
-	if MinimalDepth(dType, flag) < 0 {
+	d := MinimalDepth(dType, flag)
+	if d < 0 {
 		// MinimalDepth already SetError on unknown; ensure sticky if that path skipped
 		if !HasError() {
 			SetError(ErrGeneric)
 		}
 		return BadDepth
 	}
-	// DFS backtracking not implemented; known types report GOOD (no false BAD)
-	return GoodDepth
+	return DepthGuardByDepth(opts, d)
 }

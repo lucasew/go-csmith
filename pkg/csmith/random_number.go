@@ -16,15 +16,19 @@ type RandomNumber struct {
 var processRN *RandomNumber
 
 // MakeRndNumGenerator mirrors AbsRndNumGenerator::make_rndnum_generator.
-// AbsRndNumGenerator.cpp:66–84 — Default → NewRng; DFS not ported (sticky nil).
+// AbsRndNumGenerator.cpp:66–84 — seedrand then Default or DFS factory.
+// Reads process Options for DFS max depth / debug sequence (not under processOptsMu).
 func MakeRndNumGenerator(kind RngKind, seed uint64) *Rng {
+	return makeRndNumGeneratorWithOpts(kind, seed, ProcessOptions())
+}
+
+// makeRndNumGeneratorWithOpts is the lock-free factory used while processOptsMu is held.
+func makeRndNumGeneratorWithOpts(kind RngKind, seed uint64, opts Options) *Rng {
 	switch kind {
 	case RngKindDefault:
 		return NewRng(seed)
 	case RngKindDFS:
-		// DFSRndNumGenerator not ported on fair-rewrite spine yet.
-		SetError(ErrGeneric)
-		return nil
+		return makeDFSRndNumGeneratorOpts(seed, opts)
 	default:
 		SetError(ErrGeneric)
 		return nil
@@ -41,7 +45,8 @@ func CreateRandomNumberInstance(kind RngKind, seed uint64) {
 			seed:       seed,
 			generators: make(map[RngKind]*Rng),
 		}
-		g := MakeRndNumGenerator(kind, seed)
+		// under lock: use processOpts directly (no ProcessOptions RLock)
+		g := makeRndNumGeneratorWithOpts(kind, seed, processOpts)
 		if g == nil {
 			// sticky already set; leave instance with nil curr (fail closed)
 			return
@@ -99,7 +104,8 @@ func SwitchRndNumGenerator(kind RngKind) RngKind {
 	old := processRN.currKind
 	g := processRN.generators[kind]
 	if g == nil {
-		g = MakeRndNumGenerator(kind, processRN.seed)
+		// under lock: processOpts direct (no ProcessOptions RLock deadlock)
+		g = makeRndNumGeneratorWithOpts(kind, processRN.seed, processOpts)
 		if g == nil {
 			return old
 		}
@@ -113,11 +119,13 @@ func SwitchRndNumGenerator(kind RngKind) RngKind {
 
 // RandomNumberDoFinalization mirrors RandomNumber::doFinalization.
 // RandomNumber.cpp:142–152 — drop generators and instance.
+// Also clears DFSRndNumGenerator::impl_ + SequenceFactory sequences.
 func RandomNumberDoFinalization() {
 	processOptsMu.Lock()
 	defer processOptsMu.Unlock()
 	processRN = nil
 	processRng = nil
+	clearDFSImpl()
 }
 
 // --- instance methods (RandomNumber.cpp:112–140) ---
@@ -127,6 +135,9 @@ func (rn *RandomNumber) GetPrefixedName(name string) string {
 	if rn == nil || rn.curr == nil {
 		SetError(ErrGeneric)
 		return name
+	}
+	if rn.curr.kind == RngKindDFS {
+		return rn.curr.GetPrefixedNameDFS(name)
 	}
 	return GetPrefixedNameDefault(name)
 }

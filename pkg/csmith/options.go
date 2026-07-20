@@ -483,6 +483,10 @@ func Defaults() Options {
 	}
 }
 
+// IsRandom mirrors CGOptions::is_random.
+// CGOptions.cpp:380 — return random_based_.
+func (o Options) IsRandom() bool { return o.RandomBased }
+
 // FuncAttrFlag mirrors CGOptions::func_attr_flag — FunctionAttributes option.
 // CGOptions.cpp DEFINE_GETTER_SETTER_BOOL(func_attr_flag).
 func (o Options) FuncAttrFlag() bool { return o.FunctionAttributes }

@@ -426,12 +426,19 @@ func TestRandomNumberCreateInstance(t *testing.T) {
 	if old != RngKindDefault {
 		t.Fatalf("switch same kind old=%v", old)
 	}
-	// DFS not ported — sticky
+	// DFS requires MaxExhaustiveDepth > 0 on process options
 	ClearError()
-	_ = SwitchRndNumGenerator(RngKindDFS)
-	if !HasError() {
-		t.Fatal("DFS make_rndnum_generator must sticky fail")
+	o := Defaults()
+	o.MaxExhaustiveDepth = 4
+	SetProcessOptions(o)
+	old = SwitchRndNumGenerator(RngKindDFS)
+	if old != RngKindDefault {
+		t.Fatalf("switch to DFS old=%v", old)
 	}
+	if HasError() || GetRndNumGenerator() == nil || GetRndNumGenerator().Kind() != RngKindDFS {
+		t.Fatal("DFS switch", HasError(), GetRndNumGenerator())
+	}
+	// restore default for later tests via finalization path
 	ClearError()
 }
 
@@ -457,9 +464,28 @@ func TestMakeRndNumGeneratorDefault(t *testing.T) {
 	if r.Kind() != RngKindDefault {
 		t.Fatal(r.Kind())
 	}
+	// DFS without positive max depth sticky
 	ClearError()
+	prevO := ProcessOptions()
+	SetProcessOptions(Defaults()) // MaxExhaustiveDepth -1
 	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasError() {
-		t.Fatal("DFS not ported sticky")
+		t.Fatal("DFS max_depth<=0 sticky")
 	}
+	ClearError()
+	o := Defaults()
+	o.MaxExhaustiveDepth = 3
+	SetProcessOptions(o)
+	// clear prior singleton if any
+	clearDFSImpl()
+	dr := MakeRndNumGenerator(RngKindDFS, 1)
+	if dr == nil || HasError() || dr.Kind() != RngKindDFS {
+		t.Fatal("DFS generator", HasError())
+	}
+	// singleton
+	if MakeRndNumGenerator(RngKindDFS, 9) != dr {
+		t.Fatal("DFS singleton")
+	}
+	clearDFSImpl()
+	SetProcessOptions(prevO)
 	ClearError()
 }
