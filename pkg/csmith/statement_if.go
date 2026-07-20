@@ -121,12 +121,6 @@ func MakeRandomIf(
 		}
 		// StatementIf.cpp:89 — global_facts = pre_facts (already in FM via visit)
 	}
-	// Snapshot pre-branch effect; each arm runs from the same pre-state (StatementIf.cpp:96–99).
-	// Condition effects come from Expression::make_random visit_facts (not a second visit).
-	pre := EmptyEffect()
-	if cg.EffectAccum != nil {
-		pre = *cg.EffectAccum
-	}
 	// StatementIf.cpp:92 — effect_stm after condition (for set_accumulated_effect_after_block)
 	condEff := cg.EffectStm.Clone()
 	// residual ERROR sticky — no invent soft-if arms past EffectStm Clone residual
@@ -134,11 +128,17 @@ func MakeRandomIf(
 		return nil
 	}
 
-	thenEff := pre
-	// CGContext copy for then-arm: independent iv_bounds (C++ same ref, but
-	// Go must not share map with else/parent — CloneSubcontext).
+	// StatementIf.cpp:93–99 — both arms use the same cg_context (shared effect_accum).
+	// C++ Block::make_random(cg_context) for true then false; effect_accum is one
+	// pointer for the whole if. Forking thenEff/elseEff snapshots and MergeEffects
+	// left mid-function EffectAccum missing arm reads (seed-2 e12693: choose_visible
+	// ok_vars n=11 vs UP n=16; missing g_32/g_143/g_385/l_450/l_452).
+	// CloneSubcontext deep-copies IVBounds only; EffectAccum pointer is shared.
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		SetError(ErrGeneric)
+		return nil
+	}
 	thenCG := cg.CloneSubcontext()
-	thenCG.EffectAccum = &thenEff
 	thenB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &thenCG, false)
 	// StatementIf.cpp:94 ERROR_GUARD_AND_DEL1 after if_true
 	// live if_true Block* required sticky (no invent if with nil Then shell)
@@ -170,9 +170,8 @@ func MakeRandomIf(
 		cg.FM.SetGlobalFacts(CloneFactSlice(in), "auto_statement_if_170")
 	}
 
-	elseEff := pre
 	elseCG := cg.CloneSubcontext()
-	elseCG.EffectAccum = &elseEff
+	// EffectAccum still shared with parent (same as C++ sequential make on one cg)
 	elseB := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &elseCG, false)
 	// StatementIf.cpp:99 ERROR_GUARD_AND_DEL2 after if_false
 	// live if_false Block* required sticky (no invent if with nil Else shell)
@@ -201,16 +200,6 @@ func MakeRandomIf(
 		SetError(ErrGeneric)
 		return nil
 	}
-
-	// branch accumulators still observed on parent (generation-time effect merge)
-	// Incomplete arm accum fails closed (no invent pure MergeEffects past holes)
-	if cg.EffectAccum != nil {
-		merged := MergeEffects(thenEff, elseEff)
-		if !EffectComplete(merged) {
-			SetError(ErrGeneric)
-			return nil
-		}
-		*cg.EffectAccum = merged
-	}
+	// effect_accum already holds true+false generation reads (shared pointer)
 	return st
 }

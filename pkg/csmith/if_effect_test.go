@@ -220,7 +220,7 @@ func TestRandomParentBlockERRORGuard(t *testing.T) {
 }
 
 func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
-	// incomplete map_facts_in[then] must not invent else gen / if success
+	// incomplete EffectAccum must fail closed before arms (shared accum contract)
 	ClearError()
 	opts := Defaults()
 	opts.MaxBlockSize = 0
@@ -228,17 +228,47 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
 	fm := NewFactMgr(f)
-	// Plant then block will get new StmID; hard to plant incomplete then-in mid-make.
-	// Instead incomplete GlobalFacts before make fails closed when func_1 hack off:
-	// Use incomplete EffectAccum so arm merge fails after branches.
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	cg.Types = &TypeEnv{AllTypes: []*Type{GetIntType()}}
-	// MakeRandomIf will fail on MergeEffects incomplete or MakeRandomBlock
 	st := MakeRandomIf(NewRng(1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
+	}
+	ClearError()
+}
+
+// TestMakeRandomIfSharesEffectAccumWithParent — StatementIf.cpp:93–99 both arms
+// use the same CGContext (shared effect_accum). Forked then/else snapshots lost
+// arm reads for later StatementGoto choose_visible_read_var (seed-2 e12693).
+func TestMakeRandomIfSharesEffectAccumWithParent(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	stmtTab := NewStatementThresholdTable(opts)
+	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, nil)
+	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
+	fm := NewFactMgr(f)
+	pre := CreateVariableScalars("pre_if_rd", GetIntType(), true, false)
+	accum := EmptyEffect().ReadVar(pre)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &accum
+	thenCG := cg.CloneSubcontext()
+	if thenCG.EffectAccum != cg.EffectAccum {
+		t.Fatal("CloneSubcontext must share EffectAccum pointer (C++ same cg_context)")
+	}
+	_ = MakeRandomIf(NewRng(9), opts, probs, vs, tables, stmtTab, &cg)
+	if cg.EffectAccum == nil {
+		t.Fatal("parent EffectAccum must remain non-nil")
+	}
+	if !cg.EffectAccum.IsRead(pre) {
+		t.Fatal("parent EffectAccum must keep pre-if reads when arms share accum")
 	}
 	ClearError()
 }
