@@ -233,3 +233,26 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 		t.Fatal("facts_out")
 	}
 }
+
+// TestVisitFactsInvocationIgnoresFailedFlag — FunctionInvocation.cpp:502–555.
+// visit_facts does not consult failed; generation-time Failed is not analysis fail.
+func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
+	ClearError()
+	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	fi := &Invocation{
+		Failed: true,
+		Args: []*Expression{
+			{Term: TermVariable, Var: a, ExprType: GetIntType()},
+		},
+	}
+	eff := EmptyEffect()
+	cg := EmptyCGContext()
+	cg.EffectAccum = &eff
+	if !VisitFactsInvocation(fi, &cg, Defaults()) {
+		t.Fatalf("visit_facts must analyze despite Failed=true err=%v", HasError())
+	}
+	if !eff.IsRead(a) {
+		t.Fatal("must still visit args when Failed")
+	}
+	ClearError()
+}

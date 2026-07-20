@@ -942,12 +942,12 @@ func VisitFactsExpression(e *Expression, cg *CGContext, opts Options) bool {
 // upstream sets unordered=false); then user revisit when NeedsRevisit.
 // Binary &&/|| use FunctionInvocationBinary::visit_facts short-circuit merge.
 func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
-	// C++ always has live FunctionInvocation*; nil sticky; Failed is policy false
+	// C++ always has live FunctionInvocation*; nil sticky.
+	// FunctionInvocation.cpp:502–555 — visit_facts does NOT consult `failed`.
+	// Generation-time Failed must not invent re-analysis failure (would strip
+	// compound containers and drop mid-gen may-null — seed-2 e10107 path).
 	if fi == nil || cg == nil {
 		SetError(ErrGeneric)
-		return false
-	}
-	if fi.Failed {
 		return false
 	}
 	// FunctionInvocationBinary.cpp:487–490 — ordered standard ops
