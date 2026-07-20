@@ -44,7 +44,7 @@ func TestBuildInvocationAndFunction(t *testing.T) {
 	fm := NewFactMgr(caller)
 	cg := WithFunc(caller, EmptyEffect()).WithFactMgr(fm).WithFuncList(list)
 	caller.Stack = []*Block{{Func: caller}}
-	fi := BuildInvocationAndFunction(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(4), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi == nil || fi.Failed || fi.User == nil {
 		t.Fatal("fail")
 	}

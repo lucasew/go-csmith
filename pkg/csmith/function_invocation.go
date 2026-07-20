@@ -692,6 +692,9 @@ func BuildUserInvocation(
 // FunctionInvocationUser.cpp:173–241 — signature, params first, handover with args,
 // generate_body_with_known_params, return facts, renew_facts, effect handoff.
 // cg is *CGContext (C++ CGContext&).
+// qfer is the Expression/FunctionInvocation qfer passed to make_random_signature
+// (FunctionInvocationUser.cpp:179 — make_random_signature(cg, type, qfer)).
+// nil → full random_qualifiers(type,…); non-nil → qfer->random_qualifiers relative.
 func BuildInvocationAndFunction(
 	r *Rng,
 	opts Options,
@@ -702,6 +705,7 @@ func BuildInvocationAndFunction(
 	cg *CGContext,
 	list *FunctionList,
 	retType *Type,
+	qfer *CVQualifiers,
 ) *Invocation {
 	// FunctionInvocationUser.cpp always has RNG + CGContext + FuncList; sticky Failed
 	// (no invent call+func shell past hole). At-max is complete soft Failed (no sticky).
@@ -724,8 +728,10 @@ func BuildInvocationAndFunction(
 		SetError(ErrGeneric)
 		return &Invocation{Failed: true}
 	}
-	// FunctionInvocationUser.cpp:179 — make_random_signature
-	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, nil, list)
+	// FunctionInvocationUser.cpp:179 — make_random_signature(cg, type, qfer)
+	// Do not invent nil qfer when caller passed one (seed-2 e447: RV qfer draws
+	// differed vs always RandomQualifiersDefaultProbs).
+	callee := MakeRandomSignature(r, opts, probs, vs, &vs.Sym, *cg, retType, qfer, list)
 	if callee == nil {
 		// signature ERROR_GUARD sticky when not already set
 		if !HasError() {
@@ -1772,7 +1778,8 @@ func MakeRandomInvocation(
 				SetError(ErrGeneric)
 				return &Invocation{Failed: true}
 			}
-			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, stmtTab, cg, list, sigType)
+			// FunctionInvocationUser.cpp:179 — pass Expression qfer into signature RV qfer
+			fi = BuildInvocationAndFunction(r, opts, probs, vs, tables, stmtTab, cg, list, sigType, qfer)
 			if fi != nil && !fi.Failed && cg.CurrentFunc != nil && fi.User != nil {
 				cg.CurrentFunc.FactChanged = cg.CurrentFunc.FactChanged || fi.User.FactChanged
 			}

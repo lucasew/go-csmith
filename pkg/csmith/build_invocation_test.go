@@ -12,7 +12,7 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	list := &FunctionList{}
 	cg := EmptyCGContext()
-	fi := BuildInvocationAndFunction(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, nil)
+	fi := BuildInvocationAndFunction(NewRng(1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, nil, nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
 	}
@@ -37,7 +37,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
 	}
 	ClearError()
-	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
@@ -100,12 +100,12 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	list.Funcs = []*Function{caller}
 
 	// force new function creation path
-	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(7), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType(), nil)
 	if fi == nil || fi.Failed {
 		// may fail if max funcs / depth — try more seeds
 		ok := false
 		for seed := uint64(1); seed < 40; seed++ {
-			fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType())
+			fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg, list, GetIntType(), nil)
 			if fi != nil && !fi.Failed && fi.User != nil {
 				ok = true
 				break
@@ -238,7 +238,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext()
 	cg2.EffectAccum = &inc
-	fi := BuildInvocationAndFunction(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntType(), nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
 	}
@@ -344,7 +344,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	cg.Types = vs.Types
 	fm := NewFactMgr(caller)
 	cg = cg.WithFactMgr(fm)
-	fi := BuildInvocationAndFunction(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+	fi := BuildInvocationAndFunction(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 	if fi != nil && !fi.Failed {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")

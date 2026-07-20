@@ -68,7 +68,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 		ClearError()
 		list.Funcs = []*Function{caller}
 		caller.NewGlobals = nil
-		fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType())
+		fi = BuildInvocationAndFunction(NewRng(seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntType(), nil)
 		if fi != nil && !fi.Failed {
 			break
 		}
