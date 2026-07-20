@@ -101,15 +101,14 @@ func TestArrayBuildInitRecursive(t *testing.T) {
 	}
 	// empty init_strings list is broken IR sticky
 	ClearError()
-	seed := uint32(1)
-	if av.buildInitRecursive(0, nil, &seed) != "" {
+	if av.buildInitRecursive(0, nil) != "" {
 		t.Fatal("empty init list must fail closed")
 	}
 	if !HasError() {
 		t.Fatal("empty init list must SetError sticky")
 	}
 	ClearError()
-	if av.buildInitRecursive(0, []string{""}, &seed) != "" {
+	if av.buildInitRecursive(0, []string{""}) != "" {
 		t.Fatal("empty hole string must fail closed")
 	}
 	if !HasError() {

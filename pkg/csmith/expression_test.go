@@ -1528,3 +1528,18 @@ func TestExpressionCloneGetInvokeComplexity(t *testing.T) {
 		t.Fatal("init tables")
 	}
 }
+
+func TestExpressionConstantOutputParensNegatives(t *testing.T) {
+	// Constant.cpp:534–538 via Expression::to_string for array init_strings
+	ClearError()
+	e := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "-6L"}, ExprType: GetIntType()}
+	got := e.Output()
+	if got != "(-6L)" {
+		t.Fatalf("negative const Output: got %q want (-6L)", got)
+	}
+	e2 := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType(), Value: "3L"}, ExprType: GetIntType()}
+	if e2.Output() != "3L" {
+		t.Fatalf("positive: got %q", e2.Output())
+	}
+	ClearError()
+}

@@ -1724,13 +1724,14 @@ func (e *Expression) outputBody() string {
 	}
 	switch e.Term {
 	case TermConstant:
-		// Constant::Output always live Type* + value; sticky no invent empty token
-		// or emit past Type-nil incomplete Constant shell
-		if e.Con != nil && e.Con.Type != nil && e.Con.Value != "" {
-			return e.Con.Value
+		// Expression::to_string → Output → Constant::Output (Constant.cpp:532–551).
+		// Must use Con.Output() so negatives become "(-6L)" for array init_strings
+		// (ArrayVariable.cpp:490–492 init_values[i]->to_string()), not bare Value.
+		if e.Con == nil {
+			SetError(ErrGeneric)
+			return ""
 		}
-		SetError(ErrGeneric)
-		return ""
+		return e.Con.Output()
 	case TermVariable:
 		if e.Var == nil {
 			SetError(ErrGeneric)

@@ -763,9 +763,17 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 	av.Indices = append(av.Indices, s)
 }
 
+// arrayInitSeed mirrors ArrayVariable.cpp:429 — static unsigned seed = 0xABCDEF
+// inside build_init_recursive. Process-wide: advances across every array OutputDef
+// (do not reset per array).
+var arrayInitSeed uint32 = 0xABCDEF
+
+// ResetArrayInitSeed restores the C++ static seed (tests / Finalization).
+func ResetArrayInitSeed() { arrayInitSeed = 0xABCDEF }
+
 // buildInitRecursive mirrors ArrayVariable::build_init_recursive.
-// ArrayVariable.cpp:426–446 — nested braces; magic seed pick; join with "," (no space).
-func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, seed *uint32) string {
+// ArrayVariable.cpp:426–446 — nested braces; process-static seed pick; "," (no space).
+func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) string {
 	// C++ assert(dimen < dim) and % init_strings.size(); empty list is broken IR sticky
 	if av == nil || dimen >= len(av.Sizes) || len(initStrings) == 0 {
 		SetError(ErrGeneric)
@@ -776,7 +784,8 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 	for i := 0; i < av.Sizes[dimen]; i++ {
 		if dimen == len(av.Sizes)-1 {
 			// ArrayVariable.cpp:433–437 — ((seed*seed+(i+7)*(i+13))*52369) % n
-			s := *seed
+			// seed is static unsigned (32-bit wrap)
+			s := arrayInitSeed
 			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
 			part := initStrings[rnd]
 			if part == "" {
@@ -784,9 +793,9 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string, see
 				return ""
 			}
 			b.WriteString(part)
-			*seed = s + 1
+			arrayInitSeed = s + 1
 		} else {
-			part := av.buildInitRecursive(dimen+1, initStrings, seed)
+			part := av.buildInitRecursive(dimen+1, initStrings)
 			if part == "" {
 				if !HasError() {
 					SetError(ErrGeneric)
@@ -813,9 +822,8 @@ func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
 	}
 	// Process options match CGOptions::force_non_uniform_array_init (default true)
 	if ProcessOptions().ForceNonUniformArrayInit {
-		// ArrayVariable.cpp:452–453 — static seed 0xABCDEF in recursive
-		seed := uint32(0xABCDEF)
-		return av.buildInitRecursive(0, initStrings, &seed)
+		// ArrayVariable.cpp:429 / 452–453 — static seed continues across calls
+		return av.buildInitRecursive(0, initStrings)
 	}
 	// ArrayVariable.cpp:456–473 — build from last dimension outward
 	str := ""
