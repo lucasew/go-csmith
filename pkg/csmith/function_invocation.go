@@ -1268,16 +1268,25 @@ func MakeRandomBinaryPtrComparison(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// FunctionInvocation.cpp:295–296 — eCmpEq or eCmpNe
-	op := BinCmpEq
+	// FunctionInvocation.cpp:295–296 — rnd_flipcoin(50) ? eCmpEq : eCmpNe
+	// (true → ==, false → !=). Do not invert polarity.
+	op := BinCmpNe
 	if r.RndFlipcoin(50) {
-		op = BinCmpNe
+		op = BinCmpEq
 	}
 	opStr := op.BinaryOpC()
-	// FunctionInvocation.cpp:297–299 creates SafeOpFlags but Output for ptr_cmp
-	// does not use safe wrappers (pointer ==/!= emit as infix). Leave Safe nil.
-	_ = probs
-	// Type::choose_random_pointer_type
+	// FunctionInvocation.cpp:297–299 — SafeOpFlags::make_random_binary(get_int_type(),
+	// nullptr, nullptr, sOpBinary, op) BEFORE choose_random_pointer_type.
+	// Output for ptr_cmp still uses standard ==/!= (not safe_* wrappers), but the
+	// RNG draws for signedness + size still run (seed-2 e129 was F50 from flags).
+	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), nil, nil, SafeOpBinary, op)
+	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
+	if flags == nil || HasError() {
+		return nil
+	}
+	// FunctionInvocation.cpp:301–303 — CreateFunctionInvocationBinary (no RNG for
+	// ==/!=: safe_ops false → no tmp vars).
+	// FunctionInvocation.cpp:304 — Type::choose_random_pointer_type after flags
 	ptrTy := env.ChooseRandomPointerType(r)
 	if ptrTy == nil {
 		return nil
@@ -1366,12 +1375,7 @@ func MakeRandomBinaryPtrComparison(
 	if HasError() {
 		return nil
 	}
-	// FunctionInvocation.cpp:297–302 — flags always; Output uses standard ==/!= (not safe_ops)
-	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, op)
-	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison
-	if flags == nil {
-		return nil
-	}
+	// flags already drawn before pointer type (FunctionInvocation.cpp:297–304 order)
 	inv := &Invocation{
 		IsStd:  true,
 		Binary: opStr,

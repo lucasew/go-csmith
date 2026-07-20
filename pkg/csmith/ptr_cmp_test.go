@@ -17,7 +17,21 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	BookkeeperDoFinalization()
-	fi := MakeRandomBinaryPtrComparison(NewRng(5), opts, probs, vs, NewExprTables(opts), &cg, env)
+	// Operands may soft-miss under sparse env; flags stream order changed so seed 5 alone
+	// is not stable — find any successful ptr_cmp.
+	var fi *Invocation
+	for seed := uint64(1); seed < 50; seed++ {
+		ClearError()
+		cg2 := EmptyCGContext()
+		cg2.Types = env
+		eff2 := EmptyEffect()
+		cg2.EffectAccum = &eff2
+		fi = MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg2, env)
+		if fi != nil {
+			break
+		}
+	}
+	_ = cg
 	if fi == nil {
 		t.Fatal("nil")
 	}
@@ -30,6 +44,76 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 	if len(fi.Args) != 2 || fi.Args[0] == nil || fi.Args[1] == nil {
 		t.Fatal(fi.Args)
 	}
+	// FunctionInvocation.cpp:297–299 — SafeOpFlags always built (even if Output is infix)
+	if fi.Safe == nil {
+		t.Fatal("SafeOpFlags required on ptr_cmp (RNG order 1:1 with C++)")
+	}
+}
+
+func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
+	// FunctionInvocation.cpp:295–304 order:
+	//   F50 eq/ne → make_random_binary (F signed, F signed, U size) → choose_random_pointer_type
+	// eq polarity: flip true → ==, false → !=
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	env := &TypeEnv{}
+	if env.FindPointerType(GetIntType(), true) == nil {
+		t.Fatal("pointer type")
+	}
+	vs.Types = env
+	// Seed where first flip (eq/ne) is false → must be !=
+	// And flags consume draws before any ChooseRandomPointerType U(n=1)
+	// Use Rng depth only through the flag section via a harness that stops early:
+	// Compare two runs: pure MakeRandomBinaryKind depth vs full ptr-cmp prefix.
+	rFlags := NewRng(7)
+	d0 := rFlags.RandDepth()
+	// eq/ne draw alone
+	eqFlip := rFlags.RndFlipcoin(50)
+	_ = eqFlip
+	flags := MakeRandomBinaryKind(rFlags, opts, probs, GetIntType(), nil, nil, SafeOpBinary, BinCmpEq)
+	if flags == nil {
+		t.Fatal("flags")
+	}
+	// after eq + op1 + op2 + size: depth +1 +2 flip +1 upto (filter may re-roll size)
+	flagDepth := rFlags.RandDepth() - d0
+	if flagDepth < 4 {
+		t.Fatalf("expected at least eq+2signed+size draws, got depth delta %d", flagDepth)
+	}
+
+	// Full factory: first events must be F50 then flag F50 F50 U… then U1 pointer
+	// Polarity: simulate C++ ternary with known flip outcomes via depth-matched seeds.
+	// Seed 1: find a seed where first flip is 1 → expect "=="
+	foundEq, foundNe := false, false
+	for seed := uint64(1); seed < 200 && !(foundEq && foundNe); seed++ {
+		ClearError()
+		cg := EmptyCGContext().WithFactMgr(NewFactMgr(nil))
+		cg.Types = env
+		fi := MakeRandomBinaryPtrComparison(NewRng(seed), opts, probs, vs, NewExprTables(opts), &cg, env)
+		if fi == nil {
+			continue
+		}
+		// Replay first flip alone with same seed
+		r0 := NewRng(seed)
+		wantEq := r0.RndFlipcoin(50)
+		if wantEq && fi.Binary == "==" {
+			foundEq = true
+		}
+		if !wantEq && fi.Binary == "!=" {
+			foundNe = true
+		}
+		if wantEq && fi.Binary != "==" {
+			t.Fatalf("seed %d flip true must be == got %s", seed, fi.Binary)
+		}
+		if !wantEq && fi.Binary != "!=" {
+			t.Fatalf("seed %d flip false must be != got %s", seed, fi.Binary)
+		}
+	}
+	if !foundEq || !foundNe {
+		t.Fatalf("need both polarities in sample: eq=%v ne=%v", foundEq, foundNe)
+	}
+	ClearError()
 }
 
 func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
