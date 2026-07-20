@@ -84,17 +84,17 @@ Total items: 2070
 - [ ] ArrayVariable.cpp::ArrayVariable.size_in_bytes
 - [ ] ArrayVariable.cpp::ArrayVariable.~ArrayVariable
 - [ ] ArrayVariable.cpp::count_expr_key_var
-- [ ] Attribute.cpp::AlignedAttribute.AlignedAttribute
-- [ ] Attribute.cpp::AlignedAttribute.make_random
-- [ ] Attribute.cpp::Attribute.Attribute
-- [ ] Attribute.cpp::Attribute.make_random
-- [ ] Attribute.cpp::AttributeGenerator.Output
-- [ ] Attribute.cpp::BooleanAttribute.BooleanAttribute
-- [ ] Attribute.cpp::BooleanAttribute.make_random
-- [ ] Attribute.cpp::MultiChoiceAttribute.make_random
-- [ ] Attribute.cpp::MultiChoiceAttribute.MultiChoiceAttribute
-- [ ] Attribute.cpp::SectionAttribute.make_random
-- [ ] Attribute.cpp::SectionAttribute.SectionAttribute
+- [x] Attribute.cpp::AlignedAttribute.AlignedAttribute
+- [x] Attribute.cpp::AlignedAttribute.make_random
+- [x] Attribute.cpp::Attribute.Attribute
+- [x] Attribute.cpp::Attribute.make_random
+- [x] Attribute.cpp::AttributeGenerator.Output
+- [x] Attribute.cpp::BooleanAttribute.BooleanAttribute
+- [x] Attribute.cpp::BooleanAttribute.make_random
+- [x] Attribute.cpp::MultiChoiceAttribute.make_random
+- [x] Attribute.cpp::MultiChoiceAttribute.MultiChoiceAttribute
+- [x] Attribute.cpp::SectionAttribute.make_random
+- [x] Attribute.cpp::SectionAttribute.SectionAttribute
 - [ ] Block.cpp::Block.append_nested_loop
 - [ ] Block.cpp::Block.append_return_stmt
 - [ ] Block.cpp::Block.Block
@@ -407,39 +407,39 @@ Total items: 2070
 - [ ] CrestExtension.cpp::CrestExtension.OutputTail
 - [ ] CrestExtension.cpp::CrestExtension.type_to_string
 - [ ] CrestExtension.cpp::CrestExtension.~CrestExtension
-- [ ] CVQualifiers.cpp::CVQualifiers.add_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.CVQualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.get_all_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.get_consts
-- [ ] CVQualifiers.cpp::CVQualifiers.get_volatiles
-- [ ] CVQualifiers.cpp::CVQualifiers.indirect_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.is_const_after_deref
-- [ ] CVQualifiers.cpp::CVQualifiers.is_storage_const
-- [ ] CVQualifiers.cpp::CVQualifiers.is_storage_volatile
-- [ ] CVQualifiers.cpp::CVQualifiers.is_volatile_after_deref
-- [ ] CVQualifiers.cpp::CVQualifiers.make_scalar_consts
-- [ ] CVQualifiers.cpp::CVQualifiers.make_scalar_volatiles
-- [ ] CVQualifiers.cpp::CVQualifiers.match
-- [ ] CVQualifiers.cpp::CVQualifiers.match_indirect
-- [ ] CVQualifiers.cpp::CVQualifiers.operator=
-- [ ] CVQualifiers.cpp::CVQualifiers.output
-- [ ] CVQualifiers.cpp::CVQualifiers.output_qualified_type
-- [ ] CVQualifiers.cpp::CVQualifiers.OutputFirstQuals
-- [ ] CVQualifiers.cpp::CVQualifiers.random_add_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.random_loose_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.random_looser_consts
-- [ ] CVQualifiers.cpp::CVQualifiers.random_looser_volatiles
-- [ ] CVQualifiers.cpp::CVQualifiers.random_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.random_stricter_consts
-- [ ] CVQualifiers.cpp::CVQualifiers.random_stricter_volatiles
-- [ ] CVQualifiers.cpp::CVQualifiers.remove_qualifiers
-- [ ] CVQualifiers.cpp::CVQualifiers.restrict
-- [ ] CVQualifiers.cpp::CVQualifiers.sanity_check
-- [ ] CVQualifiers.cpp::CVQualifiers.set_const
-- [ ] CVQualifiers.cpp::CVQualifiers.set_volatile
-- [ ] CVQualifiers.cpp::CVQualifiers.stricter_than
-- [ ] CVQualifiers.cpp::CVQualifiers.~CVQualifiers
-- [ ] CVQualifiers.cpp::is_volatile_ok_on_one_level
+- [x] CVQualifiers.cpp::CVQualifiers.add_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.CVQualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.get_all_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.get_consts
+- [x] CVQualifiers.cpp::CVQualifiers.get_volatiles
+- [x] CVQualifiers.cpp::CVQualifiers.indirect_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.is_const_after_deref
+- [x] CVQualifiers.cpp::CVQualifiers.is_storage_const
+- [x] CVQualifiers.cpp::CVQualifiers.is_storage_volatile
+- [x] CVQualifiers.cpp::CVQualifiers.is_volatile_after_deref
+- [x] CVQualifiers.cpp::CVQualifiers.make_scalar_consts
+- [x] CVQualifiers.cpp::CVQualifiers.make_scalar_volatiles
+- [x] CVQualifiers.cpp::CVQualifiers.match
+- [x] CVQualifiers.cpp::CVQualifiers.match_indirect
+- [x] CVQualifiers.cpp::CVQualifiers.operator=
+- [x] CVQualifiers.cpp::CVQualifiers.output
+- [x] CVQualifiers.cpp::CVQualifiers.output_qualified_type
+- [x] CVQualifiers.cpp::CVQualifiers.OutputFirstQuals
+- [x] CVQualifiers.cpp::CVQualifiers.random_add_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.random_loose_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.random_looser_consts
+- [x] CVQualifiers.cpp::CVQualifiers.random_looser_volatiles
+- [x] CVQualifiers.cpp::CVQualifiers.random_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.random_stricter_consts
+- [x] CVQualifiers.cpp::CVQualifiers.random_stricter_volatiles
+- [x] CVQualifiers.cpp::CVQualifiers.remove_qualifiers
+- [x] CVQualifiers.cpp::CVQualifiers.restrict
+- [x] CVQualifiers.cpp::CVQualifiers.sanity_check
+- [x] CVQualifiers.cpp::CVQualifiers.set_const
+- [x] CVQualifiers.cpp::CVQualifiers.set_volatile
+- [x] CVQualifiers.cpp::CVQualifiers.stricter_than
+- [x] CVQualifiers.cpp::CVQualifiers.~CVQualifiers
+- [x] CVQualifiers.cpp::is_volatile_ok_on_one_level
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.create_output_dir
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.CreateInstance
 - [ ] DefaultOutputMgr.cpp::DefaultOutputMgr.DefaultOutputMgr

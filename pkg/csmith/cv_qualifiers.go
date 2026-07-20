@@ -30,6 +30,36 @@ func NewCVQualifiers(consts, vols []bool) CVQualifiers {
 	}
 }
 
+// GetConsts mirrors CVQualifiers::get_consts.
+// CVQualifiers.h:65.
+func (q CVQualifiers) GetConsts() []bool {
+	return q.IsConsts
+}
+
+// GetVolatiles mirrors CVQualifiers::get_volatiles.
+// CVQualifiers.h:66.
+func (q CVQualifiers) GetVolatiles() []bool {
+	return q.IsVolatiles
+}
+
+// IsStorageConst mirrors CVQualifiers::is_storage_const — is_consts[0].
+// CVQualifiers.h:52.
+func (q CVQualifiers) IsStorageConst() bool {
+	if len(q.IsConsts) == 0 {
+		return false
+	}
+	return q.IsConsts[0]
+}
+
+// IsStorageVolatile mirrors CVQualifiers::is_storage_volatile — is_volatiles[0].
+// CVQualifiers.h:53.
+func (q CVQualifiers) IsStorageVolatile() bool {
+	if len(q.IsVolatiles) == 0 {
+		return false
+	}
+	return q.IsVolatiles[0]
+}
+
 // IsConst mirrors CVQualifiers::is_const → is_const_after_deref(0).
 func (q CVQualifiers) IsConst() bool {
 	return q.IsConstAfterDeref(0)
@@ -38,6 +68,34 @@ func (q CVQualifiers) IsConst() bool {
 // IsVolatile mirrors CVQualifiers::is_volatile → is_volatile_after_deref(0).
 func (q CVQualifiers) IsVolatile() bool {
 	return q.IsVolatileAfterDeref(0)
+}
+
+// Output mirrors CVQualifiers::output — debug dump of const/vol bit vectors.
+// CVQualifiers.cpp:653–662.
+func (q CVQualifiers) Output() string {
+	var b strings.Builder
+	for i, c := range q.IsConsts {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		if c {
+			b.WriteString("1")
+		} else {
+			b.WriteString("0")
+		}
+	}
+	b.WriteString(", ")
+	for i, v := range q.IsVolatiles {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		if v {
+			b.WriteString("1")
+		} else {
+			b.WriteString("0")
+		}
+	}
+	return b.String()
 }
 
 // IsConstAfterDeref mirrors CVQualifiers::is_const_after_deref.

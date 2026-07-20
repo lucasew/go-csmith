@@ -577,3 +577,22 @@ func TestRandomLooseQualifiersIncompleteEffectSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestCVQualifiersGettersAndOutput(t *testing.T) {
+	// CVQualifiers.h get_consts/get_volatiles/is_storage_*; output dump
+	q := NewCVQualifiers([]bool{true, false}, []bool{false, true})
+	if !q.IsStorageConst() || q.IsStorageVolatile() {
+		t.Fatal("storage level 0")
+	}
+	if len(q.GetConsts()) != 2 || len(q.GetVolatiles()) != 2 {
+		t.Fatal("get vectors")
+	}
+	// Output: "1 0, 0 1"
+	if got := q.Output(); got != "1 0, 0 1" {
+		t.Fatalf("Output: %q", got)
+	}
+	empty := CVQualifiers{}
+	if empty.IsStorageConst() || empty.IsStorageVolatile() {
+		t.Fatal("empty storage")
+	}
+}
