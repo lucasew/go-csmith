@@ -398,11 +398,14 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 			// Statement.cpp:868–871 — assert(0) if !validate; NDEBUG elides assert and
 			// still installs outputs + special_handled (Release csmith does not abort).
 			// Do not sticky-poison generation: match NDEBUG continue (same class as
-			// FactUnion indirect==-1 under NDEBUG).
+			// FactUnion indirect==-1 under NDEBUG). Always-revisit may SetError on
+			// incomplete callee IR; clear soft fail like elided assert(0).
 			_ = ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
-			// residual ERROR sticky — no invent install outputs past validate residual hole
-			if HasError() {
+			ClearError()
+			if !FactsComplete(outputs) {
+				// incomplete outputs still fail closed sticky
 				fm.GlobalFacts = IncompleteFactSlice()
+				SetError(ErrGeneric)
 				return
 			}
 			fm.SetGlobalFacts(outputs, "auto_edges_analysis_408")
