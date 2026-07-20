@@ -60,8 +60,8 @@ Total items: 2070
 - [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDFSRndNumGenerator
 - [x] ArrayVariable.cpp::ArrayVariable.add_index
 - [x] ArrayVariable.cpp::ArrayVariable.ArrayVariable
-- [ ] ArrayVariable.cpp::ArrayVariable.build_init_recursive
-- [ ] ArrayVariable.cpp::ArrayVariable.build_initializer_str
+- [x] ArrayVariable.cpp::ArrayVariable.build_init_recursive
+- [x] ArrayVariable.cpp::ArrayVariable.build_initializer_str
 - [x] ArrayVariable.cpp::ArrayVariable.CreateArrayVariable
 - [x] ArrayVariable.cpp::ArrayVariable.get_array
 - [x] ArrayVariable.cpp::ArrayVariable.get_collective
@@ -74,7 +74,7 @@ Total items: 2070
 - [x] ArrayVariable.cpp::ArrayVariable.is_global
 - [x] ArrayVariable.cpp::ArrayVariable.is_variant
 - [x] ArrayVariable.cpp::ArrayVariable.is_visible_local
-- [x] ArrayVariable.cpp::ArrayVariable.itemize
+- [ ] ArrayVariable.cpp::ArrayVariable.itemize
 - [x] ArrayVariable.cpp::ArrayVariable.make_print_index_str
 - [x] ArrayVariable.cpp::ArrayVariable.no_loop_initializer
 - [x] ArrayVariable.cpp::ArrayVariable.Output
@@ -83,7 +83,7 @@ Total items: 2070
 - [x] ArrayVariable.cpp::ArrayVariable.output_init
 - [x] ArrayVariable.cpp::ArrayVariable.output_with_indices
 - [x] ArrayVariable.cpp::ArrayVariable.OutputDecl
-- [ ] ArrayVariable.cpp::ArrayVariable.OutputDef
+- [x] ArrayVariable.cpp::ArrayVariable.OutputDef
 - [x] ArrayVariable.cpp::ArrayVariable.OutputLowerBound
 - [x] ArrayVariable.cpp::ArrayVariable.OutputUpperBound
 - [x] ArrayVariable.cpp::ArrayVariable.push_back
@@ -834,7 +834,7 @@ Total items: 2070
 - [x] ExpressionVariable.cpp::ExpressionVariable.get_var
 - [x] ExpressionVariable.cpp::ExpressionVariable.make_random
 - [x] ExpressionVariable.cpp::ExpressionVariable.operator=
-- [x] ExpressionVariable.cpp::ExpressionVariable.Output
+- [ ] ExpressionVariable.cpp::ExpressionVariable.Output
 - [x] ExpressionVariable.cpp::ExpressionVariable.push_back
 - [x] ExpressionVariable.cpp::ExpressionVariable.use_var
 - [x] ExpressionVariable.cpp::ExpressionVariable.visit_facts

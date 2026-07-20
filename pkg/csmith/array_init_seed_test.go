@@ -30,11 +30,16 @@ func TestArrayInitRecursiveProcessStaticSeed(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	s2 := a2.buildInitRecursive(0, []string{"X", "Y"})
-	// manual: seed=s0+1, i=0 → idx; seed++; i=1 → idx
+	// C++ size_t width after unsigned seed*seed wrap
+	pick := func(seed uint32, i int, n int) int {
+		ss := uint64(seed * seed)
+		prod := uint64(i+7) * uint64(i+13)
+		return int(((ss + prod) * 52369) % uint64(n))
+	}
 	wantSeed := uint32(0xABCDEF + 1)
-	idx0 := ((wantSeed*wantSeed + uint32(0+7)*uint32(0+13)) * 52369) % 2
+	idx0 := pick(wantSeed, 0, 2)
 	wantSeed++
-	idx1 := ((wantSeed*wantSeed + uint32(1+7)*uint32(1+13)) * 52369) % 2
+	idx1 := pick(wantSeed, 1, 2)
 	pool := []string{"X", "Y"}
 	want := "{" + pool[idx0] + "," + pool[idx1] + "}"
 	if s2 != want {

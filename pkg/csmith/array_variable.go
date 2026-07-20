@@ -142,17 +142,23 @@ func CreateArrayVariable(
 	if HasError() {
 		return nil
 	}
-	// ArrayVariable.cpp:166 — pure_rnd_upto(total_size/2); pure_rnd_upto(0)==0
-	// no soft invent half=1 when total_size/2 is 0
+	// ArrayVariable.cpp:165–186 — pure_rnd_upto(total_size/2) then alt inits.
+	// pure_rnd_upto(0)==0 with no draw; use PureRndUpto so ProcessRng matches C++
+	// RandomNumber singleton when r is the session process RNG.
 	half := uint32(total / 2)
-	initNum := int(r.RndUpto(half))
+	// Prefer process pure path when r is the live process generator (C++ pure_rnd_*)
+	var initNum int
+	if pr := ProcessRng(); pr != nil && pr == r {
+		initNum = int(PureRndUpto(half, nil))
+	} else {
+		initNum = int(r.RndUpto(half))
+	}
 	for i := 0; i < initNum; i++ {
 		// ArrayVariable.cpp:177–185
 		// if (!pointer || strict_const_arrays) Constant::make_random
 		// else VariableSelector::make_init_value
 		var e *Expression
 		ptrLike := elem.IsPointerLike()
-		// residual ERROR sticky — no invent soft-init path past IsPointerLike residual
 		if HasError() {
 			return nil
 		}
@@ -165,8 +171,6 @@ func CreateArrayVariable(
 				e = &Expression{Term: TermConstant, Con: c, ExprType: elem}
 			}
 		} else {
-			// make_init_value needs live VS + CGContext (C++ always has both)
-			// sticky no invent Constant "0" / null stand-in for missing make_init_value
 			if vs == nil || cg == nil {
 				SetError(ErrGeneric)
 				return nil
@@ -177,17 +181,13 @@ func CreateArrayVariable(
 				return nil
 			}
 		}
-		// ArrayVariable.cpp:185 — add_init_value(e)
-		// Expression* always live after make; nil fails closed whole array
-		// (no invent partial InitExprs / fewer inits than initNum)
-		// non-sticky: soft re-pick factory when make_init_value / make_random fails
+		// ArrayVariable.cpp:185 — add_init_value(e); to_string only at OutputDef
 		if e == nil {
 			return nil
 		}
 		av.InitExprs = append(av.InitExprs, e)
-		// ArrayVariable.cpp:505–506 — init_values[i]->to_string() for brace emit
+		// Keep InitValues for legacy tests / Fact paths that read strings
 		val := e.Output()
-		// residual ERROR sticky — no invent soft-skip init value past Output residual hole
 		if HasError() {
 			return nil
 		}
@@ -195,7 +195,6 @@ func CreateArrayVariable(
 			av.InitValues = append(av.InitValues, val)
 			av.ArrayInits = append(av.ArrayInits, val)
 		} else {
-			// incomplete init Output sticky — no invent fewer InitValues than InitExprs
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -783,11 +782,16 @@ func (av *ArrayVariable) buildInitRecursive(dimen int, initStrings []string) str
 	b.WriteString("{")
 	for i := 0; i < av.Sizes[dimen]; i++ {
 		if dimen == len(av.Sizes)-1 {
-			// ArrayVariable.cpp:433–437 — ((seed*seed+(i+7)*(i+13))*52369) % n
-			// seed is static unsigned (32-bit wrap)
+			// ArrayVariable.cpp:433–437 —
+			//   size_t rnd_index = ((seed * seed + (i + 7) * (i + 13)) * 52369) % n;
+			// seed is unsigned: seed*seed wraps at 32 bits, then promotes to size_t
+			// for the rest of the expression (64-bit on LP64). All-uint32 Go mul was wrong.
 			s := arrayInitSeed
-			rnd := ((s*s + uint32(i+7)*uint32(i+13)) * 52369) % uint32(len(initStrings))
-			part := initStrings[rnd]
+			ss := uint64(s * s) // uint32 mul wrap, then widen
+			prod := uint64(i+7) * uint64(i+13)
+			rnd := (ss + prod) * 52369
+			idx := int(rnd % uint64(len(initStrings)))
+			part := initStrings[idx]
 			if part == "" {
 				SetError(ErrGeneric)
 				return ""
@@ -833,8 +837,10 @@ func (av *ArrayVariable) buildInitializerStr(initStrings []string) string {
 		dim.WriteString("{")
 		for j := 0; j < lenI; j++ {
 			if i == len(av.Sizes)-1 {
-				rnd := (uint32(i) + uint32(j+7)*uint32(j+13)) * 52369 % uint32(len(initStrings))
-				part := initStrings[rnd]
+				// ArrayVariable.cpp:462–463 — (i+(j+7)*(j+13))*52369 % n as size_t width
+				rnd := (uint64(i) + uint64(j+7)*uint64(j+13)) * 52369
+				idx := int(rnd % uint64(len(initStrings)))
+				part := initStrings[idx]
 				if part == "" {
 					SetError(ErrGeneric)
 					return ""
@@ -890,13 +896,19 @@ func (av *ArrayVariable) OutputDef() string {
 	if HasError() {
 		return ""
 	}
-	// ArrayVariable.cpp:500–507 — string initializer; assert(init)
-	vals := make([]string, 0, 1+len(av.InitValues))
-	if av.Init != nil && av.Init.Value != "" {
-		vals = append(vals, av.Init.Value)
-	} else if av.InitExpr != nil {
+	// ArrayVariable.cpp:488–493 — init_strings from init->to_string() then each
+	// init_values[i]->to_string() (Expression::Output at emit time, not cached Value).
+	vals := make([]string, 0, 1+len(av.InitExprs))
+	if av.InitExpr != nil {
 		s := av.InitExpr.Output()
-		// residual ERROR sticky — no invent soft-skip brace init past Output residual hole
+		if HasError() {
+			return ""
+		}
+		if s != "" {
+			vals = append(vals, s)
+		}
+	} else if av.Init != nil {
+		s := av.Init.Output()
 		if HasError() {
 			return ""
 		}
@@ -904,13 +916,30 @@ func (av *ArrayVariable) OutputDef() string {
 			vals = append(vals, s)
 		}
 	}
-	vals = append(vals, av.InitValues...)
+	for _, e := range av.InitExprs {
+		if e == nil {
+			SetError(ErrGeneric)
+			return ""
+		}
+		s := e.Output()
+		if HasError() {
+			return ""
+		}
+		if s == "" {
+			SetError(ErrGeneric)
+			return ""
+		}
+		vals = append(vals, s)
+	}
+	// Fallback: legacy InitValues if no Expression* pool (tests)
+	if len(vals) == 0 && len(av.InitValues) > 0 {
+		vals = append(vals, av.InitValues...)
+	}
 	// assert(init) — sticky no soft invent "0" brace list
 	if len(vals) == 0 {
 		SetError(ErrGeneric)
 		return ""
 	}
-	// sticky no invent empty holes in brace initializer list
 	for _, v := range vals {
 		if v == "" {
 			SetError(ErrGeneric)
