@@ -357,13 +357,24 @@ func (q CVQualifiers) SanityCheck(t *Type) bool {
 		len(q.IsConsts) == level+1
 }
 
+// processMatchExactQualifiers mirrors CGOptions::match_exact_qualifiers() as
+// used by random_looser/stricter_* and random_add_qualifiers.
+// StatementAssign forces the process flag during Lhs (when qf != nil); vs.Opts
+// alone stays false. C++ always reads the process CGOptions bit for both
+// CVQualifiers::match and random_looser_consts — Go Match already ORs process;
+// these random_* helpers must too (seed-2 e9060: choose exact-miss then
+// RandomLooserConsts F50 while UP skipped flips under match_exact).
+func processMatchExactQualifiers(opts Options) bool {
+	return opts.MatchExactQualifiers || ProcessOptions().MatchExactQualifiers
+}
+
 // RandomStricterConsts mirrors CVQualifiers::random_stricter_consts.
 // CVQualifiers.cpp:375–397.
 // C++ always has process RNG + Probabilities; nil r fails closed nil (no invent
 // identity bits without draw). Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
-	if opts.MatchExactQualifiers {
+	if processMatchExactQualifiers(opts) {
 		return append([]bool(nil), q.IsConsts...)
 	}
 	// CVQualifiers.cpp always has process RNG sticky; no invent identity without draw
@@ -405,7 +416,7 @@ func (q CVQualifiers) RandomStricterConsts(r *Rng, opts Options, probs *Probabil
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
-	if opts.MatchExactQualifiers {
+	if processMatchExactQualifiers(opts) {
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
@@ -447,7 +458,7 @@ func (q CVQualifiers) RandomStricterVolatiles(r *Rng, opts Options, probs *Proba
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsConsts)
-	if opts.MatchExactQualifiers {
+	if processMatchExactQualifiers(opts) {
 		return append([]bool(nil), q.IsConsts...)
 	}
 	if r == nil {
@@ -482,7 +493,7 @@ func (q CVQualifiers) RandomLooserConsts(r *Rng, opts Options, probs *Probabilit
 // Nil probs → 0% (no invent default 50).
 func (q CVQualifiers) RandomLooserVolatiles(r *Rng, opts Options, probs *Probabilities) []bool {
 	depth := len(q.IsVolatiles)
-	if opts.MatchExactQualifiers {
+	if processMatchExactQualifiers(opts) {
 		return append([]bool(nil), q.IsVolatiles...)
 	}
 	if r == nil {
@@ -649,7 +660,7 @@ func (q CVQualifiers) RandomAddQualifiers(r *Rng, opts Options, probs *Probabili
 	out := q
 	out.IsConsts = append([]bool(nil), q.IsConsts...)
 	out.IsVolatiles = append([]bool(nil), q.IsVolatiles...)
-	if opts.MatchExactQualifiers {
+	if processMatchExactQualifiers(opts) {
 		out.AddQualifiers(false, false)
 		return out
 	}
