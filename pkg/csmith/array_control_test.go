@@ -28,6 +28,35 @@ func TestMakeRandomArrayControlLe(t *testing.T) {
 	_ = init
 }
 
+func TestMakeRandomArrayControlSignedLeGePolarity(t *testing.T) {
+	// StatementFor.cpp:134 — rnd_flipcoin(50) ? eCmpLe : eCmpGe
+	ClearError()
+	foundLe, foundGe := false, false
+	for seed := uint64(1); seed < 80 && !(foundLe && foundGe); seed++ {
+		r0 := NewRng(seed)
+		// skip oob flip (prob 0 still draws)
+		_ = r0.RndFlipcoin(0)
+		wantLe := r0.RndFlipcoin(50)
+		_, _, _, testOp, _, _ := MakeRandomArrayControl(NewRng(seed), 10, true, 0)
+		if wantLe && testOp != BinCmpLe {
+			t.Fatalf("seed %d flip true must be Le got %v", seed, testOp)
+		}
+		if !wantLe && testOp != BinCmpGe {
+			t.Fatalf("seed %d flip false must be Ge got %v", seed, testOp)
+		}
+		if testOp == BinCmpLe {
+			foundLe = true
+		}
+		if testOp == BinCmpGe {
+			foundGe = true
+		}
+	}
+	if !foundLe || !foundGe {
+		t.Fatalf("need both polarities: Le=%v Ge=%v", foundLe, foundGe)
+	}
+	ClearError()
+}
+
 func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	// StatementFor.cpp:157–158 — oob_cnt when oob flip hits
 	BookkeeperDoFinalization()

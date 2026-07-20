@@ -135,9 +135,15 @@ func MakeRandomArrayControl(r *Rng, bound int, isSigned bool, oobProb int) (init
 		// StatementFor.cpp:157–158 — Bookkeeper::oob_cnt++
 		RecordOOB()
 	}
-	// StatementFor.cpp:134 — signed: rnd_flipcoin Le/Ge; unsigned: always Le
-	if isSigned && r.RndFlipcoin(50) {
-		testOp = BinCmpGe
+	// StatementFor.cpp:134 —
+	//   test_op = is_signed ? (rnd_flipcoin(50) ? eCmpLe : eCmpGe) : eCmpLe
+	// flip true → Le, false → Ge (do not invert; seed-2 e364 was Ge path extra draws)
+	if isSigned {
+		if r.RndFlipcoin(50) {
+			testOp = BinCmpLe
+		} else {
+			testOp = BinCmpGe
+		}
 	} else {
 		testOp = BinCmpLe
 	}
