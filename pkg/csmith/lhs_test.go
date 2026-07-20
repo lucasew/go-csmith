@@ -649,3 +649,26 @@ func TestLhsAsExpressionTypeNilResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestVisitIndicesAddEffectResidualSticky(t *testing.T) {
+	// AddEffect residual soft invent was invent index visit under incomplete ambient merge.
+	ClearError()
+	opts := Defaults()
+	f := &Function{Name: "func_1", ReturnType: GetIntType(), Body: &Block{}}
+	cg := WithFunc(f, EmptyEffect())
+	cg.FM = NewFactMgr(f)
+	// incomplete EffectStm → AddEffect residual sticky before index visit
+	cg.EffectStm = IncompleteEffect()
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true}, Sizes: []int{2}}
+	av.AsArray = av
+	av.IndexExprs = []*Expression{{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()}}
+	av.Variable.AsArray = av
+	l := &Lhs{Var: &av.Variable, Type: GetIntType()}
+	if l.VisitIndices(&cg, opts) {
+		t.Fatal("incomplete EffectStm AddEffect residual must fail closed VisitIndices")
+	}
+	if !HasError() {
+		t.Fatal("incomplete EffectStm AddEffect residual must SetError sticky")
+	}
+	ClearError()
+}

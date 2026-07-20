@@ -1727,10 +1727,20 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 		if v == nil {
 			return false
 		}
-		if v.IsGlobal() {
+		isG := v.IsGlobal()
+		// residual ERROR sticky — no invent soft-frame past IsGlobal residual
+		if HasError() {
+			return false
+		}
+		if isG {
 			return true
 		}
-		return IsVariableInSet(frameVars, v)
+		ok := IsVariableInSet(frameVars, v)
+		// residual ERROR sticky — no invent soft-frame past IsVariableInSet residual
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	// incomplete frame list must not invent membership past holes
 	if frameVars != nil && !VariablesComplete(frameVars) {
@@ -1744,7 +1754,14 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
+				// residual ERROR sticky — no invent soft-continue later no-reads past residual
+				if HasError() {
+					return IncompleteVariables(), IncompleteVariables()
+				}
 				noReads = append(noReads, v)
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-skip no-read past residual false
+				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
 		for _, v := range c.RW.NoWriteVars {
@@ -1753,7 +1770,12 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 				return IncompleteVariables(), IncompleteVariables()
 			}
 			if inFrame(v) {
+				if HasError() {
+					return IncompleteVariables(), IncompleteVariables()
+				}
 				noWrites = append(noWrites, v)
+			} else if HasError() {
+				return IncompleteVariables(), IncompleteVariables()
 			}
 		}
 	}
@@ -1764,7 +1786,12 @@ func (c CGContext) GetExternalNoReadsWrites(frameVars []*Variable) (noReads, noW
 			return IncompleteVariables(), IncompleteVariables()
 		}
 		if inFrame(iv) {
+			if HasError() {
+				return IncompleteVariables(), IncompleteVariables()
+			}
 			noWrites = append(noWrites, iv)
+		} else if HasError() {
+			return IncompleteVariables(), IncompleteVariables()
 		}
 	}
 	return noReads, noWrites

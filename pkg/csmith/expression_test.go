@@ -1371,3 +1371,34 @@ func TestUseVarIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExpressionGetTypeInvokeResidualSticky(t *testing.T) {
+	// Invoke GetType residual soft invent was invent type shell past incomplete arg IR.
+	ClearError()
+	// binary invoke with Type-nil arg → GetType residual sticky
+	fi := &Invocation{
+		IsStd: true, Binary: "+",
+		Args: []*Expression{
+			{Term: TermVariable, Var: &Variable{Name: "g_x", Type: nil}},
+			{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		},
+	}
+	e := &Expression{Term: TermFunction, Invoke: fi}
+	if e.GetType() != nil {
+		t.Fatal("GetType residual invoke must fail closed nil type")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual invoke must SetError sticky")
+	}
+	ClearError()
+	// Output residual: Failed soft empty non-sticky; incomplete name sticky
+	fi2 := &Invocation{User: &Function{Name: "", ReturnType: GetIntType()}}
+	e2 := &Expression{Term: TermFunction, Invoke: fi2}
+	if e2.Output() != "" {
+		t.Fatal("empty User name Output must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("empty User name Output must SetError sticky")
+	}
+	ClearError()
+}

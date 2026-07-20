@@ -295,6 +295,11 @@ func SetAccumulatedEffectAfterBlock(st *Stmt, blockEffect Effect, cg *CGContext,
 		return
 	}
 	eff := preStm.AddEffect(blockEffect)
+	// residual ERROR sticky — no invent soft-complete map past AddEffect residual
+	if HasError() {
+		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
+		return
+	}
 	if !EffectComplete(eff) {
 		cg.FM.SetMapStmEffect(st.StmID, IncompleteEffect())
 		SetError(ErrGeneric)

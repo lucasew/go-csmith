@@ -598,6 +598,11 @@ func BuildUserInvocation(
 		// Incomplete AccumEffContext fails closed sticky (no invent revisit under incomplete ambient)
 		effectAccum := EmptyEffect()
 		effectContext := cg.EffectContext().AddEffect(callee.AccumEffContext)
+		// residual ERROR sticky — no invent soft-continue revisit past AddEffect residual
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		if !EffectComplete(effectContext) {
 			SetError(ErrGeneric)
 			fi.Failed = true
@@ -754,6 +759,11 @@ func BuildInvocationAndFunction(
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
 		running = running.AddEffect(paramAccum)
+		// residual ERROR sticky — no invent soft-continue later params past AddEffect residual
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		if !EffectComplete(running) {
 			SetError(ErrGeneric)
 			fi.Failed = true
@@ -1244,6 +1254,10 @@ func MakeRandomBinaryPtrComparison(
 		// FunctionInvocation.cpp:338–342 — effect_context + lhs_eff_accum
 		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
 		rhsCtx := cg.EffectContext().AddEffect(lhsAccum)
+		// residual ERROR sticky — no invent soft-continue RHS past AddEffect residual
+		if HasError() {
+			return nil
+		}
 		if !EffectComplete(rhsCtx) {
 			SetError(ErrGeneric)
 			return nil

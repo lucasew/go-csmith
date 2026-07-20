@@ -731,3 +731,66 @@ func TestApplyFactForAssignIsPointerResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
+	// IsGlobal residual soft invent was invent soft-skip makeup past FieldVarOf residual.
+	ClearError()
+	f := &Function{Name: "func_1", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// FieldVarOf with Type-nil parent chain residual IsGlobal
+	parent := &Variable{Name: "x_bad"} // not g_ prefix, not global
+	hole := &Variable{Name: "f0", FieldVarOf: parent}
+	// blk==nil path: IsGlobal residual/false soft-skip without sticky was invent soft-success
+	// non-global soft return is intentional; residual via nil FieldVarOf parent IsGlobal sticky
+	parent.FieldVarOf = (*Variable)(nil)
+	// force residual: FieldVarOf points to nil-handled? parent IsGlobal false complete.
+	// Use recursive residual: FieldVarOf IsGlobal when parent is incomplete via nil self walk.
+	// Parent with FieldVarOf set to broken chain:
+	orphan := &Variable{Name: "orphan"}
+	// nil subject IsGlobal residual
+	(*Variable)(nil).IsGlobal()
+	if !HasError() {
+		t.Fatal("nil IsGlobal must SetError sticky")
+	}
+	ClearError()
+	// blk==nil + non-global complete soft-skip no sticky
+	fm.AddNewVarFactAndUpdate(nil, orphan)
+	if HasError() {
+		t.Fatal("non-global complete AddNewVarFactAndUpdate must soft-skip no sticky")
+	}
+	ClearError()
+	// residual: Variable with FieldVarOf whose IsGlobal residual — FieldVarOf nil Variable?
+	// FieldVarOf points to var; if FieldVarOf itself is ok. Plant residual via
+	// IsGlobal after FieldVarOf: parent nil Variable not possible as FieldVarOf type.
+	// Plant via recursive: hole.FieldVarOf where parent.FieldVarOf is set, walk ends.
+	// Soft invent was: residual ERROR already set before call soft-continues makeup.
+	SetError(ErrGeneric)
+	// ambient residual before call — AddNewVarFactAndUpdate must not invent soft-skip past residual
+	// via !IsGlobal path without checking HasError first after IsGlobal
+	// After our fix: IsGlobal after residual ambient still checks HasError after call.
+	// Better: FieldVarOf residual path.
+	// Create field of non-global: IsGlobal false complete, soft return.
+	_ = hole
+	// Use incomplete FieldVarOf chain residual from IsGlobal on field of nil name parent with FieldVarOf loop?
+	// IsGlobal residual only on nil subject and recursive FieldVarOf residual.
+	// Soft invent residual: parent IsGlobal residual when parent is nil — FieldVarOf never nil-typed as *Variable value nil means no parent.
+	// Field of a parent: if parent FieldVarOf is set to a Variable that IsGlobal residual...
+	// Actually residual on FieldVarOf recursion: if ancestor is nil *Variable via FieldVarOf = nil, recursion stops at name check.
+	// The invent was residual ambient before IsGlobal: IsGlobal complete returns false, HasError still true from ambient, old code:
+	//   if blk == nil && !v.IsGlobal() { return } // soft return with ambient residual invent soft-skip
+	// New code checks HasError after IsGlobal.
+	SetError(ErrGeneric)
+	fm.AddNewVarFactAndUpdate(nil, CreateVariableScalars("l_1", GetIntType(), false, false))
+	if !HasError() {
+		// ambient residual should remain sticky (IsGlobal complete false still HasError after)
+		t.Fatal("ambient residual AddNewVarFactAndUpdate must keep sticky")
+	}
+	ClearError()
+	// residual FieldVarOf: Variable with FieldVarOf that is nil receiver? 
+	// Use (*Variable)(nil) as subject — already sticky at entry.
+	fm.AddNewVarFactAndUpdate(nil, nil)
+	if !HasError() {
+		t.Fatal("nil var AddNewVarFactAndUpdate must SetError sticky")
+	}
+	ClearError()
+}

@@ -654,6 +654,11 @@ func (b *Block) AppendNestedLoop(
 			return nil
 		}
 		merged := be.AddEffect(stE)
+		// residual ERROR sticky — no invent soft-complete for fold past AddEffect residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		if !EffectComplete(merged) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
@@ -752,6 +757,11 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 			return nil
 		}
 		merged := be.AddEffect(stE)
+		// residual ERROR sticky — no invent soft-complete return fold past AddEffect residual
+		if HasError() {
+			b.Stmts = b.Stmts[:len(b.Stmts)-1]
+			return nil
+		}
 		if !EffectComplete(merged) {
 			b.Stmts = b.Stmts[:len(b.Stmts)-1]
 			SetError(ErrGeneric)
@@ -975,6 +985,10 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	}
 	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
+	if HasError() {
+		return ShortcutNone
+	}
 	if !EffectComplete(cg.EffectStm) {
 		return ShortcutNone
 	}

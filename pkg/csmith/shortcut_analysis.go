@@ -459,6 +459,10 @@ func ShortcutAnalysis(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Optio
 	}
 	*facts = CloneFactSlice(out)
 	cg.AddEffect(eff, false)
+	// residual ERROR sticky — no invent soft-continue ShortcutOK past AddEffect residual
+	if HasError() {
+		return ShortcutNone
+	}
 	if !EffectComplete(cg.EffectStm) {
 		return ShortcutNone
 	}

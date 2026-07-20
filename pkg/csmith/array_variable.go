@@ -1259,6 +1259,10 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 		size = av.Sizes[i]
 	}
 	body := idx.Output()
+	// residual ERROR sticky — no invent soft-empty modulo past Output residual hole
+	if HasError() {
+		return ""
+	}
 	// index Output always live; sticky no invent "(( % n)" empty shell
 	if body == "" {
 		SetError(ErrGeneric)
@@ -1267,10 +1271,12 @@ func (av *ArrayVariable) OutputIndexModulo(i int, idx *Expression) string {
 	// index Type* always live for signed cast path; Type-nil sticky empty
 	// (no invent bare modulo soft-success past incomplete index type shell)
 	t := idx.GetType()
+	// residual ERROR sticky — no invent soft-empty modulo past GetType residual hole
+	if HasError() {
+		return ""
+	}
 	if t == nil {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	// cast signed index type to unsigned before %

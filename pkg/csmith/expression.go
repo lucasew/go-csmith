@@ -251,14 +251,24 @@ func (e *Expression) GetTypeUncast() *Type {
 			SetError(ErrGeneric)
 			return nil
 		}
-		return e.Invoke.GetType()
+		ty := e.Invoke.GetType()
+		// residual ERROR sticky — no invent invoke type past GetType residual hole
+		if HasError() {
+			return nil
+		}
+		return ty
 	case TermCommaExpr:
 		// value type is RHS; sticky incomplete without CommaRHS
 		if e.CommaRHS == nil {
 			SetError(ErrGeneric)
 			return nil
 		}
-		return e.CommaRHS.GetTypeUncast()
+		ty := e.CommaRHS.GetTypeUncast()
+		// residual ERROR sticky — no invent comma type past RHS GetType residual hole
+		if HasError() {
+			return nil
+		}
+		return ty
 	case TermAssignment:
 		// ExpressionAssign::get_type — LHS type only; sticky no invent without Assign
 		if e.Assign == nil {
@@ -266,13 +276,16 @@ func (e *Expression) GetTypeUncast() *Type {
 			return nil
 		}
 		if e.Assign.Lhs != nil {
-			if t := e.Assign.Lhs.GetType(); t != nil {
+			t := e.Assign.Lhs.GetType()
+			// residual ERROR sticky — no invent assign type past Lhs GetType residual hole
+			if HasError() {
+				return nil
+			}
+			if t != nil {
 				return t
 			}
 			// Lhs.GetType sticky incomplete already; re-assert sticky
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return nil
 		}
 		if e.Assign.LhsVar != nil && e.Assign.LhsVar.Type != nil {
@@ -331,7 +344,12 @@ func (e *Expression) GetType() *Type {
 	if e.CastType != nil {
 		return e.CastType
 	}
-	return e.GetTypeUncast()
+	ty := e.GetTypeUncast()
+	// residual ERROR sticky — no invent type past GetTypeUncast residual hole
+	if HasError() {
+		return nil
+	}
+	return ty
 }
 
 // GetQualifiers mirrors Expression::get_qualifiers.
@@ -1510,7 +1528,12 @@ func (e *Expression) outputBody() string {
 		return outputExpressionVariable(e.Var, e.ExprType)
 	case TermFunction:
 		if e.Invoke != nil {
-			return e.Invoke.Output()
+			out := e.Invoke.Output()
+			// residual ERROR sticky — no invent soft-empty call past Invoke Output residual
+			if HasError() {
+				return ""
+			}
+			return out
 		}
 		SetError(ErrGeneric)
 		return ""

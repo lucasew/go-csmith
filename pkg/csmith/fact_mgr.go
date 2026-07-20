@@ -1517,8 +1517,15 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	}
 	// FactMgr.cpp:72 — assert(var->is_global()) when blk==nullptr
 	// no soft invent facts for non-global "global create" path
-	if blk == nil && !v.IsGlobal() {
-		return
+	if blk == nil {
+		isG := v.IsGlobal()
+		// residual ERROR sticky — no invent soft-skip makeup past IsGlobal residual
+		if HasError() {
+			return
+		}
+		if !isG {
+			return
+		}
 	}
 	// incomplete subject map before add — fail closed sticky (no invent push onto holes)
 	if !FactsComplete(fm.GlobalFacts) {
@@ -2305,8 +2312,23 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 	var keep, rest []*FactPointTo
 	for _, f := range *inputs {
 		v := f.Var
-		if v.IsGlobal() || IsVariableInSet(fm.Func.Param, v) {
+		isG := v.IsGlobal()
+		// residual ERROR sticky — no invent soft-partition past IsGlobal residual
+		if HasError() {
+			*inputs = IncompleteFactSlice()
+			return
+		}
+		if isG || IsVariableInSet(fm.Func.Param, v) {
+			// residual ERROR sticky — no invent soft-keep past IsVariableInSet residual
+			if HasError() {
+				*inputs = IncompleteFactSlice()
+				return
+			}
 			keep = append(keep, f)
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-rest past IsVariableInSet residual false
+			*inputs = IncompleteFactSlice()
+			return
 		} else {
 			rest = append(rest, f)
 		}

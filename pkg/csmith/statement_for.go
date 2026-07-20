@@ -425,7 +425,12 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if testFi == nil || HasError() {
 		return nil
 	}
-	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testFi.GetType()}
+	testTy := testFi.GetType()
+	// residual ERROR sticky — no invent for-test ExprType past GetType residual hole
+	if HasError() {
+		return nil
+	}
+	testExpr := &Expression{Term: TermFunction, Invoke: testFi, ExprType: testTy}
 
 	// incr assign (StatementFor.cpp:273–281)
 	lhs1 := &Lhs{Var: iv, Type: iv.Type}
