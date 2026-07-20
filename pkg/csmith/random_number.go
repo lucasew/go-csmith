@@ -57,11 +57,16 @@ func CreateRandomNumberInstance(kind RngKind, seed uint64) {
 		processRng = g
 		return
 	}
-	// Existing instance: switch to requested generator (must already exist).
+	// Existing instance: switch to requested generator; create if missing
+	// (parity with SwitchRndNumGenerator / library multi-CreateInstance).
 	g := processRN.generators[kind]
 	if g == nil {
-		SetError(ErrGeneric)
-		return
+		g = makeRndNumGeneratorWithOpts(kind, processRN.seed, processOpts)
+		if g == nil {
+			// sticky already set (e.g. DFS max_depth<=0)
+			return
+		}
+		processRN.generators[kind] = g
 	}
 	processRN.curr = g
 	processRN.currKind = kind

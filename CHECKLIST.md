@@ -8,18 +8,18 @@ Source pin: `.build/csmith-src` (see SPEC.md).
 Generated: auto-extracted from headers + `.cpp` definitions.
 Total items: 2070
 
-- [ ] AbsExtension.cpp::AbsExtension.AbsExtension
-- [ ] AbsExtension.cpp::AbsExtension.default_output_definitions
-- [ ] AbsExtension.cpp::AbsExtension.GenerateFirstParameterList
-- [ ] AbsExtension.cpp::AbsExtension.GenerateValues
-- [ ] AbsExtension.cpp::AbsExtension.get_values
-- [ ] AbsExtension.cpp::AbsExtension.Initialize
-- [ ] AbsExtension.cpp::AbsExtension.MakeFuncInvocation
-- [ ] AbsExtension.cpp::AbsExtension.OutputFirstFunInvocation
-- [ ] AbsExtension.cpp::AbsExtension.OutputHeader
-- [ ] AbsExtension.cpp::AbsExtension.OutputInit
-- [ ] AbsExtension.cpp::AbsExtension.OutputTail
-- [ ] AbsExtension.cpp::AbsExtension.~AbsExtension
+- [x] AbsExtension.cpp::AbsExtension.AbsExtension
+- [x] AbsExtension.cpp::AbsExtension.default_output_definitions
+- [x] AbsExtension.cpp::AbsExtension.GenerateFirstParameterList
+- [x] AbsExtension.cpp::AbsExtension.GenerateValues
+- [x] AbsExtension.cpp::AbsExtension.get_values
+- [x] AbsExtension.cpp::AbsExtension.Initialize
+- [x] AbsExtension.cpp::AbsExtension.MakeFuncInvocation
+- [x] AbsExtension.cpp::AbsExtension.OutputFirstFunInvocation
+- [x] AbsExtension.cpp::AbsExtension.OutputHeader
+- [x] AbsExtension.cpp::AbsExtension.OutputInit
+- [x] AbsExtension.cpp::AbsExtension.OutputTail
+- [x] AbsExtension.cpp::AbsExtension.~AbsExtension
 - [x] AbsProgramGenerator.cpp::AbsProgramGenerator.AbsProgramGenerator
 - [x] AbsProgramGenerator.cpp::AbsProgramGenerator.CreateInstance
 - [x] AbsProgramGenerator.cpp::AbsProgramGenerator.get_count_prefix
@@ -49,41 +49,41 @@ Total items: 2070
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.~AbsRndNumGenerator
 - [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDefaultRndNumGenerator
 - [x] AbsRndNumGenerator.cpp::RNDNUM_GENERATOR.rDFSRndNumGenerator
-- [ ] ArrayVariable.cpp::ArrayVariable.add_index
-- [ ] ArrayVariable.cpp::ArrayVariable.ArrayVariable
-- [ ] ArrayVariable.cpp::ArrayVariable.build_init_recursive
-- [ ] ArrayVariable.cpp::ArrayVariable.build_initializer_str
-- [ ] ArrayVariable.cpp::ArrayVariable.CreateArrayVariable
-- [ ] ArrayVariable.cpp::ArrayVariable.get_array
-- [ ] ArrayVariable.cpp::ArrayVariable.get_collective
-- [ ] ArrayVariable.cpp::ArrayVariable.get_indices
-- [ ] ArrayVariable.cpp::ArrayVariable.get_init_values
-- [ ] ArrayVariable.cpp::ArrayVariable.get_more_init_values
-- [ ] ArrayVariable.cpp::ArrayVariable.get_size
-- [ ] ArrayVariable.cpp::ArrayVariable.get_sizes
-- [ ] ArrayVariable.cpp::ArrayVariable.hash
-- [ ] ArrayVariable.cpp::ArrayVariable.is_global
-- [ ] ArrayVariable.cpp::ArrayVariable.is_variant
-- [ ] ArrayVariable.cpp::ArrayVariable.is_visible_local
-- [ ] ArrayVariable.cpp::ArrayVariable.itemize
-- [ ] ArrayVariable.cpp::ArrayVariable.make_print_index_str
-- [ ] ArrayVariable.cpp::ArrayVariable.no_loop_initializer
-- [ ] ArrayVariable.cpp::ArrayVariable.Output
-- [ ] ArrayVariable.cpp::ArrayVariable.output_addr_checks
-- [ ] ArrayVariable.cpp::ArrayVariable.output_checksum_with_indices
-- [ ] ArrayVariable.cpp::ArrayVariable.output_init
-- [ ] ArrayVariable.cpp::ArrayVariable.output_with_indices
-- [ ] ArrayVariable.cpp::ArrayVariable.OutputDecl
-- [ ] ArrayVariable.cpp::ArrayVariable.OutputDef
-- [ ] ArrayVariable.cpp::ArrayVariable.OutputLowerBound
-- [ ] ArrayVariable.cpp::ArrayVariable.OutputUpperBound
-- [ ] ArrayVariable.cpp::ArrayVariable.push_back
-- [ ] ArrayVariable.cpp::ArrayVariable.rnd_mutate
-- [ ] ArrayVariable.cpp::ArrayVariable.set_index
-- [ ] ArrayVariable.cpp::ArrayVariable.size
-- [ ] ArrayVariable.cpp::ArrayVariable.size_in_bytes
-- [ ] ArrayVariable.cpp::ArrayVariable.~ArrayVariable
-- [ ] ArrayVariable.cpp::count_expr_key_var
+- [x] ArrayVariable.cpp::ArrayVariable.add_index
+- [x] ArrayVariable.cpp::ArrayVariable.ArrayVariable
+- [x] ArrayVariable.cpp::ArrayVariable.build_init_recursive
+- [x] ArrayVariable.cpp::ArrayVariable.build_initializer_str
+- [x] ArrayVariable.cpp::ArrayVariable.CreateArrayVariable
+- [x] ArrayVariable.cpp::ArrayVariable.get_array
+- [x] ArrayVariable.cpp::ArrayVariable.get_collective
+- [x] ArrayVariable.cpp::ArrayVariable.get_indices
+- [x] ArrayVariable.cpp::ArrayVariable.get_init_values
+- [x] ArrayVariable.cpp::ArrayVariable.get_more_init_values
+- [x] ArrayVariable.cpp::ArrayVariable.get_size
+- [x] ArrayVariable.cpp::ArrayVariable.get_sizes
+- [x] ArrayVariable.cpp::ArrayVariable.hash
+- [x] ArrayVariable.cpp::ArrayVariable.is_global
+- [x] ArrayVariable.cpp::ArrayVariable.is_variant
+- [x] ArrayVariable.cpp::ArrayVariable.is_visible_local
+- [x] ArrayVariable.cpp::ArrayVariable.itemize
+- [x] ArrayVariable.cpp::ArrayVariable.make_print_index_str
+- [x] ArrayVariable.cpp::ArrayVariable.no_loop_initializer
+- [x] ArrayVariable.cpp::ArrayVariable.Output
+- [x] ArrayVariable.cpp::ArrayVariable.output_addr_checks
+- [x] ArrayVariable.cpp::ArrayVariable.output_checksum_with_indices
+- [x] ArrayVariable.cpp::ArrayVariable.output_init
+- [x] ArrayVariable.cpp::ArrayVariable.output_with_indices
+- [x] ArrayVariable.cpp::ArrayVariable.OutputDecl
+- [x] ArrayVariable.cpp::ArrayVariable.OutputDef
+- [x] ArrayVariable.cpp::ArrayVariable.OutputLowerBound
+- [x] ArrayVariable.cpp::ArrayVariable.OutputUpperBound
+- [x] ArrayVariable.cpp::ArrayVariable.push_back
+- [x] ArrayVariable.cpp::ArrayVariable.rnd_mutate
+- [x] ArrayVariable.cpp::ArrayVariable.set_index
+- [x] ArrayVariable.cpp::ArrayVariable.size
+- [x] ArrayVariable.cpp::ArrayVariable.size_in_bytes
+- [x] ArrayVariable.cpp::ArrayVariable.~ArrayVariable
+- [x] ArrayVariable.cpp::count_expr_key_var
 - [x] Attribute.cpp::AlignedAttribute.AlignedAttribute
 - [x] Attribute.cpp::AlignedAttribute.make_random
 - [x] Attribute.cpp::Attribute.Attribute
@@ -830,23 +830,23 @@ Total items: 2070
 - [ ] ExpressionVariable.cpp::ExpressionVariable.use_var
 - [ ] ExpressionVariable.cpp::ExpressionVariable.visit_facts
 - [ ] ExpressionVariable.cpp::ExpressionVariable.~ExpressionVariable
-- [ ] ExtensionMgr.cpp::ExtensionMgr.CreateExtension
-- [ ] ExtensionMgr.cpp::ExtensionMgr.DestroyExtension
-- [ ] ExtensionMgr.cpp::ExtensionMgr.GenerateFirstParameterList
-- [ ] ExtensionMgr.cpp::ExtensionMgr.GenerateValues
-- [ ] ExtensionMgr.cpp::ExtensionMgr.GetExtension
-- [ ] ExtensionMgr.cpp::ExtensionMgr.MakeFuncInvocation
-- [ ] ExtensionMgr.cpp::ExtensionMgr.OutputFirstFunInvocation
-- [ ] ExtensionMgr.cpp::ExtensionMgr.OutputHeader
-- [ ] ExtensionMgr.cpp::ExtensionMgr.OutputInit
-- [ ] ExtensionMgr.cpp::ExtensionMgr.OutputTail
-- [ ] ExtensionValue.cpp::ExtensionValue.ExtensionValue
-- [ ] ExtensionValue.cpp::ExtensionValue.get_name
-- [ ] ExtensionValue.cpp::ExtensionValue.get_qfer
-- [ ] ExtensionValue.cpp::ExtensionValue.get_type
-- [ ] ExtensionValue.cpp::ExtensionValue.get_value
-- [ ] ExtensionValue.cpp::ExtensionValue.set_value
-- [ ] ExtensionValue.cpp::ExtensionValue.~ExtensionValue
+- [x] ExtensionMgr.cpp::ExtensionMgr.CreateExtension
+- [x] ExtensionMgr.cpp::ExtensionMgr.DestroyExtension
+- [x] ExtensionMgr.cpp::ExtensionMgr.GenerateFirstParameterList
+- [x] ExtensionMgr.cpp::ExtensionMgr.GenerateValues
+- [x] ExtensionMgr.cpp::ExtensionMgr.GetExtension
+- [x] ExtensionMgr.cpp::ExtensionMgr.MakeFuncInvocation
+- [x] ExtensionMgr.cpp::ExtensionMgr.OutputFirstFunInvocation
+- [x] ExtensionMgr.cpp::ExtensionMgr.OutputHeader
+- [x] ExtensionMgr.cpp::ExtensionMgr.OutputInit
+- [x] ExtensionMgr.cpp::ExtensionMgr.OutputTail
+- [x] ExtensionValue.cpp::ExtensionValue.ExtensionValue
+- [x] ExtensionValue.cpp::ExtensionValue.get_name
+- [x] ExtensionValue.cpp::ExtensionValue.get_qfer
+- [x] ExtensionValue.cpp::ExtensionValue.get_type
+- [x] ExtensionValue.cpp::ExtensionValue.get_value
+- [x] ExtensionValue.cpp::ExtensionValue.set_value
+- [x] ExtensionValue.cpp::ExtensionValue.~ExtensionValue
 - [x] Fact.cpp::eFactCategory
 - [x] Fact.cpp::eFactCategory.ePointTo
 - [x] Fact.cpp::eFactCategory.eUnionWrite
@@ -1233,18 +1233,18 @@ Total items: 2070
 - [x] OutputMgr.cpp::OutputMgr.really_outputln
 - [x] OutputMgr.cpp::OutputMgr.set_curr_func
 - [x] OutputMgr.cpp::OutputMgr.~OutputMgr
-- [ ] PartialExpander.cpp::PartialExpander.copy_expands
-- [ ] PartialExpander.cpp::PartialExpander.direct_expand_check
-- [ ] PartialExpander.cpp::PartialExpander.expand_check
-- [ ] PartialExpander.cpp::PartialExpander.init_map
-- [ ] PartialExpander.cpp::PartialExpander.init_partial_expander
-- [ ] PartialExpander.cpp::PartialExpander.parse_options
-- [ ] PartialExpander.cpp::PartialExpander.PartialExpander
-- [ ] PartialExpander.cpp::PartialExpander.restore_init_values
-- [ ] PartialExpander.cpp::PartialExpander.set_expand
-- [ ] PartialExpander.cpp::PartialExpander.set_stmt_expand
-- [ ] PartialExpander.cpp::PartialExpander.~PartialExpander
-- [ ] PartialExpander.cpp::print_map
+- [x] PartialExpander.cpp::PartialExpander.copy_expands
+- [x] PartialExpander.cpp::PartialExpander.direct_expand_check
+- [x] PartialExpander.cpp::PartialExpander.expand_check
+- [x] PartialExpander.cpp::PartialExpander.init_map
+- [x] PartialExpander.cpp::PartialExpander.init_partial_expander
+- [x] PartialExpander.cpp::PartialExpander.parse_options
+- [x] PartialExpander.cpp::PartialExpander.PartialExpander
+- [x] PartialExpander.cpp::PartialExpander.restore_init_values
+- [x] PartialExpander.cpp::PartialExpander.set_expand
+- [x] PartialExpander.cpp::PartialExpander.set_stmt_expand
+- [x] PartialExpander.cpp::PartialExpander.~PartialExpander
+- [x] PartialExpander.cpp::print_map
 - [x] platform.cpp::create_dir
 - [x] platform.cpp::platform_gen_seed
 - [x] platform.cpp::read_time

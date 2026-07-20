@@ -12,12 +12,12 @@ var (
 
 // InitPartialExpander mirrors PartialExpander::init_partial_expander.
 // PartialExpander.cpp:59–67 — parse comma-separated kind names; enable MAX sentinel.
+// Empty options fail closed false (C++ parse_options("") → set_expand("") false).
 func InitPartialExpander(options string) bool {
 	partialExpands = initPartialMap(false)
-	if options != "" {
-		if !parsePartialOptions(options, ',') {
-			return false
-		}
+	if !parsePartialOptions(options, ',') {
+		// leave partialExpands half-init; callers treat false as fail
+		return false
 	}
 	// MAX_STATEMENT_TYPE sentinel means "partial mode active"
 	partialExpands[MaxStatementType] = true
@@ -50,19 +50,14 @@ func copyPartialMap(src map[StatementType]bool) map[StatementType]bool {
 }
 
 func parsePartialOptions(options string, sep byte) bool {
+	// PartialExpander.cpp:71–86 — empty string yields one empty token → set_expand fails
+	if options == "" {
+		return false
+	}
 	parts := SplitString(options, sep)
-	if len(parts) == 0 && options != "" {
-		// single token without separator
-		parts = []string{options}
-	}
-	// SplitString may skip empties; also handle raw single string
-	if options != "" && len(parts) == 0 {
-		parts = []string{options}
-	}
-	// re-split more carefully for no-spaces requirement
 	if len(parts) == 0 {
-		// empty options: nothing to enable
-		return true
+		// single token without separator (SplitString emptied)
+		parts = []string{options}
 	}
 	for _, s := range parts {
 		if !setPartialExpand(s) {

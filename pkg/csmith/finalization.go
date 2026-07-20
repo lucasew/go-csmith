@@ -24,6 +24,8 @@ func DoFinalization() {
 	InvocationReturnFactsDoFinalization()
 	// PartialExpander
 	ClearPartialExpander()
+	// ExtensionMgr::DestroyExtension
+	DestroyExtension()
 	// SafeOpFlags wrapper name registry
 	ClearSafeOpWrapperNames()
 	// StatementGoto::stm_labels

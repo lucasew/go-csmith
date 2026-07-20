@@ -5,12 +5,9 @@ import "testing"
 func TestDFSRandomChoiceFirstVisit(t *testing.T) {
 	// DFSRndNumGenerator::random_choice first-visit path picks lowest valid v.
 	ClearError()
-	prevO := ProcessOptions()
-	prevR := ProcessRng()
 	defer func() {
 		RandomNumberDoFinalization()
-		SetProcessOptions(prevO)
-		SetProcessRng(prevR)
+		ReinstallTestProcessSingletons()
 		ClearError()
 	}()
 	o := Defaults()
@@ -182,12 +179,9 @@ func TestDFSGetPrefixedName(t *testing.T) {
 
 func TestDFSDepthGuardIntegration(t *testing.T) {
 	ClearError()
-	prevO := ProcessOptions()
-	prevR := ProcessRng()
 	defer func() {
 		RandomNumberDoFinalization()
-		SetProcessOptions(prevO)
-		SetProcessRng(prevR)
+		ReinstallTestProcessSingletons()
 		ClearError()
 	}()
 	o := Defaults()

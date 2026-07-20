@@ -143,6 +143,14 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	vs.Types = &g.Types
 	// Attribute generators for this generation (Initialize*Attributes)
 	InitAttrGenerators(opts, probs)
+	// ExtensionMgr::CreateExtension — null default; sticky if klee/crest/coverage
+	CreateExtension(opts)
+	// PartialExpander::init_partial_expander when --partial-expand set
+	if opts.PartialExpand != "" {
+		if !InitPartialExpanderFromOptions(opts) {
+			SetError(ErrGeneric)
+		}
+	}
 	// AbsProgramGenerator::current_generator_
 	SetProcessProgramGenerator(g)
 	return g
@@ -1403,6 +1411,88 @@ func (g *ProgramGenerator) GoGenerator() string {
 		b.WriteString("--- end wrapper.h --- */\n")
 	}
 	return b.String()
+}
+
+// GoGeneratorDFSLoop mirrors DFSProgramGenerator::goGenerator multi-program loop.
+// DFSProgramGenerator.cpp:71–97 — types once; structs once; while !all_done regenerate.
+// Caps iterations so a stuck DFS cannot hang the library (fail closed sticky).
+// Restores PartialExpander backup, gensym, function list each successful/failed pass.
+const dfsLoopMaxPrograms = 10000
+
+func (g *ProgramGenerator) GoGeneratorDFSLoop() string {
+	if g == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if g.OutputKind != OutputMgrKindDFS && !g.Opts.DFSExhaustive {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+		SetError(ErrGeneric)
+		return ""
+	}
+	g.Initialize()
+	// re-assert DFS after Initialize (re-creates RNG)
+	if g.Rng == nil || g.Rng.Kind() != RngKindDFS {
+		SetError(ErrGeneric)
+		return ""
+	}
+	g.GenerateAllTypes()
+	if HasError() {
+		return ""
+	}
+	var all strings.Builder
+	structsFile := g.OutputStructTypes()
+	if HasError() {
+		return ""
+	}
+	if structsFile != "" {
+		all.WriteString("/* --- ")
+		all.WriteString(DFSStructOutputPath())
+		all.WriteString(" ---\n")
+		all.WriteString(structsFile)
+		all.WriteString("--- end structs --- */\n")
+	}
+	// DFSProgramGenerator.cpp:78 — OutputStructUnions once before loop
+	for iter := 0; !g.Rng.DFSGetAllDone(); iter++ {
+		if iter >= dfsLoopMaxPrograms {
+			SetError(ErrGeneric)
+			return ""
+		}
+		// Error::set_error(SUCCESS)
+		ClearError()
+		// fresh function list for this program
+		g.Funcs = FunctionList{}
+		g.FactMgrs = NewFactMgrMap()
+		g.GenerateFunctions()
+		if GetError() == ErrSuccess {
+			hdr := DFSOutputHeader(g.OutputHeader(), g.Opts.CompactOutput)
+			if HasError() {
+				// treat as failed program; still reset state
+			} else {
+				body := g.OutputDFS()
+				if !HasError() && body != "" {
+					all.WriteString(hdr)
+					all.WriteString(body)
+					all.WriteString(ReallyOutputLn())
+					g.GoodCount++
+				}
+			}
+		}
+		// reset for next enumeration
+		g.Rng.DFSResetState()
+		// Function::doFinalization — drop built funcs
+		g.Funcs = FunctionList{}
+		g.FactMgrs = NewFactMgrMap()
+		// VariableSelector::doFinalization — clear session globals/locals
+		if g.VS != nil {
+			g.VS.DoFinalization()
+		}
+		ResetDefaultGensym()
+		RestorePartialExpanderInitValues()
+	}
+	return all.String()
 }
 
 // WrapperHeader returns wrapper.h content when identify_wrappers is set.

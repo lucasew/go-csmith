@@ -114,16 +114,13 @@ func TestDepthGuardRandomAlwaysGood(t *testing.T) {
 	opts.DFSExhaustive = true
 	// DFS mode needs live DFS engine (DepthSpec::backtracking).
 	// Fresh engine current_pos_=-1 → eager_backtracking returns false → GOOD.
-	prevR := ProcessRng()
-	prevO := ProcessOptions()
 	RandomNumberDoFinalization()
 	opts.MaxExhaustiveDepth = 8
 	SetProcessOptions(opts)
 	CreateRandomNumberInstance(RngKindDFS, 1)
 	defer func() {
 		RandomNumberDoFinalization()
-		SetProcessOptions(prevO)
-		SetProcessRng(prevR)
+		ReinstallTestProcessSingletons()
 		ClearError()
 	}()
 	ClearError()

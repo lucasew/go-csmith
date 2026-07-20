@@ -43,12 +43,9 @@ func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
 func TestRandomOutputVarDefsAssign(t *testing.T) {
 	// DefaultOutputMgr.cpp:144–151 pure_rnd_upto per global
 	ClearError()
-	prevR := ProcessRng()
-	prevO := ProcessOptions()
 	defer func() {
 		RandomNumberDoFinalization()
-		SetProcessOptions(prevO)
-		SetProcessRng(prevR)
+		ReinstallTestProcessSingletons()
 		ClearError()
 	}()
 	CreateRandomNumberInstance(RngKindDefault, 2)
@@ -155,6 +152,7 @@ func TestProcessProgramGenerator(t *testing.T) {
 		t.Fatal(g.GetOutputMgrKind())
 	}
 	DoFinalization()
+	ReinstallTestProcessSingletons()
 	if ProcessProgramGenerator() != nil {
 		// finalization clears; may sticky on Get
 		ClearError()
@@ -166,6 +164,7 @@ func TestNewProgramGeneratorDFSSelectsKind(t *testing.T) {
 	prevO := ProcessOptions()
 	defer func() {
 		DoFinalization()
+		ReinstallTestProcessSingletons()
 		SetProcessOptions(prevO)
 		ClearError()
 	}()
