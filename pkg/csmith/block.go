@@ -58,9 +58,13 @@ type Stmt struct {
 }
 
 // nextStmID is Statement::sid allocator.
+// Note: C++ Statement.cpp:366–367 assigns then increments (first id 0). Go keeps
+// pre-increment first id 1 because StmID 0 is the incomplete-IR sentinel across
+// visit/eligible paths; block-id emit is thus +1 vs C++ until that sentinel is
+// split from valid id 0 (fair follow-up).
 var nextStmID int
 
-// AllocStmID mirrors Statement constructor stm_id = ++sid.
+// AllocStmID allocates a live statement id (never 0 — reserved incomplete).
 func AllocStmID() int {
 	nextStmID++
 	return nextStmID
