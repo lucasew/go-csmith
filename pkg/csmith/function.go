@@ -1001,15 +1001,21 @@ func (f *Function) OutputForwardDeclOpts(forceStatic bool, r *Rng, withAttrs boo
 		return ""
 	}
 	s := f.OutputHeader(forceStatic)
+	// residual ERROR sticky — no invent bare ";" past OutputHeader residual
+	if HasError() {
+		return ""
+	}
 	// incomplete header IR sticky — no invent bare ";"
 	if s == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	if withAttrs && r != nil {
 		s += EnsureFuncAttrGenerator().Output(r)
+		// residual ERROR sticky — no invent soft-continue ";" past attr residual
+		if HasError() {
+			return ""
+		}
 	}
 	s += ";"
 	return s

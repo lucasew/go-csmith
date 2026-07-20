@@ -322,3 +322,71 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputAssignAsExprLhsOutputResidualSticky(t *testing.T) {
+	// Lhs.Output residual soft invent was invent assign rewrite past soft-empty LHS.
+	ClearError()
+	parent := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntType()}, Sizes: []int{2}}
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:      []int{2},
+		Collective: parent,
+		IndexExprs: []*Expression{{Term: TermConstant, Con: &Constant{Value: "0"}}}, // Type-nil residual
+	}
+	item.AsArray = item
+	st := &Stmt{
+		Kind: StmtAssign, Lhs: &Lhs{Var: &item.Variable, Type: GetIntType()},
+		LhsVar: &item.Variable, AssignOp: AssignSimple,
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+	}
+	if s := OutputAssignAsExpr(st, false); s != "" {
+		t.Fatal("Lhs Output residual must fail closed OutputAssignAsExpr", s)
+	}
+	if !HasError() {
+		t.Fatal("Lhs Output residual OutputAssignAsExpr must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputAssignAsExprRhsOutputResidualSticky(t *testing.T) {
+	// Expr.Output residual soft invent was soft-continue invent bare lhs / partial assign.
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
+		AssignOp: AssignSimple,
+		Expr:     &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
+	}
+	if s := OutputAssignAsExpr(st, false); s != "" {
+		t.Fatal("RHS Output residual must fail closed OutputAssignAsExpr", s)
+	}
+	if !HasError() {
+		t.Fatal("RHS Output residual OutputAssignAsExpr must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputAssignAsExprCCompVolatileResidualSticky(t *testing.T) {
+	// IsVolatile residual soft invent was invent ccomp rewrite past hole as complete.
+	ClearError()
+	// Type-nil Lhs → IsVolatile residual fail-closed true + sticky
+	v := &Variable{Name: "g_v", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
+	st := &Stmt{
+		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: nil},
+		AssignOp: AssignBitAnd,
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(7)},
+		SafeFlags: MakeDummyFlags(),
+	}
+	opts := Defaults()
+	opts.CComp = true
+	opts.SafeMath = true
+	// assignLhsText via Lhs.Output may residual first (IndirectLevel/GetType);
+	// either way whole OutputAssignAsExpr must fail closed sticky.
+	if s := OutputAssignAsExprOpts(st, false, opts); s != "" {
+		t.Fatal("IsVolatile/Lhs residual must fail closed ccomp rewrite", s)
+	}
+	if !HasError() {
+		t.Fatal("IsVolatile/Lhs residual ccomp rewrite must SetError sticky")
+	}
+	ClearError()
+}

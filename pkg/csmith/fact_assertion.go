@@ -111,11 +111,13 @@ func (f *FactPointTo) OutputCondition() string {
 		return ""
 	}
 	lhs := outputFactVar(f.Var)
+	// residual ERROR sticky — no invent soft-empty condition past outputFactVar residual
+	if HasError() {
+		return ""
+	}
 	// subject always live Output; sticky no invent " == 0" / " >= &" without lhs
 	if lhs == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var parts []string
@@ -135,11 +137,17 @@ func (f *FactPointTo) OutputCondition() string {
 			// range form: (p >= &lo && p <= &hi)
 			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
 			lo := pointee.OutputLowerBound(false)
+			// residual ERROR sticky — no invent soft-continue hi past LowerBound residual
+			if HasError() {
+				return ""
+			}
 			hi := pointee.OutputUpperBound(false)
+			// residual ERROR sticky — no invent soft-continue range past UpperBound residual
+			if HasError() {
+				return ""
+			}
 			if lo == "" || hi == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			parts = append(parts, "("+lhs+" >= &"+lo+" && "+lhs+" <= &"+hi+")")
@@ -156,6 +164,10 @@ func (f *FactPointTo) OutputCondition() string {
 		default:
 			// pointee->Output always live name; sticky no invent bare "&"
 			nm := pointee.GetActualName(false)
+			// residual ERROR sticky — no invent soft-empty & past GetActualName residual
+			if HasError() {
+				return ""
+			}
 			if nm == "" {
 				SetError(ErrGeneric)
 				return ""

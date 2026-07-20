@@ -729,3 +729,31 @@ func TestOutputAddrOfGetActualNameResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputConditionBoundResidualSticky(t *testing.T) {
+	// OutputLower/UpperBound residual soft invent was soft-continue invent partial range.
+	ClearError()
+	// array without AsArray → OutputLowerBound residual sticky
+	arr := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}}
+	f := &FactPointTo{Var: CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), PointTo: []*Variable{arr}}
+	if s := f.OutputCondition(); s != "" {
+		t.Fatal("bound residual must fail closed OutputCondition", s)
+	}
+	if !HasError() {
+		t.Fatal("bound residual OutputCondition must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestOutputForwardDeclHeaderResidualSticky(t *testing.T) {
+	// OutputHeader residual soft invent was invent bare ";" past empty header shell.
+	ClearError()
+	f := &Function{Name: "", ReturnType: GetIntType()} // empty name residual
+	if s := f.OutputForwardDecl(); s != "" {
+		t.Fatal("OutputHeader residual must fail closed OutputForwardDecl", s)
+	}
+	if !HasError() {
+		t.Fatal("OutputHeader residual OutputForwardDecl must SetError sticky")
+	}
+	ClearError()
+}

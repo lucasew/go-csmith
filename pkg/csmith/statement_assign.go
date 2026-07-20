@@ -375,11 +375,28 @@ func MakeRandomAssignQfer(
 
 	// StatementAssign.cpp:228 — make_possible_compound_assign (safe math flags/tmps)
 	st := makePossibleCompoundAssign(*cg, opts, probs, r, typ, lhs, op, rhs, gensymFromVS(vs))
+	// residual ERROR sticky — no invent ArrayAccess/complete assign past compound residual
+	if HasError() {
+		return Stmt{}
+	}
 	lhsIndir := 0
 	if st.Lhs != nil {
 		lhsIndir = st.Lhs.IndirectLevel()
-		if lhsIndir > 0 || (opts.WrapVolatiles && st.Lhs.IsVolatile()) {
+		// residual ERROR sticky — no invent ArrayAccess past IndirectLevel residual hole
+		if HasError() {
+			return Stmt{}
+		}
+		isVol := opts.WrapVolatiles && st.Lhs.IsVolatile()
+		// residual ERROR sticky — no invent ArrayAccess past IsVolatile residual hole
+		if HasError() {
+			return Stmt{}
+		}
+		if lhsIndir > 0 || isVol {
 			st.ArrayAccess = st.Lhs.Output(opts.WrapVolatiles)
+			// residual ERROR sticky — no invent soft-empty ArrayAccess past Output residual
+			if HasError() {
+				return Stmt{}
+			}
 		}
 	}
 	// FactMgr::update_fact_for_assign(sa) — get_rhs() (canonized ExpressionFuncall)
@@ -595,10 +612,20 @@ func assignLhsText(st *Stmt, wrapVol bool) string {
 		return st.ArrayAccess
 	}
 	if st.Lhs != nil {
-		return st.Lhs.Output(wrapVol)
+		out := st.Lhs.Output(wrapVol)
+		// residual ERROR sticky — no invent soft-empty LHS past Lhs.Output residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	if st.LhsVar != nil {
-		return st.LhsVar.OutputLhsC()
+		out := st.LhsVar.OutputLhsC()
+		// residual ERROR sticky — no invent soft-empty LHS past OutputLhsC residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	return ""
 }
@@ -631,6 +658,10 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 	var rhs string
 	if st.Expr != nil {
 		rhs = st.Expr.Output()
+		// residual ERROR sticky — no invent soft-empty RHS past Output residual hole
+		if HasError() {
+			return ""
+		}
 	}
 	if !st.AssignOp.NeedNoRHS() && (st.Expr == nil || rhs == "") {
 		if !HasError() {
@@ -648,7 +679,15 @@ func OutputAssignAsExprOpts(st *Stmt, wrapVol bool, opts Options) string {
 			// no invent "lhs = lhs + " with empty rhs Output
 			if bop, ok := st.AssignOp.CompoundToBinaryOps(); ok && opts.CComp {
 				if assignLhsIsVolatile(st) {
+					// residual ERROR sticky — no invent ccomp rewrite past IsVolatile residual
+					if HasError() {
+						return ""
+					}
 					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
+				}
+				// residual ERROR sticky — no invent non-vol soft path past IsVolatile residual false
+				if HasError() {
+					return ""
 				}
 			}
 			return OutputAssignSimple(st, wrapVol)
@@ -1054,6 +1093,10 @@ func VisitFactsStatementAssign(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		lhsVar = st.Lhs.Var
 		indir = st.Lhs.IndirectLevel()
+		// residual ERROR sticky — no invent visit success past IndirectLevel residual
+		if HasError() {
+			return false
+		}
 	} else if st.LhsVar != nil {
 		tmp := &Lhs{Var: st.LhsVar, Type: st.LhsVar.Type}
 		if !lhsCG.VisitFactsLhs(tmp, opts) {
