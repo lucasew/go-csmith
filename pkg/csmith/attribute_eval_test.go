@@ -426,6 +426,33 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	}
 }
 
+func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
+	// GetContainerUnion residual soft invent was soft-continue later pointees invent empty unions.
+	ClearError()
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	// Type-nil parent ancestry: GetContainerUnion stickies ERROR
+	parent := &Variable{Name: "g_hole"} // Type nil
+	fld := &Variable{Name: "g_hole.f0", Type: GetIntType(), FieldVarOf: parent}
+	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld})}
+	e := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
+	got := FindUnionPointees(facts, e)
+	if VariablesComplete(got) {
+		t.Fatal("GetContainerUnion residual must fail closed incomplete, not invent empty complete", got)
+	}
+	if !HasError() {
+		t.Fatal("GetContainerUnion residual FindUnionPointees must SetError sticky")
+	}
+	ClearError()
+	// residual must also invent overlap (restrictive) not conflict-free
+	if !HaveOverlappingFields(e, e, facts) {
+		t.Fatal("GetContainerUnion residual HaveOverlappingFields must fail closed as overlap")
+	}
+	if !HasError() {
+		t.Fatal("GetContainerUnion residual HaveOverlappingFields must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestBuiltinOutputSkipped(t *testing.T) {
 	f := &Function{Name: "__builtin_clz", ReturnType: GetIntType(), IsBuiltin: true}
 	if f.Output() != "" || f.OutputForwardDecl() != "" {

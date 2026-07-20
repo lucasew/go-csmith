@@ -508,6 +508,10 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 	}
 	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
+		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
+		if HasError() {
+			return nil
+		}
 	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)
@@ -706,10 +710,18 @@ func (av *ArrayVariable) OutputDef() string {
 	}
 	var b strings.Builder
 	if !av.NoLoopInitializer() {
+		// residual ERROR sticky — no invent decl-only path past NoLoopInitializer residual
+		if HasError() {
+			return ""
+		}
 		// ArrayVariable.cpp:494–498 — OutputDecl + ";" (loop fills body)
 		b.WriteString(decl)
 		b.WriteString(";")
 		return b.String()
+	}
+	// residual ERROR sticky — no invent brace init past NoLoopInitializer residual true
+	if HasError() {
+		return ""
 	}
 	// ArrayVariable.cpp:500–507 — string initializer; assert(init)
 	vals := make([]string, 0, 1+len(av.InitValues))
@@ -845,6 +857,14 @@ func (av *ArrayVariable) OutputInitOpts(indent string, ctrl []string, postIncr b
 	}
 	// no_loop_initializer: soft empty (brace def path used instead)
 	if av.NoLoopInitializer() {
+		// residual ERROR sticky — no invent empty soft-success past NoLoopInitializer residual
+		if HasError() {
+			return ""
+		}
+		return ""
+	}
+	// residual ERROR sticky — no invent loop-init past NoLoopInitializer residual false
+	if HasError() {
 		return ""
 	}
 	// ArrayVariable.cpp:622–623 — collective itemized members skip output_init
@@ -966,6 +986,10 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 	}
 	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
+		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
+		if HasError() {
+			return nil
+		}
 	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)

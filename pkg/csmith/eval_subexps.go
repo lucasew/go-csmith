@@ -47,7 +47,12 @@ func GetEvalToSubexps(e *Expression) []*Expression {
 			SetError(ErrGeneric)
 			return IncompleteExpressions()
 		}
-		return GetEvalToSubexps(e.CommaRHS)
+		sub := GetEvalToSubexps(e.CommaRHS)
+		// residual ERROR sticky — no invent self-eval complete list past RHS residual
+		if HasError() {
+			return IncompleteExpressions()
+		}
+		return sub
 	case TermAssignment:
 		// ExpressionAssign.cpp:107–111 — get_lhs()->get_eval_to_subexps (Lhs pushes self)
 		if e.Assign == nil {
@@ -124,7 +129,16 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 			SetError(ErrGeneric)
 			return IncompleteVariables()
 		}
-		vars = MergePointeesOfPointer(e.Var.GetCollective(), ind, facts)
+		coll := e.Var.GetCollective()
+		// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
+		if HasError() {
+			return IncompleteVariables()
+		}
+		vars = MergePointeesOfPointer(coll, ind, facts)
+		// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
+		if HasError() {
+			return IncompleteVariables()
+		}
 		// incomplete merge; empty non-nil = no pointees
 		if !VariablesComplete(vars) {
 			SetError(ErrGeneric)
@@ -141,6 +155,10 @@ func FindUnionPointees(facts []*FactPointTo, e *Expression) []*Variable {
 			return IncompleteVariables()
 		}
 		u := v.GetContainerUnion()
+		// residual ERROR sticky — no invent soft-continue later pointees past GetContainerUnion residual
+		if HasError() {
+			return IncompleteVariables()
+		}
 		// only care referenced union fields, not the union itself
 		if u != nil && v != u {
 			if !IsVariableInSet(unions, u) {
@@ -174,6 +192,10 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 		return true
 	}
 	vars1 := FindUnionPointees(facts, e1)
+	// residual ERROR sticky — no invent soft-continue overlap past FindUnion residual
+	if HasError() {
+		return true
+	}
 	// incomplete → sticky overlap; complete empty → no union pointees on e1
 	if !VariablesComplete(vars1) {
 		if !HasError() {
@@ -185,6 +207,10 @@ func HaveOverlappingFields(e1, e2 *Expression, facts []*FactPointTo) bool {
 		return false
 	}
 	vars2 := FindUnionPointees(facts, e2)
+	// residual ERROR sticky — no invent soft-continue overlap past e2 FindUnion residual
+	if HasError() {
+		return true
+	}
 	if !VariablesComplete(vars2) {
 		if !HasError() {
 			SetError(ErrGeneric)

@@ -375,6 +375,10 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 	}
 	if item.Type.IsAggregate() {
 		item.CreateFieldVars()
+		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
+		if HasError() {
+			return nil
+		}
 	}
 	if vs != nil {
 		vs.AllVars = append(vs.AllVars, &item.Variable)

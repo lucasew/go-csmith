@@ -631,6 +631,34 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 	}
 }
 
+func TestItemizeCreateFieldVarsResidualSticky(t *testing.T) {
+	// CreateFieldVars residual soft invent was invent complete itemize shell past hole.
+	ClearError()
+	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
+		{Name: "f0", Type: GetIntType(), BitWidth: -1},
+		{Name: "f1", Type: nil, BitWidth: -1}, // incomplete field type
+	}}
+	av := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: st, IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	if av.Itemize(NewRng(1)) != nil {
+		t.Fatal("CreateFieldVars residual must fail closed Itemize, not invent item")
+	}
+	if !HasError() {
+		t.Fatal("CreateFieldVars residual Itemize must SetError sticky")
+	}
+	ClearError()
+	if av.ItemizeConstIndices([]int{0}, nil) != nil {
+		t.Fatal("CreateFieldVars residual must fail closed ItemizeConstIndices")
+	}
+	if !HasError() {
+		t.Fatal("CreateFieldVars residual ItemizeConstIndices must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestSizeInBytesArray(t *testing.T) {
 	av := &ArrayVariable{
 		Variable: Variable{Name: "a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3}},
