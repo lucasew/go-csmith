@@ -216,6 +216,43 @@ func TestAddNewVarFactAndUpdatePushesMapsWhenFactAlreadyPresent(t *testing.T) {
 	ClearError()
 }
 
+// TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn —
+// Statement.cpp:380–389 in_block walks parent (never self). FactMgr.cpp:96–98
+// only updates map_facts_in for stm->in_block(blk). The declaring Block itself
+// must not receive its own locals on map_facts_in (seed-2: body-local l_260 on
+// map_in[body] → post_loop reintroduces → outer OOS → garbage → e10107).
+func TestAddNewVarFactAndUpdateDoesNotPushIntoDeclaringBlockMapIn(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// Declaring loop body (no parent needed for in_block of nested stmts)
+	body := &Block{StmID: 90, Func: f}
+	// Nested assign inside body — Statement::in_block(body) walks parent to body
+	inner := &Stmt{Kind: StmtAssign, StmID: 108}
+	body.Stmts = []Stmt{*inner}
+	f.Blocks = []*Block{body}
+	// Map slots for body (declaring block) and inner stmt
+	fm.MapFactsIn[body.StmID] = []*FactPointTo{}
+	fm.MapFactsOut[body.StmID] = []*FactPointTo{}
+	fm.MapFactsIn[inner.StmID] = []*FactPointTo{}
+	fm.MapFactsOut[inner.StmID] = []*FactPointTo{}
+	loc := CreateVariableScalars("l_260", PointerTo(GetIntType()), false, false)
+	fm.AddNewVarFactAndUpdate(body, loc)
+	if HasError() {
+		t.Fatalf("AddNewVarFactAndUpdate sticky: %v", HasError())
+	}
+	if FindRelatedPointTo(fm.MapFactsIn[body.StmID], loc) != nil {
+		t.Fatal("declaring block map_facts_in must not get body-local (in_block self is false)")
+	}
+	if FindRelatedPointTo(fm.MapFactsIn[inner.StmID], loc) == nil {
+		t.Fatal("nested stmt in body must get the local on map_facts_in")
+	}
+	if FindRelatedPointTo(fm.GlobalFacts, loc) == nil {
+		t.Fatal("GlobalFacts must still get init fact")
+	}
+	ClearError()
+}
+
 func TestVarCollectiveNilMustNotInventAddNewVarFact(t *testing.T) {
 	// GenerateNew* FM path: varCollective nil → SetError, no silent invent success
 	// without facts (AddNewVarFactAndUpdate(nil,nil) no-ops).

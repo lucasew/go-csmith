@@ -1808,6 +1808,15 @@ func stmtIDInBlockMapIn(f *Function, stmID int, blk *Block) bool {
 		SetError(ErrGeneric)
 		return false
 	}
+	// Statement.cpp:380–389 — in_block walks parent starting at parent; a statement
+	// (including Block-as-statement) is never in_block of itself.
+	// BlockContainsStmID(b, b.StmID)==true must not invent self-membership: that
+	// pushed body-locals into map_facts_in[body] (seed-2: l_260 on map_in[90] →
+	// post_loop reintroduced the local → block-28 OOS of l_144 marked l_260
+	// garbage → for 124 strip → e10107 may-null wipe).
+	if stmID == blk.StmID {
+		return false
+	}
 	if BlockContainsStmID(blk, stmID) {
 		return true
 	}
