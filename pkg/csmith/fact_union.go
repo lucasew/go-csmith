@@ -104,6 +104,46 @@ func FindRelatedUnion(facts []*FactUnion, v *Variable) *FactUnion {
 	return nil
 }
 
+// GetVar mirrors FactUnion::get_var.
+func (f *FactUnion) GetVar() *Variable {
+	if f == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return f.Var
+}
+
+// SetVar mirrors FactUnion::set_var.
+func (f *FactUnion) SetVar(v *Variable) {
+	if f == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	if v == nil {
+		SetError(ErrGeneric)
+		return
+	}
+	f.Var = v
+}
+
+// GetLastWrittenFID mirrors FactUnion::get_last_written_fid.
+func (f *FactUnion) GetLastWrittenFID() int {
+	if f == nil {
+		SetError(ErrGeneric)
+		return FactUnionBottom
+	}
+	return f.LastWrittenFID
+}
+
+// IsRelated mirrors Fact::is_related for Union — same subject var.
+func (f *FactUnion) IsRelated(other *FactUnion) bool {
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.Var == other.Var
+}
+
 // IsTop mirrors FactUnion::is_top.
 // Incomplete FactUnion sticky false (no invent TOP / soft re-pick past hole).
 func (f *FactUnion) IsTop() bool {

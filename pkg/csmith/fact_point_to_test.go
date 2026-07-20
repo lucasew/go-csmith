@@ -711,3 +711,38 @@ func TestFactFreeHelpers(t *testing.T) {
 	ClearError()
 	FactDoFinalization()
 }
+
+func TestFactPointToPointToAndStr(t *testing.T) {
+	// FactPointTo.cpp:398–405 point_to; 530–540 point_to_str
+	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	f := MakeFactPointTo(p, a)
+	if !f.PointsTo(a) {
+		t.Fatal("points to a")
+	}
+	if f.PointsTo(p) {
+		t.Fatal("not points to p")
+	}
+	if PointToStr(NullPtr) != "0" || PointToStr(TBDPtr) != "tbd" || PointToStr(GarbagePtr) != "garbage" {
+		t.Fatal("specials")
+	}
+	if PointToStr(a) != "&g_a" {
+		t.Fatal(PointToStr(a))
+	}
+	if f.Size() != 1 || f.Empty() {
+		t.Fatal("size/empty")
+	}
+	f2 := MakeFactPointTo(p, a)
+	if !f.IsRelated(f2) {
+		t.Fatal("related same var")
+	}
+	f.Clear()
+	if !f.Empty() || !f.IsTop() {
+		t.Fatal("clear → top")
+	}
+	ClearError()
+	if PointToStr(nil) != "" || !HasError() {
+		t.Fatal("nil PointToStr sticky")
+	}
+	ClearError()
+}

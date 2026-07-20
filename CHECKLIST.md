@@ -881,111 +881,111 @@ Total items: 2070
 - [x] Fact.cpp::renew_facts
 - [x] Fact.cpp::same_facts
 - [x] Fact.cpp::subset_facts
-- [ ] FactMgr.cpp::FactMgr.add_fact_out
-- [ ] FactMgr.cpp::FactMgr.add_interested_facts
-- [ ] FactMgr.cpp::FactMgr.add_new_var_fact
-- [ ] FactMgr.cpp::FactMgr.add_new_var_fact_and_update_inout_maps
-- [ ] FactMgr.cpp::FactMgr.add_param_facts
-- [ ] FactMgr.cpp::FactMgr.backup_stm_fact_maps
-- [ ] FactMgr.cpp::FactMgr.caller_to_callee_handover
-- [ ] FactMgr.cpp::FactMgr.clear_map_visited
-- [ ] FactMgr.cpp::FactMgr.create_cfg_edge
-- [ ] FactMgr.cpp::FactMgr.doFinalization
-- [ ] FactMgr.cpp::FactMgr.FactMgr
-- [ ] FactMgr.cpp::FactMgr.find_dangling_global_ptrs
-- [ ] FactMgr.cpp::FactMgr.find_updated_facts
-- [ ] FactMgr.cpp::FactMgr.find_updated_final_facts
+- [x] FactMgr.cpp::FactMgr.add_fact_out
+- [x] FactMgr.cpp::FactMgr.add_interested_facts
+- [x] FactMgr.cpp::FactMgr.add_new_var_fact
+- [x] FactMgr.cpp::FactMgr.add_new_var_fact_and_update_inout_maps
+- [x] FactMgr.cpp::FactMgr.add_param_facts
+- [x] FactMgr.cpp::FactMgr.backup_stm_fact_maps
+- [x] FactMgr.cpp::FactMgr.caller_to_callee_handover
+- [x] FactMgr.cpp::FactMgr.clear_map_visited
+- [x] FactMgr.cpp::FactMgr.create_cfg_edge
+- [x] FactMgr.cpp::FactMgr.doFinalization
+- [x] FactMgr.cpp::FactMgr.FactMgr
+- [x] FactMgr.cpp::FactMgr.find_dangling_global_ptrs
+- [x] FactMgr.cpp::FactMgr.find_updated_facts
+- [x] FactMgr.cpp::FactMgr.find_updated_final_facts
 - [ ] FactMgr.cpp::FactMgr.get_program_end_facts
 - [ ] FactMgr.cpp::FactMgr.makeup_new_var_facts
 - [ ] FactMgr.cpp::FactMgr.merge_jump_facts
-- [ ] FactMgr.cpp::FactMgr.output_assertions
-- [ ] FactMgr.cpp::FactMgr.remove_function_local_facts
-- [ ] FactMgr.cpp::FactMgr.remove_loop_local_facts
-- [ ] FactMgr.cpp::FactMgr.remove_rv_facts
+- [x] FactMgr.cpp::FactMgr.output_assertions
+- [x] FactMgr.cpp::FactMgr.remove_function_local_facts
+- [x] FactMgr.cpp::FactMgr.remove_loop_local_facts
+- [x] FactMgr.cpp::FactMgr.remove_rv_facts
 - [ ] FactMgr.cpp::FactMgr.reset_stm_fact_maps
-- [ ] FactMgr.cpp::FactMgr.restore_facts
-- [ ] FactMgr.cpp::FactMgr.restore_stm_fact_maps
+- [x] FactMgr.cpp::FactMgr.restore_facts
+- [x] FactMgr.cpp::FactMgr.restore_stm_fact_maps
 - [ ] FactMgr.cpp::FactMgr.sanity_check_map
-- [ ] FactMgr.cpp::FactMgr.set_fact_in
-- [ ] FactMgr.cpp::FactMgr.set_fact_out
-- [ ] FactMgr.cpp::FactMgr.setup_in_out_maps
-- [ ] FactMgr.cpp::FactMgr.update_fact_for_assign
-- [ ] FactMgr.cpp::FactMgr.update_fact_for_return
-- [ ] FactMgr.cpp::FactMgr.update_facts_for_dest
-- [ ] FactMgr.cpp::FactMgr.update_facts_for_oos_vars
+- [x] FactMgr.cpp::FactMgr.set_fact_in
+- [x] FactMgr.cpp::FactMgr.set_fact_out
+- [x] FactMgr.cpp::FactMgr.setup_in_out_maps
+- [x] FactMgr.cpp::FactMgr.update_fact_for_assign
+- [x] FactMgr.cpp::FactMgr.update_fact_for_return
+- [x] FactMgr.cpp::FactMgr.update_facts_for_dest
+- [x] FactMgr.cpp::FactMgr.update_facts_for_oos_vars
 - [ ] FactMgr.cpp::FactMgr.validate_assign
 - [ ] FactMgr.cpp::FactMgr.validate_fact
-- [ ] FactMgr.cpp::FactMgr.~FactMgr
-- [ ] FactPointTo.cpp::FactPointTo.abstract_fact_for_assign
-- [ ] FactPointTo.cpp::FactPointTo.aggregate_all_pointto_sets
-- [ ] FactPointTo.cpp::FactPointTo.clear
-- [ ] FactPointTo.cpp::FactPointTo.clone
-- [ ] FactPointTo.cpp::FactPointTo.doFinalization
-- [ ] FactPointTo.cpp::FactPointTo.empty
-- [ ] FactPointTo.cpp::FactPointTo.equal
-- [ ] FactPointTo.cpp::FactPointTo.FactPointTo
-- [ ] FactPointTo.cpp::FactPointTo.find_union_pointees
-- [ ] FactPointTo.cpp::FactPointTo.get_point_to_vars
-- [ ] FactPointTo.cpp::FactPointTo.get_var
-- [ ] FactPointTo.cpp::FactPointTo.has_invisible
-- [ ] FactPointTo.cpp::FactPointTo.imply
-- [ ] FactPointTo.cpp::FactPointTo.is_assertable
-- [ ] FactPointTo.cpp::FactPointTo.is_bottom
-- [ ] FactPointTo.cpp::FactPointTo.is_dangling_ptr
-- [ ] FactPointTo.cpp::FactPointTo.is_dead
-- [ ] FactPointTo.cpp::FactPointTo.is_null
-- [ ] FactPointTo.cpp::FactPointTo.is_pointing_to_locals
-- [ ] FactPointTo.cpp::FactPointTo.is_related
-- [ ] FactPointTo.cpp::FactPointTo.is_special_ptr
-- [ ] FactPointTo.cpp::FactPointTo.is_tbd_only
-- [ ] FactPointTo.cpp::FactPointTo.is_valid_ptr
-- [ ] FactPointTo.cpp::FactPointTo.join
-- [ ] FactPointTo.cpp::FactPointTo.join_visits
-- [ ] FactPointTo.cpp::FactPointTo.make_fact
-- [ ] FactPointTo.cpp::FactPointTo.make_facts
-- [ ] FactPointTo.cpp::FactPointTo.mark_dead_var
-- [ ] FactPointTo.cpp::FactPointTo.mark_func_end
-- [ ] FactPointTo.cpp::FactPointTo.merge_pointees_of_pointer
-- [ ] FactPointTo.cpp::FactPointTo.merge_pointees_of_pointers
-- [ ] FactPointTo.cpp::FactPointTo.operator=
-- [ ] FactPointTo.cpp::FactPointTo.opportunistic_validate
-- [ ] FactPointTo.cpp::FactPointTo.Output
-- [ ] FactPointTo.cpp::FactPointTo.point_to
-- [ ] FactPointTo.cpp::FactPointTo.point_to_str
-- [ ] FactPointTo.cpp::FactPointTo.rhs_to_lhs_transfer
-- [ ] FactPointTo.cpp::FactPointTo.set_bottom
-- [ ] FactPointTo.cpp::FactPointTo.size
-- [ ] FactPointTo.cpp::FactPointTo.update_facts_with_modified_index
-- [ ] FactPointTo.cpp::FactPointTo.update_ptr_aliases
-- [ ] FactPointTo.cpp::FactPointTo.update_with_modified_index
-- [ ] FactPointTo.cpp::FactPointTo.~FactPointTo
-- [ ] FactPointTo.cpp::output_var
-- [ ] FactUnion.cpp::FactUnion.abstract_fact_for_assign
-- [ ] FactUnion.cpp::FactUnion.clone
-- [ ] FactUnion.cpp::FactUnion.doFinalization
-- [ ] FactUnion.cpp::FactUnion.equal
-- [ ] FactUnion.cpp::FactUnion.FactUnion
-- [ ] FactUnion.cpp::FactUnion.get_last_written_fid
-- [ ] FactUnion.cpp::FactUnion.get_last_written_type
-- [ ] FactUnion.cpp::FactUnion.get_var
-- [ ] FactUnion.cpp::FactUnion.imply
-- [ ] FactUnion.cpp::FactUnion.is_assertable
-- [ ] FactUnion.cpp::FactUnion.is_bottom
-- [ ] FactUnion.cpp::FactUnion.is_field_readable
-- [ ] FactUnion.cpp::FactUnion.is_nonreadable_field
-- [ ] FactUnion.cpp::FactUnion.is_related
-- [ ] FactUnion.cpp::FactUnion.is_top
-- [ ] FactUnion.cpp::FactUnion.join
-- [ ] FactUnion.cpp::FactUnion.join_var_facts
-- [ ] FactUnion.cpp::FactUnion.make_fact
-- [ ] FactUnion.cpp::FactUnion.make_facts
-- [ ] FactUnion.cpp::FactUnion.Output
-- [ ] FactUnion.cpp::FactUnion.OutputAssertion
-- [ ] FactUnion.cpp::FactUnion.rhs_to_lhs_transfer
-- [ ] FactUnion.cpp::FactUnion.set_bottom
-- [ ] FactUnion.cpp::FactUnion.set_top
-- [ ] FactUnion.cpp::FactUnion.set_var
-- [ ] FactUnion.cpp::FactUnion.~FactUnion
+- [x] FactMgr.cpp::FactMgr.~FactMgr
+- [x] FactPointTo.cpp::FactPointTo.abstract_fact_for_assign
+- [x] FactPointTo.cpp::FactPointTo.aggregate_all_pointto_sets
+- [x] FactPointTo.cpp::FactPointTo.clear
+- [x] FactPointTo.cpp::FactPointTo.clone
+- [x] FactPointTo.cpp::FactPointTo.doFinalization
+- [x] FactPointTo.cpp::FactPointTo.empty
+- [x] FactPointTo.cpp::FactPointTo.equal
+- [x] FactPointTo.cpp::FactPointTo.FactPointTo
+- [x] FactPointTo.cpp::FactPointTo.find_union_pointees
+- [x] FactPointTo.cpp::FactPointTo.get_point_to_vars
+- [x] FactPointTo.cpp::FactPointTo.get_var
+- [x] FactPointTo.cpp::FactPointTo.has_invisible
+- [x] FactPointTo.cpp::FactPointTo.imply
+- [x] FactPointTo.cpp::FactPointTo.is_assertable
+- [x] FactPointTo.cpp::FactPointTo.is_bottom
+- [x] FactPointTo.cpp::FactPointTo.is_dangling_ptr
+- [x] FactPointTo.cpp::FactPointTo.is_dead
+- [x] FactPointTo.cpp::FactPointTo.is_null
+- [x] FactPointTo.cpp::FactPointTo.is_pointing_to_locals
+- [x] FactPointTo.cpp::FactPointTo.is_related
+- [x] FactPointTo.cpp::FactPointTo.is_special_ptr
+- [x] FactPointTo.cpp::FactPointTo.is_tbd_only
+- [x] FactPointTo.cpp::FactPointTo.is_valid_ptr
+- [x] FactPointTo.cpp::FactPointTo.join
+- [x] FactPointTo.cpp::FactPointTo.join_visits
+- [x] FactPointTo.cpp::FactPointTo.make_fact
+- [x] FactPointTo.cpp::FactPointTo.make_facts
+- [x] FactPointTo.cpp::FactPointTo.mark_dead_var
+- [x] FactPointTo.cpp::FactPointTo.mark_func_end
+- [x] FactPointTo.cpp::FactPointTo.merge_pointees_of_pointer
+- [x] FactPointTo.cpp::FactPointTo.merge_pointees_of_pointers
+- [x] FactPointTo.cpp::FactPointTo.operator=
+- [x] FactPointTo.cpp::FactPointTo.opportunistic_validate
+- [x] FactPointTo.cpp::FactPointTo.Output
+- [x] FactPointTo.cpp::FactPointTo.point_to
+- [x] FactPointTo.cpp::FactPointTo.point_to_str
+- [x] FactPointTo.cpp::FactPointTo.rhs_to_lhs_transfer
+- [x] FactPointTo.cpp::FactPointTo.set_bottom
+- [x] FactPointTo.cpp::FactPointTo.size
+- [x] FactPointTo.cpp::FactPointTo.update_facts_with_modified_index
+- [x] FactPointTo.cpp::FactPointTo.update_ptr_aliases
+- [x] FactPointTo.cpp::FactPointTo.update_with_modified_index
+- [x] FactPointTo.cpp::FactPointTo.~FactPointTo
+- [x] FactPointTo.cpp::output_var
+- [x] FactUnion.cpp::FactUnion.abstract_fact_for_assign
+- [x] FactUnion.cpp::FactUnion.clone
+- [x] FactUnion.cpp::FactUnion.doFinalization
+- [x] FactUnion.cpp::FactUnion.equal
+- [x] FactUnion.cpp::FactUnion.FactUnion
+- [x] FactUnion.cpp::FactUnion.get_last_written_fid
+- [x] FactUnion.cpp::FactUnion.get_last_written_type
+- [x] FactUnion.cpp::FactUnion.get_var
+- [x] FactUnion.cpp::FactUnion.imply
+- [x] FactUnion.cpp::FactUnion.is_assertable
+- [x] FactUnion.cpp::FactUnion.is_bottom
+- [x] FactUnion.cpp::FactUnion.is_field_readable
+- [x] FactUnion.cpp::FactUnion.is_nonreadable_field
+- [x] FactUnion.cpp::FactUnion.is_related
+- [x] FactUnion.cpp::FactUnion.is_top
+- [x] FactUnion.cpp::FactUnion.join
+- [x] FactUnion.cpp::FactUnion.join_var_facts
+- [x] FactUnion.cpp::FactUnion.make_fact
+- [x] FactUnion.cpp::FactUnion.make_facts
+- [x] FactUnion.cpp::FactUnion.Output
+- [x] FactUnion.cpp::FactUnion.OutputAssertion
+- [x] FactUnion.cpp::FactUnion.rhs_to_lhs_transfer
+- [x] FactUnion.cpp::FactUnion.set_bottom
+- [x] FactUnion.cpp::FactUnion.set_top
+- [x] FactUnion.cpp::FactUnion.set_var
+- [x] FactUnion.cpp::FactUnion.~FactUnion
 - [x] Filter.cpp::Filter.current_kind
 - [x] Filter.cpp::Filter.disable
 - [x] Filter.cpp::Filter.enable

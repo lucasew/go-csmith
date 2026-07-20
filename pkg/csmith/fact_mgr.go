@@ -2338,7 +2338,8 @@ func (fm *FactMgr) UpdateFactForAssignInto(lhs *Variable, lhsIndir int, rhs *Exp
 	return changed
 }
 
-// PointsTo reports whether this fact's set contains v.
+// PointsTo mirrors FactPointTo::point_to — loose_match against any pointee.
+// FactPointTo.cpp:398–405 — v->loose_match(pointee) || pointee->loose_match(v).
 // Incomplete PointTo (nil hole) fails closed true — no invent not-points-to past holes.
 func (f *FactPointTo) PointsTo(v *Variable) bool {
 	// Fact + subject always live; sticky incomplete — fail closed as points-to
@@ -2352,7 +2353,22 @@ func (f *FactPointTo) PointsTo(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if p == v {
+		if v.LooseMatch(p) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
+			return true
+		}
+		if p.LooseMatch(v) {
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		if HasError() {
 			return true
 		}
 	}

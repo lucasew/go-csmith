@@ -130,6 +130,65 @@ func IsSpecialPtr(p *Variable) bool {
 	return p == NullPtr || p == GarbagePtr || p == TBDPtr
 }
 
+// PointToStr mirrors FactPointTo::point_to_str.
+// FactPointTo.cpp:530–540 — specials as 0/tbd/garbage; else "&name".
+func PointToStr(v *Variable) string {
+	if v == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	switch v {
+	case NullPtr:
+		return "0"
+	case TBDPtr:
+		return "tbd"
+	case GarbagePtr:
+		return "garbage"
+	default:
+		return "&" + v.Name
+	}
+}
+
+// Size mirrors FactPointTo::size — number of pointees.
+// FactPointTo.cpp:155.
+func (f *FactPointTo) Size() int {
+	if f == nil {
+		SetError(ErrGeneric)
+		return 0
+	}
+	return len(f.PointTo)
+}
+
+// GetPointToVars mirrors FactPointTo::get_point_to_vars.
+// FactPointTo.h:69 — returns pointee slice (may be nil when empty).
+func (f *FactPointTo) GetPointToVars() []*Variable {
+	if f == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	return f.PointTo
+}
+
+// Clear mirrors FactPointTo::clear / empty point-to set (set_top lattice).
+func (f *FactPointTo) Clear() {
+	f.SetTop()
+}
+
+// Empty mirrors FactPointTo::empty — no pointees (same as is_top).
+func (f *FactPointTo) Empty() bool {
+	return f.IsTop()
+}
+
+// IsRelated mirrors Fact::is_related for PointTo — same category + same subject var.
+// Fact.h:81–83.
+func (f *FactPointTo) IsRelated(other *FactPointTo) bool {
+	if f == nil || other == nil {
+		SetError(ErrGeneric)
+		return false
+	}
+	return f.Var == other.Var
+}
+
 // FindRelatedPointTo mirrors find_related_fact for ePointTo (var identity).
 // Fact* always live; nil hole fails closed (nil — no invent skip to later match).
 func FindRelatedPointTo(facts []*FactPointTo, p *Variable) *FactPointTo {
