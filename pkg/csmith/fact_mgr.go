@@ -2111,10 +2111,16 @@ func MergeUnionFact(facts []*FactUnion, f *FactUnion) []*FactUnion {
 	return append(facts, f)
 }
 
-// CreateCFGEdge mirrors FactMgr::create_cfg_edge.
-// FactMgr.cpp:597–598.
+// CreateCFGEdge mirrors FactMgr::create_cfg_edge when dest is a Block*.
+// FactMgr.cpp:597–598 — CFGEdge dest is Statement* (Block is Statement).
+// Store DestStmID = dest.StmID so Statement::find_edges_in / has_edge_in
+// (e->dest == this) match via DestStmID; DestStmID 0 forced FindEdgesInToBlock invent.
 func (fm *FactMgr) CreateCFGEdge(srcID int, dest *Block, postDest, backLink bool) {
-	fm.CreateCFGEdgeTo(srcID, dest, 0, postDest, backLink)
+	destStmID := 0
+	if dest != nil {
+		destStmID = dest.StmID
+	}
+	fm.CreateCFGEdgeTo(srcID, dest, destStmID, postDest, backLink)
 }
 
 // CreateCFGEdgeTo is create_cfg_edge with optional dest statement id (goto).

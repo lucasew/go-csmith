@@ -1413,7 +1413,7 @@ func TestFindFixedPointDoesNotReinjectStrippedMayNull(t *testing.T) {
 	// after stmts that produced null were stripped (seed-2 g_87 / e12688).
 	// Block.cpp:513–568 — find_fixed_point does not assign global_facts; mid-gen
 	// live may stay polluted until post_creation installs map_facts_out (729).
-	// FactMgr.InFixedPoint skips merge so map_facts_out stays clean.
+	// map_facts_out from re-analysis outputs only (no invent reinject after strip).
 	ClearError()
 	SetProcessOptions(Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1484,6 +1484,57 @@ func TestStmVisitFactsRestoresLiveGlobalFacts(t *testing.T) {
 	gotLive := FindRelatedPointTo(fm.GlobalFacts, p)
 	if gotLive == nil || !gotLive.IsNull() {
 		t.Fatalf("live GlobalFacts must restore mid-gen may-null: %+v", gotLive)
+	}
+	ClearError()
+}
+
+// TestAbortBlockMakeLeavesOnFuncBlocks — Block.cpp:142–174 ERROR path.
+// stack.pop_back(); delete b; return nullptr — no func->blocks.erase.
+// remove_stmt alone erases (Block.cpp:653–660). Invent erase shrinks
+// StatementGoto::make_random's func->blocks copy (seed-2 e12688 n=11 vs 14).
+func TestAbortBlockMakeLeavesOnFuncBlocks(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	b := &Block{StmID: AllocStmID(), Func: f}
+	f.Stack = []*Block{b}
+	f.Blocks = []*Block{b}
+	abortBlockMake(f, b)
+	if len(f.Stack) != 0 {
+		t.Fatalf("abort must pop stack, got %d", len(f.Stack))
+	}
+	if len(f.Blocks) != 1 || f.Blocks[0] != b {
+		t.Fatalf("abort must leave block on Function.Blocks (C++ no erase), got %d", len(f.Blocks))
+	}
+	// sticky on nil args still
+	ClearError()
+	abortBlockMake(nil, b)
+	if !HasError() {
+		t.Fatal("nil func must SetError")
+	}
+	ClearError()
+}
+
+// TestMakeRandomBlockPostPushErrorLeavesOnBlocks — after blocks.push_back,
+// ERROR cleanup (Block.cpp:142–174) leaves entries on Blocks for goto pool size.
+func TestMakeRandomBlockPostPushErrorLeavesOnBlocks(t *testing.T) {
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetSimpleType(EVoid)}
+	b1 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtReturn, StmID: AllocStmID()}}}
+	b2 := &Block{StmID: AllocStmID(), Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: AllocStmID()}}}
+	b3 := &Block{StmID: AllocStmID(), Func: f}
+	for _, b := range []*Block{b1, b2, b3} {
+		f.Stack = append(f.Stack, b)
+		f.Blocks = append(f.Blocks, b)
+		abortBlockMake(f, b)
+	}
+	if len(f.Blocks) != 3 {
+		t.Fatalf("three ERROR make_random must leave 3 Blocks entries, got %d", len(f.Blocks))
+	}
+	if len(f.Stack) != 0 {
+		t.Fatalf("stack must be empty after aborts, got %d", len(f.Stack))
+	}
+	if n := len(append([]*Block(nil), f.Blocks...)); n != 3 {
+		t.Fatalf("goto pool copy size %d want 3", n)
 	}
 	ClearError()
 }

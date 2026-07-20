@@ -458,3 +458,29 @@ func TestFindEdgesInNilFMSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+// TestCreateCFGEdgeBlockDestUsesStmID — FactMgr.cpp:597–598 CFGEdge dest is Statement*.
+// Block* dest must record DestStmID so find_edges_in(e->dest==this) matches
+// (no invent DestStmID 0 + FindEdgesInToBlock second pass).
+func TestCreateCFGEdgeBlockDestUsesStmID(t *testing.T) {
+	ClearError()
+	fm := NewFactMgr(nil)
+	b := &Block{StmID: 42}
+	fm.CreateCFGEdge(7, b, false, true)
+	if len(fm.CFGEdges) != 1 {
+		t.Fatalf("want 1 edge, got %d", len(fm.CFGEdges))
+	}
+	e := fm.CFGEdges[0]
+	if e.DestStmID != 42 || e.DestBlock != b || !e.BackLink {
+		t.Fatalf("edge dest: stm=%d blk=%v back=%v want stm=42 DestBlock=b back", e.DestStmID, e.DestBlock == b, e.BackLink)
+	}
+	// has_edge_in / find_edges_in via DestStmID
+	if !fm.HasEdgeIn(42, false, true) {
+		t.Fatal("HasEdgeIn(block.StmID) must see self/continue-style block dest")
+	}
+	got := fm.FindEdgesIn(42, false, true)
+	if len(got) != 1 {
+		t.Fatalf("FindEdgesIn want 1, got %d", len(got))
+	}
+	ClearError()
+}

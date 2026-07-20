@@ -692,7 +692,11 @@ func MakeRandomBlock(
 	return b
 }
 
-// abortBlockMake pops stack and unregisters a failed Block::make_random (C++ delete b).
+// abortBlockMake pops stack after a failed Block::make_random.
+// Block.cpp:142–174 — on ERROR: stack.pop_back(); delete b; return nullptr.
+// C++ does NOT erase from func->blocks (only remove_stmt does Block.cpp:653–660).
+// Leaving the entry matches StatementGoto::make_random's vector copy of func->blocks
+// (seed-2 first_div e12688: invent erase → n=11 vs upstream n=14).
 // Function + Block always live on make abort; sticky (no invent soft-skip cleanup past hole).
 func abortBlockMake(f *Function, b *Block) {
 	if f == nil || b == nil {
@@ -702,12 +706,7 @@ func abortBlockMake(f *Function, b *Block) {
 	if n := len(f.Stack); n > 0 && f.Stack[n-1] == b {
 		f.Stack = f.Stack[:n-1]
 	}
-	for i, x := range f.Blocks {
-		if x == b {
-			f.Blocks = append(f.Blocks[:i], f.Blocks[i+1:]...)
-			break
-		}
-	}
+	// no invent f.Blocks erase — C++ delete leaves the pointer in func->blocks
 }
 
 // PostCreationAnalysis mirrors Block::post_creation_analysis.

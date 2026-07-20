@@ -857,12 +857,11 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	// Block.cpp:102–103 — blocks + stack push
 	f.Blocks = append(f.Blocks, b)
 	f.Stack = append(f.Stack, b)
-	pop := func() {
+	// Block.cpp:95–110 — make_dummy never erases func->blocks (only stack pop at end).
+	// Fail paths still leave the entry — same as make_random ERROR (Block.cpp:142–174).
+	popStack := func() {
 		if len(f.Stack) > 0 && f.Stack[len(f.Stack)-1] == b {
 			f.Stack = f.Stack[:len(f.Stack)-1]
-		}
-		if len(f.Blocks) > 0 && f.Blocks[len(f.Blocks)-1] == b {
-			f.Blocks = f.Blocks[:len(f.Blocks)-1]
 		}
 	}
 	preEffect := EmptyEffect()
@@ -871,19 +870,19 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 		preEffect = cg.EffectAccum.Clone()
 		// residual ERROR sticky — no invent soft-snapshot past IncompleteEffect Clone residual
 		if HasError() {
-			pop()
+			popStack()
 			return nil
 		}
 	}
 	if !EffectComplete(preEffect) {
-		pop()
+		popStack()
 		SetError(ErrGeneric)
 		return nil
 	}
 	// Block.cpp:105 — set_fact_in(b, global_facts)
 	if cg.FM != nil {
 		if !FactsComplete(cg.FM.GlobalFacts) {
-			pop()
+			popStack()
 			SetError(ErrGeneric)
 			return nil
 		}
@@ -891,15 +890,12 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	}
 	// Block.cpp:107 — post_creation_analysis
 	b.PostCreationAnalysis(cg, opts, preEffect, nil, nil)
-	// Block.cpp:108 — stack pop
-	if len(f.Stack) > 0 {
-		f.Stack = f.Stack[:len(f.Stack)-1]
-	}
+	// Block.cpp:108 — stack pop only (b stays on func->blocks)
+	popStack()
 	// incomplete post-creation must not invent dummy block success
+	// Block.cpp:95–110 still returns b after post_creation; ERROR is caller-visible.
+	// Keep b on Function.Blocks (no invent erase). Nil only when ERROR/incomplete.
 	if HasError() || (cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts)) {
-		if len(f.Blocks) > 0 && f.Blocks[len(f.Blocks)-1] == b {
-			f.Blocks = f.Blocks[:len(f.Blocks)-1]
-		}
 		if !HasError() {
 			SetError(ErrGeneric)
 		}

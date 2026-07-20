@@ -529,8 +529,13 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			return false
 		}
 		// merge live may-null into work (seed-2 e10107 mid-gen).
-		// Residual invent during FP reinjects into maps (e12688); inputs-only needs
-		// VisitFacts separate from global_facts.
+		// Statement.cpp:609–626 — stm_visit_facts mutates inputs only; never merges
+		// global_facts into inputs. Go VisitFacts* use GlobalFacts as work: load *facts,
+		// then join live may-null so mid-gen ExpressionAssign null is not dropped
+		// when map_facts_in / FP inputs lag GlobalFacts.
+		// CAUTION: during find_fixed_point this can reinject mid-gen null that C++
+		// inputs lack (seed-2 e12688 over-strip residual) — keep until FP inputs
+		// carry mid-gen lattice without invent merge.
 		if haveLive {
 			cl = mergeMayNullFromLive(liveSaved, cl)
 			if HasError() || !FactsComplete(cl) {

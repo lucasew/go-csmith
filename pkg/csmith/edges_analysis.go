@@ -525,6 +525,9 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				}
 				// fall through: continue merge/analyze loop like NDEBUG
 			}
+			// Block.cpp:531–536 — find_edges_in(this, false, true): e->dest == this.
+			// CreateCFGEdge stores DestStmID=block.StmID for Block* dests — no invent
+			// second pass FindEdgesInToBlock (would double-merge same edges).
 			back := fm.FindEdgesIn(b.StmID, false, true)
 			// nil = incomplete CFG; no invent skip holes as absent back-edges
 			if back == nil {
@@ -540,28 +543,6 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					return currentInputs, -1, false
 				}
 				// MergeFacts clears on mid-join failure — fail closed fixed-point
-				_ = MergeFacts(&currentInputs, out)
-				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
-				if HasError() {
-					return currentInputs, -1, false
-				}
-				if !FactsComplete(currentInputs) {
-					SetError(ErrGeneric)
-					return currentInputs, -1, false
-				}
-			}
-			toBlk := fm.FindEdgesInToBlock(b, false, true)
-			if toBlk == nil {
-				SetError(ErrGeneric)
-				return currentInputs, -1, false
-			}
-			for _, e := range toBlk {
-				// same map_facts_out[src] always-merge for edges into block
-				out := fm.GetMapFactsOut(e.SrcID)
-				if !FactsComplete(currentInputs) || !FactsComplete(out) {
-					SetError(ErrGeneric)
-					return currentInputs, -1, false
-				}
 				_ = MergeFacts(&currentInputs, out)
 				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
 				if HasError() {
