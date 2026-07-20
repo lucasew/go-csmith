@@ -1162,7 +1162,48 @@ func MakeRandomBinaryInvocation(
 			rhsCG.effectContext = rhsCtx
 			rhsCG.EffectAccum = &rhsAccum
 			rhsCG.EffectStm = EmptyEffect()
-			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+			// Shift constant path may already have set right above.
+			if right == nil {
+				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
+			}
+			// FunctionInvocation.cpp:246–253 — div/mod zero-guard BEFORE merge (C++ order)
+			// rhs->equals(0) || rhs->is_0_or_1() (all comparison Funcalls are is_0_or_1).
+			// Then rnd_upto(MAX_BINARY_OP, filter) rejecting mod/div/shifts.
+			if right != nil && !HasError() && (op == BinMod || op == BinDiv) {
+				eq0 := right.EqualsInt(0)
+				if HasError() {
+					return nil
+				}
+				is01 := right.Is0Or1()
+				if HasError() {
+					return nil
+				}
+				if eq0 || is01 {
+					lhsF, rhsF := false, false
+					if lhsTy != nil {
+						lhsF = lhsTy.IsFloat()
+						if HasError() {
+							return nil
+						}
+					}
+					if rhsTy != nil {
+						rhsF = rhsTy.IsFloat()
+						if HasError() {
+							return nil
+						}
+					}
+					if !lhsF && !rhsF {
+						f := NewVectorFilterItems([]int{
+							int(BinMod), int(BinDiv), int(BinLShift), int(BinRShift),
+						}, FilterModeOut)
+						op = BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), f))
+						if HasError() {
+							return nil
+						}
+						opStr = op.BinaryOpC()
+					}
+				}
+			}
 			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
 			cg.MergeParamContext(rhsCG, true)
 			if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
@@ -1176,51 +1217,6 @@ func MakeRandomBinaryInvocation(
 	// FunctionInvocation.cpp:257 — ERROR_GUARD_AND_DEL2
 	if right == nil || HasError() {
 		return nil
-	}
-	// FunctionInvocation.cpp:246–253 — avoid div/mod by 0 or possible 0/1
-	// C++: rhs->equals(0) || rhs->is_0_or_1() — covers Constant AND comparison
-	// Funcalls (all cmp ops are is_0_or_1). Then rnd_upto(MAX_BINARY_OP, filter)
-	// rejecting mod/div/shifts — NOT a silent BinAdd invent (seed-2 e9211:
-	// Mod with ptr-cmp RHS → UP U18 re-pick vs Go skip → U120).
-	if op == BinMod || op == BinDiv {
-		eq0 := right.EqualsInt(0)
-		// residual ERROR sticky — no invent soft-skip re-pick past EqualsInt residual
-		if HasError() {
-			return nil
-		}
-		is01 := right.Is0Or1()
-		// residual ERROR sticky — no invent soft-skip re-pick past Is0Or1 residual
-		if HasError() {
-			return nil
-		}
-		if eq0 || is01 {
-			lhsF, rhsF := false, false
-			if lhsTy != nil {
-				lhsF = lhsTy.IsFloat()
-				if HasError() {
-					return nil
-				}
-			}
-			if rhsTy != nil {
-				rhsF = rhsTy.IsFloat()
-				if HasError() {
-					return nil
-				}
-			}
-			if !lhsF && !rhsF {
-				// VectorFilter rejects mod/div/lshift/rshift only (no BinaryOpsProb)
-				f := NewVectorFilterItems([]int{
-					int(BinMod), int(BinDiv), int(BinLShift), int(BinRShift),
-				}, FilterModeOut)
-				op = BinaryOp(r.RndUptoFilter(uint32(MaxBinaryOp), f))
-				// residual ERROR sticky — no invent soft-op past RndUpto residual
-				if HasError() {
-					return nil
-				}
-				opStr = op.BinaryOpC()
-				// C++ fi->set_operation(op) keeps existing SafeOpFlags
-			}
-		}
 	}
 	// FunctionInvocation.cpp:266–273 — CompatibleChecker hard-fail (nullptr)
 	if CompatibleCheckExprs(opts, left, right) {
