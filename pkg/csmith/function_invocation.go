@@ -999,7 +999,12 @@ func MakeRandomBinaryInvocation(
 		return nil
 	}
 	// FunctionInvocation.cpp:171+ — type may be nullptr (StatementExpr); no GetIntType invent
-	// FunctionInvocation.cpp:174–177 — 10% pointer comparison when derived exist
+	// FunctionInvocation.cpp:174–177 — 10% pointer comparison when derived exist.
+	// C++: if (flip && has_pointer_type()) { ERROR_GUARD; return make_ptr_comparison(...); }
+	// Always return that result (including nullptr) — do NOT fall through to
+	// PickBinaryOp when ptr comparison fails (seed-2 e9211: UP U18 after matched
+	// ptr-cmp events meant Go was on a different post-success path; fall-through
+	// also invents scalar binary C++ never takes after a failed ptr-cmp attempt).
 	if r.RndFlipcoin(10) {
 		var env *TypeEnv
 		if vs != nil {
@@ -1009,13 +1014,11 @@ func MakeRandomBinaryInvocation(
 			env = cg.Types
 		}
 		if env != nil && env.HasPointerType() {
-			if fi := MakeRandomBinaryPtrComparison(r, opts, probs, vs, tables, cg, env); fi != nil {
-				return fi
+			// ERROR_GUARD after flipcoin before call is implicit via HasError checks in callee
+			if HasError() {
+				return nil
 			}
-		}
-		// incomplete DerivedTypes / ptr-cmp sticky must not invent scalar binary past hole
-		if HasError() {
-			return nil
+			return MakeRandomBinaryPtrComparison(r, opts, probs, vs, tables, cg, env)
 		}
 	}
 	// FunctionInvocation.cpp:179–183 — do { pick } while (type->is_float() && !works)
