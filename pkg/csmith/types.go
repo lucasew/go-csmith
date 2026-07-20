@@ -667,7 +667,16 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 	}
 	if t.IsSimple() && other.IsSimple() {
 		// forbidden conversion from float to int (Type.cpp:1428–1429)
-		if other.IsFloat() && !t.IsFloat() {
+		of := other.IsFloat()
+		// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
+		if HasError() {
+			return false
+		}
+		tf := t.IsFloat()
+		if HasError() {
+			return false
+		}
+		if of && !tf {
 			return false
 		}
 		if (t.simple != EVoid && other.simple != EVoid) || t.simple == other.simple {
@@ -684,15 +693,33 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 				return true
 			}
 			// Type.cpp:1439–1449
-			if opts.StrictFloat &&
-				((t.ptrTo.IsFloat() && !other.ptrTo.IsFloat()) ||
-					(!t.ptrTo.IsFloat() && other.ptrTo.IsFloat())) {
-				return false
+			if opts.StrictFloat {
+				tf := t.ptrTo.IsFloat()
+				// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
+				if HasError() {
+					return false
+				}
+				of := other.ptrTo.IsFloat()
+				if HasError() {
+					return false
+				}
+				if (tf && !of) || (!tf && of) {
+					return false
+				}
 			}
 			if opts.LangCPP {
 				return false
 			}
-			return t.ptrTo.SizeInBytes() == other.ptrTo.SizeInBytes()
+			sb1 := t.ptrTo.SizeInBytes()
+			// residual ERROR sticky — no invent size-equal past SizeInBytes residual
+			if HasError() {
+				return false
+			}
+			sb2 := other.ptrTo.SizeInBytes()
+			if HasError() {
+				return false
+			}
+			return sb1 == sb2
 		}
 	}
 	return false
@@ -763,7 +790,25 @@ func (t *Type) IsEquivalent(other *Type) bool {
 		return true
 	}
 	if t.IsSimple() && other.IsSimple() {
-		return t.IsSigned() == other.IsSigned() && t.SizeInBytes() == other.SizeInBytes()
+		s1 := t.IsSigned()
+		// residual ERROR sticky — no invent soft-equal past IsSigned residual hole
+		if HasError() {
+			return false
+		}
+		s2 := other.IsSigned()
+		if HasError() {
+			return false
+		}
+		n1 := t.SizeInBytes()
+		// residual ERROR sticky — no invent soft-equal past SizeInBytes residual hole
+		if HasError() {
+			return false
+		}
+		n2 := other.SizeInBytes()
+		if HasError() {
+			return false
+		}
+		return s1 == s2 && n1 == n2
 	}
 	return false
 }

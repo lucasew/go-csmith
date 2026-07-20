@@ -172,6 +172,17 @@ func TestLhsIndirectLevel(t *testing.T) {
 		t.Fatal("nil Lhs GetQualifiers must SetError sticky")
 	}
 	ClearError()
+	// GetCollective residual soft invent was soft-merge invent complete GetLvars list.
+	// IsArray without AsArray stickies GetCollective.
+	arrShell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	lhsArr := &Lhs{Var: arrShell, Type: GetIntType()}
+	if VariablesComplete(lhsArr.GetLvars(nil)) {
+		t.Fatal("GetCollective residual GetLvars must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("GetCollective residual GetLvars must SetError sticky")
+	}
+	ClearError()
 	if VariablesComplete(broken.GetLvars(nil)) {
 		t.Fatal("GetLvars incomplete must fail closed incomplete")
 	}

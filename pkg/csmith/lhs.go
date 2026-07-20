@@ -115,9 +115,10 @@ func (l *Lhs) GetQualifiers() CVQualifiers {
 	}
 	q := l.Var.Qfer.IndirectQualifiers(n)
 	// Lhs.cpp:200 — assert(!qfer.is_const()); const LHS is broken IR
-	// sticky error for ERROR_GUARD callers; no soft invent strip of const
+	// sticky error for ERROR_GUARD callers; no soft invent strip of const / invent quals shell
 	if q.IsConst() {
 		SetError(ErrGeneric)
+		return CVQualifiers{}
 	}
 	return q
 }
@@ -136,7 +137,17 @@ func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
 		SetError(ErrGeneric)
 		return IncompleteVariables()
 	}
-	return MergePointeesOfPointer(l.Var.GetCollective(), n, facts)
+	coll := l.Var.GetCollective()
+	// residual ERROR sticky — no invent soft-merge past GetCollective residual hole
+	if HasError() {
+		return IncompleteVariables()
+	}
+	vars := MergePointeesOfPointer(coll, n, facts)
+	// residual ERROR sticky — no invent soft-merge past MergePointees residual hole
+	if HasError() {
+		return IncompleteVariables()
+	}
+	return vars
 }
 
 // GetReferencedPtrs mirrors Lhs::get_referenced_ptrs.
@@ -159,7 +170,15 @@ func (l *Lhs) GetReferencedPtrs() []*Variable {
 		return IncompleteVariables()
 	}
 	if !l.Var.IsPointer() {
+		// residual ERROR sticky — no invent soft-empty no-ptrs past IsPointer residual false
+		if HasError() {
+			return IncompleteVariables()
+		}
 		return nil
+	}
+	// residual ERROR sticky — no invent ptr list past IsPointer residual true path
+	if HasError() {
+		return IncompleteVariables()
 	}
 	return []*Variable{l.Var}
 }
@@ -728,8 +747,18 @@ func selectDerefPointerInv(
 		return nil
 	}
 	// VariableSelector.cpp:1249 — assert(qfer && qfer->sanity_check(type)); sticky no invent
-	if qfer == nil || !qfer.SanityCheck(typ) {
+	if qfer == nil {
 		SetError(ErrGeneric)
+		return nil
+	}
+	if !qfer.SanityCheck(typ) {
+		if !HasError() {
+			SetError(ErrGeneric)
+		}
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-create past SanityCheck residual true path
+	if HasError() {
 		return nil
 	}
 	// incomplete invalid_vars fails closed sticky

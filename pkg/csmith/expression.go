@@ -364,7 +364,12 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 			return CVQualifiers{}
 		}
 		if e.Assign.Lhs != nil {
-			return e.Assign.Lhs.GetQualifiers()
+			q := e.Assign.Lhs.GetQualifiers()
+			// residual ERROR sticky — no invent assign quals past Lhs GetQualifiers residual
+			if HasError() {
+				return CVQualifiers{}
+			}
+			return q
 		}
 		if e.Assign.LhsVar != nil {
 			return e.Assign.LhsVar.Qfer
@@ -378,14 +383,24 @@ func (e *Expression) GetQualifiers() CVQualifiers {
 			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
-		return e.Invoke.GetQualifiers()
+		q := e.Invoke.GetQualifiers()
+		// residual ERROR sticky — no invent invoke quals past nested residual hole
+		if HasError() {
+			return CVQualifiers{}
+		}
+		return q
 	case TermCommaExpr:
 		// ExpressionComma value is RHS — sticky incomplete without RHS
 		if e.CommaRHS == nil {
 			SetError(ErrGeneric)
 			return CVQualifiers{}
 		}
-		return e.CommaRHS.GetQualifiers()
+		q := e.CommaRHS.GetQualifiers()
+		// residual ERROR sticky — no invent comma quals past RHS residual hole
+		if HasError() {
+			return CVQualifiers{}
+		}
+		return q
 	case TermConstant:
 		// Constant default empty quals when Con live; incomplete shell sticky
 		// (no invent complete empty-qfer success past missing Constant IR)

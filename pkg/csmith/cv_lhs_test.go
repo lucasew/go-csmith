@@ -208,11 +208,14 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 }
 
 func TestLhsGetQualifiersConstSetsError(t *testing.T) {
-	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip
+	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip / invent quals shell
 	ClearError()
 	v := CreateVariableScalars("g_c", GetIntType(), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
-	_ = lhs.GetQualifiers()
+	q := lhs.GetQualifiers()
+	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
+		t.Fatal("const LHS residual must fail closed empty quals, not invent shell", q)
+	}
 	if !HasError() {
 		t.Fatal("const LHS qfer must set sticky error")
 	}

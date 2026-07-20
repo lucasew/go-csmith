@@ -719,9 +719,17 @@ func (q CVQualifiers) OutputQualifiedType(t *Type) string {
 		return ""
 	}
 	// CVQualifiers.cpp:533 — assert(sanity_check(t)); sticky no invent bare CName for bad layout
-	if !q.Wildcard && len(q.IsConsts) > 0 && !q.SanityCheck(t) {
-		SetError(ErrGeneric)
-		return ""
+	if !q.Wildcard && len(q.IsConsts) > 0 {
+		if !q.SanityCheck(t) {
+			if !HasError() {
+				SetError(ErrGeneric)
+			}
+			return ""
+		}
+		// residual ERROR sticky — no invent soft-continue bare type past SanityCheck residual true
+		if HasError() {
+			return ""
+		}
 	}
 	opts := ProcessOptions()
 	emitConst := func() bool { return opts.Consts }
