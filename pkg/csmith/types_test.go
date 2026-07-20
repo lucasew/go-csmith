@@ -160,3 +160,82 @@ func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIsSignedIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent unsigned soft-skip past nil already sticky.
+	ClearError()
+	if !(*Type)(nil).IsSigned() {
+		t.Fatal("nil IsSigned must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil IsSigned must SetError sticky")
+	}
+	ClearError()
+	// complete pointer is not simple → unsigned false without sticky
+	pt := PointerTo(GetIntType())
+	if pt.IsSigned() {
+		t.Fatal("pointer IsSigned must be false")
+	}
+	if HasError() {
+		t.Fatal("complete pointer IsSigned must not sticky")
+	}
+	ClearError()
+	if !GetIntType().IsSigned() {
+		t.Fatal("int IsSigned must be true")
+	}
+	ClearError()
+}
+
+func TestIsFloatIsSimpleResidualSticky(t *testing.T) {
+	ClearError()
+	if (*Type)(nil).IsFloat() {
+		t.Fatal("nil IsFloat must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil IsFloat must SetError sticky")
+	}
+	ClearError()
+	if GetIntType().IsFloat() {
+		t.Fatal("int IsFloat must be false")
+	}
+	if HasError() {
+		t.Fatal("complete IsFloat must not sticky")
+	}
+	ClearError()
+}
+
+func TestHasBitfieldsIsStructResidualSticky(t *testing.T) {
+	// Nested field Type-nil sticky has-bitfields before IsStruct.
+	ClearError()
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if !st.HasBitfields() {
+		t.Fatal("nil field Type HasBitfields must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nil field Type HasBitfields must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestIsEquivalentIsSimpleResidualHygiene(t *testing.T) {
+	ClearError()
+	if GetIntType().IsEquivalent(GetIntType()) {
+		// same size signed - true
+	} else {
+		t.Fatal("int IsEquivalent int")
+	}
+	if HasError() {
+		t.Fatal("complete IsEquivalent must not sticky")
+	}
+	ClearError()
+	// pointer vs int not equivalent
+	if PointerTo(GetIntType()).IsEquivalent(GetIntType()) {
+		t.Fatal("pointer IsEquivalent int must be false")
+	}
+	if HasError() {
+		t.Fatal("complete pointer/int IsEquivalent must not sticky")
+	}
+	ClearError()
+}

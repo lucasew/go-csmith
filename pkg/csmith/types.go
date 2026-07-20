@@ -261,7 +261,15 @@ func (t *Type) HasIntField() bool {
 		return false
 	}
 	if t.IsInt() {
+		// residual ERROR sticky — no invent has-int true past IsInt residual hole
+		if HasError() {
+			return false
+		}
 		return true
+	}
+	// residual ERROR sticky — no invent soft-continue field scan past IsInt residual false
+	if HasError() {
+		return false
 	}
 	for _, f := range t.Fields {
 		if f.Type == nil {
@@ -297,6 +305,10 @@ func (t *Type) ContainPointerField() bool {
 		return true
 	}
 	if t.IsAggregate() {
+		// residual ERROR sticky — no invent soft-continue scan past IsAggregate residual
+		if HasError() {
+			return true
+		}
 		for _, f := range t.Fields {
 			if f.Type == nil {
 				// incomplete field Type sticky has-pointer (restrictive)
@@ -315,6 +327,9 @@ func (t *Type) ContainPointerField() bool {
 				return true
 			}
 		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent pointer-free soft-skip past IsAggregate residual false
+		return true
 	}
 	return false
 }
@@ -326,7 +341,18 @@ func (t *Type) IsFloat() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return t.IsSimple() && t.simple == EFloat
+	if !t.IsSimple() {
+		// residual ERROR sticky — no invent not-float soft-skip past IsSimple residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue float check past IsSimple residual true
+	if HasError() {
+		return false
+	}
+	return t.simple == EFloat
 }
 
 // IsSignedChar mirrors Type::is_signed_char.
@@ -337,7 +363,18 @@ func (t *Type) IsSignedChar() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return t.IsSimple() && t.simple == EChar
+	if !t.IsSimple() {
+		// residual ERROR sticky — no invent not-char soft-skip past IsSimple residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue char check past IsSimple residual true
+	if HasError() {
+		return false
+	}
+	return t.simple == EChar
 }
 
 // IsFullBitfieldsStruct mirrors Type::is_full_bitfields_struct.
@@ -367,7 +404,15 @@ func (t *Type) IsSigned() bool {
 		return true
 	}
 	if !t.IsSimple() {
+		// residual ERROR sticky — no invent unsigned soft-skip past IsSimple residual
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue signed check past IsSimple residual true
+	if HasError() {
+		return true
 	}
 	switch t.simple {
 	case EUChar, EUInt, EUShort, EULong, EULongLong, EUInt128:
@@ -641,6 +686,14 @@ func (t *Type) IsPromotable(other *Type) bool {
 		return false
 	}
 	if !t.IsSimple() || !other.IsSimple() {
+		// residual ERROR sticky — no invent not-promotable soft-skip past IsSimple residual
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue promote past IsSimple residual true
+	if HasError() {
 		return false
 	}
 	switch t.simple {
@@ -682,6 +735,10 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 		return true
 	}
 	if t.IsSimple() && other.IsSimple() {
+		// residual ERROR sticky — no invent soft-continue convert past IsSimple residual
+		if HasError() {
+			return false
+		}
 		// forbidden conversion from float to int (Type.cpp:1428–1429)
 		of := other.IsFloat()
 		// residual ERROR sticky — no invent soft-continue convert past IsFloat residual
@@ -698,6 +755,10 @@ func (t *Type) IsConvertableOpts(other *Type, opts Options) bool {
 		if (t.simple != EVoid && other.simple != EVoid) || t.simple == other.simple {
 			return true
 		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue pointer convert past IsSimple residual false
+	if HasError() {
 		return false
 	}
 	if t.ptrTo != nil && other.ptrTo != nil {
@@ -806,6 +867,10 @@ func (t *Type) IsEquivalent(other *Type) bool {
 		return true
 	}
 	if t.IsSimple() && other.IsSimple() {
+		// residual ERROR sticky — no invent soft-equal past IsSimple residual hole
+		if HasError() {
+			return false
+		}
 		s1 := t.IsSigned()
 		// residual ERROR sticky — no invent soft-equal past IsSigned residual hole
 		if HasError() {
@@ -825,6 +890,10 @@ func (t *Type) IsEquivalent(other *Type) bool {
 			return false
 		}
 		return s1 == s2 && n1 == n2
+	}
+	// residual ERROR sticky — no invent soft-not-equal past IsSimple residual false
+	if HasError() {
+		return false
 	}
 	return false
 }
@@ -901,16 +970,23 @@ func (t *Type) HasBitfields() bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		if f.Type.IsStruct() && f.Type.HasBitfields() {
-			// residual ERROR sticky — no invent has-bitfields true past nested hole
+		isStruct := f.Type.IsStruct()
+		// residual ERROR sticky — no invent soft-continue later fields past IsStruct residual
+		if HasError() {
+			return true
+		}
+		if isStruct {
+			if f.Type.HasBitfields() {
+				// residual ERROR sticky — no invent has-bitfields true past nested hole
+				if HasError() {
+					return true
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue later fields past nested residual false
 			if HasError() {
 				return true
 			}
-			return true
-		}
-		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-		if HasError() {
-			return true
 		}
 	}
 	return false
