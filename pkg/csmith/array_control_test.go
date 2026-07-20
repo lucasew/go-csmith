@@ -74,7 +74,8 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	cg.MustUseArrays = []*ArrayVariable{av}
+	// StatementFor.cpp:204–208 — must-use via rw_directive (not invent MustUseArrays list)
+	cg.RW = &RWDirective{MustReadVars: []*Variable{&av.Variable}}
 	lc := MakeIteration(NewRng(5), opts, probs, vs, &cg)
 	if lc == nil {
 		t.Fatal("nil lc")
@@ -103,9 +104,14 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	// force non-init path by calling setup+for
-	avs := MakeRandomArrayLoopSetup(NewRng(3), opts, vs, cg)
-	cg.MustUseArrays = avs
+	// force non-init path by calling setup+for (MakeRandomArrayLoop sets RW)
+	// If only setup helper is available, plant RW from a known array.
+	if av != nil {
+		cg.RW = &RWDirective{
+			MustReadVars:  []*Variable{&av.Variable},
+			MustWriteVars: []*Variable{&av.Variable},
+		}
+	}
 	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("for")

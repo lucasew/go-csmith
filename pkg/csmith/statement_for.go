@@ -316,42 +316,46 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	var testOp BinaryOp
 	var incrOp AssignOp
 	// array-loop path: must-use arrays (StatementFor.cpp:204–216)
-	// C++ only rw_directive; Go also MustUseArrays from make_random_array_loop
-	mustArr := cg.MustUseArrays
-	if len(mustArr) == 0 && cg.RW != nil {
-		found := cg.RW.FindMustUseArrays()
-		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
-		if found == nil {
-			SetError(ErrGeneric)
-			return nil
-		}
-		mustArr = found
-	}
-	// StatementFor.cpp:208–214 — choose_ok_var among must-use arrays; assert(av)
-	// no soft invent scan-all-arrays when choose_ok_var returns nil
-	// ArrayVariable* always live on must-use list; nil hole fails closed sticky
-	// (no invent soft-skip hole as absent must-use array)
+	// StatementFor.cpp:204–208 — only rw_directive->find_must_use_arrays (deduped
+	// must_read then must_write). Do not use MustUseArrays selection-order list:
+	// that invents duplicates when SelectArray returns the same collective twice
+	// (seed-2 e358: Go choose_ok_var n=2 vs upstream n=1 after itemize).
 	bound := InvalidIVBound
-	if len(mustArr) > 0 {
-		arrVars := make([]*Variable, 0, len(mustArr))
-		for _, av := range mustArr {
-			if av == nil {
-				SetError(ErrGeneric)
+	if cg.RW != nil {
+		mustArr := cg.RW.FindMustUseArrays()
+		// FindMustUseArrays nil = incomplete must-use lists (no invent empty)
+		if mustArr == nil {
+			// residual ERROR already sticky, or empty complete nil slice?
+			// FindMustUseArrays returns nil only on sticky hole; empty is non-nil empty
+			if HasError() {
 				return nil
 			}
-			arrVars = append(arrVars, &av.Variable)
 		}
-		pick := ChooseOKVar(r, arrVars)
-		// StatementFor.cpp:210–211 — assert(av); library fail closed
-		if pick == nil || pick.AsArray == nil {
-			if !HasError() {
-				SetError(ErrGeneric)
+		if len(mustArr) > 0 {
+			// StatementFor.cpp:208–214 — choose_ok_var among must-use arrays; assert(av)
+			// choose_ok_var itemizes collective arrays (burns per-dim RndUpto)
+			arrVars := make([]*Variable, 0, len(mustArr))
+			for _, av := range mustArr {
+				if av == nil {
+					SetError(ErrGeneric)
+					return nil
+				}
+				arrVars = append(arrVars, &av.Variable)
 			}
-			return nil
-		}
-		for _, sz := range pick.AsArray.Sizes {
-			if bound == InvalidIVBound || sz < bound {
-				bound = sz
+			pick := ChooseOKVar(r, arrVars)
+			// StatementFor.cpp:210–211 — assert(av); library fail closed
+			if pick == nil || pick.AsArray == nil {
+				if !HasError() {
+					SetError(ErrGeneric)
+				}
+				return nil
+			}
+			// StatementFor.cpp:211–214 — min dimension of chosen array
+			// (C++ bound starts as INVALID_BOUND max-unsigned; first size always taken)
+			for _, sz := range pick.AsArray.Sizes {
+				if bound == InvalidIVBound || sz < bound {
+					bound = sz
+				}
 			}
 		}
 	}

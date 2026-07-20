@@ -137,7 +137,8 @@ func TestMakeIterationArrayBoundPath(t *testing.T) {
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f)), GetIntType(), nil, NewRng(3))
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	cg.MustUseArrays = []*ArrayVariable{av}
+	// StatementFor.cpp:204–208 — find_must_use_arrays from rw_directive only
+	cg.RW = &RWDirective{MustReadVars: []*Variable{&av.Variable}}
 	lc := MakeIteration(NewRng(11), opts, NewProbabilities(opts), vs, &cg)
 	if lc == nil {
 		t.Fatal("nil")
@@ -212,17 +213,7 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	// plant incomplete MustUseArrays
-	cg.MustUseArrays = []*ArrayVariable{nil}
-	if MakeIteration(NewRng(1), opts, probs, vs, &cg) != nil {
-		t.Fatal("nil must-use array hole must fail closed MakeIteration")
-	}
-	if !HasError() {
-		t.Fatal("nil must-use array hole must SetError sticky")
-	}
-	ClearError()
-	// incomplete RW FindMustUseArrays
-	cg.MustUseArrays = nil
+	// incomplete RW FindMustUseArrays (nil hole on must_read)
 	cg.RW = &RWDirective{MustReadVars: []*Variable{nil}}
 	if MakeIteration(NewRng(2), opts, probs, vs, &cg) != nil {
 		t.Fatal("incomplete FindMustUseArrays must fail closed")
