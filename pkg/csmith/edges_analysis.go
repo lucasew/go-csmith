@@ -584,7 +584,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				}
 				return nil, -1, true
 			case ShortcutConflict:
-				return currentInputs, 0, false
+				// Block.cpp:541 — `// if (shortcut == 1) return false;` is commented out.
+				// Effect conflict at block level falls through to full statement re-analysis
+				// (unlike Statement::validate_and_update_facts which fails on shortcut==1).
+				// Inventing fail-closed here stripped nested fors during outer FP
+				// (seed-2 e10107: body 90 ShortcutConflict → for 124 fail → strip).
 			}
 		}
 		if !FactsComplete(currentInputs) {

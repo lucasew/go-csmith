@@ -373,6 +373,38 @@ func TestFindFixedPointBlock(t *testing.T) {
 	ClearError()
 }
 
+// TestFindFixedPointBlockShortcutConflictFallthrough — Block.cpp:537–541.
+// shortcut==1 (effect conflict) is commented out in C++; full re-analysis runs.
+// Inventing fail-closed on ShortcutConflict emptied bodies during outer FP.
+func TestFindFixedPointBlockShortcutConflictFallthrough(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	w := CreateVariableScalars("g_w", GetIntType(), false, false)
+	// empty body: full visit after conflict is trivial success
+	b := &Block{StmID: 1, Looping: true, Stmts: nil}
+	fm := NewFactMgr(nil)
+	entry := []*FactPointTo{}
+	fm.SetMapFactsIn(1, entry)
+	fm.SetMapFactsOut(1, entry)
+	fm.MapVisited = map[int]bool{1: true}
+	// prior block effect writes w; ambient effect_context writes w → InConflict
+	fm.SetMapStmEffect(1, EmptyEffect().WriteVar(w))
+	cg := WithEffectContext(EmptyEffect().WriteVar(w)).WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	// visitOnce false so shortcut is attempted; conflict must fall through
+	out, idx, ok := FindFixedPointBlock(b, entry, &cg, Defaults(), false)
+	if !ok {
+		t.Fatalf("block shortcut conflict must fall through to full re-analysis, idx=%d err=%v", idx, HasError())
+	}
+	_ = out
+	// full path sets maps for the block
+	if !fm.MapVisited[1] {
+		t.Fatal("full re-analysis must mark block visited")
+	}
+	ClearError()
+}
+
 func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	ClearError()
 	st := &Stmt{Kind: StmtIfElse, StmID: 7}
