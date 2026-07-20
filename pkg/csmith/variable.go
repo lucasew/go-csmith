@@ -2274,6 +2274,10 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
 	if v.Type.IsStruct() {
+		// residual ERROR sticky — no invent soft-dump past IsStruct residual true
+		if HasError() {
+			return ""
+		}
 		// incomplete FieldVars sticky whole dump (no invent soft-skip hole)
 		if !v.FieldVarsComplete() {
 			SetError(ErrGeneric)
@@ -2290,7 +2294,15 @@ func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*Fact
 		}
 		return b.String()
 	}
+	// residual ERROR sticky — no invent soft-continue past IsStruct residual false
+	if HasError() {
+		return ""
+	}
 	if v.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-dump past IsUnion residual true
+		if HasError() {
+			return ""
+		}
 		// incomplete FieldVars sticky whole dump
 		if !v.FieldVarsComplete() {
 			SetError(ErrGeneric)
@@ -2780,6 +2792,10 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 		nameStr += "[" + iv + "]"
 	}
 	if v.Type != nil && v.Type.IsAggregate() {
+		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
+		if HasError() {
+			return ""
+		}
 		j := 0
 		for i, f := range v.Type.Fields {
 			// Type* always live; nil hole fails closed sticky (no invent skip partial
@@ -2793,6 +2809,10 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 			}
 			// ArrayVariable.cpp:741–752 — skip unreadable union fields
 			if v.Type.IsUnion() && unionFacts != nil {
+				// residual ERROR sticky — no invent soft-skip union branch past IsUnion residual
+				if HasError() {
+					return ""
+				}
 				if !IsFieldReadable(v, i, unionFacts) {
 					// residual ERROR sticky — no invent soft-skip then partial array hash past hole
 					if HasError() {
@@ -2805,6 +2825,9 @@ func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) s
 				if HasError() {
 					return ""
 				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+				return ""
 			}
 			simple := f.Type.IsSimple()
 			// residual ERROR sticky — no invent soft-continue field hash past IsSimple residual

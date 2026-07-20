@@ -812,14 +812,34 @@ func AbstractFactForAssign(factsIn []*FactPointTo, lhs *Variable, lhsIndir int, 
 						continue
 					}
 					if cur.Type.IsUnion() {
+						// residual ERROR sticky — no invent soft-container past IsUnion residual true
+						if HasError() {
+							return IncompleteFactSlice()
+						}
 						u = cur
 						break
+					}
+					// residual ERROR sticky — no invent soft-continue walk past IsUnion residual false
+					if HasError() {
+						return IncompleteFactSlice()
 					}
 				}
 			}
 			// FactPointTo.cpp:288 — assert(v && v->type->eType == eUnion) hard sticky
-			if u == nil || u.Type == nil || !u.Type.IsUnion() {
+			if u == nil || u.Type == nil {
 				SetError(ErrGeneric)
+				return IncompleteFactSlice()
+			}
+			if !u.Type.IsUnion() {
+				// residual ERROR sticky — no invent soft-assert past IsUnion residual
+				if HasError() {
+					return IncompleteFactSlice()
+				}
+				SetError(ErrGeneric)
+				return IncompleteFactSlice()
+			}
+			// residual ERROR sticky — no invent soft-continue past IsUnion residual true
+			if HasError() {
 				return IncompleteFactSlice()
 			}
 		} else if HasError() {

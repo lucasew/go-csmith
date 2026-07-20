@@ -1129,7 +1129,12 @@ func (t *Type) SignedOverflowPossible(intSize int) bool {
 	if intSize < 1 {
 		return false
 	}
-	return t.SizeInBytes() >= intSize
+	sz := t.SizeInBytes()
+	// residual ERROR sticky — no invent overflow-free soft-skip past SizeInBytes residual
+	if HasError() {
+		return true
+	}
+	return sz >= intSize
 }
 
 // GetTypeFromString mirrors Type::get_type_from_string.
@@ -1183,7 +1188,17 @@ func (t *Type) TypeNameString() string {
 	if t.ptrTo != nil {
 		return "Pointer"
 	}
-	if t.IsStruct() || t.IsUnion() {
+	isSt := t.IsStruct()
+	// residual ERROR sticky — no invent soft-name past IsStruct residual
+	if HasError() {
+		return ""
+	}
+	isUn := t.IsUnion()
+	// residual ERROR sticky — no invent soft-name past IsUnion residual
+	if HasError() {
+		return ""
+	}
+	if isSt || isUn {
 		// Type.cpp struct/union tag always live at name emit; sticky no invent ""
 		if t.StructName == "" {
 			SetError(ErrGeneric)

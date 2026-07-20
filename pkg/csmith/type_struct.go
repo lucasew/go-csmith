@@ -516,18 +516,45 @@ func MakeStructConstant(r *Rng, opts Options, probs *Probabilities, st *Type) *C
 		if f.BitWidth > 0 {
 			// bitfield: GenerateRandomConstantInRange (eInt/eUInt only)
 			val = GenerateRandomConstantInRange(f.Type, f.BitWidth, opts, r)
+			// residual ERROR sticky — no invent soft-field past range residual
+			if HasError() {
+				return nil
+			}
 		} else if f.Type.IsStruct() {
+			// residual ERROR sticky — no invent soft-field past IsStruct residual true
+			if HasError() {
+				return nil
+			}
 			if c := MakeStructConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
+			if HasError() {
+				return nil
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsStruct residual false
+			return nil
 		} else if f.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-field past IsUnion residual true
+			if HasError() {
+				return nil
+			}
 			if c := MakeUnionConstant(r, opts, probs, f.Type); c != nil {
 				val = c.Value
 			}
+			if HasError() {
+				return nil
+			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+			return nil
 		} else {
 			// Constant.cpp:271 — GenerateRandomConstant(fields[i]); no soft invent "0"
 			if c := MakeRandom(f.Type, opts, probs, r); c != nil {
 				val = c.Value
+			}
+			if HasError() {
+				return nil
 			}
 		}
 		// Constant.cpp ERROR_GUARD("") on empty field — sticky fail whole struct, no invent hole
@@ -578,12 +605,27 @@ func MakeOneUnionField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv,
 				}
 				continue
 			}
-			if !t.IsStruct() && !t.IsUnion() {
+			isSt := t.IsStruct()
+			// residual ERROR sticky — no invent soft-field past IsStruct residual
+			if HasError() {
+				return StructField{}
+			}
+			isUn := t.IsUnion()
+			// residual ERROR sticky — no invent soft-field past IsUnion residual
+			if HasError() {
+				return StructField{}
+			}
+			if !isSt && !isUn {
 				// skip void / filtered simples
-				if t.IsSimple() && t.Simple() == EVoid {
+				simple := t.IsSimple()
+				// residual ERROR sticky — no invent soft-field past IsSimple residual
+				if HasError() {
+					return StructField{}
+				}
+				if simple && t.Simple() == EVoid {
 					continue
 				}
-				if t.IsSimple() && t.IsFloat() && !opts.EnableFloat {
+				if simple && t.IsFloat() && !opts.EnableFloat {
 					// residual ERROR sticky — no invent soft-continue then pick later past IsFloat hole
 					if HasError() {
 						return StructField{}
@@ -859,17 +901,38 @@ func MakeUnionConstant(r *Rng, opts Options, probs *Probabilities, ut *Type) *Co
 	}
 	var val string
 	if f0.Type.IsStruct() {
+		// residual ERROR sticky — no invent soft-union past IsStruct residual true
+		if HasError() {
+			return nil
+		}
 		if c := MakeStructConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
+		if HasError() {
+			return nil
+		}
+	} else if HasError() {
+		return nil
 	} else if f0.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-union past IsUnion residual true
+		if HasError() {
+			return nil
+		}
 		if c := MakeUnionConstant(r, opts, probs, f0.Type); c != nil {
 			val = c.Value
 		}
+		if HasError() {
+			return nil
+		}
+	} else if HasError() {
+		return nil
 	} else {
 		// Constant.cpp:292 — GenerateRandomConstant(fields[0]); no soft invent "0"
 		if c := MakeRandom(f0.Type, opts, probs, r); c != nil {
 			val = c.Value
+		}
+		if HasError() {
+			return nil
 		}
 	}
 	// ERROR_GUARD on empty first field sticky — no invent "{}"

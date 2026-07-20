@@ -279,3 +279,32 @@ func TestHasAggregateFieldIsAggregateResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestTypeNameStringIsStructResidualSticky(t *testing.T) {
+	// IsStruct residual soft invent was invent soft-empty name past Type-nil shell.
+	ClearError()
+	if (*Type)(nil).TypeNameString() != "" {
+		t.Fatal("nil TypeNameString must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("nil TypeNameString must SetError sticky")
+	}
+	ClearError()
+	// complete int
+	if GetIntType().TypeNameString() != "Int" {
+		t.Fatal("int TypeNameString must Int")
+	}
+	if HasError() {
+		t.Fatal("complete int TypeNameString must not sticky")
+	}
+	ClearError()
+	// incomplete struct empty name sticky
+	st := &Type{isStruct: true, StructName: ""}
+	if st.TypeNameString() != "" {
+		t.Fatal("empty StructName TypeNameString must fail closed empty")
+	}
+	if !HasError() {
+		t.Fatal("empty StructName TypeNameString must SetError sticky")
+	}
+	ClearError()
+}

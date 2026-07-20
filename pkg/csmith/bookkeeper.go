@@ -910,7 +910,13 @@ func outputPointerStatistics(b *strings.Builder) {
 				break
 			}
 			// Bookkeeper.cpp:260 — assert(t->eType == ePointer); skip non-pointer aggregates
-			if !p.Type.IsPointerLike() {
+			ptrLike := p.Type.IsPointerLike()
+			// residual ERROR sticky — no invent soft-skip stats past IsPointerLike residual
+			if HasError() {
+				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+				break
+			}
+			if !ptrLike {
 				continue
 			}
 			if i < len(AllAliases) {

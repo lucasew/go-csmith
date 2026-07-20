@@ -1389,8 +1389,9 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:97–100 — as_param forbid address-of argument
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
-		if asParam && v.IsArgument() && v.Type.IsDereferencedFrom(typ) {
-			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+		if asParam {
+			isArg := v.IsArgument()
+			// residual ERROR sticky — no invent soft-continue past IsArgument residual
 			if HasError() {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
@@ -1398,13 +1399,31 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			dummy = append(dummy, v)
-			continue
+			if isArg && v.Type.IsDereferencedFrom(typ) {
+				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+				if HasError() {
+					if cg.EffectAccum != nil {
+						*cg.EffectAccum = preAccum
+					}
+					cg.EffectStm = preStm
+					return nil
+				}
+				dummy = append(dummy, v)
+				continue
+			}
+			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 		}
 		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
-		if !vs.Opts.AddrTakenOfLocals && (v.IsArgument() || v.IsLocal()) &&
-			v.Type.IsDereferencedFrom(typ) {
-			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+		if !vs.Opts.AddrTakenOfLocals {
+			isArg := v.IsArgument()
+			// residual ERROR sticky — no invent soft-continue past IsArgument residual
 			if HasError() {
 				if cg.EffectAccum != nil {
 					*cg.EffectAccum = preAccum
@@ -1412,8 +1431,35 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			dummy = append(dummy, v)
-			continue
+			isLoc := v.IsLocal()
+			// residual ERROR sticky — no invent soft-continue past IsLocal residual
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
+			if (isArg || isLoc) && v.Type.IsDereferencedFrom(typ) {
+				// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom hole
+				if HasError() {
+					if cg.EffectAccum != nil {
+						*cg.EffectAccum = preAccum
+					}
+					cg.EffectStm = preStm
+					return nil
+				}
+				dummy = append(dummy, v)
+				continue
+			}
+			// residual ERROR sticky — no invent soft-continue past IsDereferencedFrom residual false
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
 		}
 		// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
 		if asReturn && vs.Opts.NoReturnDeadPointer {
