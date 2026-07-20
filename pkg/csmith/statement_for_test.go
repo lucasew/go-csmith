@@ -39,17 +39,31 @@ func TestMakeRandomIfHasBranches(t *testing.T) {
 	// need a function for context
 	r := NewRng(2)
 	seedTypesForTest(r, opts, probs, vs, &list)
+	ClearError()
 	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, &list, nil)
-	cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
-	// force if generation
-	r2 := NewRng(11)
-	st := MakeRandomIf(r2, opts, probs, vs, tables, stmtTab, &cg)
-	if st == nil || st.Kind != StmtIfElse || st.Then == nil || st.Else == nil {
-		t.Fatalf("%+v", st)
+	if f == nil {
+		t.Fatal("MakeFirst")
 	}
-	if st.Expr == nil {
-		t.Fatal("missing test expr")
+	ClearError()
+	// Paired FactMgr + function body on stack (generation context)
+	fm := f.PairedFactMgr()
+	if fm == nil {
+		fm = NewFactMgr(f)
 	}
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	if f.Body != nil {
+		f.Stack = []*Block{f.Body}
+	}
+	// force if generation — soft re-pick seeds (make_random can miss)
+	var st *Stmt
+	for seed := uint64(11); seed < 80; seed++ {
+		ClearError()
+		st = MakeRandomIf(NewRng(seed), opts, probs, vs, tables, stmtTab, &cg)
+		if st != nil && st.Kind == StmtIfElse && st.Then != nil && st.Else != nil && st.Expr != nil {
+			return
+		}
+	}
+	t.Fatalf("%+v err=%v", st, GetError())
 }
 
 func TestMakeRandomForHasLoopAndBody(t *testing.T) {

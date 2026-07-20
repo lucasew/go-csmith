@@ -550,6 +550,9 @@ func (f *Function) generateBodyCore(
 	f.BuildState = BuildBuilding
 
 	// Function.cpp:633–634 / 675–676 — CGContext(this, prev.effect_context, &effect_accum)
+	// Constructor: current_func=this, blk_depth(0), expr_depth(0), flags(0) [or flags=0 later].
+	// Do not invent inherit caller's BlkDepth (seed-2 e502: filter max-depth-5 while
+	// upstream still accepted For at lower depth after nested func body gen).
 	bodyEff := EmptyEffect()
 	if prev.EffectAccum != nil {
 		// known-params path: caller already points EffectAccum at callee accum
@@ -560,6 +563,8 @@ func (f *Function) generateBodyCore(
 	cg.CurrentFunc = f
 	cg.EffectAccum = &bodyEff
 	cg.Flags = 0
+	cg.BlkDepth = 0
+	cg.ExprDepth = 0
 	// Function.cpp:635 / 677 — extend_call_chain
 	cg.ExtendCallChain(prev)
 	// residual ERROR sticky — no invent soft-continue body past ExtendCallChain residual

@@ -45,6 +45,39 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 	}
 }
 
+func TestGenerateBodyResetsBlkDepth(t *testing.T) {
+	// Function.cpp:633 — CGContext(this, effect_context, &accum) sets blk_depth(0)
+	// even when caller context is nested (blk_depth>0).
+	ClearError()
+	opts := Defaults()
+	opts.MaxBlockSize = 1
+	opts.MaxBlockDepth = 5
+	vs := NewVariableSelector(opts)
+	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
+	_ = caller.ensurePairedFactMgr()
+	prev := WithFunc(caller, EmptyEffect()).WithFactMgr(caller.PairedFactMgr())
+	prev.BlkDepth = 4 // nested in caller
+	prev.ExprDepth = 7
+	prev.Flags = FlagInLoop
+	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
+	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	_ = callee.ensurePairedFactMgr()
+	// Capture depth at body generation via a thin check: body must be buildable
+	// at MaxBlockDepth without inventing max-depth filter (would fail with depth 4 inherit).
+	callee.GenerateBody(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
+	if HasError() {
+		t.Fatal(GetError())
+	}
+	if callee.BuildState != BuildBuilt || callee.Body == nil {
+		t.Fatal(callee.BuildState, callee.Body)
+	}
+	// Caller depth must be unchanged (body uses fresh 0)
+	if prev.BlkDepth != 4 || prev.ExprDepth != 7 {
+		t.Fatalf("caller depth mutated: blk=%d expr=%d", prev.BlkDepth, prev.ExprDepth)
+	}
+	ClearError()
+}
+
 func TestGenerateBodyBuiltinDummy(t *testing.T) {
 	opts := Defaults()
 	f := &Function{
