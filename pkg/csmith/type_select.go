@@ -419,6 +419,14 @@ func (env *TypeEnv) chooseRandomFiltered(r *Rng, opts Options, probs *Probabilit
 			return true
 		}
 		if noVolatileAgg && t.IsAggregate() && t.IsVolatileStructUnion() {
+			// residual ERROR sticky — no invent soft-skip then pick later past IsVolatileStructUnion hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent keep candidate past IsVolatileStructUnion residual false
+		if HasError() {
 			return true
 		}
 		// arg_structs / arg_unions gates (used for local array element types)

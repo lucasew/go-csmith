@@ -386,6 +386,20 @@ func TestJoinVisits(t *testing.T) {
 	if f2.JoinVisits(MakeFactPointTo(p, TBDPtr)) {
 		t.Fatal("tbd other ignored")
 	}
+	if HasError() {
+		t.Fatal("complete JoinVisits TBD-other ignore must not sticky")
+	}
+	ClearError()
+	// IsTBDOnly residual soft invent was soft-continue join invent change.
+	// Fair: sticky no-change false. PointTo nil hole IsTBDOnly residual.
+	fHole := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
+	if fHole.JoinVisits(MakeFactPointTo(p, a)) {
+		t.Fatal("IsTBDOnly residual JoinVisits must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsTBDOnly residual JoinVisits must SetError sticky")
+	}
+	ClearError()
 	// JoinVisitsInto
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	JoinVisitsInto(&facts, []*FactPointTo{MakeFactPointTo(p, b)})
@@ -393,6 +407,10 @@ func TestJoinVisits(t *testing.T) {
 	if fp == nil || !IsVariableInSet(fp.PointTo, b) {
 		t.Fatal(fp)
 	}
+	if HasError() {
+		t.Fatal("complete JoinVisitsInto must not sticky")
+	}
+	ClearError()
 	// incomplete maps fail closed sticky IncompleteFactSlice (not invent no-change complete)
 	ClearError()
 	factsHole := []*FactPointTo{MakeFactPointTo(p, a), nil}

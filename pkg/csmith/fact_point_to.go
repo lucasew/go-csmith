@@ -870,12 +870,32 @@ func (f *FactPointTo) JoinVisits(other *FactPointTo) bool {
 		return false
 	}
 	if other.IsTBDOnly() {
+		// residual ERROR sticky — no invent ignore-TBD soft-skip past IsTBDOnly hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue join past other IsTBDOnly residual false
+	if HasError() {
 		return false
 	}
 	if f.IsTBDOnly() {
+		// residual ERROR sticky — no invent clear-TBD past IsTBDOnly hole
+		if HasError() {
+			return false
+		}
 		f.PointTo = nil
+	} else if HasError() {
+		// residual ERROR sticky — no invent soft-continue join past self IsTBDOnly residual false
+		return false
 	}
-	return f.Join(other)
+	ok := f.Join(other)
+	// residual ERROR sticky — no invent join-change soft-skip past Join hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // JoinVisitsInto merges newFacts into facts with join_visits semantics.
@@ -896,6 +916,11 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 	changed := false
 	for _, nf := range newFacts {
 		cur := FindRelatedPointTo(*facts, nf.Var)
+		// residual ERROR sticky — no invent soft-continue later merges past FindRelated hole
+		if HasError() {
+			*facts = IncompleteFactSlice()
+			return false
+		}
 		if cur == nil {
 			cl := nf.Clone()
 			if cl == nil {
@@ -915,6 +940,11 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 			return false
 		}
 		if cp.JoinVisits(nf) {
+			// residual ERROR sticky — no invent soft-replace past JoinVisits residual
+			if HasError() {
+				*facts = IncompleteFactSlice()
+				return false
+			}
 			// replace in slice
 			for i, f := range *facts {
 				if f != nil && f.Var == nf.Var {
@@ -923,6 +953,10 @@ func JoinVisitsInto(facts *[]*FactPointTo, newFacts []*FactPointTo) bool {
 				}
 			}
 			changed = true
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue no-change past JoinVisits residual false
+			*facts = IncompleteFactSlice()
+			return false
 		}
 	}
 	return changed

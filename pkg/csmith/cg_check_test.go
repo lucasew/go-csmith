@@ -433,6 +433,7 @@ func TestReadIndicesVarRecordsRead(t *testing.T) {
 }
 
 func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
+	ClearError()
 	parent := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
 		Sizes:    []int{2},
@@ -451,6 +452,21 @@ func TestReadIndicesArrayFieldWalksParent(t *testing.T) {
 	if !cg.ReadIndices(field, nil) {
 		t.Fatal("array field")
 	}
+	if HasError() {
+		t.Fatal("complete array field ReadIndices must not sticky")
+	}
+	ClearError()
+	// IsArrayField residual: IsArray without AsArray parent soft invent was soft-continue
+	// complete true skip indices. Fair: sticky false.
+	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
+	fieldHole := &Variable{Name: "g_b[0].f0", Type: GetIntType(), FieldVarOf: shell}
+	if cg.ReadIndices(fieldHole, nil) {
+		t.Fatal("IsArrayField residual ReadIndices must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsArrayField residual ReadIndices must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitIndicesEffectContext(t *testing.T) {

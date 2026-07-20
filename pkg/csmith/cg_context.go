@@ -733,13 +733,26 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 			if !VisitFactsExpression(e, c, opts) {
 				return false
 			}
+			// residual ERROR sticky — no invent soft-continue later indices past visit residual
+			if HasError() {
+				return false
+			}
 		}
 		if av.FieldVarOf != nil {
-			return c.ReadIndices(av.FieldVarOf, facts)
+			ok := c.ReadIndices(av.FieldVarOf, facts)
+			// residual ERROR sticky — no invent soft-skip parent indices past nested residual
+			if HasError() {
+				return false
+			}
+			return ok
 		}
 		return true
 	}
 	if v.IsArrayField() {
+		// residual ERROR sticky — no invent soft-continue field-walk past IsArrayField hole
+		if HasError() {
+			return false
+		}
 		// CGContext.cpp:368–374 — walk to parent array; assert(v) found
 		p := v
 		for p != nil && !p.IsArray && p.AsArray == nil {
@@ -750,7 +763,16 @@ func (c *CGContext) ReadIndices(v *Variable, facts []*FactPointTo) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return c.ReadIndices(p, facts)
+		ok := c.ReadIndices(p, facts)
+		// residual ERROR sticky — no invent soft-skip parent indices past nested residual
+		if HasError() {
+			return false
+		}
+		return ok
+	}
+	// residual ERROR sticky — no invent complete true past IsArrayField residual false path
+	if HasError() {
+		return false
 	}
 	return true
 }
