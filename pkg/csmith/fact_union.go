@@ -261,6 +261,10 @@ func (f *FactUnion) Output() string {
 	}
 	// var name always live; sticky no invent " last written field: N" without identifier
 	name := f.Var.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty union fact past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""

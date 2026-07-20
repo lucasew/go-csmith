@@ -151,7 +151,15 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 				return IncompleteEffect()
 			}
 			out = out.ReadVar(v)
+			// residual ERROR sticky — no invent soft-continue later reads past ReadVar residual
+			if HasError() {
+				return IncompleteEffect()
+			}
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue merge past IsGlobal residual false
+		if HasError() {
+			return IncompleteEffect()
 		}
 		if varOnCallChain(v, callChain) {
 			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
@@ -159,6 +167,10 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 				return IncompleteEffect()
 			}
 			out = out.ReadVar(v)
+			// residual ERROR sticky — no invent soft-continue later reads past ReadVar residual
+			if HasError() {
+				return IncompleteEffect()
+			}
 		} else if HasError() {
 			// residual ERROR sticky — no invent not-on-chain soft-skip past hole
 			return IncompleteEffect()
@@ -171,8 +183,16 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 				return IncompleteEffect()
 			}
 			out = out.WriteVar(v)
+			// residual ERROR sticky — no invent soft-continue later writes past WriteVar residual
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out.pure = false
 			continue
+		}
+		// residual ERROR sticky — no invent soft-continue merge past IsGlobal residual false
+		if HasError() {
+			return IncompleteEffect()
 		}
 		if varOnCallChain(v, callChain) {
 			// residual ERROR sticky — no invent soft-skip past IsVarOnStack hole
@@ -180,6 +200,10 @@ func (e Effect) AddExternalEffectWithCallers(other Effect, callChain []*Block) E
 				return IncompleteEffect()
 			}
 			out = out.WriteVar(v)
+			// residual ERROR sticky — no invent soft-continue later writes past WriteVar residual
+			if HasError() {
+				return IncompleteEffect()
+			}
 			out.pure = false
 		} else if HasError() {
 			// residual ERROR sticky — no invent not-on-chain soft-skip past hole

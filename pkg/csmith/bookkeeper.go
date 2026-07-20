@@ -339,6 +339,10 @@ func RecordVarsWithBitfields(t *Type) {
 		return
 	}
 	level := t.IndirectLevel()
+	// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
+	if HasError() {
+		return
+	}
 	IncrCounter(&varsWithBitfields, level)
 }
 
@@ -895,13 +899,40 @@ func outputPointerStatistics(b *strings.Builder) {
 				}
 			}
 			if p.Type.IndirectLevel() > 1 {
+				// residual ERROR sticky — no invent soft-count past IndirectLevel residual hole
+				if HasError() {
+					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+					break
+				}
 				ptPtr++
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue stats past IndirectLevel residual false
+				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+				break
 			} else if pt := p.Type.PtrType(); pt != nil {
+				// residual ERROR sticky — no invent soft-count past PtrType residual hole
+				if HasError() {
+					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+					break
+				}
 				if pt.IsSimple() {
 					ptScalar++
 				} else if pt.IsStruct() {
+					// residual ERROR sticky — no invent soft-count past IsStruct residual hole
+					if HasError() {
+						totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+						break
+					}
 					ptStruct++
+				} else if HasError() {
+					// residual ERROR sticky — no invent soft-continue past IsStruct residual false
+					totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+					break
 				}
+			} else if HasError() {
+				// residual ERROR sticky — no invent soft-continue past PtrType residual nil
+				totalAlias, hasNull, ptPtr, ptScalar, ptStruct = 0, 0, 0, 0, 0
+				break
 			}
 		}
 		formattedOutput(b, "number of pointers point to pointers: ", ptPtr)

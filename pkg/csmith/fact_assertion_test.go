@@ -375,3 +375,24 @@ func TestOutputConditionNilFactSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputFactVarGetActualNameResidualSticky(t *testing.T) {
+	// GetActualName residual soft invent was invent "[0]" / condition past empty name shell.
+	ClearError()
+	if s := outputFactVar(&Variable{Type: GetIntType()}); s != "" {
+		t.Fatal("empty name residual must fail closed outputFactVar", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name residual outputFactVar must SetError sticky")
+	}
+	ClearError()
+	// complete path hygiene
+	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	if s := outputFactVar(v); s != "g_p" {
+		t.Fatal("complete outputFactVar", s)
+	}
+	if HasError() {
+		t.Fatal("complete outputFactVar must not sticky")
+	}
+	ClearError()
+}

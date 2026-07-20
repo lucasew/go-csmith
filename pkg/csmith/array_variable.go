@@ -667,10 +667,12 @@ func (av *ArrayVariable) SetIndexExpr(index int, e *Expression) {
 	}
 	// sticky no soft invent "0" for nil/empty Output (C++ uses Expression* directly)
 	s := e.Output()
+	// residual ERROR sticky — no invent soft-continue set-index past Output residual
+	if HasError() {
+		return
+	}
 	if s == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return
 	}
 	// C++ indices[index] — sticky no invent empty pad holes past end
@@ -728,11 +730,13 @@ func (av *ArrayVariable) AddIndexExpr(e *Expression) {
 		return
 	}
 	s := e.Output()
+	// residual ERROR sticky — no invent soft-continue add-index past Output residual
+	if HasError() {
+		return
+	}
 	// incomplete index IR sticky — no invent empty bracket token
 	if s == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return
 	}
 	av.IndexExprs = append(av.IndexExprs, e)

@@ -342,6 +342,15 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				}
 				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}
 				idx = idxExpr.Output()
+				// residual ERROR sticky — no invent soft-continue later dims past index Output residual
+				if HasError() {
+					return nil
+				}
+				// incomplete index Output sticky — no invent empty index string then partial item
+				if idx == "" {
+					SetError(ErrGeneric)
+					return nil
+				}
 			}
 		}
 		indices = append(indices, idx)

@@ -279,3 +279,51 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestItemizeIndexOutputResidualSticky(t *testing.T) {
+	// index Output residual soft invent was soft-continue later dims invent partial item.
+	// SetIndexExpr residual: Type-nil index Output stickies without inventing index slot.
+	ClearError()
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	parent.AsArray = parent
+	item := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
+		Sizes:      []int{4},
+		Collective: parent,
+	}
+	item.AsArray = item
+	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
+	item.SetIndexExpr(0, hole)
+	if !HasError() {
+		t.Fatal("index Output residual SetIndexExpr must SetError sticky")
+	}
+	if len(item.IndexExprs) != 0 {
+		t.Fatal("index Output residual must not invent IndexExprs slot", item.IndexExprs)
+	}
+	ClearError()
+	// AddIndexExpr residual same
+	item.AddIndexExpr(hole)
+	if !HasError() {
+		t.Fatal("index Output residual AddIndexExpr must SetError sticky")
+	}
+	if len(item.IndexExprs) != 0 {
+		t.Fatal("index Output residual must not invent AddIndexExpr slot")
+	}
+	ClearError()
+}
+
+func TestFactUnionOutputGetActualNameResidualSticky(t *testing.T) {
+	// GetActualName residual soft invent was invent " last written field: N" past empty name.
+	ClearError()
+	f := &FactUnion{Var: &Variable{Type: GetIntType()}, LastWrittenFID: 0}
+	if s := f.Output(); s != "" {
+		t.Fatal("empty name residual must fail closed FactUnion.Output", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name residual FactUnion.Output must SetError sticky")
+	}
+	ClearError()
+}

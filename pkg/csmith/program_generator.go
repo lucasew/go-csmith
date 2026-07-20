@@ -936,10 +936,12 @@ func outputArrayInitForced(av *ArrayVariable, indent string, ctrl []string, post
 	}
 	// ArrayVariable::output_with_indices always live access sticky; no invent " = init;" without LHS
 	access := av.OutputWithIndices(ctrl)
+	// residual ERROR sticky — no invent forced loop-init past OutputWithIndices residual
+	if HasError() {
+		return ""
+	}
 	if access == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	b.WriteString(pad + "    " + access + " = " + initVal + ";\n")

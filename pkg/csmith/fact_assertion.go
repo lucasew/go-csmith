@@ -186,6 +186,10 @@ func outputFactVar(v *Variable) string {
 		return ""
 	}
 	s := v.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty fact-var past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	// sticky no invent "[0]" indices without identifier
 	if s == "" {
 		SetError(ErrGeneric)
