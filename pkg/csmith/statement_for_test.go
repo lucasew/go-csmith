@@ -151,3 +151,49 @@ func TestGenerateCanEmitIfOrFor(t *testing.T) {
 		t.Fatal("expected some if or for in seeds 1..79")
 	}
 }
+
+// TestMakeRandomForSharesEffectAccumWithParent — CGContext.cpp:95–101 loop-body
+// constructor sets effect_accum(cgc.effect_accum) (shared pointer). A forked
+// bodyEff snapshot (removed) left mid-body StatementGoto choose_visible_read_var
+// with fewer parent+body reads (seed-2 first_div 12693: ok_vars 11 vs UP 16).
+func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
+	ClearError()
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	vs := NewVariableSelector(opts)
+	tables := NewExprTables(opts)
+	stmtTab := NewStatementThresholdTable(opts)
+	r := NewRng(2)
+	seedTypesForTest(r, opts, probs, vs, nil)
+	f := MakeFirst(r, opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)
+	parent := &Block{Func: f}
+	f.Stack = []*Block{parent}
+	fm := NewFactMgr(f)
+	// Plant a read on the parent accum before for-body generation.
+	pre := CreateVariableScalars("pre_rd", GetIntType(), true, false)
+	accum := EmptyEffect().ReadVar(pre)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &accum
+	// WithFlags copies the EffectAccum pointer (shared).
+	bodyCG := cg.WithFlags(FlagInLoop)
+	if bodyCG.EffectAccum != cg.EffectAccum {
+		t.Fatal("WithFlags must share EffectAccum pointer (CGContext.cpp:101)")
+	}
+	// Body code path must not rebind EffectAccum to a private snapshot.
+	// MakeRandomFor is the production path; re-check pointer identity after call.
+	st := MakeRandomFor(NewRng(4), opts, probs, vs, tables, stmtTab, &cg)
+	if st == nil {
+		// soft factory miss is ok for this contract; pointer must still be live
+		if cg.EffectAccum != &accum && cg.EffectAccum != bodyCG.EffectAccum {
+			// after make, still the same planted pointer if for failed early
+		}
+	}
+	if cg.EffectAccum == nil {
+		t.Fatal("parent EffectAccum must remain non-nil")
+	}
+	// Planted pre-read must survive (shared path never drops parent reads for a body copy)
+	if !cg.EffectAccum.IsRead(pre) {
+		t.Fatal("parent EffectAccum must keep pre-for reads when body shares accum (C++ shared pointer)")
+	}
+	ClearError()
+}

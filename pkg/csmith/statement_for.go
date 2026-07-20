@@ -561,17 +561,15 @@ func MakeRandomFor(
 	if lc.IV != nil {
 		bodyCG.AddIVBound(lc.IV, lc.Bound)
 	}
-	// body starts from post-init effect; copy so loop body doesn't permanently merge poorly
+	// CGContext.cpp:95–101 — loop-body context shares effect_accum pointer with parent.
+	// Do not fork a bodyEff snapshot: an invented copy left parent/mid-body
+	// choose_visible_read_var with fewer read_vars (seed-2 e12693: ok_vars n=11 vs UP n=16).
 	// Incomplete parent accum fails closed (no invent body under incomplete shell)
-	bodyEff := EmptyEffect()
-	if cg.EffectAccum != nil {
-		if !EffectComplete(*cg.EffectAccum) {
-			SetError(ErrGeneric)
-			return nil
-		}
-		bodyEff = *cg.EffectAccum
+	if cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum) {
+		SetError(ErrGeneric)
+		return nil
 	}
-	bodyCG.EffectAccum = &bodyEff
+	// bodyCG.EffectAccum already aliases cg.EffectAccum via CloneSubcontext pointer copy
 	body := MakeRandomBlock(r, opts, probs, vs, tables, stmtTab, &bodyCG, true)
 	// StatementFor.cpp:304 ERROR_GUARD_AND_DEL3 after body
 	if HasError() || body == nil {
@@ -593,16 +591,7 @@ func MakeRandomFor(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// merge body effect into parent accum
-	// Incomplete parent/body fails closed (no invent pure MergeEffects past holes)
-	if cg.EffectAccum != nil {
-		merged := MergeEffects(*cg.EffectAccum, bodyEff)
-		if !EffectComplete(merged) {
-			SetError(ErrGeneric)
-			return nil
-		}
-		*cg.EffectAccum = merged
-	}
+	// no MergeEffects: body writes already hit the shared parent EffectAccum
 	return st
 }
 
