@@ -2621,7 +2621,15 @@ func (vs *VariableSelector) SelectArray(r *Rng, cg CGContext) *ArrayVariable {
 			return false
 		}
 		if av.Type.IsConstStructUnion() {
+			// residual ERROR sticky — no invent soft-skip then pick later past IsConstStructUnion hole
+			if HasError() {
+				return false
+			}
 			return true
+		}
+		// residual ERROR sticky — no invent keep array past IsConstStructUnion residual false
+		if HasError() {
+			return false
 		}
 		if vs.Opts.StrictVolatileRule && av.IsVolatile() {
 			// residual ERROR sticky — no invent soft-skip past strict-vol hole

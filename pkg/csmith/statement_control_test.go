@@ -87,6 +87,8 @@ func TestGenerateFunctionsHaveReturnWhenNeeded(t *testing.T) {
 
 func TestHashNoEmptyArrayLoops(t *testing.T) {
 	// pointer array should produce empty hash (skipped)
+	// IsArray without AsArray is incomplete IR sticky empty (suite hygiene ClearError)
+	ClearError()
 	v := &Variable{
 		Name: "g_p", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{4},
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
@@ -94,9 +96,15 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 	if v.HashOutput() != "" {
 		t.Fatal("pointer array must not hash")
 	}
+	// sticky residual from IsArray without AsArray — clear so later hash tests stay complete
+	if !HasError() {
+		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestHashGlobalVarsSharedIndices(t *testing.T) {
+	ClearError()
 	CtrlVarsDoFinalization()
 	opts := Defaults()
 	vs := NewVariableSelector(opts)

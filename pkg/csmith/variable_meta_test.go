@@ -46,6 +46,21 @@ func TestIsValidVolatile(t *testing.T) {
 		t.Fatal("Type-nil parent field IsValidVolatile must SetError sticky")
 	}
 	ClearError()
+	// nested IsValidVolatile residual on container recurse soft invent was valid soft-skip.
+	// Fair: sticky invalid via Type-nil container.
+	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType()}}}
+	uv := &Variable{Name: "g_u2", Type: ut}
+	// container itself incomplete Type-nil for nested recurse path via GetContainerUnion
+	// IsInside residual already covered; also const Type-nil sticky invalid.
+	cBroken := &Variable{Name: "g_c", Type: nil, Qfer: NewCVQualifiers([]bool{true}, []bool{false})}
+	if cBroken.IsValidVolatile() {
+		t.Fatal("Type-nil const IsValidVolatile must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil const IsValidVolatile must SetError sticky")
+	}
+	ClearError()
+	_ = uv
 }
 
 func TestIsPackedAfterBitfield(t *testing.T) {

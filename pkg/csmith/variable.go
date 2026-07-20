@@ -62,6 +62,7 @@ func (v *Variable) GetActualName(prefixName bool) string {
 		SetError(ErrGeneric)
 		return ""
 	}
+	// IsGlobal residual only on nil (already gated); complete path never stickies
 	if v.IsGlobal() {
 		return GetPrefixedName(v.Name, prefixName)
 	}
@@ -776,8 +777,16 @@ func (v *Variable) IsValidVolatile() bool {
 		return false
 	}
 	if v.IsInsideUnionField() {
+		// residual ERROR sticky — no invent valid soft-skip past IsInsideUnionField hole
+		if HasError() {
+			return false
+		}
 		uv := v.GetContainerUnion()
 		if uv == nil {
+			// residual ERROR sticky — no invent soft-continue past GetContainerUnion residual
+			if HasError() {
+				return false
+			}
 			// Type-nil ancestry / incomplete container sticky invalid
 			// (use ancestryTypeHole — not residual global HasError alone)
 			if ancestryTypeHole(v) {
@@ -790,9 +799,23 @@ func (v *Variable) IsValidVolatile() bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return uv.IsValidVolatile()
+		// residual ERROR sticky — no invent container true past GetContainerUnion hole
+		if HasError() {
+			return false
+		}
+		ok := uv.IsValidVolatile()
+		// residual ERROR sticky — no invent valid soft-skip past nested IsValidVolatile hole
+		if HasError() {
+			return false
+		}
+		return ok
+	}
+	// residual ERROR sticky — no invent soft-continue non-union past IsInside residual false
+	if HasError() {
+		return false
 	}
 	// Variable.cpp:1068 — assert(init); non-const / non-zero / non-pointer → valid
+	// IsConst residual only on nil (already gated); complete path never stickies
 	if !v.IsConst() {
 		return true
 	}
@@ -1273,6 +1296,7 @@ func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
 		SetError(ErrGeneric)
 		return false
 	}
+	// IsVolatile / IsFieldVar residual only on nil (already gated); complete path never stickies
 	if v.IsVolatile() || other.IsVolatile() {
 		return false
 	}
@@ -1475,7 +1499,12 @@ func (v *Variable) Match(other *Variable) bool {
 		return false
 	}
 	if v.Type.IsAggregate() {
-		return v.HasFieldVar(other)
+		ok := v.HasFieldVar(other)
+		// residual ERROR sticky — no invent match/not-match soft-skip past HasFieldVar hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	return false
 }

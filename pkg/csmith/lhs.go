@@ -259,6 +259,7 @@ func (l *Lhs) Output(wrapVolatiles bool) string {
 	}
 	// ExpressionVariable::Output for (var, type)
 	ev := outputExpressionVariable(l.Var, l.Type)
+	// IsVolatile residual only on nil (Var already gated); complete path never stickies
 	if wrapVolatiles && l.Var.IsVolatile() {
 		// Lhs.cpp:211–216 — type->Output always live; sticky no invent "int"
 		t := l.GetType()
@@ -595,6 +596,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			incomplete = true
 			return
 		}
+		// IsConst / IsVolatile residual only on nil (v already gated); complete path never stickies
 		if v.IsConst() {
 			return
 		}

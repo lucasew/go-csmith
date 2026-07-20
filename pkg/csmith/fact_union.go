@@ -192,11 +192,27 @@ func (f *FactUnion) Join(other *FactUnion) bool {
 		return false
 	}
 	if f.Imply(other) {
+		// residual ERROR sticky — no invent join no-op true past Imply hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent soft-continue join past Imply residual false path
+	if HasError() {
 		return false
 	}
 	if other.Imply(f) {
+		// residual ERROR sticky — no invent absorb past other.Imply hole
+		if HasError() {
+			return false
+		}
 		f.LastWrittenFID = other.LastWrittenFID
 	} else {
+		// residual ERROR sticky — no invent soft-set BOTTOM past other.Imply residual false
+		if HasError() {
+			return false
+		}
 		f.SetBottom()
 	}
 	return true

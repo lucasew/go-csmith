@@ -190,6 +190,7 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 		SetError(ErrGeneric)
 		return ScopeInactive
 	}
+	// IsGlobal residual only on nil (already gated); complete path never stickies
 	if v.IsGlobal() {
 		return ScopeGlobalVar
 	}
@@ -1303,7 +1304,23 @@ func (c CGContext) AcceptType(t *Type) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return c.EffectContext().IsSideEffectFree() || !t.IsVolatileStructUnion()
+	if c.EffectContext().IsSideEffectFree() {
+		// residual ERROR sticky — no invent accept past IsSideEffectFree hole
+		if HasError() {
+			return false
+		}
+		return true
+	}
+	// residual ERROR sticky — no invent soft-continue vol check past IsSideEffectFree residual
+	if HasError() {
+		return false
+	}
+	vol := t.IsVolatileStructUnion()
+	// residual ERROR sticky — no invent accept true past IsVolatileStructUnion residual
+	if HasError() {
+		return false
+	}
+	return !vol
 }
 
 // InConflict mirrors CGContext::in_conflict — callee effect vs current context.

@@ -440,7 +440,12 @@ func (e Effect) IsWritten(v *Variable) bool {
 			SetError(ErrGeneric)
 			return true
 		}
-		return e.IsWritten(v.FieldVarOf)
+		ok := e.IsWritten(v.FieldVarOf)
+		// residual ERROR sticky — no invent not-written soft-skip past nested IsWritten hole
+		if HasError() {
+			return true
+		}
+		return ok
 	}
 	return false
 }
@@ -523,7 +528,12 @@ func (e Effect) IsRead(v *Variable) bool {
 			return true
 		}
 		if v.FieldVarOf.Type.IsStruct() {
-			return e.IsRead(v.FieldVarOf)
+			ok := e.IsRead(v.FieldVarOf)
+			// residual ERROR sticky — no invent not-read soft-skip past nested IsRead hole
+			if HasError() {
+				return true
+			}
+			return ok
 		}
 	}
 	return false

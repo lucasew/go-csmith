@@ -20,18 +20,37 @@ func TestStructDepthNested(t *testing.T) {
 		t.Fatal("int")
 	}
 	// nil field Type: fail closed deep (no invent depth 0 past hole)
+	ClearError()
 	hole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
 		{Type: nil, BitWidth: -1},
 	}}
 	if hole.StructDepth() != incompleteStructDepth {
 		t.Fatalf("incomplete depth %d want %d", hole.StructDepth(), incompleteStructDepth)
 	}
+	if !HasError() {
+		t.Fatal("nil field Type StructDepth must SetError sticky")
+	}
+	ClearError()
+	// nested residual: Type-nil deeper field soft invent was soft-continue later siblings.
+	// Fair: sticky incompleteStructDepth.
+	nestedHole := &Type{isStruct: true, StructName: "Snest", Fields: []StructField{
+		{Type: hole, BitWidth: -1},
+		{Type: GetIntType(), BitWidth: -1},
+	}}
+	if nestedHole.StructDepth() != incompleteStructDepth {
+		t.Fatalf("nested residual depth %d want %d", nestedHole.StructDepth(), incompleteStructDepth)
+	}
+	if !HasError() {
+		t.Fatal("nested residual StructDepth must SetError sticky")
+	}
+	ClearError()
 	// nested filter treats incomplete as too deep
 	opts := Defaults()
 	opts.MaxNestedStructLevel = 3
 	if hole.StructDepth() < opts.MaxNestedStructLevel {
 		t.Fatal("incomplete must fail closed over max nested")
 	}
+	ClearError()
 }
 
 func TestChooseRandomFiltersReturnUnions(t *testing.T) {

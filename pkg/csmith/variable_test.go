@@ -246,6 +246,18 @@ func TestVariableCompatibleMatchIncompleteSticky(t *testing.T) {
 		t.Fatal("Match Type-nil other must SetError sticky")
 	}
 	ClearError()
+	// HasFieldVar residual soft invent was Match true/false past FieldVars hole.
+	// Fair: sticky not-match.
+	agg := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
+	parent := &Variable{Name: "g_s", Type: agg, FieldVars: []*Variable{nil}}
+	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
+	if parent.Match(field) {
+		t.Fatal("HasFieldVar residual Match must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("HasFieldVar residual Match must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCreateFieldVarsNilSticky(t *testing.T) {

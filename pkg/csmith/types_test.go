@@ -74,4 +74,25 @@ func TestStructDepthIncompleteSticky(t *testing.T) {
 		t.Fatal("nil field Type HasLongLongField must SetError sticky")
 	}
 	ClearError()
+	// nested IsConstStructUnion residual soft invent was soft-continue later Qfer non-const.
+	// Fair: sticky const true.
+	innerHole := &Type{isStruct: true, Fields: []StructField{{Name: "x", Type: nil}}}
+	outer := &Type{isStruct: true, Fields: []StructField{
+		{Name: "nest", Type: innerHole, BitWidth: -1},
+		{Name: "ok", Type: GetIntType(), BitWidth: -1},
+	}}
+	if !outer.IsConstStructUnion() {
+		t.Fatal("nested residual IsConstStructUnion must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested residual IsConstStructUnion must SetError sticky")
+	}
+	ClearError()
+	if !outer.IsVolatileStructUnion() {
+		t.Fatal("nested residual IsVolatileStructUnion must fail closed true")
+	}
+	if !HasError() {
+		t.Fatal("nested residual IsVolatileStructUnion must SetError sticky")
+	}
+	ClearError()
 }

@@ -27,6 +27,14 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 		t.Fatal("empty Name GetActualName must SetError sticky")
 	}
 	ClearError()
+	// nil Variable sticky empty (no invent bare name without shell)
+	if s := (*Variable)(nil).GetActualName(false); s != "" {
+		t.Fatal("nil GetActualName invent", s)
+	}
+	if !HasError() {
+		t.Fatal("nil GetActualName must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestOutputDefVolatileComment(t *testing.T) {

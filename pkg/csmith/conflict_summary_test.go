@@ -48,6 +48,18 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 		t.Fatal("incomplete ambient AcceptType must SetError sticky")
 	}
 	ClearError()
+	// IsVolatileStructUnion residual: Type-nil field soft invent was accept true.
+	// Fair: sticky reject under non-SE-free context.
+	hole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{
+		{Name: "f0", Type: nil, BitWidth: -1},
+	}}
+	if cg2.AcceptType(hole) {
+		t.Fatal("IsVolatileStructUnion residual AcceptType must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("IsVolatileStructUnion residual AcceptType must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestInConflictReadWrite(t *testing.T) {

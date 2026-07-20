@@ -127,6 +127,14 @@ func (t *Type) IsConstStructUnion() bool {
 			return true
 		}
 		if f.Type.IsConstStructUnion() {
+			// residual ERROR sticky — no invent const-true past nested IsConstStructUnion hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+		if HasError() {
 			return true
 		}
 		if f.Qfer.IsConst() {
@@ -151,6 +159,14 @@ func (t *Type) IsVolatileStructUnion() bool {
 			return true
 		}
 		if f.Type.IsVolatileStructUnion() {
+			// residual ERROR sticky — no invent vol-true past nested IsVolatileStructUnion hole
+			if HasError() {
+				return true
+			}
+			return true
+		}
+		// residual ERROR sticky — no invent soft-continue later fields past nested residual false
+		if HasError() {
 			return true
 		}
 		if f.Qfer.IsVolatile() {
@@ -181,7 +197,12 @@ func (t *Type) StructDepth() int {
 			SetError(ErrGeneric)
 			return incompleteStructDepth
 		}
-		if d := f.Type.StructDepth(); d > maxField {
+		d := f.Type.StructDepth()
+		// residual ERROR sticky — no invent soft-continue later fields past nested StructDepth hole
+		if HasError() {
+			return incompleteStructDepth
+		}
+		if d > maxField {
 			maxField = d
 		}
 	}
