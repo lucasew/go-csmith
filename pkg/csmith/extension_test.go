@@ -65,15 +65,23 @@ func TestExtensionMgrNullPath(t *testing.T) {
 	if !strings.Contains(init, "argc") || !strings.Contains(init, "{") {
 		t.Fatal(init)
 	}
-	// klee sticky
+	// klee with live RNG creates extension
+	ClearError()
 	o := Defaults()
 	o.Klee = true
+	o.Func1MaxParams = 2
+	SetProcessOptions(o)
+	SetProcessRng(NewRng(1))
+	SetProcessProbabilities(NewProbabilities(o))
 	CreateExtension(o)
-	if !HasError() {
-		t.Fatal("klee sticky")
+	if HasError() || !ExtensionActive() || ExtensionKind() != "klee" {
+		t.Fatal("klee create", HasError(), ExtensionKind())
 	}
-	ClearError()
+	if !strings.Contains(ExtensionMgrOutputHeader(), "klee/klee.h") {
+		t.Fatal(ExtensionMgrOutputHeader())
+	}
 	DestroyExtension()
+	ReinstallTestProcessSingletons()
 }
 
 func TestInitPartialExpanderEmptyFail(t *testing.T) {

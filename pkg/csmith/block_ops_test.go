@@ -209,7 +209,7 @@ func TestNeedNestedLoopMustJumpResidualSticky(t *testing.T) {
 	ClearError()
 	defer ClearError()
 	b := &Block{Looping: true, Stmts: []Stmt{{Kind: StmtBreak}}} // nil Expr
-	cg := CGContext{} // RW nil would soft invent false after residual
+	cg := CGContext{}                                            // RW nil would soft invent false after residual
 	if !b.NeedNestedLoop(cg, NewRng(1)) {
 		t.Fatal("MustJump residual must fail closed true need-nested, not invent none")
 	}
@@ -224,9 +224,9 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 	b := &Block{
 		StmID: 50,
 		Stmts: []Stmt{{
-			Kind: StmtReturn,
+			Kind:  StmtReturn,
 			StmID: 51,
-			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)},
+			Expr:  &Expression{Term: TermConstant, Con: MakeInt(0)},
 		}},
 	}
 	// no back edges → true
@@ -274,7 +274,7 @@ func TestEffectCloneIndependent(t *testing.T) {
 	e2 := EmptyEffect().WriteVar(v)
 	c2 := e2.Clone()
 	_ = e2.WriteVar(CreateVariableScalars("g_3", GetIntType(), false, false))
-	// e2.WriteVar returns new Effect; original e2 maps may be shared with... 
+	// e2.WriteVar returns new Effect; original e2 maps may be shared with...
 	// Clone deep-copies so c2.written is independent
 	if len(c2.written) != 1 {
 		t.Fatal(len(c2.written))
@@ -845,7 +845,7 @@ func TestFindJumpSourcesFiltersNonGoto(t *testing.T) {
 	// break edge into for (DestStmID=50) and goto edge into assign
 	fm.CFGEdges = []*CFGEdge{
 		{SrcID: 40, DestStmID: 50, PostDest: true}, // break
-		{SrcID: 30, DestStmID: 10},                  // goto
+		{SrcID: 30, DestStmID: 10},                 // goto
 	}
 	// assign 10: only real goto 30
 	srcs := fm.FindJumpSources(10)

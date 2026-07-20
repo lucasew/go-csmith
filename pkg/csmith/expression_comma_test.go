@@ -195,7 +195,7 @@ func TestCommaOutputLHSResidualSticky(t *testing.T) {
 	// CommaLHS Output residual soft invent was soft-continue invent partial comma with RHS.
 	ClearError()
 	e := &Expression{
-		Term: TermCommaExpr,
+		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
 		CommaRHS: &Expression{Term: TermConstant, Con: MakeInt(2)},
 	}

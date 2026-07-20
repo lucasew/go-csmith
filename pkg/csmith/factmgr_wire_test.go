@@ -786,7 +786,7 @@ func TestAddNewVarFactAndUpdateIsGlobalResidualSticky(t *testing.T) {
 		t.Fatal("ambient residual AddNewVarFactAndUpdate must keep sticky")
 	}
 	ClearError()
-	// residual FieldVarOf: Variable with FieldVarOf that is nil receiver? 
+	// residual FieldVarOf: Variable with FieldVarOf that is nil receiver?
 	// Use (*Variable)(nil) as subject — already sticky at entry.
 	fm.AddNewVarFactAndUpdate(nil, nil)
 	if !HasError() {

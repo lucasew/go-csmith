@@ -350,8 +350,8 @@ func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
 		EmitStepHash: true,
 		Stmts: []Stmt{
 			{Kind: StmtAssign, StmID: 3, SourceLabel: "lbl_x",
-				LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),
-				Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)},
+				LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
+				Expr:     &Expression{Term: TermConstant, Con: MakeInt(1)},
 				AssignOp: AssignSimple},
 		},
 	}

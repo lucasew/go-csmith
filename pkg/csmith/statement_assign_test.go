@@ -195,8 +195,6 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	}
 }
 
-
-
 func TestMakePossibleCompoundAssignBrokenIRSticky(t *testing.T) {
 	// incomplete Lhs mid-compound — sticky no invent empty Binary shell
 	ClearError()

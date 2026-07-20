@@ -846,10 +846,10 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 	parent := cg.CurrentBlock()
 	// Block.cpp:99 — Block(get_current_block(), 0)
 	b := &Block{
-		Parent:      parent,
-		Func:        f,
-		blockSize:   0,
-		StmID:       AllocStmID(),
+		Parent:    parent,
+		Func:      f,
+		blockSize: 0,
+		StmID:     AllocStmID(),
 		// Block.cpp:101 — in_array_loop from iv_bounds
 		InArrayLoop: len(cg.IVBounds) > 0,
 		EmitFM:      cg.FM,

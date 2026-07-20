@@ -668,7 +668,7 @@ func TestChooseFuncContextMatchResidualTruePathSticky(t *testing.T) {
 	opts := Defaults()
 	f := &Function{
 		Name: "func_1", ReturnType: GetIntType(),
-		RV: &Variable{Name: "func_1_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		RV:      &Variable{Name: "func_1_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		FEffect: IncompleteEffect(),
 		IsBuilt: true, BuildState: BuildBuilt,
 	}

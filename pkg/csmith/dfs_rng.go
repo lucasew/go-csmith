@@ -439,4 +439,3 @@ func (r *Rng) dfsSequenceString() string {
 	}
 	return r.dfs.seq.GetSequence()
 }
-

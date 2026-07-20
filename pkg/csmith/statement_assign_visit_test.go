@@ -224,7 +224,7 @@ func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 10,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 	cg := WithEffectContext(IncompleteEffect())
@@ -251,7 +251,7 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 11,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 	// plant incomplete EffectStm so RHS path leaves residual before WriteVarSet fold

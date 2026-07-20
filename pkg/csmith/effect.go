@@ -732,7 +732,6 @@ func (e Effect) FieldIsWritten(v *Variable) bool {
 	return false
 }
 
-
 // ancestryTypeHole reports Type-nil on FieldVarOf chain (excluding specials).
 // Used by SiblingUnionField* so residual global HasError cannot invent sibling-use.
 func ancestryTypeHole(v *Variable) bool {

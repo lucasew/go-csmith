@@ -215,7 +215,6 @@ func TestCreateAndInitializeArrayFlip(t *testing.T) {
 	}
 }
 
-
 func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 	// ArrayVariable.cpp:539–552 — itemized emits name[expr]
 	parent := &ArrayVariable{
@@ -928,14 +927,14 @@ func TestIsVariantKeyVars(t *testing.T) {
 	// a[i] and a[i+1] share key i
 	a1 := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
-		Sizes: []int{8}, Collective: parent,
+		Sizes:    []int{8}, Collective: parent,
 		IndexExprs: []*Expression{ev},
 	}
 	a1.AsArray = a1
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, off}}
 	a2 := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
-		Sizes: []int{8}, Collective: parent,
+		Sizes:    []int{8}, Collective: parent,
 		IndexExprs: []*Expression{{Term: TermFunction, Invoke: fi, ExprType: GetIntType()}},
 	}
 	a2.AsArray = a2
@@ -946,7 +945,7 @@ func TestIsVariantKeyVars(t *testing.T) {
 	jv := CreateVariableScalars("j", GetIntType(), false, false)
 	a3 := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
-		Sizes: []int{8}, Collective: parent,
+		Sizes:    []int{8}, Collective: parent,
 		IndexExprs: []*Expression{{Term: TermVariable, Var: jv, ExprType: GetIntType()}},
 	}
 	a3.AsArray = a3

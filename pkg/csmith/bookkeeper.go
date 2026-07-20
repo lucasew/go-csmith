@@ -34,18 +34,18 @@ var (
 	pointerAvailForDeref    int
 	volatileAvail           int
 
-	structsWithBitfields            int
-	varsWithBitfields               []int
-	varsWithFullBitfields           []int
+	structsWithBitfields             int
+	varsWithBitfields                []int
+	varsWithFullBitfields            []int
 	varsWithBitfieldsAddressTakenCnt int
-	bitfieldsInTotal                int
-	unamedBitfieldsInTotal          int
-	constBitfieldsInTotal           int
-	volatileBitfieldsInTotal        int
-	lhsBitfieldsStructsVarsCnt      int
-	rhsBitfieldsStructsVarsCnt      int
-	lhsBitfieldCnt                  int
-	rhsBitfieldCnt                  int
+	bitfieldsInTotal                 int
+	unamedBitfieldsInTotal           int
+	constBitfieldsInTotal            int
+	volatileBitfieldsInTotal         int
+	lhsBitfieldsStructsVarsCnt       int
+	rhsBitfieldsStructsVarsCnt       int
+	lhsBitfieldCnt                   int
+	rhsBitfieldCnt                   int
 
 	forwardJumpCnt  int
 	backwardJumpCnt int

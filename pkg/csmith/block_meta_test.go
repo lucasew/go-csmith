@@ -139,7 +139,7 @@ func TestLabelAttrEmit(t *testing.T) {
 		LabelAttrRng:   NewRng(1),
 		Stmts: []Stmt{{
 			Kind: StmtAssign, SourceLabel: "lbl_1",
-			LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),
+			LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		}},
@@ -265,8 +265,8 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 	ClearError()
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
-		LhsVar: CreateVariableScalars("g_1", GetIntType(), false, false),
-		Expr:   &Expression{Term: TermConstant, Con: MakeInt(0)},
+		LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		AssignOp: AssignSimple,
 	}}}
 	out := b.Output(0)

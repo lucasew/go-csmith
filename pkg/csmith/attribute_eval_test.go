@@ -292,7 +292,6 @@ func TestNewFuncAttrGeneratorHasSection(t *testing.T) {
 	}
 }
 
-
 func TestTypeAttrOnStructDecl(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
@@ -363,7 +362,7 @@ func TestGetEvalToSubexpsIncompleteFailClosed(t *testing.T) {
 	ClearError()
 	// Type-nil LhsVar assign sticky
 	if ExpressionsComplete(GetEvalToSubexps(&Expression{
-		Term: TermAssignment,
+		Term:   TermAssignment,
 		Assign: &Stmt{Kind: StmtAssign, LhsVar: &Variable{Name: "g_hole", Type: nil}},
 	})) {
 		t.Fatal("Type-nil LhsVar must IncompleteExpressions")

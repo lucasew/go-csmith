@@ -470,4 +470,3 @@ func TestMakeRandomBinaryInvocationIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
-

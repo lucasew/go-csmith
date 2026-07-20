@@ -173,15 +173,15 @@ func TestSetDefaultSettingsParity(t *testing.T) {
 		"blind_check_global": o.BlindCheckGlobal, "no_return_dead_ptr": o.NoReturnDeadPointer,
 		"hash_value_printf": o.HashValuePrintf, "signed_char_index": o.SignedCharIndex,
 		"identify_wrappers": o.IdentifyWrappers, "mark_mutable_const": o.MarkMutableConst,
-		"force_globals_static": o.ForceGlobalsStatic,
+		"force_globals_static":         o.ForceGlobalsStatic,
 		"force_non_uniform_array_init": o.ForceNonUniformArrayInit,
-		"pre_incr_operator": o.PreIncrOperator, "pre_decr_operator": o.PreDecrOperator,
+		"pre_incr_operator":            o.PreIncrOperator, "pre_decr_operator": o.PreDecrOperator,
 		"post_incr_operator": o.PostIncrOperator, "post_decr_operator": o.PostDecrOperator,
 		"unary_plus_operator": o.UnaryPlusOperator, "use_embedded_assigns": o.EmbeddedAssigns,
 		"use_comma_exprs": o.CommaOperators, "take_union_field_addr": o.TakeUnionFieldAddr,
-		"vol_struct_union_fields": o.VolStructUnionFields,
+		"vol_struct_union_fields":   o.VolStructUnionFields,
 		"const_struct_union_fields": o.ConstStructUnionFields,
-		"addr_taken_of_locals": o.AddrTakenOfLocals, "lang_cpp": o.LangCPP, "cpp11": o.CPP11,
+		"addr_taken_of_locals":      o.AddrTakenOfLocals, "lang_cpp": o.LangCPP, "cpp11": o.CPP11,
 		"fast_execution": o.FastExecution, "Int128": o.Int128, "UInt128": o.UInt128,
 		"binary_constant": o.BinaryConstant,
 	}
@@ -210,10 +210,10 @@ func TestSetDefaultSettingsParity(t *testing.T) {
 		"max_exhaustive_depth": o.MaxExhaustiveDepth, "max_indirect_level": o.MaxPointerDepth,
 		"func1_max_params": o.Func1MaxParams, "coverage_test_size": o.CoverageTestSize,
 		"max_array_num_in_loop": o.MaxArrayNumInLoop, "inline_function_prob": o.InlineFunctionProb,
-		"builtin_function_prob": o.BuiltinFunctionProb,
+		"builtin_function_prob":         o.BuiltinFunctionProb,
 		"null_pointer_dereference_prob": o.NullPointerDerefProb,
 		"dead_pointer_dereference_prob": o.DeadPointerDerefProb,
-		"array_oob_prob": o.ArrayOOBProb, "stop_by_stmt": o.StopByStmt,
+		"array_oob_prob":                o.ArrayOOBProb, "stop_by_stmt": o.StopByStmt,
 	}
 	for k, want := range ints {
 		if gotI[k] != want {

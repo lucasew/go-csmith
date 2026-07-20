@@ -32,7 +32,10 @@ func TestMakeRandomExpressionConstant(t *testing.T) {
 	opts := Defaults()
 	tables := NewExprTables(opts)
 	r := NewRng(2)
-	e := func() *Expression { c := EmptyCGContext(); return MakeRandomExpression(r, opts, tables, nil, &c, GetSimpleType(EInt), nil, false, false, TermConstant, 0) }()
+	e := func() *Expression {
+		c := EmptyCGContext()
+		return MakeRandomExpression(r, opts, tables, nil, &c, GetSimpleType(EInt), nil, false, false, TermConstant, 0)
+	}()
 	if e == nil || e.Term != TermConstant || e.Con == nil || e.Output() == "" {
 		t.Fatalf("%+v out=%q", e, e.Output())
 	}
@@ -44,7 +47,10 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	r := NewRng(2)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	e := func() *Expression { c := EmptyCGContext(); return MakeRandomExpression(r, opts, tables, vs, &c, GetSimpleType(EInt), &q, false, false, TermVariable, 0) }()
+	e := func() *Expression {
+		c := EmptyCGContext()
+		return MakeRandomExpression(r, opts, tables, vs, &c, GetSimpleType(EInt), &q, false, false, TermVariable, 0)
+	}()
 	if e == nil || e.Term != TermVariable || e.Var == nil {
 		t.Fatalf("%+v", e)
 	}

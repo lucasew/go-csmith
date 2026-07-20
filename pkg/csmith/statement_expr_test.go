@@ -129,7 +129,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	// seed a built function to call
 	callee := &Function{
 		Name: "func_x", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
-		RV: CreateVariableQfer("func_x_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQfer("func_x_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
 		Body: &Block{},
 	}
 	list.Funcs = []*Function{callee}

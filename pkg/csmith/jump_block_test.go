@@ -79,7 +79,7 @@ func TestFindGoodJumpBlockResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed whole FindGoodJumpBlock (asDest).
 	// last if incomplete residual MustReturn false; without sticky re-pick continues to good.
 	curr := &Block{
-		Func: f,
+		Func:  f,
 		Stmts: []Stmt{{Kind: StmtIfElse, Then: nil, Else: &Block{}}},
 	}
 	good2 := &Block{Func: f, Stmts: []Stmt{{Kind: StmtAssign, StmID: 4}}}
@@ -98,8 +98,8 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 	// When src is not an ancestor of dest, path uses !IsVisibleLocal(src) for each intermediate.
 	ClearError()
 	src := &Block{}
-	src.LocalVars = []*Variable{nil} // incomplete: IsVisibleLocal hits nil hole
-	mid := &Block{}                  // no Parent chain to src → !reachedSrc
+	src.LocalVars = []*Variable{nil}                  // incomplete: IsVisibleLocal hits nil hole
+	mid := &Block{}                                   // no Parent chain to src → !reachedSrc
 	loc := &Variable{Name: "l_x", Type: GetIntType()} // non-global local
 	mid.LocalVars = []*Variable{loc}
 	got := CollectInitSkippedVars(src, mid)

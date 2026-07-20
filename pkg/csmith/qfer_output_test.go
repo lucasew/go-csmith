@@ -254,7 +254,7 @@ func TestOutputFunctionsNoInventEmptySections(t *testing.T) {
 	ClearError()
 	good := &Function{
 		Name: "func_1", AliasName: "func_1_alias", ReturnType: GetIntType(),
-		RV: CreateVariableQfer("func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
+		RV:   CreateVariableQfer("func_1_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false})),
 		Body: &Block{}, IsBuilt: true, BuildState: BuildBuilt,
 	}
 	g.Funcs.Funcs = []*Function{good, nil}

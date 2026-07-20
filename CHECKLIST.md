@@ -387,26 +387,26 @@ Total items: 2070
 - [x] Constant.cpp::GenerateRandomUnionConstant
 - [x] Constant.cpp::GenerateSmallRandomFloatHexConstant
 - [x] Constant.cpp::HexToBinary
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.CoverageTestExtension
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.GenerateValues
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.get_values
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.output_array_init
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.output_decls
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.OutputFirstFunInvocation
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.OutputHeader
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.OutputInit
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.OutputTail
-- [ ] CoverageTestExtension.cpp::CoverageTestExtension.~CoverageTestExtension
-- [ ] CrestExtension.cpp::CrestExtension.CrestExtension
-- [ ] CrestExtension.cpp::CrestExtension.GenerateValues
-- [ ] CrestExtension.cpp::CrestExtension.get_values
-- [ ] CrestExtension.cpp::CrestExtension.output_symbolics
-- [ ] CrestExtension.cpp::CrestExtension.OutputFirstFunInvocation
-- [ ] CrestExtension.cpp::CrestExtension.OutputHeader
-- [ ] CrestExtension.cpp::CrestExtension.OutputInit
-- [ ] CrestExtension.cpp::CrestExtension.OutputTail
-- [ ] CrestExtension.cpp::CrestExtension.type_to_string
-- [ ] CrestExtension.cpp::CrestExtension.~CrestExtension
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.CoverageTestExtension
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.GenerateValues
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.get_values
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.output_array_init
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.output_decls
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.OutputFirstFunInvocation
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.OutputHeader
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.OutputInit
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.OutputTail
+- [x] CoverageTestExtension.cpp::CoverageTestExtension.~CoverageTestExtension
+- [x] CrestExtension.cpp::CrestExtension.CrestExtension
+- [x] CrestExtension.cpp::CrestExtension.GenerateValues
+- [x] CrestExtension.cpp::CrestExtension.get_values
+- [x] CrestExtension.cpp::CrestExtension.output_symbolics
+- [x] CrestExtension.cpp::CrestExtension.OutputFirstFunInvocation
+- [x] CrestExtension.cpp::CrestExtension.OutputHeader
+- [x] CrestExtension.cpp::CrestExtension.OutputInit
+- [x] CrestExtension.cpp::CrestExtension.OutputTail
+- [x] CrestExtension.cpp::CrestExtension.type_to_string
+- [x] CrestExtension.cpp::CrestExtension.~CrestExtension
 - [x] CVQualifiers.cpp::CVQualifiers.add_qualifiers
 - [x] CVQualifiers.cpp::CVQualifiers.CVQualifiers
 - [x] CVQualifiers.cpp::CVQualifiers.get_all_qualifiers
@@ -1171,15 +1171,15 @@ Total items: 2070
 - [x] FunctionInvocationUser.cpp::get_return_fact_for_invocation
 - [x] FunctionInvocationUser.cpp::OutputActualParamExpression
 - [x] FunctionInvocationUser.cpp::OutputExpressionVector
-- [ ] KleeExtension.cpp::KleeExtension.GenerateValues
-- [ ] KleeExtension.cpp::KleeExtension.get_values
-- [ ] KleeExtension.cpp::KleeExtension.KleeExtension
-- [ ] KleeExtension.cpp::KleeExtension.output_symbolics
-- [ ] KleeExtension.cpp::KleeExtension.OutputFirstFunInvocation
-- [ ] KleeExtension.cpp::KleeExtension.OutputHeader
-- [ ] KleeExtension.cpp::KleeExtension.OutputInit
-- [ ] KleeExtension.cpp::KleeExtension.OutputTail
-- [ ] KleeExtension.cpp::KleeExtension.~KleeExtension
+- [x] KleeExtension.cpp::KleeExtension.GenerateValues
+- [x] KleeExtension.cpp::KleeExtension.get_values
+- [x] KleeExtension.cpp::KleeExtension.KleeExtension
+- [x] KleeExtension.cpp::KleeExtension.output_symbolics
+- [x] KleeExtension.cpp::KleeExtension.OutputFirstFunInvocation
+- [x] KleeExtension.cpp::KleeExtension.OutputHeader
+- [x] KleeExtension.cpp::KleeExtension.OutputInit
+- [x] KleeExtension.cpp::KleeExtension.OutputTail
+- [x] KleeExtension.cpp::KleeExtension.~KleeExtension
 - [x] Lhs.cpp::Lhs.clone
 - [x] Lhs.cpp::Lhs.compatible
 - [x] Lhs.cpp::Lhs.get_complexity
@@ -1248,8 +1248,8 @@ Total items: 2070
 - [x] platform.cpp::create_dir
 - [x] platform.cpp::platform_gen_seed
 - [x] platform.cpp::read_time
-- [ ] Probabilities.cpp::GroupProbElem.dump_default
-- [ ] Probabilities.cpp::GroupProbElem.dump_val
+- [x] Probabilities.cpp::GroupProbElem.dump_default
+- [x] Probabilities.cpp::GroupProbElem.dump_val
 - [x] Probabilities.cpp::GroupProbElem.elem_exist
 - [x] Probabilities.cpp::GroupProbElem.get_all_values
 - [x] Probabilities.cpp::GroupProbElem.get_prob
@@ -1262,9 +1262,9 @@ Total items: 2070
 - [x] Probabilities.cpp::GroupProbElem.~GroupProbElem
 - [x] Probabilities.cpp::Probabilities.check_extra_filter
 - [x] Probabilities.cpp::Probabilities.clear_filter
-- [ ] Probabilities.cpp::Probabilities.DestroyInstance
-- [ ] Probabilities.cpp::Probabilities.dump_actual_probabilities
-- [ ] Probabilities.cpp::Probabilities.dump_default_probabilities
+- [x] Probabilities.cpp::Probabilities.DestroyInstance
+- [x] Probabilities.cpp::Probabilities.dump_actual_probabilities
+- [x] Probabilities.cpp::Probabilities.dump_default_probabilities
 - [x] Probabilities.cpp::Probabilities.get_binary_ops_prob_filter
 - [x] Probabilities.cpp::Probabilities.get_pname
 - [x] Probabilities.cpp::Probabilities.get_prob
@@ -1275,11 +1275,11 @@ Total items: 2070
 - [x] Probabilities.cpp::Probabilities.initialize
 - [x] Probabilities.cpp::Probabilities.initialize_group_probs
 - [x] Probabilities.cpp::Probabilities.initialize_single_probs
-- [ ] Probabilities.cpp::Probabilities.parse_configuration
-- [ ] Probabilities.cpp::Probabilities.parse_group_probabilities
-- [ ] Probabilities.cpp::Probabilities.parse_line
-- [ ] Probabilities.cpp::Probabilities.parse_single_elem
-- [ ] Probabilities.cpp::Probabilities.parse_single_probability
+- [x] Probabilities.cpp::Probabilities.parse_configuration
+- [x] Probabilities.cpp::Probabilities.parse_group_probabilities
+- [x] Probabilities.cpp::Probabilities.parse_line
+- [x] Probabilities.cpp::Probabilities.parse_single_elem
+- [x] Probabilities.cpp::Probabilities.parse_single_probability
 - [x] Probabilities.cpp::Probabilities.pname_to_type
 - [x] Probabilities.cpp::Probabilities.Probabilities
 - [x] Probabilities.cpp::Probabilities.register_extra_filter
@@ -1299,8 +1299,8 @@ Total items: 2070
 - [x] Probabilities.cpp::ProbabilityFilter.filter
 - [x] Probabilities.cpp::ProbabilityFilter.ProbabilityFilter
 - [x] Probabilities.cpp::ProbabilityFilter.~ProbabilityFilter
-- [ ] Probabilities.cpp::ProbElem.dump_default
-- [ ] Probabilities.cpp::ProbElem.dump_val
+- [x] Probabilities.cpp::ProbElem.dump_default
+- [x] Probabilities.cpp::ProbElem.dump_val
 - [x] Probabilities.cpp::ProbElem.get_prob
 - [x] Probabilities.cpp::ProbElem.is_equal
 - [x] Probabilities.cpp::ProbElem.ProbElem
@@ -1408,8 +1408,8 @@ Total items: 2070
 - [x] Probabilities.cpp::ProbName.pUShortProb
 - [x] Probabilities.cpp::ProbName.pVarAttrProb
 - [x] Probabilities.cpp::ProbName.pVoidProb
-- [ ] Probabilities.cpp::SingleProbElem.dump_default
-- [ ] Probabilities.cpp::SingleProbElem.dump_val
+- [x] Probabilities.cpp::SingleProbElem.dump_default
+- [x] Probabilities.cpp::SingleProbElem.dump_val
 - [x] Probabilities.cpp::SingleProbElem.get_all_values
 - [x] Probabilities.cpp::SingleProbElem.get_prob
 - [x] Probabilities.cpp::SingleProbElem.get_prob_direct
@@ -1505,13 +1505,13 @@ Total items: 2070
 - [x] RandomNumber.cpp::RandomNumber.SwitchRndNumGenerator
 - [x] RandomNumber.cpp::RandomNumber.trace_depth
 - [x] RandomNumber.cpp::RandomNumber.~RandomNumber
-- [ ] RandomProgramGenerator.cpp::arg_check
-- [ ] RandomProgramGenerator.cpp::main
-- [ ] RandomProgramGenerator.cpp::parse_int_arg
-- [ ] RandomProgramGenerator.cpp::parse_string_arg
-- [ ] RandomProgramGenerator.cpp::print_advanced_help
-- [ ] RandomProgramGenerator.cpp::print_help
-- [ ] RandomProgramGenerator.cpp::print_version
+- [x] RandomProgramGenerator.cpp::arg_check
+- [x] RandomProgramGenerator.cpp::main
+- [x] RandomProgramGenerator.cpp::parse_int_arg
+- [x] RandomProgramGenerator.cpp::parse_string_arg
+- [x] RandomProgramGenerator.cpp::print_advanced_help
+- [x] RandomProgramGenerator.cpp::print_help
+- [x] RandomProgramGenerator.cpp::print_version
 - [x] SafeOpFlags.cpp::SafeOpFlags.clone
 - [x] SafeOpFlags.cpp::SafeOpFlags.flags_to_type
 - [x] SafeOpFlags.cpp::SafeOpFlags.get_lhs_type

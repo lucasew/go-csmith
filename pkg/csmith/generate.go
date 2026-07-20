@@ -43,6 +43,28 @@ func GenerateContext(ctx context.Context, opts Options) (string, error) {
 	// a second NewProbabilities(opts) here for InitAttrGenerators alone.
 	g := NewProgramGenerator(opts)
 	defer ClearAttrGenerators()
+	// AbsProgramGenerator.cpp:64–86 — dump/parse probabilities then exit or continue
+	if opts.DumpDefaultProbabilities != "" {
+		if err := WriteDumpDefaultProbabilities(opts.DumpDefaultProbabilities); err != nil {
+			return "", err
+		}
+		return "", nil // upstream exits after dump
+	}
+	if opts.DumpRandomProbabilities != "" {
+		if err := WriteDumpActualProbabilities(opts.DumpRandomProbabilities, opts.Seed); err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	if opts.ProbabilityConfiguration != "" {
+		p := ProcessProbabilities()
+		if p == nil {
+			return "", fmt.Errorf("probabilities not initialized")
+		}
+		if msg, ok := p.ParseConfiguration(opts.ProbabilityConfiguration); !ok {
+			return "", fmt.Errorf("parsing configuration file error: %s", msg)
+		}
+	}
 	out := g.GoGenerator()
 	// sticky ERROR_RETURN / failed make_first → empty out (no soft invent success)
 	if HasError() {

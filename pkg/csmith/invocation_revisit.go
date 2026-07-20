@@ -618,7 +618,6 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	return true
 }
 
-
 func cloneFactMap(m map[int][]*FactPointTo) map[int][]*FactPointTo {
 	if m == nil {
 		return make(map[int][]*FactPointTo)

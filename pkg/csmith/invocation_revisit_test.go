@@ -349,7 +349,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 	assign := Stmt{
 		Kind: StmtAssign, StmID: 101,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 	callee := &Function{

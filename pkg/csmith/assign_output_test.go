@@ -102,7 +102,7 @@ func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
 	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
 		SafeFlags: flags,
 	}
 	opts := Defaults()
@@ -174,8 +174,8 @@ func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 	flags := MakeDummyFlags()
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		AssignOp: AssignBitAnd,
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(7)},
+		AssignOp:  AssignBitAnd,
+		Expr:      &Expression{Term: TermConstant, Con: MakeInt(7)},
 		SafeFlags: flags,
 	}
 	opts := Defaults()
@@ -224,7 +224,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)},
+		Expr:      &Expression{Term: TermConstant, Con: MakeInt(1)},
 		SafeFlags: flags,
 	}
 	opts := Defaults()
@@ -244,7 +244,7 @@ func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
 	v := CreateVariableScalars("g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignMul,
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)},
+		Expr:      &Expression{Term: TermConstant, Con: MakeInt(2)},
 		SafeFlags: MakeDummyFlags(),
 	}
 	opts := Defaults()
@@ -373,8 +373,8 @@ func TestOutputAssignAsExprCCompVolatileResidualSticky(t *testing.T) {
 	v := &Variable{Name: "g_v", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{true})}
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: nil},
-		AssignOp: AssignBitAnd,
-		Expr:     &Expression{Term: TermConstant, Con: MakeInt(7)},
+		AssignOp:  AssignBitAnd,
+		Expr:      &Expression{Term: TermConstant, Con: MakeInt(7)},
 		SafeFlags: MakeDummyFlags(),
 	}
 	opts := Defaults()

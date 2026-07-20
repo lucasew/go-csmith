@@ -49,7 +49,7 @@ func TestVisitFactsStatementIfMerge(t *testing.T) {
 	thenAssign := Stmt{
 		Kind: StmtAssign,
 		Lhs:  &Lhs{Var: p, Type: p.Type}, LhsVar: p,
-		Expr: &Expression{Term: TermVariable, Var: b, ExprType: PointerTo(GetIntType())},
+		Expr:     &Expression{Term: TermVariable, Var: b, ExprType: PointerTo(GetIntType())},
 		AssignOp: AssignSimple,
 	}
 	// UpdateFact needs Expression for pointer assign - use &b style constant 0 and manual
@@ -194,7 +194,7 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	cg.EffectStm = IncompleteEffect()
 	if VisitFactsStatementAssign(&Stmt{
 		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: v.Type},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}, &cg, Defaults()) {
 		t.Fatal("incomplete EffectStm must fail closed assign visit")
@@ -233,7 +233,7 @@ func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
 func testForInit(iv *Variable, n int) *Stmt {
 	return &Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(), LhsVar: iv, Lhs: &Lhs{Var: iv, Type: iv.Type},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(n), ExprType: GetIntType()},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(n), ExprType: GetIntType()},
 		AssignOp: AssignSimple,
 	}
 }
@@ -293,7 +293,7 @@ func TestOutputAssignAsExprSafeAdd(t *testing.T) {
 	flags := &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
 	st := Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
-		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)},
+		Expr:     &Expression{Term: TermConstant, Con: MakeInt(2)},
 		AssignOp: AssignAdd, SafeFlags: flags,
 	}
 	out := OutputAssignAsExpr(&st, false)
@@ -457,7 +457,7 @@ func TestVisitFactsStatementForUsesBodyFactsIn(t *testing.T) {
 	bodyIn := []*FactPointTo{MakeFactPointTo(p, a)}
 	body := &Block{StmID: 20, Func: f, Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 21, LhsVar: CreateVariableScalars("g_x", GetIntType(), false, false),
-			Lhs: &Lhs{Var: CreateVariableScalars("g_x", GetIntType(), false, false), Type: GetIntType()},
+			Lhs:  &Lhs{Var: CreateVariableScalars("g_x", GetIntType(), false, false), Type: GetIntType()},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple},
 	}}
 	// pre-seed MapFactsIn so after VisitFactsBlock we force known entry

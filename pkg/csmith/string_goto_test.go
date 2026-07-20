@@ -106,7 +106,7 @@ func TestSkippedInitsAtLabelNotEmitted(t *testing.T) {
 		{Kind: StmtGoto, Label: "lbl_x", InitSkippedVars: []*Variable{loc},
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}},
 		{Kind: StmtAssign, SourceLabel: "lbl_x",
-			LhsVar: CreateVariableScalars("g_1", GetIntType(), true, false),
+			LhsVar:   CreateVariableScalars("g_1", GetIntType(), true, false),
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)}},
 	}}

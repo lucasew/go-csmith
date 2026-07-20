@@ -52,7 +52,7 @@ func NewRootCmd() *cobra.Command {
 			}
 
 			if showVersion {
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", appName, appVersion)
+				_, err := fmt.Fprint(cmd.OutOrStdout(), csmith.PrintVersion())
 				return err
 			}
 
