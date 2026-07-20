@@ -1727,11 +1727,14 @@ func (b *Block) Output(indent int) string {
 		}
 	}
 	// Block.cpp:235–241 OutputStatementList
-	sb.WriteString(b.outputStmtsOnly(indent + 1))
-	// residual ERROR sticky — no invent soft-continue past stmt list residual
-	if HasError() {
+	// Only fail closed on residuals raised during stmt emit (not pre-existing sticky).
+	hadErr := HasError()
+	stmtsOut := b.outputStmtsOnly(indent + 1)
+	if stmtsOut == "" && HasError() && !hadErr {
+		// residual during stmt list — no invent braces-only success past hole
 		return ""
 	}
+	sb.WriteString(stmtsOut)
 	// Block.cpp:266–267
 	if b.EmitDepthProtect {
 		sb.WriteString(inner + "DEPTH--;\n")
