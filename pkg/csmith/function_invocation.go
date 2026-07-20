@@ -1590,17 +1590,9 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	if flags == nil || !SafeOpsBinary(op.BinaryOpC()) {
 		return "", ""
 	}
-	// incomplete ambient fails closed sticky (no invent tmp shells / soft re-pick past holes)
-	if !EffectComplete(cg.EffectContext()) ||
-		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
-		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
-		return "", ""
-	}
-	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
-		return "", ""
-	}
+	// FunctionInvocationBinary.cpp:59–75 — no EffectComplete/FactsComplete gate before
+	// create_new_tmp_var; only flags + safe_ops + blk. Extra gates skipped gensym t_
+	// while still failing the binary (name desync vs C++).
 	blk := currentBlock(cg)
 	// FunctionInvocationBinary.cpp:68 — assert(blk); non-sticky soft re-pick when no stack
 	// (sticky would poison library MakeBinary without parent block)
@@ -1666,17 +1658,8 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	if flags == nil {
 		return ""
 	}
-	// incomplete ambient fails closed sticky (no invent tmp shell / soft re-pick past holes)
-	if !EffectComplete(cg.EffectContext()) ||
-		(cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) ||
-		!EffectComplete(cg.EffectStm) {
-		SetError(ErrGeneric)
-		return ""
-	}
-	if cg.FM != nil && !FactsComplete(cg.FM.GlobalFacts) {
-		SetError(ErrGeneric)
-		return ""
-	}
+	// FunctionInvocationUnary.cpp:51–60 — no ambient EffectComplete gate before
+	// create_new_tmp_var (same as binary Create* path).
 	blk := currentBlock(cg)
 	// FunctionInvocationUnary.cpp:57 — assert(blk); non-sticky soft re-pick when no stack
 	if blk == nil {

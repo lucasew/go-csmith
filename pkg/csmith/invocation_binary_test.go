@@ -245,19 +245,19 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	ClearError()
 }
 
-func TestCreateSafeTmpsIncompleteAmbientSticky(t *testing.T) {
-	// incomplete ambient must not invent tmp shells
+func TestCreateSafeTmpsMatchesCreatePath(t *testing.T) {
+	// FunctionInvocationBinary.cpp:59–75 — Create* allocates tmps with only
+	// flags+safe_ops+blk (no ambient EffectComplete gate). Incomplete ambient
+	// must not skip gensym t_ while still failing closed.
 	ClearError()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	flags := MakeDummyFlags()
 	cg := WithFunc(f, IncompleteEffect())
-	if t1, t2 := createBinarySafeTmps(cg, NewVariableSelector(Defaults()), flags, BinAdd); t1 != "" || t2 != "" {
-		t.Fatalf("incomplete EffectContext must fail closed createBinarySafeTmps, got %q %q", t1, t2)
-	}
-	if !HasError() {
-		t.Fatal("createBinarySafeTmps incomplete ambient must SetError sticky")
+	t1, t2 := createBinarySafeTmps(cg, NewVariableSelector(Defaults()), flags, BinAdd)
+	if t1 == "" || t2 == "" {
+		t.Fatalf("Create* path must still allocate tmps under incomplete ambient, got %q %q", t1, t2)
 	}
 	ClearError()
 	// shift always needs flags_to_type(op2); sticky no invent type1 stand-in for type2.
@@ -274,11 +274,16 @@ func TestCreateSafeTmpsIncompleteAmbientSticky(t *testing.T) {
 		t.Fatal("shift without simple RHS type must SetError sticky")
 	}
 	ClearError()
-	if tmp := createUnarySafeTmp(cg, NewVariableSelector(Defaults()), flags); tmp != "" {
-		t.Fatalf("incomplete EffectContext must fail closed createUnarySafeTmp, got %q", tmp)
+	// unary Create* also only needs flags+blk
+	tmp := createUnarySafeTmp(cg, NewVariableSelector(Defaults()), flags)
+	if tmp == "" {
+		t.Fatal("Create* unary must allocate tmp under incomplete ambient")
 	}
-	if !HasError() {
-		t.Fatal("createUnarySafeTmp incomplete ambient must SetError sticky")
+	ClearError()
+	// nil block: soft miss (no sticky invent)
+	cgNoBlk := EmptyCGContext()
+	if t1, t2 := createBinarySafeTmps(cgNoBlk, NewVariableSelector(Defaults()), flags, BinAdd); t1 != "" || t2 != "" {
+		t.Fatalf("nil block must soft-skip tmps, got %q %q", t1, t2)
 	}
 	ClearError()
 }
