@@ -106,7 +106,12 @@ func (c *Constant) NotEquals(num int) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return !c.Equals(num)
+	eq := c.Equals(num)
+	// residual ERROR sticky — no invent not-equal true past Equals residual hole
+	if HasError() {
+		return false
+	}
+	return !eq
 }
 
 // LessThan mirrors Constant::less_than(int).

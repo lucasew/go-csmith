@@ -55,6 +55,31 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 	if !e.EqualsInt(0) {
 		t.Fatal("expr fold")
 	}
+	if HasError() {
+		t.Fatal("complete EqualsInt fold must not sticky")
+	}
+	ClearError()
+	// EqualsInt residual soft invent was soft-continue invent fold true later.
+	// Fair: sticky false. incomplete arg residual.
+	fiHole := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{nil}}
+	if fiHole.EqualsInt(0) {
+		t.Fatal("EqualsInt residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("EqualsInt residual must SetError sticky")
+	}
+	ClearError()
+	// binary residual soft invent was soft-continue invent *0 fold past a0 residual.
+	// Fair: sticky false.
+	holeArg := &Expression{Term: TermConstant, Con: &Constant{Type: nil, Value: "0"}}
+	fiHole2 := &Invocation{IsStd: true, Binary: "*", Args: []*Expression{holeArg, one}}
+	if fiHole2.EqualsInt(0) {
+		t.Fatal("binary EqualsInt residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("binary EqualsInt residual must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestVisitFactsBinaryOrderedMerges(t *testing.T) {

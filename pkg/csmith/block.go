@@ -140,7 +140,19 @@ func (b *Block) FromTailToHead() bool {
 		SetError(ErrGeneric)
 		return false
 	}
+	// residual ERROR sticky — no invent soft-continue fall-through past GetLastStm residual
+	if HasError() {
+		return false
+	}
 	if s.MustJump() {
+		// residual ERROR sticky — no invent no-fall-through true past MustJump residual hole
+		if HasError() {
+			return false
+		}
+		return false
+	}
+	// residual ERROR sticky — no invent fall-through true past MustJump residual false path
+	if HasError() {
 		return false
 	}
 	return true

@@ -211,15 +211,48 @@ func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
 
 func TestExpressionEqualsIntIncompleteFailClosed(t *testing.T) {
 	// incomplete must not panic or invent fold as equals
+	ClearError()
 	if (&Expression{Term: TermCommaExpr}).EqualsInt(0) {
 		t.Fatal("nil CommaRHS must fail closed false")
 	}
+	if !HasError() {
+		t.Fatal("nil CommaRHS EqualsInt must SetError sticky")
+	}
+	ClearError()
 	if (&Expression{Term: TermAssignment, Assign: &Stmt{AssignOp: AssignSimple}}).EqualsInt(0) {
 		t.Fatal("nil Assign.Expr must fail closed false")
 	}
+	if !HasError() {
+		t.Fatal("nil Assign.Expr EqualsInt must SetError sticky")
+	}
+	ClearError()
 	if (&Expression{Term: TermFunction}).EqualsInt(0) {
 		t.Fatal("nil Invoke must fail closed false")
 	}
+	if !HasError() {
+		t.Fatal("nil Invoke EqualsInt must SetError sticky")
+	}
+	ClearError()
+	// nested EqualsInt residual soft invent was soft-continue invent equal true.
+	// Fair: sticky false. Invoke with incomplete unary arg residual.
+	holeInv := &Invocation{IsStd: true, IsUnary: true, Unary: "!", Args: []*Expression{nil}}
+	e := &Expression{Term: TermFunction, Invoke: holeInv}
+	if e.EqualsInt(0) {
+		t.Fatal("nested EqualsInt residual must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nested EqualsInt residual must SetError sticky")
+	}
+	ClearError()
+	// NotEquals residual same invent soft-continue.
+	// Fair: sticky false.
+	if (&Expression{Term: TermConstant, Con: &Constant{Type: nil, Value: "1"}}).NotEquals(0) {
+		t.Fatal("Type-nil Con NotEquals must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Con NotEquals must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestExpressionLessThanAndIs0Or1(t *testing.T) {

@@ -379,21 +379,36 @@ func (e *Expression) EqualsInt(num int) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Con.Equals(num)
+		ok := e.Con.Equals(num)
+		// residual ERROR sticky — no invent equal-true past Con.Equals residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermFunction:
 		// ExpressionFuncall always has live invoke for fold
 		if e.Invoke == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Invoke.EqualsInt(num)
+		ok := e.Invoke.EqualsInt(num)
+		// residual ERROR sticky — no invent equal-true past nested EqualsInt residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermCommaExpr:
 		// comma value is RHS; sticky incomplete without RHS
 		if e.CommaRHS == nil {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.CommaRHS.EqualsInt(num)
+		ok := e.CommaRHS.EqualsInt(num)
+		// residual ERROR sticky — no invent equal-true past RHS EqualsInt residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	case TermAssignment:
 		// ExpressionAssign::equals — simple assign && expr.equals(num)
 		if e.Assign == nil {
@@ -408,7 +423,12 @@ func (e *Expression) EqualsInt(num int) bool {
 			SetError(ErrGeneric)
 			return false
 		}
-		return e.Assign.Expr.EqualsInt(num)
+		ok := e.Assign.Expr.EqualsInt(num)
+		// residual ERROR sticky — no invent equal-true past assign RHS residual hole
+		if HasError() {
+			return false
+		}
+		return ok
 	}
 	return false
 }
@@ -431,7 +451,12 @@ func (e *Expression) NotEquals(num int) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return e.Con.NotEquals(num)
+	ok := e.Con.NotEquals(num)
+	// residual ERROR sticky — no invent not-equal true past Con.NotEquals residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // LessThan mirrors Expression::less_than(int).
@@ -452,7 +477,12 @@ func (e *Expression) LessThan(num int) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return e.Con.LessThan(num)
+	ok := e.Con.LessThan(num)
+	// residual ERROR sticky — no invent less-true past Con.LessThan residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // Is0Or1 mirrors Expression::is_0_or_1.

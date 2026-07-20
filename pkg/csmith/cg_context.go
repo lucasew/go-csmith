@@ -1356,7 +1356,12 @@ func (c CGContext) AllowVolatile() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return c.EffectContext().IsSideEffectFree()
+	ok := c.EffectContext().IsSideEffectFree()
+	// residual ERROR sticky — no invent allow-vol true past IsSideEffectFree residual hole
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // AllowConst mirrors CGContext::allow_const — const only for non-WRITE access.

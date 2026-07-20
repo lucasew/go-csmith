@@ -266,14 +266,44 @@ func (fi *Invocation) EqualsInt(num int) bool {
 			return false
 		}
 		a0 := fi.Args[0]
-		if num == 0 && fi.Unary == "!" && a0.NotEquals(0) {
-			return true
+		if num == 0 && fi.Unary == "!" {
+			if a0.NotEquals(0) {
+				// residual ERROR sticky — no invent equal-true past NotEquals residual hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue fold past NotEquals residual false
+			if HasError() {
+				return false
+			}
 		}
-		if num == 1 && fi.Unary == "!" && a0.EqualsInt(0) {
-			return true
+		if num == 1 && fi.Unary == "!" {
+			if a0.EqualsInt(0) {
+				// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual false
+			if HasError() {
+				return false
+			}
 		}
-		if fi.Unary == "-" && a0.EqualsInt(-num) {
-			return true
+		if fi.Unary == "-" {
+			if a0.EqualsInt(-num) {
+				// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
+				if HasError() {
+					return false
+				}
+				return true
+			}
+			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual false
+			if HasError() {
+				return false
+			}
 		}
 		return false
 	}
@@ -290,17 +320,31 @@ func (fi *Invocation) EqualsInt(num int) bool {
 	if num == 0 {
 		// 0 * x, 0 / x, 0 % x, 0 << x, 0 >> x, 0 && x, 0 & x
 		if a0 != nil && a0.EqualsInt(0) {
+			// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
+			if HasError() {
+				return false
+			}
 			switch op {
 			case BinMul, BinDiv, BinMod, BinLShift, BinRShift, BinAnd, BinBitAnd:
 				return true
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue fold past a0 EqualsInt residual false
+			return false
 		}
 		// x * 0, x && 0, x & 0
 		if a1 != nil && a1.EqualsInt(0) {
+			// residual ERROR sticky — no invent equal-true past EqualsInt residual hole
+			if HasError() {
+				return false
+			}
 			switch op {
 			case BinMul, BinAnd, BinBitAnd:
 				return true
 			}
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue fold past a1 EqualsInt residual false
+			return false
 		}
 		// a - a, a > a, a < a, a != a (same expression pointer)
 		if a0 != nil && a1 != nil && a0 == a1 {
@@ -310,8 +354,19 @@ func (fi *Invocation) EqualsInt(num int) bool {
 			}
 		}
 		// x % 1, x % -1
-		if a1 != nil && (a1.EqualsInt(1) || a1.EqualsInt(-1)) && op == BinMod {
-			return true
+		if a1 != nil {
+			eq1 := a1.EqualsInt(1)
+			// residual ERROR sticky — no invent soft-continue fold past EqualsInt residual
+			if HasError() {
+				return false
+			}
+			eqM1 := a1.EqualsInt(-1)
+			if HasError() {
+				return false
+			}
+			if (eq1 || eqM1) && op == BinMod {
+				return true
+			}
 		}
 	}
 	return false

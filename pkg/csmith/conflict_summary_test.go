@@ -5,14 +5,23 @@ import (
 )
 
 func TestAllowVolatileAndAcceptType(t *testing.T) {
+	ClearError()
 	cg := EmptyCGContext()
 	if !cg.AllowVolatile() {
 		t.Fatal("SE-free allows volatile")
 	}
+	if HasError() {
+		t.Fatal("complete AllowVolatile must not sticky")
+	}
+	ClearError()
 	cg2 := WithEffectContext(WithSideEffects())
 	if cg2.AllowVolatile() {
 		t.Fatal("SE should block")
 	}
+	if HasError() {
+		t.Fatal("complete non-SE AllowVolatile must not sticky")
+	}
+	ClearError()
 	if !cg.AllowConst(AccessRead) || cg.AllowConst(AccessWrite) {
 		t.Fatal("const")
 	}

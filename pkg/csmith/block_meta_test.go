@@ -6,20 +6,42 @@ import (
 )
 
 func TestFromTailToHead(t *testing.T) {
+	ClearError()
 	b := &Block{Looping: true, Stmts: []Stmt{
 		{Kind: StmtAssign},
 	}}
 	if !b.FromTailToHead() {
 		t.Fatal("fall through")
 	}
+	if HasError() {
+		t.Fatal("complete fall-through FromTailToHead must not sticky")
+	}
+	ClearError()
 	b.Stmts = []Stmt{{Kind: StmtReturn}}
 	if b.FromTailToHead() {
 		t.Fatal("return must_jump")
 	}
+	if HasError() {
+		t.Fatal("complete must_jump FromTailToHead must not sticky")
+	}
+	ClearError()
 	b.Looping = false
 	if b.FromTailToHead() {
 		t.Fatal("not looping")
 	}
+	ClearError()
+	// MustJump residual soft invent was soft-continue fall-through invent true.
+	// Fair: sticky false. last if incomplete residual MustJump.
+	b2 := &Block{Looping: true, Stmts: []Stmt{
+		{Kind: StmtIfElse, Then: nil, Else: &Block{}},
+	}}
+	if b2.FromTailToHead() {
+		t.Fatal("MustJump residual FromTailToHead must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("MustJump residual FromTailToHead must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestGetLastStmStopsAtReturn(t *testing.T) {
