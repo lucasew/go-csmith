@@ -359,13 +359,69 @@ func pickSafeOpSize(r *Rng, probs *Probabilities) (SafeOpSize, bool) {
 	return sz, true
 }
 
-// SizeToken mirrors OutputSize (without leading 'u' for unsigned).
+// OutputFuncOrMacro mirrors SafeOpFlags::OutputFuncOrMacro.
+// SafeOpFlags.cpp:245–247 — "func_" or "macro_".
+func (f *SafeOpFlags) OutputFuncOrMacro() string {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if f.IsFunc {
+		return "func_"
+	}
+	return "macro_"
+}
+
+// OutputSign mirrors SafeOpFlags::OutputSign.
+// SafeOpFlags.cpp:249–251 — "_s" or "_u".
+func (f *SafeOpFlags) OutputSign(signed bool) string {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	if signed {
+		return "_s"
+	}
+	return "_u"
+}
+
+// OutputOp1 mirrors SafeOpFlags::OutputOp1 → OutputSign(op1_).
+// SafeOpFlags.cpp:253.
+func (f *SafeOpFlags) OutputOp1() string {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return f.OutputSign(f.Op1Signed)
+}
+
+// OutputOp2 mirrors SafeOpFlags::OutputOp2 → OutputSign(op2_).
+// SafeOpFlags.cpp:255.
+func (f *SafeOpFlags) OutputOp2() string {
+	if f == nil {
+		SetError(ErrGeneric)
+		return ""
+	}
+	return f.OutputSign(f.Op2Signed)
+}
+
+// OutputSize mirrors SafeOpFlags::OutputSize.
+// SafeOpFlags.cpp:219–242 — optional leading "u" from !op1_, then type token.
+func (f *SafeOpFlags) OutputSize() string {
+	return f.SizeToken()
+}
+
+// SizeToken mirrors OutputSize (optional leading 'u' for unsigned op1).
 // SafeOpFlags.cpp:219–242 — assert invalid size; method is const on live flags.
 func (f *SafeOpFlags) SizeToken() string {
 	if f == nil {
 		// sticky no soft invent int32_t for nil flags
 		SetError(ErrGeneric)
 		return ""
+	}
+	// SafeOpFlags.cpp:236–238 — float has no u prefix path
+	if f.Size == SafeFloat {
+		return "float"
 	}
 	var b strings.Builder
 	if !f.Op1Signed {
@@ -380,8 +436,6 @@ func (f *SafeOpFlags) SizeToken() string {
 		b.WriteString("int32_t")
 	case SafeInt64:
 		b.WriteString("int64_t")
-	case SafeFloat:
-		return "float"
 	default:
 		// SafeOpFlags.cpp:239 — assert(!"invalid size!"); sticky no soft invent int32_t
 		SetError(ErrGeneric)
@@ -485,8 +539,8 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	// SafeOpFlags.cpp:239 assert invalid size; sticky no invent safe_add_func__s_s
-	sz := f.SizeToken()
+	// SafeOpFlags.cpp:314–319 — OutputFuncOrMacro + OutputSize + OutputOp1 + Op1/Op2
+	sz := f.OutputSize()
 	if sz == "" {
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -496,28 +550,14 @@ func (f *SafeOpFlags) BinaryFuncName(op string) string {
 	// safe_add_func_int32_t_s_s  /  safe_lshift_func_int32_t_s_u
 	var b strings.Builder
 	b.WriteString(prefix)
-	if f.IsFunc {
-		b.WriteString("func_")
-	} else {
-		b.WriteString("macro_")
-	}
+	b.WriteString(f.OutputFuncOrMacro())
 	b.WriteString(sz)
-	if f.Op1Signed {
-		b.WriteString("_s")
-	} else {
-		b.WriteString("_u")
-	}
+	b.WriteString(f.OutputOp1())
 	// shifts use Op2 sign; other ops repeat Op1 (SafeOpFlags.cpp:318)
 	if shift {
-		if f.Op2Signed {
-			b.WriteString("_s")
-		} else {
-			b.WriteString("_u")
-		}
-	} else if f.Op1Signed {
-		b.WriteString("_s")
+		b.WriteString(f.OutputOp2())
 	} else {
-		b.WriteString("_u")
+		b.WriteString(f.OutputOp1())
 	}
 	return b.String()
 }
@@ -555,7 +595,8 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 	if f.Size == SafeFloat {
 		return ""
 	}
-	sz := f.SizeToken()
+	// SafeOpFlags.cpp:334–338 — OutputFuncOrMacro + OutputSize + OutputOp1
+	sz := f.OutputSize()
 	if sz == "" {
 		// invalid size assert path sticky
 		if !HasError() {
@@ -563,20 +604,7 @@ func (f *SafeOpFlags) UnaryMinusFuncName() string {
 		}
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString("safe_unary_minus_")
-	if f.IsFunc {
-		b.WriteString("func_")
-	} else {
-		b.WriteString("macro_")
-	}
-	b.WriteString(sz)
-	if f.Op1Signed {
-		b.WriteString("_s")
-	} else {
-		b.WriteString("_u")
-	}
-	return b.String()
+	return "safe_unary_minus_" + f.OutputFuncOrMacro() + sz + f.OutputOp1()
 }
 
 // SafeOpsBinary reports whether op uses safe wrappers under avoid_signed_overflow.

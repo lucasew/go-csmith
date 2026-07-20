@@ -239,3 +239,41 @@ func TestMakeDummyFlagsAndGetters(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestSafeOpFlagsOutputPieces(t *testing.T) {
+	// SafeOpFlags.cpp:219–255 OutputSize/FuncOrMacro/Sign/Op1/Op2
+	f := &SafeOpFlags{Op1Signed: true, Op2Signed: false, IsFunc: true, Size: SafeInt32}
+	if f.OutputFuncOrMacro() != "func_" || f.OutputOp1() != "_s" || f.OutputOp2() != "_u" {
+		t.Fatalf("pieces: %q %q %q", f.OutputFuncOrMacro(), f.OutputOp1(), f.OutputOp2())
+	}
+	if f.OutputSize() != "int32_t" {
+		t.Fatal(f.OutputSize())
+	}
+	// unsigned op1 prefixes size with u
+	f.Op1Signed = false
+	if f.OutputSize() != "uint32_t" {
+		t.Fatal(f.OutputSize())
+	}
+	// float size token
+	f.Size = SafeFloat
+	if f.OutputSize() != "float" {
+		t.Fatal(f.OutputSize())
+	}
+	// to_string binary via Output pieces
+	f = &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32}
+	if got := f.BinaryFuncName("+"); got != "safe_add_func_int32_t_s_s" {
+		t.Fatal(got)
+	}
+	f.Op2Signed = false
+	if got := f.BinaryFuncName("<<"); got != "safe_lshift_func_int32_t_s_u" {
+		t.Fatal(got)
+	}
+	if got := f.UnaryMinusFuncName(); got != "safe_unary_minus_func_int32_t_s" {
+		t.Fatal(got)
+	}
+	ClearError()
+	if (*SafeOpFlags)(nil).OutputSize() != "" || !HasError() {
+		t.Fatal("nil OutputSize sticky")
+	}
+	ClearError()
+}

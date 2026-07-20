@@ -128,36 +128,36 @@ Total items: 2070
 - [x] Block.cpp::BlockProbability
 - [ ] Block.cpp::find_block_by_id
 - [ ] Block.cpp::OutputStatementList
-- [ ] Bookkeeper.cpp::Bookkeeper.Bookkeeper
+- [x] Bookkeeper.cpp::Bookkeeper.Bookkeeper
 - [x] Bookkeeper.cpp::Bookkeeper.doFinalization
-- [ ] Bookkeeper.cpp::Bookkeeper.output_bitfields
-- [ ] Bookkeeper.cpp::Bookkeeper.output_counters
-- [ ] Bookkeeper.cpp::Bookkeeper.output_expr_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_jump_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_oob_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_pointer_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_stmts_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_struct_union_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.output_var_freshness
-- [ ] Bookkeeper.cpp::Bookkeeper.output_volatile_access_statistics
-- [ ] Bookkeeper.cpp::Bookkeeper.record_address_taken
-- [ ] Bookkeeper.cpp::Bookkeeper.record_bitfields_reads
-- [ ] Bookkeeper.cpp::Bookkeeper.record_bitfields_writes
-- [ ] Bookkeeper.cpp::Bookkeeper.record_pointer_comparisons
-- [ ] Bookkeeper.cpp::Bookkeeper.record_type_with_bitfields
-- [ ] Bookkeeper.cpp::Bookkeeper.record_vars_with_bitfields
-- [ ] Bookkeeper.cpp::Bookkeeper.record_volatile_access
+- [x] Bookkeeper.cpp::Bookkeeper.output_bitfields
+- [x] Bookkeeper.cpp::Bookkeeper.output_counters
+- [x] Bookkeeper.cpp::Bookkeeper.output_expr_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_jump_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_oob_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_pointer_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_stmts_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_struct_union_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.output_var_freshness
+- [x] Bookkeeper.cpp::Bookkeeper.output_volatile_access_statistics
+- [x] Bookkeeper.cpp::Bookkeeper.record_address_taken
+- [x] Bookkeeper.cpp::Bookkeeper.record_bitfields_reads
+- [x] Bookkeeper.cpp::Bookkeeper.record_bitfields_writes
+- [x] Bookkeeper.cpp::Bookkeeper.record_pointer_comparisons
+- [x] Bookkeeper.cpp::Bookkeeper.record_type_with_bitfields
+- [x] Bookkeeper.cpp::Bookkeeper.record_vars_with_bitfields
+- [x] Bookkeeper.cpp::Bookkeeper.record_volatile_access
 - [ ] Bookkeeper.cpp::Bookkeeper.stat_blk_depths
 - [ ] Bookkeeper.cpp::Bookkeeper.stat_blk_depths_for_stmt
 - [ ] Bookkeeper.cpp::Bookkeeper.stat_expr_depths
 - [ ] Bookkeeper.cpp::Bookkeeper.stat_expr_depths_for_stmt
 - [ ] Bookkeeper.cpp::Bookkeeper.update_ptr_aliases
 - [ ] Bookkeeper.cpp::Bookkeeper.~Bookkeeper
-- [ ] Bookkeeper.cpp::calc_total
+- [x] Bookkeeper.cpp::calc_total
 - [ ] Bookkeeper.cpp::formatted_output
 - [ ] Bookkeeper.cpp::formatted_outputf
-- [ ] Bookkeeper.cpp::incr_counter
+- [x] Bookkeeper.cpp::incr_counter
 - [ ] CFGEdge.cpp::CFGEdge.CFGEdge
 - [ ] CFGEdge.cpp::CFGEdge.~CFGEdge
 - [ ] CGContext.cpp::CGContext.accept_type
@@ -201,13 +201,13 @@ Total items: 2070
 - [ ] CGContext.cpp::RWDirective.find_must_use_arrays
 - [ ] CGContext.cpp::RWDirective.must_write_vars
 - [x] CGOptions.cpp::CGOptions.accept_argc
-- [ ] CGOptions.cpp::CGOptions.access_once
-- [ ] CGOptions.cpp::CGOptions.addr_taken_of_locals
+- [x] CGOptions.cpp::CGOptions.access_once
+- [x] CGOptions.cpp::CGOptions.addr_taken_of_locals
 - [x] CGOptions.cpp::CGOptions.allow_const_volatile
 - [x] CGOptions.cpp::CGOptions.allow_int64
 - [x] CGOptions.cpp::CGOptions.arg_structs
 - [x] CGOptions.cpp::CGOptions.arg_unions
-- [ ] CGOptions.cpp::CGOptions.array_oob_prob
+- [x] CGOptions.cpp::CGOptions.array_oob_prob
 - [x] CGOptions.cpp::CGOptions.arrays
 - [x] CGOptions.cpp::CGOptions.avoid_signed_overflow
 - [x] CGOptions.cpp::CGOptions.binary_constant
@@ -233,17 +233,17 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.crest
 - [x] CGOptions.cpp::CGOptions.dangling_global_ptrs
 - [x] CGOptions.cpp::CGOptions.dead_pointer_dereference_prob
-- [ ] CGOptions.cpp::CGOptions.delta_input
-- [ ] CGOptions.cpp::CGOptions.delta_monitor
-- [ ] CGOptions.cpp::CGOptions.delta_output
+- [x] CGOptions.cpp::CGOptions.delta_input
+- [x] CGOptions.cpp::CGOptions.delta_monitor
+- [x] CGOptions.cpp::CGOptions.delta_output
 - [x] CGOptions.cpp::CGOptions.depth_protect
-- [ ] CGOptions.cpp::CGOptions.dfs_debug_sequence
-- [ ] CGOptions.cpp::CGOptions.dfs_exhaustive
-- [ ] CGOptions.cpp::CGOptions.disable_builtin_kinds
+- [x] CGOptions.cpp::CGOptions.dfs_debug_sequence
+- [x] CGOptions.cpp::CGOptions.dfs_exhaustive
+- [x] CGOptions.cpp::CGOptions.disable_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.divs
-- [ ] CGOptions.cpp::CGOptions.dump_default_probabilities
-- [ ] CGOptions.cpp::CGOptions.dump_random_probabilities
-- [ ] CGOptions.cpp::CGOptions.enable_builtin_kinds
+- [x] CGOptions.cpp::CGOptions.dump_default_probabilities
+- [x] CGOptions.cpp::CGOptions.dump_random_probabilities
+- [x] CGOptions.cpp::CGOptions.enable_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.enable_float
 - [ ] CGOptions.cpp::CGOptions.enabled_builtin
 - [ ] CGOptions.cpp::CGOptions.enabled_builtin_kind
@@ -254,11 +254,11 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.fixed_struct_fields
 - [x] CGOptions.cpp::CGOptions.force_globals_static
 - [x] CGOptions.cpp::CGOptions.force_non_uniform_array_init
-- [ ] CGOptions.cpp::CGOptions.fresh_array_ctrl_var_names
+- [x] CGOptions.cpp::CGOptions.fresh_array_ctrl_var_names
 - [x] CGOptions.cpp::CGOptions.func1_max_params
 - [ ] CGOptions.cpp::CGOptions.func_attr_flag
 - [x] CGOptions.cpp::CGOptions.global_variables
-- [ ] CGOptions.cpp::CGOptions.go_delta
+- [x] CGOptions.cpp::CGOptions.go_delta
 - [x] CGOptions.cpp::CGOptions.has_conflict
 - [x] CGOptions.cpp::CGOptions.has_delta_conflict
 - [x] CGOptions.cpp::CGOptions.has_extension_conflict
@@ -299,15 +299,15 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.max_union_fields
 - [ ] CGOptions.cpp::CGOptions.monitored_funcs
 - [x] CGOptions.cpp::CGOptions.muls
-- [ ] CGOptions.cpp::CGOptions.no_delta_reduction
-- [ ] CGOptions.cpp::CGOptions.no_return_dead_ptr
+- [x] CGOptions.cpp::CGOptions.no_delta_reduction
+- [x] CGOptions.cpp::CGOptions.no_return_dead_ptr
 - [x] CGOptions.cpp::CGOptions.nomain
 - [x] CGOptions.cpp::CGOptions.null_pointer_dereference_prob
 - [x] CGOptions.cpp::CGOptions.output_file
 - [x] CGOptions.cpp::CGOptions.packed_struct
 - [x] CGOptions.cpp::CGOptions.paranoid
 - [ ] CGOptions.cpp::CGOptions.parse_string_options
-- [ ] CGOptions.cpp::CGOptions.partial_expand
+- [x] CGOptions.cpp::CGOptions.partial_expand
 - [x] CGOptions.cpp::CGOptions.pointer_size
 - [x] CGOptions.cpp::CGOptions.pointers
 - [x] CGOptions.cpp::CGOptions.post_decr_operator
@@ -315,10 +315,10 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.pre_decr_operator
 - [x] CGOptions.cpp::CGOptions.pre_incr_operator
 - [x] CGOptions.cpp::CGOptions.prefix_name
-- [ ] CGOptions.cpp::CGOptions.probability_configuration
+- [x] CGOptions.cpp::CGOptions.probability_configuration
 - [x] CGOptions.cpp::CGOptions.quiet
 - [x] CGOptions.cpp::CGOptions.random_based
-- [ ] CGOptions.cpp::CGOptions.random_random
+- [x] CGOptions.cpp::CGOptions.random_random
 - [x] CGOptions.cpp::CGOptions.resolve_exhaustive_options
 - [x] CGOptions.cpp::CGOptions.return_structs
 - [x] CGOptions.cpp::CGOptions.return_unions
@@ -326,7 +326,7 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.sequence_name_prefix
 - [ ] CGOptions.cpp::CGOptions.set_default_builtin_kinds
 - [x] CGOptions.cpp::CGOptions.set_default_settings
-- [ ] CGOptions.cpp::CGOptions.set_platform_specific_options
+- [x] CGOptions.cpp::CGOptions.set_platform_specific_options
 - [ ] CGOptions.cpp::CGOptions.set_vol_tests
 - [x] CGOptions.cpp::CGOptions.signed_char_index
 - [x] CGOptions.cpp::CGOptions.split_files_dir
@@ -334,8 +334,8 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.stop_by_stmt
 - [x] CGOptions.cpp::CGOptions.strict_const_arrays
 - [x] CGOptions.cpp::CGOptions.strict_float
-- [ ] CGOptions.cpp::CGOptions.strict_volatile_rule
-- [ ] CGOptions.cpp::CGOptions.struct_output
+- [x] CGOptions.cpp::CGOptions.strict_volatile_rule
+- [x] CGOptions.cpp::CGOptions.struct_output
 - [x] CGOptions.cpp::CGOptions.take_union_field_addr
 - [x] CGOptions.cpp::CGOptions.type_attr_flag
 - [x] CGOptions.cpp::CGOptions.UInt128
@@ -1522,12 +1522,12 @@ Total items: 2070
 - [x] SafeOpFlags.cpp::SafeOpFlags.make_dummy_flags
 - [x] SafeOpFlags.cpp::SafeOpFlags.make_random_binary
 - [x] SafeOpFlags.cpp::SafeOpFlags.make_random_unary
-- [ ] SafeOpFlags.cpp::SafeOpFlags.operator=
-- [ ] SafeOpFlags.cpp::SafeOpFlags.OutputFuncOrMacro
-- [ ] SafeOpFlags.cpp::SafeOpFlags.OutputOp1
-- [ ] SafeOpFlags.cpp::SafeOpFlags.OutputOp2
-- [ ] SafeOpFlags.cpp::SafeOpFlags.OutputSign
-- [ ] SafeOpFlags.cpp::SafeOpFlags.OutputSize
+- [x] SafeOpFlags.cpp::SafeOpFlags.operator=
+- [x] SafeOpFlags.cpp::SafeOpFlags.OutputFuncOrMacro
+- [x] SafeOpFlags.cpp::SafeOpFlags.OutputOp1
+- [x] SafeOpFlags.cpp::SafeOpFlags.OutputOp2
+- [x] SafeOpFlags.cpp::SafeOpFlags.OutputSign
+- [x] SafeOpFlags.cpp::SafeOpFlags.OutputSize
 - [x] SafeOpFlags.cpp::SafeOpFlags.return_float_type
 - [x] SafeOpFlags.cpp::SafeOpFlags.safe_float_func_string
 - [x] SafeOpFlags.cpp::SafeOpFlags.SafeOpFlags
