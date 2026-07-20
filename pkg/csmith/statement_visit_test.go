@@ -202,6 +202,32 @@ func TestVisitFactsIncompleteEffectStmFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestVisitFactsReturnIsPointingToLocalsResidualSticky(t *testing.T) {
+	// IsPointingToLocals residual soft invent was soft-continue visit invent success.
+	ClearError()
+	opts := Defaults()
+	opts.NoReturnDeadPointer = true
+	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
+	f.RV = CreateVariableScalars("g_rv", PointerTo(GetIntType()), false, false)
+	blk := &Block{Func: f}
+	f.Stack = []*Block{blk}
+	// Type-nil subject stickies IsPointingToLocals
+	shell := &Variable{Name: "g_shell", Type: nil}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	st := &Stmt{
+		Kind: StmtReturn, StmID: 1,
+		Expr: &Expression{Term: TermVariable, Var: shell, ExprType: PointerTo(GetIntType())},
+	}
+	if VisitFactsStatementReturn(st, &cg, opts) {
+		t.Fatal("IsPointingToLocals residual must fail closed return visit, not invent success")
+	}
+	if !HasError() {
+		t.Fatal("IsPointingToLocals residual VisitFactsStatementReturn must SetError sticky")
+	}
+	ClearError()
+}
+
 // testForInit builds a simple StatementAssign init (StatementFor always has live init).
 // StmID is always live after create — required when FM path records map_stm_effect.
 func testForInit(iv *Variable, n int) *Stmt {

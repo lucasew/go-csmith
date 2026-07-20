@@ -33,11 +33,23 @@ func VisitFactsStatementReturn(st *Stmt, cg *CGContext, opts Options) bool {
 		}
 		facts := cg.pointToFacts()
 		if IsPointingToLocals(v, b, ind, facts) {
+			// residual ERROR sticky — no invent policy soft-reject past residual hole
+			if HasError() {
+				return false
+			}
 			// policy reject — non-sticky
+			return false
+		}
+		// residual ERROR sticky — no invent soft-continue visit past residual false path
+		if HasError() {
 			return false
 		}
 	}
 	if !VisitFactsExpression(st.Expr, cg, opts) {
+		return false
+	}
+	// residual ERROR sticky — no invent visit success past VisitFactsExpression residual
+	if HasError() {
 		return false
 	}
 	// FactMgr::update_fact_for_return — StatementReturn.cpp:91–94

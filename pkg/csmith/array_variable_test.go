@@ -891,6 +891,56 @@ func TestIsVariantKeyVars(t *testing.T) {
 	if a1.IsVariant(&a3.Variable) {
 		t.Fatal("different keys")
 	}
+	ClearError()
+}
+
+func TestIsVariantFindExprKeyVarResidualSticky(t *testing.T) {
+	// FindExprKeyVar residual soft invent was nil==nil invent variant-true past Type-nil key.
+	ClearError()
+	parent := &ArrayVariable{
+		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{8}},
+		Sizes:    []int{8},
+	}
+	parent.AsArray = parent
+	// Count==1 (TermVariable) but Type-nil Find residual nil — no invent variant true
+	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "i_hole", Type: nil}}
+	a1 := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:      []int{8},
+		Collective: parent,
+		IndexExprs: []*Expression{hole},
+	}
+	a1.AsArray = a1
+	a2 := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:      []int{8},
+		Collective: parent,
+		IndexExprs: []*Expression{hole},
+	}
+	a2.AsArray = a2
+	if a1.IsVariant(&a2.Variable) {
+		t.Fatal("FindExprKeyVar residual must fail closed not invent variant-true nil==nil")
+	}
+	if !HasError() {
+		t.Fatal("FindExprKeyVar residual IsVariant must SetError sticky")
+	}
+	ClearError()
+	// Count residual soft invent was soft-continue Find invent variant
+	emptyCon := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual count
+	a3 := &ArrayVariable{
+		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
+		Sizes:      []int{8},
+		Collective: parent,
+		IndexExprs: []*Expression{emptyCon},
+	}
+	a3.AsArray = a3
+	if a3.IsVariant(&a3.Variable) {
+		t.Fatal("CountExprKeyVar residual must fail closed IsVariant")
+	}
+	if !HasError() {
+		t.Fatal("CountExprKeyVar residual IsVariant must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestItemizeConstIndices(t *testing.T) {

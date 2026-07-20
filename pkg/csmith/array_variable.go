@@ -311,7 +311,12 @@ func CountExprKeyVar(e *Expression) int {
 				SetError(ErrGeneric)
 				return -1
 			}
-			return CountExprKeyVar(e.Invoke.Args[0])
+			c := CountExprKeyVar(e.Invoke.Args[0])
+			// residual ERROR sticky — no invent key-count past nested residual hole
+			if HasError() {
+				return -1
+			}
+			return c
 		}
 		// ArrayVariable.cpp:84 — assert(param_value.size() == 2) for binary
 		if n == 2 {
@@ -320,7 +325,15 @@ func CountExprKeyVar(e *Expression) int {
 				return -1
 			}
 			a := CountExprKeyVar(e.Invoke.Args[0])
+			// residual ERROR sticky — no invent soft-sum past left residual hole
+			if HasError() {
+				return -1
+			}
 			b := CountExprKeyVar(e.Invoke.Args[1])
+			// residual ERROR sticky — no invent soft-sum past right residual hole
+			if HasError() {
+				return -1
+			}
 			if a < 0 || b < 0 {
 				if !HasError() {
 					SetError(ErrGeneric)
@@ -374,7 +387,12 @@ func FindExprKeyVar(e *Expression) *Variable {
 				SetError(ErrGeneric)
 				return nil
 			}
-			return FindExprKeyVar(e.Invoke.Args[0])
+			kv := FindExprKeyVar(e.Invoke.Args[0])
+			// residual ERROR sticky — no invent key past nested residual hole
+			if HasError() {
+				return nil
+			}
+			return kv
 		}
 		// ArrayVariable.cpp:110 — assert(param_value.size() == 2)
 		if n == 2 {
@@ -383,7 +401,15 @@ func FindExprKeyVar(e *Expression) *Variable {
 				return nil
 			}
 			v0 := FindExprKeyVar(e.Invoke.Args[0])
+			// residual ERROR sticky — no invent soft-pick right past left residual hole
+			if HasError() {
+				return nil
+			}
 			v1 := FindExprKeyVar(e.Invoke.Args[1])
+			// residual ERROR sticky — no invent soft-pick left past right residual hole
+			if HasError() {
+				return nil
+			}
 			if v0 == nil && v1 != nil {
 				return v1
 			}
@@ -438,10 +464,31 @@ func (av *ArrayVariable) IsVariant(other *Variable) bool {
 		for i := range av.IndexExprs {
 			e, oe := av.IndexExprs[i], ov.IndexExprs[i]
 			// ArrayVariable.cpp:403–405 — Expression path; live Expression* only
-			if CountExprKeyVar(e) != 1 || CountExprKeyVar(oe) != 1 {
+			ce := CountExprKeyVar(e)
+			// residual ERROR sticky — no invent soft-continue count past residual hole
+			if HasError() {
 				return false
 			}
-			if FindExprKeyVar(e) != FindExprKeyVar(oe) {
+			coe := CountExprKeyVar(oe)
+			// residual ERROR sticky — no invent soft-continue count past oe residual hole
+			if HasError() {
+				return false
+			}
+			if ce != 1 || coe != 1 {
+				return false
+			}
+			ke := FindExprKeyVar(e)
+			// residual ERROR sticky — no invent soft-continue key match past residual hole
+			if HasError() {
+				return false
+			}
+			koe := FindExprKeyVar(oe)
+			// residual ERROR sticky — no invent soft-continue key match past oe residual
+			if HasError() {
+				return false
+			}
+			// both residual-nil soft invent was invent variant-true (nil==nil)
+			if ke == nil || koe == nil || ke != koe {
 				return false
 			}
 		}
