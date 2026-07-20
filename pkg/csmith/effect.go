@@ -377,7 +377,14 @@ func (e Effect) WriteVar(v *Variable) Effect {
 	e.written = nw
 	// Effect.cpp:144–145 — SE-free means volatile/access_once free
 	if v.IsVolatile() || v.IsAccessOnce {
+		// residual ERROR sticky — no invent complete write map past IsVolatile residual
+		if HasError() {
+			return IncompleteEffect()
+		}
 		e.sideEffectFree = false
+	} else if HasError() {
+		// residual ERROR sticky — no invent complete write map past IsVolatile residual false
+		return IncompleteEffect()
 	}
 	return e
 }
@@ -404,10 +411,20 @@ func (e Effect) ReadVar(v *Variable) Effect {
 	nr[v] = true
 	e.read = nr
 	// Effect.cpp:120–121
-	if !(v.IsConst() && !v.IsVolatile() && !v.IsAccessOnce) {
+	isConst := v.IsConst()
+	// residual ERROR sticky — no invent complete read map past IsConst residual
+	if HasError() {
+		return IncompleteEffect()
+	}
+	isVol := v.IsVolatile()
+	// residual ERROR sticky — no invent complete read map past IsVolatile residual
+	if HasError() {
+		return IncompleteEffect()
+	}
+	if !(isConst && !isVol && !v.IsAccessOnce) {
 		e.pure = false
 	}
-	if v.IsVolatile() || v.IsAccessOnce {
+	if isVol || v.IsAccessOnce {
 		e.sideEffectFree = false
 	}
 	return e

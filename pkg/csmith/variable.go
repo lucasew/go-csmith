@@ -144,6 +144,10 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	var initOut string
 	if v.InitExpr != nil {
 		initOut = v.InitExpr.Output()
+		// residual ERROR sticky — no invent soft-continue def past InitExpr Output residual
+		if HasError() {
+			return ""
+		}
 	} else if v.Init != nil {
 		initOut = v.Init.Value
 	}
@@ -155,10 +159,12 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	}
 	// Variable.cpp:640–660 — OutputDecl always live; sticky no invent " = init;" without decl
 	decl := v.OutputDeclOpts(forceStatic, prefixName)
+	// residual ERROR sticky — no invent soft-continue def past OutputDecl residual
+	if HasError() {
+		return ""
+	}
 	if decl == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -166,6 +172,10 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	// Variable.cpp:655 — var_attr_generator.Output when attributes enabled
 	if withAttrs && r != nil {
 		b.WriteString(EnsureVarAttrGenerator().Output(r))
+		// residual ERROR sticky — no invent soft-continue def past attr residual
+		if HasError() {
+			return ""
+		}
 	}
 	// Variable.cpp:656–660 — out << " = "; assert(init); init->Output
 	b.WriteString(" = ")
@@ -173,9 +183,23 @@ func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng
 	b.WriteString(";")
 	// Variable.cpp:658–661 — volatile global comment on same line path uses comment helper
 	if v.IsGlobal() && v.IsVolatile() {
-		b.WriteString(" /* VOLATILE GLOBAL ")
-		b.WriteString(v.GetActualName(prefixName))
-		b.WriteString(" */")
+		// residual ERROR sticky — no invent soft-skip comment past IsGlobal/IsVolatile residual
+		if HasError() {
+			return ""
+		}
+		nm := v.GetActualName(prefixName)
+		// residual ERROR sticky — no invent complete def past GetActualName residual
+		if HasError() {
+			return ""
+		}
+		if nm != "" {
+			b.WriteString(" /* VOLATILE GLOBAL ")
+			b.WriteString(nm)
+			b.WriteString(" */")
+		}
+	} else if HasError() {
+		// residual ERROR sticky — no invent complete def past IsGlobal residual false path
+		return ""
 	}
 	return b.String()
 }
@@ -203,33 +227,54 @@ func (v *Variable) OutputCOpts(prefixName bool) string {
 	}
 	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
 	if v.AsArray != nil && v.AsArray.Collective != nil {
-		return v.AsArray.OutputAccess()
+		out := v.AsArray.OutputAccess()
+		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
+		if HasError() {
+			return ""
+		}
+		return out
 	}
 	name := v.GetActualName(prefixName)
+	// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
+	if HasError() {
+		return ""
+	}
 	// Variable always has live get_actual_name; sticky no invent VOL_RVAL(, T) / ACCESS_ONCE()
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
 	}
 	if v.UseVolRVal && v.IsVolatile() {
+		// residual ERROR sticky — no invent soft-wrap past IsVolatile residual hole
+		if HasError() {
+			return ""
+		}
 		// Variable.cpp:690–693 — type->Output always live; sticky no invent "int"
 		if v.Type == nil {
 			SetError(ErrGeneric)
 			return ""
 		}
 		ty := v.Type.CName()
+		// residual ERROR sticky — no invent soft-wrap past CName residual hole
+		if HasError() {
+			return ""
+		}
 		if ty == "" {
 			SetError(ErrGeneric)
 			return ""
 		}
 		return "VOL_RVAL(" + name + ", " + ty + ")"
 	}
+	// residual ERROR sticky — no invent bare name past IsVolatile residual false path
+	if HasError() {
+		return ""
+	}
 	// Variable.cpp:694–696 — CGOptions::access_once() && isAccessOnce && !isAddrTaken
 	// sticky when IsAccessOnce but option off (assert enabled; no invent silent skip wrap)
 	if v.IsAccessOnce && !v.IsAddrTaken {
 		if !ProcessOptions().AccessOnce {
 			SetError(ErrGeneric)
-			return name
+			return ""
 		}
 		return "ACCESS_ONCE(" + name + ")"
 	}

@@ -64,15 +64,26 @@ func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 		t.Fatal("incomplete forHeader must SetError sticky")
 	}
 	ClearError()
+	// Test residual soft invent was soft-continue incr invent partial for header.
+	// Fair: sticky empty whole header.
+	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
+	badTest := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual Output
+	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd}
+	lcRes := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: badTest, IncrStmt: goodIncr}
+	if forHeaderOutput(lcRes) != "" {
+		t.Fatal("test Output residual must fail closed forHeaderOutput, not invent partial")
+	}
+	if !HasError() {
+		t.Fatal("test Output residual forHeaderOutput must SetError sticky")
+	}
+	ClearError()
 	out := (&Block{Stmts: []Stmt{{Kind: StmtFor, Loop: lc}}}).Output(0)
 	if strings.Contains(out, "for") {
 		t.Fatal("for without body/IR must not invent header", out)
 	}
 	// header present but no Then body
 	ClearError()
-	goodInit := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple}
 	goodTest := &Expression{Term: TermConstant, Con: MakeInt(1)}
-	goodIncr := &Stmt{Kind: StmtAssign, LhsVar: iv, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignAdd}
 	lc2 := &LoopControl{IV: iv, InitStmt: goodInit, TestExpr: goodTest, IncrStmt: goodIncr}
 	if forHeaderOutput(lc2) == "" {
 		t.Fatal("complete IR must emit header")

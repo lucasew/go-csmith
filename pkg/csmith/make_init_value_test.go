@@ -56,6 +56,21 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	}
 }
 
+func TestOutputDefInitExprResidualSticky(t *testing.T) {
+	// InitExpr.Output residual soft invent was soft-continue invent complete def.
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v.Init = nil
+	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
+	if s := v.OutputDef(false); s != "" {
+		t.Fatal("InitExpr Output residual must fail closed OutputDef", s)
+	}
+	if !HasError() {
+		t.Fatal("InitExpr Output residual OutputDef must SetError sticky")
+	}
+	ClearError()
+}
+
 func TestApplyInitExprOutputDef(t *testing.T) {
 	ClearError()
 	iv := CreateVariableScalars("g_i", GetIntType(), false, false)

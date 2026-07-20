@@ -657,13 +657,23 @@ func forHeaderOutput(lc *LoopControl) string {
 		return ""
 	}
 	init := forInitOutput(lc)
+	// residual ERROR sticky — no invent soft-continue test/incr past init residual
+	if HasError() {
+		return ""
+	}
 	test := forTestOutput(lc)
+	// residual ERROR sticky — no invent soft-continue incr past test residual
+	if HasError() {
+		return ""
+	}
 	incr := forIncrOutput(lc)
+	// residual ERROR sticky — no invent soft-continue header past incr residual
+	if HasError() {
+		return ""
+	}
 	// StatementFor.cpp:408–414 — always live init/test/incr; sticky no invent empty segments
 	if init == "" || test == "" || incr == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	return fmt.Sprintf("for (%s; %s; %s)", init, test, incr)
@@ -682,10 +692,12 @@ func arrayOpHeaderOutput(lc *LoopControl, opts Options) string {
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)
 	iv := lc.IV.OutputC()
+	// residual ERROR sticky — no invent soft-continue header past OutputC residual
+	if HasError() {
+		return ""
+	}
 	if iv == "" {
-		if !HasError() {
-			SetError(ErrGeneric)
-		}
+		SetError(ErrGeneric)
 		return ""
 	}
 	var b strings.Builder
@@ -729,7 +741,12 @@ func forInitOutput(lc *LoopControl) string {
 	if lc.IV != nil {
 		wrap = lc.IV.UseVolRVal
 	}
-	return OutputAssignAsExpr(lc.InitStmt, wrap)
+	out := OutputAssignAsExpr(lc.InitStmt, wrap)
+	// residual ERROR sticky — no invent soft-empty init past OutputAssign residual
+	if HasError() {
+		return ""
+	}
+	return out
 }
 
 func forTestOutput(lc *LoopControl) string {
@@ -738,7 +755,12 @@ func forTestOutput(lc *LoopControl) string {
 		SetError(ErrGeneric)
 		return ""
 	}
-	return lc.TestExpr.Output()
+	out := lc.TestExpr.Output()
+	// residual ERROR sticky — no invent soft-empty test past Output residual
+	if HasError() {
+		return ""
+	}
+	return out
 }
 
 // forIncrOutput emits for-loop increment via IncrStmt OutputAsExpr.
@@ -753,5 +775,10 @@ func forIncrOutput(lc *LoopControl) string {
 	if lc.IV != nil {
 		wrap = lc.IV.UseVolRVal
 	}
-	return OutputAssignAsExpr(lc.IncrStmt, wrap)
+	out := OutputAssignAsExpr(lc.IncrStmt, wrap)
+	// residual ERROR sticky — no invent soft-empty incr past OutputAssign residual
+	if HasError() {
+		return ""
+	}
+	return out
 }
