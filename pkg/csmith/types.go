@@ -493,9 +493,8 @@ func SetPlatformSizes(intSize, ptrSize int) {
 // SizeInBytes mirrors Type::SizeInBytes for simple/pointer types.
 // Type.cpp:1497–1572 — simple sizes are fixed (not host LP64 invent):
 // eInt/eUInt/eLong/eULong = 4, eLongLong/eULongLong = 8, eInt128/eUInt128 = 16.
-// Pointer uses CGOptions::pointer_size (platform.info); C++ call site discards
-// the return and falls through to 0 — we keep platform ptr size for pointee-agnostic
-// byte counts that still need a live pointer width (array/sizeof paths).
+// Pointer: Type.cpp:1568–1572 calls CGOptions::pointer_size() then falls through
+// to return 0 — fair port returns 0 (is_convertable compares pointee sizes via this).
 // Type* always live at SizeInBytes sites; sticky 0 (no invent zero-size soft-skip).
 func (t *Type) SizeInBytes() int {
 	if t == nil {
@@ -503,9 +502,9 @@ func (t *Type) SizeInBytes() int {
 		return 0
 	}
 	if t.ptrTo != nil {
-		// Type.cpp:1568–1570 — ePointer path; use platform pointer_size (not invent 0
-		// for live sizeof-style uses that C++ rarely exercises via SizeInBytes).
-		return platformPtrSize
+		// Type.cpp:1568–1572 — ePointer: pointer_size() side-effect then return 0
+		_ = platformPtrSize
+		return 0
 	}
 	// Type.cpp:1502–1531 — fixed simple sizes (independent of host LP64)
 	switch t.simple {

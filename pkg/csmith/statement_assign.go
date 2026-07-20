@@ -349,7 +349,9 @@ func MakeRandomAssignQfer(
 	lhsCG.CurrRHS = rhs
 
 	// StatementAssign.cpp:190–203 — CGOptions::match_exact_qualifiers(true) when qf
-	// process-wide for CVQualifiers::match / choose_var; restore after Lhs
+	// process-wide for CVQualifiers::match / choose_var; restore after Lhs.
+	// Must restore on every early return (no invent sticky process MatchExactQualifiers
+	// that over-restricts later choose_var qfer match — seed-2 OK-list shrink).
 	prevExact := opts.MatchExactQualifiers
 	prevProc := ProcessOptions()
 	if callerQf {
@@ -357,6 +359,10 @@ func MakeRandomAssignQfer(
 		po := prevProc
 		po.MatchExactQualifiers = true
 		SetProcessOptions(po)
+		defer func() {
+			opts.MatchExactQualifiers = prevExact
+			SetProcessOptions(prevProc)
+		}()
 	}
 	// StatementAssign.cpp:195–200 — strict_float uses RHS type for Lhs
 	lhsType := typ
@@ -374,10 +380,6 @@ func MakeRandomAssignQfer(
 	}
 	compound := op != AssignSimple
 	lhs := MakeRandomLhs(r, opts, probs, vs, &lhsCG, lhsType, compound, op.NeedNoRHS(), &qfer)
-	if callerQf {
-		opts.MatchExactQualifiers = prevExact
-		SetProcessOptions(prevProc)
-	}
 	var lhsVar *Variable
 	if lhs != nil {
 		lhsVar = lhs.Var

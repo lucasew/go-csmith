@@ -3,13 +3,14 @@ package csmith
 import "testing"
 
 func TestSizeInBytesUsesPlatform(t *testing.T) {
-	// Type.cpp:1497–1531 — simple sizes fixed; pointer uses platform_size
+	// Type.cpp:1497–1531 — simple sizes fixed; ePointer SizeInBytes returns 0
 	SetPlatformSizes(4, 8)
 	if GetIntType().SizeInBytes() != 4 {
 		t.Fatal("int")
 	}
-	if PointerTo(GetIntType()).SizeInBytes() != 8 {
-		t.Fatal("ptr")
+	// Type.cpp:1568–1572 — pointer falls through to 0 (not invent platform width)
+	if PointerTo(GetIntType()).SizeInBytes() != 0 {
+		t.Fatal("ptr SizeInBytes must be 0 like C++")
 	}
 	// Type.cpp:1511–1522 — eLong/eULong always 4 (no invent host LP64 long==8)
 	if GetSimpleType(ELong).SizeInBytes() != 4 {
@@ -29,8 +30,9 @@ func TestSizeInBytesUsesPlatform(t *testing.T) {
 		t.Fatal(GetSimpleType(EULong).CName())
 	}
 	SetPlatformSizes(4, 4)
-	if PointerTo(GetIntType()).SizeInBytes() != 4 {
-		t.Fatal("ptr ILP32")
+	// pointer still 0; platformPtrSize only for other uses
+	if PointerTo(GetIntType()).SizeInBytes() != 0 {
+		t.Fatal("ptr still 0 on ILP32")
 	}
 	// long still 4 regardless of pointer size
 	if GetSimpleType(ELong).SizeInBytes() != 4 {

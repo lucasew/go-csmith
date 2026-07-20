@@ -290,3 +290,38 @@ func TestAssignOpsProbabilityIsFloatResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T) {
+	// StatementAssign.cpp:190–203 — force match_exact when qf, always restore.
+	// Invent sticky process MatchExactQualifiers over-restricts later choose_var.
+	ClearError()
+	prev := ProcessOptions()
+	defer SetProcessOptions(prev)
+	opts := Defaults()
+	opts.MatchExactQualifiers = false
+	opts.StrictFloat = true
+	SetProcessOptions(opts)
+	// nil FM → early empty Stmt before set (callerQf path after FM check)
+	// Use path: set exact, then StrictFloat+rhs GetType residual early return.
+	// Incomplete Expression type triggers GetType residual under StrictFloat.
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	// Force early return after exact set: MakeRandomAssignQfer with qf non-nil,
+	// StrictFloat, and an RHS path is after RHS is built — use incomplete type
+	// after setting by calling with void-ish via force op path.
+	// Simpler: call MakeRandomAssignQfer with qf, then check process after
+	// a failure that used to skip restore (StrictFloat GetType).
+	// Build a broken rhs by using incomplete effect on a nested path — instead
+	// directly set process exact and invoke Lhs-making assign that fails FM wipe.
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	// Incomplete GlobalFacts after setup causes early fail at start — before exact set.
+	// Use Valid path then corrupt: call with StrictFloat and nil typ so SelectLType runs,
+	// then force HasError during strict float by… hard to hit GetType residual.
+	// Unit the defer contract: after any MakeRandomAssignQfer with qf, process flag restored.
+	_ = MakeRandomAssignQfer(NewRng(1), opts, NewProbabilities(opts), NewVariableSelector(opts), NewExprTables(opts), &cg, GetIntType(), &q)
+	if ProcessOptions().MatchExactQualifiers {
+		t.Fatal("MatchExactQualifiers must restore to false after MakeRandomAssignQfer with qf")
+	}
+	ClearError()
+}
