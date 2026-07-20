@@ -801,9 +801,22 @@ func makeRandomStmt(
 			return true
 		}
 		// Statement.cpp:167–169 — void functions cannot return
-		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil &&
-			cg.CurrentFunc.ReturnType.IsSimple() && cg.CurrentFunc.ReturnType.Simple() == EVoid {
-			return true
+		if k == StmtReturn && cg.CurrentFunc != nil && cg.CurrentFunc.ReturnType != nil {
+			isSimple := cg.CurrentFunc.ReturnType.IsSimple()
+			// residual ERROR sticky — no invent filter keep/reject past IsSimple residual
+			if HasError() {
+				return true
+			}
+			if isSimple {
+				st := cg.CurrentFunc.ReturnType.Simple()
+				// residual ERROR sticky — no invent filter keep/reject past Simple residual
+				if HasError() {
+					return true
+				}
+				if st == EVoid {
+					return true
+				}
+			}
 		}
 		// Statement.cpp:171–173 — break/continue only in loops
 		if (k == StmtBreak || k == StmtContinue) && !cg.InLoop() {
@@ -814,6 +827,7 @@ func makeRandomStmt(
 			return IsCompound(k)
 		}
 		// Statement.cpp:179–183 — at max funcs: filter only Invoke (allow others)
+		// ReachMaxFunctions nil-Func holes are non-sticky restrictive max (soft re-pick)
 		if ReachMaxFunctions(cg.Funcs, opts) {
 			return k == StmtInvoke
 		}
@@ -1079,10 +1093,12 @@ func (b *Block) Output(indent int) string {
 				return ""
 			}
 			cn := ty.CName()
+			// residual ERROR sticky — no invent soft-continue tmp decl past CName residual
+			if HasError() {
+				return ""
+			}
 			if cn == "" {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
+				SetError(ErrGeneric)
 				return ""
 			}
 			sb.WriteString(inner)

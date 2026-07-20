@@ -335,12 +335,29 @@ func (t *Type) OutputStructDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	for i, f := range t.Fields {
 		// Type.cpp:1866+ — bitfield fields: signed/unsigned only, not invent "int"
 		if f.BitWidth >= 0 {
-			if f.Type == nil || !f.Type.IsSimple() {
+			if f.Type == nil {
 				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
 				SetError(ErrGeneric)
 				return ""
 			}
+			if !f.Type.IsSimple() {
+				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
+				if HasError() {
+					return ""
+				}
+				// Type.cpp:1866 assert(eSimple) sticky; fail closed whole decl
+				SetError(ErrGeneric)
+				return ""
+			}
+			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
+			if HasError() {
+				return ""
+			}
 			st := f.Type.Simple()
+			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
+			if HasError() {
+				return ""
+			}
 			// Type.cpp:1868–1873 — eInt → signed; eUInt → unsigned; else assert(0) sticky
 			var signedKW string
 			switch st {
@@ -734,11 +751,27 @@ func (t *Type) OutputUnionDeclOpts(r *Rng, attrs *AttributeGenerator) string {
 	for _, f := range t.Fields {
 		if f.BitWidth >= 0 {
 			// unions rarely have bitfields; same assert rules as struct sticky
-			if f.Type == nil || !f.Type.IsSimple() {
+			if f.Type == nil {
 				SetError(ErrGeneric)
 				return ""
 			}
+			if !f.Type.IsSimple() {
+				// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual
+				if HasError() {
+					return ""
+				}
+				SetError(ErrGeneric)
+				return ""
+			}
+			// residual ERROR sticky — no invent soft-continue bitfield past IsSimple residual true
+			if HasError() {
+				return ""
+			}
 			st := f.Type.Simple()
+			// residual ERROR sticky — no invent soft-continue bitfield past Simple residual
+			if HasError() {
+				return ""
+			}
 			var signedKW string
 			switch st {
 			case EInt:

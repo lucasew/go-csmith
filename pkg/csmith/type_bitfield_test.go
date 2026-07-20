@@ -226,3 +226,19 @@ func TestOutputUnionDeclFieldTypeResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputStructDeclBitfieldIsSimpleResidualSticky(t *testing.T) {
+	// IsSimple residual soft invent was invent signed/unsigned past non-simple bitfield Type.
+	ClearError()
+	// pointer bitfield Type — IsSimple false without residual then SetError
+	st := &Type{isStruct: true, StructName: "Sbad", Fields: []StructField{
+		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: 3},
+	}}
+	if s := st.OutputStructDecl(); s != "" {
+		t.Fatal("non-simple bitfield must fail closed", s)
+	}
+	if !HasError() {
+		t.Fatal("non-simple bitfield OutputStructDecl must SetError sticky")
+	}
+	ClearError()
+}

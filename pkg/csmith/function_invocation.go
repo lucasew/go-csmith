@@ -304,6 +304,9 @@ func ReachMaxFunctions(list *FunctionList, opts Options) bool {
 	n := 0
 	for _, f := range list.Funcs {
 		if f == nil {
+			// incomplete Funcs fail closed as max-reached (restrictive filter — no invent
+			// room for more). Non-sticky: soft re-pick factories must not get ambient ERROR
+			// poison from list holes (see TestReachMaxFunctions / GenerateFunctions).
 			return true
 		}
 		if !f.IsBuiltin {
@@ -387,6 +390,10 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				}
 				continue
 			}
+			// residual ERROR sticky — no invent soft-keep match past Match residual true path
+			if HasError() {
+				return nil
+			}
 		}
 		// incomplete callee FEffect fails closed sticky (no invent skip as conflict past hole)
 		if cg != nil && !EffectComplete(f.FEffect) {
@@ -400,6 +407,10 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 				return nil
 			}
 			continue
+		}
+		// residual ERROR sticky — no invent soft-keep after InConflict residual false
+		if HasError() {
+			return nil
 		}
 		// Function.cpp:307–313 — strict_volatile_rule
 		if opts.StrictVolatileRule && cg != nil {
@@ -557,12 +568,18 @@ func BuildUserInvocation(
 		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
 		running = running.AddEffect(paramAccum)
+		// residual ERROR sticky — no invent soft-continue later params past AddEffect residual
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		if !EffectComplete(running) {
 			SetError(ErrGeneric)
 			fi.Failed = true
 			return fi
 		}
 		cg.MergeParamContext(paramCG, false)
+		// residual ERROR sticky — no invent soft-continue later params past MergeParam residual
 		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
 			if !HasError() {
 				SetError(ErrGeneric)

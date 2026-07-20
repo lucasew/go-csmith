@@ -660,3 +660,25 @@ func TestInvocationBinaryOutputResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestChooseFuncContextMatchResidualTruePathSticky(t *testing.T) {
+	// Match residual soft invent was invent keep after Match true with residual.
+	// Hygiene: complete match path + incomplete FEffect sticky.
+	ClearError()
+	opts := Defaults()
+	f := &Function{
+		Name: "func_1", ReturnType: GetIntType(),
+		RV: &Variable{Name: "func_1_rv", Type: GetIntType(), Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
+		FEffect: IncompleteEffect(),
+		IsBuilt: true, BuildState: BuildBuilt,
+	}
+	q := NewCVQualifiers([]bool{false}, []bool{false})
+	cg := EmptyCGContext()
+	if ChooseFuncContext(NewRng(1), []*Function{f}, GetIntType(), nil, &cg, opts, &q) != nil {
+		t.Fatal("Incomplete FEffect must fail closed ChooseFuncContext")
+	}
+	if !HasError() {
+		t.Fatal("Incomplete FEffect ChooseFuncContext must SetError sticky")
+	}
+	ClearError()
+}

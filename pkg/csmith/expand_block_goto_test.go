@@ -255,3 +255,30 @@ func TestGenerateNewParentLocalVolatileAggGlobal(t *testing.T) {
 		t.Fatal("must not be local")
 	}
 }
+
+func TestReachMaxFunctionsNilFuncResidualSticky(t *testing.T) {
+	// nil Func soft invent was invent room for more past incomplete Funcs hole.
+	// Fair: fail closed max-reached true, non-sticky (soft re-pick factories).
+	ClearError()
+	list := &FunctionList{Funcs: []*Function{nil}}
+	opts := Defaults()
+	opts.MaxFuncs = 10
+	if !ReachMaxFunctions(list, opts) {
+		t.Fatal("nil Func hole must fail closed max-reached true")
+	}
+	if HasError() {
+		t.Fatal("nil Func hole ReachMaxFunctions must stay non-sticky")
+	}
+	ClearError()
+	// complete under max
+	list2 := &FunctionList{Funcs: []*Function{
+		{Name: "func_1", ReturnType: GetIntType()},
+	}}
+	if ReachMaxFunctions(list2, opts) {
+		t.Fatal("one user func under max must not invent max")
+	}
+	if HasError() {
+		t.Fatal("complete ReachMaxFunctions must not sticky")
+	}
+	ClearError()
+}
