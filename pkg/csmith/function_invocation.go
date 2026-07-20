@@ -1114,63 +1114,65 @@ func MakeRandomBinaryInvocation(
 		}
 	}
 
+	// FunctionInvocation.cpp:222–255 — ordered RHS on original cg; else combined effect + shifts.
 	var right *Expression
-	if op == BinLShift || op == BinRShift {
-		// FunctionInvocation.cpp:236–244 — rnd_flipcoin(ShiftByNonConstantProb())
-		// C++ Probabilities singleton; nil session → 0% (no invent hard-coded 50)
-		shiftNonConst := 0
-		if probs != nil {
-			shiftNonConst = probs.Single(PShiftByNonConstantProb)
-		} else if p := ProcessProbabilities(); p != nil {
-			shiftNonConst = p.Single(PShiftByNonConstantProb)
+	if IsOrderedBinary(op) {
+		// FunctionInvocation.cpp:224–226 — RHS under original cg_context
+		right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
+	} else {
+		// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
+		// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
+		rhsAccum := EmptyEffect()
+		rhsCG := cg.CloneSubcontext()
+		rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
+		if !EffectComplete(rhsCtx) {
+			SetError(ErrGeneric)
+			return nil
 		}
-		// not_constant = flip; constant path when !not_constant
-		if !r.RndFlipcoin(uint32(shiftNonConst)) {
-			// FunctionInvocation.cpp:241 — make_random_upto(lhs_type->SizeInBytes() * 8)
-			// Type always live after flags assert; SizeInBytes 0 is incomplete
-			// (no invent default 32-bit width)
-			if lhsTy != nil {
-				sb := lhsTy.SizeInBytes()
-				// residual ERROR sticky — no invent soft-shift const past SizeInBytes residual
-				if HasError() {
-					return nil
-				}
-				if sb > 0 {
-					bits := uint32(sb * 8)
-					// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
-					if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
-						// FunctionInvocation.cpp:241–243 — Constant::make_random_upto as RHS.
-						// Not Expression::make_random — C++ does NOT bump expr_depth here
-						// (depth++ only in Expression.cpp:213–218 after make_random).
-						// Extra bump made Go hit max_expr_depth one level early (seed-2 e9188:
-						// UP U120 Function vs Go depth-gate filtered Function → Constant).
-						right = &Expression{Term: TermConstant, Con: c}
+		rhsCG.effectContext = rhsCtx
+		rhsCG.EffectAccum = &rhsAccum
+		rhsCG.EffectStm = EmptyEffect()
+		if op == BinLShift || op == BinRShift {
+			// FunctionInvocation.cpp:236–244 — rnd_flipcoin(ShiftByNonConstantProb())
+			// C++ Probabilities singleton; nil session → 0% (no invent hard-coded 50)
+			shiftNonConst := 0
+			if probs != nil {
+				shiftNonConst = probs.Single(PShiftByNonConstantProb)
+			} else if p := ProcessProbabilities(); p != nil {
+				shiftNonConst = p.Single(PShiftByNonConstantProb)
+			}
+			// not_constant = flip; constant path when !not_constant
+			if !r.RndFlipcoin(uint32(shiftNonConst)) {
+				// FunctionInvocation.cpp:241 — make_random_upto(lhs_type->SizeInBytes() * 8)
+				// Type always live after flags assert; SizeInBytes 0 is incomplete
+				// (no invent default 32-bit width)
+				if lhsTy != nil {
+					sb := lhsTy.SizeInBytes()
+					// residual ERROR sticky — no invent soft-shift const past SizeInBytes residual
+					if HasError() {
+						return nil
+					}
+					if sb > 0 {
+						bits := uint32(sb * 8)
+						// Constant::make_random_upto; ERROR_GUARD — no invent shell with nil Con
+						if c := MakeRandomUpto(bits, r); c != nil && !HasError() {
+							// FunctionInvocation.cpp:241–243 — Constant::make_random_upto as RHS.
+							// Not Expression::make_random — C++ does NOT bump expr_depth here
+							// (depth++ only in Expression.cpp:213–218 after make_random).
+							// Extra bump made Go hit max_expr_depth one level early (seed-2 e9188:
+							// UP U120 Function vs Go depth-gate filtered Function → Constant).
+							right = &Expression{Term: TermConstant, Con: c}
+						}
 					}
 				}
+			} else {
+				// FunctionInvocation.cpp:243–244 — make_random(..., no_func=false, no_const=true)
+				// Avoid negative / oversized shift amounts via constant-filter (not make_random_upto).
+				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, true, MaxTermTypes, rhsCG.ExprDepth)
 			}
-		}
-	}
-	if right == nil {
-		if IsOrderedBinary(op) {
-			// FunctionInvocation.cpp:224–226 — RHS under original cg_context
-			right = MakeRandomExpression(r, opts, tables, vs, cg, rhsTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
 		} else {
-			// FunctionInvocation.cpp:228–234 / 255 — combined effect_context + separate accum
-			// Incomplete lhs accum fails closed sticky (no invent RHS under incomplete ambient)
-			rhsAccum := EmptyEffect()
-			rhsCG := cg.CloneSubcontext()
-			rhsCtx := cg.EffectContext().AddEffectOpts(lhsAccum, true)
-			if !EffectComplete(rhsCtx) {
-				SetError(ErrGeneric)
-				return nil
-			}
-			rhsCG.effectContext = rhsCtx
-			rhsCG.EffectAccum = &rhsAccum
-			rhsCG.EffectStm = EmptyEffect()
-			// Shift constant path may already have set right above.
-			if right == nil {
-				right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
-			}
+			// FunctionInvocation.cpp:247 — Expression::make_random(rhs_cg_context, rhs_type)
+			right = MakeRandomExpression(r, opts, tables, vs, &rhsCG, rhsTy, nil, false, false, MaxTermTypes, rhsCG.ExprDepth)
 			// FunctionInvocation.cpp:246–253 — div/mod zero-guard BEFORE merge (C++ order)
 			// rhs->equals(0) || rhs->is_0_or_1() (all comparison Funcalls are is_0_or_1).
 			// Then rnd_upto(MAX_BINARY_OP, filter) rejecting mod/div/shifts.
@@ -1209,14 +1211,14 @@ func MakeRandomBinaryInvocation(
 					}
 				}
 			}
-			// FunctionInvocation.cpp:255 — merge_param_context(rhs)
-			cg.MergeParamContext(rhsCG, true)
-			if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
-				if !HasError() {
-					SetError(ErrGeneric)
-				}
-				return nil
+		}
+		// FunctionInvocation.cpp:255 — merge_param_context(rhs) (incl. shift constant path)
+		cg.MergeParamContext(rhsCG, true)
+		if HasError() || !EffectComplete(cg.EffectStm) || (cg.EffectAccum != nil && !EffectComplete(*cg.EffectAccum)) {
+			if !HasError() {
+				SetError(ErrGeneric)
 			}
+			return nil
 		}
 	}
 	// FunctionInvocation.cpp:257 — ERROR_GUARD_AND_DEL2

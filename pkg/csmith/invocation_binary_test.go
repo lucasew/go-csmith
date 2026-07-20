@@ -341,6 +341,50 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	}
 }
 
+func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
+	// FunctionInvocation.cpp:243–244 — non-constant shift RHS:
+	// Expression::make_random(rhs_cg, rhs_type, nullptr, /*no_func=*/false, /*no_const=*/true, MAX)
+	// so TermConstant is filtered (avoids negative / oversized shift amounts).
+	// Was: no_const=false → could pick Constant mid depth-gate (seed-2 e11008 U120 tries=2 vs UP tries=6).
+	opts := Defaults()
+	probs := NewProbabilities(opts)
+	probs.single[PShiftByNonConstantProb] = 100
+	prev := ProcessProbabilities()
+	SetProcessProbabilities(probs)
+	defer SetProcessProbabilities(prev)
+	// Seed a local int so Variable term is available under depth/no_const filters.
+	vs := NewVariableSelector(opts)
+	vs.Probs = probs
+	loc := &Variable{Name: "l_shift", Type: GetIntType()}
+	tables := NewExprTables(opts)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
+	f.Stack = []*Block{blk}
+	found := 0
+	for seed := uint64(1); seed < 400; seed++ {
+		ClearError()
+		cg := WithFunc(f, EmptyEffect()).WithFactMgr(NewFactMgr(f))
+		cg.ExprDepth = 0
+		fi := MakeRandomBinaryInvocation(NewRng(seed), opts, probs, vs, tables, &cg, GetIntType())
+		if fi == nil || !fi.IsStd {
+			continue
+		}
+		if fi.Binary != "<<" && fi.Binary != ">>" {
+			continue
+		}
+		if len(fi.Args) < 2 || fi.Args[1] == nil {
+			t.Fatalf("shift missing rhs seed=%d", seed)
+		}
+		found++
+		if fi.Args[1].Term == TermConstant {
+			t.Fatalf("ShiftByNonConstantProb=100 must filter TermConstant RHS (no_const=true), got Constant seed=%d", seed)
+		}
+	}
+	if found == 0 {
+		t.Fatal("expected at least one << / >> with ShiftByNonConstantProb=100")
+	}
+}
+
 func TestVisitFactsBinaryOrderedIncompleteFailClosed(t *testing.T) {
 	// sticky on nil / short args (no invent visit / soft re-pick)
 	ClearError()
