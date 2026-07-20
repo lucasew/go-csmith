@@ -797,12 +797,21 @@ func (t *Type) NeedsCast(other *Type) bool {
 		return false
 	}
 	tb, ob := t.BaseType(), other.BaseType()
+	// residual ERROR sticky — no invent soft-continue no-cast past BaseType residual
+	if HasError() {
+		return true
+	}
 	if tb == nil || ob == nil {
 		// incomplete base type sticky needs cast (restrictive)
 		SetError(ErrGeneric)
 		return true
 	}
-	return !tb.IsEquivalent(ob)
+	eq := tb.IsEquivalent(ob)
+	// residual ERROR sticky — no invent soft-continue no-cast past IsEquivalent residual
+	if HasError() {
+		return true
+	}
+	return !eq
 }
 
 // HasBitfields mirrors Type::has_bitfields.

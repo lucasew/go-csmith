@@ -110,7 +110,12 @@ func (fi *Invocation) getTypeUnary() *Type {
 			SetError(ErrGeneric)
 			return nil
 		}
-		return fi.Args[0].GetType()
+		ty := fi.Args[0].GetType()
+		// residual ERROR sticky — no invent unary type past GetType residual hole
+		if HasError() {
+			return nil
+		}
+		return ty
 	default:
 		// FunctionInvocationUnary.cpp:117 assert invalid operator sticky; no invent eInt
 		SetError(ErrGeneric)
@@ -140,6 +145,10 @@ func (fi *Invocation) getTypeBinary() *Type {
 			return nil
 		}
 		lt, rt := fi.Args[0].GetType(), fi.Args[1].GetType()
+		// residual ERROR sticky — no invent eInt/eUInt past GetType residual hole
+		if HasError() {
+			return nil
+		}
 		if lt == nil || rt == nil {
 			SetError(ErrGeneric)
 			return nil
@@ -157,6 +166,10 @@ func (fi *Invocation) getTypeBinary() *Type {
 			return nil
 		}
 		lt := fi.Args[0].GetType()
+		// residual ERROR sticky — no invent eInt/eUInt past GetType residual hole
+		if HasError() {
+			return nil
+		}
 		if lt == nil {
 			SetError(ErrGeneric)
 			return nil

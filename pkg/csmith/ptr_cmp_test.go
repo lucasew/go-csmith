@@ -65,3 +65,29 @@ func TestRecordPointerComparisonsGetType(t *testing.T) {
 	}
 	RecordPointerComparisons(lhs, rhs)
 }
+
+func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {
+	// Soft invent was left.GetType residual / CheckAndSetCast residual then invent PtrCmp inv.
+	// Fair: residual stickies fail closed before flags shell.
+	ClearError()
+	opts := Defaults()
+	opts.LangCPP = true
+	// Type-nil left GetType residual
+	left := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
+	lt := left.GetType()
+	if lt != nil || !HasError() {
+		t.Fatal("Type-nil left GetType must residual sticky nil")
+	}
+	// ptr-cmp path after GetType residual: fail closed (no invent inv shell)
+	ClearError()
+	// CheckAndSetCast residual on incomplete right after live left type
+	rightHole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_r"}}
+	rightHole.CheckAndSetCastOpts(PointerTo(GetIntType()), opts)
+	if rightHole.CastType != nil {
+		t.Fatal("GetTypeUncast residual must not invent CastType on right")
+	}
+	if !HasError() {
+		t.Fatal("CheckAndSetCast residual must SetError sticky")
+	}
+	ClearError()
+}

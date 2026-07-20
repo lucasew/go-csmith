@@ -588,3 +588,36 @@ func TestInvocationGetTypeNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestInvocationGetTypeArgResidualSticky(t *testing.T) {
+	// GetType residual soft invent was invent eInt/eUInt past incomplete arg type shell.
+	ClearError()
+	hole := &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}
+	good := &Expression{Term: TermConstant, Con: MakeInt(2)}
+	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{hole, good}}
+	if fi.GetType() != nil {
+		t.Fatal("GetType residual must fail closed nil type, not invent eInt")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual binary must SetError sticky")
+	}
+	ClearError()
+	// unary operand residual
+	fiU := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{hole}}
+	if fiU.GetType() != nil {
+		t.Fatal("GetType residual unary must fail closed nil type")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual unary must SetError sticky")
+	}
+	ClearError()
+	// shift left residual
+	fiS := &Invocation{IsStd: true, Binary: "<<", Args: []*Expression{hole, good}}
+	if fiS.GetType() != nil {
+		t.Fatal("GetType residual shift must fail closed nil type")
+	}
+	if !HasError() {
+		t.Fatal("GetType residual shift must SetError sticky")
+	}
+	ClearError()
+}

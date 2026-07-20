@@ -125,6 +125,30 @@ func TestMakeRandomReturnIncompleteAmbientFailClosed(t *testing.T) {
 	ClearError()
 }
 
+func TestCheckAndSetCastResidualNoInventReturnShell(t *testing.T) {
+	// Soft invent was CheckAndSetCast residual then invent StmtReturn complete shell.
+	// Fair: residual ERROR stickies; return path fail closed empty (no invent).
+	ClearError()
+	opts := Defaults()
+	opts.LangCPP = true
+	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
+	hole.CheckAndSetCastOpts(GetIntType(), opts)
+	if hole.CastType != nil {
+		t.Fatal("GetTypeUncast residual must not invent CastType")
+	}
+	if !HasError() {
+		t.Fatal("CheckAndSetCast residual must SetError sticky")
+	}
+	// MakeRandomReturn pattern after cast residual: empty Stmt{}, not invent return
+	if HasError() {
+		st := Stmt{}
+		if st.Kind == StmtReturn || stmtOK(st) {
+			t.Fatal("cast residual must not invent Return shell")
+		}
+	}
+	ClearError()
+}
+
 func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	// StatementReturn.cpp:91–94 — get_fact_mgr + curr_func + rv always live sticky
 	ClearError()

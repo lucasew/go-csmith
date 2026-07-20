@@ -528,6 +528,11 @@ func BuildUserInvocation(
 		}
 		// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
+		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:264–267 — running first, then merge_param_context(default include_lhs=false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
@@ -703,6 +708,11 @@ func BuildInvocationAndFunction(
 		}
 		// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
 		arg.CheckAndSetCastOpts(ty, opts)
+		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 		fi.Args = append(fi.Args, arg)
 		// FunctionInvocationUser.cpp:193–196 — running.add_effect then merge_param_context(default false)
 		// Incomplete param accum fails closed sticky (no invent more params / soft re-pick past holes)
@@ -1219,9 +1229,22 @@ func MakeRandomBinaryPtrComparison(
 		return nil
 	}
 	// FunctionInvocation.cpp:349 — typecast RHS to LHS type if needed (lang_cpp)
-	right.CheckAndSetCastOpts(left.GetType(), opts)
+	lt := left.GetType()
+	// residual ERROR sticky — no invent ptr-cmp past GetType residual hole
+	if HasError() {
+		return nil
+	}
+	right.CheckAndSetCastOpts(lt, opts)
+	// residual ERROR sticky — no invent ptr-cmp past CheckAndSetCast residual hole
+	if HasError() {
+		return nil
+	}
 	// FunctionInvocation.cpp:358 — bookkeeping
 	RecordPointerComparisons(left, right)
+	// residual ERROR sticky — no invent ptr-cmp past RecordPointerComparisons residual hole
+	if HasError() {
+		return nil
+	}
 	// FunctionInvocation.cpp:297–302 — flags always; Output uses standard ==/!= (not safe_ops)
 	flags := MakeRandomBinaryKind(r, opts, probs, GetIntType(), GetIntType(), GetIntType(), SafeOpBinary, op)
 	// ERROR_GUARD after make_random_binary; no soft invent nil-flags ptr comparison

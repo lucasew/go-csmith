@@ -193,8 +193,21 @@ func (e *Expression) checkAndSetCastCore(desired *Type) {
 		}
 		return
 	}
+	// residual ERROR sticky — no invent soft-continue NeedsCast past GetTypeUncast residual
+	if HasError() {
+		return
+	}
 	if src.NeedsCast(desired) {
+		// residual ERROR sticky — no invent CastType past NeedsCast residual hole
+		if HasError() {
+			return
+		}
 		e.CastType = desired
+		return
+	}
+	// residual ERROR sticky — no invent soft-continue no-cast past NeedsCast residual false
+	if HasError() {
+		return
 	}
 }
 

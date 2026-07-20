@@ -125,6 +125,10 @@ func MakeRandomReturn(
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
 	ev.CheckAndSetCastOpts(ret, opts)
+	// residual ERROR sticky — no invent Return stmt past CheckAndSetCast residual hole
+	if HasError() {
+		return Stmt{}
+	}
 	// ccomp + bitfield return cast (StatementAssign.cpp similar path)
 	if opts.CComp && ev.Var != nil && ev.Var.IsBitfield {
 		ev.CastType = ret

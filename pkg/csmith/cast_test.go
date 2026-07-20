@@ -142,6 +142,24 @@ func TestCheckAndSetCast(t *testing.T) {
 		t.Fatal("Type-nil var CheckAndSetCast must SetError sticky")
 	}
 	ClearError()
+	// NeedsCast residual soft invent was CastType set then invent complete cast success.
+	// Fair: sticky no CastType past NeedsCast residual true path (nil shells).
+	src := PointerTo(GetIntType())
+	if src.NeedsCast(nil) {
+		t.Fatal("NeedsCast nil other must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("NeedsCast nil other must SetError sticky")
+	}
+	ClearError()
+	// residual true path: nil src base via NeedsCast on nil this
+	if (*Type)(nil).NeedsCast(want) {
+		t.Fatal("nil NeedsCast must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil NeedsCast must SetError sticky")
+	}
+	ClearError()
 }
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {

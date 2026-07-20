@@ -313,6 +313,10 @@ func MakeRandomAssignQfer(
 	// RHS cast to L type when needed (StatementAssign.cpp:207–208 — lang_cpp)
 	if rhs != nil && typ != nil {
 		rhs.CheckAndSetCastOpts(typ, opts)
+		// residual ERROR sticky — no invent Assign past CheckAndSetCast residual hole
+		if HasError() {
+			return Stmt{}
+		}
 	}
 	if opts.CComp && lhsVar != nil && lhsVar.IsBitfield {
 		if rhs != nil {
@@ -322,7 +326,14 @@ func MakeRandomAssignQfer(
 	// StatementAssign.cpp:211–216 — float base forces simple op
 	if lhsVar != nil && lhsVar.Type != nil {
 		if bt := lhsVar.Type.BaseType(); bt != nil && bt.IsFloat() && !AssignOpWorksForFloat(op) {
+			// residual ERROR sticky — no invent float-op soft-continue past BaseType residual
+			if HasError() {
+				return Stmt{}
+			}
 			op = AssignSimple
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-continue op past BaseType residual false
+			return Stmt{}
 		}
 	}
 	if rhs != nil {
