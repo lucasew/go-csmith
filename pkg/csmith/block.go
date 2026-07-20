@@ -1195,18 +1195,12 @@ func makeRandomStmtKind(
 	case StmtReturn:
 		return MakeRandomReturn(r, opts, vs, cg)
 	case StmtAssign:
+		// Write effects: Lhs::visit_facts + merge_param_context inside MakeRandomAssign.
+		// No NoteWrite(LhsVar) — that wrongly marks pointers on *p=… (see StatementAssign).
 		st := MakeRandomAssign(r, opts, probs, vs, tables, cg, nil)
-		// residual ERROR sticky — no invent soft-continue NoteWrite past MakeRandomAssign residual
+		// residual ERROR sticky — no invent soft-return assign past MakeRandomAssign residual
 		if HasError() {
 			return Stmt{}
-		}
-		// Effect::write_var on LHS (CGContext effect_accum)
-		if st.LhsVar != nil {
-			cg.NoteWrite(st.LhsVar)
-			// residual ERROR sticky — no invent assign stmt past NoteWrite residual
-			if HasError() {
-				return Stmt{}
-			}
 		}
 		return st
 	case StmtBreak:

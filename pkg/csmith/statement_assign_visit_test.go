@@ -98,10 +98,20 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	if st.Expr != nil && BumpsExprDepth(st.Expr) && cg.ExprDepth < 1 {
 		t.Fatalf("ExprDepth=%d after assign with leaf RHS (want ≥1)", cg.ExprDepth)
 	}
-	// LHS write lands on shared effect_accum
-	if st.LhsVar != nil && !eff.IsWritten(st.LhsVar) && !cg.EffectStm.IsWritten(st.LhsVar) {
-		// NoteWrite / visit_facts path — allow either accum or stm
-		t.Fatalf("expected write effect for lhs %s", st.LhsVar.Name)
+	// LHS write lands on shared effect_accum via visit_facts + merge_param_context.
+	// Lhs.cpp:337–346 — *p writes pointees (not the pointer); bare p writes p.
+	if st.LhsVar != nil {
+		indir := 0
+		if st.Lhs != nil {
+			indir = st.Lhs.IndirectLevel()
+		}
+		if indir == 0 {
+			if !eff.IsWritten(st.LhsVar) && !cg.EffectStm.IsWritten(st.LhsVar) {
+				t.Fatalf("expected write effect for scalar lhs %s", st.LhsVar.Name)
+			}
+		} else if len(eff.WrittenVars()) == 0 && len(cg.EffectStm.WrittenVars()) == 0 {
+			t.Fatalf("expected pointee write for deref lhs %s indir=%d", st.LhsVar.Name, indir)
+		}
 	}
 }
 
@@ -284,4 +294,34 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 		t.Fatal("incomplete Accum assign visit must SetError sticky")
 	}
 	ClearError()
+}
+
+func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
+	// Lhs.cpp:337–346 — *p=… CheckReadVar(p)+write_pointed; StatementAssign must not
+	// invent NoteWrite(p) after merge (seed2 first_div e9238: pointer false-written →
+	// no ptr-bias in SelectParentLocal choose_var).
+	ClearError()
+	opts := Defaults()
+	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
+	ptr := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(ptr, pointee))
+	blk := &Block{Func: f, LocalVars: []*Variable{ptr}}
+	f.Stack = []*Block{blk}
+	eff := EmptyEffect()
+	cg := WithFunc(f, EmptyEffect()).WithFactMgr(fm)
+	cg.EffectAccum = &eff
+	lhs := &Lhs{Var: ptr, Type: GetIntType(), CompoundAssign: false}
+	ClearError()
+	if !cg.VisitFactsLhs(lhs, opts) {
+		t.Fatal("VisitFactsLhs *p failed")
+	}
+	// Pointer itself must be read, not written
+	if eff.IsWritten(ptr) || cg.EffectStm.IsWritten(ptr) {
+		t.Fatalf("deref Lhs must not write pointer %s (writes=%v)", ptr.Name, eff.WrittenVars())
+	}
+	if !eff.IsWritten(pointee) && !cg.EffectStm.IsWritten(pointee) {
+		t.Fatalf("expected write of pointee %s, writes=%v", pointee.Name, eff.WrittenVars())
+	}
 }
