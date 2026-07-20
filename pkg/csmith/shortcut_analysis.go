@@ -528,10 +528,9 @@ func StmVisitFacts(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Options)
 			}
 			return false
 		}
-		// merge live may-null into work (Go GlobalFacts stands in for inputs; mid-gen
-		// ExpressionAssign nulls must stay visible during visit — seed-2 e10107).
-		// During find_fixed_point this still reinjects into maps (e12688); full fair
-		// fix needs VisitFacts(inputs) separate from global_facts.
+		// merge live may-null into work (seed-2 e10107 mid-gen).
+		// Residual invent during FP reinjects into maps (e12688); inputs-only needs
+		// VisitFacts separate from global_facts.
 		if haveLive {
 			cl = mergeMayNullFromLive(liveSaved, cl)
 			if HasError() || !FactsComplete(cl) {

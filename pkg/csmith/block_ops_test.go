@@ -721,6 +721,55 @@ func TestFindFixedPointShortcut(t *testing.T) {
 	_ = out
 }
 
+func TestPostCreationFPOnlyOnHasEdgeIn(t *testing.T) {
+	// Block.cpp:696–697 — FP only when is_loop_body || need_revisit || has_edge_in(false,true).
+	// has_edge_in: Statement.cpp:434–446 e->dest == this (the block).
+	// ContainsBackEdge (dest->parent==this) must NOT invent force FP: that wiped
+	// mid-gen may-null via map_facts_out re-analysis install (seed-2 e10107).
+	ClearError()
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	parent := &Block{StmID: 1, Func: f}
+	inner := &Block{StmID: 50, Func: f, Parent: parent, Looping: false, NeedRevisit: false}
+	// stmt inside inner — back edge dest parent is inner (ContainsBackEdge) but dest != inner
+	st := Stmt{Kind: StmtAssign, StmID: 51,
+		LhsVar: CreateVariableScalars("g_x", GetIntType(), false, false),
+		Lhs:    &Lhs{Var: CreateVariableScalars("g_x", GetIntType(), false, false), Type: GetIntType()},
+		Expr:   &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
+	}
+	inner.Stmts = []Stmt{st}
+	fm := NewFactMgr(f)
+	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	// mid-gen may-null
+	live := MakeFactPointToSet(p, []*Variable{NullPtr})
+	if live == nil {
+		t.Fatal("live")
+	}
+	fm.GlobalFacts = []*FactPointTo{live}
+	// CFG: back edge to stmt 51 inside inner — NOT to block 50
+	fm.CreateCFGEdge(51, inner, false, true)
+	// force DestBlock parent semantics for ContainsBackEdge
+	if len(fm.CFGEdges) > 0 {
+		fm.CFGEdges[len(fm.CFGEdges)-1].DestBlock = inner
+		fm.CFGEdges[len(fm.CFGEdges)-1].DestStmID = 51
+	}
+	// map_facts_in without may-null (stale entry) — FP would reinject issue if forced
+	fm.SetMapFactsIn(50, []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_t", GetIntType(), true, false))})
+	cg := EmptyCGContext().WithFactMgr(fm)
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	inner.PostCreationAnalysis(&cg, Defaults(), EmptyEffect(), nil, nil)
+	// no FP → mid-gen may-null survives (after OOS of empty locals)
+	got := FindRelatedPointTo(fm.GlobalFacts, p)
+	if got == nil || !got.IsNull() {
+		t.Fatalf("without has_edge_in(block), must not FP-wipe mid-gen may-null: %+v hasEdge=%v", got, fm.HasEdgeIn(50, false, true))
+	}
+	// ContainsBackEdge true would have invent-forced FP under old hasBack
+	if !inner.ContainsBackEdge(fm) {
+		t.Log("note: ContainsBackEdge false — edge shape may not match parent check; still no wipe")
+	}
+	ClearError()
+}
+
 func TestPostCreationGlobalFactsFromBodyOut(t *testing.T) {
 	// Block.cpp:729 — global_facts = map_facts_out[this] after fixed-point path.
 	// After ResetBlockFactMaps deletes out maps, assign must clear GlobalFacts

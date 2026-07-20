@@ -770,7 +770,12 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 		fm.RemoveRVFacts(&fm.GlobalFacts)
 		fm.SetMapFactsOut(b.StmID, fm.GlobalFacts)
 
-		// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
+		// Block.cpp:696–697 — fixed-point when:
+		//   is_loop_body || need_revisit || has_edge_in(false, true)
+		// has_edge_in: Statement.cpp:434–446 — e->dest == this (the block statement).
+		// Do not invent ContainsBackEdge (dest->parent==this) or FindEdgesInToBlock:
+		// those force FP on blocks C++ leaves with mid-gen global_facts (seed-2 e10107
+		// wipe via auto_block_959 after unnecessary FP; e12688 over-strip).
 		mustBR := b.MustBreakOrReturnFull(fm)
 		// residual ERROR sticky — no invent soft-fixed-point past MustBreakOrReturn residual
 		if HasError() {
@@ -780,26 +785,14 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			return
 		}
 		isLoopBody := !mustBR && b.Looping
-		// FindEdgesInToBlock nil = incomplete CFG; fail closed as hasBack (no invent none)
-		toBlk := fm.FindEdgesInToBlock(b, false, true)
-		// residual ERROR sticky — no invent soft-fixed-point past FindEdges residual
+		hasBack := fm.HasEdgeIn(b.StmID, false, true)
+		// residual ERROR sticky — HasEdgeIn sets sticky on incomplete CFG
 		if HasError() {
 			fm.GlobalFacts = IncompleteFactSlice()
 			postFacts = IncompleteFactSlice()
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			return
 		}
-		hasBackEdge := b.ContainsBackEdge(fm)
-		// residual ERROR sticky — no invent soft-fixed-point past ContainsBackEdge residual
-		if HasError() {
-			fm.GlobalFacts = IncompleteFactSlice()
-			postFacts = IncompleteFactSlice()
-			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
-			return
-		}
-		hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
-			toBlk == nil || len(toBlk) > 0 ||
-			hasBackEdge
 		if isLoopBody || b.NeedRevisit || hasBack {
 			selfBack := false
 			if isLoopBody {
@@ -960,7 +953,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 					SetError(ErrGeneric)
 					return
 				} else {
-					fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
+									fm.SetGlobalFacts(CloneFactSlice(out), "auto_block_959")
 					// residual ERROR sticky — no invent soft-out past CloneFactSlice residual
 					if HasError() {
 						fm.GlobalFacts = IncompleteFactSlice()
