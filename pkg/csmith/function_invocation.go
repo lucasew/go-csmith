@@ -1072,6 +1072,15 @@ func MakeRandomBinaryInvocation(
 		// still keep flags (C++ does); Output uses standard tokens
 	}
 
+	// FunctionInvocation.cpp:201–204 — CreateFunctionInvocationBinary BEFORE operands.
+	// Tmps advance process gensym_count; creating after LHS/RHS desynced all later
+	// l_/g_/p_ names from C++ (seed-2: UP func_1,t_2,t_3,l_4… vs Go func_1,l_2…).
+	tmp1, tmp2 := createBinarySafeTmps(*cg, vs, flags, op)
+	// assert(blk): safe_ops require live block temps — fail closed, no invent bare ops
+	if flags != nil && SafeOpsBinary(opStr) && tmp1 == "" {
+		return nil
+	}
+
 	// FunctionInvocation.cpp:208–216 — LHS under dedicated accum + ambient effect_context
 	lhsAccum := EmptyEffect()
 	lhsCG := cg.CloneSubcontext()
@@ -1249,15 +1258,8 @@ func MakeRandomBinaryInvocation(
 			return nil
 		}
 	}
-	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags}
+	inv := &Invocation{IsStd: true, Binary: opStr, Args: []*Expression{left, right}, Safe: flags, Tmp1: tmp1, Tmp2: tmp2}
 	inv.setOutOpts(opts)
-	// FunctionInvocationBinary.cpp:59–75 — CreateFunctionInvocationBinary always creates
-	// tmps for safe_ops when flags; math_notmp only affects Output.
-	inv.Tmp1, inv.Tmp2 = createBinarySafeTmps(*cg, vs, flags, op)
-	// assert(blk): safe_ops require live block temps — fail closed, no invent bare ops
-	if flags != nil && SafeOpsBinary(opStr) && inv.Tmp1 == "" {
-		return nil
-	}
 	return inv
 }
 
@@ -1563,21 +1565,21 @@ func MakeRandomUnaryInvocation(
 		SetError(ErrGeneric)
 		return nil
 	}
-	// FunctionInvocation.cpp:157–159 — Expression::make_random(cg, type) — no_func=false
+	// FunctionInvocation.cpp:156–159 — CreateFunctionInvocationUnary BEFORE operand
+	// (gensym t_ before any names the operand creates).
+	tmp1 := createUnarySafeTmp(*cg, vs, flags)
+	// FunctionInvocationUnary.cpp:57 assert(blk) — fail closed when flags but no tmp
+	if flags != nil && tmp1 == "" {
+		return nil
+	}
+	// FunctionInvocation.cpp:160–162 — Expression::make_random(cg, type) — no_func=false
 	arg := MakeRandomExpression(r, opts, tables, vs, cg, argTy, nil, false, false, MaxTermTypes, cg.ExprDepth)
-	// FunctionInvocation.cpp:158 — ERROR_GUARD_AND_DEL1
+	// FunctionInvocation.cpp:161 — ERROR_GUARD_AND_DEL1
 	if arg == nil || HasError() {
 		return nil
 	}
-	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags}
+	inv := &Invocation{IsStd: true, IsUnary: true, Unary: op, Args: []*Expression{arg}, Safe: flags, Tmp1: tmp1}
 	inv.setOutOpts(opts)
-	// FunctionInvocationUnary.cpp:51–60 — CreateFunctionInvocationUnary always creates
-	// tmp when flags; math_notmp only affects Output (eMinus path).
-	inv.Tmp1 = createUnarySafeTmp(*cg, vs, flags)
-	// FunctionInvocationUnary.cpp:57 assert(blk) — fail closed when flags but no tmp
-	if flags != nil && inv.Tmp1 == "" {
-		return nil
-	}
 	return inv
 }
 

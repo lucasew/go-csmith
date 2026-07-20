@@ -501,6 +501,12 @@ func TestBlockOutputNoInventNilOrBrokenTmp(t *testing.T) {
 		t.Fatal("empty live block", out)
 	}
 	// macro_tmp_vars name+type always live; sticky no invent partial tmp list
+	// Block.cpp:261 — OutputTmpVariableList only under math_notmp
+	prevO := ProcessOptions()
+	o := prevO
+	o.MathNoTmp = true
+	SetProcessOptions(o)
+	defer SetProcessOptions(prevO)
 	ClearError()
 	b := &Block{TmpVars: map[string]ESimpleType{"": EInt}}
 	if out := b.Output(0); out != "" {

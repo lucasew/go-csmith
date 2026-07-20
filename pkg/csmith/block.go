@@ -1651,8 +1651,9 @@ func (b *Block) Output(indent int) string {
 	if b.EmitDepthProtect {
 		sb.WriteString(inner + "DEPTH++;\n")
 	}
-	// Block::OutputTmpVariableList — sorted names for deterministic emit
-	if len(b.TmpVars) > 0 {
+	// Block.cpp:261–262 — OutputTmpVariableList only when CGOptions::math_notmp().
+	// Tmps are still created during generation (gensym side-effect) either way.
+	if ProcessOptions().MathNoTmp && len(b.TmpVars) > 0 {
 		names := make([]string, 0, len(b.TmpVars))
 		for name := range b.TmpVars {
 			names = append(names, name)
