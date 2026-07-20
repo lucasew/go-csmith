@@ -792,3 +792,57 @@ func TestVisitFactsStatementIfAddEffectResidualSticky(t *testing.T) {
 	_ = cg
 	_ = st
 }
+
+
+// TestVisitFactsBlockResetsEffectAccumOnFail — Block.cpp:472–475.
+// On find_fixed_point failure, reset_effect_accum(pre_effect); do not leave
+// polluted EffectAccum for the outer StatementFor / validate path.
+func TestVisitFactsBlockResetsEffectAccumOnFail(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	// Body with StmID 0 assign forces FindFixedPoint analyze fail-closed sticky
+	// when FM is bound (StmID 0 incomplete).
+	x := CreateVariableScalars("g_x", GetIntType(), false, false)
+	bad := Stmt{Kind: StmtAssign, StmID: 0, LhsVar: x,
+		Lhs: &Lhs{Var: x, Type: GetIntType()},
+		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple}
+	b := &Block{StmID: 50, Func: f, Stmts: []Stmt{bad}}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	w := CreateVariableScalars("g_w", GetIntType(), false, false)
+	pre := EmptyEffect().WriteVar(w)
+	cg.EffectAccum = &pre
+	if VisitFactsBlock(b, &cg, Defaults()) {
+		t.Fatal("expected find_fixed_point fail on StmID 0")
+	}
+	if cg.EffectAccum == nil {
+		t.Fatal("EffectAccum must remain non-nil")
+	}
+	// After fail, accum must match pre-effect snapshot (C++ reset_effect_accum)
+	if !cg.EffectAccum.IsWritten(w) {
+		t.Fatal("EffectAccum must restore pre-effect write of g_w")
+	}
+	ClearError()
+}
+
+// TestVisitFactsBlockMarksVisitedOnSuccess — Block.cpp:478 map_visited[this]=true.
+func TestVisitFactsBlockMarksVisitedOnSuccess(t *testing.T) {
+	ClearError()
+	SetProcessOptions(Defaults())
+	f := &Function{Name: "f", ReturnType: GetIntType()}
+	fm := NewFactMgr(f)
+	b := &Block{StmID: 51, Func: f, Stmts: nil}
+	cg := EmptyCGContext().WithFactMgr(fm)
+	cg.CurrentFunc = f
+	eff := EmptyEffect()
+	cg.EffectAccum = &eff
+	if !VisitFactsBlock(b, &cg, Defaults()) {
+		t.Fatalf("empty block visit must succeed err=%v", HasError())
+	}
+	if fm.MapVisited == nil || !fm.MapVisited[51] {
+		t.Fatal("map_visited[block] must be true after successful VisitFactsBlock")
+	}
+	ClearError()
+}

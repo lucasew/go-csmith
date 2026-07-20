@@ -177,11 +177,26 @@ func VisitFactsStatementExpr(st *Stmt, cg *CGContext, opts Options) bool {
 }
 
 // VisitFactsBlock mirrors Block::visit_facts via find_fixed_point.
-// Block.cpp:466–479.
+// Block.cpp:466–479 — pre_effect snapshot; find_fixed_point; on fail reset
+// effect_accum; on success inputs=map_facts_out and map_visited[this]=true.
 func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 	if b == nil || cg == nil {
 		SetError(ErrGeneric)
 		return false
+	}
+	// Block.cpp:472 — Effect pre_effect = cg_context.get_accum_effect();
+	var preEffect Effect
+	havePre := false
+	if cg.EffectAccum != nil {
+		if !EffectComplete(*cg.EffectAccum) {
+			SetError(ErrGeneric)
+			return false
+		}
+		preEffect = cg.EffectAccum.Clone()
+		if HasError() {
+			return false
+		}
+		havePre = true
 	}
 	var inputs []*FactPointTo
 	if cg.FM != nil {
@@ -196,9 +211,13 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			return false
 		}
 	}
-	// Block.cpp:466–476 — find_fixed_point then inputs = map_facts_out[this]
+	// Block.cpp:473–476 — find_fixed_point; fail → reset_effect_accum(pre_effect)
 	out, _, ok := FindFixedPointBlock(b, inputs, cg, opts, false)
 	if !ok {
+		// Block.cpp:474–475 — cg_context.reset_effect_accum(pre_effect)
+		if havePre && cg.EffectAccum != nil {
+			*cg.EffectAccum = preEffect
+		}
 		return false
 	}
 	if cg.FM != nil && b.StmID > 0 {
@@ -223,6 +242,11 @@ func VisitFactsBlock(b *Block, cg *CGContext, opts Options) bool {
 			}
 			cg.FM.SetGlobalFacts(cl, "auto_statement_visit_224")
 		}
+		// Block.cpp:478 — fm->map_visited[this] = true (always on success)
+		if cg.FM.MapVisited == nil {
+			cg.FM.MapVisited = make(map[int]bool)
+		}
+		cg.FM.MapVisited[b.StmID] = true
 	}
 	return true
 }
