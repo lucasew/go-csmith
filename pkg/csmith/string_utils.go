@@ -66,25 +66,59 @@ func SplitStringAny(str, seps string) []string {
 	return v
 }
 
+// IgnoreSpaces mirrors StringUtils::ignore_spaces — advance pos over space/tab/nl.
+// StringUtils.cpp:50–53. Returns new index (Go-safe: stops at len).
+func IgnoreSpaces(str string, pos int) int {
+	for pos < len(str) && IsSpaceChar(str[pos]) {
+		pos++
+	}
+	return pos
+}
+
+// GetSubstringBefore mirrors StringUtils::get_substring_before.
+// StringUtils.cpp:70–76 — content from pos up to (not including) close_delim.
+// Empty if close missing or at pos.
+func GetSubstringBefore(s string, pos int, close byte) string {
+	if pos < 0 || pos >= len(s) {
+		return ""
+	}
+	end := strings.IndexByte(s[pos:], close)
+	if end <= 0 {
+		// npos or end_pos == pos → ""
+		return ""
+	}
+	return s[pos : pos+end]
+}
+
 // GetSubstring mirrors StringUtils::get_substring — content between open/close.
 // StringUtils.cpp:55–68.
 func GetSubstring(s string, open, close byte) string {
 	if s == "" {
 		return ""
 	}
-	pos := 0
-	for pos < len(s) && unicode.IsSpace(rune(s[pos])) {
-		pos++
-	}
+	pos := IgnoreSpaces(s, 0)
 	if pos >= len(s) || s[pos] != open {
 		return ""
 	}
 	pos++
-	end := strings.IndexByte(s[pos:], close)
-	if end < 0 {
-		return ""
+	return GetSubstringBefore(s, pos, close)
+}
+
+// FindAnyChar mirrors StringUtils::find_any_char.
+// StringUtils.cpp:86–97 — first index ≥ pos whose char is in toMatch; -1 = npos.
+func FindAnyChar(s string, pos int, toMatch string) int {
+	if s == "" || toMatch == "" {
+		return -1
 	}
-	return s[pos : pos+end]
+	if pos < 0 {
+		pos = 0
+	}
+	for i := pos; i < len(s); i++ {
+		if strings.ContainsRune(toMatch, rune(s[i])) {
+			return i
+		}
+	}
+	return -1
 }
 
 // FirstNonSpaceChar mirrors StringUtils::first_nonspace_char.

@@ -2,11 +2,31 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+// compatibleCheckProcess mirrors CompatibleChecker::compatible_check_ static.
+// Enabled by EnableCompatibleCheck (DFS resolve path) or opts.CompatibleCheck.
+var compatibleCheckProcess bool
+
+// EnableCompatibleCheck mirrors CompatibleChecker::enable_compatible_check.
+// CompatibleChecker.cpp:68–70; CGOptions.cpp:416–417 (resolve_exhaustive_options).
+func EnableCompatibleCheck() {
+	compatibleCheckProcess = true
+}
+
+// ResetCompatibleCheck clears the process static (tests / finalization).
+func ResetCompatibleCheck() {
+	compatibleCheckProcess = false
+}
+
+// compatibleCheckOn is true when process static or option requests the checker.
+func compatibleCheckOn(opts Options) bool {
+	return compatibleCheckProcess || opts.CompatibleCheck
+}
+
 // CompatibleCheckExprVar mirrors CompatibleChecker::compatible_check(Variable*, Expression*).
 // CompatibleChecker.cpp:43–53 — when disabled always false.
 // Returns true when assignment should be rejected (COMPATIBLE_CHECK_ERROR).
 func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
-	if !opts.CompatibleCheck {
+	if !compatibleCheckOn(opts) {
 		return false
 	}
 	// CompatibleChecker.cpp:46–49 — assert(v); assert(exp); assert(0)
@@ -25,7 +45,7 @@ func CompatibleCheckExprVar(opts Options, v *Variable, exp *Expression) bool {
 // CompatibleChecker.cpp:58–65 — when disabled false; else bidirectional compatible.
 func CompatibleCheckExprs(opts Options, a, b *Expression) bool {
 	// CompatibleChecker.cpp:60–61 — assert(exp1); assert(exp2)
-	if !opts.CompatibleCheck {
+	if !compatibleCheckOn(opts) {
 		return false
 	}
 	// incomplete Expression* fails closed sticky as reject (no invent non-error)

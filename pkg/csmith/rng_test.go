@@ -396,3 +396,70 @@ func TestProcessRndNilSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestRandomNumberCreateInstance(t *testing.T) {
+	// RandomNumber.cpp:63–74 CreateInstance default generator
+	prevR := ProcessRng()
+	RandomNumberDoFinalization()
+	defer func() {
+		RandomNumberDoFinalization()
+		SetProcessRng(prevR)
+	}()
+
+	ClearError()
+	CreateRandomNumberInstance(RngKindDefault, 2)
+	rn := GetRandomNumber()
+	if rn == nil || HasError() {
+		t.Fatal("CreateInstance default must succeed")
+	}
+	if GetRndNumGenerator() == nil {
+		t.Fatal("GetRndNumGenerator")
+	}
+	r2 := NewRng(2)
+	got := rn.RndUpto(10, nil)
+	want := r2.RndUpto(10)
+	if got != want {
+		t.Fatalf("rnd_upto via RandomNumber: got %d want %d", got, want)
+	}
+	// Switch default→default identity
+	old := SwitchRndNumGenerator(RngKindDefault)
+	if old != RngKindDefault {
+		t.Fatalf("switch same kind old=%v", old)
+	}
+	// DFS not ported — sticky
+	ClearError()
+	_ = SwitchRndNumGenerator(RngKindDFS)
+	if !HasError() {
+		t.Fatal("DFS make_rndnum_generator must sticky fail")
+	}
+	ClearError()
+}
+
+func TestRandomNumberDoFinalization(t *testing.T) {
+	prevR := ProcessRng()
+	defer SetProcessRng(prevR)
+	CreateRandomNumberInstance(RngKindDefault, 1)
+	RandomNumberDoFinalization()
+	ClearError()
+	if GetRandomNumber() != nil || !HasError() {
+		t.Fatal("after doFinalization GetInstance sticky nil")
+	}
+	ClearError()
+}
+
+func TestMakeRndNumGeneratorDefault(t *testing.T) {
+	// AbsRndNumGenerator::make_rndnum_generator default
+	ClearError()
+	r := MakeRndNumGenerator(RngKindDefault, 7)
+	if r == nil || HasError() {
+		t.Fatal("default generator")
+	}
+	if r.Kind() != RngKindDefault {
+		t.Fatal(r.Kind())
+	}
+	ClearError()
+	if MakeRndNumGenerator(RngKindDFS, 1) != nil || !HasError() {
+		t.Fatal("DFS not ported sticky")
+	}
+	ClearError()
+}

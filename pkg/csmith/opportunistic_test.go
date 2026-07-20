@@ -375,3 +375,19 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestEnableCompatibleCheckProcess(t *testing.T) {
+	// CompatibleChecker.cpp:68–70 + CGOptions resolve_exhaustive
+	ResetCompatibleCheck()
+	defer ResetCompatibleCheck()
+	opts := Defaults()
+	opts.CompatibleCheck = false
+	if CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+		t.Fatal("disabled must be false")
+	}
+	EnableCompatibleCheck()
+	// process static on even when opts.CompatibleCheck false
+	if !CompatibleCheckExprVar(opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeInt(0)}) {
+		t.Fatal("EnableCompatibleCheck must activate checker")
+	}
+}

@@ -38,7 +38,7 @@ Total items: 2070
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_prefixed_name
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.get_sequence
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.kind
-- [ ] AbsRndNumGenerator.cpp::AbsRndNumGenerator.make_rndnum_generator
+- [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.make_rndnum_generator
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.operator=
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomDigits
 - [x] AbsRndNumGenerator.cpp::AbsRndNumGenerator.RandomHexDigits
@@ -352,8 +352,8 @@ Total items: 2070
 - [x] CGOptions.cpp::CGOptions.volatiles
 - [x] CGOptions.cpp::CGOptions.wrap_volatiles
 - [ ] CGOptions.cpp::CGOptions.x86_64
-- [ ] CompatibleChecker.cpp::CompatibleChecker.compatible_check
-- [ ] CompatibleChecker.cpp::CompatibleChecker.enable_compatible_check
+- [x] CompatibleChecker.cpp::CompatibleChecker.compatible_check
+- [x] CompatibleChecker.cpp::CompatibleChecker.enable_compatible_check
 - [ ] Constant.cpp::Constant.clone
 - [ ] Constant.cpp::Constant.compatible
 - [ ] Constant.cpp::Constant.Constant
@@ -470,7 +470,7 @@ Total items: 2070
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_prefixed_name
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.get_sequence
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.kind
-- [ ] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.make_rndnum_generator
+- [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.make_rndnum_generator
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.operator=
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomDigits
 - [x] DefaultRndNumGenerator.cpp::DefaultRndNumGenerator.RandomHexDigits
@@ -996,9 +996,9 @@ Total items: 2070
 - [x] Filter.cpp::FilterKind.fDefault
 - [x] Filter.cpp::FilterKind.fDFS
 - [x] Filter.cpp::FilterKind.MAX_FILTER_KIND_SIZE
-- [ ] Finalization.cpp::Finalization.doFinalization
-- [ ] Finalization.cpp::Finalization.Finalization
-- [ ] Finalization.cpp::Finalization.~Finalization
+- [x] Finalization.cpp::Finalization.doFinalization
+- [x] Finalization.cpp::Finalization.Finalization
+- [x] Finalization.cpp::Finalization.~Finalization
 - [ ] Function.cpp::BuildState.Building
 - [ ] Function.cpp::BuildState.Built
 - [ ] Function.cpp::BuildState.Unbuilt
@@ -1489,22 +1489,22 @@ Total items: 2070
 - [x] random.cpp::rnd_flipcoin
 - [x] random.cpp::rnd_upto
 - [x] random.cpp::trace_depth
-- [ ] RandomNumber.cpp::RandomNumber.CreateInstance
-- [ ] RandomNumber.cpp::RandomNumber.doFinalization
-- [ ] RandomNumber.cpp::RandomNumber.get_prefixed_name
-- [ ] RandomNumber.cpp::RandomNumber.get_sequence
-- [ ] RandomNumber.cpp::RandomNumber.GetInstance
-- [ ] RandomNumber.cpp::RandomNumber.GetRndNumGenerator
+- [x] RandomNumber.cpp::RandomNumber.CreateInstance
+- [x] RandomNumber.cpp::RandomNumber.doFinalization
+- [x] RandomNumber.cpp::RandomNumber.get_prefixed_name
+- [x] RandomNumber.cpp::RandomNumber.get_sequence
+- [x] RandomNumber.cpp::RandomNumber.GetInstance
+- [x] RandomNumber.cpp::RandomNumber.GetRndNumGenerator
 - [ ] RandomNumber.cpp::RandomNumber.make_all_rndnum_generators
 - [ ] RandomNumber.cpp::RandomNumber.operator=
-- [ ] RandomNumber.cpp::RandomNumber.RandomDigits
-- [ ] RandomNumber.cpp::RandomNumber.RandomHexDigits
-- [ ] RandomNumber.cpp::RandomNumber.RandomNumber
-- [ ] RandomNumber.cpp::RandomNumber.rnd_flipcoin
-- [ ] RandomNumber.cpp::RandomNumber.rnd_upto
-- [ ] RandomNumber.cpp::RandomNumber.SwitchRndNumGenerator
-- [ ] RandomNumber.cpp::RandomNumber.trace_depth
-- [ ] RandomNumber.cpp::RandomNumber.~RandomNumber
+- [x] RandomNumber.cpp::RandomNumber.RandomDigits
+- [x] RandomNumber.cpp::RandomNumber.RandomHexDigits
+- [x] RandomNumber.cpp::RandomNumber.RandomNumber
+- [x] RandomNumber.cpp::RandomNumber.rnd_flipcoin
+- [x] RandomNumber.cpp::RandomNumber.rnd_upto
+- [x] RandomNumber.cpp::RandomNumber.SwitchRndNumGenerator
+- [x] RandomNumber.cpp::RandomNumber.trace_depth
+- [x] RandomNumber.cpp::RandomNumber.~RandomNumber
 - [ ] RandomProgramGenerator.cpp::arg_check
 - [ ] RandomProgramGenerator.cpp::main
 - [ ] RandomProgramGenerator.cpp::parse_int_arg
@@ -1727,7 +1727,7 @@ Total items: 2070
 - [ ] StatementFor.cpp::StatementFor.~StatementFor
 - [ ] StatementFor.cpp::make_random_array_control
 - [ ] StatementFor.cpp::make_random_loop_control
-- [ ] StatementGoto.cpp::StatementGoto.doFinalization
+- [x] StatementGoto.cpp::StatementGoto.doFinalization
 - [ ] StatementGoto.cpp::StatementGoto.find_good_jump_block
 - [ ] StatementGoto.cpp::StatementGoto.get_blocks
 - [ ] StatementGoto.cpp::StatementGoto.has_init_skipped_vars
@@ -1766,24 +1766,24 @@ Total items: 2070
 - [ ] StatementReturn.cpp::StatementReturn.StatementReturn
 - [ ] StatementReturn.cpp::StatementReturn.visit_facts
 - [ ] StatementReturn.cpp::StatementReturn.~StatementReturn
-- [ ] StringUtils.cpp::StringUtils.breakup_assigns
-- [ ] StringUtils.cpp::StringUtils.chop
-- [ ] StringUtils.cpp::StringUtils.empty_line
-- [ ] StringUtils.cpp::StringUtils.end_with
-- [ ] StringUtils.cpp::StringUtils.find_any_char
-- [ ] StringUtils.cpp::StringUtils.first_nonspace_char
-- [ ] StringUtils.cpp::StringUtils.get_substring
-- [ ] StringUtils.cpp::StringUtils.get_substring_before
-- [ ] StringUtils.cpp::StringUtils.ignore_spaces
-- [ ] StringUtils.cpp::StringUtils.int2str
-- [ ] StringUtils.cpp::StringUtils.is_space
-- [ ] StringUtils.cpp::StringUtils.longlong2str
-- [ ] StringUtils.cpp::StringUtils.split_int_string
-- [ ] StringUtils.cpp::StringUtils.split_string
-- [ ] StringUtils.cpp::StringUtils.str2int
-- [ ] StringUtils.cpp::StringUtils.str2longlong
-- [ ] StringUtils.cpp::StringUtils.StringUtils
-- [ ] StringUtils.cpp::StringUtils.~StringUtils
+- [x] StringUtils.cpp::StringUtils.breakup_assigns
+- [x] StringUtils.cpp::StringUtils.chop
+- [x] StringUtils.cpp::StringUtils.empty_line
+- [x] StringUtils.cpp::StringUtils.end_with
+- [x] StringUtils.cpp::StringUtils.find_any_char
+- [x] StringUtils.cpp::StringUtils.first_nonspace_char
+- [x] StringUtils.cpp::StringUtils.get_substring
+- [x] StringUtils.cpp::StringUtils.get_substring_before
+- [x] StringUtils.cpp::StringUtils.ignore_spaces
+- [x] StringUtils.cpp::StringUtils.int2str
+- [x] StringUtils.cpp::StringUtils.is_space
+- [x] StringUtils.cpp::StringUtils.longlong2str
+- [x] StringUtils.cpp::StringUtils.split_int_string
+- [x] StringUtils.cpp::StringUtils.split_string
+- [x] StringUtils.cpp::StringUtils.str2int
+- [x] StringUtils.cpp::StringUtils.str2longlong
+- [x] StringUtils.cpp::StringUtils.StringUtils
+- [x] StringUtils.cpp::StringUtils.~StringUtils
 - [ ] Type.cpp::ChooseRandomTypeFilter.ChooseRandomTypeFilter
 - [ ] Type.cpp::ChooseRandomTypeFilter.filter
 - [ ] Type.cpp::ChooseRandomTypeFilter.get_type
@@ -1833,7 +1833,7 @@ Total items: 2070
 - [ ] Type.cpp::Type.contain_pointer_field
 - [ ] Type.cpp::Type.copy_all_fields_types
 - [ ] Type.cpp::Type.delete_useless_structs
-- [ ] Type.cpp::Type.doFinalization
+- [x] Type.cpp::Type.doFinalization
 - [ ] Type.cpp::Type.find_pointer_type
 - [ ] Type.cpp::Type.find_type
 - [ ] Type.cpp::Type.GenerateAllTypes

@@ -36,6 +36,11 @@ func DoFinalization() {
 	// Probabilities / Rng / StmtTab process handles are re-installed by
 	// ProgramGenerator.Initialize after this call (same generation run).
 	// Clearing them here would soft-break nested make_random mid-run.
+	// CompatibleChecker process static (re-enable via resolve if needed)
+	ResetCompatibleCheck()
+	// RandomNumber::doFinalization — Finalization.cpp:53
+	// Cleared here; ProgramGenerator re-CreateInstance / SetProcessRng after.
+	RandomNumberDoFinalization()
 	// Error state
 	ClearError()
 }

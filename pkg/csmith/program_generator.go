@@ -31,10 +31,15 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 	// CGOptions process-wide state for Constant::make_random / choose_var / emit.
 	SetProcessOptions(opts)
 	seed := opts.Seed
-	r := NewRng(seed)
-	// C++ DefaultRndNumGenerator process instance — CreateVariable / create_field_vars
-	// burn the same stream (no invent separate NewRng per CreateVariable).
-	SetProcessRng(r)
+	// RandomNumber::CreateInstance(rDefaultRndNumGenerator, seed)
+	// RandomNumber.cpp:63–74 — process singleton + DefaultRndNumGenerator.
+	CreateRandomNumberInstance(RngKindDefault, seed)
+	r := ProcessRng()
+	if r == nil {
+		// Create failed (should not on Default); fail closed sticky already set.
+		r = NewRng(seed)
+		SetProcessRng(r)
+	}
 	// C++ Probabilities is a process singleton — one session table for generator + VS
 	// + CreateVariable/create_field_vars (no invent second NewProbabilities(opts))
 	probs := NewProbabilities(opts)
@@ -69,17 +74,25 @@ func NewProgramGenerator(opts Options) *ProgramGenerator {
 }
 
 // Initialize mirrors DefaultProgramGenerator::initialize (RNG already seeded).
+// C++ initialize only CreateInstance+OutputMgr; Go also runs Finalization subset
+// so library multi-Generate starts from a clean process pool (dtor-like).
 func (g *ProgramGenerator) Initialize() {
 	// Type::GenerateSimpleTypes is satisfied by GetSimpleType cache.
 	// ExtensionMgr::CreateExtension — null default, nothing to do.
-	// Finalization::doFinalization subset for a fresh generation.
+	// Finalization::doFinalization subset for a fresh generation
+	// (includes RandomNumber::doFinalization).
 	DoFinalization()
-	// DoFinalization may clear process-wide session handles; re-install the
+	// DoFinalization clears process-wide session handles; re-install the
 	// generator's live singletons (CGOptions / RNG / Probabilities / Statement table).
-	// C++ statics survive between Finalization and the next draws of this run.
 	if g != nil {
 		SetProcessOptions(g.Opts)
-		SetProcessRng(g.Rng)
+		// RandomNumber::CreateInstance after Finalization (DefaultProgramGenerator.cpp:55)
+		CreateRandomNumberInstance(RngKindDefault, g.Seed)
+		if r := ProcessRng(); r != nil {
+			g.Rng = r
+		} else {
+			SetProcessRng(g.Rng)
+		}
 		SetProcessProbabilities(g.Probs)
 		SetProcessStmtTab(g.StmtTab)
 		SetProcessExprTables(g.Tables)

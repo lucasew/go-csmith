@@ -287,6 +287,12 @@ func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 }
 
 func TestGotoLabelsClearedOnFinalization(t *testing.T) {
+	prevR := ProcessRng()
+	prevP := ProcessProbabilities()
+	defer func() {
+		SetProcessRng(prevR)
+		SetProcessProbabilities(prevP)
+	}()
 	GotoLabelsDoFinalization()
 	_ = LabelForGotoDest(1, func() string { return "lbl_x" })
 	DoFinalization()

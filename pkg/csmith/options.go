@@ -664,8 +664,12 @@ func (o Options) normalizeUpstreamFlow() Options {
 		o.ConstStructUnionFields = false
 	}
 	// Upstream DFS mode forces fixed struct fields.
+	// CGOptions.cpp:410–417 resolve_exhaustive_options side effects.
 	if o.DFSExhaustive {
 		o.FixedStructFields = true
+		if o.CompatibleCheck {
+			EnableCompatibleCheck()
+		}
 	}
 	return o
 }

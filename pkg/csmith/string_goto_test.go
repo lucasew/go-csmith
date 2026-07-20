@@ -276,3 +276,22 @@ func TestOutputSkippedVarInitsNilStmtSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestIgnoreSpacesFindAnyGetSubstringBefore(t *testing.T) {
+	// StringUtils.cpp ignore_spaces / find_any_char / get_substring_before
+	if IgnoreSpaces("  \tabc", 0) != 3 {
+		t.Fatalf("ignore_spaces: %d", IgnoreSpaces("  \tabc", 0))
+	}
+	if FindAnyChar("hello,world", 0, ",;") != 5 {
+		t.Fatalf("find_any: %d", FindAnyChar("hello,world", 0, ",;"))
+	}
+	if FindAnyChar("hello", 0, ",;") != -1 {
+		t.Fatal("npos")
+	}
+	if GetSubstringBefore("UInt,UChar)", 0, ')') != "UInt,UChar" {
+		t.Fatal(GetSubstringBefore("UInt,UChar)", 0, ')'))
+	}
+	if GetSubstringBefore("abc", 0, ')') != "" {
+		t.Fatal("missing close")
+	}
+}

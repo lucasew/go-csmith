@@ -378,6 +378,12 @@ func TestIsFrameVar(t *testing.T) {
 }
 
 func TestDoFinalization(t *testing.T) {
+	prevR := ProcessRng()
+	prevP := ProcessProbabilities()
+	defer func() {
+		SetProcessRng(prevR)
+		SetProcessProbabilities(prevP)
+	}()
 	IncrCounter(&structDepthCnts, 1)
 	nextStmID = 5
 	SetError(ErrGeneric)
