@@ -291,5 +291,72 @@ func RejectEQ(bad uint32) Filter {
 	return filterFunc(func(v uint32) bool { return v == bad })
 }
 
+// --- random.cpp process wrappers (RandomNumber::GetInstance → ProcessRng) ---
+
+// ProcessRndUpto mirrors random.cpp::rnd_upto → process DefaultRndNumGenerator.
+// random.cpp:67–71. Nil process RNG sticky 0.
+func ProcessRndUpto(n uint32, f Filter) uint32 {
+	return ProcessRng().RndUptoFilter(n, f)
+}
+
+// ProcessRndFlipcoin mirrors random.cpp::rnd_flipcoin.
+// random.cpp:73–77.
+func ProcessRndFlipcoin(p uint32, f Filter) bool {
+	return ProcessRng().RndFlipcoinFilter(p, f)
+}
+
+// ProcessRandomHexDigits mirrors random.cpp::RandomHexDigits.
+// random.cpp:57–60.
+func ProcessRandomHexDigits(num int) string {
+	return ProcessRng().RandomHexDigits(num)
+}
+
+// ProcessRandomDigits mirrors random.cpp::RandomDigits.
+// random.cpp:62–65.
+func ProcessRandomDigits(num int) string {
+	return ProcessRng().RandomDigits(num)
+}
+
+// ProcessTraceDepth mirrors random.cpp::trace_depth.
+// random.cpp:132–135.
+func ProcessTraceDepth() string {
+	return ProcessRng().TraceDepth()
+}
+
+// ProcessGetSequence mirrors random.cpp::get_sequence.
+// random.cpp:137–140.
+func ProcessGetSequence() string {
+	return ProcessRng().GetSequence()
+}
+
+// PureRndUpto mirrors pure_rnd_upto.
+// random.cpp:104–117 — n==0 → 0; random mode == rnd_upto; DFS switches generator (not ported).
+func PureRndUpto(n uint32, f Filter) uint32 {
+	if n == 0 {
+		return 0
+	}
+	// CGOptions::is_random() — non-random switches to DefaultRndNumGenerator.
+	// Go only has default RNG; pure path is identity with ProcessRndUpto.
+	return ProcessRndUpto(n, f)
+}
+
+// PureRndFlipcoin mirrors pure_rnd_flipcoin.
+// random.cpp:119–130.
+func PureRndFlipcoin(p uint32, f Filter) bool {
+	return ProcessRndFlipcoin(p, f)
+}
+
+// PureRandomHexDigits mirrors PureRandomHexDigits.
+// random.cpp:79–89.
+func PureRandomHexDigits(num int) string {
+	return ProcessRandomHexDigits(num)
+}
+
+// PureRandomDigits mirrors PureRandomDigits.
+// random.cpp:91–102.
+func PureRandomDigits(num int) string {
+	return ProcessRandomDigits(num)
+}
+
 // legacy names used by older call sites if any remain during transition.
 func newRNG(seed uint64) *Rng { return NewRng(seed) }

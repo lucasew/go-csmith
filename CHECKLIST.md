@@ -1478,17 +1478,17 @@ Total items: 2070
 - [ ] ProbabilityTable.h::insert
 - [ ] ProbabilityTable.h::set_prob_table
 - [ ] ProbabilityTable.h::sorted_insert
-- [ ] random.cpp::get_prefixed_name
-- [ ] random.cpp::get_sequence
-- [ ] random.cpp::pure_rnd_flipcoin
-- [ ] random.cpp::pure_rnd_upto
-- [ ] random.cpp::PureRandomDigits
-- [ ] random.cpp::PureRandomHexDigits
-- [ ] random.cpp::RandomDigits
-- [ ] random.cpp::RandomHexDigits
-- [ ] random.cpp::rnd_flipcoin
-- [ ] random.cpp::rnd_upto
-- [ ] random.cpp::trace_depth
+- [x] random.cpp::get_prefixed_name
+- [x] random.cpp::get_sequence
+- [x] random.cpp::pure_rnd_flipcoin
+- [x] random.cpp::pure_rnd_upto
+- [x] random.cpp::PureRandomDigits
+- [x] random.cpp::PureRandomHexDigits
+- [x] random.cpp::RandomDigits
+- [x] random.cpp::RandomHexDigits
+- [x] random.cpp::rnd_flipcoin
+- [x] random.cpp::rnd_upto
+- [x] random.cpp::trace_depth
 - [ ] RandomNumber.cpp::RandomNumber.CreateInstance
 - [ ] RandomNumber.cpp::RandomNumber.doFinalization
 - [ ] RandomNumber.cpp::RandomNumber.get_prefixed_name

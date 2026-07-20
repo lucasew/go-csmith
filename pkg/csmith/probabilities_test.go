@@ -186,9 +186,10 @@ func TestSimpleTypesFilterNilProbsResidualSticky(t *testing.T) {
 
 func TestProbabilityFilterEqualGroup(t *testing.T) {
 	// ProbabilityFilter for pSimpleTypesProb via process singleton.
+	prev := ProcessProbabilities()
 	p := NewProbabilities(Defaults())
 	SetProcessProbabilities(p)
-	defer SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
 
 	f := GetProbFilter(PSimpleTypesProb)
 	// void weight 0 → reject
@@ -220,9 +221,10 @@ func (r *rejectSimple) Filter(v uint32) bool { return v == uint32(*r) }
 
 func TestRegisterExtraFilter(t *testing.T) {
 	// Probabilities.cpp:791–813 register + check_extra_filter
+	prev := ProcessProbabilities()
 	p := NewProbabilities(Defaults())
 	SetProcessProbabilities(p)
-	defer SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
 
 	// Reject eInt via extra filter even though weight is 1 (pointer Filter for identity)
 	rej := rejectSimple(EInt)
@@ -244,7 +246,9 @@ func TestRegisterExtraFilter(t *testing.T) {
 
 func TestGetProbFilterMissingSticky(t *testing.T) {
 	// No process probs → fail closed
+	prev := ProcessProbabilities()
 	SetProcessProbabilities(nil)
+	defer SetProcessProbabilities(prev)
 	ClearError()
 	f := GetProbFilter(PSimpleTypesProb)
 	if !f.Filter(0) {

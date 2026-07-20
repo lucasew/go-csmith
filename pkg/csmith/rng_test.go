@@ -339,3 +339,60 @@ func TestSeedrandIndependence(t *testing.T) {
 		t.Fatal("seed 7 and 8 should not share first genrand")
 	}
 }
+
+func TestProcessRndWrappers(t *testing.T) {
+	// random.cpp process wrappers vs direct Rng methods (random mode).
+	prev := ProcessRng()
+	r := NewRng(2)
+	SetProcessRng(r)
+	defer SetProcessRng(prev)
+
+	r2 := NewRng(2)
+	// pure_rnd_upto(n==0) short-circuits without draw
+	if PureRndUpto(0, nil) != 0 {
+		t.Fatal("pure_rnd_upto(0) → 0")
+	}
+	// ProcessRndUpto matches Rng.RndUpto on same seed stream
+	got := ProcessRndUpto(10, nil)
+	want := r2.RndUpto(10)
+	if got != want {
+		t.Fatalf("ProcessRndUpto: got %d want %d", got, want)
+	}
+	gotF := ProcessRndFlipcoin(50, nil)
+	wantF := r2.RndFlipcoin(50)
+	if gotF != wantF {
+		t.Fatalf("ProcessRndFlipcoin: got %v want %v", gotF, wantF)
+	}
+	gotH := ProcessRandomHexDigits(4)
+	wantH := r2.RandomHexDigits(4)
+	if gotH != wantH {
+		t.Fatalf("hex: got %q want %q", gotH, wantH)
+	}
+	gotD := PureRandomDigits(3)
+	wantD := r2.RandomDigits(3)
+	if gotD != wantD {
+		t.Fatalf("digits: got %q want %q", gotD, wantD)
+	}
+	if ProcessTraceDepth() != "" || ProcessGetSequence() != "" {
+		t.Fatal("default mode trace/sequence empty")
+	}
+}
+
+func TestProcessRndNilSticky(t *testing.T) {
+	prev := ProcessRng()
+	SetProcessRng(nil)
+	defer SetProcessRng(prev)
+	ClearError()
+	if ProcessRndUpto(5, nil) != 0 || !HasError() {
+		t.Fatal("nil process Rng RndUpto sticky 0")
+	}
+	ClearError()
+	if ProcessRndFlipcoin(50, nil) || !HasError() {
+		t.Fatal("nil process Rng flipcoin sticky false")
+	}
+	ClearError()
+	if ProcessRandomHexDigits(2) != "" || !HasError() {
+		t.Fatal("nil process hex sticky empty")
+	}
+	ClearError()
+}

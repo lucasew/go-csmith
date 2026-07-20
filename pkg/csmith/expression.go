@@ -827,9 +827,8 @@ func NewExprTables(opts Options) *ExprTables {
 	// InitParamProbabilityTable
 	t.Param.AddEntry(int(TermFunction), 40)
 	t.Param.AddEntry(int(TermVariable), 40)
-	t.Param.AddEntry(int(TermConstant), 0) // constant params disallowed (weight 0 — not added if we skip; upstream adds 0)
-	// weight 0 still add_entry in upstream but max doesn't grow... actually add_entry always adds
-	// Replicate: add with 0 does max+=0
+	// Expression.cpp — constant params weight 0; add_entry still records key (max += 0).
+	t.Param.AddEntry(int(TermConstant), 0)
 	if opts.EmbeddedAssigns {
 		t.Param.AddEntry(int(TermAssignment), 10)
 	}
