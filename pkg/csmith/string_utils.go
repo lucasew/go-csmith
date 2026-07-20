@@ -152,7 +152,9 @@ func IsSpaceChar(c byte) bool {
 }
 
 // Str2Int mirrors StringUtils::str2int — strip outer parens; hex 0x prefix.
-// StringUtils.cpp:151–165.
+// StringUtils.cpp:151–165 — stringstream extraction stops at first non-digit
+// (so "0L" / "0UL" / "1L" from Constant small-path suffixes parse as 0/1).
+// C++ initializes i=-1; failed extraction returns -1.
 func Str2Int(s string) int {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -166,14 +168,44 @@ func Str2Int(s string) int {
 		}
 		s = strings.TrimSpace(s[1 : len(s)-1])
 	}
+	if s == "" {
+		return -1
+	}
 	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
-		n, err := strconv.ParseInt(s[2:], 16, 64)
+		// stringstream >> hex: consume hex digits after 0x; stop at suffix (L/UL)
+		hexPart := s[2:]
+		end := 0
+		for end < len(hexPart) {
+			c := hexPart[end]
+			if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+				end++
+				continue
+			}
+			break
+		}
+		if end == 0 {
+			return -1
+		}
+		n, err := strconv.ParseInt(hexPart[:end], 16, 64)
 		if err != nil {
 			return -1
 		}
 		return int(n)
 	}
-	n, err := strconv.Atoi(s)
+	// decimal: optional sign + digits; stop before U/L suffix (stringstream >> int)
+	i := 0
+	if s[0] == '+' || s[0] == '-' {
+		i = 1
+	}
+	start := i
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == start {
+		// no digits extracted — C++ leaves i=-1
+		return -1
+	}
+	n, err := strconv.Atoi(s[:i])
 	if err != nil {
 		return -1
 	}

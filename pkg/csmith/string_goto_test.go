@@ -19,6 +19,23 @@ func TestStr2Int(t *testing.T) {
 	if Str2Int("(7") != -1 {
 		t.Fatal("unbalanced paren must fail closed")
 	}
+	// stringstream >> int stops at L/UL (Constant small-path suffixes)
+	// StringUtils.cpp:161–162 — seed-2 e15477 div/mod re-pick needs equals(0) on "0L"
+	if Str2Int("0L") != 0 {
+		t.Fatalf("0L want 0 got %d", Str2Int("0L"))
+	}
+	if Str2Int("0UL") != 0 {
+		t.Fatalf("0UL want 0 got %d", Str2Int("0UL"))
+	}
+	if Str2Int("-1L") != -1 {
+		t.Fatalf("-1L want -1 got %d", Str2Int("-1L"))
+	}
+	if Str2Int("1L") != 1 {
+		t.Fatalf("1L want 1 got %d", Str2Int("1L"))
+	}
+	if Str2Int("0xAL") != 10 {
+		t.Fatalf("0xAL want 10 got %d", Str2Int("0xAL"))
+	}
 }
 
 func TestChopEmptyEndWith(t *testing.T) {

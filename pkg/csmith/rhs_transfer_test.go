@@ -10,6 +10,23 @@ func TestConstantEquals(t *testing.T) {
 	if MakeInt(3).Equals(0) {
 		t.Fatal("3")
 	}
+	// Constant.cpp:357–361 + str2int — small-path "0L"/"0UL" must equals(0)
+	// (seed-2 e15477: div/mod re-pick needs rhs->equals(0))
+	zeroL := &Constant{Type: GetIntType(), Value: "0L"}
+	if !zeroL.Equals(0) {
+		t.Fatal("0L must Equals(0) via Str2Int stream extract")
+	}
+	if HasError() {
+		t.Fatal("0L Equals must not sticky")
+	}
+	zeroUL := &Constant{Type: GetSimpleType(EUInt), Value: "0UL"}
+	if !zeroUL.Equals(0) {
+		t.Fatal("0UL must Equals(0)")
+	}
+	negL := &Constant{Type: GetIntType(), Value: "-1L"}
+	if !negL.Equals(-1) || negL.Equals(0) {
+		t.Fatal("-1L fold")
+	}
 	// incomplete Constant sticky false (no invent not-equal / not-less)
 	if (*Constant)(nil).Equals(0) {
 		t.Fatal("nil Constant Equals must fail closed false")

@@ -238,8 +238,12 @@ func (c *Constant) Output() string {
 }
 
 // Equals mirrors Constant::equals(int).
-// Constant.cpp:509–510.
+// Constant.cpp:509–510 — StringUtils::str2int(value) == num.
 // Incomplete Constant shell sticky false (no invent not-equal fold / soft re-pick).
+//
+// Small-path constants use "0L"/"0UL" suffixes (Constant.cpp:357–361). C++ str2int
+// stream-extracts and stops at the suffix; Atoi would miss equals(0) and skip the
+// div/mod binary re-pick (seed-2 e15477 U18 vs U120).
 func (c *Constant) Equals(num int) bool {
 	// Constant always live with Type* + non-empty Value for fold; sticky incomplete
 	// (no invent not-equal / fold success past Type-nil or empty-value shell)
@@ -247,17 +251,7 @@ func (c *Constant) Equals(num int) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	n, err := strconv.Atoi(c.Value)
-	if err != nil {
-		// try 0x hex
-		if len(c.Value) > 2 && (c.Value[0:2] == "0x" || c.Value[0:2] == "0X") {
-			u, e2 := strconv.ParseUint(c.Value[2:], 16, 64)
-			return e2 == nil && int(u) == num
-		}
-		// non-numeric complete value → not equal (not incomplete IR)
-		return false
-	}
-	return n == num
+	return Str2Int(c.Value) == num
 }
 
 // NotEqualsZero mirrors Constant/Expression not_equals(0).
@@ -294,19 +288,7 @@ func (c *Constant) LessThan(num int) bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	n, err := strconv.Atoi(c.Value)
-	if err != nil {
-		if len(c.Value) > 2 && (c.Value[0:2] == "0x" || c.Value[0:2] == "0X") {
-			u, e2 := strconv.ParseUint(c.Value[2:], 16, 64)
-			if e2 != nil {
-				return false
-			}
-			return int(u) < num
-		}
-		// non-numeric complete value → not less (not incomplete IR)
-		return false
-	}
-	return n < num
+	return Str2Int(c.Value) < num
 }
 
 // GetField mirrors Constant::get_field.
