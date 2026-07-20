@@ -266,6 +266,10 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 			invalid[iv] = true
 			continue
 		}
+		// residual ERROR sticky — no invent soft-continue non-vol IV past IsVolatile residual false
+		if HasError() {
+			return nil
+		}
 		// C++ isArray always ArrayVariable*; missing AsArray sticky on loop-ctrl pick
 		// (no invent IV shell past broken array IR)
 		if iv.IsArray && iv.AsArray == nil {

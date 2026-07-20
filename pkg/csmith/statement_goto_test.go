@@ -561,3 +561,31 @@ func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
+	// InitExpr Output residual soft invent was soft-continue invent partial re-inits.
+	ClearError()
+	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	ok.Init = MakeInt(0)
+	ok.InitExpr = nil
+	hole := CreateVariableScalars("l_bad", GetIntType(), false, false)
+	hole.Init = nil
+	hole.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual
+	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok, hole}}
+	if s := OutputSkippedVarInits(st, "    "); s != "" {
+		t.Fatal("InitExpr Output residual must fail closed OutputSkippedVarInits", s)
+	}
+	if !HasError() {
+		t.Fatal("InitExpr Output residual OutputSkippedVarInits must SetError sticky")
+	}
+	ClearError()
+	// complete single re-init
+	st2 := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok}}
+	if s := OutputSkippedVarInits(st2, "    "); !strings.Contains(s, "l_ok = 0") {
+		t.Fatal("complete OutputSkippedVarInits", s)
+	}
+	if HasError() {
+		t.Fatal("complete OutputSkippedVarInits must not sticky")
+	}
+	ClearError()
+}

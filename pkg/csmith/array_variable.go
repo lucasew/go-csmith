@@ -909,6 +909,10 @@ func (av *ArrayVariable) OutputLowerBound() string {
 	}
 	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live sticky
 	name := av.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty lower past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -929,6 +933,10 @@ func (av *ArrayVariable) OutputWithIndices(ctrl []string) string {
 		return ""
 	}
 	name := av.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		SetError(ErrGeneric)
 		return ""
@@ -1144,6 +1152,10 @@ func (av *ArrayVariable) OutputAccess() string {
 		return ""
 	}
 	name := av.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		// name always live; sticky no invent bare indices without identifier
 		SetError(ErrGeneric)
@@ -1207,6 +1219,10 @@ func (av *ArrayVariable) OutputUpperBoundArray() string {
 		return ""
 	}
 	name := av.GetActualName(false)
+	// residual ERROR sticky — no invent soft-empty upper past GetActualName residual
+	if HasError() {
+		return ""
+	}
 	if name == "" {
 		// name always live; sticky no invent bare "[n]" bounds
 		SetError(ErrGeneric)

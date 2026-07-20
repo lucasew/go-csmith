@@ -193,14 +193,20 @@ func OutputSkippedVarInits(st *Stmt, indent string) string {
 		// pre-validated VariablesComplete
 		// StatementGoto.cpp:271 — assert(v->init); sticky no invent "name = ;" for missing init
 		init := variableInitOutput(v)
+		// residual ERROR sticky — no invent soft-continue later re-inits past init residual
+		if HasError() {
+			return ""
+		}
 		if init == "" {
-			if !HasError() {
-				SetError(ErrGeneric)
-			}
+			SetError(ErrGeneric)
 			return ""
 		}
 		// get_actual_name always live; sticky no invent " = init;" without identifier
 		name := v.GetActualName(false)
+		// residual ERROR sticky — no invent soft-continue later re-inits past GetActualName residual
+		if HasError() {
+			return ""
+		}
 		if name == "" {
 			SetError(ErrGeneric)
 			return ""

@@ -855,7 +855,15 @@ func (t *Type) NeedsCast(other *Type) bool {
 		return false
 	}
 	if t.PtrType() == nil {
+		// residual ERROR sticky — no invent no-cast soft-skip past PtrType residual hole
+		if HasError() {
+			return true
+		}
 		return false
+	}
+	// residual ERROR sticky — no invent soft-continue cast past PtrType residual true path
+	if HasError() {
+		return true
 	}
 	tb, ob := t.BaseType(), other.BaseType()
 	// residual ERROR sticky — no invent soft-continue no-cast past BaseType residual

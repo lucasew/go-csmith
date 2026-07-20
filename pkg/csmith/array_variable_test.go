@@ -1065,3 +1065,34 @@ func TestSetIndexNoInventNilPad(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
+	// GetActualName residual soft invent was invent "[i]" access past empty name shell.
+	ClearError()
+	av := &ArrayVariable{
+		Variable: Variable{Type: GetIntType(), IsArray: true, ArraySizes: []int{2}},
+		Sizes:    []int{2},
+	}
+	av.AsArray = av
+	if s := av.OutputWithIndices([]string{"i"}); s != "" {
+		t.Fatal("empty name residual must fail closed OutputWithIndices", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name residual OutputWithIndices must SetError sticky")
+	}
+	ClearError()
+	if s := av.OutputLowerBound(); s != "" {
+		t.Fatal("empty name residual must fail closed OutputLowerBound", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name residual OutputLowerBound must SetError sticky")
+	}
+	ClearError()
+	if s := av.OutputUpperBoundArray(); s != "" {
+		t.Fatal("empty name residual must fail closed OutputUpperBoundArray", s)
+	}
+	if !HasError() {
+		t.Fatal("empty name residual OutputUpperBoundArray must SetError sticky")
+	}
+	ClearError()
+}

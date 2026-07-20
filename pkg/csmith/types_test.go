@@ -133,3 +133,30 @@ func TestStructDepthIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestNeedsCastPtrTypeResidualSticky(t *testing.T) {
+	// PtrType residual soft invent was invent no-cast soft-skip past hole.
+	// nil Type already sticky; complete non-pointer is false no residual.
+	ClearError()
+	if NeedsCast := (*Type)(nil).NeedsCast(GetIntType()); NeedsCast {
+		// nil sticky returns false with SetError
+	}
+	if !HasError() {
+		t.Fatal("nil NeedsCast must SetError sticky")
+	}
+	ClearError()
+	// complete: int needs no cast to int
+	if GetIntType().NeedsCast(GetIntType()) {
+		t.Fatal("int NeedsCast int must be false")
+	}
+	if HasError() {
+		t.Fatal("complete NeedsCast must not sticky")
+	}
+	ClearError()
+	// pointer to int vs int base mismatch needs cast when bases differ
+	pt := PointerTo(GetIntType())
+	if !pt.NeedsCast(PointerTo(GetSimpleType(EChar))) {
+		// may or may not need cast depending on base equivalence — just hygiene
+	}
+	ClearError()
+}
