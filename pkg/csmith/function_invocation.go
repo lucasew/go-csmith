@@ -1514,8 +1514,20 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 	}
 	// FunctionInvocationBinary.cpp:64–66 — flags_to_type must yield simple type sticky
 	ty1 := flags.LHSType()
-	if ty1 == nil || !ty1.IsSimple() {
+	if ty1 == nil {
 		SetError(ErrGeneric)
+		return "", ""
+	}
+	if !ty1.IsSimple() {
+		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
+		if HasError() {
+			return "", ""
+		}
+		SetError(ErrGeneric)
+		return "", ""
+	}
+	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
+	if HasError() {
 		return "", ""
 	}
 	st := ty1.Simple()
@@ -1524,13 +1536,27 @@ func createBinarySafeTmps(cg CGContext, vs *VariableSelector, flags *SafeOpFlags
 		sym = &vs.Sym
 	}
 	tmp1 = blk.CreateNewTmpVar(sym, st)
+	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
+	if HasError() {
+		return "", ""
+	}
 	st2 := st
 	// FunctionInvocationBinary.cpp:64–78 — flags_to_type(op2) always live for shifts;
 	// sticky no invent type1 stand-in for type2 past missing/non-simple RHS type shell
 	if op == BinLShift || op == BinRShift {
 		ty := flags.RHSType()
-		if ty == nil || !ty.IsSimple() {
+		if ty == nil {
 			SetError(ErrGeneric)
+			return "", ""
+		}
+		if !ty.IsSimple() {
+			if HasError() {
+				return "", ""
+			}
+			SetError(ErrGeneric)
+			return "", ""
+		}
+		if HasError() {
 			return "", ""
 		}
 		st2 = ty.Simple()
@@ -1563,15 +1589,32 @@ func createUnarySafeTmp(cg CGContext, vs *VariableSelector, flags *SafeOpFlags) 
 	}
 	// flags_to_type must yield simple type sticky
 	ty := flags.LHSType()
-	if ty == nil || !ty.IsSimple() {
+	if ty == nil {
 		SetError(ErrGeneric)
+		return ""
+	}
+	if !ty.IsSimple() {
+		// residual ERROR sticky — no invent soft-tmp past IsSimple residual
+		if HasError() {
+			return ""
+		}
+		SetError(ErrGeneric)
+		return ""
+	}
+	// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
+	if HasError() {
 		return ""
 	}
 	var sym *GenSym
 	if vs != nil {
 		sym = &vs.Sym
 	}
-	return blk.CreateNewTmpVar(sym, ty.Simple())
+	tmp := blk.CreateNewTmpVar(sym, ty.Simple())
+	// residual ERROR sticky — no invent soft-tmp past CreateNewTmpVar residual
+	if HasError() {
+		return ""
+	}
+	return tmp
 }
 
 // MakeRandomInvocation mirrors FunctionInvocation::make_random.
@@ -1610,8 +1653,19 @@ func MakeRandomInvocation(
 	// Match type for choose_func: nil means any return type (C++ type=0).
 	matchType := typ
 	// FunctionInvocation.cpp:71–73 path — non-simple/void force user path (type known)
-	if typ != nil && (typ.PtrType() != nil || (typ.IsSimple() && typ.Simple() == EVoid)) {
-		stdFunc = false
+	if typ != nil {
+		if typ.PtrType() != nil {
+			stdFunc = false
+		} else {
+			simple := typ.IsSimple()
+			// residual ERROR sticky — no invent soft-std path past IsSimple residual
+			if HasError() {
+				return &Invocation{Failed: true}
+			}
+			if simple && typ.Simple() == EVoid {
+				stdFunc = false
+			}
+		}
 	}
 
 	var fi *Invocation

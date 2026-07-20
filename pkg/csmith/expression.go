@@ -328,7 +328,17 @@ func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
 		SetError(ErrGeneric)
 		return 0, false
 	}
-	return e.Var.Type.IndirectLevel() - want.IndirectLevel(), true
+	lv := e.Var.Type.IndirectLevel()
+	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
+	if HasError() {
+		return 0, false
+	}
+	lw := want.IndirectLevel()
+	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
+	if HasError() {
+		return 0, false
+	}
+	return lv - lw, true
 }
 
 // GetType mirrors Expression::get_type.
@@ -1388,7 +1398,33 @@ func makeExpressionVariableFlags(
 		}
 		// ExpressionVariable.cpp:111–115 — as_return + no_return_dead_ptr
 		if asReturn && vs.Opts.NoReturnDeadPointer {
-			indirection := v.Type.IndirectLevel() - typ.IndirectLevel()
+			if v.Type == nil || typ == nil {
+				SetError(ErrGeneric)
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
+			lv := v.Type.IndirectLevel()
+			// residual ERROR sticky — no invent soft-filter past subject IndirectLevel residual
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
+			lw := typ.IndirectLevel()
+			// residual ERROR sticky — no invent soft-filter past desired IndirectLevel residual
+			if HasError() {
+				if cg.EffectAccum != nil {
+					*cg.EffectAccum = preAccum
+				}
+				cg.EffectStm = preStm
+				return nil
+			}
+			indirection := lv - lw
 			var facts []*FactPointTo
 			if cg.FM != nil {
 				// incomplete GlobalFacts fail closed sticky (no invent soft-skip local-ptr filter)

@@ -459,3 +459,24 @@ func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
+	// IsUnion residual soft invent was invent soft-nil FactUnion past non-union Type.
+	ClearError()
+	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	if MakeFactUnion(v, 0) != nil {
+		t.Fatal("non-union MakeFactUnion must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("non-union MakeFactUnion must SetError sticky")
+	}
+	ClearError()
+	// Type-nil sticky
+	if MakeFactUnion(&Variable{Name: "g_y", Type: nil}, 0) != nil {
+		t.Fatal("Type-nil MakeFactUnion must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("Type-nil MakeFactUnion must SetError sticky")
+	}
+	ClearError()
+}

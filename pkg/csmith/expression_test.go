@@ -1447,3 +1447,17 @@ func TestPickTermTypeIsConstStructUnionResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestExpressionIndirectLevelCompleteResidualSticky(t *testing.T) {
+	// IndirectLevel residual soft invent was invent level-0 complete past Type-nil shell.
+	ClearError()
+	e := &Expression{Term: TermVariable, Var: &Variable{Name: "g_x", Type: nil}, ExprType: GetIntType()}
+	n, ok := e.IndirectLevelComplete()
+	if ok || n != 0 {
+		t.Fatal("Type-nil Var IndirectLevelComplete must fail closed 0,false", n, ok)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Var IndirectLevelComplete must SetError sticky")
+	}
+	ClearError()
+}

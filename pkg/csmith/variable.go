@@ -1248,7 +1248,12 @@ func (v *Variable) IsConst() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Qfer.IsConst()
+	ok := v.Qfer.IsConst()
+	// residual ERROR sticky — no invent soft non-const past Qfer IsConst residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsVolatile mirrors Variable::is_volatile.
@@ -1259,7 +1264,12 @@ func (v *Variable) IsVolatile() bool {
 		SetError(ErrGeneric)
 		return false
 	}
-	return v.Qfer.IsVolatile()
+	ok := v.Qfer.IsVolatile()
+	// residual ERROR sticky — no invent soft non-vol past Qfer IsVolatile residual
+	if HasError() {
+		return false
+	}
+	return ok
 }
 
 // IsFieldVar mirrors Variable::is_field_var.
@@ -2086,7 +2096,13 @@ func (v *Variable) CreateFieldVars() {
 		// CVQualifiers length = IndirectLevel+1 (pointer levels + storage).
 		// Empty field qfer → all-false at each level (no invent 1-bool then SanityCheck fail
 		// → IncompleteVariables soft shell without sticky ERROR_GUARD).
-		need := f.Type.IndirectLevel() + 1
+		il := f.Type.IndirectLevel()
+		// residual ERROR sticky — no invent soft-create field past IndirectLevel residual
+		if HasError() {
+			fail()
+			return
+		}
+		need := il + 1
 		if need < 1 {
 			need = 1
 		}

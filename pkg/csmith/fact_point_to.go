@@ -652,6 +652,10 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				return IncompleteFactSlice()
 			}
 		} else if fn.RV.Type.IsAggregate() {
+			// residual ERROR sticky — no invent soft-transfer past IsAggregate residual true
+			if HasError() {
+				return IncompleteFactSlice()
+			}
 			ptrs := fn.RV.FindPointerFields()
 			if !VariablesComplete(ptrs) {
 				// FieldVars hole sticky
@@ -683,6 +687,9 @@ func RhsToLhsTransfer(facts []*FactPointTo, lvars []*Variable, rhs *Expression) 
 				ret = append(ret, fp)
 			}
 			return ret
+		} else if HasError() {
+			// residual ERROR sticky — no invent soft-scalar rv transfer past IsAggregate residual false
+			return IncompleteFactSlice()
 		}
 		// FactPointTo.cpp:250–252 — missing rv_fact during generation is non-sticky
 		// hole (soft re-pick AddParamFacts / call factories; no invent GarbagePtr)
@@ -1822,13 +1829,19 @@ func IsPointingToLocals(v *Variable, b *Block, indirection int, facts []*FactPoi
 			if HasError() {
 				return true
 			}
-			for j := 0; j < p.Type.IndirectLevel(); j++ {
+			il := p.Type.IndirectLevel()
+			// residual ERROR sticky — no invent soft-recurse past IndirectLevel residual
+			if HasError() {
+				return true
+			}
+			for j := 0; j < il; j++ {
 				nested := MergePointeesOfPointer(p, j+1, facts)
-				if !VariablesComplete(nested) {
-					// incomplete MergePointees non-sticky
+				// residual ERROR sticky — no invent soft-recurse past MergePointees residual
+				if HasError() {
 					return true
 				}
-				if HasError() {
+				if !VariablesComplete(nested) {
+					// incomplete MergePointees non-sticky
 					return true
 				}
 				for _, n := range nested {

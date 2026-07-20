@@ -685,3 +685,26 @@ func TestCompatibleVarResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
+	// IndirectLevel residual soft invent was invent level-0 complete past Type-nil shell.
+	ClearError()
+	l := &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: GetIntType()}
+	n, ok := l.IndirectLevelComplete()
+	if ok || n != 0 {
+		t.Fatal("Type-nil Lhs IndirectLevelComplete must fail closed 0,false", n, ok)
+	}
+	if !HasError() {
+		t.Fatal("Type-nil Lhs IndirectLevelComplete must SetError sticky")
+	}
+	ClearError()
+	// nil Lhs
+	n2, ok2 := (*Lhs)(nil).IndirectLevelComplete()
+	if ok2 || n2 != 0 {
+		t.Fatal("nil Lhs must fail closed")
+	}
+	if !HasError() {
+		t.Fatal("nil Lhs IndirectLevelComplete must SetError sticky")
+	}
+	ClearError()
+}

@@ -43,7 +43,17 @@ func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
 		SetError(ErrGeneric)
 		return 0, false
 	}
-	return l.Var.Type.IndirectLevel() - want.IndirectLevel(), true
+	lv := l.Var.Type.IndirectLevel()
+	// residual ERROR sticky — no invent level-0 past subject IndirectLevel residual
+	if HasError() {
+		return 0, false
+	}
+	lw := want.IndirectLevel()
+	// residual ERROR sticky — no invent level-0 past desired IndirectLevel residual
+	if HasError() {
+		return 0, false
+	}
+	return lv - lw, true
 }
 
 // GetVar mirrors Lhs::get_var.
@@ -931,7 +941,16 @@ func selectDerefPointerInv(
 	}
 
 	// VariableSelector.cpp:1268–1272 — create ptr if under max_indirect_level
-	if typ.IndirectLevel() >= opts.MaxPointerDepth {
+	if typ == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	il := typ.IndirectLevel()
+	// residual ERROR sticky — no invent soft-create ptr past IndirectLevel residual
+	if HasError() {
+		return nil
+	}
+	if il >= opts.MaxPointerDepth {
 		return nil
 	}
 	var ptrType *Type

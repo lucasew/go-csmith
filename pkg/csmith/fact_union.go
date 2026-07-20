@@ -26,9 +26,23 @@ type FactUnion struct {
 func MakeFactUnion(v *Variable, fid int) *FactUnion {
 	// FactUnion.cpp:163 — assert(v == nullptr || v->type->eType == eUnion) sticky
 	// no soft invent FactUnion on scalar/struct vars
-	if v != nil && (v.Type == nil || !v.Type.IsUnion()) {
-		SetError(ErrGeneric)
-		return nil
+	if v != nil {
+		if v.Type == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		if !v.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-nil FactUnion past IsUnion residual
+			if HasError() {
+				return nil
+			}
+			SetError(ErrGeneric)
+			return nil
+		}
+		// residual ERROR sticky — no invent soft-FactUnion past IsUnion residual true
+		if HasError() {
+			return nil
+		}
 	}
 	return &FactUnion{Var: v, LastWrittenFID: fid}
 }
@@ -231,8 +245,20 @@ func (f *FactUnion) GetLastWrittenType() *Type {
 		return nil
 	}
 	// FactUnion.cpp:65 — assert(var->type && eUnion) sticky; fail closed nil if not union
-	if f.Var.Type == nil || !f.Var.Type.IsUnion() {
+	if f.Var.Type == nil {
 		SetError(ErrGeneric)
+		return nil
+	}
+	if !f.Var.Type.IsUnion() {
+		// residual ERROR sticky — no invent soft-nil type past IsUnion residual
+		if HasError() {
+			return nil
+		}
+		SetError(ErrGeneric)
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-type past IsUnion residual true
+	if HasError() {
 		return nil
 	}
 	fid := f.LastWrittenFID
@@ -529,9 +555,21 @@ func RhsToLhsTransferUnion(
 	}
 	// FactUnion.cpp:80–81 — assert all possible LHS are unions
 	for _, v := range lvars {
-		if v == nil || v.Type == nil || !v.Type.IsUnion() {
+		if v == nil || v.Type == nil {
 			// hard IR sticky — no soft invent transfer onto non-union
 			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if !v.Type.IsUnion() {
+			// residual ERROR sticky — no invent soft-transfer past IsUnion residual
+			if HasError() {
+				return IncompleteUnionFactSlice()
+			}
+			SetError(ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		// residual ERROR sticky — no invent soft-continue later lvars past IsUnion residual true
+		if HasError() {
 			return IncompleteUnionFactSlice()
 		}
 	}

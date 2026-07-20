@@ -33,3 +33,26 @@ func TestSiblingUnionFieldGetCollectiveResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestWriteVarSetResidualSticky(t *testing.T) {
+	// WriteVar residual soft invent was invent soft-continue later writes past nil hole mid set.
+	ClearError()
+	// incomplete vars list sticky IncompleteEffect
+	out := EmptyEffect().WriteVarSet([]*Variable{nil})
+	if EffectComplete(out) {
+		t.Fatal("nil var WriteVarSet must fail closed IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("nil var WriteVarSet must SetError sticky")
+	}
+	ClearError()
+	// incomplete base
+	out2 := IncompleteEffect().WriteVarSet([]*Variable{CreateVariableScalars("g_x", GetIntType(), false, false)})
+	if EffectComplete(out2) {
+		t.Fatal("incomplete base WriteVarSet must IncompleteEffect")
+	}
+	if !HasError() {
+		t.Fatal("incomplete base WriteVarSet must SetError sticky")
+	}
+	ClearError()
+}

@@ -317,6 +317,14 @@ func (e Effect) WriteVarSet(vars []*Variable) Effect {
 	out := e
 	for _, v := range vars {
 		out = out.WriteVar(v)
+		// residual ERROR sticky — no invent soft-continue later writes past WriteVar residual
+		if HasError() {
+			return IncompleteEffect()
+		}
+		if !EffectComplete(out) {
+			SetError(ErrGeneric)
+			return IncompleteEffect()
+		}
 	}
 	return out
 }

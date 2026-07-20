@@ -1032,7 +1032,21 @@ func (vs *VariableSelector) MakeInitValue(
 		RecordAddressTaken(chosen)
 	} else if chosen.Type != nil {
 		// VariableSelector.cpp:905–909
-		derefLevel := chosen.Type.IndirectLevel() - t.IndirectLevel()
+		if t == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		lv := chosen.Type.IndirectLevel()
+		// residual ERROR sticky — no invent soft-address-taken past subject IndirectLevel residual
+		if HasError() {
+			return nil
+		}
+		lw := t.IndirectLevel()
+		// residual ERROR sticky — no invent soft-address-taken past desired IndirectLevel residual
+		if HasError() {
+			return nil
+		}
+		derefLevel := lv - lw
 		if derefLevel < 0 {
 			RecordAddressTaken(chosen)
 		}
@@ -1225,16 +1239,42 @@ func HasEligibleVolatileVarQfer(vars []*Variable, typ *Type, qfer *CVQualifiers,
 		}
 		deref := 0
 		if typ != nil {
-			deref = v.Type.IndirectLevel() - typ.IndirectLevel()
+			if v.Type == nil {
+				SetError(ErrGeneric)
+				return false
+			}
+			lv := v.Type.IndirectLevel()
+			// residual ERROR sticky — no invent soft-vol-avail past subject IndirectLevel residual
+			if HasError() {
+				return false
+			}
+			lw := typ.IndirectLevel()
+			// residual ERROR sticky — no invent soft-vol-avail past desired IndirectLevel residual
+			if HasError() {
+				return false
+			}
+			deref = lv - lw
 		}
-		if IsEligibleVar(v, deref, access, cg) && v.IsVolatile() {
+		if !IsEligibleVar(v, deref, access, cg) {
+			// hard IR residual from IsEligible sticky — no invent soft-continue then true later
+			if HasError() {
+				return false
+			}
+			continue
+		}
+		// residual ERROR sticky — no invent soft-vol-avail past IsEligible residual true
+		if HasError() {
+			return false
+		}
+		vol := v.IsVolatile()
+		// residual ERROR sticky — no invent soft-vol-avail past IsVolatile residual
+		if HasError() {
+			return false
+		}
+		if vol {
 			// VariableSelector.cpp:311 — Bookkeeper::volatile_avail++
 			RecordVolatileAvail()
 			return true
-		}
-		// hard IR residual from IsEligible sticky — no invent soft-continue then true later
-		if HasError() {
-			return false
 		}
 	}
 	return false
@@ -1607,7 +1647,21 @@ func ChooseVarFull(
 		if IsVariableInSet(invalidVars, x) {
 			continue
 		}
-		deref := x.Type.IndirectLevel() - want.IndirectLevel()
+		if x.Type == nil || want == nil {
+			SetError(ErrGeneric)
+			return nil
+		}
+		lv := x.Type.IndirectLevel()
+		// residual ERROR sticky — no invent soft-pick past subject IndirectLevel residual
+		if HasError() {
+			return nil
+		}
+		lw := want.IndirectLevel()
+		// residual ERROR sticky — no invent soft-pick past desired IndirectLevel residual
+		if HasError() {
+			return nil
+		}
+		deref := lv - lw
 		if !IsEligibleVar(x, deref, access, cg) {
 			// hard IR residual sticky (no invent soft-skip not-eligible then pick later)
 			if HasError() {
@@ -2586,8 +2640,24 @@ func (vs *VariableSelector) GenerateNewParentLocal(
 		return nil
 	}
 	// VariableSelector.cpp:921 assert(t); 920–923 — volatile struct/union field(s) → global
-	if t.IsAggregate() && t.IsVolatileStructUnion() {
-		return vs.GenerateNewGlobal(access, cg, t, qfer, r)
+	if t == nil {
+		SetError(ErrGeneric)
+		return nil
+	}
+	isAgg := t.IsAggregate()
+	// residual ERROR sticky — no invent soft-local past IsAggregate residual
+	if HasError() {
+		return nil
+	}
+	if isAgg {
+		volSU := t.IsVolatileStructUnion()
+		// residual ERROR sticky — no invent soft-global past IsVolatileStructUnion residual
+		if HasError() {
+			return nil
+		}
+		if volSU {
+			return vs.GenerateNewGlobal(access, cg, t, qfer, r)
+		}
 	}
 	// VariableSelector.cpp:924–928 — enlarge for goto visibility
 	block = ExpandBlockForGoto(block, cg)

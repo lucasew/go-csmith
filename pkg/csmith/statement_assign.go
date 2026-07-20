@@ -556,13 +556,29 @@ func makePossibleCompoundAssign(
 				return Stmt{}
 			}
 			st1 := EInt
-			if t := flags.LHSType(); t != nil && t.IsSimple() {
-				st1 = t.Simple()
+			if t := flags.LHSType(); t != nil {
+				if t.IsSimple() {
+					// residual ERROR sticky — no invent soft-tmp past IsSimple residual true
+					if HasError() {
+						return Stmt{}
+					}
+					st1 = t.Simple()
+				} else if HasError() {
+					// residual ERROR sticky — no invent soft-tmp past IsSimple residual false
+					return Stmt{}
+				}
 			}
 			st2 := st1
 			if bop == BinLShift || bop == BinRShift {
-				if t := flags.RHSType(); t != nil && t.IsSimple() {
-					st2 = t.Simple()
+				if t := flags.RHSType(); t != nil {
+					if t.IsSimple() {
+						if HasError() {
+							return Stmt{}
+						}
+						st2 = t.Simple()
+					} else if HasError() {
+						return Stmt{}
+					}
 				}
 			}
 			st.Tmp1 = blk.CreateNewTmpVar(sym, st1)
