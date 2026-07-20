@@ -311,6 +311,10 @@ func VisitFactsStatementIf(st *Stmt, cg *CGContext, opts Options) bool {
 			return false
 		}
 		elseFacts = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-else facts past CloneFactSlice residual
+		if HasError() {
+			return false
+		}
 	}
 
 	// StatementIf.cpp:178–180 — set_accumulated_effect_after_block(eff, &if_true/false)

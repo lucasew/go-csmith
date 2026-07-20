@@ -1299,3 +1299,26 @@ func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestContainsBackEdgeNilResidualSticky(t *testing.T) {
+	// ContainsBackEdge residual soft invent was invent no-back soft-skip past nil Block.
+	ClearError()
+	if (*Block)(nil).ContainsBackEdge(NewFactMgr(nil)) {
+		t.Fatal("nil Block ContainsBackEdge must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Block ContainsBackEdge must SetError sticky")
+	}
+	ClearError()
+}
+
+func TestFromTailToHeadNilResidualSticky(t *testing.T) {
+	ClearError()
+	if (*Block)(nil).FromTailToHead() {
+		t.Fatal("nil Block FromTailToHead must fail closed false")
+	}
+	if !HasError() {
+		t.Fatal("nil Block FromTailToHead must SetError sticky")
+	}
+	ClearError()
+}

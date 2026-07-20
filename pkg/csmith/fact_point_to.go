@@ -1752,6 +1752,10 @@ func MergePointeesOfPointers(ptrs []*Variable, facts []*FactPointTo) []*Variable
 			continue
 		}
 		ft := FindRelatedPointTo(facts, p)
+		// residual ERROR sticky — no invent soft-merge pointees past FindRelated residual
+		if HasError() {
+			return IncompleteVariables()
+		}
 		// FactPointTo.cpp:694 assert(exist_fact) — non-sticky IncompleteVariables
 		// (generation soft re-pick before fact is installed; no invent empty skip)
 		if ft == nil {

@@ -668,3 +668,25 @@ func TestAbstractFactUnionForAssignGetCollectiveResidualSticky(t *testing.T) {
 	}
 	ClearError()
 }
+
+func TestMergePointeesFindRelatedResidualSticky(t *testing.T) {
+	// FindRelated residual soft invent was invent soft-empty merge past nil ptr subject.
+	ClearError()
+	// VariablesComplete(ptrs) fails sticky on nil ptr (hard IR)
+	out := MergePointeesOfPointers([]*Variable{nil}, nil)
+	if VariablesComplete(out) {
+		t.Fatal("nil ptr MergePointeesOfPointers must fail closed incomplete")
+	}
+	if !HasError() {
+		t.Fatal("nil ptr MergePointeesOfPointers must SetError sticky")
+	}
+	ClearError()
+	// FindRelated residual via nil subject
+	if FindRelatedPointTo(nil, nil) != nil {
+		t.Fatal("nil subject FindRelatedPointTo must fail closed nil")
+	}
+	if !HasError() {
+		t.Fatal("nil subject FindRelatedPointTo must SetError sticky")
+	}
+	ClearError()
+}

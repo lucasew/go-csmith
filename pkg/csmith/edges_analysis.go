@@ -368,7 +368,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preEffect Effect, c
 	specialHandled := false
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
 	if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" && !cg.InLoop() {
-		if HasUncertainCallRecursiveStmt(st) {
+		unc := HasUncertainCallRecursiveStmt(st)
+		// residual ERROR sticky — no invent soft-validate past HasUncertain residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			return
+		}
+		if unc {
 			// preFacts complete above; still re-check after makeup
 			if !FactsComplete(preFacts) {
 				fm.GlobalFacts = IncompleteFactSlice()

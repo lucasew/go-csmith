@@ -408,7 +408,15 @@ func MakeRandomAssignQfer(
 
 	// StatementAssign.cpp:218–223 — CompatibleChecker → nullptr
 	if CompatibleCheckExprs(opts, rhs, LhsAsExpression(lhs)) {
+		// residual ERROR sticky — no invent soft-assign past CompatibleCheck residual true
+		if HasError() {
+			return Stmt{}
+		}
 		SetError(ErrCompatibleCheck)
+		return Stmt{}
+	}
+	// residual ERROR sticky — no invent soft-assign past CompatibleCheck residual false
+	if HasError() {
 		return Stmt{}
 	}
 
@@ -952,6 +960,10 @@ func VisitFactsInvocation(fi *Invocation, cg *CGContext, opts Options) bool {
 				return false
 			}
 			facts = CloneFactSlice(cg.FM.GlobalFacts)
+			// residual ERROR sticky — no invent soft-visit past CloneFactSlice residual
+			if HasError() {
+				return false
+			}
 		}
 		if !fi.VisitUnorderedParams(&facts, cg, opts) {
 			return false

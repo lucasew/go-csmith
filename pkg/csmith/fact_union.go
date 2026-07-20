@@ -662,7 +662,12 @@ func RhsToLhsTransferUnion(
 			return IncompleteUnionFactSlice()
 		}
 		rv := rhs.Invoke.User.RV
-		if uf := FindRelatedUnion(unionFacts, rv); uf != nil {
+		uf := FindRelatedUnion(unionFacts, rv)
+		// residual ERROR sticky — no invent soft-union transfer past FindRelatedUnion residual
+		if HasError() {
+			return IncompleteUnionFactSlice()
+		}
+		if uf != nil {
 			return MakeFactUnions(lvars, uf.LastWrittenFID)
 		}
 		// FactUnion.cpp:107 assert(rv_fact) path — non-sticky generation hole

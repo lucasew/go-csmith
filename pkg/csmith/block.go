@@ -657,17 +657,49 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 
 		// Block.cpp:696–732 — fixed-point when loop body / revisit / back edges
 		mustBR := b.MustBreakOrReturnFull(fm)
+		// residual ERROR sticky — no invent soft-fixed-point past MustBreakOrReturn residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
 		isLoopBody := !mustBR && b.Looping
 		// FindEdgesInToBlock nil = incomplete CFG; fail closed as hasBack (no invent none)
 		toBlk := fm.FindEdgesInToBlock(b, false, true)
+		// residual ERROR sticky — no invent soft-fixed-point past FindEdges residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
+		hasBackEdge := b.ContainsBackEdge(fm)
+		// residual ERROR sticky — no invent soft-fixed-point past ContainsBackEdge residual
+		if HasError() {
+			fm.GlobalFacts = IncompleteFactSlice()
+			postFacts = IncompleteFactSlice()
+			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+			return
+		}
 		hasBack := fm.HasEdgeIn(b.StmID, false, true) ||
 			toBlk == nil || len(toBlk) > 0 ||
-			b.ContainsBackEdge(fm)
+			hasBackEdge
 		if isLoopBody || b.NeedRevisit || hasBack {
 			selfBack := false
-			if isLoopBody && b.FromTailToHead() {
-				selfBack = true
-				fm.CreateCFGEdge(b.StmID, b, false, true)
+			if isLoopBody {
+				fromTail := b.FromTailToHead()
+				// residual ERROR sticky — no invent soft-self-back past FromTailToHead residual
+				if HasError() {
+					fm.GlobalFacts = IncompleteFactSlice()
+					postFacts = IncompleteFactSlice()
+					fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
+					return
+				}
+				if fromTail {
+					selfBack = true
+					fm.CreateCFGEdge(b.StmID, b, false, true)
+				}
 			}
 			// incomplete MapFactsIn fails closed — C++ map[] missing is empty complete;
 			// holes must not invent empty fixed-point re-analysis as success
@@ -897,6 +929,10 @@ func makeRandomStmt(
 				return Stmt{}
 			}
 			preFacts = CloneFactSlice(cg.FM.GlobalFacts)
+			// residual ERROR sticky — no invent soft-stmt past CloneFactSlice residual
+			if HasError() {
+				return Stmt{}
+			}
 		}
 		preEffect := EmptyEffect()
 		if cg.EffectAccum != nil {
@@ -905,6 +941,10 @@ func makeRandomStmt(
 				return Stmt{}
 			}
 			preEffect = cg.EffectAccum.Clone()
+			// residual ERROR sticky — no invent soft-stmt past Effect Clone residual
+			if HasError() {
+				return Stmt{}
+			}
 		}
 		if !EffectComplete(preEffect) {
 			SetError(ErrGeneric)

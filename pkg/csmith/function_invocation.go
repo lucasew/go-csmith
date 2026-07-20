@@ -814,8 +814,18 @@ func BuildInvocationAndFunction(
 			return fi
 		}
 		facts = CloneFactSlice(callerFM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-handover past CloneFactSlice residual
+		if HasError() {
+			fi.Failed = true
+			return fi
+		}
 	}
 	calFM.CallerToCalleeHandover(fi.Args, &facts)
+	// residual ERROR sticky — no invent soft-handover past CallerToCallee residual
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
 	calFM.GlobalFacts = facts
 
 	// FunctionInvocationUser.cpp:208–210 — generate_body_with_known_params
@@ -841,12 +851,22 @@ func BuildInvocationAndFunction(
 		return fi
 	}
 	out := calFM.GetMapFactsOut(callee.Body.StmID)
+	// residual ERROR sticky — no invent soft-ret facts past GetMapFactsOut residual
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
 	if !FactsComplete(out) {
 		SetError(ErrGeneric)
 		fi.Failed = true
 		return fi
 	}
 	retFacts = CloneFactSlice(out)
+	// residual ERROR sticky — no invent soft-ret facts past CloneFactSlice residual
+	if HasError() {
+		fi.Failed = true
+		return fi
+	}
 	if !AddBackReturnFacts(callee.Body, calFM, &retFacts) {
 		if !HasError() {
 			SetError(ErrGeneric)
@@ -1073,6 +1093,10 @@ func MakeRandomBinaryInvocation(
 			return nil
 		}
 		factsCopy = CloneFactSlice(cg.FM.GlobalFacts)
+		// residual ERROR sticky — no invent soft-binary past CloneFactSlice residual
+		if HasError() {
+			return nil
+		}
 	}
 
 	var right *Expression
@@ -1162,7 +1186,15 @@ func MakeRandomBinaryInvocation(
 	}
 	// FunctionInvocation.cpp:266–273 — CompatibleChecker hard-fail (nullptr)
 	if CompatibleCheckExprs(opts, left, right) {
+		// residual ERROR sticky — no invent soft-binary past CompatibleCheck residual true
+		if HasError() {
+			return nil
+		}
 		SetError(ErrCompatibleCheck)
+		return nil
+	}
+	// residual ERROR sticky — no invent soft-binary past CompatibleCheck residual false
+	if HasError() {
 		return nil
 	}
 	// FunctionInvocation.cpp:275–279 — ordered ops merge facts (short-circuit RHS may skip)
